@@ -14,14 +14,16 @@ jobs:
           WORKFLOW_RUN_INFO: ${{ toJSON(github.event.workflow_run) }}
         run: echo "$WORKFLOW_RUN_INFO"
       - name: Download Artifacts
-        uses: dawidd6/action-download-artifact@v3.1.4
+        uses: dawidd6/action-download-artifact@v12
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workflow: nodejs.yml
           run_id: ${{ github.event.workflow_run.id }}
-          name: e2e
+          name: ^e2e-
+          name_is_regexp: true
+          path: e2e-artifacts
       - name: Get PR number
-        uses: dawidd6/action-download-artifact@v3.1.4
+        uses: dawidd6/action-download-artifact@v12
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workflow: nodejs.yml
@@ -32,16 +34,24 @@ jobs:
         uses: juliangruber/read-file-action@v1.1.7
         with:
           path: ./pr_num.txt
+      - name: Collect screenshots
+        run: |
+          mkdir -p screenshots
+          while IFS= read -r -d '' file; do
+            rel_path="${file#e2e-artifacts/}"
+            safe_name=$(printf '%s' "$rel_path" | tr '/ ' '--')
+            cp "$file" "screenshots/$safe_name"
+          done < <(find e2e-artifacts -type f -name '*.png' -print0)
       - name: List images
-        run: ls -al
+        run: ls -al screenshots
       - name: Upload images to imgur
         id: upload_screenshots
         uses: devicons/public-upload-to-imgur@v2.2.2
         with:
-          path: ./*.png
+          path: ./screenshots/*.png
           client_id: ${{ secrets.IMGUR_CLIENT_ID }}
       - name: Comment on the PR
-        uses: jungwinter/comment@v1
+        uses: jungwinter/comment@v1.1.0
         env:
           IMG_MARKDOWN: ${{ join(fromJSON(steps.upload_screenshots.outputs.markdown_urls), '') }}
           MESSAGE: |
