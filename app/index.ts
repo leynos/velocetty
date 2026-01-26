@@ -83,9 +83,18 @@ async function installDevExtensions(isDev_: boolean) {
   const extensions = [REACT_DEVELOPER_TOOLS, REDUX_DEVTOOLS];
   const forceDownload = Boolean(process.env.UPGRADE_EXTENSIONS);
 
-  return Promise.all(
+  const results = await Promise.allSettled(
     extensions.map((extension) => installer(extension, {forceDownload, loadExtensionOptions: {allowFileAccess: true}}))
   );
+
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      // DevTools installs can fail on Linux arm64; don't block the app from opening.
+      console.warn('DevTools extension install failed:', result.reason);
+    }
+  }
+
+  return results;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-misused-promises

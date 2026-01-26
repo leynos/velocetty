@@ -8006,8 +8006,7 @@ flowchart TB
 | Playwright | 1.43.1 | E2E testing for Electron applications | `ava-e2e.config.js` |
 | proxyquire | 2.1.3 | Module mocking and dependency injection | Inline configuration |
 | ts-node | 10.9.2 | TypeScript execution for test files | `transpile-only` mode |
-| ESLint | 8.57.0 | Static code analysis and linting | `.eslintrc.json` |
-| Prettier | 3.2.5 | Code formatting enforcement | `.prettierrc` |
+| Biome | 2.3.13 | Static analysis and formatting | `biome.json` |
 | TypeScript | 5.4.5 | Static type checking | `tsconfig.base.json` |
 | CodeQL | v3 | Security vulnerability scanning | `codeql-analysis.yml` |
 | Dependabot | v2 | Dependency update automation | `dependabot.yml` |
@@ -8748,7 +8747,7 @@ The following pattern demonstrates Velocetty's approach to unit testing with moc
 - `.github/workflows/codeql-analysis.yml` - Security scanning workflow
 - `.github/workflows/e2e_comment.yml` - E2E reporting workflow
 - `.github/dependabot.yml` - Dependency update configuration
-- `.eslintrc.json` - ESLint linting configuration
+- `biome.json` - Biome linting and formatting configuration
 - `cli/api.ts` - CLI module under test
 
 #### Folders Explored
@@ -9896,10 +9895,15 @@ flowchart TB
 
 | Script | Command | Purpose |
 |--------|---------|---------|
-| `v8-snapshot` | Generates snapshots for x64 and arm64 | Multi-architecture support |
+| `v8-snapshot` | Generates snapshots for x64 and arm64 on x64 hosts; arm64-only on Linux arm64 | Host-aware support |
 | `v8-snapshot:arch` | Architecture-specific generation | Targeted optimization |
 | `mk-snapshot` | Create V8 snapshot files | Primary generation |
 | `cp-snapshot` | Copy to Electron resources | Deployment step |
+
+On Linux arm64 hosts, snapshot generation is limited to arm64 and uses the
+x64 mksnapshot binaries. Install `qemu-user` (qemu-x86_64) and ensure an
+x86_64 sysroot is available (for example, glibc/libstdc++ for x86_64 or a
+`QEMU_LD_PREFIX` sysroot) so the loader can be found.
 
 **Performance Impact**: V8 snapshots reduce cold start time by pre-compiling JavaScript to bytecode, targeting the < 2 second startup SLA.
 

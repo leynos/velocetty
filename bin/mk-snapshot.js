@@ -27,7 +27,9 @@ async function main() {
   // Verify if we will be able to use this in `mksnapshot`
   vm.runInNewContext(result.snapshotScript, undefined, {filename: snapshotScriptPath, displayErrors: true});
 
-  const outputBlobPath = `${baseDirPath}/cache/${process.env.npm_config_arch}`;
+  const targetArch =
+    process.env.npm_config_arch || (process.arch.startsWith('arm') ? 'arm64' : 'x64');
+  const outputBlobPath = `${baseDirPath}/cache/${targetArch}`;
   await mkdirp(outputBlobPath);
 
   if (process.platform !== 'darwin') {
@@ -43,8 +45,9 @@ async function main() {
 
   console.log(`Generating startup blob in "${outputBlobPath}"`);
   childProcess.execFileSync(
-    path.resolve(__dirname, '..', 'node_modules', '.bin', 'mksnapshot' + (process.platform === 'win32' ? '.cmd' : '')),
-    [snapshotScriptPath, '--output_dir', outputBlobPath]
+    process.execPath,
+    [path.resolve(__dirname, 'mksnapshot-wrapper.js'), snapshotScriptPath, '--output_dir', outputBlobPath],
+    {stdio: 'inherit'}
   );
 }
 

@@ -30,7 +30,7 @@ export function getBase64FileData(filePath: string): Promise<string | null> {
         return resolve(null);
       }
 
-      const base64Data = Buffer.from(data).toString('base64');
+      const base64Data = data.toString('base64');
       return resolve(base64Data);
     });
   });
