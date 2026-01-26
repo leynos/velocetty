@@ -9,36 +9,43 @@ Velocetty is a fork of [Hyper](https://github.com/vercel/hyper) by Vercel, exten
 Velocetty is under active development. The current roadmap focuses on:
 
 ### Core scaffolding
+
 - Repository restructuring into `frontend/`, `backend/`, and `shared/` packages
 - Transport abstraction layer for host migration (Electron to Tauri)
 - Command primitives, registry, and context key engine
 
 ### Rendering overhaul
+
 - Visible-only WebGL rendering with context pooling
 - Context-loss recovery and Canvas fallbacks
 - Performance instrumentation and baselines
 
 ### Configuration system
+
 - JSON5 configuration with schema validation and hot-reload
 - Layered settings (defaults, user config, runtime overrides)
 - Keybindings storage with export/import support
 
 ### Command system and UI
+
 - Command dispatcher with schema validation and cancellation
 - Keybinding engine with chord support and conflict detection
 - Command palette with fuzzy search and category grouping
 
 ### Plugin architecture
+
 - Schema-driven plugin settings panels
 - Tab decoration API with slot-based providers
 - Golden path example plugin
 
 ### Host migration
+
 - Backend abstraction layer shared by Electron and Tauri
 - Rust PTY manager for Tauri builds
 - Cross-platform packaging and update strategy
 
 ### Remote frontend
+
 - Protobuf/WebSocket protocol for remote connections
 - Authentication, capability negotiation, and redaction
 - Browser-based terminal UI
@@ -85,8 +92,8 @@ Binaries will appear in the `./dist` folder.
 
 Velocetty is a fork of [Hyper](https://github.com/vercel/hyper), originally created by [Vercel](https://vercel.com). We are grateful for their work in building a beautiful, extensible terminal experience.
 
-## License
+## Licence
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT Licence - see [LICENSE](LICENSE) for details.
 
 Copyright (c) 2018 Vercel, Inc.

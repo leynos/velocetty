@@ -40,6 +40,9 @@ async function main() {
   const arch = normaliseArch(process.env.npm_config_arch || process.arch);
   const downloadArch =
     arch.startsWith('arm') && platform !== 'darwin' ? `${arch}-x64` : arch;
+  const strictSslEnv = process.env.npm_config_strict_ssl;
+  // npm's strict-ssl defaults to true; only disable verification explicitly.
+  const rejectUnauthorized = strictSslEnv !== 'false';
 
   const targetFolder = path.resolve(__dirname, '..', 'node_modules', 'electron-mksnapshot', 'bin');
   if (!fs.existsSync(path.dirname(targetFolder))) {
@@ -53,7 +56,7 @@ async function main() {
     artifactName: 'mksnapshot',
     platform,
     arch: downloadArch,
-    rejectUnauthorized: process.env.npm_config_strict_ssl === 'true',
+    rejectUnauthorized,
     quiet: ['info', 'verbose', 'silly', 'http'].indexOf(process.env.npm_config_loglevel) === -1
   });
 

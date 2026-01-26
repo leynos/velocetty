@@ -60,6 +60,12 @@ Scope notes:
   - [ ] Success criteria: plugin can be enabled/disabled, settings persist to
     JSON5, and decoration updates are event-driven.
 
+### 1.4. Quality gates and supply-chain hygiene
+
+- [ ] 1.4.1. Lint succeeds with recommended settings enabled.
+- [ ] 1.4.2. `bun audit` reports no critical, high, or medium vulnerabilities.
+- [ ] 1.4.3. Continuous Integration (CI) dependencies are pinned to SHAs.
+
 ## 2. Rendering overhaul
 
 ### 2.1. Visible-only rendering and WebGL context pool

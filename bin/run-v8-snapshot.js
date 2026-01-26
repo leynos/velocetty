@@ -18,9 +18,11 @@ function normaliseArch(arch) {
 
 function resolveTargetArchitectures() {
   const hostArch = normaliseArch(process.arch);
-  const isLinuxArmHost = process.platform === 'linux' && hostArch === 'arm64';
+  const isArm64Host = hostArch === 'arm64';
+  // Non-Linux arm64 hosts often lack a reliable x64 runner for mksnapshot.
+  const canRunX64Snapshots = !isArm64Host || process.platform === 'linux';
 
-  return isLinuxArmHost ? ['arm64'] : ['x64', 'arm64'];
+  return canRunX64Snapshots ? ['x64', 'arm64'] : ['arm64'];
 }
 
 function runSnapshotForArch(arch) {

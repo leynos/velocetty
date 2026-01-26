@@ -40,6 +40,15 @@ function getPathToElectron() {
 }
 
 function ensureElectronDist(pathToElectron) {
+  if (process.env.ELECTRON_OVERRIDE_DIST_PATH) {
+    if (!fs.existsSync(pathToElectron)) {
+      throw new Error(
+        `ELECTRON_OVERRIDE_DIST_PATH is set to "${pathToElectron}" but the path does not exist.`
+      );
+    }
+    return;
+  }
+
   if (fs.existsSync(pathToElectron)) {
     return;
   }

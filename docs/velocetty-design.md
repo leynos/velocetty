@@ -1,12 +1,6 @@
-\# Technical design: command system, configuration, settings, vertical tabs, and
+# Technical design: command system, configuration, settings, vertical tabs, and remote architecture
 
-
-
-remote architecture
-
-
-
-\## Summary
+## Summary
 
 
 
@@ -14,35 +8,35 @@ This document proposes a set of architectural and implementation changes to
 
 Velocetty to deliver the capabilities defined in the product requirements
 
-document (PRD)\[^prd], while grounding the plan in the current Hyper-derived
+document (PRD)[^prd], while grounding the plan in the current Hyper-derived
 
 codebase structure and behaviour described in the technical specification
 
-(TS)\[^techspec]. It focuses on:
+(TS)[^techspec]. It focuses on:
 
 
 
-\* A unified command system (“everything is a command”), including a command
+* A unified command system (“everything is a command”), including a command
 
 &nbsp; palette, context-aware keybindings, and a keybinding editor UI.
 
-\* A JSON5-based configuration system spanning app configuration, keybindings,
+* A JSON5-based configuration system spanning app configuration, keybindings,
 
 &nbsp; and plugin-contributed settings.
 
-\* A settings tab with schema-driven plugin settings panels and an explicit
+* A settings tab with schema-driven plugin settings panels and an explicit
 
 &nbsp; trust model for any custom UI contributions.
 
-\* Vertical tabs plus a slot-based tab decoration API for plugins (providers,
+* Vertical tabs plus a slot-based tab decoration API for plugins (providers,
 
 &nbsp; not overrides).
 
-\* Rendering changes to ensure WebGL is used only for visible panes, respecting
+* Rendering changes to ensure WebGL is used only for visible panes, respecting
 
 &nbsp; WebGL context limits.
 
-\* A host migration path from the current Electron split-brain architecture to a
+* A host migration path from the current Electron split-brain architecture to a
 
 &nbsp; Tauri host, with a longer-term target of a remote-capable backend protocol
 
@@ -58,7 +52,7 @@ strategy for existing users where it is low-cost and reduces churn.
 
 
 
-\## Context
+## Context
 
 
 
@@ -70,7 +64,7 @@ plugins, and the renderer process (Chromium) runs the React + Redux UI and
 
 xterm.js terminal instances, bridged via an RPC abstraction over Electron IPC
 
-(inter-process communication).\[^techspec]
+(inter-process communication).[^techspec]
 
 
 
@@ -78,23 +72,23 @@ The TS documents several constraints that directly influence this design:
 
 
 
-\* WebGL contexts are limited (the TS references a maximum of 16 simultaneous
+* WebGL contexts are limited (the TS references a maximum of 16 simultaneous
 
 &nbsp; contexts), and Velocetty should prioritise visible panes and fall back to a
 
-&nbsp; Canvas renderer when needed.\[^techspec]
+&nbsp; Canvas renderer when needed.[^techspec]
 
-\* The current plugin system is full-trust and decorates UI and behaviour via
+* The current plugin system is full-trust and decorates UI and behaviour via
 
 &nbsp; 40+ hooks, including keymap and tab decoration hooks; error handling relies
 
-&nbsp; on try/catch isolation rather than sandboxing.\[^techspec]
+&nbsp; on try/catch isolation rather than sandboxing.[^techspec]
 
-\* Configuration is file-based, validated via a schema, and supports hot reload;
+* Configuration is file-based, validated via a schema, and supports hot reload;
 
 &nbsp; it is currently stored as JSON (`hyper.json`) with a migration path from
 
-&nbsp; legacy `.hyper.js` configurations.\[^techspec]
+&nbsp; legacy `.hyper.js` configurations.[^techspec]
 
 
 
@@ -102,31 +96,31 @@ The PRD extends the product direction by making the command system, settings
 
 UX, and plugin customization surfaces first-class, and by adding longer-term
 
-goals around Tauri and a remote frontend with a versioned protocol.\[^prd]
+goals around Tauri and a remote frontend with a versioned protocol.[^prd]
 
 
 
-\## Goals and non-goals
+## Goals and non-goals
 
 
 
-\### Goals
+### Goals
 
 
 
-\* Provide a coherent command surface that unifies menus, shortcuts, UI buttons,
+* Provide a coherent command surface that unifies menus, shortcuts, UI buttons,
 
-&nbsp; and programmatic/plugin invocation.\[^prd]
+&nbsp; and programmatic/plugin invocation.[^prd]
 
-\* Implement a context-aware keybinding engine with deterministic precedence,
+* Implement a context-aware keybinding engine with deterministic precedence,
 
-&nbsp; conflict detection, and a UI editor.\[^prd]
+&nbsp; conflict detection, and a UI editor.[^prd]
 
-\* Migrate configuration to JSON5 for human-friendly editing, and use it as the
+* Migrate configuration to JSON5 for human-friendly editing, and use it as the
 
-&nbsp; canonical source for app configuration, keybindings, and plugin settings.\[^prd]
+&nbsp; canonical source for app configuration, keybindings, and plugin settings.[^prd]
 
-\* Add a settings tab that supports:
+* Add a settings tab that supports:
 
 
 
@@ -134,43 +128,43 @@ goals around Tauri and a remote frontend with a versioned protocol.\[^prd]
 
 &nbsp; \* Schema-driven plugin settings panels by default.
 
-&nbsp; \* Optional custom plugin settings panels with an explicit trust model.\[^prd]
+&nbsp; \* Optional custom plugin settings panels with an explicit trust model.[^prd]
 
-\* Implement vertical tabs with rich metadata and a stable tab decoration API
+* Implement vertical tabs with rich metadata and a stable tab decoration API
 
-&nbsp; that uses slot providers rather than React component overrides.\[^prd]
+&nbsp; that uses slot providers rather than React component overrides.[^prd]
 
-\* Ensure WebGL rendering is allocated only to visible panes and gracefully
+* Ensure WebGL rendering is allocated only to visible panes and gracefully
 
-&nbsp; degrades when contexts are exhausted.\[^prd]
+&nbsp; degrades when contexts are exhausted.[^prd]
 
-\* Define a migration path to Tauri and a remote-capable backend protocol that
+* Define a migration path to Tauri and a remote-capable backend protocol that
 
-&nbsp; uses protobuf over WebSocket.\[^prd]
-
-
-
-\### Non-goals
+&nbsp; uses protobuf over WebSocket.[^prd]
 
 
 
-\* Backwards compatibility with existing Hyper plugin hooks and internal
+### Non-goals
 
-&nbsp; decoration mechanisms.\[^prd]
 
-\* Persisting terminal scrollback or full session state across restarts (the TS
 
-&nbsp; explicitly avoids this for security and behavioural consistency).\[^techspec]
+* Backwards compatibility with existing Hyper plugin hooks and internal
 
-\* Designing a public plugin registry, payment model, or marketplace UX (out of
+&nbsp; decoration mechanisms.[^prd]
+
+* Persisting terminal scrollback or full session state across restarts (the TS
+
+&nbsp; explicitly avoids this for security and behavioural consistency).[^techspec]
+
+* Designing a public plugin registry, payment model, or marketplace UX (out of
 
 &nbsp; scope for this document unless required to support installation flows).
 
-\* Solving multi-user collaboration or shared terminals (not requested).
+* Solving multi-user collaboration or shared terminals (not requested).
 
 
 
-\## Current architecture summary
+## Current architecture summary
 
 
 
@@ -178,23 +172,23 @@ The current system can be summarised as:
 
 
 
-\* Main process (`app/`): window lifecycle, config loading and watching, plugin
+* Main process (`app/`): window lifecycle, config loading and watching, plugin
 
-&nbsp; loading, session manager using node-pty, menus, and updates.\[^techspec]
+&nbsp; loading, session manager using node-pty, menus, and updates.[^techspec]
 
-\* Renderer (`lib/`): React UI components, Redux store/reducers/actions, xterm.js
+* Renderer (`lib/`): React UI components, Redux store/reducers/actions, xterm.js
 
-&nbsp; terminal instances, and a command registry used by keymaps/menus.\[^techspec]
+&nbsp; terminal instances, and a command registry used by keymaps/menus.[^techspec]
 
-\* Transport: typed RPC over Electron IPC (`app/rpc.ts`, `lib/utils/rpc.ts`).\[^techspec]
+* Transport: typed RPC over Electron IPC (`app/rpc.ts`, `lib/utils/rpc.ts`).[^techspec]
 
-\* Config: file-based JSON with schema validation and hot reload (`app/config/`).\[^techspec]
+* Config: file-based JSON with schema validation and hot reload (`app/config/`).[^techspec]
 
-\* Plugins: full-trust, loaded from the config directory, supporting 40+ hooks,
+* Plugins: full-trust, loaded from the config directory, supporting 40+ hooks,
 
 &nbsp; including `decorateKeymaps`, `decorateTabs`, `decorateTab`, and Redux
 
-&nbsp; middleware/reducer injection.\[^techspec]
+&nbsp; middleware/reducer injection.[^techspec]
 
 
 
@@ -208,7 +202,7 @@ explicit extension points.
 
 
 
-\## Proposed target architecture
+## Proposed target architecture
 
 
 
@@ -338,41 +332,41 @@ flowchart TB
 
 &nbsp;   Frontend <-->|"WS + protobuf (loopback)"| WS
 
-```
+```text
 
 
 
-\### Architectural principles
+### Architectural principles
 
 
 
-\* A command is the only way to “do things” in the app, whether initiated by a
+* A command is the only way to “do things” in the app, whether initiated by a
 
-&nbsp; keyboard shortcut, a menu item, a button, or a plugin.\[^prd]
+&nbsp; keyboard shortcut, a menu item, a button, or a plugin.[^prd]
 
-\* Privileged operations live behind a backend boundary. The UI requests intent,
+* Privileged operations live behind a backend boundary. The UI requests intent,
 
-&nbsp; the backend validates and executes where necessary.\[^prd]
+&nbsp; the backend validates and executes where necessary.[^prd]
 
-\* Plugin integration uses explicit, stable extension points and data models.
+* Plugin integration uses explicit, stable extension points and data models.
 
 &nbsp; Plugins contribute providers and schema, rather than overriding internal UI
 
-&nbsp; components.\[^prd]
+&nbsp; components.[^prd]
 
-\* The protocol surface is versioned, typed, and testable. Electron IPC remains
+* The protocol surface is versioned, typed, and testable. Electron IPC remains
 
 &nbsp; an interim transport, but the system should converge on a protobuf-defined
 
-&nbsp; protocol that can run locally and remotely.\[^prd]
+&nbsp; protocol that can run locally and remotely.[^prd]
 
 
 
-\## Repository layout and module boundaries
+## Repository layout and module boundaries
 
 
 
-The PRD calls out an explicit `frontend/`, `backend/`, and `shared/` split.\[^prd]
+The PRD calls out an explicit `frontend/`, `backend/`, and `shared/` split.[^prd]
 
 We adopt this and map the existing code during migration.
 
@@ -382,7 +376,7 @@ Proposed structure:
 
 
 
-\* `frontend/`
+* `frontend/`
 
 
 
@@ -390,7 +384,7 @@ Proposed structure:
 
 &nbsp;   xterm.js integration, rendering scheduler, plugin runtime.
 
-\* `backend/`
+* `backend/`
 
 
 
@@ -398,7 +392,7 @@ Proposed structure:
 
 &nbsp;   auth/authz, update integration, and backend command handlers.
 
-\* `shared/`
+* `shared/`
 
 
 
@@ -418,7 +412,7 @@ Migration mapping from the current codebase (illustrative):
 
 | `lib/`                           | `frontend/`                              | UI + Redux can be migrated incrementally.                                   |
 
-| `app/session.ts`                 | `backend/pty/`                           | Re-implemented in Rust for Tauri, but keep semantics (batching).\[^techspec] |
+| `app/session.ts`                 | `backend/pty/`                           | Re-implemented in Rust for Tauri, but keep semantics (batching).[^techspec] |
 
 | `app/config/`                    | `backend/config/` + `shared/schemas/`    | JSON5 parsing, schema validation, layered config.                           |
 
@@ -428,21 +422,21 @@ Migration mapping from the current codebase (illustrative):
 
 
 
-\*Table 1: Migration mapping for major subsystems.\*
+*Table 1: Migration mapping for major subsystems.\*
 
 
 
-\## Command system design
+## Command system design
 
 
 
-\### Command model
+### Command model
 
 
 
 A command definition is stable, namespaced, searchable, and optionally typed by
 
-an argument schema.\[^prd] Commands exist regardless of the invocation mechanism.
+an argument schema.[^prd] Commands exist regardless of the invocation mechanism.
 
 
 
@@ -450,9 +444,9 @@ Command ID conventions:
 
 
 
-\* Lowercase, dot-separated namespaces.
+* Lowercase, dot-separated namespaces.
 
-\* First segment indicates domain: `terminal.\*`, `tab.\*`, `window.\*`,
+* First segment indicates domain: `terminal.\*`, `tab.\*`, `window.\*`,
 
 &nbsp; `workspace.\*`, `settings.\*`, `plugin.\*`.
 
@@ -462,17 +456,17 @@ Examples:
 
 
 
-\* `terminal.splitPane`
+* `terminal.splitPane`
 
-\* `terminal.newTab`
+* `terminal.newTab`
 
-\* `tab.close`
+* `tab.close`
 
-\* `settings.open`
+* `settings.open`
 
-\* `settings.openKeybindings`
+* `settings.openKeybindings`
 
-\* `plugin.reload`
+* `plugin.reload`
 
 
 
@@ -520,11 +514,11 @@ export interface CommandDefinition<TArgs = unknown, TResult = unknown> {
 
 }
 
-```
+```text
 
 
 
-\### Command registry and dispatcher
+### Command registry and dispatcher
 
 
 
@@ -532,11 +526,11 @@ We implement two cooperating registries:
 
 
 
-\* Frontend registry: source of truth for what the UI can present (palette,
+* Frontend registry: source of truth for what the UI can present (palette,
 
 &nbsp; menus, keybinding editor).
 
-\* Backend registry: source of truth for what the backend will execute (and
+* Backend registry: source of truth for what the backend will execute (and
 
 &nbsp; permission-check).
 
@@ -546,19 +540,19 @@ The dispatcher always follows the same path:
 
 
 
-\* Resolve command definition by ID.
+* Resolve command definition by ID.
 
-\* Validate arguments against schema (frontend-side for early feedback; backend
+* Validate arguments against schema (frontend-side for early feedback; backend
 
 &nbsp; repeats validation for trustworthiness).
 
-\* Check enablement via `when` expression using the context key service (UI
+* Check enablement via `when` expression using the context key service (UI
 
 &nbsp; affordance) and backend permission checks (security).
 
-\* Execute handler (frontend function or backend RPC invocation).
+* Execute handler (frontend function or backend RPC invocation).
 
-\* Return a structured result (success/error/cancelled).
+* Return a structured result (success/error/cancelled).
 
 
 
@@ -618,23 +612,23 @@ export interface CommandDispatcher {
 
 
 
-\### Context keys and “when” expressions
+### Context keys and “when” expressions
 
 
 
-The PRD highlights the “when” system as a core risk area.\[^prd] The design uses
+The PRD highlights the “when” system as a core risk area.[^prd] The design uses
 
 an explicit context key service modelled after editor-class applications:
 
 
 
-\* Context keys are named values (`boolean | string | number | null`).
+* Context keys are named values (`boolean | string | number | null`).
 
-\* UI components set and clear keys as focus and state changes.
+* UI components set and clear keys as focus and state changes.
 
-\* Keybindings and commands can declare `when` expressions.
+* Keybindings and commands can declare `when` expressions.
 
-\* The evaluator is deterministic, fast, and testable.
+* The evaluator is deterministic, fast, and testable.
 
 
 
@@ -642,19 +636,19 @@ Examples of context keys:
 
 
 
-\* `terminalFocus: boolean`
+* `terminalFocus: boolean`
 
-\* `settingsOpen: boolean`
+* `settingsOpen: boolean`
 
-\* `findWidgetVisible: boolean`
+* `findWidgetVisible: boolean`
 
-\* `paneCount: number`
+* `paneCount: number`
 
-\* `tabType: "terminal" | "settings" | "about" | ...`
+* `tabType: "terminal" | "settings" | "about" | ...`
 
-\* `activeShell: string | null`
+* `activeShell: string | null`
 
-\* `remoteAttached: boolean`
+* `remoteAttached: boolean`
 
 
 
@@ -662,11 +656,11 @@ Expression grammar (minimum viable):
 
 
 
-\* Logical operators: `\&\&`, `||`, `!`
+* Logical operators: `&&`, `||`, `!`
 
-\* Comparators: `==`, `!=`, `<`, `<=`, `>`, `>=`
+* Comparators: `==`, `!=`, `<`, `<=`, `>`, `>=`
 
-\* Parentheses for grouping
+* Parentheses for grouping
 
 
 
@@ -674,9 +668,9 @@ Example `when`:
 
 
 
-\* `terminalFocus \&\& !settingsOpen`
+* `terminalFocus && !settingsOpen`
 
-\* `paneCount > 1 \&\& tabType == "terminal"`
+* `paneCount > 1 && tabType == "terminal"`
 
 
 
@@ -684,27 +678,27 @@ Implementation approach:
 
 
 
-\* Parse expressions once into an Abstract Syntax Tree (AST).
+* Parse expressions once into an Abstract Syntax Tree (AST).
 
-\* Evaluate against a simple map of context keys.
+* Evaluate against a simple map of context keys.
 
-\* Provide unit tests for parsing and evaluation.
-
-
-
-\### Command palette
+* Provide unit tests for parsing and evaluation.
 
 
 
-The command palette is a UI surface over the registry.\[^prd] Requirements:
+### Command palette
 
 
 
-\* Fuzzy search by title, ID, keywords, and category.
+The command palette is a UI surface over the registry.[^prd] Requirements:
 
-\* Display active keybinding(s) for each command.
 
-\* Support command arguments where schemas exist:
+
+* Fuzzy search by title, ID, keywords, and category.
+
+* Display active keybinding(s) for each command.
+
+* Support command arguments where schemas exist:
 
 
 
@@ -718,15 +712,15 @@ Performance:
 
 
 
-\* Pre-index command metadata for search.
+* Pre-index command metadata for search.
 
-\* Maintain a small “recently used” list in local state (not persisted by
+* Maintain a small “recently used” list in local state (not persisted by
 
 &nbsp; default; optionally persist in config if desired).
 
 
 
-\### Menu and button integration
+### Menu and button integration
 
 
 
@@ -734,7 +728,7 @@ All menus and UI buttons should dispatch via the command dispatcher, not call
 
 actions directly. This removes duplication and ensures behaviour stays
 
-consistent across UI surfaces.\[^prd]
+consistent across UI surfaces.[^prd]
 
 
 
@@ -742,23 +736,23 @@ Interim Electron integration:
 
 
 
-\* Existing menu templates (`app/menus/`) currently use command acceleration and
+* Existing menu templates (`app/menus/`) currently use command acceleration and
 
-&nbsp; the existing command registry.\[^techspec]
+&nbsp; the existing command registry.[^techspec]
 
-\* Replace the internal wiring so menu click handlers call `dispatch.invoke()`
+* Replace the internal wiring so menu click handlers call `dispatch.invoke()`
 
 &nbsp; for a command ID rather than directly emitting legacy RPC events.
 
 
 
-\### Cancellation semantics
+### Cancellation semantics
 
 
 
-\* Frontend commands: use `AbortSignal` and cooperative cancellation.
+* Frontend commands: use `AbortSignal` and cooperative cancellation.
 
-\* Backend commands: include a cancellation token in the protobuf invocation and
+* Backend commands: include a cancellation token in the protobuf invocation and
 
 &nbsp; support cancellation for long-running operations (for example, plugin install
 
@@ -766,17 +760,17 @@ Interim Electron integration:
 
 
 
-\## Keybinding system design
+## Keybinding system design
 
 
 
-\### Keybinding model
+### Keybinding model
 
 
 
 Keybindings map key sequences to commands, optionally with arguments and a
 
-`when` expression.\[^prd]
+`when` expression.[^prd]
 
 
 
@@ -804,13 +798,13 @@ Key string format:
 
 
 
-\* Modifiers: `ctrl`, `shift`, `alt`, `meta` (mapped to Cmd on macOS).
+* Modifiers: `ctrl`, `shift`, `alt`, `meta` (mapped to Cmd on macOS).
 
-\* Key: use a canonical form based on `KeyboardEvent.code` where possible to
+* Key: use a canonical form based on `KeyboardEvent.code` where possible to
 
 &nbsp; avoid layout issues, but support a human-friendly layer for display.
 
-\* Chords: space-separated sequences.
+* Chords: space-separated sequences.
 
 
 
@@ -818,15 +812,15 @@ Examples:
 
 
 
-\* `meta+shift+p` (macOS)
+* `meta+shift+p` (macOS)
 
-\* `ctrl+shift+p` (Windows/Linux)
+* `ctrl+shift+p` (Windows/Linux)
 
-\* `ctrl+k ctrl+s` (chord)
+* `ctrl+k ctrl+s` (chord)
 
 
 
-\### Resolution and precedence
+### Resolution and precedence
 
 
 
@@ -834,7 +828,7 @@ Deterministic resolution rules:
 
 
 
-\* Filter keybindings by:
+* Filter keybindings by:
 
 
 
@@ -844,7 +838,7 @@ Deterministic resolution rules:
 
 
 
-\* Choose the “winning” binding by precedence:
+* Choose the “winning” binding by precedence:
 
 
 
@@ -856,7 +850,7 @@ Deterministic resolution rules:
 
 
 
-\* Within a precedence level:
+* Within a precedence level:
 
 
 
@@ -870,13 +864,13 @@ Conflict detection:
 
 
 
-\* During load, compute conflicts for each platform modifier mapping.
+* During load, compute conflicts for each platform modifier mapping.
 
-\* Expose conflicts to the keybinding editor and (optionally) a warning panel.
+* Expose conflicts to the keybinding editor and (optionally) a warning panel.
 
 
 
-\### Keybinding editor UI
+### Keybinding editor UI
 
 
 
@@ -884,15 +878,15 @@ The editor provides:
 
 
 
-\* Search by command title/ID and key string.
+* Search by command title/ID and key string.
 
-\* Record a new keybinding by capturing keyboard input.
+* Record a new keybinding by capturing keyboard input.
 
-\* Show conflicts and allow resolution (remove, reassign).
+* Show conflicts and allow resolution (remove, reassign).
 
-\* Reset a command binding to default.
+* Reset a command binding to default.
 
-\* Export/import as JSON5.
+* Export/import as JSON5.
 
 
 
@@ -900,35 +894,35 @@ The editor is itself driven by commands:
 
 
 
-\* `settings.openKeybindings`
+* `settings.openKeybindings`
 
-\* `keybindings.add`
+* `keybindings.add`
 
-\* `keybindings.remove`
+* `keybindings.remove`
 
-\* `keybindings.resetToDefault`
+* `keybindings.resetToDefault`
 
-\* `keybindings.export`
-
-
-
-\## Configuration system: JSON5 and layering
+* `keybindings.export`
 
 
 
-\### File format and locations
+## Configuration system: JSON5 and layering
 
 
 
-The PRD specifies JSON5 as canonical.\[^prd] We will store:
+### File format and locations
 
 
 
-\* Main config: `config.json5`
+The PRD specifies JSON5 as canonical.[^prd] We will store:
 
-\* Keybindings: `keybindings.json5` (separate file for readability)
 
-\* Plugin state: stored under `plugins/` directory (bundles, manifests, cache)
+
+* Main config: `config.json5`
+
+* Keybindings: `keybindings.json5` (separate file for readability)
+
+* Plugin state: stored under `plugins/` directory (bundles, manifests, cache)
 
 
 
@@ -942,7 +936,7 @@ product name):
 
 | -------- | ----------------------------------------------------- | ----------------------------------------------- |
 
-| Linux    | `$XDG\_CONFIG\_HOME/Velocetty` or `~/.config/Velocetty` | `config.json5`, `keybindings.json5`, `plugins/` |
+| Linux    | `$XDG_CONFIG_HOME/Velocetty` or `~/.config/Velocetty` | `config.json5`, `keybindings.json5`, `plugins/` |
 
 | macOS    | `~/.config/Velocetty`                                 | same                                            |
 
@@ -950,11 +944,11 @@ product name):
 
 
 
-\*Table 2: Proposed config locations.\*
+*Table 2: Proposed config locations.\*
 
 
 
-\### Layering rules
+### Layering rules
 
 
 
@@ -994,25 +988,25 @@ Merge semantics:
 
 
 
-\* Objects: deep merge.
+* Objects: deep merge.
 
-\* Arrays: replace by default (explicit merge behaviour can be introduced later
+* Arrays: replace by default (explicit merge behaviour can be introduced later
 
 &nbsp; via JSON merge-patch-like directives if needed).
 
 
 
-\### Validation and error reporting
+### Validation and error reporting
 
 
 
-\* Use JSON5 parsing to accept comments and trailing commas.
+* Use JSON5 parsing to accept comments and trailing commas.
 
-\* Validate the merged config against a pinned JSON Schema version shipped in
+* Validate the merged config against a pinned JSON Schema version shipped in
 
 &nbsp; `shared/schemas/`.
 
-\* Provide structured diagnostics:
+* Provide structured diagnostics:
 
 
 
@@ -1026,11 +1020,11 @@ Behaviour on error:
 
 
 
-\* Keep last-known-good config in memory.
+* Keep last-known-good config in memory.
 
-\* Notify the user via a non-blocking UI notification.
+* Notify the user via a non-blocking UI notification.
 
-\* Log full diagnostics for troubleshooting.
+* Log full diagnostics for troubleshooting.
 
 
 
@@ -1038,11 +1032,11 @@ This preserves the spirit of the current hot-reload flow (watch file, reload,
 
 validate, apply, and fall back on errors), but swaps JSON parsing for JSON5 and
 
-extends schema validation to include plugin settings.\[^techspec]
+extends schema validation to include plugin settings.[^techspec]
 
 
 
-\### Hot reload semantics
+### Hot reload semantics
 
 
 
@@ -1054,15 +1048,15 @@ Hot reload (no restart):
 
 
 
-\* Theme and UI appearance settings
+* Theme and UI appearance settings
 
-\* Font settings (may require xterm reconfigure but not restart)
+* Font settings (may require xterm reconfigure but not restart)
 
-\* Keybindings
+* Keybindings
 
-\* Tab decoration preferences
+* Tab decoration preferences
 
-\* Plugin enable/disable (subject to safe unload)
+* Plugin enable/disable (subject to safe unload)
 
 
 
@@ -1070,11 +1064,11 @@ Restart required:
 
 
 
-\* Backend transport settings (listening addresses)
+* Backend transport settings (listening addresses)
 
-\* Update channel settings (depending on implementation)
+* Update channel settings (depending on implementation)
 
-\* Any backend-owned setting that affects process-level configuration
+* Any backend-owned setting that affects process-level configuration
 
 
 
@@ -1082,15 +1076,15 @@ The settings UI should surface which settings require restart.
 
 
 
-\## Settings tab and plugin settings panels
+## Settings tab and plugin settings panels
 
 
 
-\### Settings surface as a first-class tab
+### Settings surface as a first-class tab
 
 
 
-The PRD requires a settings tab integrated with the command system.\[^prd] We
+The PRD requires a settings tab integrated with the command system.[^prd] We
 
 implement settings as a tab type (`tabType = "settings"`), not a modal, so it
 
@@ -1102,23 +1096,23 @@ Core commands:
 
 
 
-\* `settings.open`
+* `settings.open`
 
-\* `settings.search`
+* `settings.search`
 
-\* `settings.resetSetting`
+* `settings.resetSetting`
 
-\* `settings.exportConfig`
+* `settings.exportConfig`
 
-\* `settings.openKeybindings`
-
-
-
-\### Schema-driven settings panels
+* `settings.openKeybindings`
 
 
 
-Default plugin settings panels are generated from schema plus UI hints.\[^prd]
+### Schema-driven settings panels
+
+
+
+Default plugin settings panels are generated from schema plus UI hints.[^prd]
 
 
 
@@ -1126,9 +1120,9 @@ Schema format:
 
 
 
-\* JSON Schema for validation.
+* JSON Schema for validation.
 
-\* A companion “UI hints” schema (or extensions under `x-ui`) to declare:
+* A companion “UI hints” schema (or extensions under `x-ui`) to declare:
 
 
 
@@ -1202,21 +1196,21 @@ Example (JSON5):
 
 
 
-\### Optional custom settings panels
+### Optional custom settings panels
 
 
 
 The PRD allows optional arbitrary React panels with an explicit security
 
-posture.\[^prd] Given the longer-term remote frontend goal, the trust model must
+posture.[^prd] Given the longer-term remote frontend goal, the trust model must
 
 be explicit:
 
 
 
-\* Default: schema-driven only.
+* Default: schema-driven only.
 
-\* Custom panels: allowed only for plugins marked `trusted: true` and only in
+* Custom panels: allowed only for plugins marked `trusted: true` and only in
 
 &nbsp; desktop-local mode (not in a remote browser UI), unless explicitly enabled
 
@@ -1234,35 +1228,35 @@ Implementation detail:
 
 
 
-\* The plugin manifest declares `contributes.settings.customPanel: true`.
+* The plugin manifest declares `contributes.settings.customPanel: true`.
 
-\* The host checks trust and environment before mounting the panel.
-
-
-
-\## Plugin system redesign
+* The host checks trust and environment before mounting the panel.
 
 
 
-\### Plugin goals
+## Plugin system redesign
 
 
 
-\* Stable, explicit APIs: commands, keybindings, settings schema, and tab
+### Plugin goals
 
-&nbsp; decorations.\[^prd]
 
-\* Avoid fragile internal UI decoration hooks (`decorateTabs`, `decorateTerm`,
 
-&nbsp; etc.) present in the current system.\[^techspec]
+* Stable, explicit APIs: commands, keybindings, settings schema, and tab
 
-\* Support remote frontend without requiring the remote client to have filesystem
+&nbsp; decorations.[^prd]
+
+* Avoid fragile internal UI decoration hooks (`decorateTabs`, `decorateTerm`,
+
+&nbsp; etc.) present in the current system.[^techspec]
+
+* Support remote frontend without requiring the remote client to have filesystem
 
 &nbsp; access.
 
 
 
-\### Plugin packaging and installation
+### Plugin packaging and installation
 
 
 
@@ -1270,11 +1264,11 @@ Backend responsibilities:
 
 
 
-\* Install plugins (download bundle, verify, store).
+* Install plugins (download bundle, verify, store).
 
-\* Maintain a plugin index (manifest metadata, enabled state).
+* Maintain a plugin index (manifest metadata, enabled state).
 
-\* Expose plugin manifests and entrypoints to the frontend.
+* Expose plugin manifests and entrypoints to the frontend.
 
 
 
@@ -1282,7 +1276,7 @@ Storage location (under config directory):
 
 
 
-```
+```text
 
 plugins/
 
@@ -1300,9 +1294,9 @@ plugins/
 
 
 
-The TS currently stores plugins as npm packages in a `plugins/node\_modules/`
+The TS currently stores plugins as npm packages in a `plugins/node_modules/`
 
-directory.\[^techspec] This design intentionally moves away from “arbitrary npm
+directory.[^techspec] This design intentionally moves away from “arbitrary npm
 
 module with Node access” and towards a web-safe bundle model, which aligns with
 
@@ -1310,7 +1304,7 @@ remote UI requirements.
 
 
 
-\### Plugin runtime
+### Plugin runtime
 
 
 
@@ -1376,7 +1370,7 @@ export interface PluginContext {
 
 
 
-\### Plugin command security
+### Plugin command security
 
 
 
@@ -1384,7 +1378,7 @@ Plugins can register commands, but any privileged operation must be performed
 
 via backend commands. The command boundary becomes the choke-point for
 
-permission checks, as required by the PRD.\[^prd]
+permission checks, as required by the PRD.[^prd]
 
 
 
@@ -1392,15 +1386,15 @@ Example pattern:
 
 
 
-\* Plugin command `git.openRepo` (frontend) invokes backend command
+* Plugin command `git.openRepo` (frontend) invokes backend command
 
 &nbsp; `filesystem.openPath` with an explicit path argument.
 
-\* Backend checks permissions and redaction rules (especially for remote).
+* Backend checks permissions and redaction rules (especially for remote).
 
 
 
-\### Plugin settings persistence
+### Plugin settings persistence
 
 
 
@@ -1432,15 +1426,15 @@ Plugin settings persist into `config.json5` under a namespace, for example:
 
 
 
-This aligns with the PRD requirement for namespaced plugin settings in JSON5.\[^prd]
+This aligns with the PRD requirement for namespaced plugin settings in JSON5.[^prd]
 
 
 
-\## Vertical tabs and tab decoration API
+## Vertical tabs and tab decoration API
 
 
 
-\### Tab model
+### Tab model
 
 
 
@@ -1456,27 +1450,27 @@ Core entities:
 
 
 
-\* `Session`: backend PTY session + metadata (pid, title, cwd, profile, etc.).
+* `Session`: backend PTY session + metadata (pid, title, cwd, profile, etc.).
 
 &nbsp; The TS already models session state in Redux with fields such as `uid`,
 
-&nbsp; `title`, `pid`, and `cwd`.\[^techspec]
+&nbsp; `title`, `pid`, and `cwd`.[^techspec]
 
-\* `Pane`: a leaf view bound to a session.
+* `Pane`: a leaf view bound to a session.
 
-\* `PaneGroup`: a tree node representing either a split container or leaf.
+* `PaneGroup`: a tree node representing either a split container or leaf.
 
-&nbsp; This maps closely to the existing “term group” tree in the TS.\[^techspec]
+&nbsp; This maps closely to the existing “term group” tree in the TS.[^techspec]
 
-\* `Tab`: contains a root `PaneGroup`, plus tab-level metadata (pinned, group,
+* `Tab`: contains a root `PaneGroup`, plus tab-level metadata (pinned, group,
 
 &nbsp; lastActiveAt, activity flags).
 
-\* `TabType`: `"terminal" | "settings" | ..."`
+* `TabType`: `"terminal" | "settings" | ..."`
 
 
 
-\### Vertical tabs UI
+### Vertical tabs UI
 
 
 
@@ -1484,9 +1478,9 @@ Requirements (from PRD):
 
 
 
-\* Vertical tab rail
+* Vertical tab rail
 
-\* Rich tab content: pinning, grouping, reorder, activity indicators.\[^prd]
+* Rich tab content: pinning, grouping, reorder, activity indicators.[^prd]
 
 
 
@@ -1494,27 +1488,27 @@ Implementation notes:
 
 
 
-\* Virtualise the tab list for large tab counts.
+* Virtualise the tab list for large tab counts.
 
-\* Support drag-and-drop reorder and group moves.
+* Support drag-and-drop reorder and group moves.
 
-\* Provide keyboard navigation commands (`tab.next`, `tab.previous`,
+* Provide keyboard navigation commands (`tab.next`, `tab.previous`,
 
 &nbsp; `tab.moveUp`, etc.), integrated with keybindings.
 
 
 
-\### Tab decoration API: slots and providers
+### Tab decoration API: slots and providers
 
 
 
 The PRD explicitly calls out “slots with well-defined data inputs and merge
 
-rules” and “providers, not overrides”.\[^prd]
+rules” and “providers, not overrides”.[^prd]
 
 
 
-\#### Slot model
+#### Slot model
 
 
 
@@ -1522,15 +1516,15 @@ Decorations are composed of fixed slots:
 
 
 
-\* `icon` (single)
+* `icon` (single)
 
-\* `title` (single)
+* `title` (single)
 
-\* `subtitle` (single, optional)
+* `subtitle` (single, optional)
 
-\* `badges` (list, bounded)
+* `badges` (list, bounded)
 
-\* `widgets` (list, bounded, command-driven)
+* `widgets` (list, bounded, command-driven)
 
 
 
@@ -1628,17 +1622,17 @@ export interface TabDecorationProvider {
 
 
 
-\#### Merge rules
+#### Merge rules
 
 
 
-Define merge rules up-front (PRD “gotcha”).\[^prd]
+Define merge rules up-front (PRD “gotcha”).[^prd]
 
 
 
-\* Providers are evaluated in descending priority order.
+* Providers are evaluated in descending priority order.
 
-\* For singleton slots (`icon`, `title`, `subtitle`):
+* For singleton slots (`icon`, `title`, `subtitle`):
 
 
 
@@ -1646,7 +1640,7 @@ Define merge rules up-front (PRD “gotcha”).\[^prd]
 
 &nbsp; \* Ties break deterministically by provider `id` (lexicographic).
 
-\* For list slots (`badges`, `widgets`):
+* For list slots (`badges`, `widgets`):
 
 
 
@@ -1664,7 +1658,7 @@ User overrides:
 
 
 
-\* Users can enable/disable providers and optionally adjust precedence via
+* Users can enable/disable providers and optionally adjust precedence via
 
 &nbsp; config:
 
@@ -1692,33 +1686,33 @@ User overrides:
 
 
 
-\#### Performance constraints
+#### Performance constraints
 
 
 
-\* Evaluate decorations event-driven, not polling (PRD requirement).\[^prd]
+* Evaluate decorations event-driven, not polling (PRD requirement).[^prd]
 
-\* Cache provider outputs keyed by `(providerId, tabId, tabRevision)` where
+* Cache provider outputs keyed by `(providerId, tabId, tabRevision)` where
 
 &nbsp; `tabRevision` increments when any relevant context value changes.
 
-\* Timebox async providers (for example, 50 ms budget for initial render).
+* Timebox async providers (for example, 50 ms budget for initial render).
 
 &nbsp; Providers may still resolve later, but they must not block tab paint.
 
 
 
-\## Rendering: WebGL only for visible panes
+## Rendering: WebGL only for visible panes
 
 
 
 The TS already documents WebGL context limits and the need to prioritise visible
 
-panes.\[^techspec] The PRD turns this into an explicit deliverable.\[^prd]
+panes.[^techspec] The PRD turns this into an explicit deliverable.[^prd]
 
 
 
-\### Visibility model
+### Visibility model
 
 
 
@@ -1726,15 +1720,15 @@ A pane is “visible” if:
 
 
 
-\* Its tab is active, and
+* Its tab is active, and
 
-\* It is not occluded by a modal overlay that prevents rendering, and
+* It is not occluded by a modal overlay that prevents rendering, and
 
-\* It has non-zero layout bounds (after split calculations).
+* It has non-zero layout bounds (after split calculations).
 
 
 
-\### WebGL context pool
+### WebGL context pool
 
 
 
@@ -1742,7 +1736,7 @@ Implement a renderer service in the frontend:
 
 
 
-\* `WebGLContextPool`
+* `WebGLContextPool`
 
 
 
@@ -1762,31 +1756,31 @@ Context loss recovery:
 
 
 
-\* On context loss events, immediately detach WebGL addon and attach Canvas.
+* On context loss events, immediately detach WebGL addon and attach Canvas.
 
-\* Retry WebGL attach later when resources become available.
-
-
-
-\### Render scheduling
+* Retry WebGL attach later when resources become available.
 
 
 
-\* Use `requestAnimationFrame` for UI-driven updates.
-
-\* For PTY output bursts, continue using batching semantics akin to the TS data
-
-&nbsp; batcher (16 ms / 200 KB thresholds) to avoid overwhelming the UI thread.\[^techspec]
-
-\* Ensure pane resize operations coalesce via `ResizeObserver`.
+### Render scheduling
 
 
 
-\## Host migration: Electron to Tauri
+* Use `requestAnimationFrame` for UI-driven updates.
+
+* For PTY output bursts, continue using batching semantics akin to the TS data
+
+&nbsp; batcher (16 ms / 200 KB thresholds) to avoid overwhelming the UI thread.[^techspec]
+
+* Ensure pane resize operations coalesce via `ResizeObserver`.
 
 
 
-\### Interim (Electron) approach
+## Host migration: Electron to Tauri
+
+
+
+### Interim (Electron) approach
 
 
 
@@ -1794,7 +1788,7 @@ Phases 1–5 from the PRD can be delivered on the existing Electron foundation
 
 while we build the new architecture layers (commands, keybindings, settings,
 
-tabs, plugin API).\[^prd]
+tabs, plugin API).[^prd]
 
 
 
@@ -1804,21 +1798,21 @@ Electron IPC as a transport adapter.
 
 
 
-\### Target (Tauri) approach
+### Target (Tauri) approach
 
 
 
-Phase 6 introduces a Tauri host.\[^prd] The Tauri backend owns:
+Phase 6 introduces a Tauri host.[^prd] The Tauri backend owns:
 
 
 
-\* PTY/session management (Rust implementation replacing node-pty).
+* PTY/session management (Rust implementation replacing node-pty).
 
-\* Filesystem and configuration I/O and watchers.
+* Filesystem and configuration I/O and watchers.
 
-\* Plugin installation and storage.
+* Plugin installation and storage.
 
-\* A local WebSocket server (loopback) that exposes the protobuf protocol.
+* A local WebSocket server (loopback) that exposes the protobuf protocol.
 
 
 
@@ -1830,31 +1824,31 @@ reduces duplication: the UI always speaks one protocol.
 
 
 
-\## Remote frontend: protobuf/WebSocket protocol
+## Remote frontend: protobuf/WebSocket protocol
 
 
 
 The PRD calls for protobuf-defined protocol and a WebSocket transport with
 
-multiplexing, authentication, and capability negotiation.\[^prd]
+multiplexing, authentication, and capability negotiation.[^prd]
 
 
 
-\### Protocol goals
+### Protocol goals
 
 
 
-\* Versioned messages with backwards-compatible evolution.
+* Versioned messages with backwards-compatible evolution.
 
-\* Binary framing for PTY data streams.
+* Binary framing for PTY data streams.
 
-\* Multiplexing for multiple sessions/tabs/windows over one connection.
+* Multiplexing for multiple sessions/tabs/windows over one connection.
 
-\* Explicit auth and capability exchange at connection start.
+* Explicit auth and capability exchange at connection start.
 
 
 
-\### Protobuf message sketch
+### Protobuf message sketch
 
 
 
@@ -1870,9 +1864,9 @@ package velocetty.v1;
 
 message ClientHello {
 
-&nbsp; string client\_version = 1;
+&nbsp; string client_version = 1;
 
-&nbsp; bool wants\_admin\_capabilities = 2;
+&nbsp; bool wants_admin_capabilities = 2;
 
 }
 
@@ -1880,11 +1874,11 @@ message ClientHello {
 
 message ServerHello {
 
-&nbsp; string server\_version = 1;
+&nbsp; string server_version = 1;
 
 &nbsp; repeated string capabilities = 2; // e.g. "pty", "fs.read", "plugins"
 
-&nbsp; bool redaction\_enabled = 3;
+&nbsp; bool redaction_enabled = 3;
 
 }
 
@@ -1892,11 +1886,11 @@ message ServerHello {
 
 message CommandInvoke {
 
-&nbsp; string request\_id = 1;
+&nbsp; string request_id = 1;
 
-&nbsp; string command\_id = 2;
+&nbsp; string command_id = 2;
 
-&nbsp; bytes args\_json = 3; // JSON-encoded args for flexibility; schema validated.
+&nbsp; bytes args_json = 3; // JSON-encoded args for flexibility; schema validated.
 
 }
 
@@ -1904,15 +1898,15 @@ message CommandInvoke {
 
 message CommandResult {
 
-&nbsp; string request\_id = 1;
+&nbsp; string request_id = 1;
 
 &nbsp; bool ok = 2;
 
-&nbsp; bytes result\_json = 3;
+&nbsp; bytes result_json = 3;
 
-&nbsp; string error\_code = 4;
+&nbsp; string error_code = 4;
 
-&nbsp; string error\_message = 5;
+&nbsp; string error_message = 5;
 
 }
 
@@ -1920,9 +1914,9 @@ message CommandResult {
 
 message PtyOpen {
 
-&nbsp; string session\_id = 1;
+&nbsp; string session_id = 1;
 
-&nbsp; bytes options\_json = 2;
+&nbsp; bytes options_json = 2;
 
 }
 
@@ -1930,7 +1924,7 @@ message PtyOpen {
 
 message PtyData {
 
-&nbsp; string session\_id = 1;
+&nbsp; string session_id = 1;
 
 &nbsp; bytes data = 2;
 
@@ -1940,7 +1934,7 @@ message PtyData {
 
 message PtyResize {
 
-&nbsp; string session\_id = 1;
+&nbsp; string session_id = 1;
 
 &nbsp; uint32 cols = 2;
 
@@ -1954,19 +1948,19 @@ message Envelope {
 
 &nbsp; oneof msg {
 
-&nbsp;   ClientHello client\_hello = 1;
+&nbsp;   ClientHello client_hello = 1;
 
-&nbsp;   ServerHello server\_hello = 2;
+&nbsp;   ServerHello server_hello = 2;
 
-&nbsp;   CommandInvoke command\_invoke = 3;
+&nbsp;   CommandInvoke command_invoke = 3;
 
-&nbsp;   CommandResult command\_result = 4;
+&nbsp;   CommandResult command_result = 4;
 
-&nbsp;   PtyOpen pty\_open = 5;
+&nbsp;   PtyOpen pty_open = 5;
 
-&nbsp;   PtyData pty\_data = 6;
+&nbsp;   PtyData pty_data = 6;
 
-&nbsp;   PtyResize pty\_resize = 7;
+&nbsp;   PtyResize pty_resize = 7;
 
 &nbsp; }
 
@@ -1980,21 +1974,21 @@ Notes:
 
 
 
-\* Use JSON for args/results within protobuf initially to reduce churn while the
+* Use JSON for args/results within protobuf initially to reduce churn while the
 
 &nbsp; command system evolves, but still validate against schemas on both sides.
 
-\* PTY data remains raw bytes.
+* PTY data remains raw bytes.
 
 
 
-\### Authentication and authorisation
+### Authentication and authorisation
 
 
 
-\* Local loopback connection: token stored in a host-managed secure store.
+* Local loopback connection: token stored in a host-managed secure store.
 
-\* Remote connection:
+* Remote connection:
 
 
 
@@ -2006,13 +2000,13 @@ Notes:
 
 
 
-\### Redaction and sensitive metadata
+### Redaction and sensitive metadata
 
 
 
 The PRD calls out that tab decorations can leak sensitive information (paths,
 
-hostnames) once remote exists.\[^prd]
+hostnames) once remote exists.[^prd]
 
 
 
@@ -2020,23 +2014,23 @@ Design:
 
 
 
-\* Backend marks fields as redacted when the remote session lacks permission.
+* Backend marks fields as redacted when the remote session lacks permission.
 
-\* Frontend and plugins see redacted values (for example, `cwd = undefined` and
+* Frontend and plugins see redacted values (for example, `cwd = undefined` and
 
 &nbsp; `redacted = true`), so they cannot accidentally display sensitive data.
 
 
 
-\## Testing, observability, and performance
+## Testing, observability, and performance
 
 
 
-\### Testing
+### Testing
 
 
 
-\* Unit tests:
+* Unit tests:
 
 
 
@@ -2048,7 +2042,7 @@ Design:
 
 &nbsp; \* JSON5 parsing and schema validation diagnostics.
 
-\* Integration tests:
+* Integration tests:
 
 
 
@@ -2058,7 +2052,7 @@ Design:
 
 &nbsp; \* Plugin contribution loading and enable/disable flows.
 
-\* Performance tests:
+* Performance tests:
 
 
 
@@ -2068,39 +2062,39 @@ Design:
 
 
 
-\### Observability
+### Observability
 
 
 
-The PRD calls out instrumentation early.\[^prd] Minimum:
+The PRD calls out instrumentation early.[^prd] Minimum:
 
 
 
-\* Input latency (keydown to terminal write).
+* Input latency (keydown to terminal write).
 
-\* Frame timing (long frames).
+* Frame timing (long frames).
 
-\* WebGL context usage (current, peak, fallback events).
+* WebGL context usage (current, peak, fallback events).
 
-\* Command execution timings (frontend and backend).
+* Command execution timings (frontend and backend).
 
-\* Plugin provider timings (decoration providers, command handlers).
-
-
-
-\## Implementation plan
+* Plugin provider timings (decoration providers, command handlers).
 
 
 
-This follows the PRD sequencing, expressed as roadmap-style tasks.\[^prd]
+## Implementation plan
 
 
 
-\### 1. Core scaffolding
+This follows the PRD sequencing, expressed as roadmap-style tasks.[^prd]
 
 
 
-\* \[ ] 1.1. Repository split into `frontend/`, `backend/`, `shared/`.
+### 1. Core scaffolding
+
+
+
+* \[ ] 1.1. Repository split into `frontend/`, `backend/`, `shared/`.
 
 
 
@@ -2108,7 +2102,7 @@ This follows the PRD sequencing, expressed as roadmap-style tasks.\[^prd]
 
 &nbsp; \* \[ ] Establish build and test pipelines per package.
 
-\* \[ ] 1.2. Define the command system primitives in `shared/`.
+* \[ ] 1.2. Define the command system primitives in `shared/`.
 
 
 
@@ -2116,7 +2110,7 @@ This follows the PRD sequencing, expressed as roadmap-style tasks.\[^prd]
 
 &nbsp; \* \[ ] Context key expression grammar and evaluator.
 
-\* \[ ] 1.3. Golden path example plugin.
+* \[ ] 1.3. Golden path example plugin.
 
 
 
@@ -2126,123 +2120,123 @@ This follows the PRD sequencing, expressed as roadmap-style tasks.\[^prd]
 
 
 
-\### 2. Rendering overhaul
+### 2. Rendering overhaul
 
 
 
-\* \[ ] 2.1. Implement `WebGLContextPool` and pane visibility detection.
+* \[ ] 2.1. Implement `WebGLContextPool` and pane visibility detection.
 
-\* \[ ] 2.2. Attach WebGL only to visible panes; fall back to Canvas when needed.
+* \[ ] 2.2. Attach WebGL only to visible panes; fall back to Canvas when needed.
 
-\* \[ ] 2.3. Add instrumentation for WebGL context usage and fallback rates.
-
-
-
-\### 3. JSON5 + command system + keybindings
+* \[ ] 2.3. Add instrumentation for WebGL context usage and fallback rates.
 
 
 
-\* \[ ] 3.1. JSON5 config loader, schema validation, and diagnostics.
-
-\* \[ ] 3.2. Keybindings stored and loaded from `keybindings.json5`.
-
-\* \[ ] 3.3. Command palette UI.
-
-\* \[ ] 3.4. Keybinding engine with chords and `when` support.
-
-\* \[ ] 3.5. Ensure menus and buttons route through command dispatcher.
+### 3. JSON5 + command system + keybindings
 
 
 
-\### 4. Settings tab + schema-driven plugin settings
+* \[ ] 3.1. JSON5 config loader, schema validation, and diagnostics.
+
+* \[ ] 3.2. Keybindings stored and loaded from `keybindings.json5`.
+
+* \[ ] 3.3. Command palette UI.
+
+* \[ ] 3.4. Keybinding engine with chords and `when` support.
+
+* \[ ] 3.5. Ensure menus and buttons route through command dispatcher.
 
 
 
-\* \[ ] 4.1. Settings tab shell with search, categories, and reset-to-default.
-
-\* \[ ] 4.2. Schema-driven plugin settings panels with namespaced persistence.
-
-\* \[ ] 4.3. Settings-driven commands (export config, open keybindings, etc.).
+### 4. Settings tab + schema-driven plugin settings
 
 
 
-\### 5. Vertical tabs + tab decoration API
+* \[ ] 4.1. Settings tab shell with search, categories, and reset-to-default.
+
+* \[ ] 4.2. Schema-driven plugin settings panels with namespaced persistence.
+
+* \[ ] 4.3. Settings-driven commands (export config, open keybindings, etc.).
 
 
 
-\* \[ ] 5.1. Vertical tab rail with pinning, grouping, reorder, and indicators.
-
-\* \[ ] 5.2. Tab decoration engine (slots + provider merge rules).
-
-\* \[ ] 5.3. UI for enabling/disabling providers and adjusting precedence.
+### 5. Vertical tabs + tab decoration API
 
 
 
-\### 6. Tauri host integration
+* \[ ] 5.1. Vertical tab rail with pinning, grouping, reorder, and indicators.
+
+* \[ ] 5.2. Tab decoration engine (slots + provider merge rules).
+
+* \[ ] 5.3. UI for enabling/disabling providers and adjusting precedence.
 
 
 
-\* \[ ] 6.1. Introduce a backend abstraction layer with transport adapters.
-
-\* \[ ] 6.2. Prototype PTY manager in Rust and integrate with frontend.
-
-\* \[ ] 6.3. Package desktop app with Tauri, including update strategy.
+### 6. Tauri host integration
 
 
 
-\### 7. Remote frontend + protocol
+* \[ ] 6.1. Introduce a backend abstraction layer with transport adapters.
+
+* \[ ] 6.2. Prototype PTY manager in Rust and integrate with frontend.
+
+* \[ ] 6.3. Package desktop app with Tauri, including update strategy.
 
 
 
-\* \[ ] 7.1. Protobuf definitions and WebSocket server in backend.
-
-\* \[ ] 7.2. Auth + capability negotiation.
-
-\* \[ ] 7.3. Remote browser UI that can attach and drive command invocations.
+### 7. Remote frontend + protocol
 
 
 
-\## Risks and mitigations
+* \[ ] 7.1. Protobuf definitions and WebSocket server in backend.
+
+* \[ ] 7.2. Auth + capability negotiation.
+
+* \[ ] 7.3. Remote browser UI that can attach and drive command invocations.
 
 
 
-\* Command “when” complexity: keep the grammar small, test heavily, and provide
+## Risks and mitigations
 
-&nbsp; explicit context keys rather than ad-hoc state checks.\[^prd]
 
-\* Tab decoration chaos: enforce slot bounds and deterministic merge rules, and
 
-&nbsp; provide user-facing precedence control.\[^prd]
+* Command “when” complexity: keep the grammar small, test heavily, and provide
 
-\* Plugin trust and remote: default to schema-driven settings panels, restrict
+&nbsp; explicit context keys rather than ad-hoc state checks.[^prd]
+
+* Tab decoration chaos: enforce slot bounds and deterministic merge rules, and
+
+&nbsp; provide user-facing precedence control.[^prd]
+
+* Plugin trust and remote: default to schema-driven settings panels, restrict
 
 &nbsp; custom panels by trust and environment, and implement backend redaction for
 
-&nbsp; sensitive metadata.\[^prd]
+&nbsp; sensitive metadata.[^prd]
 
-\* Migration cost: maintain an interim Electron transport adapter, and avoid
+* Migration cost: maintain an interim Electron transport adapter, and avoid
 
 &nbsp; shipping Electron-specific assumptions into the command and config layers.
 
 
 
-\## Outstanding decisions
+## Outstanding decisions
 
 
 
-\* Final naming and location conventions for config and plugin directories (the
+* Final naming and location conventions for config and plugin directories (the
 
-&nbsp; TS uses `Hyper` paths today; this design proposes `Velocetty`).\[^techspec]
+&nbsp; TS uses `Hyper` paths today; this design proposes `Velocetty`).[^techspec]
 
-\* Whether to support workspace-level overrides in the initial release, or defer
+* Whether to support workspace-level overrides in the initial release, or defer
 
 &nbsp; until after the command/keybinding systems stabilise.
 
-\* Exact UX and storage for provider precedence (ordered list vs numeric
+* Exact UX and storage for provider precedence (ordered list vs numeric
 
 &nbsp; priorities plus overrides).
 
-\* Whether to require plugin bundles to be fully web-safe from day one, or allow
+* Whether to require plugin bundles to be fully web-safe from day one, or allow
 
 &nbsp; a “desktop-only trusted plugin” tier.
 
@@ -2252,19 +2246,16 @@ This follows the PRD sequencing, expressed as roadmap-style tasks.\[^prd]
 
 
 
-\[^prd]: “Velocetty product requirements document”, attached.
+[^prd]: “Velocetty product requirements document”, attached.
 
 
 
-\[^techspec]: “Technical specification”, attached.
+[^techspec]: “Technical specification”, attached.
 
 
 
-\[^style]: “Documentation style guide”, attached.
+[^style]: “Documentation style guide”, attached.
 
 
 
-Sources:   
-
-
-
+Sources:

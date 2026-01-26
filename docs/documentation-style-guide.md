@@ -1,7 +1,8 @@
 # Documentation style guide
 
-This guide outlines conventions for authoring documentation for Lille. Apply
-these rules to keep the documentation clear and consistent for developers.
+This guide outlines conventions for authoring documentation for Velocetty.
+Apply these rules to keep the documentation clear and consistent for
+developers.
 
 ## Spelling
 

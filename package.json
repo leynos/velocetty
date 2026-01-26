@@ -1,8 +1,10 @@
 {
   "name": "hyper",
   "version": "4.0.0-canary.5",
+  "packageManager": "bun@1.2.21",
   "repository": "zeit/hyper",
   "scripts": {
+    "preinstall": "node bin/ensure-bun.cjs",
     "start": "echo 'please run `bun run dev` in one tab and then `bun run app` in another one'",
     "app": "cross-env ELECTRONMON_LOGLEVEL=error electronmon target",
     "dev": "concurrently -n \"Webpack,TypeScript\" -c \"cyan.bold,blue.bold\" \"bunx webpack-cli -w\" \"tsc --build -v --pretty --watch --preserveWatchOutput\" -k",
@@ -14,7 +16,7 @@
     "test:unit:watch": "bun run test:unit -- --watch",
     "test:e2e": "ava --config ava-e2e.config.js",
     "postinstall": "bun run v8-snapshot && bun run build:hyper-app && electron-builder install-app-deps && bun run rebuild-node-pty && node bin/copy-node-modules.js && husky install && bun run generate-schema",
-    "rebuild-node-pty": "bunx electron-rebuild -f -o node-pty -m target",
+    "rebuild-node-pty": "electron-rebuild -f -o node-pty -m target",
     "dist": "bun run build && electron-builder",
     "clean": "node ./bin/rimraf-standalone.js node_modules && node ./bin/rimraf-standalone.js ./app/node_modules && node ./bin/rimraf-standalone.js ./app/renderer",
     "v8-snapshot": "node bin/run-v8-snapshot.js",
@@ -93,7 +95,7 @@
     "@types/lodash": "^4.17.0",
     "@types/mousetrap": "1.6.15",
     "@types/ms": "0.7.34",
-    "@types/node": "^22.19.7",
+    "@types/node": "^16.18.113",
     "@types/plist": "3.0.5",
     "@types/react": "18.2.79",
     "@types/react-dom": "18.2.25",

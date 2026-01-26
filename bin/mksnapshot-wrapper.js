@@ -10,6 +10,22 @@ const crossArchDirs = ['clang_x86_v8_arm', 'clang_x64_v8_arm64', 'win_clang_x64'
 const workingDir = temp.mkdirSync('mksnapshot-workdir');
 const mksnapshotDir = path.join(__dirname, '..', 'node_modules', 'electron-mksnapshot', 'bin');
 
+function normaliseArch(arch) {
+  if (!arch) {
+    return 'x64';
+  }
+
+  if (arch === 'aarch64') {
+    return 'arm64';
+  }
+
+  if (arch === 'amd64') {
+    return 'x64';
+  }
+
+  return arch;
+}
+
 function getBinaryPath(binary, binaryPath) {
   if (process.platform === 'win32') {
     return path.join(binaryPath, `${binary}.exe`);
@@ -90,7 +106,8 @@ function resolveSysroot() {
 }
 
 function resolveRunner(binaryPath) {
-  const isLinuxArmHost = process.platform === 'linux' && process.arch === 'arm64';
+  const hostArch = normaliseArch(process.arch);
+  const isLinuxArmHost = process.platform === 'linux' && hostArch === 'arm64';
   if (!isLinuxArmHost || !isElfX86_64(binaryPath)) {
     return {command: binaryPath, prefix: []};
   }
@@ -153,6 +170,7 @@ if (args.includes('--startup_blob')) {
   process.exit(1);
 }
 
+fsExtra.ensureDirSync(outputDir);
 fsExtra.copySync(mksnapshotDir, workingDir);
 
 const argsFile = path.join(mksnapshotDir, 'mksnapshot_args');
@@ -214,7 +232,7 @@ fs.copyFileSync(path.join(mksnapshotBinaryDir, 'snapshot_blob.bin'), path.join(o
 const v8ContextGenCommand = getBinaryPath('v8_context_snapshot_generator', mksnapshotBinaryDir);
 let v8ContextFile = 'v8_context_snapshot.bin';
 if (process.platform === 'darwin') {
-  const targetArch = process.env.npm_config_arch || process.arch;
+  const targetArch = normaliseArch(process.env.npm_config_arch || process.arch);
   v8ContextFile = targetArch === 'arm64' ? 'v8_context_snapshot.arm64.bin' : 'v8_context_snapshot.x86_64.bin';
 }
 

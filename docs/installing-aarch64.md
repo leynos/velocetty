@@ -2,16 +2,16 @@
 
 This guide covers the extra steps needed to build V8 snapshots on aarch64
 Linux. The main build is supported, but Electron only ships x86_64
-`mksnapshot` binaries for Linux. To run those binaries on aarch64, you need
-QEMU user emulation plus an x86_64 sysroot.
+`mksnapshot` binaries for Linux. To run those binaries on aarch64, the build
+requires QEMU user emulation plus an x86_64 sysroot.
 
 ## Prerequisites
 
 - QEMU user emulation providing `qemu-x86_64` in your `PATH`.
-- A x86_64 sysroot that contains the dynamic loader and standard C++ runtime.
+- An x86_64 sysroot that contains the dynamic loader and standard C++ runtime.
 
 On Fedora aarch64, the default repositories do not provide x86_64 runtime
-packages, so you must supply a sysroot yourself.
+packages, so a sysroot must be supplied separately.
 
 ## Option A: Container-backed sysroot (recommended)
 
@@ -63,13 +63,13 @@ bunx concurrently --help
 
 ### `qemu-x86_64: Could not open '/lib64/ld-linux-x86-64.so.2'`
 
-Your sysroot is missing the loader or QEMU is not pointed at it. Ensure the
+The sysroot is missing the loader, or QEMU is not pointed at it. Ensure the
 loader exists and export `QEMU_LD_PREFIX` to the sysroot path.
 
 ### `qemu-x86_64` not found
 
-Install QEMU user emulation for your distribution, or ensure `qemu-x86_64`
-from your package manager is on `PATH`.
+Install QEMU user emulation for the distribution, or ensure the
+distribution-provided `qemu-x86_64` binary is on `PATH`.
 
 ### `CLI for webpack must be installed`
 
@@ -82,7 +82,7 @@ bun run build:hyper-app
 ### TypeScript errors inside `node_modules`
 
 If `tsc --build --watch` reports errors from `@types/node` or other
-dependencies, ensure your dependencies are up to date and that `skipLibCheck`
+dependencies, ensure the dependencies are up to date and that `skipLibCheck`
 is enabled in `tsconfig.base.json`.
 
 ### `Invalid header: Does not start with Cr24`

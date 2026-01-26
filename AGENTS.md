@@ -153,15 +153,15 @@ browser‑only runtime.
   hints, and asset hashing. Esbuild handles TS/JS transforms in dev; production
   uses Rollup via Vite.
 - **Project scripts (Bun)**:
-- `fmt`: `bunx biome format --write .`
-- `lint`: `bunx biome ci .`
-- `check:types`: `tsc --noEmit`
-- `dev`: `vite`
-- `build`: `vite build`
-- `preview`: `vite preview`
-- `tokens:build`: `node tokens/build/style-dictionary.js`
-- `test`: `bun test --preload ./tests/setup-happy-dom.ts`
-- `test:e2e`: `playwright test`
+  - `fmt`: `bunx biome format --write .`
+  - `lint`: `bunx biome ci .`
+  - `check:types`: `tsc --noEmit`
+  - `dev`: `vite`
+  - `build`: `vite build`
+  - `preview`: `vite preview`
+  - `tokens:build`: `node tokens/build/style-dictionary.js`
+  - `test`: `bun test --preload ./tests/setup-happy-dom.ts`
+  - `test:e2e`: `playwright test`
 
   Prefer Bun's direct shortcuts: `bun fmt`, `bun lint`, `bun check:types`,
   `bun test`, and `bun test:e2e`. Bun accepts `bun run <name>` too, but the

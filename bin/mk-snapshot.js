@@ -9,6 +9,22 @@ const excludedModules = {};
 
 const crossArchDirs = ['clang_x86_v8_arm', 'clang_x64_v8_arm64', 'win_clang_x64'];
 
+function normaliseArch(arch) {
+  if (!arch) {
+    return 'x64';
+  }
+
+  if (arch === 'aarch64') {
+    return 'arm64';
+  }
+
+  if (arch === 'amd64') {
+    return 'x64';
+  }
+
+  return arch;
+}
+
 async function main() {
   const baseDirPath = path.resolve(__dirname, '..');
 
@@ -27,8 +43,7 @@ async function main() {
   // Verify if we will be able to use this in `mksnapshot`
   vm.runInNewContext(result.snapshotScript, undefined, {filename: snapshotScriptPath, displayErrors: true});
 
-  const targetArch =
-    process.env.npm_config_arch || (process.arch.startsWith('arm') ? 'arm64' : 'x64');
+  const targetArch = normaliseArch(process.env.npm_config_arch || process.arch);
   const outputBlobPath = `${baseDirPath}/cache/${targetArch}`;
   await mkdirp(outputBlobPath);
 

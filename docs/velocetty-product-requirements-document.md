@@ -1,12 +1,20 @@
-Right — those two revisions fit *very* cleanly, and they actually make the whole thing feel like a “real editor-class app” rather than “a terminal with extras”.
+# Velocetty product requirements document
 
-Here’s the high-level plan updated to include (a) a normalized command/shortcut system and (b) a tab-handle customisation surface with proper plugin hooks.
+This document defines the current product stance and workstreams for
+Velocetty. It treats the command and shortcut system, and the tab-handle
+customisation surface, as first-class requirements that shape the surrounding
+architecture and user experience.
 
-## Product stance (unchanged, but sharpened)
+## Product stance
 
-We’re building a new terminal that reuses useful work from Hyper/Vercel where it helps, and we are explicitly not targeting backwards compatibility. That gives us permission to design a coherent command system, a first-class settings UX, and a plugin architecture that doesn’t rely on poking internals.
+Velocetty is a new terminal that reuses useful work from Hyper/Vercel where it
+helps, without targeting backwards compatibility. This stance permits a
+coherent command system, a first-class settings user experience, and a plugin
+architecture that does not rely on internal implementation details.
 
-A core design mantra: “Everything the app can do is a command.” Then keybindings, menus, buttons, command palette, and even remote control all become consistent views over the same underlying surface.
+A core design mantra is: “Everything the app can do is a command.” Keybindings,
+menus, buttons, the command palette, and remote control therefore become
+consistent views over the same underlying surface.
 
 ## Workstreams and deliverables
 
