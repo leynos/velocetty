@@ -21,3 +21,4 @@ plugins
 .vscode/*
 !.vscode/launch.json
 .idea
+.grepai/
