@@ -65,6 +65,10 @@ Scope notes:
 - [ ] 1.4.1. Lint succeeds with recommended settings enabled.
 - [ ] 1.4.2. `bun audit` reports no critical, high, or medium vulnerabilities.
 - [ ] 1.4.3. Continuous Integration (CI) dependencies are pinned to SHAs.
+- [ ] 1.4.4. Fully remove dependencies on Yarn and AVA, including in CI.
+- [ ] 1.4.5. Replace Husky with `git-hooks` for repository hook management.
+- [ ] 1.4.6. Adopt `tsgo` for TypeScript compilation and type checking.
+- [ ] 1.4.7. Longer term: replace Webpack with esbuild or Bun (TBD).
 
 ## 2. Rendering overhaul
 
