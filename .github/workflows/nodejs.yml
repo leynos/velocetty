@@ -37,10 +37,21 @@ jobs:
           bun-version: 1.2.21
       - name: Fix node-gyp and Python
         run: python3 -m pip install packaging setuptools
-      - name: Get yarn cache directory path
+      - name: Determine Yarn cache directory
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        run: |
+          set -euo pipefail
+          if command -v yarn >/dev/null 2>&1; then
+            dir="$(yarn cache dir)"
+          else
+            case "${RUNNER_OS}" in
+              Windows) dir="${LOCALAPPDATA}\\Yarn\\Cache" ;;
+              *) dir="${HOME}/.cache/yarn" ;;
+            esac
+          fi
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@v5
+        if: steps.yarn-cache-dir-path.outputs.dir != ''
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock', 'app/yarn.lock') }}
@@ -117,7 +128,7 @@ jobs:
           name: pr_num
           path: ./pr_num.txt
       - uses: actions/cache/save@v5
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && steps.yarn-cache-dir-path.outputs.dir != ''
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock', 'app/yarn.lock') }}
@@ -151,10 +162,21 @@ jobs:
           bun-version: 1.2.21
       - name: Fix node-gyp and Python
         run: python3 -m pip install packaging setuptools
-      - name: Get yarn cache directory path
+      - name: Determine Yarn cache directory
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        run: |
+          set -euo pipefail
+          if command -v yarn >/dev/null 2>&1; then
+            dir="$(yarn cache dir)"
+          else
+            case "${RUNNER_OS}" in
+              Windows) dir="${LOCALAPPDATA}\\Yarn\\Cache" ;;
+              *) dir="${HOME}/.cache/yarn" ;;
+            esac
+          fi
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@v5
+        if: steps.yarn-cache-dir-path.outputs.dir != ''
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock', 'app/yarn.lock') }}
