@@ -4,25 +4,25 @@
   "packageManager": "bun@1.2.21",
   "repository": "zeit/hyper",
   "scripts": {
-    "fmt": "biome check .",
+    "fmt": "node node_modules/@biomejs/biome/bin/biome check .",
     "preinstall": "node bin/ensure-bun.cjs",
     "start": "echo 'please run `bun run dev` in one tab and then `bun run app` in another one'",
-    "app": "cross-env ELECTRONMON_LOGLEVEL=error electronmon target",
-    "dev": "concurrently -n \"Webpack,TypeScript\" -c \"cyan.bold,blue.bold\" \"bunx webpack-cli -w\" \"tsc --build -v --pretty --watch --preserveWatchOutput\" -k",
-    "build": "cross-env NODE_ENV=production bunx webpack-cli && tsc -b -v && cross-env BABEL_ENV=production babel target/renderer/bundle.js --out-file target/renderer/bundle.js --no-comments --minified",
+    "app": "node node_modules/cross-env/src/bin/cross-env.js ELECTRONMON_LOGLEVEL=error node node_modules/electronmon/bin/cli.js target",
+    "dev": "node node_modules/concurrently/dist/bin/concurrently.js -n \"Webpack,TypeScript\" -c \"cyan.bold,blue.bold\" \"bunx webpack-cli -w\" \"node node_modules/typescript/bin/tsc --build -v --pretty --watch --preserveWatchOutput\" -k",
+    "build": "node node_modules/cross-env/src/bin/cross-env.js NODE_ENV=production bunx webpack-cli && node node_modules/typescript/bin/tsc -b -v && node node_modules/cross-env/src/bin/cross-env.js BABEL_ENV=production babel target/renderer/bundle.js --out-file target/renderer/bundle.js --no-comments --minified",
     "build:hyper-app": "bunx webpack-cli --config-name hyper-app",
-    "lint": "biome check .",
+    "lint": "node node_modules/@biomejs/biome/bin/biome check .",
     "test": "bun run lint && bun run test:unit",
     "test:unit": "node node_modules/ava/entrypoints/cli.mjs",
     "test:unit:watch": "bun run test:unit -- --watch",
     "test:e2e": "ava --config ava-e2e.config.js",
-    "postinstall": "bun run v8-snapshot && bun run build:hyper-app && electron-builder install-app-deps && bun run rebuild-node-pty && node bin/copy-node-modules.js && husky install && bun run generate-schema",
-    "rebuild-node-pty": "electron-rebuild -f -o node-pty -m target",
-    "dist": "bun run build && electron-builder",
+    "postinstall": "bun run v8-snapshot && bun run build:hyper-app && node bin/run-electron-builder.cjs install-app-deps && bun run rebuild-node-pty && node bin/copy-node-modules.js && node node_modules/husky/bin.mjs install && bun run generate-schema",
+    "rebuild-node-pty": "node node_modules/@electron/rebuild/lib/cli.js -f -o node-pty -m target",
+    "dist": "bun run build && node bin/run-electron-builder.cjs",
     "clean": "node ./bin/rimraf-standalone.js node_modules && node ./bin/rimraf-standalone.js ./app/node_modules && node ./bin/rimraf-standalone.js ./app/renderer",
     "v8-snapshot": "node bin/run-v8-snapshot.js",
     "v8-snapshot:arch": "bun run mk-snapshot && bun run cp-snapshot",
-    "mk-snapshot": "cross-env ELECTRON_CUSTOM_VERSION=$npm_package_devDependencies_electron node bin/download-mksnapshot.js && node bin/mk-snapshot.js",
+    "mk-snapshot": "node node_modules/cross-env/src/bin/cross-env.js ELECTRON_CUSTOM_VERSION=$npm_package_devDependencies_electron node bin/download-mksnapshot.js && node bin/mk-snapshot.js",
     "cp-snapshot": "node bin/cp-snapshot.js",
     "generate-schema": "bunx typescript-json-schema ./typings/config.d.ts rawConfig -o ./app/config/schema.json --required --ignoreErrors"
   },
@@ -142,6 +142,10 @@
     "ts-node": "10.9.2",
     "typescript": "5.4.5",
     "webpack": "5.91.0"
+  },
+  "overrides": {
+    "node-gyp": "^10.0.0",
+    "@electron/rebuild>node-gyp": "^10.0.0"
   },
   "electronmon": {
     "patterns": [

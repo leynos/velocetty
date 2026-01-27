@@ -48,15 +48,18 @@ bun run postinstall
 
 This project uses `bunx webpack-cli` inside scripts. Running `webpack`
 directly can trigger an interactive npm install that fails on aarch64.
-Similarly, the rebuild step uses `bunx electron-rebuild`, so avoid calling
+Similarly, the rebuild step runs the local `@electron/rebuild` CLI via
+`node node_modules/@electron/rebuild/lib/cli.js`, so avoid calling
 `electron-rebuild` directly. The copy step uses `node bin/copy-node-modules.js`.
+Electron-builder is invoked via `node bin/run-electron-builder.cjs` to avoid
+its package-manager detection running Bun via Node.
 Schema generation uses `bunx typescript-json-schema --ignoreErrors`.
-Development scripts also rely on `electronmon` and `concurrently`. If either
-command is not found, run them through Bun:
+Development scripts also rely on local `electronmon` and `concurrently`
+binaries. If either command is not found, run the local entry points:
 
 ```bash
-bunx electronmon target
-bunx concurrently --help
+node node_modules/electronmon/bin/cli.js target
+node node_modules/concurrently/dist/bin/concurrently.js --help
 ```
 
 ## Troubleshooting
