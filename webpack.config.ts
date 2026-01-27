@@ -1,4 +1,4 @@
-import path from 'path';
+import path from 'node:path';
 
 import Copy from 'copy-webpack-plugin';
 import TerserPlugin from 'terser-webpack-plugin';
@@ -147,7 +147,7 @@ const config: webpack.Configuration[] = [
       })
     ],
     optimization: {
-      minimize: isProd ? true : false,
+      minimize: !!isProd,
       minimizer: [new TerserPlugin()]
     },
     target: 'electron-renderer'
@@ -186,7 +186,7 @@ const config: webpack.Configuration[] = [
       })
     ],
     optimization: {
-      minimize: isProd ? true : false,
+      minimize: !!isProd,
       minimizer: [new TerserPlugin()]
     },
     target: 'node'

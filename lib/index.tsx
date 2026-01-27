@@ -1,6 +1,5 @@
 import './v8-snapshot-util';
 import {webFrame} from 'electron';
-import React from 'react';
 
 import {createRoot} from 'react-dom/client';
 import {Provider} from 'react-redux';
@@ -43,7 +42,7 @@ const fetchFileData = (configData: configOptions) => {
 
   void getBase64FileData(configInfo.bellSoundURL).then((base64FileData) => {
     // prepend "base64," to the result of this method in order for this to work properly within xterm.js
-    const bellSound = !base64FileData ? null : 'base64,' + base64FileData;
+    const bellSound = !base64FileData ? null : `base64,${base64FileData}`;
     configInfo.bellSound = bellSound;
     store_.dispatch(reloadConfig(configInfo));
   });

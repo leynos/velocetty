@@ -1,4 +1,5 @@
-import React, {useCallback, useRef, useEffect, forwardRef} from 'react';
+import type React from 'react';
+import {useCallback, useRef, useEffect, forwardRef} from 'react';
 
 import {VscArrowDown} from '@react-icons/all-files/vsc/VscArrowDown';
 import {VscArrowUp} from '@react-icons/all-files/vsc/VscArrowUp';
@@ -46,7 +47,6 @@ const SearchButton = ({
     <div
       onClick={onClick}
       className={clsx('search-button', {'search-button-active': active})}
-      tabIndex={0}
       onKeyUp={handleKeyUp}
       title={title}
     >
@@ -120,7 +120,7 @@ const SearchBox = forwardRef<HTMLDivElement, SearchBoxProps>((props, ref) => {
 
   useEffect(() => {
     inputRef.current?.focus();
-  }, [inputRef.current]);
+  }, []);
 
   const searchButtonColors: SearchButtonColors = {
     backgroundColor: borderColor,

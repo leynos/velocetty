@@ -7,9 +7,9 @@
  * installed. It therefore avoids third-party modules and reads the pinned Bun
  * version directly from package.json.
  */
-const fs = require('fs');
-const path = require('path');
-const {spawnSync} = require('child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const {spawnSync} = require('node:child_process');
 
 function readPinnedBunVersion() {
   const packageJsonPath = path.resolve(__dirname, '..', 'package.json');

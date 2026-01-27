@@ -37,7 +37,7 @@ const editMenu = (
     {
       label: 'Select All',
       accelerator: commandKeys['editor:selectAll'],
-      click(item, focusedWindow) {
+      click(_item, focusedWindow) {
         execCommand('editor:selectAll', focusedWindow);
       }
     },
@@ -50,28 +50,28 @@ const editMenu = (
         {
           label: 'Previous word',
           accelerator: commandKeys['editor:movePreviousWord'],
-          click(item, focusedWindow) {
+          click(_item, focusedWindow) {
             execCommand('editor:movePreviousWord', focusedWindow);
           }
         },
         {
           label: 'Next word',
           accelerator: commandKeys['editor:moveNextWord'],
-          click(item, focusedWindow) {
+          click(_item, focusedWindow) {
             execCommand('editor:moveNextWord', focusedWindow);
           }
         },
         {
           label: 'Line beginning',
           accelerator: commandKeys['editor:moveBeginningLine'],
-          click(item, focusedWindow) {
+          click(_item, focusedWindow) {
             execCommand('editor:moveBeginningLine', focusedWindow);
           }
         },
         {
           label: 'Line end',
           accelerator: commandKeys['editor:moveEndLine'],
-          click(item, focusedWindow) {
+          click(_item, focusedWindow) {
             execCommand('editor:moveEndLine', focusedWindow);
           }
         }
@@ -83,28 +83,28 @@ const editMenu = (
         {
           label: 'Previous word',
           accelerator: commandKeys['editor:deletePreviousWord'],
-          click(item, focusedWindow) {
+          click(_item, focusedWindow) {
             execCommand('editor:deletePreviousWord', focusedWindow);
           }
         },
         {
           label: 'Next word',
           accelerator: commandKeys['editor:deleteNextWord'],
-          click(item, focusedWindow) {
+          click(_item, focusedWindow) {
             execCommand('editor:deleteNextWord', focusedWindow);
           }
         },
         {
           label: 'Line beginning',
           accelerator: commandKeys['editor:deleteBeginningLine'],
-          click(item, focusedWindow) {
+          click(_item, focusedWindow) {
             execCommand('editor:deleteBeginningLine', focusedWindow);
           }
         },
         {
           label: 'Line end',
           accelerator: commandKeys['editor:deleteEndLine'],
-          click(item, focusedWindow) {
+          click(_item, focusedWindow) {
             execCommand('editor:deleteEndLine', focusedWindow);
           }
         }
@@ -116,14 +116,14 @@ const editMenu = (
     {
       label: 'Clear Buffer',
       accelerator: commandKeys['editor:clearBuffer'],
-      click(item, focusedWindow) {
+      click(_item, focusedWindow) {
         execCommand('editor:clearBuffer', focusedWindow);
       }
     },
     {
       label: 'Search',
       accelerator: commandKeys['editor:search'],
-      click(item, focusedWindow) {
+      click(_item, focusedWindow) {
         execCommand('editor:search', focusedWindow);
       }
     }

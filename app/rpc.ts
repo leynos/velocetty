@@ -1,4 +1,4 @@
-import {EventEmitter} from 'events';
+import {EventEmitter} from 'node:events';
 
 import {ipcMain} from 'electron';
 import type {BrowserWindow, IpcMainEvent} from 'electron';
@@ -39,7 +39,7 @@ export class Server {
     return this.win.webContents;
   }
 
-  ipcListener = <U extends keyof MainEvents>(event: IpcMainEvent, {ev, data}: {ev: U; data: MainEvents[U]}) =>
+  ipcListener = <U extends keyof MainEvents>(_event: IpcMainEvent, {ev, data}: {ev: U; data: MainEvents[U]}) =>
     this.emitter.emit(ev, data);
 
   on = <U extends keyof MainEvents>(ev: U, fn: (arg0: MainEvents[U]) => void) => {

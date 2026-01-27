@@ -1,4 +1,4 @@
-import type {ExecFileOptions, ExecOptions} from 'child_process';
+import type {ExecFileOptions, ExecOptions} from 'node:child_process';
 
 import {ipcRenderer} from './ipc';
 

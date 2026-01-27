@@ -1,6 +1,6 @@
-import {existsSync, readlink, symlink} from 'fs';
-import path from 'path';
-import {promisify} from 'util';
+import {existsSync, readlink, symlink} from 'node:fs';
+import path from 'node:path';
+import {promisify} from 'node:util';
 
 import {clipboard, dialog} from 'electron';
 
@@ -92,7 +92,7 @@ const addBinToUserPath = () => {
       let newPathValue = binPath;
       let type: ValueType = Registry.ValueType.SZ;
       if (pathItem) {
-        type = Registry.queryValueRaw(envKey, pathItem)!.type;
+        type = Registry.queryValueRaw(envKey, pathItem)?.type;
         if (type !== Registry.ValueType.SZ && type !== Registry.ValueType.EXPAND_SZ) {
           reject(`Registry key type is ${type}`);
           return;
@@ -143,7 +143,7 @@ export const installCLI = async (withNotification: boolean) => {
     }
   } else if (process.platform === 'darwin' || process.platform === 'linux') {
     // AppImages are mounted on run at a temporary path, don't create symlink
-    if (process.env['APPIMAGE']) {
+    if (process.env.APPIMAGE) {
       console.log('Skipping CLI symlink creation as it is an AppImage install');
       return;
     }

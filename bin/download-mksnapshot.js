@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const {downloadArtifact} = require('@electron/get');
 const extractZip = require('extract-zip');
 const {normaliseArch} = require('./shared/arch');

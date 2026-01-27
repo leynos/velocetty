@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
+const fs = require('node:fs');
 const fsExtra = require('fs-extra');
-const {spawnSync} = require('child_process');
-const path = require('path');
+const {spawnSync} = require('node:child_process');
+const path = require('node:path');
 const temp = require('temp').track();
 const {normaliseArch} = require('./shared/arch');
 
@@ -35,13 +35,13 @@ function isElfX86_64(binaryPath) {
 
     const machine = header.readUInt16LE(18);
     return machine === 0x3e;
-  } catch (error) {
+  } catch (_error) {
     return false;
   } finally {
     if (fd !== undefined) {
       try {
         fs.closeSync(fd);
-      } catch (closeError) {
+      } catch (_closeError) {
         // Ignore close errors for best-effort detection.
       }
     }
@@ -56,9 +56,7 @@ function findExecutableInPath(names) {
       try {
         fs.accessSync(candidate, fs.constants.X_OK);
         return candidate;
-      } catch (error) {
-        continue;
-      }
+      } catch (_error) {}
     }
   }
 

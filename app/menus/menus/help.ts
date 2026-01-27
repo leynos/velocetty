@@ -1,4 +1,4 @@
-import {release} from 'os';
+import {release} from 'node:os';
 
 import {app, shell, dialog, clipboard} from 'electron';
 import type {MenuItemConstructorOptions} from 'electron';
@@ -8,7 +8,7 @@ import {version} from '../../package.json';
 
 const {arch, env, platform, versions} = process;
 
-const helpMenu = (commands: Record<string, string>, showAbout: () => void): MenuItemConstructorOptions => {
+const helpMenu = (_commands: Record<string, string>, showAbout: () => void): MenuItemConstructorOptions => {
   const submenu: MenuItemConstructorOptions[] = [
     {
       label: `${app.name} Website`,
@@ -18,7 +18,7 @@ const helpMenu = (commands: Record<string, string>, showAbout: () => void): Menu
     },
     {
       label: 'Report Issue',
-      click(menuItem, focusedWindow) {
+      click(_menuItem, focusedWindow) {
         const body = `<!--
   Hi there! Thank you for discovering and submitting an issue.
   Before you submit this; let's make sure of a few things.

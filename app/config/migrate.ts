@@ -1,4 +1,4 @@
-import {dirname, resolve} from 'path';
+import {dirname, resolve} from 'node:path';
 
 import {builders, namedTypes} from 'ast-types';
 import type {ExpressionKind} from 'ast-types/lib/gen/kinds';

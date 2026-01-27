@@ -13,14 +13,14 @@ const shellMenu = (
       {
         label: 'New Tab',
         accelerator: commandKeys['tab:new'],
-        click(item, focusedWindow) {
+        click(_item, focusedWindow) {
           execCommand('tab:new', focusedWindow);
         }
       },
       {
         label: 'New Window',
         accelerator: commandKeys['window:new'],
-        click(item, focusedWindow) {
+        click(_item, focusedWindow) {
           execCommand('window:new', focusedWindow);
         }
       },
@@ -30,14 +30,14 @@ const shellMenu = (
       {
         label: 'Split Down',
         accelerator: commandKeys['pane:splitDown'],
-        click(item, focusedWindow) {
+        click(_item, focusedWindow) {
           execCommand('pane:splitDown', focusedWindow);
         }
       },
       {
         label: 'Split Right',
         accelerator: commandKeys['pane:splitRight'],
-        click(item, focusedWindow) {
+        click(_item, focusedWindow) {
           execCommand('pane:splitRight', focusedWindow);
         }
       },
@@ -51,14 +51,14 @@ const shellMenu = (
             {
               label: 'New Tab',
               accelerator: commandKeys[`tab:new:${profile}`],
-              click(item, focusedWindow) {
+              click(_item, focusedWindow) {
                 execCommand(`tab:new:${profile}`, focusedWindow);
               }
             },
             {
               label: 'New Window',
               accelerator: commandKeys[`window:new:${profile}`],
-              click(item, focusedWindow) {
+              click(_item, focusedWindow) {
                 execCommand(`window:new:${profile}`, focusedWindow);
               }
             },
@@ -68,14 +68,14 @@ const shellMenu = (
             {
               label: 'Split Down',
               accelerator: commandKeys[`pane:splitDown:${profile}`],
-              click(item, focusedWindow) {
+              click(_item, focusedWindow) {
                 execCommand(`pane:splitDown:${profile}`, focusedWindow);
               }
             },
             {
               label: 'Split Right',
               accelerator: commandKeys[`pane:splitRight:${profile}`],
-              click(item, focusedWindow) {
+              click(_item, focusedWindow) {
                 execCommand(`pane:splitRight:${profile}`, focusedWindow);
               }
             }
@@ -88,7 +88,7 @@ const shellMenu = (
       {
         label: 'Close',
         accelerator: commandKeys['pane:close'],
-        click(item, focusedWindow) {
+        click(_item, focusedWindow) {
           execCommand('pane:close', focusedWindow);
         }
       },

@@ -23,7 +23,7 @@ const appVersion = app.getVersion();
 let menu_: Menu;
 
 export const createMenu = (
-  createWindow: (fn?: (win: BrowserWindow) => void, options?: Record<string, any>) => BrowserWindow,
+  _createWindow: (fn?: (win: BrowserWindow) => void, options?: Record<string, any>) => BrowserWindow,
   getLoadedPluginVersions: () => {name: string; version: string}[]
 ) => {
   const config = getConfig();

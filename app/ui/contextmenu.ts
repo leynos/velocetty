@@ -24,7 +24,7 @@ const filterCutCopy = (selection: string, menuItem: MenuItemConstructorOptions) 
 };
 
 const contextMenuTemplate = (
-  createWindow: (fn?: (win: BrowserWindow) => void, options?: Record<string, any>) => BrowserWindow,
+  _createWindow: (fn?: (win: BrowserWindow) => void, options?: Record<string, any>) => BrowserWindow,
   selection: string
 ) => {
   const commandKeys = getCommandKeys(getDecoratedKeymaps());
@@ -34,9 +34,7 @@ const contextMenuTemplate = (
     getProfiles().map((p) => p.name)
   ).submenu as MenuItemConstructorOptions[];
   const _edit = editMenu(commandKeys, execCommand).submenu.filter(filterCutCopy.bind(null, selection));
-  return _edit
-    .concat(separator, _shell)
-    .filter((menuItem) => !Object.prototype.hasOwnProperty.call(menuItem, 'enabled') || menuItem.enabled);
+  return _edit.concat(separator, _shell).filter((menuItem) => !Object.hasOwn(menuItem, 'enabled') || menuItem.enabled);
 };
 
 export default contextMenuTemplate;

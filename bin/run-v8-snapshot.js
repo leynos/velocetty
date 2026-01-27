@@ -1,4 +1,4 @@
-const childProcess = require('child_process');
+const childProcess = require('node:child_process');
 const {normaliseArch} = require('./shared/arch');
 
 function resolveTargetArchitectures() {

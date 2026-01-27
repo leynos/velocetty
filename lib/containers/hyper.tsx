@@ -1,4 +1,4 @@
-import React, {forwardRef, useEffect, useRef} from 'react';
+import {forwardRef, useEffect, useRef} from 'react';
 
 import Mousetrap from 'mousetrap';
 import type {MousetrapInstance} from 'mousetrap';
@@ -22,10 +22,10 @@ const Hyper = forwardRef<HTMLDivElement, HyperProps>((props, ref) => {
 
   useEffect(() => {
     void attachKeyListeners();
-  }, [props.lastConfigUpdate]);
+  }, [attachKeyListeners]);
   useEffect(() => {
     handleFocusActive(props.activeSession);
-  }, [props.activeSession]);
+  }, [props.activeSession, handleFocusActive]);
 
   const handleFocusActive = (uid?: string | null) => {
     const term = uid && terms.current?.getTermByUid(uid);
@@ -72,7 +72,7 @@ const Hyper = forwardRef<HTMLDivElement, HyperProps>((props, ref) => {
   useEffect(() => {
     void attachKeyListeners();
     window.rpc.on('term selectAll', handleSelectAll);
-  }, []);
+  }, [attachKeyListeners, handleSelectAll]);
 
   const onTermsRef = (_terms: Terms | null) => {
     terms.current = _terms;

@@ -1,10 +1,10 @@
 /* eslint-disable eslint-comments/disable-enable-pair */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-import {exec, execFile} from 'child_process';
-import {writeFileSync} from 'fs';
-import {resolve, basename} from 'path';
-import {promisify} from 'util';
+import {exec, execFile} from 'node:child_process';
+import {writeFileSync} from 'node:fs';
+import {resolve, basename} from 'node:path';
+import {promisify} from 'node:util';
 
 import {app, dialog, ipcMain as _ipcMain} from 'electron';
 import type {BrowserWindow, App, MenuItemConstructorOptions} from 'electron';
@@ -63,7 +63,7 @@ config.subscribe(() => {
 // https://github.com/vercel/hyper/issues/619
 function patchModuleLoad() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const Module = require('module');
+  const Module = require('node:module');
   const originalLoad = Module._load;
   Module._load = function _load(modulePath: string) {
     // PLEASE NOTE: Code changes here, also need to be changed in
@@ -158,7 +158,7 @@ function getPluginVersions() {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       version = require(resolve(path_, 'package.json')).version;
       //eslint-disable-next-line no-empty
-    } catch (err) {}
+    } catch (_err) {}
     return [basename(path_), version];
   });
 }
@@ -198,9 +198,9 @@ if (cache.get('hyper.plugins') !== id || process.env.HYPER_FORCE_UPDATE) {
 
 (() => {
   const baseConfig = config.getConfig();
-  if (baseConfig['autoUpdatePlugins']) {
+  if (baseConfig.autoUpdatePlugins) {
     // otherwise update plugins every 5 hours
-    setInterval(updatePlugins, ms(baseConfig['autoUpdatePlugins'] === true ? '5h' : baseConfig['autoUpdatePlugins']));
+    setInterval(updatePlugins, ms(baseConfig.autoUpdatePlugins === true ? '5h' : baseConfig.autoUpdatePlugins));
   }
 })();
 
@@ -220,7 +220,7 @@ function syncPackageJSON() {
   const file = resolve(path, 'package.json');
   try {
     writeFileSync(file, JSON.stringify(pkg, null, 2));
-  } catch (err) {
+  } catch (_err) {
     alert(`An error occurred writing to ${file}`);
   }
 }
@@ -296,7 +296,7 @@ function requirePlugins(): any[] {
       try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         mod._version = require(resolve(path_, 'package.json')).version;
-      } catch (err) {
+      } catch (_err) {
         console.warn(`No package.json found in ${path_}`);
       }
       console.log(`Plugin ${mod._name} (${mod._version}) loaded.`);
@@ -464,11 +464,11 @@ export {toDependencies as _toDependencies};
 
 const ipcMain = _ipcMain as IpcMainWithCommands;
 
-ipcMain.handle('child_process.exec', (event, command, options) => {
+ipcMain.handle('child_process.exec', (_event, command, options) => {
   return promisify(exec)(command, options);
 });
 
-ipcMain.handle('child_process.execFile', (event, file, args, options) => {
+ipcMain.handle('child_process.execFile', (_event, file, args, options) => {
   return promisify(execFile)(file, args, options);
 });
 
@@ -476,5 +476,5 @@ ipcMain.handle('getLoadedPluginVersions', () => getLoadedPluginVersions());
 ipcMain.handle('getPaths', () => getPaths());
 ipcMain.handle('getBasePaths', () => getBasePaths());
 ipcMain.handle('getDeprecatedConfig', () => getDeprecatedConfig());
-ipcMain.handle('getDecoratedConfig', (e, profile) => getDecoratedConfig(profile));
+ipcMain.handle('getDecoratedConfig', (_e, profile) => getDecoratedConfig(profile));
 ipcMain.handle('getDecoratedKeymaps', () => getDecoratedKeymaps());

@@ -1,7 +1,7 @@
-const childProcess = require('child_process');
-const vm = require('vm');
-const path = require('path');
-const fs = require('fs');
+const childProcess = require('node:child_process');
+const vm = require('node:vm');
+const path = require('node:path');
+const fs = require('node:fs');
 const electronLink = require('electron-link');
 const {mkdirp} = require('fs-extra');
 const {normaliseArch} = require('./shared/arch');
@@ -19,7 +19,7 @@ async function main() {
     mainPath: `${__dirname}/snapshot-libs.js`,
     cachePath: `${baseDirPath}/cache`,
     // eslint-disable-next-line no-prototype-builtins
-    shouldExcludeModule: (modulePath) => excludedModules.hasOwnProperty(modulePath)
+    shouldExcludeModule: (modulePath) => Object.hasOwn(excludedModules, modulePath)
   });
 
   const snapshotScriptPath = `${baseDirPath}/cache/snapshot-libs.js`;

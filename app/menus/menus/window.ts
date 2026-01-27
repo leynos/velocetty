@@ -36,14 +36,14 @@ const windowMenu = (
           {
             label: 'Previous',
             accelerator: commandKeys['tab:prev'],
-            click: (item, focusedWindow) => {
+            click: (_item, focusedWindow) => {
               execCommand('tab:prev', focusedWindow);
             }
           },
           {
             label: 'Next',
             accelerator: commandKeys['tab:next'],
-            click: (item, focusedWindow) => {
+            click: (_item, focusedWindow) => {
               execCommand('tab:next', focusedWindow);
             }
           },
@@ -62,14 +62,14 @@ const windowMenu = (
           {
             label: 'Previous',
             accelerator: commandKeys['pane:prev'],
-            click: (item, focusedWindow) => {
+            click: (_item, focusedWindow) => {
               execCommand('pane:prev', focusedWindow);
             }
           },
           {
             label: 'Next',
             accelerator: commandKeys['pane:next'],
-            click: (item, focusedWindow) => {
+            click: (_item, focusedWindow) => {
               execCommand('pane:next', focusedWindow);
             }
           }
@@ -83,7 +83,7 @@ const windowMenu = (
       },
       {
         label: 'Toggle Always on Top',
-        click: (item, focusedWindow) => {
+        click: (_item, focusedWindow) => {
           execCommand('window:toggleKeepOnTop', focusedWindow);
         }
       },

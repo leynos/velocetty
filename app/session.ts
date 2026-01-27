@@ -1,6 +1,6 @@
-import {EventEmitter} from 'events';
-import {dirname} from 'path';
-import {StringDecoder} from 'string_decoder';
+import {EventEmitter} from 'node:events';
+import {dirname} from 'node:path';
+import {StringDecoder} from 'node:string_decoder';
 
 import defaultShell from 'default-shell';
 import type {IPty, IWindowsPtyForkOptions, spawn as npSpawn} from 'node-pty';
@@ -22,7 +22,7 @@ let spawn: typeof npSpawn;
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   spawn = require('node-pty').spawn;
-} catch (err) {
+} catch (_err) {
   throw createNodePtyError();
 }
 
@@ -106,7 +106,7 @@ export default class Session extends EventEmitter {
     this.batcher = null;
     this.shell = null;
     this.ended = false;
-    this.initTimestamp = new Date().getTime();
+    this.initTimestamp = Date.now();
     this.init(options);
   }
 
@@ -118,8 +118,7 @@ export default class Session extends EventEmitter {
     const shell = _shell || defaultShell;
     const shellArgs = _shellArgs || defaultShellArgs;
 
-    const cleanEnv =
-      process.env['APPIMAGE'] && process.env['APPDIR'] ? shellEnv.sync(_shell || defaultShell) : process.env;
+    const cleanEnv = process.env.APPIMAGE && process.env.APPDIR ? shellEnv.sync(_shell || defaultShell) : process.env;
     const baseEnv: Record<string, string> = {
       ...cleanEnv,
       LANG: `${osLocale.sync().replace(/-/, '_')}.UTF-8`,
@@ -131,9 +130,9 @@ export default class Session extends EventEmitter {
     };
     // path to AppImage mount point is added to PATH environment variable automatically
     // which conflicts with the cli
-    if (baseEnv['APPIMAGE'] && baseEnv['APPDIR']) {
-      baseEnv['PATH'] = [dirname(cliScriptPath)]
-        .concat((baseEnv['PATH'] || '').split(':').filter((val) => !val.startsWith(baseEnv['APPDIR'])))
+    if (baseEnv.APPIMAGE && baseEnv.APPDIR) {
+      baseEnv.PATH = [dirname(cliScriptPath)]
+        .concat((baseEnv.PATH || '').split(':').filter((val) => !val.startsWith(baseEnv.APPDIR)))
         .join(':');
     }
 
@@ -183,7 +182,7 @@ export default class Session extends EventEmitter {
       if (!this.ended) {
         // fall back to default shell config if the shell exits within 1 sec with non zero exit code
         // this will inform users in case there are errors in the config instead of instant exit
-        const runDuration = new Date().getTime() - this.initTimestamp;
+        const runDuration = Date.now() - this.initTimestamp;
         if (e.exitCode > 0 && runDuration < 1000) {
           const fallBackShellConfig = getFallBackShellConfig(shell, shellArgs, defaultShell, defaultShellArgs);
           if (fallBackShellConfig) {

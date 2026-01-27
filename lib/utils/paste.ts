@@ -8,7 +8,7 @@ const getPath = (platform: string) => {
       if (clipboard.has('NSFilenamesPboardType')) {
         // Parse plist file containing the path list of copied files
         const list = plist.parse(clipboard.read('NSFilenamesPboardType')) as plist.PlistArray;
-        return "'" + list.join("' '") + "'";
+        return `'${list.join("' '")}'`;
       } else {
         return null;
       }

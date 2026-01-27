@@ -1,4 +1,4 @@
-import React, {forwardRef} from 'react';
+import {forwardRef} from 'react';
 
 import type {TabsProps} from '../../typings/hyper';
 import {decorate, getTabProps} from '../utils/plugins';

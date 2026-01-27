@@ -39,7 +39,7 @@ const SplitPane = forwardRef<HTMLDivElement, SplitPaneProps>((props, ref) => {
     const target = ev.target as HTMLDivElement;
     dragTarget.current = target;
     dragPanePosition.current = dragTarget.current.getBoundingClientRect()[d2];
-    panesSize.current = target.parentElement!.getBoundingClientRect()[d1];
+    panesSize.current = target.parentElement?.getBoundingClientRect()[d1];
     paneIndex.current = index;
   };
 
@@ -84,7 +84,7 @@ const SplitPane = forwardRef<HTMLDivElement, SplitPaneProps>((props, ref) => {
     return () => {
       onDragEnd();
     };
-  }, []);
+  }, [onDragEnd]);
 
   const {children, direction, borderColor} = props;
   const sizeProperty = direction === 'horizontal' ? 'height' : 'width';

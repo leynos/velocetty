@@ -181,7 +181,7 @@ export default class Term extends React.PureComponent<
 
     // The parent element for the terminal is attached and removed manually so
     // that we can preserve it across mounts and unmounts of the component
-    this.termRef = props.term ? props.term.element!.parentElement! : document.createElement('div');
+    this.termRef = props.term ? props.term.element?.parentElement! : document.createElement('div');
     this.termRef.className = 'term_fit term_term';
 
     this.termWrapperRef?.appendChild(this.termRef);
@@ -250,7 +250,7 @@ export default class Term extends React.PureComponent<
     }
 
     try {
-      this.term.element!.style.padding = props.padding;
+      this.term.element?.style.padding = props.padding;
     } catch (error) {
       console.log(error);
     }
@@ -457,7 +457,7 @@ export default class Term extends React.PureComponent<
     this.termOptions = nextTermOptions;
 
     try {
-      this.term.element!.style.padding = this.props.padding;
+      this.term.element?.style.padding = this.props.padding;
     } catch (error) {
       console.log(error);
     }

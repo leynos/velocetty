@@ -1,6 +1,6 @@
-import {existsSync} from 'fs';
-import {isAbsolute, normalize, sep} from 'path';
-import {URL, fileURLToPath} from 'url';
+import {existsSync} from 'node:fs';
+import {isAbsolute, normalize, sep} from 'node:path';
+import {URL, fileURLToPath} from 'node:url';
 
 import {app, BrowserWindow, shell, Menu} from 'electron';
 import type {BrowserWindowConstructorOptions} from 'electron';
@@ -252,7 +252,7 @@ export function newWindow(
     Menu.buildFromTemplate(contextMenuTemplate(createWindow, selection)).popup({window});
   });
   rpc.on('open hamburger menu', ({x, y}) => {
-    Menu.getApplicationMenu()!.popup({x: Math.ceil(x), y: Math.ceil(y)});
+    Menu.getApplicationMenu()?.popup({x: Math.ceil(x), y: Math.ceil(y)});
   });
   // Same deal as above, grabbing the window titlebar when the window
   // is maximized on Windows results in unmaximize, without hitting any

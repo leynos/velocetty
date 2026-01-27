@@ -1,4 +1,4 @@
-import {EventEmitter} from 'events';
+import {EventEmitter} from 'node:events';
 
 import type {IpcRendererEvent} from 'electron';
 
@@ -29,7 +29,7 @@ export default class Client {
       }, 0);
     } else {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      this.ipc.on('init', (ev: IpcRendererEvent, uid: string, profileName: string) => {
+      this.ipc.on('init', (_ev: IpcRendererEvent, uid: string, _profileName: string) => {
         // we cache so that if the object
         // gets re-instantiated we don't
         // wait for a `init` event
@@ -43,7 +43,7 @@ export default class Client {
   }
 
   ipcListener = <U extends keyof RendererEvents>(
-    event: IpcRendererEvent,
+    _event: IpcRendererEvent,
     {ch, data}: {ch: U; data: RendererEvents[U]}
   ) => this.emitter.emit(ch, data);
 

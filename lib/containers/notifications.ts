@@ -53,7 +53,7 @@ const mapStateToProps = (state: HyperState) => {
       ...state_,
       updateShowing: true,
       updateVersion: ui.updateVersion,
-      updateNote: ui.updateNotes!.split('\n')[0],
+      updateNote: ui.updateNotes?.split('\n')[0],
       updateReleaseUrl: ui.updateReleaseUrl,
       updateCanInstall: ui.updateCanInstall
     };
