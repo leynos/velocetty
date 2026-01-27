@@ -4,6 +4,7 @@ A modern, extensible terminal built on open web standards.
 
 Velocetty is a fork of [Hyper](https://github.com/vercel/hyper) by Vercel, extending the original vision with a command-driven architecture, improved rendering performance, and a robust plugin system.
 
+
 ## Project status
 
 Velocetty is under active development. The current roadmap focuses on:
@@ -51,6 +52,7 @@ Velocetty is under active development. The current roadmap focuses on:
 - Browser-based terminal UI
 
 For full details, see [docs/roadmap.md](docs/roadmap.md).
+
 
 ## Usage
 

@@ -5,10 +5,5 @@
     "outDir": "../target/",
     "noImplicitAny": false
   },
-  "include": [
-    "./**/*",
-    "./package.json",
-    "../typings/extend-electron.d.ts",
-    "../typings/ext-modules.d.ts"
-  ]
+  "include": ["./**/*", "./package.json", "../typings/extend-electron.d.ts", "../typings/ext-modules.d.ts"]
 }

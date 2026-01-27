@@ -4,26 +4,11 @@ const path = require('path');
 const fs = require('fs');
 const electronLink = require('electron-link');
 const {mkdirp} = require('fs-extra');
+const {normaliseArch} = require('./shared/arch');
 
 const excludedModules = {};
 
 const crossArchDirs = ['clang_x86_v8_arm', 'clang_x64_v8_arm64', 'win_clang_x64'];
-
-function normaliseArch(arch) {
-  if (!arch) {
-    return 'x64';
-  }
-
-  if (arch === 'aarch64') {
-    return 'arm64';
-  }
-
-  if (arch === 'amd64') {
-    return 'x64';
-  }
-
-  return arch;
-}
 
 async function main() {
   const baseDirPath = path.resolve(__dirname, '..');

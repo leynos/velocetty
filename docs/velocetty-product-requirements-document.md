@@ -2,7 +2,7 @@
 
 This document defines the current product stance and workstreams for
 Velocetty. It treats the command and shortcut system, and the tab-handle
-customisation surface, as first-class requirements that shape the surrounding
+customization surface, as first-class requirements that shape the surrounding
 architecture and user experience.
 
 ## Product stance
@@ -20,7 +20,9 @@ consistent views over the same underlying surface.
 
 ### 0) Foundation and scaffolding
 
-Keep the earlier foundations, plus one extra decision we now need early: a “command bus” abstraction that both core and plugins can use, spanning frontend and backend.
+Keep the earlier foundations, plus one extra decision needed early: a “command
+bus” abstraction that both core and plugins can use, spanning frontend and
+backend.
 
 Deliverables:
 
@@ -30,11 +32,14 @@ Deliverables:
 
 - Basic instrumentation (input latency, frame timing, context allocation).
 
-- A “golden path” example plugin that exercises commands + settings + tab decoration.
+- A “golden path” example plugin that exercises commands + settings + tab
+  decoration.
 
 ### 1) Rendering: WebGL only for visible panes
 
-Unchanged goal, but with a specific interface boundary: rendering should consume a “pane model” that can also feed tab decorations (process name, cwd, activity state) without plugins spelunking UI internals.
+Unchanged goal, but with a specific interface boundary: rendering should
+consume a “pane model” that can also feed tab decorations (process name, cwd,
+activity state) without plugins spelunking UI internals.
 
 Deliverables:
 
@@ -66,31 +71,36 @@ Deliverables:
 
 ### 3) Command system and keybinding management (new, first-class workstream)
 
-This is the “VS Code / Windows Terminal / Obsidian” part: a normalized command registry, a dispatcher, a keybinding engine, and a UI to manage it.
+This is the “VS Code / Windows Terminal / Obsidian” part: a normalized command
+registry, a dispatcher, a keybinding engine, and a UI to manage it.
 
 Deliverables (core):
 
 - Command registry:
 
-- Stable command IDs (`terminal.splitPane`, `tab.close`, `workspace.openSettings`, etc.)
+- Stable command IDs (`terminal.splitPane`, `tab.close`,
+  `workspace.openSettings`, etc.)
 
 - Metadata: title, category, description, icon (optional), searchable keywords.
 
 - Enablement/visibility conditions (“when” clauses) driven by context keys.
 
-- Optional argument schema (so commands can be invoked programmatically and validated).
+- Optional argument schema (so commands can be invoked programmatically and
+  validated).
 
 - Command dispatcher:
 
-- Single invocation path used by keyboard shortcuts, command palette, menus, buttons, and plugin calls.
+- Single invocation path used by keyboard shortcuts, command palette, menus,
+  buttons, and plugin calls.
 
 - Supports async commands and cancellation semantics where sensible.
 
 - Keybinding engine:
 
-- Supports chords (e.g. `Ctrl+K Ctrl+S`) if you want VS Code parity.
+- Supports chords (e.g. `Ctrl+K Ctrl+S`) to match VS Code parity.
 
-- Context-aware resolution using “when” expressions (e.g. `terminalFocus && !findWidgetVisible`).
+- Context-aware resolution using “when” expressions (e.g.
+  `terminalFocus && !findWidgetVisible`).
 
 - Conflict detection and deterministic precedence rules.
 
@@ -106,7 +116,8 @@ Deliverables (core):
 
 - Keybinding editor UI:
 
-- Search commands, set/remove bindings, show conflicts, export/import (still JSON5 canonical).
+- Search commands, set/remove bindings, show conflicts, export/import (still
+  JSON5 canonical).
 
 - Clear affordances for “reset to defaults”.
 
@@ -116,19 +127,27 @@ Deliverables (plugin hooks):
 
 - `registerCommand(id, metadata, handler)`
 
-- `registerKeybindings([{ commandId, keys, when }])` (or contribute defaults via manifest/schema)
+- `registerKeybindings([{ commandId, keys, when }])` (or contribute defaults
+  via manifest/schema)
 
-- Plugins can contribute context keys (or subscribe to existing ones) so shortcuts can be conditional in meaningful ways.
+- Plugins can contribute context keys (or subscribe to existing ones) so
+  shortcuts can be conditional in meaningful ways.
 
-- Plugins can expose commands to the palette automatically, with an option to hide them unless explicitly enabled.
+- Plugins can expose commands to the palette automatically, with an option to
+  hide them unless explicitly enabled.
 
 Security/architecture notes that matter later:
 
-- A command is the perfect choke-point for permissioning once you have a remote frontend. If a backend-owned command implies privileged access (filesystem, PTY spawning, credentials), the command invocation should traverse a permission-aware boundary even if it originated in the local UI.
+- A command is the perfect choke-point for permissioning once a remote frontend
+  exists. If a backend-owned command implies privileged access (filesystem,
+  PTY spawning, credentials), the command invocation should traverse a
+  permission-aware boundary even if it originated in the local UI.
 
 ### 4) Settings tab + plugin settings panels (with security posture explicit)
 
-The settings tab remains, but now it *must* integrate with the command system: “Open Settings”, “Search Settings”, “Reset Setting”, “Export Config”, “Open Keybindings”, etc. should all be commands.
+The settings tab remains, but now it *must* integrate with the command system:
+“Open Settings”, “Search Settings”, “Reset Setting”, “Export Config”, “Open
+Keybindings”, etc. should all be commands.
 
 Deliverables:
 
@@ -138,13 +157,16 @@ Deliverables:
 
 - Schema-driven panels as the safe default.
 
-- Optional arbitrary React panels as an explicit opt-in with a stated security model (trusted vs sandboxed).
+- Optional arbitrary React panels as an explicit opt-in with a stated security
+  model (trusted vs sandboxed).
 
 ### 5) Schema-driven settings panels for plugins
 
 Same as before, but tightened around the command system:
 
-- Schema can declare settings fields *and* optional commands (e.g. “Test connection”, “Clear cache”, “Re-index”), so plugins don’t invent bespoke UI glue.
+- Schema can declare settings fields *and* optional commands (e.g. “Test
+  connection”, “Clear cache”, “Re-index”), so plugins don’t invent bespoke UI
+  glue.
 
 Deliverables:
 
@@ -154,19 +176,23 @@ Deliverables:
 
 - Namespaced persistence into JSON5.
 
-### 6) Vertical tabs + rich tab content + clean tab-handle customisation hooks (expanded)
+### 6) Vertical tabs + rich tab content + clean tab-handle customization hooks (expanded)
 
-This is your second revision: tab handles themselves become an extensibility surface, without plugins mucking with layout internals.
+This revision treats tab handles themselves as an extensibility surface, without
+plugins mucking with layout internals.
 
-The key is to treat the tab handle as a composition of “slots” with well-defined data inputs and merge rules, rather than “here’s a React component, good luck”.
+The key is to treat the tab handle as a composition of “slots” with
+well-defined data inputs and merge rules, rather than “here’s a React
+component, good luck”.
 
 Deliverables (core):
 
-- Vertical tab rail and rich tab content (pinning, grouping, reorder, activity indicators).
+- Vertical tab rail and rich tab content (pinning, grouping, reorder, activity
+  indicators).
 
 - Tab model and state lifecycle (activate/deactivate, serialize/restore).
 
-Deliverables (tab handle customisation API):
+Deliverables (tab handle customization API):
 
 - A “Tab Decoration API” that exposes stable slots, for example:
 
@@ -178,25 +204,33 @@ Deliverables (tab handle customisation API):
 
 - Badges (e.g. exit code, bell indicator, git branch)
 
-- Right-side widgets (careful: keep this constrained to avoid performance/UI chaos)
+- Right-side widgets (careful: keep this constrained to avoid performance/UI
+  chaos)
 
 - Providers, not overrides:
 
-- Plugins register “decoration providers” that receive a read-only context (tab id, active pane id, process info, cwd, activity/bell state, maybe last command) and return partial decorations.
+- Plugins register “decoration providers” that receive a read-only context (tab
+  id, active pane id, process info, cwd, activity/bell state, maybe last
+  command) and return partial decorations.
 
-- The host merges contributions deterministically (priority + explicit conflict rules).
+- The host merges contributions deterministically (priority + explicit conflict
+  rules).
 
 - Performance discipline:
 
-- Decoration updates should be event-driven (process changed, cwd changed, tab focus changed), not polling.
+- Decoration updates should be event-driven (process changed, cwd changed, tab
+  focus changed), not polling.
 
-- Providers may be async, but with caching and timeouts so a slow plugin doesn’t stall tab rendering.
+- Providers may be async, but with caching and timeouts so a slow plugin doesn’t
+  stall tab rendering.
 
 - User control:
 
-- Settings to enable/disable specific decoration providers and define precedence (“prefer process icon plugin over default icon”).
+- Settings to enable/disable specific decoration providers and define
+  precedence (“prefer process icon plugin over default icon”).
 
-- Optional per-provider settings surfaced through the schema-driven settings system.
+- Optional per-provider settings surfaced through the schema-driven settings
+  system.
 
 Examples this directly supports:
 
@@ -204,11 +238,14 @@ Examples this directly supports:
 
 - “Second line shows CWD”: provider adds subtitle = cwd (with truncation rules).
 
-- More exotic: show git branch for cwd, show SSH host, show container name — all without breaking the host.
+- More exotic: show git branch for cwd, show SSH host, show container name —
+  all without breaking the host.
 
 Security note:
 
-- Tab decoration providers are a surprisingly sensitive surface once remote UI exists, because they can leak information (paths, hostnames). You’ll want a redaction/permission story for what metadata can be exposed to a remote frontend.
+- Tab decoration providers are a surprisingly sensitive surface once remote UI
+  exists, because they can leak information (paths, hostnames). A redaction and
+  permission model is required for metadata exposed to a remote frontend.
 
 ### 7) Move host to Tauri
 
@@ -226,7 +263,8 @@ Deliverables:
 
 ### 8) Frontend/backend segregation + remote frontend + protobuf/WebSocket comms
 
-This becomes cleaner because commands already exist as the canonical “intent” layer.
+This becomes cleaner because commands already exist as the canonical “intent”
+layer.
 
 Deliverables:
 
@@ -242,7 +280,7 @@ Deliverables:
 
 - WebSocket transport with multiplexing.
 
-- Authentication and authorisation model for remote attachment.
+- Authentication and authorization model for remote attachment.
 
 - Capability negotiation (local Tauri UI can do X; remote browser UI can do Y).
 
@@ -258,15 +296,18 @@ Visible-only WebGL; stable multi-pane; measurable latency improvements.
 
 Phase 3: JSON5 + command system + keybindings (do these together)
 
-Config is canonical; command palette exists; keybinding editor works; plugins can register commands safely; UI actions route through commands.
+Config is canonical; command palette exists; keybinding editor works; plugins
+can register commands safely; UI actions route through commands.
 
 Phase 4: Settings tab + schema-driven plugin settings
 
-Settings UX complete; plugins add settings panels; settings can trigger commands.
+Settings UX complete; plugins add settings panels; settings can trigger
+commands.
 
 Phase 5: Vertical tabs + tab handle decoration API
 
-Vertical tabs ship; plugin providers can influence icon/title/subtitle/badges deterministically and performantly.
+Vertical tabs ship; plugin providers can influence icon/title/subtitle/badges
+deterministically and performantly.
 
 Phase 6: Tauri host integration
 
@@ -274,12 +315,22 @@ Desktop host solid, backend owns privileged ops, packaging pipeline in place.
 
 Phase 7: Remote frontend + protocol
 
-Browser UI can attach; protobuf/WebSocket comms stable and versioned; auth/permissions defined.
+Browser UI can attach; protobuf/WebSocket comms stable and versioned;
+auth/permissions defined.
 
 ## A couple of design “gotchas” worth nailing early
 
-The command “when” system: if you get this right, everything else becomes easy. You’ll want context keys like `terminalFocus`, `paneCount > 1`, `findOpen`, `settingsOpen`, `tabType == "terminal"`, etc. Make them explicit and testable, not ad-hoc booleans scattered through components.
+The command “when” system should keep context keys explicit and testable, such
+as
+`terminalFocus`, `paneCount > 1`, `findOpen`, `settingsOpen`, or
+`tabType == "terminal"`, instead of ad-hoc booleans scattered through
+components.
 
-Tab decoration merge rules: define them up-front. For instance, if two plugins provide an icon, do you pick highest priority? Do you allow stacking (badge + icon) but not dual icons? The UX gets messy fast if the rules are implicit.
+Tab decoration merge rules should be defined up-front. For example, when two
+plugins provide icons, the rules should clarify whether priority wins, stacking
+(badge + icon) is permitted, or dual icons are disallowed to avoid ambiguous
+UX.
 
-That’s the revised high-level plan. It’s still “high level”, but it now has the right pressure points surfaced so the PRD and tech design can lock decisions early instead of discovering them mid-implementation.
+The revised high-level plan remains high level, but it now surfaces the right
+pressure points so the PRD and tech design can lock decisions early instead of
+discovering them mid-implementation.

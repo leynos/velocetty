@@ -87,7 +87,7 @@
 ## Refactoring Heuristics & Workflow
 
 - **Recognizing Refactoring Needs:** Regularly assess the codebase for potential
-  refactoring opportunities. Consider refactoring when you observe:
+  refactoring opportunities. Consider refactoring when observations indicate:
 - **Long Methods/Functions:** Functions or methods that are excessively long
     or try to do too many things.
 - **Duplicated Code:** Identical or very similar code blocks appearing in

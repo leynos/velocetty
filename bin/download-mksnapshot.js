@@ -2,22 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const {downloadArtifact} = require('@electron/get');
 const extractZip = require('extract-zip');
-
-function normaliseArch(arch) {
-  if (!arch) {
-    return 'x64';
-  }
-
-  if (arch === 'aarch64') {
-    return 'arm64';
-  }
-
-  if (arch === 'amd64') {
-    return 'x64';
-  }
-
-  return arch;
-}
+const {normaliseArch} = require('./shared/arch');
 
 function resolveElectronVersion() {
   if (process.env.ELECTRON_CUSTOM_VERSION) {
@@ -27,7 +12,12 @@ function resolveElectronVersion() {
   const packageJsonPath = path.resolve(__dirname, '..', 'package.json');
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
-  return packageJson.devDependencies?.electron;
+  const electronVersion = packageJson.devDependencies?.electron;
+  if (!electronVersion) {
+    return undefined;
+  }
+
+  return electronVersion.replace(/^[~^]/, '');
 }
 
 async function main() {
@@ -38,8 +28,7 @@ async function main() {
 
   const platform = process.env.npm_config_platform || process.platform;
   const arch = normaliseArch(process.env.npm_config_arch || process.arch);
-  const downloadArch =
-    arch.startsWith('arm') && platform !== 'darwin' ? `${arch}-x64` : arch;
+  const downloadArch = arch.startsWith('arm') && platform !== 'darwin' ? `${arch}-x64` : arch;
   const strictSslEnv = process.env.npm_config_strict_ssl;
   // npm's strict-ssl defaults to true; only disable verification explicitly.
   const rejectUnauthorized = strictSslEnv !== 'false';

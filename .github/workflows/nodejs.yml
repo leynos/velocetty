@@ -34,7 +34,7 @@ jobs:
       - name: Use Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.2.21
+          bun-version: 1.3.7
       - name: Fix node-gyp and Python
         run: python3 -m pip install packaging setuptools
       - name: Determine Yarn cache directory
@@ -58,7 +58,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Install
-        run: yarn install
+        run: bun install
         env:
           npm_config_node_gyp: ${{ github.workspace }}${{ runner.os == 'Windows' && '\node_modules\node-gyp\bin\node-gyp.js' || '/node_modules/node-gyp/bin/node-gyp.js' }}
       - name: Install libarchive-tools
@@ -116,6 +116,7 @@ jobs:
         with:
           name: e2e-${{ matrix.os }}
           path: dist/tmp/*.png
+          if-no-files-found: warn
       - name: Save the pr number in an artifact
         if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest'
         env:
@@ -159,7 +160,7 @@ jobs:
       - name: Use Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.2.21
+          bun-version: 1.3.7
       - name: Fix node-gyp and Python
         run: python3 -m pip install packaging setuptools
       - name: Determine Yarn cache directory
@@ -184,7 +185,7 @@ jobs:
             ${{ runner.os }}-yarn-
       - name: Install
         run: |
-          yarn install
+          bun install
           sudo apt update
           sudo apt install libarchive-tools
       - name: Compile

@@ -6,11 +6,10 @@
  * Bun-native test that shells out to AVA and asserts that it succeeds.
  */
 const {spawnSync} = require('node:child_process');
-const path = require('node:path');
 const {expect, test} = require('bun:test');
 
 function resolveAvaCliPath() {
-  return path.resolve(__dirname, '..', 'node_modules', 'ava', 'entrypoints', 'cli.mjs');
+  return require.resolve('ava/cli');
 }
 
 test('AVA unit suite passes', () => {

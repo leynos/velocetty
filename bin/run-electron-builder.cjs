@@ -8,34 +8,25 @@
  * fails with a syntax error. Clearing these variables keeps the execution
  * path consistent and local to this repository.
  */
-const { spawnSync } = require("node:child_process");
-const { resolve } = require("node:path");
+const {spawnSync} = require('node:child_process');
+const {resolve} = require('node:path');
 
-const electronBuilderCli = resolve(
-  __dirname,
-  "..",
-  "node_modules",
-  "electron-builder",
-  "out",
-  "cli",
-  "cli.js",
-);
+const electronBuilderCli = resolve(__dirname, '..', 'node_modules', 'electron-builder', 'out', 'cli', 'cli.js');
 
 const args = process.argv.slice(2);
-const env = { ...process.env };
+const env = {...process.env};
 
 delete env.npm_execpath;
 delete env.npm_node_execpath;
 
 const result = spawnSync(process.execPath, [electronBuilderCli, ...args], {
-  stdio: "inherit",
-  env,
+  stdio: 'inherit',
+  env
 });
 
 if (result.error) {
-  console.error("Failed to run electron-builder:", result.error);
+  console.error('Failed to run electron-builder:', result.error);
   process.exit(1);
 }
 
 process.exit(result.status ?? 1);
-

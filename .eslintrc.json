@@ -1,12 +1,5 @@
 {
-  "plugins": [
-    "react",
-    "prettier",
-    "@typescript-eslint",
-    "eslint-comments",
-    "lodash",
-    "import"
-  ],
+  "plugins": ["react", "prettier", "@typescript-eslint", "eslint-comments", "lodash", "import"],
   "extends": [
     "eslint:recommended",
     "plugin:react/recommended",
@@ -22,9 +15,7 @@
       "experimentalObjectRestSpread": true
     },
     "allowImportExportEverywhere": true,
-    "project": [
-      "./tsconfig.eslint.json"
-    ]
+    "project": ["./tsconfig.eslint.json"]
   },
   "env": {
     "es6": true,
@@ -41,10 +32,7 @@
     "import/internal-regex": "^(electron|react)$"
   },
   "rules": {
-    "func-names": [
-      "error",
-      "as-needed"
-    ],
+    "func-names": ["error", "as-needed"],
     "no-shadow": "error",
     "no-extra-semi": 0,
     "react/prop-types": 0,
@@ -66,22 +54,16 @@
       }
     ],
     "eslint-comments/no-unused-disable": "error",
-    "react/no-unknown-property":[
+    "react/no-unknown-property": [
       "error",
       {
-        "ignore": [
-          "jsx",
-          "global"
-        ]
+        "ignore": ["jsx", "global"]
       }
     ]
   },
   "overrides": [
     {
-      "files": [
-        "**.ts",
-        "**.tsx"
-      ],
+      "files": ["**.ts", "**.tsx"],
       "extends": [
         "plugin:@typescript-eslint/recommended",
         "plugin:@typescript-eslint/recommended-requiring-type-checking",
@@ -99,9 +81,9 @@
         "@typescript-eslint/no-unsafe-assignment": "off",
         "@typescript-eslint/no-unsafe-member-access": "off",
         "@typescript-eslint/restrict-template-expressions": "off",
-        "@typescript-eslint/consistent-type-imports": [ "error", { "disallowTypeAnnotations": false } ],
-        "lodash/prop-shorthand": [ "error", "always" ],
-        "lodash/import-scope": [ "error", "method" ],
+        "@typescript-eslint/consistent-type-imports": ["error", { "disallowTypeAnnotations": false }],
+        "lodash/prop-shorthand": ["error", "always"],
+        "lodash/import-scope": ["error", "method"],
         "lodash/collection-return": "error",
         "lodash/collection-method-value": "error",
         "import/no-extraneous-dependencies": "error",
@@ -109,14 +91,7 @@
         "import/order": [
           "error",
           {
-            "groups": [
-              "builtin",
-              "internal",
-              "external",
-              "parent",
-              "sibling",
-              "index"
-            ],
+            "groups": ["builtin", "internal", "external", "parent", "sibling", "index"],
             "newlines-between": "always",
             "alphabetize": {
               "order": "asc",
@@ -128,31 +103,14 @@
       }
     },
     {
-      "extends": [
-        "plugin:jsonc/recommended-with-json",
-        "plugin:json-schema-validator/recommended"
-      ],
-      "files": [
-        "*.json"
-      ],
+      "extends": ["plugin:jsonc/recommended-with-json", "plugin:json-schema-validator/recommended"],
+      "files": ["*.json"],
       "parser": "jsonc-eslint-parser",
-      "plugins": [
-        "jsonc",
-        "json-schema-validator"
-      ],
+      "plugins": ["jsonc", "json-schema-validator"],
       "rules": {
-        "jsonc/array-element-newline": [
-          "error",
-          "consistent"
-        ],
-        "jsonc/array-bracket-newline": [
-          "error",
-          "consistent"
-        ],
-        "jsonc/indent": [
-          "error",
-          2
-        ],
+        "jsonc/array-element-newline": ["error", "consistent"],
+        "jsonc/array-bracket-newline": ["error", "consistent"],
+        "jsonc/indent": ["error", 2],
         "prettier/prettier": "off",
         "json-schema-validator/no-invalid": "error"
       }

@@ -1,20 +1,5 @@
 const childProcess = require('child_process');
-
-function normaliseArch(arch) {
-  if (!arch) {
-    return 'x64';
-  }
-
-  if (arch === 'aarch64') {
-    return 'arm64';
-  }
-
-  if (arch === 'amd64') {
-    return 'x64';
-  }
-
-  return arch;
-}
+const {normaliseArch} = require('./shared/arch');
 
 function resolveTargetArchitectures() {
   const hostArch = normaliseArch(process.arch);
