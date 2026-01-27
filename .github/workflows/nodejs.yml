@@ -22,17 +22,36 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Use Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
+      - name: Enable Yarn (Corepack)
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+      - name: Use Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.21
       - name: Fix node-gyp and Python
         run: python3 -m pip install packaging setuptools
-      - name: Get yarn cache directory path
+      - name: Determine Yarn cache directory
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
-      - uses: actions/cache/restore@v4
+        run: |
+          set -euo pipefail
+          if command -v yarn >/dev/null 2>&1; then
+            dir="$(yarn cache dir)"
+          else
+            case "${RUNNER_OS}" in
+              Windows) dir="${LOCALAPPDATA}\\Yarn\\Cache" ;;
+              *) dir="${HOME}/.cache/yarn" ;;
+            esac
+          fi
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v5
+        if: steps.yarn-cache-dir-path.outputs.dir != ''
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock', 'app/yarn.lock') }}
@@ -87,29 +106,29 @@ jobs:
         run: yarn run test:e2e
       - name: Run E2E Tests on Linux
         if: runner.os == 'Linux'
-        uses: GabrielBB/xvfb-action@v1.6
+        uses: GabrielBB/xvfb-action@v1.7
         with:
           run: yarn run test:e2e
         env:
           SHELL: /bin/bash
       - name: Archive E2E test screenshot
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v6
         with:
-          name: e2e
+          name: e2e-${{ matrix.os }}
           path: dist/tmp/*.png
       - name: Save the pr number in an artifact
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest'
         env:
           PR_NUM: ${{ github.event.number }}
         run: echo $PR_NUM > pr_num.txt
       - name: Upload the pr num
-        uses: actions/upload-artifact@v3
-        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v6
+        if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest'
         with:
           name: pr_num
           path: ./pr_num.txt
-      - uses: actions/cache/save@v4
-        if: github.event_name == 'push'
+      - uses: actions/cache/save@v5
+        if: github.event_name == 'push' && steps.yarn-cache-dir-path.outputs.dir != ''
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock', 'app/yarn.lock') }}
@@ -128,17 +147,36 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Use Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
+      - name: Enable Yarn (Corepack)
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+      - name: Use Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.21
       - name: Fix node-gyp and Python
         run: python3 -m pip install packaging setuptools
-      - name: Get yarn cache directory path
+      - name: Determine Yarn cache directory
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
-      - uses: actions/cache/restore@v4
+        run: |
+          set -euo pipefail
+          if command -v yarn >/dev/null 2>&1; then
+            dir="$(yarn cache dir)"
+          else
+            case "${RUNNER_OS}" in
+              Windows) dir="${LOCALAPPDATA}\\Yarn\\Cache" ;;
+              *) dir="${HOME}/.cache/yarn" ;;
+            esac
+          fi
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v5
+        if: steps.yarn-cache-dir-path.outputs.dir != ''
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock', 'app/yarn.lock') }}
@@ -152,7 +190,7 @@ jobs:
       - name: Compile
         run: yarn run build
       - name: rebuild node-pty
-        uses: pguyot/arm-runner-action@v2.5.2
+        uses: pguyot/arm-runner-action@v2.6.5
         with:
           image_additional_mb: 2000
           base_image: ${{ matrix.image }}

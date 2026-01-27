@@ -9,6 +9,22 @@ const excludedModules = {};
 
 const crossArchDirs = ['clang_x86_v8_arm', 'clang_x64_v8_arm64', 'win_clang_x64'];
 
+function normaliseArch(arch) {
+  if (!arch) {
+    return 'x64';
+  }
+
+  if (arch === 'aarch64') {
+    return 'arm64';
+  }
+
+  if (arch === 'amd64') {
+    return 'x64';
+  }
+
+  return arch;
+}
+
 async function main() {
   const baseDirPath = path.resolve(__dirname, '..');
 
@@ -27,7 +43,8 @@ async function main() {
   // Verify if we will be able to use this in `mksnapshot`
   vm.runInNewContext(result.snapshotScript, undefined, {filename: snapshotScriptPath, displayErrors: true});
 
-  const outputBlobPath = `${baseDirPath}/cache/${process.env.npm_config_arch}`;
+  const targetArch = normaliseArch(process.env.npm_config_arch || process.arch);
+  const outputBlobPath = `${baseDirPath}/cache/${targetArch}`;
   await mkdirp(outputBlobPath);
 
   if (process.platform !== 'darwin') {
@@ -43,8 +60,9 @@ async function main() {
 
   console.log(`Generating startup blob in "${outputBlobPath}"`);
   childProcess.execFileSync(
-    path.resolve(__dirname, '..', 'node_modules', '.bin', 'mksnapshot' + (process.platform === 'win32' ? '.cmd' : '')),
-    [snapshotScriptPath, '--output_dir', outputBlobPath]
+    process.execPath,
+    [path.resolve(__dirname, 'mksnapshot-wrapper.js'), snapshotScriptPath, '--output_dir', outputBlobPath],
+    {stdio: 'inherit'}
   );
 }
 

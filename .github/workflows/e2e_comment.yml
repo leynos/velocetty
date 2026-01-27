@@ -14,34 +14,66 @@ jobs:
           WORKFLOW_RUN_INFO: ${{ toJSON(github.event.workflow_run) }}
         run: echo "$WORKFLOW_RUN_INFO"
       - name: Download Artifacts
-        uses: dawidd6/action-download-artifact@v3.1.4
+        uses: dawidd6/action-download-artifact@v12
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workflow: nodejs.yml
           run_id: ${{ github.event.workflow_run.id }}
-          name: e2e
+          name: ^e2e-
+          name_is_regexp: true
+          path: e2e-artifacts
+          if_no_artifact_found: warn
       - name: Get PR number
-        uses: dawidd6/action-download-artifact@v3.1.4
+        uses: dawidd6/action-download-artifact@v12
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workflow: nodejs.yml
           run_id: ${{ github.event.workflow_run.id }}
           name: pr_num
+          if_no_artifact_found: warn
+      - name: Check PR number artefact
+        id: pr_num_exists
+        run: |
+          if [ -f pr_num.txt ]; then
+            echo "exists=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=0" >> "$GITHUB_OUTPUT"
+          fi
       - name: Read the pr_num file
+        if: steps.pr_num_exists.outputs.exists == '1'
         id: pr_num_reader
         uses: juliangruber/read-file-action@v1.1.7
         with:
           path: ./pr_num.txt
+      - name: Collect screenshots
+        if: steps.pr_num_exists.outputs.exists == '1'
+        run: |
+          mkdir -p screenshots
+          mkdir -p e2e-artifacts
+          while IFS= read -r -d '' file; do
+            rel_path="${file#e2e-artifacts/}"
+            safe_name=$(printf '%s' "$rel_path" | tr '/ ' '--')
+            cp "$file" "screenshots/$safe_name"
+          done < <(find e2e-artifacts -type f -name '*.png' -print0)
+      - name: Count screenshots
+        id: screenshot_count
+        if: steps.pr_num_exists.outputs.exists == '1'
+        run: |
+          count=$(find screenshots -type f -name '*.png' | wc -l | tr -d ' ')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
       - name: List images
-        run: ls -al
+        if: steps.pr_num_exists.outputs.exists == '1' && steps.screenshot_count.outputs.count != '0'
+        run: ls -al screenshots
       - name: Upload images to imgur
         id: upload_screenshots
+        if: steps.pr_num_exists.outputs.exists == '1' && steps.screenshot_count.outputs.count != '0'
         uses: devicons/public-upload-to-imgur@v2.2.2
         with:
-          path: ./*.png
+          path: ./screenshots/*.png
           client_id: ${{ secrets.IMGUR_CLIENT_ID }}
       - name: Comment on the PR
-        uses: jungwinter/comment@v1
+        if: steps.pr_num_exists.outputs.exists == '1' && steps.screenshot_count.outputs.count != '0'
+        uses: jungwinter/comment@v1.1.0
         env:
           IMG_MARKDOWN: ${{ join(fromJSON(steps.upload_screenshots.outputs.markdown_urls), '') }}
           MESSAGE: |
@@ -57,6 +89,7 @@ jobs:
           body: ${{ format(env.MESSAGE, env.IMG_MARKDOWN, github.repository, github.event.workflow_run.id) }}
       - name: Hide older comments
         uses: kanga333/comment-hider@v0.4.0
+        if: steps.pr_num_exists.outputs.exists == '1'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           leave_visible: 1
