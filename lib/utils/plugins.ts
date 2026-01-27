@@ -269,16 +269,16 @@ const loadModules = () => {
   const loadedPlugins = plugins.getLoadedPluginVersions().map((plugin: any) => plugin.name);
   modules = paths.plugins
     .concat(paths.localPlugins)
-    .filter((plugin) => loadedPlugins.indexOf(pathModule.basename(plugin)) !== -1)
-    .map((path) => {
+    .filter((pluginPath: string) => loadedPlugins.indexOf(pathModule.basename(pluginPath)) !== -1)
+    .map((pluginPath: string) => {
       let mod: hyperPlugin;
-      const pluginName = getPluginName(path);
-      const pluginVersion = getPluginVersion(path);
+      const pluginName = getPluginName(pluginPath);
+      const pluginVersion = getPluginVersion(pluginPath);
 
       // window.require allows us to ensure this doesn't get
       // in the way of our build
       try {
-        mod = window.require(path);
+        mod = window.require(pluginPath);
       } catch (err) {
         notify(
           'Plugin load error',
@@ -379,7 +379,7 @@ const loadModules = () => {
 
       return mod;
     })
-    .filter((mod): mod is hyperPlugin => Boolean(mod));
+    .filter((mod: hyperPlugin | undefined): mod is hyperPlugin => Boolean(mod));
 
   const deprecatedPlugins = plugins.getDeprecatedConfig();
   Object.keys(deprecatedPlugins).forEach((name) => {

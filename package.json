@@ -4,6 +4,7 @@
   "packageManager": "bun@1.2.21",
   "repository": "zeit/hyper",
   "scripts": {
+    "fmt": "biome check .",
     "preinstall": "node bin/ensure-bun.cjs",
     "start": "echo 'please run `bun run dev` in one tab and then `bun run app` in another one'",
     "app": "cross-env ELECTRONMON_LOGLEVEL=error electronmon target",

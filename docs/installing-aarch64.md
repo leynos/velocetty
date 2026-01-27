@@ -7,7 +7,7 @@ requires QEMU user emulation plus an x86_64 sysroot.
 
 ## Prerequisites
 
-- QEMU user emulation providing `qemu-x86_64` in your `PATH`.
+- QEMU user emulation providing `qemu-x86_64` in the `PATH`.
 - An x86_64 sysroot that contains the dynamic loader and standard C++ runtime.
 
 On Fedora aarch64, the default repositories do not provide x86_64 runtime

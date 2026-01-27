@@ -85,11 +85,26 @@ function getV8ContextFileName(archToCopy) {
   }
 }
 
+function resolveMacBundleName(context) {
+  const appInfo = context?.packager?.appInfo;
+  const bundleName = appInfo?.productFilename || appInfo?.productName || 'Hyper';
+  return `${bundleName}.app`;
+}
+
 exports.default = async (context) => {
   const archToCopy = Arch[context.arch];
   const pathToElectron =
     process.platform === 'darwin'
-      ? `${context.appOutDir}/Hyper.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Resources`
+      ? path.join(
+          context.appOutDir,
+          resolveMacBundleName(context),
+          'Contents',
+          'Frameworks',
+          'Electron Framework.framework',
+          'Versions',
+          'A',
+          'Resources'
+        )
       : context.appOutDir;
   copySnapshot(pathToElectron, archToCopy);
 };

@@ -250,7 +250,7 @@ Keep docs close to code.
   deterministic and parallel‑safe.
 - **Fixtures**: Use factories/builders for component props and server
   responses. Avoid ad hoc object literals in tests.
-- **Parameterised tests**: Drive variations with helper builders or tight loops
+- **Parameterized tests**: Drive variations with helper builders or tight loops
   rather than copy‑pasting cases.
 - **Mocking**: Prefer dependency injection; if you must stub modules, lean on
   the `mock` helpers provided by `bun:test`.
@@ -294,7 +294,7 @@ Keep docs close to code.
   Avoid `refetchOnWindowFocus` unless the data truly needs it.
 - **Async**: Avoid `await` inside loops; batch with `Promise.allSettled`. Use
   `async` iterables/streams for large data.
-- **Rendering**: Enable React StrictMode in dev; memoise expensive components;
+- **Rendering**: Enable React StrictMode in dev; memoize expensive components;
   prefer derived data via selectors.
 - **Stability**: Keep JSON stable (deterministic key order) for snapshots and
   client‑side caches.
@@ -303,7 +303,7 @@ Keep docs close to code.
 
 - **CSP**: Ship a Content Security Policy where deployment allows it. For SPA
   hosting, prefer hashed scripts and forbid `eval`/`new Function`.
-- **Trusted Types**: If embedding third‑party HTML, gate through a sanitiser
+- **Trusted Types**: If embedding third‑party HTML, gate through a sanitizer
   and (where supported) Trusted Types policies.
 - **Secrets**: Never hard‑code secrets in client bundles. Use public,
   least‑privilege tokens only; treat everything as public.
@@ -340,9 +340,9 @@ Keep docs close to code.
   `select` to project server data for components. Wire `AbortSignal` to
   fetches. Use `retry` policies appropriate to the endpoint.
 - **Router** (if used): Code‑split per route; prefetch data on navigation where
-  it improves perceived performance. Handle not‑found/unauthorised with typed
+  it improves perceived performance. Handle not‑found/unauthorized with typed
   loaders.
-- **Table** (if used): Keep row models pure; virtualise for large sets; memoise
+- **Table** (if used): Keep row models pure; virtualize for large sets; memoize
   column defs.
 - **State**: Encapsulate server state with TanStack Query and model complex
   local state with reducers or state machines inside custom hooks.
