@@ -1,3 +1,4 @@
+/** @file Migrates Hyper 3 configuration into the Hyper 4 format. */
 import {dirname, resolve} from 'node:path';
 
 import {builders, namedTypes} from 'ast-types';

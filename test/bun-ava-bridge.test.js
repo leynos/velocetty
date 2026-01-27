@@ -5,11 +5,13 @@
  * Bun's test runner requires `.test`/`.spec` filenames, so provide a single
  * Bun-native test that shells out to AVA and asserts that it succeeds.
  */
+const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 const {expect, test} = require('bun:test');
 
 function resolveAvaCliPath() {
-  return require.resolve('ava/cli');
+  const avaPackagePath = require.resolve('ava/package.json');
+  return path.join(path.dirname(avaPackagePath), 'entrypoints', 'cli.mjs');
 }
 
 test('AVA unit suite passes', () => {

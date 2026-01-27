@@ -1,3 +1,4 @@
+/** @file Injects global scrollbar styles based on theme colours. */
 import {forwardRef} from 'react';
 
 import type {StyleSheetProps} from '../../typings/hyper';

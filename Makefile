@@ -1,4 +1,6 @@
-.PHONY: check-fmt typecheck lint test
+.PHONY: all check-fmt typecheck lint test clean
+
+all: check-fmt lint test
 
 check-fmt:
 	node node_modules/@biomejs/biome/bin/biome check --linter-enabled=false --assist-enabled=false .
@@ -11,3 +13,6 @@ lint:
 
 test:
 	bun run test
+
+clean:
+	bun run clean

@@ -1,3 +1,4 @@
+/** @file Renders the tabs strip and new tab controls. */
 import {forwardRef} from 'react';
 
 import type {TabsProps} from '../../typings/hyper';

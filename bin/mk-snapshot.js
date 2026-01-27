@@ -18,7 +18,6 @@ async function main() {
     baseDirPath: baseDirPath,
     mainPath: `${__dirname}/snapshot-libs.js`,
     cachePath: `${baseDirPath}/cache`,
-    // eslint-disable-next-line no-prototype-builtins
     shouldExcludeModule: (modulePath) => Object.hasOwn(excludedModules, modulePath)
   });
 

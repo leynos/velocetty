@@ -1,5 +1,7 @@
+/** @file Verifies Hyper side effects for key bindings and focus. */
 import React from 'react';
 import {createRoot} from 'react-dom/client';
+// react-dom/test-utils is required until React 18.3+ exposes act from react.
 import {act} from 'react-dom/test-utils';
 
 import test from 'ava';
@@ -25,11 +27,11 @@ test.serial('Hyper attaches key listeners on mount and config updates', async (t
       execCommand: () => ({type: 'exec'})
     },
     '../utils/plugins': {
-      connect: () => (Component: React.ComponentType<any>) => Component
+      connect: () => (Component: React.ComponentType<unknown>) => Component
     },
     './header': {HeaderContainer: () => null},
     './notifications': () => null,
-    './terms': (props: {ref_: (terms: any) => void}) => {
+    './terms': (props: {ref_: (terms: unknown) => void}) => {
       props.ref_({
         getTermByUid: () => null,
         getActiveTerm: () => null
@@ -139,11 +141,11 @@ test.serial('Hyper focuses the active session when it changes', async (t) => {
       execCommand: () => ({type: 'exec'})
     },
     '../utils/plugins': {
-      connect: () => (Component: React.ComponentType<any>) => Component
+      connect: () => (Component: React.ComponentType<unknown>) => Component
     },
     './header': {HeaderContainer: () => null},
     './notifications': () => null,
-    './terms': (props: {ref_: (terms: any) => void}) => {
+    './terms': (props: {ref_: (terms: unknown) => void}) => {
       props.ref_({
         getTermByUid: (uid: string) => (uid === 'session-1' ? termStub : null),
         getActiveTerm: () => termStub

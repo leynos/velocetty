@@ -1,3 +1,4 @@
+/** @file Creates and manages the main application window. */
 import {existsSync} from 'node:fs';
 import {isAbsolute, normalize, sep} from 'node:path';
 import {URL, fileURLToPath} from 'node:url';
@@ -248,8 +249,7 @@ export function newWindow(
     void shell.openExternal(url);
   });
   rpc.on('open context menu', (selection) => {
-    const {createWindow} = app;
-    Menu.buildFromTemplate(contextMenuTemplate(createWindow, selection)).popup({window});
+    Menu.buildFromTemplate(contextMenuTemplate(selection)).popup({window});
   });
   rpc.on('open hamburger menu', ({x, y}) => {
     Menu.getApplicationMenu()?.popup({x: Math.ceil(x), y: Math.ceil(y)});

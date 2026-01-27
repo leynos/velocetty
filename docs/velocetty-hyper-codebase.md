@@ -8772,6 +8772,18 @@ The following pattern demonstrates Velocetty's approach to unit testing with moc
 - Electron Automated Testing Guide: https://www.electronjs.org/docs/latest/tutorial/automated-testing
 - AVA Test Runner: https://github.com/avajs/ava
 
+### 6.6.12 Biome rule adoption notes
+
+Biome is now the primary linter. Some rules remain disabled while legacy
+violations are refactored. Track progress in roadmap item 1.4.8 and log rule
+enablement here as each one is reintroduced:
+
+- `noExplicitAny`
+- `noNonNullAssertion`
+- `useNodejsImportProtocol`
+- `useExhaustiveDependencies`
+- a11y rule set
+
 # 7. User Interface Design
 
 ## 7.1 OVERVIEW

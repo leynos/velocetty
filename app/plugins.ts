@@ -1,6 +1,4 @@
-/* eslint-disable eslint-comments/disable-enable-pair */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+/** @file Manages plugin lifecycle and exposes plugin APIs to the app. */
 import {exec, execFile} from 'node:child_process';
 import {writeFileSync} from 'node:fs';
 import {resolve, basename} from 'node:path';

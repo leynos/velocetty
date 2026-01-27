@@ -1,3 +1,4 @@
+/** @file Renders a single tab with close and select handlers. */
 import type React from 'react';
 import {forwardRef} from 'react';
 

@@ -32,14 +32,17 @@ const SplitPane = forwardRef<HTMLDivElement, SplitPaneProps>((props, ref) => {
 
   const handleDragStart = (ev: React.MouseEvent<HTMLDivElement>, index: number) => {
     ev.preventDefault();
+    const target = ev.target as HTMLDivElement;
+    const parent = target.parentElement;
+    if (!parent) {
+      return;
+    }
     setDragging(true);
     window.addEventListener('mousemove', onDrag);
     window.addEventListener('mouseup', onDragEnd);
-
-    const target = ev.target as HTMLDivElement;
     dragTarget.current = target;
     dragPanePosition.current = dragTarget.current.getBoundingClientRect()[d2];
-    panesSize.current = target.parentElement?.getBoundingClientRect()[d1];
+    panesSize.current = parent.getBoundingClientRect()[d1];
     paneIndex.current = index;
   };
 
@@ -59,6 +62,9 @@ const SplitPane = forwardRef<HTMLDivElement, SplitPaneProps>((props, ref) => {
   };
 
   const onDrag = (ev: MouseEvent) => {
+    if (!panesSize.current) {
+      return;
+    }
     const sizes_ = getSizes();
 
     const i = paneIndex.current;
@@ -84,7 +90,7 @@ const SplitPane = forwardRef<HTMLDivElement, SplitPaneProps>((props, ref) => {
     return () => {
       onDragEnd();
     };
-  }, [onDragEnd]);
+  }, []);
 
   const {children, direction, borderColor} = props;
   const sizeProperty = direction === 'horizontal' ? 'height' : 'width';

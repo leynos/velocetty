@@ -1,6 +1,10 @@
+/** @file Provides Happy DOM setup helpers for unit tests. */
 import {Window} from 'happy-dom';
 
 type Cleanup = () => void;
+type RpcStub = {
+  on: () => void;
+};
 
 export const setupHappyDom = (): Cleanup => {
   const window = new Window();
@@ -33,7 +37,7 @@ export const setupHappyDom = (): Cleanup => {
     };
   }
 
-  window.rpc = {
+  (window as Window & {rpc: RpcStub}).rpc = {
     on: () => {}
   };
 

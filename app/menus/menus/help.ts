@@ -1,3 +1,4 @@
+/** @file Builds the Help menu and GitHub issue template links. */
 import {release} from 'node:os';
 
 import {app, shell, dialog, clipboard} from 'electron';

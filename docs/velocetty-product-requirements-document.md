@@ -244,7 +244,7 @@ Examples this directly supports:
 Security note:
 
 - Tab decoration providers are a surprisingly sensitive surface once remote UI
-  exists, because they can leak information (paths, hostnames). A redaction and
+  exists because they can leak information (paths, hostnames). A redaction and
   permission model is required for metadata exposed to a remote frontend.
 
 ### 7) Move host to Tauri

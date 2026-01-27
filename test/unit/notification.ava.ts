@@ -1,5 +1,7 @@
+/** @file Exercises notification timing and dismissal behaviour. */
 import React from 'react';
 import {createRoot} from 'react-dom/client';
+// react-dom/test-utils is required until React 18.3+ exposes act from react.
 import {act} from 'react-dom/test-utils';
 
 import test from 'ava';
@@ -30,7 +32,11 @@ test.serial('Notification auto-dismisses after the timeout on mount', async (t) 
   await waitFor(15);
   const indicator = container.querySelector('.notification_indicator');
   t.truthy(indicator);
-  indicator?.dispatchEvent(new Event('webkitTransitionEnd'));
+  if (!indicator) {
+    t.fail('Expected notification indicator to be present.');
+  } else {
+    indicator.dispatchEvent(new Event('webkitTransitionEnd'));
+  }
 
   t.is(dismissCount, 1);
 
@@ -71,11 +77,19 @@ test.serial('Notification resets the timer when text changes', async (t) => {
   await waitFor(12);
   const indicator = container.querySelector('.notification_indicator');
   t.truthy(indicator);
-  indicator?.dispatchEvent(new Event('webkitTransitionEnd'));
+  if (!indicator) {
+    t.fail('Expected notification indicator to be present.');
+  } else {
+    indicator.dispatchEvent(new Event('webkitTransitionEnd'));
+  }
   t.is(dismissCount, 0);
 
   await waitFor(12);
-  indicator?.dispatchEvent(new Event('webkitTransitionEnd'));
+  if (!indicator) {
+    t.fail('Expected notification indicator to be present.');
+  } else {
+    indicator.dispatchEvent(new Event('webkitTransitionEnd'));
+  }
   t.is(dismissCount, 1);
 
   root.unmount();

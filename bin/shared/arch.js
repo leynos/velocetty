@@ -1,5 +1,10 @@
 const DEFAULT_ARCH = 'x64';
 
+/**
+ * Normalises architecture aliases to Electron-supported values.
+ * @param {string | undefined} arch - The raw architecture string.
+ * @returns {string} The normalised architecture.
+ */
 function normaliseArch(arch) {
   if (!arch) {
     return DEFAULT_ARCH;

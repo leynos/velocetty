@@ -1,6 +1,5 @@
 // Packages
 import {app, dialog, Menu} from 'electron';
-import type {BrowserWindow} from 'electron';
 
 // Utilities
 import {execCommand} from '../commands';
@@ -22,10 +21,7 @@ const appVersion = app.getVersion();
 
 let menu_: Menu;
 
-export const createMenu = (
-  _createWindow: (fn?: (win: BrowserWindow) => void, options?: Record<string, any>) => BrowserWindow,
-  getLoadedPluginVersions: () => {name: string; version: string}[]
-) => {
+export const createMenu = (getLoadedPluginVersions: () => {name: string; version: string}[]) => {
   const config = getConfig();
   // We take only first shortcut in array for each command
   const allCommandKeys = getDecoratedKeymaps();
