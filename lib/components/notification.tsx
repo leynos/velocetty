@@ -1,5 +1,5 @@
-import type React from 'react';
-import {forwardRef, useEffect, useRef, useState} from 'react';
+// biome-ignore lint/style/useImportType: React value is required for JSX runtime under ts-node tests.
+import React, {forwardRef, useEffect, useRef, useState} from 'react';
 
 import type {NotificationProps} from '../../typings/hyper';
 
@@ -9,18 +9,14 @@ const Notification = forwardRef<HTMLDivElement, React.PropsWithChildren<Notifica
 
   useEffect(() => {
     setDismissTimer();
-  }, [setDismissTimer]);
+  }, []);
 
   useEffect(() => {
     // if we have a timer going and the notification text
     // changed we reset the timer
     resetDismissTimer();
     setDismissing(false);
-  }, [
-    // if we have a timer going and the notification text
-    // changed we reset the timer
-    resetDismissTimer
-  ]);
+  }, [props.text]);
 
   const handleDismiss = () => {
     setDismissing(true);

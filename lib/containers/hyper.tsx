@@ -1,4 +1,5 @@
-import {forwardRef, useEffect, useRef} from 'react';
+// biome-ignore lint/correctness/noUnusedImports: React value is required for JSX runtime under ts-node tests.
+import React, {forwardRef, useEffect, useRef} from 'react';
 
 import Mousetrap from 'mousetrap';
 import type {MousetrapInstance} from 'mousetrap';
@@ -22,10 +23,10 @@ const Hyper = forwardRef<HTMLDivElement, HyperProps>((props, ref) => {
 
   useEffect(() => {
     void attachKeyListeners();
-  }, [attachKeyListeners]);
+  }, [props.lastConfigUpdate]);
   useEffect(() => {
     handleFocusActive(props.activeSession);
-  }, [props.activeSession, handleFocusActive]);
+  }, [props.activeSession]);
 
   const handleFocusActive = (uid?: string | null) => {
     const term = uid && terms.current?.getTermByUid(uid);
@@ -70,9 +71,8 @@ const Hyper = forwardRef<HTMLDivElement, HyperProps>((props, ref) => {
   };
 
   useEffect(() => {
-    void attachKeyListeners();
     window.rpc.on('term selectAll', handleSelectAll);
-  }, [attachKeyListeners, handleSelectAll]);
+  }, []);
 
   const onTermsRef = (_terms: Terms | null) => {
     terms.current = _terms;
