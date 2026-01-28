@@ -116,7 +116,7 @@ function reportAllowedAdvisories(expected) {
  * Determine whether the current module is executed as the entry script.
  *
  * @param {ImportMeta} meta Module metadata provided by Node.js.
- * @returns {boolean} Whether the script was launched directly via `node`.
+ * @returns {boolean} Whether the script was launched directly via `bun`.
  * @example
  * if (isExecutedDirectly(import.meta)) {
  *   console.log('Run from CLI');

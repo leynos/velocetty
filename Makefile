@@ -3,10 +3,10 @@
 all: check-fmt lint test
 
 check-fmt:
-	node node_modules/@biomejs/biome/bin/biome check --linter-enabled=false --assist-enabled=false .
+	bun node_modules/@biomejs/biome/bin/biome check --linter-enabled=false --assist-enabled=false .
 
 typecheck:
-	node node_modules/.bin/tsgo --project tsconfig.typecheck.json
+	bun node_modules/.bin/tsgo --project tsconfig.typecheck.json
 
 lint:
 	bun run lint

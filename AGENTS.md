@@ -48,6 +48,14 @@
 - A documentation style guide lives in
   `docs/documentation-style-guide.md`.
 
+## Tooling Defaults
+
+- Use `bun` for JavaScript/TypeScript script invocations (including shebangs)
+  unless there is a known reason not to. Any exception must be explicitly
+  noted alongside the invocation or in this file.
+- AVA does not run reliably under Bun (missing `node:v8` coverage hooks), so
+  `test:unit` and the AVA bridge test intentionally invoke `node`.
+
 ## Change Quality & Committing
 
 - **Atomicity:** Aim for small, focused, atomic changes. Each change (and
