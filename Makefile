@@ -1,4 +1,6 @@
-.PHONY: all check-fmt typecheck lint test clean nixie
+.PHONY: all check-fmt typecheck lint test clean markdownlint nixie
+
+MDLINT ?= markdownlint-cli2
 
 all: check-fmt typecheck lint test
 
@@ -16,6 +18,9 @@ test:
 
 clean:
 	bun run clean
+
+markdownlint:
+	find . -type f -name '*.md' -not -path '*/target/*' -not -path '*/node_modules/*' -print0 | xargs -0 $(MDLINT)
 
 nixie:
 	# CI currently requires --no-sandbox; remove once nixie supports
