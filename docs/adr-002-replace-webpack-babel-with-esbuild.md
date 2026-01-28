@@ -104,7 +104,8 @@ once plugin and asset handling are validated.
 ### Phase 3: Full pipeline
 
 - Migrate remaining build steps and remove Webpack and Babel dependencies.
-- Update CI and documentation to reflect the new build flow.
+- Update Continuous Integration (CI) pipelines and documentation to reflect
+  the new build flow.
 
 ## Known Risks and Limitations
 

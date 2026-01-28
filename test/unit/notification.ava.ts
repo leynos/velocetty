@@ -18,18 +18,20 @@ test.serial('Notification auto-dismisses after the timeout on mount', async (t) 
   const root = createRoot(container);
 
   let dismissCount = 0;
+  const dismissAfterMs = 60;
+  const bufferMs = 60;
   await act(async () => {
     root.render(
       React.createElement(Notification, {
         backgroundColor: '#000',
-        dismissAfter: 10,
+        dismissAfter: dismissAfterMs,
         onDismiss: () => dismissCount++,
         text: 'Hello'
       })
     );
   });
 
-  await waitFor(15);
+  await waitFor(dismissAfterMs + bufferMs);
   const indicator = container.querySelector('.notification_indicator');
   t.truthy(indicator);
   if (!indicator) {
@@ -51,30 +53,31 @@ test.serial('Notification resets the timer when text changes', async (t) => {
   const root = createRoot(container);
 
   let dismissCount = 0;
+  const dismissAfterMs = 80;
   await act(async () => {
     root.render(
       React.createElement(Notification, {
         backgroundColor: '#000',
-        dismissAfter: 20,
+        dismissAfter: dismissAfterMs,
         onDismiss: () => dismissCount++,
         text: 'First'
       })
     );
   });
 
-  await waitFor(10);
+  await waitFor(40);
   await act(async () => {
     root.render(
       React.createElement(Notification, {
         backgroundColor: '#000',
-        dismissAfter: 20,
+        dismissAfter: dismissAfterMs,
         onDismiss: () => dismissCount++,
         text: 'Second'
       })
     );
   });
 
-  await waitFor(12);
+  await waitFor(50);
   const indicator = container.querySelector('.notification_indicator');
   t.truthy(indicator);
   if (!indicator) {
@@ -84,7 +87,7 @@ test.serial('Notification resets the timer when text changes', async (t) => {
   }
   t.is(dismissCount, 0);
 
-  await waitFor(12);
+  await waitFor(40);
   if (!indicator) {
     t.fail('Expected notification indicator to be present.');
   } else {

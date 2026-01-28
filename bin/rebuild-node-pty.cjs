@@ -4,7 +4,7 @@ const fs = require('node:fs');
 
 const repoRoot = path.resolve(__dirname, '..');
 const moduleRoot = path.join(repoRoot, 'target', 'node_modules', 'node-pty');
-const nodeGypPath = path.join(repoRoot, 'node_modules', '.bin', 'node-gyp');
+const nodeGypPath = path.join(repoRoot, 'node_modules', 'node-gyp', 'bin', 'node-gyp.js');
 
 if (!fs.existsSync(moduleRoot)) {
   console.error(`node-pty module not found at ${moduleRoot}. Run bun install first.`);

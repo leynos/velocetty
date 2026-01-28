@@ -22,6 +22,20 @@ UMD bundle usage.[^react-19-upgrade][^react-19-jsx]
 - Reduce exposure to deprecated APIs and legacy build modes.
 - Ensure the test and rendering stack is compatible with React 19 changes.
 
+## Requirements
+
+### Functional requirements
+
+- Keep the renderer compatible with a supported React release.
+- Provide an incremental upgrade path through React 18.3 to React 19.
+- Preserve existing UI test coverage after the upgrade.
+
+### Technical requirements
+
+- Adopt the new JSX transform required by React 19.
+- Remove reliance on deprecated APIs such as string refs.
+- Ensure Electron renderer builds remain compatible with the new React runtime.
+
 ## Options Considered
 
 ### Option A: Stay on React 18.2
@@ -98,8 +112,8 @@ and aligns with React's documented upgrade guidance.[^react-19-upgrade]
 ## Architectural Rationale
 
 Keeping React up to date supports maintainability and reduces the cost of
-future upgrades, while an incremental path minimises migration risk for the
+future upgrades, while an incremental path minimizes migration risk for the
 Electron renderer stack.[^react-19-upgrade]
 
 [^react-19-upgrade]: <https://react.dev/blog/2024/04/25/react-19-upgrade-guide>
-[^react-19-jsx]: <https://az.react.dev/blog/2024/04/25/react-19-upgrade-guide>
+[^react-19-jsx]: <https://react.dev/blog/2024/04/25/react-19-upgrade-guide>

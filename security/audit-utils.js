@@ -94,8 +94,8 @@ export function collectAdvisories(auditJson) {
 
     for (const advisory of value) {
       advisories.push({
-        package: packageName,
         ...advisory,
+        package: packageName,
         github_advisory_id: extractGithubAdvisoryId(advisory)
       });
     }

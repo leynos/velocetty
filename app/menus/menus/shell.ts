@@ -1,11 +1,18 @@
-import type {BaseWindow, BrowserWindow, MenuItemConstructorOptions} from 'electron';
+/** @file Provides the shell/file menu template for tab and pane actions. */
+import {BrowserWindow, type MenuItemConstructorOptions} from 'electron';
+
+const toBrowserWindow = (focusedWindow?: unknown): BrowserWindow | undefined =>
+  focusedWindow instanceof BrowserWindow ? focusedWindow : undefined;
 
 const shellMenu = (
   commandKeys: Record<string, string>,
-  execCommand: (command: string, focusedWindow?: BrowserWindow | BaseWindow) => void,
+  execCommand: (command: string, focusedWindow?: BrowserWindow) => void,
   profiles: string[]
 ): MenuItemConstructorOptions => {
   const isMac = process.platform === 'darwin';
+  const execWithBrowserWindow = (command: string, focusedWindow?: unknown) => {
+    execCommand(command, toBrowserWindow(focusedWindow));
+  };
 
   return {
     label: isMac ? 'Shell' : 'File',
@@ -14,14 +21,14 @@ const shellMenu = (
         label: 'New Tab',
         accelerator: commandKeys['tab:new'],
         click(_item, focusedWindow) {
-          execCommand('tab:new', focusedWindow);
+          execWithBrowserWindow('tab:new', focusedWindow);
         }
       },
       {
         label: 'New Window',
         accelerator: commandKeys['window:new'],
         click(_item, focusedWindow) {
-          execCommand('window:new', focusedWindow);
+          execWithBrowserWindow('window:new', focusedWindow);
         }
       },
       {
@@ -31,14 +38,14 @@ const shellMenu = (
         label: 'Split Down',
         accelerator: commandKeys['pane:splitDown'],
         click(_item, focusedWindow) {
-          execCommand('pane:splitDown', focusedWindow);
+          execWithBrowserWindow('pane:splitDown', focusedWindow);
         }
       },
       {
         label: 'Split Right',
         accelerator: commandKeys['pane:splitRight'],
         click(_item, focusedWindow) {
-          execCommand('pane:splitRight', focusedWindow);
+          execWithBrowserWindow('pane:splitRight', focusedWindow);
         }
       },
       {
@@ -52,14 +59,14 @@ const shellMenu = (
               label: 'New Tab',
               accelerator: commandKeys[`tab:new:${profile}`],
               click(_item, focusedWindow) {
-                execCommand(`tab:new:${profile}`, focusedWindow);
+                execWithBrowserWindow(`tab:new:${profile}`, focusedWindow);
               }
             },
             {
               label: 'New Window',
               accelerator: commandKeys[`window:new:${profile}`],
               click(_item, focusedWindow) {
-                execCommand(`window:new:${profile}`, focusedWindow);
+                execWithBrowserWindow(`window:new:${profile}`, focusedWindow);
               }
             },
             {
@@ -69,14 +76,14 @@ const shellMenu = (
               label: 'Split Down',
               accelerator: commandKeys[`pane:splitDown:${profile}`],
               click(_item, focusedWindow) {
-                execCommand(`pane:splitDown:${profile}`, focusedWindow);
+                execWithBrowserWindow(`pane:splitDown:${profile}`, focusedWindow);
               }
             },
             {
               label: 'Split Right',
               accelerator: commandKeys[`pane:splitRight:${profile}`],
               click(_item, focusedWindow) {
-                execCommand(`pane:splitRight:${profile}`, focusedWindow);
+                execWithBrowserWindow(`pane:splitRight:${profile}`, focusedWindow);
               }
             }
           ]
@@ -89,7 +96,7 @@ const shellMenu = (
         label: 'Close',
         accelerator: commandKeys['pane:close'],
         click(_item, focusedWindow) {
-          execCommand('pane:close', focusedWindow);
+          execWithBrowserWindow('pane:close', focusedWindow);
         }
       },
       {

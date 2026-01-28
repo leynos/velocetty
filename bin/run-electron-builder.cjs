@@ -9,6 +9,7 @@
  * path consistent and local to this repository.
  */
 const {spawnSync} = require('node:child_process');
+const {existsSync} = require('node:fs');
 const {resolve} = require('node:path');
 
 const electronBuilderCli = resolve(__dirname, '..', 'node_modules', 'electron-builder', 'out', 'cli', 'cli.js');
@@ -18,6 +19,11 @@ const env = {...process.env};
 
 delete env.npm_execpath;
 delete env.npm_node_execpath;
+
+if (!existsSync(electronBuilderCli)) {
+  console.error(`electron-builder CLI not found at ${electronBuilderCli}. Run bun install.`);
+  process.exit(1);
+}
 
 const result = spawnSync(process.execPath, [electronBuilderCli, ...args], {
   stdio: 'inherit',
@@ -29,4 +35,9 @@ if (result.error) {
   process.exit(1);
 }
 
-process.exit(result.status ?? 1);
+if (result.status !== 0) {
+  console.error(`electron-builder exited with code ${result.status ?? 'unknown'}.`);
+  process.exit(result.status ?? 1);
+}
+
+process.exit(0);

@@ -1,6 +1,6 @@
 .PHONY: all check-fmt typecheck lint test clean nixie
 
-all: check-fmt lint test
+all: check-fmt typecheck lint test
 
 check-fmt:
 	bun node_modules/@biomejs/biome/bin/biome check --linter-enabled=false --assist-enabled=false .

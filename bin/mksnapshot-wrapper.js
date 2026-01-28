@@ -213,8 +213,6 @@ if (mksnapshotProcess.status !== 0) {
 if (args.includes('--help')) {
   process.exit(0);
 }
-
-fsExtra.ensureDirSync(outputDir);
 fs.copyFileSync(path.join(mksnapshotBinaryDir, 'snapshot_blob.bin'), path.join(outputDir, 'snapshot_blob.bin'));
 
 const v8ContextGenCommand = getBinaryPath('v8_context_snapshot_generator', mksnapshotBinaryDir);

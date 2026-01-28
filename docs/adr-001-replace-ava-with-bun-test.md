@@ -14,7 +14,7 @@ The repository currently uses AVA for unit tests and a Bun bridge test to
 invoke the AVA suite. This layering adds runtime and tooling dependencies,
 slows the feedback loop, and complicates test configuration. The project goal
 is to reduce dev dependencies and speed up builds. Bun already ships with a
-built-in test runner, so we need a decision on whether to replace AVA with Bun
+built-in test runner, so a decision is required on whether to replace AVA with Bun
 `test`.[^bun-test]
 
 ## Decision Drivers
@@ -24,6 +24,20 @@ built-in test runner, so we need a decision on whether to replace AVA with Bun
 - Keep TypeScript and JSX test authoring straightforward.[^bun-test]
 - Preserve essential test features such as snapshots, DOM helpers, and
   lifecycle hooks.[^bun-test]
+
+## Requirements
+
+### Functional requirements
+
+- Run unit and UI test suites under a single primary runner.
+- Keep snapshots, DOM helpers, and lifecycle hooks available.
+- Preserve TypeScript and JSX test authoring.
+
+### Technical requirements
+
+- Reduce dev dependency count and test setup overhead.
+- Support reliable execution in Continuous Integration (CI).
+- Align with the Bun-first tooling strategy.
 
 ## Options Considered
 

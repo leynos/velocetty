@@ -71,7 +71,7 @@ Scope notes:
 - [ ] 1.4.7. Longer term: replace Webpack with esbuild or Bun (TBD).
 - [ ] 1.4.8. Re-enable Biome rules currently disabled for legacy code:
   `noExplicitAny`, `noNonNullAssertion`, `useNodejsImportProtocol`,
-  `useExhaustiveDependencies`, and the a11y rule set. Track progress by
+  `useExhaustiveDependencies`, and the accessibility (a11y) rule set. Track
   documenting each rule's enablement date in `docs/velocetty-hyper-codebase.md`.
 
 ## 2. Rendering overhaul

@@ -17,7 +17,7 @@
         "got": "^12.4.1",
         "json-loader": "^0.5.7",
         "lodash": "^4.17.21",
-        "mousetrap": "chabou/mousetrap#useCapture",
+        "mousetrap": "^1.6.5",
         "ms": "^2.1.3",
         "open": "^8.4.2",
         "ora": "^8.0.1",
@@ -1227,7 +1227,7 @@
 
     "module-not-found-error": ["module-not-found-error@1.0.1", "", {}, "sha1-z4tP9PKWQGdNbN0CsOO8UjwrvcA="],
 
-    "mousetrap": ["mousetrap@github:chabou/mousetrap#c95eeea", {}, "chabou-mousetrap-c95eeea"],
+    "mousetrap": ["mousetrap@1.6.5", "", {}, "sha512-QNo4kEepaIBwiT8CDhP98umTetp+JNfQYBWvC1pc6/OAibuXtRcxZ58Qz8skvEHYvURne/7R8T5VoOI7rDsEUA=="],
 
     "mri": ["mri@1.1.4", "", {}, "sha512-6y7IjGPm8AzlvoUrwAaw1tLnUBudaS3752vcd8JtrpGGQn+rXIe63LFVHm/YMwtqAuh+LJPCFdlLYPWM1nYn6w=="],
 

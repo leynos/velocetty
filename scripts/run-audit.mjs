@@ -36,8 +36,16 @@ function buildLedgerMaps(workspaceKeys, auditEntries, referenceDate) {
 
   const ledgerByAdvisory = new Map();
   const allowedIds = [];
+  const seenIds = new Set();
 
   for (const entry of auditEntries) {
+    if (entry.id) {
+      if (seenIds.has(entry.id)) {
+        throw new Error(`Duplicate audit exception id detected: ${entry.id}`);
+      }
+      seenIds.add(entry.id);
+    }
+
     if (!workspaceKeys.has(entry.package)) {
       continue;
     }
@@ -133,6 +141,7 @@ function isExecutedDirectly(meta) {
     const absoluteInvokedPath = resolve(invokedPath);
     return normalise(scriptPath) === normalise(absoluteInvokedPath);
   } catch {
+    // Treat resolution failures as "not invoked directly".
     return false;
   }
 }

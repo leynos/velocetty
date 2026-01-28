@@ -453,13 +453,16 @@ export function getTabProps<T extends Assignable<TabProps, T>>(tab: any, parentP
 // connects + decorates a class
 // plugins can override mapToState, dispatchToProps
 // and the class gets decorated (proxied)
-export function connect<stateProps extends {}, dispatchProps>(
-  stateFn: (state: HyperState) => stateProps,
-  dispatchFn: (dispatch: HyperDispatch) => dispatchProps,
+export function connect<StateProps extends Record<string, unknown>, DispatchProps extends Record<string, unknown>>(
+  stateFn: (state: HyperState) => StateProps,
+  dispatchFn: (dispatch: HyperDispatch) => DispatchProps,
   c: null | undefined,
   d: ConnectOptions = {}
 ) {
-  return (Class: ComponentType<any>, name: keyof typeof connectors) => {
+  return <P extends Record<string, unknown>>(
+    Class: ComponentType<P & StateProps & DispatchProps>,
+    name: keyof typeof connectors
+  ) => {
     return reduxConnect(
       (state: HyperState) => {
         let ret = stateFn(state);
@@ -518,7 +521,10 @@ export function connect<stateProps extends {}, dispatchProps>(
       },
       c,
       d
-    )(decorate(Class, name) as any);
+    )(
+      // @ts-expect-error react-redux connect does not type decorated components with explicit props.
+      decorate(Class, name)
+    );
   };
 }
 

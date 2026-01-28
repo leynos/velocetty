@@ -218,8 +218,9 @@ function syncPackageJSON() {
   const file = resolve(path, 'package.json');
   try {
     writeFileSync(file, JSON.stringify(pkg, null, 2));
-  } catch (_err) {
-    alert(`An error occurred writing to ${file}`);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    alert(`An error occurred writing to ${file}: ${reason}`);
   }
 }
 

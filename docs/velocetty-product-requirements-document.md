@@ -234,7 +234,7 @@ Deliverables (tab handle customization API):
 
 Examples this directly supports:
 
-- “Icon based on what’s running”: provider maps process name to icon.
+- “Icon based on what’s running”: provider maps process name to an icon.
 
 - “Second line shows CWD”: provider adds subtitle = cwd (with truncation rules).
 

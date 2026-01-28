@@ -22,6 +22,20 @@ module rebuilds and API changes.[^electron-40-release][^electron-40-blog]
 - Maintain compatibility with modern operating systems and security updates.
 - Reduce long-term maintenance by avoiding a large version gap.
 
+## Requirements
+
+### Functional requirements
+
+- Keep the application running across major Electron upgrades.
+- Maintain native module functionality (for example, node-pty) at each step.
+- Preserve packaging outputs for macOS, Windows, and Linux.
+
+### Technical requirements
+
+- Align Chromium, Node.js, and V8 versions with supported Electron releases.
+- Minimize upgrade risk by staging changes across major releases.
+- Ensure build and packaging automation stays operational during upgrades.
+
 ## Options Considered
 
 ### Option A: Stay on Electron 22
@@ -98,7 +112,8 @@ packaging changes.[^electron-40-blog]
 ## Outstanding Decisions
 
 - Which intermediate Electron versions to use for staged upgrades.
-- Whether to enforce stricter CI checks on Electron API deprecations.
+- Whether to enforce stricter Continuous Integration (CI) checks on Electron
+  API deprecations.
 
 ## Architectural Rationale
 
