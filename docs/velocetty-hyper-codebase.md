@@ -1812,7 +1812,7 @@ Optional Dependencies:
 
 | Consideration | Mitigation |
 |---------------|------------|
-| **Supply Chain Risk** | Dependency audit via `yarn audit` in CI pipeline |
+| **Supply Chain Risk** | Dependency audit via `bun run audit` (wrapper for `bun audit`) in CI pipeline |
 | **Native Module Security** | `node-pty` executes with user privileges; no elevation by default |
 | **Plugin Trust Model** | Plugins are full-trust Node.js modules with unrestricted access |
 
