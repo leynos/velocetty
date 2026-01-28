@@ -102,6 +102,32 @@ engineering, product, and operations stakeholders.
   documented source.
 - Prefer tables with an "Evidence" or "File Path" column for traceability.
 
+## Applicability matrix and scope control
+
+Start the document with a short applicability matrix that marks which major
+areas apply to the codebase. Use it to guide which sections you keep,
+condense, or mark as not applicable.
+
+| Area | Applies | Evidence | Notes |
+|------|---------|----------|-------|
+| UI/UX | Yes/No | File path(s) | Short rationale |
+| Infrastructure | Yes/No | File path(s) | e.g. desktop vs server |
+| Network services | Yes/No | File path(s) | External APIs, RPC |
+| Storage | Yes/No | File path(s) | Local files, DBs, caches |
+| Extension system | Yes/No | File path(s) | Plugins, hooks |
+
+When an area does not apply:
+
+- Keep the section heading for numbering consistency.
+- Add a one-paragraph "Not applicable" note with evidence.
+- If multiple adjacent sections are not applicable, replace them with a
+  single "Not applicable" subsection that lists all skipped sections.
+
+When an area partially applies:
+
+- Condense to the minimal set of subsections that remain relevant.
+- Add an explicit note describing which parts were omitted and why.
+
 ## Writing rules
 
 - Follow the house documentation style guide in `docs/`.
