@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed.
+Accepted (Option B: Incremental upgrades).
 
 ## Date
 
