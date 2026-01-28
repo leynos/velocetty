@@ -1,3 +1,5 @@
+import type React from 'react';
+
 import type {HyperState, HyperDispatch} from '../../typings/hyper';
 import {
   resizeSession,
@@ -91,7 +93,10 @@ const mapDispatchToProps = (dispatch: HyperDispatch) => {
   };
 };
 
-const TermsContainer = connect(mapStateToProps, mapDispatchToProps, null, {forwardRef: true})(Terms, 'Terms');
+const TermsContainer = connect(mapStateToProps, mapDispatchToProps, null, {forwardRef: true})(
+  Terms,
+  'Terms'
+) as unknown as React.ComponentType<any>;
 
 export default TermsContainer;
 

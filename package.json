@@ -103,6 +103,7 @@
     "@types/seamless-immutable": "^7.1.19",
     "@types/styled-jsx": "^2.2.9",
     "@types/uuid": "^9.0.8",
+    "@typescript/native-preview": "^7.0.0-dev.20260128.1",
     "ajv": "^8.12.0",
     "ava": "^6.1.2",
     "babel-loader": "^9.1.3",

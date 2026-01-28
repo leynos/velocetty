@@ -250,10 +250,8 @@ export default class Term extends React.PureComponent<
       this.searchAddon = props.searchAddon!;
     }
 
-    try {
-      this.term.element?.style.padding = props.padding;
-    } catch (error) {
-      console.log(error);
+    if (this.term.element) {
+      this.term.element.style.padding = props.padding;
     }
 
     this.fitAddon.fit();
@@ -457,10 +455,8 @@ export default class Term extends React.PureComponent<
 
     this.termOptions = nextTermOptions;
 
-    try {
-      this.term.element?.style.padding = this.props.padding;
-    } catch (error) {
-      console.log(error);
+    if (this.term.element) {
+      this.term.element.style.padding = this.props.padding;
     }
 
     if (

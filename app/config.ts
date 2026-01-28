@@ -132,9 +132,9 @@ export {get as getWin, recordState as winRecord, defaults as windowDefaults} fro
 
 export const fixConfigDefaults = (decoratedConfig: configOptions) => {
   const defaultConfig = getDefaultConfig().config!;
-  decoratedConfig.colors = getColorMap(decoratedConfig.colors) || {};
+  const colorOverrides = getColorMap(decoratedConfig.colors);
   // We must have default colors for xterm css.
-  decoratedConfig.colors = {...defaultConfig.colors, ...decoratedConfig.colors};
+  decoratedConfig.colors = {...defaultConfig.colors, ...(colorOverrides ?? {})};
   return decoratedConfig;
 };
 

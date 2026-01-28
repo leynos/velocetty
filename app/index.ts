@@ -186,7 +186,7 @@ app.on('ready', () =>
         const menu = plugins.decorateMenu(AppMenu.createMenu(plugins.getLoadedPluginVersions));
 
         // If we're on Mac make a Dock Menu
-        if (process.platform === 'darwin') {
+        if (process.platform === 'darwin' && app.dock) {
           const dockMenu = Menu.buildFromTemplate([
             {
               label: 'New Window',

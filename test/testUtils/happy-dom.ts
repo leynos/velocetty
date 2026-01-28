@@ -26,15 +26,15 @@ export const setupHappyDom = (): Cleanup => {
   });
 
   if (!window.requestAnimationFrame) {
-    window.requestAnimationFrame = (callback: FrameRequestCallback) => {
+    window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
       return window.setTimeout(() => callback(window.performance.now()), 0);
-    };
+    }) as unknown as typeof window.requestAnimationFrame;
   }
 
   if (!window.cancelAnimationFrame) {
-    window.cancelAnimationFrame = (handle: number) => {
-      window.clearTimeout(handle);
-    };
+    window.cancelAnimationFrame = ((handle: number | NodeJS.Timeout) => {
+      window.clearTimeout(handle as NodeJS.Timeout);
+    }) as unknown as typeof window.cancelAnimationFrame;
   }
 
   (window as Window & {rpc: RpcStub}).rpc = {

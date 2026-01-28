@@ -459,10 +459,7 @@ export function connect<stateProps extends {}, dispatchProps>(
   c: null | undefined,
   d: ConnectOptions = {}
 ) {
-  return <P extends Record<string, unknown>>(
-    Class: ComponentType<P & stateProps & dispatchProps>,
-    name: keyof typeof connectors
-  ) => {
+  return (Class: ComponentType<any>, name: keyof typeof connectors) => {
     return reduxConnect(
       (state: HyperState) => {
         let ret = stateFn(state);
@@ -521,7 +518,7 @@ export function connect<stateProps extends {}, dispatchProps>(
       },
       c,
       d
-    )(decorate(Class, name) as any) as ComponentType<P>;
+    )(decorate(Class, name) as any);
   };
 }
 

@@ -6,7 +6,7 @@ check-fmt:
 	node node_modules/@biomejs/biome/bin/biome check --linter-enabled=false --assist-enabled=false .
 
 typecheck:
-	@echo "Typecheck not configured for this repository."
+	node node_modules/.bin/tsgo --project tsconfig.typecheck.json
 
 lint:
 	bun run lint
