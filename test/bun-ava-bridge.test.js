@@ -17,7 +17,7 @@ function resolveAvaCliPath() {
 test('AVA unit suite passes', () => {
   const avaCliPath = resolveAvaCliPath();
   const result = spawnSync('node', [avaCliPath, '--config', 'ava.config.js'], {
-    env: process.env,
+    env: {...process.env, AVA_FORCE_CLEAN_EXIT: '1'},
     stdio: 'inherit'
   });
 

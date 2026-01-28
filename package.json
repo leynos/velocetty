@@ -13,7 +13,7 @@
     "build:hyper-app": "bunx webpack-cli --config-name hyper-app",
     "lint": "node node_modules/@biomejs/biome/bin/biome check .",
     "test": "bun run lint && bun run test:unit",
-    "test:unit": "node node_modules/ava/entrypoints/cli.mjs",
+    "test:unit": "node node_modules/cross-env/src/bin/cross-env.js AVA_FORCE_CLEAN_EXIT=1 node node_modules/ava/entrypoints/cli.mjs",
     "test:unit:watch": "bun run test:unit -- --watch",
     "test:e2e": "ava --config ava-e2e.config.js",
     "postinstall": "bun run v8-snapshot && bun run build:hyper-app && node bin/run-electron-builder.cjs install-app-deps && bun run rebuild-node-pty && node bin/copy-node-modules.js && node node_modules/husky/bin.mjs install && bun run generate-schema",
