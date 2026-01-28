@@ -1,4 +1,4 @@
-.PHONY: all check-fmt typecheck lint test clean
+.PHONY: all check-fmt typecheck lint test clean nixie
 
 all: check-fmt lint test
 
@@ -16,3 +16,8 @@ test:
 
 clean:
 	bun run clean
+
+nixie:
+	# CI currently requires --no-sandbox; remove once nixie supports
+	# environment variable control for this option
+	nixie --no-sandbox
