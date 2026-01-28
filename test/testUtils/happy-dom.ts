@@ -3,9 +3,9 @@ import {Window} from 'happy-dom';
 
 type Cleanup = () => void;
 type RpcStub = {
-  off: () => void;
-  on: () => void;
-  removeListener: () => void;
+  off: (..._args: unknown[]) => void;
+  on: (..._args: unknown[]) => void;
+  removeListener: (..._args: unknown[]) => void;
 };
 
 export const setupHappyDom = (): Cleanup => {
@@ -40,9 +40,9 @@ export const setupHappyDom = (): Cleanup => {
   }
 
   (window as Window & {rpc: RpcStub}).rpc = {
-    off: () => {},
-    on: () => {},
-    removeListener: () => {}
+    off: (..._args: unknown[]) => {},
+    on: (..._args: unknown[]) => {},
+    removeListener: (..._args: unknown[]) => {}
   };
 
   return () => {

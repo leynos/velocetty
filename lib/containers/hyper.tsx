@@ -1,3 +1,10 @@
+/**
+ * @file Container for the Hyper window UI.
+ * Responsible for wiring keybindings, focus management, and RPC-driven
+ * actions
+ * while rendering the header, terms, and notification surfaces for the app.
+ * Used as the top-level React container in the renderer window.
+ */
 // biome-ignore lint/correctness/noUnusedImports: React value is required for JSX runtime under ts-node tests.
 import React, {forwardRef, useEffect, useRef} from 'react';
 
