@@ -74,7 +74,7 @@ const Hyper = forwardRef<HTMLDivElement, HyperProps>((props, ref) => {
     const onSelectAll = handleSelectAll;
     window.rpc.on('term selectAll', onSelectAll);
     return () => {
-      window.rpc.removeListener('term selectAll', onSelectAll);
+      window.rpc.off('term selectAll', onSelectAll);
     };
   }, []);
 

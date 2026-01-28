@@ -52,6 +52,11 @@ export default class Client {
     return this;
   };
 
+  off = <U extends keyof RendererEvents>(ev: U, fn: (arg0: RendererEvents[U]) => void) => {
+    this.emitter.removeListener(ev, fn);
+    return this;
+  };
+
   once = <U extends keyof RendererEvents>(ev: U, fn: (arg0: RendererEvents[U]) => void) => {
     this.emitter.once(ev, fn);
     return this;
