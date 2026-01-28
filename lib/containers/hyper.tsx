@@ -71,7 +71,11 @@ const Hyper = forwardRef<HTMLDivElement, HyperProps>((props, ref) => {
   };
 
   useEffect(() => {
-    window.rpc.on('term selectAll', handleSelectAll);
+    const onSelectAll = handleSelectAll;
+    window.rpc.on('term selectAll', onSelectAll);
+    return () => {
+      window.rpc.removeListener('term selectAll', onSelectAll);
+    };
   }, []);
 
   const onTermsRef = (_terms: Terms | null) => {

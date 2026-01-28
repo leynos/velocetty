@@ -4,6 +4,7 @@ import {Window} from 'happy-dom';
 type Cleanup = () => void;
 type RpcStub = {
   on: () => void;
+  removeListener: () => void;
 };
 
 export const setupHappyDom = (): Cleanup => {
@@ -38,7 +39,8 @@ export const setupHappyDom = (): Cleanup => {
   }
 
   (window as Window & {rpc: RpcStub}).rpc = {
-    on: () => {}
+    on: () => {},
+    removeListener: () => {}
   };
 
   return () => {
