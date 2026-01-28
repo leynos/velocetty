@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (Option B: Migrate to Bun test runner).
+Accepted (2026-01-28: Option B - Migrate to Bun test runner).
 
 ## Date
 

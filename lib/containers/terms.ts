@@ -100,6 +100,6 @@ type TermsContainerProps = Omit<React.ComponentProps<typeof Terms>, keyof TermsC
 const TermsContainer = connect(mapStateToProps, mapDispatchToProps, null, {forwardRef: true})(
   Terms,
   'Terms'
-) as unknown as React.ComponentType<TermsContainerProps>;
+) as React.ComponentType<TermsContainerProps>;
 
 export default TermsContainer;

@@ -1,16 +1,13 @@
 /** @file Builds the Window menu template for tab and pane navigation. */
-import {BrowserWindow, type MenuItemConstructorOptions} from 'electron';
+import type {MenuItemConstructorOptions} from 'electron';
 
-const toBrowserWindow = (focusedWindow?: unknown): BrowserWindow | undefined =>
-  focusedWindow instanceof BrowserWindow ? focusedWindow : undefined;
+import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
 
 const windowMenu = (
   commandKeys: Record<string, string>,
-  execCommand: (command: string, focusedWindow?: BrowserWindow) => void
+  execCommand: MenuCommandRunner
 ): MenuItemConstructorOptions => {
-  const execWithBrowserWindow = (command: string, focusedWindow?: unknown) => {
-    execCommand(command, toBrowserWindow(focusedWindow));
-  };
+  const execWithBrowserWindow = makeMenuCommandExecutor(execCommand);
 
   // Generating tab:jump array
   const tabJump: MenuItemConstructorOptions[] = [];

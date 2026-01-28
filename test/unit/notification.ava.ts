@@ -88,11 +88,7 @@ test.serial('Notification resets the timer when text changes', async (t) => {
   t.is(dismissCount, 0);
 
   await waitFor(40);
-  if (!indicator) {
-    t.fail('Expected notification indicator to be present.');
-  } else {
-    indicator.dispatchEvent(new Event('webkitTransitionEnd'));
-  }
+  indicator.dispatchEvent(new Event('webkitTransitionEnd'));
   t.is(dismissCount, 1);
 
   root.unmount();

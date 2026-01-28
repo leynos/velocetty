@@ -181,8 +181,7 @@ export default class Term extends React.PureComponent<
 
     // The parent element for the terminal is attached and removed manually so
     // that we can preserve it across mounts and unmounts of the component
-    const existingParent = props.term?.element?.parentElement ?? null;
-    this.termRef = existingParent ?? document.createElement('div');
+    this.termRef = props.term?.element?.parentElement ?? document.createElement('div');
     this.termRef.className = 'term_fit term_term';
 
     this.termWrapperRef?.appendChild(this.termRef);

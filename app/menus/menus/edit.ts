@@ -1,16 +1,10 @@
 /** @file Defines the Edit menu template and command bindings. */
-import {BrowserWindow, type MenuItemConstructorOptions} from 'electron';
+import type {MenuItemConstructorOptions} from 'electron';
 
-const toBrowserWindow = (focusedWindow?: unknown): BrowserWindow | undefined =>
-  focusedWindow instanceof BrowserWindow ? focusedWindow : undefined;
+import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
 
-const editMenu = (
-  commandKeys: Record<string, string>,
-  execCommand: (command: string, focusedWindow?: BrowserWindow) => void
-) => {
-  const execWithBrowserWindow = (command: string, focusedWindow?: unknown) => {
-    execCommand(command, toBrowserWindow(focusedWindow));
-  };
+const editMenu = (commandKeys: Record<string, string>, execCommand: MenuCommandRunner) => {
+  const execWithBrowserWindow = makeMenuCommandExecutor(execCommand);
 
   const submenu: MenuItemConstructorOptions[] = [
     {

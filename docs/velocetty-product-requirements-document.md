@@ -280,7 +280,7 @@ Deliverables:
 
 - WebSocket transport with multiplexing.
 
-- Authentication and authorization model for remote attachment.
+- Authentication and authorisation model for remote attachment.
 
 - Capability negotiation (local Tauri UI can do X; remote browser UI can do Y).
 

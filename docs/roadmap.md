@@ -72,7 +72,8 @@ Scope notes:
 - [ ] 1.4.8. Re-enable Biome rules currently disabled for legacy code:
   `noExplicitAny`, `noNonNullAssertion`, `useNodejsImportProtocol`,
   `useExhaustiveDependencies`, and the accessibility (a11y) rule set. Track
-  documenting each rule's enablement date in `docs/velocetty-hyper-codebase.md`.
+  each rule's enablement date in `docs/velocetty-hyper-codebase.md`. Tracking
+  issue: BIOME-001 in `docs/tracking-issues.md`.
 
 ## 2. Rendering overhaul
 

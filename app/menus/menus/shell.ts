@@ -1,18 +1,15 @@
 /** @file Provides the shell/file menu template for tab and pane actions. */
-import {BrowserWindow, type MenuItemConstructorOptions} from 'electron';
+import type {MenuItemConstructorOptions} from 'electron';
 
-const toBrowserWindow = (focusedWindow?: unknown): BrowserWindow | undefined =>
-  focusedWindow instanceof BrowserWindow ? focusedWindow : undefined;
+import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
 
 const shellMenu = (
   commandKeys: Record<string, string>,
-  execCommand: (command: string, focusedWindow?: BrowserWindow) => void,
+  execCommand: MenuCommandRunner,
   profiles: string[]
 ): MenuItemConstructorOptions => {
   const isMac = process.platform === 'darwin';
-  const execWithBrowserWindow = (command: string, focusedWindow?: unknown) => {
-    execCommand(command, toBrowserWindow(focusedWindow));
-  };
+  const execWithBrowserWindow = makeMenuCommandExecutor(execCommand);
 
   return {
     label: isMac ? 'Shell' : 'File',

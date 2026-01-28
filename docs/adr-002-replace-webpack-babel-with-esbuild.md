@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (Option B: Replace with esbuild).
+Accepted (2026-01-28: Option B - Replace with esbuild).
 
 ## Date
 

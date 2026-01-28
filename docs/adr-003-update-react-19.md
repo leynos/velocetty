@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (Option B: Incremental upgrade).
+Accepted (2026-01-28: Option B - Incremental upgrade).
 
 ## Date
 
