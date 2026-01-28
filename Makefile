@@ -1,6 +1,7 @@
 .PHONY: all check-fmt typecheck lint test clean markdownlint nixie
 
 MDLINT ?= markdownlint-cli2
+XARGS_R := $(shell if xargs --help 2>&1 | grep -q '\\-r'; then printf -- '-r'; fi)
 
 all: check-fmt typecheck lint test
 
@@ -20,7 +21,7 @@ clean:
 	bun run clean
 
 markdownlint: # Lint Markdown files
-	find . -type f -name '*.md' -not -path '*/target/*' -not -path '*/node_modules/*' -print0 | xargs -0r $(MDLINT)
+	find . -type f -name '*.md' -not -path '*/target/*' -not -path '*/node_modules/*' -print0 | xargs -0 $(XARGS_R) $(MDLINT)
 
 nixie:
 	# CI currently requires --no-sandbox; remove once nixie supports
