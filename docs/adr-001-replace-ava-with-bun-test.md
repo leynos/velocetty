@@ -100,7 +100,8 @@ with Bun.[^bun-test]
 
 ### Phase 2: Dual-run validation
 
-- Convert representative suites to Bun and run both runners in CI.
+- Convert representative suites to Bun and run both runners in Continuous
+  Integration (CI).
 - Establish parity for snapshots and DOM tests.
 
 ### Phase 3: Full migration
