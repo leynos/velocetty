@@ -20,7 +20,7 @@ clean:
 	bun run clean
 
 markdownlint: # Lint Markdown files
-	find . -type f -name '*.md' -not -path '*/target/*' -not -path '*/node_modules/*' -print0 | xargs -0 $(MDLINT)
+	find . -type f -name '*.md' -not -path '*/target/*' -not -path '*/node_modules/*' -print0 | xargs -0r $(MDLINT)
 
 nixie:
 	# CI currently requires --no-sandbox; remove once nixie supports
