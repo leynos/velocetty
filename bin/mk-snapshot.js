@@ -1,10 +1,16 @@
-const childProcess = require('node:child_process');
-const vm = require('node:vm');
-const path = require('node:path');
-const fs = require('node:fs');
-const electronLink = require('electron-link');
-const {mkdirp} = require('fs-extra');
-const {normaliseArch} = require('./shared/arch');
+import childProcess from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import {fileURLToPath} from 'node:url';
+
+import electronLink from 'electron-link';
+import {mkdirp} from 'fs-extra';
+
+import {normaliseArch} from './shared/arch.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const excludedModules = {};
 

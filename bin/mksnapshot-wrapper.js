@@ -1,14 +1,22 @@
 #!/usr/bin/env bun
 
-const fs = require('node:fs');
-const fsExtra = require('fs-extra');
-const {spawnSync} = require('node:child_process');
-const path = require('node:path');
-const temp = require('temp').track();
-const {normaliseArch} = require('./shared/arch');
+import {spawnSync} from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+import fsExtra from 'fs-extra';
+import temp from 'temp';
+
+import {normaliseArch} from './shared/arch.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const tempTracker = temp.track();
 
 const crossArchDirs = ['clang_x86_v8_arm', 'clang_x64_v8_arm64', 'win_clang_x64'];
-const workingDir = temp.mkdirSync('mksnapshot-workdir');
+const workingDir = tempTracker.mkdirSync('mksnapshot-workdir');
 const mksnapshotDir = path.join(__dirname, '..', 'node_modules', 'electron-mksnapshot', 'bin');
 
 function getBinaryPath(binary, binaryPath) {

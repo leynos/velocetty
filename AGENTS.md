@@ -128,7 +128,7 @@
 - Validate Markdown files using `bunx markdownlint-cli \"docs/**/*.md\"`.
 - Run `bun fmt` after any documentation changes to format all Markdown
   files and fix table markup.
-- Validate Mermaid diagrams in Markdown files by running `bunx nixie`.
+- Validate Mermaid diagrams in Markdown files by running `nixie --no-sandbox`.
 - Markdown paragraphs and bullet points must be wrapped at 80 columns.
 - Code blocks must be wrapped at 120 columns.
 - Tables and headings must not be wrapped.

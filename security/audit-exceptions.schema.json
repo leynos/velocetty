@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://velocetty.dev/schemas/audit-exceptions.json",
   "title": "Dependency audit exceptions allowlist",
-  "description": "Declarative allowlist of time-bound dependency audit exceptions.",
+  "description": "Declarative allowlist of time-bound dependency audit exceptions. Entry ids must be unique; enforcement occurs in scripts/run-audit.mjs.",
   "type": "array",
   "minItems": 0,
   "uniqueItems": true,
@@ -12,6 +12,7 @@
     "required": ["id", "package", "advisory", "reason", "addedAt", "expiresAt"],
     "properties": {
       "id": {
+        "description": "Unique identifier for the audit exception entry.",
         "type": "string",
         "minLength": 1,
         "pattern": "^[A-Z0-9][A-Z0-9_-]*$"

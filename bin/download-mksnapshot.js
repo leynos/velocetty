@@ -1,8 +1,14 @@
-const fs = require('node:fs');
-const path = require('node:path');
-const {downloadArtifact} = require('@electron/get');
-const extractZip = require('extract-zip');
-const {normaliseArch} = require('./shared/arch');
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+import * as electronGet from '@electron/get';
+import extractZip from 'extract-zip';
+
+import {normaliseArch} from './shared/arch.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function resolveElectronVersion() {
   if (process.env.ELECTRON_CUSTOM_VERSION) {
@@ -40,7 +46,7 @@ async function main() {
 
   fs.mkdirSync(targetFolder, {recursive: true});
 
-  const zipPath = await downloadArtifact({
+  const zipPath = await electronGet.downloadArtifact({
     version,
     artifactName: 'mksnapshot',
     platform,

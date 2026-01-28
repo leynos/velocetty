@@ -1,5 +1,6 @@
-const childProcess = require('node:child_process');
-const {normaliseArch} = require('./shared/arch');
+import {spawnSync} from 'node:child_process';
+
+import {normaliseArch} from './shared/arch.js';
 
 function resolveTargetArchitectures() {
   const hostArch = normaliseArch(process.arch);
@@ -12,7 +13,7 @@ function resolveTargetArchitectures() {
 
 function runSnapshotForArch(arch) {
   console.log(`Generating V8 snapshots for ${arch}...`);
-  const result = childProcess.spawnSync('bun', ['run', 'v8-snapshot:arch'], {
+  const result = spawnSync('bun', ['run', 'v8-snapshot:arch'], {
     stdio: 'inherit',
     env: {
       ...process.env,

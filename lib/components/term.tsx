@@ -491,7 +491,11 @@ export default class Term extends React.PureComponent<
 
   componentWillUnmount() {
     terms[this.props.uid] = null;
-    this.termWrapperRef?.removeChild(this.termRef!);
+    const termWrapper = this.termWrapperRef;
+    const termElement = this.termRef;
+    if (termWrapper && termElement) {
+      termWrapper.removeChild(termElement);
+    }
     this.props.ref_(this.props.uid, null);
 
     // to clean up the terminal, we remove the listeners

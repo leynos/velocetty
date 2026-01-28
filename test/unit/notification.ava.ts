@@ -31,13 +31,17 @@ test.serial('Notification auto-dismisses after the timeout on mount', async (t) 
     );
   });
 
-  await waitFor(dismissAfterMs + bufferMs);
+  await act(async () => {
+    await waitFor(dismissAfterMs + bufferMs);
+  });
   const indicator = container.querySelector('.notification_indicator');
   t.truthy(indicator);
   if (!indicator) {
     t.fail('Expected notification indicator to be present.');
   } else {
-    indicator.dispatchEvent(new Event('webkitTransitionEnd'));
+    await act(async () => {
+      indicator.dispatchEvent(new Event('webkitTransitionEnd'));
+    });
   }
 
   t.is(dismissCount, 1);
@@ -65,7 +69,9 @@ test.serial('Notification resets the timer when text changes', async (t) => {
     );
   });
 
-  await waitFor(40);
+  await act(async () => {
+    await waitFor(40);
+  });
   await act(async () => {
     root.render(
       React.createElement(Notification, {
@@ -77,18 +83,30 @@ test.serial('Notification resets the timer when text changes', async (t) => {
     );
   });
 
-  await waitFor(50);
+  await act(async () => {
+    await waitFor(50);
+  });
   const indicator = container.querySelector('.notification_indicator');
   t.truthy(indicator);
   if (!indicator) {
     t.fail('Expected notification indicator to be present.');
   } else {
-    indicator.dispatchEvent(new Event('webkitTransitionEnd'));
+    await act(async () => {
+      indicator.dispatchEvent(new Event('webkitTransitionEnd'));
+    });
   }
   t.is(dismissCount, 0);
 
-  await waitFor(40);
-  indicator.dispatchEvent(new Event('webkitTransitionEnd'));
+  await act(async () => {
+    await waitFor(40);
+  });
+  if (!indicator) {
+    t.fail('Expected notification indicator to be present.');
+  } else {
+    await act(async () => {
+      indicator.dispatchEvent(new Event('webkitTransitionEnd'));
+    });
+  }
   t.is(dismissCount, 1);
 
   root.unmount();

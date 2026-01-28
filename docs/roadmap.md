@@ -295,14 +295,14 @@ Scope notes:
   - [ ] Success criteria: WebSocket transport handles PTY throughput without
     command latency regressions.
 
-### 8.2. Authentication, authorization, and redaction
+### 8.2. Authentication, authorisation, and redaction
 
 - [ ] 8.2.1. Implement auth and capability negotiation. Requires 8.1.2. See
   [velocetty-design.md](velocetty-design.md) §Authentication and
-  authorization.
+  authorisation.
   - [ ] Issue and store local loopback tokens securely.
   - [ ] Bind capability sets to remote sessions.
-  - [ ] Success criteria: unauthorized connections cannot invoke privileged
+  - [ ] Success criteria: unauthorised connections cannot invoke privileged
     commands.
 - [ ] 8.2.2. Implement redaction of sensitive metadata. Requires 6.2.1 and
   8.2.1. See [velocetty-design.md](velocetty-design.md) §Redaction and sensitive
