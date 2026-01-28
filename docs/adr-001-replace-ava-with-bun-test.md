@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed.
+Accepted (Option B: Migrate to Bun test runner).
 
 ## Date
 
