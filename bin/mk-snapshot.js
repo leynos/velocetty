@@ -45,7 +45,7 @@ async function main() {
       await Promise.all(
         matchingDirs.map(async (dir) => {
           await fs.promises.mkdir(`${dir}/gen/v8`, {recursive: true});
-          fs.copyFileSync(embeddedSPath, `${dir}/gen/v8/embedded.S`);
+          await fs.promises.copyFile(embeddedSPath, `${dir}/gen/v8/embedded.S`);
         })
       );
     }
