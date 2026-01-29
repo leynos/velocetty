@@ -10,6 +10,11 @@ import Notification from '../../lib/components/notification';
 import {setupHappyDom} from '../testUtils/happy-dom';
 
 const waitFor = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const dispatchOpacityTransition = (indicator: Element) => {
+  const event = new Event('transitionend') as TransitionEvent;
+  Object.defineProperty(event, 'propertyName', {value: 'opacity'});
+  indicator.dispatchEvent(event);
+};
 
 test.serial('Notification auto-dismisses after the timeout on mount', async (t) => {
   const cleanup = setupHappyDom();
@@ -40,7 +45,7 @@ test.serial('Notification auto-dismisses after the timeout on mount', async (t) 
     t.fail('Expected notification indicator to be present.');
   } else {
     await act(async () => {
-      indicator.dispatchEvent(new Event('transitionend'));
+      dispatchOpacityTransition(indicator);
     });
   }
 
@@ -92,7 +97,7 @@ test.serial('Notification resets the timer when text changes', async (t) => {
     t.fail('Expected notification indicator to be present.');
   } else {
     await act(async () => {
-      indicator.dispatchEvent(new Event('transitionend'));
+      dispatchOpacityTransition(indicator);
     });
   }
   t.is(dismissCount, 0);
@@ -104,7 +109,7 @@ test.serial('Notification resets the timer when text changes', async (t) => {
     t.fail('Expected notification indicator to be present.');
   } else {
     await act(async () => {
-      indicator.dispatchEvent(new Event('transitionend'));
+      dispatchOpacityTransition(indicator);
     });
   }
   t.is(dismissCount, 1);
