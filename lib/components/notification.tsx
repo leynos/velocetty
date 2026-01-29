@@ -86,9 +86,14 @@ const Notification = forwardRef<HTMLDivElement, React.PropsWithChildren<Notifica
       {props.customChildrenBefore}
       {props.children || props.text}
       {props.userDismissable ? (
-        <a className="notification_dismissLink" onClick={handleDismiss} style={{color: props.userDismissColor}}>
+        <button
+          type="button"
+          className="notification_dismissLink"
+          onClick={handleDismiss}
+          style={{color: props.userDismissColor}}
+        >
           [x]
-        </a>
+        </button>
       ) : null}
       {props.customChildren}
 
