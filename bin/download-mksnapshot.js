@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-import * as electronGet from '@electron/get';
+import {downloadArtifact} from '@electron/get';
 import extractZip from 'extract-zip';
 
 import {normaliseArch} from './shared/arch.js';
@@ -46,13 +46,15 @@ async function main() {
 
   fs.mkdirSync(targetFolder, {recursive: true});
 
-  const zipPath = await electronGet.downloadArtifact({
+  const zipPath = await downloadArtifact({
     version,
     artifactName: 'mksnapshot',
     platform,
     arch: downloadArch,
     rejectUnauthorized,
-    quiet: !['info', 'verbose', 'silly', 'http'].includes(process.env.npm_config_loglevel)
+    downloadOptions: {
+      quiet: !['info', 'verbose', 'silly', 'http'].includes(process.env.npm_config_loglevel)
+    }
   });
 
   await extractZip(zipPath, {dir: targetFolder});

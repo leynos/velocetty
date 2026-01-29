@@ -1,3 +1,8 @@
+/**
+ * @file Renders in-app notification indicators and dismissal behaviour.
+ * Handles timer-based auto-dismiss, transition hooks, and custom slot content
+ * for the renderer notification bar.
+ */
 // biome-ignore lint/style/useImportType: React value is required for JSX runtime under ts-node tests.
 import React, {forwardRef, useEffect, useRef, useState} from 'react';
 

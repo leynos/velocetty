@@ -1,3 +1,8 @@
+/**
+ * @file RPC client for renderer-to-main IPC messaging.
+ * Manages event subscription lifecycle and emits typed commands for the
+ * renderer process.
+ */
 import {EventEmitter} from 'node:events';
 
 import type {IpcRendererEvent} from 'electron';
@@ -28,7 +33,6 @@ export default class Client {
         this.emitter.emit('ready');
       }, 0);
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       this.ipc.on('init', (_ev: IpcRendererEvent, uid: string, _profileName: string) => {
         // we cache so that if the object
         // gets re-instantiated we don't
@@ -53,8 +57,7 @@ export default class Client {
   };
 
   off = <U extends keyof RendererEvents>(ev: U, fn: (arg0: RendererEvents[U]) => void) => {
-    this.emitter.removeListener(ev, fn);
-    return this;
+    return this.removeListener(ev, fn);
   };
 
   once = <U extends keyof RendererEvents>(ev: U, fn: (arg0: RendererEvents[U]) => void) => {

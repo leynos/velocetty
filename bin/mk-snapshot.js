@@ -12,6 +12,7 @@ import {normaliseArch} from './shared/arch.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Keep as a placeholder for future module exclusion configuration.
 const excludedModules = {};
 
 const crossArchDirs = ['clang_x86_v8_arm', 'clang_x64_v8_arm64', 'win_clang_x64'];
