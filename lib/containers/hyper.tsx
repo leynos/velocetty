@@ -30,7 +30,7 @@ const Hyper = forwardRef<HTMLDivElement, HyperProps>((props, ref) => {
 
   useEffect(() => {
     void attachKeyListeners();
-  }, [props.lastConfigUpdate]);
+  }, [props.execCommand, props.lastConfigUpdate]);
   useEffect(() => {
     handleFocusActive(props.activeSession);
   }, [props.activeSession]);

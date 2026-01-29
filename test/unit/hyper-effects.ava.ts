@@ -57,6 +57,8 @@ test.serial('Hyper attaches key listeners on mount and config updates', async (t
     }
   }).default;
 
+  const execCommand = () => {};
+
   await act(async () => {
     root.render(
       React.createElement(Hyper, {
@@ -69,7 +71,7 @@ test.serial('Hyper attaches key listeners on mount and config updates', async (t
         maximized: false,
         fullScreen: false,
         lastConfigUpdate: 1,
-        execCommand: () => {}
+        execCommand
       })
     );
     await waitFor(0);
@@ -91,7 +93,7 @@ test.serial('Hyper attaches key listeners on mount and config updates', async (t
         maximized: false,
         fullScreen: false,
         lastConfigUpdate: 1,
-        execCommand: () => {}
+        execCommand
       })
     );
     await waitFor(0);
@@ -111,7 +113,7 @@ test.serial('Hyper attaches key listeners on mount and config updates', async (t
         maximized: false,
         fullScreen: false,
         lastConfigUpdate: 2,
-        execCommand: () => {}
+        execCommand
       })
     );
     await waitFor(0);

@@ -5,6 +5,8 @@ import type {NotificationProps} from '../../typings/hyper';
 
 const Notification = forwardRef<HTMLDivElement, React.PropsWithChildren<NotificationProps>>((props, ref) => {
   const dismissTimer = useRef<NodeJS.Timeout | undefined>(undefined);
+  const transitionHandler = useRef<(() => void) | null>(null);
+  const transitionNode = useRef<HTMLDivElement | null>(null);
   const [dismissing, setDismissing] = useState(false);
 
   useEffect(() => {
@@ -23,12 +25,19 @@ const Notification = forwardRef<HTMLDivElement, React.PropsWithChildren<Notifica
   };
 
   const onElement = (el: HTMLDivElement | null) => {
+    if (transitionNode.current && transitionHandler.current) {
+      transitionNode.current.removeEventListener('webkitTransitionEnd', transitionHandler.current);
+    }
+
     if (el) {
-      el.addEventListener('webkitTransitionEnd', () => {
+      const handler = () => {
         if (dismissing) {
           props.onDismiss();
         }
-      });
+      };
+      transitionHandler.current = handler;
+      transitionNode.current = el;
+      el.addEventListener('webkitTransitionEnd', handler);
       const {backgroundColor} = props;
       if (backgroundColor) {
         el.style.setProperty('background-color', backgroundColor, 'important');
@@ -57,6 +66,11 @@ const Notification = forwardRef<HTMLDivElement, React.PropsWithChildren<Notifica
   useEffect(() => {
     return () => {
       clearTimeout(dismissTimer.current);
+      if (transitionNode.current && transitionHandler.current) {
+        transitionNode.current.removeEventListener('webkitTransitionEnd', transitionHandler.current);
+      }
+      transitionNode.current = null;
+      transitionHandler.current = null;
     };
   }, []);
 
