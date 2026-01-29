@@ -29,11 +29,7 @@ const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLD
 
       if (el) {
         const handler = (event: TransitionEvent) => {
-          if (event.target && event.target !== el) {
-            return;
-          }
-
-          if (event.propertyName && event.propertyName !== 'opacity') {
+          if (event.target !== transitionNode.current || event.propertyName !== 'opacity') {
             return;
           }
 

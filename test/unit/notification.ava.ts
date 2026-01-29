@@ -13,6 +13,7 @@ const waitFor = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)
 const dispatchOpacityTransition = (indicator: Element) => {
   const event = new Event('transitionend') as TransitionEvent;
   Object.defineProperty(event, 'propertyName', {value: 'opacity'});
+  Object.defineProperty(event, 'target', {value: indicator});
   indicator.dispatchEvent(event);
 };
 
