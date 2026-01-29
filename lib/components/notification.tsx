@@ -26,7 +26,7 @@ const Notification = forwardRef<HTMLDivElement, React.PropsWithChildren<Notifica
 
   const onElement = (el: HTMLDivElement | null) => {
     if (transitionNode.current && transitionHandler.current) {
-      transitionNode.current.removeEventListener('webkitTransitionEnd', transitionHandler.current);
+      transitionNode.current.removeEventListener('transitionend', transitionHandler.current);
     }
 
     if (el) {
@@ -37,7 +37,7 @@ const Notification = forwardRef<HTMLDivElement, React.PropsWithChildren<Notifica
       };
       transitionHandler.current = handler;
       transitionNode.current = el;
-      el.addEventListener('webkitTransitionEnd', handler);
+      el.addEventListener('transitionend', handler);
       const {backgroundColor} = props;
       if (backgroundColor) {
         el.style.setProperty('background-color', backgroundColor, 'important');
@@ -67,7 +67,7 @@ const Notification = forwardRef<HTMLDivElement, React.PropsWithChildren<Notifica
     return () => {
       clearTimeout(dismissTimer.current);
       if (transitionNode.current && transitionHandler.current) {
-        transitionNode.current.removeEventListener('webkitTransitionEnd', transitionHandler.current);
+        transitionNode.current.removeEventListener('transitionend', transitionHandler.current);
       }
       transitionNode.current = null;
       transitionHandler.current = null;

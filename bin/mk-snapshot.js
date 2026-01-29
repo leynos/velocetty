@@ -39,12 +39,15 @@ async function main() {
 
   if (process.platform !== 'darwin') {
     const mksnapshotBinPath = `${baseDirPath}/node_modules/electron-mksnapshot/bin`;
+    const embeddedSPath = `${mksnapshotBinPath}/gen/v8/embedded.S`;
     const matchingDirs = crossArchDirs.map((dir) => `${mksnapshotBinPath}/${dir}`).filter((dir) => fs.existsSync(dir));
-    for (const dir of matchingDirs) {
-      if (fs.existsSync(`${mksnapshotBinPath}/gen/v8/embedded.S`)) {
-        await mkdirp(`${dir}/gen/v8`);
-        fs.copyFileSync(`${mksnapshotBinPath}/gen/v8/embedded.S`, `${dir}/gen/v8/embedded.S`);
-      }
+    if (fs.existsSync(embeddedSPath)) {
+      await Promise.all(
+        matchingDirs.map(async (dir) => {
+          await mkdirp(`${dir}/gen/v8`);
+          fs.copyFileSync(embeddedSPath, `${dir}/gen/v8/embedded.S`);
+        })
+      );
     }
   }
 

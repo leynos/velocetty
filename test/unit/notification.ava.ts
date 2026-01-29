@@ -40,7 +40,7 @@ test.serial('Notification auto-dismisses after the timeout on mount', async (t) 
     t.fail('Expected notification indicator to be present.');
   } else {
     await act(async () => {
-      indicator.dispatchEvent(new Event('webkitTransitionEnd'));
+      indicator.dispatchEvent(new Event('transitionend'));
     });
   }
 
@@ -92,7 +92,7 @@ test.serial('Notification resets the timer when text changes', async (t) => {
     t.fail('Expected notification indicator to be present.');
   } else {
     await act(async () => {
-      indicator.dispatchEvent(new Event('webkitTransitionEnd'));
+      indicator.dispatchEvent(new Event('transitionend'));
     });
   }
   t.is(dismissCount, 0);
@@ -104,7 +104,7 @@ test.serial('Notification resets the timer when text changes', async (t) => {
     t.fail('Expected notification indicator to be present.');
   } else {
     await act(async () => {
-      indicator.dispatchEvent(new Event('webkitTransitionEnd'));
+      indicator.dispatchEvent(new Event('transitionend'));
     });
   }
   t.is(dismissCount, 1);
