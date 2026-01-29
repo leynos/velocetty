@@ -52,7 +52,7 @@ async function main() {
     platform,
     arch: downloadArch,
     rejectUnauthorized,
-    quiet: ['info', 'verbose', 'silly', 'http'].indexOf(process.env.npm_config_loglevel) === -1
+    quiet: !['info', 'verbose', 'silly', 'http'].includes(process.env.npm_config_loglevel)
   });
 
   await extractZip(zipPath, {dir: targetFolder});
