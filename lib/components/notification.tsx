@@ -17,7 +17,6 @@ const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLD
   const [dismissing, setDismissing] = useState(false);
 
   const handleDismiss = useCallback(() => {
-    dismissingRef.current = true;
     setDismissing(true);
   }, []);
 
@@ -73,9 +72,12 @@ const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLD
     // if we have a timer going and the notification text
     // changed we reset the timer
     resetDismissTimer();
-    dismissingRef.current = false;
     setDismissing(false);
   }, [resetDismissTimer, text]);
+
+  useEffect(() => {
+    dismissingRef.current = dismissing;
+  }, [dismissing]);
 
   useEffect(() => {
     return () => {
