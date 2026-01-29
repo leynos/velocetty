@@ -5,7 +5,6 @@ import vm from 'node:vm';
 import {fileURLToPath} from 'node:url';
 
 import electronLink from 'electron-link';
-import {mkdirp} from 'fs-extra';
 
 import {normaliseArch} from './shared/arch.js';
 
@@ -36,7 +35,7 @@ async function main() {
 
   const targetArch = normaliseArch(process.env.npm_config_arch || process.arch);
   const outputBlobPath = `${baseDirPath}/cache/${targetArch}`;
-  await mkdirp(outputBlobPath);
+  await fs.promises.mkdir(outputBlobPath, {recursive: true});
 
   if (process.platform !== 'darwin') {
     const mksnapshotBinPath = `${baseDirPath}/node_modules/electron-mksnapshot/bin`;
@@ -45,7 +44,7 @@ async function main() {
     if (fs.existsSync(embeddedSPath)) {
       await Promise.all(
         matchingDirs.map(async (dir) => {
-          await mkdirp(`${dir}/gen/v8`);
+          await fs.promises.mkdir(`${dir}/gen/v8`, {recursive: true});
           fs.copyFileSync(embeddedSPath, `${dir}/gen/v8/embedded.S`);
         })
       );
