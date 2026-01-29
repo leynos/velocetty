@@ -27,10 +27,9 @@ const editMenu = (commandKeys: Record<string, string>, execCommand: MenuCommandR
     },
     {
       role: 'copy',
-      command: 'editor:copy',
       accelerator: commandKeys['editor:copy'],
       registerAccelerator: true
-    } as any,
+    },
     {
       role: 'paste',
       accelerator: commandKeys['editor:paste'],

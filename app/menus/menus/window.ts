@@ -16,7 +16,10 @@ const windowMenu = (
     const label = i === 9 ? 'Last' : `${i}`;
     tabJump.push({
       label,
-      accelerator: commandKeys[`tab:jump:${label.toLowerCase()}`]
+      accelerator: commandKeys[`tab:jump:${label.toLowerCase()}`],
+      click: (_item, focusedWindow) => {
+        execWithBrowserWindow(`tab:jump:${label.toLowerCase()}`, focusedWindow);
+      }
     });
   }
 
