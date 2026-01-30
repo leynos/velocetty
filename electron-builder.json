@@ -7,7 +7,6 @@
     "app": "target"
   },
   "extraResources": [
-    "./bin/yarn-standalone.js",
     "./bin/cli.js",
     {
       "from": "./build/${os}/",

@@ -3,22 +3,23 @@ import cp from 'child_process';
 import ms from 'ms';
 import queue from 'queue';
 
-import {yarn, plugs} from '../config/paths';
+import {bun, plugs} from '../config/paths';
 
 export const install = (fn: (err: string | null) => void) => {
   const spawnQueue = queue({concurrency: 1});
-  function yarnFn(args: string[], cb: (err: string | null) => void) {
+  function bunFn(args: string[], cb: (err: string | null) => void) {
     const env = {
+      ...process.env,
       NODE_ENV: 'production',
       ELECTRON_RUN_AS_NODE: 'true'
     };
     spawnQueue.push((end) => {
-      const cmd = [process.execPath, yarn].concat(args).join(' ');
-      console.log('Launching yarn:', cmd);
+      const cmd = [bun].concat(args).join(' ');
+      console.log('Launching bun:', cmd);
 
       cp.execFile(
-        process.execPath,
-        [yarn].concat(args),
+        bun,
+        args,
         {
           cwd: plugs.base,
           env,
@@ -40,7 +41,7 @@ export const install = (fn: (err: string | null) => void) => {
     spawnQueue.start();
   }
 
-  yarnFn(['install', '--no-emoji', '--no-lockfile', '--cache-folder', plugs.cache], (err) => {
+  bunFn(['install', '--no-save', '--production', '--cache-dir', plugs.cache, '--no-progress'], (err) => {
     if (err) {
       return fn(err);
     }

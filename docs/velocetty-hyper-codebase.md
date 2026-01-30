@@ -681,7 +681,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | Dependency Type | Details |
 |-----------------|---------|
 | **Prerequisite Features** | F-004 (Configuration System) |
-| **System Dependencies** | Node.js module resolution, npm/yarn package management |
+| **System Dependencies** | Node.js module resolution, npm/bun package management |
 | **External Dependencies** | npm registry for plugin distribution |
 | **Integration Requirements** | React component decoration, Redux middleware/reducer integration |
 
@@ -801,7 +801,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | Dependency Type | Details |
 |-----------------|---------|
 | **Prerequisite Features** | F-005 (Plugin System), F-004 (Configuration System) |
-| **System Dependencies** | Node.js runtime, npm/yarn |
+| **System Dependencies** | Node.js runtime, npm/bun |
 | **External Dependencies** | npm registry API |
 | **Integration Requirements** | Configuration file access, plugin directory management |
 
@@ -1242,7 +1242,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 | Validation Category | Rules |
 |---------------------|-------|
-| **Business Rules** | Use yarn for package installation; 5-minute timeout |
+| **Business Rules** | Use bun for package installation; 5-minute timeout |
 | **Data Validation** | Plugin name validated against npm registry |
 | **Security Requirements** | npm package integrity verification |
 
@@ -1325,7 +1325,7 @@ flowchart TB
 | Plugin Loader | `app/plugins.ts` | F-005, F-007, F-006 |
 | Session Manager | `app/session.ts` | F-001, F-002 |
 | File Watcher | via chokidar | F-004 |
-| Package Manager | via yarn | F-005, F-009 |
+| Package Manager | via bun | F-005, F-009 |
 
 ---
 
@@ -1428,7 +1428,7 @@ flowchart TB
 | F-005-RQ-004 | React HOCs, Plugin Connectors | React |
 | F-006-RQ-001 | Keymap Loader, Command Registry | Electron |
 | F-008-RQ-002 | Updater Module, Auto-Updater | Network, Electron |
-| F-009-RQ-001 | CLI API, Yarn | npm registry |
+| F-009-RQ-001 | CLI API, Bun | npm registry |
 
 ---
 
@@ -1806,7 +1806,7 @@ Optional Dependencies:
 |--------|-------------|
 | **Exact Versions** | Critical dependencies (Electron, React, xterm.js) use exact versions to ensure reproducible builds |
 | **Caret Ranges** | Utility libraries use caret (`^`) ranges for automatic patch updates |
-| **Lock File** | `yarn.lock` ensures consistent dependency resolution across environments |
+| **Lock File** | `bun.lock` ensures consistent dependency resolution across environments |
 
 ### 3.3.5 Security Considerations
 
@@ -2034,12 +2034,12 @@ Velocetty uses three Webpack configurations defined in `webpack.config.ts`:
 ```bash
 # Install dependencies
 
-yarn
+bun
 
 #### Development mode (requires two terminal windows)
 
-yarn run dev        # Webpack watch + TypeScript incremental build
-yarn run app        # Run Electron with electronmon (hot-reload)
+bun run dev        # Webpack watch + TypeScript incremental build
+bun run app        # Run Electron with electronmon (hot-reload)
 
 #### Development server
 
@@ -2047,11 +2047,11 @@ yarn run app        # Run Electron with electronmon (hot-reload)
 
 #### Production build
 
-yarn run build      # Full Webpack production + TypeScript + Babel minification
+bun run build      # Full Webpack production + TypeScript + Babel minification
 
 #### Package for distribution
 
-yarn run dist       # Build + electron-builder packaging
+bun run dist       # Build + electron-builder packaging
 ```
 
 ### 3.6.5 Testing Framework
@@ -2090,9 +2090,9 @@ flowchart LR
     subgraph CI["CI Pipeline (nodejs.yml)"]
         Checkout["Checkout"]
         Setup["Setup Node.js 18.x"]
-        Install["yarn install<br/>(with caching)"]
-        Build["yarn build"]
-        Test["yarn test"]
+        Install["bun install<br/>(with caching)"]
+        Build["bun run build"]
+        Test["bun test"]
         E2E["E2E Tests<br/>(Playwright)"]
     end
     
@@ -2130,7 +2130,7 @@ flowchart LR
 | Feature | Implementation |
 |---------|----------------|
 | **Node.js Version** | 18.x |
-| **Caching** | Yarn cache for faster installs |
+| **Caching** | Bun cache for faster installs |
 | **Matrix Strategy** | `[macos-latest, ubuntu-latest, windows-latest]` |
 | **Native Modules** | Automatic node-pty rebuilding per platform |
 | **Artifacts** | Installer uploads for each platform |
@@ -2775,7 +2775,7 @@ flowchart TB
     subgraph HotReload["Plugin Hot Reload"]
         UpdateTrigger([Plugin Update<br/>Triggered])
         SyncPackageJSON["syncPackageJSON()"]
-        RunYarn["Run yarn install<br/>via Queue"]
+        RunBun["Run bun install<br/>via Queue"]
         ClearCache["Clear require Cache"]
         ReloadModules["Reload Plugin Modules"]
         NotifyWatchers["Notify Watchers"]
@@ -2808,8 +2808,8 @@ flowchart TB
     ReducerHooks --> MapStateHooks
     
     UpdateTrigger --> SyncPackageJSON
-    SyncPackageJSON --> RunYarn
-    RunYarn --> ClearCache
+    SyncPackageJSON --> RunBun
+    RunBun --> ClearCache
     ClearCache --> ReloadModules
     ReloadModules --> NotifyWatchers
     NotifyWatchers --> ShowNotification
@@ -3502,7 +3502,7 @@ flowchart TB
 
 | Command | Purpose | Implementation |
 |---------|---------|----------------|
-| `hyper install <plugin>` | Install plugin from npm | `cli/api.ts` - Updates config, triggers yarn install |
+| `hyper install <plugin>` | Install plugin from npm | `cli/api.ts` - Updates config, triggers bun install |
 | `hyper uninstall <plugin>` | Remove installed plugin | `cli/api.ts` - Removes from config |
 | `hyper list` | List installed plugins | Reads from config file |
 | `hyper search <query>` | Search npm for plugins | Queries npm registry |
@@ -4180,7 +4180,7 @@ flowchart TB
 - Load and validate plugin extensions
 - Manage plugin lifecycle hooks
 - Implement Module._load patching for shared dependencies
-- Provide yarn-based plugin installation with timeout handling
+- Provide bun-based plugin installation with timeout handling
 
 **Extension Hooks (40+ Total)**:
 
@@ -4202,7 +4202,7 @@ flowchart TB
     Exists{{"Package<br/>Exists?"}}
     UpdateConfig["Add to plugins array"]
     WriteConfig["Write hyper.json"]
-    YarnInstall["Trigger yarn install<br/>(5-minute timeout)"]
+    BunInstall["Trigger bun install<br/>(5-minute timeout)"]
     ClearCache["Clear require cache"]
     ReloadPlugins["Reload plugin modules"]
     Success(["Installation Complete"])
@@ -4213,8 +4213,8 @@ flowchart TB
     Query --> Exists
     Exists -->|"Yes"| UpdateConfig
     UpdateConfig --> WriteConfig
-    WriteConfig --> YarnInstall
-    YarnInstall --> ClearCache
+    WriteConfig --> BunInstall
+    BunInstall --> ClearCache
     ClearCache --> ReloadPlugins
     ReloadPlugins --> Success
     Exists -->|"No"| NotFound
@@ -4231,7 +4231,7 @@ flowchart TB
 
 | Command | Implementation | Purpose |
 |---------|---------------|---------|
-| `hyper install <plugin>` | `cli/api.ts` | Add plugin to config, trigger yarn install |
+| `hyper install <plugin>` | `cli/api.ts` | Add plugin to config, trigger bun install |
 | `hyper uninstall <plugin>` | `cli/api.ts` | Remove plugin from config |
 | `hyper list` | `cli/api.ts` | List installed plugins |
 | `hyper search <query>` | npms.io API | Search npm registry for plugins |
@@ -4292,7 +4292,7 @@ flowchart TB
 | User Configuration | JSON file with schema | Programmatic editing, future preferences UI, validation |
 | Window Geometry | electron-store | Encrypted persistence, automatic serialization |
 | Terminal Content | In-memory only | Security (no command history logging), privacy |
-| Plugin Packages | npm/yarn in plugins directory | Standard package management, familiar workflow |
+| Plugin Packages | npm/bun in plugins directory | Standard package management, familiar workflow |
 | Session State | Redux (not persisted) | Traditional terminal behavior, no startup delay |
 
 ### 5.3.4 Caching Strategy Justification
@@ -5099,7 +5099,7 @@ flowchart TB
 |---------------|------------|-------------------|---------------|
 | **Configuration Storage** | JSON files with schema validation | Persistent across restarts | User-managed, survives application updates |
 | **Application State** | electron-store + Redux in-memory | Partial persistence | Window geometry persisted; session state volatile |
-| **Plugin Storage** | npm/yarn filesystem structure | Persistent across restarts | Managed via CLI commands |
+| **Plugin Storage** | npm/bun filesystem structure | Persistent across restarts | Managed via CLI commands |
 
 ---
 
@@ -5399,7 +5399,7 @@ flowchart TB
         end
         
         subgraph PluginCache["Plugin Installation Cache"]
-            YarnCache["Yarn Cache<br/>(~/.cache/yarn)"]
+            BunCache["Bun Cache<br/>(~/.cache/bun)"]
             PluginCacheDir["plugins/cache/<br/>(local cache)"]
         end
     end
@@ -5593,7 +5593,7 @@ flowchart TB
 | **User Configuration** | JSON file with JSON Schema | Programmatic editing, editor IntelliSense, validation |
 | **Window Geometry** | electron-store | Encrypted persistence, automatic serialization |
 | **Terminal Content** | In-memory only | Security (no command history logging), privacy |
-| **Plugin Packages** | npm/yarn in plugins directory | Standard package management, familiar workflow |
+| **Plugin Packages** | npm/bun in plugins directory | Standard package management, familiar workflow |
 | **Session State** | Redux (not persisted) | Traditional terminal behavior, no startup delay |
 
 ---
@@ -6185,7 +6185,7 @@ sequenceDiagram
     participant API as cli/api.ts
     participant NPM as npm Registry
     participant Config as hyper.json
-    participant Yarn as Yarn Package Manager
+    participant Bun as Bun Package Manager
     participant Plugins as Plugin Manager
     participant RPC as RPC Bridge
     participant Renderer as Renderer Process
@@ -6202,8 +6202,8 @@ sequenceDiagram
         API->>Config: Add to plugins array
         API->>Config: Write updated config
         Config->>API: Generate package.json
-        API->>Yarn: yarn install (5-min timeout)
-        Yarn-->>API: Installation complete
+        API->>Bun: bun install (5-min timeout)
+        Bun-->>API: Installation complete
         API->>Plugins: Clear require cache
         Plugins->>Plugins: Reload plugin modules
         Plugins->>RPC: Notify watchers
@@ -7638,11 +7638,11 @@ flowchart TB
     subgraph CIPipeline["CI Pipeline (nodejs.yml)"]
         Checkout["Checkout Code"]
         SetupNode["Setup Node.js 18.x"]
-        InstallDeps["yarn install<br/>(with caching)"]
-        LintCheck["yarn lint"]
-        BuildApp["yarn build"]
-        UnitTests["yarn test<br/>(AVA)"]
-        E2ETests["yarn test:e2e<br/>(Playwright)"]
+        InstallDeps["bun install<br/>(with caching)"]
+        LintCheck["bun lint"]
+        BuildApp["bun run build"]
+        UnitTests["bun test<br/>(AVA)"]
+        E2ETests["bun test:e2e<br/>(Playwright)"]
     end
     
     subgraph BuildMatrix["Build Matrix"]
@@ -8272,7 +8272,7 @@ flowchart TB
 flowchart TB
     Start([E2E Test Initiated])
     BuildCheck{{"Packaged<br/>Build Exists?"}}
-    RunBuild["yarn run dist<br/>Build Application"]
+    RunBuild["bun run dist<br/>Build Application"]
     ResolveBinary["Resolve Platform<br/>Binary Path"]
     LaunchElectron["Playwright<br/>_electron.launch()"]
     WaitWindow["electronApp.firstWindow()<br/>Wait for Window"]
@@ -8339,10 +8339,10 @@ flowchart TB
     subgraph CIPipeline["CI Pipeline (nodejs.yml)"]
         Checkout["Checkout Code"]
         SetupNode["Setup Node.js 18.x"]
-        InstallDeps["yarn install<br/>(with caching)"]
-        LintTest["yarn run test<br/>(lint + unit)"]
-        BuildDist["yarn run dist<br/>(package)"]
-        E2ETest["yarn run test:e2e<br/>(Playwright)"]
+        InstallDeps["bun install<br/>(with caching)"]
+        LintTest["bun run test<br/>(lint + unit)"]
+        BuildDist["bun run dist<br/>(package)"]
+        E2ETest["bun run test:e2e<br/>(Playwright)"]
     end
     
     subgraph BuildMatrix["Cross-Platform Matrix"]
@@ -8366,7 +8366,7 @@ flowchart TB
 
 | Script | Command | Scope |
 |--------|---------|-------|
-| `test` | `yarn run lint && yarn run test:unit` | Full test suite (lint + unit) |
+| `test` | `bun run lint && bun run test:unit` | Full test suite (lint + unit) |
 | `test:unit` | `ava` | Unit tests only |
 | `test:unit:watch` | `ava --watch` | Development watch mode |
 | `test:e2e` | `ava --config ava-e2e.config.js` | End-to-end tests |
@@ -8583,14 +8583,14 @@ flowchart TB
     subgraph LocalDev["Local Development Testing"]
         DevMachine["Developer Machine"]
         NodeRuntime["Node.js 18.x"]
-        YarnPM["Yarn Package Manager"]
+        BunPM["Bun Package Manager"]
     end
     
     subgraph TestCommands["Test Commands"]
-        LintUnit["yarn run test<br/>(lint + unit)"]
-        WatchMode["yarn run test:unit:watch<br/>(development)"]
-        BuildFirst["yarn run dist<br/>(required for E2E)"]
-        E2ETest["yarn run test:e2e<br/>(packaged app)"]
+        LintUnit["bun run test<br/>(lint + unit)"]
+        WatchMode["bun run test:unit:watch<br/>(development)"]
+        BuildFirst["bun run dist<br/>(required for E2E)"]
+        E2ETest["bun run test:e2e<br/>(packaged app)"]
     end
     
     subgraph Outputs["Test Outputs"]
@@ -8607,7 +8607,7 @@ flowchart TB
 | Environment Aspect | Configuration | Purpose |
 |-------------------|---------------|---------|
 | Node.js version | 18.x | LTS compatibility |
-| Package manager | Yarn with caching | Fast installs |
+| Package manager | Bun with caching | Fast installs |
 | Build matrix | macOS, Ubuntu, Windows | Cross-platform |
 | Linux display | Xvfb (virtual) | Headless E2E |
 | Native modules | Auto-rebuild per platform | node-pty compatibility |
@@ -9865,11 +9865,11 @@ Velocetty defines three distinct Webpack configurations in `webpack.config.ts` f
 
 | Script | Command | Purpose |
 |--------|---------|---------|
-| `build` | `yarn run build:webpack && yarn run build:ts` | Full production build |
+| `build` | `bun run build:webpack && bun run build:ts` | Full production build |
 | `build:webpack` | `webpack --config webpack.config.ts` | Webpack bundle generation |
 | `build:ts` | `tsc --build` | TypeScript compilation |
 | `dev` | `webpack --watch` + `tsc --watch` | Development watch mode |
-| `dist` | `yarn run build && electron-builder` | Build + package for distribution |
+| `dist` | `bun run build && electron-builder` | Build + package for distribution |
 
 ### 8.2.5 V8 Snapshot Optimization
 
@@ -10031,9 +10031,9 @@ flowchart TB
     subgraph MainPipeline["Main CI Pipeline (nodejs.yml)"]
         Checkout["Checkout<br/>actions/checkout@v4"]
         SetupNode["Setup Node.js<br/>actions/setup-node@v4"]
-        InstallDeps["Install Dependencies<br/>yarn install"]
-        LintTest["Lint + Unit Tests<br/>yarn run test"]
-        Build["Build Distribution<br/>yarn run dist"]
+        InstallDeps["Install Dependencies<br/>bun install"]
+        LintTest["Lint + Unit Tests<br/>bun run test"]
+        Build["Build Distribution<br/>bun run dist"]
         E2E["E2E Tests<br/>Playwright"]
         Upload["Upload Artifacts"]
     end
@@ -10101,11 +10101,11 @@ flowchart LR
     subgraph Stage1["Stage 1: Setup"]
         Checkout["Checkout Code"]
         NodeSetup["Setup Node.js 18.x"]
-        CacheRestore["Restore Yarn Cache"]
+        CacheRestore["Restore Bun Cache"]
     end
     
     subgraph Stage2["Stage 2: Install"]
-        YarnInstall["yarn install"]
+        BunInstall["bun install"]
         NativeRebuild["Rebuild Native<br/>Modules"]
         PythonSetup["Setup Python<br/>(Windows workaround)"]
     end
@@ -10130,7 +10130,7 @@ flowchart LR
     
     subgraph Stage6["Stage 6: Publish"]
         UploadArtifacts["Upload Installers"]
-        CacheSave["Save Yarn Cache"]
+        CacheSave["Save Bun Cache"]
     end
     
     Stage1 --> Stage2
@@ -10144,7 +10144,7 @@ flowchart LR
 
 | Cache Component | Key Pattern | Scope |
 |-----------------|-------------|-------|
-| Yarn Cache | `${{ runner.os }}-yarn-${{ hashFiles('yarn.lock', 'app/yarn.lock') }}` | Per-OS, per-lockfile |
+| Bun Cache | `${{ runner.os }}-bun-${{ hashFiles('bun.lock', 'app/bun.lock') }}` | Per-OS, per-lockfile |
 | npm Cache | `npm-${{ runner.os }}` | Per-OS |
 | Save Trigger | Push events only | Avoid cache updates on PRs |
 
@@ -10434,7 +10434,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     subgraph Development["Development"]
-        LocalDev["Local Development<br/>yarn run dev"]
+        LocalDev["Local Development<br/>bun run dev"]
         FeatureBranch["Feature Branch"]
     end
     
@@ -10489,7 +10489,7 @@ flowchart LR
 | **Build Minutes** | ~45-60 min per full matrix run | 3 platforms × ~15-20 min each |
 | **Storage** | ~500 MB artifacts per run | Platform installers + screenshots |
 | **ARM Build** | ~30 min additional | QEMU emulation overhead |
-| **Cache Size** | ~500 MB per OS | Yarn dependencies |
+| **Cache Size** | ~500 MB per OS | Bun dependencies |
 
 ### 8.9.2 External Infrastructure Dependencies
 

@@ -54,7 +54,7 @@ const plugs = {
   local: resolve(plugins, 'local'),
   cache: resolve(plugins, 'cache')
 };
-const yarn = resolve(__dirname, '../../bin/yarn-standalone.js');
+const bun = process.env.BUN_PATH ?? 'bun';
 const cliScriptPath = resolve(__dirname, '../../bin/hyper');
 const cliLinkPath = '/usr/local/bin/hyper';
 
@@ -87,7 +87,7 @@ export {
   icon,
   defaultPlatformKeyPath,
   plugs,
-  yarn,
+  bun,
   cliScriptPath,
   cliLinkPath,
   homeDirectory,

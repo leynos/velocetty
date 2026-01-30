@@ -72,7 +72,7 @@
   },
   "overrides": [
     {
-      "includes": ["bin/rimraf-standalone.js", "bin/yarn-standalone.js"],
+      "includes": ["bin/rimraf-standalone.js"],
       "formatter": {
         "enabled": false
       },

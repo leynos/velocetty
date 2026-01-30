@@ -48,10 +48,6 @@ const config: webpack.Configuration[] = [
             to: './config/[name][ext]'
           },
           {
-            from: './app/yarn.lock',
-            to: 'yarn.lock'
-          },
-          {
             from: './app/keymaps/*.json',
             globOptions: {ignore: ['**/node_modules/**']},
             to: './keymaps/[name][ext]'
