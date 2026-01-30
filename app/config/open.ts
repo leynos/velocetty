@@ -1,4 +1,5 @@
-import {exec} from 'child_process';
+/** @file Opens the config file with platform-specific fallbacks. */
+import {exec} from 'node:child_process';
 
 import {shell} from 'electron';
 

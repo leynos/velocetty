@@ -181,7 +181,7 @@ export default class Term extends React.PureComponent<
 
     // The parent element for the terminal is attached and removed manually so
     // that we can preserve it across mounts and unmounts of the component
-    this.termRef = props.term ? props.term.element!.parentElement! : document.createElement('div');
+    this.termRef = props.term?.element?.parentElement ?? document.createElement('div');
     this.termRef.className = 'term_fit term_term';
 
     this.termWrapperRef?.appendChild(this.termRef);
@@ -249,10 +249,8 @@ export default class Term extends React.PureComponent<
       this.searchAddon = props.searchAddon!;
     }
 
-    try {
-      this.term.element!.style.padding = props.padding;
-    } catch (error) {
-      console.log(error);
+    if (this.term.element) {
+      this.term.element.style.padding = props.padding;
     }
 
     this.fitAddon.fit();
@@ -456,10 +454,8 @@ export default class Term extends React.PureComponent<
 
     this.termOptions = nextTermOptions;
 
-    try {
-      this.term.element!.style.padding = this.props.padding;
-    } catch (error) {
-      console.log(error);
+    if (this.term.element) {
+      this.term.element.style.padding = this.props.padding;
     }
 
     if (
@@ -495,7 +491,11 @@ export default class Term extends React.PureComponent<
 
   componentWillUnmount() {
     terms[this.props.uid] = null;
-    this.termWrapperRef?.removeChild(this.termRef!);
+    const termWrapper = this.termWrapperRef;
+    const termElement = this.termRef;
+    if (termWrapper && termElement) {
+      termWrapper.removeChild(termElement);
+    }
     this.props.ref_(this.props.uid, null);
 
     // to clean up the terminal, we remove the listeners

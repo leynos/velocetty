@@ -74,7 +74,7 @@ The TS documents several constraints that directly influence this design:
 
 * WebGL contexts are limited (the TS references a maximum of 16 simultaneous
 
-&nbsp; contexts), and Velocetty should prioritise visible panes and fall back to a
+&nbsp; contexts), and Velocetty should prioritize visible panes and fall back to a
 
 &nbsp; Canvas renderer when needed.[^techspec]
 
@@ -168,7 +168,7 @@ goals around Tauri and a remote frontend with a versioned protocol.[^prd]
 
 
 
-The current system can be summarised as:
+The current system can be summarized as:
 
 
 
@@ -332,7 +332,7 @@ flowchart TB
 
 &nbsp;   Frontend <-->|"WS + protobuf (loopback)"| WS
 
-```text
+```
 
 
 
@@ -368,7 +368,7 @@ flowchart TB
 
 The PRD calls out an explicit `frontend/`, `backend/`, and `shared/` split.[^prd]
 
-We adopt this and map the existing code during migration.
+This approach maps the existing code during migration.
 
 
 
@@ -522,7 +522,7 @@ export interface CommandDefinition<TArgs = unknown, TResult = unknown> {
 
 
 
-We implement two cooperating registries:
+Two cooperating registries are implemented:
 
 
 
@@ -914,7 +914,7 @@ The editor is itself driven by commands:
 
 
 
-The PRD specifies JSON5 as canonical.[^prd] We will store:
+The PRD specifies JSON5 as canonical.[^prd] Storage includes:
 
 
 
@@ -1084,9 +1084,8 @@ The settings UI should surface which settings require restart.
 
 
 
-The PRD requires a settings tab integrated with the command system.[^prd] We
-
-implement settings as a tab type (`tabType = "settings"`), not a modal, so it
+The PRD requires a settings tab integrated with the command system.[^prd]
+Settings are implemented as a tab type (`tabType = "settings"`), not a modal, so it
 
 can participate in navigation and state.
 
@@ -1438,7 +1437,7 @@ This aligns with the PRD requirement for namespaced plugin settings in JSON5.[^p
 
 
 
-We preserve the TS concept of sessions and term groups (split panes) as the
+The TS concept of sessions and term groups (split panes) is preserved as the
 
 underlying data model, but evolve the UI to a vertical rail and introduce a
 
@@ -1488,7 +1487,7 @@ Implementation notes:
 
 
 
-* Virtualise the tab list for large tab counts.
+* Virtualize the tab list for large tab counts.
 
 * Support drag-and-drop reorder and group moves.
 
@@ -1706,7 +1705,7 @@ User overrides:
 
 
 
-The TS already documents WebGL context limits and the need to prioritise visible
+The TS already documents WebGL context limits and the need to prioritize visible
 
 panes.[^techspec] The PRD turns this into an explicit deliverable.[^prd]
 
@@ -1786,7 +1785,7 @@ Context loss recovery:
 
 Phases 1–5 from the PRD can be delivered on the existing Electron foundation
 
-while we build the new architecture layers (commands, keybindings, settings,
+while the new architecture layers (commands, keybindings, settings,
 
 tabs, plugin API).[^prd]
 
@@ -1982,7 +1981,7 @@ Notes:
 
 
 
-### Authentication and authorisation
+### Authentication and authorization
 
 
 
@@ -2230,7 +2229,7 @@ This follows the PRD sequencing, expressed as roadmap-style tasks.[^prd]
 
 * Whether to support workspace-level overrides in the initial release, or defer
 
-&nbsp; until after the command/keybinding systems stabilise.
+&nbsp; until after the command/keybinding systems stabilize.
 
 * Exact UX and storage for provider precedence (ordered list vs numeric
 
@@ -2251,10 +2250,6 @@ This follows the PRD sequencing, expressed as roadmap-style tasks.[^prd]
 
 
 [^techspec]: “Technical specification”, attached.
-
-
-
-[^style]: “Documentation style guide”, attached.
 
 
 

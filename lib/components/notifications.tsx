@@ -1,4 +1,5 @@
-import React, {forwardRef} from 'react';
+/** @file Renders the transient notifications container. */
+import {forwardRef} from 'react';
 
 import type {NotificationsProps} from '../../typings/hyper';
 import {decorate} from '../utils/plugins';

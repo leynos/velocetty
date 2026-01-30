@@ -4,7 +4,7 @@
     "checkJs": false,
     "composite": true,
     "esModuleInterop": true,
-    "jsx": "react",
+    "jsx": "react-jsx",
     "module": "commonjs",
     "moduleResolution": "node",
     "preserveConstEnums": true,
@@ -14,8 +14,6 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "ES2022",
-    "typeRoots": [
-      "./node_modules/@types"
-    ]
+    "typeRoots": ["./node_modules/@types"]
   }
 }

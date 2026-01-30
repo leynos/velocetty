@@ -1,8 +1,5 @@
 {
-  "presets": [
-    "@babel/react",
-    "@babel/typescript"
-  ],
+  "presets": ["@babel/react", "@babel/typescript"],
   "plugins": [
     [
       "styled-jsx/babel",

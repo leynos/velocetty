@@ -1812,7 +1812,7 @@ Optional Dependencies:
 
 | Consideration | Mitigation |
 |---------------|------------|
-| **Supply Chain Risk** | Dependency audit via `yarn audit` in CI pipeline |
+| **Supply Chain Risk** | Dependency audit via `bun run audit` (wrapper for `bun audit`) in CI pipeline |
 | **Native Module Security** | `node-pty` executes with user privileges; no elevation by default |
 | **Plugin Trust Model** | Plugins are full-trust Node.js modules with unrestricted access |
 
@@ -3749,38 +3749,38 @@ The architecture explicitly acknowledges the IPC overhead inherent in Electron a
 
 ```mermaid
 flowchart TB
-    subgraph ExternalSystems[\"External Systems\"]
-        OS[\"Operating System\"]
-        Shell[\"Shell Process\"]
-        NPM[\"npm Registry\"]
-        UpdateServer[\"Update Server\"]
-        FileSystem[\"File System\"]
+    subgraph ExternalSystems["External Systems"]
+        OS["Operating System"]
+        Shell["Shell Process"]
+        NPM["npm Registry"]
+        UpdateServer["Update Server"]
+        FileSystem["File System"]
     end
     
-    subgraph VelocettyBoundary[\"Velocetty Application Boundary\"]
-        subgraph MainProcess[\"Main Process\"]
-            AppInit[\"App Initialization\"]
-            ConfigMgr[\"Config Manager\"]
-            SessionMgr[\"Session Manager\"]
-            PluginMgr[\"Plugin Manager\"]
-            RPCServer[\"RPC Server\"]
+    subgraph VelocettyBoundary["Velocetty Application Boundary"]
+        subgraph MainProcess["Main Process"]
+            AppInit["App Initialization"]
+            ConfigMgr["Config Manager"]
+            SessionMgr["Session Manager"]
+            PluginMgr["Plugin Manager"]
+            RPCServer["RPC Server"]
         end
         
-        subgraph RendererProcess[\"Renderer Process\"]
-            ReactApp[\"React Application\"]
-            ReduxStore[\"Redux Store\"]
-            XtermRenderer[\"xterm.js Renderer\"]
-            RPCClient[\"RPC Client\"]
+        subgraph RendererProcess["Renderer Process"]
+            ReactApp["React Application"]
+            ReduxStore["Redux Store"]
+            XtermRenderer["xterm.js Renderer"]
+            RPCClient["RPC Client"]
         end
         
-        RPCServer <-->|\"IPC Bridge\"| RPCClient
+        RPCServer <-->|"IPC Bridge"| RPCClient
     end
     
-    SessionMgr <-->|\"node-pty\"| Shell
+    SessionMgr <-->|"node-pty"| Shell
     Shell <--> OS
-    ConfigMgr <-->|\"JSON I/O\"| FileSystem
-    PluginMgr <-->|\"npm API\"| NPM
-    AppInit <-->|\"HTTP Polling\"| UpdateServer
+    ConfigMgr <-->|"JSON I/O"| FileSystem
+    PluginMgr <-->|"npm API"| NPM
+    AppInit <-->|"HTTP Polling"| UpdateServer
 ```
 
 ### 5.1.2 Core Components Table
@@ -4016,12 +4016,12 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    subgraph MiddlewarePipeline[\"Middleware Pipeline (Order Matters)\"]
-        T1[\"1. thunk\"]
-        PM[\"2. plugins.middleware\"]
-        T2[\"3. thunk\"]
-        WM[\"4. writeMiddleware\"]
-        EF[\"5. effects\"]
+    subgraph MiddlewarePipeline["Middleware Pipeline (Order Matters)"]
+        T1["1. thunk"]
+        PM["2. plugins.middleware"]
+        T2["3. thunk"]
+        WM["4. writeMiddleware"]
+        EF["5. effects"]
     end
     
     T1 --> PM
@@ -4044,20 +4044,20 @@ The `writeMiddleware` (`lib/store/write-middleware.ts`) implements a critical pe
 
 ```mermaid
 flowchart TB
-    Action[\"Action Dispatched\"]
-    Check{{\"Type =<br/>SESSION_PTY_DATA?\"}}
-    Lookup[\"Lookup term by uid<br/>in terms registry\"]
-    Found{{\"Term<br/>Found?\"}}
-    DirectWrite[\"term.term.write(data)<br/>Direct xterm call\"]
-    Forward[\"next(action)<br/>Continue pipeline\"]
+    Action["Action Dispatched"]
+    Check{{"Type =<br/>SESSION_PTY_DATA?"}}
+    Lookup["Lookup term by uid<br/>in terms registry"]
+    Found{{"Term<br/>Found?"}}
+    DirectWrite["term.term.write(data)<br/>Direct xterm call"]
+    Forward["next(action)<br/>Continue pipeline"]
     
     Action --> Check
-    Check -->|\"Yes\"| Lookup
+    Check -->|"Yes"| Lookup
     Lookup --> Found
-    Found -->|\"Yes\"| DirectWrite
+    Found -->|"Yes"| DirectWrite
     DirectWrite --> Forward
-    Found -->|\"No\"| Forward
-    Check -->|\"No\"| Forward
+    Found -->|"No"| Forward
+    Check -->|"No"| Forward
 ```
 
 #### Terminal Component (`lib/components/term.tsx`)
@@ -4084,27 +4084,27 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    Mount([\"componentDidMount\"])
-    Fit[\"1. FitAddon\"]
-    Search[\"2. SearchAddon\"]
-    WebLinks[\"3. WebLinksAddon\"]
-    Open[\"4. Open Terminal\"]
+    Mount(["componentDidMount"])
+    Fit["1. FitAddon"]
+    Search["2. SearchAddon"]
+    WebLinks["3. WebLinksAddon"]
+    Open["4. Open Terminal"]
     
-    WebGLCheck{{\"WebGL<br/>Enabled?\"}}
-    TransCheck{{\"Transparency<br/>Enabled?\"}}
-    SupportCheck{{\"WebGL2<br/>Supported?\"}}
+    WebGLCheck{{"WebGL<br/>Enabled?"}}
+    TransCheck{{"Transparency<br/>Enabled?"}}
+    SupportCheck{{"WebGL2<br/>Supported?"}}
     
-    WebGL[\"5a. WebglAddon<br/>+ onContextLoss\"]
-    Canvas[\"5b. CanvasAddon\"]
+    WebGL["5a. WebglAddon<br/>+ onContextLoss"]
+    Canvas["5b. CanvasAddon"]
     
-    LigCheck{{\"Ligatures<br/>Enabled?\"}}
-    NotWebGL{{\"NOT<br/>WebGL?\"}}
-    Ligatures[\"6. LigaturesAddon\"]
-    Unicode[\"7. Unicode11Addon\"]
+    LigCheck{{"Ligatures<br/>Enabled?"}}
+    NotWebGL{{"NOT<br/>WebGL?"}}
+    Ligatures["6. LigaturesAddon"]
+    Unicode["7. Unicode11Addon"]
     
-    ImageCheck{{\"imageSupport<br/>Enabled?\"}}
-    Image[\"8. ImageAddon\"]
-    Ready([\"Terminal Ready\"])
+    ImageCheck{{"imageSupport<br/>Enabled?"}}
+    Image["8. ImageAddon"]
+    Ready(["Terminal Ready"])
     
     Mount --> Fit
     Fit --> Search
@@ -4112,25 +4112,25 @@ flowchart TB
     WebLinks --> Open
     Open --> WebGLCheck
     
-    WebGLCheck -->|\"Yes\"| TransCheck
-    TransCheck -->|\"Yes\"| Canvas
-    TransCheck -->|\"No\"| SupportCheck
-    SupportCheck -->|\"Yes\"| WebGL
-    SupportCheck -->|\"No\"| Canvas
-    WebGLCheck -->|\"No\"| Canvas
+    WebGLCheck -->|"Yes"| TransCheck
+    TransCheck -->|"Yes"| Canvas
+    TransCheck -->|"No"| SupportCheck
+    SupportCheck -->|"Yes"| WebGL
+    SupportCheck -->|"No"| Canvas
+    WebGLCheck -->|"No"| Canvas
     
     WebGL --> LigCheck
     Canvas --> LigCheck
     
-    LigCheck -->|\"Yes\"| NotWebGL
-    NotWebGL -->|\"Yes\"| Ligatures
-    NotWebGL -->|\"No\"| Unicode
+    LigCheck -->|"Yes"| NotWebGL
+    NotWebGL -->|"Yes"| Ligatures
+    NotWebGL -->|"No"| Unicode
     Ligatures --> Unicode
-    LigCheck -->|\"No\"| Unicode
+    LigCheck -->|"No"| Unicode
     
     Unicode --> ImageCheck
-    ImageCheck -->|\"Yes\"| Image
-    ImageCheck -->|\"No\"| Ready
+    ImageCheck -->|"Yes"| Image
+    ImageCheck -->|"No"| Ready
     Image --> Ready
 ```
 
@@ -4196,28 +4196,28 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    Install([\"hyper install plugin\"])
-    Normalize[\"Normalize Package Name\"]
-    Query[\"Query npm Registry\"]
-    Exists{{\"Package<br/>Exists?\"}}
-    UpdateConfig[\"Add to plugins array\"]
-    WriteConfig[\"Write hyper.json\"]
-    YarnInstall[\"Trigger yarn install<br/>(5-minute timeout)\"]
-    ClearCache[\"Clear require cache\"]
-    ReloadPlugins[\"Reload plugin modules\"]
-    Success([\"Installation Complete\"])
-    NotFound([\"Error: Not Found\"])
+    Install(["hyper install plugin"])
+    Normalize["Normalize Package Name"]
+    Query["Query npm Registry"]
+    Exists{{"Package<br/>Exists?"}}
+    UpdateConfig["Add to plugins array"]
+    WriteConfig["Write hyper.json"]
+    YarnInstall["Trigger yarn install<br/>(5-minute timeout)"]
+    ClearCache["Clear require cache"]
+    ReloadPlugins["Reload plugin modules"]
+    Success(["Installation Complete"])
+    NotFound(["Error: Not Found"])
     
     Install --> Normalize
     Normalize --> Query
     Query --> Exists
-    Exists -->|\"Yes\"| UpdateConfig
+    Exists -->|"Yes"| UpdateConfig
     UpdateConfig --> WriteConfig
     WriteConfig --> YarnInstall
     YarnInstall --> ClearCache
     ClearCache --> ReloadPlugins
     ReloadPlugins --> Success
-    Exists -->|\"No\"| NotFound
+    Exists -->|"No"| NotFound
 ```
 
 ### 5.2.5 CLI Tool (`cli/`)
@@ -4258,25 +4258,25 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    subgraph Decision[\"IPC Communication Strategy\"]
-        Problem[\"Problem: Terminal output<br/>crosses process boundary\"]
+    subgraph Decision["IPC Communication Strategy"]
+        Problem["Problem: Terminal output<br/>crosses process boundary"]
         
-        subgraph Options[\"Options Considered\"]
-            O1[\"1. Raw IPC per byte\"]
-            O2[\"2. Fixed-interval batching\"]
-            O3[\"3. Hybrid time/size batching\"]
+        subgraph Options["Options Considered"]
+            O1["1. Raw IPC per byte"]
+            O2["2. Fixed-interval batching"]
+            O3["3. Hybrid time/size batching"]
         end
         
-        subgraph Selected[\"Selected: Option 3\"]
-            S1[\"16ms time threshold<br/>(60fps aligned)\"]
-            S2[\"200KB size threshold<br/>(memory bound)\"]
-            S3[\"UUID prefix routing<br/>(session identification)\"]
+        subgraph Selected["Selected: Option 3"]
+            S1["16ms time threshold<br/>(60fps aligned)"]
+            S2["200KB size threshold<br/>(memory bound)"]
+            S3["UUID prefix routing<br/>(session identification)"]
         end
         
-        subgraph Rationale[\"Rationale\"]
-            R1[\"Reduces IPC calls 60-90%\"]
-            R2[\"Prevents memory accumulation\"]
-            R3[\"Maintains responsive feel\"]
+        subgraph Rationale["Rationale"]
+            R1["Reduces IPC calls 60-90%"]
+            R2["Prevents memory accumulation"]
+            R3["Maintains responsive feel"]
         end
     end
     
@@ -4356,43 +4356,43 @@ Velocetty implements a lightweight observability model appropriate for desktop a
 
 ```mermaid
 flowchart TB
-    ShellExit([\"Shell Process Exits\"])
-    Capture[\"Capture exitCode<br/>and duration\"]
-    QuickFail{{\"exitCode > 0<br/>AND<br/>duration < 1s?\"}}
+    ShellExit(["Shell Process Exits"])
+    Capture["Capture exitCode<br/>and duration"]
+    QuickFail{{"exitCode > 0<br/>AND<br/>duration < 1s?"}}
     
-    subgraph QuickFailureRecovery[\"Quick Failure Recovery\"]
-        CheckFallback{{\"Fallback Shell<br/>Configured?\"}}
-        TryFallback[\"Spawn Fallback Shell\"]
-        WriteWarning[\"Display Warning<br/>in Terminal\"]
-        FallbackOK{{\"Fallback<br/>Succeeded?\"}}
+    subgraph QuickFailureRecovery["Quick Failure Recovery"]
+        CheckFallback{{"Fallback Shell<br/>Configured?"}}
+        TryFallback["Spawn Fallback Shell"]
+        WriteWarning["Display Warning<br/>in Terminal"]
+        FallbackOK{{"Fallback<br/>Succeeded?"}}
     end
     
-    subgraph NormalExit[\"Normal Exit Handling\"]
-        MarkEnded[\"Mark Session Ended\"]
-        EmitExit[\"Emit exit Event\"]
-        CheckBehavior{{\"Exit<br/>Behavior?\"}}
-        ClosePane[\"Auto-close Pane\"]
-        KeepOpen[\"Keep Pane Open\"]
+    subgraph NormalExit["Normal Exit Handling"]
+        MarkEnded["Mark Session Ended"]
+        EmitExit["Emit exit Event"]
+        CheckBehavior{{"Exit<br/>Behavior?"}}
+        ClosePane["Auto-close Pane"]
+        KeepOpen["Keep Pane Open"]
     end
     
-    Cleanup[\"Cleanup PTY Resources\"]
-    Complete([\"Session Complete\"])
+    Cleanup["Cleanup PTY Resources"]
+    Complete(["Session Complete"])
     
     ShellExit --> Capture
     Capture --> QuickFail
-    QuickFail -->|\"Yes\"| CheckFallback
-    CheckFallback -->|\"Yes\"| TryFallback
+    QuickFail -->|"Yes"| CheckFallback
+    CheckFallback -->|"Yes"| TryFallback
     TryFallback --> WriteWarning
     WriteWarning --> FallbackOK
-    FallbackOK -->|\"Yes\"| ShellExit
-    FallbackOK -->|\"No\"| NormalExit
-    CheckFallback -->|\"No\"| NormalExit
-    QuickFail -->|\"No\"| NormalExit
+    FallbackOK -->|"Yes"| ShellExit
+    FallbackOK -->|"No"| NormalExit
+    CheckFallback -->|"No"| NormalExit
+    QuickFail -->|"No"| NormalExit
     NormalExit --> MarkEnded
     MarkEnded --> EmitExit
     EmitExit --> CheckBehavior
-    CheckBehavior -->|\"Auto-close\"| ClosePane
-    CheckBehavior -->|\"Keep Open\"| KeepOpen
+    CheckBehavior -->|"Auto-close"| ClosePane
+    CheckBehavior -->|"Keep Open"| KeepOpen
     ClosePane --> Cleanup
     KeepOpen --> Cleanup
     Cleanup --> Complete
@@ -4402,22 +4402,22 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    WebGLActive([\"WebGL Renderer Active\"])
-    GPUEvent[\"GPU Resource Exhaustion\"]
-    ContextLost[\"Context Lost Event\"]
+    WebGLActive(["WebGL Renderer Active"])
+    GPUEvent["GPU Resource Exhaustion"]
+    ContextLost["Context Lost Event"]
     
-    LogWarning[\"Log: WebGL context lost\"]
-    DisposeWebGL[\"Dispose WebGL Addon\"]
-    LoadCanvas[\"Load CanvasAddon\"]
-    AttachCanvas[\"Attach to Terminal\"]
-    Verify{{\"Rendering<br/>Functional?\"}}
+    LogWarning["Log: WebGL context lost"]
+    DisposeWebGL["Dispose WebGL Addon"]
+    LoadCanvas["Load CanvasAddon"]
+    AttachCanvas["Attach to Terminal"]
+    Verify{{"Rendering<br/>Functional?"}}
     
-    Continue[\"Continue Operation<br/>(Reduced Performance)\"]
-    Ready([\"Terminal Ready\"])
+    Continue["Continue Operation<br/>(Reduced Performance)"]
+    Ready(["Terminal Ready"])
     
-    CriticalError[\"Critical Rendering Error\"]
-    NotifyUser[\"Notify User\"]
-    SuggestRestart[\"Suggest Restart\"]
+    CriticalError["Critical Rendering Error"]
+    NotifyUser["Notify User"]
+    SuggestRestart["Suggest Restart"]
     
     WebGLActive --> GPUEvent
     GPUEvent --> ContextLost
@@ -4426,9 +4426,9 @@ flowchart TB
     DisposeWebGL --> LoadCanvas
     LoadCanvas --> AttachCanvas
     AttachCanvas --> Verify
-    Verify -->|\"Yes\"| Continue
+    Verify -->|"Yes"| Continue
     Continue --> Ready
-    Verify -->|\"No\"| CriticalError
+    Verify -->|"No"| CriticalError
     CriticalError --> NotifyUser
     NotifyUser --> SuggestRestart
 ```
@@ -4437,43 +4437,43 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    HookCall([\"Plugin Hook Invocation\"])
-    Wrap[\"Wrap in Try-Catch\"]
-    Execute[\"Execute Hook Function\"]
-    Error{{\"Error<br/>Thrown?\"}}
+    HookCall(["Plugin Hook Invocation"])
+    Wrap["Wrap in Try-Catch"]
+    Execute["Execute Hook Function"]
+    Error{{"Error<br/>Thrown?"}}
     
-    Catch[\"Catch Error\"]
-    LogError[\"Log with Plugin Name\"]
-    IdentifyType[\"Identify Hook Type\"]
+    Catch["Catch Error"]
+    LogError["Log with Plugin Name"]
+    IdentifyType["Identify Hook Type"]
     
-    IsDecoration{{\"Decoration<br/>Hook?\"}}
-    ReturnOriginal[\"Return Original<br/>Component/Config\"]
+    IsDecoration{{"Decoration<br/>Hook?"}}
+    ReturnOriginal["Return Original<br/>Component/Config"]
     
-    IsMiddleware{{\"Middleware<br/>Hook?\"}}
-    SkipMiddleware[\"Skip Middleware<br/>Forward Action\"]
+    IsMiddleware{{"Middleware<br/>Hook?"}}
+    SkipMiddleware["Skip Middleware<br/>Forward Action"]
     
-    IsLifecycle{{\"Lifecycle<br/>Hook?\"}}
-    ContinueStartup[\"Continue Without<br/>Plugin\"]
+    IsLifecycle{{"Lifecycle<br/>Hook?"}}
+    ContinueStartup["Continue Without<br/>Plugin"]
     
-    NotifyUser[\"Toast: Plugin Error\"]
-    Continue[\"Continue with<br/>Other Plugins\"]
-    Functional([\"App Remains<br/>Functional\"])
+    NotifyUser["Toast: Plugin Error"]
+    Continue["Continue with<br/>Other Plugins"]
+    Functional(["App Remains<br/>Functional"])
     
     HookCall --> Wrap
     Wrap --> Execute
     Execute --> Error
-    Error -->|\"No\"| Continue
-    Error -->|\"Yes\"| Catch
+    Error -->|"No"| Continue
+    Error -->|"Yes"| Catch
     Catch --> LogError
     LogError --> IdentifyType
     IdentifyType --> IsDecoration
-    IsDecoration -->|\"Yes\"| ReturnOriginal
+    IsDecoration -->|"Yes"| ReturnOriginal
     ReturnOriginal --> NotifyUser
-    IsDecoration -->|\"No\"| IsMiddleware
-    IsMiddleware -->|\"Yes\"| SkipMiddleware
+    IsDecoration -->|"No"| IsMiddleware
+    IsMiddleware -->|"Yes"| SkipMiddleware
     SkipMiddleware --> NotifyUser
-    IsMiddleware -->|\"No\"| IsLifecycle
-    IsLifecycle -->|\"Yes\"| ContinueStartup
+    IsMiddleware -->|"No"| IsLifecycle
+    IsLifecycle -->|"Yes"| ContinueStartup
     ContinueStartup --> NotifyUser
     NotifyUser --> Continue
     Continue --> Functional
@@ -8771,6 +8771,18 @@ The following pattern demonstrates Velocetty's approach to unit testing with moc
 - Playwright Electron Documentation: https://playwright.dev/docs/api/class-electron
 - Electron Automated Testing Guide: https://www.electronjs.org/docs/latest/tutorial/automated-testing
 - AVA Test Runner: https://github.com/avajs/ava
+
+### 6.6.12 Biome rule adoption notes
+
+Biome is now the primary linter. Some rules remain disabled while legacy
+violations are refactored. Track progress in roadmap item 1.4.8 and log rule
+enablement here as each one is reintroduced:
+
+- `noExplicitAny`
+- `noNonNullAssertion`
+- `useNodejsImportProtocol`
+- `useExhaustiveDependencies`
+- a11y rule set
 
 # 7. User Interface Design
 

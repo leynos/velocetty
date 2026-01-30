@@ -22,7 +22,7 @@ import * as config from './config';
 config.setup();
 
 // Native
-import {resolve} from 'path';
+import {resolve} from 'node:path';
 
 // Packages
 import {app, BrowserWindow, Menu, screen} from 'electron';
@@ -183,10 +183,10 @@ app.on('ready', () =>
       });
 
       const makeMenu = () => {
-        const menu = plugins.decorateMenu(AppMenu.createMenu(createWindow, plugins.getLoadedPluginVersions));
+        const menu = plugins.decorateMenu(AppMenu.createMenu(plugins.getLoadedPluginVersions));
 
         // If we're on Mac make a Dock Menu
-        if (process.platform === 'darwin') {
+        if (process.platform === 'darwin' && app.dock) {
           const dockMenu = Menu.buildFromTemplate([
             {
               label: 'New Window',
@@ -230,7 +230,7 @@ function GetWindow(callback: (win: BrowserWindow) => void) {
   const lastWindow = app.getLastFocusedWindow();
   if (lastWindow) {
     callback(lastWindow);
-  } else if (!lastWindow && {}.hasOwnProperty.call(app, 'createWindow')) {
+  } else if (!lastWindow && Object.hasOwn(app, 'createWindow')) {
     app.createWindow(callback);
   } else {
     // If createWindow doesn't exist yet ('ready' event was not fired),

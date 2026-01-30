@@ -44,9 +44,7 @@
       "lightCoral": "#F08080"
     },
     "shell": "",
-    "shellArgs": [
-      "--login"
-    ],
+    "shellArgs": ["--login"],
     "env": {},
     "bell": "SOUND",
     "bellSound": null,

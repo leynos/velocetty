@@ -1,4 +1,4 @@
-import {release} from 'os';
+import {release} from 'node:os';
 
 import Immutable from 'seamless-immutable';
 import type {Immutable as ImmutableType} from 'seamless-immutable';

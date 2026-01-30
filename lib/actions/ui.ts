@@ -1,5 +1,5 @@
-import {stat} from 'fs';
-import type {Stats} from 'fs';
+import {stat} from 'node:fs';
+import type {Stats} from 'node:fs';
 
 import type parseUrl from 'parse-url';
 import {php_escapeshellcmd as escapeShellCmd} from 'php-escape-shell';

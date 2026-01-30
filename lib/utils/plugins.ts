@@ -1,7 +1,7 @@
 // eslint-disable-next-line eslint-comments/disable-enable-pair
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-import ChildProcess from 'child_process';
-import pathModule from 'path';
+import ChildProcess from 'node:child_process';
+import pathModule from 'node:path';
 
 import React, {PureComponent} from 'react';
 import type {ComponentType} from 'react';
@@ -74,9 +74,6 @@ function exposeDecorated<P extends Record<string, any>>(
   Component_: React.ComponentType<P>
 ): React.ComponentClass<P, unknown> {
   return class DecoratedComponent extends React.Component<P> {
-    constructor(props: P, context: any) {
-      super(props, context);
-    }
     onRef = (decorated_: any) => {
       if (this.props.onDecorated) {
         try {
@@ -102,7 +99,7 @@ function getDecorated<P extends Record<string, any>>(
     (class_ as any).displayName = `_exposeDecorated(${name})`;
 
     modules.forEach((mod: any) => {
-      const method = 'decorate' + name;
+      const method = `decorate${name}`;
       const fn: Function & {_pluginName: string} = mod[method];
 
       if (fn) {
@@ -169,7 +166,7 @@ export function decorate<P extends Record<string, any>>(
 // so plugins can `require` them without needing their own version
 // https://github.com/vercel/hyper/issues/619
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const Module = require('module') as typeof import('module') & {_load: Function};
+const Module = require('node:module') as typeof import('module') & {_load: Function};
 const originalLoad = Module._load;
 Module._load = function _load(path: string) {
   // PLEASE NOTE: Code changes here, also need to be changed in
@@ -227,7 +224,7 @@ const getPluginVersion = (path: string): string | null => {
   let version: string | null = null;
   try {
     version = window.require(pathModule.resolve(path, 'package.json')).version as string;
-  } catch (err) {
+  } catch (_err) {
     console.warn(`No package.json found in ${path}`);
   }
   return version;
@@ -289,7 +286,7 @@ const loadModules = () => {
       }
 
       ObjectTypedKeys(mod).forEach((i) => {
-        if (Object.hasOwnProperty.call(mod, i)) {
+        if (Object.hasOwn(mod, i)) {
           mod[i]._pluginName = pluginName;
           mod[i]._pluginVersion = pluginVersion;
         }
@@ -456,14 +453,14 @@ export function getTabProps<T extends Assignable<TabProps, T>>(tab: any, parentP
 // connects + decorates a class
 // plugins can override mapToState, dispatchToProps
 // and the class gets decorated (proxied)
-export function connect<stateProps extends {}, dispatchProps>(
-  stateFn: (state: HyperState) => stateProps,
-  dispatchFn: (dispatch: HyperDispatch) => dispatchProps,
+export function connect<StateProps extends Record<string, unknown>, DispatchProps extends Record<string, unknown>>(
+  stateFn: (state: HyperState) => StateProps,
+  dispatchFn: (dispatch: HyperDispatch) => DispatchProps,
   c: null | undefined,
   d: ConnectOptions = {}
 ) {
   return <P extends Record<string, unknown>>(
-    Class: ComponentType<P & stateProps & dispatchProps>,
+    Class: ComponentType<P & StateProps & DispatchProps>,
     name: keyof typeof connectors
   ) => {
     return reduxConnect(
@@ -524,7 +521,10 @@ export function connect<stateProps extends {}, dispatchProps>(
       },
       c,
       d
-    )(decorate(Class, name) as any) as ComponentType<P>;
+    )(
+      // @ts-expect-error react-redux connect does not type decorated components with explicit props.
+      decorate(Class, name)
+    );
   };
 }
 

@@ -1,23 +1,14 @@
-const fs = require('fs');
-const path = require('path');
-const {downloadArtifact} = require('@electron/get');
-const extractZip = require('extract-zip');
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 
-function normaliseArch(arch) {
-  if (!arch) {
-    return 'x64';
-  }
+import {downloadArtifact} from '@electron/get';
+import extractZip from 'extract-zip';
 
-  if (arch === 'aarch64') {
-    return 'arm64';
-  }
+import {normaliseArch} from './shared/arch.js';
 
-  if (arch === 'amd64') {
-    return 'x64';
-  }
-
-  return arch;
-}
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function resolveElectronVersion() {
   if (process.env.ELECTRON_CUSTOM_VERSION) {
@@ -27,7 +18,12 @@ function resolveElectronVersion() {
   const packageJsonPath = path.resolve(__dirname, '..', 'package.json');
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
-  return packageJson.devDependencies?.electron;
+  const electronVersion = packageJson.devDependencies?.electron;
+  if (!electronVersion) {
+    return undefined;
+  }
+
+  return electronVersion.replace(/^[~^]/, '');
 }
 
 async function main() {
@@ -38,8 +34,7 @@ async function main() {
 
   const platform = process.env.npm_config_platform || process.platform;
   const arch = normaliseArch(process.env.npm_config_arch || process.arch);
-  const downloadArch =
-    arch.startsWith('arm') && platform !== 'darwin' ? `${arch}-x64` : arch;
+  const downloadArch = arch.startsWith('arm') && platform !== 'darwin' ? `${arch}-x64` : arch;
   const strictSslEnv = process.env.npm_config_strict_ssl;
   // npm's strict-ssl defaults to true; only disable verification explicitly.
   const rejectUnauthorized = strictSslEnv !== 'false';
@@ -57,7 +52,9 @@ async function main() {
     platform,
     arch: downloadArch,
     rejectUnauthorized,
-    quiet: ['info', 'verbose', 'silly', 'http'].indexOf(process.env.npm_config_loglevel) === -1
+    downloadOptions: {
+      quiet: !['info', 'verbose', 'silly', 'http'].includes(process.env.npm_config_loglevel)
+    }
   });
 
   await extractZip(zipPath, {dir: targetFolder});

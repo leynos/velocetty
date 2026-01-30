@@ -124,7 +124,7 @@ const commands: Record<string, (focusedWindow?: BrowserWindow) => void> = {
   },
   'window:hamburgerMenu': () => {
     if (process.platform !== 'darwin' && ['', true].includes(getConfig().showHamburgerMenu)) {
-      Menu.getApplicationMenu()!.popup({x: 25, y: 22});
+      Menu.getApplicationMenu()?.popup({x: 25, y: 22});
     }
   },
   'systemContextMenu:add': () => {

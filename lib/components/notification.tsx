@@ -1,74 +1,118 @@
-import React, {forwardRef, useEffect, useRef, useState} from 'react';
+/**
+ * @file Renders in-app notification indicators and dismissal behaviour.
+ * Handles timer-based auto-dismiss, transition hooks, and custom slot content
+ * for the renderer notification bar.
+ */
+// biome-ignore lint/style/useImportType: React value is required for JSX runtime under ts-node tests.
+import React, {forwardRef, useCallback, useEffect, useRef, useState} from 'react';
 
 import type {NotificationProps} from '../../typings/hyper';
 
-const Notification = forwardRef<HTMLDivElement, React.PropsWithChildren<NotificationProps>>((props, ref) => {
+const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLDivElement>) => {
+  const {backgroundColor, dismissAfter, onDismiss, text} = props;
   const dismissTimer = useRef<NodeJS.Timeout | undefined>(undefined);
+  const dismissingRef = useRef(false);
+  const transitionHandler = useRef<((event: TransitionEvent) => void) | null>(null);
+  const transitionNode = useRef<HTMLDivElement | null>(null);
   const [dismissing, setDismissing] = useState(false);
 
-  useEffect(() => {
-    setDismissTimer();
+  const handleDismiss = useCallback(() => {
+    setDismissing(true);
   }, []);
+
+  const onElement = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (transitionNode.current && transitionHandler.current) {
+        transitionNode.current.removeEventListener('transitionend', transitionHandler.current);
+      }
+
+      if (el) {
+        const handler = (event: TransitionEvent) => {
+          if (event.target !== transitionNode.current || event.propertyName !== 'opacity') {
+            return;
+          }
+
+          if (dismissingRef.current) {
+            onDismiss();
+          }
+        };
+        transitionHandler.current = handler;
+        transitionNode.current = el;
+        el.addEventListener('transitionend', handler);
+        if (backgroundColor) {
+          el.style.setProperty('background-color', backgroundColor, 'important');
+        }
+
+        if (ref) {
+          if (typeof ref === 'function') ref(el);
+          else ref.current = el;
+        }
+      } else if (ref) {
+        if (typeof ref === 'function') ref(null);
+        else ref.current = null;
+      }
+    },
+    [backgroundColor, onDismiss, ref]
+  );
+
+  const setDismissTimer = useCallback(() => {
+    if (typeof dismissAfter === 'number') {
+      dismissTimer.current = setTimeout(() => {
+        handleDismiss();
+      }, dismissAfter);
+    }
+  }, [dismissAfter, handleDismiss]);
+
+  const resetDismissTimer = useCallback(() => {
+    clearTimeout(dismissTimer.current);
+    setDismissTimer();
+  }, [setDismissTimer]);
 
   useEffect(() => {
     // if we have a timer going and the notification text
     // changed we reset the timer
     resetDismissTimer();
     setDismissing(false);
-  }, [props.text]);
+  }, [resetDismissTimer, text]);
 
-  const handleDismiss = () => {
-    setDismissing(true);
-  };
-
-  const onElement = (el: HTMLDivElement | null) => {
-    if (el) {
-      el.addEventListener('webkitTransitionEnd', () => {
-        if (dismissing) {
-          props.onDismiss();
-        }
-      });
-      const {backgroundColor} = props;
-      if (backgroundColor) {
-        el.style.setProperty('background-color', backgroundColor, 'important');
-      }
-
-      if (ref) {
-        if (typeof ref === 'function') ref(el);
-        else ref.current = el;
-      }
-    }
-  };
-
-  const setDismissTimer = () => {
-    if (typeof props.dismissAfter === 'number') {
-      dismissTimer.current = setTimeout(() => {
-        handleDismiss();
-      }, props.dismissAfter);
-    }
-  };
-
-  const resetDismissTimer = () => {
-    clearTimeout(dismissTimer.current);
-    setDismissTimer();
-  };
+  useEffect(() => {
+    dismissingRef.current = dismissing;
+  }, [dismissing]);
 
   useEffect(() => {
     return () => {
       clearTimeout(dismissTimer.current);
+      if (transitionNode.current && transitionHandler.current) {
+        transitionNode.current.removeEventListener('transitionend', transitionHandler.current);
+      }
+      transitionNode.current = null;
+      transitionHandler.current = null;
     };
   }, []);
 
+  return {
+    handleDismiss,
+    onElement,
+    opacity: dismissing ? 0 : 1
+  };
+};
+
+const Notification = forwardRef<HTMLDivElement, React.PropsWithChildren<NotificationProps>>((props, ref) => {
+  const {handleDismiss, onElement, opacity} = useNotification(props, ref);
   const {backgroundColor, color} = props;
-  const opacity = dismissing ? 0 : 1;
   return (
     <div ref={onElement} style={{opacity, backgroundColor, color}} className="notification_indicator">
       {props.customChildrenBefore}
       {props.children || props.text}
       {props.userDismissable ? (
-        <a className="notification_dismissLink" onClick={handleDismiss} style={{color: props.userDismissColor}}>
+        <button
+          type="button"
+          className="notification_dismissLink"
+          onClick={handleDismiss}
+          style={{color: props.userDismissColor}}
+        >
           [x]
-        </a>
+        </button>
       ) : null}
       {props.customChildren}
 

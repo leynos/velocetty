@@ -1,30 +1,23 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
-const fs = require('fs');
-const fsExtra = require('fs-extra');
-const {spawnSync} = require('child_process');
-const path = require('path');
-const temp = require('temp').track();
+import {spawnSync} from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+import fsExtra from 'fs-extra';
+import temp from 'temp';
+
+import {normaliseArch} from './shared/arch.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const tempTracker = temp.track();
 
 const crossArchDirs = ['clang_x86_v8_arm', 'clang_x64_v8_arm64', 'win_clang_x64'];
-const workingDir = temp.mkdirSync('mksnapshot-workdir');
+const workingDir = tempTracker.mkdirSync('mksnapshot-workdir');
 const mksnapshotDir = path.join(__dirname, '..', 'node_modules', 'electron-mksnapshot', 'bin');
-
-function normaliseArch(arch) {
-  if (!arch) {
-    return 'x64';
-  }
-
-  if (arch === 'aarch64') {
-    return 'arm64';
-  }
-
-  if (arch === 'amd64') {
-    return 'x64';
-  }
-
-  return arch;
-}
 
 function getBinaryPath(binary, binaryPath) {
   if (process.platform === 'win32') {
@@ -35,25 +28,31 @@ function getBinaryPath(binary, binaryPath) {
 }
 
 function isElfX86_64(binaryPath) {
+  let fd;
   try {
-    const header = fs.readFileSync(binaryPath, {encoding: null, flag: 'r'});
-    if (header.length < 20) {
+    const header = Buffer.alloc(20);
+    fd = fs.openSync(binaryPath, 'r');
+    const bytesRead = fs.readSync(fd, header, 0, header.length, 0);
+    if (bytesRead < header.length) {
       return false;
     }
 
-    if (
-      header[0] !== 0x7f ||
-      header[1] !== 0x45 ||
-      header[2] !== 0x4c ||
-      header[3] !== 0x46
-    ) {
+    if (header[0] !== 0x7f || header[1] !== 0x45 || header[2] !== 0x4c || header[3] !== 0x46) {
       return false;
     }
 
     const machine = header.readUInt16LE(18);
     return machine === 0x3e;
-  } catch (error) {
+  } catch (_error) {
     return false;
+  } finally {
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd);
+      } catch (_closeError) {
+        // Ignore close errors for best-effort detection.
+      }
+    }
   }
 }
 
@@ -65,9 +64,7 @@ function findExecutableInPath(names) {
       try {
         fs.accessSync(candidate, fs.constants.X_OK);
         return candidate;
-      } catch (error) {
-        continue;
-      }
+      } catch (_error) {}
     }
   }
 
@@ -114,9 +111,7 @@ function resolveRunner(binaryPath) {
 
   const runner = findExecutableInPath(['qemu-x86_64', 'qemu-x86_64-static']);
   if (!runner) {
-    throw new Error(
-      'Linux arm64 hosts need qemu-user (qemu-x86_64) to run Electron\'s x64 mksnapshot binary.'
-    );
+    throw new Error("Linux arm64 hosts need qemu-user (qemu-x86_64) to run Electron's x64 mksnapshot binary.");
   }
 
   const sysroot = resolveSysroot();
@@ -131,9 +126,7 @@ function resolveRunner(binaryPath) {
     );
   }
 
-  return sysroot
-    ? {command: runner, prefix: ['-L', sysroot, binaryPath]}
-    : {command: runner, prefix: [binaryPath]};
+  return sysroot ? {command: runner, prefix: ['-L', sysroot, binaryPath]} : {command: runner, prefix: [binaryPath]};
 }
 
 function spawnWithRunner(binaryPath, args, options) {
@@ -182,7 +175,9 @@ if (fs.existsSync(argsFile)) {
   const builtinsRegEx = /.*builtins-pgo.*/g;
   const mksnapshotArgsFromFile = mksnapshotArgsFile
     .split(newlineRegEx)
-    .filter((arg) => !arg.match(newlineRegEx) && !arg.match(turboProfileRegEx) && !arg.match(builtinsRegEx) && arg !== '');
+    .filter(
+      (arg) => !arg.match(newlineRegEx) && !arg.match(turboProfileRegEx) && !arg.match(builtinsRegEx) && arg !== ''
+    );
   const mksnapshotBinaryPath = path.parse(mksnapshotArgsFromFile[0]);
   if (mksnapshotBinaryPath.dir) {
     mksnapshotBinaryDir = path.join(workingDir, mksnapshotBinaryPath.dir);
@@ -226,7 +221,6 @@ if (mksnapshotProcess.status !== 0) {
 if (args.includes('--help')) {
   process.exit(0);
 }
-
 fs.copyFileSync(path.join(mksnapshotBinaryDir, 'snapshot_blob.bin'), path.join(outputDir, 'snapshot_blob.bin'));
 
 const v8ContextGenCommand = getBinaryPath('v8_context_snapshot_generator', mksnapshotBinaryDir);
@@ -238,7 +232,7 @@ if (process.platform === 'darwin') {
 
 const v8ContextGenArgs = [`--output_file=${path.join(outputDir, v8ContextFile)}`];
 const v8ContextGenProcess = spawnWithRunner(v8ContextGenCommand, v8ContextGenArgs, {
-  cwd: mksnapshotDir,
+  cwd: mksnapshotBinaryDir,
   env: process.env,
   stdio: 'inherit'
 });

@@ -1,31 +1,33 @@
-import type {BrowserWindow, MenuItemConstructorOptions} from 'electron';
+/** @file Defines the View menu template for window and zoom commands. */
+import type {MenuItemConstructorOptions} from 'electron';
 
-const viewMenu = (
-  commandKeys: Record<string, string>,
-  execCommand: (command: string, focusedWindow?: BrowserWindow) => void
-): MenuItemConstructorOptions => {
+import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
+
+const viewMenu = (commandKeys: Record<string, string>, execCommand: MenuCommandRunner): MenuItemConstructorOptions => {
+  const execWithBrowserWindow = makeMenuCommandExecutor(execCommand);
+
   return {
     label: 'View',
     submenu: [
       {
         label: 'Reload',
         accelerator: commandKeys['window:reload'],
-        click(item, focusedWindow) {
-          execCommand('window:reload', focusedWindow);
+        click(_item, focusedWindow) {
+          execWithBrowserWindow('window:reload', focusedWindow);
         }
       },
       {
         label: 'Full Reload',
         accelerator: commandKeys['window:reloadFull'],
-        click(item, focusedWindow) {
-          execCommand('window:reloadFull', focusedWindow);
+        click(_item, focusedWindow) {
+          execWithBrowserWindow('window:reloadFull', focusedWindow);
         }
       },
       {
         label: 'Developer Tools',
         accelerator: commandKeys['window:devtools'],
-        click: (item, focusedWindow) => {
-          execCommand('window:devtools', focusedWindow);
+        click: (_item, focusedWindow) => {
+          execWithBrowserWindow('window:devtools', focusedWindow);
         }
       },
       {
@@ -34,22 +36,22 @@ const viewMenu = (
       {
         label: 'Reset Zoom Level',
         accelerator: commandKeys['zoom:reset'],
-        click(item, focusedWindow) {
-          execCommand('zoom:reset', focusedWindow);
+        click(_item, focusedWindow) {
+          execWithBrowserWindow('zoom:reset', focusedWindow);
         }
       },
       {
         label: 'Zoom In',
         accelerator: commandKeys['zoom:in'],
-        click(item, focusedWindow) {
-          execCommand('zoom:in', focusedWindow);
+        click(_item, focusedWindow) {
+          execWithBrowserWindow('zoom:in', focusedWindow);
         }
       },
       {
         label: 'Zoom Out',
         accelerator: commandKeys['zoom:out'],
-        click(item, focusedWindow) {
-          execCommand('zoom:out', focusedWindow);
+        click(_item, focusedWindow) {
+          execWithBrowserWindow('zoom:out', focusedWindow);
         }
       }
     ]

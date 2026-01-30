@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "formatter": {
-    "enabled": false,
+    "enabled": true,
     "indentStyle": "space",
     "indentWidth": 2,
     "lineWidth": 120,
@@ -23,7 +23,39 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": false
+      "recommended": true,
+      "complexity": {
+        "noArguments": "off",
+        "noBannedTypes": "off"
+      },
+      "a11y": {
+        "noStaticElementInteractions": "off",
+        "noSvgWithoutTitle": "off",
+        "useKeyWithClickEvents": "off",
+        "useValidAnchor": "off"
+      },
+      "correctness": {
+        "noConstantCondition": "off",
+        "noInvalidUseBeforeDeclaration": "off",
+        "noInnerDeclarations": "off",
+        "noVoidTypeReturn": "off",
+        "useExhaustiveDependencies": "off"
+      },
+      "style": {
+        "noNonNullAssertion": "off",
+        "useNodejsImportProtocol": "off",
+        "useShorthandFunctionType": "off"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "off",
+        "noExplicitAny": "off",
+        "noImplicitAnyLet": "off",
+        "noNonNullAssertedOptionalChain": "off",
+        "useIterableCallbackReturn": "off"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "off"
+      }
     }
   },
   "javascript": {
@@ -37,5 +69,16 @@
       "bracketSpacing": false,
       "bracketSameLine": false
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["bin/rimraf-standalone.js", "bin/yarn-standalone.js"],
+      "formatter": {
+        "enabled": false
+      },
+      "linter": {
+        "enabled": false
+      }
+    }
+  ]
 }

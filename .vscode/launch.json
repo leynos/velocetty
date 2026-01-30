@@ -9,7 +9,7 @@
       "program": "${workspaceRoot}/target/index.js",
       "protocol": "inspector"
     },
-     {
+    {
       "type": "node",
       "request": "launch",
       "name": "cli",

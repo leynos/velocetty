@@ -1,29 +1,20 @@
-const childProcess = require('child_process');
-const vm = require('vm');
-const path = require('path');
-const fs = require('fs');
-const electronLink = require('electron-link');
-const {mkdirp} = require('fs-extra');
+import childProcess from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import {fileURLToPath} from 'node:url';
 
+import electronLink from 'electron-link';
+
+import {normaliseArch} from './shared/arch.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Keep as a placeholder for future module exclusion configuration.
 const excludedModules = {};
 
 const crossArchDirs = ['clang_x86_v8_arm', 'clang_x64_v8_arm64', 'win_clang_x64'];
-
-function normaliseArch(arch) {
-  if (!arch) {
-    return 'x64';
-  }
-
-  if (arch === 'aarch64') {
-    return 'arm64';
-  }
-
-  if (arch === 'amd64') {
-    return 'x64';
-  }
-
-  return arch;
-}
 
 async function main() {
   const baseDirPath = path.resolve(__dirname, '..');
@@ -33,8 +24,7 @@ async function main() {
     baseDirPath: baseDirPath,
     mainPath: `${__dirname}/snapshot-libs.js`,
     cachePath: `${baseDirPath}/cache`,
-    // eslint-disable-next-line no-prototype-builtins
-    shouldExcludeModule: (modulePath) => excludedModules.hasOwnProperty(modulePath)
+    shouldExcludeModule: (modulePath) => Object.hasOwn(excludedModules, modulePath)
   });
 
   const snapshotScriptPath = `${baseDirPath}/cache/snapshot-libs.js`;
@@ -45,16 +35,19 @@ async function main() {
 
   const targetArch = normaliseArch(process.env.npm_config_arch || process.arch);
   const outputBlobPath = `${baseDirPath}/cache/${targetArch}`;
-  await mkdirp(outputBlobPath);
+  await fs.promises.mkdir(outputBlobPath, {recursive: true});
 
   if (process.platform !== 'darwin') {
     const mksnapshotBinPath = `${baseDirPath}/node_modules/electron-mksnapshot/bin`;
+    const embeddedSPath = `${mksnapshotBinPath}/gen/v8/embedded.S`;
     const matchingDirs = crossArchDirs.map((dir) => `${mksnapshotBinPath}/${dir}`).filter((dir) => fs.existsSync(dir));
-    for (const dir of matchingDirs) {
-      if (fs.existsSync(`${mksnapshotBinPath}/gen/v8/embedded.S`)) {
-        await mkdirp(`${dir}/gen/v8`);
-        fs.copyFileSync(`${mksnapshotBinPath}/gen/v8/embedded.S`, `${dir}/gen/v8/embedded.S`);
-      }
+    if (fs.existsSync(embeddedSPath)) {
+      await Promise.all(
+        matchingDirs.map(async (dir) => {
+          await fs.promises.mkdir(`${dir}/gen/v8`, {recursive: true});
+          await fs.promises.copyFile(embeddedSPath, `${dir}/gen/v8/embedded.S`);
+        })
+      );
     }
   }
 
@@ -66,4 +59,7 @@ async function main() {
   );
 }
 
-main().catch((err) => console.error(err));
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

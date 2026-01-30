@@ -1,6 +1,7 @@
-import {existsSync, readlink, symlink} from 'fs';
-import path from 'path';
-import {promisify} from 'util';
+/** @file Installs the Hyper CLI helper by adding links or PATH entries. */
+import {existsSync, readlink, symlink} from 'node:fs';
+import path from 'node:path';
+import {promisify} from 'node:util';
 
 import {clipboard, dialog} from 'electron';
 
@@ -44,13 +45,13 @@ const addSymlink = async (silent: boolean) => {
     }
     await symLink(cliScriptPath, cliLinkPath);
   } catch (_err) {
-    const err = _err as {code: string};
+    const err = _err as {code?: string; message?: string};
     // 'EINVAL' is returned by readlink,
     // 'EEXIST' is returned by symlink
     let error =
       err.code === 'EEXIST' || err.code === 'EINVAL'
         ? `File already exists: ${cliLinkPath}`
-        : `Symlink creation failed: ${err.code}`;
+        : `Symlink creation failed: ${err.code ?? 'Unknown error'}${err.message ? ` (${err.message})` : ''}`;
     // Need sudo access to create symlink
     if (err.code === 'EACCES' && !silent) {
       const result = await dialog.showMessageBox({
@@ -65,7 +66,8 @@ sudo ln -sf "${cliScriptPath}" "${cliLinkPath}"`,
           await sudoExec(`ln -sf "${cliScriptPath}" "${cliLinkPath}"`, {name: 'Hyper'});
           return;
         } catch (_error) {
-          error = (_error as any[])[0];
+          const sudoError = Array.isArray(_error) ? _error[0] : _error;
+          error = typeof sudoError === 'string' ? sudoError : `Symlink creation failed: ${String(sudoError)}`;
         }
       } else if (result.response === 1) {
         clipboard.writeText(`sudo ln -sf "${cliScriptPath}" "${cliLinkPath}"`);
@@ -92,7 +94,7 @@ const addBinToUserPath = () => {
       let newPathValue = binPath;
       let type: ValueType = Registry.ValueType.SZ;
       if (pathItem) {
-        type = Registry.queryValueRaw(envKey, pathItem)!.type;
+        type = Registry.queryValueRaw(envKey, pathItem)?.type;
         if (type !== Registry.ValueType.SZ && type !== Registry.ValueType.EXPAND_SZ) {
           reject(`Registry key type is ${type}`);
           return;
@@ -143,7 +145,7 @@ export const installCLI = async (withNotification: boolean) => {
     }
   } else if (process.platform === 'darwin' || process.platform === 'linux') {
     // AppImages are mounted on run at a temporary path, don't create symlink
-    if (process.env['APPIMAGE']) {
+    if (process.env.APPIMAGE) {
       console.log('Skipping CLI symlink creation as it is an AppImage install');
       return;
     }

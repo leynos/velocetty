@@ -48,6 +48,14 @@
 - A documentation style guide lives in
   `docs/documentation-style-guide.md`.
 
+## Tooling Defaults
+
+- Use `bun` for JavaScript/TypeScript script invocations (including shebangs)
+  unless there is a known reason not to. Any exception must be explicitly
+  noted alongside the invocation or in this file.
+- AVA does not run reliably under Bun (missing `node:v8` coverage hooks), so
+  `test:unit` and the AVA bridge test intentionally invoke `node`.
+
 ## Change Quality & Committing
 
 - **Atomicity:** Aim for small, focused, atomic changes. Each change (and
@@ -87,7 +95,7 @@
 ## Refactoring Heuristics & Workflow
 
 - **Recognizing Refactoring Needs:** Regularly assess the codebase for potential
-  refactoring opportunities. Consider refactoring when you observe:
+  refactoring opportunities. Consider refactoring when observations indicate:
 - **Long Methods/Functions:** Functions or methods that are excessively long
     or try to do too many things.
 - **Duplicated Code:** Identical or very similar code blocks appearing in
@@ -120,7 +128,7 @@
 - Validate Markdown files using `bunx markdownlint-cli \"docs/**/*.md\"`.
 - Run `bun fmt` after any documentation changes to format all Markdown
   files and fix table markup.
-- Validate Mermaid diagrams in Markdown files by running `bunx nixie`.
+- Validate Mermaid diagrams in Markdown files by running `nixie --no-sandbox`.
 - Markdown paragraphs and bullet points must be wrapped at 80 columns.
 - Code blocks must be wrapped at 120 columns.
 - Tables and headings must not be wrapped.

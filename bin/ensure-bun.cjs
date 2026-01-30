@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 /**
  * Guard postinstall scripts that rely on Bun being available.
@@ -7,9 +7,9 @@
  * installed. It therefore avoids third-party modules and reads the pinned Bun
  * version directly from package.json.
  */
-const fs = require('fs');
-const path = require('path');
-const {spawnSync} = require('child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const {spawnSync} = require('node:child_process');
 
 function readPinnedBunVersion() {
   const packageJsonPath = path.resolve(__dirname, '..', 'package.json');
@@ -36,7 +36,7 @@ const bunCheck = spawnSync('bun', ['--version'], {
 
 if (bunCheck.error || bunCheck.status !== 0) {
   console.error('Bun is required for this repository.');
-  console.error('Install Bun, then run `bun install` (or `yarn install`).');
+  console.error('Install Bun, then run `bun install`.');
   process.exit(1);
 }
 
@@ -48,22 +48,16 @@ if (!pinnedVersion) {
 }
 
 if (Number.isNaN(getMajor(bunVersion)) || Number.isNaN(getMajor(pinnedVersion))) {
-  console.warn(
-    `Unable to compare Bun versions (found "${bunVersion}", pinned "${pinnedVersion}").`
-  );
+  console.warn(`Unable to compare Bun versions (found "${bunVersion}", pinned "${pinnedVersion}").`);
   process.exit(0);
 }
 
 if (getMajor(bunVersion) !== getMajor(pinnedVersion)) {
-  console.error(
-    `Bun ${pinnedVersion} is pinned in package.json, but Bun ${bunVersion} was found.`
-  );
+  console.error(`Bun ${pinnedVersion} is pinned in package.json, but Bun ${bunVersion} was found.`);
   console.error('Install the pinned Bun version to avoid toolchain drift.');
   process.exit(1);
 }
 
 if (bunVersion !== pinnedVersion) {
-  console.warn(
-    `Bun ${pinnedVersion} is pinned in package.json, but Bun ${bunVersion} was found.`
-  );
+  console.warn(`Bun ${pinnedVersion} is pinned in package.json, but Bun ${bunVersion} was found.`);
 }

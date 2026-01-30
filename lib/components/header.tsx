@@ -1,4 +1,5 @@
-import React, {forwardRef, useState} from 'react';
+import type React from 'react';
+import {forwardRef, useState} from 'react';
 
 import type {HeaderProps} from '../../typings/hyper';
 import {decorate, getTabsProps} from '../utils/plugins';

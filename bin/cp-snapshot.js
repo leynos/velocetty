@@ -1,6 +1,6 @@
-const path = require('path');
-const fs = require('fs');
-const childProcess = require('child_process');
+const path = require('node:path');
+const fs = require('node:fs');
+const childProcess = require('node:child_process');
 const {Arch} = require('electron-builder');
 
 function copySnapshot(pathToElectron, archToCopy) {
@@ -12,9 +12,7 @@ function copySnapshot(pathToElectron, archToCopy) {
   console.log('Copying v8 snapshots from', pathToBlob, 'to', pathToElectron);
   if (!fs.existsSync(pathToBlob) || !fs.existsSync(pathToBlobV8)) {
     throw new Error(
-      `Missing snapshot output. Expected ${snapshotFileName} and ${v8ContextFileName} in ${path.dirname(
-        pathToBlob
-      )}`
+      `Missing snapshot output. Expected ${snapshotFileName} and ${v8ContextFileName} in ${path.dirname(pathToBlob)}`
     );
   }
   fs.copyFileSync(pathToBlob, path.join(pathToElectron, snapshotFileName));
@@ -42,9 +40,7 @@ function getPathToElectron() {
 function ensureElectronDist(pathToElectron) {
   if (process.env.ELECTRON_OVERRIDE_DIST_PATH) {
     if (!fs.existsSync(pathToElectron)) {
-      throw new Error(
-        `ELECTRON_OVERRIDE_DIST_PATH is set to "${pathToElectron}" but the path does not exist.`
-      );
+      throw new Error(`ELECTRON_OVERRIDE_DIST_PATH is set to "${pathToElectron}" but the path does not exist.`);
     }
     return;
   }

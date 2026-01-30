@@ -79,7 +79,7 @@ const updater = (win: BrowserWindow) => {
 
   const {rpc} = win;
 
-  const onupdate = (ev: Event, releaseNotes: string, releaseName: string, date: Date, updateUrl: string) => {
+  const onupdate = (_ev: Event, releaseNotes: string, releaseName: string, _date: Date, updateUrl: string) => {
     const releaseUrl = updateUrl || `https://github.com/vercel/hyper/releases/tag/${releaseName}`;
     rpc.emit('update available', {releaseNotes, releaseName, releaseUrl, canInstall: !isLinux});
   };

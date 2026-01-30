@@ -1,4 +1,4 @@
-import vm from 'vm';
+import vm from 'node:vm';
 
 import merge from 'lodash/merge';
 

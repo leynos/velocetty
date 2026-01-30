@@ -1,4 +1,4 @@
-import type {ExecFileOptions, ExecOptions} from 'child_process';
+import type {ExecFileOptions, ExecOptions} from 'node:child_process';
 
 import type {IpcMain, IpcRenderer} from 'electron';
 
@@ -110,10 +110,7 @@ export interface TypedEmitter<Events> {
 type OptionalPromise<T> = T | Promise<T>;
 
 export type IpcCommands = {
-  'child_process.exec': (
-    command: string,
-    options: ExecOptions
-  ) => {stdout: string | Buffer; stderr: string | Buffer};
+  'child_process.exec': (command: string, options: ExecOptions) => {stdout: string | Buffer; stderr: string | Buffer};
   'child_process.execFile': (
     file: string,
     args: string[],

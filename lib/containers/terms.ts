@@ -1,3 +1,6 @@
+/** @file Connects terminal state and actions to the Terms component. */
+import type React from 'react';
+
 import type {HyperState, HyperDispatch} from '../../typings/hyper';
 import {
   resizeSession,
@@ -91,8 +94,12 @@ const mapDispatchToProps = (dispatch: HyperDispatch) => {
   };
 };
 
-const TermsContainer = connect(mapStateToProps, mapDispatchToProps, null, {forwardRef: true})(Terms, 'Terms');
+export type TermsConnectedProps = ReturnType<typeof mapStateToProps> & ReturnType<typeof mapDispatchToProps>;
+type TermsContainerProps = Omit<React.ComponentProps<typeof Terms>, keyof TermsConnectedProps>;
+
+const TermsContainer = connect(mapStateToProps, mapDispatchToProps, null, {forwardRef: true})(
+  Terms,
+  'Terms'
+) as React.ComponentType<TermsContainerProps>;
 
 export default TermsContainer;
-
-export type TermsConnectedProps = ReturnType<typeof mapStateToProps> & ReturnType<typeof mapDispatchToProps>;

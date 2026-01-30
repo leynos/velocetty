@@ -1,3 +1,4 @@
+/** @file Renders terminal groups and split panes for sessions. */
 import React from 'react';
 
 import {connect} from 'react-redux';
@@ -41,7 +42,8 @@ class TermGroup_ extends React.PureComponent<TermGroupProps> {
       return first;
     }
 
-    const direction = this.props.termGroup.direction!.toLowerCase() as 'horizontal' | 'vertical';
+    const directionValue = this.props.termGroup.direction?.toLowerCase();
+    const direction: 'horizontal' | 'vertical' = directionValue === 'vertical' ? 'vertical' : 'horizontal';
     return (
       <SplitPane
         direction={direction}

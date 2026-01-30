@@ -1,4 +1,4 @@
-import React, {useRef, useState} from 'react';
+import {useRef, useState} from 'react';
 
 import {VscChevronDown} from '@react-icons/all-files/vsc/VscChevronDown';
 import useClickAway from 'react-use/lib/useClickAway';

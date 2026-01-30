@@ -1,5 +1,6 @@
+/** @file End-to-end smoke tests for packaged Electron builds. */
 // Native
-import path from 'path';
+import path from 'node:path';
 
 // Packages
 import test from 'ava';

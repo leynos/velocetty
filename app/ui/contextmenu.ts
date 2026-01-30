@@ -1,4 +1,5 @@
-import type {MenuItemConstructorOptions, BrowserWindow} from 'electron';
+/** @file Builds context menu templates for terminal selections. */
+import type {MenuItemConstructorOptions} from 'electron';
 
 import {execCommand} from '../commands';
 import {getProfiles} from '../config';
@@ -23,10 +24,7 @@ const filterCutCopy = (selection: string, menuItem: MenuItemConstructorOptions) 
   return menuItem;
 };
 
-const contextMenuTemplate = (
-  createWindow: (fn?: (win: BrowserWindow) => void, options?: Record<string, any>) => BrowserWindow,
-  selection: string
-) => {
+const contextMenuTemplate = (selection: string) => {
   const commandKeys = getCommandKeys(getDecoratedKeymaps());
   const _shell = shellMenu(
     commandKeys,
@@ -34,9 +32,7 @@ const contextMenuTemplate = (
     getProfiles().map((p) => p.name)
   ).submenu as MenuItemConstructorOptions[];
   const _edit = editMenu(commandKeys, execCommand).submenu.filter(filterCutCopy.bind(null, selection));
-  return _edit
-    .concat(separator, _shell)
-    .filter((menuItem) => !Object.prototype.hasOwnProperty.call(menuItem, 'enabled') || menuItem.enabled);
+  return _edit.concat(separator, _shell).filter((menuItem) => !Object.hasOwn(menuItem, 'enabled') || menuItem.enabled);
 };
 
 export default contextMenuTemplate;

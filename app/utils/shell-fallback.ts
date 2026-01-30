@@ -14,7 +14,7 @@ export const getFallBackShellConfig = (
     };
   }
 
-  if (shell != defaultShell) {
+  if (shell !== defaultShell) {
     return {
       shell: defaultShell,
       shellArgs: defaultShellArgs

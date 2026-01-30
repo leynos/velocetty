@@ -1,10 +1,10 @@
 // This is a CLI tool, using console is OK
 /* eslint no-console: 0 */
-import {spawn, exec} from 'child_process';
-import type {SpawnOptions} from 'child_process';
-import {existsSync} from 'fs';
-import {isAbsolute, resolve} from 'path';
-import {promisify} from 'util';
+import {spawn, exec} from 'node:child_process';
+import type {SpawnOptions} from 'node:child_process';
+import {existsSync} from 'node:fs';
+import {isAbsolute, resolve} from 'node:path';
+import {promisify} from 'node:util';
 
 import args from 'args';
 import chalk from 'chalk';
@@ -55,7 +55,7 @@ const columnify = (data: {name: string; description: string}[]) => {
 args.command(
   'install',
   'Install a plugin',
-  (name, args_) => {
+  (_name, args_) => {
     checkConfig();
     const pluginName = args_[0];
     assertPluginName(pluginName);
@@ -70,7 +70,7 @@ args.command(
 args.command(
   'uninstall',
   'Uninstall a plugin',
-  (name, args_) => {
+  (_name, args_) => {
     checkConfig();
     const pluginName = args_[0];
     assertPluginName(pluginName);
@@ -118,7 +118,7 @@ const lsRemote = (pattern?: string) => {
 args.command(
   'search',
   'Search for plugins on npm',
-  (name, args_) => {
+  (_name, args_) => {
     const spinner = ora('Searching').start();
     const query = args_[0] ? args_[0].toLowerCase() : '';
 
@@ -166,7 +166,7 @@ args.command(
 args.command(
   'docs',
   'Open the npm page of a plugin',
-  (name, args_) => {
+  (_name, args_) => {
     const pluginName = args_[0];
     assertPluginName(pluginName);
     void open(`http://ghub.io/${pluginName}`, {wait: false});
@@ -210,10 +210,10 @@ const main = (argv: string[]) => {
     ELECTRON_NO_ATTACH_CONSOLE: '1'
   });
 
-  delete env['ELECTRON_RUN_AS_NODE'];
+  delete env.ELECTRON_RUN_AS_NODE;
 
   if (flags.verbose) {
-    env['ELECTRON_ENABLE_LOGGING'] = '1';
+    env.ELECTRON_ENABLE_LOGGING = '1';
   }
 
   const options: SpawnOptions = {
@@ -231,7 +231,7 @@ const main = (argv: string[]) => {
   });
 
   if (!flags.verbose) {
-    options['stdio'] = 'ignore';
+    options.stdio = 'ignore';
     if (process.platform === 'darwin') {
       //Use `open` to prevent multiple Hyper process
       const cmd = `open -b co.zeit.hyper ${args_}`;
