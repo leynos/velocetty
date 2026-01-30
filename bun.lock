@@ -93,6 +93,8 @@
         "husky": "^9.0.11",
         "inquirer": "^9.2.18",
         "node-addon-api": "^8.0.0",
+        "node-gyp": "^10.0.0",
+        "node-gyp-build": "^4.7.1",
         "null-loader": "^4.0.1",
         "parse-url": "^8.1.0",
         "playwright": "^1.43.1",

@@ -2224,7 +2224,7 @@ flowchart TB
 | **Main Process** | Node.js/TypeScript, node-pty | OS integration, PTY management |
 | **Renderer Process** | React 18.2.0, Redux 4.2.1 | UI components, state management |
 | **Terminal Rendering** | xterm.js 5.3.0 + WebGL addon | Terminal emulation and display |
-| **Build System** | Webpack 5.91.0, TypeScript 5.4.5 | Module bundling, type safety |
+| **Build System** | Webpack 5.91.0, TypeScript 5.4.5, node-gyp 10.x, node-gyp-build 4.x | Module bundling, type safety, native module compilation |
 | **Distribution** | electron-builder 24.13.3 | Cross-platform packaging |
 
 ### 3.8.2 Technology Selection Criteria
