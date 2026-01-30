@@ -62,7 +62,7 @@ Scope notes:
 
 ### 1.4. Quality gates and supply-chain hygiene
 
-- [ ] 1.4.1. Lint succeeds with recommended settings enabled.
+- [x] 1.4.1. Lint succeeds with recommended settings enabled.
 - [ ] 1.4.2. `bun audit` reports no critical, high, or medium vulnerabilities.
 - [ ] 1.4.3. Continuous Integration (CI) dependencies are pinned to SHAs.
 - [ ] 1.4.4. Fully remove dependencies on Yarn and AVA, including in CI.
