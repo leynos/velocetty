@@ -11,7 +11,7 @@
     {
       "from": "./build/${os}/",
       "to": "./bin/",
-      "filter": ["hyper*"]
+      "filter": ["hyper*", "bun*"]
     }
   ],
   "artifactName": "${productName}-${version}-${arch}.${ext}",

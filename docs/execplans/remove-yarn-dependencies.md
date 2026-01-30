@@ -84,6 +84,8 @@ removed, and runtime code that previously invoked Yarn now uses Bun.
       commands only.
     - [x] (2026-01-30 18:36Z) Update local developer documentation to use Bun.
     - [x] (2026-01-30 19:18Z) Run required validation commands and capture logs.
+    - [x] (2026-01-30 20:05Z) Stage Bun binary for packaged builds and update
+      runtime paths.
 
 ## Surprises & Discoveries
 
@@ -113,14 +115,20 @@ removed, and runtime code that previously invoked Yarn now uses Bun.
       Rationale: Maintains type safety validation without changing existing
       scripts.
       Date/Author: 2026-01-30 (Codex)
+    - Decision: Bundle the Bun binary via `build/${os}/` so packaging picks up
+      a per-OS Bun runtime.
+      Rationale: Ensures plugin installation works in packaged builds without
+      a system Bun dependency.
+      Date/Author: 2026-01-30 (Codex)
 
 ## Outcomes & Retrospective
 
 Yarn has been removed from runtime, CI, and documentation references, and
 plugin installs now use Bun with production-safe flags. The build no longer
 ships the Yarn standalone binary or lockfile, and CI runs Bun-only workflows.
-Type checking required a `bunx tsc` fallback because no `check:types` script
-exists. Future improvements could formalise that script to reduce ambiguity.
+Packaged builds now bundle the Bun binary under `resources/bin/` for runtime
+plugin installation with a fallback to system Bun in dev. Type checking uses
+the new `check:types` script for `tsgo`.
 
 ## Context and Orientation
 
@@ -129,7 +137,8 @@ Key locations affected by the Yarn removal:
 - `.github/workflows/nodejs.yml` now runs Bun-only commands for the `build` and
   `build-linux-arm` jobs.
 - `README.md` and `PLUGINS.md` now document Bun-based developer workflows.
-- `app/config/paths.ts` now exports a Bun path used by runtime plugin install.
+- `app/config/paths.ts` now points at the bundled Bun binary under
+  `resources/bin/` with a fallback to system Bun when running from source.
 - `bin/yarn-standalone.js` has been removed and is no longer bundled by
   `electron-builder.json` or excluded in `biome.json`.
 - `webpack.config.ts` no longer copies `app/yarn.lock`, and the file has been
@@ -254,3 +263,4 @@ removals, and recorded Bun install decisions; remaining work is validation.
 2026-01-30: Logged validation results and the typecheck fallback used when the
 `check:types` script was missing.
 2026-01-30: Marked plan complete and summarised outcomes after validation.
+2026-01-30: Added Bun binary bundling and updated runtime paths and outcomes.

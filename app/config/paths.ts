@@ -54,7 +54,15 @@ const plugs = {
   local: resolve(plugins, 'local'),
   cache: resolve(plugins, 'cache')
 };
-const bun = process.env.BUN_PATH ?? 'bun';
+const bunExecutable = process.platform === 'win32' ? 'bun.exe' : 'bun';
+const bundledBun = resolve(__dirname, '../../bin', bunExecutable);
+let bun = process.env.BUN_PATH ?? bundledBun;
+
+try {
+  statSync(bun);
+} catch (_err) {
+  bun = 'bun';
+}
 const cliScriptPath = resolve(__dirname, '../../bin/hyper');
 const cliLinkPath = '/usr/local/bin/hyper';
 

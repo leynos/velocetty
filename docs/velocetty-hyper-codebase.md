@@ -681,7 +681,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | Dependency Type | Details |
 |-----------------|---------|
 | **Prerequisite Features** | F-004 (Configuration System) |
-| **System Dependencies** | Node.js module resolution, npm/bun package management |
+| **System Dependencies** | Node.js module resolution, npm/bun package management, bundled Bun binary in `resources/bin` |
 | **External Dependencies** | npm registry for plugin distribution |
 | **Integration Requirements** | React component decoration, Redux middleware/reducer integration |
 
@@ -801,7 +801,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | Dependency Type | Details |
 |-----------------|---------|
 | **Prerequisite Features** | F-005 (Plugin System), F-004 (Configuration System) |
-| **System Dependencies** | Node.js runtime, npm/bun |
+| **System Dependencies** | Node.js runtime, npm/bun, bundled Bun binary in `resources/bin` |
 | **External Dependencies** | npm registry API |
 | **Integration Requirements** | Configuration file access, plugin directory management |
 
