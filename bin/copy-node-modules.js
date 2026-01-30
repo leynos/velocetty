@@ -14,6 +14,7 @@ function copyNodeModules() {
     throw new Error(`Source node_modules not found at ${sourceDir}`);
   }
 
+  fs.emptyDirSync(destinationDir);
   console.log(`Copying node_modules from ${sourceDir} to ${destinationDir}`);
   // fs-extra handles directories and symlinks without the cpy-cli EISDIR failure.
   fs.copySync(sourceDir, destinationDir, {
