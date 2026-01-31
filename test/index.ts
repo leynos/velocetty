@@ -12,6 +12,7 @@ let app: ElectronApplication;
 
 test.before(async () => {
   let pathToBinary;
+  const launchArgs: string[] = [];
 
   switch (process.platform) {
     case 'linux':
@@ -30,8 +31,13 @@ test.before(async () => {
       throw new Error('Path to the built binary needs to be defined for this platform in test/index.js');
   }
 
+  if (process.platform === 'linux' && (process.env.CI === 'true' || process.env.ELECTRON_DISABLE_SANDBOX === '1')) {
+    launchArgs.push('--no-sandbox', '--disable-setuid-sandbox');
+  }
+
   app = await _electron.launch({
-    executablePath: pathToBinary
+    executablePath: pathToBinary,
+    args: launchArgs
   });
   await app.firstWindow();
   await new Promise((resolve) => setTimeout(resolve, 5000));
