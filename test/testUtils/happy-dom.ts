@@ -13,7 +13,8 @@ let happyDomModule: Promise<HappyDomModule> | null = null;
 
 const loadHappyDom = () => {
   if (!happyDomModule) {
-    happyDomModule = import('happy-dom');
+    // Use runtime import to avoid ts-node transpiling to require().
+    happyDomModule = new Function('return import("happy-dom")')();
   }
   return happyDomModule;
 };
