@@ -23,8 +23,9 @@ import {bun, plugs} from '../config/paths';
  *
  * @param fn - Callback invoked with `null` on success or an error string on
  * failure.
+ * @param signal - Optional abort signal to cancel the install process.
  */
-export const install = (fn: (err: string | null) => void) => {
+export const install = (fn: (err: string | null) => void, signal?: AbortSignal) => {
   const spawnQueue = queue({concurrency: 1});
   /**
    * Queues and executes a Bun command for plugin installation.
@@ -40,6 +41,10 @@ export const install = (fn: (err: string | null) => void) => {
    * @param cb - Callback invoked on completion.
    */
   function bunFn(args: string[], cb: (err: string | null) => void) {
+    if (signal?.aborted) {
+      cb('Bun install aborted.');
+      return;
+    }
     const env = {
       ...process.env,
       NODE_ENV: 'production',
@@ -56,7 +61,8 @@ export const install = (fn: (err: string | null) => void) => {
           cwd: plugs.base,
           env,
           timeout: ms('5m'),
-          maxBuffer: 1024 * 1024
+          maxBuffer: 1024 * 1024,
+          signal
         },
         (err, stdout, stderr) => {
           if (err) {
