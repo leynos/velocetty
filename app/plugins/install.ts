@@ -1,6 +1,8 @@
 /**
- * @file Plugin installation module that spawns Bun to install plugin
- * dependencies.
+ * @file Handles plugin installation via Bun in a serialised queue.
+ *
+ * Spawns `bun install` in the plugins directory with production dependencies
+ * only, using a concurrency-1 queue to avoid parallel install conflicts.
  */
 import cp from 'child_process';
 

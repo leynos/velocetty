@@ -1,3 +1,7 @@
+/**
+ * @file Initialises the auto-updater, wires platform-specific update events,
+ * and manages update-channel configuration.
+ */
 // Packages
 import electron, {app} from 'electron';
 import type {BrowserWindow, AutoUpdater} from 'electron';

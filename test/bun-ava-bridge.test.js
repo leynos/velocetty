@@ -20,6 +20,7 @@ function resolveAvaCliPath() {
 function runAvaSuite(configFile) {
   const avaCliPath = resolveAvaCliPath();
   const result = spawnSync('node', [avaCliPath, '--config', configFile], {
+    cwd: path.join(__dirname, '..'),
     env: {...process.env, AVA_FORCE_CLEAN_EXIT: '1'},
     stdio: 'inherit'
   });
