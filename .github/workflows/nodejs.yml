@@ -43,7 +43,9 @@ jobs:
           sudo apt update
           sudo apt install libarchive-tools
       - name: Lint and Run Unit Tests
-        run: bun run test
+        run: |
+          bun run lint
+          bun test
       - name: Getting Build Icon
         if: github.ref == 'refs/heads/canary' || github.base_ref == 'canary'
         run: |
