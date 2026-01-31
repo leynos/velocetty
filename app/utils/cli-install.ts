@@ -94,7 +94,7 @@ const addBinToUserPath = () => {
       let newPathValue = binPath;
       let type: ValueType = Registry.ValueType.SZ;
       if (pathItem) {
-        type = Registry.queryValueRaw(envKey, pathItem)?.type;
+        type = Registry.queryValueRaw(envKey, pathItem)?.type ?? Registry.ValueType.SZ;
         if (type !== Registry.ValueType.SZ && type !== Registry.ValueType.EXPAND_SZ) {
           reject(`Registry key type is ${type}`);
           return;
