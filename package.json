@@ -5,7 +5,7 @@
   "repository": "zeit/hyper",
   "scripts": {
     "fmt": "bun node_modules/@biomejs/biome/bin/biome format --write .",
-    "preinstall": "bun bin/ensure-bun.cjs",
+    "preinstall": "bun bin/ensure-bun.cjs && bun bin/ensure-node-gyp-build.cjs",
     "start": "echo 'please run `bun run dev` in one tab and then `bun run app` in another one'",
     "app": "bun node_modules/cross-env/src/bin/cross-env.js ELECTRONMON_LOGLEVEL=error bun node_modules/electronmon/bin/cli.js target",
     "dev": "bun node_modules/concurrently/dist/bin/concurrently.js -n \"Webpack,TypeScript\" -c \"cyan.bold,blue.bold\" \"bunx webpack-cli -w\" \"bun node_modules/typescript/bin/tsc --build -v --pretty --watch --preserveWatchOutput\" -k",
