@@ -13,6 +13,7 @@ typecheck:
 
 lint:
 	bun run lint
+	actionlint
 
 test:
 	bun run test

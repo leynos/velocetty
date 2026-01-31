@@ -118,7 +118,6 @@ jobs:
           DEBUG: pw:browser*
           ELECTRON_ENABLE_LOGGING: '1'
           ELECTRON_ENABLE_STACK_DUMPING: '1'
-        env:
           SHELL: /bin/bash
       - name: Debug Linux Electron bundle
         if: failure() && runner.os == 'Linux'
