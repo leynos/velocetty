@@ -66,6 +66,11 @@ export const install = (fn: (err: string | null) => void, signal?: AbortSignal) 
         },
         (err, stdout, stderr) => {
           if (err) {
+            console.error('Bun install failed:', {
+              code: err.code,
+              signal: err.signal,
+              message: err.message
+            });
             cb(stderr);
           } else {
             cb(null);
