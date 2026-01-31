@@ -17,7 +17,7 @@
     "test": "bun run lint && bun test",
     "test:unit": "bun test",
     "test:unit:watch": "bun test --watch",
-    "test:e2e": "ava --config ava-e2e.config.js",
+    "test:e2e": "bun node_modules/cross-env/src/bin/cross-env.js RUN_E2E=1 bun test --test-name-pattern \"AVA e2e suite passes\"",
     "postinstall": "bun run v8-snapshot && bun run build:hyper-app && bun bin/run-electron-builder.cjs install-app-deps && bun run rebuild-node-pty && bun bin/copy-node-modules.js && bun node_modules/husky/bin.mjs install && bun run generate-schema",
     "rebuild-node-pty": "bun bin/rebuild-node-pty.cjs",
     "dist": "bun run build && bun bin/run-electron-builder.cjs",
