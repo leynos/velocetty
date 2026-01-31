@@ -66,11 +66,20 @@ test.serial('updater wires update handlers and emits', async (t) => {
 
   updater(winStub);
 
-  const expectedEvent = process.platform === 'linux' ? 'update-available' : 'update-downloaded';
-  t.is(updateEvent, expectedEvent);
-  t.truthy(updateHandler);
+  if (updateEvent === null) {
+    t.fail('Expected update event to be registered.');
+    return;
+  }
 
-  updateHandler?.({} as Electron.Event, 'notes', 'release', new Date('2020-01-01'), '');
+  if (updateHandler === null) {
+    t.fail('Expected update handler to be registered.');
+    return;
+  }
+
+  const expectedEvent = process.platform === 'linux' ? 'update-available' : 'update-downloaded';
+  t.is(updateEvent as typeof expectedEvent, expectedEvent);
+
+  (updateHandler as (...args: unknown[]) => void)({} as Electron.Event, 'notes', 'release', new Date('2020-01-01'), '');
 
   t.deepEqual(emitCalls, [
     [
