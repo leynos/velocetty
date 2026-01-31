@@ -32,7 +32,7 @@ require(resolved);
 const windowsShim = [
   '@ECHO OFF',
   'setlocal',
-  'set CANDIDATES=%CD%',
+  'set CANDIDATES=%CD%;%~dp0..',
   'if not "%INIT_CWD%"=="" set CANDIDATES=%CANDIDATES%;%INIT_CWD%',
   'for %%G in ("%CANDIDATES:;=" "%") do (',
   '  if exist "%%~G\\node_modules\\node-gyp-build\\bin.js" (',

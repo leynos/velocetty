@@ -4,7 +4,6 @@
  * Centralises filesystem paths used across config, plugins, and CLI helpers,
  * including the resolved Bun binary used for plugin installs.
  */
-// This module exports paths, names, and other metadata that is referenced
 import {execSync} from 'node:child_process';
 import {statSync} from 'node:fs';
 import {homedir} from 'node:os';
