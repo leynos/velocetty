@@ -69,8 +69,9 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
       - name: Archive Build Artifacts
-        uses: LabhanshAgrawal/upload-artifact@v3
+        uses: actions/upload-artifact@v6
         with:
+          name: build-${{ matrix.os }}
           path: |
             dist/*.dmg
             dist/*.snap
@@ -79,6 +80,7 @@ jobs:
             dist/*.rpm
             dist/*.pacman
             dist/*.exe
+          if-no-files-found: warn
       - name: Run E2E Tests
         if: runner.os != 'Linux'
         run: bun run test:e2e
@@ -168,11 +170,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Archive Build Artifacts
-        uses: LabhanshAgrawal/upload-artifact@v3
+        uses: actions/upload-artifact@v6
         with:
+          name: build-linux-${{ matrix.name }}
           path: |
             dist/*.snap
             dist/*.AppImage
             dist/*.deb
             dist/*.rpm
             dist/*.pacman
+          if-no-files-found: warn
