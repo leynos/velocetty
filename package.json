@@ -147,5 +147,8 @@
       "!lib/**",
       "!dist/**"
     ]
+  },
+  "patchedDependencies": {
+    "leveldown@5.6.0": "patches/leveldown@5.6.0.patch"
   }
 }

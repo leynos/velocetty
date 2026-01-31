@@ -110,6 +110,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "leveldown@5.6.0": "patches/leveldown@5.6.0.patch",
+  },
   "overrides": {
     "@electron/rebuild>node-gyp": "^10.0.0",
     "node-gyp": "^10.0.0",
