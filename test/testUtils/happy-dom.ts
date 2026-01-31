@@ -1,5 +1,6 @@
 /** @file Provides Happy DOM setup helpers for unit tests. */
-import {Window} from 'happy-dom';
+
+type HappyDomModule = typeof import('happy-dom');
 
 type Cleanup = () => void;
 type RpcStub = {
@@ -8,7 +9,17 @@ type RpcStub = {
   removeListener: (..._args: unknown[]) => void;
 };
 
-export const setupHappyDom = (): Cleanup => {
+let happyDomModule: Promise<HappyDomModule> | null = null;
+
+const loadHappyDom = () => {
+  if (!happyDomModule) {
+    happyDomModule = import('happy-dom');
+  }
+  return happyDomModule;
+};
+
+export const setupHappyDom = async (): Promise<Cleanup> => {
+  const {Window} = await loadHappyDom();
   const window = new Window();
   const previousWindow = globalThis.window;
   const previousDocument = globalThis.document;
@@ -39,7 +50,7 @@ export const setupHappyDom = (): Cleanup => {
     }) as unknown as typeof window.cancelAnimationFrame;
   }
 
-  (window as Window & {rpc: RpcStub}).rpc = {
+  (window as unknown as {rpc: RpcStub}).rpc = {
     off: (..._args: unknown[]) => {},
     on: (..._args: unknown[]) => {},
     removeListener: (..._args: unknown[]) => {}
