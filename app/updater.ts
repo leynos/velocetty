@@ -1,3 +1,7 @@
+/**
+ * @file Initialises the auto-updater, wires platform-specific update events,
+ * and manages update-channel configuration.
+ */
 // Packages
 import electron, {app} from 'electron';
 import type {BrowserWindow, AutoUpdater} from 'electron';
@@ -61,13 +65,15 @@ async function init() {
 
   autoUpdater.setFeedURL({url: feedURL});
 
-  setTimeout(() => {
-    void checkForUpdates();
-  }, ms('10s'));
+  if (process.env.NODE_ENV !== 'test') {
+    setTimeout(() => {
+      void checkForUpdates();
+    }, ms('10s'));
 
-  setInterval(() => {
-    void checkForUpdates();
-  }, ms('30m'));
+    setInterval(() => {
+      void checkForUpdates();
+    }, ms('30m'));
+  }
 
   isInit = true;
 }
@@ -79,7 +85,16 @@ const updater = (win: BrowserWindow) => {
 
   const {rpc} = win;
 
-  const onupdate = (_ev: Event, releaseNotes: string, releaseName: string, _date: Date, updateUrl: string) => {
+  /**
+   * Relay update availability to renderer listeners, preserving platform event wiring.
+   */
+  const onupdate = (
+    _ev: Electron.Event,
+    releaseNotes: string,
+    releaseName: string,
+    _date: Date,
+    updateUrl?: string
+  ) => {
     const releaseUrl = updateUrl || `https://github.com/vercel/hyper/releases/tag/${releaseName}`;
     rpc.emit('update available', {releaseNotes, releaseName, releaseUrl, canInstall: !isLinux});
   };

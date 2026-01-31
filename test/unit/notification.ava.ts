@@ -18,7 +18,7 @@ const dispatchOpacityTransition = (indicator: Element) => {
 };
 
 test.serial('Notification auto-dismisses after the timeout on mount', async (t) => {
-  const cleanup = setupHappyDom();
+  const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -57,7 +57,7 @@ test.serial('Notification auto-dismisses after the timeout on mount', async (t) 
 });
 
 test.serial('Notification resets the timer when text changes', async (t) => {
-  const cleanup = setupHappyDom();
+  const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);

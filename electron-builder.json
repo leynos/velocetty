@@ -7,12 +7,11 @@
     "app": "target"
   },
   "extraResources": [
-    "./bin/yarn-standalone.js",
     "./bin/cli.js",
     {
       "from": "./build/${os}/",
       "to": "./bin/",
-      "filter": ["hyper*"]
+      "filter": ["hyper*", "bun*"]
     }
   ],
   "artifactName": "${productName}-${version}-${arch}.${ext}",

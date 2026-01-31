@@ -27,36 +27,12 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - name: Enable Yarn (Corepack)
-        run: |
-          corepack enable
-          corepack prepare yarn@1.22.22 --activate
       - name: Use Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.7
       - name: Fix node-gyp and Python
         run: python3 -m pip install packaging setuptools
-      - name: Determine Yarn cache directory
-        id: yarn-cache-dir-path
-        run: |
-          set -euo pipefail
-          if command -v yarn >/dev/null 2>&1; then
-            dir="$(yarn cache dir)"
-          else
-            case "${RUNNER_OS}" in
-              Windows) dir="${LOCALAPPDATA}\\Yarn\\Cache" ;;
-              *) dir="${HOME}/.cache/yarn" ;;
-            esac
-          fi
-          echo "dir=$dir" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache/restore@v5
-        if: steps.yarn-cache-dir-path.outputs.dir != ''
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock', 'app/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
       - name: Install
         run: bun install
         env:
@@ -67,7 +43,9 @@ jobs:
           sudo apt update
           sudo apt install libarchive-tools
       - name: Lint and Run Unit Tests
-        run: yarn run test
+        run: |
+          bun run lint
+          bun test
       - name: Getting Build Icon
         if: github.ref == 'refs/heads/canary' || github.base_ref == 'canary'
         run: |
@@ -81,7 +59,7 @@ jobs:
           if [ -z "$WIN_CSC_KEY_PASSWORD" ] ; then unset WIN_CSC_KEY_PASSWORD ; fi
           if [ -z "$APPLE_ID" ] ; then unset APPLE_ID ; fi
           if [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] ; then unset APPLE_APP_SPECIFIC_PASSWORD ; fi
-          yarn run dist
+          bun run dist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
@@ -91,8 +69,9 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
       - name: Archive Build Artifacts
-        uses: LabhanshAgrawal/upload-artifact@v3
+        uses: actions/upload-artifact@v6
         with:
+          name: build-${{ matrix.os }}
           path: |
             dist/*.dmg
             dist/*.snap
@@ -101,16 +80,25 @@ jobs:
             dist/*.rpm
             dist/*.pacman
             dist/*.exe
+          if-no-files-found: warn
       - name: Run E2E Tests
         if: runner.os != 'Linux'
-        run: yarn run test:e2e
+        run: bun run test:e2e
       - name: Run E2E Tests on Linux
         if: runner.os == 'Linux'
         uses: GabrielBB/xvfb-action@v1.7
         with:
-          run: yarn run test:e2e
+          run: bun run test:e2e
         env:
           SHELL: /bin/bash
+      - name: Debug Linux Electron bundle
+        if: failure() && runner.os == 'Linux'
+        run: |
+          set -euxo pipefail
+          ls -la dist
+          ls -la dist/linux-unpacked
+          file dist/linux-unpacked/hyper || true
+          ldd dist/linux-unpacked/hyper || true
       - name: Archive E2E test screenshot
         uses: actions/upload-artifact@v6
         with:
@@ -128,11 +116,6 @@ jobs:
         with:
           name: pr_num
           path: ./pr_num.txt
-      - uses: actions/cache/save@v5
-        if: github.event_name == 'push' && steps.yarn-cache-dir-path.outputs.dir != ''
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock', 'app/yarn.lock') }}
 
   build-linux-arm:
     runs-on: ubuntu-latest
@@ -153,43 +136,19 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - name: Enable Yarn (Corepack)
-        run: |
-          corepack enable
-          corepack prepare yarn@1.22.22 --activate
       - name: Use Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.7
       - name: Fix node-gyp and Python
         run: python3 -m pip install packaging setuptools
-      - name: Determine Yarn cache directory
-        id: yarn-cache-dir-path
-        run: |
-          set -euo pipefail
-          if command -v yarn >/dev/null 2>&1; then
-            dir="$(yarn cache dir)"
-          else
-            case "${RUNNER_OS}" in
-              Windows) dir="${LOCALAPPDATA}\\Yarn\\Cache" ;;
-              *) dir="${HOME}/.cache/yarn" ;;
-            esac
-          fi
-          echo "dir=$dir" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache/restore@v5
-        if: steps.yarn-cache-dir-path.outputs.dir != ''
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock', 'app/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
       - name: Install
         run: |
           bun install
           sudo apt update
           sudo apt install libarchive-tools
       - name: Compile
-        run: yarn run build
+        run: bun run build
       - name: rebuild node-pty
         uses: pguyot/arm-runner-action@v2.6.5
         with:
@@ -213,17 +172,19 @@ jobs:
           sudo dpkg --add-architecture i386
           sudo apt update
           sudo apt install -y libglib2.0-0:i386 libexpat1:i386 libgcc-s1:i386
-          npm_config_arch=armv7l yarn run v8-snapshot:arch
+          npm_config_arch=armv7l bun run v8-snapshot:arch
       - name: Build
-        run: node bin/run-electron-builder.cjs -l deb rpm AppImage pacman --${{ matrix.name }} -c electron-builder-linux-ci.json
+        run: bun bin/run-electron-builder.cjs -l deb rpm AppImage pacman --${{ matrix.name }} -c electron-builder-linux-ci.json
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Archive Build Artifacts
-        uses: LabhanshAgrawal/upload-artifact@v3
+        uses: actions/upload-artifact@v6
         with:
+          name: build-linux-${{ matrix.name }}
           path: |
             dist/*.snap
             dist/*.AppImage
             dist/*.deb
             dist/*.rpm
             dist/*.pacman
+          if-no-files-found: warn

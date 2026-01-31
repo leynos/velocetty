@@ -13,7 +13,7 @@ const proxyquire = require('proxyquire').noCallThru();
 const waitFor = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test.serial('Hyper attaches key listeners on mount and config updates', async (t) => {
-  const cleanup = setupHappyDom();
+  const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -126,7 +126,7 @@ test.serial('Hyper attaches key listeners on mount and config updates', async (t
 });
 
 test.serial('Hyper focuses the active session when it changes', async (t) => {
-  const cleanup = setupHappyDom();
+  const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);

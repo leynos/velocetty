@@ -60,33 +60,35 @@ Velocetty is not yet available for general use. Development builds can be create
 
 ## Contribute
 
-You will need [Yarn](https://yarnpkg.com/en/docs/install) installed.
+Bun is required for local development. Install it from
+[Bun](https://bun.sh/).
 
 1. Install platform-specific packages:
-   - **Windows**: Run `yarn global add windows-build-tools` from an elevated prompt
+   - **Windows**: Run `bun add -g windows-build-tools` from an elevated
+     prompt
    - **macOS**: No additional packages required
    - **Linux (RPM-based)**: `GraphicsMagick`, `libicns-utils`, `xz`
    - **Linux (Debian-based)**: `graphicsmagick`, `icnsutils`, `xz-utils`
 
 2. Fork and clone the repository
 
-3. Install dependencies: `yarn`
+3. Install dependencies: `bun install`
 
-4. Build and watch for changes: `yarn run dev`
+4. Build and watch for changes: `bun run dev`
 
-5. Run the app: `yarn run app` (from another terminal)
+5. Run the app: `bun run app` (from another terminal)
 
 To generate distribution binaries:
 
 ```bash
-yarn run dist
+bun run dist
 ```
 
 Binaries will appear in the `./dist` folder.
 
 ### Known issues
 
-- **node-pty build errors**: Run `yarn run rebuild-node-pty`
+- **node-pty build errors**: Run `bun run rebuild-node-pty`
 - **C++ errors on macOS**: Set `export CXX=clang++`
 - **codesign errors on macOS**: Set `export CSC_IDENTITY_AUTO_DISCOVERY=false`
 

@@ -1,5 +1,7 @@
 /** @file Provides Happy DOM setup helpers for unit tests. */
-import {Window} from 'happy-dom';
+
+/** Happy DOM module type for runtime import. */
+type HappyDomModule = typeof import('happy-dom');
 
 type Cleanup = () => void;
 type RpcStub = {
@@ -8,7 +10,22 @@ type RpcStub = {
   removeListener: (..._args: unknown[]) => void;
 };
 
-export const setupHappyDom = (): Cleanup => {
+let happyDomModule: Promise<HappyDomModule> | null = null;
+
+/** Lazily load Happy DOM via runtime dynamic import to avoid ts-node transpiling. */
+const loadHappyDom = (): Promise<HappyDomModule> => {
+  if (!happyDomModule) {
+    // Use runtime import to avoid ts-node transpiling to require(). This uses
+    // indirect eval, which is acceptable in test-only code and can be removed
+    // once these tests run under Bun's native TypeScript execution.
+    happyDomModule = new Function('return import("happy-dom")')() as Promise<HappyDomModule>;
+  }
+  return happyDomModule;
+};
+
+/** Initialise Happy DOM globals for unit tests and return a cleanup function. */
+export const setupHappyDom = async (): Promise<Cleanup> => {
+  const {Window} = await loadHappyDom();
   const window = new Window();
   const previousWindow = globalThis.window;
   const previousDocument = globalThis.document;
@@ -39,7 +56,7 @@ export const setupHappyDom = (): Cleanup => {
     }) as unknown as typeof window.cancelAnimationFrame;
   }
 
-  (window as Window & {rpc: RpcStub}).rpc = {
+  (window as unknown as {rpc: RpcStub}).rpc = {
     off: (..._args: unknown[]) => {},
     on: (..._args: unknown[]) => {},
     removeListener: (..._args: unknown[]) => {}

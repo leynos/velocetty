@@ -1,0 +1,13 @@
+diff --git a/package.json b/package.json
+index 9b0b6465b9fddab8206e1617336cea784eb4657a..3b5061de9b69b4423325f7b4e55d0161d32c8c7b 100644
+--- a/package.json
++++ b/package.json
+@@ -5,7 +5,7 @@
+   "license": "MIT",
+   "main": "leveldown.js",
+   "scripts": {
+-    "install": "node-gyp-build",
++    "install": "node-gyp-build",
+     "test": "standard && (nyc -s tape test/*-test.js | faucet) && nyc report",
+     "test-gc": "node --expose-gc test/gc.js",
+     "test-electron": "electron test/electron.js",

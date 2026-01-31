@@ -5,18 +5,19 @@
   "repository": "zeit/hyper",
   "scripts": {
     "fmt": "bun node_modules/@biomejs/biome/bin/biome format --write .",
-    "preinstall": "bun bin/ensure-bun.cjs",
+    "preinstall": "bun bin/ensure-bun.cjs && bun bin/ensure-node-gyp-build.cjs",
     "start": "echo 'please run `bun run dev` in one tab and then `bun run app` in another one'",
     "app": "bun node_modules/cross-env/src/bin/cross-env.js ELECTRONMON_LOGLEVEL=error bun node_modules/electronmon/bin/cli.js target",
     "dev": "bun node_modules/concurrently/dist/bin/concurrently.js -n \"Webpack,TypeScript\" -c \"cyan.bold,blue.bold\" \"bunx webpack-cli -w\" \"bun node_modules/typescript/bin/tsc --build -v --pretty --watch --preserveWatchOutput\" -k",
-    "build": "bun node_modules/cross-env/src/bin/cross-env.js NODE_ENV=production bunx webpack-cli && bun node_modules/typescript/bin/tsc -b -v && bun node_modules/cross-env/src/bin/cross-env.js BABEL_ENV=production babel target/renderer/bundle.js --out-file target/renderer/bundle.js --no-comments --minified",
+    "build": "bun node_modules/cross-env/src/bin/cross-env.js NODE_ENV=production bunx webpack-cli && bun node_modules/typescript/bin/tsc -b -v && bun node_modules/cross-env/src/bin/cross-env.js BABEL_ENV=production bun node_modules/@babel/cli/bin/babel.js target/renderer/bundle.js --out-file target/renderer/bundle.js --no-comments --minified",
     "build:hyper-app": "bunx webpack-cli --config-name hyper-app",
     "lint": "bun node_modules/@biomejs/biome/bin/biome check .",
+    "check:types": "bun node_modules/.bin/tsgo --project tsconfig.typecheck.json",
     "audit": "bun scripts/run-audit.mjs",
-    "test": "bun run lint && bun run test:unit",
-    "test:unit": "bun node_modules/cross-env/src/bin/cross-env.js AVA_FORCE_CLEAN_EXIT=1 node node_modules/ava/entrypoints/cli.mjs",
-    "test:unit:watch": "bun run test:unit -- --watch",
-    "test:e2e": "ava --config ava-e2e.config.js",
+    "test": "bun run lint && bun test",
+    "test:unit": "bun test",
+    "test:unit:watch": "bun test --watch",
+    "test:e2e": "bun node_modules/cross-env/src/bin/cross-env.js RUN_E2E=1 bun test --test-name-pattern \"AVA e2e suite passes\"",
     "postinstall": "bun run v8-snapshot && bun run build:hyper-app && bun bin/run-electron-builder.cjs install-app-deps && bun run rebuild-node-pty && bun bin/copy-node-modules.js && bun node_modules/husky/bin.mjs install && bun run generate-schema",
     "rebuild-node-pty": "bun bin/rebuild-node-pty.cjs",
     "dist": "bun run build && bun bin/run-electron-builder.cjs",
@@ -120,6 +121,8 @@
     "happy-dom": "^20.3.9",
     "husky": "^9.0.11",
     "inquirer": "^9.2.18",
+    "node-gyp": "^10.0.0",
+    "node-gyp-build": "^4.7.1",
     "node-addon-api": "^8.0.0",
     "null-loader": "^4.0.1",
     "parse-url": "^8.1.0",
@@ -144,5 +147,8 @@
       "!lib/**",
       "!dist/**"
     ]
+  },
+  "patchedDependencies": {
+    "leveldown@5.6.0": "patches/leveldown@5.6.0.patch"
   }
 }

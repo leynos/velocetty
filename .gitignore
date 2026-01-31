@@ -4,6 +4,8 @@ app/renderer
 target
 bin/cli.*
 cache
+build/**/bun
+build/**/bun.exe
 
 # dependencies
 node_modules
