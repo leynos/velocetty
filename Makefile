@@ -13,7 +13,7 @@ typecheck:
 
 lint:
 	bun run lint
-	actionlint
+	@if command -v actionlint >/dev/null 2>&1; then actionlint; else echo "actionlint not installed; skipping"; fi
 
 test:
 	bun run test

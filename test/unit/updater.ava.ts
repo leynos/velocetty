@@ -11,13 +11,40 @@ test.serial('updater wires update handlers and emits', async (t) => {
     process.env.NODE_ENV = originalNodeEnv;
   });
 
-  const emitCalls: Array<[string, Record<string, unknown>]> = [];
-  let updateEvent: string | null = null;
-  let updateHandler: ((...args: unknown[]) => void) | null = null;
+  type UpdateEvent = 'update-available' | 'update-downloaded';
+  type UpdateEventPayload = Pick<Electron.Event, 'preventDefault'>;
+  type UpdateHandler = (
+    event: UpdateEventPayload,
+    releaseNotes: string,
+    releaseName: string,
+    releaseDate: Date,
+    updateUrl?: string
+  ) => void;
+  type ErrorHandler = (error: Error) => void;
 
-  const autoUpdater = {
-    on: (event: string, handler: (...args: unknown[]) => void) => {
-      if (event !== 'error') {
+  const emitCalls: Array<[string, Record<string, unknown>]> = [];
+  let updateEvent: UpdateEvent | null = null;
+  let updateHandler: UpdateHandler | null = null;
+
+  type AutoUpdaterStub = {
+    on(event: UpdateEvent, handler: UpdateHandler): AutoUpdaterStub;
+    on(event: 'error', handler: ErrorHandler): AutoUpdaterStub;
+    removeListener: () => AutoUpdaterStub;
+    setFeedURL: () => void;
+    checkForUpdates: () => void;
+    quitAndInstall: () => void;
+  };
+
+  const isUpdateEvent = (event: UpdateEvent | 'error'): event is UpdateEvent => event !== 'error';
+
+  const isUpdateHandler = (
+    event: UpdateEvent | 'error',
+    handler: UpdateHandler | ErrorHandler
+  ): handler is UpdateHandler => event !== 'error';
+
+  const autoUpdater: AutoUpdaterStub = {
+    on: (event: UpdateEvent | 'error', handler: UpdateHandler | ErrorHandler) => {
+      if (isUpdateEvent(event) && isUpdateHandler(event, handler)) {
         updateEvent = event;
         updateHandler = handler;
       }
@@ -76,10 +103,11 @@ test.serial('updater wires update handlers and emits', async (t) => {
     return;
   }
 
-  const expectedEvent = process.platform === 'linux' ? 'update-available' : 'update-downloaded';
-  t.is(updateEvent as typeof expectedEvent, expectedEvent);
+  const expectedEvent: UpdateEvent = process.platform === 'linux' ? 'update-available' : 'update-downloaded';
+  t.is(updateEvent, expectedEvent);
 
-  (updateHandler as (...args: unknown[]) => void)({} as Electron.Event, 'notes', 'release', new Date('2020-01-01'), '');
+  const updateEventPayload: UpdateEventPayload = {preventDefault: () => {}};
+  updateHandler(updateEventPayload, 'notes', 'release', new Date('2020-01-01'), '');
 
   t.deepEqual(emitCalls, [
     [
