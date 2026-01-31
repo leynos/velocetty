@@ -14,6 +14,17 @@ function copyNodeModules() {
     throw new Error(`Source node_modules not found at ${sourceDir}`);
   }
 
+  const resolvedBaseDir = path.resolve(baseDir);
+  const resolvedSourceDir = path.resolve(sourceDir);
+  const resolvedDestinationDir = path.resolve(destinationDir);
+
+  if (!resolvedDestinationDir.startsWith(`${resolvedBaseDir}${path.sep}`)) {
+    throw new Error(`Refusing to empty unexpected destination: ${resolvedDestinationDir}`);
+  }
+  if (resolvedDestinationDir === resolvedSourceDir) {
+    throw new Error('Refusing to empty destination node_modules identical to source.');
+  }
+
   fs.emptyDirSync(destinationDir);
   console.log(`Copying node_modules from ${sourceDir} to ${destinationDir}`);
   // fs-extra handles directories and symlinks without the cpy-cli EISDIR failure.

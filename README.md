@@ -60,10 +60,12 @@ Velocetty is not yet available for general use. Development builds can be create
 
 ## Contribute
 
-You will need [Bun](https://bun.sh/) installed.
+Bun is required for local development. Install it from
+[Bun](https://bun.sh/).
 
 1. Install platform-specific packages:
-   - **Windows**: Run `bun add -g windows-build-tools` from an elevated prompt
+   - **Windows**: Run `bun add -g windows-build-tools` from an elevated
+     prompt
    - **macOS**: No additional packages required
    - **Linux (RPM-based)**: `GraphicsMagick`, `libicns-utils`, `xz`
    - **Linux (Debian-based)**: `graphicsmagick`, `icnsutils`, `xz-utils`

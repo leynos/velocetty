@@ -11,7 +11,7 @@ export const install = (fn: (err: string | null) => void) => {
     const env = {
       ...process.env,
       NODE_ENV: 'production',
-      ELECTRON_RUN_AS_NODE: 'true'
+      BUN_INSTALL_CACHE_DIR: plugs.cache
     };
     spawnQueue.push((end) => {
       const cmd = [bun].concat(args).join(' ');
@@ -41,7 +41,7 @@ export const install = (fn: (err: string | null) => void) => {
     spawnQueue.start();
   }
 
-  bunFn(['install', '--no-save', '--production', '--cache-dir', plugs.cache, '--no-progress'], (err) => {
+  bunFn(['install', '--production', '--silent'], (err) => {
     if (err) {
       return fn(err);
     }

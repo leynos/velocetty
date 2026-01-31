@@ -84,14 +84,6 @@ jobs:
       - name: Run E2E Tests
         if: runner.os != 'Linux'
         run: bun run test:e2e
-      - name: Debug Linux Electron bundle
-        if: runner.os == 'Linux'
-        run: |
-          set -euxo pipefail
-          ls -la dist
-          ls -la dist/linux-unpacked
-          file dist/linux-unpacked/hyper || true
-          ldd dist/linux-unpacked/hyper || true
       - name: Run E2E Tests on Linux
         if: runner.os == 'Linux'
         uses: GabrielBB/xvfb-action@v1.7
@@ -99,6 +91,14 @@ jobs:
           run: bun run test:e2e
         env:
           SHELL: /bin/bash
+      - name: Debug Linux Electron bundle
+        if: failure() && runner.os == 'Linux'
+        run: |
+          set -euxo pipefail
+          ls -la dist
+          ls -la dist/linux-unpacked
+          file dist/linux-unpacked/hyper || true
+          ldd dist/linux-unpacked/hyper || true
       - name: Archive E2E test screenshot
         uses: actions/upload-artifact@v6
         with:

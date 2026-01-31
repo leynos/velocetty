@@ -1,3 +1,12 @@
+<!--
+@file docs/execplans/remove-yarn-dependencies.md
+Purpose: Track the execution plan for replacing Yarn with Bun across scripts,
+continuous integration (CI), and runtime integration.
+Invariants: Keep constraints, tolerances, risks, progress, surprises &
+discoveries, decision log, and outcomes updated as work proceeds.
+Cross-links: docs/documentation-style-guide.md, README.md, PLUGINS.md
+-->
+
 # Replace Yarn Usage With Bun
 
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
@@ -10,10 +19,11 @@ No `PLANS.md` exists in the repository at the time of writing.
 
 ## Purpose / Big Picture
 
-Eliminate Yarn from scripts, CI, and runtime integration so the repository and
-application rely on Bun instead. Success is observable when CI workflows use
-Bun only, developer documentation references Bun, `bin/yarn-standalone.js` is
-removed, and runtime code that previously invoked Yarn now uses Bun.
+Eliminate Yarn from scripts, continuous integration (CI), and runtime
+integration so the repository and application rely on Bun instead. Success is
+observable when CI workflows use Bun only, developer documentation references
+Bun, `bin/yarn-standalone.js` is removed, and runtime code that previously
+invoked Yarn now uses Bun.
 
 ## Constraints
 
@@ -26,15 +36,15 @@ removed, and runtime code that previously invoked Yarn now uses Bun.
 - Do not introduce new external dependencies.
 - Preserve existing behaviour of scripts (same script names, same command
   order).
-- Do not change user-facing CLI command names unless explicitly requested.
+- Do not change user-facing command-line interface (CLI) command names unless
+  explicitly requested.
 
 ## Tolerances (Exception Triggers)
 
 - Scope: if more than 20 files or more than 130k net lines must change, stop
   and escalate. (Removing `bin/yarn-standalone.js` is expected to dominate the
   line count.)
-- Interface: if any public CLI interface or script name must change, stop and
-  escalate.
+- Interface: if any public CLI or script name must change, stop and escalate.
 - Dependencies: if a new dependency or GitHub Action is required beyond
   `oven-sh/setup-bun@v2`, stop and escalate.
 - Iterations: if lint or tests fail after two remediation attempts, stop and
@@ -148,9 +158,9 @@ Key locations affected by the Yarn removal:
 
 Stage A: confirm scope and inventory.
 Run `rg -n "yarn"` across scripts, CI, and runtime code. Use Leta to trace
-where `paths.yarn` is referenced so we can update all call sites. If we find
-runtime usage that depends on a bundled package manager, decide whether to
-bundle Bun or require a system install; if this is unclear, escalate.
+where `paths.yarn` is referenced so all call sites can be updated. If runtime
+usage depends on a bundled package manager, decide whether to bundle Bun or
+require a system install; if this is unclear, escalate.
 
 Stage B: remove Yarn runtime assets.
 Delete `bin/yarn-standalone.js` and remove references in configs such as
@@ -262,5 +272,5 @@ review and future debugging.
 removals, and recorded Bun install decisions; remaining work is validation.
 2026-01-30: Logged validation results and the typecheck fallback used when the
 `check:types` script was missing.
-2026-01-30: Marked plan complete and summarised outcomes after validation.
+2026-01-30: Marked plan complete and summarized outcomes after validation.
 2026-01-30: Added Bun binary bundling and updated runtime paths and outcomes.

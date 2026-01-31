@@ -1,8 +1,5 @@
-diff --git a/node_modules/leveldown/.bun-tag-3df30fe93402c17e b/.bun-tag-3df30fe93402c17e
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/package.json b/package.json
-index 9b0b6465b9fddab8206e1617336cea784eb4657a..c79c7f53350346bb8f115c02cf72744af1beef3a 100644
+index 9b0b6465b9fddab8206e1617336cea784eb4657a..3b5061de9b69b4423325f7b4e55d0161d32c8c7b 100644
 --- a/package.json
 +++ b/package.json
 @@ -5,7 +5,7 @@
@@ -10,7 +7,7 @@ index 9b0b6465b9fddab8206e1617336cea784eb4657a..c79c7f53350346bb8f115c02cf72744a
    "main": "leveldown.js",
    "scripts": {
 -    "install": "node-gyp-build",
-+    "install": "node -e \"require('node-gyp-build/bin.js')\"",
++    "install": "node-gyp-build",
      "test": "standard && (nyc -s tape test/*-test.js | faucet) && nyc report",
      "test-gc": "node --expose-gc test/gc.js",
      "test-electron": "electron test/electron.js",

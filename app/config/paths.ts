@@ -1,4 +1,5 @@
 // This module exports paths, names, and other metadata that is referenced
+import {execSync} from 'node:child_process';
 import {statSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {resolve, join} from 'node:path';
@@ -54,15 +55,29 @@ const plugs = {
   local: resolve(plugins, 'local'),
   cache: resolve(plugins, 'cache')
 };
+/** The Bun executable name for the current platform. */
 const bunExecutable = process.platform === 'win32' ? 'bun.exe' : 'bun';
+/** The Bun binary bundled alongside packaged app assets. */
 const bundledBun = resolve(__dirname, '../../bin', bunExecutable);
-let bun = process.env.BUN_PATH ?? bundledBun;
+/** Resolved Bun binary used for plugin installs. */
+const bun = (() => {
+  const bunCandidate = process.env.BUN_PATH ?? bundledBun;
 
-try {
-  statSync(bun);
-} catch (_err) {
-  bun = 'bun';
-}
+  try {
+    statSync(bunCandidate);
+    return bunCandidate;
+  } catch (_err) {
+    // Ignore missing bundled binary; fall back to PATH probe.
+  }
+
+  try {
+    execSync(`${bunExecutable} --version`, {stdio: 'ignore'});
+    return bunExecutable;
+  } catch (_err) {
+    console.warn('Bun binary not found. Set BUN_PATH or ensure Bun is on PATH to enable plugin installs.');
+    return bunExecutable;
+  }
+})();
 const cliScriptPath = resolve(__dirname, '../../bin/hyper');
 const cliLinkPath = '/usr/local/bin/hyper';
 

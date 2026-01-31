@@ -9,6 +9,9 @@ const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 const {expect, test} = require('bun:test');
 
+const avaUnitTimeoutMs = 30_000;
+const avaE2eTimeoutMs = 120_000;
+
 function resolveAvaCliPath() {
   const avaPackagePath = require.resolve('ava/package.json');
   return path.join(path.dirname(avaPackagePath), 'entrypoints', 'cli.mjs');
@@ -28,12 +31,20 @@ function runAvaSuite(configFile) {
   expect(result.status ?? 1).toBe(0);
 }
 
-test('AVA unit suite passes', () => {
-  runAvaSuite('ava.config.js');
-});
+test(
+  'AVA unit suite passes',
+  () => {
+    runAvaSuite('ava.config.js');
+  },
+  avaUnitTimeoutMs
+);
 
 const e2eTest = process.env.RUN_E2E === '1' ? test : test.skip;
 
-e2eTest('AVA e2e suite passes', () => {
-  runAvaSuite('ava-e2e.config.js');
-});
+e2eTest(
+  'AVA e2e suite passes',
+  () => {
+    runAvaSuite('ava-e2e.config.js');
+  },
+  avaE2eTimeoutMs
+);

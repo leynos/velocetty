@@ -28,8 +28,9 @@ const buildPlatformMap = {
 const buildPlatform = buildPlatformMap[process.platform];
 const bunBinaryName = process.platform === 'win32' ? 'bun.exe' : 'bun';
 const bunSource = process.execPath;
+const isBunRuntime = Boolean(process.versions?.bun);
 
-if (buildPlatform) {
+if (buildPlatform && isBunRuntime) {
   const bunTargetDir = resolve(__dirname, '..', 'build', buildPlatform);
   const bunTarget = resolve(bunTargetDir, bunBinaryName);
 
@@ -43,9 +44,10 @@ if (buildPlatform) {
       chmodSync(bunTarget, 0o755);
     }
   } catch (error) {
-    console.error('Failed to stage Bun binary for packaging:', error);
-    process.exit(1);
+    console.warn('Failed to stage Bun binary for packaging:', error);
   }
+} else if (buildPlatform && !isBunRuntime) {
+  console.warn('Skipping Bun staging because the runner is not Bun.');
 }
 
 if (!existsSync(electronBuilderCli)) {

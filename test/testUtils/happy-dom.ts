@@ -13,7 +13,9 @@ let happyDomModule: Promise<HappyDomModule> | null = null;
 
 const loadHappyDom = (): Promise<HappyDomModule> => {
   if (!happyDomModule) {
-    // Use runtime import to avoid ts-node transpiling to require().
+    // Use runtime import to avoid ts-node transpiling to require(). This uses
+    // indirect eval, which is acceptable in test-only code and can be removed
+    // once these tests run under Bun's native TypeScript execution.
     happyDomModule = new Function('return import("happy-dom")')() as Promise<HappyDomModule>;
   }
   return happyDomModule;

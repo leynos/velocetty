@@ -2,12 +2,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const localBinDir = path.resolve(__dirname, '..', 'node_modules', '.bin');
-const globalBinDir = process.env.BUN_INSTALL ? path.join(process.env.BUN_INSTALL, 'bin') : null;
 
 const unixShim = `#!/usr/bin/env node
 const path = require('node:path');
 
-const candidates = [process.cwd()];
+const candidates = [process.cwd(), path.resolve(__dirname, '..')];
 if (process.env.INIT_CWD) {
   candidates.push(process.env.INIT_CWD);
 }
@@ -17,7 +16,9 @@ for (const base of candidates) {
   try {
     resolved = require.resolve('node-gyp-build/bin.js', { paths: [base] });
     break;
-  } catch {}
+  } catch {
+    // Ignore resolution failures to allow trying the next candidate path.
+  }
 }
 
 if (!resolved) {
@@ -34,8 +35,8 @@ const windowsShim = [
   'set CANDIDATES=%CD%',
   'if not "%INIT_CWD%"=="" set CANDIDATES=%CANDIDATES%;%INIT_CWD%',
   'for %%G in ("%CANDIDATES:;=" "%") do (',
-  '  if exist "%%~G\\\\node_modules\\\\node-gyp-build\\\\bin.js" (',
-  '    node "%%~G\\\\node_modules\\\\node-gyp-build\\\\bin.js" %*',
+  '  if exist "%%~G\\node_modules\\node-gyp-build\\bin.js" (',
+  '    node "%%~G\\node_modules\\node-gyp-build\\bin.js" %*',
   '    exit /b %errorlevel%',
   '  )',
   ')',
@@ -63,4 +64,3 @@ const writeShim = (binDir) => {
 };
 
 writeShim(localBinDir);
-writeShim(globalBinDir);
