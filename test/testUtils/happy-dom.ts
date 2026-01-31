@@ -11,10 +11,10 @@ type RpcStub = {
 
 let happyDomModule: Promise<HappyDomModule> | null = null;
 
-const loadHappyDom = () => {
+const loadHappyDom = (): Promise<HappyDomModule> => {
   if (!happyDomModule) {
     // Use runtime import to avoid ts-node transpiling to require().
-    happyDomModule = new Function('return import("happy-dom")')();
+    happyDomModule = new Function('return import("happy-dom")')() as Promise<HappyDomModule>;
   }
   return happyDomModule;
 };
