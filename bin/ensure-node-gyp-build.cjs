@@ -3,7 +3,7 @@ const path = require('node:path');
 
 const localBinDir = path.resolve(__dirname, '..', 'node_modules', '.bin');
 
-const unixShim = `#!/usr/bin/env node
+const unixShim = `#!/usr/bin/env bun
 const path = require('node:path');
 
 const candidates = [process.cwd(), path.resolve(__dirname, '..')];
@@ -36,7 +36,7 @@ const windowsShim = [
   'if not "%INIT_CWD%"=="" set CANDIDATES=%CANDIDATES%;%INIT_CWD%',
   'for %%G in ("%CANDIDATES:;=" "%") do (',
   '  if exist "%%~G\\node_modules\\node-gyp-build\\bin.js" (',
-  '    node "%%~G\\node_modules\\node-gyp-build\\bin.js" %*',
+  '    bun "%%~G\\node_modules\\node-gyp-build\\bin.js" %*',
   '    exit /b %errorlevel%',
   '  )',
   ')',

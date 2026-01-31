@@ -27,8 +27,8 @@ const buildPlatformMap = {
 };
 const buildPlatform = buildPlatformMap[process.platform];
 const bunBinaryName = process.platform === 'win32' ? 'bun.exe' : 'bun';
-const bunSource = process.execPath;
 const isBunRuntime = Boolean(process.versions?.bun);
+const bunSource = isBunRuntime ? process.execPath : null;
 
 if (buildPlatform && isBunRuntime) {
   const bunTargetDir = resolve(__dirname, '..', 'build', buildPlatform);
@@ -36,8 +36,8 @@ if (buildPlatform && isBunRuntime) {
 
   try {
     mkdirSync(bunTargetDir, {recursive: true});
-    if (!existsSync(bunSource)) {
-      throw new Error(`Bun binary not found at ${bunSource}.`);
+    if (!bunSource || !existsSync(bunSource)) {
+      throw new Error(`Bun binary not found at ${bunSource ?? 'unknown path'}.`);
     }
     copyFileSync(bunSource, bunTarget);
     if (process.platform !== 'win32') {
