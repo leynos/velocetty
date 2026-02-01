@@ -27,8 +27,7 @@ test.serial('updater wires update handlers and emits', async (t) => {
   let updateHandler: UpdateHandler | null = null;
 
   type AutoUpdaterStub = {
-    on(event: UpdateEvent, handler: UpdateHandler): AutoUpdaterStub;
-    on(event: 'error', handler: ErrorHandler): AutoUpdaterStub;
+    on: (event: UpdateEvent | 'error', handler: UpdateHandler | ErrorHandler) => AutoUpdaterStub;
     removeListener: () => AutoUpdaterStub;
     setFeedURL: () => void;
     checkForUpdates: () => void;
