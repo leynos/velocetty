@@ -11,8 +11,11 @@ test.serial('updater wires update handlers and emits', async (t) => {
     process.env.NODE_ENV = originalNodeEnv;
   });
 
+  /** Update lifecycle events that trigger renderer notifications. */
   type UpdateEvent = 'update-available' | 'update-downloaded';
+  /** AutoUpdater event payload subset used by this test. */
   type UpdateEventPayload = Pick<Electron.Event, 'preventDefault'>;
+  /** Handler signature for update event callbacks. */
   type UpdateHandler = (
     event: UpdateEventPayload,
     releaseNotes: string,
@@ -20,14 +23,17 @@ test.serial('updater wires update handlers and emits', async (t) => {
     releaseDate: Date,
     updateUrl?: string
   ) => void;
+  /** Handler signature for autoUpdater error callbacks. */
   type ErrorHandler = (error: Error) => void;
 
   const emitCalls: Array<[string, Record<string, unknown>]> = [];
   let updateEvent: UpdateEvent | null = null;
   let updateHandler: UpdateHandler | null = null;
 
+  /** Argument tuple variants supported by the autoUpdater on() stub. */
   type AutoUpdaterOnArgs = ['error', ErrorHandler] | [UpdateEvent, UpdateHandler];
 
+  /** Minimal autoUpdater surface needed by the updater wiring test. */
   type AutoUpdaterStub = {
     on: (...args: AutoUpdaterOnArgs) => AutoUpdaterStub;
     removeListener: () => AutoUpdaterStub;
@@ -89,8 +95,18 @@ test.serial('updater wires update handlers and emits', async (t) => {
 
   updater(winStub);
 
-  const registeredEvent: UpdateEvent = updateEvent ?? t.fail('Expected update event to be registered.');
-  const registeredHandler: UpdateHandler = updateHandler ?? t.fail('Expected update handler to be registered.');
+  if (updateEvent == null) {
+    t.fail('Expected update event to be registered.');
+    return;
+  }
+
+  if (updateHandler == null) {
+    t.fail('Expected update handler to be registered.');
+    return;
+  }
+
+  const registeredEvent: UpdateEvent = updateEvent;
+  const registeredHandler: UpdateHandler = updateHandler;
 
   const expectedEvent: UpdateEvent = process.platform === 'linux' ? 'update-available' : 'update-downloaded';
   t.true(registeredEvent === expectedEvent);
