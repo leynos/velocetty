@@ -71,6 +71,7 @@
         "@types/ms": "^0.7.34",
         "@types/node": "^16.18.113",
         "@types/plist": "^3.0.5",
+        "@types/proxyquire": "^1.3.31",
         "@types/react": "^18.2.79",
         "@types/react-dom": "^18.2.25",
         "@types/seamless-immutable": "^7.1.19",
@@ -386,6 +387,8 @@
     "@types/plist": ["@types/plist@3.0.5", "", { "dependencies": { "@types/node": "*", "xmlbuilder": ">=11.0.1" } }, "sha512-E6OCaRmAe4WDmWNsL/9RMqdkkzDCY1etutkflWk4c+AcjDU07Pcz1fQwTX0TQz+Pxqn9i4L1TU3UFpjnrcDgxA=="],
 
     "@types/prop-types": ["@types/prop-types@15.7.3", "", {}, "sha512-KfRL3PuHmqQLOG+2tGpRO26Ctg+Cq1E01D2DMriKEATHgWLfeNDmq9e29Q9WIky0dQ3NPkd1mzYH8Lm936Z9qw=="],
+
+    "@types/proxyquire": ["@types/proxyquire@1.3.31", "", {}, "sha512-uALowNG2TSM1HNPMMOR0AJwv4aPYPhqB0xlEhkeRTMuto5hjoSPZkvgu1nbPUkz3gEPAHv4sy4DmKsurZiEfRQ=="],
 
     "@types/react": ["@types/react@18.2.79", "", { "dependencies": { "@types/prop-types": "*", "csstype": "^3.0.2" } }, "sha512-RwGAGXPl9kSXwdNTafkOEuFrTBD5SA2B3iEB96xi8+xu5ddUa/cpvyVCSNn+asgLCTHkb5ZxN8gbuibYJi4s1w=="],
 

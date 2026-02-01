@@ -1,7 +1,8 @@
 /** @file Verifies updater wiring for autoUpdater events. */
+import proxyquire from 'proxyquire';
 import test from 'ava';
 
-const proxyquire: typeof import('proxyquire') = require('proxyquire').noCallThru();
+const proxyquireStrict = proxyquire.noCallThru();
 
 test.serial('updater wires update handlers and emits', async (t) => {
   const originalNodeEnv = process.env.NODE_ENV;
@@ -47,7 +48,8 @@ test.serial('updater wires update handlers and emits', async (t) => {
       if (args[0] === 'error') {
         return autoUpdater;
       }
-      const [event, handler] = args;
+      const updateArgs = args as [UpdateEvent, UpdateHandler];
+      const [event, handler] = updateArgs;
       updateEvent = event;
       updateHandler = handler;
       return autoUpdater;
@@ -75,7 +77,7 @@ test.serial('updater wires update handlers and emits', async (t) => {
     on: () => {}
   };
 
-  const updater = proxyquire('../../app/updater', {
+  const updater = proxyquireStrict('../../app/updater', {
     electron: {
       autoUpdater,
       app: appStub
