@@ -4,7 +4,7 @@ import {createRoot} from 'react-dom/client';
 // react-dom/test-utils is required until React 18.3+ exposes act from react.
 import {act} from 'react-dom/test-utils';
 
-import test from 'ava';
+import {expect, test} from 'bun:test';
 
 import Notification from '../../lib/components/notification';
 import {setupHappyDom} from '../testUtils/happy-dom';
@@ -17,7 +17,7 @@ const dispatchOpacityTransition = (indicator: Element) => {
   indicator.dispatchEvent(event);
 };
 
-test.serial('Notification auto-dismisses after the timeout on mount', async (t) => {
+test.serial('Notification auto-dismisses after the timeout on mount', async () => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -41,22 +41,22 @@ test.serial('Notification auto-dismisses after the timeout on mount', async (t) 
     await waitFor(dismissAfterMs + bufferMs);
   });
   const indicator = container.querySelector('.notification_indicator');
-  t.truthy(indicator);
+  expect(indicator).toBeTruthy();
   if (!indicator) {
-    t.fail('Expected notification indicator to be present.');
+    throw new Error('Expected notification indicator to be present.');
   } else {
     await act(async () => {
       dispatchOpacityTransition(indicator);
     });
   }
 
-  t.is(dismissCount, 1);
+  expect(dismissCount).toBe(1);
 
   root.unmount();
   cleanup();
 });
 
-test.serial('Notification resets the timer when text changes', async (t) => {
+test.serial('Notification resets the timer when text changes', async () => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -93,27 +93,27 @@ test.serial('Notification resets the timer when text changes', async (t) => {
     await waitFor(50);
   });
   const indicator = container.querySelector('.notification_indicator');
-  t.truthy(indicator);
+  expect(indicator).toBeTruthy();
   if (!indicator) {
-    t.fail('Expected notification indicator to be present.');
+    throw new Error('Expected notification indicator to be present.');
   } else {
     await act(async () => {
       dispatchOpacityTransition(indicator);
     });
   }
-  t.is(dismissCount, 0);
+  expect(dismissCount).toBe(0);
 
   await act(async () => {
     await waitFor(40);
   });
   if (!indicator) {
-    t.fail('Expected notification indicator to be present.');
+    throw new Error('Expected notification indicator to be present.');
   } else {
     await act(async () => {
       dispatchOpacityTransition(indicator);
     });
   }
-  t.is(dismissCount, 1);
+  expect(dismissCount).toBe(1);
 
   root.unmount();
   cleanup();

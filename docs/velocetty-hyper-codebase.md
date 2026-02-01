@@ -1524,7 +1524,7 @@ Base Configuration (tsconfig.base.json):
 
 | Language | Usage | Locations |
 |----------|-------|-----------|
-| **JavaScript** | Configuration files, legacy interop | `release.js`, AVA test configs |
+| **JavaScript** | Configuration files, legacy interop | `release.js`, `scripts/` |
 | **JSON** | Configuration, schemas, package manifests | `package.json`, `schema.json`, `*.json` keymaps |
 | **CSS** | Styling within styled-jsx templates | Embedded in React components |
 
@@ -2058,17 +2058,16 @@ bun run dist       # Build + electron-builder packaging
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| **AVA** | 6.1.2 | Unit test runner (parallel execution) |
+| **Bun test runner** | 1.3.7 | Unit test runner (Jest-compatible) |
 | **Playwright** | 1.43.1 | End-to-end testing for packaged application |
-| **ts-node** | 10.9.2 | TypeScript execution for test files |
-| **proxyquire** | 2.1.3 | Module mocking for unit tests |
+| **Bun `mock.module`** | 1.3.7 | Module mocking for unit tests |
 
 #### Test Configurations
 
 | Configuration | Location | Timeout | Purpose |
 |---------------|----------|---------|---------|
-| `ava.config.js` | `test/unit/` | Default | Unit tests |
-| `ava-e2e.config.js` | `test/e2e/` | 30 seconds | End-to-end tests |
+| `*.test.ts` | `test/unit/` | Default | Unit tests |
+| `*.test.ts` | `test/e2e/` | 30 seconds | End-to-end tests (gated) |
 
 ### 3.6.6 Code Quality Tools
 
@@ -7096,7 +7095,7 @@ flowchart TB
         
         subgraph QualityAssurance["Quality Assurance Pipeline"]
             CodeQL["CodeQL Analysis<br/>Security Scanning"]
-            UnitTests["AVA Unit Tests<br/>Core Logic Validation"]
+            UnitTests["Bun Unit Tests<br/>Core Logic Validation"]
             E2ETests["Playwright E2E<br/>Application Smoke Tests"]
             Dependabot["Dependabot<br/>Dependency Security"]
         end
@@ -7641,7 +7640,7 @@ flowchart TB
         InstallDeps["bun install<br/>(with caching)"]
         LintCheck["bun lint"]
         BuildApp["bun run build"]
-        UnitTests["bun test<br/>(AVA)"]
+        UnitTests["bun test<br/>Unit Tests"]
         E2ETests["bun test:e2e<br/>(Playwright)"]
     end
     
@@ -7718,7 +7717,7 @@ flowchart LR
 
 | Test Type | Framework | Coverage Area |
 |-----------|-----------|---------------|
-| Unit Tests | AVA 6.1.2 | Core logic, utilities |
+| Unit Tests | Bun test runner 1.3.7 | Core logic, utilities |
 | E2E Tests | Playwright 1.43.1 | Application smoke tests |
 | Lint Checks | ESLint 8.57.0 | Code quality standards |
 | Type Checking | TypeScript 5.4.5 | Static type analysis |
@@ -7925,7 +7924,7 @@ flowchart TB
 - `lib/utils/` - Utility modules including RPC and plugins
 - `lib/components/` - UI components including terminal renderer
 - `.github/workflows/` - CI/CD workflow definitions
-- `test/` - Test suite structure (AVA unit tests, Playwright E2E)
+- `test/` - Test suite structure (Bun unit tests, Playwright E2E)
 
 #### Technical Specification Sections Referenced
 
@@ -7961,9 +7960,8 @@ Unlike web applications requiring API testing, load testing, or multi-tenant sce
 flowchart TB
     subgraph TestingLayers["Velocetty Testing Architecture"]
         subgraph UnitTestLayer["Unit Testing Layer"]
-            AVA["AVA 6.1.2<br/>Test Runner"]
-            Proxyquire["proxyquire 2.1.3<br/>Module Mocking"]
-            TSNode["ts-node 10.9.2<br/>TypeScript Execution"]
+            BunTest["Bun test runner 1.3.7<br/>Unit Tests"]
+            BunMocks["Bun mock.module<br/>Module Mocking"]
         end
         
         subgraph E2ETestLayer["End-to-End Testing Layer"]
@@ -8002,10 +8000,9 @@ flowchart TB
 
 | Tool | Version | Purpose | Configuration |
 |------|---------|---------|---------------|
-| AVA | 6.1.2 | Unit test runner with parallel execution | `ava.config.js` |
-| Playwright | 1.43.1 | E2E testing for Electron applications | `ava-e2e.config.js` |
-| proxyquire | 2.1.3 | Module mocking and dependency injection | Inline configuration |
-| ts-node | 10.9.2 | TypeScript execution for test files | `transpile-only` mode |
+| Bun test runner | 1.3.7 | Unit test runner (Jest-compatible) | `bun test` |
+| Playwright | 1.43.1 | E2E testing for Electron applications | `test/e2e/*.test.ts` |
+| Bun `mock.module` | 1.3.7 | Module mocking and dependency injection | `mock.module()` |
 | Biome | 2.3.13 | Static analysis and formatting | `biome.json` |
 | TypeScript | 5.4.5 | Static type checking | `tsconfig.base.json` |
 | CodeQL | v3 | Security vulnerability scanning | `codeql-analysis.yml` |
@@ -8017,17 +8014,17 @@ flowchart TB
 
 #### 6.6.2.1 Testing Framework Configuration
 
-Velocetty uses **AVA** as its unit testing framework, chosen for its parallel test execution capabilities and native TypeScript support via ts-node.
+Velocetty uses Bun's built-in test runner for unit tests. Unit tests live in
+`test/unit/` and follow the `*.test.ts` naming convention used by Bun's
+default discovery. Bun executes TypeScript directly; type checking remains a
+separate step via `bun run check:types`.
 
-#### AVA Configuration (`ava.config.js`)
+#### Bun test discovery (unit)
 
 | Setting | Value | Purpose |
 |---------|-------|---------|
-| `files` | `['test/unit/*']` | Test file discovery pattern |
-| `extensions` | `['ts']` | TypeScript file recognition |
-| `require` | `['ts-node/register/transpile-only']` | TypeScript compilation without type checking |
-
-The `transpile-only` mode enables faster test execution by skipping type validation during test runs, delegating type checking to the separate TypeScript compilation step in CI.
+| Test root | `test/unit/` | Unit test directory |
+| File pattern | `*.test.ts` | Default Bun discovery |
 
 #### 6.6.2.2 Test Organization Structure
 
@@ -8037,7 +8034,7 @@ flowchart TB
         TestRoot["test/"]
         UnitDir["test/unit/"]
         UtilsDir["test/testUtils/"]
-        E2EIndex["test/index.ts"]
+        E2EIndex["test/e2e/electron.e2e.test.ts"]
     end
     
     subgraph UnitTests["Unit Test Files"]
@@ -8069,20 +8066,21 @@ flowchart TB
 
 #### 6.6.2.3 Mocking Strategy
 
-Velocetty employs **proxyquire** for module-level dependency injection, enabling isolation of external dependencies without modifying production code.
+Velocetty employs Bun's `mock.module()` API for module-level dependency
+injection, enabling isolation of external dependencies without modifying
+production code.
 
 #### Mocking Pattern Implementation
 
 ```mermaid
 sequenceDiagram
     participant Test as Test File
-    participant Proxyquire as proxyquire
+    participant BunMock as Bun mock.module
     participant Module as Module Under Test
     participant Stub as Mock Stubs
     
-    Test->>Proxyquire: proxyquire().noCallThru()
-    Test->>Proxyquire: Define dependency stubs
-    Proxyquire->>Module: Load with injected stubs
+    Test->>BunMock: mock.module('dep', stub)
+    Test->>Module: import() after mocks
     Module->>Stub: Call mocked dependencies
     Stub->>Module: Return controlled responses
     Module->>Test: Return testable result
@@ -8101,7 +8099,7 @@ sequenceDiagram
 
 | Practice | Implementation | Evidence |
 |----------|----------------|----------|
-| No call-through | `.noCallThru()` pattern | Prevents accidental real I/O |
+| Register mocks early | `mock.module()` before `import()` | Prevents accidental real I/O |
 | Inline stubs | Object literal syntax | Clear dependency specification |
 | Promise mocking | `Promise.resolve()` returns | Async API simulation |
 | Capture arguments | Variable assignment in stubs | URL verification |
@@ -8112,7 +8110,7 @@ sequenceDiagram
 |------------|---------|---------|
 | Test files | `*.test.ts` | `cli-api.test.ts` |
 | Test descriptions | Verb + expected behavior | `'existsOnNpm() builds the url for scoped packages'` |
-| Assertion style | AVA's `t.is()`, `t.true()` | `t.is(getUrl, expectedUrl)` |
+| Assertion style | Bun `expect()` matchers | `expect(getUrl).toBe(expectedUrl)` |
 
 #### 6.6.2.5 Test Data Management
 
@@ -8198,20 +8196,22 @@ flowchart TB
 
 #### 6.6.4.1 E2E Testing Framework
 
-Velocetty uses **Playwright** with AVA integration for end-to-end testing. Playwright has experimental Electron support via Electron's support for the Chrome DevTools Protocol (CDP).
+Velocetty uses **Playwright** within Bun's test runner for end-to-end
+testing. Playwright has experimental Electron support via Electron's support
+for the Chrome DevTools Protocol (CDP).
 
-#### E2E Configuration (`ava-e2e.config.js`)
+#### E2E configuration (Bun test)
 
 | Setting | Value | Purpose |
 |---------|-------|---------|
-| `files` | `['test/*']` | E2E test discovery (root test directory) |
-| `extensions` | `['ts']` | TypeScript file support |
-| `require` | `['ts-node/register/transpile-only']` | Fast TypeScript execution |
-| `timeout` | `'30s'` | Extended timeout for application launch |
+| Test directory | `test/e2e/` | E2E test discovery |
+| File pattern | `*.test.ts` | Default Bun discovery |
+| Timeout | `30_000 ms` | Per-test timeout for app launch |
+| Environment gate | `RUN_E2E=1` | Skip by default |
 
 #### 6.6.4.2 E2E Test Scenarios
 
-#### Current Smoke Test Implementation (`test/index.ts`)
+#### Current Smoke Test Implementation (`test/e2e/electron.e2e.test.ts`)
 
 The E2E suite implements a single comprehensive smoke test that validates the packaged application:
 
@@ -8367,9 +8367,9 @@ flowchart TB
 | Script | Command | Scope |
 |--------|---------|-------|
 | `test` | `bun run lint && bun run test:unit` | Full test suite (lint + unit) |
-| `test:unit` | `ava` | Unit tests only |
-| `test:unit:watch` | `ava --watch` | Development watch mode |
-| `test:e2e` | `ava --config ava-e2e.config.js` | End-to-end tests |
+| `test:unit` | `bun test test/unit` | Unit tests only |
+| `test:unit:watch` | `bun test --watch test/unit` | Development watch mode |
+| `test:e2e` | `RUN_E2E=1 bun test test/e2e` | End-to-end tests |
 
 #### 6.6.5.3 Automated Test Triggers
 
@@ -8382,13 +8382,13 @@ flowchart TB
 
 #### 6.6.5.4 Parallel Test Execution
 
-AVA provides built-in parallel test execution:
+Bun runs tests in a single process by default, with opt-in concurrency:
 
-| Feature | AVA Implementation | Benefit |
+| Feature | Bun implementation | Benefit |
 |---------|-------------------|---------|
-| Process isolation | Separate Node.js processes per test file | Prevents test pollution |
-| Concurrent execution | Default parallel mode | Faster test runs |
-| Serial fallback | `test.serial()` | When isolation required |
+| Default order | Sequential test execution | Deterministic runs |
+| Concurrent execution | `--concurrent`, `test.concurrent()` | Faster async tests |
+| Serial fallback | `test.serial()` | Protect shared state |
 
 #### 6.6.5.5 Test Reporting and Artifacts
 
@@ -8433,7 +8433,7 @@ flowchart TB
 | E2E stabilization delay | 5-second wait after window open | Active |
 | Extended timeout | 30-second E2E timeout | Active |
 | Screenshot on failure | Always capture artifacts | Active |
-| Test isolation | Process isolation via AVA | Active |
+| Test isolation | Single-process runner; use `test.serial` | Active |
 | Retry mechanism | Not implemented | Future consideration |
 
 ---
@@ -8539,7 +8539,7 @@ flowchart TB
     subgraph QualityGates["Quality Gates Pipeline"]
         Gate1["Gate 1: Lint<br/>ESLint + Prettier"]
         Gate2["Gate 2: Type Check<br/>TypeScript Compilation"]
-        Gate3["Gate 3: Unit Tests<br/>AVA Test Suite"]
+        Gate3["Gate 3: Unit Tests<br/>Bun Test Suite"]
         Gate4["Gate 4: Build<br/>Webpack + Packaging"]
         Gate5["Gate 5: E2E<br/>Playwright Smoke"]
         Gate6["Gate 6: Security<br/>CodeQL Scan"]
@@ -8569,7 +8569,7 @@ flowchart TB
 |--------|--------|----------------|--------|
 | Cold start time | < 2 seconds | Manual, DevTools | Not automated |
 | Keystroke latency | < 50ms | Manual, DevTools | Not automated |
-| E2E launch time | < 30 seconds | AVA timeout | Implicit |
+| E2E launch time | < 30 seconds | Bun test timeout | Implicit |
 | Memory usage | < 300 MB (idle) | DevTools Memory | Manual only |
 
 ---
@@ -8619,7 +8619,7 @@ flowchart TB
     subgraph SourceCode["Source Code"]
         AppCode["app/ lib/ cli/"]
         TestCode["test/unit/"]
-        E2ECode["test/index.ts"]
+        E2ECode["test/e2e/"]
     end
     
     subgraph BuildArtifacts["Build Artifacts"]
@@ -8628,7 +8628,7 @@ flowchart TB
     end
     
     subgraph TestExecution["Test Execution"]
-        UnitRunner["AVA Unit Runner<br/>Tests Source Modules"]
+        UnitRunner["Bun Unit Runner<br/>Tests Source Modules"]
         E2ERunner["Playwright E2E<br/>Tests Packaged App"]
     end
     
@@ -8660,11 +8660,11 @@ The following pattern demonstrates Velocetty's approach to unit testing with moc
 
 | Pattern Element | Implementation | Purpose |
 |-----------------|----------------|---------|
-| Import test framework | `import test from 'ava'` | Access test runner |
-| Configure proxyquire | `proxyquire().noCallThru()` | Prevent real I/O |
+| Import test framework | `import {test, expect, mock} from 'bun:test'` | Access test runner |
+| Register mocks | `mock.module('../dep', () => stub)` | Prevent real I/O |
 | Define stubs | Object literal with dependency replacements | Control external behavior |
-| Load module | `proxyquire('../../module', stubs)` | Inject dependencies |
-| Assert results | `t.is(actual, expected)` | Validate behavior |
+| Load module | `await import('../../module')` | Inject dependencies |
+| Assert results | `expect(actual).toBe(expected)` | Validate behavior |
 
 #### 6.6.9.2 E2E Test Pattern Example
 
@@ -8735,10 +8735,8 @@ The following pattern demonstrates Velocetty's approach to unit testing with moc
 
 #### Files Examined
 
-- `ava.config.js` - AVA unit test configuration
-- `ava-e2e.config.js` - AVA E2E test configuration
 - `package.json` - Test scripts and dependencies
-- `test/index.ts` - E2E smoke test implementation
+- `test/e2e/electron.e2e.test.ts` - E2E smoke test implementation
 - `test/unit/cli-api.test.ts` - CLI API unit tests
 - `test/unit/window-utils.test.ts` - Window utilities unit tests
 - `test/unit/to-electron-background-color.test.ts` - Color conversion tests
@@ -8770,7 +8768,7 @@ The following pattern demonstrates Velocetty's approach to unit testing with moc
 
 - Playwright Electron Documentation: https://playwright.dev/docs/api/class-electron
 - Electron Automated Testing Guide: https://www.electronjs.org/docs/latest/tutorial/automated-testing
-- AVA Test Runner: https://github.com/avajs/ava
+- Bun test runner: <https://bun.com/docs/test>
 
 ### 6.6.12 Biome rule adoption notes
 
@@ -10113,7 +10111,7 @@ flowchart LR
     subgraph Stage3["Stage 3: Quality"]
         Lint["ESLint Check"]
         TypeCheck["TypeScript Check"]
-        UnitTests["AVA Unit Tests"]
+        UnitTests["Bun Unit Tests"]
     end
     
     subgraph Stage4["Stage 4: Build"]
@@ -10155,7 +10153,7 @@ flowchart TB
     subgraph QualityGates["Quality Gates Pipeline"]
         Gate1["Gate 1: Lint<br/>ESLint 8.57.0"]
         Gate2["Gate 2: Type Check<br/>TypeScript 5.4.5"]
-        Gate3["Gate 3: Unit Tests<br/>AVA 6.1.2"]
+        Gate3["Gate 3: Unit Tests<br/>Bun test runner"]
         Gate4["Gate 4: Build<br/>Webpack + electron-builder"]
         Gate5["Gate 5: E2E Tests<br/>Playwright 1.43.1"]
         Gate6["Gate 6: Security<br/>CodeQL Analysis"]
@@ -10183,7 +10181,7 @@ flowchart TB
 |--------------|------|----------------|
 | Lint | ESLint 8.57.0 + Prettier 3.2.5 | Job fails, PR blocked |
 | Type Check | TypeScript 5.4.5 | Build fails |
-| Unit Tests | AVA 6.1.2 | Job fails, PR blocked |
+| Unit Tests | Bun test runner 1.3.7 | Job fails, PR blocked |
 | Build | Webpack + electron-builder | Job fails |
 | E2E Tests | Playwright 1.43.1 | Job fails, screenshot captured |
 | Security | CodeQL | Security alert generated |
@@ -10905,9 +10903,9 @@ This glossary defines technical terms used throughout this Technical Specificati
 
 | Term | Definition |
 |------|------------|
-| **AVA** | Minimal JavaScript test runner with parallel execution used for unit testing |
+| **Bun test runner** | Bun's built-in Jest-compatible test runner |
 | **Playwright** | End-to-end testing framework with Electron automation support via Chrome DevTools Protocol |
-| **proxyquire** | Module mocking library for dependency injection in tests |
+| **Bun `mock.module`** | Bun's module mocking API for dependency injection in tests |
 | **Smoke Test** | Basic test validating that the application launches and operates correctly |
 | **CodeQL** | GitHub's semantic code analysis engine for vulnerability detection |
 | **Dependabot** | Automated dependency update service integrated with GitHub |
@@ -11015,7 +11013,6 @@ This section provides expanded forms of acronyms used throughout this Technical 
 
 | Acronym | Expanded Form | Context |
 |---------|---------------|---------|
-| **AVA** | (Proper noun, not an acronym) | JavaScript test runner |
 | **E2E** | End-to-End | Testing methodology |
 | **KPI** | Key Performance Indicator | Success metrics |
 | **P95** | 95th Percentile | Performance metric |

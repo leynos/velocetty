@@ -4,58 +4,91 @@ import {createRoot} from 'react-dom/client';
 // react-dom/test-utils is required until React 18.3+ exposes act from react.
 import {act} from 'react-dom/test-utils';
 
-import test from 'ava';
+import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
 
-const proxyquire = require('proxyquire').noCallThru();
-
 const waitFor = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-test.serial('Hyper attaches key listeners on mount and config updates', async (t) => {
+type TermsRef = {
+  getTermByUid: (uid: string) => {focus: () => void} | null;
+  getActiveTerm: () => {focus: () => void; selectAll?: () => void} | null;
+};
+
+let Hyper: React.ComponentType<any>;
+let registerCalls = 0;
+let bindCalls = 0;
+let resetCalls = 0;
+let registeredKeys: Record<string, string> = {};
+let termsRef: TermsRef = {
+  getTermByUid: () => null,
+  getActiveTerm: () => null
+};
+
+class MousetrapMock {
+  bind() {
+    bindCalls += 1;
+  }
+
+  reset() {
+    resetCalls += 1;
+  }
+}
+
+mock.module('../../lib/actions/ui', () => ({
+  execCommand: () => ({type: 'exec'})
+}));
+
+mock.module('../../lib/utils/plugins', () => ({
+  connect: () => (Component: React.ComponentType<unknown>) => Component
+}));
+
+mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));
+mock.module('../../lib/containers/notifications', () => ({default: () => null}));
+mock.module('../../lib/containers/terms', () => ({
+  default: (props: {ref_: (terms: TermsRef) => void}) => {
+    props.ref_(termsRef);
+    return null;
+  }
+}));
+
+mock.module('mousetrap', () => ({default: MousetrapMock}));
+
+mock.module('../../lib/command-registry', () => ({
+  getRegisteredKeys: async () => {
+    registerCalls += 1;
+    return registeredKeys;
+  },
+  getCommandHandler: () => () => {},
+  shouldPreventDefault: () => false
+}));
+
+beforeAll(async () => {
+  ({default: Hyper} = await import('../../lib/containers/hyper'));
+});
+
+beforeEach(() => {
+  registerCalls = 0;
+  bindCalls = 0;
+  resetCalls = 0;
+  registeredKeys = {};
+  termsRef = {
+    getTermByUid: () => null,
+    getActiveTerm: () => null
+  };
+});
+
+afterAll(() => {
+  mock.restore();
+});
+
+test.serial('Hyper attaches key listeners on mount and config updates', async () => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
 
-  let registerCalls = 0;
-  let bindCalls = 0;
-  let resetCalls = 0;
-
-  const Hyper = proxyquire('../../lib/containers/hyper', {
-    '../actions/ui': {
-      execCommand: () => ({type: 'exec'})
-    },
-    '../utils/plugins': {
-      connect: () => (Component: React.ComponentType<unknown>) => Component
-    },
-    './header': {HeaderContainer: () => null},
-    './notifications': () => null,
-    './terms': (props: {ref_: (terms: unknown) => void}) => {
-      props.ref_({
-        getTermByUid: () => null,
-        getActiveTerm: () => null
-      });
-      return null;
-    },
-    mousetrap: function MousetrapMock() {
-      this.bind = () => {
-        bindCalls += 1;
-      };
-      this.reset = () => {
-        resetCalls += 1;
-      };
-      return this;
-    },
-    '../command-registry': {
-      getRegisteredKeys: async () => {
-        registerCalls += 1;
-        return {demo: 'demo:command'};
-      },
-      getCommandHandler: () => () => {},
-      shouldPreventDefault: () => false
-    }
-  }).default;
+  registeredKeys = {demo: 'demo:command'};
 
   const execCommand = () => {};
 
@@ -77,9 +110,9 @@ test.serial('Hyper attaches key listeners on mount and config updates', async (t
     await waitFor(0);
   });
 
-  t.is(registerCalls, 1);
-  t.true(bindCalls > 0);
-  t.is(resetCalls, 0);
+  expect(registerCalls).toBe(1);
+  expect(bindCalls > 0).toBe(true);
+  expect(resetCalls).toBe(0);
 
   await act(async () => {
     root.render(
@@ -99,7 +132,7 @@ test.serial('Hyper attaches key listeners on mount and config updates', async (t
     await waitFor(0);
   });
 
-  t.is(registerCalls, 1);
+  expect(registerCalls).toBe(1);
 
   await act(async () => {
     root.render(
@@ -119,13 +152,13 @@ test.serial('Hyper attaches key listeners on mount and config updates', async (t
     await waitFor(0);
   });
 
-  t.is(registerCalls, 2);
+  expect(registerCalls).toBe(2);
 
   root.unmount();
   cleanup();
 });
 
-test.serial('Hyper focuses the active session when it changes', async (t) => {
+test.serial('Hyper focuses the active session when it changes', async () => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -138,33 +171,10 @@ test.serial('Hyper focuses the active session when it changes', async (t) => {
     }
   };
 
-  const Hyper = proxyquire('../../lib/containers/hyper', {
-    '../actions/ui': {
-      execCommand: () => ({type: 'exec'})
-    },
-    '../utils/plugins': {
-      connect: () => (Component: React.ComponentType<unknown>) => Component
-    },
-    './header': {HeaderContainer: () => null},
-    './notifications': () => null,
-    './terms': (props: {ref_: (terms: unknown) => void}) => {
-      props.ref_({
-        getTermByUid: (uid: string) => (uid === 'session-1' ? termStub : null),
-        getActiveTerm: () => termStub
-      });
-      return null;
-    },
-    mousetrap: function MousetrapMock() {
-      this.bind = () => {};
-      this.reset = () => {};
-      return this;
-    },
-    '../command-registry': {
-      getRegisteredKeys: async () => ({}),
-      getCommandHandler: () => () => {},
-      shouldPreventDefault: () => false
-    }
-  }).default;
+  termsRef = {
+    getTermByUid: (uid: string) => (uid === 'session-1' ? termStub : null),
+    getActiveTerm: () => termStub
+  };
 
   await act(async () => {
     root.render(
@@ -184,7 +194,7 @@ test.serial('Hyper focuses the active session when it changes', async (t) => {
     await waitFor(0);
   });
 
-  t.is(focusCalls, 0);
+  expect(focusCalls).toBe(0);
 
   await act(async () => {
     root.render(
@@ -204,7 +214,7 @@ test.serial('Hyper focuses the active session when it changes', async (t) => {
     await waitFor(0);
   });
 
-  t.is(focusCalls, 1);
+  expect(focusCalls).toBe(1);
 
   root.unmount();
   cleanup();

@@ -3,7 +3,7 @@
  * Handles timer-based auto-dismiss, transition hooks, and custom slot content
  * for the renderer notification bar.
  */
-// biome-ignore lint/style/useImportType: React value is required for JSX runtime under ts-node tests.
+// biome-ignore lint/style/useImportType: React value is required for the current JSX runtime.
 import React, {forwardRef, useCallback, useEffect, useRef, useState} from 'react';
 
 import type {NotificationProps} from '../../typings/hyper';

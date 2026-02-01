@@ -5,7 +5,7 @@ This ExecPlan is a living document. The sections `Constraints`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as
 work proceeds.
 
-Status: DRAFT
+Status: IN PROGRESS
 
 No `PLANS.md` file was found in the repository root at plan start.
 
@@ -69,20 +69,32 @@ entry for AVA removal is marked done.
 
 ## Progress
 
-- [ ] (2026-02-01 14:54Z) Draft the ExecPlan and confirm scope with the
+- [x] (2026-02-01 14:54Z) Draft the ExecPlan and confirm scope with the
   user.
-- [ ] Inventory AVA usage, test file locations, and scripts to update.
-- [ ] Convert unit and E2E tests to `bun:test` and rename files for Bun
-  discovery.
-- [ ] Remove AVA config, bridge tests, and dependencies.
-- [ ] Update documentation and roadmap entries.
-- [ ] Run format, lint, and test gates; fix any issues; commit changes.
+- [x] (2026-02-01 15:11Z) Receive approval to proceed with implementation.
+- [x] (2026-02-01 16:05Z) Inventory AVA usage, test file locations, and
+  scripts to update.
+- [x] (2026-02-01 16:20Z) Convert unit and E2E tests to `bun:test` and
+  rename files for Bun discovery.
+- [x] (2026-02-01 16:24Z) Remove AVA config, bridge tests, and dependencies.
+- [x] (2026-02-01 16:33Z) Update documentation and roadmap entries.
+- [x] (2026-02-01 18:05Z) Run format, lint, and test gates; fix any issues;
+  commit changes.
 
 ## Surprises & Discoveries
 
-- Observation: None yet.
-  Evidence: N/A.
-  Impact: N/A.
+- Observation: `bun install` runs the full postinstall pipeline (V8
+  snapshots, packaging prep, and native rebuilds), which is time-intensive.
+  Evidence: The install triggered `v8-snapshot`, `electron-builder` app
+  dependency installation, and `node-pty` rebuild steps.
+  Impact: Allow additional time for dependency updates and avoid repeating
+  installs unless necessary.
+- Observation: `proxyquire` does not reliably intercept ESM imports under
+  Bun's test runner.
+  Evidence: Bun test runs failed when proxyquire injected stubs for ESM
+  modules, leaving mocks undefined.
+  Impact: Replace proxyquire usage with Bun `mock.module()` and remove the
+  dependency.
 
 ## Decision Log
 
@@ -90,32 +102,51 @@ entry for AVA removal is marked done.
   gated behind `RUN_E2E=1` to preserve fast default runs.
   Rationale: Matches existing E2E gating while moving the runner to Bun.
   Date/Author: 2026-02-01 14:54Z, Codex.
+- Decision: Proceed with implementation after user approval.
+  Rationale: User approved the plan and requested execution.
+  Date/Author: 2026-02-01 15:11Z, Codex.
+- Decision: Keep E2E setup and teardown inside the Bun test body with an
+  explicit timeout.
+  Rationale: Ensures the per-test timeout covers packaged app startup and
+  avoids relying on implicit hook timeouts.
+  Date/Author: 2026-02-01 16:22Z, Codex.
+- Decision: Remove `bunfig.toml` after dropping the AVA preload.
+  Rationale: The file only existed to shim AVA under Bun and is no longer
+  required.
+  Date/Author: 2026-02-01 16:25Z, Codex.
+- Decision: Replace proxyquire stubs with Bun `mock.module()`.
+  Rationale: Bun's ESM loader does not support proxyquire's CommonJS
+  interception.
+  Date/Author: 2026-02-01 17:20Z, Codex.
 
 ## Outcomes & Retrospective
 
-- Pending. Populate after implementation.
+- Completed the AVA-to-Bun migration, including module mocks via Bun
+  `mock.module()`, and removed legacy AVA/proxyquire artefacts.
+- Gates passed: `make check-fmt`, `make lint`, `make test`.
+- Remaining note: Bun tests emit React `act(...)` warnings in Happy DOM,
+  but all assertions pass.
 
 ## Context and Orientation
 
-The repository currently uses AVA for unit tests and an AVA bridge test to
-run both unit and E2E suites under Bun. AVA configuration lives in
-`ava.config.js` and `ava-e2e.config.js`, and the bridge is
-`test/bun-ava-bridge.test.js`. Unit tests live under `test/unit/` with
-`.ava.ts` filenames, and the E2E test is `test/index.ts`. The Bun config
-(`bunfig.toml`) preloads `test/bun-test-preload.js`, which exists only to
-support AVA under Bun. `package.json` scripts route `test:unit` and
-`test:e2e` through the bridge. The roadmap entry `1.4.4` mentions removing
-AVA; this plan completes that requirement and marks the entry done once
-AVA is removed.
+The repository previously used AVA for unit tests and a Bun bridge test to
+run AVA under `bun test`. The migration replaces that with Bun's built-in
+test runner. Unit tests now live under `test/unit/` as `*.test.ts` files, and
+the E2E smoke test lives in `test/e2e/electron.e2e.test.ts` with
+`RUN_E2E=1` gating. Module mocking now uses Bun `mock.module()` stubs
+instead of proxyquire. AVA config and bridge files have been removed, and
+`package.json` scripts now invoke `bun test` directly. The roadmap entry
+`1.4.4` tracks the AVA removal and is marked done once the migration is
+complete.
 
 ## Plan of Work
 
 Stage A: Inventory and mapping (no code changes). Confirm all AVA usage
-via `rg` searches, review test files in `test/unit/` and `test/index.ts`,
-and map AVA constructs (`test.serial`, `test.before`, `t.teardown`,
-`t.true`, `t.false`, `t.is`, `t.deepEqual`, `t.fail`) to Bun's `test`,
-`beforeAll`, `afterAll`, `afterEach`, and `expect` equivalents. Decide on
-new filenames matching Bun discovery patterns.
+via `rg` searches, review test files in `test/unit/` and
+`test/e2e/electron.e2e.test.ts`, and map AVA constructs (`test.serial`,
+`test.before`, `t.teardown`, `t.true`, `t.false`, `t.is`, `t.deepEqual`,
+`t.fail`) to Bun's `test`, hook helpers, and `expect` equivalents. Decide
+on new filenames matching Bun discovery patterns.
 
 Stage B: Test runner migration. Rename unit test files from `*.ava.ts` to
 `*.test.ts` (or `*.spec.ts`) and update imports to `bun:test`. Replace AVA
@@ -127,11 +158,10 @@ convert its hooks to `beforeAll`/`afterAll`, and keep it gated behind
 
 Stage C: Remove AVA artefacts and update scripts. Delete `ava.config.js`,
 `ava-e2e.config.js`, `test/bun-ava-bridge.test.js`, and
-`test/bun-test-preload.js`. Update `bunfig.toml` to remove the AVA preload
-and add any new preloads if needed for Happy DOM. Update `package.json`
-scripts to run `bun test` directly for unit and E2E suites, and remove
-AVA-related devDependencies (`ava`, `@ava/babel`, `@ava/typescript`).
-Update `bun.lock` accordingly.
+`test/bun-test-preload.js`. Remove `bunfig.toml` if it only exists for the
+AVA preload. Update `package.json` scripts to run `bun test` directly for
+unit and E2E suites, and remove AVA-related devDependencies (`ava`,
+`@ava/babel`, `@ava/typescript`). Update `bun.lock` accordingly.
 
 Stage D: Documentation and roadmap updates. Create or update
 `docs/developers-guide.md` to describe the Bun test workflow (unit, E2E,
@@ -162,8 +192,7 @@ documentation changes.
 
    - Delete `ava.config.js`, `ava-e2e.config.js`,
      `test/bun-ava-bridge.test.js`, and `test/bun-test-preload.js`.
-   - Update `bunfig.toml` to remove the AVA preload and add any new
-     preloads if required.
+   - Remove `bunfig.toml` if it only exists for the AVA preload.
 
 5. Update `package.json` scripts and dependencies:
 
@@ -228,22 +257,27 @@ adding workarounds that change production code.
 Expected file changes include:
 
 - Removed: `ava.config.js`, `ava-e2e.config.js`,
-  `test/bun-ava-bridge.test.js`, `test/bun-test-preload.js`.
+  `test/bun-ava-bridge.test.js`, `test/bun-test-preload.js`,
+  `bunfig.toml`.
 - Renamed: `test/unit/*.ava.ts` to `test/unit/*.test.ts` (or `.spec.ts`).
-- Renamed/moved: `test/index.ts` to a Bun-discovered E2E test filename.
-- Updated: `package.json`, `bunfig.toml`, `bun.lock`,
-  `docs/developers-guide.md`, `docs/velocetty-hyper-codebase.md`,
-  `docs/roadmap.md`.
+- Renamed/moved: `test/index.ts` to `test/e2e/electron.e2e.test.ts`.
+- Updated: `package.json`, `bun.lock`, `docs/developers-guide.md`,
+  `docs/velocetty-hyper-codebase.md`, `docs/roadmap.md`.
 
 ## Interfaces and Dependencies
 
 - Test runner API: `bun:test` (`test`, `describe`, `beforeAll`,
   `afterAll`, `afterEach`, `expect`).
 - E2E automation: `playwright`'s Electron API (`_electron.launch`).
-- Test utilities: `proxyquire` for dependency injection, Happy DOM helpers
-  in `test/testUtils/happy-dom.ts`.
+- Test utilities: Bun `mock.module()` for dependency injection, Happy DOM
+  helpers in `test/testUtils/happy-dom.ts`.
 
 ## Revision note
 
-- 2026-02-01 14:54Z: Initial ExecPlan drafted for AVA-to-Bun migration.
-  No implementation started yet.
+- 2026-02-01 15:11Z: Status set to IN PROGRESS and approval recorded. No
+  implementation steps completed yet.
+- 2026-02-01 16:36Z: Progress, context, and decisions updated to reflect the
+  Bun migration work, including removal of the AVA preload and E2E timeout
+  handling.
+- 2026-02-01 17:20Z: Documented proxyquire removal and switch to Bun module
+  mocks.
