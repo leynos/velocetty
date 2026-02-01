@@ -40,8 +40,8 @@ jobs:
       - name: Install libarchive-tools
         if: runner.os == 'Linux'
         run: |
-          sudo apt update
-          sudo apt install libarchive-tools
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools
       - name: Lint and Run Unit Tests
         run: |
           bun run lint
@@ -84,12 +84,40 @@ jobs:
       - name: Run E2E Tests
         if: runner.os != 'Linux'
         run: bun run test:e2e
+      - name: Install Linux E2E runtime deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            xauth \
+            libasound2t64 \
+            libatk-bridge2.0-0 \
+            libatspi2.0-0 \
+            libdrm2 \
+            libgbm1 \
+            libgtk-3-0 \
+            libnss3 \
+            libx11-xcb1 \
+            libxcomposite1 \
+            libxcursor1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            libxrender1 \
+            libxkbcommon-x11-0 \
+            libxi6 \
+            libxshmfence1 \
+            libxss1 \
+            libxtst6
       - name: Run E2E Tests on Linux
         if: runner.os == 'Linux'
         uses: GabrielBB/xvfb-action@v1.7
         with:
           run: bun run test:e2e
         env:
+          DEBUG: pw:browser*
+          ELECTRON_ENABLE_LOGGING: '1'
+          ELECTRON_ENABLE_STACK_DUMPING: '1'
           SHELL: /bin/bash
       - name: Debug Linux Electron bundle
         if: failure() && runner.os == 'Linux'
@@ -145,8 +173,8 @@ jobs:
       - name: Install
         run: |
           bun install
-          sudo apt update
-          sudo apt install libarchive-tools
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools
       - name: Compile
         run: bun run build
       - name: rebuild node-pty
@@ -170,8 +198,8 @@ jobs:
         if: matrix.name == 'armv7l'
         run: |
           sudo dpkg --add-architecture i386
-          sudo apt update
-          sudo apt install -y libglib2.0-0:i386 libexpat1:i386 libgcc-s1:i386
+          sudo apt-get update
+          sudo apt-get install -y libglib2.0-0:i386 libexpat1:i386 libgcc-s1:i386
           npm_config_arch=armv7l bun run v8-snapshot:arch
       - name: Build
         run: bun bin/run-electron-builder.cjs -l deb rpm AppImage pacman --${{ matrix.name }} -c electron-builder-linux-ci.json

@@ -14,10 +14,14 @@
     "lint": "bun node_modules/@biomejs/biome/bin/biome check .",
     "check:types": "bun node_modules/.bin/tsgo --project tsconfig.typecheck.json",
     "audit": "bun scripts/run-audit.mjs",
-    "test": "bun run lint && bun test",
-    "test:unit": "bun test",
-    "test:unit:watch": "bun test --watch",
-    "test:e2e": "bun node_modules/cross-env/src/bin/cross-env.js RUN_E2E=1 bun test --test-name-pattern \"AVA e2e suite passes\"",
+    "test": "bun run lint && bun run test:unit",
+    "test:unit:prepare": "bun ./bin/rimraf-standalone.js dist/tmp/root/test",
+    "test:unit:run": "bun test test/bun-ava-bridge.test.js",
+    "test:unit": "bun run test:unit:prepare && bun run test:unit:run",
+    "test:unit:watch": "bun run test:unit:prepare && bun test --watch test/bun-ava-bridge.test.js",
+    "test:e2e:prepare": "bun ./bin/rimraf-standalone.js dist/tmp/root/test",
+    "test:e2e:run": "bun node_modules/cross-env/src/bin/cross-env.js RUN_E2E=1 bun test --test-name-pattern \"AVA e2e suite passes\" test/bun-ava-bridge.test.js",
+    "test:e2e": "bun run test:e2e:prepare && bun run test:e2e:run",
     "postinstall": "bun run v8-snapshot && bun run build:hyper-app && bun bin/run-electron-builder.cjs install-app-deps && bun run rebuild-node-pty && bun bin/copy-node-modules.js && bun node_modules/husky/bin.mjs install && bun run generate-schema",
     "rebuild-node-pty": "bun bin/rebuild-node-pty.cjs",
     "dist": "bun run build && bun bin/run-electron-builder.cjs",
@@ -100,6 +104,7 @@
     "@types/ms": "^0.7.34",
     "@types/node": "^16.18.113",
     "@types/plist": "^3.0.5",
+    "@types/proxyquire": "^1.3.31",
     "@types/react": "^18.2.79",
     "@types/react-dom": "^18.2.25",
     "@types/seamless-immutable": "^7.1.19",
@@ -121,9 +126,9 @@
     "happy-dom": "^20.3.9",
     "husky": "^9.0.11",
     "inquirer": "^9.2.18",
+    "node-addon-api": "^8.0.0",
     "node-gyp": "^10.0.0",
     "node-gyp-build": "^4.7.1",
-    "node-addon-api": "^8.0.0",
     "null-loader": "^4.0.1",
     "parse-url": "^8.1.0",
     "playwright": "^1.43.1",
@@ -149,6 +154,7 @@
     ]
   },
   "patchedDependencies": {
-    "leveldown@5.6.0": "patches/leveldown@5.6.0.patch"
+    "leveldown@5.6.0": "patches/leveldown@5.6.0.patch",
+    "node-gyp-build@4.7.1": "patches/node-gyp-build@4.7.1.patch"
   }
 }
