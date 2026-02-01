@@ -26,27 +26,24 @@ test.serial('updater wires update handlers and emits', async (t) => {
   let updateEvent: UpdateEvent | null = null;
   let updateHandler: UpdateHandler | null = null;
 
+  type AutoUpdaterOnArgs = ['error', ErrorHandler] | [UpdateEvent, UpdateHandler];
+
   type AutoUpdaterStub = {
-    on: (event: UpdateEvent | 'error', handler: UpdateHandler | ErrorHandler) => AutoUpdaterStub;
+    on: (...args: AutoUpdaterOnArgs) => AutoUpdaterStub;
     removeListener: () => AutoUpdaterStub;
     setFeedURL: () => void;
     checkForUpdates: () => void;
     quitAndInstall: () => void;
   };
 
-  const isUpdateEvent = (event: UpdateEvent | 'error'): event is UpdateEvent => event !== 'error';
-
-  const isUpdateHandler = (
-    event: UpdateEvent | 'error',
-    handler: UpdateHandler | ErrorHandler
-  ): handler is UpdateHandler => event !== 'error';
-
   const autoUpdater: AutoUpdaterStub = {
-    on: (event: UpdateEvent | 'error', handler: UpdateHandler | ErrorHandler) => {
-      if (isUpdateEvent(event) && isUpdateHandler(event, handler)) {
-        updateEvent = event;
-        updateHandler = handler;
+    on: (...args) => {
+      if (args[0] === 'error') {
+        return autoUpdater;
       }
+      const [event, handler] = args;
+      updateEvent = event;
+      updateHandler = handler;
       return autoUpdater;
     },
     removeListener: () => autoUpdater,
@@ -92,21 +89,14 @@ test.serial('updater wires update handlers and emits', async (t) => {
 
   updater(winStub);
 
-  if (updateEvent === null) {
-    t.fail('Expected update event to be registered.');
-    return;
-  }
-
-  if (updateHandler === null) {
-    t.fail('Expected update handler to be registered.');
-    return;
-  }
+  const registeredEvent: UpdateEvent = updateEvent ?? t.fail('Expected update event to be registered.');
+  const registeredHandler: UpdateHandler = updateHandler ?? t.fail('Expected update handler to be registered.');
 
   const expectedEvent: UpdateEvent = process.platform === 'linux' ? 'update-available' : 'update-downloaded';
-  t.is(updateEvent, expectedEvent);
+  t.true(registeredEvent === expectedEvent);
 
   const updateEventPayload: UpdateEventPayload = {preventDefault: () => {}};
-  updateHandler(updateEventPayload, 'notes', 'release', new Date('2020-01-01'), '');
+  registeredHandler(updateEventPayload, 'notes', 'release', new Date('2020-01-01'), '');
 
   t.deepEqual(emitCalls, [
     [
