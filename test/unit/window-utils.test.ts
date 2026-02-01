@@ -1,8 +1,8 @@
 // eslint-disable-next-line eslint-comments/disable-enable-pair
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-import {fileURLToPath} from 'node:url';
-
 import {afterAll, beforeAll, expect, mock, test} from 'bun:test';
+
+import {getAppElectronPath} from '../testUtils/electron-path';
 
 type Display = {
   workArea: {
@@ -13,7 +13,7 @@ type Display = {
   };
 };
 
-const appElectronPath = fileURLToPath(new URL('../../app/node_modules/electron/index.js', import.meta.url));
+const appElectronPath = getAppElectronPath();
 
 const screenStub = {
   getAllDisplays: (): Display[] => []
