@@ -1,4 +1,4 @@
-.PHONY: all check-fmt typecheck lint test clean markdownlint nixie
+.PHONY: all check-fmt typecheck lint test build clean markdownlint nixie
 
 MDLINT ?= markdownlint-cli2
 XARGS_R := $(shell if xargs --help 2>&1 | grep -q '\\-r'; then printf -- '-r'; fi)
@@ -17,6 +17,9 @@ lint:
 
 test:
 	bun run test
+
+build:
+	bun run build && bun bin/run-electron-builder.cjs
 
 clean:
 	bun run clean

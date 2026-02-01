@@ -111,7 +111,7 @@ test.serial('updater wires update handlers and emits', async (t) => {
   const registeredHandler: UpdateHandler = updateHandler;
 
   const expectedEvent: UpdateEvent = process.platform === 'linux' ? 'update-available' : 'update-downloaded';
-  t.is(registeredEvent, expectedEvent);
+  t.is<UpdateEvent, UpdateEvent>(registeredEvent, expectedEvent);
 
   const updateEventPayload: UpdateEventPayload = {preventDefault: () => {}};
   registeredHandler(updateEventPayload, 'notes', 'release', new Date('2020-01-01'), '');
