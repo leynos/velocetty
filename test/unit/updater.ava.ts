@@ -1,7 +1,7 @@
 /** @file Verifies updater wiring for autoUpdater events. */
 import test from 'ava';
 
-const proxyquire = require('proxyquire').noCallThru();
+const proxyquire: typeof import('proxyquire') = require('proxyquire').noCallThru();
 
 test.serial('updater wires update handlers and emits', async (t) => {
   const originalNodeEnv = process.env.NODE_ENV;
@@ -109,7 +109,7 @@ test.serial('updater wires update handlers and emits', async (t) => {
   const registeredHandler: UpdateHandler = updateHandler;
 
   const expectedEvent: UpdateEvent = process.platform === 'linux' ? 'update-available' : 'update-downloaded';
-  t.true(registeredEvent === expectedEvent);
+  t.is(registeredEvent, expectedEvent);
 
   const updateEventPayload: UpdateEventPayload = {preventDefault: () => {}};
   registeredHandler(updateEventPayload, 'notes', 'release', new Date('2020-01-01'), '');
