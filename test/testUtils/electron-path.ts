@@ -39,6 +39,13 @@ let isRegistered = false;
 
 export const getElectronMock = () => electronMock;
 
+export const resetElectronMock = () => {
+  delete electronMock.default.autoUpdater;
+  electronMock.default.screen.getAllDisplays = () => [];
+  electronMock.app.runningUnderARM64Translation = false;
+  electronMock.app.config = {subscribe: () => {}};
+};
+
 export const registerElectronMock = () => {
   if (isRegistered) {
     return;

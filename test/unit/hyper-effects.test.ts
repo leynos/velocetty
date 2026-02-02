@@ -10,12 +10,21 @@ import {setupHappyDom} from '../testUtils/happy-dom';
 
 const waitFor = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Terms ref used by Hyper to resolve focus and selection targets.
+ */
 type TermsRef = {
   getTermByUid: (uid: string) => {focus: () => void} | null;
   getActiveTerm: () => {focus: () => void; selectAll?: () => void} | null;
 };
 
-let Hyper: React.ComponentType<any>;
+/**
+ * Hyper component type derived from the container export.
+ */
+type HyperComponent = typeof import('../../lib/containers/hyper').default;
+type HyperProps = React.ComponentProps<HyperComponent>;
+
+let Hyper: HyperComponent;
 let registerCalls = 0;
 let bindCalls = 0;
 let resetCalls = 0;
@@ -25,6 +34,9 @@ let termsRef: TermsRef = {
   getActiveTerm: () => null
 };
 
+/**
+ * Mousetrap test double that captures bind and reset activity.
+ */
 class MousetrapMock {
   bind() {
     bindCalls += 1;
@@ -34,6 +46,20 @@ class MousetrapMock {
     resetCalls += 1;
   }
 }
+
+const buildHyperProps = (overrides: Partial<HyperProps> = {}): HyperProps => ({
+  isMac: false,
+  customCSS: '',
+  uiFontFamily: 'sans-serif',
+  borderColor: '#000',
+  activeSession: null,
+  backgroundColor: '#000',
+  maximized: false,
+  fullScreen: false,
+  lastConfigUpdate: 1,
+  execCommand: () => {},
+  ...overrides
+});
 
 mock.module('../../lib/actions/ui', () => ({
   execCommand: () => ({type: 'exec'})
@@ -90,18 +116,12 @@ test.serial('Hyper attaches key listeners on mount and config updates', async ()
 
   await act(async () => {
     root.render(
-      React.createElement(Hyper, {
-        isMac: false,
-        customCSS: '',
-        uiFontFamily: 'sans-serif',
-        borderColor: '#000',
-        activeSession: null,
-        backgroundColor: '#000',
-        maximized: false,
-        fullScreen: false,
-        lastConfigUpdate: 1,
-        execCommand
-      })
+      React.createElement(
+        Hyper,
+        buildHyperProps({
+          execCommand
+        })
+      )
     );
     await waitFor(0);
   });
@@ -112,18 +132,13 @@ test.serial('Hyper attaches key listeners on mount and config updates', async ()
 
   await act(async () => {
     root.render(
-      React.createElement(Hyper, {
-        isMac: false,
-        customCSS: '',
-        uiFontFamily: 'sans-serif',
-        borderColor: '#000',
-        activeSession: null,
-        backgroundColor: '#111',
-        maximized: false,
-        fullScreen: false,
-        lastConfigUpdate: 1,
-        execCommand
-      })
+      React.createElement(
+        Hyper,
+        buildHyperProps({
+          backgroundColor: '#111',
+          execCommand
+        })
+      )
     );
     await waitFor(0);
   });
@@ -132,18 +147,14 @@ test.serial('Hyper attaches key listeners on mount and config updates', async ()
 
   await act(async () => {
     root.render(
-      React.createElement(Hyper, {
-        isMac: false,
-        customCSS: '',
-        uiFontFamily: 'sans-serif',
-        borderColor: '#000',
-        activeSession: null,
-        backgroundColor: '#111',
-        maximized: false,
-        fullScreen: false,
-        lastConfigUpdate: 2,
-        execCommand
-      })
+      React.createElement(
+        Hyper,
+        buildHyperProps({
+          backgroundColor: '#111',
+          lastConfigUpdate: 2,
+          execCommand
+        })
+      )
     );
     await waitFor(0);
   });
@@ -173,20 +184,7 @@ test.serial('Hyper focuses the active session when it changes', async () => {
   };
 
   await act(async () => {
-    root.render(
-      React.createElement(Hyper, {
-        isMac: false,
-        customCSS: '',
-        uiFontFamily: 'sans-serif',
-        borderColor: '#000',
-        activeSession: null,
-        backgroundColor: '#000',
-        maximized: false,
-        fullScreen: false,
-        lastConfigUpdate: 1,
-        execCommand: () => {}
-      })
-    );
+    root.render(React.createElement(Hyper, buildHyperProps()));
     await waitFor(0);
   });
 
@@ -194,18 +192,12 @@ test.serial('Hyper focuses the active session when it changes', async () => {
 
   await act(async () => {
     root.render(
-      React.createElement(Hyper, {
-        isMac: false,
-        customCSS: '',
-        uiFontFamily: 'sans-serif',
-        borderColor: '#000',
-        activeSession: 'session-1',
-        backgroundColor: '#000',
-        maximized: false,
-        fullScreen: false,
-        lastConfigUpdate: 1,
-        execCommand: () => {}
-      })
+      React.createElement(
+        Hyper,
+        buildHyperProps({
+          activeSession: 'session-1'
+        })
+      )
     );
     await waitFor(0);
   });

@@ -1,78 +1,88 @@
 /** @file Verifies updater wiring for autoUpdater events. */
 import {expect, mock, test} from 'bun:test';
 
-import {getElectronMock, registerElectronMock} from '../testUtils/electron-path';
+import {getElectronMock, registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
+
+/** Update lifecycle events that trigger renderer notifications. */
+type UpdateEvent = 'update-available' | 'update-downloaded';
+/** AutoUpdater event payload subset used by this test. */
+type UpdateEventPayload = Pick<Electron.Event, 'preventDefault'>;
+/** Handler signature for update event callbacks. */
+type UpdateHandler = (
+  event: UpdateEventPayload,
+  releaseNotes: string,
+  releaseName: string,
+  releaseDate: Date,
+  updateUrl?: string
+) => void;
+/** Handler signature for autoUpdater error callbacks. */
+type ErrorHandler = (error: Error) => void;
+/** Argument tuple variants supported by the autoUpdater on() stub. */
+type AutoUpdaterOnArgs = ['error', ErrorHandler] | [UpdateEvent, UpdateHandler];
+/** Minimal autoUpdater surface needed by the updater wiring test. */
+type AutoUpdaterStub = {
+  on: (...args: AutoUpdaterOnArgs) => AutoUpdaterStub;
+  removeListener: () => AutoUpdaterStub;
+  setFeedURL: () => void;
+  checkForUpdates: () => void;
+  quitAndInstall: () => void;
+};
+
+const buildAutoUpdaterStub = () => {
+  let updateEvent: UpdateEvent | null = null;
+  let updateHandler: UpdateHandler | null = null;
+  const autoUpdater: AutoUpdaterStub = {
+    on: (...args) => {
+      if (args[0] === 'error') {
+        return autoUpdater;
+      }
+      const [event, handler] = args as [UpdateEvent, UpdateHandler];
+      updateEvent = event;
+      updateHandler = handler;
+      return autoUpdater;
+    },
+    removeListener: () => autoUpdater,
+    setFeedURL: () => {},
+    checkForUpdates: () => {},
+    quitAndInstall: () => {}
+  };
+
+  return {
+    autoUpdater,
+    getUpdateEvent: () => updateEvent,
+    getUpdateHandler: () => updateHandler
+  };
+};
+
+const buildAppStub = () => ({
+  runningUnderARM64Translation: false,
+  config: {subscribe: () => {}}
+});
+
+const buildRpcStub = (emitCalls: Array<[string, Record<string, unknown>]>) => ({
+  emit: (event: string, payload: Record<string, unknown>) => {
+    emitCalls.push([event, payload]);
+  },
+  once: () => {}
+});
+
+const buildWindowStub = (rpcStub: ReturnType<typeof buildRpcStub>) => ({
+  rpc: rpcStub,
+  on: () => {}
+});
 
 test.serial('updater wires update handlers and emits', async () => {
   const originalNodeEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = 'test';
 
   try {
-    /** Update lifecycle events that trigger renderer notifications. */
-    type UpdateEvent = 'update-available' | 'update-downloaded';
-    /** AutoUpdater event payload subset used by this test. */
-    type UpdateEventPayload = Pick<Electron.Event, 'preventDefault'>;
-    /** Handler signature for update event callbacks. */
-    type UpdateHandler = (
-      event: UpdateEventPayload,
-      releaseNotes: string,
-      releaseName: string,
-      releaseDate: Date,
-      updateUrl?: string
-    ) => void;
-    /** Handler signature for autoUpdater error callbacks. */
-    type ErrorHandler = (error: Error) => void;
-
     const emitCalls: Array<[string, Record<string, unknown>]> = [];
-    let updateEvent: UpdateEvent | null = null;
-    let updateHandler: UpdateHandler | null = null;
+    const {autoUpdater, getUpdateEvent, getUpdateHandler} = buildAutoUpdaterStub();
+    const appStub = buildAppStub();
+    const rpcStub = buildRpcStub(emitCalls);
+    const winStub = buildWindowStub(rpcStub);
 
-    /** Argument tuple variants supported by the autoUpdater on() stub. */
-    type AutoUpdaterOnArgs = ['error', ErrorHandler] | [UpdateEvent, UpdateHandler];
-
-    /** Minimal autoUpdater surface needed by the updater wiring test. */
-    type AutoUpdaterStub = {
-      on: (...args: AutoUpdaterOnArgs) => AutoUpdaterStub;
-      removeListener: () => AutoUpdaterStub;
-      setFeedURL: () => void;
-      checkForUpdates: () => void;
-      quitAndInstall: () => void;
-    };
-
-    const autoUpdater: AutoUpdaterStub = {
-      on: (...args) => {
-        if (args[0] === 'error') {
-          return autoUpdater;
-        }
-        const updateArgs = args as [UpdateEvent, UpdateHandler];
-        const [event, handler] = updateArgs;
-        updateEvent = event;
-        updateHandler = handler;
-        return autoUpdater;
-      },
-      removeListener: () => autoUpdater,
-      setFeedURL: () => {},
-      checkForUpdates: () => {},
-      quitAndInstall: () => {}
-    };
-
-    const appStub = {
-      runningUnderARM64Translation: false,
-      config: {subscribe: () => {}}
-    };
-
-    const rpcStub = {
-      emit: (event: string, payload: Record<string, unknown>) => {
-        emitCalls.push([event, payload]);
-      },
-      once: () => {}
-    };
-
-    const winStub = {
-      rpc: rpcStub,
-      on: () => {}
-    };
-
+    resetElectronMock();
     registerElectronMock();
     const electronMock = getElectronMock();
     electronMock.default.autoUpdater = autoUpdater;
@@ -93,10 +103,12 @@ test.serial('updater wires update handlers and emits', async () => {
 
     updater(winStub);
 
+    const updateEvent = getUpdateEvent();
     if (updateEvent == null) {
       throw new Error('Expected update event to be registered.');
     }
 
+    const updateHandler = getUpdateHandler();
     if (updateHandler == null) {
       throw new Error('Expected update handler to be registered.');
     }

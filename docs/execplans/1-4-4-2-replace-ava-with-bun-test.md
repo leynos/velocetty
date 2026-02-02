@@ -1,3 +1,12 @@
+<!--
+@file ExecPlan: replace AVA with Bun test runner
+Purpose: Track execution steps, risks, and decisions for migrating tests to
+Bun.
+Invariants: Keep progress, risks, and decision log current during execution.
+Cross-links: docs/adr-001-replace-ava-with-bun-test.md,
+docs/testing-with-bun.md, docs/developers-guide.md
+-->
+
 # Replace AVA with Bun test runner
 
 This ExecPlan is a living document. The sections `Constraints`,

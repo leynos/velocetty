@@ -2057,7 +2057,7 @@ bun run dist       # Build + electron-builder packaging
 ### 3.6.5 Testing Framework
 
 | Tool | Version | Purpose |
-|------|---------|---------|
+| ---- | ------- | ------- |
 | **Bun test runner** | 1.3.7 | Unit test runner (Jest-compatible) |
 | **Playwright** | 1.43.1 | End-to-end testing for packaged application |
 | **Bun `mock.module`** | 1.3.7 | Module mocking for unit tests |
@@ -2065,7 +2065,7 @@ bun run dist       # Build + electron-builder packaging
 #### Test Configurations
 
 | Configuration | Location | Timeout | Purpose |
-|---------------|----------|---------|---------|
+| ------------- | -------- | ------- | ------- |
 | `*.test.ts` | `test/unit/` | Default | Unit tests |
 | `*.test.ts` | `test/e2e/` | 30 seconds | End-to-end tests (gated) |
 

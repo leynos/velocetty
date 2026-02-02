@@ -1,3 +1,4 @@
+/** @file Verifies CLI API registry URL construction. */
 /* eslint-disable eslint-comments/disable-enable-pair */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-call */

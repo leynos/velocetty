@@ -25,18 +25,21 @@ const shouldUsePlaywright = driverOverride ? driverOverride === 'playwright' : !
 
 const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let didTimeout = false;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      didTimeout = true;
+      reject(new Error(`Timed out after ${ms}ms`));
+    }, ms);
+  });
   try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timeoutId = setTimeout(() => {
-          reject(new Error(`Timed out after ${ms}ms`));
-        }, ms);
-      })
-    ]);
+    return await Promise.race([promise, timeoutPromise]);
   } finally {
     if (timeoutId) {
       clearTimeout(timeoutId);
+    }
+    if (didTimeout) {
+      void promise.catch(() => {});
     }
   }
 };
@@ -87,6 +90,9 @@ e2eTest(
     let spawnOutput = '';
     try {
       const {pathToBinary, launchArgs} = resolveLaunchConfig();
+      if (!(await fs.pathExists(pathToBinary))) {
+        throw new Error(`Expected packaged app binary at ${pathToBinary}. Run bun run dist first.`);
+      }
       log(`CI=${process.env.CI ?? 'unset'} driver=${shouldUsePlaywright ? 'playwright' : 'spawn'}`);
       log(`Launching ${pathToBinary} with args: ${launchArgs.join(' ') || '(none)'}`);
       if (shouldUsePlaywright) {

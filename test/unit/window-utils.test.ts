@@ -1,8 +1,9 @@
+/** @file Verifies window position validation against display layouts. */
 // eslint-disable-next-line eslint-comments/disable-enable-pair
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-import {beforeAll, expect, test} from 'bun:test';
+import {beforeAll, beforeEach, expect, test} from 'bun:test';
 
-import {getElectronMock, registerElectronMock} from '../testUtils/electron-path';
+import {getElectronMock, registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
 
 type Display = {
   workArea: {
@@ -12,6 +13,8 @@ type Display = {
     height: number;
   };
 };
+
+type Position = [number, number];
 
 const screenStub = {
   getAllDisplays: (): Display[] => []
@@ -27,69 +30,49 @@ beforeAll(async () => {
   ({positionIsValid} = await import('../../app/utils/window-utils'));
 });
 
-test('positionIsValid() returns true when window is on only screen', () => {
-  const position = [50, 50];
-  screenStub.getAllDisplays = () => {
-    return [
-      {
-        workArea: {
-          x: 0,
-          y: 0,
-          width: 500,
-          height: 500
-        }
-      }
-    ];
-  };
-
-  const result = positionIsValid(position);
-
-  expect(result).toBe(true);
+beforeEach(() => {
+  resetElectronMock();
+  electronMock.default.screen = screenStub;
 });
 
-test('positionIsValid() returns true when window is on second screen', () => {
-  const position = [750, 50];
-  screenStub.getAllDisplays = () => {
-    return [
-      {
-        workArea: {
-          x: 0,
-          y: 0,
-          width: 500,
-          height: 500
-        }
-      },
-      {
-        workArea: {
-          x: 500,
-          y: 0,
-          width: 500,
-          height: 500
-        }
-      }
-    ];
-  };
-
-  const result = positionIsValid(position);
-
-  expect(result).toBe(true);
+const buildDisplay = (x: number, y: number, width: number, height: number): Display => ({
+  workArea: {x, y, width, height}
 });
 
-test('positionIsValid() returns false when position isnt valid', () => {
-  const primaryDisplay = {
-    workArea: {
-      x: 0,
-      y: 0,
-      width: 500,
-      height: 500
-    }
-  };
-  const position = [600, 50];
-  screenStub.getAllDisplays = () => {
-    return [primaryDisplay];
-  };
+const setDisplays = (displays: Display[]) => {
+  screenStub.getAllDisplays = () => displays;
+};
 
-  const result = positionIsValid(position);
+const cases: Array<{
+  name: string;
+  position: Position;
+  displays: Display[];
+  expected: boolean;
+}> = [
+  {
+    name: 'positionIsValid() returns true when window is on only screen',
+    position: [50, 50],
+    displays: [buildDisplay(0, 0, 500, 500)],
+    expected: true
+  },
+  {
+    name: 'positionIsValid() returns true when window is on second screen',
+    position: [750, 50],
+    displays: [buildDisplay(0, 0, 500, 500), buildDisplay(500, 0, 500, 500)],
+    expected: true
+  },
+  {
+    name: 'positionIsValid() returns false when position is not valid',
+    position: [600, 50],
+    displays: [buildDisplay(0, 0, 500, 500)],
+    expected: false
+  }
+];
 
-  expect(result).toBe(false);
+cases.forEach(({name, position, displays, expected}) => {
+  test(name, () => {
+    setDisplays(displays);
+    const result = positionIsValid(position);
+    expect(result).toBe(expected);
+  });
 });

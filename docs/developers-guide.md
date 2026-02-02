@@ -1,4 +1,15 @@
-# Developers guide
+<!--
+@file Developers' guide
+Purpose: Summarise local development practices and validation commands for
+the Velocetty repository.
+Invariants: Keep Makefile targets and validation steps aligned with CI and
+tooling changes.
+Cross-links: docs/testing-with-bun.md,
+docs/adr-001-replace-ava-with-bun-test.md,
+docs/roadmap.md
+-->
+
+# Developers' guide
 
 This guide captures the development practices specific to the Velocetty
 repository. It is intentionally concise and focused on the steps developers
@@ -17,7 +28,7 @@ Run the standard gates before opening a pull request:
 - `make check-fmt`
 - `make lint`
 
-When you change documentation, also run:
+When documentation changes, also run:
 
 - `bunx markdownlint-cli "docs/**/*.md"`
 - `nixie --no-sandbox`
@@ -31,7 +42,7 @@ Unit tests run under Bun's built-in test runner. Use one of the following:
 - `bun run test:unit`
 - `bun test test/unit`
 
-### End-to-end tests (Playwright)
+### End-to-end (E2E) tests (Playwright)
 
 End-to-end tests are opt-in. They run Playwright against packaged binaries
 and require the `dist/` output created by the packaging pipeline.
@@ -40,10 +51,10 @@ and require the `dist/` output created by the packaging pipeline.
 - Run E2E tests with `bun run test:e2e`.
 
 The E2E tests are skipped unless `RUN_E2E=1` is set. The script
-`bun run test:e2e` sets this for you.
+`bun run test:e2e` sets this automatically.
 
 By default, E2E runs Playwright locally and a spawn-based smoke check in
-CI. Override the driver with `E2E_DRIVER=playwright` or
+CI. The driver can be overridden with `E2E_DRIVER=playwright` or
 `E2E_DRIVER=spawn`. Debug logging is opt-in with `E2E_DEBUG=1`, and
 `E2E_CAPTURE=1` captures a screenshot from the Electron app.
 

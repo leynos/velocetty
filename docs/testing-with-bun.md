@@ -1,18 +1,28 @@
+<!--
+@file Testing with Bun
+Purpose: Explain Bun's test runner capabilities, limitations, and how it fits
+with Playwright in this repository.
+Invariants: Keep guidance aligned with Bun versions and repository test
+commands.
+Cross-links: docs/developers-guide.md,
+docs/adr-001-replace-ava-with-bun-test.md
+-->
+
 # Testing with Bun
 
 ## What Bun’s test runner is (and what it isn’t)
 
-Bun ships with a fast, built-in, **Jest-compatible** test runner. You write
-tests in JS/TS using a Jest-like API from `bun:test`, and you run them with `bun
-test`. It supports TypeScript/JSX, lifecycle hooks, snapshot testing, DOM/UI
-testing patterns, watch mode, and preloaded setup scripts. Bun aims for broad
-Jest compatibility, but it doesn’t implement everything; the docs explicitly
-frame compatibility as “aiming” rather than “complete”.[^1]
+Bun ships with a fast, built-in, **Jest-compatible** test runner. Tests are
+written in JavaScript (JS) and TypeScript (TS) using a Jest-like API from
+`bun:test`, and executed with `bun test`. It supports TypeScript/JSX, lifecycle
+hooks, snapshot testing, DOM/UI testing patterns, watch mode, and preloaded
+setup scripts. Bun aims for broad Jest compatibility, but it doesn’t implement
+everything; the docs explicitly frame compatibility as “aiming” rather than
+“complete”.[^1]
 
-A key practical implication: treat Bun’s runner as your “unit + integration +
-component” workhorse; for serious cross-browser end-to-end testing, you’ll often
-still lean on Playwright (and usually Node) for full fidelity—more on that
-below.[^2]
+A key practical implication: treat Bun’s runner as the “unit + integration +
+component” workhorse; for serious cross-browser end-to-end testing, Playwright
+(and usually Node) remains the full-fidelity option—more on that below.[^2]
 
 ---
 
@@ -38,9 +48,9 @@ By default:
 1. Test files execute **sequentially** (not in parallel)
 2. Within each file, tests run sequentially in definition order[^3]
 
-So: if you rely on global mutable state, you might “get away with it”
-locally—until you turn on concurrency or randomization and discover the truth
-(the best kind of truth: reproducible).[^1]
+So: if global mutable state is relied upon, it may appear to “work” locally
+until concurrency or randomization is enabled and the behaviour is exposed (the
+best kind of truth: reproducible).[^1]
 
 ---
 
@@ -74,15 +84,17 @@ test("async works", async () => {
 });
 ```
 
-Or use a `done` callback; if you accept `done`, you must call it or the test
-will hang.[^4]
+A `done` callback is also supported; accepting `done` requires calling it or
+the test will hang.[^4]
 
 ### Per-test timeouts (and what “timeout” means in Bun)
 
-You can pass a per-test timeout in milliseconds as an additional argument:
+A per-test timeout can be passed in milliseconds as an additional argument:
 
 ```ts
 import { test, expect } from "bun:test";
+
+const slowOperation = async () => 42;
 
 test("fast operation", async () => {
   const data = await slowOperation();
@@ -111,28 +123,28 @@ flakiness—though the best outcome is still fixing the flake).[^4]
 
 There’s a special mode: `bun test --todo`. In this mode, failing TODO tests
 don’t error the run, but **TODO tests that pass** get reported as failures—so
-you can remove the TODO marker or re-check the test.[^4]
+the TODO marker can be removed or the test re-checked.[^4]
 
 ### Focused execution with `.only` (Bun’s “safety catch”)
 
-You can mark tests/suites with `test.only` / `describe.only`, but Bun only
-respects them when you pass `--only`.
+Tests/suites can be marked with `test.only` / `describe.only`, but Bun only
+respects them when `--only` is passed.
 
 - Run only `.only` tests: `bun test --only`
 - Run everything (even if `.only` exists): `bun test`[^4]
 
-This is a nice CI foot-gun prevention pattern: committed `.only` doesn’t
-silently nuke your suite unless your command line opts into it.
+This is a useful CI foot-gun prevention pattern: committed `.only` doesn’t
+silently skip the suite unless the command line opts into it.
 
 ### Conditional execution
 
-Bun gives you expressive conditionals:
+Bun provides expressive conditionals:
 
 - `test.if(condition)(name, fn)` runs only if truthy[^4]
 - `test.skipIf(condition)(...)` skips if truthy[^4]
 - `test.todoIf(condition)(...)` marks TODO if truthy[^4]
 
-And you can do the same at suite level (`describe.if`, `describe.skipIf`,
+The same pattern applies at suite level (`describe.if`, `describe.skipIf`,
 `describe.todoIf`).[^4]
 
 ### “Expected failure” tracking
@@ -140,8 +152,8 @@ And you can do the same at suite level (`describe.if`, `describe.skipIf`,
 `test.failing(...)` inverts the result:
 
 - failing test marked `.failing()` → treated as pass
-- passing test marked `.failing()` → treated as fail (so you notice it started
-  passing and should update expectations)[^4]
+- passing test marked `.failing()` → treated as fail (so regressions are
+  flagged and expectations can be updated)[^4]
 
 ---
 
@@ -178,12 +190,12 @@ Title format specifiers include `%p %s %d %i %f %j %o %# %%`.[^4]
 Bun supports:
 
 - `expect.hasAssertions()` to require at least one assertion in the test (handy
-  for async tests where you might accidentally return early)[^4]
+  for async tests that might accidentally return early)[^4]
 - `expect.assertions(count)` is also documented as supported.[^4]
 
 ### Type-level tests with `expectTypeOf`
 
-You can do type assertions (compile-time intent checks) via `expectTypeOf`:
+Type assertions (compile-time intent checks) are supported via `expectTypeOf`:
 
 ```ts
 import { expectTypeOf } from "bun:test";
@@ -197,7 +209,7 @@ This is especially useful for public APIs and generic-heavy libraries.[^4]
 
 ---
 
-## `expect` matchers: what you actually have in Bun
+## `expect` matchers: what is available in Bun
 
 Bun lists supported matchers explicitly and notes that full Jest compatibility
 remains a goal.[^4]
@@ -265,7 +277,7 @@ One explicitly “not yet implemented” item: `.addSnapshotSerializer()`.[^4]
 
 ---
 
-## Running tests effectively (CLI patterns you’ll actually use)
+## Running tests effectively (CLI patterns used most often)
 
 ### The basics
 
@@ -350,8 +362,8 @@ bun test --seed 123456   # implies --randomize
 
 ## Concurrency: speed vs determinism, made explicit
 
-By default, Bun runs tests sequentially within a file. You can opt into
-concurrent execution for async tests.
+By default, Bun runs tests sequentially within a file. Concurrent execution
+can be enabled for async tests.
 
 ### Enable concurrency broadly
 
@@ -368,12 +380,12 @@ Bun defaults max concurrency to 20.[^1]
 - `test.serial(...)` forces sequential behaviour even when `--concurrent`
   runs.[^1]
 
-This gives you a clean way to keep “stateful” integration tests serial while
+This provides a clean way to keep “stateful” integration tests serial while
 letting pure/isolated tests fly.
 
 ### Gradual migration with `concurrentTestGlob`
 
-You can enable concurrency only for matching files via `bunfig.toml`:
+Concurrency can be enabled only for matching files via `bunfig.toml`:
 
 ```toml
 [test]
@@ -493,8 +505,8 @@ bun test --env-file=.env.test
 
 CLI flags override config values.[^5]
 
-You can define environment-specific config sections like `[test.ci]` and select
-them with:
+Environment-specific config sections like `[test.ci]` can be defined and
+selected with:
 
 ```bash
 bun test --config=ci
@@ -582,8 +594,8 @@ preload = ["./happydom.ts", "./testing-library.ts"]
 
 ### TypeScript: declaration merging for matcher types
 
-Bun’s guide shows extending `Matchers` via module augmentation so your editor
-understands `toBeInTheDocument()` etc.[^6]
+Bun’s guide shows extending `Matchers` via module augmentation so editors
+understand `toBeInTheDocument()` etc.[^6]
 
 ### Example test
 
@@ -622,7 +634,7 @@ So the sane strategy is usually:
 - Use Bun for fast unit/component feedback loops.
 - Use Playwright (often under Node) for “real” cross-browser e2e in CI.
 - Optionally experiment with Bun locally for faster iteration, while accepting
-  you may need to fall back to Node for flaky/feature-heavy scenarios.[^2]
+  Node may be required for flaky or feature-heavy scenarios.[^2]
 
 ### Setting up Playwright in a Bun project
 
@@ -635,8 +647,8 @@ bun add @playwright/test
 
 [^2]
 
-The guide also notes you must ensure Playwright browser binaries are installed
-(it references using the Node-style `npx playwright install` approach).[^2]
+The guide also notes that Playwright browser binaries must be installed (it
+references using the Node-style `npx playwright install` approach).[^2]
 
 ### Running “Playwright tests” via Bun commands
 
@@ -650,7 +662,7 @@ bun test
 and suggests passing environment variables inline, e.g. `ENV=staging bun
 test`.[^2]
 
-Pragmatically, there are two interpretations you can adopt in real projects:
+Pragmatically, two interpretations can be adopted in real projects:
 
 1. **Bun runner + Playwright API**: write `bun:test` tests that call
    Playwright’s browser automation API inside the test body (fast, simple, fewer
@@ -665,35 +677,33 @@ approach, and option (2) tends to be the feature-complete approach.[^2]
 ### Cross-browser accuracy still matters (and Bun doesn’t magically grant it)
 
 The BrowserStack guide explicitly warns that Bun-run Playwright execution can
-skew towards Chromium and that you still need real cross-browser validation to
-catch engine-specific bugs. It argues for cloud real-browser testing to prevent
-regressions from browser-specific behaviour.[^2]
+skew towards Chromium and that real cross-browser validation is still required
+to catch engine-specific bugs. It argues for cloud real-browser testing to
+prevent regressions from browser-specific behaviour.[^2]
 
 ---
 
 ## High-value “gotchas” and habits (learned the fun way)
 
-- `.only` won’t save you unless you pass `--only`. This reduces accidental CI
+- `.only` is ignored unless `--only` is passed. This reduces accidental CI
   under-testing.[^4]
-- Positional filters are substring matches, not globs; use `./path` to run a
-  specific file.[^3]
+- Positional filters are substring matches, not globs; the `./path` prefix runs
+  a specific file.[^3]
 - Default execution is sequential; concurrency (`--concurrent`,
-  `test.concurrent`) will surface hidden coupling fast. Lean into that; it’s a
-  bug detector disguised as a performance knob.[^1]
-- Use `--randomize`/`--seed` to make order-dependence reproducible instead of
-  mystical.[^1]
-- Use preloads for global setup, DOM registration, matcher extension, and global
-  mocks—keep per-test files focused.[^5]
-- If you rely on Playwright’s advanced features, assume you’ll need Node for
-  full reliability; treat Bun as an optimisation path, not a guaranteed
+  `test.concurrent`) surfaces hidden coupling fast and acts as a bug detector
+  disguised as a performance knob.[^1]
+- `--randomize`/`--seed` make order-dependence reproducible instead of mystical.[^1]
+- Preloads handle global setup, DOM registration, matcher extension, and global
+  mocks while keeping per-test files focused.[^5]
+- When Playwright’s advanced features are required, Node remains necessary for
+  full reliability; treat Bun as an optimization path, not a guaranteed
   replacement.[^2]
 
 ---
 
-If you’d like this in a single Markdown file you can drop into a repo wiki (with
-a compact TOC and “copy/paste” config snippets), I can produce that as a clean
-doc artefact in the same style—still self-contained, just easier to store and
-version.
+A single Markdown file suitable for a repo wiki (with a compact TOC and
+“copy/paste” config snippets) can be produced as a clean doc artefact in the
+same style—self-contained and easier to store and version.
 
 [^1]: <https://bun.com/docs/test> "Test runner - Bun"
 [^2]: <https://www.browserstack.com/guide/bun-playwright> "How to Use Bun for
