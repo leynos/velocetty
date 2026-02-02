@@ -11,10 +11,12 @@ import type {ElectronApplication} from 'playwright';
 const shouldRunE2E = process.env.RUN_E2E === '1';
 const e2eTest = shouldRunE2E ? test : test.skip;
 const e2eTimeoutMs = 30_000;
+const launchTimeoutMs = 15_000;
 const windowTimeoutMs = 10_000;
 const closeTimeoutMs = 5_000;
 const shouldCapture = process.env.E2E_CAPTURE === '1';
 const shouldWaitForWindow = process.env.CI !== 'true';
+const debugE2E = process.env.E2E_DEBUG === '1' || process.env.CI === 'true';
 
 const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -67,19 +69,36 @@ const resolveLaunchConfig = () => {
 e2eTest(
   'launches the packaged app',
   async () => {
+    const startTime = Date.now();
+    const log = (message: string) => {
+      if (!debugE2E) {
+        return;
+      }
+      const elapsedMs = Date.now() - startTime;
+      console.log(`[e2e ${elapsedMs}ms] ${message}`);
+    };
     let app: ElectronApplication | null = null;
     try {
       const {pathToBinary, launchArgs} = resolveLaunchConfig();
-      app = await _electron.launch({
-        executablePath: pathToBinary,
-        args: launchArgs
-      });
+      log(`Launching ${pathToBinary} with args: ${launchArgs.join(' ') || '(none)'}`);
+      app = await withTimeout(
+        _electron.launch({
+          executablePath: pathToBinary,
+          args: launchArgs,
+          timeout: launchTimeoutMs
+        }),
+        launchTimeoutMs
+      );
+      log('Electron launch completed.');
       if (shouldWaitForWindow) {
+        log('Waiting for first window.');
         const window = await withTimeout(app.firstWindow(), windowTimeoutMs);
         expect(window).toBeDefined();
+        log('First window resolved.');
       } else {
         const process = app.process();
         expect(process).toBeDefined();
+        log(`Electron process PID: ${process?.pid ?? 'unknown'}.`);
       }
       await new Promise((resolve) => setTimeout(resolve, 2000));
     } finally {
@@ -104,7 +123,9 @@ e2eTest(
       }
       if (app) {
         try {
+          log('Closing Electron.');
           await withTimeout(app.close(), closeTimeoutMs);
+          log('Electron closed.');
         } catch (error) {
           const process = app.process();
           if (process && !process.killed) {
