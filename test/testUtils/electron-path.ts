@@ -55,8 +55,7 @@ let isRegistered = false;
 /**
  * Returns the shared Electron mock instance.
  *
- * # Examples
- *
+ * @example
  * ```ts
  * registerElectronMock();
  * const electronMock = getElectronMock();
@@ -68,8 +67,7 @@ export const getElectronMock = () => electronMock;
 /**
  * Restores the Electron mock to its default state.
  *
- * # Examples
- *
+ * @example
  * ```ts
  * resetElectronMock();
  * ```
@@ -84,8 +82,7 @@ export const resetElectronMock = () => {
 /**
  * Applies targeted overrides to the Electron mock for a single test.
  *
- * # Examples
- *
+ * @example
  * ```ts
  * configureElectronMock({
  *   app: {runningUnderARM64Translation: true}
@@ -112,8 +109,7 @@ export const configureElectronMock = (overrides: ElectronMockOverrides) => {
  * (`electron` and the app-resolved `appElectronPath`).
  * Idempotent—subsequent calls return immediately if already registered.
  *
- * # Examples
- *
+ * @example
  * ```ts
  * registerElectronMock();
  * ```

@@ -213,12 +213,12 @@ documentation changes.
 
 6. Update documentation:
 
-  - Create or update `../developers-guide.md` with the new testing
+   - Create or update `../developers-guide.md` with the new testing
      workflow.
-  - Update `../velocetty-hyper-codebase.md` AVA references and test
+   - Update `../velocetty-hyper-codebase.md` AVA references and test
      script tables.
    - Update any other doc references to AVA found in step 1.
-  - Mark roadmap entry `1.4.4` as done in `../roadmap.md`.
+   - Mark roadmap entry `1.4.4` as done in `../roadmap.md`.
 
 7. Run validation commands with logs captured via `tee`:
 

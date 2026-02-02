@@ -593,7 +593,7 @@ preload = ["./happydom.ts", "./testing-library.ts"]
 
 ### TypeScript: declaration merging for matcher types
 
-Bun’s guide shows extending `Matchers` via module augmentation so editors
+Bun’s guide shows extending `Matchers` via module augmentation, so editors
 understand `toBeInTheDocument()` etc.[^6]
 
 ### Example test
