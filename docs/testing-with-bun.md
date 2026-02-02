@@ -48,7 +48,7 @@ By default:
 2. Within each file, tests run sequentially in definition order[^3]
 
 So: if global mutable state is relied upon, it may appear to “work” locally
-until concurrency or randomization is enabled and the behaviour is exposed (the
+until concurrency or randomization is enabled, and the behaviour is exposed (the
 best kind of truth: reproducible).[^1]
 
 ---
@@ -670,7 +670,7 @@ Pragmatically, two interpretations can be adopted in real projects:
    while using Bun for dependency management and other scripts—accepting that
    Bun-as-runtime might still encounter Node-compat friction.
 
-Given the BrowserStack caveats, option (1) tends to be the cleaner “Bun-native”
+Given the BrowserStack warnings, option (1) tends to be the cleaner “Bun-native”
 approach, and option (2) tends to be the feature-complete approach.[^2]
 
 ### Cross-browser accuracy still matters (and Bun doesn’t magically grant it)

@@ -42,7 +42,7 @@ entry for AVA removal is marked done.
   columns, using en-GB-oxendict spelling.
 - Do not introduce new external dependencies without explicit approval.
 
-## Tolerances (Exception triggers)
+## Tolerances (exception triggers)
 
 - Scope: if the change exceeds 30 files or 900 net lines, stop and
   escalate.
@@ -90,7 +90,7 @@ entry for AVA removal is marked done.
 - [x] (2026-02-01 18:05Z) Run format, lint, and test gates; fix any issues;
   commit changes.
 
-## Surprises & Discoveries
+## Surprises & discoveries
 
 - Observation: `bun install` runs the full postinstall pipeline (V8
   snapshots, packaging prep, and native rebuilds), which is time-intensive.
@@ -105,7 +105,7 @@ entry for AVA removal is marked done.
   Impact: Replace proxyquire usage with Bun `mock.module()` and remove the
   dependency.
 
-## Decision Log
+## Decision log
 
 - Decision: Plan to replace AVA tests with `bun:test` and keep E2E tests
   gated behind `RUN_E2E=1` to preserve fast default runs.
@@ -128,7 +128,7 @@ entry for AVA removal is marked done.
   interception.
   Date/Author: 2026-02-01 17:20Z, Codex.
 
-## Outcomes & Retrospective
+## Outcomes & retrospective
 
 - Completed the AVA-to-Bun migration, including module mocks via Bun
   `mock.module()`, and removed legacy AVA/proxyquire artefacts.
@@ -136,7 +136,7 @@ entry for AVA removal is marked done.
 - Remaining note: Bun tests emit React `act(...)` warnings in Happy DOM,
   but all assertions pass.
 
-## Context and Orientation
+## Context and orientation
 
 The repository previously used AVA for unit tests and a Bun bridge test to
 run AVA under `bun test`. The migration replaces that with Bun's built-in
@@ -148,7 +148,7 @@ instead of proxyquire. AVA config and bridge files have been removed, and
 `1.4.4` tracks the AVA removal and is marked done once the migration is
 complete.
 
-## Plan of Work
+## Plan of work
 
 Stage A: Inventory and mapping (no code changes). Confirm all AVA usage
 via `rg` searches, review test files in `test/unit/` and
@@ -182,7 +182,7 @@ references to AVA found via `rg` searches. Mark roadmap entry `1.4.4` as
 roadmap item requires it). Run Markdown linting and formatting tools for
 documentation changes.
 
-## Concrete Steps
+## Concrete steps
 
 1. Audit current AVA usage and test layout:
 
@@ -235,7 +235,7 @@ documentation changes.
 
 9. Commit changes with a descriptive message after all gates pass.
 
-## Validation and Acceptance
+## Validation and acceptance
 
 Quality criteria (done means all of the following):
 
@@ -253,7 +253,7 @@ Quality method (how we check):
 - Verify `rg -n "\\bava\\b"` returns no AVA usage except historical
   references that are intentionally retained in ADRs.
 
-## Idempotence and Recovery
+## Idempotence and recovery
 
 The steps are safe to re-run. File renames and deletions are deterministic.
 If a test fails after conversion, revert only the affected test file to the
@@ -261,7 +261,7 @@ last working commit and re-apply the conversion carefully. If E2E tests
 fail due to Bun/Playwright incompatibilities, stop and escalate rather than
 adding workarounds that change production code.
 
-## Artifacts and Notes
+## Artifacts and notes
 
 Expected file changes include:
 
@@ -273,7 +273,7 @@ Expected file changes include:
 - Updated: `package.json`, `bun.lock`, `docs/developers-guide.md`,
   `docs/velocetty-hyper-codebase.md`, `docs/roadmap.md`.
 
-## Interfaces and Dependencies
+## Interfaces and dependencies
 
 - Test runner API: `bun:test` (`test`, `describe`, `beforeAll`,
   `afterAll`, `afterEach`, `expect`).

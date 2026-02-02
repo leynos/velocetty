@@ -2,13 +2,13 @@
 
 ## Module header
 
-- Purpose: Summarise local development practices and validation commands for
+- Purpose: Summarize local development practices and validation commands for
   the Velocetty repository.
 - Invariants: Keep Makefile targets and validation steps aligned with CI and
   tooling changes.
-- Cross-links: [Testing with Bun](docs/testing-with-bun.md),
-  [ADR 001](docs/adr-001-replace-ava-with-bun-test.md), and
-  [Roadmap](docs/roadmap.md).
+- Cross-links: [Testing with Bun](testing-with-bun.md),
+  [ADR 001](adr-001-replace-ava-with-bun-test.md), and
+  [Roadmap](roadmap.md).
 
 This guide captures the development practices specific to the Velocetty
 repository. It is intentionally concise and focused on the steps developers

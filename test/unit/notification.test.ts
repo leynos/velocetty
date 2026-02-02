@@ -23,11 +23,27 @@ const buildNotificationProps = (
   ...overrides
 });
 const dispatchOpacityTransition = (indicator: Element) => {
+  // Happy DOM does not fully populate TransitionEvent fields.
   const event = new Event('transitionend') as TransitionEvent;
   Object.defineProperty(event, 'propertyName', {value: 'opacity'});
   Object.defineProperty(event, 'target', {value: indicator});
   indicator.dispatchEvent(event);
 };
+/**
+ * Creates a deterministic timer adapter for unit tests.
+ *
+ * # Returns
+ * Helper functions to install/restore timers and advance time.
+ *
+ * # Examples
+ *
+ * ```ts
+ * const timers = createFakeTimers();
+ * timers.install();
+ * timers.advanceTimersByTime(100);
+ * timers.restore();
+ * ```
+ */
 const createFakeTimers = () => {
   let now = 0;
   let nextId = 1;
@@ -152,18 +168,18 @@ test.serial('Notification resets the timer when text changes', async () => {
     await act(async () => {
       timers.advanceTimersByTime(50);
     });
-    const firstIndicator = requireIndicator(container);
+    let indicator = requireIndicator(container);
     await act(async () => {
-      dispatchOpacityTransition(firstIndicator);
+      dispatchOpacityTransition(indicator);
     });
     expect(dismissCount).toBe(0);
 
     await act(async () => {
       timers.advanceTimersByTime(40);
     });
-    const secondIndicator = requireIndicator(container);
+    indicator = requireIndicator(container);
     await act(async () => {
-      dispatchOpacityTransition(secondIndicator);
+      dispatchOpacityTransition(indicator);
     });
     expect(dismissCount).toBe(1);
   } finally {
