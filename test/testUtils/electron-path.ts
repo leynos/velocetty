@@ -108,7 +108,9 @@ export const configureElectronMock = (overrides: ElectronMockOverrides) => {
 };
 
 /**
- * Registers the Electron mock for both module specifiers used in the app.
+ * Registers the Electron mock for both module specifiers used in the app
+ * (`electron` and the app-resolved `appElectronPath`).
+ * Idempotent—subsequent calls return immediately if already registered.
  *
  * # Examples
  *

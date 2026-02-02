@@ -73,7 +73,18 @@ const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
  * Resolves the packaged Electron binary path and platform-specific arguments.
  *
  * # Returns
- * A binary path and any required launch arguments for the current platform.
+ * An object shaped as `{pathToBinary: string, launchArgs: string[]}` with the
+ * resolved binary path and any required launch arguments for the current
+ * platform.
+ *
+ * # Platform support
+ * - `linux`: `dist/linux-unpacked/hyper`
+ * - `darwin`: `dist/mac/Hyper.app/Contents/MacOS/Hyper`
+ * - `win32`: `dist/win-unpacked/Hyper.exe`
+ *
+ * On Linux, when `CI='true'` or `ELECTRON_DISABLE_SANDBOX='1'`, the function
+ * adds `--no-sandbox` and `--disable-setuid-sandbox` to `launchArgs`. It throws
+ * an `Error` for unsupported platforms.
  *
  * # Examples
  *
