@@ -76,7 +76,8 @@ test.serial('updater wires update handlers and emits', async () => {
     registerElectronMock();
     const electronMock = getElectronMock();
     electronMock.default.autoUpdater = autoUpdater;
-    electronMock.app = appStub;
+    electronMock.app.runningUnderARM64Translation = appStub.runningUnderARM64Translation;
+    electronMock.app.config = appStub.config;
 
     mock.module('../../app/auto-updater-linux', () => ({default: autoUpdater}));
     mock.module('../../app/config', () => ({getDefaultProfile: () => 'default'}));

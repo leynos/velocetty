@@ -17,7 +17,10 @@ type ElectronMock = {
       getAllDisplays: () => unknown[];
     };
   };
-  app: Record<string, unknown>;
+  app: {
+    runningUnderARM64Translation?: boolean;
+    config?: {subscribe?: () => void};
+  };
 };
 
 const electronMock: ElectronMock = {
@@ -26,7 +29,10 @@ const electronMock: ElectronMock = {
       getAllDisplays: () => []
     }
   },
-  app: {}
+  app: {
+    runningUnderARM64Translation: false,
+    config: {subscribe: () => {}}
+  }
 };
 
 let isRegistered = false;
