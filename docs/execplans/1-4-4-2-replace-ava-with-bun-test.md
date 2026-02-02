@@ -9,9 +9,9 @@
   [Testing with Bun](../testing-with-bun.md), and
   [Developers' guide](../developers-guide.md).
 
-This ExecPlan is a living document. The sections `constraints`,
-`tolerances (exception triggers)`, `risks`, `progress`,
-`surprises & discoveries`, `decision log`, and `outcomes & retrospective`
+This ExecPlan is a living document. The sections `Constraints`,
+`Tolerances (exception triggers)`, `Risks`, `Progress`,
+`Surprises & discoveries`, `Decision log`, and `Outcomes & retrospective`
 must be kept up to date as work proceeds.
 
 Status: IN PROGRESS
