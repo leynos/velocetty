@@ -1,7 +1,7 @@
 /** @file Verifies updater wiring for autoUpdater events. */
 import {expect, mock, test} from 'bun:test';
 
-import {getAppElectronPath} from '../testUtils/electron-path';
+import {mockElectronModule} from '../testUtils/electron-path';
 
 test.serial('updater wires update handlers and emits', async () => {
   const originalNodeEnv = process.env.NODE_ENV;
@@ -73,7 +73,7 @@ test.serial('updater wires update handlers and emits', async () => {
       on: () => {}
     };
 
-    mock.module(getAppElectronPath(), () => ({
+    mockElectronModule(() => ({
       default: {autoUpdater},
       app: appStub
     }));

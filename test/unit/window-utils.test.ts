@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 import {afterAll, beforeAll, expect, mock, test} from 'bun:test';
 
-import {getAppElectronPath} from '../testUtils/electron-path';
+import {mockElectronModule} from '../testUtils/electron-path';
 
 type Display = {
   workArea: {
@@ -13,13 +13,11 @@ type Display = {
   };
 };
 
-const appElectronPath = getAppElectronPath();
-
 const screenStub = {
   getAllDisplays: (): Display[] => []
 };
 
-mock.module(appElectronPath, () => ({default: {screen: screenStub}}));
+mockElectronModule(() => ({default: {screen: screenStub}}));
 
 let positionIsValid: typeof import('../../app/utils/window-utils').positionIsValid;
 
