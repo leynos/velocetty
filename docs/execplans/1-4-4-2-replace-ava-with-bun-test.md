@@ -5,14 +5,14 @@
 - Purpose: Track execution steps, risks, and decisions for migrating tests to
   Bun.
 - Invariants: Keep progress, risks, and decision log current during execution.
-- Cross-links: [ADR 001](docs/adr-001-replace-ava-with-bun-test.md),
-  [Testing with Bun](docs/testing-with-bun.md), and
-  [Developers' guide](docs/developers-guide.md).
+- Cross-links: [ADR 001](../adr-001-replace-ava-with-bun-test.md),
+  [Testing with Bun](../testing-with-bun.md), and
+  [Developers' guide](../developers-guide.md).
 
-This ExecPlan is a living document. The sections `Constraints`,
-`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as
-work proceeds.
+This ExecPlan is a living document. The sections `constraints`,
+`tolerances (exception triggers)`, `risks`, `progress`,
+`surprises & discoveries`, `decision log`, and `outcomes & retrospective`
+must be kept up to date as work proceeds.
 
 Status: IN PROGRESS
 
@@ -30,8 +30,8 @@ entry for AVA removal is marked done.
 
 ## Constraints
 
-- Follow `docs/adr-001-replace-ava-with-bun-test.md` and
-  `docs/testing-with-bun.md` for runner selection and behaviour.
+- Follow `../adr-001-replace-ava-with-bun-test.md` and
+  `../testing-with-bun.md` for runner selection and behaviour.
 - Use Bun for JavaScript/TypeScript commands and prefer Makefile targets
   for validation (`make check-fmt`, `make lint`, `make test`).
 - Keep the existing test intent, assertions, and coverage; only update
@@ -72,7 +72,7 @@ entry for AVA removal is marked done.
 - Risk: Documentation references to AVA become inconsistent.
   Severity: medium
   Likelihood: high
-  Mitigation: update `docs/velocetty-hyper-codebase.md` sections that
+  Mitigation: update `../velocetty-hyper-codebase.md` sections that
   describe the test runner, config files, and scripts; add a developer
   guide entry for the new workflow.
 
@@ -173,9 +173,9 @@ unit and E2E suites, and remove AVA-related devDependencies (`ava`,
 `@ava/babel`, `@ava/typescript`). Update `bun.lock` accordingly.
 
 Stage D: Documentation and roadmap updates. Create or update
-`docs/developers-guide.md` to describe the Bun test workflow (unit, E2E,
+`../developers-guide.md` to describe the Bun test workflow (unit, E2E,
 opt-in E2E via `RUN_E2E=1`, and the Makefile commands). Update
-`docs/velocetty-hyper-codebase.md` sections that mention AVA, its config
+`../velocetty-hyper-codebase.md` sections that mention AVA, its config
 files, and test scripts to reflect Bun. Update any other documentation
 references to AVA found via `rg` searches. Mark roadmap entry `1.4.4` as
 `[x]` once AVA is fully removed (confirm no Yarn references if this
@@ -213,12 +213,12 @@ documentation changes.
 
 6. Update documentation:
 
-   - Create or update `docs/developers-guide.md` with the new testing
+  - Create or update `../developers-guide.md` with the new testing
      workflow.
-   - Update `docs/velocetty-hyper-codebase.md` AVA references and test
+  - Update `../velocetty-hyper-codebase.md` AVA references and test
      script tables.
    - Update any other doc references to AVA found in step 1.
-   - Mark roadmap entry `1.4.4` as done in `docs/roadmap.md`.
+  - Mark roadmap entry `1.4.4` as done in `../roadmap.md`.
 
 7. Run validation commands with logs captured via `tee`:
 
@@ -270,8 +270,8 @@ Expected file changes include:
   `bunfig.toml`.
 - Renamed: `test/unit/*.ava.ts` to `test/unit/*.test.ts` (or `.spec.ts`).
 - Renamed/moved: `test/index.ts` to `test/e2e/electron.e2e.test.ts`.
-- Updated: `package.json`, `bun.lock`, `docs/developers-guide.md`,
-  `docs/velocetty-hyper-codebase.md`, `docs/roadmap.md`.
+- Updated: `package.json`, `bun.lock`, `../developers-guide.md`,
+  `../velocetty-hyper-codebase.md`, `../roadmap.md`.
 
 ## Interfaces and dependencies
 

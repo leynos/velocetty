@@ -32,11 +32,9 @@ const dispatchOpacityTransition = (indicator: Element) => {
 /**
  * Creates a deterministic timer adapter for unit tests.
  *
- * # Returns
- * Helper functions to install/restore timers and advance time.
+ * @returns Helper functions to install/restore timers and advance time.
  *
- * # Examples
- *
+ * @example
  * ```ts
  * const timers = createFakeTimers();
  * timers.install();
