@@ -16,9 +16,12 @@ const launchTimeoutMs = 15_000;
 const windowTimeoutMs = 10_000;
 const closeTimeoutMs = 5_000;
 const shouldCapture = process.env.E2E_CAPTURE === '1';
-const shouldWaitForWindow = process.env.CI !== 'true';
-const debugE2E = process.env.E2E_DEBUG === '1' || process.env.CI === 'true';
-const shouldUsePlaywright = process.env.CI !== 'true';
+const isCi =
+  process.env.CI !== undefined && process.env.CI !== '' && process.env.CI !== '0' && process.env.CI !== 'false';
+const shouldWaitForWindow = !isCi;
+const debugE2E = process.env.E2E_DEBUG === '1' || isCi;
+const driverOverride = process.env.E2E_DRIVER;
+const shouldUsePlaywright = driverOverride ? driverOverride === 'playwright' : !isCi;
 
 const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -84,6 +87,7 @@ e2eTest(
     let spawnOutput = '';
     try {
       const {pathToBinary, launchArgs} = resolveLaunchConfig();
+      log(`CI=${process.env.CI ?? 'unset'} driver=${shouldUsePlaywright ? 'playwright' : 'spawn'}`);
       log(`Launching ${pathToBinary} with args: ${launchArgs.join(' ') || '(none)'}`);
       if (shouldUsePlaywright) {
         app = await withTimeout(
