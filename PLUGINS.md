@@ -3,21 +3,33 @@
 ## Workflow
 
 ### Run Hyper in dev mode
-Hyper can be run in dev mode by cloning this repository and following the ["Contributing" section of our README](https://github.com/vercel/hyper#contribute).
 
-In dev mode you'll get more ouput and access to React/Redux dev-tools in Electron.
+Hyper can be run in dev mode by cloning this repository and following the
+["Contributing" section of our README][hyper-contrib].
 
-Prerequisites and steps are described in the ["Contributing" section of our README](https://github.com/vercel/hyper#contribute).
-Be sure to use the `canary` branch.
+In dev mode you'll get more output and access to React/Redux devtools in
+Electron.
+
+Prerequisites and steps are described in the ["Contributing" section of our
+README][hyper-contrib]. Be sure to use the `canary` branch.
 
 ### Create a dev config file
-Copy your config file `hyper.json` to the root of your cloned repository. Hyper, in dev mode, will use this copied config file. That means that you can continue to use your main installation of Hyper with your day-to-day configuration.
-After the first run, Hyper, in dev mode, will have created a new `plugins` directory in your repository directory.
+
+Copy your config file `hyper.json` to the root of your cloned repository.
+Hyper, in dev mode, will use this copied config file. That means that you can
+continue to use your main installation of Hyper with your day-to-day
+configuration. After the first run, Hyper, in dev mode, will have created a
+new `plugins` directory in your repository directory.
 
 ### Setup your plugin
-Go to your recently created `<repository_root>/plugins/local` directory and create/clone your plugin repo. An even better method on macOS/Linux is to add a symlink to your plugin directory.
 
-Edit your dev config file, and add your plugin name (directory name in your `local` directory) in the `localPlugins` array.
+Go to your recently created `<repository_root>/plugins/local` directory and
+create or clone your plugin repo. An even better method on macOS/Linux is to
+add a symlink to your plugin directory.
+
+Edit your dev config file, and add your plugin name (directory name in your
+`local` directory) in the `localPlugins` array.
+
 ```js
 module.exports = {
   config: {
@@ -30,28 +42,39 @@ module.exports = {
 ```
 
 ### Running your plugin
-To load, your plugin should expose at least one API method. All possible methods are listed [here](https://github.com/vercel/hyper/blob/canary/app/plugins/extensions.ts).
+
+To load, your plugin should expose at least one API method. All possible
+methods are listed in the [extensions API list][extensions-api].
 
 After launching Hyper in dev mode, run `bun run app`. The app should log that
 the plugin has been correctly loaded: `Plugin hyper-awesome-plugin (0.1.0)
 loaded.` The name and version printed come from the plugin `package.json`
 file.
 
-A `console.log()` in plugin code appears in the Electron dev-tools only when
-it is located in a renderer method, such as component decorators. A
+A `console.log()` in plugin code appears in the Electron devtools only when it
+is located in a renderer method, such as component decorators. A
 `console.log()` in the Electron main process, such as the `onApp` handler,
 appears in the terminal that ran `bun run app` or in the VS Code console.
 
 ## Recipes
-Almost all available API methods can be found on https://hyper.is.
-If there's any missing, let us know or submit a PR to document it!
+
+Almost all available API methods can be found on [hyper.is][hyper-site]. If
+anything is missing, let us know or submit a PR to document it.
 
 ### Components
-You can decorate almost all Hyper components with a Higher-Order Component (HOC). To understand their architecture, the easiest way is to use React dev-tools to dig in to their hierarchy.
 
-Multiple plugins can decorate the same Hyper component. Thus, `Component` passed as first argument to your decorator function could possibly not be an original Hyper component but a HOC of a previous plugin. If you need to retrieve a reference to a real Hyper component, you can pass down a `onDecorated` handler.
+You can decorate almost all Hyper components with a Higher-Order Component
+(HOC). To understand their architecture, the easiest way is to use React
+devtools to dig into their hierarchy.
+
+Multiple plugins can decorate the same Hyper component. Thus, `Component`
+passed as first argument to your decorator function could possibly not be an
+original Hyper component but a HOC of a previous plugin. If you need to
+retrieve a reference to a real Hyper component, you can pass down an
+`onDecorated` handler.
+
 ```js
-exports.decorateTerms = (Terms, {React}) => {
+exports.decorateTerms = (Terms, { React }) => {
   return class extends React.Component {
     constructor(props, context) {
       super(props, context);
@@ -76,14 +99,21 @@ exports.decorateTerms = (Terms, {React}) => {
       // <Terms onDecorated={this.onDecorated} />
     }
   }
+}
 ```
-:warning: Note that you have to execute `this.props.onDecorated` to not break the handler chain. Without this, you could break other plugins that decorate the same component.
+
+Warning: execute `this.props.onDecorated` to avoid breaking the handler chain.
+Without this, you could break other plugins that decorate the same component.
 
 ### Keymaps
-If you want to add some keymaps, you need to do 2 things:
+
+If you want to add some keymaps, you need to do 2 things.
 
 #### Declare your key bindings
-Use the `decorateKeymaps` API handler to modify existing keymaps and add yours with the following format `command: hotkeys`.
+
+Use the `decorateKeymaps` API handler to modify existing keymaps and add yours
+with the following format `command: hotkeys`.
+
 ```js
 // Adding Keymaps
 exports.decorateKeymaps = keymaps => {
@@ -94,11 +124,17 @@ exports.decorateKeymaps = keymaps => {
   return Object.assign({}, keymaps, newKeymaps);
 }
 ```
-The command name can be whatever you want, but the following is better to respect the default naming convention: `<context>:<action>`.
-Hotkeys are composed by [Mousetrap supported keys](https://craig.is/killing/mice#keys).
 
-**Bonus feature**: if your command ends with `:prefix`, it would mean that you want to use this command with an additional digit to the command. Then Hyper will create all your commands under the hood. For example, this keymap `'pane:hide:prefix': 'ctrl+shift'` will automatically generate the following:
-```
+The command name can be whatever you want, but the following is better to
+respect the default naming convention: `<context>:<action>`.
+Hotkeys are composed by [Mousetrap supported keys][mousetrap-keys].
+
+**Bonus feature**: if your command ends with `:prefix`, it means you want to
+use this command with an additional digit. Hyper will create all your commands
+under the hood. For example, this keymap `'pane:hide:prefix': 'ctrl+shift'`
+will automatically generate the following:
+
+```js
 {
   'pane:hide:1': 'ctrl+shift+1',
   'pane:hide:2': 'ctrl+shift+2',
@@ -107,13 +143,18 @@ Hotkeys are composed by [Mousetrap supported keys](https://craig.is/killing/mice
   'pane:hide:last': 'ctrl+shift+9'
 }
 ```
-Notice that `9` has been replaced by `last` because most of the time this is handy if you have more than 9 items.
 
+Notice that `9` has been replaced by `last` because most of the time this is
+handy if you have more than 9 items.
 
 #### Register a handler for your commands
+
 ##### Renderer/Window
-Most of time, you'll want to execute some sort of handler in context of the renderer, like dispatching a Redux action.
-To trigger these handlers, you'll have to register them with the `registerCommands` Terms method.
+
+Most of time, you'll want to execute some sort of handler in context of the
+renderer, like dispatching a Redux action. To trigger these handlers, you'll
+have to register them with the `registerCommands` Terms method.
+
 ```js
 this.terms.registerCommands({
   'pane:maximize': e => {
@@ -125,8 +166,11 @@ this.terms.registerCommands({
 ```
 
 ##### Main process
-If there is no handler in the renderer for an existing command, an `rpc` message is emitted.
-If you want to execute a handler in main process you have to subscribe to a message, for example:
+
+If there is no handler in the renderer for an existing command, an `rpc`
+message is emitted. If you want to execute a handler in main process you have
+to subscribe to a message, for example:
+
 ```js
 rpc.on('command pane:snapshot', () => {
   /* Awesome snapshot feature */
@@ -134,15 +178,20 @@ rpc.on('command pane:snapshot', () => {
 ```
 
 ### Menu
-Your plugin can expose a `decorateMenu` function to modify the Hyper menu template.
-Check the [Electron documentation](https://electronjs.org/docs/api/menu-item) for more details about the different menu item types/options available.
 
-Be careful, a click handler will be executed on the main process. If you need to trigger a handler in the render process you need to use an `rpc` message like this:
+Your plugin can expose a `decorateMenu` function to modify the Hyper menu
+template. Check the [Electron documentation][electron-menu-item] for more
+details about the different menu item types and options available.
+
+Be careful, a click handler will be executed on the main process. If you need
+to trigger a handler in the render process you need to use an `rpc` message
+like this:
+
 ```js
-exports.decorateMenu = (menu) => {
+exports.decorateMenu = menu => {
   debug('decorateMenu');
   const isMac = process.platform === 'darwin';
-  // menu label is different on mac
+  // Menu label is different on mac
   const menuLabel = isMac ? 'Shell' : 'File';
 
   return menu.map(menuCategory => {
@@ -158,7 +207,7 @@ exports.decorateMenu = (menu) => {
         label: 'Clear all panes in all tabs',
         accelerator: 'ctrl+shift+y',
         click(item, focusedWindow) {
-          // on macOS, menu item can clicked without or minized window
+          // On macOS, menu items can be clicked without a focused window.
           if (focusedWindow) {
             focusedWindow.rpc.emit('clear allPanes');
           }
@@ -167,11 +216,12 @@ exports.decorateMenu = (menu) => {
     ]
   });
 }
-/* Plugin needs to register a rpc handler on renderer side for example in a Terms HOC*/
+
+// Plugin needs to register an rpc handler on the renderer side, for example:
 exports.decorateTerms = (Terms, { React }) => {
   return class extends React.Component {
     componentDidMount() {
-      window.rpc.on('clear allPanes',() => {
+      window.rpc.on('clear allPanes', () => {
         /* Awesome plugin feature */
       })
     }
@@ -180,12 +230,16 @@ exports.decorateTerms = (Terms, { React }) => {
 ```
 
 ### Cursor
-If your plugin needs to know cursor position/size, it can decorate the Term component and pass a handler. This handler will be called with each cursor move while passing back all information about the cursor.
+
+If your plugin needs to know cursor position or size, it can decorate the Term
+component and pass a handler. This handler will be called with each cursor
+move while passing back all information about the cursor.
+
 ```js
 exports.decorateTerm = (Term, { React, notify }) => {
   // Define and return our higher order component.
   return class extends React.Component {
-    onCursorMove (cursorFrame) {
+    onCursorMove(cursorFrame) {
       // Don't forget to propagate it to HOC chain
       if (this.props.onCursorMove) this.props.onCursorMove(cursorFrame);
 
@@ -197,7 +251,9 @@ exports.decorateTerm = (Term, { React, notify }) => {
 ```
 
 ### Require Electron
-Hyper doesn't provide a reference to electron. However plugins can directly require electron.
+
+Hyper doesn't provide a reference to electron. However plugins can directly
+require electron.
 
 ```js
 const electron = require('electron')
@@ -208,9 +264,23 @@ const { dialog, Menu } = require('electron')
 This is needed in order to allow show/hide to have proper return of focus.
 
 ## Hyper v2 breaking changes
-Hyper v2 uses `xterm.js` instead of `hterm`. It means that PTY output renders now in a canvas element, not with a hackable DOM structure.
-For example, plugins can't use TermCSS in order to modify text or link styles anymore. It is now required to use available configuration params that are passed down to `xterm.js`.
 
-If your plugin was deeply linked with the `hterm` API (even public methods), it certainly doesn't work anymore.
+Hyper v2 uses `xterm.js` instead of `hterm`. It means that PTY output renders
+now in a canvas element, not with a hackable DOM structure. For example,
+plugins can't use TermCSS in order to modify text or link styles anymore. It
+is now required to use available configuration params that are passed down to
+`xterm.js`.
 
-If your plugin needs some unavailable API to tweak `xterm.js`, please open an issue. We'll be happy to expose some existing `xterm.js` API or implement new ones.
+If your plugin was deeply linked with the `hterm` API (even public methods), it
+certainly doesn't work anymore.
+
+If your plugin needs some unavailable API to tweak `xterm.js`, please open an
+issue. We'll be happy to expose some existing `xterm.js` API or implement new
+ones.
+
+[electron-menu-item]: https://www.electronjs.org/docs/latest/api/menu-item
+<!-- markdownlint-disable-next-line MD013 -->
+[extensions-api]: https://github.com/vercel/hyper/blob/canary/app/plugins/extensions.ts
+[hyper-contrib]: https://github.com/vercel/hyper#contribute
+[hyper-site]: https://hyper.is
+[mousetrap-keys]: https://craig.is/killing/mice#keys
