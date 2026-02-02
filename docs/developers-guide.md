@@ -1,15 +1,14 @@
-<!--
-@file Developers' guide
-Purpose: Summarise local development practices and validation commands for
-the Velocetty repository.
-Invariants: Keep Makefile targets and validation steps aligned with CI and
-tooling changes.
-Cross-links: docs/testing-with-bun.md,
-docs/adr-001-replace-ava-with-bun-test.md,
-docs/roadmap.md
--->
-
 # Developers' guide
+
+## Module header
+
+- Purpose: Summarise local development practices and validation commands for
+  the Velocetty repository.
+- Invariants: Keep Makefile targets and validation steps aligned with CI and
+  tooling changes.
+- Cross-links: [Testing with Bun](docs/testing-with-bun.md),
+  [ADR 001](docs/adr-001-replace-ava-with-bun-test.md), and
+  [Roadmap](docs/roadmap.md).
 
 This guide captures the development practices specific to the Velocetty
 repository. It is intentionally concise and focused on the steps developers
@@ -58,8 +57,9 @@ CI. The driver can be overridden with `E2E_DRIVER=playwright` or
 `E2E_DRIVER=spawn`. Debug logging is opt-in with `E2E_DEBUG=1`, and
 `E2E_CAPTURE=1` captures a screenshot from the Electron app.
 
-Diagram: end-to-end test flow showing the prepare step, driver selection,
-and the Playwright versus spawn execution paths.
+For screen readers: The following flowchart outlines the E2E test flow,
+including the prepare step, driver selection, and the Playwright versus spawn
+paths.
 
 ```mermaid
 flowchart TB
@@ -93,7 +93,7 @@ flowchart TB
 
     subgraph SpawnLayer[Spawned E2E Layer]
         SpawnLaunch[Spawn packaged Electron app]
-        SpawnWait[Wait for PID + short delay]
+        SpawnWait[Wait for PID + readiness log marker]
         SpawnSmoke[Assert process stays up]
     end
 

@@ -1,4 +1,9 @@
-/** @file End-to-end smoke tests for packaged Electron builds. */
+/**
+ * @file End-to-end smoke tests for packaged Electron builds.
+ * Purpose: Validate that packaged Electron binaries can launch and respond.
+ * Usage: Set RUN_E2E=1, optionally E2E_DRIVER=playwright|spawn, E2E_DEBUG=1,
+ * or E2E_CAPTURE=1 for extra diagnostics.
+ */
 // Native
 import {spawn} from 'node:child_process';
 import path from 'node:path';
@@ -21,8 +26,28 @@ const isCi =
 const shouldWaitForWindow = !isCi;
 const debugE2E = process.env.E2E_DEBUG === '1';
 const driverOverride = process.env.E2E_DRIVER;
+const validDrivers = new Set(['playwright', 'spawn']);
+if (shouldRunE2E && driverOverride && !validDrivers.has(driverOverride)) {
+  throw new Error(`E2E_DRIVER must be "playwright" or "spawn", received "${driverOverride}".`);
+}
 const shouldUsePlaywright = driverOverride ? driverOverride === 'playwright' : !isCi;
 
+/**
+ * Returns a promise that rejects when the timeout elapses.
+ *
+ * # Parameters
+ * - `promise`: Work to race against the timeout.
+ * - `ms`: Timeout in milliseconds.
+ *
+ * # Returns
+ * The resolved value of `promise` if it finishes in time.
+ *
+ * # Examples
+ *
+ * ```ts
+ * await withTimeout(Promise.resolve('ok'), 500);
+ * ```
+ */
 const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   let didTimeout = false;
@@ -44,6 +69,18 @@ const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
   }
 };
 
+/**
+ * Resolves the packaged Electron binary path and platform-specific arguments.
+ *
+ * # Returns
+ * A binary path and any required launch arguments for the current platform.
+ *
+ * # Examples
+ *
+ * ```ts
+ * const {pathToBinary, launchArgs} = resolveLaunchConfig();
+ * ```
+ */
 const resolveLaunchConfig = () => {
   let pathToBinary: string;
   const launchArgs: string[] = [];
@@ -88,6 +125,32 @@ e2eTest(
     let app: ElectronApplication | null = null;
     let spawned: ReturnType<typeof spawn> | null = null;
     let spawnOutput = '';
+    let outputWatchers: Array<{matcher: RegExp; resolve: () => void}> = [];
+    const notifyOutputWatchers = () => {
+      outputWatchers.forEach((watcher) => {
+        if (watcher.matcher.test(spawnOutput)) {
+          watcher.resolve();
+        }
+      });
+    };
+    const waitForSpawnOutput = async (matcher: RegExp, timeoutMs: number) =>
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          if (matcher.test(spawnOutput)) {
+            resolve();
+            return;
+          }
+          const watcher = {
+            matcher,
+            resolve: () => {
+              outputWatchers = outputWatchers.filter((entry) => entry !== watcher);
+              resolve();
+            }
+          };
+          outputWatchers.push(watcher);
+        }),
+        timeoutMs
+      );
     try {
       const {pathToBinary, launchArgs} = resolveLaunchConfig();
       if (!(await fs.pathExists(pathToBinary))) {
@@ -123,6 +186,7 @@ e2eTest(
         spawned.stdout?.on('data', (data) => {
           const chunk = data.toString();
           spawnOutput += chunk;
+          notifyOutputWatchers();
           if (debugE2E) {
             process.stdout.write(chunk);
           }
@@ -130,6 +194,7 @@ e2eTest(
         spawned.stderr?.on('data', (data) => {
           const chunk = data.toString();
           spawnOutput += chunk;
+          notifyOutputWatchers();
           if (debugE2E) {
             process.stderr.write(chunk);
           }
@@ -146,27 +211,27 @@ e2eTest(
           launchTimeoutMs
         );
         log(`Spawned Electron PID: ${spawned.pid ?? 'unknown'}.`);
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await waitForSpawnOutput(/running in prod mode|electron will open/i, windowTimeoutMs);
         if (spawned.exitCode != null) {
           throw new Error(`Electron exited early with code ${spawned.exitCode}. Output:\n${spawnOutput}`);
         }
       }
-      await new Promise((resolve) => setTimeout(resolve, 2000));
     } finally {
       if (app && shouldCapture) {
         try {
-          const imageBuffer = await withTimeout(
-            app
-              .evaluate(({BrowserWindow}) =>
-                BrowserWindow.getFocusedWindow()
-                  ?.capturePage()
-                  .then((img) => img.toPNG().toString('base64'))
-              )
-              .then((img) => Buffer.from(img || '', 'base64')),
+          const encodedImage = await withTimeout(
+            app.evaluate(async ({BrowserWindow}) => {
+              const focusedWindow = BrowserWindow.getFocusedWindow();
+              if (!focusedWindow) {
+                return null;
+              }
+              const image = await focusedWindow.capturePage();
+              return image.toPNG().toString('base64');
+            }),
             2_000
           );
-          if (imageBuffer) {
-            await fs.writeFile(`dist/tmp/${process.platform}_test.png`, imageBuffer);
+          if (encodedImage) {
+            await fs.writeFile(`dist/tmp/${process.platform}_test.png`, Buffer.from(encodedImage, 'base64'));
           }
         } catch (error) {
           console.warn('Skipping E2E screenshot capture:', error);

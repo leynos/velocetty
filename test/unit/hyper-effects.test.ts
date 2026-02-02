@@ -61,6 +61,10 @@ const buildHyperProps = (overrides: Partial<HyperProps> = {}): HyperProps => ({
   ...overrides
 });
 
+const renderHyper = (root: ReturnType<typeof createRoot>, overrides: Partial<HyperProps> = {}) => {
+  root.render(React.createElement(Hyper, buildHyperProps(overrides)));
+};
+
 mock.module('../../lib/actions/ui', () => ({
   execCommand: () => ({type: 'exec'})
 }));
@@ -115,14 +119,7 @@ test.serial('Hyper attaches key listeners on mount and config updates', async ()
   const execCommand = () => {};
 
   await act(async () => {
-    root.render(
-      React.createElement(
-        Hyper,
-        buildHyperProps({
-          execCommand
-        })
-      )
-    );
+    renderHyper(root, {execCommand});
     await waitFor(0);
   });
 
@@ -131,31 +128,14 @@ test.serial('Hyper attaches key listeners on mount and config updates', async ()
   expect(resetCalls).toBe(0);
 
   await act(async () => {
-    root.render(
-      React.createElement(
-        Hyper,
-        buildHyperProps({
-          backgroundColor: '#111',
-          execCommand
-        })
-      )
-    );
+    renderHyper(root, {backgroundColor: '#111', execCommand});
     await waitFor(0);
   });
 
   expect(registerCalls).toBe(1);
 
   await act(async () => {
-    root.render(
-      React.createElement(
-        Hyper,
-        buildHyperProps({
-          backgroundColor: '#111',
-          lastConfigUpdate: 2,
-          execCommand
-        })
-      )
-    );
+    renderHyper(root, {backgroundColor: '#111', lastConfigUpdate: 2, execCommand});
     await waitFor(0);
   });
 
@@ -184,21 +164,14 @@ test.serial('Hyper focuses the active session when it changes', async () => {
   };
 
   await act(async () => {
-    root.render(React.createElement(Hyper, buildHyperProps()));
+    renderHyper(root);
     await waitFor(0);
   });
 
   expect(focusCalls).toBe(0);
 
   await act(async () => {
-    root.render(
-      React.createElement(
-        Hyper,
-        buildHyperProps({
-          activeSession: 'session-1'
-        })
-      )
-    );
+    renderHyper(root, {activeSession: 'session-1'});
     await waitFor(0);
   });
 

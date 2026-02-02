@@ -1,13 +1,13 @@
-<!--
-@file ExecPlan: replace AVA with Bun test runner
-Purpose: Track execution steps, risks, and decisions for migrating tests to
-Bun.
-Invariants: Keep progress, risks, and decision log current during execution.
-Cross-links: docs/adr-001-replace-ava-with-bun-test.md,
-docs/testing-with-bun.md, docs/developers-guide.md
--->
-
 # Replace AVA with Bun test runner
+
+## Module header
+
+- Purpose: Track execution steps, risks, and decisions for migrating tests to
+  Bun.
+- Invariants: Keep progress, risks, and decision log current during execution.
+- Cross-links: [ADR 001](docs/adr-001-replace-ava-with-bun-test.md),
+  [Testing with Bun](docs/testing-with-bun.md), and
+  [Developers' guide](docs/developers-guide.md).
 
 This ExecPlan is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -21,7 +21,7 @@ No `PLANS.md` file was found in the repository root at plan start.
 ## Purpose / Big picture
 
 Migrate unit and end-to-end (E2E) tests from AVA to Bun's built-in test
-runner so the repository uses a single primary runner, removes AVA
+runner, so the repository uses a single primary runner, removes AVA
 dependencies, and aligns with the Bun-first tooling strategy. Success is
 observable when `make check-fmt`, `make lint`, and `make test` all pass,
 unit tests run directly under `bun test`, E2E tests run under `bun test`
@@ -61,7 +61,7 @@ entry for AVA removal is marked done.
   Severity: high
   Likelihood: medium
   Mitigation: keep E2E tests isolated, gate them behind `RUN_E2E=1`, and
-  document any Bun-specific caveats; stop and escalate if Playwright
+  document any Bun-specific warnings; stop and escalate if Playwright
   fails under Bun.
 - Risk: AVA features (serial tests, teardown hooks) may not map 1:1.
   Severity: medium

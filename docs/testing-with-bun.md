@@ -1,14 +1,13 @@
-<!--
-@file Testing with Bun
-Purpose: Explain Bun's test runner capabilities, limitations, and how it fits
-with Playwright in this repository.
-Invariants: Keep guidance aligned with Bun versions and repository test
-commands.
-Cross-links: docs/developers-guide.md,
-docs/adr-001-replace-ava-with-bun-test.md
--->
-
 # Testing with Bun
+
+## Module header
+
+- Purpose: Explain Bun's test runner capabilities, limitations, and how it
+  fits with Playwright in this repository.
+- Invariants: Keep guidance aligned with Bun versions and repository test
+  commands.
+- Cross-links: [Developers' guide](docs/developers-guide.md) and
+  [ADR 001](docs/adr-001-replace-ava-with-bun-test.md).
 
 ## What Bun’s test runner is (and what it isn’t)
 

@@ -1,7 +1,7 @@
 /** @file Verifies updater wiring for autoUpdater events. */
 import {expect, mock, test} from 'bun:test';
 
-import {getElectronMock, registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
+import {configureElectronMock, registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
 
 /** Update lifecycle events that trigger renderer notifications. */
 type UpdateEvent = 'update-available' | 'update-downloaded';
@@ -71,6 +71,21 @@ const buildWindowStub = (rpcStub: ReturnType<typeof buildRpcStub>) => ({
   on: () => {}
 });
 
+const registerUpdaterMocks = (autoUpdater: AutoUpdaterStub) => {
+  mock.module('../../app/auto-updater-linux', () => ({default: autoUpdater}));
+  mock.module('../../app/config', () => ({getDefaultProfile: () => 'default'}));
+  mock.module('../../app/plugins', () => ({
+    getDecoratedConfig: () => ({disableAutoUpdates: true, updateChannel: 'stable'})
+  }));
+  mock.module('../../app/package.json', () => ({version: '0.0.0-test'}));
+  mock.module('async-retry', () => ({
+    default: async (fn: () => unknown) => await fn()
+  }));
+};
+
+/**
+ * Runs serially because it mutates shared module state (NODE_ENV and mocks).
+ */
 test.serial('updater wires update handlers and emits', async () => {
   const originalNodeEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = 'test';
@@ -84,20 +99,15 @@ test.serial('updater wires update handlers and emits', async () => {
 
     resetElectronMock();
     registerElectronMock();
-    const electronMock = getElectronMock();
-    electronMock.default.autoUpdater = autoUpdater;
-    electronMock.app.runningUnderARM64Translation = appStub.runningUnderARM64Translation;
-    electronMock.app.config = appStub.config;
+    configureElectronMock({
+      default: {autoUpdater},
+      app: {
+        runningUnderARM64Translation: appStub.runningUnderARM64Translation,
+        config: appStub.config
+      }
+    });
 
-    mock.module('../../app/auto-updater-linux', () => ({default: autoUpdater}));
-    mock.module('../../app/config', () => ({getDefaultProfile: () => 'default'}));
-    mock.module('../../app/plugins', () => ({
-      getDecoratedConfig: () => ({disableAutoUpdates: true, updateChannel: 'stable'})
-    }));
-    mock.module('../../app/package.json', () => ({version: '0.0.0-test'}));
-    mock.module('async-retry', () => ({
-      default: async (fn: () => unknown) => await fn()
-    }));
+    registerUpdaterMocks(autoUpdater);
 
     const {default: updater} = await import('../../app/updater');
 

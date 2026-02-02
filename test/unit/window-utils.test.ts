@@ -1,9 +1,9 @@
 /** @file Verifies window position validation against display layouts. */
 // eslint-disable-next-line eslint-comments/disable-enable-pair
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-call -- Electron mock registration is not typed. */
 import {beforeAll, beforeEach, expect, test} from 'bun:test';
 
-import {getElectronMock, registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
+import {configureElectronMock, registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
 
 type Display = {
   workArea: {
@@ -20,19 +20,16 @@ const screenStub = {
   getAllDisplays: (): Display[] => []
 };
 
-registerElectronMock();
-const electronMock = getElectronMock();
-electronMock.default.screen = screenStub;
-
 let positionIsValid: typeof import('../../app/utils/window-utils').positionIsValid;
 
 beforeAll(async () => {
+  registerElectronMock();
   ({positionIsValid} = await import('../../app/utils/window-utils'));
 });
 
 beforeEach(() => {
   resetElectronMock();
-  electronMock.default.screen = screenStub;
+  configureElectronMock({default: {screen: screenStub}});
 });
 
 const buildDisplay = (x: number, y: number, width: number, height: number): Display => ({

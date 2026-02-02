@@ -1,10 +1,20 @@
-# Technical Specification
+# Technical specification
 
-# 1. Introduction
+## Module header
 
-## 1.1 EXECUTIVE SUMMARY
+- Purpose: Describe the Velocetty codebase structure, requirements, and
+  implementation details for contributors.
+- Invariants: Keep the specification aligned with current architecture,
+  dependencies, and testing workflows.
+- Cross-links: [Velocetty design](docs/velocetty-design.md),
+  [Product requirements](docs/velocetty-product-requirements-document.md),
+  and [Testing with Bun](docs/testing-with-bun.md).
 
-### 1.1.1 Project Overview
+## 1. Introduction
+
+### 1.1 Executive summary
+
+#### 1.1.1 Project overview
 
 Velocetty is a fork of **Hyper** (version 4.0.0-canary.5), a terminal emulator originally built and maintained by Vercel (formerly ZEIT) and the open-source community. Licensed under the MIT License, Velocetty inherits Hyper's mission to create "a beautiful and extensible experience for command-line interface users, built on open web standards."
 
@@ -17,7 +27,7 @@ The project represents a strategic evolution of a mature, feature-rich terminal 
 | **Primary Language** | TypeScript |
 | **Platform Support** | macOS, Windows, Linux |
 
-### 1.1.2 Core Business Problem
+#### 1.1.2 Core business problem
 
 Velocetty addresses critical gaps in the terminal emulator market:
 
@@ -29,7 +39,7 @@ Velocetty addresses critical gaps in the terminal emulator market:
 
 4. **Cross-Platform Consistency**: Development teams working across macOS, Windows, and Linux need consistent terminal experiences. Velocetty's Electron-based architecture ensures uniform behavior and appearance.
 
-### 1.1.3 Key Stakeholders and Users
+#### 1.1.3 Key stakeholders and users
 
 | Stakeholder Category | Description | Primary Needs |
 |---------------------|-------------|---------------|
@@ -38,7 +48,7 @@ Velocetty addresses critical gaps in the terminal emulator market:
 | **Enterprise DevOps Teams** | Organizations standardizing development environments | Cross-platform consistency, configuration management, security |
 | **Design-Conscious Developers** | Users valuing aesthetics alongside functionality | Theming, visual customization, modern UI patterns |
 
-### 1.1.4 Expected Business Impact and Value Proposition
+#### 1.1.4 Expected business impact and value proposition
 
 **Value Proposition Matrix**
 
@@ -52,11 +62,11 @@ Velocetty addresses critical gaps in the terminal emulator market:
 
 ---
 
-## 1.2 SYSTEM OVERVIEW
+### 1.2 System overview
 
-### 1.2.1 Project Context
+#### 1.2.1 Project context
 
-#### Business Context and Market Positioning
+##### Business context and market positioning
 
 Velocetty operates in the terminal emulator segment, competing with native applications (iTerm2, Windows Terminal, GNOME Terminal) and web-technology-based alternatives (Hyper, Tabby, Warp). The project differentiates through:
 
@@ -64,7 +74,7 @@ Velocetty operates in the terminal emulator segment, competing with native appli
 - **Extension Ecosystem**: Deep React/Redux integration allows community-driven innovation
 - **Cross-Platform Parity**: Single codebase delivers consistent experience across operating systems
 
-#### Current System Architecture
+##### Current system architecture
 
 Velocetty inherits Hyper's well-documented Electron split-brain architecture:
 
@@ -101,7 +111,7 @@ flowchart TB
     SessionMgr --> PTY
 ```
 
-#### Integration with Existing Enterprise Landscape
+##### Integration with existing enterprise landscape
 
 Velocetty integrates with development environments through:
 
@@ -112,9 +122,9 @@ Velocetty integrates with development environments through:
 | Configuration | JSON file with XDG compliance | `app/config/paths.ts` |
 | Plugin Ecosystem | NPM-based plugin distribution | `cli/` tooling |
 
-### 1.2.2 High-Level Description
+#### 1.2.2 High-level description
 
-#### Primary System Capabilities
+##### Primary system capabilities
 
 1. **Terminal Emulation Core**
    - PTY session management with intelligent data batching (16ms/200KB thresholds)
@@ -139,7 +149,7 @@ Velocetty integrates with development environments through:
    - Windows: NSIS installer (x64 and arm64)
    - Linux: deb, rpm, AppImage, snap, and pacman packages
 
-#### Major System Components
+##### Major system components
 
 ```mermaid
 flowchart LR
@@ -193,7 +203,7 @@ flowchart LR
 | Menu System | `app/menus/` | Application menus with platform-specific variants |
 | Keymaps | `app/keymaps/` | Platform-specific keyboard shortcut definitions |
 
-#### Core Technical Approach
+##### Core technical approach
 
 **Technology Stack**
 
@@ -218,9 +228,9 @@ flowchart LR
 
 4. **Lazy PTY Creation**: First PTY session is created as early as possible during startup to minimize perceived launch time.
 
-### 1.2.3 Success Criteria
+#### 1.2.3 Success criteria
 
-#### Measurable Objectives
+##### Measurable objectives
 
 | Objective | Metric | Target |
 |-----------|--------|--------|
@@ -230,7 +240,7 @@ flowchart LR
 | Rendering Performance | Frame rate during scrolling | 60 fps (WebGL) |
 | Plugin Load Time | Extension initialization | < 500ms total |
 
-#### Critical Success Factors
+##### Critical success factors
 
 1. **Performance Parity with Native Terminals**: WebGL rendering must deliver frame rates comparable to native terminal applications, especially during rapid output (e.g., `find ~`, `cat largefile.log`).
 
@@ -240,7 +250,7 @@ flowchart LR
 
 4. **Configuration Migration**: Smooth transition path for users migrating from Hyper v3 JavaScript configs to Velocetty JSON/JSON5 format.
 
-#### Key Performance Indicators (KPIs)
+##### Key performance indicators (KPIs)
 
 | KPI Category | Indicator | Measurement Method |
 |--------------|-----------|-------------------|
@@ -252,11 +262,11 @@ flowchart LR
 
 ---
 
-## 1.3 SCOPE
+### 1.3 Scope
 
-### 1.3.1 In-Scope
+#### 1.3.1 In-scope
 
-#### Core Features and Functionalities
+##### Core features and functionalities
 
 **Must-Have Capabilities**
 
@@ -323,7 +333,7 @@ flowchart LR
    - Configuration file validation
    - Update signature verification
 
-#### Implementation Boundaries
+##### Implementation boundaries
 
 **System Boundaries**
 
@@ -383,9 +393,9 @@ flowchart TB
 | Session State | Window/tab layout | In-memory (per session) |
 | Terminal History | Scrollback buffer | In-memory (configurable limit) |
 
-### 1.3.2 Out-of-Scope
+#### 1.3.2 Out-of-scope
 
-#### Explicitly Excluded Features
+##### Explicitly excluded features
 
 | Feature | Rationale | Future Consideration |
 |---------|-----------|---------------------|
@@ -398,7 +408,7 @@ flowchart TB
 | **Integrated SSH Key Management** | Security complexity, existing tools sufficient | Not planned |
 | **Built-in Multiplexer (tmux-like)** | Scope creep, users have existing solutions | Not planned |
 
-#### Future Phase Considerations
+##### Future phase considerations
 
 **Phase 2 Candidates**
 
@@ -434,7 +444,7 @@ flowchart TB
    - Sandboxed plugin execution
    - Plugin signing and verification
 
-#### Integration Points Not Covered
+##### Integration points not covered
 
 | Integration | Status | Alternative |
 |-------------|--------|-------------|
@@ -443,7 +453,7 @@ flowchart TB
 | Container Runtime Integration | Out of scope | Users manage via shell |
 | Centralized Enterprise Deployment | Out of scope | Manual installation/configuration |
 
-#### Unsupported Use Cases
+##### Unsupported use cases
 
 1. **Headless/Server Operation**: Velocetty requires a graphical environment; headless terminal needs should use standard terminal emulators.
 
@@ -457,9 +467,9 @@ flowchart TB
 
 ---
 
-## 1.4 DOCUMENT CONVENTIONS
+### 1.4 Document conventions
 
-### 1.4.1 Terminology
+#### 1.4.1 Terminology
 
 | Term | Definition |
 |------|------------|
@@ -471,7 +481,7 @@ flowchart TB
 | **Profile** | Named configuration preset for shell and terminal settings |
 | **Term Group** | Logical grouping of split terminal panes within a tab |
 
-### 1.4.2 Version Information
+#### 1.4.2 Version information
 
 | Component | Version | Notes |
 |-----------|---------|-------|
@@ -483,9 +493,9 @@ flowchart TB
 
 ---
 
-## 1.5 REFERENCES
+### 1.5 References
 
-### 1.5.1 Repository Files Examined
+#### 1.5.1 Repository files examined
 
 | File Path | Relevance |
 |-----------|-----------|
@@ -503,7 +513,7 @@ flowchart TB
 | `lib/components/` | React UI component implementations |
 | `lib/reducers/` | Redux state management |
 
-### 1.5.2 Repository Folders Explored
+#### 1.5.2 Repository folders explored
 
 | Folder Path | Contents |
 |-------------|----------|
@@ -522,22 +532,27 @@ flowchart TB
 | `typings/` | TypeScript type definitions |
 | `test/` | Testing infrastructure |
 
-### 1.5.3 External References
+#### 1.5.3 External references
 
 | Source | Topic | Date |
 |--------|-------|------|
-| npm: xterm-addon-webgl | WebGL addon deprecation notice, recommending @xterm/* scoped packages | 2025 |
-| DoltHub Blog | Electron vs Tauri architectural comparison | November 2025 |
-| RaftLabs | Tauri 2.0 adoption metrics (35% YoY growth) and performance benchmarks | September 2025 |
-| GitHub: xterm.js | WebGL renderer limitations and texture atlas management | Various |
+| [npm: xterm-addon-webgl](https://www.npmjs.com/package/xterm-addon-webgl)[^ext-xterm-addon-webgl] | WebGL addon deprecation notice, recommending @xterm/* scoped packages | 2025 |
+| [DoltHub blog](https://www.dolthub.com/blog/)[^ext-dolthub] | Electron vs Tauri architectural comparison | November 2025 |
+| [RaftLabs](https://www.raftlabs.com/)[^ext-raftlabs] | Tauri 2.0 adoption metrics (35% YoY growth) and performance benchmarks | September 2025 |
+| [GitHub: xterm.js](https://github.com/xtermjs/xterm.js)[^ext-xtermjs] | WebGL renderer limitations and texture atlas management | Various |
 
-# 2. Product Requirements
+[^ext-xterm-addon-webgl]: <https://www.npmjs.com/package/xterm-addon-webgl>
+[^ext-dolthub]: <https://www.dolthub.com/blog/>
+[^ext-raftlabs]: <https://www.raftlabs.com/>
+[^ext-xtermjs]: <https://github.com/xtermjs/xterm.js>
 
-## 2.1 FEATURE CATALOG
+## 2. Product requirements
+
+### 2.1 Feature catalog
 
 This section provides a comprehensive catalog of Velocetty's discrete, testable features. Each feature is documented with metadata, descriptions, dependencies, and implementation context derived from the inherited Hyper codebase.
 
-### 2.1.1 Terminal Emulation Core
+#### 2.1.1 Terminal emulation core
 
 | Attribute | Value |
 |-----------|-------|
@@ -547,7 +562,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Priority Level** | Critical |
 | **Status** | Completed |
 
-#### Description
+##### Description
 
 | Aspect | Details |
 |--------|---------|
@@ -556,7 +571,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **User Benefits** | Fast, responsive terminal experience with hardware-accelerated rendering, configurable fonts, colors, and cursor styles |
 | **Technical Context** | Implements PTY management in `app/session.ts` with intelligent data batching (16ms time-based, 200KB size-based thresholds) to optimize IPC communication between main and renderer processes |
 
-#### Dependencies
+##### Dependencies
 
 | Dependency Type | Details |
 |-----------------|---------|
@@ -567,7 +582,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.1.2 Multi-Session Architecture
+#### 2.1.2 Multi-session architecture
 
 | Attribute | Value |
 |-----------|-------|
@@ -577,7 +592,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Priority Level** | Critical |
 | **Status** | Completed |
 
-#### Description
+##### Description
 
 | Aspect | Details |
 |--------|---------|
@@ -586,7 +601,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **User Benefits** | Organize work across windows/tabs, view multiple terminals side-by-side, quickly navigate between sessions |
 | **Technical Context** | Term groups organized as tree structure in `lib/reducers/term-groups.ts` with parent/child relationships; split pane minimum size constraint of 5% |
 
-#### Dependencies
+##### Dependencies
 
 | Dependency Type | Details |
 |-----------------|---------|
@@ -597,7 +612,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.1.3 In-Terminal Search
+#### 2.1.3 In-terminal search
 
 | Attribute | Value |
 |-----------|-------|
@@ -607,7 +622,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Priority Level** | High |
 | **Status** | Completed |
 
-#### Description
+##### Description
 
 | Aspect | Details |
 |--------|---------|
@@ -616,7 +631,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **User Benefits** | Find text in terminal history, navigate search results, filter with regex patterns |
 | **Technical Context** | Implemented via `xterm-addon-search` 0.13.0 with overlay component in `lib/components/searchBox.tsx` |
 
-#### Dependencies
+##### Dependencies
 
 | Dependency Type | Details |
 |-----------------|---------|
@@ -627,7 +642,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.1.4 Configuration System
+#### 2.1.4 Configuration system
 
 | Attribute | Value |
 |-----------|-------|
@@ -637,7 +652,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Priority Level** | Critical |
 | **Status** | Completed |
 
-#### Description
+##### Description
 
 | Aspect | Details |
 |--------|---------|
@@ -646,7 +661,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **User Benefits** | Customize appearance, behavior, and shell settings; create multiple profiles for different workflows |
 | **Technical Context** | Configuration subsystem in `app/config/` with schema validation via `app/config/schema.json`, hot-reload via chokidar file watching |
 
-#### Dependencies
+##### Dependencies
 
 | Dependency Type | Details |
 |-----------------|---------|
@@ -657,7 +672,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.1.5 Plugin/Extension System
+#### 2.1.5 Plugin/extension system
 
 | Attribute | Value |
 |-----------|-------|
@@ -667,7 +682,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Priority Level** | Critical |
 | **Status** | Completed |
 
-#### Description
+##### Description
 
 | Aspect | Details |
 |--------|---------|
@@ -676,7 +691,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **User Benefits** | Install themes, add features, customize UI, integrate with external tools |
 | **Technical Context** | Extension hooks defined in `app/plugins/extensions.ts`; plugins are universal Node.js modules loaded by both Electron main and renderer processes |
 
-#### Dependencies
+##### Dependencies
 
 | Dependency Type | Details |
 |-----------------|---------|
@@ -687,7 +702,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.1.6 Keyboard Shortcuts System
+#### 2.1.6 Keyboard shortcuts system
 
 | Attribute | Value |
 |-----------|-------|
@@ -697,7 +712,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Priority Level** | High |
 | **Status** | Completed |
 
-#### Description
+##### Description
 
 | Aspect | Details |
 |--------|---------|
@@ -706,7 +721,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **User Benefits** | Efficient navigation, session management, and editing without mouse interaction |
 | **Technical Context** | Platform keymaps in `app/keymaps/` (darwin.json, linux.json, win32.json); command registry in `lib/command-registry.ts` |
 
-#### Dependencies
+##### Dependencies
 
 | Dependency Type | Details |
 |-----------------|---------|
@@ -717,7 +732,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.1.7 Application Menu System
+#### 2.1.7 Application menu system
 
 | Attribute | Value |
 |-----------|-------|
@@ -727,7 +742,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Priority Level** | High |
 | **Status** | Completed |
 
-#### Description
+##### Description
 
 | Aspect | Details |
 |--------|---------|
@@ -736,7 +751,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **User Benefits** | Access all features through familiar menu structure, learn keyboard shortcuts via menu hints |
 | **Technical Context** | Menu templates in `app/menus/menus/` with platform variants; dynamic profile menu generation from configuration |
 
-#### Dependencies
+##### Dependencies
 
 | Dependency Type | Details |
 |-----------------|---------|
@@ -747,7 +762,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.1.8 Auto-Update System
+#### 2.1.8 Auto-update system
 
 | Attribute | Value |
 |-----------|-------|
@@ -757,7 +772,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Priority Level** | High |
 | **Status** | Completed |
 
-#### Description
+##### Description
 
 | Aspect | Details |
 |--------|---------|
@@ -766,7 +781,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **User Benefits** | Automatic notifications of updates, easy update installation, channel selection for early access |
 | **Technical Context** | Implemented in `app/updater.ts` with Linux-specific handler in `app/auto-updater-linux.ts`; polling at 10s initial, then 30-minute intervals |
 
-#### Dependencies
+##### Dependencies
 
 | Dependency Type | Details |
 |-----------------|---------|
@@ -777,7 +792,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.1.9 Command-Line Interface (CLI)
+#### 2.1.9 Command-line interface (CLI)
 
 | Attribute | Value |
 |-----------|-------|
@@ -787,7 +802,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Priority Level** | Medium |
 | **Status** | Completed |
 
-#### Description
+##### Description
 
 | Aspect | Details |
 |--------|---------|
@@ -796,7 +811,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **User Benefits** | Install/remove plugins from terminal, search plugin registry, launch application |
 | **Technical Context** | Implemented in `cli/` directory with API operations in `cli/api.ts` |
 
-#### Dependencies
+##### Dependencies
 
 | Dependency Type | Details |
 |-----------------|---------|
@@ -807,7 +822,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.1.10 Cross-Platform Support
+#### 2.1.10 Cross-platform support
 
 | Attribute | Value |
 |-----------|-------|
@@ -817,7 +832,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Priority Level** | Critical |
 | **Status** | Completed |
 
-#### Description
+##### Description
 
 | Aspect | Details |
 |--------|---------|
@@ -826,7 +841,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **User Benefits** | Same features and appearance regardless of OS, platform-native behaviors where appropriate |
 | **Technical Context** | Build configuration in `electron-builder.json`; platform utilities in `app/utils/` |
 
-#### Dependencies
+##### Dependencies
 
 | Dependency Type | Details |
 |-----------------|---------|
@@ -837,7 +852,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.1.11 Notification System
+#### 2.1.11 Notification system
 
 | Attribute | Value |
 |-----------|-------|
@@ -847,7 +862,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Priority Level** | Medium |
 | **Status** | Completed |
 
-#### Description
+##### Description
 
 | Aspect | Details |
 |--------|---------|
@@ -856,7 +871,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **User Benefits** | Receive update notifications, resize confirmations, plugin messages |
 | **Technical Context** | Implemented in `app/notifications.ts` and `lib/components/notifications.tsx` |
 
-#### Dependencies
+##### Dependencies
 
 | Dependency Type | Details |
 |-----------------|---------|
@@ -867,7 +882,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.1.12 Performance Optimization
+#### 2.1.12 Performance optimization
 
 | Attribute | Value |
 |-----------|-------|
@@ -877,7 +892,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Priority Level** | High |
 | **Status** | Completed |
 
-#### Description
+##### Description
 
 | Aspect | Details |
 |--------|---------|
@@ -886,7 +901,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **User Benefits** | Fast application startup, responsive terminal output, smooth scrolling |
 | **Technical Context** | Data batching in `app/session.ts`, write middleware bypass in `lib/store/write-middleware.ts`, V8 snapshot utilities in `lib/v8-snapshot-util.ts` |
 
-#### Dependencies
+##### Dependencies
 
 | Dependency Type | Details |
 |-----------------|---------|
@@ -897,11 +912,11 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-## 2.2 FUNCTIONAL REQUIREMENTS TABLES
+### 2.2 Functional requirements tables
 
-### 2.2.1 Terminal Emulation Core (F-001)
+#### 2.2.1 Terminal emulation core (F-001)
 
-#### Requirements Table
+##### Requirements table
 
 | Requirement ID | Description | Priority |
 |----------------|-------------|----------|
@@ -914,7 +929,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | F-001-RQ-007 | Support configurable scrollback buffer | Should-Have |
 | F-001-RQ-008 | Handle terminal resize events | Must-Have |
 
-#### F-001-RQ-001: PTY Session Creation
+##### F-001-RQ-001: PTY session creation
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -931,7 +946,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Data Validation** | Shell path must exist and be executable; rows/cols must be positive integers |
 | **Security Requirements** | Environment variables sanitized; shell execution respects OS permissions |
 
-#### F-001-RQ-002: Terminal Output Rendering
+##### F-001-RQ-002: terminal output rendering
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -948,7 +963,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Data Validation** | Buffer data UTF-8 encoded |
 | **Security Requirements** | Terminal escape sequences cannot access local resources |
 
-#### F-001-RQ-005: WebGL Rendering
+##### F-001-RQ-005: WebGL rendering
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -967,9 +982,9 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.2.2 Multi-Session Architecture (F-002)
+#### 2.2.2 Multi-session architecture (F-002)
 
-#### Requirements Table
+##### Requirements table
 
 | Requirement ID | Description | Priority |
 |----------------|-------------|----------|
@@ -982,7 +997,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | F-002-RQ-007 | Resize split panes | Should-Have |
 | F-002-RQ-008 | Close sessions with confirmation | Must-Have |
 
-#### F-002-RQ-001: Tab Creation
+##### F-002-RQ-001: tab creation
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -999,7 +1014,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Data Validation** | Profile name must exist in configuration |
 | **Security Requirements** | Session inherits configured environment only |
 
-#### F-002-RQ-003: Horizontal Split
+##### F-002-RQ-003: horizontal split
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -1018,9 +1033,9 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.2.3 In-Terminal Search (F-003)
+#### 2.2.3 In-terminal search (F-003)
 
-#### Requirements Table
+##### Requirements table
 
 | Requirement ID | Description | Priority |
 |----------------|-------------|----------|
@@ -1032,7 +1047,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | F-003-RQ-006 | Support regular expressions | Should-Have |
 | F-003-RQ-007 | Close search overlay | Must-Have |
 
-#### F-003-RQ-002: Buffer Search
+##### F-003-RQ-002: buffer search
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -1051,9 +1066,9 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.2.4 Configuration System (F-004)
+#### 2.2.4 Configuration system (F-004)
 
-#### Requirements Table
+##### Requirements table
 
 | Requirement ID | Description | Priority |
 |----------------|-------------|----------|
@@ -1065,7 +1080,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | F-004-RQ-006 | Migrate legacy v3 configurations | Should-Have |
 | F-004-RQ-007 | Store configuration in XDG-compliant paths | Must-Have |
 
-#### F-004-RQ-001: Configuration Loading
+##### F-004-RQ-001: configuration loading
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -1082,7 +1097,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Data Validation** | JSON syntax validation; schema validation for all fields |
 | **Security Requirements** | Configuration file permissions checked on startup |
 
-#### F-004-RQ-004: Hot Reload
+##### F-004-RQ-004: hot reload
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -1101,9 +1116,9 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.2.5 Plugin/Extension System (F-005)
+#### 2.2.5 Plugin/extension system (F-005)
 
-#### Requirements Table
+##### Requirements table
 
 | Requirement ID | Description | Priority |
 |----------------|-------------|----------|
@@ -1116,7 +1131,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | F-005-RQ-007 | Hot-reload plugins | Should-Have |
 | F-005-RQ-008 | Support local plugin development | Should-Have |
 
-#### F-005-RQ-001: Plugin Loading
+##### F-005-RQ-001: plugin loading
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -1133,7 +1148,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | **Data Validation** | Plugin must export valid hook functions |
 | **Security Requirements** | Full-trust execution model (no sandboxing) |
 
-#### F-005-RQ-004: UI Decoration Hooks
+##### F-005-RQ-004: UI decoration hooks
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -1152,9 +1167,9 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.2.6 Keyboard Shortcuts System (F-006)
+#### 2.2.6 Keyboard shortcuts system (F-006)
 
-#### Requirements Table
+##### Requirements table
 
 | Requirement ID | Description | Priority |
 |----------------|-------------|----------|
@@ -1164,7 +1179,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | F-006-RQ-004 | Support customizable keymaps via plugins | Should-Have |
 | F-006-RQ-005 | Support prefix commands with numbered variants | Should-Have |
 
-#### F-006-RQ-001: Platform Keymaps
+##### F-006-RQ-001: platform keymaps
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -1183,9 +1198,9 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.2.7 Auto-Update System (F-008)
+#### 2.2.7 Auto-update system (F-008)
 
-#### Requirements Table
+##### Requirements table
 
 | Requirement ID | Description | Priority |
 |----------------|-------------|----------|
@@ -1197,7 +1212,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | F-008-RQ-006 | Support architecture-aware updates | Should-Have |
 | F-008-RQ-007 | Allow disabling auto-updates | Should-Have |
 
-#### F-008-RQ-002: Periodic Update Checks
+##### F-008-RQ-002: periodic update checks
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -1216,9 +1231,9 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-### 2.2.8 CLI Tool (F-009)
+#### 2.2.8 CLI tool (F-009)
 
-#### Requirements Table
+##### Requirements table
 
 | Requirement ID | Description | Priority |
 |----------------|-------------|----------|
@@ -1229,7 +1244,7 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 | F-009-RQ-005 | Open plugin documentation | Should-Have |
 | F-009-RQ-006 | Launch Hyper application | Should-Have |
 
-#### F-009-RQ-001: Plugin Installation
+##### F-009-RQ-001: plugin installation
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -1248,9 +1263,9 @@ This section provides a comprehensive catalog of Velocetty's discrete, testable 
 
 ---
 
-## 2.3 FEATURE RELATIONSHIPS
+### 2.3 Feature relationships
 
-### 2.3.1 Feature Dependencies Map
+#### 2.3.1 Feature dependencies map
 
 The following diagram illustrates the dependency relationships between Velocetty features:
 
@@ -1290,7 +1305,7 @@ flowchart TB
     F010 --> F008
 ```
 
-### 2.3.2 Integration Points
+#### 2.3.2 Integration points
 
 | Source Feature | Target Feature | Integration Type |
 |----------------|----------------|------------------|
@@ -1307,7 +1322,7 @@ flowchart TB
 | F-009 CLI | F-004 Configuration | Configuration file modification |
 | F-009 CLI | F-005 Plugins | Plugin installation/removal |
 
-### 2.3.3 Shared Components
+#### 2.3.3 Shared components
 
 | Component | Location | Used By Features |
 |-----------|----------|------------------|
@@ -1317,7 +1332,7 @@ flowchart TB
 | Command Registry | `lib/command-registry.ts` | F-006, F-007 |
 | Notification Manager | `app/notifications.ts` | F-008, F-011, F-012 |
 
-### 2.3.4 Common Services
+#### 2.3.4 Common services
 
 | Service | Location | Consuming Features |
 |---------|----------|-------------------|
@@ -1329,9 +1344,9 @@ flowchart TB
 
 ---
 
-## 2.4 IMPLEMENTATION CONSIDERATIONS
+### 2.4 Implementation considerations
 
-### 2.4.1 Terminal Emulation Core (F-001)
+#### 2.4.1 Terminal emulation core (F-001)
 
 | Consideration | Details |
 |---------------|---------|
@@ -1341,7 +1356,7 @@ flowchart TB
 | **Security Implications** | PTY sessions execute with user privileges; environment variable passing must be controlled |
 | **Maintenance Requirements** | node-pty requires native module rebuilding for Electron version changes; xterm.js updates may require addon compatibility testing |
 
-### 2.4.2 Multi-Session Architecture (F-002)
+#### 2.4.2 Multi-session architecture (F-002)
 
 | Consideration | Details |
 |---------------|---------|
@@ -1351,7 +1366,7 @@ flowchart TB
 | **Security Implications** | Per-window session isolation; sessions cannot access other session data |
 | **Maintenance Requirements** | Term group reducer logic complex; split/resize operations must maintain tree consistency |
 
-### 2.4.3 Configuration System (F-004)
+#### 2.4.3 Configuration system (F-004)
 
 | Consideration | Details |
 |---------------|---------|
@@ -1361,7 +1376,7 @@ flowchart TB
 | **Security Implications** | Configuration file should be user-writable only; plugin names validated before installation |
 | **Maintenance Requirements** | Schema must be updated with new configuration options; migration paths for version changes |
 
-### 2.4.4 Plugin/Extension System (F-005)
+#### 2.4.4 Plugin/extension system (F-005)
 
 | Consideration | Details |
 |---------------|---------|
@@ -1371,7 +1386,7 @@ flowchart TB
 | **Security Implications** | Plugins have full access to file system, network, and process; users must trust plugin authors; no capability-based permissions |
 | **Maintenance Requirements** | 40+ hooks must remain stable for ecosystem compatibility; breaking changes require major version |
 
-### 2.4.5 Performance Optimization (F-012)
+#### 2.4.5 Performance optimization (F-012)
 
 | Consideration | Details |
 |---------------|---------|
@@ -1381,7 +1396,7 @@ flowchart TB
 | **Security Implications** | WebGL context isolation per terminal |
 | **Maintenance Requirements** | Batching thresholds may require tuning; WebGL compatibility testing across GPU vendors |
 
-### 2.4.6 Cross-Platform Support (F-010)
+#### 2.4.6 Cross-platform support (F-010)
 
 | Consideration | Details |
 |---------------|---------|
@@ -1393,9 +1408,9 @@ flowchart TB
 
 ---
 
-## 2.5 TRACEABILITY MATRIX
+### 2.5 Traceability matrix
 
-### 2.5.1 Feature to Source File Mapping
+#### 2.5.1 Feature to source file mapping
 
 | Feature ID | Primary Source Files |
 |------------|---------------------|
@@ -1412,7 +1427,7 @@ flowchart TB
 | F-011 | `app/notifications.ts`, `lib/components/notifications.tsx` |
 | F-012 | `app/session.ts`, `lib/store/write-middleware.ts`, `lib/v8-snapshot-util.ts` |
 
-### 2.5.2 Requirement to Component Mapping
+#### 2.5.2 Requirement to component mapping
 
 | Requirement ID | Components | Dependencies |
 |----------------|------------|--------------|
@@ -1432,9 +1447,9 @@ flowchart TB
 
 ---
 
-## 2.6 REFERENCES
+### 2.6 References
 
-#### Files Examined
+##### Files examined
 
 - `app/session.ts` - PTY session management, data batching implementation
 - `lib/components/term.tsx` - Terminal React component
@@ -1468,7 +1483,7 @@ flowchart TB
 - `lib/v8-snapshot-util.ts` - V8 snapshot utilities
 - `package.json` - Project dependencies and metadata
 
-#### External Dependencies Referenced
+##### External dependencies referenced
 
 - Electron 22.3.25
 - React 18.2.0
@@ -1482,13 +1497,13 @@ flowchart TB
 - chokidar (file watching)
 - electron-store (state persistence)
 
-# 3. Technology Stack
+## 3. Technology stack
 
 This section provides a comprehensive reference of the technologies, frameworks, libraries, and tools that comprise Velocetty's technical foundation. As a fork of the Hyper terminal emulator originally developed by Vercel, Velocetty inherits a mature, web-standards-based technology stack optimized for terminal emulation across desktop platforms.
 
-## 3.1 PROGRAMMING LANGUAGES
+### 3.1 Programming languages
 
-### 3.1.1 Primary Language: TypeScript
+#### 3.1.1 Primary language: TypeScript
 
 | Attribute | Value |
 |-----------|-------|
@@ -1497,7 +1512,7 @@ This section provides a comprehensive reference of the technologies, frameworks,
 | **Module System** | CommonJS |
 | **Configuration** | `tsconfig.base.json` with strict mode enabled |
 
-#### Language Selection Justification
+##### Language selection justification
 
 TypeScript serves as Velocetty's primary development language, chosen for the following architectural reasons:
 
@@ -1509,9 +1524,9 @@ TypeScript serves as Velocetty's primary development language, chosen for the fo
 
 4. **Plugin API Contracts**: The 40+ extension hooks documented in `typings/` establish clear API contracts for third-party plugin developers.
 
-#### TypeScript Configuration
+##### TypeScript configuration
 
-```
+```plaintext
 Base Configuration (tsconfig.base.json):
 ├── Target: ES2022 (modern JavaScript features)
 ├── Module: CommonJS (Node.js compatibility)
@@ -1520,7 +1535,7 @@ Base Configuration (tsconfig.base.json):
 └── Declaration: Enabled (type definition generation)
 ```
 
-### 3.1.2 Secondary Languages
+#### 3.1.2 Secondary languages
 
 | Language | Usage | Locations |
 |----------|-------|-----------|
@@ -1528,7 +1543,7 @@ Base Configuration (tsconfig.base.json):
 | **JSON** | Configuration, schemas, package manifests | `package.json`, `schema.json`, `*.json` keymaps |
 | **CSS** | Styling within styled-jsx templates | Embedded in React components |
 
-### 3.1.3 Language Constraints and Dependencies
+#### 3.1.3 Language constraints and dependencies
 
 | Constraint | Description |
 |------------|-------------|
@@ -1537,9 +1552,9 @@ Base Configuration (tsconfig.base.json):
 | **Native Module Compatibility** | `node-pty` requires matching Node.js ABI version for native bindings |
 | **ES Module Limitations** | CommonJS required for Electron main process compatibility |
 
-## 3.2 FRAMEWORKS & LIBRARIES
+### 3.2 Frameworks & libraries
 
-### 3.2.1 Application Shell Framework
+#### 3.2.1 Application shell framework
 
 ```mermaid
 flowchart TB
@@ -1567,7 +1582,7 @@ flowchart TB
     MainProcess --> NodeRuntime
 ```
 
-#### Core Framework: Electron
+##### Core framework: Electron
 
 | Attribute | Value |
 |-----------|-------|
@@ -1581,7 +1596,7 @@ flowchart TB
 
 **Technical Debt Note**: Electron 22 reached end-of-life on October 10, 2023. While extended support was provided for Windows 7/8/8.1 compatibility, this version no longer receives security updates. Upgrading to a supported Electron version is a critical future consideration.
 
-#### IPC Communication Layer
+##### IPC communication layer
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -1589,7 +1604,7 @@ flowchart TB
 
 **Architectural Note**: The `@electron/remote` package facilitates the communication pattern between processes, though its use is being deprecated in favor of explicit IPC messaging for security reasons.
 
-### 3.2.2 UI Framework Stack
+#### 3.2.2 UI framework stack
 
 ```mermaid
 flowchart LR
@@ -1615,7 +1630,7 @@ flowchart LR
     StateStack --> DevTools
 ```
 
-#### React Ecosystem
+##### React ecosystem
 
 | Package | Version | Purpose | Justification |
 |---------|---------|---------|---------------|
@@ -1626,7 +1641,7 @@ flowchart LR
 
 **Selection Justification**: React was chosen for its composability model, which directly enables Velocetty's powerful plugin decoration system. Plugins can wrap and extend React components (tabs, header, terminal view, split panes) through the `decorate*` hooks defined in the extension API.
 
-#### Redux State Management
+##### Redux state management
 
 | Package | Version | Purpose | Justification |
 |---------|---------|---------|---------------|
@@ -1643,7 +1658,7 @@ flowchart LR
 
 **Performance Optimization**: The `SESSION_PTY_DATA` action bypasses Redux middleware entirely via the write middleware pattern (`lib/store/write-middleware.ts`) to minimize latency for high-volume terminal output.
 
-### 3.2.3 Terminal Emulation Stack
+#### 3.2.3 Terminal emulation stack
 
 ```mermaid
 flowchart TB
@@ -1670,7 +1685,7 @@ flowchart TB
     WebGLAddon -.->|"Fallback"| CanvasAddon
 ```
 
-## xterm.js Core
+### xterm.js core
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -1683,7 +1698,7 @@ flowchart TB
 - ANSI color support
 - Accessibility features (screen reader mode)
 
-#### Rendering Addons
+##### Rendering addons
 
 | Package | Version | Purpose | Constraint |
 |---------|---------|---------|------------|
@@ -1692,7 +1707,7 @@ flowchart TB
 
 **Critical Constraint**: The WebGL renderer is limited to 16 simultaneous terminal contexts. This browser-level limitation means that when viewing more than 16 terminals simultaneously, some terminals must fall back to the canvas renderer. Velocetty should prioritize WebGL allocation to visible panes rather than using first-come-first-served allocation.
 
-#### Feature Addons
+##### Feature addons
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -1705,7 +1720,7 @@ flowchart TB
 
 **Rendering Architecture Note**: xterm.js renders terminal output to a canvas element, not a DOM structure. This means plugins cannot directly manipulate terminal row/glyph elements—metadata display (such as tab icons or CWD indicators) must use explicit APIs rather than DOM inspection.
 
-### 3.2.4 PTY and Shell Integration
+#### 3.2.4 PTY and shell integration
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -1722,7 +1737,7 @@ flowchart TB
 
 **Native Module Constraint**: `node-pty` is a native Node.js addon requiring compilation for each platform/architecture/Electron version combination. The rebuild process is documented in the development workflow and CI/CD configuration.
 
-### 3.2.5 Utility Libraries
+#### 3.2.5 Utility libraries
 
 | Category | Package | Version | Purpose |
 |----------|---------|---------|---------|
@@ -1742,16 +1757,16 @@ flowchart TB
 | **Plist Parsing** | `plist` | 3.1.0 | macOS plist file support |
 | **Keyboard Shortcuts** | `mousetrap` | Fork: `chabou/mousetrap#useCapture` | Keyboard shortcut handling |
 
-## 3.3 OPEN SOURCE DEPENDENCIES
+### 3.3 Open source dependencies
 
-### 3.3.1 Package Registry Configuration
+#### 3.3.1 Package registry configuration
 
 | Registry | Purpose |
 |----------|---------|
 | **npm** | Primary package registry for all JavaScript/TypeScript dependencies |
 | **registry-url** | Dynamic registry resolution for plugin installation |
 
-### 3.3.2 Root Package Dependencies
+#### 3.3.2 Root package dependencies
 
 The root `package.json` defines development-time dependencies and build tools:
 
@@ -1776,7 +1791,7 @@ Root Dependencies (package.json):
 └── xterm-addon-webgl: 0.16.0
 ```
 
-### 3.3.3 Runtime Package Dependencies
+#### 3.3.3 Runtime package dependencies
 
 The `app/package.json` defines runtime dependencies bundled with the application:
 
@@ -1800,7 +1815,7 @@ Optional Dependencies:
 └── native-reg: 1.1.1 (Windows registry access)
 ```
 
-### 3.3.4 Dependency Version Policy
+#### 3.3.4 Dependency version policy
 
 | Policy | Description |
 |--------|-------------|
@@ -1808,7 +1823,7 @@ Optional Dependencies:
 | **Caret Ranges** | Utility libraries use caret (`^`) ranges for automatic patch updates |
 | **Lock File** | `bun.lock` ensures consistent dependency resolution across environments |
 
-### 3.3.5 Security Considerations
+#### 3.3.5 Security considerations
 
 | Consideration | Mitigation |
 |---------------|------------|
@@ -1816,9 +1831,9 @@ Optional Dependencies:
 | **Native Module Security** | `node-pty` executes with user privileges; no elevation by default |
 | **Plugin Trust Model** | Plugins are full-trust Node.js modules with unrestricted access |
 
-## 3.4 THIRD-PARTY SERVICES
+### 3.4 Third-party services
 
-### 3.4.1 External Service Architecture
+#### 3.4.1 External service architecture
 
 ```mermaid
 flowchart LR
@@ -1841,7 +1856,7 @@ flowchart LR
     PluginManager --> NPMSSearch
 ```
 
-### 3.4.2 Auto-Update Service
+#### 3.4.2 Auto-update service
 
 | Attribute | Value |
 |-----------|-------|
@@ -1855,7 +1870,7 @@ flowchart LR
 - Platform-specific update mechanisms (Squirrel for macOS/Windows)
 - Custom Linux update handler for non-Squirrel platforms
 
-### 3.4.3 Plugin Discovery and Distribution
+#### 3.4.3 Plugin discovery and distribution
 
 | Service | Endpoint | Purpose |
 |---------|----------|---------|
@@ -1866,7 +1881,7 @@ flowchart LR
 - `hyper-plugin`: Functional extensions
 - `hyper-theme`: Visual themes
 
-### 3.4.4 Notification Service
+#### 3.4.4 Notification service
 
 | Attribute | Value |
 |-----------|-------|
@@ -1875,15 +1890,15 @@ flowchart LR
 | **Purpose** | Fetch product announcements and notifications |
 | **Implementation** | `app/notifications.ts` |
 
-### 3.4.5 Protocol Handlers
+#### 3.4.5 Protocol handlers
 
 | Protocol | Handler | Registration |
 |----------|---------|--------------|
 | `ssh://` | Default SSH client | `electron-builder.json` protocol registration |
 
-## 3.5 DATABASES & STORAGE
+### 3.5 Databases & storage
 
-### 3.5.1 Storage Architecture
+#### 3.5.1 Storage architecture
 
 Velocetty operates as a desktop application without network database dependencies. All persistence is file-based and local to the user's system.
 
@@ -1914,7 +1929,7 @@ flowchart TB
     StorageLayer --> FileSystem
 ```
 
-### 3.5.2 Configuration Storage
+#### 3.5.2 Configuration storage
 
 | Storage Type | Technology | Location | Purpose |
 |--------------|------------|----------|---------|
@@ -1922,7 +1937,7 @@ flowchart TB
 | **Configuration Schema** | JSON Schema | `app/config/schema.json` | Configuration validation |
 | **Legacy Migration** | JavaScript → JSON | Auto-converted from `.hyper.js` | Backward compatibility |
 
-#### Platform-Specific Paths
+##### Platform-specific paths
 
 | Platform | Configuration Directory |
 |----------|------------------------|
@@ -1930,7 +1945,7 @@ flowchart TB
 | **macOS** | `~/.config/Hyper` |
 | **Windows** | `%APPDATA%/Hyper` |
 
-#### Configuration File Structure
+##### Configuration file structure
 
 ```
 Configuration Directory:
@@ -1941,7 +1956,7 @@ Configuration Directory:
 └── .migration-marker    # Migration tracking
 ```
 
-### 3.5.3 Application State Storage
+#### 3.5.3 Application state storage
 
 | Storage Type | Technology | Persistence | Purpose |
 |--------------|------------|-------------|---------|
@@ -1950,7 +1965,7 @@ Configuration Directory:
 
 **Design Decision**: Session state (including terminal scrollback) is intentionally not persisted across application restarts. This aligns with traditional terminal emulator behavior and avoids potential security concerns with persisting command history.
 
-### 3.5.4 Plugin Storage
+#### 3.5.4 Plugin storage
 
 | Location | Purpose |
 |----------|---------|
@@ -1958,7 +1973,7 @@ Configuration Directory:
 | `~/.config/Hyper/plugins/local/` | User-created or migrated local plugins |
 | `~/.config/Hyper/plugins/package.json` | Plugin dependency manifest |
 
-### 3.5.5 Data Persistence Strategy
+#### 3.5.5 Data persistence strategy
 
 | Data Type | Strategy | Rationale |
 |-----------|----------|-----------|
@@ -1967,7 +1982,7 @@ Configuration Directory:
 | **Terminal Content** | In-memory only | Security and privacy (no command history logging) |
 | **Plugin State** | File system + npm manifest | Standard npm package management model |
 
-### 3.5.6 Caching Strategy
+#### 3.5.6 Caching strategy
 
 | Cache Type | Implementation | Purpose |
 |------------|----------------|---------|
@@ -1975,9 +1990,9 @@ Configuration Directory:
 | **Hot-Reload** | chokidar file watching | Detect configuration changes without restart |
 | **V8 Snapshot** | Precompiled JavaScript snapshot | Faster application startup |
 
-## 3.6 DEVELOPMENT & DEPLOYMENT
+### 3.6 Development & deployment
 
-### 3.6.1 Build System Architecture
+#### 3.6.1 Build system architecture
 
 ```mermaid
 flowchart TB
@@ -2010,7 +2025,7 @@ flowchart TB
     OutputArtifacts --> Packaging
 ```
 
-### 3.6.2 Core Build Tools
+#### 3.6.2 Core build tools
 
 | Tool | Version | Purpose |
 |------|---------|---------|
@@ -2019,7 +2034,7 @@ flowchart TB
 | **Babel** | 7.24.x | JavaScript transpilation and JSX transformation |
 | **Terser** | 5.30.3 | Production JavaScript minification |
 
-### 3.6.3 Webpack Configuration
+#### 3.6.3 Webpack configuration
 
 Velocetty uses three Webpack configurations defined in `webpack.config.ts`:
 
@@ -2029,32 +2044,32 @@ Velocetty uses three Webpack configurations defined in `webpack.config.ts`:
 | **hyper** | `electron-renderer` | `lib/index.tsx` | `target/renderer/bundle.js` |
 | **hyper-cli** | Node.js | `cli/index.ts` | `bin/cli.js` |
 
-### 3.6.4 Development Workflow
+#### 3.6.4 Development workflow
 
 ```bash
-# Install dependencies
+## Install dependencies
 
 bun
 
-#### Development mode (requires two terminal windows)
+##### Development mode (requires two terminal Windows)
 
 bun run dev        # Webpack watch + TypeScript incremental build
 bun run app        # Run Electron with electronmon (hot-reload)
 
-#### Development server
+##### Development server
 
-#### Accessible at http://localhost:9080
+##### Accessible at http://localhost:9080
 
-#### Production build
+##### Production build
 
 bun run build      # Full Webpack production + TypeScript + Babel minification
 
-#### Package for distribution
+##### Package for distribution
 
 bun run dist       # Build + electron-builder packaging
 ```
 
-### 3.6.5 Testing Framework
+#### 3.6.5 Testing framework
 
 | Tool | Version | Purpose |
 | ---- | ------- | ------- |
@@ -2062,14 +2077,14 @@ bun run dist       # Build + electron-builder packaging
 | **Playwright** | 1.43.1 | End-to-end testing for packaged application |
 | **Bun `mock.module`** | 1.3.7 | Module mocking for unit tests |
 
-#### Test Configurations
+##### Test configurations
 
 | Configuration | Location | Timeout | Purpose |
 | ------------- | -------- | ------- | ------- |
 | `*.test.ts` | `test/unit/` | Default | Unit tests |
 | `*.test.ts` | `test/e2e/` | 30 seconds | End-to-end tests (gated) |
 
-### 3.6.6 Code Quality Tools
+#### 3.6.6 Code quality tools
 
 | Tool | Version | Purpose |
 |------|---------|---------|
@@ -2077,7 +2092,7 @@ bun run dist       # Build + electron-builder packaging
 | **Prettier** | 3.2.5 | Code formatting (120 cols, 2 spaces, single quotes) |
 | **Husky** | 9.0.11 | Git hooks for pre-commit linting |
 
-### 3.6.7 CI/CD Pipeline
+#### 3.6.7 CI/CD pipeline
 
 ```mermaid
 flowchart LR
@@ -2116,7 +2131,7 @@ flowchart LR
     Triggers --> Security
 ```
 
-#### GitHub Actions Workflows
+##### GitHub actions workflows
 
 | Workflow | Purpose |
 |----------|---------|
@@ -2124,7 +2139,7 @@ flowchart LR
 | `codeql-analysis.yml` | Security vulnerability scanning |
 | `e2e_comment.yml` | Post E2E results to pull requests |
 
-#### CI Pipeline Features
+##### CI pipeline features
 
 | Feature | Implementation |
 |---------|----------------|
@@ -2135,9 +2150,9 @@ flowchart LR
 | **Artifacts** | Installer uploads for each platform |
 | **E2E Reporting** | Screenshot capture with Imgur upload |
 
-### 3.6.8 Packaging and Distribution
+#### 3.6.8 Packaging and distribution
 
-#### electron-builder Configuration
+##### Electron-builder configuration
 
 | Platform | Formats | Architectures |
 |----------|---------|---------------|
@@ -2145,7 +2160,7 @@ flowchart LR
 | **Windows** | NSIS installer | x64, arm64 |
 | **Linux** | deb, rpm, AppImage, snap, pacman | x64 (arm64 via separate job) |
 
-#### Code Signing
+##### Code signing
 
 | Platform | Mechanism |
 |----------|-----------|
@@ -2153,7 +2168,7 @@ flowchart LR
 | **Windows** | RFC3161 timestamping via Comodo |
 | **Linux** | No code signing (user trust model) |
 
-### 3.6.9 V8 Snapshot Optimization
+#### 3.6.9 V8 snapshot optimization
 
 | Tool | Purpose |
 |------|---------|
@@ -2164,9 +2179,9 @@ flowchart LR
 
 **Performance Impact**: V8 snapshots reduce cold start time by pre-compiling JavaScript to bytecode, avoiding runtime parsing overhead.
 
-## 3.7 INTEGRATION REQUIREMENTS
+### 3.7 Integration requirements
 
-### 3.7.1 Component Integration Matrix
+#### 3.7.1 Component integration matrix
 
 ```mermaid
 flowchart TB
@@ -2185,7 +2200,7 @@ flowchart TB
     NodePTY -->|"Data Flow"| Redux
 ```
 
-### 3.7.2 Version Compatibility Requirements
+#### 3.7.2 Version compatibility requirements
 
 | Integration | Requirement | Constraint |
 |-------------|-------------|------------|
@@ -2195,7 +2210,7 @@ flowchart TB
 | **xterm.js ↔ Addons** | xterm 5.x series | Addons must match major version |
 | **node-pty ↔ Electron** | Rebuild required per version | `electron-rebuild` in post-install |
 
-### 3.7.3 Plugin Integration Requirements
+#### 3.7.3 Plugin integration requirements
 
 | Requirement | Description |
 |-------------|-------------|
@@ -2204,7 +2219,7 @@ flowchart TB
 | **Redux Middleware** | Must follow Redux middleware signature |
 | **Decoration Pattern** | Must compose with existing components, not replace |
 
-### 3.7.4 Security Considerations
+#### 3.7.4 Security considerations
 
 | Consideration | Current State | Mitigation |
 |---------------|---------------|------------|
@@ -2213,9 +2228,9 @@ flowchart TB
 | **IPC Security** | `@electron/remote` enables cross-process access | Migrate to explicit IPC messaging |
 | **Native Module Access** | `node-pty` has full system access | Runs with user privileges only |
 
-## 3.8 TECHNOLOGY STACK SUMMARY
+### 3.8 Technology stack summary
 
-### 3.8.1 Layer Overview
+#### 3.8.1 Layer overview
 
 | Layer | Primary Technologies | Purpose |
 |-------|---------------------|---------|
@@ -2226,7 +2241,7 @@ flowchart TB
 | **Build System** | Webpack 5.91.0, TypeScript 5.4.5, node-gyp 10.x, node-gyp-build 4.x | Module bundling, type safety, native module compilation |
 | **Distribution** | electron-builder 24.13.3 | Cross-platform packaging |
 
-### 3.8.2 Technology Selection Criteria
+#### 3.8.2 Technology selection criteria
 
 | Criterion | Approach |
 |-----------|----------|
@@ -2236,7 +2251,7 @@ flowchart TB
 | **Developer Experience** | TypeScript provides type safety and tooling |
 | **Community** | All major technologies have active ecosystems |
 
-### 3.8.3 Technical Debt and Future Considerations
+#### 3.8.3 Technical debt and future considerations
 
 | Item | Priority | Description |
 |------|----------|-------------|
@@ -2247,9 +2262,9 @@ flowchart TB
 
 ---
 
-## 3.9 REFERENCES
+### 3.9 References
 
-### 3.9.1 Repository Files Examined
+#### 3.9.1 Repository files examined
 
 | File | Relevance |
 |------|-----------|
@@ -2267,7 +2282,7 @@ flowchart TB
 | `README.md` | Development workflow documentation |
 | `PLUGINS.md` | Plugin API and development guide |
 
-### 3.9.2 Repository Folders Examined
+#### 3.9.2 Repository folders examined
 
 | Folder | Contents |
 |--------|----------|
@@ -2283,7 +2298,7 @@ flowchart TB
 | `typings/` | TypeScript type definitions |
 | `.github/workflows/` | CI/CD pipeline definitions |
 
-### 3.9.3 External Sources Referenced
+#### 3.9.3 External sources referenced
 
 | Source | Information Retrieved |
 |--------|----------------------|
@@ -2291,17 +2306,17 @@ flowchart TB
 | npm Registry | xterm.js 5.3.0 current status, package deprecation notices |
 | xterm.js GitHub | Package migration to @xterm/* scoped packages |
 
-# 4. Process Flowchart
+## 4. Process flowchart
 
 This section provides comprehensive process flowcharts documenting Velocetty's core business processes, integration workflows, and technical implementation flows. Each flowchart illustrates the system's end-to-end user journeys, decision points, error handling paths, and state transitions.
 
-## 4.1 SYSTEM WORKFLOWS
+### 4.1 System workflows
 
-### 4.1.1 Application Startup Flow
+#### 4.1.1 Application startup flow
 
 The application startup flow represents the critical path from user launch to the first interactive terminal session. This flow involves coordination between the Electron main process, renderer process, and operating system.
 
-#### High-Level Startup Sequence
+##### High-level startup sequence
 
 ```mermaid
 flowchart TB
@@ -2376,7 +2391,7 @@ flowchart TB
     SpawnPTY --> TerminalReady
 ```
 
-#### Startup Timing Constraints
+##### Startup timing constraints
 
 | Phase | Target Duration | Critical Path |
 |-------|----------------|---------------|
@@ -2387,7 +2402,7 @@ flowchart TB
 | First PTY Spawn | < 500ms | Final step |
 | **Total Cold Start** | **< 2 seconds** | End-to-end |
 
-### 4.1.2 Session Lifecycle Flow
+#### 4.1.2 Session lifecycle flow
 
 The session lifecycle manages PTY creation, data flow, and termination for each terminal instance.
 
@@ -2471,7 +2486,7 @@ flowchart TB
     DispatchPtyExit --> SessionClosed
 ```
 
-#### Data Batching Specification
+##### Data batching specification
 
 | Parameter | Value | Purpose |
 |-----------|-------|---------|
@@ -2480,7 +2495,7 @@ flowchart TB
 | String Decoder | UTF-8 | Character encoding handling |
 | Batch Prefix | 36-char UUID | Session identification for routing |
 
-### 4.1.3 Terminal Rendering Flow
+#### 4.1.3 Terminal rendering flow
 
 This flowchart illustrates the decision process for selecting the appropriate rendering backend and the addon initialization sequence.
 
@@ -2566,7 +2581,7 @@ flowchart TB
     RegisterTermsRegistry --> TerminalReady
 ```
 
-#### WebGL Context Management
+##### WebGL context management
 
 | Constraint | Value | Mitigation |
 |------------|-------|------------|
@@ -2574,9 +2589,9 @@ flowchart TB
 | Transparency Support | Not supported | Fallback to CanvasAddon |
 | Context Loss | GPU resource exhaustion | Automatic CanvasAddon fallback |
 
-## 4.2 INTEGRATION WORKFLOWS
+### 4.2 Integration workflows
 
-### 4.2.1 IPC/RPC Communication Flow
+#### 4.2.1 IPC/RPC communication flow
 
 The IPC bridge facilitates all communication between the Electron main process and renderer processes using a typed RPC abstraction.
 
@@ -2639,7 +2654,7 @@ flowchart TB
     IPCMain --> MainReceive
 ```
 
-#### Key RPC Events
+##### Key RPC events
 
 | Event Category | Direction | Examples |
 |----------------|-----------|----------|
@@ -2649,7 +2664,7 @@ flowchart TB
 | Update Events | Main → Renderer | `update available` |
 | User Actions | Renderer → Main | `new`, `close`, `resize`, `data` |
 
-### 4.2.2 Configuration Hot-Reload Flow
+#### 4.2.2 Configuration hot-reload flow
 
 The configuration system monitors file changes and propagates updates to all system components without requiring application restart.
 
@@ -2714,7 +2729,7 @@ flowchart TB
     ReapplyStyles --> PluginDecorate
 ```
 
-#### Configuration Processing Rules
+##### Configuration processing rules
 
 | Rule | Behavior |
 |------|----------|
@@ -2724,7 +2739,7 @@ flowchart TB
 | Deprecated CSS | Warning notification shown |
 | Profile Override | Deep merge profile over base config |
 
-### 4.2.3 Plugin Loading and Decoration Flow
+#### 4.2.3 Plugin loading and decoration flow
 
 The plugin system loads extensions at startup and provides hooks throughout the application lifecycle.
 
@@ -2814,7 +2829,7 @@ flowchart TB
     NotifyWatchers --> ShowNotification
 ```
 
-#### Available Extension Hooks (40+)
+##### Available extension hooks (40+)
 
 | Category | Hooks |
 |----------|-------|
@@ -2825,9 +2840,9 @@ flowchart TB
 | **Redux Integration** | `middleware`, `reduceUI`, `reduceSessions`, `reduceTermGroups` |
 | **Session** | `decorateSessionClass`, `decorateSessionOptions`, `decorateBrowserOptions`, `decorateWindowClass` |
 
-## 4.3 CORE FEATURE FLOWS
+### 4.3 Core feature flows
 
-### 4.3.1 Tab and Pane Split Flow
+#### 4.3.1 Tab and pane split flow
 
 The term group system manages the hierarchical structure of tabs and split panes, maintaining a tree representation in Redux state.
 
@@ -2903,7 +2918,7 @@ flowchart TB
     RenderUpdate --> SplitComplete
 ```
 
-#### Pane Size Management
+##### Pane size management
 
 | Operation | Algorithm | Constraint |
 |-----------|-----------|------------|
@@ -2912,7 +2927,7 @@ flowchart TB
 | Minimum Size | 5% (`MIN_SIZE = 0.05`) | Prevents invisible panes |
 | Default Split | 50/50 division | Equal distribution |
 
-### 4.3.2 In-Terminal Search Flow
+#### 4.3.2 In-terminal search flow
 
 The search feature integrates xterm-addon-search with a React overlay component for text search within the terminal scrollback buffer.
 
@@ -2996,7 +3011,7 @@ flowchart TB
     ReturnFocus --> SearchClosed
 ```
 
-#### Search Options
+##### Search options
 
 | Option | Description | Default |
 |--------|-------------|---------|
@@ -3005,7 +3020,7 @@ flowchart TB
 | Regex | Use regular expression patterns | false |
 | Incremental | Search as user types | true |
 
-### 4.3.3 Auto-Update Flow
+#### 4.3.3 Auto-update flow
 
 The auto-update system periodically checks for new versions and facilitates user-initiated update installation.
 
@@ -3095,7 +3110,7 @@ flowchart TB
     QuitAndInstall --> AppRestarts
 ```
 
-#### Update Schedule Parameters
+##### Update schedule parameters
 
 | Parameter | Value | Purpose |
 |-----------|-------|---------|
@@ -3104,9 +3119,9 @@ flowchart TB
 | Timeout | 5 seconds | Prevent hanging on slow networks |
 | Channels | stable, canary | Release track selection |
 
-## 4.4 STATE MANAGEMENT FLOWS
+### 4.4 State management flows
 
-### 4.4.1 Redux State Flow
+#### 4.4.1 Redux state flow
 
 The Redux store manages application state with a specialized middleware pipeline optimized for terminal data throughput.
 
@@ -3187,7 +3202,7 @@ flowchart TB
     ComponentRerender --> UIUpdated
 ```
 
-#### State Slices
+##### State slices
 
 | Slice | Location | Responsibility |
 |-------|----------|----------------|
@@ -3195,7 +3210,7 @@ flowchart TB
 | `sessions` | `lib/reducers/sessions.ts` | Session records, activeUid, search state |
 | `termGroups` | `lib/reducers/term-groups.ts` | Term group tree, activeSessions map, activeRootGroup |
 
-#### Write Middleware Performance Optimization
+##### Write middleware performance optimization
 
 The write middleware is critical for maintaining terminal responsiveness during high-volume output scenarios (e.g., `find ~`, `cat largefile.log`):
 
@@ -3217,7 +3232,7 @@ flowchart LR
     Action2 -.->|"Still forwarded"| Reducer1
 ```
 
-### 4.4.2 Term Group State Transitions
+#### 4.4.2 Term group state transitions
 
 The term group reducer manages complex state transitions for tab and pane operations.
 
@@ -3253,7 +3268,7 @@ stateDiagram-v2
     }
 ```
 
-#### Term Group Actions
+##### Term group actions
 
 | Action | State Transition |
 |--------|------------------|
@@ -3263,9 +3278,9 @@ stateDiagram-v2
 | `TERM_GROUP_EXIT` | Remove term group, rebalance siblings |
 | `TERM_GROUP_RESIZE` | Update size ratios in parent |
 
-## 4.5 ERROR HANDLING FLOWS
+### 4.5 Error handling flows
 
-### 4.5.1 PTY Session Error Recovery
+#### 4.5.1 PTY session error recovery
 
 ```mermaid
 flowchart TB
@@ -3330,7 +3345,7 @@ flowchart TB
     CleanupPTY --> SessionComplete
 ```
 
-### 4.5.2 WebGL Context Loss Recovery
+#### 4.5.2 WebGL context loss recovery
 
 ```mermaid
 flowchart TB
@@ -3375,7 +3390,7 @@ flowchart TB
     NotifyUser --> SuggestRestart
 ```
 
-### 4.5.3 Plugin Error Isolation
+#### 4.5.3 Plugin error isolation
 
 ```mermaid
 flowchart TB
@@ -3427,9 +3442,9 @@ flowchart TB
     OtherPlugins --> AppFunctional
 ```
 
-## 4.6 CLI WORKFLOW
+### 4.6 CLI workflow
 
-### 4.6.1 CLI Command Processing Flow
+#### 4.6.1 CLI command processing flow
 
 ```mermaid
 flowchart TB
@@ -3497,7 +3512,7 @@ flowchart TB
     SpawnElectron --> AppLaunched
 ```
 
-#### CLI Commands Summary
+##### CLI commands summary
 
 | Command | Purpose | Implementation |
 |---------|---------|----------------|
@@ -3508,9 +3523,9 @@ flowchart TB
 | `hyper docs <plugin>` | Open plugin documentation | Opens npm package page |
 | `hyper` (no args) | Launch Velocetty application | Spawns Electron process |
 
-## 4.7 SEQUENCE DIAGRAMS
+### 4.7 Sequence diagrams
 
-### 4.7.1 Terminal Data Flow Sequence
+#### 4.7.1 Terminal data flow sequence
 
 ```mermaid
 sequenceDiagram
@@ -3548,7 +3563,7 @@ sequenceDiagram
     Middleware->>Renderer: Forward to Reducers
 ```
 
-### 4.7.2 Window Creation Sequence
+#### 4.7.2 Window creation sequence
 
 ```mermaid
 sequenceDiagram
@@ -3585,7 +3600,7 @@ sequenceDiagram
     Term-->>User: Terminal Ready
 ```
 
-### 4.7.3 Plugin Decoration Sequence
+#### 4.7.3 Plugin decoration sequence
 
 ```mermaid
 sequenceDiagram
@@ -3614,9 +3629,9 @@ sequenceDiagram
     Note over Core,Final: Composition preserves base behavior
 ```
 
-## 4.8 VALIDATION RULES AND CHECKPOINTS
+### 4.8 Validation rules and checkpoints
 
-### 4.8.1 Business Rules by Process Step
+#### 4.8.1 Business rules by process step
 
 | Process | Step | Business Rule |
 |---------|------|---------------|
@@ -3634,7 +3649,7 @@ sequenceDiagram
 | **WebGL Allocation** | Limit | Maximum 16 simultaneous WebGL contexts |
 | **Update Checks** | Schedule | 10s initial, then every 30 minutes |
 
-### 4.8.2 Authorization Checkpoints
+#### 4.8.2 Authorization checkpoints
 
 | Checkpoint | Verification | Implementation |
 |------------|--------------|----------------|
@@ -3644,7 +3659,7 @@ sequenceDiagram
 | Configuration Write | User home directory access | XDG path resolution |
 | Auto-Update | Signature verification | Electron autoUpdater |
 
-### 4.8.3 Data Validation Requirements
+#### 4.8.3 Data validation requirements
 
 | Data | Validation Rule | Error Handling |
 |------|-----------------|----------------|
@@ -3655,9 +3670,9 @@ sequenceDiagram
 | Rows/Cols | Positive integers | Clamp to valid range |
 | Search Regex | Valid regular expression | Display regex error |
 
-## 4.9 REFERENCES
+### 4.9 References
 
-#### Files Examined
+##### Files examined
 
 - `app/index.ts` - Main process entry point, application initialization
 - `app/session.ts` - PTY session management, DataBatcher implementation
@@ -3682,7 +3697,7 @@ sequenceDiagram
 - `cli/index.ts` - CLI entry point
 - `cli/api.ts` - CLI API operations
 
-#### Folders Explored
+##### Folders explored
 
 - `app/` - Main process implementation
 - `app/config/` - Configuration subsystem
@@ -3698,7 +3713,7 @@ sequenceDiagram
 - `lib/utils/` - Renderer utilities
 - `cli/` - CLI tool implementation
 
-#### Technical Specification Sections Referenced
+##### Technical specification sections referenced
 
 - 1.2 SYSTEM OVERVIEW - Architecture diagrams and component descriptions
 - 2.1 FEATURE CATALOG - Feature definitions and dependencies
@@ -3708,13 +3723,13 @@ sequenceDiagram
 - 3.7 INTEGRATION REQUIREMENTS - Component integration matrix
 - xterm.js Core - Terminal rendering specifications
 
-# 5. System Architecture
+## 5. System architecture
 
-## 5.1 HIGH-LEVEL ARCHITECTURE
+### 5.1 High-level architecture
 
-### 5.1.1 System Overview
+#### 5.1.1 System overview
 
-#### Architectural Style and Rationale
+##### Architectural style and rationale
 
 Velocetty implements an **Electron Split-Brain Architecture** with **Event-Driven IPC Communication**, inheriting and refining the well-documented architectural patterns from the Hyper terminal emulator. This architecture comprises two distinct execution contexts that communicate through a bidirectional IPC bridge:
 
@@ -3736,7 +3751,7 @@ Velocetty implements an **Electron Split-Brain Architecture** with **Event-Drive
 
 The architecture explicitly acknowledges the IPC overhead inherent in Electron applications. As documented in Hyper's performance engineering work, terminal data must cross the process boundary via IPC, and JSON encoding/decoding overhead requires careful optimization through data batching strategies.
 
-#### Key Architectural Principles
+##### Key architectural principles
 
 1. **Process Isolation**: Security and stability through separation of concerns between main and renderer processes
 2. **Composition over Replacement**: Plugin decoration pattern preserves base behavior while enabling customization
@@ -3744,7 +3759,7 @@ The architecture explicitly acknowledges the IPC overhead inherent in Electron a
 4. **Platform Abstraction**: Platform-specific implementations (menus, keymaps, paths) encapsulated behind consistent interfaces
 5. **Hot-Reloadable Configuration**: File-watching enables live configuration updates without application restart
 
-#### System Boundaries and Major Interfaces
+##### System boundaries and major interfaces
 
 ```mermaid
 flowchart TB
@@ -3782,7 +3797,7 @@ flowchart TB
     AppInit <-->|"HTTP Polling"| UpdateServer
 ```
 
-### 5.1.2 Core Components Table
+#### 5.1.2 Core components table
 
 | Component Name | Primary Responsibility | Key Dependencies | Integration Points |
 |----------------|----------------------|------------------|-------------------|
@@ -3797,9 +3812,9 @@ flowchart TB
 | CLI Tool (`cli/`) | Plugin management, application launching | args, got, npm registry | Config file, npm ecosystem |
 | Menu System (`app/menus/`) | Application and context menus | Electron Menu API, keymaps | Command dispatcher, config system |
 
-### 5.1.3 Data Flow Description
+#### 5.1.3 Data flow description
 
-#### Terminal Output Flow (Main → Renderer)
+##### Terminal output flow (main → renderer)
 
 The primary data flow for terminal output follows a carefully optimized path designed to minimize latency while managing IPC overhead:
 
@@ -3812,7 +3827,7 @@ The primary data flow for terminal output follows a carefully optimized path des
 
 This flow explicitly bypasses Redux state management for terminal data to eliminate serialization overhead, achieving the < 50ms keystroke-to-echo latency target.
 
-#### User Input Flow (Renderer → Main)
+##### User input flow (renderer → main)
 
 User keyboard input follows the reverse path:
 
@@ -3822,7 +3837,7 @@ User keyboard input follows the reverse path:
 4. **Main Process Receipt**: `rpc.on('data', ...)` handler receives input in main process
 5. **PTY Write**: `Session.write()` forwards data to `pty.write()`, reaching shell process
 
-#### Configuration Flow
+##### Configuration flow
 
 Configuration changes propagate through the system via file-watching:
 
@@ -3834,7 +3849,7 @@ Configuration changes propagate through the system via file-watching:
 6. **Redux Update**: Renderer dispatches `reloadConfig()` action, UI reducer updates state
 7. **Component Re-render**: React components receive updated props, re-render as needed
 
-#### Plugin Decoration Flow
+##### Plugin decoration flow
 
 Plugin extensions compose with core functionality through decoration:
 
@@ -3844,7 +3859,7 @@ Plugin extensions compose with core functionality through decoration:
 4. **Decoration Composition**: `decorate(Component, 'Name')` wraps components with plugin decorators
 5. **Error Isolation**: Try-catch boundaries isolate plugin failures, return original on error
 
-### 5.1.4 External Integration Points
+#### 5.1.4 External integration points
 
 | System Name | Integration Type | Data Exchange Pattern | Protocol/Format |
 |-------------|------------------|----------------------|-----------------|
@@ -3856,11 +3871,11 @@ Plugin extensions compose with core functionality through decoration:
 
 ---
 
-## 5.2 COMPONENT DETAILS
+### 5.2 Component details
 
-### 5.2.1 Main Process Components
+#### 5.2.1 Main process components
 
-#### Application Entry (`app/index.ts`)
+##### Application entry (`app/index.ts`)
 
 **Purpose and Responsibilities**:
 - Bootstrap Electron application lifecycle
@@ -3891,7 +3906,7 @@ Plugin extensions compose with core functionality through decoration:
 - Window geometry persisted via `electron-store` for restoration
 - Plugin `onWindow` hooks execute per-window creation
 
-#### Session Manager (`app/session.ts`)
+##### Session manager (`app/session.ts`)
 
 **Purpose and Responsibilities**:
 - Manage PTY session lifecycle (creation, data flow, termination)
@@ -3928,7 +3943,7 @@ Plugin extensions compose with core functionality through decoration:
 - Fallback shell mechanism with warning message display
 - Graceful degradation when fallback unavailable
 
-#### RPC Bridge (`app/rpc.ts`)
+##### RPC bridge (`app/RPC.ts`)
 
 **Purpose and Responsibilities**:
 - Provide typed bidirectional IPC abstraction
@@ -3971,9 +3986,9 @@ sequenceDiagram
     Main->>IPC: destroy()
 ```
 
-### 5.2.2 Renderer Process Components
+#### 5.2.2 Renderer process components
 
-#### Renderer Entry (`lib/index.tsx`)
+##### Renderer entry (`lib/index.tsx`)
 
 **Purpose and Responsibilities**:
 - Bootstrap React 18 application with Redux store
@@ -3997,7 +4012,7 @@ sequenceDiagram
 | Window State | `enter full screen`, `leave full screen`, `windowGeometry change` | Window chrome state |
 | Configuration | `config change` | Hot-reload support |
 
-#### Redux Store (`lib/store/`)
+##### Redux store (`lib/store/`)
 
 **Purpose and Responsibilities**:
 - Centralized state management for renderer process
@@ -4059,7 +4074,7 @@ flowchart TB
     Check -->|"No"| Forward
 ```
 
-#### Terminal Component (`lib/components/term.tsx`)
+##### Terminal component (`lib/components/term.tsx`)
 
 **Purpose and Responsibilities**:
 - Host xterm.js terminal instance
@@ -4141,7 +4156,7 @@ flowchart TB
 | Transparency support | Not supported | Automatic Canvas fallback |
 | Context loss | GPU resource exhaustion | `onContextLoss` handler with Canvas fallback |
 
-### 5.2.3 Configuration System (`app/config/`)
+#### 5.2.3 Configuration system (`app/config/`)
 
 **Purpose and Responsibilities**:
 - Load and validate JSON configuration at startup
@@ -4173,7 +4188,7 @@ flowchart TB
 | macOS | `~/.config/Hyper` |
 | Windows | `%APPDATA%/Hyper` |
 
-### 5.2.4 Plugin Manager (`app/plugins.ts`, `lib/utils/plugins.ts`)
+#### 5.2.4 Plugin manager (`app/plugins.ts`, `lib/utils/plugins.ts`)
 
 **Purpose and Responsibilities**:
 - Load and validate plugin extensions
@@ -4219,7 +4234,7 @@ flowchart TB
     Exists -->|"No"| NotFound
 ```
 
-### 5.2.5 CLI Tool (`cli/`)
+#### 5.2.5 CLI tool (`CLI/`)
 
 **Purpose and Responsibilities**:
 - Provide command-line interface for plugin management
@@ -4239,9 +4254,9 @@ flowchart TB
 
 ---
 
-## 5.3 TECHNICAL DECISIONS
+### 5.3 Technical decisions
 
-### 5.3.1 Architecture Style Decisions
+#### 5.3.1 Architecture style decisions
 
 | Decision | Choice | Rationale | Tradeoffs |
 |----------|--------|-----------|-----------|
@@ -4253,7 +4268,7 @@ flowchart TB
 | IPC Optimization | Custom data batching | Reduce serialization overhead, align with frame timing | Added complexity, latency tradeoff |
 | Plugin Model | Full trust execution | Maximum extensibility, React/Redux composition | Security risk, no sandboxing |
 
-### 5.3.2 Communication Pattern Decisions
+#### 5.3.2 Communication pattern decisions
 
 ```mermaid
 flowchart TB
@@ -4284,7 +4299,7 @@ flowchart TB
     Selected --> Rationale
 ```
 
-### 5.3.3 Data Storage Solution Rationale
+#### 5.3.3 Data storage solution rationale
 
 | Data Type | Solution | Rationale |
 |-----------|----------|-----------|
@@ -4294,7 +4309,7 @@ flowchart TB
 | Plugin Packages | npm/bun in plugins directory | Standard package management, familiar workflow |
 | Session State | Redux (not persisted) | Traditional terminal behavior, no startup delay |
 
-### 5.3.4 Caching Strategy Justification
+#### 5.3.4 Caching strategy justification
 
 | Cache Type | Implementation | Justification |
 |------------|----------------|---------------|
@@ -4303,7 +4318,7 @@ flowchart TB
 | V8 Snapshot | Precompiled JavaScript | Reduce cold start time by ~200ms |
 | Module._load Patch | Shared React/ReactDOM | Prevent duplicate React instances in plugins |
 
-### 5.3.5 Security Mechanism Analysis
+#### 5.3.5 Security mechanism analysis
 
 | Concern | Current State | Risk Level | Mitigation Path |
 |---------|--------------|------------|-----------------|
@@ -4315,9 +4330,9 @@ flowchart TB
 
 ---
 
-## 5.4 CROSS-CUTTING CONCERNS
+### 5.4 Cross-cutting concerns
 
-### 5.4.1 Monitoring and Observability Approach
+#### 5.4.1 Monitoring and observability approach
 
 Velocetty implements a lightweight observability model appropriate for desktop applications:
 
@@ -4334,7 +4349,7 @@ Velocetty implements a lightweight observability model appropriate for desktop a
 - Frame render timing (WebGL/Canvas)
 - Plugin load time aggregation
 
-### 5.4.2 Logging and Tracing Strategy
+#### 5.4.2 Logging and tracing strategy
 
 | Process | Logging Mechanism | Output Destination |
 |---------|-------------------|-------------------|
@@ -4349,9 +4364,9 @@ Velocetty implements a lightweight observability model appropriate for desktop a
 - Error stack traces with context
 - Plugin warning notifications
 
-### 5.4.3 Error Handling Patterns
+#### 5.4.3 Error handling patterns
 
-#### PTY Session Error Recovery Flow
+##### PTY session error recovery flow
 
 ```mermaid
 flowchart TB
@@ -4397,7 +4412,7 @@ flowchart TB
     Cleanup --> Complete
 ```
 
-#### WebGL Context Loss Recovery
+##### WebGL context loss recovery
 
 ```mermaid
 flowchart TB
@@ -4432,7 +4447,7 @@ flowchart TB
     NotifyUser --> SuggestRestart
 ```
 
-#### Plugin Error Isolation
+##### Plugin error isolation
 
 ```mermaid
 flowchart TB
@@ -4478,7 +4493,7 @@ flowchart TB
     Continue --> Functional
 ```
 
-### 5.4.4 Performance Requirements and SLAs
+#### 5.4.4 Performance requirements and SLAs
 
 | Metric | Target | Measurement Point |
 |--------|--------|-------------------|
@@ -4490,7 +4505,7 @@ flowchart TB
 | Configuration hot-reload | < 100ms | File change to UI update |
 | IPC batch efficiency | 60-90% reduction | Calls vs. unbatched baseline |
 
-### 5.4.5 Disaster Recovery Procedures
+#### 5.4.5 Disaster recovery procedures
 
 | Failure Scenario | Detection | Recovery Procedure |
 |-----------------|-----------|-------------------|
@@ -4503,9 +4518,9 @@ flowchart TB
 
 ---
 
-## 5.5 REFERENCES
+### 5.5 References
 
-### 5.5.1 Source Files Examined
+#### 5.5.1 Source files examined
 
 **Main Process Core**:
 - `app/index.ts` - Main entry point, window management, event routing
@@ -4565,7 +4580,7 @@ flowchart TB
 - `cli/index.ts` - CLI entry point
 - `cli/api.ts` - Plugin management API
 
-### 5.5.2 Technical Specification Sections Referenced
+#### 5.5.2 Technical specification sections referenced
 
 - Section 1.2 SYSTEM OVERVIEW - Architectural context and success criteria
 - Section 2.1 FEATURE CATALOG - Feature dependencies and implementation context
@@ -4577,17 +4592,17 @@ flowchart TB
 - Section 4.5 ERROR HANDLING FLOWS - Recovery procedures
 - Section 4.6 CLI WORKFLOW - Command-line interface processing
 
-# 6. SYSTEM COMPONENTS DESIGN
+## 6. System components design
 
-## 6.1 Core Services Architecture
+### 6.1 Core services architecture
 
-#### SERVICES ARCHITECTURE
+##### Services architecture
 
-## 6.1 Core Services Architecture
+### 6.1 Core services architecture
 
-### 6.1.1 Architecture Applicability Assessment
+#### 6.1.1 Architecture applicability assessment
 
-#### Traditional Microservices Architecture: Not Applicable
+##### Traditional microservices architecture: not applicable
 
 Velocetty is a **desktop terminal emulator application** built on Electron, inheriting the well-documented architectural patterns from Hyper. As such, traditional microservices architecture concepts—including service discovery, load balancing, auto-scaling, and circuit breakers—are **not applicable** to this system.
 
@@ -4600,7 +4615,7 @@ Velocetty is a **desktop terminal emulator application** built on Electron, inhe
 | **Data Storage** | Local filesystem + memory | Distributed databases |
 | **Load Distribution** | N/A | Round-robin, weighted, etc. |
 
-#### Rationale for Non-Applicability
+##### Rationale for non-applicability
 
 The fundamental reasons why traditional microservices patterns do not apply:
 
@@ -4612,11 +4627,11 @@ The fundamental reasons why traditional microservices patterns do not apply:
 
 4. **Stateful Desktop Paradigm**: Terminal sessions maintain local state (command history, scrollback buffer, working directory) that is inherently tied to the user's machine.
 
-### 6.1.2 Internal Component Architecture
+#### 6.1.2 Internal component architecture
 
 While Velocetty does not implement microservices, it employs a well-defined **internal component architecture** with distinct "service-like" modules organized across two Electron processes that communicate via Inter-Process Communication (IPC).
 
-#### Process Architecture Overview
+##### Process architecture overview
 
 ```mermaid
 flowchart TB
@@ -4657,7 +4672,7 @@ flowchart TB
     Updater <-->|"HTTP Polling"| UpdateServer
 ```
 
-#### Main Process Components
+##### Main process components
 
 The Main Process runs in the Node.js environment and handles operating system integration, native APIs, and privileged operations.
 
@@ -4672,7 +4687,7 @@ The Main Process runs in the Node.js environment and handles operating system in
 | **Auto Updater** | `app/updater.ts` | Update channel polling, version checking, manifest retrieval |
 | **Notification Service** | `app/notifications.ts` | News polling, notification dispatch to renderer |
 
-#### Renderer Process Components
+##### Renderer process components
 
 The Renderer Process executes within Chromium and manages the visual interface, user interactions, and terminal rendering.
 
@@ -4686,9 +4701,9 @@ The Renderer Process executes within Chromium and manages the visual interface, 
 | **Command Registry** | `lib/command-registry.ts` | Keyboard shortcut registration, command dispatch |
 | **Plugin Utilities** | `lib/utils/plugins.ts` | Renderer-side plugin orchestration, decoration composition |
 
-### 6.1.3 Inter-Process Communication Patterns
+#### 6.1.3 Inter-process communication patterns
 
-#### IPC Bridge Architecture
+##### IPC bridge architecture
 
 Velocetty implements a custom bidirectional IPC bridge using Electron's `ipcMain` and `ipcRenderer` modules, with UUID-keyed channels for window isolation.
 
@@ -4726,7 +4741,7 @@ sequenceDiagram
     Main->>Main: Cleanup session map
 ```
 
-#### Typed Event Definitions
+##### Typed event definitions
 
 The IPC bridge uses strongly-typed event definitions to ensure communication integrity between processes.
 
@@ -4743,7 +4758,7 @@ The IPC bridge uses strongly-typed event definitions to ensure communication int
 | **Main → Renderer** | `config change` | `{}` | Configuration hot-reload trigger |
 | **Main → Renderer** | `move left req` | `{}` | Tab navigation command |
 
-#### Data Batching Strategy
+##### Data batching strategy
 
 To mitigate IPC overhead for high-volume terminal output, the Session Manager implements intelligent data batching:
 
@@ -4777,9 +4792,9 @@ flowchart TB
 | **Batch Prefix** | 36-character UUID | Session identification for multi-session routing |
 | **IPC Call Reduction** | 60-90% | Empirical reduction vs. unbatched transmission |
 
-### 6.1.4 Desktop-Appropriate Scalability Design
+#### 6.1.4 Desktop-appropriate scalability design
 
-#### Scalability Scope for Desktop Applications
+##### Scalability scope for desktop applications
 
 Traditional horizontal and vertical scaling concepts do not apply to Velocetty as a desktop application. However, the architecture supports **window-level and tab-level scaling** within the single-user context.
 
@@ -4790,7 +4805,7 @@ Traditional horizontal and vertical scaling concepts do not apply to Velocetty a
 | **Split Panes** | Term group hierarchy in Redux state | WebGL context limit of 16 simultaneous contexts |
 | **PTY Sessions** | Session map with UUID keys | OS limit on pseudo-terminal file descriptors |
 
-#### Resource Allocation Strategy
+##### Resource allocation strategy
 
 ```mermaid
 flowchart LR
@@ -4818,7 +4833,7 @@ flowchart LR
 | **PTY Handles** | On-demand creation, cleanup on session exit | OS-dependent limit |
 | **CPU** | Event-driven, batch processing to reduce overhead | < 5% idle CPU |
 
-#### Performance Optimization Techniques
+##### Performance optimization techniques
 
 The architecture implements several performance optimizations appropriate for desktop terminal applications:
 
@@ -4830,9 +4845,9 @@ The architecture implements several performance optimizations appropriate for de
 | **Lazy Addon Loading** | Terminal addons loaded on-demand based on configuration | Reduced initial memory footprint |
 | **WebGL Prioritization** | GPU-accelerated rendering for visible terminals | 60fps scrolling performance |
 
-### 6.1.5 Desktop-Appropriate Resilience Patterns
+#### 6.1.5 Desktop-appropriate resilience patterns
 
-#### Fault Tolerance Mechanisms
+##### Fault tolerance mechanisms
 
 Velocetty implements resilience patterns appropriate for desktop applications, focusing on graceful degradation and recovery rather than distributed system patterns like circuit breakers.
 
@@ -4865,7 +4880,7 @@ flowchart TB
     end
 ```
 
-#### PTY Session Error Recovery
+##### PTY session error recovery
 
 The Session Manager implements intelligent failure detection and recovery for shell processes:
 
@@ -4876,7 +4891,7 @@ The Session Manager implements intelligent failure detection and recovery for sh
 | **Normal Exit** | Exit code 0 or duration ≥ 1 second | Mark session ended, apply exit behavior |
 | **PTY Spawn Failure** | node-pty throws exception | Log error, notify user, no session created |
 
-#### WebGL Context Loss Recovery
+##### WebGL context loss recovery
 
 The Terminal component handles GPU resource exhaustion through automatic fallback:
 
@@ -4902,7 +4917,7 @@ flowchart TB
     VerifyRender -->|"No"| CriticalError
 ```
 
-#### Plugin Error Isolation
+##### Plugin error isolation
 
 The plugin system implements defensive error handling to prevent extension failures from crashing the application:
 
@@ -4913,7 +4928,7 @@ The plugin system implements defensive error handling to prevent extension failu
 | **Lifecycle Hooks** | Log error and continue startup | Application starts without plugin |
 | **Reducer Hooks** | Return previous state on error | State unchanged by failed plugin |
 
-#### Disaster Recovery Procedures
+##### Disaster recovery procedures
 
 | Failure Scenario | Detection Method | Recovery Procedure |
 |-----------------|------------------|-------------------|
@@ -4924,9 +4939,9 @@ The plugin system implements defensive error handling to prevent extension failu
 | **Renderer Crash** | Renderer process exit event | Recreate window, restore session if possible |
 | **PTY Spawn Failure** | Quick exit detection (< 1 second) | Fallback shell with warning message |
 
-### 6.1.6 Service Degradation Policies
+#### 6.1.6 Service degradation policies
 
-#### Graceful Degradation Hierarchy
+##### Graceful degradation hierarchy
 
 Velocetty implements a graduated degradation approach when resources become constrained:
 
@@ -4954,9 +4969,9 @@ flowchart TB
 | **Level 3** | Plugin throws unrecoverable error | Specific plugin features unavailable | Uninstall/fix plugin |
 | **Level 4** | Primary shell fails to spawn | Using system default shell | Fix shell configuration |
 
-### 6.1.7 Performance Requirements and SLAs
+#### 6.1.7 Performance requirements and SLAs
 
-#### Desktop Application Performance Targets
+##### Desktop application performance targets
 
 | Metric | Target | Measurement Point |
 |--------|--------|-------------------|
@@ -4968,7 +4983,7 @@ flowchart TB
 | **Configuration Hot-Reload** | < 100ms | File change to UI update |
 | **IPC Batch Efficiency** | 60-90% reduction | Calls vs. unbatched baseline |
 
-#### Performance Monitoring Points
+##### Performance monitoring points
 
 The application includes internal instrumentation for performance tracking:
 
@@ -4979,7 +4994,7 @@ The application includes internal instrumentation for performance tracking:
 | **Frame Render Timing** | RequestAnimationFrame instrumentation | Terminal component |
 | **Plugin Load Aggregation** | Per-plugin load time collection | Plugin manager |
 
-### 6.1.8 Summary: Why Traditional Service Patterns Don't Apply
+#### 6.1.8 Summary: why traditional service patterns don't apply
 
 | Traditional Service Pattern | Applicability | Rationale |
 |----------------------------|---------------|-----------|
@@ -4999,7 +5014,7 @@ Velocetty's architecture instead focuses on:
 - **Plugin error isolation** to prevent extension failures from crashing the application
 - **Configuration resilience** with validation and restoration capabilities
 
-#### References
+##### References
 
 The following sources were examined to compile this architectural documentation:
 
@@ -5018,11 +5033,11 @@ The following sources were examined to compile this architectural documentation:
 - `typings/common.d.ts` - IPC event type definitions
 - Technical Specification Sections: 1.2, 4.1, 4.5, 5.1, 5.2, 5.3, 5.4, 3.8
 
-## 6.2 Database Design
+### 6.2 Database design
 
-### 6.2.1 Applicability Assessment
+#### 6.2.1 Applicability assessment
 
-#### 6.2.1.1 Traditional Database Design: Not Applicable
+##### 6.2.1.1 Traditional database design: not applicable
 
 Velocetty is a **desktop terminal emulator application** built on Electron. As such, traditional database design concepts—including relational schemas, entity-relationship modeling, distributed replication, and network-accessible database servers—are **not applicable** to this system.
 
@@ -5037,7 +5052,7 @@ Velocetty is a **desktop terminal emulator application** built on Electron. As s
 | **Connection Pooling** | Not applicable; no database connections |
 | **Database Migrations** | Configuration file migrations (v3 → v4) |
 
-#### 6.2.1.2 Rationale for Non-Applicability
+##### 6.2.1.2 Rationale for non-applicability
 
 The fundamental architecture of Velocetty precludes traditional database requirements:
 
@@ -5051,11 +5066,11 @@ The fundamental architecture of Velocetty precludes traditional database require
 
 ---
 
-### 6.2.2 File-Based Storage Architecture
+#### 6.2.2 File-based storage architecture
 
 Although Velocetty does not employ traditional databases, it implements a well-defined **file-based storage architecture** organized into three distinct storage layers that serve the data persistence needs of a desktop application.
 
-#### 6.2.2.1 Storage Layer Overview
+##### 6.2.2.1 Storage layer overview
 
 ```mermaid
 flowchart TB
@@ -5092,7 +5107,7 @@ flowchart TB
     StateStorage -.->|"electron-store only"| FileSystemPaths
 ```
 
-#### 6.2.2.2 Storage Layer Classification
+##### 6.2.2.2 Storage layer classification
 
 | Storage Layer | Technology | Persistence Model | Data Lifetime |
 |---------------|------------|-------------------|---------------|
@@ -5102,9 +5117,9 @@ flowchart TB
 
 ---
 
-### 6.2.3 Schema Design
+#### 6.2.3 Schema design
 
-#### 6.2.3.1 Configuration File Structure
+##### 6.2.3.1 Configuration file structure
 
 The primary configuration file (`hyper.json`) follows a structured JSON schema with three main sections:
 
@@ -5139,7 +5154,7 @@ flowchart TB
     Root --> KeymapsSection
 ```
 
-#### 6.2.3.2 JSON Schema Validation
+##### 6.2.3.2 JSON schema validation
 
 Configuration validation is enforced through JSON Schema Draft-07, defined in `app/config/schema.json`:
 
@@ -5150,7 +5165,7 @@ Configuration validation is enforced through JSON Schema Draft-07, defined in `a
 | **profileConfigOptions** | Object (subset of configOptions) | Per-profile overridable settings |
 | **configOptions** | Object (40+ properties) | Complete configuration structure |
 
-#### Color Palette Schema Requirements
+##### Color palette schema requirements
 
 The ColorMap type requires exactly 16 ANSI color definitions:
 
@@ -5159,7 +5174,7 @@ The ColorMap type requires exactly 16 ANSI color definitions:
 | **Standard Colors** | black, red, green, yellow, blue, magenta, cyan, white |
 | **Bright Colors** | lightBlack, lightRed, lightGreen, lightYellow, lightBlue, lightMagenta, lightCyan, lightWhite |
 
-#### 6.2.3.3 Platform-Specific Path Resolution
+##### 6.2.3.3 Platform-specific path resolution
 
 Configuration file locations follow XDG Base Directory Specification on Unix-like systems:
 
@@ -5169,7 +5184,7 @@ Configuration file locations follow XDG Base Directory Specification on Unix-lik
 | **macOS** | `~/.config/Hyper` | Consistent with Linux for cross-platform tools |
 | **Windows** | `%APPDATA%/Hyper` | Uses Electron's `app.getPath('userData')` |
 
-#### Directory Structure
+##### Directory structure
 
 ```
 Configuration Directory:
@@ -5184,9 +5199,9 @@ Configuration Directory:
 
 ---
 
-### 6.2.4 Data Models and Structures
+#### 6.2.4 Data models and structures
 
-#### 6.2.4.1 Configuration Data Model
+##### 6.2.4.1 Configuration data model
 
 The configuration system implements a layered merge model where user settings override platform-specific defaults:
 
@@ -5211,7 +5226,7 @@ flowchart TB
     Normalize --> FinalConfig
 ```
 
-#### 6.2.4.2 Redux State Model (In-Memory)
+##### 6.2.4.2 Redux state model (in-memory)
 
 Session and UI state is managed entirely in memory via Redux, intentionally not persisted:
 
@@ -5221,7 +5236,7 @@ Session and UI state is managed entirely in memory via Redux, intentionally not 
 | **sessions** | sessions (Record<uid, session>), activeUid, search state | **Not persisted** (volatile) |
 | **termGroups** | termGroups (tree structure), activeSessions, activeRootGroup | **Not persisted** (volatile) |
 
-#### Session Record Structure
+##### Session record structure
 
 ```mermaid
 flowchart LR
@@ -5238,7 +5253,7 @@ flowchart LR
     end
 ```
 
-#### 6.2.4.3 Window State Model (Persisted)
+##### 6.2.4.3 Window state model (persisted)
 
 Window geometry is persisted using `electron-store` for restoration across application restarts:
 
@@ -5249,9 +5264,9 @@ Window geometry is persisted using `electron-store` for restoration across appli
 
 ---
 
-### 6.2.5 Data Flow Diagrams
+#### 6.2.5 Data flow diagrams
 
-#### 6.2.5.1 Configuration Data Flow
+##### 6.2.5.1 Configuration data flow
 
 ```mermaid
 sequenceDiagram
@@ -5285,7 +5300,7 @@ sequenceDiagram
     Renderer->>Redux: Refresh config state
 ```
 
-#### 6.2.5.2 State Persistence Flow
+##### 6.2.5.2 State persistence flow
 
 ```mermaid
 flowchart TB
@@ -5318,9 +5333,9 @@ flowchart TB
 
 ---
 
-### 6.2.6 Data Management
+#### 6.2.6 Data management
 
-#### 6.2.6.1 Migration Procedures
+##### 6.2.6.1 Migration procedures
 
 Velocetty implements migration support for transitioning from Hyper v3 (JavaScript configuration) to v4 (JSON configuration):
 
@@ -5349,7 +5364,7 @@ flowchart TB
     CreateMarker --> Complete
 ```
 
-#### Migration Artifacts
+##### Migration artifacts
 
 | Artifact | Location | Purpose |
 |----------|----------|---------|
@@ -5357,7 +5372,7 @@ flowchart TB
 | **.migration-marker** | Configuration directory | Prevents duplicate migration attempts |
 | **hyper.json** | Configuration directory | New JSON configuration file |
 
-#### 6.2.6.2 Versioning Strategy
+##### 6.2.6.2 Versioning strategy
 
 Configuration versioning is implicit through schema evolution:
 
@@ -5367,7 +5382,7 @@ Configuration versioning is implicit through schema evolution:
 | **Migration Marker** | `.migration-marker` file | Tracks migration state from v3 to v4 |
 | **Plugin Manifest** | `plugins/package.json` | Tracks plugin versions via npm semver |
 
-#### 6.2.6.3 Archival Policies
+##### 6.2.6.3 Archival policies
 
 | Data Category | Archival Policy | Rationale |
 |---------------|-----------------|-----------|
@@ -5378,9 +5393,9 @@ Configuration versioning is implicit through schema evolution:
 
 ---
 
-### 6.2.7 Caching Strategy
+#### 6.2.7 Caching strategy
 
-#### 6.2.7.1 Cache Implementation
+##### 6.2.7.1 Cache implementation
 
 ```mermaid
 flowchart TB
@@ -5404,7 +5419,7 @@ flowchart TB
     end
 ```
 
-#### 6.2.7.2 Cache Policies
+##### 6.2.7.2 Cache policies
 
 | Cache Type | Implementation | Invalidation Trigger | Purpose |
 |------------|----------------|---------------------|---------|
@@ -5415,9 +5430,9 @@ flowchart TB
 
 ---
 
-### 6.2.8 Compliance Considerations
+#### 6.2.8 Compliance considerations
 
-#### 6.2.8.1 Privacy Controls
+##### 6.2.8.1 Privacy controls
 
 Velocetty implements privacy-first data handling as a core design principle:
 
@@ -5430,7 +5445,7 @@ Velocetty implements privacy-first data handling as a core design principle:
 
 **Design Decision**: Session state (including terminal scrollback) is intentionally not persisted across application restarts. This aligns with traditional terminal emulator behavior and avoids potential security concerns with persisting command history.
 
-#### 6.2.8.2 Data Retention Rules
+##### 6.2.8.2 Data retention rules
 
 | Data Type | Retention Period | Cleanup Mechanism |
 |-----------|------------------|-------------------|
@@ -5440,7 +5455,7 @@ Velocetty implements privacy-first data handling as a core design principle:
 | **Terminal Sessions** | Application lifetime | Automatic on window close |
 | **Scrollback Buffer** | Session lifetime | Automatic on session exit |
 
-#### 6.2.8.3 Access Controls
+##### 6.2.8.3 Access controls
 
 | Resource | Access Control | Implementation |
 |----------|----------------|----------------|
@@ -5451,9 +5466,9 @@ Velocetty implements privacy-first data handling as a core design principle:
 
 ---
 
-### 6.2.9 Backup and Fault Tolerance
+#### 6.2.9 Backup and fault tolerance
 
-#### 6.2.9.1 Fault Tolerance Architecture
+##### 6.2.9.1 Fault tolerance architecture
 
 ```mermaid
 flowchart TB
@@ -5477,7 +5492,7 @@ flowchart TB
     end
 ```
 
-#### 6.2.9.2 Configuration Corruption Recovery
+##### 6.2.9.2 Configuration corruption recovery
 
 | Failure Scenario | Detection Method | Recovery Action |
 |------------------|------------------|-----------------|
@@ -5486,7 +5501,7 @@ flowchart TB
 | **Missing Configuration File** | File existence check | Generate from config-default.json |
 | **Permission Denied** | File read exception | Use in-memory defaults, notify user |
 
-#### 6.2.9.3 Backup Recommendations
+##### 6.2.9.3 Backup recommendations
 
 Since Velocetty does not implement automatic backup, users are responsible for preserving their configuration:
 
@@ -5498,9 +5513,9 @@ Since Velocetty does not implement automatic backup, users are responsible for p
 
 ---
 
-### 6.2.10 Performance Optimization
+#### 6.2.10 Performance optimization
 
-#### 6.2.10.1 Write Middleware Bypass
+##### 6.2.10.1 Write middleware bypass
 
 The most critical performance optimization bypasses Redux entirely for high-volume terminal output:
 
@@ -5522,7 +5537,7 @@ flowchart LR
     Action2 -.->|"Still forwarded<br/>(no state update)"| Reducer1
 ```
 
-#### 6.2.10.2 IPC Data Batching
+##### 6.2.10.2 IPC data batching
 
 Terminal output data is batched before crossing the IPC boundary:
 
@@ -5533,7 +5548,7 @@ Terminal output data is batched before crossing the IPC boundary:
 | **Batch Prefix** | 36-character UUID | Session routing identifier |
 | **IPC Call Reduction** | 60-90% | Empirical reduction vs. unbatched transmission |
 
-#### 6.2.10.3 Configuration Access Optimization
+##### 6.2.10.3 Configuration access optimization
 
 | Optimization | Implementation | Impact |
 |--------------|----------------|--------|
@@ -5544,9 +5559,9 @@ Terminal output data is batched before crossing the IPC boundary:
 
 ---
 
-### 6.2.11 Data Flow Summary
+#### 6.2.11 Data flow summary
 
-#### 6.2.11.1 Complete Storage Architecture Diagram
+##### 6.2.11.1 Complete storage architecture diagram
 
 ```mermaid
 flowchart TB
@@ -5585,7 +5600,7 @@ flowchart TB
     WindowManager --> GeometryStore
 ```
 
-#### 6.2.11.2 Storage Technology Summary
+##### 6.2.11.2 Storage technology summary
 
 | Storage Need | Technology Choice | Rationale |
 |--------------|-------------------|-----------|
@@ -5597,9 +5612,9 @@ flowchart TB
 
 ---
 
-### 6.2.12 Why Traditional Database Patterns Do Not Apply
+#### 6.2.12 Why traditional database patterns do not apply
 
-#### 6.2.12.1 Pattern Applicability Matrix
+##### 6.2.12.1 Pattern applicability matrix
 
 | Traditional Database Pattern | Applicability | Rationale |
 |------------------------------|---------------|-----------|
@@ -5613,7 +5628,7 @@ flowchart TB
 | **Read/Write Splitting** | ❌ Not Applicable | Single-process file access |
 | **ACID Transactions** | ⚠️ Partially Applicable | Atomic file writes via fs-extra |
 
-#### 6.2.12.2 Desktop Application Data Architecture Summary
+##### 6.2.12.2 Desktop application data architecture summary
 
 Velocetty's architecture instead focuses on:
 
@@ -5627,9 +5642,9 @@ This approach aligns with the desktop terminal emulator paradigm where user data
 
 ---
 
-### 6.2.13 References
+#### 6.2.13 References
 
-#### Files Examined
+##### Files examined
 
 - `app/config/paths.ts` - XDG-compliant path resolution, plugin paths, configuration file locations
 - `app/config/windows.ts` - electron-store usage for window geometry persistence
@@ -5648,14 +5663,14 @@ This approach aligns with the desktop terminal emulator paradigm where user data
 - `typings/config.d.ts` - TypeScript definitions for configuration types
 - `typings/hyper.d.ts` - Redux state type definitions
 
-#### Folders Explored
+##### Folders explored
 
 - `app/config/` - Configuration subsystem implementation
 - `lib/store/` - Redux store configuration and middleware
 - `lib/reducers/` - Redux reducer implementations
 - `typings/` - TypeScript type definitions
 
-#### Technical Specification Sections Referenced
+##### Technical specification sections referenced
 
 - Section 3.5 DATABASES & STORAGE - Primary storage architecture documentation
 - Section 5.2 COMPONENT DETAILS - Configuration system and plugin manager details
@@ -5664,9 +5679,9 @@ This approach aligns with the desktop terminal emulator paradigm where user data
 - Section 4.4 STATE MANAGEMENT FLOWS - Redux state flow documentation
 - Section 4.5 ERROR HANDLING FLOWS - Fault tolerance and recovery patterns
 
-## 6.3 Integration Architecture
+### 6.3 Integration architecture
 
-### 6.3.1 Integration Architecture Overview
+#### 6.3.1 Integration architecture overview
 
 Velocetty implements a **desktop-appropriate integration architecture** that differs fundamentally from traditional web service API patterns. As an Electron-based terminal emulator, the system's integration architecture centers on three primary integration domains:
 
@@ -5680,7 +5695,7 @@ Velocetty implements a **desktop-appropriate integration architecture** that dif
 | External Services | HTTPS REST | Update checks, plugin discovery |
 | Plugin System | CommonJS Module Loading | Extensibility substrate |
 
-#### 6.3.1.1 Traditional API Patterns: Limited Applicability
+##### 6.3.1.1 Traditional API patterns: limited applicability
 
 Unlike web services that expose REST/GraphQL endpoints, Velocetty operates as a single-user desktop application. Traditional API design concepts require reinterpretation:
 
@@ -5739,11 +5754,11 @@ flowchart TB
 
 ---
 
-### 6.3.2 IPC Bridge Architecture (Internal API Layer)
+#### 6.3.2 IPC bridge architecture (internal API layer)
 
 The IPC bridge serves as Velocetty's primary internal API, facilitating all communication between the Electron main process and renderer processes.
 
-#### 6.3.2.1 Protocol Specification
+##### 6.3.2.1 Protocol specification
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -5753,7 +5768,7 @@ The IPC bridge serves as Velocetty's primary internal API, facilitating all comm
 | **Communication Pattern** | Bidirectional event-driven |
 | **Error Handling** | Destruction guards, null-safe emission |
 
-#### Channel Initialization Sequence
+##### Channel initialization sequence
 
 ```mermaid
 sequenceDiagram
@@ -5788,11 +5803,11 @@ sequenceDiagram
     Main->>Main: Remove from session map
 ```
 
-#### 6.3.2.2 Typed Event Contracts
+##### 6.3.2.2 Typed event contracts
 
 The IPC bridge enforces type safety through strongly-typed event definitions in `typings/common.d.ts`.
 
-#### MainEvents (Renderer → Main)
+##### Mainevents (renderer → main)
 
 | Event | Payload | Purpose |
 |-------|---------|---------|
@@ -5804,7 +5819,7 @@ The IPC bridge enforces type safety through strongly-typed event definitions in 
 | `command` | `string` | Command dispatch (menu/shortcut) |
 | `maximize` / `minimize` / `unmaximize` | `{}` | Window state controls |
 
-#### RendererEvents (Main → Renderer)
+##### Rendererevents (main → renderer)
 
 | Event | Payload | Purpose |
 |-------|---------|---------|
@@ -5816,7 +5831,7 @@ The IPC bridge enforces type safety through strongly-typed event definitions in 
 | `split request horizontal` | `{}` | Split pane command |
 | `move left req` / `move right req` | `{}` | Tab navigation |
 
-#### 6.3.2.3 IPC Command Interface (Request-Response Pattern)
+##### 6.3.2.3 IPC command interface (request-response pattern)
 
 For operations requiring responses, Velocetty implements a typed command interface:
 
@@ -5855,9 +5870,9 @@ flowchart LR
 
 ---
 
-### 6.3.3 Message Processing Architecture
+#### 6.3.3 Message processing architecture
 
-#### 6.3.3.1 Data Batching Strategy
+##### 6.3.3.1 Data batching strategy
 
 The Session Manager implements intelligent data batching to mitigate IPC overhead for high-volume terminal output.
 
@@ -5894,7 +5909,7 @@ flowchart TB
     Reset -.->|"Next Output"| PTYOutput
 ```
 
-#### Batching Parameters
+##### Batching parameters
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
@@ -5903,7 +5918,7 @@ flowchart TB
 | **Batch Prefix** | 36-character UUID | Session identification for multi-session routing |
 | **IPC Call Reduction** | 60-90% | Empirical reduction vs. unbatched transmission |
 
-#### 6.3.3.2 Redux Middleware Pipeline
+##### 6.3.3.2 Redux middleware pipeline
 
 The renderer process employs a carefully ordered middleware pipeline for message processing:
 
@@ -5933,7 +5948,7 @@ flowchart LR
 | `writeMiddleware` | 4th | Performance bypass for terminal data |
 | `effects` | 5th | Execute action side effects |
 
-#### 6.3.3.3 Write Middleware Performance Bypass
+##### 6.3.3.3 Write middleware performance bypass
 
 The `writeMiddleware` implements a critical optimization by bypassing Redux state management for terminal output:
 
@@ -5961,7 +5976,7 @@ flowchart TB
 
 **Performance Impact**: This bypass eliminates Redux state serialization, achieving the < 50ms keystroke-to-echo latency target.
 
-#### 6.3.3.4 Event Processing Flow (Complete Data Path)
+##### 6.3.3.4 Event processing flow (complete data path)
 
 ```mermaid
 sequenceDiagram
@@ -6000,11 +6015,11 @@ sequenceDiagram
 
 ---
 
-### 6.3.4 External Service Integration
+#### 6.3.4 External service integration
 
 Velocetty integrates with a limited set of external HTTP services for updates, plugin discovery, and notifications.
 
-#### 6.3.4.1 External Service Architecture
+##### 6.3.4.1 External service architecture
 
 ```mermaid
 flowchart TB
@@ -6028,9 +6043,9 @@ flowchart TB
     Notifications -->|"HTTPS Polling"| ExternalServices
 ```
 
-#### 6.3.4.2 Service Contract Specifications
+##### 6.3.4.2 Service contract specifications
 
-#### Auto-Update Service
+##### Auto-update service
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -6043,7 +6058,7 @@ flowchart TB
 | **Response Format** | JSON update manifest |
 | **Authentication** | None (public endpoints) |
 
-#### npm Registry Integration
+##### npm registry integration
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -6053,7 +6068,7 @@ flowchart TB
 | **Response Format** | JSON with `versions` metadata |
 | **Purpose** | Plugin installation validation |
 
-## npms.io Search API
+### npms.io search API
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -6062,7 +6077,7 @@ flowchart TB
 | **Response Format** | JSON array of package metadata |
 | **Purpose** | Plugin discovery (`hyper search` CLI) |
 
-#### Notification Service
+##### Notification service
 
 | Attribute | Specification |
 |-----------|---------------|
@@ -6071,7 +6086,7 @@ flowchart TB
 | **Polling Interval** | 30 minutes |
 | **Purpose** | Product announcements and notifications |
 
-#### 6.3.4.3 External Integration Error Handling
+##### 6.3.4.3 External integration error handling
 
 | Service | Error Type | Handling Strategy |
 |---------|------------|-------------------|
@@ -6083,11 +6098,11 @@ flowchart TB
 
 ---
 
-### 6.3.5 Plugin Integration Architecture
+#### 6.3.5 Plugin integration architecture
 
 The plugin system provides the primary extensibility API for Velocetty, implementing a composition-based decoration pattern with 40+ extension hooks.
 
-#### 6.3.5.1 Plugin Loading Architecture
+##### 6.3.5.1 Plugin loading architecture
 
 ```mermaid
 flowchart TB
@@ -6136,7 +6151,7 @@ flowchart TB
     DecorationHooks --> StateHooks
 ```
 
-#### 6.3.5.2 Extension Hook Categories
+##### 6.3.5.2 Extension hook categories
 
 | Category | Hooks | Process |
 |----------|-------|---------|
@@ -6147,7 +6162,7 @@ flowchart TB
 | **Redux Integration** | `middleware`, `reduceUI`, `reduceSessions`, `reduceTermGroups` | Renderer |
 | **State Dispatchers** | `mapHyperTermState`, `mapTermsState`, `mapHeaderState`, `mapNotificationsState`, `mapHyperTermDispatch`, `mapTermsDispatch` | Renderer |
 
-#### 6.3.5.3 Decoration Composition Pattern
+##### 6.3.5.3 Decoration composition pattern
 
 ```mermaid
 sequenceDiagram
@@ -6176,7 +6191,7 @@ sequenceDiagram
     Note over Core,Final: Composition preserves base behavior
 ```
 
-#### 6.3.5.4 Plugin Installation Integration Flow
+##### 6.3.5.4 Plugin installation integration flow
 
 ```mermaid
 sequenceDiagram
@@ -6213,9 +6228,9 @@ sequenceDiagram
 
 ---
 
-### 6.3.6 Error Handling Strategy
+#### 6.3.6 Error handling strategy
 
-#### 6.3.6.1 Plugin Error Isolation
+##### 6.3.6.1 Plugin error isolation
 
 The plugin system implements defensive error handling to prevent extension failures from crashing the application:
 
@@ -6271,7 +6286,7 @@ flowchart TB
     Continue --> Functional
 ```
 
-#### Error Handling by Hook Category
+##### Error handling by hook category
 
 | Hook Category | Error Strategy | Fallback Behavior |
 |---------------|----------------|-------------------|
@@ -6281,7 +6296,7 @@ flowchart TB
 | **Reducer Hooks** | Return previous state | State unchanged by failed plugin |
 | **Props Injection** | Merge failure isolation | Original props preserved |
 
-#### 6.3.6.2 IPC Error Handling
+##### 6.3.6.2 IPC error handling
 
 | Error Condition | Detection | Recovery Action |
 |-----------------|-----------|-----------------|
@@ -6292,9 +6307,9 @@ flowchart TB
 
 ---
 
-### 6.3.7 Protocol Handler Integration
+#### 6.3.7 Protocol handler integration
 
-#### 6.3.7.1 SSH Protocol Handler
+##### 6.3.7.1 SSH protocol handler
 
 Velocetty registers as the handler for `ssh://` protocol URLs:
 
@@ -6307,9 +6322,9 @@ Velocetty registers as the handler for `ssh://` protocol URLs:
 
 ---
 
-### 6.3.8 Integration Security Considerations
+#### 6.3.8 Integration security considerations
 
-#### 6.3.8.1 Security Model
+##### 6.3.8.1 Security model
 
 | Aspect | Current Implementation | Risk Level |
 |--------|------------------------|------------|
@@ -6318,7 +6333,7 @@ Velocetty registers as the handler for `ssh://` protocol URLs:
 | **External APIs** | Public endpoints, no authentication | Low |
 | **Native Module Access** | node-pty has full system access | Medium |
 
-#### 6.3.8.2 Security Mitigations
+##### 6.3.8.2 Security mitigations
 
 | Risk | Mitigation Strategy |
 |------|---------------------|
@@ -6329,9 +6344,9 @@ Velocetty registers as the handler for `ssh://` protocol URLs:
 
 ---
 
-### 6.3.9 Integration Performance Metrics
+#### 6.3.9 Integration performance metrics
 
-#### 6.3.9.1 Performance Targets
+##### 6.3.9.1 Performance targets
 
 | Metric | Target | Measurement Point |
 |--------|--------|-------------------|
@@ -6341,7 +6356,7 @@ Velocetty registers as the handler for `ssh://` protocol URLs:
 | **Config Hot-Reload** | < 100ms | File change to UI update |
 | **External API Timeout** | 10 seconds | npm registry, update server |
 
-#### 6.3.9.2 Integration Monitoring Points
+##### 6.3.9.2 Integration monitoring points
 
 | Monitoring Point | Implementation | Location |
 |------------------|----------------|----------|
@@ -6352,9 +6367,9 @@ Velocetty registers as the handler for `ssh://` protocol URLs:
 
 ---
 
-### 6.3.10 References
+#### 6.3.10 References
 
-#### Source Files Examined
+##### Source files examined
 
 - `app/rpc.ts` - Main process IPC server implementation, UUID-keyed channel management
 - `app/session.ts` - PTY session management, DataBatcher implementation with 16ms/200KB thresholds
@@ -6368,7 +6383,7 @@ Velocetty registers as the handler for `ssh://` protocol URLs:
 - `cli/index.ts` - npms.io search API integration, CLI command handlers
 - `typings/common.d.ts` - Typed IPC event definitions, MainEvents/RendererEvents
 
-#### Technical Specification Sections Referenced
+##### Technical specification sections referenced
 
 - Section 3.4 THIRD-PARTY SERVICES - External service specifications
 - Section 3.7 INTEGRATION REQUIREMENTS - Component integration matrix
@@ -6378,9 +6393,9 @@ Velocetty registers as the handler for `ssh://` protocol URLs:
 - Section 5.4 CROSS-CUTTING CONCERNS - Error handling patterns
 - Section 6.1 Core Services Architecture - IPC patterns and resilience
 
-## 6.4 Security Architecture
+### 6.4 Security architecture
 
-### 6.4.1 Security Model Overview
+#### 6.4.1 Security model overview
 
 Velocetty implements a **desktop application security model** that differs fundamentally from traditional web service patterns. As an Electron-based terminal emulator operating in a single-user local context, the system does not implement server-side authentication or authorization mechanisms. Instead, security focuses on:
 
@@ -6390,7 +6405,7 @@ Velocetty implements a **desktop application security model** that differs funda
 4. **Data Privacy**: Privacy-by-design principles for terminal content
 5. **Supply Chain Security**: Automated vulnerability scanning and dependency management
 
-#### 6.4.1.1 Security Architecture Diagram
+##### 6.4.1.1 Security architecture diagram
 
 ```mermaid
 flowchart TB
@@ -6425,7 +6440,7 @@ flowchart TB
     PluginMain -->|"Package Fetch"| NPMRegistry
 ```
 
-#### 6.4.1.2 Traditional Security Concepts Reinterpretation
+##### 6.4.1.2 Traditional security concepts reinterpretation
 
 | Traditional Concept | Velocetty Implementation | Rationale |
 |--------------------|--------------------------|-----------|
@@ -6437,9 +6452,9 @@ flowchart TB
 
 ---
 
-### 6.4.2 Electron Security Configuration
+#### 6.4.2 Electron security configuration
 
-#### 6.4.2.1 BrowserWindow Security Settings
+##### 6.4.2.1 Browserwindow security settings
 
 Velocetty's `BrowserWindow` configuration in `app/ui/window.ts` implements the following security-relevant settings:
 
@@ -6452,7 +6467,7 @@ Velocetty's `BrowserWindow` configuration in `app/ui/window.ts` implements the f
 **Configuration Evidence** (`app/ui/window.ts`, lines 50-54):
 The `webPreferences` object explicitly enables `nodeIntegration` and disables `contextIsolation`, which contradicts Electron's recommended security defaults but is architecturally required for Velocetty's plugin system.
 
-#### 6.4.2.2 Content Security Policy
+##### 6.4.2.2 Content security policy
 
 Velocetty implements a Content Security Policy via HTML meta tag in `app/index.html`:
 
@@ -6463,7 +6478,7 @@ Velocetty implements a Content Security Policy via HTML meta tag in `app/index.h
 
 **Security Analysis**: The CSP provides limited protection against external script injection but allows inline scripts necessary for the React/styled-jsx architecture. This policy prevents loading scripts from external URLs while permitting the application's bundled code to execute.
 
-#### 6.4.2.3 Security Configuration Flow
+##### 6.4.2.3 Security configuration flow
 
 ```mermaid
 flowchart TB
@@ -6501,7 +6516,7 @@ flowchart TB
     CrossProcess --> NoRemote
 ```
 
-#### 6.4.2.4 @electron/remote Module
+##### 6.4.2.4 @Electron/remote module
 
 The `@electron/remote` module (version 2.1.2) is enabled to facilitate cross-process communication for the plugin architecture:
 
@@ -6518,9 +6533,9 @@ The `@electron/remote` module (version 2.1.2) is enabled to facilitate cross-pro
 
 ---
 
-### 6.4.3 Plugin Security Model
+#### 6.4.3 Plugin security model
 
-#### 6.4.3.1 Full Trust Architecture
+##### 6.4.3.1 Full trust architecture
 
 Velocetty inherits Hyper's **full-trust plugin model**, where extensions execute with complete application privileges. This design decision prioritizes extensibility over isolation:
 
@@ -6564,7 +6579,7 @@ flowchart TB
     TryCatch -->|"Graceful"| Fallback
 ```
 
-#### 6.4.3.2 Available Extension Hooks
+##### 6.4.3.2 Available extension hooks
 
 Plugins can access 40+ extension hooks defined in `app/plugins/extensions.ts`:
 
@@ -6576,7 +6591,7 @@ Plugins can access 40+ extension hooks defined in `app/plugins/extensions.ts`:
 | **UI Components** | `decorateTab`, `decorateTerm`, `decorateHeader` | UI injection |
 | **Props Mappers** | `mapTermsState`, `mapSessionsDispatch` | Data flow interception |
 
-#### 6.4.3.3 Plugin Error Isolation
+##### 6.4.3.3 Plugin error isolation
 
 While plugins have full trust access, Velocetty implements error isolation to prevent plugin failures from crashing the application:
 
@@ -6589,7 +6604,7 @@ While plugins have full trust access, Velocetty implements error isolation to pr
 
 **Evidence** (`lib/utils/plugins.ts`): The `decorate()` function wraps plugin decorators in try-catch blocks, logging errors and returning the original component/value on failure.
 
-#### 6.4.3.4 Plugin Security Policy Matrix
+##### 6.4.3.4 Plugin security policy matrix
 
 | Security Aspect | Current State | Risk Level | Mitigation |
 |-----------------|---------------|------------|------------|
@@ -6602,9 +6617,9 @@ While plugins have full trust access, Velocetty implements error isolation to pr
 
 ---
 
-### 6.4.4 IPC Security
+#### 6.4.4 IPC security
 
-#### 6.4.4.1 Channel Isolation
+##### 6.4.4.1 Channel isolation
 
 Velocetty's IPC bridge (`app/rpc.ts`, `lib/utils/rpc.ts`) implements channel isolation using unique identifiers:
 
@@ -6615,7 +6630,7 @@ Velocetty's IPC bridge (`app/rpc.ts`, `lib/utils/rpc.ts`) implements channel iso
 | Destruction Guards | Null-safe emission checks | Prevents messages to destroyed windows |
 | Handler Registration | Per-window listener lifecycle | Automatic cleanup on window close |
 
-#### 6.4.4.2 IPC Authentication Flow
+##### 6.4.4.2 IPC authentication flow
 
 ```mermaid
 sequenceDiagram
@@ -6647,7 +6662,7 @@ sequenceDiagram
     Main->>Main: Remove from sessions map
 ```
 
-#### 6.4.4.3 Typed Event Contracts
+##### 6.4.4.3 Typed event contracts
 
 The IPC bridge enforces type safety through strongly-typed event definitions in `typings/common.d.ts`:
 
@@ -6672,9 +6687,9 @@ The IPC bridge enforces type safety through strongly-typed event definitions in 
 
 ---
 
-### 6.4.5 Data Protection
+#### 6.4.5 Data protection
 
-#### 6.4.5.1 Data Classification and Protection
+##### 6.4.5.1 Data classification and protection
 
 | Data Type | Classification | Storage | Protection Method |
 |-----------|---------------|---------|-------------------|
@@ -6684,7 +6699,7 @@ The IPC bridge enforces type safety through strongly-typed event definitions in 
 | Window Geometry | Low | electron-store | Encrypted by default |
 | Environment Variables | Medium | Process memory | Sanitization on spawn |
 
-#### 6.4.5.2 Environment Variable Sanitization
+##### 6.4.5.2 Environment variable sanitization
 
 Velocetty sanitizes environment variables before spawning shell processes to prevent sensitive data leakage:
 
@@ -6703,7 +6718,7 @@ if (baseEnv.GOOGLE_API_KEY && process.env.GOOGLE_API_KEY === baseEnv.GOOGLE_API_
 | `COLORTERM` | Set to `truecolor` | Enable 24-bit color |
 | `TERM_PROGRAM` | Set to `Hyper` | Application identification |
 
-#### 6.4.5.3 Configuration File Security
+##### 6.4.5.3 Configuration file security
 
 **Configuration Paths** (XDG-compliant from `app/config/paths.ts`):
 
@@ -6723,7 +6738,7 @@ Legacy `.hyper.js` JavaScript configurations are evaluated using Node.js `vm.Scr
 | Purpose | Legacy config value extraction only |
 | Scope | Read-only config migration |
 
-#### 6.4.5.4 Data Flow Security Diagram
+##### 6.4.5.4 Data flow security diagram
 
 ```mermaid
 flowchart TB
@@ -6775,9 +6790,9 @@ flowchart TB
 
 ---
 
-### 6.4.6 Code Signing and Distribution Security
+#### 6.4.6 Code signing and distribution security
 
-#### 6.4.6.1 macOS Code Signing
+##### 6.4.6.1 MacOS code signing
 
 Velocetty implements comprehensive macOS code signing and notarization:
 
@@ -6797,7 +6812,7 @@ Velocetty implements comprehensive macOS code signing and notarization:
 - Apple ID credentials from environment variables
 - Automated via `electron-builder` afterSign hook
 
-#### 6.4.6.2 Windows Code Signing
+##### 6.4.6.2 Windows code signing
 
 | Attribute | Value |
 |-----------|-------|
@@ -6805,7 +6820,7 @@ Velocetty implements comprehensive macOS code signing and notarization:
 | Configuration | `electron-builder.json` (line 39) |
 | Certificate | Environment-provided during CI/CD |
 
-#### 6.4.6.3 Auto-Update Security
+##### 6.4.6.3 Auto-update security
 
 ```mermaid
 flowchart TB
@@ -6852,9 +6867,9 @@ flowchart TB
 
 ---
 
-### 6.4.7 Security Scanning and Compliance
+#### 6.4.7 Security scanning and compliance
 
-#### 6.4.7.1 Automated Security Scanning
+##### 6.4.7.1 Automated security scanning
 
 | Mechanism | Schedule | Scope | Configuration |
 |-----------|----------|-------|---------------|
@@ -6862,7 +6877,7 @@ flowchart TB
 | Dependabot | Weekly (Sundays) | npm + GitHub Actions | `.github/dependabot.yml` |
 | Target Branch | `canary` | Pre-release validation | GitHub workflow configuration |
 
-#### 6.4.7.2 Dependency Security
+##### 6.4.7.2 Dependency security
 
 **Dependabot Configuration** (`.github/dependabot.yml`):
 
@@ -6872,7 +6887,7 @@ flowchart TB
 | npm | Weekly | `/app` |
 | GitHub Actions | Weekly | `.github/workflows/` |
 
-#### 6.4.7.3 Security Scanning Flow
+##### 6.4.7.3 Security scanning flow
 
 ```mermaid
 flowchart LR
@@ -6921,9 +6936,9 @@ flowchart LR
 
 ---
 
-### 6.4.8 Known Security Concerns and Technical Debt
+#### 6.4.8 Known security concerns and technical debt
 
-#### 6.4.8.1 Critical Security Issues
+##### 6.4.8.1 Critical security issues
 
 | Concern | Current State | Risk Level | Evidence |
 |---------|--------------|------------|----------|
@@ -6935,7 +6950,7 @@ flowchart LR
 | Node Integration | Enabled in renderer | **Medium** | `app/ui/window.ts` |
 | Context Isolation | Disabled | **Medium** | `app/ui/window.ts` |
 
-#### 6.4.8.2 Electron 22 Known Vulnerabilities
+##### 6.4.8.2 Electron 22 known vulnerabilities
 
 Based on CVE database research:
 
@@ -6945,7 +6960,7 @@ Based on CVE database research:
 | Context Isolation Bypass | Exploitable via non-serializable objects | < 22.3.6 | Fixed in 22.3.6+ |
 | Chromium vulnerabilities | Multiple CVEs in Chromium 108 | All 22.x | **Unpatched** |
 
-#### 6.4.8.3 Security Configuration Compliance
+##### 6.4.8.3 Security configuration compliance
 
 | Electron Best Practice | Velocetty Status | Compliance | Justification |
 |-----------------------|------------------|------------|---------------|
@@ -6958,9 +6973,9 @@ Based on CVE database research:
 
 ---
 
-### 6.4.9 Security Recommendations and Mitigation Strategies
+#### 6.4.9 Security recommendations and mitigation strategies
 
-#### 6.4.9.1 Short-Term Mitigations
+##### 6.4.9.1 Short-term mitigations
 
 | Risk | Mitigation | Implementation |
 |------|------------|----------------|
@@ -6969,7 +6984,7 @@ Based on CVE database research:
 | `@electron/remote` | Migrate to explicit IPC | Refactor cross-process calls |
 | CSP weakness | Review `'unsafe-inline'` necessity | Evaluate alternative styling |
 
-#### 6.4.9.2 Long-Term Security Roadmap
+##### 6.4.9.2 Long-term security roadmap
 
 ```mermaid
 flowchart TB
@@ -6995,7 +7010,7 @@ flowchart TB
     Phase2 --> Phase3
 ```
 
-#### 6.4.9.3 Plugin Security Best Practices
+##### 6.4.9.3 Plugin security best practices
 
 For users installing plugins:
 
@@ -7009,9 +7024,9 @@ For users installing plugins:
 
 ---
 
-### 6.4.10 References
+#### 6.4.10 References
 
-#### Files Examined
+##### Files examined
 
 - `app/ui/window.ts` - BrowserWindow security settings (webPreferences)
 - `app/index.html` - Content Security Policy meta tag
@@ -7033,7 +7048,7 @@ For users installing plugins:
 - `typings/common.d.ts` - IPC event type definitions
 - `app/package.json` - Runtime dependencies, Electron version
 
-#### Folders Explored
+##### Folders explored
 
 - `app/` - Main process implementation
 - `app/config/` - Configuration system
@@ -7042,17 +7057,17 @@ For users installing plugins:
 - `build/mac/` - macOS entitlements
 - `.github/workflows/` - CI/CD and security workflows
 
-#### External Security Resources
+##### External security resources
 
 - Electron Security Documentation: https://www.electronjs.org/docs/latest/tutorial/security/
 - Electron Context Isolation: https://www.electronjs.org/docs/latest/tutorial/context-isolation
 - CVE Details for Electron: https://www.cvedetails.com/vulnerability-list/vendor_id-17824/product_id-44696/Electronjs-Electron.html
 
-## 6.5 Monitoring and Observability
+### 6.5 Monitoring and observability
 
-### 6.5.1 Monitoring Architecture Applicability Assessment
+#### 6.5.1 Monitoring architecture applicability assessment
 
-#### 6.5.1.1 Desktop Application Context Statement
+##### 6.5.1.1 Desktop application context statement
 
 **Detailed Monitoring Architecture is not applicable for this system** in the traditional sense of server-side monitoring infrastructure. Velocetty is an **Electron-based desktop terminal emulator** inheriting Hyper's architecture, operating in a **single-user local context** with no backend services requiring enterprise APM solutions like Prometheus, Grafana, ELK stack, or Datadog.
 
@@ -7065,7 +7080,7 @@ For users installing plugins:
 | **Distributed Tracing** | N/A (single application) | Jaeger, Zipkin, X-Ray |
 | **Alert Management** | User notifications | PagerDuty, OpsGenie |
 
-#### 6.5.1.2 Rationale for Non-Applicability
+##### 6.5.1.2 Rationale for non-applicability
 
 Traditional monitoring infrastructure does not apply to Velocetty for the following reasons:
 
@@ -7074,7 +7089,7 @@ Traditional monitoring infrastructure does not apply to Velocetty for the follow
 3. **Privacy by Design**: Terminal content is never logged or transmitted to external systems
 4. **Local Crash Data**: Crash and error information stays on the user's machine unless explicitly reported via GitHub issues
 
-#### 6.5.1.3 Desktop-Appropriate Observability Model
+##### 6.5.1.3 Desktop-appropriate observability model
 
 Instead of traditional monitoring, Velocetty implements a **lightweight observability model** appropriate for desktop applications:
 
@@ -7107,13 +7122,13 @@ flowchart TB
 
 ---
 
-### 6.5.2 Monitoring Infrastructure
+#### 6.5.2 Monitoring infrastructure
 
-#### 6.5.2.1 Logging Architecture
+##### 6.5.2.1 Logging architecture
 
 Velocetty implements a dual-process logging strategy aligned with Electron's architecture.
 
-#### Log Output Destinations by Process
+##### Log output destinations by process
 
 | Process | Logging Mechanism | Output Destination | Evidence |
 |---------|-------------------|-------------------|----------|
@@ -7122,7 +7137,7 @@ Velocetty implements a dual-process logging strategy aligned with Electron's arc
 | Plugin Errors | Toast notifications + console | In-app notification tray + DevTools | `lib/utils/plugins.ts` |
 | Development Mode | Redux DevTools | Chrome extension | Redux store configuration |
 
-#### Log Categories and Content
+##### Log categories and content
 
 | Log Category | Trigger Events | Example Content |
 |--------------|----------------|-----------------|
@@ -7132,7 +7147,7 @@ Velocetty implements a dual-process logging strategy aligned with Electron's arc
 | Plugin Warnings | Extension failures | Plugin name + hook identification |
 | Performance Metrics | Timing measurements | Init time, batch flush counts |
 
-#### Notification System Architecture
+##### Notification system architecture
 
 ```mermaid
 flowchart TB
@@ -7165,11 +7180,11 @@ flowchart TB
     WebNotif --> ToastMessage
 ```
 
-#### 6.5.2.2 Performance Instrumentation
+##### 6.5.2.2 Performance instrumentation
 
 Velocetty includes internal instrumentation for performance measurement during development and debugging.
 
-#### Instrumentation Points
+##### Instrumentation points
 
 | Measurement Point | Implementation | Location |
 |-------------------|----------------|----------|
@@ -7178,7 +7193,7 @@ Velocetty includes internal instrumentation for performance measurement during d
 | Renderer Type Tracking | IPC event reporting | `lib/components/term.tsx` |
 | Update Polling | Interval-based logging | `app/updater.ts` |
 
-#### Application Init Timing
+##### Application init timing
 
 The renderer initialization time is measured directly in the HTML entry point:
 
@@ -7198,7 +7213,7 @@ sequenceDiagram
     HTML->>Console: log('total init time', end - start)
 ```
 
-#### 6.5.2.3 Update and Error Telemetry
+##### 6.5.2.3 Update and error telemetry
 
 The auto-update system includes minimal telemetry for update checks:
 
@@ -7208,7 +7223,7 @@ The auto-update system includes minimal telemetry for update checks:
 | Error Logging | Local console only | No external transmission |
 | Crash Reporting | Electron crash handler | Local storage only |
 
-#### Auto-Update Monitoring Flow
+##### Auto-update monitoring flow
 
 ```mermaid
 flowchart TB
@@ -7241,13 +7256,13 @@ flowchart TB
 
 ---
 
-### 6.5.3 Observability Patterns
+#### 6.5.3 Observability patterns
 
-#### 6.5.3.1 Health Check Mechanisms
+##### 6.5.3.1 Health check mechanisms
 
 Velocetty implements implicit health checks through error detection and recovery mechanisms rather than explicit health endpoints.
 
-#### Health Check Matrix
+##### Health check matrix
 
 | Health Aspect | Detection Mechanism | Healthy State | Recovery Action |
 |---------------|---------------------|---------------|-----------------|
@@ -7258,7 +7273,7 @@ Velocetty implements implicit health checks through error detection and recovery
 | Main Process | Electron crash handler | Process responsive | Application restart |
 | Renderer Process | Process exit detection | Window responsive | Window recreation |
 
-#### Session Health Monitoring
+##### Session health monitoring
 
 ```mermaid
 flowchart TB
@@ -7292,11 +7307,11 @@ flowchart TB
     NormalExit --> MarkHealthy
 ```
 
-#### 6.5.3.2 Performance Metrics and SLAs
+##### 6.5.3.2 Performance metrics and SLAs
 
 Velocetty defines performance targets appropriate for desktop terminal applications.
 
-#### Performance SLA Targets
+##### Performance SLA targets
 
 | Metric | Target | Measurement Point | Priority |
 |--------|--------|-------------------|----------|
@@ -7308,7 +7323,7 @@ Velocetty defines performance targets appropriate for desktop terminal applicati
 | Configuration hot-reload | < 100ms | File change → UI update | Medium |
 | IPC batch efficiency | 60-90% reduction | Calls vs. unbatched baseline | High |
 
-#### Performance Measurement Architecture
+##### Performance measurement architecture
 
 ```mermaid
 flowchart TB
@@ -7343,9 +7358,9 @@ flowchart TB
     ResourcePerf --> MemoryPanel
 ```
 
-#### 6.5.3.3 Resource Tracking
+##### 6.5.3.3 Resource tracking
 
-#### Desktop Resource Allocation
+##### Desktop resource allocation
 
 | Resource | Baseline Allocation | Scaling Behavior | Constraint |
 |----------|---------------------|------------------|------------|
@@ -7355,7 +7370,7 @@ flowchart TB
 | WebGL Contexts | 16 maximum active | Visible panes prioritized | GPU hardware limit |
 | Canvas Contexts | Unlimited | Fallback for WebGL overflow | CPU-bound rendering |
 
-#### WebGL Context Capacity Tracking
+##### WebGL context capacity tracking
 
 ```mermaid
 flowchart TB
@@ -7392,13 +7407,13 @@ flowchart TB
 
 ---
 
-### 6.5.4 Error Recovery and Incident Response
+#### 6.5.4 Error recovery and incident response
 
-#### 6.5.4.1 Automated Recovery Flows
+##### 6.5.4.1 Automated recovery flows
 
 Velocetty implements automatic recovery mechanisms for common failure scenarios without requiring user intervention.
 
-#### PTY Session Error Recovery
+##### PTY session error recovery
 
 ```mermaid
 flowchart TB
@@ -7444,7 +7459,7 @@ flowchart TB
     Cleanup --> Complete
 ```
 
-#### WebGL Context Loss Recovery
+##### WebGL context loss recovery
 
 ```mermaid
 flowchart TB
@@ -7480,7 +7495,7 @@ flowchart TB
     NotifyUser --> SuggestRestart
 ```
 
-#### Plugin Error Isolation
+##### Plugin error isolation
 
 ```mermaid
 flowchart TB
@@ -7527,7 +7542,7 @@ flowchart TB
     ContinuePlugins --> AppFunctional
 ```
 
-#### 6.5.4.2 Disaster Recovery Procedures
+##### 6.5.4.2 Disaster recovery procedures
 
 | Failure Scenario | Detection Method | Recovery Procedure | User Impact |
 |------------------|------------------|-------------------|-------------|
@@ -7538,7 +7553,7 @@ flowchart TB
 | Main process crash | Electron crash handler | Restart application, restore geometry | Session state lost |
 | Renderer crash | Renderer process exit | Recreate window, restore session | Terminal state partially lost |
 
-#### 6.5.4.3 Graceful Degradation Hierarchy
+##### 6.5.4.3 Graceful degradation hierarchy
 
 ```mermaid
 flowchart TB
@@ -7566,13 +7581,13 @@ flowchart TB
 
 ---
 
-### 6.5.5 User Feedback and Issue Reporting
+#### 6.5.5 User feedback and issue reporting
 
-#### 6.5.5.1 User Feedback Collection
+##### 6.5.5.1 User feedback collection
 
 In the absence of automated telemetry, Velocetty relies on user-initiated feedback through GitHub issue templates.
 
-#### Feedback Flow Architecture
+##### Feedback flow architecture
 
 ```mermaid
 flowchart TB
@@ -7606,7 +7621,7 @@ flowchart TB
     OpenBrowser --> SecurityReport
 ```
 
-#### 6.5.5.2 Diagnostic Information Sources
+##### 6.5.5.2 Diagnostic information sources
 
 | Information Type | Location | Access Method |
 |------------------|----------|---------------|
@@ -7618,13 +7633,13 @@ flowchart TB
 
 ---
 
-### 6.5.6 Quality Assurance Pipeline
+#### 6.5.6 Quality assurance pipeline
 
-#### 6.5.6.1 Continuous Integration Monitoring
+##### 6.5.6.1 Continuous integration monitoring
 
 Velocetty's CI/CD pipeline provides automated quality assurance that serves as a pre-release monitoring mechanism.
 
-#### CI Pipeline Architecture
+##### CI pipeline architecture
 
 ```mermaid
 flowchart TB
@@ -7668,7 +7683,7 @@ flowchart TB
     SecurityScanning --> SARIFReport
 ```
 
-#### 6.5.6.2 Security Scanning Configuration
+##### 6.5.6.2 Security scanning configuration
 
 | Mechanism | Schedule | Scope | Output |
 |-----------|----------|-------|--------|
@@ -7676,7 +7691,7 @@ flowchart TB
 | Dependabot | Weekly (Sundays) | npm + GitHub Actions | Automated update PRs |
 | Target Branch | `canary` | Pre-release validation | Security alerts |
 
-#### Security Scanning Workflow
+##### Security scanning workflow
 
 ```mermaid
 flowchart LR
@@ -7713,7 +7728,7 @@ flowchart LR
     MergeUpdates --> ReleaseCanary
 ```
 
-#### 6.5.6.3 Test Coverage Metrics
+##### 6.5.6.3 Test coverage metrics
 
 | Test Type | Framework | Coverage Area |
 |-----------|-----------|---------------|
@@ -7722,7 +7737,7 @@ flowchart LR
 | Lint Checks | ESLint 8.57.0 | Code quality standards |
 | Type Checking | TypeScript 5.4.5 | Static type analysis |
 
-#### E2E Test Monitoring
+##### E2E test monitoring
 
 | E2E Aspect | Implementation | Purpose |
 |------------|----------------|---------|
@@ -7733,13 +7748,13 @@ flowchart LR
 
 ---
 
-### 6.5.7 Dashboard and Visualization
+#### 6.5.7 Dashboard and visualization
 
-#### 6.5.7.1 Development Dashboard (DevTools)
+##### 6.5.7.1 Development dashboard (devtools)
 
 For development and debugging, Chrome DevTools serves as the primary observability dashboard.
 
-#### DevTools Observability Panels
+##### Devtools observability panels
 
 ```mermaid
 flowchart TB
@@ -7775,7 +7790,7 @@ flowchart TB
     end
 ```
 
-#### 6.5.7.2 CI/CD Dashboard (GitHub)
+##### 6.5.7.2 CI/CD dashboard (GitHub)
 
 GitHub provides the dashboard for CI/CD observability:
 
@@ -7788,13 +7803,13 @@ GitHub provides the dashboard for CI/CD observability:
 
 ---
 
-### 6.5.8 Alert Definitions
+#### 6.5.8 Alert definitions
 
-#### 6.5.8.1 User-Facing Alerts
+##### 6.5.8.1 User-facing alerts
 
 Velocetty uses Electron system notifications for user-facing alerts about runtime issues.
 
-#### Alert Categories and Routing
+##### Alert categories and routing
 
 | Alert Category | Trigger Condition | Notification Type | Action Required |
 |----------------|-------------------|-------------------|-----------------|
@@ -7803,7 +7818,7 @@ Velocetty uses Electron system notifications for user-facing alerts about runtim
 | Update Available | New version detected | System notification | Optional update |
 | Configuration Error | Schema validation failure | Console warning | Fix config file |
 
-#### Alert Flow Diagram
+##### Alert flow diagram
 
 ```mermaid
 flowchart TB
@@ -7843,7 +7858,7 @@ flowchart TB
     UpdateAvail --> InstallUpdate
 ```
 
-#### 6.5.8.2 CI/CD Alerts
+##### 6.5.8.2 CI/CD alerts
 
 | Alert Type | Trigger | Notification Channel |
 |------------|---------|---------------------|
@@ -7854,9 +7869,9 @@ flowchart TB
 
 ---
 
-### 6.5.9 Monitoring Best Practices for Desktop Development
+#### 6.5.9 Monitoring best practices for desktop development
 
-#### 6.5.9.1 Recommended Development Practices
+##### 6.5.9.1 Recommended development practices
 
 | Practice | Implementation | Benefit |
 |----------|----------------|---------|
@@ -7866,7 +7881,7 @@ flowchart TB
 | Error Boundaries | Wrap plugin hooks in try-catch | Isolate failures |
 | Performance Timing | Use `performance.now()` | Measure bottlenecks |
 
-#### 6.5.9.2 Debugging Workflow
+##### 6.5.9.2 Debugging workflow
 
 ```mermaid
 flowchart TB
@@ -7902,9 +7917,9 @@ flowchart TB
 
 ---
 
-### 6.5.10 References
+#### 6.5.10 References
 
-#### Files Examined
+##### Files examined
 
 - `app/notify.ts` - Main process notification/logging utility
 - `app/session.ts` - PTY session management with timing instrumentation and error recovery
@@ -7917,7 +7932,7 @@ flowchart TB
 - `.github/workflows/codeql-analysis.yml` - Security scanning configuration
 - `.github/dependabot.yml` - Dependency update automation
 
-#### Folders Explored
+##### Folders explored
 
 - `app/` - Main process implementation
 - `app/config/` - Configuration system with validation
@@ -7926,7 +7941,7 @@ flowchart TB
 - `.github/workflows/` - CI/CD workflow definitions
 - `test/` - Test suite structure (Bun unit tests, Playwright E2E)
 
-#### Technical Specification Sections Referenced
+##### Technical specification sections referenced
 
 - 5.4 CROSS-CUTTING CONCERNS - Monitoring approach, logging strategy, SLAs
 - 5.1 HIGH-LEVEL ARCHITECTURE - System architecture context
@@ -7935,11 +7950,11 @@ flowchart TB
 - 6.1 CORE SERVICES ARCHITECTURE - Desktop-appropriate patterns
 - 3.6 DEVELOPMENT & DEPLOYMENT - CI/CD pipeline details
 
-## 6.6 Testing Strategy
+### 6.6 Testing strategy
 
-### 6.6.1 Testing Strategy Overview
+#### 6.6.1 Testing strategy overview
 
-#### 6.6.1.1 Desktop Application Testing Context
+##### 6.6.1.1 Desktop application testing context
 
 Velocetty is an **Electron-based desktop terminal emulator** operating in a single-user local context with no backend services. This architectural reality fundamentally shapes the testing strategy, which focuses on:
 
@@ -7954,7 +7969,7 @@ Unlike web applications requiring API testing, load testing, or multi-tenant sce
 - Plugin isolation and error recovery
 - Configuration system integrity
 
-#### 6.6.1.2 Testing Architecture Diagram
+##### 6.6.1.2 Testing architecture diagram
 
 ```mermaid
 flowchart TB
@@ -7996,7 +8011,7 @@ flowchart TB
     BuildMatrix --> Artifacts
 ```
 
-#### 6.6.1.3 Testing Tools and Frameworks Summary
+##### 6.6.1.3 Testing tools and frameworks summary
 
 | Tool | Version | Purpose | Configuration |
 |------|---------|---------|---------------|
@@ -8010,23 +8025,23 @@ flowchart TB
 
 ---
 
-### 6.6.2 Unit Testing
+#### 6.6.2 Unit testing
 
-#### 6.6.2.1 Testing Framework Configuration
+##### 6.6.2.1 Testing framework configuration
 
 Velocetty uses Bun's built-in test runner for unit tests. Unit tests live in
 `test/unit/` and follow the `*.test.ts` naming convention used by Bun's
 default discovery. Bun executes TypeScript directly; type checking remains a
 separate step via `bun run check:types`.
 
-#### Bun test discovery (unit)
+##### Bun test discovery (unit)
 
 | Setting | Value | Purpose |
 |---------|-------|---------|
 | Test root | `test/unit/` | Unit test directory |
 | File pattern | `*.test.ts` | Default Bun discovery |
 
-#### 6.6.2.2 Test Organization Structure
+##### 6.6.2.2 Test organization structure
 
 ```mermaid
 flowchart TB
@@ -8056,7 +8071,7 @@ flowchart TB
     UtilsDir --> HexColor
 ```
 
-#### Test File Coverage Matrix
+##### Test file coverage matrix
 
 | Test File | Module Under Test | Test Cases | Coverage Area |
 |-----------|-------------------|------------|---------------|
@@ -8064,13 +8079,13 @@ flowchart TB
 | `window-utils.test.ts` | `app/utils/` | Multi-monitor validation | Window position calculations |
 | `to-electron-background-color.test.ts` | Color utilities | Hex conversion | Electron color normalization |
 
-#### 6.6.2.3 Mocking Strategy
+##### 6.6.2.3 Mocking strategy
 
 Velocetty employs Bun's `mock.module()` API for module-level dependency
 injection, enabling isolation of external dependencies without modifying
 production code.
 
-#### Mocking Pattern Implementation
+##### Mocking pattern implementation
 
 ```mermaid
 sequenceDiagram
@@ -8087,7 +8102,7 @@ sequenceDiagram
     Test->>Test: Assert expectations
 ```
 
-#### Dependency Mocking Matrix
+##### Dependency mocking matrix
 
 | Dependency | Mock Type | Test File | Purpose |
 |------------|-----------|-----------|---------|
@@ -8095,7 +8110,7 @@ sequenceDiagram
 | `registry-url` | Static return value | `cli-api.test.ts` | Control npm registry URL |
 | `electron.screen` | Display layout object | `window-utils.test.ts` | Simulate monitor configurations |
 
-#### Mocking Best Practices
+##### Mocking best practices
 
 | Practice | Implementation | Evidence |
 |----------|----------------|----------|
@@ -8104,7 +8119,7 @@ sequenceDiagram
 | Promise mocking | `Promise.resolve()` returns | Async API simulation |
 | Capture arguments | Variable assignment in stubs | URL verification |
 
-#### 6.6.2.4 Test Naming Conventions
+##### 6.6.2.4 Test naming conventions
 
 | Convention | Pattern | Example |
 |------------|---------|---------|
@@ -8112,7 +8127,7 @@ sequenceDiagram
 | Test descriptions | Verb + expected behavior | `'existsOnNpm() builds the url for scoped packages'` |
 | Assertion style | Bun `expect()` matchers | `expect(getUrl).toBe(expectedUrl)` |
 
-#### 6.6.2.5 Test Data Management
+##### 6.6.2.5 Test data management
 
 **Current Approach**: Test data is embedded inline within test cases using literal values:
 
@@ -8123,7 +8138,7 @@ sequenceDiagram
 | Display configurations | Object literals | `{ bounds: { x: 0, y: 0, width: 1920, height: 1080 } }` |
 | Expected outputs | Assertion parameters | `'https://registry.npmjs.org/@scope%2fpkg'` |
 
-#### 6.6.2.6 Test Utilities
+##### 6.6.2.6 Test utilities
 
 The `test/testUtils/` directory contains shared helper functions:
 
@@ -8133,9 +8148,9 @@ The `test/testUtils/` directory contains shared helper functions:
 
 ---
 
-### 6.6.3 Integration Testing
+#### 6.6.3 Integration testing
 
-#### 6.6.3.1 Integration Testing Applicability
+##### 6.6.3.1 Integration testing applicability
 
 **Current State**: Velocetty does not implement a dedicated integration test suite. This is appropriate for the following reasons:
 
@@ -8146,11 +8161,11 @@ The `test/testUtils/` directory contains shared helper functions:
 | **Database** | No database layer (configuration stored in JSON files) |
 | **API Contracts** | IPC contracts tested through E2E smoke tests |
 
-#### 6.6.3.2 Integration Points and Coverage
+##### 6.6.3.2 Integration points and coverage
 
 Integration between components is validated through a combination of unit tests (for isolated interfaces) and E2E tests (for full-stack behavior).
 
-#### Component Integration Matrix
+##### Component integration matrix
 
 | Integration Point | Components | Testing Approach | Current Coverage |
 |-------------------|------------|------------------|------------------|
@@ -8160,7 +8175,7 @@ Integration between components is validated through a combination of unit tests 
 | Configuration | Config Manager ↔ File System | Unit tests (CLI API) | Partial coverage |
 | Redux Store | Store ↔ Components | E2E smoke test | UI state management |
 
-#### 6.6.3.3 IPC Integration Testing Flow
+##### 6.6.3.3 IPC integration testing flow
 
 ```mermaid
 flowchart TB
@@ -8181,7 +8196,7 @@ flowchart TB
     IntegrationScope --> ValidationMethods
 ```
 
-#### 6.6.3.4 Future Integration Testing Recommendations
+##### 6.6.3.4 Future integration testing recommendations
 
 | Recommendation | Priority | Rationale |
 |----------------|----------|-----------|
@@ -8192,15 +8207,15 @@ flowchart TB
 
 ---
 
-### 6.6.4 End-to-End Testing
+#### 6.6.4 End-to-end testing
 
-#### 6.6.4.1 E2E Testing Framework
+##### 6.6.4.1 E2E testing framework
 
 Velocetty uses **Playwright** within Bun's test runner for end-to-end
 testing. Playwright has experimental Electron support via Electron's support
 for the Chrome DevTools Protocol (CDP).
 
-#### E2E configuration (Bun test)
+##### E2E configuration (bun test)
 
 | Setting | Value | Purpose |
 |---------|-------|---------|
@@ -8209,9 +8224,9 @@ for the Chrome DevTools Protocol (CDP).
 | Timeout | `30_000 ms` | Per-test timeout for app launch |
 | Environment gate | `RUN_E2E=1` | Skip by default |
 
-#### 6.6.4.2 E2E Test Scenarios
+##### 6.6.4.2 E2E test scenarios
 
-#### Current Smoke Test Implementation (`test/e2e/electron.e2e.test.ts`)
+##### Current smoke test implementation (`test/E2E/Electron.E2E.test.ts`)
 
 The E2E suite implements a single comprehensive smoke test that validates the packaged application:
 
@@ -8222,7 +8237,7 @@ The E2E suite implements a single comprehensive smoke test that validates the pa
 | Production Mode | Check DevTools state | DevTools are not open |
 | Artifact Capture | Screenshot on teardown | Visual evidence for CI reporting |
 
-#### 6.6.4.3 Platform-Specific Binary Resolution
+##### 6.6.4.3 Platform-specific binary resolution
 
 ```mermaid
 flowchart TB
@@ -8258,7 +8273,7 @@ flowchart TB
     FirstWindow --> Assertions
 ```
 
-#### Binary Path Matrix
+##### Binary path matrix
 
 | Platform | Binary Location | Notes |
 |----------|-----------------|-------|
@@ -8266,7 +8281,7 @@ flowchart TB
 | Linux | `dist/linux-unpacked/hyper` | Unpacked Electron directory |
 | Windows | `dist/win-unpacked/Hyper.exe` | Windows executable |
 
-#### 6.6.4.4 E2E Test Execution Flow
+##### 6.6.4.4 E2E test execution flow
 
 ```mermaid
 flowchart TB
@@ -8295,14 +8310,14 @@ flowchart TB
     CloseApp --> Complete
 ```
 
-#### 6.6.4.5 Test Artifact Generation
+##### 6.6.4.5 Test artifact generation
 
 | Artifact Type | Location | Purpose |
 |---------------|----------|---------|
 | Screenshots | `dist/tmp/${platform}_test.png` | Visual validation, CI reporting |
 | Platform designation | `darwin`, `linux`, `win32` | Distinguish platform results |
 
-#### 6.6.4.6 E2E Testing Limitations
+##### 6.6.4.6 E2E testing limitations
 
 | Limitation | Impact | Mitigation |
 |------------|--------|------------|
@@ -8312,7 +8327,7 @@ flowchart TB
 | No keyboard input tests | Input handling untested | Manual testing required |
 | No multi-window tests | Window management gaps | Single window validation only |
 
-#### 6.6.4.7 Linux Display Requirements
+##### 6.6.4.7 Linux display requirements
 
 E2E tests on Linux CI runners require a virtual display environment:
 
@@ -8324,9 +8339,9 @@ E2E tests on Linux CI runners require a virtual display environment:
 
 ---
 
-### 6.6.5 Test Automation
+#### 6.6.5 Test automation
 
-#### 6.6.5.1 CI/CD Integration Architecture
+##### 6.6.5.1 CI/CD integration architecture
 
 ```mermaid
 flowchart TB
@@ -8362,7 +8377,7 @@ flowchart TB
     BuildMatrix --> Artifacts
 ```
 
-#### 6.6.5.2 Test Scripts Configuration
+##### 6.6.5.2 Test scripts configuration
 
 | Script | Command | Scope |
 |--------|---------|-------|
@@ -8371,7 +8386,7 @@ flowchart TB
 | `test:unit:watch` | `bun test --watch test/unit` | Development watch mode |
 | `test:e2e` | `RUN_E2E=1 bun test test/e2e` | End-to-end tests |
 
-#### 6.6.5.3 Automated Test Triggers
+##### 6.6.5.3 Automated test triggers
 
 | Trigger | Event | Tests Executed |
 |---------|-------|----------------|
@@ -8380,7 +8395,7 @@ flowchart TB
 | Pull Request | Code review workflow | Lint, Unit, Build, E2E |
 | Weekly Schedule | Fridays 06:37 UTC | CodeQL security scan |
 
-#### 6.6.5.4 Parallel Test Execution
+##### 6.6.5.4 Parallel test execution
 
 Bun runs tests in a single process by default, with opt-in concurrency:
 
@@ -8390,9 +8405,9 @@ Bun runs tests in a single process by default, with opt-in concurrency:
 | Concurrent execution | `--concurrent`, `test.concurrent()` | Faster async tests |
 | Serial fallback | `test.serial()` | Protect shared state |
 
-#### 6.6.5.5 Test Reporting and Artifacts
+##### 6.6.5.5 Test reporting and artifacts
 
-#### E2E Screenshot Reporting Workflow
+##### E2E screenshot reporting workflow
 
 ```mermaid
 flowchart TB
@@ -8417,7 +8432,7 @@ flowchart TB
     PostComment --> HideOldComments
 ```
 
-#### 6.6.5.6 Failed Test Handling
+##### 6.6.5.6 Failed test handling
 
 | Failure Scenario | CI Behavior | Developer Action |
 |------------------|-------------|------------------|
@@ -8426,7 +8441,7 @@ flowchart TB
 | Lint failure | Job fails immediately | Fix code style |
 | Build failure | No E2E execution | Fix compilation errors |
 
-#### 6.6.5.7 Flaky Test Management
+##### 6.6.5.7 Flaky test management
 
 | Strategy | Implementation | Status |
 |----------|----------------|--------|
@@ -8438,9 +8453,9 @@ flowchart TB
 
 ---
 
-### 6.6.6 Security Testing
+#### 6.6.6 Security testing
 
-#### 6.6.6.1 Automated Security Scanning
+##### 6.6.6.1 Automated security scanning
 
 ```mermaid
 flowchart LR
@@ -8474,7 +8489,7 @@ flowchart LR
     DependabotProcess --> UpdatePRs
 ```
 
-#### 6.6.6.2 CodeQL Configuration
+##### 6.6.6.2 Codeql configuration
 
 | Attribute | Value | Purpose |
 |-----------|-------|---------|
@@ -8483,7 +8498,7 @@ flowchart LR
 | Languages | JavaScript | Primary codebase language |
 | Output | SARIF report | GitHub Security integration |
 
-#### 6.6.6.3 Dependabot Configuration
+##### 6.6.6.3 Dependabot configuration
 
 | Ecosystem | Directory | Schedule | Target Branch |
 |-----------|-----------|----------|---------------|
@@ -8491,7 +8506,7 @@ flowchart LR
 | npm | `/app` | Weekly | canary |
 | github-actions | `/` | Weekly | canary |
 
-#### 6.6.6.4 Security Testing Gaps
+##### 6.6.6.4 Security testing gaps
 
 | Gap | Risk | Recommendation |
 |-----|------|----------------|
@@ -8502,9 +8517,9 @@ flowchart LR
 
 ---
 
-### 6.6.7 Quality Metrics
+#### 6.6.7 Quality metrics
 
-#### 6.6.7.1 Current Test Coverage
+##### 6.6.7.1 Current test coverage
 
 | Test Type | Count | Scope | Status |
 |-----------|-------|-------|--------|
@@ -8515,7 +8530,7 @@ flowchart LR
 
 **Note**: Velocetty does not currently implement code coverage measurement tooling (Istanbul/NYC). Coverage metrics are not formally tracked.
 
-#### 6.6.7.2 Code Coverage Targets
+##### 6.6.7.2 Code coverage targets
 
 | Coverage Type | Current | Target | Priority |
 |---------------|---------|--------|----------|
@@ -8523,7 +8538,7 @@ flowchart LR
 | Branch coverage | Not measured | 50% (recommended) | Medium |
 | Critical path coverage | E2E smoke only | Core workflows | High |
 
-#### 6.6.7.3 Test Success Rate Requirements
+##### 6.6.7.3 Test success rate requirements
 
 | Requirement | Threshold | Enforcement |
 |-------------|-----------|-------------|
@@ -8532,7 +8547,7 @@ flowchart LR
 | Lint compliance | 100% | CI job failure |
 | Type checking | 100% | Build failure |
 
-#### 6.6.7.4 Quality Gates
+##### 6.6.7.4 Quality gates
 
 ```mermaid
 flowchart TB
@@ -8563,7 +8578,7 @@ flowchart TB
     Gate5 -->|"Fail"| Fail
 ```
 
-#### 6.6.7.5 Performance Test Thresholds
+##### 6.6.7.5 Performance test thresholds
 
 | Metric | Target | Testing Method | Status |
 |--------|--------|----------------|--------|
@@ -8574,9 +8589,9 @@ flowchart TB
 
 ---
 
-### 6.6.8 Test Environment Architecture
+#### 6.6.8 Test environment architecture
 
-#### 6.6.8.1 Local Development Environment
+##### 6.6.8.1 Local development environment
 
 ```mermaid
 flowchart TB
@@ -8602,7 +8617,7 @@ flowchart TB
     TestCommands --> Outputs
 ```
 
-#### 6.6.8.2 CI Environment Configuration
+##### 6.6.8.2 CI environment configuration
 
 | Environment Aspect | Configuration | Purpose |
 |-------------------|---------------|---------|
@@ -8612,7 +8627,7 @@ flowchart TB
 | Linux display | Xvfb (virtual) | Headless E2E |
 | Native modules | Auto-rebuild per platform | node-pty compatibility |
 
-#### 6.6.8.3 Test Data Flow Diagram
+##### 6.6.8.3 Test data flow diagram
 
 ```mermaid
 flowchart TB
@@ -8652,9 +8667,9 @@ flowchart TB
 
 ---
 
-### 6.6.9 Testing Best Practices and Patterns
+#### 6.6.9 Testing best practices and patterns
 
-#### 6.6.9.1 Unit Test Pattern Example
+##### 6.6.9.1 Unit test pattern example
 
 The following pattern demonstrates Velocetty's approach to unit testing with mocked dependencies:
 
@@ -8666,7 +8681,7 @@ The following pattern demonstrates Velocetty's approach to unit testing with moc
 | Load module | `await import('../../module')` | Inject dependencies |
 | Assert results | `expect(actual).toBe(expected)` | Validate behavior |
 
-#### 6.6.9.2 E2E Test Pattern Example
+##### 6.6.9.2 E2E test pattern example
 
 | Pattern Element | Implementation | Purpose |
 |-----------------|----------------|---------|
@@ -8678,9 +8693,9 @@ The following pattern demonstrates Velocetty's approach to unit testing with moc
 | Assertions | Verify application state | Validate behavior |
 | Cleanup | `electronApp.close()` | Release resources |
 
-#### 6.6.9.3 Testing Recommendations
+##### 6.6.9.3 Testing recommendations
 
-#### Recommended Test Coverage Expansion
+##### Recommended test coverage expansion
 
 | Area | Priority | Recommendation |
 |------|----------|----------------|
@@ -8691,7 +8706,7 @@ The following pattern demonstrates Velocetty's approach to unit testing with moc
 | Configuration validation | Medium | Test schema validation |
 | Error recovery | Low | Test fallback mechanisms |
 
-#### Recommended Tooling Additions
+##### Recommended tooling additions
 
 | Tool | Purpose | Priority |
 |------|---------|----------|
@@ -8702,9 +8717,9 @@ The following pattern demonstrates Velocetty's approach to unit testing with moc
 
 ---
 
-### 6.6.10 Test Strategy Matrix
+#### 6.6.10 Test strategy matrix
 
-#### 6.6.10.1 Component Test Coverage Matrix
+##### 6.6.10.1 Component test coverage matrix
 
 | Component | Unit Tests | Integration | E2E | Security |
 |-----------|------------|-------------|-----|----------|
@@ -8718,7 +8733,7 @@ The following pattern demonstrates Velocetty's approach to unit testing with moc
 | IPC Bridge | ❌ Not covered | E2E only | ✅ Smoke | CodeQL |
 | Configuration | Partial | E2E only | ✅ Smoke | CodeQL |
 
-#### 6.6.10.2 Test Type Strategy Matrix
+##### 6.6.10.2 Test type strategy matrix
 
 | Test Type | Coverage Goal | Current Status | Gap |
 |-----------|---------------|----------------|-----|
@@ -8731,9 +8746,9 @@ The following pattern demonstrates Velocetty's approach to unit testing with moc
 
 ---
 
-### 6.6.11 References
+#### 6.6.11 References
 
-#### Files Examined
+##### Files examined
 
 - `package.json` - Test scripts and dependencies
 - `test/e2e/electron.e2e.test.ts` - E2E smoke test implementation
@@ -8748,14 +8763,14 @@ The following pattern demonstrates Velocetty's approach to unit testing with moc
 - `biome.json` - Biome linting and formatting configuration
 - `cli/api.ts` - CLI module under test
 
-#### Folders Explored
+##### Folders explored
 
 - `test/` - Test suite root directory
 - `test/unit/` - Unit test files
 - `test/testUtils/` - Shared test utilities
 - `.github/workflows/` - CI/CD workflow definitions
 
-#### Technical Specification Sections Referenced
+##### Technical specification sections referenced
 
 - 6.5 MONITORING AND OBSERVABILITY - QA pipeline architecture
 - 6.4 Security Architecture - Security scanning configuration
@@ -8764,13 +8779,13 @@ The following pattern demonstrates Velocetty's approach to unit testing with moc
 - 4.5 ERROR HANDLING FLOWS - Error recovery patterns
 - 3.6 DEVELOPMENT & DEPLOYMENT - Testing framework details
 
-#### External Resources
+##### External resources
 
 - Playwright Electron Documentation: https://playwright.dev/docs/api/class-electron
 - Electron Automated Testing Guide: https://www.electronjs.org/docs/latest/tutorial/automated-testing
 - Bun test runner: <https://bun.com/docs/test>
 
-### 6.6.12 Biome rule adoption notes
+#### 6.6.12 Biome rule adoption notes
 
 Biome is now the primary linter. Some rules remain disabled while legacy
 violations are refactored. Track progress in roadmap item 1.4.8 and log rule
@@ -8782,13 +8797,13 @@ enablement here as each one is reintroduced:
 - `useExhaustiveDependencies`
 - a11y rule set
 
-# 7. User Interface Design
+## 7. User interface design
 
-## 7.1 OVERVIEW
+### 7.1 Overview
 
 Velocetty implements a sophisticated user interface built on modern web technologies within an Electron desktop application shell. The UI architecture inherits and refines the patterns established by the Hyper terminal emulator, delivering a cross-platform terminal experience with deep extensibility through React/Redux-based plugin decoration.
 
-### 7.1.1 Design Philosophy
+#### 7.1.1 Design philosophy
 
 The user interface follows several core principles:
 
@@ -8800,7 +8815,7 @@ The user interface follows several core principles:
 | **Keyboard-Centric Workflow** | Comprehensive keyboard shortcut system with platform-appropriate modifiers |
 | **Themeable Aesthetics** | Deep CSS customization with color palette, typography, and cursor styling |
 
-### 7.1.2 UI Technology Stack
+#### 7.1.2 UI technology stack
 
 The renderer process UI layer utilizes a modern JavaScript component architecture:
 
@@ -8818,9 +8833,9 @@ The renderer process UI layer utilizes a modern JavaScript component architectur
 
 ---
 
-## 7.2 UI ARCHITECTURE
+### 7.2 UI architecture
 
-### 7.2.1 Process Separation Model
+#### 7.2.1 Process separation model
 
 The user interface operates within Electron's renderer process, communicating with the main process through a typed IPC bridge:
 
@@ -8861,7 +8876,7 @@ flowchart TB
     XtermJS -.-> CanvasRenderer
 ```
 
-### 7.2.2 Component Hierarchy
+#### 7.2.2 Component hierarchy
 
 The React component tree follows a hierarchical structure with Redux container bindings:
 
@@ -8917,7 +8932,7 @@ flowchart TB
     NotificationsContainer --> Notification
 ```
 
-### 7.2.3 HTML Entry Point
+#### 7.2.3 HTML entry point
 
 The renderer process loads from a minimal HTML template that bootstraps the React application:
 
@@ -8931,15 +8946,15 @@ The renderer process loads from a minimal HTML template that bootstraps the Reac
 
 ---
 
-## 7.3 SCREEN DEFINITIONS
+### 7.3 Screen definitions
 
-### 7.3.1 Main Application Window
+#### 7.3.1 Main application window
 
 **Component**: `HyperContainer` (`lib/containers/hyper.tsx`)
 
 The main application window serves as the root container for all UI elements, managing global keyboard shortcuts and state subscriptions.
 
-#### Layout Specifications
+##### Layout specifications
 
 | Property | Value | Platform Notes |
 |----------|-------|----------------|
@@ -8948,7 +8963,7 @@ The main application window serves as the root container for all UI elements, ma
 | Border Width | 1px (0px when maximized) | Non-Mac platforms |
 | z-index Layering | Header (100), Content (default), Notifications (fixed) | All platforms |
 
-#### Architectural Responsibilities
+##### Architectural responsibilities
 
 - Global keyboard shortcut binding via Mousetrap library
 - Focus management through `window.focusActiveTerm()` global
@@ -8968,13 +8983,13 @@ flowchart LR
     ContentArea --> NotificationArea
 ```
 
-### 7.3.2 Header and Tab Bar
+#### 7.3.2 Header and tab bar
 
 **Component**: `Header` (`lib/components/header.tsx`)
 
 The header provides window chrome, tab navigation, and platform-specific controls.
 
-#### Layout Specifications
+##### Layout specifications
 
 | Property | Value |
 |----------|-------|
@@ -8983,7 +8998,7 @@ The header provides window chrome, tab navigation, and platform-specific control
 | z-index | 100 |
 | Draggable Region | `-webkit-app-region: drag` |
 
-#### Platform-Specific Variants
+##### Platform-specific variants
 
 | Platform | Window Controls | Hamburger Menu | Tab Layout |
 |----------|-----------------|----------------|------------|
@@ -8991,20 +9006,20 @@ The header provides window chrome, tab navigation, and platform-specific control
 | **Windows** | Right side (min/max/close) | Left side | Full width |
 | **Linux** | Configurable (left/right) | Configurable | Full width |
 
-#### Configuration Options
+##### Configuration options
 
 ```
 showHamburgerMenu: boolean | ''  // Default: true on Windows/Linux
 showWindowControls: boolean | 'left' | ''  // Default: true on Windows/Linux
 ```
 
-### 7.3.3 Tabs Component
+#### 7.3.3 Tabs component
 
 **Component**: `Tabs` (`lib/components/tabs.tsx`)
 
 Manages the horizontal tab strip with support for multiple concurrent terminal sessions.
 
-#### Behavioral Modes
+##### Behavioral modes
 
 | Condition | macOS Behavior | Windows/Linux Behavior |
 |-----------|----------------|------------------------|
@@ -9012,7 +9027,7 @@ Manages the horizontal tab strip with support for multiple concurrent terminal s
 | Multiple Tabs | Full tab bar with close buttons | Full tab bar with close buttons |
 | Overflow | Scrollable tab list | Scrollable tab list |
 
-#### Tab Properties
+##### Tab properties
 
 | Property | Type | Purpose |
 |----------|------|---------|
@@ -9021,13 +9036,13 @@ Manages the horizontal tab strip with support for multiple concurrent terminal s
 | `isActive` | boolean | Currently selected state |
 | `hasActivity` | boolean | Background tab has new output |
 
-### 7.3.4 Individual Tab
+#### 7.3.4 Individual tab
 
 **Component**: `Tab` (`lib/components/tab.tsx`)
 
 Renders a single tab with interactive behaviors for selection and closing.
 
-#### User Interactions
+##### User interactions
 
 | Interaction | Behavior |
 |-------------|----------|
@@ -9036,7 +9051,7 @@ Renders a single tab with interactive behaviors for selection and closing.
 | Hover on close button | Reveal close icon |
 | Click close button | Trigger `onClose` callback |
 
-#### Visual States
+##### Visual states
 
 | State | Styling |
 |-------|---------|
@@ -9044,13 +9059,13 @@ Renders a single tab with interactive behaviors for selection and closing.
 | Inactive | Default background |
 | Activity | Visual indicator (dot/highlight) for background output |
 
-### 7.3.5 Terminal View
+#### 7.3.5 Terminal view
 
 **Component**: `Term` (`lib/components/term.tsx`)
 
 Hosts the xterm.js terminal instance with addon management and renderer selection.
 
-## xterm.js Configuration Options
+### xterm.js configuration options
 
 | Option | Type | Description |
 |--------|------|-------------|
@@ -9069,7 +9084,7 @@ Hosts the xterm.js terminal instance with addon management and renderer selectio
 | `screenReaderMode` | boolean | Accessibility mode |
 | `overviewRulerWidth` | number | Scrollbar indicator width (20px) |
 
-#### Addon Loading Sequence
+##### Addon loading sequence
 
 ```mermaid
 flowchart TB
@@ -9120,13 +9135,13 @@ flowchart TB
     Image --> Complete
 ```
 
-### 7.3.6 Search Overlay
+#### 7.3.6 Search overlay
 
 **Component**: `SearchBox` (`lib/components/searchBox.tsx`)
 
 Provides in-terminal text search with pattern matching options.
 
-#### Features
+##### Features
 
 | Feature | Icon Source | Description |
 |---------|-------------|-------------|
@@ -9137,7 +9152,7 @@ Provides in-terminal text search with pattern matching options.
 | Navigation | Previous/Next | Cycle through results |
 | Close | X button | Dismiss search overlay |
 
-#### Search Options Schema
+##### Search options schema
 
 ```
 {
@@ -9148,13 +9163,13 @@ Provides in-terminal text search with pattern matching options.
 }
 ```
 
-### 7.3.7 Split Pane System
+#### 7.3.7 Split pane system
 
 **Component**: `SplitPane` (`lib/components/split-pane.tsx`)
 
 Enables horizontal and vertical terminal splitting with resizable dividers.
 
-#### Split Specifications
+##### Split specifications
 
 | Property | Value | Description |
 |----------|-------|-------------|
@@ -9162,7 +9177,7 @@ Enables horizontal and vertical terminal splitting with resizable dividers.
 | Default Split | 50/50 | Equal distribution |
 | Divider Width | Draggable region | Resize interaction zone |
 
-#### User Interactions
+##### User interactions
 
 | Interaction | Behavior |
 |-------------|----------|
@@ -9170,13 +9185,13 @@ Enables horizontal and vertical terminal splitting with resizable dividers.
 | Double-click divider | Auto-resize to default ratio |
 | Full-viewport shim | Prevents event loss during drag |
 
-### 7.3.8 Notifications
+#### 7.3.8 Notifications
 
 **Component**: `Notifications` (`lib/components/notifications.tsx`)
 
 Displays toast-style notifications for system events and user feedback.
 
-#### Notification Types
+##### Notification types
 
 | Type | Trigger | Actions Available |
 |------|---------|-------------------|
@@ -9185,7 +9200,7 @@ Displays toast-style notifications for system events and user feedback.
 | Update Available | Auto-update check | Restart / Download |
 | Plugin Message | Plugin notification API | Custom actions |
 
-#### Position and Styling
+##### Position and styling
 
 | Property | Value |
 |----------|-------|
@@ -9195,9 +9210,9 @@ Displays toast-style notifications for system events and user feedback.
 
 ---
 
-## 7.4 STATE MANAGEMENT
+### 7.4 State management
 
-### 7.4.1 Redux Store Architecture
+#### 7.4.1 Redux store architecture
 
 The renderer process maintains a centralized Redux store with three primary state slices:
 
@@ -9228,7 +9243,7 @@ flowchart TB
     SessionsSlice --> TermGroupsSlice
 ```
 
-### 7.4.2 UI State Slice
+#### 7.4.2 UI state slice
 
 **File**: `lib/reducers/ui.ts`
 
@@ -9254,7 +9269,7 @@ flowchart TB
 | `webGLRenderer` | boolean | WebGL renderer preference |
 | `imageSupport` | boolean | Terminal image protocol |
 
-### 7.4.3 Sessions State Slice
+#### 7.4.3 Sessions state slice
 
 **File**: `lib/reducers/sessions.ts`
 
@@ -9263,7 +9278,7 @@ flowchart TB
 | `sessions` | Record<string, Session> | Session objects by UID |
 | `activeUid` | string \| null | Currently focused session |
 
-#### Session Object Schema
+##### Session object schema
 
 ```
 Session {
@@ -9279,7 +9294,7 @@ Session {
 }
 ```
 
-### 7.4.4 Term Groups State Slice
+#### 7.4.4 Term groups state slice
 
 **File**: `lib/reducers/term-groups.ts`
 
@@ -9289,7 +9304,7 @@ Session {
 | `activeSessions` | Record<string, string> | Root group → Active session mapping |
 | `activeRootGroup` | string \| null | Currently active tab root |
 
-#### Term Group Object Schema
+##### Term group object schema
 
 ```
 TermGroup {
@@ -9302,7 +9317,7 @@ TermGroup {
 }
 ```
 
-### 7.4.5 Middleware Pipeline
+#### 7.4.5 Middleware pipeline
 
 The Redux middleware pipeline is ordered for optimal performance and plugin integration:
 
@@ -9319,7 +9334,7 @@ flowchart LR
     Thunk1 --> Plugins --> Thunk2 --> Write --> Effects
 ```
 
-### 7.4.6 Write Middleware Performance Bypass
+#### 7.4.6 Write middleware performance bypass
 
 The `writeMiddleware` (`lib/store/write-middleware.ts`) implements a critical performance optimization by bypassing Redux state management for terminal output data:
 
@@ -9347,9 +9362,9 @@ This bypass eliminates Redux serialization overhead for high-volume terminal out
 
 ---
 
-## 7.5 UI/BACKEND INTERACTION BOUNDARIES
+### 7.5 UI/backend interaction boundaries
 
-### 7.5.1 IPC Event Categories
+#### 7.5.1 IPC event categories
 
 Communication between renderer and main processes follows typed event patterns:
 
@@ -9363,7 +9378,7 @@ Communication between renderer and main processes follows typed event patterns:
 | **Updates** | `update available` | Main → Renderer | Auto-update prompts |
 | **User Input** | `data`, `resize`, `exit`, `new` | Renderer → Main | User actions |
 
-### 7.5.2 RPC Bridge Architecture
+#### 7.5.2 RPC bridge architecture
 
 **Main Process Server** (`app/rpc.ts`):
 - UUID-keyed channels provide window isolation
@@ -9376,9 +9391,9 @@ Communication between renderer and main processes follows typed event patterns:
 - Typed listeners via `TypedEmitter<RendererEvents>`
 - Automatic cleanup on window destroy
 
-### 7.5.3 Data Flow Patterns
+#### 7.5.3 Data flow patterns
 
-#### Terminal Output Flow (Main → Renderer)
+##### Terminal output flow (main → renderer)
 
 ```mermaid
 sequenceDiagram
@@ -9398,7 +9413,7 @@ sequenceDiagram
     XTerm->>XTerm: WebGL/Canvas render
 ```
 
-#### User Input Flow (Renderer → Main)
+##### User input flow (renderer → main)
 
 ```mermaid
 sequenceDiagram
@@ -9418,13 +9433,13 @@ sequenceDiagram
 
 ---
 
-## 7.6 VISUAL DESIGN SYSTEM
+### 7.6 Visual design system
 
-### 7.6.1 Theming Architecture
+#### 7.6.1 Theming architecture
 
 Velocetty supports comprehensive visual customization through configuration:
 
-#### Color Configuration
+##### Color configuration
 
 | Property | Purpose | Default |
 |----------|---------|---------|
@@ -9435,7 +9450,7 @@ Velocetty supports comprehensive visual customization through configuration:
 | `cursorAccentColor` | Cursor text color | Background color |
 | `selectionColor` | Selection highlight | Semi-transparent accent |
 
-#### ANSI Color Palette (16 Colors)
+##### Ansi color palette (16 colors)
 
 ```
 colors: {
@@ -9445,7 +9460,7 @@ colors: {
 }
 ```
 
-### 7.6.2 Typography System
+#### 7.6.2 Typography system
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -9457,7 +9472,7 @@ colors: {
 | `letterSpacing` | number | Character spacing adjustment |
 | `padding` | string | Terminal content padding (CSS format) |
 
-### 7.6.3 Cursor Styles
+#### 7.6.3 Cursor styles
 
 | Style | Visual | Configuration Value |
 |-------|--------|---------------------|
@@ -9466,7 +9481,7 @@ colors: {
 | Block | `█` | `cursorShape: 'BLOCK'` |
 | Blink | Animated | `cursorBlink: true` |
 
-### 7.6.4 Platform-Specific Styling
+#### 7.6.4 Platform-specific styling
 
 | Platform | Window Corners | Border | Transparency | Zoom Factor |
 |----------|----------------|--------|--------------|-------------|
@@ -9474,7 +9489,7 @@ colors: {
 | **Windows** | Square | 1px (0 when maximized) | Not supported | 1.0 |
 | **Linux** | Square | 1px (0 when maximized) | Not supported | 1.2 |
 
-### 7.6.5 CSS Architecture
+#### 7.6.5 Css architecture
 
 **styled-jsx**: Scoped component-level CSS prevents global style conflicts:
 
@@ -9494,9 +9509,9 @@ colors: {
 
 ---
 
-## 7.7 USER INTERACTIONS
+### 7.7 User interactions
 
-### 7.7.1 Keyboard Shortcuts System
+#### 7.7.1 Keyboard shortcuts system
 
 Platform-specific keymap files define keyboard shortcuts:
 
@@ -9506,7 +9521,7 @@ Platform-specific keymap files define keyboard shortcuts:
 | `app/keymaps/linux.json` | Linux |
 | `app/keymaps/win32.json` | Windows |
 
-#### Key Command Categories
+##### Key command categories
 
 | Category | Example Commands |
 |----------|------------------|
@@ -9515,7 +9530,7 @@ Platform-specific keymap files define keyboard shortcuts:
 | **Editor** | Copy, paste, select all, find/search |
 | **View** | Zoom in/out, reset zoom, fullscreen, reload |
 
-### 7.7.2 Mouse Interactions
+#### 7.7.2 Mouse interactions
 
 | Component | Interaction | Behavior |
 |-----------|-------------|----------|
@@ -9529,7 +9544,7 @@ Platform-specific keymap files define keyboard shortcuts:
 | **Terminal** | Right-click | Context menu (or quickEdit paste) |
 | **Terminal Link** | Cmd/Ctrl+click | Open URL in browser |
 
-### 7.7.3 Context Menu
+#### 7.7.3 Context menu
 
 **File**: `app/ui/contextmenu.ts`
 
@@ -9540,9 +9555,9 @@ Platform-specific keymap files define keyboard shortcuts:
 
 ---
 
-## 7.8 PLUGIN EXTENSION POINTS
+### 7.8 Plugin extension points
 
-### 7.8.1 Component Decoration Hooks
+#### 7.8.1 Component decoration hooks
 
 Plugins can wrap and extend React components through decoration hooks:
 
@@ -9560,7 +9575,7 @@ Plugins can wrap and extend React components through decoration hooks:
 | `decorateNotifications` | Notifications | Notification container |
 | `decorateSearchBox` | SearchBox | Search overlay |
 
-### 7.8.2 Props Injection Hooks
+#### 7.8.2 Props injection hooks
 
 | Hook | Purpose |
 |------|---------|
@@ -9569,7 +9584,7 @@ Plugins can wrap and extend React components through decoration hooks:
 | `getTabsProps` | Inject props to Tabs component |
 | `getTermGroupProps` | Inject props to TermGroup component |
 
-### 7.8.3 State Mapping Hooks
+#### 7.8.3 State mapping hooks
 
 | Hook | Purpose |
 |------|---------|
@@ -9578,7 +9593,7 @@ Plugins can wrap and extend React components through decoration hooks:
 | `mapHeaderState` | Transform state for Header |
 | `mapNotificationsState` | Transform state for Notifications |
 
-### 7.8.4 Redux Integration Hooks
+#### 7.8.4 Redux integration hooks
 
 | Hook | Purpose |
 |------|---------|
@@ -9589,9 +9604,9 @@ Plugins can wrap and extend React components through decoration hooks:
 
 ---
 
-## 7.9 RENDERING CONSTRAINTS
+### 7.9 Rendering constraints
 
-### 7.9.1 WebGL Limitations
+#### 7.9.1 WebGL limitations
 
 The xterm.js WebGL renderer has known constraints that impact UI design decisions:
 
@@ -9602,7 +9617,7 @@ The xterm.js WebGL renderer has known constraints that impact UI design decision
 | **Context Loss** | GPU resource exhaustion | `onContextLoss` handler triggers Canvas fallback |
 | **Ligatures** | Not supported in WebGL | Disabled when using WebGL renderer |
 
-### 7.9.2 Renderer Selection Logic
+#### 7.9.2 Renderer selection logic
 
 ```mermaid
 flowchart TB
@@ -9624,7 +9639,7 @@ flowchart TB
     CheckSupport -->|"Yes"| UseWebGL
 ```
 
-### 7.9.3 Canvas Rendering Note
+#### 7.9.3 Canvas rendering note
 
 When the Canvas renderer is used (either by configuration or fallback), the following features become available:
 - **Font Ligatures**: Programming ligatures via `LigaturesAddon`
@@ -9634,9 +9649,9 @@ However, performance may be reduced compared to WebGL rendering, particularly fo
 
 ---
 
-## 7.10 ACCESSIBILITY CONSIDERATIONS
+### 7.10 Accessibility considerations
 
-### 7.10.1 Screen Reader Support
+#### 7.10.1 Screen reader support
 
 xterm.js provides accessibility features through configuration:
 
@@ -9645,7 +9660,7 @@ xterm.js provides accessibility features through configuration:
 | `screenReaderMode: true` | Enable screen reader announcements |
 | `overviewRulerWidth: 20` | Scrollbar position indicator |
 
-### 7.10.2 Keyboard Navigation
+#### 7.10.2 Keyboard navigation
 
 - All UI elements are keyboard-accessible
 - Tab navigation follows logical component order
@@ -9654,9 +9669,9 @@ xterm.js provides accessibility features through configuration:
 
 ---
 
-## 7.11 REFERENCES
+### 7.11 References
 
-#### Files Examined
+##### Files examined
 
 | File | Relevance |
 |------|-----------|
@@ -9680,7 +9695,7 @@ xterm.js provides accessibility features through configuration:
 | `app/index.html` | Renderer HTML entry point |
 | `typings/config.d.ts` | Configuration type definitions |
 
-#### Folders Explored
+##### Folders explored
 
 | Folder | Contents |
 |--------|----------|
@@ -9695,7 +9710,7 @@ xterm.js provides accessibility features through configuration:
 | `app/menus/` | Application menu templates |
 | `typings/` | TypeScript type definitions |
 
-#### Technical Specification Sections Referenced
+##### Technical specification sections referenced
 
 - 5.1 HIGH-LEVEL ARCHITECTURE
 - 5.2 COMPONENT DETAILS
@@ -9706,11 +9721,11 @@ xterm.js provides accessibility features through configuration:
 - 4.5 ERROR HANDLING FLOWS
 - 2.1 FEATURE CATALOG
 
-# 8. Infrastructure
+## 8. Infrastructure
 
-## 8.1 INFRASTRUCTURE APPLICABILITY ASSESSMENT
+### 8.1 Infrastructure applicability assessment
 
-### 8.1.1 Desktop Application Context Statement
+#### 8.1.1 Desktop application context statement
 
 **Detailed Infrastructure Architecture is not applicable for this system** in the traditional sense of server-side deployment infrastructure. Velocetty is an **Electron-based desktop terminal emulator** inherited from Hyper, operating in a **single-user local context** with no backend services requiring cloud deployment, containerization, or orchestration.
 
@@ -9740,7 +9755,7 @@ flowchart TB
     Applicable -->|"Supports"| DesktopApp
 ```
 
-### 8.1.2 Infrastructure Non-Applicability Matrix
+#### 8.1.2 Infrastructure non-applicability matrix
 
 | Traditional Infrastructure Concept | Velocetty Status | Rationale |
 |-----------------------------------|------------------|-----------|
@@ -9753,7 +9768,7 @@ flowchart TB
 | **Multi-Region Deployment** | Not Applicable | Application runs on user's local machine |
 | **Service Mesh** | Not Applicable | No microservices architecture |
 
-### 8.1.3 Desktop-Appropriate Infrastructure Model
+#### 8.1.3 Desktop-appropriate infrastructure model
 
 Velocetty's infrastructure focuses on **build, package, sign, and distribute** workflows rather than runtime deployment:
 
@@ -9794,9 +9809,9 @@ flowchart LR
 
 ---
 
-## 8.2 BUILD INFRASTRUCTURE
+### 8.2 Build infrastructure
 
-### 8.2.1 Build System Architecture
+#### 8.2.1 Build system architecture
 
 Velocetty employs a multi-stage build pipeline that transforms TypeScript source code into optimized, packaged desktop applications for three major platforms.
 
@@ -9839,7 +9854,7 @@ flowchart TB
     PackagingPipeline --> FinalArtifacts
 ```
 
-### 8.2.2 Core Build Tools
+#### 8.2.2 Core build tools
 
 | Tool | Version | Purpose | Configuration File |
 |------|---------|---------|-------------------|
@@ -9849,7 +9864,7 @@ flowchart TB
 | **Terser** | 5.30.3 | Production JavaScript minification | Webpack integration |
 | **electron-builder** | 24.13.3 | Cross-platform packaging and distribution | `electron-builder.json` |
 
-### 8.2.3 Webpack Configuration Matrix
+#### 8.2.3 Webpack configuration matrix
 
 Velocetty defines three distinct Webpack configurations in `webpack.config.ts` for different build targets:
 
@@ -9859,7 +9874,7 @@ Velocetty defines three distinct Webpack configurations in `webpack.config.ts` f
 | **hyper** | `electron-renderer` | `lib/index.tsx` | `target/renderer/bundle.js` | Renderer process UI bundle |
 | **hyper-cli** | Node.js | `cli/index.ts` | `bin/cli.js` | CLI tool for plugin management |
 
-### 8.2.4 Build Scripts Configuration
+#### 8.2.4 Build scripts configuration
 
 | Script | Command | Purpose |
 |--------|---------|---------|
@@ -9869,7 +9884,7 @@ Velocetty defines three distinct Webpack configurations in `webpack.config.ts` f
 | `dev` | `webpack --watch` + `tsc --watch` | Development watch mode |
 | `dist` | `bun run build && electron-builder` | Build + package for distribution |
 
-### 8.2.5 V8 Snapshot Optimization
+#### 8.2.5 V8 snapshot optimization
 
 V8 snapshots pre-compile JavaScript to bytecode for faster cold start times, bypassing runtime parsing overhead.
 
@@ -9919,9 +9934,9 @@ x86_64 sysroot is available (for example, glibc/libstdc++ for x86_64 or a
 
 ---
 
-## 8.3 CROSS-PLATFORM PACKAGING
+### 8.3 Cross-platform packaging
 
-### 8.3.1 Platform Distribution Matrix
+#### 8.3.1 Platform distribution matrix
 
 Velocetty packages applications for all major desktop platforms using electron-builder:
 
@@ -9931,9 +9946,9 @@ Velocetty packages applications for all major desktop platforms using electron-b
 | **Windows** | NSIS Installer | x64, arm64 | RFC 3161 Timestamping | `electron-builder.json` |
 | **Linux** | deb, rpm, AppImage, snap, pacman | x64, arm64, armv7l | None (user trust model) | `electron-builder.json` |
 
-### 8.3.2 Packaging Configuration
+#### 8.3.2 Packaging configuration
 
-## electron-builder.json Core Settings
+### Electron-builder.JSON core settings
 
 | Setting | Value | Purpose |
 |---------|-------|---------|
@@ -9944,7 +9959,7 @@ Velocetty packages applications for all major desktop platforms using electron-b
 | `asarUnpack` | `node_modules/node-pty`, `**/vscode-ripgrep/**` | Native modules requiring extraction |
 | `compression` | `normal` | Balance size vs. build time |
 
-### 8.3.3 Platform-Specific Packaging Configuration
+#### 8.3.3 Platform-specific packaging configuration
 
 ```mermaid
 flowchart TB
@@ -9973,7 +9988,7 @@ flowchart TB
     PackagingConfig --> FinalOutput["Platform Installers"]
 ```
 
-#### macOS-Specific Settings
+##### MacOS-specific settings
 
 | Setting | Value | Purpose |
 |---------|-------|---------|
@@ -9984,7 +9999,7 @@ flowchart TB
 | `entitlements` | `build/mac/entitlements.plist` | Security entitlements |
 | `afterSign` | `bin/notarize.js` | Post-sign notarization hook |
 
-#### Windows-Specific Settings
+##### Windows-specific settings
 
 | Setting | Value | Purpose |
 |---------|-------|---------|
@@ -9993,7 +10008,7 @@ flowchart TB
 | `rfc3161TimeStampServer` | `http://timestamp.comodoca.com` | Code signing timestamp |
 | `protocols.name` | `ssh` | Protocol handler registration |
 
-#### Linux-Specific Settings
+##### Linux-specific settings
 
 | Setting | Value | Purpose |
 |---------|-------|---------|
@@ -10001,7 +10016,7 @@ flowchart TB
 | `category` | `TerminalEmulator;Development` | Desktop integration |
 | `maintainer` | `Vercel, Inc.` | Package metadata |
 
-### 8.3.4 Native Module Handling
+#### 8.3.4 Native module handling
 
 Electron applications require native modules to be rebuilt for each platform and architecture. Velocetty unpacks the following native modules from the ASAR archive:
 
@@ -10012,9 +10027,9 @@ Electron applications require native modules to be rebuilt for each platform and
 
 ---
 
-## 8.4 CI/CD PIPELINE
+### 8.4 CI/CD pipeline
 
-### 8.4.1 Pipeline Architecture Overview
+#### 8.4.1 Pipeline architecture overview
 
 Velocetty employs GitHub Actions for continuous integration and deployment, with a multi-platform build matrix ensuring cross-platform compatibility.
 
@@ -10067,7 +10082,7 @@ flowchart TB
     SecurityPipeline --> SecurityReports
 ```
 
-### 8.4.2 GitHub Actions Workflow Configuration
+#### 8.4.2 GitHub actions workflow configuration
 
 | Workflow File | Trigger | Purpose |
 |---------------|---------|---------|
@@ -10075,9 +10090,9 @@ flowchart TB
 | `codeql-analysis.yml` | Push, PR, Weekly Schedule | Security vulnerability scanning |
 | `e2e_comment.yml` | workflow_run completion | Post E2E screenshots to PRs |
 
-### 8.4.3 Build Matrix Configuration
+#### 8.4.3 Build matrix configuration
 
-#### Primary Build Job
+##### Primary build job
 
 | Platform | Node.js Version | Shell | Special Requirements |
 |----------|-----------------|-------|---------------------|
@@ -10085,14 +10100,14 @@ flowchart TB
 | `ubuntu-latest` | 18.x | bash | `libarchive-tools`, Xvfb for E2E |
 | `windows-latest` | 18.x | bash | windows-build-tools |
 
-#### ARM Build Job (Linux Only)
+##### ARM build job (Linux only)
 
 | Architecture | Base Image | CPU Emulation | Purpose |
 |--------------|------------|---------------|---------|
 | `armv7l` | `raspios_lite:latest` | `cortex-a8` | Raspberry Pi 32-bit |
 | `arm64` | `raspios_lite_arm64:latest` | `cortex-a53` | Raspberry Pi 64-bit |
 
-### 8.4.4 Pipeline Stages Detail
+#### 8.4.4 Pipeline stages detail
 
 ```mermaid
 flowchart LR
@@ -10138,7 +10153,7 @@ flowchart LR
     Stage5 --> Stage6
 ```
 
-### 8.4.5 Dependency Caching Strategy
+#### 8.4.5 Dependency caching strategy
 
 | Cache Component | Key Pattern | Scope |
 |-----------------|-------------|-------|
@@ -10146,7 +10161,7 @@ flowchart LR
 | npm Cache | `npm-${{ runner.os }}` | Per-OS |
 | Save Trigger | Push events only | Avoid cache updates on PRs |
 
-### 8.4.6 Quality Gates
+#### 8.4.6 Quality gates
 
 ```mermaid
 flowchart TB
@@ -10188,9 +10203,9 @@ flowchart TB
 
 ---
 
-## 8.5 CODE SIGNING AND NOTARIZATION
+### 8.5 Code signing and notarization
 
-### 8.5.1 Code Signing Architecture
+#### 8.5.1 Code signing architecture
 
 ```mermaid
 flowchart TB
@@ -10227,11 +10242,11 @@ flowchart TB
     CISecrets --> WinSigning
 ```
 
-### 8.5.2 macOS Notarization
+#### 8.5.2 MacOS notarization
 
 Velocetty implements comprehensive macOS code signing and notarization to satisfy Gatekeeper requirements.
 
-#### Notarization Process
+##### Notarization process
 
 | Step | Tool | Purpose |
 |------|------|---------|
@@ -10239,7 +10254,7 @@ Velocetty implements comprehensive macOS code signing and notarization to satisf
 | Notarization | `@electron/notarize` | Submit to Apple for review |
 | Stapling | `stapler` | Attach notarization ticket |
 
-#### Entitlements Configuration (`build/mac/entitlements.plist`)
+##### Entitlements configuration (`build/mac/entitlements.plist`)
 
 | Entitlement | Purpose | Security Implication |
 |-------------|---------|---------------------|
@@ -10250,7 +10265,7 @@ Velocetty implements comprehensive macOS code signing and notarization to satisf
 | `com.apple.security.device.audio-input` | Microphone access | Accessibility features |
 | `com.apple.security.device.camera` | Camera access | Accessibility features |
 
-#### Notarization Hook (`bin/notarize.js`)
+##### Notarization hook (`bin/notarize.js`)
 
 | Configuration | Value |
 |---------------|-------|
@@ -10259,7 +10274,7 @@ Velocetty implements comprehensive macOS code signing and notarization to satisf
 | Credentials Source | `APPLE_ID`, `APPLE_PASSWORD` environment variables |
 | Hook Timing | electron-builder `afterSign` |
 
-### 8.5.3 Windows Code Signing
+#### 8.5.3 Windows code signing
 
 | Configuration | Value | Purpose |
 |---------------|-------|---------|
@@ -10267,7 +10282,7 @@ Velocetty implements comprehensive macOS code signing and notarization to satisf
 | Certificate | Environment-provided via CI | `WIN_CERT_P12_BASE64` secret |
 | Algorithm | SHA-256 | Modern signing standard |
 
-### 8.5.4 CI Signing Secrets Matrix
+#### 8.5.4 CI signing secrets matrix
 
 | Secret Name | Platform | Purpose |
 |-------------|----------|---------|
@@ -10281,9 +10296,9 @@ Velocetty implements comprehensive macOS code signing and notarization to satisf
 
 ---
 
-## 8.6 AUTO-UPDATE INFRASTRUCTURE
+### 8.6 Auto-update infrastructure
 
-### 8.6.1 Update System Architecture
+#### 8.6.1 Update system architecture
 
 Velocetty implements an auto-update system using Electron's `autoUpdater` module with external update servers.
 
@@ -10322,14 +10337,14 @@ flowchart TB
     NotifyUser --> InstallUpdate
 ```
 
-### 8.6.2 Update Channel Configuration
+#### 8.6.2 Update channel configuration
 
 | Channel | Update Server URL Pattern | Purpose |
 |---------|---------------------------|---------|
 | **Stable** | `https://releases.hyper.is/update/{platform}/{version}` | Production releases |
 | **Canary** | `https://releases-canary.hyper.is/update/{platform}/{version}` | Pre-release testing |
 
-### 8.6.3 Platform-Specific Update URLs
+#### 8.6.3 Platform-specific update URLs
 
 | Platform | Architecture | URL Pattern |
 |----------|--------------|-------------|
@@ -10340,7 +10355,7 @@ flowchart TB
 | Linux (x64) | x64 | `https://releases{-canary}.hyper.is/update/deb/{version}` |
 | Linux (arm64) | arm64 | `https://releases{-canary}.hyper.is/update/deb_arm64/{version}` |
 
-### 8.6.4 Update Polling Configuration
+#### 8.6.4 Update polling configuration
 
 | Parameter | Value | Purpose |
 |-----------|-------|---------|
@@ -10349,7 +10364,7 @@ flowchart TB
 | Protocol | HTTPS | Secure transport |
 | Conditional Check | `disableAutoUpdates !== true` | User opt-out support |
 
-### 8.6.5 Linux Update Behavior
+#### 8.6.5 Linux update behavior
 
 Linux uses a custom implementation (`app/auto-updater-linux.ts`) due to Electron's limited Linux auto-update support:
 
@@ -10361,9 +10376,9 @@ Linux uses a custom implementation (`app/auto-updater-linux.ts`) due to Electron
 
 ---
 
-## 8.7 SECURITY SCANNING INFRASTRUCTURE
+### 8.7 Security scanning infrastructure
 
-### 8.7.1 Security Scanning Architecture
+#### 8.7.1 Security scanning architecture
 
 ```mermaid
 flowchart LR
@@ -10397,7 +10412,7 @@ flowchart LR
     DependabotProcess --> UpdatePRs
 ```
 
-### 8.7.2 CodeQL Configuration
+#### 8.7.2 Codeql configuration
 
 | Attribute | Value | Purpose |
 |-----------|-------|---------|
@@ -10407,7 +10422,7 @@ flowchart LR
 | Languages | JavaScript | Primary codebase language |
 | Output | SARIF report | GitHub Security integration |
 
-### 8.7.3 Dependabot Configuration
+#### 8.7.3 Dependabot configuration
 
 | Ecosystem | Directory | Schedule | Target Branch |
 |-----------|-----------|----------|---------------|
@@ -10415,7 +10430,7 @@ flowchart LR
 | npm | `/app` | Weekly (Sundays 11:00) | canary |
 | github-actions | `/` | Weekly (Sundays 11:00) | canary |
 
-#### Dependabot Settings
+##### Dependabot settings
 
 | Setting | Value | Purpose |
 |---------|-------|---------|
@@ -10425,9 +10440,9 @@ flowchart LR
 
 ---
 
-## 8.8 ENVIRONMENT PROMOTION STRATEGY
+### 8.8 Environment promotion strategy
 
-### 8.8.1 Release Channel Flow
+#### 8.8.1 Release channel flow
 
 ```mermaid
 flowchart LR
@@ -10466,7 +10481,7 @@ flowchart LR
     StableBuild --> StableServer
 ```
 
-### 8.8.2 Environment Comparison Matrix
+#### 8.8.2 Environment comparison matrix
 
 | Aspect | Development | Canary | Stable |
 |--------|-------------|--------|--------|
@@ -10478,9 +10493,9 @@ flowchart LR
 
 ---
 
-## 8.9 INFRASTRUCTURE RESOURCE REQUIREMENTS
+### 8.9 Infrastructure resource requirements
 
-### 8.9.1 CI/CD Resource Consumption
+#### 8.9.1 CI/CD resource consumption
 
 | Resource | GitHub Actions Usage | Notes |
 |----------|---------------------|-------|
@@ -10489,7 +10504,7 @@ flowchart LR
 | **ARM Build** | ~30 min additional | QEMU emulation overhead |
 | **Cache Size** | ~500 MB per OS | Bun dependencies |
 
-### 8.9.2 External Infrastructure Dependencies
+#### 8.9.2 External infrastructure dependencies
 
 | Service | Provider | Purpose | Cost Model |
 |---------|----------|---------|------------|
@@ -10499,7 +10514,7 @@ flowchart LR
 | **Apple Notary** | Apple | macOS notarization | Free with Developer account |
 | **Timestamp Server** | Comodo | Windows signing | Free public service |
 
-### 8.9.3 Developer Machine Requirements
+#### 8.9.3 Developer machine requirements
 
 | Requirement | Minimum | Recommended | Purpose |
 |-------------|---------|-------------|---------|
@@ -10510,9 +10525,9 @@ flowchart LR
 
 ---
 
-## 8.10 DISASTER RECOVERY AND BACKUP
+### 8.10 Disaster recovery and backup
 
-### 8.10.1 Source Code Backup
+#### 8.10.1 Source code backup
 
 | Component | Backup Location | Recovery Procedure |
 |-----------|-----------------|-------------------|
@@ -10520,7 +10535,7 @@ flowchart LR
 | CI Configuration | `.github/` directory | Restored with source |
 | Build Configuration | Repository root | Restored with source |
 
-### 8.10.2 Signing Certificate Management
+#### 8.10.2 Signing certificate management
 
 | Certificate Type | Storage | Recovery Procedure |
 |------------------|---------|-------------------|
@@ -10528,7 +10543,7 @@ flowchart LR
 | Windows Code Signing | Certificate Authority | Re-issue from CA |
 | GitHub Secrets | GitHub Encrypted Secrets | Re-upload from secure storage |
 
-### 8.10.3 Build Artifact Recovery
+#### 8.10.3 Build artifact recovery
 
 | Artifact Type | Recovery Source | Retention |
 |---------------|-----------------|-----------|
@@ -10538,9 +10553,9 @@ flowchart LR
 
 ---
 
-## 8.11 INFRASTRUCTURE MONITORING
+### 8.11 Infrastructure monitoring
 
-### 8.11.1 CI/CD Pipeline Monitoring
+#### 8.11.1 CI/CD pipeline monitoring
 
 ```mermaid
 flowchart TB
@@ -10567,7 +10582,7 @@ flowchart TB
     CIMonitoring --> DeveloperAction["Developer Action"]
 ```
 
-### 8.11.2 Monitoring Matrix
+#### 8.11.2 Monitoring matrix
 
 | Monitoring Area | Tool | Dashboard Location | Alert Mechanism |
 |-----------------|------|-------------------|-----------------|
@@ -10579,9 +10594,9 @@ flowchart TB
 
 ---
 
-## 8.12 REFERENCES
+### 8.12 References
 
-#### Files Examined
+##### Files examined
 
 - `package.json` - Build scripts, dependencies, version (lines 1-148)
 - `webpack.config.ts` - Webpack configuration for three build targets (lines 1-196)
@@ -10600,7 +10615,7 @@ flowchart TB
 - `bin/snapshot-libs.js` - Dependencies for V8 snapshots
 - `build/mac/entitlements.plist` - macOS security entitlements (lines 1-26)
 
-#### Folders Explored
+##### Folders explored
 
 - `/` - Repository root structure
 - `.github/` - GitHub-specific configurations
@@ -10610,7 +10625,7 @@ flowchart TB
 - `build/` - Platform-specific packaging assets
 - `test/` - Test suite structure
 
-#### Technical Specification Sections Referenced
+##### Technical specification sections referenced
 
 - 1.2 SYSTEM OVERVIEW - Product context and architecture
 - 3.6 DEVELOPMENT & DEPLOYMENT - Build system details
@@ -10620,13 +10635,13 @@ flowchart TB
 - 6.5 MONITORING AND OBSERVABILITY - CI/CD monitoring patterns
 - 6.6 TESTING STRATEGY - Test framework and CI integration
 
-# 9. Appendices
+## 9. Appendices
 
-## 9.1 ADDITIONAL TECHNICAL INFORMATION
+### 9.1 Additional technical information
 
 This section provides supplementary technical specifications, constraints, and reference data that complement the main documentation body.
 
-### 9.1.1 Technology Version Matrix
+#### 9.1.1 Technology version matrix
 
 The following table provides a comprehensive reference of core technology versions used in Velocetty:
 
@@ -10642,7 +10657,7 @@ The following table provides a comprehensive reference of core technology versio
 | Webpack | 5.91.0 | Module bundler | `package.json` |
 | electron-builder | 24.13.3 | Application packaging tool | `package.json` |
 
-### 9.1.2 xterm.js Addon Versions
+#### 9.1.2 xterm.js addon versions
 
 | Addon | Version | Purpose |
 |-------|---------|---------|
@@ -10655,7 +10670,7 @@ The following table provides a comprehensive reference of core technology versio
 | xterm-addon-ligatures | 0.7.0 | Font ligature rendering |
 | xterm-addon-unicode11 | 0.6.0 | Unicode 11 support |
 
-### 9.1.3 WebGL Context Constraints
+#### 9.1.3 WebGL context constraints
 
 The xterm.js WebGL renderer operates under browser-imposed resource limitations:
 
@@ -10666,7 +10681,7 @@ The xterm.js WebGL renderer operates under browser-imposed resource limitations:
 | Font ligatures | Not supported | Programming ligatures cannot render in WebGL mode | Use Canvas renderer for ligature support |
 | Context loss recovery | GPU resource exhaustion | WebGL context may be lost under memory pressure | `onContextLoss` handler triggers Canvas fallback |
 
-### 9.1.4 IPC Data Batching Configuration
+#### 9.1.4 IPC data batching configuration
 
 Performance-critical parameters for terminal data transmission:
 
@@ -10677,7 +10692,7 @@ Performance-critical parameters for terminal data transmission:
 | Batch prefix | 36-character UUID | Session routing identifier for multi-terminal windows |
 | IPC call reduction | 60-90% | Empirical improvement versus unbatched transmission |
 
-### 9.1.5 Platform-Specific Configuration Paths
+#### 9.1.5 Platform-specific configuration paths
 
 | Platform | Configuration Directory | Notes |
 |----------|-------------------------|-------|
@@ -10685,7 +10700,7 @@ Performance-critical parameters for terminal data transmission:
 | macOS | `~/.config/Hyper` | Follows Unix convention |
 | Windows | `%APPDATA%/Hyper` | Standard Windows user data location |
 
-### 9.1.6 Plugin Extension Hook Summary
+#### 9.1.6 Plugin extension hook summary
 
 Velocetty exposes 40+ extension hooks organized into functional categories:
 
@@ -10697,7 +10712,7 @@ Velocetty exposes 40+ extension hooks organized into functional categories:
 | Props Injection | 4 | `getTermProps`, `getTabProps`, `getTabsProps`, `getTermGroupProps` |
 | State Mapping | 8 | `mapHyperTermState`, `mapTermsState`, `mapHeaderState`, `mapNotificationsState` |
 
-### 9.1.7 Update Channel URL Patterns
+#### 9.1.7 Update channel URL patterns
 
 | Channel | Platform | URL Pattern |
 |---------|----------|-------------|
@@ -10710,7 +10725,7 @@ Velocetty exposes 40+ extension hooks organized into functional categories:
 | Canary | macOS (arm64) | `https://releases-canary.hyper.is/update/darwin_arm64/{version}` |
 | Canary | Windows (x64) | `https://releases-canary.hyper.is/update/win32/{version}` |
 
-### 9.1.8 Terminal Emulation Standards
+#### 9.1.8 Terminal emulation standards
 
 Velocetty's terminal emulation through xterm.js implements the following industry standards:
 
@@ -10746,7 +10761,7 @@ flowchart TB
     EscSeq --> CSI
 ```
 
-### 9.1.9 Performance Targets and SLAs
+#### 9.1.9 Performance targets and SLAs
 
 | Metric | Target | Measurement Method |
 |--------|--------|-------------------|
@@ -10757,7 +10772,7 @@ flowchart TB
 | Memory usage (idle) | < 300 MB | Single window with one terminal |
 | Memory per additional terminal | ~50 MB | Incremental overhead |
 
-### 9.1.10 Redux Middleware Pipeline Order
+#### 9.1.10 Redux middleware pipeline order
 
 The middleware execution order is critical for proper operation:
 
@@ -10787,11 +10802,11 @@ flowchart LR
 
 ---
 
-## 9.2 GLOSSARY
+### 9.2 Glossary
 
 This glossary defines technical terms used throughout this Technical Specification document.
 
-### 9.2.1 Architecture and System Terms
+#### 9.2.1 Architecture and system terms
 
 | Term | Definition |
 |------|------------|
@@ -10803,7 +10818,7 @@ This glossary defines technical terms used throughout this Technical Specificati
 | **Process Isolation** | Security and stability pattern separating concerns between main and renderer processes in Electron |
 | **Trust Boundary** | The logical security perimeter within which code executes with equivalent privileges |
 
-### 9.2.2 Terminal Emulation Terms
+#### 9.2.2 Terminal emulation terms
 
 | Term | Definition |
 |------|------------|
@@ -10820,7 +10835,7 @@ This glossary defines technical terms used throughout this Technical Specificati
 | **ANSI Colors** | Standard 16-color palette (8 standard + 8 bright) defined by ANSI X3.64 for terminal text coloring |
 | **True Color** | 24-bit RGB color support (16.7 million colors) in terminal emulators via SGR escape sequences |
 
-### 9.2.3 Data and State Management Terms
+#### 9.2.3 Data and state management terms
 
 | Term | Definition |
 |------|------------|
@@ -10835,7 +10850,7 @@ This glossary defines technical terms used throughout this Technical Specificati
 | **Reducer** | Pure function that takes current state and an action, returning a new state |
 | **Middleware** | Function that intercepts Redux actions before they reach reducers, enabling side effects |
 
-### 9.2.4 Plugin System Terms
+#### 9.2.4 Plugin system terms
 
 | Term | Definition |
 |------|------------|
@@ -10849,7 +10864,7 @@ This glossary defines technical terms used throughout this Technical Specificati
 | **Props Injection Hook** | Plugin functions (`getTermProps`, `getTabProps`) that inject additional props into React components |
 | **State Mapping Hook** | Plugin functions that transform Redux state before it reaches components |
 
-### 9.2.5 Configuration Terms
+#### 9.2.5 Configuration terms
 
 | Term | Definition |
 |------|------------|
@@ -10862,7 +10877,7 @@ This glossary defines technical terms used throughout this Technical Specificati
 | **ColorMap** | Configuration object containing 16 ANSI color definitions (8 standard + 8 bright colors) |
 | **Default Shell** | The user's system default shell resolved via platform-specific methods |
 
-### 9.2.6 UI Component Terms
+#### 9.2.6 UI component terms
 
 | Term | Definition |
 |------|------------|
@@ -10876,7 +10891,7 @@ This glossary defines technical terms used throughout this Technical Specificati
 | **Notification** | Toast notification component for user messages |
 | **Terms** | Container component managing all terminal instances in a window |
 
-### 9.2.7 Build and Packaging Terms
+#### 9.2.7 Build and packaging terms
 
 | Term | Definition |
 |------|------------|
@@ -10889,7 +10904,7 @@ This glossary defines technical terms used throughout this Technical Specificati
 | **AppImage** | Linux portable application format requiring no installation or root privileges |
 | **Entitlements** | macOS security declarations specifying application capabilities and permissions |
 
-### 9.2.8 Network and Protocol Terms
+#### 9.2.8 Network and protocol terms
 
 | Term | Definition |
 |------|------------|
@@ -10899,7 +10914,7 @@ This glossary defines technical terms used throughout this Technical Specificati
 | **Auto-Update Polling** | Periodic check (30-minute interval) for available application updates |
 | **Manifest** | JSON document describing available application updates and their metadata |
 
-### 9.2.9 Testing Terms
+#### 9.2.9 Testing terms
 
 | Term | Definition |
 |------|------------|
@@ -10914,11 +10929,11 @@ This glossary defines technical terms used throughout this Technical Specificati
 
 ---
 
-## 9.3 ACRONYMS
+### 9.3 Acronyms
 
 This section provides expanded forms of acronyms used throughout this Technical Specification document.
 
-### 9.3.1 Core Technology Acronyms
+#### 9.3.1 Core technology acronyms
 
 | Acronym | Expanded Form | Context |
 |---------|---------------|---------|
@@ -10950,7 +10965,7 @@ This section provides expanded forms of acronyms used throughout this Technical 
 | **UUID** | Universally Unique Identifier | 36-character identifier format |
 | **UX** | User Experience | Design and usability methodology |
 
-### 9.3.2 Framework and Library Acronyms
+#### 9.3.2 Framework and library acronyms
 
 | Acronym | Expanded Form | Context |
 |---------|---------------|---------|
@@ -10963,7 +10978,7 @@ This section provides expanded forms of acronyms used throughout this Technical 
 | **TSX** | TypeScript JSX | TypeScript React syntax |
 | **XDG** | X Desktop Group (freedesktop.org) | Linux desktop specification |
 
-### 9.3.3 Terminal and Display Acronyms
+#### 9.3.3 Terminal and display acronyms
 
 | Acronym | Expanded Form | Context |
 |---------|---------------|---------|
@@ -10979,7 +10994,7 @@ This section provides expanded forms of acronyms used throughout this Technical 
 | **WebGL2** | Web Graphics Library 2.0 | Updated WebGL specification |
 | **WinPTY** | Windows Pseudo-Terminal | Legacy Windows PTY implementation |
 
-### 9.3.4 Build and Deployment Acronyms
+#### 9.3.4 Build and deployment acronyms
 
 | Acronym | Expanded Form | Context |
 |---------|---------------|---------|
@@ -10993,7 +11008,7 @@ This section provides expanded forms of acronyms used throughout this Technical 
 | **PR** | Pull Request | Git/GitHub workflow |
 | **SDK** | Software Development Kit | Development tools package |
 
-### 9.3.5 Standards and Specifications Acronyms
+#### 9.3.5 Standards and specifications acronyms
 
 | Acronym | Expanded Form | Context |
 |---------|---------------|---------|
@@ -11009,7 +11024,7 @@ This section provides expanded forms of acronyms used throughout this Technical 
 | **UTC** | Coordinated Universal Time | Time zone reference |
 | **YAML** | YAML Ain't Markup Language | Configuration format (CI/CD) |
 
-### 9.3.6 Testing and Quality Acronyms
+#### 9.3.6 Testing and quality acronyms
 
 | Acronym | Expanded Form | Context |
 |---------|---------------|---------|
@@ -11020,7 +11035,7 @@ This section provides expanded forms of acronyms used throughout this Technical 
 | **SLA** | Service Level Agreement | Performance targets |
 | **Xvfb** | X Virtual Frame Buffer | Headless X11 server for CI |
 
-### 9.3.7 Measurement Units
+#### 9.3.7 Measurement units
 
 | Acronym | Expanded Form | Context |
 |---------|---------------|---------|
@@ -11032,9 +11047,9 @@ This section provides expanded forms of acronyms used throughout this Technical 
 
 ---
 
-## 9.4 REFERENCES
+### 9.4 References
 
-### 9.4.1 Technical Specification Sections Referenced
+#### 9.4.1 Technical specification sections referenced
 
 The following sections from this Technical Specification document were referenced in compiling this appendix:
 
@@ -11053,7 +11068,7 @@ The following sections from this Technical Specification document were reference
 | 8.2 BUILD INFRASTRUCTURE | Build tools, V8 snapshot configuration |
 | 8.6 AUTO-UPDATE INFRASTRUCTURE | Update channels, polling configuration |
 
-### 9.4.2 Repository Files Referenced
+#### 9.4.2 Repository files referenced
 
 | File Path | Relevance |
 |-----------|-----------|
@@ -11069,7 +11084,7 @@ The following sections from this Technical Specification document were reference
 | `typings/common.d.ts` | IPC event type definitions |
 | `PLUGINS.md` | Plugin development documentation |
 
-### 9.4.3 Repository Folders Referenced
+#### 9.4.3 Repository folders referenced
 
 | Folder Path | Contents |
 |-------------|----------|
@@ -11083,7 +11098,7 @@ The following sections from this Technical Specification document were reference
 | `test/` | Test suite |
 | `typings/` | TypeScript declaration files |
 
-### 9.4.4 External Technical References
+#### 9.4.4 External technical references
 
 | Resource | URL | Purpose |
 |----------|-----|---------|

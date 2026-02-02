@@ -7,14 +7,16 @@ import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 let existsOnNpm: typeof import('../../cli/api').existsOnNpm;
 let getUrl = '';
 
+const buildRegistryResponse = (versions: string[] = []) => ({
+  body: {
+    versions
+  }
+});
+
 const gotMock = {
   get(url: string) {
     getUrl = url;
-    return Promise.resolve({
-      body: {
-        versions: []
-      }
-    });
+    return Promise.resolve(buildRegistryResponse());
   }
 };
 
@@ -31,12 +33,22 @@ beforeEach(() => {
   getUrl = '';
 });
 
-test('existsOnNpm() builds the url for non-scoped packages', async () => {
-  await existsOnNpm('pkg');
-  expect(getUrl).toBe('https://registry.npmjs.org/pkg');
-});
+const cases = [
+  {
+    name: 'non-scoped packages',
+    packageName: 'pkg',
+    expectedUrl: 'https://registry.npmjs.org/pkg'
+  },
+  {
+    name: 'scoped packages',
+    packageName: '@scope/pkg',
+    expectedUrl: 'https://registry.npmjs.org/@scope%2fpkg'
+  }
+];
 
-test('existsOnNpm() builds the url for scoped packages', async () => {
-  await existsOnNpm('@scope/pkg');
-  expect(getUrl).toBe('https://registry.npmjs.org/@scope%2fpkg');
+cases.forEach(({name, packageName, expectedUrl}) => {
+  test(`existsOnNpm() builds the url for ${name}`, async () => {
+    await existsOnNpm(packageName);
+    expect(getUrl).toBe(expectedUrl);
+  });
 });
