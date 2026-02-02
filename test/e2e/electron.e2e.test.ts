@@ -19,7 +19,7 @@ const shouldCapture = process.env.E2E_CAPTURE === '1';
 const isCi =
   process.env.CI !== undefined && process.env.CI !== '' && process.env.CI !== '0' && process.env.CI !== 'false';
 const shouldWaitForWindow = !isCi;
-const debugE2E = process.env.E2E_DEBUG === '1' || isCi;
+const debugE2E = process.env.E2E_DEBUG === '1';
 const driverOverride = process.env.E2E_DRIVER;
 const shouldUsePlaywright = driverOverride ? driverOverride === 'playwright' : !isCi;
 
