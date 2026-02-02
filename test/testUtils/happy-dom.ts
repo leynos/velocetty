@@ -12,13 +12,10 @@ type RpcStub = {
 
 let happyDomModule: Promise<HappyDomModule> | null = null;
 
-/** Lazily load Happy DOM via runtime dynamic import to avoid ts-node transpiling. */
+/** Lazily load Happy DOM via dynamic import to keep tests light. */
 const loadHappyDom = (): Promise<HappyDomModule> => {
   if (!happyDomModule) {
-    // Use runtime import to avoid ts-node transpiling to require(). This uses
-    // indirect eval, which is acceptable in test-only code and can be removed
-    // once these tests run under Bun's native TypeScript execution.
-    happyDomModule = new Function('return import("happy-dom")')() as Promise<HappyDomModule>;
+    happyDomModule = import('happy-dom');
   }
   return happyDomModule;
 };

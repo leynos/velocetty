@@ -5,7 +5,7 @@
  * while rendering the header, terms, and notification surfaces for the app.
  * Used as the top-level React container in the renderer window.
  */
-// biome-ignore lint/correctness/noUnusedImports: React value is required for JSX runtime under ts-node tests.
+// biome-ignore lint/correctness/noUnusedImports: React value is required for the current JSX runtime.
 import React, {forwardRef, useEffect, useRef} from 'react';
 
 import Mousetrap from 'mousetrap';
