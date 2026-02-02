@@ -4,7 +4,7 @@ import {createRoot} from 'react-dom/client';
 // react-dom/test-utils is required until React 18.3+ exposes act from react.
 import {act} from 'react-dom/test-utils';
 
-import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
 
@@ -76,10 +76,6 @@ beforeEach(() => {
     getTermByUid: () => null,
     getActiveTerm: () => null
   };
-});
-
-afterAll(() => {
-  mock.restore();
 });
 
 test.serial('Hyper attaches key listeners on mount and config updates', async () => {

@@ -1,7 +1,7 @@
 /* eslint-disable eslint-comments/disable-enable-pair */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
 let existsOnNpm: typeof import('../../cli/api').existsOnNpm;
 let getUrl = '';
@@ -28,10 +28,6 @@ beforeAll(async () => {
 
 beforeEach(() => {
   getUrl = '';
-});
-
-afterAll(() => {
-  mock.restore();
 });
 
 test('existsOnNpm() builds the url for non-scoped packages', async () => {

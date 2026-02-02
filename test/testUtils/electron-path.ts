@@ -10,9 +10,34 @@ const appEntryPath = fileURLToPath(new URL('../../app/updater.ts', import.meta.u
 const appRequire = createRequire(appEntryPath);
 const appElectronPath = realpathSync(appRequire.resolve('electron'));
 
-export const getAppElectronPath = () => appElectronPath;
+type ElectronMock = {
+  default: {
+    autoUpdater?: unknown;
+    screen: {
+      getAllDisplays: () => unknown[];
+    };
+  };
+  app: Record<string, unknown>;
+};
 
-export const mockElectronModule = (factory: () => Record<string, unknown>) => {
-  mock.module('electron', factory);
-  mock.module(appElectronPath, factory);
+const electronMock: ElectronMock = {
+  default: {
+    screen: {
+      getAllDisplays: () => []
+    }
+  },
+  app: {}
+};
+
+let isRegistered = false;
+
+export const getElectronMock = () => electronMock;
+
+export const registerElectronMock = () => {
+  if (isRegistered) {
+    return;
+  }
+  mock.module('electron', () => electronMock);
+  mock.module(appElectronPath, () => electronMock);
+  isRegistered = true;
 };

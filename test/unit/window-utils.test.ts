@@ -1,8 +1,8 @@
 // eslint-disable-next-line eslint-comments/disable-enable-pair
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-import {afterAll, beforeAll, expect, mock, test} from 'bun:test';
+import {beforeAll, expect, test} from 'bun:test';
 
-import {mockElectronModule} from '../testUtils/electron-path';
+import {getElectronMock, registerElectronMock} from '../testUtils/electron-path';
 
 type Display = {
   workArea: {
@@ -17,16 +17,14 @@ const screenStub = {
   getAllDisplays: (): Display[] => []
 };
 
-mockElectronModule(() => ({default: {screen: screenStub}}));
+registerElectronMock();
+const electronMock = getElectronMock();
+electronMock.default.screen = screenStub;
 
 let positionIsValid: typeof import('../../app/utils/window-utils').positionIsValid;
 
 beforeAll(async () => {
   ({positionIsValid} = await import('../../app/utils/window-utils'));
-});
-
-afterAll(() => {
-  mock.restore();
 });
 
 test('positionIsValid() returns true when window is on only screen', () => {
