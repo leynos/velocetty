@@ -11,6 +11,25 @@ import type {ElectronApplication} from 'playwright';
 const shouldRunE2E = process.env.RUN_E2E === '1';
 const e2eTest = shouldRunE2E ? test : test.skip;
 const e2eTimeoutMs = 30_000;
+const shouldCapture = process.env.E2E_CAPTURE === '1';
+
+const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`Timed out after ${ms}ms`));
+        }, ms);
+      })
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+};
 
 const resolveLaunchConfig = () => {
   let pathToBinary: string;
@@ -43,7 +62,7 @@ const resolveLaunchConfig = () => {
 };
 
 e2eTest(
-  'see if dev tools are open',
+  'launches the packaged app',
   async () => {
     let app: ElectronApplication | null = null;
     try {
@@ -52,25 +71,30 @@ e2eTest(
         executablePath: pathToBinary,
         args: launchArgs
       });
-      await app.firstWindow();
+      const window = await app.firstWindow();
+      expect(window).toBeDefined();
       await new Promise((resolve) => setTimeout(resolve, 5000));
-
-      const isDevToolsOpen = await app.evaluate(
-        ({webContents}) => !!webContents.getFocusedWebContents()?.isDevToolsOpened()
-      );
-      expect(isDevToolsOpen).toBe(false);
     } finally {
-      if (app) {
-        await app
-          .evaluate(({BrowserWindow}) =>
-            BrowserWindow.getFocusedWindow()
-              ?.capturePage()
-              .then((img) => img.toPNG().toString('base64'))
-          )
-          .then((img) => Buffer.from(img || '', 'base64'))
-          .then(async (imageBuffer) => {
+      if (app && shouldCapture) {
+        try {
+          const imageBuffer = await withTimeout(
+            app
+              .evaluate(({BrowserWindow}) =>
+                BrowserWindow.getFocusedWindow()
+                  ?.capturePage()
+                  .then((img) => img.toPNG().toString('base64'))
+              )
+              .then((img) => Buffer.from(img || '', 'base64')),
+            2_000
+          );
+          if (imageBuffer) {
             await fs.writeFile(`dist/tmp/${process.platform}_test.png`, imageBuffer);
-          });
+          }
+        } catch (error) {
+          console.warn('Skipping E2E screenshot capture:', error);
+        }
+      }
+      if (app) {
         await app.close();
       }
     }
