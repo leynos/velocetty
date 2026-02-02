@@ -1,5 +1,6 @@
 /** @file End-to-end smoke tests for packaged Electron builds. */
 // Native
+import {spawn} from 'node:child_process';
 import path from 'node:path';
 
 // Packages
@@ -17,6 +18,7 @@ const closeTimeoutMs = 5_000;
 const shouldCapture = process.env.E2E_CAPTURE === '1';
 const shouldWaitForWindow = process.env.CI !== 'true';
 const debugE2E = process.env.E2E_DEBUG === '1' || process.env.CI === 'true';
+const shouldUsePlaywright = process.env.CI !== 'true';
 
 const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -78,27 +80,66 @@ e2eTest(
       console.log(`[e2e ${elapsedMs}ms] ${message}`);
     };
     let app: ElectronApplication | null = null;
+    let spawned: ReturnType<typeof spawn> | null = null;
+    let spawnOutput = '';
     try {
       const {pathToBinary, launchArgs} = resolveLaunchConfig();
       log(`Launching ${pathToBinary} with args: ${launchArgs.join(' ') || '(none)'}`);
-      app = await withTimeout(
-        _electron.launch({
-          executablePath: pathToBinary,
-          args: launchArgs,
-          timeout: launchTimeoutMs
-        }),
-        launchTimeoutMs
-      );
-      log('Electron launch completed.');
-      if (shouldWaitForWindow) {
-        log('Waiting for first window.');
-        const window = await withTimeout(app.firstWindow(), windowTimeoutMs);
-        expect(window).toBeDefined();
-        log('First window resolved.');
+      if (shouldUsePlaywright) {
+        app = await withTimeout(
+          _electron.launch({
+            executablePath: pathToBinary,
+            args: launchArgs,
+            timeout: launchTimeoutMs
+          }),
+          launchTimeoutMs
+        );
+        log('Electron launch completed.');
+        if (shouldWaitForWindow) {
+          log('Waiting for first window.');
+          const window = await withTimeout(app.firstWindow(), windowTimeoutMs);
+          expect(window).toBeDefined();
+          log('First window resolved.');
+        } else {
+          const process = app.process();
+          expect(process).toBeDefined();
+          log(`Electron process PID: ${process?.pid ?? 'unknown'}.`);
+        }
       } else {
-        const process = app.process();
-        expect(process).toBeDefined();
-        log(`Electron process PID: ${process?.pid ?? 'unknown'}.`);
+        spawned = spawn(pathToBinary, launchArgs, {
+          env: {...process.env},
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+        spawned.stdout?.on('data', (data) => {
+          const chunk = data.toString();
+          spawnOutput += chunk;
+          if (debugE2E) {
+            process.stdout.write(chunk);
+          }
+        });
+        spawned.stderr?.on('data', (data) => {
+          const chunk = data.toString();
+          spawnOutput += chunk;
+          if (debugE2E) {
+            process.stderr.write(chunk);
+          }
+        });
+        await withTimeout(
+          new Promise<void>((resolve, reject) => {
+            if (spawned?.pid) {
+              resolve();
+              return;
+            }
+            spawned?.once('error', reject);
+            spawned?.once('spawn', () => resolve());
+          }),
+          launchTimeoutMs
+        );
+        log(`Spawned Electron PID: ${spawned.pid ?? 'unknown'}.`);
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        if (spawned.exitCode != null) {
+          throw new Error(`Electron exited early with code ${spawned.exitCode}. Output:\n${spawnOutput}`);
+        }
       }
       await new Promise((resolve) => setTimeout(resolve, 2000));
     } finally {
@@ -132,6 +173,13 @@ e2eTest(
             process.kill('SIGKILL');
           }
           console.warn('E2E cleanup timed out; force-killed Electron.', error);
+        }
+      }
+      if (spawned) {
+        spawned.kill('SIGTERM');
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        if (spawned.exitCode == null) {
+          spawned.kill('SIGKILL');
         }
       }
     }
