@@ -84,7 +84,7 @@ bun run build:hyper-app
 
 ### TypeScript errors inside `node_modules`
 
-If `tsc --build --watch` reports errors from `@types/node` or other
+If `tsgo --build --watch` reports errors from `@types/node` or other
 dependencies, ensure the dependencies are up to date and that `skipLibCheck`
 is enabled in `tsconfig.base.json`.
 

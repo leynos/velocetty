@@ -18,6 +18,8 @@ must follow locally.
 
 - Use Bun for JavaScript and TypeScript scripts.
 - Prefer Makefile targets for validation commands.
+- Use `tsgo` (`@typescript/native-preview`) for TypeScript compilation and
+  type-checking tasks.
 - Keep documentation wrapped to 80 columns and code blocks to 120 columns.
 
 ## Formatting and linting
@@ -31,6 +33,13 @@ When documentation changes, also run:
 
 - `bunx markdownlint-cli "docs/**/*.md"`
 - `nixie --no-sandbox`
+
+## Type checking
+
+Type checking runs via `tsgo` and the shared `tsconfig.typecheck.json` project:
+
+- `make typecheck`
+- `bun run check:types`
 
 ## Tests
 

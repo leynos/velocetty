@@ -1512,6 +1512,10 @@ This section provides a comprehensive reference of the technologies, frameworks,
 | **Module System** | CommonJS |
 | **Configuration** | `tsconfig.base.json` with strict mode enabled |
 
+Compilation and type checking use `tsgo` from `@typescript/native-preview`
+(7.0.0-dev.20260128.1). The `typescript` npm package (5.4.5) remains for tools
+that depend on the JavaScript compiler API.
+
 ##### Language selection justification
 
 TypeScript serves as Velocetty's primary development language, chosen for the following architectural reasons:
@@ -2002,7 +2006,7 @@ flowchart TB
     end
     
     subgraph BuildPipeline["Build Pipeline"]
-        TSC["TypeScript Compiler<br/>tsc 5.4.5"]
+        TSGO["TypeScript Compiler<br/>tsgo 7.0.0-dev.20260128.1"]
         Webpack["Webpack 5.91.0"]
         Babel["Babel 7.24.x"]
         Terser["Terser 5.30.3"]
@@ -2029,7 +2033,7 @@ flowchart TB
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| **TypeScript** | 5.4.5 | Type checking and transpilation |
+| **tsgo (TypeScript native preview)** | 7.0.0-dev.20260128.1 | Type checking and transpilation |
 | **Webpack** | 5.91.0 | Module bundling with three named configurations |
 | **Babel** | 7.24.x | JavaScript transpilation and JSX transformation |
 | **Terser** | 5.30.3 | Production JavaScript minification |
@@ -2238,7 +2242,7 @@ flowchart TB
 | **Main Process** | Node.js/TypeScript, node-pty | OS integration, PTY management |
 | **Renderer Process** | React 18.2.0, Redux 4.2.1 | UI components, state management |
 | **Terminal Rendering** | xterm.js 5.3.0 + WebGL addon | Terminal emulation and display |
-| **Build System** | Webpack 5.91.0, TypeScript 5.4.5, node-gyp 10.x, node-gyp-build 4.x | Module bundling, type safety, native module compilation |
+| **Build System** | Webpack 5.91.0, tsgo 7.0.0-dev.20260128.1, node-gyp 10.x, node-gyp-build 4.x | Module bundling, type safety, native module compilation |
 | **Distribution** | electron-builder 24.13.3 | Cross-platform packaging |
 
 #### 3.8.2 Technology selection criteria
@@ -3889,7 +3893,7 @@ Plugin extensions compose with core functionality through decoration:
 **Technologies and Frameworks**:
 - Electron 22.3.25 (Chromium 108, Node.js 16.17.1)
 - `@electron/remote` 2.1.2 for cross-process module access
-- TypeScript 5.4.5 with strict mode
+- TypeScript (tsgo 7.0.0-dev.20260128.1) with strict mode
 
 **Key Interfaces and APIs**:
 
@@ -7735,7 +7739,7 @@ flowchart LR
 | Unit Tests | Bun test runner 1.3.7 | Core logic, utilities |
 | E2E Tests | Playwright 1.43.1 | Application smoke tests |
 | Lint Checks | ESLint 8.57.0 | Code quality standards |
-| Type Checking | TypeScript 5.4.5 | Static type analysis |
+| Type Checking | tsgo 7.0.0-dev.20260128.1 | Static type analysis |
 
 ##### E2E test monitoring
 
@@ -7986,7 +7990,7 @@ flowchart TB
         end
         
         subgraph StaticAnalysisLayer["Static Analysis Layer"]
-            TSCheck["TypeScript 5.4.5<br/>Type Checking"]
+            TSCheck["tsgo 7.0.0-dev.20260128.1<br/>Type Checking"]
             ESLint["ESLint 8.57.0<br/>Linting"]
             Prettier["Prettier 3.2.5<br/>Formatting"]
         end
@@ -8019,7 +8023,7 @@ flowchart TB
 | Playwright | 1.43.1 | E2E testing for Electron applications | `test/e2e/*.test.ts` |
 | Bun `mock.module` | 1.3.7 | Module mocking and dependency injection | `mock.module()` |
 | Biome | 2.3.13 | Static analysis and formatting | `biome.json` |
-| TypeScript | 5.4.5 | Static type checking | `tsconfig.base.json` |
+| tsgo (TypeScript native preview) | 7.0.0-dev.20260128.1 | Static type checking | `tsconfig.base.json` |
 | CodeQL | v3 | Security vulnerability scanning | `codeql-analysis.yml` |
 | Dependabot | v2 | Dependency update automation | `dependabot.yml` |
 
@@ -9824,7 +9828,7 @@ flowchart TB
     end
     
     subgraph BuildPipeline["Build Pipeline"]
-        TSC["TypeScript Compiler<br/>tsc 5.4.5"]
+        TSGO["TypeScript Compiler<br/>tsgo 7.0.0-dev.20260128.1"]
         Webpack["Webpack 5.91.0<br/>Module Bundler"]
         Babel["Babel 7.24.x<br/>Transpilation"]
         Terser["Terser 5.30.3<br/>Minification"]
@@ -9858,7 +9862,7 @@ flowchart TB
 
 | Tool | Version | Purpose | Configuration File |
 |------|---------|---------|-------------------|
-| **TypeScript** | 5.4.5 | Type checking and transpilation | `tsconfig.base.json` |
+| **tsgo (TypeScript native preview)** | 7.0.0-dev.20260128.1 | Type checking and transpilation | `tsconfig.base.json` |
 | **Webpack** | 5.91.0 | Module bundling with multiple configurations | `webpack.config.ts` |
 | **Babel** | 7.24.x | JavaScript transpilation and JSX transformation | Webpack integration |
 | **Terser** | 5.30.3 | Production JavaScript minification | Webpack integration |
@@ -9880,8 +9884,8 @@ Velocetty defines three distinct Webpack configurations in `webpack.config.ts` f
 |--------|---------|---------|
 | `build` | `bun run build:webpack && bun run build:ts` | Full production build |
 | `build:webpack` | `webpack --config webpack.config.ts` | Webpack bundle generation |
-| `build:ts` | `tsc --build` | TypeScript compilation |
-| `dev` | `webpack --watch` + `tsc --watch` | Development watch mode |
+| `build:ts` | `tsgo --build` | TypeScript compilation |
+| `dev` | `webpack --watch` + `tsgo --watch` | Development watch mode |
 | `dist` | `bun run build && electron-builder` | Build + package for distribution |
 
 #### 8.2.5 V8 snapshot optimization
@@ -10167,7 +10171,7 @@ flowchart LR
 flowchart TB
     subgraph QualityGates["Quality Gates Pipeline"]
         Gate1["Gate 1: Lint<br/>ESLint 8.57.0"]
-        Gate2["Gate 2: Type Check<br/>TypeScript 5.4.5"]
+        Gate2["Gate 2: Type Check<br/>tsgo 7.0.0-dev.20260128.1"]
         Gate3["Gate 3: Unit Tests<br/>Bun test runner"]
         Gate4["Gate 4: Build<br/>Webpack + electron-builder"]
         Gate5["Gate 5: E2E Tests<br/>Playwright 1.43.1"]
@@ -10195,7 +10199,7 @@ flowchart TB
 | Quality Gate | Tool | Failure Action |
 |--------------|------|----------------|
 | Lint | ESLint 8.57.0 + Prettier 3.2.5 | Job fails, PR blocked |
-| Type Check | TypeScript 5.4.5 | Build fails |
+| Type Check | tsgo 7.0.0-dev.20260128.1 | Build fails |
 | Unit Tests | Bun test runner 1.3.7 | Job fails, PR blocked |
 | Build | Webpack + electron-builder | Job fails |
 | E2E Tests | Playwright 1.43.1 | Job fails, screenshot captured |

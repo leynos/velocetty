@@ -163,7 +163,7 @@ browser‑only runtime.
 - **Project scripts (Bun)**:
   - `fmt`: `bunx biome format --write .`
   - `lint`: `bunx biome ci .`
-  - `check:types`: `tsc --noEmit`
+  - `check:types`: `tsgo --project tsconfig.typecheck.json`
   - `dev`: `vite`
   - `build`: `vite build`
   - `preview`: `vite preview`
@@ -198,7 +198,7 @@ Use a strict `tsconfig.json` suitable for browser builds:
 - `verbatimModuleSyntax: true` (and use `import type` / `export type`)
 - `moduleResolution: "bundler"` (lets Vite resolve modern packages)
 - `lib`: include only what you need (e.g., `dom`, `dom.iterable`, `es2022`)
-- Do not emit from `tsc` in app packages (`noEmit: true`); Vite handles
+- Do not emit from `tsgo` in app packages (`noEmit: true`); Vite handles
   emission.
 
 **Order**: Place JSDoc comments above declarations and above any decorators.
