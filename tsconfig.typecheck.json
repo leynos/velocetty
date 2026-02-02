@@ -5,6 +5,6 @@
     "noEmit": true,
     "strict": false
   },
-  "include": ["./app/", "./lib/", "./test/", "./cli/", "./typings/"],
+  "include": ["./app/", "./lib/", "./cli/", "./typings/"],
   "exclude": ["./dist/", "./node_modules/", "./target/"]
 }
