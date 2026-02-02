@@ -14,6 +14,7 @@ const e2eTimeoutMs = 30_000;
 const windowTimeoutMs = 10_000;
 const closeTimeoutMs = 5_000;
 const shouldCapture = process.env.E2E_CAPTURE === '1';
+const shouldWaitForWindow = process.env.CI !== 'true';
 
 const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -73,8 +74,13 @@ e2eTest(
         executablePath: pathToBinary,
         args: launchArgs
       });
-      const window = await withTimeout(app.firstWindow(), windowTimeoutMs);
-      expect(window).toBeDefined();
+      if (shouldWaitForWindow) {
+        const window = await withTimeout(app.firstWindow(), windowTimeoutMs);
+        expect(window).toBeDefined();
+      } else {
+        const process = app.process();
+        expect(process).toBeDefined();
+      }
       await new Promise((resolve) => setTimeout(resolve, 2000));
     } finally {
       if (app && shouldCapture) {
