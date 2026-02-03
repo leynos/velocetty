@@ -90,8 +90,8 @@ without calling `tsc`, and the roadmap entry 1.4.6 is marked done.
 
 ## Surprises & Discoveries
 
-- Observation: `make markdownlint` initially failed due to legacy Markdown
-  formatting patterns.
+- Observation: the Markdownlint make target initially failed due to legacy
+  Markdown formatting patterns.
   Evidence: `/tmp/markdownlint-velocetty-1-4-6-replace-tsc-with-tsgo.out`
   Impact: Updated Markdownlint configuration and templates to restore a clean
   validation run.
