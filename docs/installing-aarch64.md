@@ -84,9 +84,9 @@ bun run build:hyper-app
 
 ### TypeScript errors inside `node_modules`
 
-If `tsgo --build --watch` reports errors from `@types/node` or other
-dependencies, ensure the dependencies are up to date and that `skipLibCheck`
-is enabled in `tsconfig.base.json`.
+If `tsgo --project tsconfig.json --watch` reports errors from `@types/node` or
+other dependencies, ensure the dependencies are up to date and that
+`skipLibCheck` is enabled in `tsconfig.base.json`.
 
 ### `Invalid header: Does not start with Cr24`
 

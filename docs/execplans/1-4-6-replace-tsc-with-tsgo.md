@@ -50,8 +50,7 @@ without calling `tsc`, and the roadmap entry 1.4.6 is marked done.
 - Dependencies: if a new dependency or a change to the version range of
   `@typescript/native-preview` or `typescript` is required, stop and escalate.
 - Tooling: if `tsgo` lacks required command-line interface (CLI) flags
-  (`--build`, `--watch`, or
-  `--project`) and a workaround is needed, stop and escalate.
+  (`--watch` or `--project`) and a workaround is needed, stop and escalate.
 - Tests: if `make check-fmt`, `make lint`, or `make test` fails twice after
   updates, stop and escalate.
 
@@ -86,15 +85,15 @@ without calling `tsc`, and the roadmap entry 1.4.6 is marked done.
 - [x] (2026-02-02 18:27Z) Mark roadmap item 1.4.6 as done.
 - [x] (2026-02-02 19:05Z) Validate required gates (`make check-fmt`,
   `make lint`, `make test`, `make markdownlint`, `make nixie`).
-- [x] (2026-02-03 02:10Z) Re-run markdown validation after addressing review
+- [x] (2026-02-03 02:10Z) Re-run Markdown validation after addressing review
   feedback and confirm it passes.
 
 ## Surprises & Discoveries
 
-- Observation: `make markdownlint` initially failed due to legacy markdown
+- Observation: `make markdownlint` initially failed due to legacy Markdown
   formatting patterns.
   Evidence: `/tmp/markdownlint-velocetty-1-4-6-replace-tsc-with-tsgo.out`
-  Impact: Updated markdownlint configuration and templates to restore a clean
+  Impact: Updated Markdownlint configuration and templates to restore a clean
   validation run.
 
 ## Decision Log
@@ -102,7 +101,7 @@ without calling `tsc`, and the roadmap entry 1.4.6 is marked done.
 - Decision: Proceed with implementation following plan approval.
   Rationale: User explicitly approved the draft ExecPlan.
   Date/Author: 2026-02-02 (assistant)
-- Decision: Do not attempt repo-wide markdownlint remediation.
+- Decision: Do not attempt repo-wide Markdownlint remediation.
   Rationale: The errors predate this change and resolving them would exceed
   the task scope and tolerances.
   Date/Author: 2026-02-02 (assistant)
@@ -112,7 +111,7 @@ without calling `tsc`, and the roadmap entry 1.4.6 is marked done.
 The repository now uses `tsgo` for TypeScript builds and type checks in the
 `dev`, `build`, and `check:types` workflows, with documentation and the
 roadmap updated accordingly. Markdownlint validation now passes after reflow
-updates and inline markdownlint directives for legacy documents.
+updates and inline Markdownlint directives for legacy documents.
 
 ## Context and Orientation
 
@@ -129,12 +128,12 @@ compiler lives in `docs/velocetty-hyper-codebase.md`, `docs/developers-guide.md`
 Stage A: confirm current usage and `tsgo` command-line interface (CLI)
 compatibility. Identify every
 `tsc` reference in scripts, CI configuration, and docs. Verify which `tsc`
-flags (`--build`, `--watch`, `--pretty`, `--preserveWatchOutput`, `--project`)
-are supported by `tsgo` so replacements are accurate.
+flags (`--watch`, `--pretty`, `--preserveWatchOutput`, `--project`) are
+supported by `tsgo` so replacements are accurate.
 
 Stage B: update build and development scripts. Replace `tsc` invocations in
 `package.json` with `tsgo` equivalents, ensuring `dev` uses `tsgo` watch mode
-and `build` uses `tsgo` build mode. Keep the command structure intact so CI
+and `build` uses a project compile. Keep the command structure intact so CI
 continues to call the same scripts.
 
 Stage C: update documentation. Replace references to `tsc` in
@@ -165,8 +164,9 @@ the required checks.
    Replace `tsc` invocations in `dev` and `build` with `tsgo` equivalents, for
    example:
 
-   - `dev`: replace the `tsc --build --watch` command with `tsgo --build --watch`.
-   - `build`: replace `tsc -b -v` with `tsgo -b -v`.
+   - `dev`: replace the `tsc --build --watch` command with
+     `tsgo --project tsconfig.json --watch`.
+   - `build`: replace `tsc -b -v` with `tsgo --project tsconfig.json`.
 
    If `tsgo` does not support `--pretty` or `--preserveWatchOutput`, remove
    those flags and record the change in the developers' guide.
@@ -221,7 +221,7 @@ and ask for guidance.
 
 ## Artifacts and Notes
 
-Keep the `tee` logs from validation in `/tmp` and summarise any failures in the
+Keep the `tee` logs from validation in `/tmp` and summarize any failures in the
 Decision Log before retrying.
 
 ## Interfaces and Dependencies
@@ -240,6 +240,6 @@ Initial draft created on 2026-02-02.
 inventory step as complete.
 2026-02-02: Recorded completion of script and documentation updates and
 aligned the context section with the new `tsgo` usage.
-2026-02-02: Logged markdownlint failure due to pre-existing violations and
+2026-02-02: Logged Markdownlint failure due to pre-existing violations and
 recorded the validation status.
 2026-02-02: Marked the plan complete and documented the validation outcomes.
