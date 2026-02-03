@@ -1,4 +1,5 @@
 /** @file Renders the tabs strip and new tab controls. */
+import type React from 'react';
 import {forwardRef} from 'react';
 
 import type {TabsProps} from '../../typings/hyper';
@@ -10,7 +11,7 @@ import Tab_ from './tab';
 const Tab = decorate(Tab_, 'Tab');
 const isMac = /Mac/.test(navigator.userAgent);
 
-const Tabs = forwardRef<HTMLElement, TabsProps>((props, ref) => {
+const Tabs = forwardRef(function Tabs(props: TabsProps, ref: React.ForwardedRef<HTMLElement>) {
   const {tabs = [], borderColor, onChange, onClose, fullScreen} = props;
 
   const hide = !isMac && tabs.length === 1;
@@ -48,7 +49,6 @@ const Tabs = forwardRef<HTMLElement, TabsProps>((props, ref) => {
       ) : null}
       <DropdownButton {...props} tabsVisible={tabs.length > 1} />
       {props.customChildren}
-
       <style jsx>{`
         .tabs_nav {
           font-size: 12px;

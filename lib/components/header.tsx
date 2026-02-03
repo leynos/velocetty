@@ -8,7 +8,7 @@ import Tabs_ from './tabs';
 
 const Tabs = decorate(Tabs_, 'Tabs');
 
-const Header = forwardRef<HTMLElement, HeaderProps>((props, ref) => {
+const Header = forwardRef(function Header(props: HeaderProps, ref: React.ForwardedRef<HTMLElement>) {
   const [headerMouseDownWindowX, setHeaderMouseDownWindowX] = useState<number>(0);
   const [headerMouseDownWindowY, setHeaderMouseDownWindowY] = useState<number>(0);
 

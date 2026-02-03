@@ -74,7 +74,7 @@ Scope notes:
   `useExhaustiveDependencies`, and the accessibility (a11y) rule set. Track
   each rule's enablement date in `docs/velocetty-hyper-codebase.md`. Tracking
   issue: BIOME-001 in `docs/tracking-issues.md`.
-- [ ] 1.4.9. Migrate to React 18.3 (see adr-003)
+- [x] 1.4.9. Migrate to React 18.3 (see adr-003)
 - [ ] 1.4.10. Migrate to React 19.x (see adr-003)
 - [ ] 1.4.11. Migrate to Electron 28 (see adr-004)
 - [ ] 1.4.12. Migrate to Electron 34 (see adr-004)

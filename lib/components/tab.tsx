@@ -4,7 +4,7 @@ import {forwardRef} from 'react';
 
 import type {TabProps} from '../../typings/hyper';
 
-const Tab = forwardRef<HTMLLIElement, TabProps>((props, ref) => {
+const Tab = forwardRef(function Tab(props: TabProps, ref: React.ForwardedRef<HTMLLIElement>) {
   const handleClick = (event: React.MouseEvent) => {
     const isLeftClick = event.nativeEvent.which === 1;
 
