@@ -1,4 +1,7 @@
-# Technical design: command system, configuration, settings, vertical tabs, and remote architecture
+# Technical design: command system, settings, tabs, and architecture
+
+<!-- markdownlint-disable MD012 MD013 -->
+<!-- Legacy formatting retained; reflow once content is revised. -->
 
 ## Summary
 

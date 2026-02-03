@@ -1,8 +1,14 @@
-<!-- Hi there! Thanks for submitting a PR! We're excited to see what you've got for us.
+<!-- markdownlint-disable MD041 -->
+<!--
+Thanks for submitting a pull request (PR). This template helps reviewers
+understand the status and context of the change set.
 
-- To help whoever reviews your PR, it'd be extremely helpful for you to list whether your PR is ready to be merged,
-If there's anything left to do and if there are any related PRs
-- It'd also be extremely helpful to enable us to update your PR incase we need to rebase or what-not by checking `Allow edits from maintainers`
-- If your PR changes some API, please make a PR for hyper website too: https://github.com/vercel/hyper-site.
+- List whether the PR is ready to be merged, any remaining work, and any
+  related PRs.
+- Allow maintainers to edit the PR in case a rebase is required by checking
+  `Allow edits from maintainers`.
+- If the PR changes some API, open a PR for the Hyper website too:
+  https://github.com/vercel/hyper-site.
 
-Thanks, again! -->
+Thanks!
+-->
