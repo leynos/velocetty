@@ -149,7 +149,7 @@ const Header = forwardRef(function Header(props: HeaderProps, ref: React.Forward
       />
       {props.customChildren}
 
-      <style jsx>{`
+      <style jsx="true">{`
         .header_header {
           position: fixed;
           top: 1px;

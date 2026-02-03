@@ -126,7 +126,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
       })}
       <div style={{display: dragging ? 'block' : 'none'}} className="splitpane_shim" />
 
-      <style jsx>{`
+      <style jsx="true">{`
         .splitpane_panes {
           display: flex;
           flex: 1;

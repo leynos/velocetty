@@ -49,7 +49,7 @@ const Tabs = forwardRef(function Tabs(props: TabsProps, ref: React.ForwardedRef<
       ) : null}
       <DropdownButton {...props} tabsVisible={tabs.length > 1} />
       {props.customChildren}
-      <style jsx>{`
+      <style jsx="true">{`
         .tabs_nav {
           font-size: 12px;
           height: 34px;

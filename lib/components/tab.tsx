@@ -51,7 +51,7 @@ const Tab = forwardRef(function Tab(props: TabProps, ref: React.ForwardedRef<HTM
         {props.customChildren}
       </li>
 
-      <style jsx>{`
+      <style jsx="true">{`
         .tab_tab {
           color: #ccc;
           border-color: #ccc;

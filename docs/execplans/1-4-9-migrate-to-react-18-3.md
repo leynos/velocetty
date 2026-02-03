@@ -91,6 +91,9 @@ roadmap entry 1.4.9 is marked done.
   `make lint`, and `make test`.
 - [x] (2026-02-03 20:23Z) Re-ran documentation formatting and Mermaid
   validation (`bun fmt`, `make markdownlint`, `make nixie`).
+- [x] (2026-02-03 21:02Z) Cleared remaining test warnings by switching to
+  `React.act`, enabling the act environment in Happy DOM, and normalising
+  `styled-jsx` attributes.
 - [x] (2026-02-03 20:33Z) Committed changes and closed out the ExecPlan.
 
 ## Surprises & Discoveries
@@ -131,8 +134,8 @@ restoring `styled-jsx` blocks, adding a local typings shim for the `jsx` and
 parsing. Documentation was updated to reflect the new React version and the
 roadmap entry is marked done. All validation gates (`bun install`, `make build`,
 `make check-fmt`, `make lint`, `make test`, `make markdownlint`, `make nixie`)
-completed successfully; unit tests still emit the pre-existing `act` and `jsx`
-warnings.
+completed successfully, and unit test warnings were resolved for the React
+18.3 upgrade.
 
 ## Context and Orientation
 

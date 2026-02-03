@@ -5,7 +5,7 @@
 
 declare namespace React {
   interface HTMLAttributes<T> {
-    jsx?: boolean | undefined;
-    global?: boolean | undefined;
+    jsx?: boolean | string | undefined;
+    global?: boolean | string | undefined;
   }
 }

@@ -550,7 +550,7 @@ export default class Term extends React.PureComponent<
             font={this.props.uiFontFamily}
           />
         ) : null}
-        <style jsx>{`
+        <style jsx="true">{`
           .term_fit {
             display: block;
             width: 100%;
