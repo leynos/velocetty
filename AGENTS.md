@@ -163,7 +163,7 @@ browser‑only runtime.
 - **Project scripts (Bun)**:
   - `fmt`: `bunx biome format --write .`
   - `lint`: `bunx biome ci .`
-  - `check:types`: `tsgo --project tsconfig.typecheck.json`
+  - `check:types`: `bunx tsgo --project tsconfig.typecheck.json`
   - `dev`: `vite`
   - `build`: `vite build`
   - `preview`: `vite preview`

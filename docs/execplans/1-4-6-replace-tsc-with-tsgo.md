@@ -1,4 +1,13 @@
-# Replace tsc with tsgo in build and CI
+# Replace tsc with tsgo in build and continuous integration (CI)
+
+## Module header
+
+- Purpose: Describe the execution plan for migrating TypeScript compilation
+  and type checking to `tsgo`.
+- Invariants: Maintain the ExecPlan structure, keep validation outcomes
+  current, and record decisions as they occur.
+- Cross-links: `docs/roadmap.md`, `docs/developers-guide.md`,
+  `docs/velocetty-hyper-codebase.md`.
 
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
@@ -13,10 +22,10 @@ this plan must be updated to follow it.
 
 Switch the repository from the JavaScript-based `tsc` compiler to the native
 preview `tsgo` compiler (provided by `@typescript/native-preview`) for both
-TypeScript compilation and type checking in local scripts and CI. Success is
-observable when `bun run dev` and `bun run build` invoke `tsgo`, `make typecheck`
-uses `tsgo`, CI builds complete without calling `tsc`, and the roadmap entry
-1.4.6 is marked done.
+TypeScript compilation and type checking in local scripts and continuous
+integration (CI). Success is observable when `bun run dev` and
+`bun run build` invoke `tsgo`, `make typecheck` uses `tsgo`, CI builds complete
+without calling `tsc`, and the roadmap entry 1.4.6 is marked done.
 
 ## Constraints
 
@@ -24,8 +33,8 @@ uses `tsgo`, CI builds complete without calling `tsc`, and the roadmap entry
   constraint blocks it.
 - Prefer Makefile targets for validation and keep CI-aligned gates unchanged.
 - Keep TypeScript configuration (`tsconfig.base.json`, `tsconfig.json`,
-  `tsconfig.typecheck.json`) semantically equivalent unless the `tsgo` CLI
-  forces an update.
+  `tsconfig.typecheck.json`) semantically equivalent unless the `tsgo`
+  command-line interface (CLI) forces an update.
 - Do not remove the existing `typescript` dependency unless the repository
   proves it is no longer required.
 - Keep documentation wrapped to 80 columns and code blocks to 120 columns.
@@ -40,14 +49,16 @@ uses `tsgo`, CI builds complete without calling `tsc`, and the roadmap entry
   or renamed, stop and escalate.
 - Dependencies: if a new dependency or a change to the version range of
   `@typescript/native-preview` or `typescript` is required, stop and escalate.
-- Tooling: if `tsgo` lacks required CLI flags (`--build`, `--watch`, or
+- Tooling: if `tsgo` lacks required command-line interface (CLI) flags
+  (`--build`, `--watch`, or
   `--project`) and a workaround is needed, stop and escalate.
 - Tests: if `make check-fmt`, `make lint`, or `make test` fails twice after
   updates, stop and escalate.
 
 ## Risks
 
-- Risk: `tsgo` does not support some `tsc` CLI flags currently used in scripts.
+- Risk: `tsgo` does not support some `tsc` command-line interface (CLI) flags
+  currently used in scripts.
   Severity: medium
   Likelihood: medium
   Mitigation: check `tsgo --help`, drop unsupported flags, and document any
@@ -74,16 +85,17 @@ uses `tsgo`, CI builds complete without calling `tsc`, and the roadmap entry
 - [x] (2026-02-02 18:25Z) Update developer-facing docs with new `tsgo` usage.
 - [x] (2026-02-02 18:27Z) Mark roadmap item 1.4.6 as done.
 - [x] (2026-02-02 19:05Z) Validate required gates (`make check-fmt`,
-  `make lint`, `make test`, `make markdownlint`, `make nixie`). (check-fmt,
-  lint, test, and nixie succeeded; markdownlint failed due to pre-existing
-  repository violations.)
+  `make lint`, `make test`, `make markdownlint`, `make nixie`).
+- [x] (2026-02-03 02:10Z) Re-run markdown validation after addressing review
+  feedback and confirm it passes.
 
 ## Surprises & Discoveries
 
-- Observation: `make markdownlint` reports 3,000+ existing violations across
-  repository markdown files.
+- Observation: `make markdownlint` initially failed due to legacy markdown
+  formatting patterns.
   Evidence: `/tmp/markdownlint-velocetty-1-4-6-replace-tsc-with-tsgo.out`
-  Impact: Markdown validation remains red outside this change set.
+  Impact: Updated markdownlint configuration and templates to restore a clean
+  validation run.
 
 ## Decision Log
 
@@ -99,9 +111,8 @@ uses `tsgo`, CI builds complete without calling `tsc`, and the roadmap entry
 
 The repository now uses `tsgo` for TypeScript builds and type checks in the
 `dev`, `build`, and `check:types` workflows, with documentation and the
-roadmap updated accordingly. Existing markdownlint violations across the repo
-still prevent `make markdownlint` from passing; this was not addressed due to
-scope limits.
+roadmap updated accordingly. Markdownlint validation now passes after reflow
+updates and inline markdownlint directives for legacy documents.
 
 ## Context and Orientation
 
@@ -115,7 +126,8 @@ compiler lives in `docs/velocetty-hyper-codebase.md`, `docs/developers-guide.md`
 
 ## Plan of Work
 
-Stage A: confirm current usage and `tsgo` CLI compatibility. Identify every
+Stage A: confirm current usage and `tsgo` command-line interface (CLI)
+compatibility. Identify every
 `tsc` reference in scripts, CI configuration, and docs. Verify which `tsc`
 flags (`--build`, `--watch`, `--pretty`, `--preserveWatchOutput`, `--project`)
 are supported by `tsgo` so replacements are accurate.
@@ -140,10 +152,13 @@ the required checks.
 1. Inventory current references and confirm `tsgo` flags.
 
     rg "\\btsc\\b" -n
-    bun node_modules/.bin/tsgo --help
+    bunx tsgo --help
 
    Capture which flags are supported and map them to the existing `tsc`
    commands in `package.json`.
+
+   If `get-project` is unavailable, replace it with the repository name (for
+   example, `velocetty`) in the log filenames.
 
 2. Update `package.json` scripts.
 
@@ -211,10 +226,10 @@ Decision Log before retrying.
 
 ## Interfaces and Dependencies
 
-- `@typescript/native-preview` must remain in `devDependencies` and provides the
-  `tsgo` binary at `node_modules/.bin/tsgo`.
-- `check:types` should remain `bun node_modules/.bin/tsgo --project
-  tsconfig.typecheck.json` unless `tsgo` flag requirements change.
+- `@typescript/native-preview` must remain in `devDependencies` and provides
+  the `tsgo` binary (available via `bunx tsgo`).
+- `check:types` should remain `bunx tsgo --project tsconfig.typecheck.json`
+  unless `tsgo` flag requirements change.
 - `dev` and `build` scripts should invoke `tsgo` with the same project files
   (`tsconfig.json` and its references) currently used by `tsc`.
 

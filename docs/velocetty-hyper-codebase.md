@@ -1,5 +1,8 @@
 # Technical specification
 
+<!-- markdownlint-disable MD001 MD009 MD013 MD024 MD031 MD032 MD034 MD036 MD040 MD060 -->
+<!-- Legacy formatting retained; reflow tables, headings, and lists when revising content. -->
+
 ## Module header
 
 - Purpose: Describe the Velocetty codebase structure, requirements, and

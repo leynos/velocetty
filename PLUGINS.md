@@ -21,7 +21,7 @@ continue to use your main installation of Hyper with your day-to-day
 configuration. After the first run, Hyper, in dev mode, will have created a
 new `plugins` directory in your repository directory.
 
-### Setup your plugin
+### Set up your plugin
 
 Go to your recently created `<repository_root>/plugins/local` directory and
 create or clone your plugin repo. An even better method on macOS/Linux is to
@@ -151,9 +151,9 @@ handy if you have more than 9 items.
 
 ##### Renderer/Window
 
-Most of time, you'll want to execute some sort of handler in context of the
-renderer, like dispatching a Redux action. To trigger these handlers, you'll
-have to register them with the `registerCommands` Terms method.
+Most of the time, you'll want to execute some sort of handler in context of
+the renderer, like dispatching a Redux action. To trigger these handlers,
+you'll have to register them with the `registerCommands` Terms method.
 
 ```js
 this.terms.registerCommands({
@@ -167,9 +167,9 @@ this.terms.registerCommands({
 
 ##### Main process
 
-If there is no handler in the renderer for an existing command, an `rpc`
-message is emitted. If you want to execute a handler in main process you have
-to subscribe to a message, for example:
+If there is no handler in the renderer process for an existing command, an
+`rpc` message is emitted. If you want to execute a handler in the main
+process, you have to subscribe to a message; for example:
 
 ```js
 rpc.on('command pane:snapshot', () => {
@@ -184,7 +184,7 @@ template. Check the [Electron documentation][electron-menu-item] for more
 details about the different menu item types and options available.
 
 Be careful, a click handler will be executed on the main process. If you need
-to trigger a handler in the render process you need to use an `rpc` message
+to trigger a handler in the renderer process you need to use an `rpc` message
 like this:
 
 ```js
@@ -252,7 +252,7 @@ exports.decorateTerm = (Term, { React, notify }) => {
 
 ### Require Electron
 
-Hyper doesn't provide a reference to electron. However plugins can directly
+Hyper doesn't provide a reference to electron. However, plugins can directly
 require electron.
 
 ```js
@@ -272,7 +272,7 @@ is now required to use available configuration params that are passed down to
 `xterm.js`.
 
 If your plugin was deeply linked with the `hterm` API (even public methods), it
-certainly doesn't work anymore.
+certainly doesn't work any more.
 
 If your plugin needs some unavailable API to tweak `xterm.js`, please open an
 issue. We'll be happy to expose some existing `xterm.js` API or implement new

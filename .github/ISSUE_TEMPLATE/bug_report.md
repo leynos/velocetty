@@ -8,26 +8,26 @@ assignees: ''
 ---
 
 <!--
-  Hi there! Thank you for discovering and submitting an issue.
+  Hi there! Thanks for discovering and submitting an issue.
 
-  Before you submit this; let's make sure of a few things.
+  Before submitting, review a few things.
   Please make sure the following boxes are ticked if they are correct.
-  If not, please try and fulfill these first.
+  If not, please try and fulfil these first.
 -->
 
 <!-- Checked checkbox should look like this: [x] -->
-- [ ] I am on the [latest][hyper-latest] Hyper.app version.
-- [ ] I have searched the [issues][hyper-issues] of this repo and believe
-  that this is not a duplicate.
+- [ ] On the [latest][hyper-latest] Hyper.app version.
+- [ ] Searched the [issues][hyper-issues] of this repo and confirmed this is
+  not a duplicate.
 
 <!--
-  Once those are done, if you're able to fill in the following list with your
-  information, it'd be very helpful to whoever handles the issue.
+  Once those are done, filling in the following list with the requested
+  information is very helpful to whoever handles the issue.
 -->
 
 - **OS version and name**: <!-- Replace with version + name -->
 - **Hyper.app version**: <!-- Replace with version -->
-- **Link of a [Gist][gist] with the contents of your hyper.json**:
+- **Link of a [Gist][gist] with the contents of hyper.json**:
   <!-- Gist Link Here -->
 - **Relevant information from devtools** _(CMD+ALT+I on macOS, CTRL+SHIFT+I
   elsewhere)_:
@@ -37,7 +37,7 @@ assignees: ''
   Hyper.app without any add-ons or extras. Straight out of the box.) -->
 
 ## Issue
-<!-- Now feel free to write your issue, but please be descriptive! Thanks! -->
+<!-- Now add a description of the issue, but please be descriptive. Thanks! -->
 
 [gist]: https://gist.github.com/
 [hyper-issues]: https://github.com/vercel/hyper/issues
