@@ -8,7 +8,7 @@
     "preinstall": "bun bin/ensure-bun.cjs && bun bin/ensure-node-gyp-build.cjs",
     "start": "echo 'please run `bun run dev` in one tab and then `bun run app` in another one'",
     "app": "bun node_modules/cross-env/src/bin/cross-env.js ELECTRONMON_LOGLEVEL=error bun node_modules/electronmon/bin/cli.js target",
-    "dev": "bun node_modules/concurrently/dist/bin/concurrently.js -n \"Webpack,TypeScript\" -c \"cyan.bold,blue.bold\" \"bunx webpack-cli -w\" \"bunx tsgo --project tsconfig.json --pretty --watch --preserveWatchOutput\" -k",
+    "dev": "bun node_modules/concurrently/dist/bin/concurrently.js -n \"Webpack,TypeScript\" -c \"cyan.bold,blue.bold\" \"bunx webpack-cli -w\" \"bunx tsgo --build -v --pretty --watch --preserveWatchOutput\" -k",
     "build": "bun node_modules/cross-env/src/bin/cross-env.js NODE_ENV=production bunx webpack-cli && bunx tsgo --project tsconfig.json && bun node_modules/cross-env/src/bin/cross-env.js BABEL_ENV=production bun node_modules/@babel/cli/bin/babel.js target/renderer/bundle.js --out-file target/renderer/bundle.js --no-comments --minified",
     "build:hyper-app": "bunx webpack-cli --config-name hyper-app",
     "lint": "bun node_modules/@biomejs/biome/bin/biome check .",
