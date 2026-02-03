@@ -10741,8 +10741,8 @@ for different build targets:
 | -------- | --------- | --------- |
 | `build` | `bun run build:webpack && bun run build:ts` | Full production build |
 | `build:webpack` | `webpack --config webpack.config.ts` | Webpack bundle generation |
-| `build:ts` | `tsgo --project tsconfig.json` | TypeScript compilation |
-| `dev` | `webpack --watch` + `tsgo --project tsconfig.json --watch` | Development watch mode |
+| `build:ts` | `tsgo --build` | TypeScript compilation |
+| `dev` | `webpack --watch` + `tsgo --build --watch` | Development watch mode |
 | `dist` | `bun run build && electron-builder` | Build + package for distribution |
 
 #### 8.2.5 V8 snapshot optimization

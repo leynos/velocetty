@@ -50,7 +50,8 @@ without calling `tsc`, and the roadmap entry 1.4.6 is marked done.
 - Dependencies: if a new dependency or a change to the version range of
   `@typescript/native-preview` or `typescript` is required, stop and escalate.
 - Tooling: if `tsgo` lacks required command-line interface (CLI) flags
-  (`--watch` or `--project`) and a workaround is needed, stop and escalate.
+  (`--build`, `--watch`, or `--project`) and a workaround is needed, stop and
+  escalate.
 - Tests: if `make check-fmt`, `make lint`, or `make test` fails twice after
   updates, stop and escalate.
 
@@ -128,8 +129,8 @@ compiler lives in `docs/velocetty-hyper-codebase.md`, `docs/developers-guide.md`
 Stage A: confirm current usage and `tsgo` command-line interface (CLI)
 compatibility. Identify every
 `tsc` reference in scripts, CI configuration, and docs. Verify which `tsc`
-flags (`--watch`, `--pretty`, `--preserveWatchOutput`, `--project`) are
-supported by `tsgo` so replacements are accurate.
+flags (`--build`, `--watch`, `--pretty`, `--preserveWatchOutput`, `--project`)
+are supported by `tsgo` so replacements are accurate.
 
 Stage B: update build and development scripts. Replace `tsc` invocations in
 `package.json` with `tsgo` equivalents, ensuring `dev` uses `tsgo` watch mode
@@ -165,8 +166,8 @@ the required checks.
    example:
 
    - `dev`: replace the `tsc --build --watch` command with
-     `tsgo --project tsconfig.json --watch`.
-   - `build`: replace `tsc -b -v` with `tsgo --project tsconfig.json`.
+     `tsgo --build --watch`.
+   - `build`: replace `tsc -b -v` with `tsgo --build -v`.
 
    If `tsgo` does not support `--pretty` or `--preserveWatchOutput`, remove
    those flags and record the change in the developers' guide.

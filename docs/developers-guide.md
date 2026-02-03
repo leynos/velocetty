@@ -41,10 +41,9 @@ Type checking runs via `tsgo` and the shared `tsconfig.typecheck.json` project:
 - `make typecheck`
 - `bun run check:types`
 
-`tsgo` 7.0.0-dev.20260128.1 supports `--watch`, `--pretty`,
+`tsgo` 7.0.0-dev.20260128.1 supports `--build`, `--watch`, `--pretty`,
 `--preserveWatchOutput`, and `--project`; the `dev` and `build` scripts rely
-on those flags. Build mode via `--build` is not used in the native preview
-because project reference support is incomplete.
+on those flags.
 
 ## Tests
 
