@@ -10,18 +10,19 @@
   `docs/developers-guide.md`, `docs/velocetty-hyper-codebase.md`.
 
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+`Risks`, `Progress`, `Surprises & discoveries`, `Decision log`, and
+`Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
 No `PLANS.md` exists at the repository root as of 2026-02-03. If one is added,
 this plan must be updated to follow it.
 
-## Purpose / Big Picture
+## Purpose / big picture
 
 Upgrade the renderer stack from React 18.2 to React 18.3 (React and React DOM),
-keeping the incremental migration path towards React 19 described in ADR 003.
+keeping the incremental migration path towards React 19 described in
+Architecture Decision Record (ADR) 003.
 Success is observable when the repository installs with React 18.3 versions,
 all validation gates pass, documentation reflects the new versions, and the
 roadmap entry 1.4.9 is marked done.
@@ -39,7 +40,7 @@ roadmap entry 1.4.9 is marked done.
 - Ensure `bun install`, `make build`, `make check-fmt`, `make lint`, and
   `make test` succeed before marking the roadmap entry done.
 
-## Tolerances (Exception Triggers)
+## Tolerances (exception triggers)
 
 - Scope: if the change requires more than 18 files or more than 500 net lines,
   stop and escalate.
@@ -92,11 +93,11 @@ roadmap entry 1.4.9 is marked done.
 - [x] (2026-02-03 20:23Z) Re-ran documentation formatting and Mermaid
   validation (`bun fmt`, `make markdownlint`, `make nixie`).
 - [x] (2026-02-03 21:02Z) Cleared remaining test warnings by switching to
-  `React.act`, enabling the act environment in Happy DOM, and normalising
+  `React.act`, enabling the act environment in Happy DOM, and normalizing
   `styled-jsx` attributes.
 - [x] (2026-02-03 20:33Z) Committed changes and closed out the ExecPlan.
 
-## Surprises & Discoveries
+## Surprises & discoveries
 
 - Observation: `bun install` reported Bun 1.3.5 while the repo pins 1.3.7.
   Evidence: `/tmp/install-velocetty-1-4-9-migrate-to-react-18-3.out`.
@@ -106,12 +107,12 @@ roadmap entry 1.4.9 is marked done.
   `styled-jsx` style tags.
   Evidence: `make build` type errors before adding `typings/styled-jsx.d.ts`.
   Impact: Added a local typings shim to preserve the existing styling model.
-- Observation: Unit tests still emit `react-dom/test-utils` and `jsx` attribute
-  warnings.
+- Observation: Unit test warnings were resolved after switching to `React.act`
+  and marking the act environment in Happy DOM.
   Evidence: `/tmp/test-velocetty-1-4-9-migrate-to-react-18-3.out`.
-  Impact: Tests pass; warnings remain from existing test/runtime behaviour.
+  Impact: Tests pass without the earlier act or `jsx` attribute warnings.
 
-## Decision Log
+## Decision log
 
 - Decision: Follow ADR 003 and upgrade to React 18.3 before React 19.
   Rationale: ADR 003 explicitly specifies an incremental upgrade path.
@@ -125,19 +126,19 @@ roadmap entry 1.4.9 is marked done.
   changing runtime behaviour.
   Date/Author: 2026-02-03 (assistant)
 
-## Outcomes & Retrospective
+## Outcomes & retrospective
 
 React and React DOM are now on 18.3.1 across both manifests, with matching
 `@types` updates and a refreshed lockfile. Renderer styling remains intact by
 restoring `styled-jsx` blocks, adding a local typings shim for the `jsx` and
-`global` attributes, and keeping Babel's TypeScript preset aligned with TSX
-parsing. Documentation was updated to reflect the new React version and the
-roadmap entry is marked done. All validation gates (`bun install`, `make build`,
-`make check-fmt`, `make lint`, `make test`, `make markdownlint`, `make nixie`)
-completed successfully, and unit test warnings were resolved for the React
-18.3 upgrade.
+`global` attributes, and keeping Babel's TypeScript preset aligned with
+TypeScript JSX (TSX) parsing. Documentation was updated to reflect the new
+React version and the roadmap entry is marked done. All validation gates
+(`bun install`, `make build`, `make check-fmt`, `make lint`, `make test`,
+`make markdownlint`, `make nixie`) completed successfully, and unit test
+warnings were resolved for the React 18.3 upgrade.
 
-## Context and Orientation
+## Context and orientation
 
 React and React DOM are declared in both the repository root `package.json`
 (caret ranges used for most dependencies) and `app/package.json` (exact
@@ -148,7 +149,7 @@ versions and developer practices lives in `docs/velocetty-hyper-codebase.md`
 and `docs/developers-guide.md`. The roadmap entry 1.4.9 in `docs/roadmap.md`
 must be marked done after validation passes.
 
-## Plan of Work
+## Plan of work
 
 Stage A: confirm the target React 18.3.x versions. Query the registry for the
 latest 18.3.x versions of `react`, `react-dom`, and `@types` packages. Review
@@ -169,7 +170,7 @@ Stage D: validate and commit. Run the required formatting, linting, build, and
 test gates with logs captured via `tee`. Commit each logical change only after
 its gates pass.
 
-## Concrete Steps
+## Concrete steps
 
 1. Confirm target versions and scan for deprecated patterns.
 
@@ -242,7 +243,7 @@ its gates pass.
    - Commit 1: dependency manifest and lockfile updates.
    - Commit 2: documentation updates and roadmap change.
 
-## Validation and Acceptance
+## Validation and acceptance
 
 Quality criteria (done means all of the following are true):
 
@@ -255,20 +256,20 @@ Quality criteria (done means all of the following are true):
 - Documentation validators (`bun run fmt`, `make markdownlint`, `make nixie`)
   complete successfully after doc updates.
 
-## Idempotence and Recovery
+## Idempotence and recovery
 
 Most steps are safe to repeat. If `bun install` or `make build` fails, re-run
 after addressing the reported errors and confirm `bun.lock` remains consistent.
 If a validation gate fails, consult the corresponding log file in `/tmp/` and
 retry only after the underlying issue is fixed.
 
-## Artifacts and Notes
+## Artifacts and notes
 
 Store command outputs in `/tmp/*-velocetty-$(git branch --show).out` to retain
 proof of successful validation. Include any notable warnings in the
 `Surprises & Discoveries` section.
 
-## Interfaces and Dependencies
+## Interfaces and dependencies
 
 React-related dependencies that must be aligned to 18.3.x:
 

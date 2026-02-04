@@ -3,9 +3,11 @@
  */
 /// <reference types="react" />
 
-declare namespace React {
-  interface HTMLAttributes<T> {
-    jsx?: boolean | string | undefined;
-    global?: boolean | string | undefined;
+declare namespace JSX {
+  interface IntrinsicElements {
+    style: React.DetailedHTMLProps<React.StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement> & {
+      jsx?: boolean | string | undefined;
+      global?: boolean | string | undefined;
+    };
   }
 }

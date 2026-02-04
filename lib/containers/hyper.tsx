@@ -120,21 +120,21 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
 
       {props.customChildren}
 
-      {`
-          .hyper_main {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            border: 1px solid #333;
-          }
+      <style jsx="true">{`
+        .hyper_main {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          border: 1px solid #333;
+        }
 
-          .hyper_mainRounded {
-            border-radius: 10.5px;
-            overflow: hidden;
-          }
-        `}
+        .hyper_mainRounded {
+          border-radius: 10.5px;
+          overflow: hidden;
+        }
+      `}</style>
 
       {/*
         Add custom CSS to Hyper.
