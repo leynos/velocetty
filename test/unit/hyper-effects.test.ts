@@ -1,8 +1,6 @@
 /** @file Verifies Hyper side effects for key bindings and focus. */
-import React from 'react';
+import React, {act} from 'react';
 import {createRoot} from 'react-dom/client';
-// react-dom/test-utils is required until React 18.3+ exposes act from react.
-import {act} from 'react-dom/test-utils';
 
 import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
@@ -141,7 +139,9 @@ test.serial('Hyper attaches key listeners on mount and config updates', async ()
 
   expect(registerCalls).toBe(2);
 
-  root.unmount();
+  await act(async () => {
+    root.unmount();
+  });
   cleanup();
 });
 
@@ -177,6 +177,8 @@ test.serial('Hyper focuses the active session when it changes', async () => {
 
   expect(focusCalls).toBe(1);
 
-  root.unmount();
+  await act(async () => {
+    root.unmount();
+  });
   cleanup();
 });

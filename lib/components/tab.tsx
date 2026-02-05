@@ -4,7 +4,7 @@ import {forwardRef} from 'react';
 
 import type {TabProps} from '../../typings/hyper';
 
-const Tab = forwardRef<HTMLLIElement, TabProps>((props, ref) => {
+const Tab = forwardRef(function Tab(props: TabProps, ref: React.ForwardedRef<HTMLLIElement>) {
   const handleClick = (event: React.MouseEvent) => {
     const isLeftClick = event.nativeEvent.which === 1;
 
@@ -51,7 +51,7 @@ const Tab = forwardRef<HTMLLIElement, TabProps>((props, ref) => {
         {props.customChildren}
       </li>
 
-      <style jsx>{`
+      <style jsx="true">{`
         .tab_tab {
           color: #ccc;
           border-color: #ccc;

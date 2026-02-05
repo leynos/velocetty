@@ -4,7 +4,7 @@ import sum from 'lodash/sum';
 
 import type {SplitPaneProps} from '../../typings/hyper';
 
-const SplitPane = forwardRef<HTMLDivElement, SplitPaneProps>((props, ref) => {
+const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const dragPanePosition = useRef<number>(0);
   const dragTarget = useRef<HTMLDivElement | null>(null);
   const paneIndex = useRef<number>(0);
@@ -126,7 +126,7 @@ const SplitPane = forwardRef<HTMLDivElement, SplitPaneProps>((props, ref) => {
       })}
       <div style={{display: dragging ? 'block' : 'none'}} className="splitpane_shim" />
 
-      <style jsx>{`
+      <style jsx="true">{`
         .splitpane_panes {
           display: flex;
           flex: 1;

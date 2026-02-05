@@ -5,8 +5,8 @@
  * while rendering the header, terms, and notification surfaces for the app.
  * Used as the top-level React container in the renderer window.
  */
-// biome-ignore lint/correctness/noUnusedImports: React value is required for the current JSX runtime.
-import React, {forwardRef, useEffect, useRef} from 'react';
+import type React from 'react';
+import {forwardRef, useEffect, useRef} from 'react';
 
 import Mousetrap from 'mousetrap';
 import type {MousetrapInstance} from 'mousetrap';
@@ -24,7 +24,7 @@ import TermsContainer from './terms';
 
 const isMac = /Mac/.test(navigator.userAgent);
 
-const Hyper = forwardRef<HTMLDivElement, HyperProps>((props, ref) => {
+const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const mousetrap = useRef<MousetrapInstance | null>(null);
   const terms = useRef<Terms | null>(null);
 
@@ -120,23 +120,21 @@ const Hyper = forwardRef<HTMLDivElement, HyperProps>((props, ref) => {
 
       {props.customChildren}
 
-      <style jsx>
-        {`
-          .hyper_main {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            border: 1px solid #333;
-          }
+      <style jsx="true">{`
+        .hyper_main {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          border: 1px solid #333;
+        }
 
-          .hyper_mainRounded {
-            border-radius: 10.5px;
-            overflow: hidden;
-          }
-        `}
-      </style>
+        .hyper_mainRounded {
+          border-radius: 10.5px;
+          overflow: hidden;
+        }
+      `}</style>
 
       {/*
         Add custom CSS to Hyper.

@@ -1,12 +1,18 @@
 {
   "presets": [
     [
+      "@babel/typescript",
+      {
+        "isTSX": true,
+        "allExtensions": true
+      }
+    ],
+    [
       "@babel/react",
       {
         "runtime": "automatic"
       }
-    ],
-    "@babel/typescript"
+    ]
   ],
   "plugins": [
     [

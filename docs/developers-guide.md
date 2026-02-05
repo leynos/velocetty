@@ -22,6 +22,13 @@ must follow locally.
   type-checking tasks.
 - Keep documentation wrapped to 80 columns and code blocks to 120 columns.
 
+## React version alignment
+
+The renderer runtime depends on React in both the root `package.json` and the
+packaged app manifest in `app/package.json`. When upgrading React, update both
+manifests in the same change and keep the app manifest on exact versions to
+avoid duplicate React instances in plugins.
+
 ## Formatting and linting
 
 Run the standard gates before opening a pull request:

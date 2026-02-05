@@ -1,8 +1,6 @@
 /** @file Exercises notification timing and dismissal behaviour. */
-import React from 'react';
+import React, {act} from 'react';
 import {createRoot} from 'react-dom/client';
-// react-dom/test-utils is required until React 18.3+ exposes act from react.
-import {act} from 'react-dom/test-utils';
 
 import {expect, test} from 'bun:test';
 
@@ -129,7 +127,9 @@ test.serial('Notification auto-dismisses after the timeout on mount', async () =
     expect(dismissCount).toBe(1);
   } finally {
     timers.restore();
-    root.unmount();
+    await act(async () => {
+      root.unmount();
+    });
     cleanup();
   }
 });
@@ -182,7 +182,9 @@ test.serial('Notification resets the timer when text changes', async () => {
     expect(dismissCount).toBe(1);
   } finally {
     timers.restore();
-    root.unmount();
+    await act(async () => {
+      root.unmount();
+    });
     cleanup();
   }
 });

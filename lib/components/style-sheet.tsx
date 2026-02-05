@@ -1,13 +1,14 @@
 /** @file Injects global scrollbar styles based on theme colours. */
+import type React from 'react';
 import {forwardRef} from 'react';
 
 import type {StyleSheetProps} from '../../typings/hyper';
 
-const StyleSheet = forwardRef<HTMLStyleElement, StyleSheetProps>((props, ref) => {
+const StyleSheet = forwardRef(function StyleSheet(props: StyleSheetProps, ref: React.ForwardedRef<HTMLStyleElement>) {
   const {borderColor} = props;
 
   return (
-    <style jsx global ref={ref}>{`
+    <style jsx="true" global="true" ref={ref}>{`
       ::-webkit-scrollbar {
         width: 5px;
       }

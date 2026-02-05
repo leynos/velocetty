@@ -27,6 +27,9 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
   const previousWindow = globalThis.window;
   const previousDocument = globalThis.document;
   const previousNavigator = globalThis.navigator;
+  const actEnvironmentHost = globalThis as typeof globalThis & {IS_REACT_ACT_ENVIRONMENT?: boolean};
+  const hadActEnvironment = Object.hasOwn(actEnvironmentHost, 'IS_REACT_ACT_ENVIRONMENT');
+  const previousActEnvironment = actEnvironmentHost.IS_REACT_ACT_ENVIRONMENT;
 
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
@@ -39,6 +42,10 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
   Object.defineProperty(globalThis, 'navigator', {
     configurable: true,
     value: window.navigator
+  });
+  Object.defineProperty(actEnvironmentHost, 'IS_REACT_ACT_ENVIRONMENT', {
+    configurable: true,
+    value: true
   });
 
   if (!window.requestAnimationFrame) {
@@ -72,6 +79,14 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
       configurable: true,
       value: previousNavigator
     });
+    if (hadActEnvironment) {
+      Object.defineProperty(actEnvironmentHost, 'IS_REACT_ACT_ENVIRONMENT', {
+        configurable: true,
+        value: previousActEnvironment
+      });
+    } else {
+      delete actEnvironmentHost.IS_REACT_ACT_ENVIRONMENT;
+    }
     window.close();
   };
 };

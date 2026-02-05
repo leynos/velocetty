@@ -51,8 +51,7 @@ const SearchButton = ({
       title={title}
     >
       {children}
-      <style jsx>
-        {`
+      <style jsx="true">{`
           .search-button {
             cursor: pointer;
             color: ${foregroundColor};
@@ -78,13 +77,12 @@ const SearchButton = ({
           .search-button-active:hover {
             background-color: ${selectionColor};
           }
-        `}
-      </style>
+      `}</style>
     </div>
   );
 };
 
-const SearchBox = forwardRef<HTMLDivElement, SearchBoxProps>((props, ref) => {
+const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const {
     caseSensitive,
     wholeWord,
@@ -177,57 +175,54 @@ const SearchBox = forwardRef<HTMLDivElement, SearchBoxProps>((props, ref) => {
           <VscClose size="14px" />
         </SearchButton>
       </div>
+      <style jsx="true">{`
+        .search-container {
+          background-color: ${backgroundColor};
+          border: 1px solid ${borderColor};
+          border-radius: 2px;
+          position: absolute;
+          right: 13px;
+          top: 4px;
+          z-index: 10;
+          padding: 4px;
+          font-family: ${font};
+          font-size: 12px;
+        }
 
-      <style jsx>
-        {`
-          .search-container {
-            background-color: ${backgroundColor};
-            border: 1px solid ${borderColor};
-            border-radius: 2px;
-            position: absolute;
-            right: 13px;
-            top: 4px;
-            z-index: 10;
-            padding: 4px;
-            font-family: ${font};
-            font-size: 12px;
-          }
+        .search-input {
+          outline: none;
+          background-color: transparent;
+          border: none;
+          color: ${foregroundColor};
+          align-self: stretch;
+          width: 100px;
+        }
 
-          .search-input {
-            outline: none;
-            background-color: transparent;
-            border: none;
-            color: ${foregroundColor};
-            align-self: stretch;
-            width: 100px;
-          }
+        .flex-row {
+          display: flex;
+          flex-direction: row;
+          justify-content: space-between;
+          align-items: center;
+          gap: 4px;
+        }
 
-          .flex-row {
-            display: flex;
-            flex-direction: row;
-            justify-content: space-between;
-            align-items: center;
-            gap: 4px;
-          }
+        .search-box {
+          border: none;
+          border-radius: 2px;
+          outline: ${borderColor} solid 1px;
+          background-color: ${backgroundColor};
+          color: ${foregroundColor};
+          padding: 0px 4px;
+        }
 
-          .search-box {
-            border: none;
-            border-radius: 2px;
-            outline: ${borderColor} solid 1px;
-            background-color: ${backgroundColor};
-            color: ${foregroundColor};
-            padding: 0px 4px;
-          }
+        .search-input::placeholder {
+          color: ${foregroundColor};
+        }
 
-          .search-input::placeholder {
-            color: ${foregroundColor};
-          }
-
-          .search-box:focus-within {
-            outline: ${selectionColor} solid 2px;
-          }
-        `}
-      </style>
+        .search-box:focus-within {
+          outline: ${selectionColor} solid 2px;
+        }
+      `}</style>
     </div>
   );
 });

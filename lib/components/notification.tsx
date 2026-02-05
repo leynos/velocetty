@@ -97,7 +97,10 @@ const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLD
   };
 };
 
-const Notification = forwardRef<HTMLDivElement, React.PropsWithChildren<NotificationProps>>((props, ref) => {
+const Notification = forwardRef(function Notification(
+  props: React.PropsWithChildren<NotificationProps>,
+  ref: React.ForwardedRef<HTMLDivElement>
+) {
   const {handleDismiss, onElement, opacity} = useNotification(props, ref);
   const {backgroundColor, color} = props;
   return (
@@ -116,7 +119,7 @@ const Notification = forwardRef<HTMLDivElement, React.PropsWithChildren<Notifica
       ) : null}
       {props.customChildren}
 
-      <style jsx>{`
+      <style jsx="true">{`
         .notification_indicator {
           display: inline-block;
           cursor: default;

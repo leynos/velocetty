@@ -1,4 +1,5 @@
 /** @file Renders the transient notifications container. */
+import type React from 'react';
 import {forwardRef} from 'react';
 
 import type {NotificationsProps} from '../../typings/hyper';
@@ -8,7 +9,10 @@ import Notification_ from './notification';
 
 const Notification = decorate(Notification_, 'Notification');
 
-const Notifications = forwardRef<HTMLDivElement, NotificationsProps>((props, ref) => {
+const Notifications = forwardRef(function Notifications(
+  props: NotificationsProps,
+  ref: React.ForwardedRef<HTMLDivElement>
+) {
   return (
     <div className="notifications_view" ref={ref}>
       {props.customChildrenBefore}
@@ -117,7 +121,7 @@ const Notifications = forwardRef<HTMLDivElement, NotificationsProps>((props, ref
       )}
       {props.customChildren}
 
-      <style jsx>{`
+      <style jsx="true">{`
         .notifications_view {
           position: fixed;
           bottom: 20px;
