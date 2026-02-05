@@ -11,9 +11,10 @@
 import type {Dispatch, Middleware} from 'redux';
 
 import type {HyperActions, HyperState} from '../../typings/hyper';
-type EffectAction = HyperActions & {effect?: () => void};
 
-const hasEffect = (action: unknown): action is EffectAction => {
+const executedEffects = new WeakSet<object>();
+
+const hasEffect = (action: unknown): action is HyperActions => {
   if (typeof action !== 'object' || action === null) {
     return false;
   }
@@ -23,8 +24,11 @@ const hasEffect = (action: unknown): action is EffectAction => {
 const effectsMiddleware: Middleware<{}, HyperState, Dispatch<HyperActions>> = () => (next) => (action) => {
   const ret = next(action);
   if (hasEffect(action) && typeof action.effect === 'function') {
-    action.effect();
-    delete action.effect;
+    const actionObject = action as object;
+    if (!executedEffects.has(actionObject)) {
+      action.effect();
+      executedEffects.add(actionObject);
+    }
   }
   return ret;
 };

@@ -2388,7 +2388,7 @@ flowchart TB
 | ------------- | ------------- | ------------ |
 | **Electron ↔ Node.js** | Bundled Node.js 16.17.1 | Native modules must target this ABI |
 | **Electron ↔ Chromium** | Chromium 108 bundled | WebGL/Canvas rendering APIs |
-| **React ↔ Redux** | react-redux 9.x | Requires React 19+ hooks API |
+| **React ↔ Redux** | react-redux 9.x | Requires React 18.0+ hooks API |
 | **xterm.js ↔ Addons** | xterm 5.x series | Addons must match major version |
 | **node-pty ↔ Electron** | Rebuild required per version | `electron-rebuild` in post-install |
 

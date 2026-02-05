@@ -1,15 +1,15 @@
-# Migrate Renderer Stack To React 19
+# Migrate renderer stack to React 19
 
 This execution plan (ExecPlan) is a living document. The sections
 `Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+`Risks`, `Progress`, `Surprises & discoveries`, `Decision log`, and
+`Outcomes & retrospective` must be kept up to date as work proceeds.
 
-Status: COMPLETE
+Status: Complete
 
 No `PLANS.md` exists in this repository, so this plan stands alone.
 
-## Purpose / Big Picture
+## Purpose / Big picture
 
 Upgrade the renderer React stack from 18.3 to React 19 in line with
 `docs/adr-003-update-react-19.md`. Success means the Electron renderer builds
@@ -33,7 +33,7 @@ and see all required commands complete successfully.
 - Documentation must stay wrapped to 80 columns with code blocks wrapped to
   120 columns.
 
-## Tolerances (Exception Triggers)
+## Tolerances (exception triggers)
 
 - Scope: if upgrading React 19 requires modifying more than 30 files or more
   than 900 net lines, stop and escalate.
@@ -59,7 +59,8 @@ and see all required commands complete successfully.
   Likelihood: low
   Mitigation: search for string ref patterns and replace with `useRef` or
   `createRef` where necessary.
-- Risk: plugin runtime relies on React UMD globals or bundled copies.
+- Risk: plugin runtime relies on React Universal Module Definition (UMD)
+  globals or bundled copies.
   Severity: medium
   Likelihood: low
   Mitigation: verify no UMD imports or global React usage remain; keep the
@@ -82,7 +83,7 @@ and see all required commands complete successfully.
 - [x] (2026-02-05 18:25Z) Post-implementation fixes applied for Redux 5
   middleware typing, React Redux imports, and Bun version alignment.
 
-## Surprises & Discoveries
+## Surprises & discoveries
 
 - Observation: `bun install` failed during V8 snapshot generation because
   `electron-link` could not parse the React Redux 9.2.0 production bundle.
@@ -92,12 +93,12 @@ and see all required commands complete successfully.
   linking so the install pipeline can complete.
 - Observation: Redux 5 middleware typing switched to `unknown` actions, and
   React Redux 9 removed internal `es/components/connect` paths.
-  Evidence: CI type errors for middleware signatures and missing module
-  `react-redux/es/components/connect`.
+  Evidence: Continuous Integration (CI) type errors for middleware signatures
+  and missing module `react-redux/es/components/connect`.
   Impact: Added middleware type guards, updated the React Redux type import,
   and extended the JSX typing augmentation to include `JSX.Element`.
 
-## Decision Log
+## Decision log
 
 - Decision: Draft the ExecPlan before implementation, per `execplans` rules.
   Rationale: The upgrade may require dependency alignment decisions and should
@@ -116,7 +117,7 @@ and see all required commands complete successfully.
   React 19 upgrade.
   Date/Author: 2026-02-05 / Codex
 
-## Outcomes & Retrospective
+## Outcomes & retrospective
 
 React 19.2.4 and related dependencies are now aligned across the renderer and
 app manifests, and Redux has been updated to 5.0.1 with compatible middleware.
@@ -124,7 +125,7 @@ The snapshot build pipeline now skips the React Redux production bundle to keep
 `bun install` reliable. Documentation and the roadmap reflect the upgrade, and
 all required validation commands pass.
 
-## Context and Orientation
+## Context and orientation
 
 The React renderer lives under `lib/` and is bootstrapped in `lib/index.tsx`
 using `createRoot`. React and React DOM versions are defined in two places:
@@ -136,7 +137,7 @@ already configured for the new JSX transform. The product and architecture
 context for this upgrade is documented in `docs/adr-003-update-react-19.md`,
 `docs/velocetty-design.md`, and `docs/velocetty-hyper-codebase.md`.
 
-## Plan of Work
+## Plan of work
 
 Stage A: Baseline and dependency assessment. Confirm current React versions,
 scan for legacy React APIs (string refs, `ReactDOM.render`, UMD usage), and
@@ -162,24 +163,28 @@ complete once all validations pass.
 Stage E: Validation and final checks. Run the required commands in order and
 capture logs. Only proceed to commit once all gates pass.
 
-## Concrete Steps
+## Concrete steps
 
 1. Record current dependency baselines and peer dependency expectations.
 
     Run:
 
-        bun x npm info react version
-        bun x npm info react-dom version
-        bun x npm info react-redux peerDependencies
-        bun x npm info react-use peerDependencies
-        bun x npm info styled-jsx peerDependencies
+    ```shell
+    bun x npm info react version
+    bun x npm info react-dom version
+    bun x npm info react-redux peerDependencies
+    bun x npm info react-use peerDependencies
+    bun x npm info styled-jsx peerDependencies
+    ```
 
 2. Search for legacy React usage in the renderer and plugin bridge.
 
     Run:
 
-        rg -n "ReactDOM.render|createFactory|ref=\\\"|ref='" lib app
-        rg -n "react/umd|react-dom/umd|window.React" lib app
+    ```shell
+    rg -n "ReactDOM.render|createFactory|ref=\\\"|ref='" lib app
+    rg -n "react/umd|react-dom/umd|window.React" lib app
+    ```
 
 3. Update dependency versions.
 
@@ -208,18 +213,22 @@ capture logs. Only proceed to commit once all gates pass.
 
     Run:
 
-        bun install | tee /tmp/bun-install-velocetty-1-4-10-migrate-to-react-19.out
-        make build | tee /tmp/build-velocetty-1-4-10-migrate-to-react-19.out
-        make check-fmt | tee /tmp/check-fmt-velocetty-1-4-10-migrate-to-react-19.out
-        make lint | tee /tmp/lint-velocetty-1-4-10-migrate-to-react-19.out
-        make test | tee /tmp/test-velocetty-1-4-10-migrate-to-react-19.out
+    ```shell
+    bun install | tee /tmp/bun-install-velocetty-1-4-10-migrate-to-react-19.out
+    make build | tee /tmp/build-velocetty-1-4-10-migrate-to-react-19.out
+    make check-fmt | tee /tmp/check-fmt-velocetty-1-4-10-migrate-to-react-19.out
+    make lint | tee /tmp/lint-velocetty-1-4-10-migrate-to-react-19.out
+    make test | tee /tmp/test-velocetty-1-4-10-migrate-to-react-19.out
+    ```
 
     If documentation changed, also run:
 
-        bunx markdownlint-cli "docs/**/*.md" | tee /tmp/mdlint-velocetty-1-4-10-migrate-to-react-19.out
-        nixie --no-sandbox | tee /tmp/nixie-velocetty-1-4-10-migrate-to-react-19.out
+    ```shell
+    bunx markdownlint-cli "docs/**/*.md" | tee /tmp/mdlint-velocetty-1-4-10-migrate-to-react-19.out
+    nixie --no-sandbox | tee /tmp/nixie-velocetty-1-4-10-migrate-to-react-19.out
+    ```
 
-## Validation and Acceptance
+## Validation and acceptance
 
 Quality criteria:
 
@@ -231,6 +240,7 @@ Quality criteria:
   as done.
 - The following commands succeed with exit code 0:
 
+    ```shell
     bun install
     make build
     make check-fmt
@@ -238,15 +248,16 @@ Quality criteria:
     make test
     bunx markdownlint-cli "docs/**/*.md" (when docs change)
     nixie --no-sandbox (when docs change)
+    ```
 
-## Idempotence and Recovery
+## Idempotence and recovery
 
 `bun install` and the Makefile targets are safe to re-run. If any command
 fails, review the corresponding log in `/tmp/` and fix the underlying issue
 before re-running only the failed command. Use Git status to verify the lock
 file and documentation changes are expected after re-running.
 
-## Artifacts and Notes
+## Artifacts and notes
 
 Expected file touch list (may expand if compatibility fixes are needed):
 
@@ -258,7 +269,7 @@ Expected file touch list (may expand if compatibility fixes are needed):
 - `docs/velocetty-hyper-codebase.md`
 - `docs/roadmap.md`
 
-## Interfaces and Dependencies
+## Interfaces and dependencies
 
 The React runtime and types must be React 19-compatible at the end of the
 upgrade. The following versions should be set to the latest React 19-compatible

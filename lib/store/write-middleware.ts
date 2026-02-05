@@ -10,13 +10,9 @@
  */
 import type {Dispatch, Middleware} from 'redux';
 
+import type {SessionPtyDataAction} from '../../typings/constants/sessions';
 import type {HyperActions, HyperState} from '../../typings/hyper';
 import terms from '../terms';
-
-// the only side effect we perform from middleware
-// is to write to the react term instance directly
-// to avoid a performance hit
-type SessionPtyDataAction = HyperActions & {type: 'SESSION_PTY_DATA'; uid: string; data: string};
 
 const isSessionPtyDataAction = (action: unknown): action is SessionPtyDataAction => {
   if (typeof action !== 'object' || action === null) {

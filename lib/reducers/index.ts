@@ -1,3 +1,13 @@
+/**
+ * @file Exports the root Redux reducer assembled with `combineReducers`.
+ *
+ * Responsibilities:
+ * - Compose the `ui`, `sessions`, and `termGroups` reducers.
+ * - Provide a typed root reducer using `Reducer` and `ReducersMapObject`.
+ *
+ * Usage:
+ * - Import as the application root reducer when creating the Redux store.
+ */
 import {combineReducers} from 'redux';
 import type {Reducer, ReducersMapObject} from 'redux';
 
