@@ -1788,9 +1788,9 @@ the `decorate*` hooks defined in the extension API.
 
 | Package | Version | Purpose | Justification |
 | --------- | --------- | --------- | --------------- |
-| `redux` | 4.2.1 | Centralized state container | Predictable state for complex multi-session UI |
-| `react-redux` | 8.1.3 | React-Redux bindings | Connect React components to Redux store |
-| `redux-thunk` | 2.4.2 | Async action middleware | Handle asynchronous operations (PTY data, plugin loading) |
+| `redux` | 5.0.1 | Centralized state container | Predictable state for complex multi-session UI |
+| `react-redux` | 9.2.0 | React-Redux bindings | Connect React components to Redux store |
+| `redux-thunk` | 3.1.0 | Async action middleware | Handle asynchronous operations (PTY data, plugin loading) |
 | `reselect` | 4.1.8 | Memoized selector library | Performance optimization for derived state |
 | `seamless-immutable` | 7.1.4 | Immutable data structures | Prevent accidental state mutations |
 
@@ -1950,7 +1950,7 @@ Root Dependencies (package.json):
 ├── react: 19.2.4
 ├── react-dom: 19.2.4
 ├── react-redux: 9.2.0
-├── redux: 4.2.1
+├── redux: 5.0.1
 ├── redux-thunk: 3.1.0
 ├── xterm: 5.3.0
 ├── xterm-addon-canvas: 0.5.0
@@ -9635,7 +9635,7 @@ architecture:
 | ------------ | --------- | --------- | --------------- |
 | **Electron** | 22.3.25 | Application shell (Chromium 108) | Cross-platform desktop integration |
 | **React** | 19.2.4 | Component-based UI framework | Enables plugin decoration pattern |
-| **Redux** | 4.2.1 | Centralized state management | Predictable state for complex multi-session UI |
+| **Redux** | 5.0.1 | Centralized state management | Predictable state for complex multi-session UI |
 | **styled-jsx** | 5.1.2 | Scoped CSS-in-JS styling | Component-local styles without global conflicts |
 | **xterm.js** | 5.3.0 | Terminal emulation engine | Industry-standard terminal rendering |
 | **xterm-addon-webgl** | 0.16.0 | GPU-accelerated rendering | High-performance terminal output |
@@ -11555,7 +11555,7 @@ versions used in Velocetty:
 | Node.js | 16.17.1 | Main process runtime (bundled) | Electron 22 bundle |
 | TypeScript | 5.4.5 | Primary development language | `package.json` |
 | React | 19.2.4 | UI component framework | `package.json` |
-| Redux | 4.2.1 | State management library | `package.json` |
+| Redux | 5.0.1 | State management library | `package.json` |
 | xterm.js | 5.3.0 | Terminal emulation library | `package.json` |
 | Webpack | 5.91.0 | Module bundler | `package.json` |
 | electron-builder | 24.13.3 | Application packaging tool | `package.json` |
