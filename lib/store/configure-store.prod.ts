@@ -9,7 +9,7 @@
  * - Use in production runtime paths where Redux DevTools are not required.
  */
 import {createStore, applyMiddleware} from 'redux';
-import {thunk} from 'redux-thunk';
+import thunk from 'redux-thunk';
 import type {ThunkMiddleware} from 'redux-thunk';
 
 import type {HyperState, HyperActions} from '../../typings/hyper';

@@ -23,6 +23,6 @@ const reducers: ReducersMapObject<HyperState, HyperActions> = {
   termGroups
 };
 
-const rootReducer = combineReducers(reducers) as Reducer<HyperState, HyperActions, Partial<HyperState>>;
+const rootReducer = combineReducers(reducers) as Reducer<HyperState, HyperActions>;
 
 export default rootReducer;

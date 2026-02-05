@@ -11,7 +11,7 @@
  */
 import {composeWithDevTools} from '@redux-devtools/extension';
 import {createStore, applyMiddleware} from 'redux';
-import {thunk} from 'redux-thunk';
+import thunk from 'redux-thunk';
 import type {ThunkMiddleware} from 'redux-thunk';
 
 import type {HyperState, HyperActions} from '../../typings/hyper';
