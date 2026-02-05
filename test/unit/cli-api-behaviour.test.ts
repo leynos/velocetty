@@ -1,4 +1,6 @@
 /** @file Covers install, uninstall, and listing branches in CLI plugin APIs. */
+import {realpathSync as nodeRealpathSync} from 'node:fs';
+
 import {beforeEach, expect, mock, test} from 'bun:test';
 
 type ConfigData = {
@@ -41,6 +43,7 @@ const gotMock = {
 mock.module('node:fs', () => ({
   default: fsMock,
   existsSync: fsMock.existsSync,
+  realpathSync: nodeRealpathSync,
   readFileSync: fsMock.readFileSync,
   writeFileSync: fsMock.writeFileSync
 }));
