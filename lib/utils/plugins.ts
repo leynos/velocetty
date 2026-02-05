@@ -1,3 +1,13 @@
+/**
+ * @file Renderer plugin loading and React/Redux decoration utilities.
+ *
+ * Responsibilities:
+ * - Load renderer plugins and wire them into the Redux/React pipeline.
+ * - Provide connector helpers for plugin-authored UI components.
+ *
+ * Usage:
+ * - Imported by renderer entry points to register plugin hooks.
+ */
 // eslint-disable-next-line eslint-comments/disable-enable-pair
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import ChildProcess from 'node:child_process';

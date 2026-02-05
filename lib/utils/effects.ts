@@ -1,14 +1,16 @@
+/**
+ * @file Redux middleware that executes optional `effect` callbacks on actions.
+ *
+ * Responsibilities:
+ * - Run action `effect` callbacks after the plugins middleware.
+ * - Allow plugins to interrupt, defer, or augment side effects.
+ *
+ * Usage:
+ * - Register in the Redux middleware chain after `plugins.middleware`.
+ */
 import type {Dispatch, Middleware} from 'redux';
 
 import type {HyperActions, HyperState} from '../../typings/hyper';
-/**
- * Simple redux middleware that executes
- * the `effect` field if provided in an action
- * since this is preceded by the `plugins`
- * middleware. It allows authors to interrupt,
- * defer or add to existing side effects at will
- * as the result of an action being triggered.
- */
 type EffectAction = HyperActions & {effect?: () => void};
 
 const hasEffect = (action: unknown): action is EffectAction => {

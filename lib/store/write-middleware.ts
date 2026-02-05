@@ -1,3 +1,13 @@
+/**
+ * @file Redux middleware that writes PTY data directly to terminal instances.
+ *
+ * Responsibilities:
+ * - Intercept `SESSION_PTY_DATA` actions and write data to the corresponding
+ *   terminal instance for performance (bypassing React reconciliation).
+ *
+ * Usage:
+ * - Include in the middleware chain via `applyMiddleware`.
+ */
 import type {Dispatch, Middleware} from 'redux';
 
 import type {HyperActions, HyperState} from '../../typings/hyper';

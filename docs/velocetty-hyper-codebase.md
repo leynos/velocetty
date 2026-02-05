@@ -247,7 +247,7 @@ flowchart LR
 | Runtime Shell | Electron | 22.3.25 | Desktop application framework |
 | Main Process | Node.js/TypeScript | 5.4.5 | OS integration, PTY management |
 | Renderer Framework | React | 19.2.4 | UI component architecture |
-| State Management | Redux | 4.2.1 | Centralized state with middleware |
+| State Management | Redux | 5.0.1 | Centralized state with middleware |
 | Terminal Core | xterm.js | 5.3.0 | Terminal emulation and rendering |
 | GPU Rendering | xterm-addon-webgl | 0.16.0 | Hardware-accelerated display |
 | Build System | Webpack | 5.91.0 | Module bundling and optimization |
