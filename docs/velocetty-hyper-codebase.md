@@ -246,7 +246,7 @@ flowchart LR
 | ------- | ------------ | --------- | --------- |
 | Runtime Shell | Electron | 22.3.25 | Desktop application framework |
 | Main Process | Node.js/TypeScript | 5.4.5 | OS integration, PTY management |
-| Renderer Framework | React | 18.3.1 | UI component architecture |
+| Renderer Framework | React | 19.2.4 | UI component architecture |
 | State Management | Redux | 4.2.1 | Centralized state with middleware |
 | Terminal Core | xterm.js | 5.3.0 | Terminal emulation and rendering |
 | GPU Rendering | xterm-addon-webgl | 0.16.0 | Hardware-accelerated display |
@@ -553,7 +553,7 @@ flowchart TB
 | Velocetty (base) | 4.0.0-canary.5 | Fork of Hyper canary |
 | Electron | 22.3.25 | Runtime framework |
 | xterm.js | 5.3.0 | Terminal emulation |
-| React | 18.3.1 | UI framework |
+| React | 19.2.4 | UI framework |
 | TypeScript | 5.4.5 | Development language |
 
 ---
@@ -1585,9 +1585,9 @@ flowchart TB
 
 - Electron 22.3.25
 
-- React 18.3.1
+- React 19.2.4
 
-- Redux 4.2.1
+- Redux 5.0.1
 
 - xterm.js 5.3.0
 
@@ -1749,15 +1749,15 @@ favor of explicit IPC messaging for security reasons.
 ```mermaid
 flowchart LR
     subgraph UIStack["UI Framework Stack"]
-        React["React 18.3.1"]
-        ReactDOM["react-dom 18.3.1"]
+        React["React 19.2.4"]
+        ReactDOM["react-dom 19.2.4"]
         StyledJSX["styled-jsx 5.1.2"]
     end
     
     subgraph StateStack["State Management"]
-        Redux["Redux 4.2.1"]
-        ReactRedux["react-redux 8.1.3"]
-        Thunk["redux-thunk 2.4.2"]
+        Redux["Redux 5.0.1"]
+        ReactRedux["react-redux 9.2.0"]
+        Thunk["redux-thunk 3.1.0"]
         Reselect["reselect 4.1.8"]
         Immutable["seamless-immutable 7.1.4"]
     end
@@ -1774,8 +1774,8 @@ flowchart LR
 
 | Package | Version | Purpose | Justification |
 | --------- | --------- | --------- | --------------- |
-| `react` | 18.3.1 | Component-based UI architecture | Industry-standard for complex UIs; enables plugin decoration pattern |
-| `react-dom` | 18.3.1 | DOM rendering bindings | Required for React browser rendering |
+| `react` | 19.2.4 | Component-based UI architecture | Industry-standard for complex UIs; enables plugin decoration pattern |
+| `react-dom` | 19.2.4 | DOM rendering bindings | Required for React browser rendering |
 | `styled-jsx` | 5.1.2 | Scoped CSS-in-JS styling | Provides component-local styles without global CSS conflicts |
 | `stylis` | 3.5.4 | CSS preprocessing | Runtime CSS processing for styled-jsx |
 
@@ -1947,8 +1947,8 @@ Root Dependencies (package.json):
 ├── @electron/remote: 2.1.2
 ├── @react-icons/all-files: 4.1.0
 ├── @redux-devtools/extension: ^3.3.0
-├── react: 18.3.1
-├── react-dom: 18.3.1
+├── react: 19.2.4
+├── react-dom: 19.2.4
 ├── react-redux: 8.1.3
 ├── redux: 4.2.1
 ├── redux-thunk: 2.4.2
@@ -2369,8 +2369,8 @@ JavaScript to bytecode, avoiding runtime parsing overhead.
 flowchart TB
     subgraph CoreIntegration["Core Component Integration"]
         Electron["Electron 22.3.25"]
-        React["React 18.3.1"]
-        Redux["Redux 4.2.1"]
+        React["React 19.2.4"]
+        Redux["Redux 5.0.1"]
         Xterm["xterm.js 5.3.0"]
         NodePTY["node-pty 1.0.0"]
     end
@@ -2388,7 +2388,7 @@ flowchart TB
 | ------------- | ------------- | ------------ |
 | **Electron ↔ Node.js** | Bundled Node.js 16.17.1 | Native modules must target this ABI |
 | **Electron ↔ Chromium** | Chromium 108 bundled | WebGL/Canvas rendering APIs |
-| **React ↔ Redux** | react-redux 8.x | Requires React 18+ hooks API |
+| **React ↔ Redux** | react-redux 9.x | Requires React 19+ hooks API |
 | **xterm.js ↔ Addons** | xterm 5.x series | Addons must match major version |
 | **node-pty ↔ Electron** | Rebuild required per version | `electron-rebuild` in post-install |
 
@@ -2397,7 +2397,7 @@ flowchart TB
 | Requirement | Description |
 | ------------- | ------------- |
 | **Module Format** | CommonJS (required for Electron main process) |
-| **React Version** | Must be compatible with React 18 |
+| **React Version** | Must be compatible with React 19 |
 | **Redux Middleware** | Must follow Redux middleware signature |
 | **Decoration Pattern** | Must compose with existing components, not replace |
 
@@ -2418,7 +2418,7 @@ flowchart TB
 | ------- | --------------------- | --------- |
 | **Application Shell** | Electron 22.3.25 | Cross-platform desktop framework |
 | **Main Process** | Node.js/TypeScript, node-pty | OS integration, PTY management |
-| **Renderer Process** | React 18.3.1, Redux 4.2.1 | UI components, state management |
+| **Renderer Process** | React 19.2.4, Redux 5.0.1 | UI components, state management |
 | **Terminal Rendering** | xterm.js 5.3.0 + WebGL addon | Terminal emulation and display |
 | **Build System** | Webpack 5.91.0, tsgo 7.0.0-dev.20260128.1, node-gyp 10.x, node-gyp-build 4.x | Module bundling, type safety, native module compilation |
 | **Distribution** | electron-builder 24.13.3 | Cross-platform packaging |
@@ -4075,9 +4075,9 @@ flowchart TB
 | Session Manager (`app/session.ts`) | PTY lifecycle, data batching, shell spawning | node-pty 1.0.0, DataBatcher class | RPC to renderer, plugin env hooks |
 | RPC Bridge (`app/rpc.ts`, `lib/utils/rpc.ts`) | Typed bidirectional IPC communication | Electron ipcMain/ipcRenderer, uuid | All cross-process communication |
 | Plugin Manager (`app/plugins.ts`, `lib/utils/plugins.ts`) | Extension loading, decoration, lifecycle hooks | electron-store, Module._load patching | Both processes, all extensible components |
-| Redux Store (`lib/store/`) | Centralized renderer state management | Redux 4.2.1, redux-thunk, seamless-immutable | React containers, plugin middleware |
+| Redux Store (`lib/store/`) | Centralized renderer state management | Redux 5.0.1, redux-thunk, seamless-immutable | React containers, plugin middleware |
 | Terminal Component (`lib/components/term.tsx`) | xterm.js hosting, addon management, WebGL/Canvas rendering | xterm.js 5.3.0, WebGL/Canvas addons | Redux state, session data stream |
-| UI Components (`lib/components/`) | React component tree for terminal UI | React 18.3.1, styled-jsx | Redux containers, plugin decoration |
+| UI Components (`lib/components/`) | React component tree for terminal UI | React 19.2.4, styled-jsx | Redux containers, plugin decoration |
 | CLI Tool (`cli/`) | Plugin management, application launching | args, got, npm registry | Config file, npm ecosystem |
 | Menu System (`app/menus/`) | Application and context menus | Electron Menu API, keymaps | Command dispatcher, config system |
 
@@ -4349,7 +4349,7 @@ sequenceDiagram
 
 **Purpose and Responsibilities**:
 
-- Bootstrap React 18 application with Redux store
+- Bootstrap React 19 application with Redux store
 
 - Register 30+ RPC event handlers for main process communication
 
@@ -4361,9 +4361,9 @@ sequenceDiagram
 
 **Technologies and Frameworks**:
 
-- React 18.3.1 with createRoot API
+- React 19.2.4 with createRoot API
 
-- Redux 4.2.1 with thunk middleware
+- Redux 5.0.1 with thunk middleware
 
 - Electron IPC renderer bindings
 
@@ -4391,9 +4391,9 @@ sequenceDiagram
 
 **Technologies and Frameworks**:
 
-- Redux 4.2.1 with `createStore`
+- Redux 5.0.1 with `createStore`
 
-- redux-thunk 2.4.2 for async actions
+- redux-thunk 3.1.0 for async actions
 
 - seamless-immutable 7.1.4 for state immutability
 
@@ -4664,8 +4664,8 @@ flowchart TB
 | ---------- | -------- | ----------- | ----------- |
 | Application Shell | Electron 22.3.25 | Cross-platform desktop with web tech UI; deep codebase integration | Larger binary (~100MB), Chromium memory overhead, EOL version |
 | Process Model | Main/Renderer split | Security isolation, native access in main, web UI in renderer | IPC overhead, state synchronization complexity |
-| UI Framework | React 18.3.1 | Component composition model enables plugin decoration pattern | Bundle size, rendering overhead vs. native UI |
-| State Management | Redux 4.2.1 | Predictable state, plugin middleware integration, time-travel debugging | Boilerplate, performance overhead for high-frequency updates |
+| UI Framework | React 19.2.4 | Component composition model enables plugin decoration pattern | Bundle size, rendering overhead vs. native UI |
+| State Management | Redux 5.0.1 | Predictable state, plugin middleware integration, time-travel debugging | Boilerplate, performance overhead for high-frequency updates |
 | Terminal Engine | xterm.js 5.3.0 | Mature ecosystem, WebGL support, addon architecture | Browser-based limitations, no native text rendering |
 | IPC Optimization | Custom data batching | Reduce serialization overhead, align with frame timing | Added complexity, latency tradeoff |
 | Plugin Model | Full trust execution | Maximum extensibility, React/Redux composition | Security risk, no sandboxing |
@@ -5173,7 +5173,7 @@ user interactions, and terminal rendering.
 
 | Component | File Location | Responsibilities |
 | ----------- | --------------- | ------------------ |
-| **Renderer Entry** | `lib/index.tsx` | React 18 bootstrap, 30+ RPC event handler registration, Redux store initialization |
+| **Renderer Entry** | `lib/index.tsx` | React 19 bootstrap, 30+ RPC event handler registration, Redux store initialization |
 | **Redux Store** | `lib/store/` | Centralized state management, plugin middleware integration, write middleware bypass |
 | **Terminal Component** | `lib/components/term.tsx` | xterm.js hosting, WebGL/Canvas addon management, context loss recovery |
 | **RPC Client** | `lib/utils/rpc.ts` | IPC communication with main process, typed event emission |
@@ -9634,7 +9634,7 @@ architecture:
 | Technology | Version | Purpose | Justification |
 | ------------ | --------- | --------- | --------------- |
 | **Electron** | 22.3.25 | Application shell (Chromium 108) | Cross-platform desktop integration |
-| **React** | 18.3.1 | Component-based UI framework | Enables plugin decoration pattern |
+| **React** | 19.2.4 | Component-based UI framework | Enables plugin decoration pattern |
 | **Redux** | 4.2.1 | Centralized state management | Predictable state for complex multi-session UI |
 | **styled-jsx** | 5.1.2 | Scoped CSS-in-JS styling | Component-local styles without global conflicts |
 | **xterm.js** | 5.3.0 | Terminal emulation engine | Industry-standard terminal rendering |
@@ -11554,7 +11554,7 @@ versions used in Velocetty:
 | Chromium | 108.0.5359.179 | Renderer engine (bundled) | Electron 22 bundle |
 | Node.js | 16.17.1 | Main process runtime (bundled) | Electron 22 bundle |
 | TypeScript | 5.4.5 | Primary development language | `package.json` |
-| React | 18.3.1 | UI component framework | `package.json` |
+| React | 19.2.4 | UI component framework | `package.json` |
 | Redux | 4.2.1 | State management library | `package.json` |
 | xterm.js | 5.3.0 | Terminal emulation library | `package.json` |
 | Webpack | 5.91.0 | Module bundler | `package.json` |

@@ -11,8 +11,8 @@ import {normaliseArch} from './shared/arch.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Keep as a placeholder for future module exclusion configuration.
-const excludedModules = {};
+// Exclude modules that electron-link cannot parse in production builds.
+const excludedModuleMatchers = ['/node_modules/react-redux/'];
 
 const crossArchDirs = ['clang_x86_v8_arm', 'clang_x64_v8_arm64', 'win_clang_x64'];
 
@@ -24,7 +24,13 @@ async function main() {
     baseDirPath: baseDirPath,
     mainPath: `${__dirname}/snapshot-libs.js`,
     cachePath: `${baseDirPath}/cache`,
-    shouldExcludeModule: (modulePath) => Object.hasOwn(excludedModules, modulePath)
+    shouldExcludeModule: ({requiredModulePath}) => {
+      if (typeof requiredModulePath !== 'string') {
+        return false;
+      }
+      const normalisedPath = requiredModulePath.replace(/\\/g, '/');
+      return excludedModuleMatchers.some((matcher) => normalisedPath.includes(matcher));
+    }
   });
 
   const snapshotScriptPath = `${baseDirPath}/cache/snapshot-libs.js`;

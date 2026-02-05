@@ -4,7 +4,7 @@ This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
 `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 No `PLANS.md` exists in this repository, so this plan stands alone.
 
@@ -71,11 +71,22 @@ and see all required commands complete successfully.
 
 ## Progress
 
-- [ ] (2026-02-05 00:00Z) Draft ExecPlan created.
+- [x] (2026-02-05 00:00Z) Draft ExecPlan created.
+- [x] (2026-02-05 14:10Z) ExecPlan approved to proceed with implementation.
+- [x] (2026-02-05 14:22Z) Stage A complete: dependency baselines confirmed.
+- [x] (2026-02-05 14:42Z) Stage B complete: React 19 dependencies updated.
+- [x] (2026-02-05 15:12Z) Stage C complete: React 19 code remediation applied.
+- [x] (2026-02-05 15:12Z) Stage D complete: documentation updated.
+- [x] (2026-02-05 16:12Z) Stage E complete: validation commands pass.
 
 ## Surprises & Discoveries
 
-- None recorded yet.
+- Observation: `bun install` failed during V8 snapshot generation because
+  `electron-link` could not parse the React Redux 9.2.0 production bundle.
+  Evidence: `mk-snapshot` error referencing
+  `react-redux.production.min.cjs` in the install log.
+  Impact: Updated `bin/mk-snapshot.js` to exclude `react-redux` from snapshot
+  linking so the install pipeline can complete.
 
 ## Decision Log
 
@@ -83,10 +94,21 @@ and see all required commands complete successfully.
   Rationale: The upgrade may require dependency alignment decisions and should
   not proceed without review.
   Date/Author: 2026-02-05 / Codex
+- Decision: Proceed with implementation after approval.
+  Rationale: User approved the ExecPlan; no blocking constraints identified.
+  Date/Author: 2026-02-05 / Codex
+- Decision: Exclude `react-redux` from V8 snapshot linking.
+  Rationale: `electron-link` fails to parse the React Redux production bundle,
+  blocking `bun install` and the build pipeline.
+  Date/Author: 2026-02-05 / Codex
 
 ## Outcomes & Retrospective
 
-- Pending plan approval and implementation.
+React 19.2.4 and related dependencies are now aligned across the renderer and
+app manifests, and Redux has been updated to 5.0.1 with compatible middleware.
+The snapshot build pipeline now skips the React Redux production bundle to keep
+`bun install` reliable. Documentation and the roadmap reflect the upgrade, and
+all required validation commands pass.
 
 ## Context and Orientation
 
@@ -113,8 +135,9 @@ packages need upgrades for compatibility, update them in the same change. Keep
 Babel and TypeScript JSX settings aligned with React 19.
 
 Stage C: Code remediation. Replace any string refs or other removed APIs, and
-ensure plugin shared module behaviour remains intact. Re-run TypeScript checks
-and fix any type errors surfaced by updated `@types/react` or `@types/react-dom`.
+ensure plugin shared module behaviour remains intact. Re-run TypeScript
+checks and fix any type errors surfaced by updated `@types/react` or
+`@types/react-dom`.
 
 Stage D: Documentation updates. Update `docs/developers-guide.md` with any new
 React 19 development practices (for example, avoiding string refs and keeping
@@ -234,4 +257,4 @@ releases as determined in Stage A:
 
 ## Revision note
 
-Initial draft created for review prior to implementation.
+Marked Stage E complete, recorded outcomes, and set status to COMPLETE.
