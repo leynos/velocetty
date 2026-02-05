@@ -1,7 +1,7 @@
 /** @file Covers install, uninstall, and listing branches in CLI plugin APIs. */
-import {realpathSync as nodeRealpathSync} from 'node:fs';
-
 import {beforeEach, expect, mock, test} from 'bun:test';
+
+import {buildNodeFsModuleMock} from '../testUtils/mock-node-fs';
 
 type ConfigData = {
   plugins: unknown;
@@ -40,13 +40,13 @@ const gotMock = {
   }
 };
 
-mock.module('node:fs', () => ({
-  default: fsMock,
-  existsSync: fsMock.existsSync,
-  realpathSync: nodeRealpathSync,
-  readFileSync: fsMock.readFileSync,
-  writeFileSync: fsMock.writeFileSync
-}));
+mock.module('node:fs', () =>
+  buildNodeFsModuleMock({
+    existsSync: fsMock.existsSync,
+    readFileSync: fsMock.readFileSync,
+    writeFileSync: fsMock.writeFileSync
+  })
+);
 
 mock.module('registry-url', () => ({default: () => 'https://registry.npmjs.org/'}));
 mock.module('got', () => ({default: gotMock}));
@@ -137,4 +137,9 @@ test('exists(), list(), and isInstalled() handle empty or malformed plugin array
   };
   const malformedApi = await loadCliApi();
   expect(malformedApi.isInstalled('plugin-x')).toBe(false);
+});
+
+test('node:fs mock preserves passthrough exports required by other suites', async () => {
+  const fsModule = await import('node:fs');
+  expect(typeof fsModule.realpathSync).toBe('function');
 });
