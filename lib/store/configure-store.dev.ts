@@ -1,6 +1,17 @@
+/**
+ * @file Configures and exports the Redux store for development builds.
+ *
+ * Responsibilities:
+ * - Create the store with `createStore`.
+ * - Compose middleware via `applyMiddleware` and `composeWithDevTools`.
+ *
+ * Usage:
+ * - Use in development runtime paths where Redux DevTools integration is
+ *   required.
+ */
 import {composeWithDevTools} from '@redux-devtools/extension';
 import {createStore, applyMiddleware} from 'redux';
-import _thunk from 'redux-thunk';
+import {thunk} from 'redux-thunk';
 import type {ThunkMiddleware} from 'redux-thunk';
 
 import type {HyperState, HyperActions} from '../../typings/hyper';
@@ -10,12 +21,12 @@ import * as plugins from '../utils/plugins';
 
 import writeMiddleware from './write-middleware';
 
-const thunk: ThunkMiddleware<HyperState, HyperActions> = _thunk;
+const thunkMiddleware: ThunkMiddleware<HyperState, HyperActions> = thunk as ThunkMiddleware<HyperState, HyperActions>;
 
 const configureStoreForDevelopment = () => {
-  const enhancer = composeWithDevTools(applyMiddleware(thunk, plugins.middleware, thunk, writeMiddleware, effects));
+  const enhancer = composeWithDevTools(applyMiddleware(thunkMiddleware, plugins.middleware, writeMiddleware, effects));
 
-  return createStore(rootReducer, enhancer);
+  return createStore(rootReducer, undefined, enhancer);
 };
 
 export default configureStoreForDevelopment;

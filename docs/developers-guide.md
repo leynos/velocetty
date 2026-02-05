@@ -27,7 +27,9 @@ must follow locally.
 The renderer runtime depends on React in both the root `package.json` and the
 packaged app manifest in `app/package.json`. When upgrading React, update both
 manifests in the same change and keep the app manifest on exact versions to
-avoid duplicate React instances in plugins.
+avoid duplicate React instances in plugins. React 19 requires aligning
+`react-redux` 9.x with `redux` 5.x, plus matching `@types/react` and
+`@types/react-dom` versions in `package.json`.
 
 ## Formatting and linting
 

@@ -1,22 +1,35 @@
+/**
+ * @file Redux middleware that executes optional `effect` callbacks on actions.
+ *
+ * Responsibilities:
+ * - Run action `effect` callbacks after the plugins middleware.
+ * - Allow plugins to interrupt, defer, or augment side effects.
+ *
+ * Usage:
+ * - Register in the Redux middleware chain after `plugins.middleware`.
+ */
 import type {Dispatch, Middleware} from 'redux';
 
 import type {HyperActions, HyperState} from '../../typings/hyper';
-/**
- * Simple redux middleware that executes
- * the `effect` field if provided in an action
- * since this is preceded by the `plugins`
- * middleware. It allows authors to interrupt,
- * defer or add to existing side effects at will
- * as the result of an action being triggered.
- */
+
+const executedEffects = new WeakSet<object>();
+
+const hasEffect = (action: unknown): action is HyperActions => {
+  if (typeof action !== 'object' || action === null) {
+    return false;
+  }
+  return 'effect' in action;
+};
+
 const effectsMiddleware: Middleware<{}, HyperState, Dispatch<HyperActions>> = () => (next) => (action) => {
   const ret = next(action);
-  if (action.effect) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    action.effect();
-    delete action.effect;
+  if (hasEffect(action) && typeof action.effect === 'function') {
+    const actionObject = action as object;
+    if (!executedEffects.has(actionObject)) {
+      executedEffects.add(actionObject);
+      action.effect();
+    }
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return ret;
 };
 export default effectsMiddleware;

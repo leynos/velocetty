@@ -1,3 +1,13 @@
+/**
+ * @file Renderer plugin loading and React/Redux decoration utilities.
+ *
+ * Responsibilities:
+ * - Load renderer plugins and wire them into the Redux/React pipeline.
+ * - Provide connector helpers for plugin-authored UI components.
+ *
+ * Usage:
+ * - Imported by renderer entry points to register plugin hooks.
+ */
 // eslint-disable-next-line eslint-comments/disable-enable-pair
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import ChildProcess from 'node:child_process';
@@ -10,7 +20,6 @@ import {require as remoteRequire} from '@electron/remote';
 // TODO: Should be updates to new async API https://medium.com/@nornagon/electrons-remote-module-considered-harmful-70d69500f31
 import ReactDOM from 'react-dom';
 import {connect as reduxConnect} from 'react-redux';
-import type {ConnectOptions} from 'react-redux/es/components/connect';
 import type {Dispatch, Middleware} from 'redux';
 
 import type {
@@ -32,6 +41,8 @@ import Notification from '../components/notification';
 import IPCChildProcess from './ipc-child-process';
 import notify from './notify';
 import {ObjectTypedKeys} from './object';
+
+type ConnectOptions = NonNullable<Parameters<typeof reduxConnect>[3]>;
 
 // remote interface to `../plugins`
 const plugins = remoteRequire('./plugins') as typeof import('../../app/plugins');
@@ -579,5 +590,5 @@ export function decorateSessionsReducer(fn: ISessionReducer) {
 export const middleware: Middleware<{}, HyperState, Dispatch<HyperActions>> = (store) => (next) => (action) => {
   const nextMiddleware = (remaining: Middleware[]) => (action_: any) =>
     remaining.length ? remaining[0](store)(nextMiddleware(remaining.slice(1)))(action_) : next(action_);
-  nextMiddleware(middlewares)(action);
+  return nextMiddleware(middlewares)(action);
 };
