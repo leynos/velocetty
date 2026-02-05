@@ -590,5 +590,5 @@ export function decorateSessionsReducer(fn: ISessionReducer) {
 export const middleware: Middleware<{}, HyperState, Dispatch<HyperActions>> = (store) => (next) => (action) => {
   const nextMiddleware = (remaining: Middleware[]) => (action_: any) =>
     remaining.length ? remaining[0](store)(nextMiddleware(remaining.slice(1)))(action_) : next(action_);
-  nextMiddleware(middlewares)(action);
+  return nextMiddleware(middlewares)(action);
 };
