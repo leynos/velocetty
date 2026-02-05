@@ -12,7 +12,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Exclude modules that electron-link cannot parse in production builds.
-const excludedModuleMatchers = ['/node_modules/react-redux/'];
+// Match as a real path segment to avoid substring false positives.
+const excludedModuleMatchers = [/\/node_modules\/react-redux(?:\/|$)/];
 
 const crossArchDirs = ['clang_x86_v8_arm', 'clang_x64_v8_arm64', 'win_clang_x64'];
 
@@ -29,7 +30,7 @@ async function main() {
         return false;
       }
       const normalisedPath = requiredModulePath.replace(/\\/g, '/');
-      return excludedModuleMatchers.some((matcher) => normalisedPath.includes(matcher));
+      return excludedModuleMatchers.some((matcher) => matcher.test(normalisedPath));
     }
   });
 
