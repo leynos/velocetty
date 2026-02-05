@@ -14,13 +14,40 @@
  * - Update or remove this file if `styled-jsx` usage is replaced or if React's
  *   types begin to include these attributes natively.
  */
-/// <reference types="react" />
+import type React from 'react';
 
-declare namespace JSX {
-  interface IntrinsicElements {
-    style: React.DetailedHTMLProps<React.StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement> & {
-      jsx?: boolean | string | undefined;
-      global?: boolean | string | undefined;
-    };
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      style: React.DetailedHTMLProps<React.StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement> & {
+        jsx?: boolean | string | undefined;
+        global?: boolean | string | undefined;
+      };
+    }
   }
 }
+
+declare module 'react/jsx-runtime' {
+  namespace JSX {
+    interface IntrinsicElements {
+      style: React.DetailedHTMLProps<React.StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement> & {
+        jsx?: boolean | string | undefined;
+        global?: boolean | string | undefined;
+      };
+    }
+  }
+}
+
+declare module 'react/jsx-dev-runtime' {
+  namespace JSX {
+    interface IntrinsicElements {
+      style: React.DetailedHTMLProps<React.StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement> & {
+        jsx?: boolean | string | undefined;
+        global?: boolean | string | undefined;
+      };
+    }
+  }
+}
+
+// biome-ignore lint/complexity/noUselessEmptyExport: keep explicit module marker for declaration consistency.
+export {};
