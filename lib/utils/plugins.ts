@@ -10,7 +10,6 @@ import {require as remoteRequire} from '@electron/remote';
 // TODO: Should be updates to new async API https://medium.com/@nornagon/electrons-remote-module-considered-harmful-70d69500f31
 import ReactDOM from 'react-dom';
 import {connect as reduxConnect} from 'react-redux';
-import type {ConnectOptions} from 'react-redux/es/components/connect';
 import type {Dispatch, Middleware} from 'redux';
 
 import type {
@@ -32,6 +31,8 @@ import Notification from '../components/notification';
 import IPCChildProcess from './ipc-child-process';
 import notify from './notify';
 import {ObjectTypedKeys} from './object';
+
+type ConnectOptions = NonNullable<Parameters<typeof reduxConnect>[3]>;
 
 // remote interface to `../plugins`
 const plugins = remoteRequire('./plugins') as typeof import('../../app/plugins');

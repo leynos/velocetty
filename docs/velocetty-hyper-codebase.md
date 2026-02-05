@@ -1949,9 +1949,9 @@ Root Dependencies (package.json):
 ├── @redux-devtools/extension: ^3.3.0
 ├── react: 19.2.4
 ├── react-dom: 19.2.4
-├── react-redux: 8.1.3
+├── react-redux: 9.2.0
 ├── redux: 4.2.1
-├── redux-thunk: 2.4.2
+├── redux-thunk: 3.1.0
 ├── xterm: 5.3.0
 ├── xterm-addon-canvas: 0.5.0
 ├── xterm-addon-fit: 0.8.0
@@ -2254,9 +2254,9 @@ bun run dist       # Build + electron-builder packaging
 
 | Tool | Version | Purpose |
 | ---- | ------- | ------- |
-| **Bun test runner** | 1.3.7 | Unit test runner (Jest-compatible) |
+| **Bun test runner** | 1.3.8 | Unit test runner (Jest-compatible) |
 | **Playwright** | 1.43.1 | End-to-end testing for packaged application |
-| **Bun `mock.module`** | 1.3.7 | Module mocking for unit tests |
+| **Bun `mock.module`** | 1.3.8 | Module mocking for unit tests |
 
 ##### Test configurations
 
@@ -8459,7 +8459,7 @@ flowchart LR
 
 | Test Type | Framework | Coverage Area |
 | ----------- | ----------- | --------------- |
-| Unit Tests | Bun test runner 1.3.7 | Core logic, utilities |
+| Unit Tests | Bun test runner 1.3.8 | Core logic, utilities |
 | E2E Tests | Playwright 1.43.1 | Application smoke tests |
 | Lint Checks | ESLint 8.57.0 | Code quality standards |
 | Type Checking | tsgo 7.0.0-dev.20260128.1 | Static type analysis |
@@ -8747,7 +8747,7 @@ scenarios, Velocetty's testing strategy prioritizes:
 flowchart TB
     subgraph TestingLayers["Velocetty Testing Architecture"]
         subgraph UnitTestLayer["Unit Testing Layer"]
-            BunTest["Bun test runner 1.3.7<br/>Unit Tests"]
+            BunTest["Bun test runner 1.3.8<br/>Unit Tests"]
             BunMocks["Bun mock.module<br/>Module Mocking"]
         end
         
@@ -8787,9 +8787,9 @@ flowchart TB
 
 | Tool | Version | Purpose | Configuration |
 | ------ | --------- | --------- | --------------- |
-| Bun test runner | 1.3.7 | Unit test runner (Jest-compatible) | `bun test` |
+| Bun test runner | 1.3.8 | Unit test runner (Jest-compatible) | `bun test` |
 | Playwright | 1.43.1 | E2E testing for Electron applications | `test/e2e/*.test.ts` |
-| Bun `mock.module` | 1.3.7 | Module mocking and dependency injection | `mock.module()` |
+| Bun `mock.module` | 1.3.8 | Module mocking and dependency injection | `mock.module()` |
 | Biome | 2.3.13 | Static analysis and formatting | `biome.json` |
 | tsgo (TypeScript native preview) | 7.0.0-dev.20260128.1 | Static type checking | `tsconfig.base.json` |
 | CodeQL | v3 | Security vulnerability scanning | `codeql-analysis.yml` |
@@ -11063,7 +11063,7 @@ flowchart TB
 | -------------- | ------ | ---------------- |
 | Lint | ESLint 8.57.0 + Prettier 3.2.5 | Job fails, PR blocked |
 | Type Check | tsgo 7.0.0-dev.20260128.1 | Build fails |
-| Unit Tests | Bun test runner 1.3.7 | Job fails, PR blocked |
+| Unit Tests | Bun test runner 1.3.8 | Job fails, PR blocked |
 | Build | Webpack + electron-builder | Job fails |
 | E2E Tests | Playwright 1.43.1 | Job fails, screenshot captured |
 | Security | CodeQL | Security alert generated |

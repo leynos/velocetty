@@ -78,6 +78,8 @@ and see all required commands complete successfully.
 - [x] (2026-02-05 15:12Z) Stage C complete: React 19 code remediation applied.
 - [x] (2026-02-05 15:12Z) Stage D complete: documentation updated.
 - [x] (2026-02-05 16:12Z) Stage E complete: validation commands pass.
+- [x] (2026-02-05 18:25Z) Post-implementation fixes applied for Redux 5
+  middleware typing, React Redux imports, and Bun version alignment.
 
 ## Surprises & Discoveries
 
@@ -87,6 +89,12 @@ and see all required commands complete successfully.
   `react-redux.production.min.cjs` in the install log.
   Impact: Updated `bin/mk-snapshot.js` to exclude `react-redux` from snapshot
   linking so the install pipeline can complete.
+- Observation: Redux 5 middleware typing switched to `unknown` actions, and
+  React Redux 9 removed internal `es/components/connect` paths.
+  Evidence: CI type errors for middleware signatures and missing module
+  `react-redux/es/components/connect`.
+  Impact: Added middleware type guards, updated the React Redux type import,
+  and extended the JSX typing augmentation to include `JSX.Element`.
 
 ## Decision Log
 
@@ -100,6 +108,11 @@ and see all required commands complete successfully.
 - Decision: Exclude `react-redux` from V8 snapshot linking.
   Rationale: `electron-link` fails to parse the React Redux production bundle,
   blocking `bun install` and the build pipeline.
+  Date/Author: 2026-02-05 / Codex
+- Decision: Update Redux middleware typing and React Redux imports for Redux 5
+  and React Redux 9 compatibility, and bump Bun to 1.3.8 in CI.
+  Rationale: CI build failures surfaced type and tooling mismatches after the
+  React 19 upgrade.
   Date/Author: 2026-02-05 / Codex
 
 ## Outcomes & Retrospective
@@ -257,4 +270,4 @@ releases as determined in Stage A:
 
 ## Revision note
 
-Marked Stage E complete, recorded outcomes, and set status to COMPLETE.
+Recorded post-implementation fixes for Redux 5, React Redux 9, and Bun 1.3.8.

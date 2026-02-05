@@ -18,6 +18,8 @@ import type React from 'react';
 
 declare global {
   namespace JSX {
+    type Element = React.ReactElement;
+
     interface IntrinsicElements {
       style: React.DetailedHTMLProps<React.StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement> & {
         jsx?: boolean | string | undefined;
