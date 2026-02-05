@@ -51,7 +51,7 @@ const SearchButton = ({
       title={title}
     >
       {children}
-      <style jsx="true">{`
+      <style jsx={true}>{`
           .search-button {
             cursor: pointer;
             color: ${foregroundColor};
@@ -175,7 +175,7 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
           <VscClose size="14px" />
         </SearchButton>
       </div>
-      <style jsx="true">{`
+      <style jsx={true}>{`
         .search-container {
           background-color: ${backgroundColor};
           border: 1px solid ${borderColor};

@@ -141,7 +141,7 @@ export default class Terms extends React.Component<React.PropsWithChildren<Terms
           borderColor={this.props.borderColor}
         />
 
-        <style jsx="true">{`
+        <style jsx={true}>{`
           .terms_terms {
             position: absolute;
             margin-top: 34px;

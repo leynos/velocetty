@@ -6,13 +6,14 @@
  */
 // Native
 import {spawn} from 'node:child_process';
-import path from 'node:path';
 
 // Packages
 import {expect, test} from 'bun:test';
 import fs from 'fs-extra';
 import {_electron} from 'playwright';
 import type {ElectronApplication} from 'playwright';
+
+import {resolveLaunchConfig, withTimeout} from './electron-e2e-helpers';
 
 const shouldRunE2E = process.env.RUN_E2E === '1';
 const e2eTest = shouldRunE2E ? test : test.skip;
@@ -31,96 +32,6 @@ if (shouldRunE2E && driverOverride && !validDrivers.has(driverOverride)) {
   throw new Error(`E2E_DRIVER must be "playwright" or "spawn", received "${driverOverride}".`);
 }
 const shouldUsePlaywright = driverOverride ? driverOverride === 'playwright' : !isCi;
-
-/**
- * Returns a promise that rejects when the timeout elapses.
- *
- * # Parameters
- * - `promise`: Work to race against the timeout.
- * - `ms`: Timeout in milliseconds.
- *
- * # Returns
- * The resolved value of `promise` if it finishes in time.
- *
- * # Examples
- *
- * ```ts
- * await withTimeout(Promise.resolve('ok'), 500);
- * ```
- */
-const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  let didTimeout = false;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      didTimeout = true;
-      reject(new Error(`Timed out after ${ms}ms`));
-    }, ms);
-  });
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    if (didTimeout) {
-      void promise.catch(() => {});
-    }
-  }
-};
-
-/**
- * Resolves the packaged Electron binary path and platform-specific arguments.
- *
- * # Returns
- * An object shaped as `{pathToBinary: string, launchArgs: string[]}` with the
- * resolved binary path and any required launch arguments for the current
- * platform.
- *
- * # Platform support
- * - `linux`: `dist/linux-unpacked/hyper`
- * - `darwin`: `dist/mac/Hyper.app/Contents/MacOS/Hyper`
- * - `win32`: `dist/win-unpacked/Hyper.exe`
- *
- * On Linux, when `CI='true'` or `ELECTRON_DISABLE_SANDBOX='1'`, the function
- * adds `--no-sandbox` and `--disable-setuid-sandbox` to `launchArgs`. It throws
- * an `Error` for unsupported platforms.
- *
- * # Examples
- *
- * ```ts
- * const {pathToBinary, launchArgs} = resolveLaunchConfig();
- * ```
- */
-const resolveLaunchConfig = () => {
-  let pathToBinary: string;
-  const launchArgs: string[] = [];
-
-  switch (process.platform) {
-    case 'linux':
-      pathToBinary = path.join(__dirname, '../../dist/linux-unpacked/hyper');
-      break;
-
-    case 'darwin':
-      pathToBinary = path.join(__dirname, '../../dist/mac/Hyper.app/Contents/MacOS/Hyper');
-      break;
-
-    case 'win32':
-      pathToBinary = path.join(__dirname, '../../dist/win-unpacked/Hyper.exe');
-      break;
-
-    default:
-      throw new Error(
-        'Path to the built binary needs to be defined for this platform in test/e2e/electron.e2e.test.ts'
-      );
-  }
-
-  if (process.platform === 'linux' && (process.env.CI === 'true' || process.env.ELECTRON_DISABLE_SANDBOX === '1')) {
-    launchArgs.push('--no-sandbox', '--disable-setuid-sandbox');
-  }
-
-  return {pathToBinary, launchArgs};
-};
 
 e2eTest(
   'launches the packaged app',

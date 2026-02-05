@@ -62,6 +62,8 @@ Unit tests run under Bun's built-in test runner. Use one of the following:
 
 - `bun run test:unit`
 - `bun test test/unit`
+- `bun run test:coverage` (writes text + lcov reports under `coverage/`)
+- `make coverage`
 
 ### End-to-end (E2E) tests (Playwright)
 
