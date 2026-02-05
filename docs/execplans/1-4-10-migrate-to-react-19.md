@@ -115,7 +115,7 @@ and see all required commands complete successfully.
   and React Redux 9 compatibility, and bump Bun to 1.3.8 in CI.
   Rationale: CI build failures surfaced type and tooling mismatches after the
   React 19 upgrade.
-  Date/Author: 2026-02-05 / Codex
+  Date/Author: 2026-02-05 / Codex.
 
 ## Outcomes & retrospective
 

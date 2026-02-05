@@ -22,7 +22,8 @@ const isSessionPtyDataAction = (action: unknown): action is SessionPtyDataAction
   return (
     maybeAction.type === 'SESSION_PTY_DATA' &&
     typeof maybeAction.uid === 'string' &&
-    typeof maybeAction.data === 'string'
+    typeof maybeAction.data === 'string' &&
+    typeof maybeAction.now === 'number'
   );
 };
 

@@ -26,8 +26,8 @@ const effectsMiddleware: Middleware<{}, HyperState, Dispatch<HyperActions>> = ()
   if (hasEffect(action) && typeof action.effect === 'function') {
     const actionObject = action as object;
     if (!executedEffects.has(actionObject)) {
-      action.effect();
       executedEffects.add(actionObject);
+      action.effect();
     }
   }
   return ret;
