@@ -1,8 +1,8 @@
 # Assess coverage gaps and add Bun coverage benchmarking
 
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` are maintained as work proceeds.
+`Risks`, `Progress`, `Surprises and discoveries`, `Decision log`, and
+`Outcomes and retrospective` are maintained as work proceeds.
 
 Status: COMPLETE
 

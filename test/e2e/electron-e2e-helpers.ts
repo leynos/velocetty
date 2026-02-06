@@ -1,12 +1,12 @@
 /** @file Shared helpers for Electron E2E launch and timeout behaviour. */
 import path from 'node:path';
 
-type ResolveLaunchConfigOptions = {
+type ResolveLaunchConfigOptions = Readonly<{
   platform?: NodeJS.Platform;
   ci?: string;
   electronDisableSandbox?: string;
   baseDir?: string;
-};
+}>;
 
 type SupportedPlatform = 'linux' | 'darwin' | 'win32';
 

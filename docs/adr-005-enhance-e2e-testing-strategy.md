@@ -11,12 +11,11 @@ checks and deeper scheduled coverage).
 
 ## Context and problem statement
 
-The current end-to-end (E2E) suite is intentionally narrow. It validates that a
-packaged
-Electron binary can launch, and it can run in Playwright mode or spawn mode,
-but it does not assert enough renderer behaviour after startup. As a result,
-it is possible to pass E2E checks while still regressing critical user-visible
-flows in the user interface (UI) layer.[^1]
+The current end-to-end (E2E) suite is intentionally narrow. It validates that
+a packaged Electron binary can launch, and it can run in Playwright mode or
+spawn mode, but it does not assert enough renderer behaviour after startup. As
+a result, it is possible to pass E2E checks while still regressing critical
+user-visible flows in the user interface (UI) layer.[^1]
 
 Two competing needs must be balanced:
 

@@ -41,26 +41,49 @@ const settle = async () => {
 
 const createTimerCapture = () => {
   const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
   const originalSetInterval = globalThis.setInterval;
+  const originalClearInterval = globalThis.clearInterval;
   const timeoutCallbacks: Array<() => void> = [];
   const intervalCallbacks: Array<() => void> = [];
+  const clearedTimeouts: number[] = [];
+  const clearedIntervals: number[] = [];
+  let nextTimerId = 0;
 
   return {
     timeoutCallbacks,
     intervalCallbacks,
+    clearedTimeouts,
+    clearedIntervals,
     install: () => {
       globalThis.setTimeout = ((callback: () => void) => {
+        nextTimerId += 1;
         timeoutCallbacks.push(callback);
-        return 1 as unknown as NodeJS.Timeout;
+        return nextTimerId as unknown as NodeJS.Timeout;
       }) as typeof globalThis.setTimeout;
+      globalThis.clearTimeout = ((timer?: NodeJS.Timeout) => {
+        const timerId = Number(timer);
+        if (Number.isFinite(timerId)) {
+          clearedTimeouts.push(timerId);
+        }
+      }) as typeof globalThis.clearTimeout;
       globalThis.setInterval = ((callback: () => void) => {
+        nextTimerId += 1;
         intervalCallbacks.push(callback);
-        return 1 as unknown as NodeJS.Timeout;
+        return nextTimerId as unknown as NodeJS.Timeout;
       }) as typeof globalThis.setInterval;
+      globalThis.clearInterval = ((timer?: NodeJS.Timeout) => {
+        const timerId = Number(timer);
+        if (Number.isFinite(timerId)) {
+          clearedIntervals.push(timerId);
+        }
+      }) as typeof globalThis.clearInterval;
     },
     restore: () => {
       globalThis.setTimeout = originalSetTimeout;
+      globalThis.clearTimeout = originalClearTimeout;
       globalThis.setInterval = originalSetInterval;
+      globalThis.clearInterval = originalClearInterval;
     }
   };
 };

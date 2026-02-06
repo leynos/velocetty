@@ -118,6 +118,7 @@ test('install() maps npm and transport errors to stable user-facing messages', a
   gotError = {statusCode: 404, message: 'Not found'};
   await expect(install('missing-plugin')).rejects.toBe('missing-plugin not found on npm');
 
+  // gotMock reads this mutable binding at call time for the second install path.
   gotError = {message: 'socket hang up'};
   await expect(install('unstable-plugin')).rejects.toBe(
     'socket hang up\nPlugin check failed. Check your internet connection or retry later.'
