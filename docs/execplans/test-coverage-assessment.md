@@ -1,4 +1,4 @@
-# Assess Coverage Gaps and Add Bun Coverage Benchmarking
+# Assess coverage gaps and add Bun coverage benchmarking
 
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
@@ -6,7 +6,7 @@ This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 
 Status: COMPLETE
 
-## Purpose / Big Picture
+## Purpose and big picture
 
 The current repository has a small unit and E2E test surface, but there is no
 standardized Bun coverage workflow and several high-branch files are
@@ -32,7 +32,7 @@ Success is observable when:
 - Keep documentation aligned with actual commands and outputs.
 - Do not introduce new external dependencies.
 
-## Tolerances (Exception Triggers)
+## Tolerances (exception triggers)
 
 - Scope: if more than 12 files must change, stop and re-evaluate scope.
 - Interfaces: if production-facing API signatures must change, stop and
@@ -76,7 +76,7 @@ Success is observable when:
   metrics.
 - [x] 2026-02-05 22:23 UTC: Ran required Makefile gates successfully.
 
-## Surprises & Discoveries
+## Surprises and discoveries
 
 - `bun run test:unit` initially failed because `act` was imported from `react`
   instead of `react-dom/test-utils` in two tests.
@@ -103,7 +103,7 @@ Success is observable when:
     props in multiple styled-jsx blocks; these were corrected to
     `jsx={true}` / `global={true}` so the requested gates pass.
 
-## Decision Log
+## Decision log
 
 - Decision: Fix baseline test breakage before coverage expansion.
   Rationale: Coverage metrics are only meaningful once the suite is stable.
@@ -126,7 +126,7 @@ Success is observable when:
   Rationale: User-required quality gates include `make typecheck`, which could
   not pass without these corrections.
 
-## Outcomes & Retrospective
+## Outcomes and retrospective
 
 Completed deliverables:
 

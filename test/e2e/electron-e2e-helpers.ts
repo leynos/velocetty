@@ -55,9 +55,7 @@ export const resolveLaunchConfig = (options: ResolveLaunchConfigOptions = {}) =>
       pathToBinary = path.join(baseDir, '../../dist/win-unpacked/Hyper.exe');
       break;
     default:
-      throw new Error(
-        'Path to the built binary needs to be defined for this platform in test/e2e/electron.e2e.test.ts'
-      );
+      throw new Error('Path to the built binary needs to be defined for this platform in E2E launch helpers.');
   }
 
   if (platform === 'linux' && (ci === 'true' || electronDisableSandbox === '1')) {

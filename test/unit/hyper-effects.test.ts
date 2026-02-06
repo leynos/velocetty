@@ -1,7 +1,6 @@
 /** @file Verifies Hyper side effects for key bindings and focus. */
-import React from 'react';
+import React, {act} from 'react';
 import {createRoot} from 'react-dom/client';
-import {act} from 'react-dom/test-utils';
 
 import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
@@ -129,7 +128,7 @@ test.serial('Hyper attaches key listeners on mount and config updates', async ()
   });
 
   expect(registerCalls).toBe(1);
-  expect(bindCalls > 0).toBe(true);
+  expect(bindCalls).toBeGreaterThan(0);
   expect(resetCalls).toBe(0);
 
   await act(async () => {
@@ -269,5 +268,54 @@ test.serial('Hyper routes key handlers and select-all callbacks through terms', 
     await waitFor(0);
   });
   expect(removedListeners).toContain('term selectAll');
+  cleanup();
+});
+
+test.serial('Hyper does not call preventDefault when key handlers allow default behaviour', async () => {
+  const cleanup = await setupHappyDom();
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  const rpcWindow = window as Window & {
+    rpc: {
+      on: (event: string, callback: () => void) => void;
+      off: (event: string, callback: () => void) => void;
+      removeListener: (..._args: unknown[]) => void;
+    };
+  };
+  rpcWindow.rpc = {
+    on: () => {},
+    off: () => {},
+    removeListener: () => {}
+  };
+
+  let commandCalls = 0;
+  let preventedDefaultCalls = 0;
+  shouldPreventDefaultResult = false;
+  registeredKeys = {demo: 'demo:command'};
+
+  await act(async () => {
+    renderHyper(root, {
+      execCommand: () => {
+        commandCalls += 1;
+      }
+    });
+    await waitFor(0);
+  });
+
+  expect(boundKeyHandlers).toHaveLength(1);
+  boundKeyHandlers[0]({
+    preventDefault: () => {
+      preventedDefaultCalls += 1;
+    }
+  });
+
+  expect(commandCalls).toBe(1);
+  expect(preventedDefaultCalls).toBe(0);
+
+  await act(async () => {
+    root.unmount();
+  });
   cleanup();
 });

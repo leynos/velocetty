@@ -1,7 +1,6 @@
 /** @file Exercises notification timing and dismissal behaviour. */
-import React from 'react';
+import React, {act} from 'react';
 import {createRoot} from 'react-dom/client';
-import {act} from 'react-dom/test-utils';
 
 import {expect, test} from 'bun:test';
 
@@ -22,11 +21,14 @@ const buildNotificationProps = (
   ...overrides
 });
 const dispatchOpacityTransition = (indicator: Element) => {
+  indicator.dispatchEvent(buildTransitionEvent(indicator, 'opacity'));
+};
+const buildTransitionEvent = (target: Element, propertyName: string) => {
   // Happy DOM does not fully populate TransitionEvent fields.
   const event = new Event('transitionend') as TransitionEvent;
-  Object.defineProperty(event, 'propertyName', {value: 'opacity'});
-  Object.defineProperty(event, 'target', {value: indicator});
-  indicator.dispatchEvent(event);
+  Object.defineProperty(event, 'propertyName', {value: propertyName});
+  Object.defineProperty(event, 'target', {value: target});
+  return event;
 };
 /**
  * Creates a deterministic timer adapter for unit tests.
@@ -227,9 +229,7 @@ test.serial('Notification handles manual dismiss transition for user-dismissable
     });
 
     const indicator = requireIndicator(container);
-    const ignoredTransition = new Event('transitionend') as TransitionEvent;
-    Object.defineProperty(ignoredTransition, 'propertyName', {value: 'transform'});
-    Object.defineProperty(ignoredTransition, 'target', {value: indicator});
+    const ignoredTransition = buildTransitionEvent(indicator, 'transform');
     await act(async () => {
       indicator.dispatchEvent(ignoredTransition);
     });

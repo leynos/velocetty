@@ -7,24 +7,25 @@ checks and deeper scheduled coverage).
 
 ## Date
 
-2026-02-05.
+2026-02-05
 
 ## Context and Problem Statement
 
-The current E2E suite is intentionally narrow. It validates that a packaged
+The current end-to-end (E2E) suite is intentionally narrow. It validates that a
+packaged
 Electron binary can launch, and it can run in Playwright mode or spawn mode,
 but it does not assert enough renderer behaviour after startup. As a result,
-we can pass E2E checks while still regressing critical user-visible flows in
-the UI layer.[^dev-guide]
+it is possible to pass E2E checks while still regressing critical user-visible
+flows in the user interface (UI) layer.[^1]
 
-We also need to balance two competing needs:
+Two competing needs must be balanced:
 
 - Fast feedback on pull requests.
 - Deeper behavioural confidence before releases.
 
 Bun is now the default test runtime for unit and integration testing in this
 repository, but deeper Playwright capabilities remain most reliable when run
-with Playwright's own runner under Node.js.[^bun-test][^playwright-test]
+with Playwright's own runner under Node.js.[^2][^3]
 This ADR proposes a structured split that keeps pull request checks fast while
 raising behavioural confidence in scheduled and release-time E2E runs.
 
@@ -65,7 +66,7 @@ it provides limited confidence in renderer behaviour.
 Implement richer Playwright interactions while still running all E2E through
 `bun test`. This keeps runtime consistency, but it risks weaker compatibility
 with advanced Playwright features compared with Playwright's Node-first test
-runner.[^bun-playwright]
+runner.[^4]
 
 ### Option C: Layered strategy (recommended)
 
@@ -75,6 +76,9 @@ Use two E2E lanes:
   assertions.
 - A deeper scheduled lane driven by Playwright's test runner under Node.js for
   richer interaction and diagnostics.
+
+For screen readers: The following table compares trade-offs between the three
+strategy options, including confidence, speed, and operational complexity.
 
 | Topic | Option A | Option B | Option C |
 | --- | --- | --- | --- |
@@ -155,9 +159,9 @@ This direction aligns with Velocetty's Bun-first development workflow while
 acknowledging that Playwright's deeper browser automation features are best
 supported in Playwright's own runner. The layered approach improves confidence
 where risk is highest, without forcing every pull request through a slow,
-high-variance E2E path.[^bun-test][^playwright-test]
+high-variance E2E path.[^2][^3]
 
-[^dev-guide]: [Developers' guide](developers-guide.md)
-[^bun-test]: <https://bun.com/docs/test>
-[^playwright-test]: <https://playwright.dev/docs/test-intro>
-[^bun-playwright]: <https://www.browserstack.com/guide/bun-playwright>
+[^1]: [Developers' guide](developers-guide.md)
+[^2]: <https://bun.com/docs/test>
+[^3]: <https://playwright.dev/docs/test-intro>
+[^4]: <https://www.browserstack.com/guide/bun-playwright>

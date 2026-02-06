@@ -16,6 +16,11 @@ test('withTimeout() rejects when work exceeds the timeout budget', async () => {
   await expect(withTimeout(pendingPromise, 1)).rejects.toThrow('Timed out after 1ms');
 });
 
+test('withTimeout() forwards promise rejections before timeout elapses', async () => {
+  const failure = new Error('boom');
+  await expect(withTimeout(Promise.reject(failure), 50)).rejects.toThrow('boom');
+});
+
 test('resolveLaunchConfig() returns Linux defaults without sandbox flags', () => {
   expect(
     resolveLaunchConfig({
@@ -49,20 +54,16 @@ test('resolveLaunchConfig() adds Linux sandbox flags in CI and sandbox-disabled 
   ).toEqual(['--no-sandbox', '--disable-setuid-sandbox']);
 });
 
-test('resolveLaunchConfig() returns packaged paths for darwin and win32', () => {
+test.each([
+  ['darwin', '../../dist/mac/Hyper.app/Contents/MacOS/Hyper'],
+  ['win32', '../../dist/win-unpacked/Hyper.exe']
+] as const)('resolveLaunchConfig() returns packaged paths for %s', (platform, relativeBinaryPath) => {
   expect(
     resolveLaunchConfig({
-      platform: 'darwin',
+      platform,
       baseDir
     }).pathToBinary
-  ).toBe(path.join(baseDir, '../../dist/mac/Hyper.app/Contents/MacOS/Hyper'));
-
-  expect(
-    resolveLaunchConfig({
-      platform: 'win32',
-      baseDir
-    }).pathToBinary
-  ).toBe(path.join(baseDir, '../../dist/win-unpacked/Hyper.exe'));
+  ).toBe(path.join(baseDir, relativeBinaryPath));
 });
 
 test('resolveLaunchConfig() rejects unsupported platforms', () => {

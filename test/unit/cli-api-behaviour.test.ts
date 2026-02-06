@@ -19,10 +19,14 @@ let savedConfigs: ConfigData[] = [];
 let requestedUrls: string[] = [];
 let gotError: GotError | null = null;
 let gotVersions: unknown = ['1.0.0'];
+let fsExistsSyncResult = true;
+let fsReadFileSyncValue: unknown;
+let hasReadFileSyncOverride = false;
 
 const fsMock = {
-  existsSync: () => true,
-  readFileSync: () => JSON.stringify(configData),
+  existsSync: () => fsExistsSyncResult,
+  // Assumes cli/api only reads the single config file under test.
+  readFileSync: () => (hasReadFileSyncOverride ? fsReadFileSyncValue : JSON.stringify(configData)),
   writeFileSync: (_path: string, contents: string) => {
     const parsed = JSON.parse(contents) as ConfigData;
     savedConfigs.push(parsed);
@@ -53,6 +57,7 @@ mock.module('got', () => ({default: gotMock}));
 
 const loadCliApi = async () => {
   importIndex += 1;
+  // Query-string cache busting forces a fresh module instance per test in Bun.
   return await import(`../../cli/api.ts?coverage_case=${importIndex}`);
 };
 
@@ -62,6 +67,9 @@ beforeEach(() => {
   requestedUrls = [];
   gotError = null;
   gotVersions = ['1.0.0'];
+  fsExistsSyncResult = true;
+  hasReadFileSyncOverride = false;
+  fsReadFileSyncValue = undefined;
 });
 
 test('list() and isInstalled() read configured plugin state', async () => {
@@ -82,6 +90,18 @@ test('install() persists plugin entries from npm checks', async () => {
   expect(savedConfigs.at(-1)).toEqual({
     plugins: ['plugin-alpha'],
     localPlugins: []
+  });
+});
+
+test('install() persists local plugin entries when local install is requested', async () => {
+  const {install} = await loadCliApi();
+
+  await install('local-plugin', true);
+
+  expect(requestedUrls).toEqual(['https://registry.npmjs.org/local-plugin']);
+  expect(savedConfigs.at(-1)).toEqual({
+    plugins: [],
+    localPlugins: ['local-plugin']
   });
 });
 
@@ -137,6 +157,13 @@ test('exists(), list(), and isInstalled() handle empty or malformed plugin array
   };
   const malformedApi = await loadCliApi();
   expect(malformedApi.isInstalled('plugin-x')).toBe(false);
+});
+
+test('exists() returns false when config reading yields undefined', async () => {
+  hasReadFileSyncOverride = true;
+  fsReadFileSyncValue = undefined;
+  const {exists} = await loadCliApi();
+  expect(exists()).toBe(false);
 });
 
 test('node:fs mock preserves passthrough exports required by other suites', async () => {
