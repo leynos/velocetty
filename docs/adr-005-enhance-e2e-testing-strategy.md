@@ -154,7 +154,7 @@ The proposed direction is:
 
 ## Architectural rationale
 
-This direction aligns with Velocetty's Bun-first development workflow while
+This direction aligns with Velocetty's Bun-first development workflow, while
 acknowledging that Playwright's deeper browser automation features are best
 supported in Playwright's own runner. The layered approach improves confidence
 where risk is highest, without forcing every pull request through a slow,
