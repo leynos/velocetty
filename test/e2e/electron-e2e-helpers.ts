@@ -55,7 +55,6 @@ export const resolveLaunchConfig = (options: ResolveLaunchConfigOptions = {}) =>
   const baseDir = options.baseDir ?? __dirname;
 
   let pathToBinary: string;
-  const launchArgs: string[] = [];
 
   switch (platform) {
     case 'linux':
@@ -71,9 +70,10 @@ export const resolveLaunchConfig = (options: ResolveLaunchConfigOptions = {}) =>
       return assertNever(platform);
   }
 
-  if (platform === 'linux' && (ci === 'true' || electronDisableSandbox === '1')) {
-    launchArgs.push('--no-sandbox', '--disable-setuid-sandbox');
-  }
+  const launchArgs: readonly string[] =
+    platform === 'linux' && (ci === 'true' || electronDisableSandbox === '1')
+      ? ['--no-sandbox', '--disable-setuid-sandbox']
+      : [];
 
   return {pathToBinary, launchArgs};
 };

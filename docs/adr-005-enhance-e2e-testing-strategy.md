@@ -106,7 +106,7 @@ The proposed direction is:
 
 ### Goals
 
-- Catch regressions where the app launches but the renderer is not usable.
+- Catch regressions where the app launches, but the renderer is not usable.
 - Validate at least one user interaction flow end-to-end.
 - Preserve quick pull request signal while improving release confidence.
 
