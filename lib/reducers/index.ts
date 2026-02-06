@@ -9,7 +9,7 @@
  * - Import as the application root reducer when creating the Redux store.
  */
 import {combineReducers} from 'redux';
-import type {Reducer, ReducersMapObject} from 'redux';
+import type {ReducersMapObject} from 'redux';
 
 import type {HyperActions, HyperState} from '../../typings/hyper';
 
@@ -23,6 +23,6 @@ const reducers: ReducersMapObject<HyperState, HyperActions> = {
   termGroups
 };
 
-const rootReducer = combineReducers(reducers) as Reducer<HyperState, HyperActions>;
+const rootReducer = combineReducers(reducers);
 
 export default rootReducer;
