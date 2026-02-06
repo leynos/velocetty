@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 005: Enhance end-to-end testing strategy
+# Architectural decision record (ADR) 005: enhance end-to-end testing strategy
 
 ## Status
 
@@ -55,19 +55,19 @@ raising behavioural confidence in scheduled and release-time E2E runs.
 
 ## Options considered
 
-### Option A: Keep a smoke-only E2E suite
+### Option A: keep a smoke-only E2E suite
 
 Retain only the current startup smoke checks in Bun. This is cheap to run, but
 it provides limited confidence in renderer behaviour.
 
-### Option B: Expand all E2E checks inside the Bun test runner
+### Option B: expand all E2E checks inside the Bun test runner
 
 Implement richer Playwright interactions while still running all E2E through
 `bun test`. This keeps runtime consistency, but it risks weaker compatibility
 with advanced Playwright features compared with Playwright's Node-first test
 runner.[^4]
 
-### Option C: Layered strategy (recommended)
+### Option C: layered strategy (recommended)
 
 Use two E2E lanes:
 
@@ -118,13 +118,13 @@ The proposed direction is:
 
 ## Migration plan
 
-### Phase 1: Fast-lane hardening
+### Phase 1: fast-lane hardening
 
 - Extend the existing E2E smoke check to assert renderer readiness.
 - Fail on critical renderer console errors during startup.
 - Preserve `E2E_DRIVER=spawn|playwright` compatibility in the fast lane.
 
-### Phase 2: Deeper behavioural lane
+### Phase 2: deeper behavioural lane
 
 - Add Playwright-runner suites under a dedicated command and CI job.
 - Cover at least one interaction path, such as opening a tab or invoking a
