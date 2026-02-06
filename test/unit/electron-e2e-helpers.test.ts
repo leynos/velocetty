@@ -35,21 +35,15 @@ test('resolveLaunchConfig() returns Linux defaults without sandbox flags', () =>
   });
 });
 
-test('resolveLaunchConfig() adds Linux sandbox flags in CI and sandbox-disabled modes', () => {
+test.each([
+  {ci: 'true'},
+  {ci: 'false', electronDisableSandbox: '1'}
+] as const)('resolveLaunchConfig() adds Linux sandbox flags in trigger mode %#', (overrides) => {
   expect(
     resolveLaunchConfig({
       platform: 'linux',
-      ci: 'true',
-      baseDir
-    }).launchArgs
-  ).toEqual(['--no-sandbox', '--disable-setuid-sandbox']);
-
-  expect(
-    resolveLaunchConfig({
-      platform: 'linux',
-      ci: 'false',
-      electronDisableSandbox: '1',
-      baseDir
+      baseDir,
+      ...overrides
     }).launchArgs
   ).toEqual(['--no-sandbox', '--disable-setuid-sandbox']);
 });

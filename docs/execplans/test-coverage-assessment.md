@@ -78,8 +78,9 @@ Success is observable when:
 
 ## Surprises and discoveries
 
-- `bun run test:unit` initially failed because `act` was imported from `react`
-  instead of `react-dom/test-utils` in two tests.
+- `bun run test:unit` initially failed because the suite used mixed `act`
+  import paths; tests are now standardized on React 19's `act` import from
+  `react`.
 - Baseline `bun test --coverage test/unit` results:
   - Functions: 72.73%
   - Lines: 84.77%

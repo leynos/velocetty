@@ -16,6 +16,14 @@ type TermsRef = {
   getActiveTerm: () => {focus: () => void; selectAll?: () => void} | null;
 };
 type KeyHandler = (event: {preventDefault: () => void; catched?: boolean}) => void;
+type RpcWindow = Window & {
+  rpc: {
+    on: (event: string, callback: () => void) => void;
+    off: (event: string, callback: () => void) => void;
+    removeListener: (..._args: unknown[]) => void;
+  };
+  focusActiveTerm?: (uid?: string) => void;
+};
 
 /**
  * Hyper component type derived from the container export.
@@ -65,6 +73,22 @@ const buildHyperProps = (overrides: Partial<HyperProps> = {}): HyperProps => ({
 
 const renderHyper = (root: ReturnType<typeof createRoot>, overrides: Partial<HyperProps> = {}) => {
   root.render(React.createElement(Hyper, buildHyperProps(overrides)));
+};
+
+const buildRpcWindowStub = () => {
+  const listeners: Record<string, () => void> = {};
+  const removedListeners: string[] = [];
+  const rpcWindow = window as RpcWindow;
+  rpcWindow.rpc = {
+    on: (event, callback) => {
+      listeners[event] = callback;
+    },
+    off: (event) => {
+      removedListeners.push(event);
+    },
+    removeListener: () => {}
+  };
+  return {listeners, removedListeners, rpcWindow};
 };
 
 mock.module('../../lib/actions/ui', () => ({
@@ -195,25 +219,7 @@ test.serial('Hyper routes key handlers and select-all callbacks through terms', 
   document.body.appendChild(container);
   const root = createRoot(container);
 
-  const listeners: Record<string, () => void> = {};
-  const removedListeners: string[] = [];
-  const rpcWindow = window as Window & {
-    rpc: {
-      on: (event: string, callback: () => void) => void;
-      off: (event: string, callback: () => void) => void;
-      removeListener: (..._args: unknown[]) => void;
-    };
-    focusActiveTerm?: (uid?: string) => void;
-  };
-  rpcWindow.rpc = {
-    on: (event, callback) => {
-      listeners[event] = callback;
-    },
-    off: (event) => {
-      removedListeners.push(event);
-    },
-    removeListener: () => {}
-  };
+  const {listeners, removedListeners, rpcWindow} = buildRpcWindowStub();
 
   let commandCalls = 0;
   let preventedDefaultCalls = 0;
@@ -243,7 +249,7 @@ test.serial('Hyper routes key handlers and select-all callbacks through terms', 
     await waitFor(0);
   });
 
-  expect(boundKeyHandlers.length).toBe(1);
+  expect(boundKeyHandlers).toHaveLength(1);
   boundKeyHandlers[0]({
     preventDefault: () => {
       preventedDefaultCalls += 1;
@@ -277,18 +283,7 @@ test.serial('Hyper does not call preventDefault when key handlers allow default 
   document.body.appendChild(container);
   const root = createRoot(container);
 
-  const rpcWindow = window as Window & {
-    rpc: {
-      on: (event: string, callback: () => void) => void;
-      off: (event: string, callback: () => void) => void;
-      removeListener: (..._args: unknown[]) => void;
-    };
-  };
-  rpcWindow.rpc = {
-    on: () => {},
-    off: () => {},
-    removeListener: () => {}
-  };
+  buildRpcWindowStub();
 
   let commandCalls = 0;
   let preventedDefaultCalls = 0;

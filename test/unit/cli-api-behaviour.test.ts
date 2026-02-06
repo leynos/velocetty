@@ -129,7 +129,7 @@ test('existsOnNpm() rejects malformed responses that do not include versions', a
 
   gotVersions = undefined;
   await expect(existsOnNpm('plugin-without-versions')).rejects.toMatchObject({
-    body: {}
+    body: {versions: undefined}
   });
 });
 
@@ -148,6 +148,7 @@ test('uninstall() removes installed plugins and rejects unknown plugins', async 
 
 test('exists(), list(), and isInstalled() handle empty or malformed plugin arrays', async () => {
   const normalApi = await loadCliApi();
+  // exists() checks readable config presence; list() checks populated plugin entries.
   expect(normalApi.exists()).toBe(true);
   expect(normalApi.list()).toBe(false);
 

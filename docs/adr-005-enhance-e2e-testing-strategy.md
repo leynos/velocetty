@@ -9,7 +9,7 @@ checks and deeper scheduled coverage).
 
 2026-02-05
 
-## Context and Problem Statement
+## Context and problem statement
 
 The current end-to-end (E2E) suite is intentionally narrow. It validates that a
 packaged
@@ -29,7 +29,7 @@ with Playwright's own runner under Node.js.[^2][^3]
 This ADR proposes a structured split that keeps pull request checks fast while
 raising behavioural confidence in scheduled and release-time E2E runs.
 
-## Decision Drivers
+## Decision drivers
 
 - Improve confidence in renderer correctness, not only process launch.
 - Keep pull request feedback loops fast and predictable.
@@ -54,7 +54,7 @@ raising behavioural confidence in scheduled and release-time E2E runs.
 - Maintain deterministic tests by extracting testable helper logic where
   practical.
 
-## Options Considered
+## Options considered
 
 ### Option A: Keep a smoke-only E2E suite
 
@@ -90,7 +90,7 @@ strategy options, including confidence, speed, and operational complexity.
 
 _Table 1: Trade-offs across E2E strategy options._
 
-## Decision Outcome / Proposed Direction
+## Decision outcome / proposed direction
 
 Adopt Option C. Implement a layered E2E strategy that keeps a fast lane for
 pull requests and a deeper lane for scheduled or release validation.
@@ -103,7 +103,7 @@ The proposed direction is:
 - Standardize failure artefacts (stdout, stderr, renderer console, screenshot,
   and Playwright traces where available).
 
-## Goals and Non-Goals
+## Goals and non-goals
 
 ### Goals
 
@@ -111,13 +111,13 @@ The proposed direction is:
 - Validate at least one user interaction flow end-to-end.
 - Preserve quick pull request signal while improving release confidence.
 
-### Non-Goals
+### Non-goals
 
 - Replacing Bun as the default unit and integration runner.
 - Building exhaustive UI E2E coverage for every surface in one iteration.
 - Refactoring unrelated runtime architecture to support E2E.
 
-## Migration Plan
+## Migration plan
 
 ### Phase 1: Fast-lane hardening
 
@@ -138,14 +138,14 @@ The proposed direction is:
 - Run deeper lane on a schedule and before release cut branches.
 - Reassess scope quarterly and expand high-value paths incrementally.
 
-## Known Risks and Limitations
+## Known risks and limitations
 
 - Additional CI jobs increase infrastructure cost and maintenance burden.
 - Interaction-path tests can become flaky without careful selector strategy and
   deterministic waits.
 - Cross-platform packaged builds still introduce environment-specific variance.
 
-## Outstanding Decisions
+## Outstanding decisions
 
 - Which interaction flow should be the first required deep-lane scenario.
 - Whether deep-lane failures should block releases immediately or operate as a
@@ -153,7 +153,7 @@ The proposed direction is:
 - Which artefacts are mandatory in Continuous Integration (CI) retention
   policies.
 
-## Architectural Rationale
+## Architectural rationale
 
 This direction aligns with Velocetty's Bun-first development workflow while
 acknowledging that Playwright's deeper browser automation features are best

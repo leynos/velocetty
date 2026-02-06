@@ -488,7 +488,7 @@ make coverage
 ```
 
 The command runs Bun's built-in coverage engine over `test/unit` and emits both
-text output and an LCOV (line coverage) report in `coverage/`.
+text output and an LCOV coverage report in `coverage/`.
 
 ### Reporters (JUnit in config)
 

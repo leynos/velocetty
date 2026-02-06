@@ -276,5 +276,6 @@ test.serial('Notification forwards and clears function refs on mount lifecycle',
     cleanup();
   }
 
+  // The unmount in finally invokes the ref callback with null.
   expect(refValues.at(-1)).toBeNull();
 });

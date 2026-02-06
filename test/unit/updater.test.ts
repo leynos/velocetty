@@ -65,7 +65,24 @@ const createTimerCapture = () => {
   };
 };
 
+const createConsoleErrorCapture = () => {
+  const originalConsoleError = console.error;
+  const errorCalls: unknown[][] = [];
+  return {
+    errorCalls,
+    install: () => {
+      console.error = (...args: unknown[]) => {
+        errorCalls.push(args);
+      };
+    },
+    restore: () => {
+      console.error = originalConsoleError;
+    }
+  };
+};
+
 const buildAutoUpdaterStub = () => {
+  // Updater currently registers one handler per event type in this test target.
   const handlers: Partial<Record<'error' | UpdateEvent, AutoUpdaterHandler>> = {};
   const feedUrlCalls: FeedUrlEntry[] = [];
   const removedListeners: UpdateEvent[] = [];
@@ -245,13 +262,10 @@ test.serial('updater wires lifecycle handlers, timers, and channel updates', asy
 
 test.serial('updater honours disableAutoUpdates and handles updater error events', async () => {
   const originalNodeEnv = process.env.NODE_ENV;
-  const originalConsoleError = console.error;
   const timers = createTimerCapture();
-  const errorCalls: unknown[][] = [];
+  const consoleCapture = createConsoleErrorCapture();
   process.env.NODE_ENV = 'production';
-  console.error = (...args: unknown[]) => {
-    errorCalls.push(args);
-  };
+  consoleCapture.install();
   timers.install();
 
   try {
@@ -297,12 +311,12 @@ test.serial('updater honours disableAutoUpdates and handles updater error events
     }
     const error = new Error('simulated updater error');
     errorHandler(error);
-    expect(errorCalls).toHaveLength(1);
-    expect(String(errorCalls[0][0])).toContain('Error fetching updates');
-    expect(String(errorCalls[0][1])).toContain('simulated updater error');
+    expect(consoleCapture.errorCalls).toHaveLength(1);
+    expect(String(consoleCapture.errorCalls[0][0])).toContain('Error fetching updates');
+    expect(String(consoleCapture.errorCalls[0][1])).toContain('simulated updater error');
   } finally {
     process.env.NODE_ENV = originalNodeEnv;
-    console.error = originalConsoleError;
+    consoleCapture.restore();
     timers.restore();
   }
 });
