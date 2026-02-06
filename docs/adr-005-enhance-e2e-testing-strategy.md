@@ -146,11 +146,11 @@ The proposed direction is:
 
 ## Outstanding decisions
 
-- Which interaction flow should be the first required deep-lane scenario.
+- Which interaction flow should be the first required deep-lane scenario?
 - Whether deep-lane failures should block releases immediately or operate as a
   temporary warning gate.
 - Which artefacts are mandatory in Continuous Integration (CI) retention
-  policies.
+  policies?
 
 ## Architectural rationale
 
