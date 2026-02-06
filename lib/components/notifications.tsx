@@ -121,7 +121,7 @@ const Notifications = forwardRef(function Notifications(
       )}
       {props.customChildren}
 
-      <style jsx="true">{`
+      <style jsx={true}>{`
         .notifications_view {
           position: fixed;
           bottom: 20px;

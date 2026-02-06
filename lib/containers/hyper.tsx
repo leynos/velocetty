@@ -120,7 +120,7 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
 
       {props.customChildren}
 
-      <style jsx="true">{`
+      <style jsx={true}>{`
         .hyper_main {
           position: fixed;
           top: 0;

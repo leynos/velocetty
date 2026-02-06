@@ -480,6 +480,16 @@ coverageIgnoreSourcemaps = true
 Bun supports both a single numeric threshold and a detailed object threshold;
 setting thresholds enables failing the run on low coverage.[^5]
 
+In this repository, coverage is collected with:
+
+```bash
+bun run test:coverage
+make coverage
+```
+
+The command runs Bun's built-in coverage engine over `test/unit` and emits both
+text output and an LCOV coverage report in `coverage/`.
+
 ### Reporters (JUnit in config)
 
 ```toml

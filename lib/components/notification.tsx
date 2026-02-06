@@ -119,7 +119,7 @@ const Notification = forwardRef(function Notification(
       ) : null}
       {props.customChildren}
 
-      <style jsx="true">{`
+      <style jsx={true}>{`
         .notification_indicator {
           display: inline-block;
           cursor: default;

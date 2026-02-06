@@ -64,7 +64,7 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
         </ul>
       )}
 
-      <style jsx="true">{`
+      <style jsx={true}>{`
         .profile_dropdown {
           border-width: 1px;
           border-style: solid;

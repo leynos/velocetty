@@ -15,6 +15,15 @@ type TermsRef = {
   getTermByUid: (uid: string) => {focus: () => void} | null;
   getActiveTerm: () => {focus: () => void; selectAll?: () => void} | null;
 };
+type KeyHandler = (event: {preventDefault: () => void; catched?: boolean}) => void;
+type RpcWindow = Window & {
+  rpc: {
+    on: (event: string, callback: () => void) => void;
+    off: (event: string, callback: () => void) => void;
+    removeListener: (..._args: unknown[]) => void;
+  };
+  focusActiveTerm?: (uid?: string) => void;
+};
 
 /**
  * Hyper component type derived from the container export.
@@ -27,6 +36,8 @@ let registerCalls = 0;
 let bindCalls = 0;
 let resetCalls = 0;
 let registeredKeys: Record<string, string> = {};
+let shouldPreventDefaultResult = false;
+let boundKeyHandlers: KeyHandler[] = [];
 let termsRef: TermsRef = {
   getTermByUid: () => null,
   getActiveTerm: () => null
@@ -36,8 +47,9 @@ let termsRef: TermsRef = {
  * Mousetrap test double that captures bind and reset activity.
  */
 class MousetrapMock {
-  bind() {
+  bind(_keys: string, handler: KeyHandler) {
     bindCalls += 1;
+    boundKeyHandlers.push(handler);
   }
 
   reset() {
@@ -61,6 +73,22 @@ const buildHyperProps = (overrides: Partial<HyperProps> = {}): HyperProps => ({
 
 const renderHyper = (root: ReturnType<typeof createRoot>, overrides: Partial<HyperProps> = {}) => {
   root.render(React.createElement(Hyper, buildHyperProps(overrides)));
+};
+
+const buildRpcWindowStub = () => {
+  const listeners: Record<string, () => void> = {};
+  const removedListeners: string[] = [];
+  const rpcWindow = window as RpcWindow;
+  rpcWindow.rpc = {
+    on: (event, callback) => {
+      listeners[event] = callback;
+    },
+    off: (event) => {
+      removedListeners.push(event);
+    },
+    removeListener: () => {}
+  };
+  return {listeners, removedListeners, rpcWindow};
 };
 
 mock.module('../../lib/actions/ui', () => ({
@@ -88,7 +116,7 @@ mock.module('../../lib/command-registry', () => ({
     return registeredKeys;
   },
   getCommandHandler: () => () => {},
-  shouldPreventDefault: () => false
+  shouldPreventDefault: () => shouldPreventDefaultResult
 }));
 
 beforeAll(async () => {
@@ -100,6 +128,8 @@ beforeEach(() => {
   bindCalls = 0;
   resetCalls = 0;
   registeredKeys = {};
+  shouldPreventDefaultResult = false;
+  boundKeyHandlers = [];
   termsRef = {
     getTermByUid: () => null,
     getActiveTerm: () => null
@@ -122,7 +152,7 @@ test.serial('Hyper attaches key listeners on mount and config updates', async ()
   });
 
   expect(registerCalls).toBe(1);
-  expect(bindCalls > 0).toBe(true);
+  expect(bindCalls).toBeGreaterThan(0);
   expect(resetCalls).toBe(0);
 
   await act(async () => {
@@ -176,6 +206,108 @@ test.serial('Hyper focuses the active session when it changes', async () => {
   });
 
   expect(focusCalls).toBe(1);
+
+  await act(async () => {
+    root.unmount();
+  });
+  cleanup();
+});
+
+test.serial('Hyper routes key handlers and select-all callbacks through terms', async () => {
+  const cleanup = await setupHappyDom();
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  const {listeners, removedListeners, rpcWindow} = buildRpcWindowStub();
+
+  let commandCalls = 0;
+  let preventedDefaultCalls = 0;
+  let selectAllCalls = 0;
+  let activeFocusCalls = 0;
+  registeredKeys = {demo: 'demo:command'};
+  shouldPreventDefaultResult = true;
+  const activeTerm = {
+    focus: () => {
+      activeFocusCalls += 1;
+    },
+    selectAll: () => {
+      selectAllCalls += 1;
+    }
+  };
+  termsRef = {
+    getTermByUid: () => null,
+    getActiveTerm: () => activeTerm
+  };
+
+  await act(async () => {
+    renderHyper(root, {
+      execCommand: () => {
+        commandCalls += 1;
+      }
+    });
+    await waitFor(0);
+  });
+
+  expect(boundKeyHandlers).toHaveLength(1);
+  boundKeyHandlers[0]({
+    preventDefault: () => {
+      preventedDefaultCalls += 1;
+    }
+  });
+  expect(commandCalls).toBe(1);
+  expect(preventedDefaultCalls).toBe(1);
+
+  const onSelectAll = listeners['term selectAll'];
+  expect(onSelectAll).toBeDefined();
+  if (!onSelectAll) {
+    throw new Error('Expected term selectAll listener to be registered.');
+  }
+  onSelectAll();
+  expect(selectAllCalls).toBe(1);
+
+  rpcWindow.focusActiveTerm?.();
+  expect(activeFocusCalls).toBe(1);
+
+  await act(async () => {
+    root.unmount();
+    await waitFor(0);
+  });
+  expect(removedListeners).toContain('term selectAll');
+  cleanup();
+});
+
+test.serial('Hyper does not call preventDefault when key handlers allow default behaviour', async () => {
+  const cleanup = await setupHappyDom();
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  buildRpcWindowStub();
+
+  let commandCalls = 0;
+  let preventedDefaultCalls = 0;
+  shouldPreventDefaultResult = false;
+  registeredKeys = {demo: 'demo:command'};
+
+  await act(async () => {
+    renderHyper(root, {
+      execCommand: () => {
+        commandCalls += 1;
+      }
+    });
+    await waitFor(0);
+  });
+
+  expect(boundKeyHandlers).toHaveLength(1);
+  boundKeyHandlers[0]({
+    preventDefault: () => {
+      preventedDefaultCalls += 1;
+    }
+  });
+
+  expect(commandCalls).toBe(1);
+  expect(preventedDefaultCalls).toBe(0);
 
   await act(async () => {
     root.unmount();

@@ -8,7 +8,7 @@ const StyleSheet = forwardRef(function StyleSheet(props: StyleSheetProps, ref: R
   const {borderColor} = props;
 
   return (
-    <style jsx="true" global="true" ref={ref}>{`
+    <style jsx={true} global={true} ref={ref}>{`
       ::-webkit-scrollbar {
         width: 5px;
       }

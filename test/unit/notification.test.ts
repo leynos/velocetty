@@ -21,11 +21,14 @@ const buildNotificationProps = (
   ...overrides
 });
 const dispatchOpacityTransition = (indicator: Element) => {
+  indicator.dispatchEvent(buildTransitionEvent(indicator, 'opacity'));
+};
+const buildTransitionEvent = (target: Element, propertyName: string) => {
   // Happy DOM does not fully populate TransitionEvent fields.
   const event = new Event('transitionend') as TransitionEvent;
-  Object.defineProperty(event, 'propertyName', {value: 'opacity'});
-  Object.defineProperty(event, 'target', {value: indicator});
-  indicator.dispatchEvent(event);
+  Object.defineProperty(event, 'propertyName', {value: propertyName});
+  Object.defineProperty(event, 'target', {value: target});
+  return event;
 };
 /**
  * Creates a deterministic timer adapter for unit tests.
@@ -91,6 +94,14 @@ const requireIndicator = (container: HTMLElement) => {
     throw new Error('Expected notification indicator to be present.');
   }
   return indicator;
+};
+const requireDismissButton = (container: HTMLElement) => {
+  const button = container.querySelector('.notification_dismissLink');
+  expect(button).toBeTruthy();
+  if (!button) {
+    throw new Error('Expected dismiss button to be present.');
+  }
+  return button;
 };
 
 test.serial('Notification auto-dismisses after the timeout on mount', async () => {
@@ -187,4 +198,84 @@ test.serial('Notification resets the timer when text changes', async () => {
     });
     cleanup();
   }
+});
+
+test.serial('Notification handles manual dismiss transition for user-dismissable notices', async () => {
+  const cleanup = await setupHappyDom();
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  try {
+    let dismissCount = 0;
+    await act(async () => {
+      root.render(
+        React.createElement(
+          Notification,
+          buildNotificationProps(
+            1_000,
+            () => {
+              dismissCount += 1;
+            },
+            {userDismissable: true, userDismissColor: '#fff'}
+          )
+        )
+      );
+    });
+
+    const dismissButton = requireDismissButton(container) as HTMLButtonElement;
+    await act(async () => {
+      dismissButton.click();
+    });
+
+    const indicator = requireIndicator(container);
+    const ignoredTransition = buildTransitionEvent(indicator, 'transform');
+    await act(async () => {
+      indicator.dispatchEvent(ignoredTransition);
+    });
+    expect(dismissCount).toBe(0);
+
+    await act(async () => {
+      dispatchOpacityTransition(indicator);
+    });
+    expect(dismissCount).toBe(1);
+  } finally {
+    await act(async () => {
+      root.unmount();
+    });
+    cleanup();
+  }
+});
+
+test.serial('Notification forwards and clears function refs on mount lifecycle', async () => {
+  const cleanup = await setupHappyDom();
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  const refValues: Array<HTMLDivElement | null> = [];
+  const notificationRef = (element: HTMLDivElement | null) => {
+    refValues.push(element);
+  };
+
+  try {
+    await act(async () => {
+      root.render(
+        React.createElement(Notification, {
+          ...buildNotificationProps(250, () => {}),
+          ref: notificationRef
+        })
+      );
+    });
+
+    expect(refValues.some((value) => value !== null)).toBe(true);
+  } finally {
+    await act(async () => {
+      root.unmount();
+    });
+    cleanup();
+  }
+
+  // The unmount in finally invokes the ref callback with null.
+  expect(refValues.at(-1)).toBeNull();
 });
