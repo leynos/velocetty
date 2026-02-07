@@ -1,11 +1,19 @@
 /** @file Shared helpers for Electron E2E launch and timeout behaviour. */
+import fs from 'node:fs/promises';
+import {tmpdir} from 'node:os';
 import path from 'node:path';
+import type {ConsoleMessage, Page} from 'playwright';
 
 type ResolveLaunchConfigOptions = Readonly<{
   platform?: NodeJS.Platform;
   ci?: string;
   electronDisableSandbox?: string;
   baseDir?: string;
+}>;
+
+type IsolatedE2EEnvironment = Readonly<{
+  env: NodeJS.ProcessEnv;
+  cleanup: () => Promise<void>;
 }>;
 
 type SupportedPlatform = 'linux' | 'darwin' | 'win32';
@@ -15,6 +23,33 @@ const isSupportedPlatform = (platform: NodeJS.Platform): platform is SupportedPl
 
 const assertNever = (value: never): never => {
   throw new Error(`Unsupported platform: ${String(value)}`);
+};
+
+const defaultNonCriticalRendererErrorPatterns = [/Download the React DevTools/i, /DevTools failed to load source map/i];
+
+export const isNonCriticalRendererError = (
+  text: string,
+  nonCriticalErrorPatterns = defaultNonCriticalRendererErrorPatterns
+) => nonCriticalErrorPatterns.some((pattern) => pattern.test(text));
+
+/**
+ * Creates an isolated HOME/XDG config environment to avoid loading user
+ * plugins or local developer configuration during E2E runs.
+ */
+export const createIsolatedE2EEnvironment = async (): Promise<IsolatedE2EEnvironment> => {
+  const tempHome = await fs.mkdtemp(path.join(tmpdir(), 'velocetty-e2e-home-'));
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    HOME: tempHome,
+    XDG_CONFIG_HOME: tempHome,
+    USERPROFILE: tempHome
+  };
+  return {
+    env,
+    cleanup: async () => {
+      await fs.rm(tempHome, {recursive: true, force: true});
+    }
+  };
 };
 
 /**
@@ -39,6 +74,61 @@ export const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
       void promise.catch(() => {});
     }
   }
+};
+
+/**
+ * Waits until the renderer has mounted and at least one terminal-related
+ * element is present in the document.
+ */
+export const waitForRendererReady = async (page: Page, timeoutMs: number) => {
+  const terminalSelectors = ['.xterm', '.term_term', '.tabs_list'];
+  const startTime = Date.now();
+  while (Date.now() - startTime <= timeoutMs) {
+    const isReady = await page.evaluate((selectors) => {
+      const mountNode = document.querySelector('#mount');
+      if (!mountNode || mountNode.childElementCount === 0) {
+        return false;
+      }
+      return selectors.some((selector) => document.querySelector(selector) !== null);
+    }, terminalSelectors);
+    if (isReady) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Timed out after ${timeoutMs}ms waiting for renderer readiness`);
+};
+
+type RendererConsoleMonitor = Readonly<{
+  criticalErrors: string[];
+  stop: () => void;
+}>;
+
+/**
+ * Tracks renderer console error events and filters known low-signal messages.
+ */
+export const startRendererConsoleMonitor = (
+  page: Page,
+  nonCriticalErrorPatterns = defaultNonCriticalRendererErrorPatterns
+): RendererConsoleMonitor => {
+  const criticalErrors: string[] = [];
+  const onConsole = (message: ConsoleMessage) => {
+    if (message.type() !== 'error') {
+      return;
+    }
+    const text = message.text();
+    if (!isNonCriticalRendererError(text, nonCriticalErrorPatterns)) {
+      criticalErrors.push(text);
+    }
+  };
+
+  page.on('console', onConsole);
+  return {
+    criticalErrors,
+    stop: () => {
+      page.off('console', onConsole);
+    }
+  };
 };
 
 /**

@@ -5,6 +5,9 @@ on:
       - master
       - canary
   pull_request:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
 defaults:
   run:
     shell: bash
@@ -12,6 +15,7 @@ env:
   NODE_VERSION: 18.x
 jobs:
   build:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ${{matrix.os}}
     strategy:
       matrix:
@@ -81,9 +85,9 @@ jobs:
             dist/*.pacman
             dist/*.exe
           if-no-files-found: warn
-      - name: Run E2E Tests
+      - name: Run fast-lane E2E tests
         if: runner.os != 'Linux'
-        run: bun run test:e2e
+        run: bun run test:e2e:fast
       - name: Install Linux E2E runtime deps
         if: runner.os == 'Linux'
         run: |
@@ -109,11 +113,11 @@ jobs:
             libxshmfence1 \
             libxss1 \
             libxtst6
-      - name: Run E2E Tests on Linux
+      - name: Run fast-lane E2E tests on Linux
         if: runner.os == 'Linux'
         uses: GabrielBB/xvfb-action@v1.7
         with:
-          run: bun run test:e2e
+          run: bun run test:e2e:fast
         env:
           DEBUG: pw:browser*
           ELECTRON_ENABLE_LOGGING: '1'
@@ -145,7 +149,89 @@ jobs:
           name: pr_num
           path: ./pr_num.txt
 
+  e2e-deep-linux:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/canary'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Use Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.8
+      - name: Fix node-gyp and Python
+        run: python3 -m pip install packaging setuptools
+      - name: Install
+        run: bun install
+        env:
+          npm_config_node_gyp: ${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
+      - name: Install Linux build and E2E runtime deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libarchive-tools \
+            xauth \
+            libasound2t64 \
+            libatk-bridge2.0-0 \
+            libatspi2.0-0 \
+            libdrm2 \
+            libgbm1 \
+            libgtk-3-0 \
+            libnss3 \
+            libx11-xcb1 \
+            libxcomposite1 \
+            libxcursor1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            libxrender1 \
+            libxkbcommon-x11-0 \
+            libxi6 \
+            libxshmfence1 \
+            libxss1 \
+            libxtst6
+      - name: Build packaged app
+        run: |
+          if [ -z "$CSC_LINK" ] ; then unset CSC_LINK ; fi
+          if [ -z "$CSC_KEY_PASSWORD" ] ; then unset CSC_KEY_PASSWORD ; fi
+          if [ -z "$WIN_CSC_LINK" ] ; then unset WIN_CSC_LINK ; fi
+          if [ -z "$WIN_CSC_KEY_PASSWORD" ] ; then unset WIN_CSC_KEY_PASSWORD ; fi
+          if [ -z "$APPLE_ID" ] ; then unset APPLE_ID ; fi
+          if [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] ; then unset APPLE_APP_SPECIFIC_PASSWORD ; fi
+          bun run dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_P12_PASSWORD }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CERT_P12_BASE64 }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CERT_P12_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      - name: Run deep-lane E2E tests
+        uses: GabrielBB/xvfb-action@v1.7
+        with:
+          run: bun run test:e2e:deep
+        env:
+          DEBUG: pw:browser*
+          ELECTRON_ENABLE_LOGGING: '1'
+          ELECTRON_ENABLE_STACK_DUMPING: '1'
+          SHELL: /bin/bash
+      - name: Upload deep-lane E2E artefacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: e2e-deep-linux
+          path: |
+            test-results/e2e-deep/**
+            playwright-report/e2e-deep/**
+          if-no-files-found: warn
+
   build-linux-arm:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     strategy:
       matrix:

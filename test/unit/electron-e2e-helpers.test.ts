@@ -1,9 +1,17 @@
 /** @file Tests deterministic branches in shared Electron E2E helper utilities. */
+import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import {expect, test} from 'bun:test';
 
-import {resolveLaunchConfig, withTimeout} from '../e2e/electron-e2e-helpers';
+import {
+  createIsolatedE2EEnvironment,
+  isNonCriticalRendererError,
+  resolveLaunchConfig,
+  startRendererConsoleMonitor,
+  waitForRendererReady,
+  withTimeout
+} from '../e2e/electron-e2e-helpers';
 
 const baseDir = '/tmp/velocetty/test/e2e';
 
@@ -67,4 +75,73 @@ test('resolveLaunchConfig() rejects unsupported platforms', () => {
       baseDir
     })
   ).toThrow('Path to the built binary needs to be defined for this platform');
+});
+
+test('waitForRendererReady() waits for mount and terminal selectors', async () => {
+  const capturedSelectors: string[][] = [];
+  let checkCount = 0;
+  const mockPage = {
+    evaluate: (_pageFunction: unknown, selectors: string[]) => {
+      capturedSelectors.push(selectors);
+      checkCount += 1;
+      return Promise.resolve(checkCount > 1);
+    }
+  };
+
+  await expect(waitForRendererReady(mockPage as never, 500)).resolves.toBeUndefined();
+  expect(capturedSelectors).toEqual([
+    ['.xterm', '.term_term', '.tabs_list'],
+    ['.xterm', '.term_term', '.tabs_list']
+  ]);
+});
+
+test('startRendererConsoleMonitor() captures only critical renderer errors', () => {
+  type ConsoleListener = (message: {type: () => string; text: () => string}) => void;
+  const listeners: ConsoleListener[] = [];
+  const mockPage = {
+    on: (_event: string, listener: ConsoleListener) => {
+      listeners.push(listener);
+    },
+    off: (_event: string, listener: ConsoleListener) => {
+      const listenerIndex = listeners.indexOf(listener);
+      if (listenerIndex >= 0) {
+        listeners.splice(listenerIndex, 1);
+      }
+    }
+  };
+
+  const monitor = startRendererConsoleMonitor(mockPage as never);
+
+  listeners[0]!({
+    type: () => 'error',
+    text: () => 'DevTools failed to load source map'
+  });
+  listeners[0]!({
+    type: () => 'warning',
+    text: () => 'warning message'
+  });
+  listeners[0]!({
+    type: () => 'error',
+    text: () => 'Unhandled renderer crash'
+  });
+
+  expect(monitor.criticalErrors).toEqual(['Unhandled renderer crash']);
+  monitor.stop();
+  expect(listeners).toHaveLength(0);
+});
+
+test('isNonCriticalRendererError() matches known allowlisted errors', () => {
+  expect(isNonCriticalRendererError('DevTools failed to load source map')).toBe(true);
+  expect(isNonCriticalRendererError('Unhandled renderer crash')).toBe(false);
+});
+
+test('createIsolatedE2EEnvironment() creates and cleans temp home paths', async () => {
+  const isolated = await createIsolatedE2EEnvironment();
+  expect(isolated.env.HOME).toBeDefined();
+  expect(isolated.env.XDG_CONFIG_HOME).toBe(isolated.env.HOME);
+  expect(isolated.env.USERPROFILE).toBe(isolated.env.HOME);
+
+  await fs.access(isolated.env.HOME!);
+  await isolated.cleanup();
+  await expect(fs.access(isolated.env.HOME!)).rejects.toThrow();
 });

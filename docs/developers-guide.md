@@ -66,89 +66,37 @@ Unit tests run under Bun's built-in test runner. Use one of the following:
   `coverage/`)
 - `make coverage`
 
-### End-to-end (E2E) tests (Playwright)
+### End-to-end (E2E) tests (layered strategy)
 
-End-to-end tests are opt-in. They run Playwright against packaged binaries
-and require the `dist/` output created by the packaging pipeline.
+End-to-end tests are split into two lanes and require packaged binaries in
+`dist/`.
 
-- Build the app (for example, `bun run dist`).
-- Run E2E tests with `bun run test:e2e`.
+Fast lane (required on pull requests):
 
-The E2E tests are skipped unless `RUN_E2E=1` is set. The script
-`bun run test:e2e` sets this automatically.
+- Run `bun run test:e2e:fast` (or `bun run test:e2e`).
+- Executes Bun-driven smoke checks in `test/e2e/`.
+- Asserts renderer readiness and fails on critical renderer console errors.
+- Supports `E2E_DRIVER=playwright|spawn` overrides; CI uses spawn-mode markers
+  emitted by the main process to gate renderer readiness and renderer errors.
+- Supports `E2E_DEBUG=1` for verbose launch logs and `E2E_CAPTURE=1` for
+  screenshot capture.
 
-By default, E2E runs Playwright locally and a spawn-based smoke check in
-CI. The driver can be overridden with `E2E_DRIVER=playwright` or
-`E2E_DRIVER=spawn`. Debug logging is opt-in with `E2E_DEBUG=1`, and
-`E2E_CAPTURE=1` captures a screenshot from the Electron app.
+Deep lane (scheduled and release validation):
 
-For screen readers: The following flowchart outlines the E2E test flow,
-including the prepare step, driver selection, and the Playwright versus spawn
-paths.
+- Run `bun run test:e2e:deep`.
+- Executes Playwright Test under Node.js using
+  `playwright.e2e.config.ts` and `test/e2e-deep/`.
+- Installs Playwright Chromium on demand before execution.
+- Validates the first interaction-path scenario (terminal input and rendered
+  output).
+- Retains full diagnostics on failures:
+  stdout/stderr logs, renderer console logs, screenshots, and traces.
+- Runs in CI on Linux for scheduled checks, manual `workflow_dispatch`, and
+  pushes to `master` and `canary`.
+- Deep-lane failures on `master` and `canary` are release-blocking.
 
-```mermaid
-flowchart TB
-    Dev[Developer]
-
-    subgraph LocalCommands[Local Test Commands]
-        LintCmd["bun run lint"]
-        UnitCmd["bun run test:unit"]
-        E2ECmd["bun run test:e2e"]
-    end
-
-    subgraph BunUnitRunner[Bun Unit Test Runner]
-        UnitPrep["test:unit:prepare\n(rimraf dist/tmp/root/test)"]
-        BunDiscover[Discover test/unit/*.test.ts]
-        BunRunUnit[Execute unit tests]
-    end
-
-    subgraph BunE2ERunner[Bun Runner for E2E]
-        E2EPrep["test:e2e:prepare\n(rimraf dist/tmp/root/test)"]
-        SetEnv[Set RUN_E2E=1]
-        BunDiscoverE2E[Discover test/e2e/*.test.ts]
-        BunRunE2E[Execute E2E test file]
-        DriverSelect{"Driver?\n(playwright or spawn)"}
-    end
-
-    subgraph PlaywrightLayer[Playwright E2E Layer]
-        PWLaunch[Launch packaged Electron app]
-        PWWait[Wait for first window\nnon-CI default]
-        PWSmoke[Run smoke scenario]
-    end
-
-    subgraph SpawnLayer[Spawned E2E Layer]
-        SpawnLaunch[Spawn packaged Electron app]
-        SpawnWait[Wait for PID + readiness log marker]
-        SpawnSmoke[Assert process stays up]
-    end
-
-    Dev --> LintCmd
-    Dev --> UnitCmd
-    Dev --> E2ECmd
-
-    UnitCmd --> BunUnitRunner
-    BunUnitRunner --> UnitPrep
-    UnitPrep --> BunDiscover
-    BunDiscover --> BunRunUnit
-    BunRunUnit --> Dev
-
-    E2ECmd --> BunE2ERunner
-    BunE2ERunner --> E2EPrep
-    E2EPrep --> SetEnv
-    SetEnv --> BunDiscoverE2E
-    BunDiscoverE2E --> BunRunE2E
-    BunRunE2E --> DriverSelect
-    DriverSelect --> PlaywrightLayer
-    DriverSelect --> SpawnLayer
-    PlaywrightLayer --> PWLaunch
-    PWLaunch --> PWWait
-    PWWait --> PWSmoke
-    SpawnLayer --> SpawnLaunch
-    SpawnLaunch --> SpawnWait
-    SpawnWait --> SpawnSmoke
-    PWSmoke --> Dev
-    SpawnSmoke --> Dev
-```
+Before either lane, build packaged artefacts with `bun run dist` if they do
+not already exist.
 
 ## Default test gate
 

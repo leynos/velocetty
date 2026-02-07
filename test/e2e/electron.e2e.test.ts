@@ -13,25 +13,31 @@ import fs from 'fs-extra';
 import {_electron} from 'playwright';
 import type {ElectronApplication} from 'playwright';
 
-import {resolveLaunchConfig, withTimeout} from './electron-e2e-helpers';
+import {
+  createIsolatedE2EEnvironment,
+  isNonCriticalRendererError,
+  resolveLaunchConfig,
+  startRendererConsoleMonitor,
+  waitForRendererReady,
+  withTimeout
+} from './electron-e2e-helpers';
 
 const shouldRunE2E = process.env.RUN_E2E === '1';
 const e2eTest = shouldRunE2E ? test : test.skip;
 const e2eTimeoutMs = 30_000;
-const launchTimeoutMs = 15_000;
+const launchTimeoutMs = 20_000;
 const windowTimeoutMs = 10_000;
+const rendererReadyTimeoutMs = 12_000;
 const closeTimeoutMs = 5_000;
+const spawnStabilityTimeoutMs = 1_000;
 const shouldCapture = process.env.E2E_CAPTURE === '1';
-const isCi =
-  process.env.CI !== undefined && process.env.CI !== '' && process.env.CI !== '0' && process.env.CI !== 'false';
-const shouldWaitForWindow = !isCi;
 const debugE2E = process.env.E2E_DEBUG === '1';
 const driverOverride = process.env.E2E_DRIVER;
 const validDrivers = new Set(['playwright', 'spawn']);
 if (shouldRunE2E && driverOverride && !validDrivers.has(driverOverride)) {
   throw new Error(`E2E_DRIVER must be "playwright" or "spawn", received "${driverOverride}".`);
 }
-const shouldUsePlaywright = driverOverride ? driverOverride === 'playwright' : !isCi;
+const shouldUsePlaywright = driverOverride === 'playwright';
 
 e2eTest(
   'launches the packaged app',
@@ -46,6 +52,8 @@ e2eTest(
     };
     let app: ElectronApplication | null = null;
     let spawned: ReturnType<typeof spawn> | null = null;
+    let rendererConsoleMonitor: ReturnType<typeof startRendererConsoleMonitor> | null = null;
+    const isolatedEnvironment = await createIsolatedE2EEnvironment();
     let spawnOutput = '';
     let outputWatchers: Array<{matcher: RegExp; resolve: () => void}> = [];
     const notifyOutputWatchers = () => {
@@ -85,24 +93,23 @@ e2eTest(
           _electron.launch({
             executablePath: pathToBinary,
             args: launchArgs,
+            env: isolatedEnvironment.env,
             timeout: launchTimeoutMs
           }),
           launchTimeoutMs
         );
         log('Electron launch completed.');
-        if (shouldWaitForWindow) {
-          log('Waiting for first window.');
-          const window = await withTimeout(app.firstWindow(), windowTimeoutMs);
-          expect(window).toBeDefined();
-          log('First window resolved.');
-        } else {
-          const process = app.process();
-          expect(process).toBeDefined();
-          log(`Electron process PID: ${process?.pid ?? 'unknown'}.`);
-        }
+        log('Waiting for first window.');
+        const window = await withTimeout(app.firstWindow(), windowTimeoutMs);
+        expect(window).toBeDefined();
+        rendererConsoleMonitor = startRendererConsoleMonitor(window);
+        log('Waiting for renderer readiness markers.');
+        await waitForRendererReady(window, rendererReadyTimeoutMs);
+        expect(rendererConsoleMonitor.criticalErrors).toHaveLength(0);
+        log('First window resolved.');
       } else {
         spawned = spawn(pathToBinary, launchArgs, {
-          env: {...process.env},
+          env: isolatedEnvironment.env,
           stdio: ['ignore', 'pipe', 'pipe']
         });
         spawned.stdout?.on('data', (data) => {
@@ -134,11 +141,24 @@ e2eTest(
         );
         log(`Spawned Electron PID: ${spawned.pid ?? 'unknown'}.`);
         await waitForSpawnOutput(/running in prod mode|electron will open/i, windowTimeoutMs);
+        await waitForSpawnOutput(/\[e2e\] renderer-ready/i, rendererReadyTimeoutMs);
+        await withTimeout(
+          new Promise<void>((resolve) => {
+            setTimeout(() => resolve(), spawnStabilityTimeoutMs);
+          }),
+          spawnStabilityTimeoutMs + 100
+        );
         if (spawned.exitCode != null) {
           throw new Error(`Electron exited early with code ${spawned.exitCode}. Output:\n${spawnOutput}`);
         }
+        const rendererErrorLines = spawnOutput
+          .split('\n')
+          .filter((line) => line.includes('[e2e][renderer-error]') && line.trim().length > 0)
+          .filter((line) => !isNonCriticalRendererError(line));
+        expect(rendererErrorLines).toHaveLength(0);
       }
     } finally {
+      rendererConsoleMonitor?.stop();
       if (app && shouldCapture) {
         try {
           const encodedImage = await withTimeout(
@@ -179,6 +199,7 @@ e2eTest(
           spawned.kill('SIGKILL');
         }
       }
+      await isolatedEnvironment.cleanup();
     }
   },
   e2eTimeoutMs
