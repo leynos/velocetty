@@ -16,6 +16,10 @@ type IsolatedE2EEnvironment = Readonly<{
   cleanup: () => Promise<void>;
 }>;
 
+type ReadActiveTerminalBufferOptions = Readonly<{
+  lineLimit?: number;
+}>;
+
 type SupportedPlatform = 'linux' | 'darwin' | 'win32';
 
 const isSupportedPlatform = (platform: NodeJS.Platform): platform is SupportedPlatform =>
@@ -96,6 +100,86 @@ export const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
       void promise.catch(() => {});
     }
   }
+};
+
+/**
+ * Reads recent lines from the active terminal buffer in the renderer window.
+ * Throws clear errors when the expected renderer wiring is unavailable.
+ */
+export const readActiveTerminalBuffer = async (windowPage: Page, options: ReadActiveTerminalBufferOptions = {}) => {
+  const lineLimit = options.lineLimit ?? 40;
+  return await windowPage.evaluate((resolvedLineLimit) => {
+    const fail = (message: string): never => {
+      throw new Error(`[e2e] unable to read active terminal buffer: ${message}`);
+    };
+
+    if (typeof document === 'undefined') {
+      fail('renderer document is unavailable');
+    }
+
+    const termWrapper = document.querySelector('.term_wrapper');
+    if (!termWrapper) {
+      fail('missing `.term_wrapper` element in renderer DOM');
+    }
+
+    const fiberKey = Object.getOwnPropertyNames(termWrapper).find((key) => key.startsWith('__reactFiber$'));
+    if (!fiberKey) {
+      fail('React fiber metadata not found on `.term_wrapper`');
+    }
+
+    const initialNode = (termWrapper as Record<string, unknown>)[fiberKey];
+    if (!initialNode || typeof initialNode !== 'object') {
+      fail('React fiber metadata on `.term_wrapper` is not traversable');
+    }
+
+    type MaybeFiberNode = {stateNode?: unknown; return?: unknown};
+    type MaybeTermState = {
+      term?: {buffer?: {active?: {_buffer?: {lines?: {length?: number; get?: (index: number) => unknown}}}}};
+    };
+
+    let node: unknown = initialNode;
+    let termStateNode: MaybeTermState | null = null;
+    for (let i = 0; i < 80 && node; i += 1) {
+      if (typeof node !== 'object') {
+        break;
+      }
+      const currentNode = node as MaybeFiberNode;
+      if (
+        currentNode.stateNode &&
+        typeof currentNode.stateNode === 'object' &&
+        'term' in currentNode.stateNode &&
+        (currentNode.stateNode as {term?: unknown}).term
+      ) {
+        termStateNode = currentNode.stateNode as MaybeTermState;
+        break;
+      }
+      node = currentNode.return;
+    }
+
+    if (!termStateNode) {
+      fail('terminal React state node was not found in fiber chain');
+    }
+
+    const lines = termStateNode.term?.buffer?.active?._buffer?.lines;
+    if (!lines) {
+      fail('terminal buffer lines collection is unavailable');
+    }
+    if (typeof lines.length !== 'number') {
+      fail('terminal buffer lines collection has non-numeric length');
+    }
+    if (typeof lines.get !== 'function') {
+      fail('terminal buffer lines collection is missing get(index)');
+    }
+
+    const output: string[] = [];
+    const boundedLineLimit = Math.max(1, resolvedLineLimit);
+    const start = Math.max(0, lines.length - boundedLineLimit);
+    for (let index = start; index < lines.length; index += 1) {
+      const line = lines.get(index) as {translateToString?: (trimRight?: boolean) => string} | undefined;
+      output.push(line?.translateToString?.(true) ?? '');
+    }
+    return output;
+  }, lineLimit);
 };
 
 /**

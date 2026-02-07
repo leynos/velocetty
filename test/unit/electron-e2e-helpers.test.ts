@@ -8,6 +8,7 @@ import {
   createIsolatedE2EEnvironment,
   extractRendererErrorMessage,
   isNonCriticalRendererError,
+  readActiveTerminalBuffer,
   resolveLaunchConfig,
   startRendererConsoleMonitor,
   waitForRendererReady,
@@ -141,6 +142,30 @@ test('extractRendererErrorMessage() strips e2e prefix and source metadata', () =
     'Unhandled renderer crash'
   );
   expect(extractRendererErrorMessage('Plain renderer error')).toBe('Plain renderer error');
+});
+
+test('readActiveTerminalBuffer() passes default line limit to page evaluation', async () => {
+  let capturedLineLimit = 0;
+  const mockPage = {
+    evaluate: (_pageFunction: unknown, lineLimit: number) => {
+      capturedLineLimit = lineLimit;
+      return Promise.resolve(['line one']);
+    }
+  };
+
+  await expect(readActiveTerminalBuffer(mockPage as never)).resolves.toEqual(['line one']);
+  expect(capturedLineLimit).toBe(40);
+});
+
+test('readActiveTerminalBuffer() surfaces clear failures when renderer document is unavailable', async () => {
+  const mockPage = {
+    evaluate: (pageFunction: (lineLimit: number) => string[], lineLimit: number) =>
+      Promise.resolve().then(() => pageFunction(lineLimit))
+  };
+
+  await expect(readActiveTerminalBuffer(mockPage as never)).rejects.toThrow(
+    '[e2e] unable to read active terminal buffer: renderer document is unavailable'
+  );
 });
 
 test('createIsolatedE2EEnvironment() creates and cleans temp home paths', async () => {

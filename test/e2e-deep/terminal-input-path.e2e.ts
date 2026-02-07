@@ -5,12 +5,12 @@
  */
 import fs from 'node:fs/promises';
 
-import type {Page} from 'playwright';
 import {_electron} from 'playwright';
 import {expect, test} from 'playwright/test';
 
 import {
   createIsolatedE2EEnvironment,
+  readActiveTerminalBuffer,
   resolveLaunchConfig,
   startRendererConsoleMonitor,
   waitForRendererReady,
@@ -22,50 +22,6 @@ const windowTimeoutMs = 10_000;
 const rendererReadyTimeoutMs = 12_000;
 const commandOutputTimeoutMs = 12_000;
 const closeTimeoutMs = 5_000;
-
-const readActiveTerminalBuffer = async (windowPage: Page) =>
-  await windowPage.evaluate(() => {
-    const termWrapper = document.querySelector('.term_wrapper');
-    if (!termWrapper) {
-      return [];
-    }
-
-    const fiberKey = Object.getOwnPropertyNames(termWrapper).find((key) => key.startsWith('__reactFiber$'));
-    if (!fiberKey) {
-      return [];
-    }
-
-    let node: unknown = (termWrapper as Record<string, unknown>)[fiberKey];
-    let termComponent: {
-      term?: {buffer?: {active?: {_buffer?: {lines?: {length?: number; get?: (index: number) => any}}}}};
-    } | null = null;
-    for (let i = 0; i < 50 && node; i += 1) {
-      const currentNode = node as {stateNode?: unknown; return?: unknown};
-      if (
-        currentNode.stateNode &&
-        typeof currentNode.stateNode === 'object' &&
-        'term' in currentNode.stateNode &&
-        (currentNode.stateNode as {term?: unknown}).term
-      ) {
-        termComponent = currentNode.stateNode as typeof termComponent;
-        break;
-      }
-      node = currentNode.return;
-    }
-
-    const lines = termComponent?.term?.buffer?.active?._buffer?.lines;
-    if (!lines || typeof lines.length !== 'number' || typeof lines.get !== 'function') {
-      return [];
-    }
-
-    const output: string[] = [];
-    const start = Math.max(0, lines.length - 40);
-    for (let index = start; index < lines.length; index += 1) {
-      const line = lines.get(index) as {translateToString?: (trimRight?: boolean) => string} | undefined;
-      output.push(line?.translateToString?.(true) ?? '');
-    }
-    return output;
-  });
 
 test('renders command output after terminal input', async ({page: _page}, testInfo) => {
   const {pathToBinary, launchArgs} = resolveLaunchConfig();
