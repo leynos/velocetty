@@ -132,7 +132,7 @@ Update `test/e2e/electron.e2e.test.ts` and shared helpers in
 Add:
 
 - `playwright.e2e.config.ts` for Playwright Test under Node.js,
-- `test/e2e-deep/terminal-input-path.spec.ts` for the first mandatory
+- `test/e2e-deep/terminal-input-path.e2e.ts` for the first mandatory
   interaction path.
 
 The deep test validates:
