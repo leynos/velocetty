@@ -95,6 +95,82 @@ Deep lane (scheduled and release validation):
   pushes to `master` and `canary`.
 - Deep-lane failures on `master` and `canary` are release-blocking.
 
+For screen readers: The following sequence diagram shows fast-lane execution,
+including main-process readiness/error markers consumed by Bun E2E assertions.
+
+```mermaid
+sequenceDiagram
+  actor Dev
+  participant BunTest as Bun_test_runner
+  participant ElectronMain as Electron_main_process
+  participant Renderer as Electron_renderer
+  participant Console
+
+  Dev->>BunTest: run bun run test:e2e:fast
+  BunTest->>BunTest: set RUN_E2E=1
+  BunTest->>ElectronMain: launch packaged Electron app
+  ElectronMain->>Renderer: load renderer URL
+  Renderer-->>ElectronMain: did-finish-load
+  ElectronMain->>ElectronMain: RUN_E2E == 1
+  ElectronMain->>Console: log [e2e] renderer-ready
+  ElectronMain->>Renderer: send init(uid, profileName)
+
+  Renderer->>ElectronMain: console-message(level,message,line,sourceId)
+  ElectronMain->>ElectronMain: if level >= error
+  ElectronMain->>Console: log [e2e][renderer-error] sourceId:line message
+
+  BunTest->>ElectronMain: wait for renderer-ready marker
+  ElectronMain-->>BunTest: renderer-ready observed
+  BunTest->>BunTest: assert readiness and no critical renderer-error logs
+  BunTest-->>Dev: report fast-lane E2E result
+```
+
+Figure 1: Fast-lane E2E sequence from Bun invocation to readiness/error
+assertions.
+
+For screen readers: The following sequence diagram shows deep-lane execution
+through Playwright CLI/Test, including interaction-path assertion and artefact
+reporting.
+
+```mermaid
+sequenceDiagram
+  actor Dev
+  participant Bun as Bun_cli
+  participant PWCLI as Playwright_CLI
+  participant PWTest as Playwright_Test_runner
+  participant ElectronMain as Electron_main_process
+  participant Renderer as Electron_renderer
+  participant Console as Console
+
+  Dev->>Bun: run bun run test:e2e:deep
+  Bun->>Bun: test:e2e:prepare (rimraf dist/tmp/root/test)
+  Bun->>PWCLI: install chromium
+  PWCLI-->>Bun: chromium installed
+
+  Bun->>PWCLI: test -c playwright.e2e.config.ts
+  PWCLI->>PWTest: run tests in test/e2e-deep
+
+  PWTest->>ElectronMain: launch packaged Electron app
+  ElectronMain->>Renderer: load renderer URL
+  Renderer-->>ElectronMain: did-finish-load
+  ElectronMain->>Console: log [e2e] renderer-ready
+  ElectronMain->>Renderer: send init(uid, profileName)
+
+  PWTest->>Renderer: type sentinel command into terminal
+  Renderer-->>ElectronMain: console-message events
+  ElectronMain->>Console: log high severity errors as [e2e][renderer-error]
+
+  PWTest->>Renderer: wait for rendered output containing sentinel
+  Renderer-->>PWTest: terminal output with sentinel
+  PWTest->>PWTest: assert interaction path
+
+  PWTest-->>PWCLI: report test result
+  PWCLI-->>Dev: generate report and artefacts on failure
+```
+
+Figure 2: Deep-lane E2E sequence from Bun command orchestration to Playwright
+interaction and reporting.
+
 Before either lane, build packaged artefacts with `bun run dist` if they do
 not already exist.
 
