@@ -33,16 +33,38 @@ export const isNonCriticalRendererError = (
 ) => nonCriticalErrorPatterns.some((pattern) => pattern.test(text));
 
 /**
- * Creates an isolated HOME/XDG config environment to avoid loading user
- * plugins or local developer configuration during E2E runs.
+ * Extracts the underlying renderer error message from an
+ * `[e2e][renderer-error]` log line.
+ */
+export const extractRendererErrorMessage = (line: string) => {
+  const marker = '[e2e][renderer-error]';
+  const markerIndex = line.indexOf(marker);
+  if (markerIndex < 0) {
+    return line.trim();
+  }
+
+  const payload = line.slice(markerIndex + marker.length).trim();
+  return payload.replace(/^\S+:\d+\s+/, '');
+};
+
+/**
+ * Creates an isolated HOME/XDG/Windows AppData environment to avoid loading
+ * user plugins or local developer configuration during E2E runs.
  */
 export const createIsolatedE2EEnvironment = async (): Promise<IsolatedE2EEnvironment> => {
   const tempHome = await fs.mkdtemp(path.join(tmpdir(), 'velocetty-e2e-home-'));
+  const appData = path.join(tempHome, 'AppData', 'Roaming');
+  const localAppData = path.join(tempHome, 'AppData', 'Local');
+  await fs.mkdir(appData, {recursive: true});
+  await fs.mkdir(localAppData, {recursive: true});
+
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     HOME: tempHome,
     XDG_CONFIG_HOME: tempHome,
-    USERPROFILE: tempHome
+    USERPROFILE: tempHome,
+    APPDATA: appData,
+    LOCALAPPDATA: localAppData
   };
   return {
     env,

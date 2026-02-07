@@ -1,4 +1,4 @@
-# Implement ADR-005 Option C layered E2E strategy
+# Implement ADR-005 Option C layered end-to-end strategy
 
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`, and
@@ -8,11 +8,13 @@ Status: Complete (Option C implemented and validated locally)
 
 ## Purpose and big picture
 
-ADR-005 selected Option C: keep a fast pull request E2E lane and add a deeper
-behavioural lane for scheduled and release validation. The repository currently
-has only one Bun-driven packaged-app smoke test with limited renderer coverage.
+Architecture Decision Record 005 (ADR-005) selected Option C: keep a fast pull
+request end-to-end (E2E) lane and add a deeper behavioural lane for scheduled
+and release validation. The repository currently has only one Bun-driven
+packaged-app smoke test with limited renderer coverage.
 
-This change introduces a layered test strategy with explicit CI policy,
+This change introduces a layered test strategy with explicit continuous
+integration (CI) policy,
 interaction-path coverage, and standard diagnostics so that:
 
 - pull requests keep fast E2E feedback,
@@ -102,8 +104,8 @@ Success is observable when:
   Rationale: it validates renderer readiness and interactive behaviour with high
   product value for minimal initial scope.
 
-- Decision: Treat deep-lane failures on `master` and `canary` as release
-  blocking.
+- Decision: Treat deep-lane failures on `master` and `canary` as
+  release-blocking.
   Rationale: ADR intent is deeper confidence before release cut.
 
 - Decision: Start deep lane on Linux only.

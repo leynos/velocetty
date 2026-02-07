@@ -15,6 +15,7 @@ import type {ElectronApplication} from 'playwright';
 
 import {
   createIsolatedE2EEnvironment,
+  extractRendererErrorMessage,
   isNonCriticalRendererError,
   resolveLaunchConfig,
   startRendererConsoleMonitor,
@@ -154,7 +155,8 @@ e2eTest(
         const rendererErrorLines = spawnOutput
           .split('\n')
           .filter((line) => line.includes('[e2e][renderer-error]') && line.trim().length > 0)
-          .filter((line) => !isNonCriticalRendererError(line));
+          .map((line) => extractRendererErrorMessage(line))
+          .filter((message) => !isNonCriticalRendererError(message));
         expect(rendererErrorLines).toHaveLength(0);
       }
     } finally {

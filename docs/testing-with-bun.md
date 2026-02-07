@@ -645,9 +645,10 @@ So the sane strategy is usually:
 - Optionally experiment with Bun locally for faster iteration, while accepting
   Node may be required for flaky or feature-heavy scenarios.[^2]
 
-### Repository policy: layered E2E lanes (ADR-005)
+### Repository policy: layered test lanes
 
-Velocetty implements a layered strategy:
+Architecture Decision Record 005 (ADR-005) defines Velocetty's layered
+end-to-end (E2E) strategy:
 
 - Fast lane: `bun run test:e2e:fast` (or `bun run test:e2e`) keeps packaged-app
   smoke coverage and renderer-readiness assertions in the Bun runner.

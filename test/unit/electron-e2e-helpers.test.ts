@@ -6,6 +6,7 @@ import {expect, test} from 'bun:test';
 
 import {
   createIsolatedE2EEnvironment,
+  extractRendererErrorMessage,
   isNonCriticalRendererError,
   resolveLaunchConfig,
   startRendererConsoleMonitor,
@@ -135,13 +136,24 @@ test('isNonCriticalRendererError() matches known allowlisted errors', () => {
   expect(isNonCriticalRendererError('Unhandled renderer crash')).toBe(false);
 });
 
+test('extractRendererErrorMessage() strips e2e prefix and source metadata', () => {
+  expect(extractRendererErrorMessage('[e2e][renderer-error] /path/to/file.js:42 Unhandled renderer crash')).toBe(
+    'Unhandled renderer crash'
+  );
+  expect(extractRendererErrorMessage('Plain renderer error')).toBe('Plain renderer error');
+});
+
 test('createIsolatedE2EEnvironment() creates and cleans temp home paths', async () => {
   const isolated = await createIsolatedE2EEnvironment();
   expect(isolated.env.HOME).toBeDefined();
   expect(isolated.env.XDG_CONFIG_HOME).toBe(isolated.env.HOME);
   expect(isolated.env.USERPROFILE).toBe(isolated.env.HOME);
+  expect(isolated.env.APPDATA).toBeDefined();
+  expect(isolated.env.LOCALAPPDATA).toBeDefined();
 
   await fs.access(isolated.env.HOME!);
+  await fs.access(isolated.env.APPDATA!);
+  await fs.access(isolated.env.LOCALAPPDATA!);
   await isolated.cleanup();
   await expect(fs.access(isolated.env.HOME!)).rejects.toThrow();
 });
