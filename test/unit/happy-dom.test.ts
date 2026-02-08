@@ -3,6 +3,7 @@ import {expect, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
 
+/** Flushes queued microtasks so async setup ordering can be observed in tests. */
 const waitForMicrotasks = async () => {
   await Promise.resolve();
   await Promise.resolve();

@@ -113,16 +113,20 @@ test('startRendererConsoleMonitor() captures only critical renderer errors', () 
   };
 
   const monitor = startRendererConsoleMonitor(mockPage as never);
+  const listener = listeners.at(0);
+  if (!listener) {
+    throw new Error('Expected startRendererConsoleMonitor() to register a listener');
+  }
 
-  listeners[0]!({
+  listener({
     type: () => 'error',
     text: () => 'DevTools failed to load source map'
   });
-  listeners[0]!({
+  listener({
     type: () => 'warning',
     text: () => 'warning message'
   });
-  listeners[0]!({
+  listener({
     type: () => 'error',
     text: () => 'Unhandled renderer crash'
   });

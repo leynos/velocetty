@@ -1,0 +1,53 @@
+name: Build packaged app
+description: Build distributable artifacts with optional signing secrets.
+
+inputs:
+  gh_token:
+    description: GitHub token used by electron-builder publishing logic.
+    required: true
+  csc_link:
+    description: Base64-encoded macOS signing certificate.
+    required: false
+    default: ''
+  csc_key_password:
+    description: Password for macOS signing certificate.
+    required: false
+    default: ''
+  win_csc_link:
+    description: Base64-encoded Windows signing certificate.
+    required: false
+    default: ''
+  win_csc_key_password:
+    description: Password for Windows signing certificate.
+    required: false
+    default: ''
+  apple_id:
+    description: Apple ID for notarization.
+    required: false
+    default: ''
+  apple_app_specific_password:
+    description: Apple app-specific password for notarization.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Build distribution bundle
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.gh_token }}
+        CSC_LINK: ${{ inputs.csc_link }}
+        CSC_KEY_PASSWORD: ${{ inputs.csc_key_password }}
+        WIN_CSC_LINK: ${{ inputs.win_csc_link }}
+        WIN_CSC_KEY_PASSWORD: ${{ inputs.win_csc_key_password }}
+        APPLE_ID: ${{ inputs.apple_id }}
+        APPLE_APP_SPECIFIC_PASSWORD: ${{ inputs.apple_app_specific_password }}
+      run: |
+        if [ -z "$CSC_LINK" ] ; then unset CSC_LINK ; fi
+        if [ -z "$CSC_KEY_PASSWORD" ] ; then unset CSC_KEY_PASSWORD ; fi
+        if [ -z "$WIN_CSC_LINK" ] ; then unset WIN_CSC_LINK ; fi
+        if [ -z "$WIN_CSC_KEY_PASSWORD" ] ; then unset WIN_CSC_KEY_PASSWORD ; fi
+        if [ -z "$APPLE_ID" ] ; then unset APPLE_ID ; fi
+        if [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] ; then unset APPLE_APP_SPECIFIC_PASSWORD ; fi
+        bun run dist

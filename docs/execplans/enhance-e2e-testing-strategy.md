@@ -27,7 +27,7 @@ Success is observable when:
   errors,
 - deep lane runs under Playwright Test on Node.js,
 - deep lane is triggered on schedule, manual dispatch, and pushes to
-  `master`/`canary`,
+  `master`/`canary`
 - `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`
   all pass,
 - `docs/developers-guide.md` and roadmap tracking are updated.
@@ -208,7 +208,7 @@ Implemented and validated:
 - roadmap and developer documentation updates,
 - required repository quality gates.
 
-Final outcome:
+Outcome:
 
 - Fast-lane and deep-lane E2E checks now both pass in this environment, and the
   previously surfaced packaged renderer startup failure has been resolved.

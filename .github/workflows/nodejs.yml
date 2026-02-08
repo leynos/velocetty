@@ -56,22 +56,15 @@ jobs:
           cp build/canary.ico build/icon.ico
           cp build/canary.icns build/icon.icns
       - name: Build
-        run: |
-          if [ -z "$CSC_LINK" ] ; then unset CSC_LINK ; fi
-          if [ -z "$CSC_KEY_PASSWORD" ] ; then unset CSC_KEY_PASSWORD ; fi
-          if [ -z "$WIN_CSC_LINK" ] ; then unset WIN_CSC_LINK ; fi
-          if [ -z "$WIN_CSC_KEY_PASSWORD" ] ; then unset WIN_CSC_KEY_PASSWORD ; fi
-          if [ -z "$APPLE_ID" ] ; then unset APPLE_ID ; fi
-          if [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] ; then unset APPLE_APP_SPECIFIC_PASSWORD ; fi
-          bun run dist
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_P12_PASSWORD }}
-          WIN_CSC_LINK: ${{ secrets.WIN_CERT_P12_BASE64 }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CERT_P12_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+        uses: ./.github/actions/build-packaged-app
+        with:
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          csc_link: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          csc_key_password: ${{ secrets.MAC_CERT_P12_PASSWORD }}
+          win_csc_link: ${{ secrets.WIN_CERT_P12_BASE64 }}
+          win_csc_key_password: ${{ secrets.WIN_CERT_P12_PASSWORD }}
+          apple_id: ${{ secrets.APPLE_ID }}
+          apple_app_specific_password: ${{ secrets.APPLE_PASSWORD }}
       - name: Archive Build Artifacts
         uses: actions/upload-artifact@v6
         with:
@@ -195,22 +188,15 @@ jobs:
             libxss1 \
             libxtst6
       - name: Build packaged app
-        run: |
-          if [ -z "$CSC_LINK" ] ; then unset CSC_LINK ; fi
-          if [ -z "$CSC_KEY_PASSWORD" ] ; then unset CSC_KEY_PASSWORD ; fi
-          if [ -z "$WIN_CSC_LINK" ] ; then unset WIN_CSC_LINK ; fi
-          if [ -z "$WIN_CSC_KEY_PASSWORD" ] ; then unset WIN_CSC_KEY_PASSWORD ; fi
-          if [ -z "$APPLE_ID" ] ; then unset APPLE_ID ; fi
-          if [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] ; then unset APPLE_APP_SPECIFIC_PASSWORD ; fi
-          bun run dist
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_P12_PASSWORD }}
-          WIN_CSC_LINK: ${{ secrets.WIN_CERT_P12_BASE64 }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CERT_P12_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+        uses: ./.github/actions/build-packaged-app
+        with:
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          csc_link: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          csc_key_password: ${{ secrets.MAC_CERT_P12_PASSWORD }}
+          win_csc_link: ${{ secrets.WIN_CERT_P12_BASE64 }}
+          win_csc_key_password: ${{ secrets.WIN_CERT_P12_PASSWORD }}
+          apple_id: ${{ secrets.APPLE_ID }}
+          apple_app_specific_password: ${{ secrets.APPLE_PASSWORD }}
       - name: Run deep-lane E2E tests
         uses: GabrielBB/xvfb-action@v1.7
         with:

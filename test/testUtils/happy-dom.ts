@@ -11,6 +11,7 @@ type RpcStub = {
 };
 
 let happyDomModule: Promise<HappyDomModule> | null = null;
+/** Serializes concurrent Happy DOM setup/teardown cycles across test files. */
 let happyDomLease: Promise<void> = Promise.resolve();
 
 /**
@@ -41,8 +42,6 @@ const loadHappyDom = (): Promise<HappyDomModule> => {
 /** Initialise Happy DOM globals for unit tests and return a cleanup function. */
 export const setupHappyDom = async (): Promise<Cleanup> => {
   const releaseLease = await acquireHappyDomLease();
-  const {Window} = await loadHappyDom();
-  const window = new Window();
   let cleanupComplete = false;
   const previousWindow = globalThis.window;
   const previousDocument = globalThis.document;
@@ -52,6 +51,9 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
   const previousActEnvironment = actEnvironmentHost.IS_REACT_ACT_ENVIRONMENT;
 
   try {
+    const {Window} = await loadHappyDom();
+    const window = new Window();
+
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: window as unknown as Window & typeof globalThis.window
