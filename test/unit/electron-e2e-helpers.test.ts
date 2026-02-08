@@ -1,9 +1,19 @@
 /** @file Tests deterministic branches in shared Electron E2E helper utilities. */
+import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import {expect, test} from 'bun:test';
 
-import {resolveLaunchConfig, withTimeout} from '../e2e/electron-e2e-helpers';
+import {
+  createIsolatedE2EEnvironment,
+  extractRendererErrorMessage,
+  isNonCriticalRendererError,
+  readActiveTerminalBuffer,
+  resolveLaunchConfig,
+  startRendererConsoleMonitor,
+  waitForRendererReady,
+  withTimeout
+} from '../e2e/electron-e2e-helpers';
 
 const baseDir = '/tmp/velocetty/test/e2e';
 
@@ -67,4 +77,114 @@ test('resolveLaunchConfig() rejects unsupported platforms', () => {
       baseDir
     })
   ).toThrow('Path to the built binary needs to be defined for this platform');
+});
+
+test('waitForRendererReady() waits for mount and terminal selectors', async () => {
+  const capturedSelectors: string[][] = [];
+  let checkCount = 0;
+  const mockPage = {
+    evaluate: (_pageFunction: unknown, selectors: string[]) => {
+      capturedSelectors.push(selectors);
+      checkCount += 1;
+      return Promise.resolve(checkCount > 1);
+    }
+  };
+
+  await expect(waitForRendererReady(mockPage as never, 500)).resolves.toBeUndefined();
+  expect(capturedSelectors).toEqual([
+    ['.xterm', '.term_term', '.tabs_list'],
+    ['.xterm', '.term_term', '.tabs_list']
+  ]);
+});
+
+test('startRendererConsoleMonitor() captures only critical renderer errors', () => {
+  type ConsoleListener = (message: {type: () => string; text: () => string}) => void;
+  const listeners: ConsoleListener[] = [];
+  const mockPage = {
+    on: (_event: string, listener: ConsoleListener) => {
+      listeners.push(listener);
+    },
+    off: (_event: string, listener: ConsoleListener) => {
+      const listenerIndex = listeners.indexOf(listener);
+      if (listenerIndex >= 0) {
+        listeners.splice(listenerIndex, 1);
+      }
+    }
+  };
+
+  const monitor = startRendererConsoleMonitor(mockPage as never);
+  const listener = listeners.at(0);
+  if (!listener) {
+    throw new Error('Expected startRendererConsoleMonitor() to register a listener');
+  }
+
+  listener({
+    type: () => 'error',
+    text: () => 'DevTools failed to load source map'
+  });
+  listener({
+    type: () => 'warning',
+    text: () => 'warning message'
+  });
+  listener({
+    type: () => 'error',
+    text: () => 'Unhandled renderer crash'
+  });
+
+  expect(monitor.criticalErrors).toEqual(['Unhandled renderer crash']);
+  monitor.stop();
+  expect(listeners).toHaveLength(0);
+});
+
+test('isNonCriticalRendererError() matches known allowlisted errors', () => {
+  expect(isNonCriticalRendererError('DevTools failed to load source map')).toBe(true);
+  expect(isNonCriticalRendererError('Unhandled renderer crash')).toBe(false);
+});
+
+test('extractRendererErrorMessage() strips e2e prefix and source metadata', () => {
+  expect(extractRendererErrorMessage('[e2e][renderer-error] /path/to/file.js:42 Unhandled renderer crash')).toBe(
+    'Unhandled renderer crash'
+  );
+  expect(extractRendererErrorMessage('Plain renderer error')).toBe('Plain renderer error');
+});
+
+test('readActiveTerminalBuffer() passes default line limit to page evaluation', async () => {
+  let capturedLineLimit = 0;
+  const mockPage = {
+    evaluate: (_pageFunction: unknown, lineLimit: number) => {
+      capturedLineLimit = lineLimit;
+      return Promise.resolve(['line one']);
+    }
+  };
+
+  await expect(readActiveTerminalBuffer(mockPage as never)).resolves.toEqual(['line one']);
+  expect(capturedLineLimit).toBe(40);
+});
+
+test('readActiveTerminalBuffer() surfaces clear failures when renderer document is unavailable', async () => {
+  const mockPage = {
+    evaluate: (pageFunction: (lineLimit: number) => string[], lineLimit: number) =>
+      Promise.resolve().then(() => pageFunction(lineLimit))
+  };
+
+  await expect(readActiveTerminalBuffer(mockPage as never)).rejects.toThrow(
+    '[e2e] unable to read active terminal buffer: renderer document is unavailable'
+  );
+});
+
+test('createIsolatedE2EEnvironment() creates and cleans temp home paths', async () => {
+  const isolated = await createIsolatedE2EEnvironment();
+  const {HOME, APPDATA, LOCALAPPDATA} = isolated.env;
+  if (!HOME || !APPDATA || !LOCALAPPDATA) {
+    throw new Error('Expected isolated E2E environment paths to be defined');
+  }
+
+  expect(isolated.env.XDG_CONFIG_HOME).toBe(HOME);
+  expect(isolated.env.USERPROFILE).toBe(HOME);
+
+  await fs.access(HOME);
+  await fs.access(APPDATA);
+  await fs.access(LOCALAPPDATA);
+  await isolated.cleanup();
+  await expect(fs.access(HOME)).rejects.toThrow();
 });

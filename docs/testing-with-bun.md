@@ -645,6 +645,26 @@ So the sane strategy is usually:
 - Optionally experiment with Bun locally for faster iteration, while accepting
   Node may be required for flaky or feature-heavy scenarios.[^2]
 
+### Repository policy: layered test lanes
+
+Architecture Decision Record 005 (ADR-005) defines Velocetty's layered
+end-to-end (E2E) strategy:
+
+- Fast lane: `bun run test:e2e:fast` (or `bun run test:e2e`) keeps packaged-app
+  smoke coverage and renderer-readiness assertions in the Bun runner.
+- Deep lane: `bun run test:e2e:deep` runs Playwright Test under Node.js via
+  `playwright.e2e.config.ts` for richer interaction checks and diagnostics.
+  The deep command installs Chromium when needed before executing the suite.
+
+CI policy:
+
+- Pull requests run the fast lane.
+- Deep lane runs on schedule, on manual `workflow_dispatch`, and on pushes to
+  `master` and `canary`.
+- Deep-lane failures on release branches are treated as release-blocking.
+- Failed deep-lane runs retain stdout/stderr logs, renderer console logs,
+  screenshots, and traces.
+
 ### Setting up Playwright in a Bun project
 
 As described in the BrowserStack guide.

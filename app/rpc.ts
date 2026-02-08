@@ -27,12 +27,25 @@ export class Server {
 
     ipcMain.on(uid, this.ipcListener);
 
+    const shouldReportE2E = process.env.RUN_E2E === '1';
+
     // we intentionally subscribe to `on` instead of `once`
     // to support reloading the window and re-initializing
     // the channel
     this.wc.on('did-finish-load', () => {
+      if (shouldReportE2E) {
+        console.log('[e2e] renderer-ready');
+      }
       this.wc.send('init', uid, win.profileName);
     });
+
+    if (shouldReportE2E) {
+      this.wc.on('console-message', (_event, level, message, line, sourceId) => {
+        if (level >= 3) {
+          console.error(`[e2e][renderer-error] ${sourceId}:${line} ${message}`);
+        }
+      });
+    }
   }
 
   get wc() {

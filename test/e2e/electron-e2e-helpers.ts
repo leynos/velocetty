@@ -1,11 +1,23 @@
 /** @file Shared helpers for Electron E2E launch and timeout behaviour. */
+import fs from 'node:fs/promises';
+import {tmpdir} from 'node:os';
 import path from 'node:path';
+import type {ConsoleMessage, Page} from 'playwright';
 
 type ResolveLaunchConfigOptions = Readonly<{
   platform?: NodeJS.Platform;
   ci?: string;
   electronDisableSandbox?: string;
   baseDir?: string;
+}>;
+
+type IsolatedE2EEnvironment = Readonly<{
+  env: NodeJS.ProcessEnv;
+  cleanup: () => Promise<void>;
+}>;
+
+type ReadActiveTerminalBufferOptions = Readonly<{
+  lineLimit?: number;
 }>;
 
 type SupportedPlatform = 'linux' | 'darwin' | 'win32';
@@ -15,6 +27,55 @@ const isSupportedPlatform = (platform: NodeJS.Platform): platform is SupportedPl
 
 const assertNever = (value: never): never => {
   throw new Error(`Unsupported platform: ${String(value)}`);
+};
+
+const defaultNonCriticalRendererErrorPatterns = [/Download the React DevTools/i, /DevTools failed to load source map/i];
+
+export const isNonCriticalRendererError = (
+  text: string,
+  nonCriticalErrorPatterns = defaultNonCriticalRendererErrorPatterns
+) => nonCriticalErrorPatterns.some((pattern) => pattern.test(text));
+
+/**
+ * Extracts the underlying renderer error message from an
+ * `[e2e][renderer-error]` log line.
+ */
+export const extractRendererErrorMessage = (line: string) => {
+  const marker = '[e2e][renderer-error]';
+  const markerIndex = line.indexOf(marker);
+  if (markerIndex < 0) {
+    return line.trim();
+  }
+
+  const payload = line.slice(markerIndex + marker.length).trim();
+  return payload.replace(/^\S+:\d+\s+/, '');
+};
+
+/**
+ * Creates an isolated HOME/XDG/Windows AppData environment to avoid loading
+ * user plugins or local developer configuration during E2E runs.
+ */
+export const createIsolatedE2EEnvironment = async (): Promise<IsolatedE2EEnvironment> => {
+  const tempHome = await fs.mkdtemp(path.join(tmpdir(), 'velocetty-e2e-home-'));
+  const appData = path.join(tempHome, 'AppData', 'Roaming');
+  const localAppData = path.join(tempHome, 'AppData', 'Local');
+  await fs.mkdir(appData, {recursive: true});
+  await fs.mkdir(localAppData, {recursive: true});
+
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    HOME: tempHome,
+    XDG_CONFIG_HOME: tempHome,
+    USERPROFILE: tempHome,
+    APPDATA: appData,
+    LOCALAPPDATA: localAppData
+  };
+  return {
+    env,
+    cleanup: async () => {
+      await fs.rm(tempHome, {recursive: true, force: true});
+    }
+  };
 };
 
 /**
@@ -39,6 +100,141 @@ export const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
       void promise.catch(() => {});
     }
   }
+};
+
+/**
+ * Reads recent lines from the active terminal buffer in the renderer window.
+ * Throws clear errors when the expected renderer wiring is unavailable.
+ */
+export const readActiveTerminalBuffer = async (windowPage: Page, options: ReadActiveTerminalBufferOptions = {}) => {
+  const lineLimit = options.lineLimit ?? 40;
+  return await windowPage.evaluate((resolvedLineLimit) => {
+    const fail = (message: string): never => {
+      throw new Error(`[e2e] unable to read active terminal buffer: ${message}`);
+    };
+
+    if (typeof document === 'undefined') {
+      fail('renderer document is unavailable');
+    }
+
+    const termWrapper = document.querySelector('.term_wrapper');
+    if (!termWrapper) {
+      fail('missing `.term_wrapper` element in renderer DOM');
+    }
+
+    const fiberKey = Object.getOwnPropertyNames(termWrapper).find((key) => key.startsWith('__reactFiber$'));
+    if (!fiberKey) {
+      fail('React fiber metadata not found on `.term_wrapper`');
+    }
+
+    const initialNode = (termWrapper as Record<string, unknown>)[fiberKey];
+    if (!initialNode || typeof initialNode !== 'object') {
+      fail('React fiber metadata on `.term_wrapper` is not traversable');
+    }
+
+    type MaybeFiberNode = {stateNode?: unknown; return?: unknown};
+    type MaybeTermState = {
+      term?: {buffer?: {active?: {_buffer?: {lines?: {length?: number; get?: (index: number) => unknown}}}}};
+    };
+
+    let node: unknown = initialNode;
+    let termStateNode: MaybeTermState | null = null;
+    for (let i = 0; i < 80 && node; i += 1) {
+      if (typeof node !== 'object') {
+        break;
+      }
+      const currentNode = node as MaybeFiberNode;
+      if (
+        currentNode.stateNode &&
+        typeof currentNode.stateNode === 'object' &&
+        'term' in currentNode.stateNode &&
+        (currentNode.stateNode as {term?: unknown}).term
+      ) {
+        termStateNode = currentNode.stateNode as MaybeTermState;
+        break;
+      }
+      node = currentNode.return;
+    }
+
+    if (!termStateNode) {
+      fail('terminal React state node was not found in fiber chain');
+    }
+
+    const lines = termStateNode.term?.buffer?.active?._buffer?.lines;
+    if (!lines) {
+      fail('terminal buffer lines collection is unavailable');
+    }
+    if (typeof lines.length !== 'number') {
+      fail('terminal buffer lines collection has non-numeric length');
+    }
+    if (typeof lines.get !== 'function') {
+      fail('terminal buffer lines collection is missing get(index)');
+    }
+
+    const output: string[] = [];
+    const boundedLineLimit = Math.max(1, resolvedLineLimit);
+    const start = Math.max(0, lines.length - boundedLineLimit);
+    for (let index = start; index < lines.length; index += 1) {
+      const line = lines.get(index) as {translateToString?: (trimRight?: boolean) => string} | undefined;
+      output.push(line?.translateToString?.(true) ?? '');
+    }
+    return output;
+  }, lineLimit);
+};
+
+/**
+ * Waits until the renderer has mounted and at least one terminal-related
+ * element is present in the document.
+ */
+export const waitForRendererReady = async (page: Page, timeoutMs: number) => {
+  const terminalSelectors = ['.xterm', '.term_term', '.tabs_list'];
+  const startTime = Date.now();
+  while (Date.now() - startTime <= timeoutMs) {
+    const isReady = await page.evaluate((selectors) => {
+      const mountNode = document.querySelector('#mount');
+      if (!mountNode || mountNode.childElementCount === 0) {
+        return false;
+      }
+      return selectors.some((selector) => document.querySelector(selector) !== null);
+    }, terminalSelectors);
+    if (isReady) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Timed out after ${timeoutMs}ms waiting for renderer readiness`);
+};
+
+type RendererConsoleMonitor = Readonly<{
+  criticalErrors: string[];
+  stop: () => void;
+}>;
+
+/**
+ * Tracks renderer console error events and filters known low-signal messages.
+ */
+export const startRendererConsoleMonitor = (
+  page: Page,
+  nonCriticalErrorPatterns = defaultNonCriticalRendererErrorPatterns
+): RendererConsoleMonitor => {
+  const criticalErrors: string[] = [];
+  const onConsole = (message: ConsoleMessage) => {
+    if (message.type() !== 'error') {
+      return;
+    }
+    const text = message.text();
+    if (!isNonCriticalRendererError(text, nonCriticalErrorPatterns)) {
+      criticalErrors.push(text);
+    }
+  };
+
+  page.on('console', onConsole);
+  return {
+    criticalErrors,
+    stop: () => {
+      page.off('console', onConsole);
+    }
+  };
 };
 
 /**

@@ -352,6 +352,17 @@ Scope notes:
   - [ ] Simulate high tab/pane counts with visible-only allocation.
   - [ ] Validate fallback behaviour and recovery.
   - [ ] Success criteria: no crashes, and WebGL usage stays under the maximum.
+- [x] 9.2.3. Implement Architecture Decision Record 005 (ADR-005) layered
+  end-to-end (E2E) strategy (Option C). See
+  [ADR 005](adr-005-enhance-e2e-testing-strategy.md).
+  - [x] Keep fast-lane pull request checks in Bun with renderer readiness and
+    critical console error assertions.
+  - [x] Add a deep Playwright Test lane under Node.js with an interaction-path
+    scenario (terminal input and rendered output).
+  - [x] Run deep lane on schedule, manual trigger (`workflow_dispatch`), and
+    pushes to `master` and `canary`.
+  - [x] Retain deep-lane failure artefacts (stdout/stderr, renderer console,
+    screenshots, and traces).
 
 ## Out of scope for this roadmap
 

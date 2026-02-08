@@ -1,6 +1,8 @@
 # build output
 dist
 coverage
+playwright-report
+test-results
 app/renderer
 target
 bin/cli.*
