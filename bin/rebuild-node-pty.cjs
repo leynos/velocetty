@@ -22,7 +22,7 @@ const result = spawnSync(
     nodeGypPath,
     'rebuild',
     '--runtime=electron',
-    `--target=${process.env.npm_package_devDependencies_electron || '22.3.25'}`,
+    `--target=${process.env.npm_package_devDependencies_electron || '28.3.3'}`,
     '--dist-url=https://www.electronjs.org/headers',
     '--build-from-source',
     '--verbose'
