@@ -123,8 +123,8 @@ Success is observable when:
 Update `test/e2e/electron.e2e.test.ts` and shared helpers in
 `test/e2e/electron-e2e-helpers.ts` to:
 
-- wait for renderer readiness markers (`#mount` populated + terminal UI
-  selectors),
+- wait for renderer readiness markers (`#mount` populated + terminal user
+  interface (UI) selectors),
 - capture and evaluate renderer console error events,
 - fail on critical console errors,
 - retain driver compatibility for `playwright` and `spawn`.

@@ -44,10 +44,19 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
   const releaseLease = await acquireHappyDomLease();
   let cleanupComplete = false;
   let windowToClose: {close: () => void} | null = null;
-  const previousWindow = globalThis.window;
-  const previousDocument = globalThis.document;
-  const previousNavigator = globalThis.navigator;
-  const actEnvironmentHost = globalThis as typeof globalThis & {IS_REACT_ACT_ENVIRONMENT?: boolean};
+  const globalHost = globalThis as typeof globalThis & {
+    window?: Window & typeof globalThis.window;
+    document?: Document;
+    navigator?: Navigator;
+    IS_REACT_ACT_ENVIRONMENT?: boolean;
+  };
+  const hadWindow = Object.hasOwn(globalHost, 'window');
+  const hadDocument = Object.hasOwn(globalHost, 'document');
+  const hadNavigator = Object.hasOwn(globalHost, 'navigator');
+  const previousWindow = globalHost.window;
+  const previousDocument = globalHost.document;
+  const previousNavigator = globalHost.navigator;
+  const actEnvironmentHost = globalHost;
   const hadActEnvironment = Object.hasOwn(actEnvironmentHost, 'IS_REACT_ACT_ENVIRONMENT');
   const previousActEnvironment = actEnvironmentHost.IS_REACT_ACT_ENVIRONMENT;
 
@@ -59,18 +68,30 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
 
     let finalizeError: unknown;
     try {
-      Object.defineProperty(globalThis, 'window', {
-        configurable: true,
-        value: previousWindow
-      });
-      Object.defineProperty(globalThis, 'document', {
-        configurable: true,
-        value: previousDocument
-      });
-      Object.defineProperty(globalThis, 'navigator', {
-        configurable: true,
-        value: previousNavigator
-      });
+      if (hadWindow) {
+        Object.defineProperty(globalHost, 'window', {
+          configurable: true,
+          value: previousWindow
+        });
+      } else {
+        delete globalHost.window;
+      }
+      if (hadDocument) {
+        Object.defineProperty(globalHost, 'document', {
+          configurable: true,
+          value: previousDocument
+        });
+      } else {
+        delete globalHost.document;
+      }
+      if (hadNavigator) {
+        Object.defineProperty(globalHost, 'navigator', {
+          configurable: true,
+          value: previousNavigator
+        });
+      } else {
+        delete globalHost.navigator;
+      }
       if (hadActEnvironment) {
         Object.defineProperty(actEnvironmentHost, 'IS_REACT_ACT_ENVIRONMENT', {
           configurable: true,
@@ -103,15 +124,15 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
     const window = new Window();
     windowToClose = window as unknown as {close: () => void};
 
-    Object.defineProperty(globalThis, 'window', {
+    Object.defineProperty(globalHost, 'window', {
       configurable: true,
       value: window as unknown as Window & typeof globalThis.window
     });
-    Object.defineProperty(globalThis, 'document', {
+    Object.defineProperty(globalHost, 'document', {
       configurable: true,
       value: window.document
     });
-    Object.defineProperty(globalThis, 'navigator', {
+    Object.defineProperty(globalHost, 'navigator', {
       configurable: true,
       value: window.navigator
     });

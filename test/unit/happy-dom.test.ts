@@ -34,3 +34,16 @@ test.serial('setupHappyDom cleanup is idempotent', async () => {
   cleanup();
   cleanup();
 });
+
+test.serial('setupHappyDom restores global property presence state', async () => {
+  const hadWindow = Object.hasOwn(globalThis, 'window');
+  const hadDocument = Object.hasOwn(globalThis, 'document');
+  const hadNavigator = Object.hasOwn(globalThis, 'navigator');
+
+  const cleanup = await setupHappyDom();
+  cleanup();
+
+  expect(Object.hasOwn(globalThis, 'window')).toBe(hadWindow);
+  expect(Object.hasOwn(globalThis, 'document')).toBe(hadDocument);
+  expect(Object.hasOwn(globalThis, 'navigator')).toBe(hadNavigator);
+});
