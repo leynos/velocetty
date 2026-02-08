@@ -148,8 +148,8 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
     }
 
     if (!window.cancelAnimationFrame) {
-      window.cancelAnimationFrame = ((handle: number | NodeJS.Timeout) => {
-        window.clearTimeout(handle as NodeJS.Timeout);
+      window.cancelAnimationFrame = ((handle: ReturnType<typeof window.setTimeout>) => {
+        window.clearTimeout(handle);
       }) as unknown as typeof window.cancelAnimationFrame;
     }
 

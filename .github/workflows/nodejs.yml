@@ -83,29 +83,7 @@ jobs:
         run: bun run test:e2e:fast
       - name: Install Linux E2E runtime deps
         if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            xauth \
-            libasound2t64 \
-            libatk-bridge2.0-0 \
-            libatspi2.0-0 \
-            libdrm2 \
-            libgbm1 \
-            libgtk-3-0 \
-            libnss3 \
-            libx11-xcb1 \
-            libxcomposite1 \
-            libxcursor1 \
-            libxdamage1 \
-            libxfixes3 \
-            libxrandr2 \
-            libxrender1 \
-            libxkbcommon-x11-0 \
-            libxi6 \
-            libxshmfence1 \
-            libxss1 \
-            libxtst6
+        uses: ./.github/actions/install-linux-e2e-runtime-deps
       - name: Run fast-lane E2E tests on Linux
         if: runner.os == 'Linux'
         uses: GabrielBB/xvfb-action@b706e4e27b14669b486812790492dc50ca16b465 # v1.7
@@ -163,30 +141,9 @@ jobs:
         env:
           npm_config_node_gyp: ${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
       - name: Install Linux build and E2E runtime deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libarchive-tools \
-            xauth \
-            libasound2t64 \
-            libatk-bridge2.0-0 \
-            libatspi2.0-0 \
-            libdrm2 \
-            libgbm1 \
-            libgtk-3-0 \
-            libnss3 \
-            libx11-xcb1 \
-            libxcomposite1 \
-            libxcursor1 \
-            libxdamage1 \
-            libxfixes3 \
-            libxrandr2 \
-            libxrender1 \
-            libxkbcommon-x11-0 \
-            libxi6 \
-            libxshmfence1 \
-            libxss1 \
-            libxtst6
+        uses: ./.github/actions/install-linux-e2e-runtime-deps
+        with:
+          include_libarchive_tools: 'true'
       - name: Build packaged app
         uses: ./.github/actions/build-packaged-app
         with:
