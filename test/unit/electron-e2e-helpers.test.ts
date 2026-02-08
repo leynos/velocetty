@@ -174,15 +174,17 @@ test('readActiveTerminalBuffer() surfaces clear failures when renderer document 
 
 test('createIsolatedE2EEnvironment() creates and cleans temp home paths', async () => {
   const isolated = await createIsolatedE2EEnvironment();
-  expect(isolated.env.HOME).toBeDefined();
-  expect(isolated.env.XDG_CONFIG_HOME).toBe(isolated.env.HOME);
-  expect(isolated.env.USERPROFILE).toBe(isolated.env.HOME);
-  expect(isolated.env.APPDATA).toBeDefined();
-  expect(isolated.env.LOCALAPPDATA).toBeDefined();
+  const {HOME, APPDATA, LOCALAPPDATA} = isolated.env;
+  if (!HOME || !APPDATA || !LOCALAPPDATA) {
+    throw new Error('Expected isolated E2E environment paths to be defined');
+  }
 
-  await fs.access(isolated.env.HOME!);
-  await fs.access(isolated.env.APPDATA!);
-  await fs.access(isolated.env.LOCALAPPDATA!);
+  expect(isolated.env.XDG_CONFIG_HOME).toBe(HOME);
+  expect(isolated.env.USERPROFILE).toBe(HOME);
+
+  await fs.access(HOME);
+  await fs.access(APPDATA);
+  await fs.access(LOCALAPPDATA);
   await isolated.cleanup();
-  await expect(fs.access(isolated.env.HOME!)).rejects.toThrow();
+  await expect(fs.access(HOME)).rejects.toThrow();
 });

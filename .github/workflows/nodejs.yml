@@ -59,12 +59,12 @@ jobs:
         uses: ./.github/actions/build-packaged-app
         with:
           gh_token: ${{ secrets.GITHUB_TOKEN }}
-          csc_link: ${{ secrets.MAC_CERT_P12_BASE64 }}
-          csc_key_password: ${{ secrets.MAC_CERT_P12_PASSWORD }}
-          win_csc_link: ${{ secrets.WIN_CERT_P12_BASE64 }}
-          win_csc_key_password: ${{ secrets.WIN_CERT_P12_PASSWORD }}
-          apple_id: ${{ secrets.APPLE_ID }}
-          apple_app_specific_password: ${{ secrets.APPLE_PASSWORD }}
+          csc_link: ${{ runner.os == 'macOS' && secrets.MAC_CERT_P12_BASE64 || '' }}
+          csc_key_password: ${{ runner.os == 'macOS' && secrets.MAC_CERT_P12_PASSWORD || '' }}
+          win_csc_link: ${{ runner.os == 'Windows' && secrets.WIN_CERT_P12_BASE64 || '' }}
+          win_csc_key_password: ${{ runner.os == 'Windows' && secrets.WIN_CERT_P12_PASSWORD || '' }}
+          apple_id: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
+          apple_app_specific_password: ${{ runner.os == 'macOS' && secrets.APPLE_PASSWORD || '' }}
       - name: Archive Build Artifacts
         uses: actions/upload-artifact@v6
         with:
@@ -191,12 +191,6 @@ jobs:
         uses: ./.github/actions/build-packaged-app
         with:
           gh_token: ${{ secrets.GITHUB_TOKEN }}
-          csc_link: ${{ secrets.MAC_CERT_P12_BASE64 }}
-          csc_key_password: ${{ secrets.MAC_CERT_P12_PASSWORD }}
-          win_csc_link: ${{ secrets.WIN_CERT_P12_BASE64 }}
-          win_csc_key_password: ${{ secrets.WIN_CERT_P12_PASSWORD }}
-          apple_id: ${{ secrets.APPLE_ID }}
-          apple_app_specific_password: ${{ secrets.APPLE_PASSWORD }}
       - name: Run deep-lane E2E tests
         uses: GabrielBB/xvfb-action@v1.7
         with:

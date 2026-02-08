@@ -43,6 +43,7 @@ const loadHappyDom = (): Promise<HappyDomModule> => {
 export const setupHappyDom = async (): Promise<Cleanup> => {
   const releaseLease = await acquireHappyDomLease();
   let cleanupComplete = false;
+  let windowToClose: {close: () => void} | null = null;
   const previousWindow = globalThis.window;
   const previousDocument = globalThis.document;
   const previousNavigator = globalThis.navigator;
@@ -50,9 +51,57 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
   const hadActEnvironment = Object.hasOwn(actEnvironmentHost, 'IS_REACT_ACT_ENVIRONMENT');
   const previousActEnvironment = actEnvironmentHost.IS_REACT_ACT_ENVIRONMENT;
 
+  const finalizeSetup = () => {
+    if (cleanupComplete) {
+      return;
+    }
+    cleanupComplete = true;
+
+    let finalizeError: unknown;
+    try {
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: previousWindow
+      });
+      Object.defineProperty(globalThis, 'document', {
+        configurable: true,
+        value: previousDocument
+      });
+      Object.defineProperty(globalThis, 'navigator', {
+        configurable: true,
+        value: previousNavigator
+      });
+      if (hadActEnvironment) {
+        Object.defineProperty(actEnvironmentHost, 'IS_REACT_ACT_ENVIRONMENT', {
+          configurable: true,
+          value: previousActEnvironment
+        });
+      } else {
+        delete actEnvironmentHost.IS_REACT_ACT_ENVIRONMENT;
+      }
+    } catch (error) {
+      finalizeError = error;
+    }
+
+    try {
+      windowToClose?.close();
+    } catch (error) {
+      if (!finalizeError) {
+        finalizeError = error;
+      }
+    } finally {
+      releaseLease();
+    }
+
+    if (finalizeError) {
+      throw finalizeError;
+    }
+  };
+
   try {
     const {Window} = await loadHappyDom();
     const window = new Window();
+    windowToClose = window as unknown as {close: () => void};
 
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
@@ -89,39 +138,12 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
       removeListener: (..._args: unknown[]) => {}
     };
 
-    return () => {
-      if (cleanupComplete) {
-        return;
-      }
-      cleanupComplete = true;
-
-      Object.defineProperty(globalThis, 'window', {
-        configurable: true,
-        value: previousWindow
-      });
-      Object.defineProperty(globalThis, 'document', {
-        configurable: true,
-        value: previousDocument
-      });
-      Object.defineProperty(globalThis, 'navigator', {
-        configurable: true,
-        value: previousNavigator
-      });
-      if (hadActEnvironment) {
-        Object.defineProperty(actEnvironmentHost, 'IS_REACT_ACT_ENVIRONMENT', {
-          configurable: true,
-          value: previousActEnvironment
-        });
-      } else {
-        delete actEnvironmentHost.IS_REACT_ACT_ENVIRONMENT;
-      }
-      window.close();
-      releaseLease();
-    };
+    return () => finalizeSetup();
   } catch (error) {
-    if (!cleanupComplete) {
-      cleanupComplete = true;
-      releaseLease();
+    try {
+      finalizeSetup();
+    } catch (finalizeError) {
+      throw new AggregateError([error, finalizeError], 'Failed to initialize and cleanup Happy DOM globals');
     }
     throw error;
   }

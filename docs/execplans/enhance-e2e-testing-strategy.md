@@ -68,7 +68,7 @@ Success is observable when:
   Severity: low.
   Likelihood: medium.
   Mitigation: retain full artefacts on failure-only paths for screenshots and
-  traces while still collecting textual diagnostics.
+  traces, while still collecting textual diagnostics.
 
 ## Progress
 
