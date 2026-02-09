@@ -90,16 +90,24 @@ const updater = (win: BrowserWindow) => {
     rpc.emit('update available', {releaseNotes, releaseName, releaseUrl, canInstall: !isLinux});
   };
 
+  type LinuxUpdateAvailableArgs = [
+    event?: Electron.Event,
+    releaseNotes?: string,
+    releaseName?: string,
+    releaseDate?: Date,
+    updateUrl?: string
+  ];
+
   /**
    * Electron 34 types `update-available` as a zero-argument event, while our
    * Linux shim emits metadata arguments. Keep a typed zero-arg listener for
    * subscription and parse optional payload args for Linux runtime parity.
    */
-  const onLinuxUpdateAvailable = (...eventArgs: unknown[]) => {
-    const [, notesArg, nameArg, , urlArg] = eventArgs;
-    const releaseNotes = typeof notesArg === 'string' ? notesArg : '';
-    const releaseName = typeof nameArg === 'string' && nameArg.length > 0 ? nameArg : version;
-    const updateUrl = typeof urlArg === 'string' && urlArg.length > 0 ? urlArg : undefined;
+  const onLinuxUpdateAvailable = (
+    ...[, releaseNotes = '', releaseNameArg, , updateUrlArg]: LinuxUpdateAvailableArgs
+  ) => {
+    const releaseName = releaseNameArg && releaseNameArg.length > 0 ? releaseNameArg : version;
+    const updateUrl = updateUrlArg && updateUrlArg.length > 0 ? updateUrlArg : undefined;
 
     emitUpdateAvailable(releaseNotes, releaseName, updateUrl);
   };

@@ -12,7 +12,7 @@ defaults:
   run:
     shell: bash
 env:
-  NODE_VERSION: 20.x
+  NODE_VERSION: 20.18.1
 jobs:
   build:
     if: github.event_name == 'push' || github.event_name == 'pull_request'
@@ -210,9 +210,9 @@ jobs:
           copy_artifact_path: target/node_modules/node-pty
           copy_artifact_dest: target/node_modules
           commands: |
-            wget https://nodejs.org/dist/v20.18.1/node-v20.18.1-linux-${{ matrix.name }}.tar.xz
-            tar -xJf node-v20.18.1-linux-${{ matrix.name }}.tar.xz
-            sudo cp node-v20.18.1-linux-${{ matrix.name }}/* /usr/local/ -R
+            wget https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${{ matrix.name }}.tar.xz
+            tar -xJf node-v${NODE_VERSION}-linux-${{ matrix.name }}.tar.xz
+            sudo cp node-v${NODE_VERSION}-linux-${{ matrix.name }}/* /usr/local/ -R
             npm run rebuild-node-pty
       - name: chown node-pty
         run: |
