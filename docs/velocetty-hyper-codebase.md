@@ -2385,7 +2385,7 @@ flowchart TB
 
 | Integration | Requirement | Constraint |
 | ------------- | ------------- | ------------ |
-| **Electron ↔ Node.js** | Bundled Node.js 20.18.1 | Native modules must target this application binary interface (ABI) |
+| **Electron ↔ Node.js** | Bundled Node.js 20.18.1 | Native modules must target this Application Binary Interface (ABI) |
 | **Electron ↔ Chromium** | Chromium 132.0.6834.83 bundled | WebGL/Canvas rendering APIs |
 | **React ↔ Redux** | react-redux 9.x | Requires React 18.0+ hooks API |
 | **xterm.js ↔ Addons** | xterm 5.x series | Addons must match major version |
