@@ -75,6 +75,13 @@ and roadmap item `1.4.11` is marked done.
 - [x] (2026-02-08 21:55Z) Re-ran full required gates after documentation
   updates.
 - [x] (2026-02-08 21:56Z) Finalized ExecPlan status and retrospective.
+- [x] (2026-02-09 00:06Z) Investigated CI `bun install` failure in
+  `install-app-deps` and reproduced patch-package mismatch for
+  `node-pty+1.1.0.patch`.
+- [x] (2026-02-09 00:08Z) Removed obsolete node-pty patch and made
+  `build:hyper-app` tolerate empty `app/patches/` copy inputs.
+- [x] (2026-02-09 00:10Z) Re-ran required gates (`bun install`, `make build`,
+  `make check-fmt`, `make lint`, `make test`) after remediation.
 
 ## Surprises & discoveries
 
@@ -89,6 +96,12 @@ and roadmap item `1.4.11` is marked done.
   `node-pty+1.0.0.patch` after the repository moved to
   `node-pty+1.1.0.patch`.
   Impact: `build:hyper-app` now clears `target/patches` before copying.
+- Observation: `node-pty+1.1.0.patch` still targeted the old 1.0.0 NAN-era
+  source and no longer applied to `node-pty@1.1.0` (N-API implementation).
+  Evidence: deterministic repro via `npx patch-package` in a clean temporary
+  install with `node-pty@1.1.0`.
+  Impact: removed the obsolete patch and updated the asset copy step to allow
+  empty `app/patches/` content.
 
 ## Decision log
 
@@ -109,6 +122,14 @@ and roadmap item `1.4.11` is marked done.
   Rationale: remove stale Electron 22 guidance and align docs with migrated
   runtime baseline.
   Date/Author: 2026-02-08 / Codex
+- Decision: remove `app/patches/node-pty+1.1.0.patch`.
+  Rationale: patch was obsolete and unapplyable against upstream
+  `node-pty@1.1.0`, causing CI install failure.
+  Date/Author: 2026-02-09 / Codex
+- Decision: set `noErrorOnMissing: true` for the `app/patches` copy pattern in
+  `webpack.config.ts`.
+  Rationale: support zero-patch state without failing `build:hyper-app`.
+  Date/Author: 2026-02-09 / Codex
 
 ## Outcomes & retrospective
 
@@ -117,6 +138,10 @@ native module rebuilding works with Electron 28 headers. The most significant
 implementation risk was native compatibility of `node-pty`; this was resolved
 with a version bump to `1.1.0` plus a deterministic copy-step fix for patch
 artefacts in `target/patches`.
+
+Post-completion CI validation revealed that the carried-over node-pty patch for
+`1.1.0` was obsolete. Removing that patch and allowing empty patch-copy inputs
+resolved the install-app-deps failure without changing runtime behaviour.
 
 All required commands now pass on this branch:
 
