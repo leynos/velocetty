@@ -95,7 +95,7 @@ And when tracking/developer documents are updated:
   Electron 28 in `docs/velocetty-hyper-codebase.md`.
   Evidence: targeted grep sweep before edits.
   Impact: required a broader documentation baseline update than just roadmap and
-  developers guide.
+  developers' guide.
 
 ## Decision log
 

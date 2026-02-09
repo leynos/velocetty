@@ -18,6 +18,14 @@ import {getDecoratedConfig} from './plugins';
 const {platform} = process;
 const isLinux = platform === 'linux';
 
+type LinuxUpdateAvailableArgs = [
+  event?: Electron.Event,
+  releaseNotes?: string,
+  releaseName?: string,
+  releaseDate?: Date,
+  updateUrl?: string
+];
+
 const autoUpdater: AutoUpdater = isLinux ? autoUpdaterLinux : electron.autoUpdater;
 
 const getDecoratedConfigWithRetry = async () => {
@@ -89,14 +97,6 @@ const updater = (win: BrowserWindow) => {
     const releaseUrl = updateUrl || `https://github.com/vercel/hyper/releases/tag/${releaseName}`;
     rpc.emit('update available', {releaseNotes, releaseName, releaseUrl, canInstall: !isLinux});
   };
-
-  type LinuxUpdateAvailableArgs = [
-    event?: Electron.Event,
-    releaseNotes?: string,
-    releaseName?: string,
-    releaseDate?: Date,
-    updateUrl?: string
-  ];
 
   /**
    * Electron 34 types `update-available` as a zero-argument event, while our
