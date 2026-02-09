@@ -2323,7 +2323,7 @@ flowchart LR
 
 | Feature | Implementation |
 | --------- | ---------------- |
-| **Node.js Version** | 18.x |
+| **Node.js Version** | 20.x |
 | **Caching** | Bun cache for faster installs |
 | **Matrix Strategy** | `[macos-latest, ubuntu-latest, windows-latest]` |
 | **Native Modules** | Automatic node-pty rebuilding per platform |
@@ -9395,7 +9395,7 @@ flowchart TB
 
 | Environment Aspect | Configuration | Purpose |
 | ------------------- | --------------- | --------- |
-| Node.js version | 18.x | LTS compatibility |
+| Node.js version | 20.x | LTS compatibility |
 | Package manager | Bun with caching | Fast installs |
 | Build matrix | macOS, Ubuntu, Windows | Cross-platform |
 | Linux display | Xvfb (virtual) | Headless E2E |
