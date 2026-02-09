@@ -1,6 +1,7 @@
 # Migrate runtime stack to Electron 34
 
-This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
+This Execution Plan (ExecPlan) is a living document. The sections
+`Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
 `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
@@ -28,7 +29,7 @@ And when tracking/developer documents are updated:
 
 ## Constraints
 
-- Follow ADR-004 staged migration path from
+- Follow Architecture Decision Record (ADR)-004 staged migration path from
   `docs/adr-004-update-electron-40.md`: 22 → 28 → 34 → 40.
 - Preserve existing script and Make target names.
 - Maintain native module functionality (`node-pty`) after the upgrade.
@@ -43,7 +44,8 @@ And when tracking/developer documents are updated:
   escalate.
 - Dependencies: if a new third-party dependency is required, stop and
   escalate.
-- Interfaces: if user-facing runtime behaviour or CLI contracts must change,
+- Interfaces: if user-facing runtime behaviour or command-line interface (CLI)
+  contracts must change,
   stop and escalate.
 - Validation: if required gates fail after two focused remediation passes,
   stop and escalate with logs.
@@ -57,7 +59,8 @@ And when tracking/developer documents are updated:
   Likelihood: medium
   Mitigation: validate `bun install` early and only adjust runtime dependencies
   if failure evidence confirms incompatibility.
-- Risk: V8 snapshot generation may fail with Electron 34 runtime changes.
+- Risk: V8 JavaScript engine snapshot generation may fail with Electron 34
+  runtime changes.
   Severity: medium
   Likelihood: medium
   Mitigation: validate during `make build` and adjust snapshot tooling only if
@@ -75,7 +78,8 @@ And when tracking/developer documents are updated:
   roadmap, and existing runtime/tooling files.
 - [x] (2026-02-09) Updated runtime anchors in `package.json` and
   `bin/rebuild-node-pty.cjs` for Electron 34.
-- [x] (2026-02-09) Updated CI Node baseline in `.github/workflows/nodejs.yml`
+- [x] (2026-02-09) Updated Continuous Integration (CI) Node baseline in
+  `.github/workflows/nodejs.yml`
   to align with Electron 34's bundled Node family.
 - [x] (2026-02-09) Updated `docs/developers-guide.md`,
   `docs/velocetty-hyper-codebase.md`, and `docs/roadmap.md` for the new

@@ -123,7 +123,7 @@
     "electron": "^34.5.8",
     "electron-builder": "^24.13.3",
     "electron-link": "^0.6.0",
-    "electron-mksnapshot": "^29.3.0",
+    "electron-mksnapshot": "^34.5.8",
     "electronmon": "^2.0.2",
     "happy-dom": "^20.3.9",
     "husky": "^9.0.11",
