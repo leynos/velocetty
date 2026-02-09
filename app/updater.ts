@@ -18,6 +18,14 @@ import {getDecoratedConfig} from './plugins';
 const {platform} = process;
 const isLinux = platform === 'linux';
 
+type LinuxUpdateAvailableArgs = [
+  event?: Electron.Event,
+  releaseNotes?: string,
+  releaseName?: string,
+  releaseDate?: Date,
+  updateUrl?: string
+];
+
 const autoUpdater: AutoUpdater = isLinux ? autoUpdaterLinux : electron.autoUpdater;
 
 const getDecoratedConfigWithRetry = async () => {
@@ -85,24 +93,38 @@ const updater = (win: BrowserWindow) => {
 
   const {rpc} = win;
 
-  /**
-   * Relay update availability to renderer listeners, preserving platform event wiring.
-   */
-  const onupdate = (
-    _ev: Electron.Event,
-    releaseNotes: string,
-    releaseName: string,
-    _date: Date,
-    updateUrl?: string
-  ) => {
+  const emitUpdateAvailable = (releaseNotes: string, releaseName: string, updateUrl?: string) => {
     const releaseUrl = updateUrl || `https://github.com/vercel/hyper/releases/tag/${releaseName}`;
     rpc.emit('update available', {releaseNotes, releaseName, releaseUrl, canInstall: !isLinux});
   };
 
+  /**
+   * Electron 34 types `update-available` as a zero-argument event, while our
+   * Linux shim emits metadata arguments. Keep a typed zero-arg listener for
+   * subscription and parse optional payload args for Linux runtime parity.
+   */
+  const onLinuxUpdateAvailable = (...args: LinuxUpdateAvailableArgs) => {
+    const [_event, releaseNotes = '', releaseNameArg, _releaseDate, updateUrlArg = ''] = args;
+    const releaseName = releaseNameArg || version;
+    const updateUrl = updateUrlArg || undefined;
+
+    emitUpdateAvailable(releaseNotes, releaseName, updateUrl);
+  };
+
+  const onUpdateDownloaded = (
+    _ev: Electron.Event,
+    releaseNotes: string,
+    releaseName: string,
+    _date: Date,
+    updateUrl: string
+  ) => {
+    emitUpdateAvailable(releaseNotes, releaseName, updateUrl);
+  };
+
   if (isLinux) {
-    autoUpdater.on('update-available', onupdate);
+    autoUpdater.on('update-available', onLinuxUpdateAvailable);
   } else {
-    autoUpdater.on('update-downloaded', onupdate);
+    autoUpdater.on('update-downloaded', onUpdateDownloaded);
   }
 
   rpc.once('quit and install', () => {
@@ -125,9 +147,9 @@ const updater = (win: BrowserWindow) => {
 
   win.on('close', () => {
     if (isLinux) {
-      autoUpdater.removeListener('update-available', onupdate);
+      autoUpdater.removeListener('update-available', onLinuxUpdateAvailable);
     } else {
-      autoUpdater.removeListener('update-downloaded', onupdate);
+      autoUpdater.removeListener('update-downloaded', onUpdateDownloaded);
     }
   });
 };

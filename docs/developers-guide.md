@@ -28,10 +28,15 @@ When upgrading Electron, keep runtime and native-module rebuild settings aligned
 in the same change:
 
 - Update `devDependencies.electron` in `package.json`.
+- Align `@types/node` in `package.json` to the bundled Node.js major for the
+  target Electron release.
 - Bump the fallback target version in `bin/rebuild-node-pty.cjs`.
 - Adjust `app/package.json` if runtime dependencies (for example, `node-pty`)
   need a compatibility bump for the new Electron Application Binary Interface
   (ABI).
+- If CI rebuilds native modules, align `.github/workflows/nodejs.yml`
+  `NODE_VERSION` and any architecture-specific Node bootstrap downloads to the
+  same Node.js major family.
 - Run `bun install` to validate snapshot generation, `install-app-deps`, and
   `node-pty` rebuilding before running the remaining gates.
 
