@@ -1730,8 +1730,8 @@ inherited Hyper codebase has deep Electron integration that would require
 significant refactoring to migrate.
 
 **Technical Debt Note**: Electron 34 is the second staged runtime baseline on
-the ADR-004 path (28 → 34 → 40). Continue staged upgrades to reduce exposure to
-runtime drift and keep security fixes current.
+the Architecture Decision Record (ADR)-004 path (28 → 34 → 40). Continue staged
+upgrades to reduce exposure to runtime drift and keep security fixes current.
 
 ##### IPC communication layer
 
