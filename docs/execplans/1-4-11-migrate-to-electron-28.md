@@ -123,7 +123,7 @@ and roadmap item `1.4.11` is marked done.
   runtime baseline.
   Date/Author: 2026-02-08 / Codex
 - Decision: remove `app/patches/node-pty+1.1.0.patch`.
-  Rationale: patch was obsolete and unapplyable against upstream
+  Rationale: patch was obsolete and inapplicable against upstream
   `node-pty@1.1.0`, causing CI install failure.
   Date/Author: 2026-02-09 / Codex
 - Decision: set `noErrorOnMissing: true` for the `app/patches` copy pattern in
