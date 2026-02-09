@@ -85,24 +85,39 @@ const updater = (win: BrowserWindow) => {
 
   const {rpc} = win;
 
-  /**
-   * Relay update availability to renderer listeners, preserving platform event wiring.
-   */
-  const onupdate = (
-    _ev: Electron.Event,
-    releaseNotes: string,
-    releaseName: string,
-    _date: Date,
-    updateUrl?: string
-  ) => {
+  const emitUpdateAvailable = (releaseNotes: string, releaseName: string, updateUrl?: string) => {
     const releaseUrl = updateUrl || `https://github.com/vercel/hyper/releases/tag/${releaseName}`;
     rpc.emit('update available', {releaseNotes, releaseName, releaseUrl, canInstall: !isLinux});
   };
 
+  /**
+   * Electron 34 types `update-available` as a zero-argument event, while our
+   * Linux shim emits metadata arguments. Keep a typed zero-arg listener for
+   * subscription and parse optional payload args for Linux runtime parity.
+   */
+  const onLinuxUpdateAvailable = (...eventArgs: unknown[]) => {
+    const [, notesArg, nameArg, , urlArg] = eventArgs;
+    const releaseNotes = typeof notesArg === 'string' ? notesArg : '';
+    const releaseName = typeof nameArg === 'string' && nameArg.length > 0 ? nameArg : version;
+    const updateUrl = typeof urlArg === 'string' && urlArg.length > 0 ? urlArg : undefined;
+
+    emitUpdateAvailable(releaseNotes, releaseName, updateUrl);
+  };
+
+  const onUpdateDownloaded = (
+    _ev: Electron.Event,
+    releaseNotes: string,
+    releaseName: string,
+    _date: Date,
+    updateUrl: string
+  ) => {
+    emitUpdateAvailable(releaseNotes, releaseName, updateUrl);
+  };
+
   if (isLinux) {
-    autoUpdater.on('update-available', onupdate);
+    autoUpdater.on('update-available', onLinuxUpdateAvailable);
   } else {
-    autoUpdater.on('update-downloaded', onupdate);
+    autoUpdater.on('update-downloaded', onUpdateDownloaded);
   }
 
   rpc.once('quit and install', () => {
@@ -125,9 +140,9 @@ const updater = (win: BrowserWindow) => {
 
   win.on('close', () => {
     if (isLinux) {
-      autoUpdater.removeListener('update-available', onupdate);
+      autoUpdater.removeListener('update-available', onLinuxUpdateAvailable);
     } else {
-      autoUpdater.removeListener('update-downloaded', onupdate);
+      autoUpdater.removeListener('update-downloaded', onUpdateDownloaded);
     }
   });
 };
