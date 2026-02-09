@@ -235,4 +235,4 @@ Done criteria for this roadmap item:
 ## Revision note
 
 Updated to `COMPLETE` after final gate rerun and documentation completion,
-including final outcomes and closure of pending progress items.
+including outcomes and closure of pending progress items.

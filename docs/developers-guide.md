@@ -28,8 +28,8 @@ When upgrading Electron, keep runtime and native-module rebuild settings aligned
 in the same change:
 
 - Update `devDependencies.electron` in `package.json`.
-- Update the fallback target version in `bin/rebuild-node-pty.cjs`.
-- Update `app/package.json` if runtime dependencies (for example, `node-pty`)
+- Bump the fallback target version in `bin/rebuild-node-pty.cjs`.
+- Adjust `app/package.json` if runtime dependencies (for example, `node-pty`)
   need a compatibility bump for the new Electron ABI.
 - Run `bun install` to validate snapshot generation, `install-app-deps`, and
   `node-pty` rebuilding before running the remaining gates.

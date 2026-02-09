@@ -1678,7 +1678,7 @@ Base Configuration (tsconfig.base.json):
 
 | Constraint | Description |
 | ------------ | ------------- |
-| **Node.js Runtime** | TypeScript executes within Node.js 18.x (bundled with Electron 28) |
+| **Node.js Runtime** | Application code executes as JavaScript in Node.js 18.x (bundled with Electron 28); TypeScript is compiled during build |
 | **Chromium V8** | Renderer process JavaScript executed by Chromium's V8 engine |
 | **Native Module Compatibility** | `node-pty` requires matching Node.js ABI version for native bindings |
 | **ES Module Limitations** | CommonJS required for Electron main process compatibility |
@@ -1980,7 +1980,7 @@ Runtime Dependencies (app/package.json):
 ├── electron-is-dev: 2.0.0
 ├── electron-store: 8.2.0
 ├── fs-extra: 11.2.0
-├── node-pty: 1.0.0
+├── node-pty: 1.1.0
 └── recast: 0.23.6
 
 Optional Dependencies:
@@ -2371,7 +2371,7 @@ flowchart TB
         React["React 19.2.4"]
         Redux["Redux 5.0.1"]
         Xterm["xterm.js 5.3.0"]
-        NodePTY["node-pty 1.0.0"]
+        NodePTY["node-pty 1.1.0"]
     end
     
     Electron -->|"IPC Bridge"| React
@@ -4071,7 +4071,7 @@ flowchart TB
 | ---------------- | ---------------------- | ------------------ | ------------------- |
 | Main Process Entry (`app/index.ts`) | Electron initialization, window lifecycle, event routing | `@electron/remote`, config module, plugins module | IPC bridge, OS event handlers |
 | Configuration System (`app/config/`) | JSON config loading, schema validation, hot-reload | chokidar, electron-store, fs-extra | Plugin decoration, renderer bridge |
-| Session Manager (`app/session.ts`) | PTY lifecycle, data batching, shell spawning | node-pty 1.0.0, DataBatcher class | RPC to renderer, plugin env hooks |
+| Session Manager (`app/session.ts`) | PTY lifecycle, data batching, shell spawning | node-pty 1.1.0, DataBatcher class | RPC to renderer, plugin env hooks |
 | RPC Bridge (`app/rpc.ts`, `lib/utils/rpc.ts`) | Typed bidirectional IPC communication | Electron ipcMain/ipcRenderer, uuid | All cross-process communication |
 | Plugin Manager (`app/plugins.ts`, `lib/utils/plugins.ts`) | Extension loading, decoration, lifecycle hooks | electron-store, Module._load patching | Both processes, all extensible components |
 | Redux Store (`lib/store/`) | Centralized renderer state management | Redux 5.0.1, redux-thunk, seamless-immutable | React containers, plugin middleware |
@@ -4259,7 +4259,7 @@ Plugin extensions compose with core functionality through decoration:
 
 **Technologies and Frameworks**:
 
-- node-pty 1.0.0 (native PTY binding)
+- node-pty 1.1.0 (native PTY binding)
 
 - Custom DataBatcher class for IPC optimization
 
