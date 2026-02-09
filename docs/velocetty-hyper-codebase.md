@@ -244,7 +244,7 @@ flowchart LR
 
 | Layer | Technology | Version | Purpose |
 | ------- | ------------ | --------- | --------- |
-| Runtime Shell | Electron | 22.3.25 | Desktop application framework |
+| Runtime Shell | Electron | 28.3.3 | Desktop application framework |
 | Main Process | Node.js/TypeScript | 5.4.5 | OS integration, PTY management |
 | Renderer Framework | React | 19.2.4 | UI component architecture |
 | State Management | Redux | 5.0.1 | Centralized state with middleware |
@@ -410,7 +410,7 @@ flowchart TB
     end
     
     subgraph External["External Dependencies"]
-        Electron22["Electron 22.3.25"]
+        Electron28["Electron 28.3.3"]
         NodePTY["node-pty"]
         XtermJS5["xterm.js 5.3.0"]
         NPMRegistry["NPM Registry"]
@@ -551,7 +551,7 @@ flowchart TB
 | Component | Version | Notes |
 | ----------- | --------- | ------- |
 | Velocetty (base) | 4.0.0-canary.5 | Fork of Hyper canary |
-| Electron | 22.3.25 | Runtime framework |
+| Electron | 28.3.3 | Runtime framework |
 | xterm.js | 5.3.0 | Terminal emulation |
 | React | 19.2.4 | UI framework |
 | TypeScript | 5.4.5 | Development language |
@@ -1583,7 +1583,7 @@ flowchart TB
 
 ##### External dependencies referenced
 
-- Electron 22.3.25
+- Electron 28.3.3
 
 - React 19.2.4
 
@@ -1678,7 +1678,7 @@ Base Configuration (tsconfig.base.json):
 
 | Constraint | Description |
 | ------------ | ------------- |
-| **Node.js Runtime** | TypeScript executes within Node.js 18.x (bundled with Electron 22) |
+| **Node.js Runtime** | Application code executes as JavaScript in Node.js 18.x (bundled with Electron 28); TypeScript is compiled during build |
 | **Chromium V8** | Renderer process JavaScript executed by Chromium's V8 engine |
 | **Native Module Compatibility** | `node-pty` requires matching Node.js ABI version for native bindings |
 | **ES Module Limitations** | CommonJS required for Electron main process compatibility |
@@ -1689,7 +1689,7 @@ Base Configuration (tsconfig.base.json):
 
 ```mermaid
 flowchart TB
-    subgraph ElectronFramework["Electron Framework 22.3.25"]
+    subgraph ElectronFramework["Electron Framework 28.3.3"]
         MainProcess["Main Process<br/>(Node.js)"]
         RendererProcess["Renderer Process<br/>(Chromium)"]
         IPCBridge["IPC Bridge"]
@@ -1718,10 +1718,10 @@ flowchart TB
 | Attribute | Value |
 | ----------- | ------- |
 | **Package** | `electron` |
-| **Version** | 22.3.25 |
-| **Chromium Version** | 108.0.5359.179 |
-| **Node.js Version** | 16.17.1 (bundled) |
-| **Support Status** | End-of-life (October 10, 2023) |
+| **Version** | 28.3.3 |
+| **Chromium Version** | 120.0.6099.56 |
+| **Node.js Version** | 18.18.2 (bundled) |
+| **Support Status** | Interim baseline on Architecture Decision Record (ADR)-004 path to Electron 40 |
 
 **Selection Justification**: Electron provides the cross-platform desktop
 application framework enabling Velocetty to deliver consistent terminal
@@ -1729,10 +1729,9 @@ experiences across macOS, Windows, and Linux using web technologies. The
 inherited Hyper codebase has deep Electron integration that would require
 significant refactoring to migrate.
 
-**Technical Debt Note**: Electron 22 reached end-of-life on October 10, 2023.
-While extended support was provided for Windows 7/8/8.1 compatibility, this
-version no longer receives security updates. Upgrading to a supported Electron
-version is a critical future consideration.
+**Technical Debt Note**: Electron 28 is the first staged runtime baseline on
+the ADR-004 path (28 → 34 → 40). Continue staged upgrades to reduce exposure to
+runtime drift and keep security fixes current.
 
 ##### IPC communication layer
 
@@ -1981,7 +1980,7 @@ Runtime Dependencies (app/package.json):
 ├── electron-is-dev: 2.0.0
 ├── electron-store: 8.2.0
 ├── fs-extra: 11.2.0
-├── node-pty: 1.0.0
+├── node-pty: 1.1.0
 └── recast: 0.23.6
 
 Optional Dependencies:
@@ -2368,11 +2367,11 @@ JavaScript to bytecode, avoiding runtime parsing overhead.
 ```mermaid
 flowchart TB
     subgraph CoreIntegration["Core Component Integration"]
-        Electron["Electron 22.3.25"]
+        Electron["Electron 28.3.3"]
         React["React 19.2.4"]
         Redux["Redux 5.0.1"]
         Xterm["xterm.js 5.3.0"]
-        NodePTY["node-pty 1.0.0"]
+        NodePTY["node-pty 1.1.0"]
     end
     
     Electron -->|"IPC Bridge"| React
@@ -2386,8 +2385,8 @@ flowchart TB
 
 | Integration | Requirement | Constraint |
 | ------------- | ------------- | ------------ |
-| **Electron ↔ Node.js** | Bundled Node.js 16.17.1 | Native modules must target this ABI |
-| **Electron ↔ Chromium** | Chromium 108 bundled | WebGL/Canvas rendering APIs |
+| **Electron ↔ Node.js** | Bundled Node.js 18.18.2 | Native modules must target this ABI |
+| **Electron ↔ Chromium** | Chromium 120.0.6099.56 bundled | WebGL/Canvas rendering APIs |
 | **React ↔ Redux** | react-redux 9.x | Requires React 18.0+ hooks API |
 | **xterm.js ↔ Addons** | xterm 5.x series | Addons must match major version |
 | **node-pty ↔ Electron** | Rebuild required per version | `electron-rebuild` in post-install |
@@ -2405,7 +2404,7 @@ flowchart TB
 
 | Consideration | Current State | Mitigation |
 | --------------- | --------------- | ------------ |
-| **Electron End-of-Life** | Version 22 unsupported since October 2023 | Plan upgrade to supported version |
+| **Electron upgrade trajectory** | Electron 28 baseline adopted | Continue roadmap upgrades to 34 and 40 |
 | **Plugin Trust Model** | Full-trust execution (no sandboxing) | User education; future sandbox consideration |
 | **IPC Security** | `@electron/remote` enables cross-process access | Migrate to explicit IPC messaging |
 | **Native Module Access** | `node-pty` has full system access | Runs with user privileges only |
@@ -2416,7 +2415,7 @@ flowchart TB
 
 | Layer | Primary Technologies | Purpose |
 | ------- | --------------------- | --------- |
-| **Application Shell** | Electron 22.3.25 | Cross-platform desktop framework |
+| **Application Shell** | Electron 28.3.3 | Cross-platform desktop framework |
 | **Main Process** | Node.js/TypeScript, node-pty | OS integration, PTY management |
 | **Renderer Process** | React 19.2.4, Redux 5.0.1 | UI components, state management |
 | **Terminal Rendering** | xterm.js 5.3.0 + WebGL addon | Terminal emulation and display |
@@ -2437,7 +2436,7 @@ flowchart TB
 
 | Item | Priority | Description |
 | ------ | ---------- | ------------- |
-| **Electron Upgrade** | Critical | Electron 22 is end-of-life; upgrade to supported version |
+| **Electron Upgrade** | Critical | Electron 28 is an interim milestone; continue upgrades to 34 and 40 |
 | **xterm.js Package Migration** | Medium | Migrate from `xterm` to scoped `@xterm/*` packages |
 | **IPC Modernization** | Medium | Replace `@electron/remote` with explicit IPC |
 | **Plugin Sandboxing** | Low | Investigate capability-based plugin permissions |
@@ -2484,7 +2483,7 @@ flowchart TB
 
 | Source | Information Retrieved |
 | -------- | ---------------------- |
-| Electron Documentation | Electron 22 end-of-life date (October 10, 2023), support policy |
+| Electron Documentation | Electron 28 release/runtime compatibility details |
 | npm Registry | xterm.js 5.3.0 current status, package deprecation notices |
 | xterm.js GitHub | Package migration to @xterm/* scoped packages |
 
@@ -4072,7 +4071,7 @@ flowchart TB
 | ---------------- | ---------------------- | ------------------ | ------------------- |
 | Main Process Entry (`app/index.ts`) | Electron initialization, window lifecycle, event routing | `@electron/remote`, config module, plugins module | IPC bridge, OS event handlers |
 | Configuration System (`app/config/`) | JSON config loading, schema validation, hot-reload | chokidar, electron-store, fs-extra | Plugin decoration, renderer bridge |
-| Session Manager (`app/session.ts`) | PTY lifecycle, data batching, shell spawning | node-pty 1.0.0, DataBatcher class | RPC to renderer, plugin env hooks |
+| Session Manager (`app/session.ts`) | PTY lifecycle, data batching, shell spawning | node-pty 1.1.0, DataBatcher class | RPC to renderer, plugin env hooks |
 | RPC Bridge (`app/rpc.ts`, `lib/utils/rpc.ts`) | Typed bidirectional IPC communication | Electron ipcMain/ipcRenderer, uuid | All cross-process communication |
 | Plugin Manager (`app/plugins.ts`, `lib/utils/plugins.ts`) | Extension loading, decoration, lifecycle hooks | electron-store, Module._load patching | Both processes, all extensible components |
 | Redux Store (`lib/store/`) | Centralized renderer state management | Redux 5.0.1, redux-thunk, seamless-immutable | React containers, plugin middleware |
@@ -4222,7 +4221,7 @@ Plugin extensions compose with core functionality through decoration:
 
 **Technologies and Frameworks**:
 
-- Electron 22.3.25 (Chromium 108, Node.js 16.17.1)
+- Electron 28.3.3 (Chromium 120.0.6099.56, Node.js 18.18.2)
 
 - `@electron/remote` 2.1.2 for cross-process module access
 
@@ -4260,7 +4259,7 @@ Plugin extensions compose with core functionality through decoration:
 
 **Technologies and Frameworks**:
 
-- node-pty 1.0.0 (native PTY binding)
+- node-pty 1.1.0 (native PTY binding)
 
 - Custom DataBatcher class for IPC optimization
 
@@ -4662,7 +4661,7 @@ flowchart TB
 
 | Decision | Choice | Rationale | Tradeoffs |
 | ---------- | -------- | ----------- | ----------- |
-| Application Shell | Electron 22.3.25 | Cross-platform desktop with web tech UI; deep codebase integration | Larger binary (~100MB), Chromium memory overhead, EOL version |
+| Application Shell | Electron 28.3.3 | Cross-platform desktop with web tech UI; deep codebase integration | Larger binary (~100MB), Chromium memory overhead, End-of-life (EOL) version |
 | Process Model | Main/Renderer split | Security isolation, native access in main, web UI in renderer | IPC overhead, state synchronization complexity |
 | UI Framework | React 19.2.4 | Component composition model enables plugin decoration pattern | Bundle size, rendering overhead vs. native UI |
 | State Management | Redux 5.0.1 | Predictable state, plugin middleware integration, time-travel debugging | Boilerplate, performance overhead for high-frequency updates |
@@ -4724,7 +4723,7 @@ flowchart TB
 
 | Concern | Current State | Risk Level | Mitigation Path |
 | --------- | -------------- | ------------ | ----------------- |
-| Electron Version | 22.3.25 (EOL October 2023) | **High** | Upgrade to supported version required |
+| Electron Version | 28.3.3 (interim baseline) | **High** | Continue staged upgrades to 34 and 40 |
 | Plugin Trust Model | Full trust execution | **High** | User education; future sandbox consideration |
 | `@electron/remote` | Enabled for cross-process access | **Medium** | Migrate to explicit IPC messaging |
 | Node Integration | Enabled in renderer | **Medium** | Required for plugin system architecture |
@@ -7614,23 +7613,21 @@ flowchart LR
 
 | Concern | Current State | Risk Level | Evidence |
 | --------- | -------------- | ------------ | ---------- |
-| Electron Version | 22.3.25 (EOL October 2023) | **Critical** | `app/package.json` |
-| Chromium Version | 108.0.5359.179 | **Critical** | Bundled with Electron 22 |
-| Node.js Version | 16.17.1 (EOL) | **High** | Bundled with Electron 22 |
+| Electron Version | 28.3.3 (interim baseline) | **Critical** | `app/package.json` |
+| Chromium Version | 120.0.6099.56 | **Critical** | Bundled with Electron 28 |
+| Node.js Version | 18.18.2 (EOL) | **High** | Bundled with Electron 28 |
 | Plugin Trust Model | Full trust, no sandboxing | **High** | Architectural decision |
 | `@electron/remote` | Enabled (deprecated) | **Medium** | `app/index.ts`, `app/ui/window.ts` |
 | Node Integration | Enabled in renderer | **Medium** | `app/ui/window.ts` |
 | Context Isolation | Disabled | **Medium** | `app/ui/window.ts` |
 
-##### 6.4.8.2 Electron 22 known vulnerabilities
+##### 6.4.8.2 Electron 28 baseline risk profile
 
-Based on CVE database research:
-
-| CVE | Description | Affected Versions | Status in 22.3.25 |
-| ----- | ------------- | ------------------- | ------------------- |
-| CSP Bypass | `eval()` allowed despite CSP when `sandbox: false` | 22.0.0-22.0.0 | Fixed in 22.0.1+ |
-| Context Isolation Bypass | Exploitable via non-serializable objects | < 22.3.6 | Fixed in 22.3.6+ |
-| Chromium vulnerabilities | Multiple CVEs in Chromium 108 | All 22.x | **Unpatched** |
+| Area | Observation | Status in 28.3.3 |
+| ------ | ------------- | ------------------- |
+| Chromium baseline | Bundled Chromium 120.0.6099.56 is newer than prior baseline but still requires staged upgrades | Track roadmap items 1.4.12 and 1.4.13 |
+| Main/renderer hardening | `nodeIntegration` enabled and `contextIsolation` disabled | Outstanding hardening debt |
+| Cross-process access | `@electron/remote` remains enabled | Planned migration to explicit IPC |
 
 ##### 6.4.8.3 Security configuration compliance
 
@@ -7641,7 +7638,7 @@ Based on CVE database research:
 | Disable `@electron/remote` | Enabled | **Non-compliant** | Cross-process access |
 | Enable `sandbox` | Disabled | **Non-compliant** | Plugin Node.js access |
 | Define CSP | Partial (`'unsafe-inline'`) | **Partial** | styled-jsx requirement |
-| Use current Electron | 22.3.25 (EOL) | **Non-compliant** | Upgrade required |
+| Use current Electron | 28.3.3 (interim baseline) | **Partial** | Continue roadmap upgrades |
 
 ---
 
@@ -9287,7 +9284,7 @@ flowchart LR
 | Gap | Risk | Recommendation |
 | ----- | ------ | ---------------- |
 | Plugin security | High—full trust model | User education, trusted sources |
-| Electron version | Critical—EOL Electron 22 | Priority upgrade path |
+| Electron version | Critical—EOL Electron 28 | Priority upgrade path |
 | Context isolation | Medium—disabled | Evaluate migration feasibility |
 | CSP validation | Low—`unsafe-inline` | Review styled-jsx alternatives |
 
@@ -9633,7 +9630,7 @@ architecture:
 
 | Technology | Version | Purpose | Justification |
 | ------------ | --------- | --------- | --------------- |
-| **Electron** | 22.3.25 | Application shell (Chromium 108) | Cross-platform desktop integration |
+| **Electron** | 28.3.3 | Application shell (Chromium 120.0.6099.56) | Cross-platform desktop integration |
 | **React** | 19.2.4 | Component-based UI framework | Enables plugin decoration pattern |
 | **Redux** | 5.0.1 | Centralized state management | Predictable state for complex multi-session UI |
 | **styled-jsx** | 5.1.2 | Scoped CSS-in-JS styling | Component-local styles without global conflicts |
@@ -11550,9 +11547,9 @@ versions used in Velocetty:
 
 | Technology | Version | Purpose | Evidence |
 | ------------ | --------- | --------- | ---------- |
-| Electron | 22.3.25 | Desktop application framework | `app/package.json` |
-| Chromium | 108.0.5359.179 | Renderer engine (bundled) | Electron 22 bundle |
-| Node.js | 16.17.1 | Main process runtime (bundled) | Electron 22 bundle |
+| Electron | 28.3.3 | Desktop application framework | `app/package.json` |
+| Chromium | 120.0.6099.56 | Renderer engine (bundled) | Electron 28 bundle |
+| Node.js | 18.18.2 | Main process runtime (bundled) | Electron 28 bundle |
 | TypeScript | 5.4.5 | Primary development language | `package.json` |
 | React | 19.2.4 | UI component framework | `package.json` |
 | Redux | 5.0.1 | State management library | `package.json` |
