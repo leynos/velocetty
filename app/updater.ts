@@ -104,7 +104,7 @@ const updater = (win: BrowserWindow) => {
    * subscription and parse optional payload args for Linux runtime parity.
    */
   const onLinuxUpdateAvailable = (...args: LinuxUpdateAvailableArgs) => {
-    const [_event, releaseNotes = '', releaseNameArg = '', _releaseDate, updateUrlArg = ''] = args;
+    const [_event, releaseNotes = '', releaseNameArg, _releaseDate, updateUrlArg = ''] = args;
     const releaseName = releaseNameArg || version;
     const updateUrl = updateUrlArg || undefined;
 

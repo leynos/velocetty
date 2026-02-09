@@ -78,9 +78,9 @@ And when tracking/developer documents are updated:
   roadmap, and existing runtime/tooling files.
 - [x] (2026-02-09) Updated runtime anchors in `package.json` and
   `bin/rebuild-node-pty.cjs` for Electron 34.
-- [x] (2026-02-09) Updated Continuous Integration (CI) Node baseline in
+- [x] (2026-02-09) Updated Continuous Integration (CI) Node.js baseline in
   `.github/workflows/nodejs.yml`
-  to align with Electron 34's bundled Node family.
+  to align with Electron 34's bundled Node.js family.
 - [x] (2026-02-09) Updated `docs/developers-guide.md`,
   `docs/velocetty-hyper-codebase.md`, and `docs/roadmap.md` for the new
   baseline and completion tracking.
@@ -103,10 +103,11 @@ And when tracking/developer documents are updated:
   Rationale: latest available Electron 34 patch release at execution time.
   Date/Author: 2026-02-09 / Codex
 - Decision: align `@types/node` to `^20.19.33`.
-  Rationale: keep type baseline aligned with Electron 34's bundled Node major.
+  Rationale: keep type baseline aligned with Electron 34's bundled Node.js
+  major.
   Date/Author: 2026-02-09 / Codex
-- Decision: align CI workflow Node baseline to 20.x and arm bootstrap to
-  Node 20.18.1.
+- Decision: align CI workflow Node.js baseline to 20.x and arm bootstrap to
+  Node.js 20.18.1.
   Rationale: keep rebuild/runtime assumptions consistent with Electron 34.
   Date/Author: 2026-02-09 / Codex
 
@@ -127,16 +128,16 @@ The main migration risk remained native module compatibility. This was
 contained by validating `bun install` first and confirming `node-pty` rebuild
 success before running the rest of the gates.
 
-Developer guidance now includes explicit Node-typing and CI Node-baseline
+Developer guidance now includes explicit Node.js typing and CI Node.js baseline
 alignment expectations when upgrading Electron.
 
 ## Context and orientation
 
 Key migration surfaces:
 
-- `package.json`: Electron and Node typings versions.
+- `package.json`: Electron and Node.js typings versions.
 - `bin/rebuild-node-pty.cjs`: native module rebuild fallback target.
-- `.github/workflows/nodejs.yml`: CI Node baseline for native rebuilds.
+- `.github/workflows/nodejs.yml`: CI Node.js baseline for native rebuilds.
 - `docs/developers-guide.md`: local migration and validation practice.
 - `docs/roadmap.md`: roadmap delivery status.
 - `docs/velocetty-hyper-codebase.md`: current architecture/runtime baseline.
@@ -145,7 +146,7 @@ Key migration surfaces:
 
 Stage A: Update runtime anchors and rebuild target.
 
-Stage B: Align CI Node baseline with Electron 34 runtime family.
+Stage B: Align CI Node.js baseline with Electron 34 runtime family.
 
 Stage C: Update developer and architecture baseline documentation.
 
