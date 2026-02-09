@@ -206,7 +206,7 @@ Stage E: Re-run gates after doc updates and finalize.
 
 Done criteria for this roadmap item:
 
-- Electron runtime upgraded to 28 baseline.
+- Electron runtime upgraded to Electron 28 baseline.
 - Native rebuild path succeeds with Electron 28 target.
 - Required commands pass:
   - `bun install`

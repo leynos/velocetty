@@ -4661,7 +4661,7 @@ flowchart TB
 
 | Decision | Choice | Rationale | Tradeoffs |
 | ---------- | -------- | ----------- | ----------- |
-| Application Shell | Electron 28.3.3 | Cross-platform desktop with web tech UI; deep codebase integration | Larger binary (~100MB), Chromium memory overhead, EOL version |
+| Application Shell | Electron 28.3.3 | Cross-platform desktop with web tech UI; deep codebase integration | Larger binary (~100MB), Chromium memory overhead, End-of-life (EOL) version |
 | Process Model | Main/Renderer split | Security isolation, native access in main, web UI in renderer | IPC overhead, state synchronization complexity |
 | UI Framework | React 19.2.4 | Component composition model enables plugin decoration pattern | Bundle size, rendering overhead vs. native UI |
 | State Management | Redux 5.0.1 | Predictable state, plugin middleware integration, time-travel debugging | Boilerplate, performance overhead for high-frequency updates |
