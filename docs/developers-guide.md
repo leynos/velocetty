@@ -30,7 +30,8 @@ in the same change:
 - Update `devDependencies.electron` in `package.json`.
 - Bump the fallback target version in `bin/rebuild-node-pty.cjs`.
 - Adjust `app/package.json` if runtime dependencies (for example, `node-pty`)
-  need a compatibility bump for the new Electron ABI.
+  need a compatibility bump for the new Electron Application Binary Interface
+  (ABI).
 - Run `bun install` to validate snapshot generation, `install-app-deps`, and
   `node-pty` rebuilding before running the remaining gates.
 

@@ -1721,7 +1721,7 @@ flowchart TB
 | **Version** | 28.3.3 |
 | **Chromium Version** | 120.0.6099.56 |
 | **Node.js Version** | 18.18.2 (bundled) |
-| **Support Status** | Interim baseline on ADR-004 path to Electron 40 |
+| **Support Status** | Interim baseline on Architecture Decision Record (ADR)-004 path to Electron 40 |
 
 **Selection Justification**: Electron provides the cross-platform desktop
 application framework enabling Velocetty to deliver consistent terminal

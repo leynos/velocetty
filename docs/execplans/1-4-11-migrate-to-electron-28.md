@@ -18,11 +18,13 @@ and roadmap item `1.4.11` is marked done.
 
 ## Constraints
 
-- Follow `docs/adr-004-update-electron-40.md` staged migration path:
+- Follow Architecture Decision Record (ADR)-004 staged migration path from
+  `docs/adr-004-update-electron-40.md`:
   Electron 22 → 28 → 34 → 40.
-- Keep existing script and Make target names stable.
-- Keep native module functionality (`node-pty`) working after the upgrade.
-- Keep documentation wrapped to 80 columns and code blocks to 120 columns.
+- Preserve existing script and Make target names.
+- Maintain native module functionality (`node-pty`) after the upgrade.
+- Ensure documentation stays wrapped to 80 columns and code blocks to 120
+  columns.
 - Update `docs/developers-guide.md` if development practice changes.
 - Do not mark roadmap item `1.4.11` done until required gates pass.
 
@@ -75,7 +77,8 @@ and roadmap item `1.4.11` is marked done.
 - [x] (2026-02-08 21:55Z) Re-ran full required gates after documentation
   updates.
 - [x] (2026-02-08 21:56Z) Finalized ExecPlan status and retrospective.
-- [x] (2026-02-09 00:06Z) Investigated CI `bun install` failure in
+- [x] (2026-02-09 00:06Z) Investigated Continuous Integration (CI) `bun install`
+  failure in
   `install-app-deps` and reproduced patch-package mismatch for
   `node-pty+1.1.0.patch`.
 - [x] (2026-02-09 00:08Z) Removed obsolete node-pty patch and made
@@ -99,7 +102,7 @@ and roadmap item `1.4.11` is marked done.
 - Observation: `node-pty+1.1.0.patch` still targeted the old 1.0.0 NAN-era
   source and no longer applied to `node-pty@1.1.0` (N-API implementation).
   Evidence: deterministic repro via `npx patch-package` in a clean temporary
-  install with `node-pty@1.1.0`.
+  installation with `node-pty@1.1.0`.
   Impact: removed the obsolete patch and updated the asset copy step to allow
   empty `app/patches/` content.
 
