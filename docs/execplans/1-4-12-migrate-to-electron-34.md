@@ -9,7 +9,7 @@ Status: COMPLETE
 
 No `PLANS.md` exists in this repository, so this plan stands alone.
 
-## Purpose / Big Picture
+## Purpose / big picture
 
 Deliver roadmap item `1.4.12` by migrating the runtime from Electron 28 to
 Electron 34 while preserving build, packaging, and test workflows.
@@ -38,7 +38,7 @@ And when tracking/developer documents are updated:
 - Update `docs/developers-guide.md` if development practice changes.
 - Do not mark roadmap item `1.4.12` done until required gates pass.
 
-## Tolerances (Exception Triggers)
+## Tolerances (exception triggers)
 
 - Scope: if implementation exceeds 25 files or 1000 net lines, stop and
   escalate.
@@ -88,7 +88,7 @@ And when tracking/developer documents are updated:
   `bun install`, `make build`, `make check-fmt`, `make lint`, `make test`.
 - [x] (2026-02-09) Finalized plan status and retrospective.
 
-## Surprises & Discoveries
+## Surprises & discoveries
 
 - Observation: ADR-004 references Electron 34 runtime details but the previous
   completed milestone still left many architecture baseline references to
@@ -97,7 +97,7 @@ And when tracking/developer documents are updated:
   Impact: required a broader documentation baseline update than just roadmap and
   developers guide.
 
-## Decision Log
+## Decision log
 
 - Decision: target Electron `34.5.8` for this milestone.
   Rationale: latest available Electron 34 patch release at execution time.
@@ -110,7 +110,7 @@ And when tracking/developer documents are updated:
   Rationale: keep rebuild/runtime assumptions consistent with Electron 34.
   Date/Author: 2026-02-09 / Codex
 
-## Outcomes & Retrospective
+## Outcomes & retrospective
 
 Roadmap item `1.4.12` is complete. The runtime now targets Electron 34 and
 native module rebuilding succeeds with Electron 34 headers.
@@ -130,7 +130,7 @@ success before running the rest of the gates.
 Developer guidance now includes explicit Node-typing and CI Node-baseline
 alignment expectations when upgrading Electron.
 
-## Context and Orientation
+## Context and orientation
 
 Key migration surfaces:
 
@@ -141,7 +141,7 @@ Key migration surfaces:
 - `docs/roadmap.md`: roadmap delivery status.
 - `docs/velocetty-hyper-codebase.md`: current architecture/runtime baseline.
 
-## Plan of Work
+## Plan of work
 
 Stage A: Update runtime anchors and rebuild target.
 
@@ -153,7 +153,7 @@ Stage D: Run required gates and capture logs.
 
 Stage E: Finalize ExecPlan to `COMPLETE`.
 
-## Concrete Steps
+## Concrete steps
 
 1. Update runtime anchors in `package.json` and `bin/rebuild-node-pty.cjs`.
 2. Update CI runtime anchors in `.github/workflows/nodejs.yml`.
@@ -172,7 +172,7 @@ Stage E: Finalize ExecPlan to `COMPLETE`.
      `/tmp/test-velocetty-1-4-12-migrate-to-electron-34.out`
 5. Finalize docs and ExecPlan status.
 
-## Validation and Acceptance
+## Validation and acceptance
 
 Done criteria for roadmap item `1.4.12`:
 
@@ -187,7 +187,7 @@ Done criteria for roadmap item `1.4.12`:
 - `docs/developers-guide.md` reflects migration-practice changes.
 - `docs/roadmap.md` marks `1.4.12` done.
 
-## Idempotence and Recovery
+## Idempotence and recovery
 
 - Commands are rerunnable; failures are diagnosed using `/tmp` logs.
 - If `bun install` fails in postinstall, fix the failing stage and rerun
@@ -195,7 +195,7 @@ Done criteria for roadmap item `1.4.12`:
 - If build fails due to stale generated artefacts, clean generated outputs and
   rerun `make build`.
 
-## Interfaces and Dependencies
+## Interfaces and dependencies
 
 - Runtime dependency baseline:
   - `electron`: `^34.5.8` (`package.json`)
@@ -207,7 +207,7 @@ Done criteria for roadmap item `1.4.12`:
 - CI baseline:
   - `.github/workflows/nodejs.yml` `NODE_VERSION: 20.x`.
 
-## Revision Note
+## Revision note
 
 Updated to `COMPLETE` after passing all required quality gates and finalizing
 tracking/guidance documentation for the Electron 34 baseline.
