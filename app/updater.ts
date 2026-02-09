@@ -103,11 +103,10 @@ const updater = (win: BrowserWindow) => {
    * Linux shim emits metadata arguments. Keep a typed zero-arg listener for
    * subscription and parse optional payload args for Linux runtime parity.
    */
-  const onLinuxUpdateAvailable = (
-    ...[, releaseNotes = '', releaseNameArg, , updateUrlArg]: LinuxUpdateAvailableArgs
-  ) => {
-    const releaseName = releaseNameArg && releaseNameArg.length > 0 ? releaseNameArg : version;
-    const updateUrl = updateUrlArg && updateUrlArg.length > 0 ? updateUrlArg : undefined;
+  const onLinuxUpdateAvailable = (...args: LinuxUpdateAvailableArgs) => {
+    const [_event, releaseNotes = '', releaseNameArg = '', _releaseDate, updateUrlArg = ''] = args;
+    const releaseName = releaseNameArg || version;
+    const updateUrl = updateUrlArg || undefined;
 
     emitUpdateAvailable(releaseNotes, releaseName, updateUrl);
   };

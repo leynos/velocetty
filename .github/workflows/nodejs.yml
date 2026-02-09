@@ -207,6 +207,7 @@ jobs:
           base_image: ${{ matrix.image }}
           cpu: ${{ matrix.cpu }}
           shell: bash
+          import_github_env: true
           copy_artifact_path: target/node_modules/node-pty
           copy_artifact_dest: target/node_modules
           commands: |
