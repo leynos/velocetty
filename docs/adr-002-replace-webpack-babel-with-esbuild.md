@@ -203,6 +203,36 @@ once plugin and asset handling are validated.
   - Replace direct CLI bundling with a checked-in `build/esbuild.mjs` entry
     point so plugin logic is versioned and testable.
 
+### Validation gaps and required testing coverage
+
+The current automated tests are not sufficient to validate the net outcome of
+the Webpack/Babel-to-esbuild transform migration. Existing unit tests primarily
+cover application behaviour and do not assert build-pipeline equivalence for
+loader/plugin transform outputs.
+
+The migration must not be considered complete until the following validation
+requirements are implemented and passing in CI.
+
+| Risk area | Current validation gap | Required test coverage |
+| --- | --- | --- |
+| `styled-jsx` transform parity | No assertions that `<style jsx>` and `<style jsx global>` compile to equivalent runtime styling under the new pipeline | Add renderer integration tests that build with esbuild and verify scoped and global style application in representative components |
+| Static copy and copy-only flow (`hyper-app`) | No contract tests for copied artefacts currently managed by `copy-webpack-plugin` and `null-loader` | Add build contract tests that assert required files and directory structure in `target/` after build |
+| Externals/ignore mapping | No tests that prove require path shape and ignored modules (`spawn-sync`, sourcemap artefacts) remain correct | Add bundle inspection tests and runtime smoke tests for modules currently in Webpack `externals` and `IgnorePlugin` rules |
+| Snapshot bootstrap shim | No migration-era test for replacing `__non_webpack_require__` semantics | Add production-mode integration test that boots renderer snapshot path and confirms module loading succeeds |
+| CLI shebang behaviour | No assertion that bundled CLI output preserves executable shebang behaviour after removing `shebang-loader` | Add CLI artefact test that checks shebang presence/position and executes a basic command path |
+| Minification/source-map expectations | No explicit contract test for production minification and development source-map quality after switching off Terser/Babel post-pass | Add build mode tests that assert minified production output properties and development source-map availability |
+
+Required CI acceptance criteria for migration PRs:
+
+- Build equivalence suite passes for both development and production modes.
+- Renderer smoke tests pass for plugin-critical paths (`styled-jsx`, externals,
+  snapshot bootstrap).
+- CLI smoke tests pass for executable output behaviour.
+- Artefact contract tests pass for copied static resources and expected bundle
+  layout.
+- Coverage report includes the new build validation suites and enforces a
+  baseline threshold agreed by maintainers before Webpack/Babel removal.
+
 ## Outstanding Decisions
 
 - Whether to keep a minimal Babel step for any legacy transforms.
