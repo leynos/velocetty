@@ -74,6 +74,13 @@ Bun is required for local development. Install it from [Bun][bun].
 4. Build and watch for changes: `bun run dev`.
 5. Run the app: `bun run app` (from another terminal).
 
+If your machine has unstable GPU drivers or rendering issues, force software
+rendering for the Electron process:
+
+```bash
+VELOCETTY_DISABLE_GPU=1 bun run app
+```
+
 To generate distribution binaries:
 
 ```bash

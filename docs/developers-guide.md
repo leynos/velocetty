@@ -78,6 +78,16 @@ Current repository runtime baseline after roadmap item `1.4.13`:
 When preparing future Electron upgrades, update these anchors together and
 avoid merging partial baseline updates.
 
+## GPU fallback launch switch
+
+Use the `VELOCETTY_DISABLE_GPU` environment variable when debugging renderer
+issues caused by problematic GPU drivers:
+
+- `VELOCETTY_DISABLE_GPU=1 bun run app`
+
+When this switch is enabled, the main process disables hardware acceleration
+before Electron readiness and applies software-rendering Chromium flags.
+
 ## React version alignment
 
 The renderer runtime depends on React in both the root `package.json` and the

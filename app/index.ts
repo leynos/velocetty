@@ -35,6 +35,7 @@ import * as AppMenu from './menus/menu';
 import * as plugins from './plugins';
 import {newWindow} from './ui/window';
 import {installCLI} from './utils/cli-install';
+import {configureGpuMode} from './utils/configure-gpu';
 import * as windowUtils from './utils/window-utils';
 
 const windowSet = new Set<BrowserWindow>([]);
@@ -55,8 +56,7 @@ app.getLastFocusedWindow = () => {
   });
 };
 
-console.log('Disabling Chromium GPU blacklist');
-app.commandLine.appendSwitch('ignore-gpu-blacklist');
+configureGpuMode(app);
 
 if (isDev) {
   console.log('running in dev mode');
