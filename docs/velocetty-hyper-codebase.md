@@ -2184,9 +2184,8 @@ flowchart TB
     
     subgraph BuildPipeline["Build Pipeline"]
         TSGO["TypeScript Compiler<br/>tsgo 7.0.0-dev.20260128.1"]
-        Webpack["Webpack 5.91.0"]
-        Babel["Babel 7.24.x"]
-        Terser["Terser 5.30.3"]
+        EsbuildBundler["esbuild 0.25.12<br/>Bundling and minification"]
+        StyledJsxBridge["Babel Bridge 7.24.x<br/>styled-jsx transform path"]
     end
     
     subgraph OutputArtifacts["Output Artifacts"]
@@ -9330,7 +9329,7 @@ flowchart TB
         Gate1["Gate 1: Lint<br/>ESLint + Prettier"]
         Gate2["Gate 2: Type Check<br/>TypeScript Compilation"]
         Gate3["Gate 3: Unit Tests<br/>Bun Test Suite"]
-        Gate4["Gate 4: Build<br/>Webpack + Packaging"]
+        Gate4["Gate 4: Build<br/>esbuild + Packaging"]
         Gate5["Gate 5: E2E<br/>Playwright Smoke"]
         Gate6["Gate 6: Security<br/>CodeQL Scan"]
     end
@@ -10598,7 +10597,7 @@ flowchart TB
         end
         
         subgraph Applicable["APPLICABLE (Desktop Distribution Infrastructure)"]
-            BuildSystem["Build System<br/>(Webpack/TypeScript)"]
+            BuildSystem["Build System<br/>(esbuild/TypeScript)"]
             Packaging["Packaging<br/>(electron-builder)"]
             CICD["CI/CD Pipeline<br/>(GitHub Actions)"]
             CodeSigning["Code Signing<br/>(Apple/Windows)"]
@@ -10636,9 +10635,9 @@ flowchart LR
     end
     
     subgraph BuildPhase["Build Phase"]
-        Compile["TypeScript<br/>Compilation"]
-        Bundle["Webpack<br/>Bundling"]
-        Optimize["Terser<br/>Minification"]
+        Compile["TypeScript<br/>Compilation (tsgo)"]
+        Bundle["esbuild<br/>Bundling"]
+        Optimize["esbuild<br/>Minification + source maps"]
     end
     
     subgraph PackagePhase["Package Phase"]
@@ -10683,9 +10682,8 @@ flowchart TB
     
     subgraph BuildPipeline["Build Pipeline"]
         TSGO["TypeScript Compiler<br/>tsgo 7.0.0-dev.20260128.1"]
-        Webpack["Webpack 5.91.0<br/>Module Bundler"]
-        Babel["Babel 7.24.x<br/>Transpilation"]
-        Terser["Terser 5.30.3<br/>Minification"]
+        EsbuildBundler["esbuild 0.25.12<br/>Module bundling and minification"]
+        StyledJsxBridge["Babel Bridge 7.24.x<br/>styled-jsx transform path"]
     end
     
     subgraph OutputArtifacts["Output Artifacts"]
@@ -10992,7 +10990,7 @@ flowchart LR
     end
     
     subgraph Stage4["Stage 4: Build"]
-        WebpackBuild["Webpack Bundle"]
+        EsbuildBuild["esbuild Bundle"]
         ElectronPack["electron-builder<br/>Package"]
         CodeSign["Code Signing"]
     end
@@ -11031,7 +11029,7 @@ flowchart TB
         Gate1["Gate 1: Lint<br/>ESLint 8.57.0"]
         Gate2["Gate 2: Type Check<br/>tsgo 7.0.0-dev.20260128.1"]
         Gate3["Gate 3: Unit Tests<br/>Bun test runner"]
-        Gate4["Gate 4: Build<br/>Webpack + electron-builder"]
+        Gate4["Gate 4: Build<br/>esbuild + electron-builder"]
         Gate5["Gate 5: E2E Tests<br/>Playwright 1.43.1"]
         Gate6["Gate 6: Security<br/>CodeQL Analysis"]
     end
@@ -11059,7 +11057,7 @@ flowchart TB
 | Lint | ESLint 8.57.0 + Prettier 3.2.5 | Job fails, PR blocked |
 | Type Check | tsgo 7.0.0-dev.20260128.1 | Build fails |
 | Unit Tests | Bun test runner 1.3.8 | Job fails, PR blocked |
-| Build | Webpack + electron-builder | Job fails |
+| Build | esbuild + electron-builder | Job fails |
 | E2E Tests | Playwright 1.43.1 | Job fails, screenshot captured |
 | Security | CodeQL | Security alert generated |
 
