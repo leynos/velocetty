@@ -19,6 +19,17 @@ const sortedFileNames = async (directoryPath: string, extension: string) => {
     .sort((left, right) => left.localeCompare(right));
 };
 
+const copySingleFile = async (sourcePath: string, targetPath: string, allowMissing = false) => {
+  try {
+    await cp(sourcePath, targetPath, {force: true});
+  } catch (error) {
+    if (allowMissing && isNotFoundError(error)) {
+      return;
+    }
+    throw error;
+  }
+};
+
 const copyFilesByExtension = async (
   sourceDirectory: string,
   targetDirectory: string,
@@ -29,18 +40,9 @@ const copyFilesByExtension = async (
     await mkdir(targetDirectory, {recursive: true});
     const fileNames = await sortedFileNames(sourceDirectory, extension);
     await Promise.all(
-      fileNames.map(async (fileName) => {
-        try {
-          await cp(path.join(sourceDirectory, fileName), path.join(targetDirectory, fileName), {
-            force: true
-          });
-        } catch (error) {
-          if (allowMissing && isNotFoundError(error)) {
-            return;
-          }
-          throw error;
-        }
-      })
+      fileNames.map((fileName) =>
+        copySingleFile(path.join(sourceDirectory, fileName), path.join(targetDirectory, fileName), allowMissing)
+      )
     );
   } catch (error) {
     if (allowMissing && isNotFoundError(error)) {
