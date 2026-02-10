@@ -266,7 +266,7 @@ test('translation: esbuild handles shebang-bearing dependencies without shebang-
     });
 
     const bundleOutput = buildResult.outputFiles.find((file) => file.path.endsWith('.js'))?.text ?? '';
-    expect(bundleOutput.includes('rc')).toBe(true);
+    expect(bundleOutput.includes('"rc"') || bundleOutput.includes("'rc'")).toBe(true);
     expect(bundleOutput.includes('name: "rc"')).toBe(true);
     expect(bundleOutput.includes('#!/usr/bin/env node')).toBe(false);
   } finally {
