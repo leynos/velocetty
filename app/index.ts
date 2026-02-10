@@ -25,7 +25,7 @@ config.setup();
 import {resolve} from 'node:path';
 
 // Packages
-import {app, BrowserWindow, Menu, screen} from 'electron';
+import {app, BrowserWindow, Menu, screen, session} from 'electron';
 
 import isDev from 'electron-is-dev';
 import {gitDescribe} from 'git-describe';
@@ -78,13 +78,24 @@ async function installDevExtensions(isDev_: boolean) {
   if (!isDev_) {
     return [];
   }
-  const {default: installer, REACT_DEVELOPER_TOOLS, REDUX_DEVTOOLS} = await import('electron-devtools-installer');
+  const {REACT_DEVELOPER_TOOLS, REDUX_DEVTOOLS} = await import('electron-devtools-installer');
+  const {default: downloadChromeExtension} = await import('electron-devtools-installer/dist/downloadChromeExtension');
 
   const extensions = [REACT_DEVELOPER_TOOLS, REDUX_DEVTOOLS];
   const forceDownload = Boolean(process.env.UPGRADE_EXTENSIONS);
 
   const results = await Promise.allSettled(
-    extensions.map((extension) => installer(extension, {forceDownload, loadExtensionOptions: {allowFileAccess: true}}))
+    extensions.map(async (extension) => {
+      const extensionFolder = await downloadChromeExtension(extension.id, forceDownload);
+      const installedExtension = session.defaultSession.extensions.getExtension(extension.id);
+      if (installedExtension) {
+        session.defaultSession.extensions.removeExtension(extension.id);
+      }
+      const loadedExtension = await session.defaultSession.extensions.loadExtension(extensionFolder, {
+        allowFileAccess: true
+      });
+      return loadedExtension.name;
+    })
   );
 
   for (const result of results) {
