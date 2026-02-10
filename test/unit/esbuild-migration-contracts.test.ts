@@ -97,20 +97,27 @@ test('packaging: hyper-app and renderer copy flows preserve required files', asy
   const rootDir = await createTempDir();
   try {
     await writeFixtureFile(path.join(rootDir, 'app', 'index.html'), '<html></html>');
+    await writeFixtureFile(path.join(rootDir, 'app', 'ignore.tmp'), 'ignore-me');
     await writeFixtureFile(path.join(rootDir, 'app', 'package.json'), '{"name":"fixture"}');
     await writeFixtureFile(path.join(rootDir, 'app', 'tsconfig.json'), '{"extends":"../tsconfig.base.json"}');
     await writeFixtureFile(path.join(rootDir, 'app', 'config', 'schema.json'), '{"type":"object"}');
     await writeFixtureFile(path.join(rootDir, 'app', 'keymaps', 'linux.json'), '{"key":"value"}');
     await writeFixtureFile(path.join(rootDir, 'app', 'static', 'icon.png'), 'png-data');
+    await writeFixtureFile(path.join(rootDir, 'app', 'static', 'logo.svg'), '<svg>app</svg>');
+    await writeFixtureFile(path.join(rootDir, 'app', 'static', 'ignore.bak'), 'skip-me');
     await writeFixtureFile(path.join(rootDir, 'assets', 'icons.svg'), '<svg></svg>');
+    await writeFixtureFile(path.join(rootDir, 'assets', 'preview.png'), 'preview-png');
+    await writeFixtureFile(path.join(rootDir, 'assets', 'ignore.tmp'), 'skip-me');
 
     await copyHyperAppArtifacts({
       rootDir,
-      targetDir: path.join(rootDir, 'target')
+      targetDir: path.join(rootDir, 'target'),
+      allowMissingPatches: true
     });
     await copyRendererArtifacts({
       rootDir,
-      targetDir: path.join(rootDir, 'target', 'renderer')
+      targetDir: path.join(rootDir, 'target', 'renderer'),
+      allowMissingAssets: false
     });
 
     const copiedHtml = await readFile(path.join(rootDir, 'target', 'index.html'), 'utf8');
@@ -119,7 +126,9 @@ test('packaging: hyper-app and renderer copy flows preserve required files', asy
     const copiedConfig = await readFile(path.join(rootDir, 'target', 'config', 'schema.json'), 'utf8');
     const copiedKeymap = await readFile(path.join(rootDir, 'target', 'keymaps', 'linux.json'), 'utf8');
     const copiedStaticIcon = await readFile(path.join(rootDir, 'target', 'static', 'icon.png'), 'utf8');
+    const copiedStaticSvg = await readFile(path.join(rootDir, 'target', 'static', 'logo.svg'), 'utf8');
     const copiedAsset = await readFile(path.join(rootDir, 'target', 'renderer', 'assets', 'icons.svg'), 'utf8');
+    const copiedAssetPng = await readFile(path.join(rootDir, 'target', 'renderer', 'assets', 'preview.png'), 'utf8');
 
     expect(copiedHtml).toBe('<html></html>');
     expect(copiedPackageJson).toBe('{"name":"fixture"}');
@@ -127,7 +136,56 @@ test('packaging: hyper-app and renderer copy flows preserve required files', asy
     expect(copiedConfig).toBe('{"type":"object"}');
     expect(copiedKeymap).toBe('{"key":"value"}');
     expect(copiedStaticIcon).toBe('png-data');
+    expect(copiedStaticSvg).toBe('<svg>app</svg>');
     expect(copiedAsset).toBe('<svg></svg>');
+    expect(copiedAssetPng).toBe('preview-png');
+    await expect(readFile(path.join(rootDir, 'target', 'ignore.tmp'), 'utf8')).rejects.toThrow();
+    await expect(readFile(path.join(rootDir, 'target', 'static', 'ignore.bak'), 'utf8')).rejects.toThrow();
+    await expect(readFile(path.join(rootDir, 'target', 'renderer', 'assets', 'ignore.tmp'), 'utf8')).rejects.toThrow();
+  } finally {
+    await rm(rootDir, {recursive: true, force: true});
+  }
+});
+
+test('packaging: allowMissing options control optional copy failures', async () => {
+  const rootDir = await createTempDir();
+  try {
+    await writeFixtureFile(path.join(rootDir, 'app', 'index.html'), '<html></html>');
+    await writeFixtureFile(path.join(rootDir, 'app', 'package.json'), '{"name":"fixture"}');
+    await writeFixtureFile(path.join(rootDir, 'app', 'tsconfig.json'), '{"extends":"../tsconfig.base.json"}');
+    await writeFixtureFile(path.join(rootDir, 'app', 'config', 'schema.json'), '{"type":"object"}');
+    await writeFixtureFile(path.join(rootDir, 'app', 'keymaps', 'linux.json'), '{"key":"value"}');
+    await writeFixtureFile(path.join(rootDir, 'app', 'static', 'icon.png'), 'png-data');
+
+    await expect(
+      copyHyperAppArtifacts({
+        rootDir,
+        targetDir: path.join(rootDir, 'target'),
+        allowMissingPatches: true
+      })
+    ).resolves.toBeUndefined();
+    await expect(
+      copyHyperAppArtifacts({
+        rootDir,
+        targetDir: path.join(rootDir, 'target'),
+        allowMissingPatches: false
+      })
+    ).rejects.toThrow();
+
+    await expect(
+      copyRendererArtifacts({
+        rootDir,
+        targetDir: path.join(rootDir, 'target', 'renderer-allow-missing'),
+        allowMissingAssets: true
+      })
+    ).resolves.toBeUndefined();
+    await expect(
+      copyRendererArtifacts({
+        rootDir,
+        targetDir: path.join(rootDir, 'target', 'renderer-strict'),
+        allowMissingAssets: false
+      })
+    ).rejects.toThrow();
   } finally {
     await rm(rootDir, {recursive: true, force: true});
   }

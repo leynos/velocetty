@@ -8,6 +8,16 @@ type CopyOptions = {
   targetDir?: string;
 };
 
+/** Options for copy flow that mirrors the legacy hyper-app webpack output. */
+type HyperAppCopyOptions = CopyOptions & {
+  allowMissingPatches?: boolean;
+};
+
+/** Options for renderer asset copy flow. */
+type RendererCopyOptions = CopyOptions & {
+  allowMissingAssets?: boolean;
+};
+
 /** Returns true when a filesystem error indicates a missing file or directory. */
 const isNotFoundError = (error: unknown): error is NodeJS.ErrnoException => {
   return (error as NodeJS.ErrnoException).code === 'ENOENT';
@@ -57,6 +67,18 @@ const copyFilesByExtension = async (
   }
 };
 
+/** Copies files matching any provided extension from source to target. */
+const copyFilesByExtensions = async (
+  sourceDirectory: string,
+  targetDirectory: string,
+  extensions: readonly string[],
+  allowMissing = false
+) => {
+  await Promise.all(
+    extensions.map((extension) => copyFilesByExtension(sourceDirectory, targetDirectory, extension, allowMissing))
+  );
+};
+
 /** Copies an entire directory tree and optionally tolerates missing sources. */
 const copyDirectory = async (sourceDirectory: string, targetDirectory: string, allowMissing = false) => {
   try {
@@ -74,10 +96,11 @@ const copyDirectory = async (sourceDirectory: string, targetDirectory: string, a
 };
 
 /** Copies the former `hyper-app` webpack artefacts into `target/`. */
-export const copyHyperAppArtifacts = async (options: CopyOptions = {}) => {
+export const copyHyperAppArtifacts = async (options: HyperAppCopyOptions = {}) => {
   const rootDir = options.rootDir ?? process.cwd();
   const targetDir = options.targetDir ?? path.join(rootDir, 'target');
   const appDirectory = path.join(rootDir, 'app');
+  const allowMissingPatches = options.allowMissingPatches ?? true;
 
   await rm(path.join(targetDir, 'patches'), {recursive: true, force: true});
   await mkdir(targetDir, {recursive: true});
@@ -87,14 +110,20 @@ export const copyHyperAppArtifacts = async (options: CopyOptions = {}) => {
     copyFilesByExtension(appDirectory, targetDir, '.json'),
     copyFilesByExtension(path.join(appDirectory, 'config'), path.join(targetDir, 'config'), '.json'),
     copyFilesByExtension(path.join(appDirectory, 'keymaps'), path.join(targetDir, 'keymaps'), '.json'),
-    copyDirectory(path.join(appDirectory, 'static'), path.join(targetDir, 'static')),
-    copyDirectory(path.join(appDirectory, 'patches'), path.join(targetDir, 'patches'), true)
+    copyFilesByExtensions(path.join(appDirectory, 'static'), path.join(targetDir, 'static'), ['.png', '.svg']),
+    copyDirectory(path.join(appDirectory, 'patches'), path.join(targetDir, 'patches'), allowMissingPatches)
   ]);
 };
 
 /** Copies renderer static assets to the renderer output directory. */
-export const copyRendererArtifacts = async (options: CopyOptions = {}) => {
+export const copyRendererArtifacts = async (options: RendererCopyOptions = {}) => {
   const rootDir = options.rootDir ?? process.cwd();
   const targetDir = options.targetDir ?? path.join(rootDir, 'target', 'renderer');
-  await copyDirectory(path.join(rootDir, 'assets'), path.join(targetDir, 'assets'));
+  const allowMissingAssets = options.allowMissingAssets ?? false;
+  await copyFilesByExtensions(
+    path.join(rootDir, 'assets'),
+    path.join(targetDir, 'assets'),
+    ['.png', '.svg'],
+    allowMissingAssets
+  );
 };
