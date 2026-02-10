@@ -143,7 +143,8 @@ updated without reclassifying the observed risk inventory.
   - preserve `styled-jsx` compatibility (via a focused bridge transform);
   - replace copy-only Webpack behaviours with an explicit copy pipeline;
   - reproduce externals and ignore semantics used by renderer/CLI bundles;
-  - provide a CSP-safe replacement for the `__non_webpack_require__` shim;
+  - provide a Content Security Policy (CSP)-safe replacement for the
+    `__non_webpack_require__` shim;
   - move to an esbuild JavaScript build entrypoint to host plugin logic.
 - Phase 2+ cleanups:
   - rewrite `styled-jsx` usage to remove the remaining Babel bridge path.
@@ -167,7 +168,7 @@ updated without reclassifying the observed risk inventory.
     an alternative style strategy (for example CSS modules or explicit runtime
     injection patterns already used for `customCSS`).
 
-#### 2. Static file and copy-only bundle behaviour (required bespoke pipeline)
+#### 2. Static file and copy-only bundle behaviour (necessary bespoke pipeline)
 
 - Evidence:
   - `hyper-app` build relies on `null-loader` and copy patterns (HTML, JSON,
@@ -183,7 +184,7 @@ updated without reclassifying the observed risk inventory.
     `esbuild-plugin-copy`).[^esbuild-plugin-copy]
   - Keep copy rules in one manifest-like source to avoid drift.
 
-#### 3. Webpack-specific runtime shim rewrite (required bespoke transform)
+#### 3. Webpack-specific runtime shim rewrite (necessary bespoke transform)
 
 - Evidence:
   - `lib/v8-snapshot-util.ts` imports Node's module loader using
@@ -223,7 +224,7 @@ updated without reclassifying the observed risk inventory.
     esbuild's JavaScript build API.[^esbuild-plugins]
 - Recommended migration path:
   - Replace direct CLI bundling with a checked-in `build/esbuild.mjs` entry
-    point so plugin logic is versioned and testable.
+    point, so plugin logic is versioned and testable.
 
 ### Validation gaps and required testing coverage
 
