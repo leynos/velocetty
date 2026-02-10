@@ -175,7 +175,7 @@ Validated commands:
 Additional documentation-quality gates run and passed after markdown edits:
 
 - `bun fmt`
-- `bunx markdownlint-cli "docs/**/*.md"`
+- `bunx markdownlint-cli2 "docs/**/*.md"`
 - `nixie --no-sandbox`
 
 ## Context and orientation

@@ -13,14 +13,12 @@ declare global {
 
   const snapshotResult: {
     customRequire: {
-      (module: string): NodeModule;
-      cache: Record<string, {exports: NodeModule}>;
-      definitions: Record<string, {exports: any}>;
+      (module: string): unknown;
+      cache: Record<string, {exports: unknown}>;
+      definitions: Record<string, unknown>;
     };
     setGlobals(global: any, process: any, window: any, document: any, console: any, require: any): void;
   };
-
-  const __non_webpack_require__: NodeRequire;
 }
 
 export type ITermGroup = Immutable<{

@@ -250,7 +250,7 @@ flowchart LR
 | State Management | Redux | 5.0.1 | Centralized state with middleware |
 | Terminal Core | xterm.js | 5.3.0 | Terminal emulation and rendering |
 | GPU Rendering | xterm-addon-webgl | 0.16.0 | Hardware-accelerated display |
-| Build System | Webpack | 5.91.0 | Module bundling and optimization |
+| Build System | esbuild | 0.25.12 | Module bundling and optimization |
 | Packaging | electron-builder | 24.13.3 | Cross-platform distribution |
 
 ###### Architectural Patterns
@@ -2184,9 +2184,8 @@ flowchart TB
     
     subgraph BuildPipeline["Build Pipeline"]
         TSGO["TypeScript Compiler<br/>tsgo 7.0.0-dev.20260128.1"]
-        Webpack["Webpack 5.91.0"]
-        Babel["Babel 7.24.x"]
-        Terser["Terser 5.30.3"]
+        EsbuildBundler["esbuild 0.25.12<br/>Bundling and minification"]
+        StyledJsxBridge["Babel Bridge 7.24.x<br/>styled-jsx transform path"]
     end
     
     subgraph OutputArtifacts["Output Artifacts"]
@@ -2210,18 +2209,18 @@ flowchart TB
 
 | Tool | Version | Purpose |
 | ------ | --------- | --------- |
+| **esbuild** | 0.25.12 | Bundling, transpilation, and minification for renderer and CLI |
+| **Babel (targeted bridge)** | 7.24.x | `styled-jsx` transform path used by esbuild plugin |
 | **tsgo (TypeScript native preview)** | 7.0.0-dev.20260128.1 | Type checking and transpilation |
-| **Webpack** | 5.91.0 | Module bundling with three named configurations |
-| **Babel** | 7.24.x | JavaScript transpilation and JSX transformation |
-| **Terser** | 5.30.3 | Production JavaScript minification |
 
-#### 3.6.3 Webpack configuration
+#### 3.6.3 esbuild target configuration
 
-Velocetty uses three Webpack configurations defined in `webpack.config.ts`:
+Velocetty uses one esbuild entrypoint script (`build/esbuild/build.ts`) that
+builds three targets:
 
 | Configuration | Target | Entry | Output |
 | --------------- | -------- | ------- | -------- |
-| **hyper-app** | `electron-main` | Static assets | `target/` directory |
+| **hyper-app** | `electron-main` | Copy-only static assets | `target/` directory |
 | **hyper** | `electron-renderer` | `lib/index.tsx` | `target/renderer/bundle.js` |
 | **hyper-cli** | Node.js | `cli/index.ts` | `bin/cli.js` |
 
@@ -2234,7 +2233,7 @@ bun
 
 ##### Development mode (requires two terminal Windows)
 
-bun run dev        # Webpack watch + TypeScript incremental build
+bun run dev        # esbuild watch + TypeScript incremental build
 bun run app        # Run Electron with electronmon (hot-reload)
 
 ##### Development server
@@ -2243,7 +2242,7 @@ bun run app        # Run Electron with electronmon (hot-reload)
 
 ##### Production build
 
-bun run build      # Full Webpack production + TypeScript + Babel minification
+bun run build      # Full esbuild production + TypeScript build
 
 ##### Package for distribution
 
@@ -2420,7 +2419,7 @@ flowchart TB
 | **Main Process** | Node.js/TypeScript, node-pty | OS integration, PTY management |
 | **Renderer Process** | React 19.2.4, Redux 5.0.1 | UI components, state management |
 | **Terminal Rendering** | xterm.js 5.3.0 + WebGL addon | Terminal emulation and display |
-| **Build System** | Webpack 5.91.0, tsgo 7.0.0-dev.20260128.1, node-gyp 10.x, node-gyp-build 4.x | Module bundling, type safety, native module compilation |
+| **Build System** | esbuild 0.25.12, tsgo 7.0.0-dev.20260128.1, node-gyp 10.x, node-gyp-build 4.x | Module bundling, type safety, native module compilation |
 | **Distribution** | electron-builder 24.13.3 | Cross-platform packaging |
 
 #### 3.8.2 Technology selection criteria
@@ -2452,8 +2451,8 @@ flowchart TB
 | ------ | ----------- |
 | `package.json` | Root dependencies, scripts, development configuration |
 | `app/package.json` | Runtime dependencies bundled with application |
-| `webpack.config.ts` | Build configuration for three bundle targets |
-| `babel.config.json` | Babel transpilation settings |
+| `build/esbuild/build.ts` | Build orchestration for all bundle targets |
+| `build/esbuild/esbuild-plugins/` | esbuild plugin implementations and bridge transforms |
 | `tsconfig.base.json` | TypeScript compiler configuration |
 | `electron-builder.json` | Cross-platform packaging configuration |
 | `lib/components/term.tsx` | Terminal component with xterm.js addon integration |
@@ -9330,7 +9329,7 @@ flowchart TB
         Gate1["Gate 1: Lint<br/>ESLint + Prettier"]
         Gate2["Gate 2: Type Check<br/>TypeScript Compilation"]
         Gate3["Gate 3: Unit Tests<br/>Bun Test Suite"]
-        Gate4["Gate 4: Build<br/>Webpack + Packaging"]
+        Gate4["Gate 4: Build<br/>esbuild + Packaging"]
         Gate5["Gate 5: E2E<br/>Playwright Smoke"]
         Gate6["Gate 6: Security<br/>CodeQL Scan"]
     end
@@ -10598,7 +10597,7 @@ flowchart TB
         end
         
         subgraph Applicable["APPLICABLE (Desktop Distribution Infrastructure)"]
-            BuildSystem["Build System<br/>(Webpack/TypeScript)"]
+            BuildSystem["Build System<br/>(esbuild/TypeScript)"]
             Packaging["Packaging<br/>(electron-builder)"]
             CICD["CI/CD Pipeline<br/>(GitHub Actions)"]
             CodeSigning["Code Signing<br/>(Apple/Windows)"]
@@ -10636,9 +10635,9 @@ flowchart LR
     end
     
     subgraph BuildPhase["Build Phase"]
-        Compile["TypeScript<br/>Compilation"]
-        Bundle["Webpack<br/>Bundling"]
-        Optimize["Terser<br/>Minification"]
+        Compile["TypeScript<br/>Compilation (tsgo)"]
+        Bundle["esbuild<br/>Bundling"]
+        Optimize["esbuild<br/>Minification + source maps"]
     end
     
     subgraph PackagePhase["Package Phase"]
@@ -10683,9 +10682,8 @@ flowchart TB
     
     subgraph BuildPipeline["Build Pipeline"]
         TSGO["TypeScript Compiler<br/>tsgo 7.0.0-dev.20260128.1"]
-        Webpack["Webpack 5.91.0<br/>Module Bundler"]
-        Babel["Babel 7.24.x<br/>Transpilation"]
-        Terser["Terser 5.30.3<br/>Minification"]
+        EsbuildBundler["esbuild 0.25.12<br/>Module bundling and minification"]
+        StyledJsxBridge["Babel Bridge 7.24.x<br/>styled-jsx transform path"]
     end
     
     subgraph OutputArtifacts["Output Artifacts"]
@@ -10716,20 +10714,18 @@ flowchart TB
 
 | Tool | Version | Purpose | Configuration File |
 | ------ | --------- | --------- | ------------------- |
+| **esbuild** | 0.25.12 | Module bundling with shared plugin pipeline | `build/esbuild/build.ts` |
+| **Babel (targeted bridge)** | 7.24.x | `styled-jsx` transform for selected files | `build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin.ts` |
 | **tsgo (TypeScript native preview)** | 7.0.0-dev.20260128.1 | Type checking and transpilation | `tsconfig.base.json` |
-| **Webpack** | 5.91.0 | Module bundling with multiple configurations | `webpack.config.ts` |
-| **Babel** | 7.24.x | JavaScript transpilation and JSX transformation | Webpack integration |
-| **Terser** | 5.30.3 | Production JavaScript minification | Webpack integration |
 | **electron-builder** | 24.13.3 | Cross-platform packaging and distribution | `electron-builder.json` |
 
-#### 8.2.3 Webpack configuration matrix
+#### 8.2.3 esbuild target matrix
 
-Velocetty defines three distinct Webpack configurations in `webpack.config.ts`
-for different build targets:
+Velocetty defines three build targets via `build/esbuild/build.ts`:
 
 | Configuration Name | Target | Entry Point | Output Location | Purpose |
 | ------------------- | -------- | ------------- | ----------------- | --------- |
-| **hyper-app** | `electron-main` | Static assets | `target/` | Main process bundle |
+| **hyper-app** | `electron-main` | Static assets | `target/` | Main process copy pipeline |
 | **hyper** | `electron-renderer` | `lib/index.tsx` | `target/renderer/bundle.js` | Renderer process UI bundle |
 | **hyper-cli** | Node.js | `cli/index.ts` | `bin/cli.js` | CLI tool for plugin management |
 
@@ -10737,10 +10733,9 @@ for different build targets:
 
 | Script | Command | Purpose |
 | -------- | --------- | --------- |
-| `build` | `bun run build:webpack && bun run build:ts` | Full production build |
-| `build:webpack` | `webpack --config webpack.config.ts` | Webpack bundle generation |
-| `build:ts` | `tsgo --build` | TypeScript compilation |
-| `dev` | `webpack --watch` + `tsgo --build --watch` | Development watch mode |
+| `build` | `NODE_ENV=production bun ./build/esbuild/build.ts --mode=production && tsgo --build` | Full production build |
+| `build:hyper-app` | `bun ./build/esbuild/build.ts --mode=production --target=hyper-app` | Static copy pipeline |
+| `dev` | `bun ./build/esbuild/build.ts --watch --mode=development` + `tsgo --build --watch` | Development watch mode |
 | `dist` | `bun run build && electron-builder` | Build + package for distribution |
 
 #### 8.2.5 V8 snapshot optimization
@@ -10995,7 +10990,7 @@ flowchart LR
     end
     
     subgraph Stage4["Stage 4: Build"]
-        WebpackBuild["Webpack Bundle"]
+        EsbuildBuild["esbuild Bundle"]
         ElectronPack["electron-builder<br/>Package"]
         CodeSign["Code Signing"]
     end
@@ -11034,7 +11029,7 @@ flowchart TB
         Gate1["Gate 1: Lint<br/>ESLint 8.57.0"]
         Gate2["Gate 2: Type Check<br/>tsgo 7.0.0-dev.20260128.1"]
         Gate3["Gate 3: Unit Tests<br/>Bun test runner"]
-        Gate4["Gate 4: Build<br/>Webpack + electron-builder"]
+        Gate4["Gate 4: Build<br/>esbuild + electron-builder"]
         Gate5["Gate 5: E2E Tests<br/>Playwright 1.43.1"]
         Gate6["Gate 6: Security<br/>CodeQL Analysis"]
     end
@@ -11062,7 +11057,7 @@ flowchart TB
 | Lint | ESLint 8.57.0 + Prettier 3.2.5 | Job fails, PR blocked |
 | Type Check | tsgo 7.0.0-dev.20260128.1 | Build fails |
 | Unit Tests | Bun test runner 1.3.8 | Job fails, PR blocked |
-| Build | Webpack + electron-builder | Job fails |
+| Build | esbuild + electron-builder | Job fails |
 | E2E Tests | Playwright 1.43.1 | Job fails, screenshot captured |
 | Security | CodeQL | Security alert generated |
 
@@ -11468,9 +11463,8 @@ flowchart TB
 
 - `package.json` - Build scripts, dependencies, version (lines 1-148)
 
-- `webpack.config.ts` - Webpack configuration for three build targets (lines
-
-  1-196)
+- `build/esbuild/build.ts` - esbuild orchestration for three build targets
+  (lines 1-196)
 
 - `tsconfig.base.json` - TypeScript compiler configuration
 
@@ -11555,7 +11549,7 @@ versions used in Velocetty:
 | React | 19.2.4 | UI component framework | `package.json` |
 | Redux | 5.0.1 | State management library | `package.json` |
 | xterm.js | 5.3.0 | Terminal emulation library | `package.json` |
-| Webpack | 5.91.0 | Module bundler | `package.json` |
+| esbuild | 0.25.12 | Module bundler | `package.json` |
 | electron-builder | 24.13.3 | Application packaging tool | `package.json` |
 
 #### 9.1.2 xterm.js addon versions

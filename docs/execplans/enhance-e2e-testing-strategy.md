@@ -187,7 +187,7 @@ Mandatory gates:
 
 Documentation gates (docs changed):
 
-- `bunx markdownlint-cli "docs/**/*.md"`
+- `bunx markdownlint-cli2 "docs/**/*.md"`
 - `nixie --no-sandbox`
 
 Feature-specific checks:

@@ -223,7 +223,7 @@ const clearModulesCache = () => {
   // clear require cache
   for (const entry in window.require.cache) {
     if (entry.indexOf(path) === 0 || entry.indexOf(localPath) === 0) {
-      // `require` is webpacks', `window.require` is electron's
+      // `window.require` resolves the Electron runtime module cache.
       delete window.require.cache[entry];
     }
   }

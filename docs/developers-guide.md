@@ -7,7 +7,8 @@
 - Invariants: Keep Makefile targets and validation steps aligned with CI and
   tooling changes.
 - Cross-links: [Testing with Bun](testing-with-bun.md),
-  [ADR 001](adr-001-replace-ava-with-bun-test.md), and
+  [ADR 001](adr-001-replace-ava-with-bun-test.md),
+  [ADR 002](adr-002-replace-webpack-babel-with-esbuild.md), and
   [Roadmap](roadmap.md).
 
 This guide captures the development practices specific to the Velocetty
@@ -20,7 +21,35 @@ must follow locally.
 - Prefer Makefile targets for validation commands.
 - Use `tsgo` (`@typescript/native-preview`) for TypeScript compilation and
   type-checking tasks.
+- Use `build/esbuild/build.ts` as the canonical JavaScript bundling entrypoint
+  for renderer, CLI, and app copy artefacts.
 - Keep documentation wrapped to 80 columns and code blocks to 120 columns.
+
+## esbuild build pipeline and safeguards
+
+The repository now bundles with esbuild by default:
+
+- `bun run dev`: esbuild watch mode plus `tsgo --build --watch`
+- `bun run build`: production esbuild bundles plus `tsgo --build`
+- `bun run build:hyper-app`: copy-only app artefact pipeline via esbuild
+  support scripts
+
+ADR 002 still requires test-first discipline for any follow-on changes to
+bundler scripts, bundler configuration, or custom esbuild plugin logic.
+Contract suites must stay in place and green before changing default build
+paths or plugin behaviour.
+
+Required coverage categories before cut-over:
+
+- Translation outcomes: verify `styled-jsx` scoped/global behaviour, externals
+  mapping, source maps, and production minification output.
+- Packaging outcomes: verify copied artefacts under `target/` and CLI artefact
+  shape (including shebang integrity).
+- Bespoke plugin validation: add deterministic unit tests for each custom
+  esbuild plugin path (resolve/load/copy/ignore behaviour and diagnostics).
+
+Follow `docs/execplans/replace-webpack-babel-with-esbuild.md` for migration
+ordering and milestone gates.
 
 ## Electron runtime alignment
 
@@ -67,7 +96,7 @@ Run the standard gates before opening a pull request:
 
 When documentation changes, also run:
 
-- `bunx markdownlint-cli "docs/**/*.md"`
+- `bunx markdownlint-cli2 "docs/**/*.md"`
 - `nixie --no-sandbox`
 
 ## Type checking

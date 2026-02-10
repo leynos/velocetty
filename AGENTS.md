@@ -125,7 +125,7 @@
 
 ## Markdown Guidance
 
-- Validate Markdown files using `bunx markdownlint-cli \"docs/**/*.md\"`.
+- Validate Markdown files using `bunx markdownlint-cli2 \"docs/**/*.md\"`.
 - Run `bun fmt` after any documentation changes to format all Markdown
   files and fix table markup.
 - Validate Mermaid diagrams in Markdown files by running `nixie --no-sandbox`.
