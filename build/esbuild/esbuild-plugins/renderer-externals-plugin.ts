@@ -1,14 +1,18 @@
 /** @file Resolves renderer externals to runtime `require()` paths. */
 import type {Plugin} from 'esbuild';
 
-import {rendererExternalRequireMap} from '../constants';
+import {rendererExternalRequireMap, type RendererExternalModule} from '../constants';
+
+const isRendererExternalModule = (moduleName: string): moduleName is RendererExternalModule => {
+  return Object.hasOwn(rendererExternalRequireMap, moduleName);
+};
 
 /**
  * Returns the runtime `require()` path for renderer externals, or `null`
  * when the module should be bundled normally.
  */
 export const resolveRendererExternalPath = (moduleName: string): string | null => {
-  return rendererExternalRequireMap[moduleName as keyof typeof rendererExternalRequireMap] ?? null;
+  return isRendererExternalModule(moduleName) ? rendererExternalRequireMap[moduleName] : null;
 };
 
 /**

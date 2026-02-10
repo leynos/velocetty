@@ -19,6 +19,16 @@ type RunEsbuildOptions = {
   rootDir?: string;
 };
 
+type TargetExecutionContext = {
+  mode: BuildMode;
+  rootDir: string;
+};
+
+type TargetDescriptor = {
+  runOneShot: (context: TargetExecutionContext) => Promise<void>;
+  runWatch: (context: TargetExecutionContext) => Promise<BuildContext | null>;
+};
+
 const isProductionMode = (mode: BuildMode) => mode === 'production';
 
 const createBaseBuildOptions = (mode: BuildMode, rootDir: string): BuildOptions => {
@@ -77,9 +87,7 @@ export const createCliBuildOptions = (mode: BuildMode, rootDir: string): BuildOp
   };
 };
 
-const containsTarget = (targets: BuildTarget[], target: BuildTarget) => {
-  return targets.includes(target);
-};
+const targetExecutionOrder: BuildTarget[] = ['hyper-app', 'renderer', 'cli'];
 
 const watchBuild = async (options: BuildOptions): Promise<BuildContext> => {
   const buildContext = await context(options);
@@ -87,21 +95,60 @@ const watchBuild = async (options: BuildOptions): Promise<BuildContext> => {
   return buildContext;
 };
 
-const runWatchBuilds = async (options: RunEsbuildOptions) => {
+const createTargetDescriptors = (): Record<BuildTarget, TargetDescriptor> => {
+  return {
+    'hyper-app': {
+      runOneShot: async ({rootDir}) => {
+        await copyHyperAppArtifacts({rootDir});
+      },
+      runWatch: async ({rootDir}) => {
+        await copyHyperAppArtifacts({rootDir});
+        return null;
+      }
+    },
+    renderer: {
+      runOneShot: async ({mode, rootDir}) => {
+        await copyRendererArtifacts({rootDir});
+        await build(createRendererBuildOptions(mode, rootDir));
+      },
+      runWatch: async ({mode, rootDir}) => {
+        await copyRendererArtifacts({rootDir});
+        return watchBuild(createRendererBuildOptions(mode, rootDir));
+      }
+    },
+    cli: {
+      runOneShot: async ({mode, rootDir}) => {
+        await build(createCliBuildOptions(mode, rootDir));
+      },
+      runWatch: async ({mode, rootDir}) => {
+        return watchBuild(createCliBuildOptions(mode, rootDir));
+      }
+    }
+  };
+};
+
+const runTargets = async (options: RunEsbuildOptions) => {
   const rootDir = options.rootDir ?? process.cwd();
+  const targetSet = new Set(options.targets);
+  const descriptors = createTargetDescriptors();
+
+  if (!options.watch) {
+    const oneShotBuilds = targetExecutionOrder
+      .filter((target) => targetSet.has(target))
+      .map((target) => descriptors[target].runOneShot({mode: options.mode, rootDir}));
+    await Promise.all(oneShotBuilds);
+    return;
+  }
+
   const contexts: BuildContext[] = [];
-
-  if (containsTarget(options.targets, 'hyper-app')) {
-    await copyHyperAppArtifacts({rootDir});
-  }
-
-  if (containsTarget(options.targets, 'renderer')) {
-    await copyRendererArtifacts({rootDir});
-    contexts.push(await watchBuild(createRendererBuildOptions(options.mode, rootDir)));
-  }
-
-  if (containsTarget(options.targets, 'cli')) {
-    contexts.push(await watchBuild(createCliBuildOptions(options.mode, rootDir)));
+  for (const target of targetExecutionOrder) {
+    if (!targetSet.has(target)) {
+      continue;
+    }
+    const watchContext = await descriptors[target].runWatch({mode: options.mode, rootDir});
+    if (watchContext) {
+      contexts.push(watchContext);
+    }
   }
 
   const closeAllContexts = async () => {
@@ -120,36 +167,7 @@ const runWatchBuilds = async (options: RunEsbuildOptions) => {
   });
 };
 
-const runOneShotBuilds = async (options: RunEsbuildOptions) => {
-  const rootDir = options.rootDir ?? process.cwd();
-  const buildOperations: Promise<unknown>[] = [];
-
-  if (containsTarget(options.targets, 'hyper-app')) {
-    buildOperations.push(copyHyperAppArtifacts({rootDir}));
-  }
-
-  if (containsTarget(options.targets, 'renderer')) {
-    buildOperations.push(
-      (async () => {
-        await copyRendererArtifacts({rootDir});
-        await build(createRendererBuildOptions(options.mode, rootDir));
-      })()
-    );
-  }
-
-  if (containsTarget(options.targets, 'cli')) {
-    buildOperations.push(build(createCliBuildOptions(options.mode, rootDir)));
-  }
-
-  await Promise.all(buildOperations);
-};
-
 /** Runs the selected esbuild targets in watch or one-shot mode. */
 export const runEsbuild = async (options: RunEsbuildOptions) => {
-  if (options.watch) {
-    await runWatchBuilds(options);
-    return;
-  }
-
-  await runOneShotBuilds(options);
+  await runTargets(options);
 };

@@ -3,7 +3,7 @@
 ## Module header
 
 - Purpose: Define a test-first, low-risk migration plan from Webpack/Babel to
-  esbuild as required by ADR 002.
+  esbuild as required by Architecture Decision Record (ADR) 002.
 - Invariants: Keep build outputs, packaging artefacts, and runtime behaviour
   equivalent while migration work is in flight.
 - Cross-links: `docs/adr-002-replace-webpack-babel-with-esbuild.md`,
@@ -20,14 +20,14 @@ Status: COMPLETE
 No `PLANS.md` exists at the repository root as of 2026-02-10. If one is added,
 this plan must be updated to follow it.
 
-## Purpose / Big Picture
+## Purpose / big picture
 
 Migrate the repository build pipeline from Webpack/Babel to esbuild without
-breaking renderer behaviour, CLI behaviour, or packaging output. The migration
-is complete when build commands use esbuild, Webpack/Babel dependencies are
-removed, required build-contract and plugin-validation tests pass, and quality
-gates succeed (`bun install`, `make build`, `make check-fmt`, `make lint`,
-`make test`).
+breaking renderer behaviour, command-line interface (CLI) behaviour, or
+packaging output. The migration is complete when build commands use esbuild,
+Webpack/Babel dependencies are removed, required build-contract and
+plugin-validation tests pass, and quality gates succeed (`bun install`,
+`make build`, `make check-fmt`, `make lint`, `make test`).
 
 Success must be observable in three ways:
 
@@ -52,7 +52,7 @@ Success must be observable in three ways:
 - Keep documentation and roadmap aligned with implemented behaviour.
 - Keep markdown wrapped to 80 columns and code blocks wrapped to 120 columns.
 
-## Tolerances (Exception Triggers)
+## Tolerances (exception triggers)
 
 - Scope: if migration requires more than 18 files or 900 net lines in a single
   milestone, stop and split the milestone.
@@ -91,8 +91,8 @@ Success must be observable in three ways:
   Mitigation: add plugin-level tests plus bundle-inspection tests before
   enabling esbuild as default.
 
-- Risk: `__non_webpack_require__` in `lib/v8-snapshot-util.ts` is Webpack
-  specific.
+- Risk: `__non_webpack_require__` in `lib/v8-snapshot-util.ts` is
+  Webpack-specific.
   Severity: high.
   Likelihood: medium.
   Mitigation: rewrite to a bundler-agnostic loader path and verify with
@@ -123,17 +123,17 @@ Success must be observable in three ways:
 - [x] 2026-02-10 14:29 UTC: Final validation gates passed: `bun install`,
   `make build`, `make check-fmt`, `make lint`, and `make test`.
 
-## Surprises & Discoveries
+## Surprises & discoveries
 
 - Existing `test/` coverage does not include build-pipeline contract tests for
   bundle equivalence or packaging artefact shape.
 - Current `build` script still performs a post-bundle Babel minification pass,
   which must be replaced by esbuild minification behaviour and validated.
-- `build/esbuild/plugins/*` was accidentally ignored by `.gitignore` due a
+- `build/esbuild/plugins/*` was accidentally ignored by `.gitignore` due to a
   generic `plugins` ignore rule, requiring a path relocation to
   `build/esbuild/esbuild-plugins/`.
 
-## Decision Log
+## Decision log
 
 - Decision: Treat pre-migration test coverage as a hard gate rather than a
   follow-up task.
@@ -154,7 +154,7 @@ Success must be observable in three ways:
   repository missing required plugin source files.
   Date/Author: 2026-02-10 (assistant).
 
-## Outcomes & Retrospective
+## Outcomes & retrospective
 
 Completed outcomes:
 
@@ -171,7 +171,7 @@ Lessons learned:
 - For Electron renderer bundles, explicitly externalize Node built-ins and
   preserve `*.d.ts` resolution behaviour previously relied on by Webpack.
 
-## Context and Orientation
+## Context and orientation
 
 The active build entry points now live in `package.json` scripts and route to
 `build/esbuild/build.ts`, with supporting plugin modules under
@@ -187,7 +187,7 @@ The migration must preserve three output families:
 `docs/velocetty-hyper-codebase.md` documents current architecture and tool
 inventory; this plan supersedes that document only after migration completion.
 
-## Plan of Work
+## Plan of work
 
 Stage A: establish mandatory pre-migration coverage.
 
@@ -206,7 +206,7 @@ Stage A: establish mandatory pre-migration coverage.
 
 Stage B: introduce esbuild build entry point in shadow mode.
 
-- Add `build/esbuild.mjs` (or equivalent) as the plugin host and maintain
+- Add `build/esbuild/build.ts` (or equivalent) as the plugin host and maintain
   current scripts unchanged.
 - Add non-default scripts (`build:esbuild:*`) that write to isolated output
   directories for comparison.
@@ -248,7 +248,7 @@ Stage F: finalize and verify.
 - Mark the roadmap migration implementation item complete when and only when
   legacy tooling has been removed.
 
-## Concrete Steps
+## Concrete steps
 
 1. Baseline and fixtures.
 
@@ -276,7 +276,7 @@ Stage F: finalize and verify.
 
 5. Shadow esbuild implementation.
 
-   - Add `build/esbuild.mjs` and plugin modules.
+   - Add `build/esbuild/build.ts` and plugin modules.
    - Add non-default scripts to generate side-by-side outputs.
    - Run new tests and compare outputs with existing contracts.
 
@@ -286,7 +286,7 @@ Stage F: finalize and verify.
    - Remove Webpack/Babel dependencies and obsolete configuration.
    - Update docs and roadmap implementation item, then run mandatory gates.
 
-## Validation and Acceptance
+## Validation and acceptance
 
 Migration implementation is accepted only when all conditions below are true:
 
@@ -299,7 +299,7 @@ Migration implementation is accepted only when all conditions below are true:
 - `docs/developers-guide.md` and `docs/velocetty-hyper-codebase.md` are aligned
   with the active build pipeline.
 
-## Idempotence and Recovery
+## Idempotence and recovery
 
 All stages are designed to be rerunnable. If a stage fails:
 
@@ -311,7 +311,7 @@ All stages are designed to be rerunnable. If a stage fails:
 If parity cannot be reached for a required risk area within tolerance limits,
 stop and escalate with logs and fixture evidence.
 
-## Interfaces and Dependencies
+## Interfaces and dependencies
 
 - Build scripts: `package.json`.
 - Active esbuild host: `build/esbuild/build.ts` and support modules under

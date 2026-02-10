@@ -3,13 +3,17 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 
 import {transformAsync} from '@babel/core';
-import type {Plugin} from 'esbuild';
+import type {BuildOptions, Plugin} from 'esbuild';
 import styledJsxBabelPlugin from 'styled-jsx/babel';
 
 import {styledJsxBabelPluginOptions} from '../constants';
 
 const TSX_FILTER = /\.[jt]sx$/;
-const STYLE_JSX_USAGE_PATTERN = /<style\b[^>]*\bjsx(?:\s*=|\s|>)/;
+const STYLE_JSX_USAGE_PATTERN = /<style\b[^>]*\sjsx(?:\s*=|\s|>)/;
+
+const shouldIncludeInlineSourceMap = (sourcemap: BuildOptions['sourcemap']) => {
+  return sourcemap !== undefined && sourcemap !== false;
+};
 
 /** Returns true when source contains `styled-jsx` style tags. */
 export const usesStyledJsx = (source: string): boolean => {
@@ -20,12 +24,12 @@ export const usesStyledJsx = (source: string): boolean => {
  * Runs a narrowly-scoped Babel transform for files that use `styled-jsx`.
  * esbuild still handles bundling and non-styled-jsx transforms.
  */
-export const transformStyledJsxSource = async (source: string, filePath: string) => {
+export const transformStyledJsxSource = async (source: string, filePath: string, includeSourceMaps = false) => {
   const transformed = await transformAsync(source, {
     filename: filePath,
     babelrc: false,
     configFile: false,
-    sourceMaps: false,
+    sourceMaps: includeSourceMaps ? 'inline' : false,
     presets: [
       [
         '@babel/preset-typescript',
@@ -64,7 +68,11 @@ export const createStyledJsxBabelBridgePlugin = (): Plugin => {
           return null;
         }
 
-        const transformed = await transformStyledJsxSource(source, filePath);
+        const transformed = await transformStyledJsxSource(
+          source,
+          filePath,
+          shouldIncludeInlineSourceMap(build.initialOptions.sourcemap)
+        );
         return {
           loader: 'js',
           resolveDir: path.dirname(filePath),

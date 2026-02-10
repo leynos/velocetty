@@ -7,6 +7,10 @@ type CopyOptions = {
   targetDir?: string;
 };
 
+const isNotFoundError = (error: unknown): error is NodeJS.ErrnoException => {
+  return (error as NodeJS.ErrnoException).code === 'ENOENT';
+};
+
 const sortedFileNames = async (directoryPath: string, extension: string) => {
   const entries = await readdir(directoryPath, {withFileTypes: true});
   return entries
@@ -25,14 +29,21 @@ const copyFilesByExtension = async (
     await mkdir(targetDirectory, {recursive: true});
     const fileNames = await sortedFileNames(sourceDirectory, extension);
     await Promise.all(
-      fileNames.map((fileName) =>
-        cp(path.join(sourceDirectory, fileName), path.join(targetDirectory, fileName), {
-          force: true
-        })
-      )
+      fileNames.map(async (fileName) => {
+        try {
+          await cp(path.join(sourceDirectory, fileName), path.join(targetDirectory, fileName), {
+            force: true
+          });
+        } catch (error) {
+          if (allowMissing && isNotFoundError(error)) {
+            return;
+          }
+          throw error;
+        }
+      })
     );
   } catch (error) {
-    if (allowMissing && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (allowMissing && isNotFoundError(error)) {
       return;
     }
     throw error;
@@ -47,7 +58,7 @@ const copyDirectory = async (sourceDirectory: string, targetDirectory: string, a
       force: true
     });
   } catch (error) {
-    if (allowMissing && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (allowMissing && isNotFoundError(error)) {
       return;
     }
     throw error;
@@ -63,12 +74,14 @@ export const copyHyperAppArtifacts = async (options: CopyOptions = {}) => {
   await rm(path.join(targetDir, 'patches'), {recursive: true, force: true});
   await mkdir(targetDir, {recursive: true});
 
-  await copyFilesByExtension(appDirectory, targetDir, '.html');
-  await copyFilesByExtension(appDirectory, targetDir, '.json');
-  await copyFilesByExtension(path.join(appDirectory, 'config'), path.join(targetDir, 'config'), '.json');
-  await copyFilesByExtension(path.join(appDirectory, 'keymaps'), path.join(targetDir, 'keymaps'), '.json');
-  await copyDirectory(path.join(appDirectory, 'static'), path.join(targetDir, 'static'));
-  await copyDirectory(path.join(appDirectory, 'patches'), path.join(targetDir, 'patches'), true);
+  await Promise.all([
+    copyFilesByExtension(appDirectory, targetDir, '.html'),
+    copyFilesByExtension(appDirectory, targetDir, '.json'),
+    copyFilesByExtension(path.join(appDirectory, 'config'), path.join(targetDir, 'config'), '.json'),
+    copyFilesByExtension(path.join(appDirectory, 'keymaps'), path.join(targetDir, 'keymaps'), '.json'),
+    copyDirectory(path.join(appDirectory, 'static'), path.join(targetDir, 'static')),
+    copyDirectory(path.join(appDirectory, 'patches'), path.join(targetDir, 'patches'), true)
+  ]);
 };
 
 /** Copies renderer static assets to the renderer output directory. */

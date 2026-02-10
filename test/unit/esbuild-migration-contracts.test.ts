@@ -19,6 +19,7 @@ import {
 } from '../../build/esbuild/esbuild-plugins/renderer-externals-plugin';
 import {
   createStyledJsxBabelBridgePlugin,
+  transformStyledJsxSource,
   usesStyledJsx
 } from '../../build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin';
 
@@ -122,6 +123,38 @@ test('packaging: hyper-app and renderer copy flows preserve required files', asy
   }
 });
 
+test('packaging: app index loads renderer stylesheet output', async () => {
+  const appIndexHtml = await readFile(path.join(process.cwd(), 'app', 'index.html'), 'utf8');
+  expect(appIndexHtml.includes('renderer/bundle.css')).toBe(true);
+});
+
+test('packaging: hyper-app copy handles missing patches and replaces stale target patches', async () => {
+  const rootDir = await createTempDir();
+  const targetDir = path.join(rootDir, 'target');
+
+  try {
+    await writeFixtureFile(path.join(rootDir, 'app', 'index.html'), '<html></html>');
+    await writeFixtureFile(path.join(rootDir, 'app', 'package.json'), '{"name":"fixture"}');
+    await writeFixtureFile(path.join(rootDir, 'app', 'tsconfig.json'), '{"extends":"../tsconfig.base.json"}');
+    await writeFixtureFile(path.join(rootDir, 'app', 'config', 'schema.json'), '{"type":"object"}');
+    await writeFixtureFile(path.join(rootDir, 'app', 'keymaps', 'linux.json'), '{"key":"value"}');
+    await writeFixtureFile(path.join(rootDir, 'app', 'static', 'icon.png'), 'png-data');
+    await writeFixtureFile(path.join(targetDir, 'patches', 'stale.patch'), 'stale');
+
+    await copyHyperAppArtifacts({rootDir, targetDir});
+
+    await expect(readFile(path.join(targetDir, 'patches', 'stale.patch'), 'utf8')).rejects.toThrow();
+
+    await writeFixtureFile(path.join(rootDir, 'app', 'patches', 'fresh.patch'), 'fresh');
+    await copyHyperAppArtifacts({rootDir, targetDir});
+
+    const copiedPatch = await readFile(path.join(targetDir, 'patches', 'fresh.patch'), 'utf8');
+    expect(copiedPatch).toBe('fresh');
+  } finally {
+    await rm(rootDir, {recursive: true, force: true});
+  }
+});
+
 test('plugin validation: renderer externals map to legacy runtime require paths', async () => {
   const resolved = resolveRendererExternalPath('lodash');
   expect(resolved).toBe('./node_modules/lodash/lodash.js');
@@ -132,6 +165,13 @@ test('plugin validation: renderer externals map to legacy runtime require paths'
     plugins: [createRendererExternalsPlugin()]
   });
   expect(bundleOutput.includes('require("./node_modules/lodash/lodash.js")')).toBe(true);
+
+  const reactBundleOutput = await testPluginWithFixture("import React from 'react'; console.log(Boolean(React));", {
+    platform: 'browser',
+    format: 'iife',
+    plugins: [createRendererExternalsPlugin()]
+  });
+  expect(reactBundleOutput.includes('require("react")')).toBe(true);
 });
 
 test('plugin validation: ignored imports remain unresolved externals', async () => {
@@ -177,7 +217,33 @@ test('translation: build options keep source maps in development and minify in p
 
 test('translation: styled-jsx usage detection only flags matching files', () => {
   expect(usesStyledJsx('<style jsx={true}>{``}</style>')).toBe(true);
+  expect(usesStyledJsx('<style jsx>{``}</style>')).toBe(true);
+  expect(usesStyledJsx('<style jsx global>{``}</style>')).toBe(true);
+  expect(
+    usesStyledJsx(`<style
+  jsx
+  global={true}
+>{\`\`}</style>`)
+  ).toBe(true);
+  expect(usesStyledJsx('<style jsxx>{``}</style>')).toBe(false);
+  expect(usesStyledJsx('<style data-jsx>{``}</style>')).toBe(false);
   expect(usesStyledJsx('<style>{``}</style>')).toBe(false);
+});
+
+test('translation: styled-jsx transform emits inline source maps when requested', async () => {
+  const source = [
+    'export const Fixture = () => (',
+    '  <div>',
+    '    <style jsx>{`.x { color: red; }`}</style>',
+    '  </div>',
+    ');'
+  ].join('\n');
+
+  const transformedWithoutMap = await transformStyledJsxSource(source, '/tmp/fixture.tsx', false);
+  const transformedWithMap = await transformStyledJsxSource(source, '/tmp/fixture.tsx', true);
+
+  expect(transformedWithoutMap.code.includes('sourceMappingURL')).toBe(false);
+  expect(transformedWithMap.code.includes('sourceMappingURL=data:')).toBe(true);
 });
 
 test('translation: esbuild handles shebang-bearing dependencies without shebang-loader', async () => {
@@ -201,6 +267,8 @@ test('translation: esbuild handles shebang-bearing dependencies without shebang-
 
     const bundleOutput = buildResult.outputFiles.find((file) => file.path.endsWith('.js'))?.text ?? '';
     expect(bundleOutput.includes('rc')).toBe(true);
+    expect(bundleOutput.includes('name: "rc"')).toBe(true);
+    expect(bundleOutput.includes('#!/usr/bin/env node')).toBe(false);
   } finally {
     await rm(rootDir, {recursive: true, force: true});
   }
