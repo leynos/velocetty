@@ -1,4 +1,25 @@
-/** @file Validates snapshot bootstrap behaviour for bundler-agnostic runtime require. */
+/**
+ * @file Verifies the snapshot bootstrap contract in `lib/v8-snapshot-util.ts`.
+ *
+ * Responsibilities:
+ * - Exercise bundler-agnostic runtime `require` lookup through `global.require`
+ *   and `window.require`.
+ * - Validate snapshot cache/definition wiring performed during bootstrap.
+ *
+ * Invariants:
+ * - Bootstrap resolves virtual modules via `customRequire` and falls back to
+ *   native module loading for other imports.
+ * - `setGlobals` receives the resolved runtime `require` exactly once per
+ *   bootstrap run.
+ * - Missing runtime `require` throws the expected initialization error, while
+ *   an absent `snapshotResult` remains a no-op.
+ *
+ * Usage:
+ * - Imports `lib/v8-snapshot-util.ts` with cache-busting query suffixes to
+ *   execute bootstrap side effects and validate observable runtime behaviour.
+ *
+ * Cross-link: `lib/v8-snapshot-util.ts`.
+ */
 import {afterEach, expect, test} from 'bun:test';
 
 type SnapshotResultShape = {

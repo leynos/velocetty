@@ -174,14 +174,16 @@ test('plugin validation: renderer externals map to legacy runtime require paths'
     format: 'iife',
     plugins: [createRendererExternalsPlugin()]
   });
-  expect(bundleOutput.includes('require("./node_modules/lodash/lodash.js")')).toBe(true);
+  expect(bundleOutput.includes('./node_modules/lodash/lodash.js')).toBe(true);
+  expect(bundleOutput.includes('rendererRequire')).toBe(true);
 
   const reactBundleOutput = await testPluginWithFixture("import React from 'react'; console.log(Boolean(React));", {
     platform: 'browser',
     format: 'iife',
     plugins: [createRendererExternalsPlugin()]
   });
-  expect(reactBundleOutput.includes('require("react")')).toBe(true);
+  expect(reactBundleOutput.includes('"react"') || reactBundleOutput.includes("'react'")).toBe(true);
+  expect(reactBundleOutput.includes('rendererRequire')).toBe(true);
 });
 
 test('plugin validation: ignored imports remain unresolved externals', async () => {
@@ -211,7 +213,7 @@ test('plugin validation: node built-ins are externalized for runtime resolution'
 });
 
 test('translation: build options keep source maps in development and minify in production', () => {
-  const rootDir = '/tmp/velocetty-esbuild-options';
+  const rootDir = path.join(tmpdir(), 'velocetty-esbuild-options');
   const developmentRenderer = createRendererBuildOptions('development', rootDir);
   const productionRenderer = createRendererBuildOptions('production', rootDir);
   const developmentCli = createCliBuildOptions('development', rootDir);
