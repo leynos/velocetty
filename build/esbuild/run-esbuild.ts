@@ -21,26 +21,37 @@ type RunEsbuildOptions = {
 
 const isProductionMode = (mode: BuildMode) => mode === 'production';
 
-export const createRendererBuildOptions = (mode: BuildMode, rootDir: string): BuildOptions => {
+const createBaseBuildOptions = (mode: BuildMode, rootDir: string): BuildOptions => {
   return {
     absWorkingDir: rootDir,
-    entryPoints: [path.join(rootDir, 'lib', 'index.tsx')],
-    outfile: path.join(rootDir, 'target', 'renderer', 'bundle.js'),
     bundle: true,
-    platform: 'browser',
-    format: 'iife',
-    target: ['es2022'],
-    sourcemap: isProductionMode(mode) ? 'external' : 'linked',
     minify: isProductionMode(mode),
     legalComments: isProductionMode(mode) ? 'none' : 'inline',
     resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.d.ts', '.json'],
     loader: {
       '.d.ts': 'ts',
-      '.json': 'json',
-      '.css': 'css'
+      '.json': 'json'
     },
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode)
+    }
+  };
+};
+
+export const createRendererBuildOptions = (mode: BuildMode, rootDir: string): BuildOptions => {
+  const baseBuildOptions = createBaseBuildOptions(mode, rootDir);
+
+  return {
+    ...baseBuildOptions,
+    entryPoints: [path.join(rootDir, 'lib', 'index.tsx')],
+    outfile: path.join(rootDir, 'target', 'renderer', 'bundle.js'),
+    platform: 'browser',
+    format: 'iife',
+    target: ['es2022'],
+    sourcemap: isProductionMode(mode) ? 'external' : 'linked',
+    loader: {
+      ...(baseBuildOptions.loader ?? {}),
+      '.css': 'css'
     },
     plugins: [
       createStyledJsxBabelBridgePlugin(),
@@ -52,25 +63,16 @@ export const createRendererBuildOptions = (mode: BuildMode, rootDir: string): Bu
 };
 
 export const createCliBuildOptions = (mode: BuildMode, rootDir: string): BuildOptions => {
+  const baseBuildOptions = createBaseBuildOptions(mode, rootDir);
+
   return {
-    absWorkingDir: rootDir,
+    ...baseBuildOptions,
     entryPoints: [path.join(rootDir, 'cli', 'index.ts')],
     outfile: path.join(rootDir, 'bin', 'cli.js'),
-    bundle: true,
     platform: 'node',
     format: 'cjs',
     target: ['node24'],
     sourcemap: isProductionMode(mode) ? false : 'linked',
-    minify: isProductionMode(mode),
-    legalComments: isProductionMode(mode) ? 'none' : 'inline',
-    resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.d.ts', '.json'],
-    loader: {
-      '.d.ts': 'ts',
-      '.json': 'json'
-    },
-    define: {
-      'process.env.NODE_ENV': JSON.stringify(mode)
-    },
     plugins: [createNodeBuiltinsPlugin(), createIgnoreImportsPlugin()]
   };
 };
