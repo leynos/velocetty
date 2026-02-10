@@ -15,7 +15,7 @@ This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
 `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 No `PLANS.md` exists at the repository root as of 2026-02-10. If one is added,
 this plan must be updated to follow it.
@@ -110,17 +110,18 @@ Success must be observable in three ways:
   `package.json`, `webpack.config.ts`, and existing test suites.
 - [x] 2026-02-10 13:23 UTC: Drafted this ExecPlan with mandatory pre-migration
   coverage milestones for translation, packaging, and bespoke plugins.
-- [ ] Add pre-migration build-contract tests for translation outcomes while
-  Webpack remains the active bundler.
-- [ ] Add pre-migration packaging contract tests for copied artefacts and CLI
-  output shape.
-- [ ] Implement and validate bespoke esbuild plugins behind a non-default
-  script path.
-- [ ] Switch build scripts to esbuild and keep all migration contract tests
-  green.
-- [ ] Remove Webpack/Babel dependencies and update docs/CI references.
-- [ ] Run final gates: `bun install`, `make build`, `make check-fmt`,
-  `make lint`, and `make test`.
+- [x] 2026-02-10 14:05 UTC: Added pre-migration build-contract tests for
+  translation outcomes in `test/unit/esbuild-migration-contracts.test.ts`.
+- [x] 2026-02-10 14:05 UTC: Added pre-migration packaging contract tests for
+  copied artefacts and CLI/shebang handling.
+- [x] 2026-02-10 14:18 UTC: Implemented and validated bespoke esbuild plugins
+  for styled-jsx bridge, externals mapping, ignore rules, and Node built-ins.
+- [x] 2026-02-10 14:22 UTC: Switched default build scripts to esbuild and kept
+  migration contract tests green.
+- [x] 2026-02-10 14:22 UTC: Removed Webpack/Babel dependencies and legacy
+  bundler configs.
+- [x] 2026-02-10 14:29 UTC: Final validation gates passed: `bun install`,
+  `make build`, `make check-fmt`, `make lint`, and `make test`.
 
 ## Surprises & Discoveries
 
@@ -128,6 +129,9 @@ Success must be observable in three ways:
   bundle equivalence or packaging artefact shape.
 - Current `build` script still performs a post-bundle Babel minification pass,
   which must be replaced by esbuild minification behaviour and validated.
+- `build/esbuild/plugins/*` was accidentally ignored by `.gitignore` due a
+  generic `plugins` ignore rule, requiring a path relocation to
+  `build/esbuild/esbuild-plugins/`.
 
 ## Decision Log
 
@@ -144,21 +148,35 @@ Success must be observable in three ways:
   while plugin behaviour is still being validated.
   Date/Author: 2026-02-10 (assistant).
 
+- Decision: Relocate esbuild plugin modules from `build/esbuild/plugins/` to
+  `build/esbuild/esbuild-plugins/`.
+  Rationale: `.gitignore` excluded the former path, which would have left the
+  repository missing required plugin source files.
+  Date/Author: 2026-02-10 (assistant).
+
 ## Outcomes & Retrospective
 
-To be completed after implementation. The final write-up must include:
+Completed outcomes:
 
-- which risks materialized and how they were mitigated;
-- test suites added (translation, packaging, plugin validation);
-- dependency and script diffs;
-- gate outcomes and any post-migration follow-up tasks.
+- Build scripts now use esbuild for `dev`, `build`, and `build:hyper-app`.
+- Legacy Webpack/Babel configuration files were removed.
+- Migration contract tests now cover translation behaviour, packaging
+  artefacts, bespoke plugin behaviour, and snapshot bootstrap behaviour.
+- Final gates passed:
+  `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`.
+
+Lessons learned:
+
+- Keep plugin source paths clear of broad ignore rules.
+- For Electron renderer bundles, explicitly externalize Node built-ins and
+  preserve `*.d.ts` resolution behaviour previously relied on by Webpack.
 
 ## Context and Orientation
 
-Current build entry points live in `package.json` scripts, with Webpack configs
-in `webpack.config.ts` and Babel transforms in `babel.config.json`. The
-renderer still depends on `styled-jsx`, and runtime snapshot logic currently
-uses `__non_webpack_require__` in `lib/v8-snapshot-util.ts`.
+The active build entry points now live in `package.json` scripts and route to
+`build/esbuild/build.ts`, with supporting plugin modules under
+`build/esbuild/esbuild-plugins/`. The renderer still uses `styled-jsx`, now
+through a focused Babel bridge inside the esbuild pipeline.
 
 The migration must preserve three output families:
 
@@ -296,13 +314,15 @@ stop and escalate with logs and fixture evidence.
 ## Interfaces and Dependencies
 
 - Build scripts: `package.json`.
-- Legacy bundler config: `webpack.config.ts`, `babel.config.json`.
-- Snapshot shim: `lib/v8-snapshot-util.ts`.
-- Planned esbuild host: `build/esbuild.mjs` and plugin modules under
+- Active esbuild host: `build/esbuild/build.ts` and support modules under
   `build/esbuild/`.
-- Tests: `test/unit/`, `test/e2e/`, and any migration-specific fixture paths.
-- Packaging config remains in `electron-builder.json`.
+- Snapshot shim: `lib/v8-snapshot-util.ts`.
+- Migration contract tests:
+  `test/unit/esbuild-migration-contracts.test.ts` and
+  `test/unit/v8-snapshot-util.test.ts`.
+- Packaging config: `electron-builder.json`.
 
 ## Revision note
 
 Initial draft created on 2026-02-10.
+Completed implementation and validation on 2026-02-10.

@@ -89,8 +89,15 @@ Scope notes:
     `@types/node`, rebuild target, and CI Node baseline).
   - [x] Success criteria: `bun install`, `make build`, `make check-fmt`,
     `make lint`, and `make test` pass.
-- [ ] 1.4.14. Execute the Webpack/Babel-to-esbuild migration plan from
+- [x] 1.4.14. Execute the Webpack/Babel-to-esbuild migration plan from
   ADR-002 and remove legacy bundler dependencies from scripts and manifests.
+  - [x] Switch default bundling scripts (`dev`, `build`, `build:hyper-app`) to
+    the esbuild build entrypoint.
+  - [x] Add migration contract tests for translation outcomes, packaging
+    outcomes, and bespoke plugin validation.
+  - [x] Rewrite snapshot bootstrap loading to remove Webpack-specific globals.
+  - [x] Success criteria: `bun install`, `make build`, `make check-fmt`,
+    `make lint`, and `make test` pass after cut-over.
 
 ## 2. Rendering overhaul
 

@@ -5,6 +5,7 @@ import {build, context, type BuildContext, type BuildOptions} from 'esbuild';
 
 import {copyHyperAppArtifacts, copyRendererArtifacts} from './copy-artifacts';
 import {createIgnoreImportsPlugin} from './esbuild-plugins/ignore-imports-plugin';
+import {createNodeBuiltinsPlugin} from './esbuild-plugins/node-builtins-plugin';
 import {createRendererExternalsPlugin} from './esbuild-plugins/renderer-externals-plugin';
 import {createStyledJsxBabelBridgePlugin} from './esbuild-plugins/styled-jsx-babel-bridge-plugin';
 
@@ -32,14 +33,21 @@ export const createRendererBuildOptions = (mode: BuildMode, rootDir: string): Bu
     sourcemap: isProductionMode(mode) ? 'external' : 'linked',
     minify: isProductionMode(mode),
     legalComments: isProductionMode(mode) ? 'none' : 'inline',
+    resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.d.ts', '.json'],
     loader: {
+      '.d.ts': 'ts',
       '.json': 'json',
       '.css': 'css'
     },
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode)
     },
-    plugins: [createStyledJsxBabelBridgePlugin(), createRendererExternalsPlugin(), createIgnoreImportsPlugin()]
+    plugins: [
+      createStyledJsxBabelBridgePlugin(),
+      createRendererExternalsPlugin(),
+      createNodeBuiltinsPlugin(),
+      createIgnoreImportsPlugin()
+    ]
   };
 };
 
@@ -55,10 +63,15 @@ export const createCliBuildOptions = (mode: BuildMode, rootDir: string): BuildOp
     sourcemap: isProductionMode(mode) ? false : 'linked',
     minify: isProductionMode(mode),
     legalComments: isProductionMode(mode) ? 'none' : 'inline',
+    resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.d.ts', '.json'],
+    loader: {
+      '.d.ts': 'ts',
+      '.json': 'json'
+    },
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode)
     },
-    plugins: [createIgnoreImportsPlugin()]
+    plugins: [createNodeBuiltinsPlugin(), createIgnoreImportsPlugin()]
   };
 };
 

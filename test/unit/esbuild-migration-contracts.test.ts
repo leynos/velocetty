@@ -12,6 +12,7 @@ import {
   shouldIgnoreImportPath,
   createIgnoreImportsPlugin
 } from '../../build/esbuild/esbuild-plugins/ignore-imports-plugin';
+import {createNodeBuiltinsPlugin, isNodeBuiltinImport} from '../../build/esbuild/esbuild-plugins/node-builtins-plugin';
 import {
   createRendererExternalsPlugin,
   resolveRendererExternalPath
@@ -152,6 +153,33 @@ test('plugin validation: ignored imports remain unresolved externals', async () 
   }
 });
 
+test('plugin validation: node built-ins are externalized for runtime resolution', async () => {
+  expect(isNodeBuiltinImport('node:fs')).toBe(true);
+  expect(isNodeBuiltinImport('fs')).toBe(true);
+  expect(isNodeBuiltinImport('lodash')).toBe(false);
+
+  const rootDir = await createTempDir();
+  try {
+    const entryPoint = path.join(rootDir, 'entry.ts');
+    await writeFixtureFile(entryPoint, "import fs from 'node:fs'; console.log(Boolean(fs));");
+
+    const buildResult = await runEsbuildBuild({
+      entryPoints: [entryPoint],
+      bundle: true,
+      write: false,
+      outfile: path.join(rootDir, 'bundle.js'),
+      platform: 'browser',
+      format: 'iife',
+      plugins: [createNodeBuiltinsPlugin()]
+    });
+
+    const bundleOutput = buildResult.outputFiles.find((file) => file.path.endsWith('.js'))?.text ?? '';
+    expect(bundleOutput.includes('require("node:fs")')).toBe(true);
+  } finally {
+    await rm(rootDir, {recursive: true, force: true});
+  }
+});
+
 test('translation: build options keep source maps in development and minify in production', () => {
   const rootDir = '/tmp/velocetty-esbuild-options';
   const developmentRenderer = createRendererBuildOptions('development', rootDir);
@@ -170,4 +198,30 @@ test('translation: build options keep source maps in development and minify in p
 test('translation: styled-jsx usage detection only flags matching files', () => {
   expect(usesStyledJsx('<style jsx={true}>{``}</style>')).toBe(true);
   expect(usesStyledJsx('<style>{``}</style>')).toBe(false);
+});
+
+test('translation: esbuild handles shebang-bearing dependencies without shebang-loader', async () => {
+  const rootDir = await createTempDir();
+  try {
+    await writeFixtureFile(
+      path.join(rootDir, 'node_modules', 'rc', 'index.js'),
+      ['#!/usr/bin/env node', 'module.exports = {name: "rc"};'].join('\n')
+    );
+    const entryPoint = path.join(rootDir, 'entry.ts');
+    await writeFixtureFile(entryPoint, "import rc from 'rc'; console.log(rc.name);");
+
+    const buildResult = await runEsbuildBuild({
+      entryPoints: [entryPoint],
+      bundle: true,
+      write: false,
+      outfile: path.join(rootDir, 'bundle.js'),
+      platform: 'node',
+      format: 'cjs'
+    });
+
+    const bundleOutput = buildResult.outputFiles.find((file) => file.path.endsWith('.js'))?.text ?? '';
+    expect(bundleOutput.includes('rc')).toBe(true);
+  } finally {
+    await rm(rootDir, {recursive: true, force: true});
+  }
 });

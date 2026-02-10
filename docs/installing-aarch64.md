@@ -46,8 +46,7 @@ For the full postinstall chain, run:
 bun run postinstall
 ```
 
-This project uses `bunx webpack-cli` inside scripts. Running `webpack`
-directly can trigger an interactive npm install that fails on aarch64.
+This project uses `bun ./build/esbuild/build.ts` inside scripts for bundling.
 Similarly, the rebuild step runs `bun bin/rebuild-node-pty.cjs`, which
 executes `node-gyp` from the module directory; avoid calling
 `electron-rebuild` directly. The copy step uses `bun bin/copy-node-modules.js`.
@@ -74,9 +73,10 @@ loader exists and export `QEMU_LD_PREFIX` to the sysroot path.
 Install QEMU user emulation for the distribution, or ensure the
 distribution-provided `qemu-x86_64` binary is on `PATH`.
 
-### `CLI for webpack must be installed`
+### Bundler command errors
 
-Do not run `webpack` directly on aarch64. Use the Bun scripts instead:
+Do not run ad hoc bundler binaries directly on aarch64. Use the Bun scripts
+instead:
 
 ```bash
 bun run build:hyper-app

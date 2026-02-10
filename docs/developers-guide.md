@@ -21,14 +21,23 @@ must follow locally.
 - Prefer Makefile targets for validation commands.
 - Use `tsgo` (`@typescript/native-preview`) for TypeScript compilation and
   type-checking tasks.
+- Use `build/esbuild/build.ts` as the canonical JavaScript bundling entrypoint
+  for renderer, CLI, and app copy artefacts.
 - Keep documentation wrapped to 80 columns and code blocks to 120 columns.
 
-## Webpack/Babel-to-esbuild migration practice
+## esbuild build pipeline and safeguards
 
-ADR 002 requires test-first migration from Webpack/Babel to esbuild. For any
-change that touches bundler scripts, bundler configuration, or esbuild plugin
-logic, ensure the migration contract suites are in place and passing before
-switching default build paths.
+The repository now bundles with esbuild by default:
+
+- `bun run dev`: esbuild watch mode plus `tsgo --build --watch`
+- `bun run build`: production esbuild bundles plus `tsgo --build`
+- `bun run build:hyper-app`: copy-only app artefact pipeline via esbuild
+  support scripts
+
+ADR 002 still requires test-first discipline for any follow-on changes to
+bundler scripts, bundler configuration, or custom esbuild plugin logic.
+Contract suites must stay in place and green before changing default build
+paths or plugin behaviour.
 
 Required coverage categories before cut-over:
 

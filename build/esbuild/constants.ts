@@ -31,7 +31,9 @@ export const rendererExternalRequireMap = {
   'xterm-addon-web-links': './node_modules/xterm-addon-web-links/lib/xterm-addon-web-links.js',
   'xterm-addon-webgl': './node_modules/xterm-addon-webgl/lib/xterm-addon-webgl.js',
   'xterm-addon-canvas': './node_modules/xterm-addon-canvas/lib/xterm-addon-canvas.js',
-  xterm: './node_modules/xterm/lib/xterm.js'
+  xterm: './node_modules/xterm/lib/xterm.js',
+  electron: 'electron',
+  '@electron/remote': '@electron/remote'
 } as const;
 
 export type RendererExternalModule = keyof typeof rendererExternalRequireMap;
