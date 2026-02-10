@@ -96,7 +96,7 @@ Run the standard gates before opening a pull request:
 
 When documentation changes, also run:
 
-- `bunx markdownlint-cli "docs/**/*.md"`
+- `bunx markdownlint-cli2 "docs/**/*.md"`
 - `nixie --no-sandbox`
 
 ## Type checking

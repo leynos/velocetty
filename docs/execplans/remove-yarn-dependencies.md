@@ -230,7 +230,7 @@ All commands run from the repository root.
 
    If Markdown changed:
 
-    bunx markdownlint-cli "docs/**/*.md" \
+    bunx markdownlint-cli2 "docs/**/*.md" \
       | tee /tmp/markdownlint-velocetty-$(git branch --show).out
     nixie --no-sandbox
 

@@ -225,7 +225,7 @@ documentation changes.
     make check-fmt | tee /tmp/check-fmt-velocetty-$(git branch --show).out
     make lint | tee /tmp/lint-velocetty-$(git branch --show).out
     make test | tee /tmp/test-velocetty-$(git branch --show).out
-    bunx markdownlint-cli "docs/**/*.md" | \\
+    bunx markdownlint-cli2 "docs/**/*.md" | \\
       tee /tmp/markdownlint-velocetty-$(git branch --show).out
     nixie --no-sandbox | tee /tmp/nixie-velocetty-$(git branch --show).out
 

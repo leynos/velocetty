@@ -224,7 +224,7 @@ capture logs. Only proceed to commit once all gates pass.
     If documentation changed, also run:
 
     ```shell
-    bunx markdownlint-cli "docs/**/*.md" | tee /tmp/mdlint-velocetty-1-4-10-migrate-to-react-19.out
+    bunx markdownlint-cli2 "docs/**/*.md" | tee /tmp/mdlint-velocetty-1-4-10-migrate-to-react-19.out
     nixie --no-sandbox | tee /tmp/nixie-velocetty-1-4-10-migrate-to-react-19.out
     ```
 
@@ -246,7 +246,7 @@ Quality criteria:
     make check-fmt
     make lint
     make test
-    bunx markdownlint-cli "docs/**/*.md" (when docs change)
+    bunx markdownlint-cli2 "docs/**/*.md" (when docs change)
     nixie --no-sandbox (when docs change)
     ```
 
