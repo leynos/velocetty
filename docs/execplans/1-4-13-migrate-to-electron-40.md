@@ -1,8 +1,9 @@
 # Migrate runtime stack to Electron 40
 
-This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprises & discoveries`, `Decision log`, and
-`Outcomes & retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
+`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
+proceeds.
 
 Status: COMPLETE
 
@@ -11,7 +12,8 @@ No `PLANS.md` exists in this repository, so this plan stands alone.
 ## Purpose / big picture
 
 Deliver roadmap item `1.4.13` by migrating the runtime from Electron 34 to
-Electron 40 in line with ADR-004's staged path. Success is observable when
+Electron 40 in line with Architecture Decision Record (ADR) 004's staged path.
+Success is observable when
 `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`
 all succeed on this branch, `docs/developers-guide.md` captures any updated
 development practice for Electron 40, and `docs/roadmap.md` marks `1.4.13`
@@ -19,9 +21,9 @@ done.
 
 ## Constraints
 
-- Follow ADR-004 from `docs/adr-004-update-electron-40.md`: staged runtime
-  upgrades remain the governing approach and this milestone is the final
-  Electron 40 step.
+- Follow Architecture Decision Record (ADR) 004 from
+  `docs/adr-004-update-electron-40.md`: staged runtime upgrades remain the
+  governing approach and this milestone is the final Electron 40 step.
 - Preserve existing Make targets and npm/bun script entry points used by local
   development and Continuous Integration (CI).
 - Maintain native module functionality for `node-pty` and associated rebuild
@@ -47,7 +49,8 @@ done.
 
 ## Risks
 
-- Risk: `node-pty` may fail against Electron 40/Node 24 ABI changes.
+- Risk: `node-pty` may fail against Electron 40/Node 24 Application Binary
+  Interface (ABI) changes.
   Severity: high
   Likelihood: medium
   Mitigation: run `bun install` first, inspect rebuild failures, and only
@@ -84,11 +87,14 @@ done.
 - [x] (2026-02-10) Applied post-review documentation correction in
   `docs/velocetty-hyper-codebase.md` to align the CI Node.js row with the
   Electron 40 baseline (`24.x`).
+- [x] (2026-02-10) Addressed pull request review comments by updating acronym
+  expansions/grammar in this ExecPlan, roadmap citation and success-criteria
+  detail, and rebuild-target derivation logic in `bin/rebuild-node-pty.cjs`.
 
 ## Surprises & discoveries
 
 - Observation: `grepai` semantic search is intermittently unavailable in this
-  environment due local embedding service timeouts.
+  environment due to local embedding service timeouts.
   Evidence: repeated `grepai search ... --json --compact` errors reporting
   timeout while awaiting Ollama embedding responses.
   Impact: context gathering falls back to direct file reads for this task.
@@ -112,31 +118,37 @@ done.
   implementation approval.
   Rationale: aligns with ExecPlan process and keeps implementation changes
   gated behind reviewed scope.
-  Date/Author: 2026-02-09 / Codex
+  Date/Author: 2026-02-09 / Codex.
 - Decision: keep required gate commands in the exact sequence requested by the
   roadmap task (`bun install` then Make gates).
   Rationale: `bun install` exercises native rebuild and snapshot generation
   before higher-level checks, reducing diagnosis ambiguity.
-  Date/Author: 2026-02-09 / Codex
+  Date/Author: 2026-02-09 / Codex.
 - Decision: target Electron `40.2.1` and align `electron-mksnapshot` to the
   same patch.
   Rationale: latest available Electron 40 patch release at implementation time
   with matching snapshot tooling.
-  Date/Author: 2026-02-10 / Codex
+  Date/Author: 2026-02-10 / Codex.
 - Decision: align TypeScript Node typings to `@types/node ^24.10.12` and CI
   `NODE_VERSION` to `24.11.1`.
   Rationale: keep development and native rebuild tooling aligned with Electron
   40's bundled Node.js major/minor baseline.
-  Date/Author: 2026-02-10 / Codex
+  Date/Author: 2026-02-10 / Codex.
 - Decision: retain `node-pty` at `1.1.0`.
   Rationale: no stable upstream version newer than `1.1.0` and rebuild/test
   evidence shows compatibility with Electron 40 in this repository.
-  Date/Author: 2026-02-10 / Codex
+  Date/Author: 2026-02-10 / Codex.
 - Decision: apply a targeted follow-up documentation correction for the CI
   feature table Node.js version value.
   Rationale: reviewer feedback identified a stale `20.x` row inconsistent with
   the Electron 40/Node 24 baseline.
-  Date/Author: 2026-02-10 / Codex
+  Date/Author: 2026-02-10 / Codex.
+- Decision: remove the hardcoded Electron fallback from
+  `bin/rebuild-node-pty.cjs` and derive the fallback target from
+  `package.json`.
+  Rationale: avoids version drift between runtime dependency updates and native
+  rebuild target selection during future Electron upgrades.
+  Date/Author: 2026-02-10 / Codex.
 
 ## Outcomes & retrospective
 
@@ -265,7 +277,7 @@ Done criteria for roadmap item `1.4.13`:
 - Potential compatibility anchor:
   - `app/package.json` `node-pty` (change only if required by build evidence)
 - CI/runtime alignment:
-  - `.github/workflows/nodejs.yml` Node bootstrap/runtime version anchors
+  - `.github/workflows/nodejs.yml` Node bootstrap/runtime version anchors.
 
 ## Revision note
 
@@ -276,3 +288,7 @@ documentation (including roadmap completion state).
 Post-completion review update: corrected a stale CI Node.js table entry in
 `docs/velocetty-hyper-codebase.md` from `20.x` to `24.x` to match the shipped
 runtime and CI baselines.
+
+Additional review remediation update: resolved pull request comments covering
+version-derivation hardcoding risk, roadmap citation/success-criteria clarity,
+and ExecPlan terminology/grammar consistency.
