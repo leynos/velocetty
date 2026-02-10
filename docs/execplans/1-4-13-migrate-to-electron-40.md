@@ -81,6 +81,9 @@ done.
   `docs/roadmap.md`.
 - [x] (2026-02-10) Re-ran full gate sequence after documentation changes and
   confirmed all required checks still pass.
+- [x] (2026-02-10) Applied post-review documentation correction in
+  `docs/velocetty-hyper-codebase.md` to align the CI Node.js row with the
+  Electron 40 baseline (`24.x`).
 
 ## Surprises & discoveries
 
@@ -128,6 +131,11 @@ done.
 - Decision: retain `node-pty` at `1.1.0`.
   Rationale: no stable upstream version newer than `1.1.0` and rebuild/test
   evidence shows compatibility with Electron 40 in this repository.
+  Date/Author: 2026-02-10 / Codex
+- Decision: apply a targeted follow-up documentation correction for the CI
+  feature table Node.js version value.
+  Rationale: reviewer feedback identified a stale `20.x` row inconsistent with
+  the Electron 40/Node 24 baseline.
   Date/Author: 2026-02-10 / Codex
 
 ## Outcomes & retrospective
@@ -264,3 +272,7 @@ Done criteria for roadmap item `1.4.13`:
 Updated from `IN PROGRESS` to `COMPLETE` after implementing Electron 40 runtime
 anchor changes, validating all required gates, and updating developer/tracking
 documentation (including roadmap completion state).
+
+Post-completion review update: corrected a stale CI Node.js table entry in
+`docs/velocetty-hyper-codebase.md` from `20.x` to `24.x` to match the shipped
+runtime and CI baselines.

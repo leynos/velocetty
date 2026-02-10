@@ -2324,7 +2324,7 @@ flowchart LR
 
 | Feature | Implementation |
 | --------- | ---------------- |
-| **Node.js Version** | 20.x |
+| **Node.js Version** | 24.x |
 | **Caching** | Bun cache for faster installs |
 | **Matrix Strategy** | `[macos-latest, ubuntu-latest, windows-latest]` |
 | **Native Modules** | Automatic node-pty rebuilding per platform |
