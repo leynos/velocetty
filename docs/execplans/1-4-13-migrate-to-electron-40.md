@@ -90,6 +90,10 @@ done.
 - [x] (2026-02-10) Addressed pull request review comments by updating acronym
   expansions/grammar in this ExecPlan, roadmap citation and success-criteria
   detail, and rebuild-target derivation logic in `bin/rebuild-node-pty.cjs`.
+- [x] (2026-02-10) Addressed follow-up pull request comments by adding malformed
+  `package.json` parse handling in `bin/rebuild-node-pty.cjs` and correcting
+  Electron 40.2.1 Chromium patch references to `144.0.7559.111` in
+  `docs/velocetty-hyper-codebase.md`.
 
 ## Surprises & discoveries
 
@@ -148,6 +152,11 @@ done.
   `package.json`.
   Rationale: avoids version drift between runtime dependency updates and native
   rebuild target selection during future Electron upgrades.
+  Date/Author: 2026-02-10 / Codex.
+- Decision: use Chromium `144.0.7559.111` as the Electron `40.2.1` baseline in
+  `docs/velocetty-hyper-codebase.md`.
+  Rationale: align documentation with Electron 40.2.1 release metadata and
+  eliminate stale patch-level version references.
   Date/Author: 2026-02-10 / Codex.
 
 ## Outcomes & retrospective
@@ -292,3 +301,7 @@ runtime and CI baselines.
 Additional review remediation update: resolved pull request comments covering
 version-derivation hardcoding risk, roadmap citation/success-criteria clarity,
 and ExecPlan terminology/grammar consistency.
+
+Second review remediation update: resolved pull request comments covering
+malformed `package.json` parse handling in the rebuild script and Chromium
+patch-level version accuracy for Electron 40.2.1 documentation baselines.

@@ -1719,7 +1719,7 @@ flowchart TB
 | ----------- | ------- |
 | **Package** | `electron` |
 | **Version** | 40.2.1 |
-| **Chromium Version** | 144.0.7559.60 |
+| **Chromium Version** | 144.0.7559.111 |
 | **Node.js Version** | 24.11.1 (bundled) |
 | **Support Status** | Current baseline on the Architecture Decision Record (ADR)-004 migration path |
 
@@ -2387,7 +2387,7 @@ flowchart TB
 | Integration | Requirement | Constraint |
 | ------------- | ------------- | ------------ |
 | **Electron ↔ Node.js** | Bundled Node.js 24.11.1 | Native modules must target this Application Binary Interface (ABI) |
-| **Electron ↔ Chromium** | Chromium 144.0.7559.60 bundled | WebGL/Canvas rendering APIs |
+| **Electron ↔ Chromium** | Chromium 144.0.7559.111 bundled | WebGL/Canvas rendering APIs |
 | **React ↔ Redux** | react-redux 9.x | Requires React 18.0+ hooks API |
 | **xterm.js ↔ Addons** | xterm 5.x series | Addons must match major version |
 | **node-pty ↔ Electron** | Rebuild required per version | `electron-rebuild` in post-install |
@@ -4222,7 +4222,7 @@ Plugin extensions compose with core functionality through decoration:
 
 **Technologies and Frameworks**:
 
-- Electron 40.2.1 (Chromium 144.0.7559.60, Node.js 24.11.1)
+- Electron 40.2.1 (Chromium 144.0.7559.111, Node.js 24.11.1)
 
 - `@electron/remote` 2.1.2 for cross-process module access
 
@@ -7615,7 +7615,7 @@ flowchart LR
 | Concern | Current State | Risk Level | Evidence |
 | --------- | -------------- | ------------ | ---------- |
 | Electron Version | 40.2.1 (current baseline) | **Critical** | `app/package.json` |
-| Chromium Version | 144.0.7559.60 | **Critical** | Bundled with Electron 40 |
+| Chromium Version | 144.0.7559.111 | **Critical** | Bundled with Electron 40 |
 | Node.js Version | 24.11.1 (bundled) | **High** | Bundled with Electron 40 |
 | Plugin Trust Model | Full trust, no sandboxing | **High** | Architectural decision |
 | `@electron/remote` | Enabled (deprecated) | **Medium** | `app/index.ts`, `app/ui/window.ts` |
@@ -7626,7 +7626,7 @@ flowchart LR
 
 | Area | Observation | Status in 40.2.1 |
 | ------ | ------------- | ------------------- |
-| Chromium baseline | Bundled Chromium 144.0.7559.60 aligns with the current staged target | Roadmap item 1.4.13 complete |
+| Chromium baseline | Bundled Chromium 144.0.7559.111 aligns with the current staged target | Roadmap item 1.4.13 complete |
 | Main/renderer hardening | `nodeIntegration` enabled and `contextIsolation` disabled | Outstanding hardening debt |
 | Cross-process access | `@electron/remote` remains enabled | Planned migration to explicit IPC |
 
@@ -9631,7 +9631,7 @@ architecture:
 
 | Technology | Version | Purpose | Justification |
 | ------------ | --------- | --------- | --------------- |
-| **Electron** | 40.2.1 | Application shell (Chromium 144.0.7559.60) | Cross-platform desktop integration |
+| **Electron** | 40.2.1 | Application shell (Chromium 144.0.7559.111) | Cross-platform desktop integration |
 | **React** | 19.2.4 | Component-based UI framework | Enables plugin decoration pattern |
 | **Redux** | 5.0.1 | Centralized state management | Predictable state for complex multi-session UI |
 | **styled-jsx** | 5.1.2 | Scoped CSS-in-JS styling | Component-local styles without global conflicts |
@@ -11549,7 +11549,7 @@ versions used in Velocetty:
 | Technology | Version | Purpose | Evidence |
 | ------------ | --------- | --------- | ---------- |
 | Electron | 40.2.1 | Desktop application framework | `app/package.json` |
-| Chromium | 144.0.7559.60 | Renderer engine (bundled) | Electron 40 bundle |
+| Chromium | 144.0.7559.111 | Renderer engine (bundled) | Electron 40 bundle |
 | Node.js | 24.11.1 | Main process runtime (bundled) | Electron 40 bundle |
 | TypeScript | 5.4.5 | Primary development language | `package.json` |
 | React | 19.2.4 | UI component framework | `package.json` |

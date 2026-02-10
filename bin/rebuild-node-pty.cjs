@@ -21,8 +21,14 @@ const readElectronTargetFromPackageJson = () => {
     return '';
   }
 
-  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-  return normalizeVersion(packageJson?.devDependencies?.electron);
+  try {
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    return normalizeVersion(packageJson?.devDependencies?.electron);
+  } catch (error) {
+    const details = error instanceof Error ? error.message : String(error);
+    console.error(`Failed to parse ${packageJsonPath}: ${details}`);
+    return '';
+  }
 };
 
 const electronTarget =
