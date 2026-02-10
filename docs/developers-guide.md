@@ -7,7 +7,8 @@
 - Invariants: Keep Makefile targets and validation steps aligned with CI and
   tooling changes.
 - Cross-links: [Testing with Bun](testing-with-bun.md),
-  [ADR 001](adr-001-replace-ava-with-bun-test.md), and
+  [ADR 001](adr-001-replace-ava-with-bun-test.md),
+  [ADR 002](adr-002-replace-webpack-babel-with-esbuild.md), and
   [Roadmap](roadmap.md).
 
 This guide captures the development practices specific to the Velocetty
@@ -21,6 +22,25 @@ must follow locally.
 - Use `tsgo` (`@typescript/native-preview`) for TypeScript compilation and
   type-checking tasks.
 - Keep documentation wrapped to 80 columns and code blocks to 120 columns.
+
+## Webpack/Babel-to-esbuild migration practice
+
+ADR 002 requires test-first migration from Webpack/Babel to esbuild. For any
+change that touches bundler scripts, bundler configuration, or esbuild plugin
+logic, ensure the migration contract suites are in place and passing before
+switching default build paths.
+
+Required coverage categories before cut-over:
+
+- Translation outcomes: verify `styled-jsx` scoped/global behaviour, externals
+  mapping, source maps, and production minification output.
+- Packaging outcomes: verify copied artefacts under `target/` and CLI artefact
+  shape (including shebang integrity).
+- Bespoke plugin validation: add deterministic unit tests for each custom
+  esbuild plugin path (resolve/load/copy/ignore behaviour and diagnostics).
+
+Follow `docs/execplans/replace-webpack-babel-with-esbuild.md` for migration
+ordering and milestone gates.
 
 ## Electron runtime alignment
 

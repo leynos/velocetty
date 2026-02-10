@@ -68,7 +68,9 @@ Scope notes:
 - [x] 1.4.4. Fully remove dependencies on Yarn and AVA, including in CI.
 - [ ] 1.4.5. Replace Husky with `git-hooks` for repository hook management.
 - [x] 1.4.6. Adopt `tsgo` for TypeScript compilation and type checking.
-- [ ] 1.4.7. Longer term: replace Webpack with esbuild or Bun (TBD).
+- [x] 1.4.7. Publish the migration plan for replacing Webpack/Babel with
+  esbuild (see ADR-002 and
+  `docs/execplans/replace-webpack-babel-with-esbuild.md`).
 - [ ] 1.4.8. Re-enable Biome rules currently disabled for legacy code:
   `noExplicitAny`, `noNonNullAssertion`, `useNodejsImportProtocol`,
   `useExhaustiveDependencies`, and the accessibility (a11y) rule set. Track
@@ -87,6 +89,8 @@ Scope notes:
     `@types/node`, rebuild target, and CI Node baseline).
   - [x] Success criteria: `bun install`, `make build`, `make check-fmt`,
     `make lint`, and `make test` pass.
+- [ ] 1.4.14. Execute the Webpack/Babel-to-esbuild migration plan from
+  ADR-002 and remove legacy bundler dependencies from scripts and manifests.
 
 ## 2. Rendering overhaul
 
