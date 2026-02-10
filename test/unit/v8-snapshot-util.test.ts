@@ -93,22 +93,42 @@ const importSnapshotUtil = async (testCase: string) => {
   return import(`../../lib/v8-snapshot-util.ts?${testCase}_${importSuffix}`);
 };
 
+const testSnapshotBootstrap = async (
+  virtualModuleName: string,
+  testCaseName: string,
+  requireLocation: 'global' | 'window'
+) => {
+  const moduleContainer = createModuleContainer();
+  const runtimeRequire = createRuntimeRequire(moduleContainer);
+  const setGlobalsCalls: unknown[][] = [];
+  const snapshotResult = createSnapshotResult({[virtualModuleName]: {}}, setGlobalsCalls);
+
+  if (requireLocation === 'global') {
+    setupSnapshotGlobals({
+      snapshotResult,
+      globalRequire: runtimeRequire
+    });
+  } else {
+    setupSnapshotGlobals({
+      snapshotResult,
+      windowRequire: runtimeRequire
+    });
+  }
+
+  await importSnapshotUtil(testCaseName);
+  return {moduleContainer, runtimeRequire, snapshotResult, setGlobalsCalls};
+};
+
 afterEach(() => {
   cleanupGlobals();
 });
 
 test('uses runtime require and snapshot cache/definitions when available', async () => {
-  const moduleContainer = createModuleContainer();
-  const runtimeRequire = createRuntimeRequire(moduleContainer);
-  const setGlobalsCalls: unknown[][] = [];
-  const snapshotResult = createSnapshotResult({'virtual:plugin': {}}, setGlobalsCalls);
-
-  setupSnapshotGlobals({
-    snapshotResult,
-    globalRequire: runtimeRequire
-  });
-
-  await importSnapshotUtil('bootstrap_case');
+  const {moduleContainer, runtimeRequire, snapshotResult, setGlobalsCalls} = await testSnapshotBootstrap(
+    'virtual:plugin',
+    'bootstrap_case',
+    'global'
+  );
 
   const loadedVirtualModule = moduleContainer._load('virtual:plugin');
   const loadedNativeModule = moduleContainer._load('native:module');
@@ -123,17 +143,11 @@ test('uses runtime require and snapshot cache/definitions when available', async
 });
 
 test('falls back to window.require when global require is unavailable', async () => {
-  const moduleContainer = createModuleContainer();
-  const windowRequire = createRuntimeRequire(moduleContainer);
-  const setGlobalsCalls: unknown[][] = [];
-  const snapshotResult = createSnapshotResult({'virtual:renderer': {}}, setGlobalsCalls);
-
-  setupSnapshotGlobals({
-    snapshotResult,
-    windowRequire
-  });
-
-  await importSnapshotUtil('window_require_case');
+  const {moduleContainer, runtimeRequire, snapshotResult, setGlobalsCalls} = await testSnapshotBootstrap(
+    'virtual:renderer',
+    'window_require_case',
+    'window'
+  );
 
   const loadedVirtualModule = moduleContainer._load('virtual:renderer');
   const loadedNativeModule = moduleContainer._load('native:module');
@@ -144,7 +158,7 @@ test('falls back to window.require when global require is unavailable', async ()
     exports: 'custom:virtual:renderer'
   });
   expect(setGlobalsCalls).toHaveLength(1);
-  expect(setGlobalsCalls[0].at(-1)).toBe(windowRequire);
+  expect(setGlobalsCalls[0].at(-1)).toBe(runtimeRequire);
 });
 
 test('throws when snapshot bootstrap cannot find runtime require', async () => {
