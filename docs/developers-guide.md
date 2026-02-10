@@ -40,6 +40,15 @@ in the same change:
 - Run `bun install` to validate snapshot generation, `install-app-deps`, and
   `node-pty` rebuilding before running the remaining gates.
 
+Current repository runtime baseline after roadmap item `1.4.13`:
+
+- `electron` and `electron-mksnapshot`: `^40.2.1`
+- `@types/node`: `^24.10.12`
+- CI workflow `NODE_VERSION`: `24.11.1`
+
+When preparing future Electron upgrades, update these anchors together and
+avoid merging partial baseline updates.
+
 ## React version alignment
 
 The renderer runtime depends on React in both the root `package.json` and the

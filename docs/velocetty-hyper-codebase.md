@@ -244,7 +244,7 @@ flowchart LR
 
 | Layer | Technology | Version | Purpose |
 | ------- | ------------ | --------- | --------- |
-| Runtime Shell | Electron | 34.5.8 | Desktop application framework |
+| Runtime Shell | Electron | 40.2.1 | Desktop application framework |
 | Main Process | Node.js/TypeScript | 5.4.5 | OS integration, PTY management |
 | Renderer Framework | React | 19.2.4 | UI component architecture |
 | State Management | Redux | 5.0.1 | Centralized state with middleware |
@@ -410,7 +410,7 @@ flowchart TB
     end
     
     subgraph External["External Dependencies"]
-        Electron34["Electron 34.5.8"]
+        Electron40["Electron 40.2.1"]
         NodePTY["node-pty"]
         XtermJS5["xterm.js 5.3.0"]
         NPMRegistry["NPM Registry"]
@@ -551,7 +551,7 @@ flowchart TB
 | Component | Version | Notes |
 | ----------- | --------- | ------- |
 | Velocetty (base) | 4.0.0-canary.5 | Fork of Hyper canary |
-| Electron | 34.5.8 | Runtime framework |
+| Electron | 40.2.1 | Runtime framework |
 | xterm.js | 5.3.0 | Terminal emulation |
 | React | 19.2.4 | UI framework |
 | TypeScript | 5.4.5 | Development language |
@@ -1583,7 +1583,7 @@ flowchart TB
 
 ##### External dependencies referenced
 
-- Electron 34.5.8
+- Electron 40.2.1
 
 - React 19.2.4
 
@@ -1678,7 +1678,7 @@ Base Configuration (tsconfig.base.json):
 
 | Constraint | Description |
 | ------------ | ------------- |
-| **Node.js Runtime** | Application code executes as JavaScript in Node.js 20.x (bundled with Electron 34); TypeScript is compiled during build |
+| **Node.js Runtime** | Application code executes as JavaScript in Node.js 24.x (bundled with Electron 40); TypeScript is compiled during build |
 | **Chromium V8** | Renderer process JavaScript executed by Chromium's V8 engine |
 | **Native Module Compatibility** | `node-pty` requires matching Node.js ABI version for native bindings |
 | **ES Module Limitations** | CommonJS required for Electron main process compatibility |
@@ -1689,7 +1689,7 @@ Base Configuration (tsconfig.base.json):
 
 ```mermaid
 flowchart TB
-    subgraph ElectronFramework["Electron Framework 34.5.8"]
+    subgraph ElectronFramework["Electron Framework 40.2.1"]
         MainProcess["Main Process<br/>(Node.js)"]
         RendererProcess["Renderer Process<br/>(Chromium)"]
         IPCBridge["IPC Bridge"]
@@ -1718,10 +1718,10 @@ flowchart TB
 | Attribute | Value |
 | ----------- | ------- |
 | **Package** | `electron` |
-| **Version** | 34.5.8 |
-| **Chromium Version** | 132.0.6834.83 |
-| **Node.js Version** | 20.18.1 (bundled) |
-| **Support Status** | Interim baseline on Architecture Decision Record (ADR)-004 path to Electron 40 |
+| **Version** | 40.2.1 |
+| **Chromium Version** | 144.0.7559.60 |
+| **Node.js Version** | 24.11.1 (bundled) |
+| **Support Status** | Current baseline on the Architecture Decision Record (ADR)-004 migration path |
 
 **Selection Justification**: Electron provides the cross-platform desktop
 application framework enabling Velocetty to deliver consistent terminal
@@ -1729,9 +1729,10 @@ experiences across macOS, Windows, and Linux using web technologies. The
 inherited Hyper codebase has deep Electron integration that would require
 significant refactoring to migrate.
 
-**Technical Debt Note**: Electron 34 is the second staged runtime baseline on
-the Architecture Decision Record (ADR)-004 path (28 → 34 → 40). Continue staged
-upgrades to reduce exposure to runtime drift and keep security fixes current.
+**Technical Debt Note**: Electron 40 is the current staged runtime baseline on
+the Architecture Decision Record (ADR)-004 path (28 → 34 → 40). Continue
+tracking Electron patch updates to reduce runtime drift and keep security fixes
+current.
 
 ##### IPC communication layer
 
@@ -2283,7 +2284,7 @@ flowchart LR
     
     subgraph CI["CI Pipeline (nodejs.yml)"]
         Checkout["Checkout"]
-        Setup["Setup Node.js 20.x"]
+        Setup["Setup Node.js 24.x"]
         Install["bun install<br/>(with caching)"]
         Build["bun run build"]
         Test["bun test"]
@@ -2367,7 +2368,7 @@ JavaScript to bytecode, avoiding runtime parsing overhead.
 ```mermaid
 flowchart TB
     subgraph CoreIntegration["Core Component Integration"]
-        Electron["Electron 34.5.8"]
+        Electron["Electron 40.2.1"]
         React["React 19.2.4"]
         Redux["Redux 5.0.1"]
         Xterm["xterm.js 5.3.0"]
@@ -2385,8 +2386,8 @@ flowchart TB
 
 | Integration | Requirement | Constraint |
 | ------------- | ------------- | ------------ |
-| **Electron ↔ Node.js** | Bundled Node.js 20.18.1 | Native modules must target this Application Binary Interface (ABI) |
-| **Electron ↔ Chromium** | Chromium 132.0.6834.83 bundled | WebGL/Canvas rendering APIs |
+| **Electron ↔ Node.js** | Bundled Node.js 24.11.1 | Native modules must target this Application Binary Interface (ABI) |
+| **Electron ↔ Chromium** | Chromium 144.0.7559.60 bundled | WebGL/Canvas rendering APIs |
 | **React ↔ Redux** | react-redux 9.x | Requires React 18.0+ hooks API |
 | **xterm.js ↔ Addons** | xterm 5.x series | Addons must match major version |
 | **node-pty ↔ Electron** | Rebuild required per version | `electron-rebuild` in post-install |
@@ -2404,7 +2405,7 @@ flowchart TB
 
 | Consideration | Current State | Mitigation |
 | --------------- | --------------- | ------------ |
-| **Electron upgrade trajectory** | Electron 34 baseline adopted | Continue roadmap upgrade to 40 |
+| **Electron upgrade trajectory** | Electron 40 baseline adopted | Keep Electron 40 patch releases current |
 | **Plugin Trust Model** | Full-trust execution (no sandboxing) | User education; future sandbox consideration |
 | **IPC Security** | `@electron/remote` enables cross-process access | Migrate to explicit IPC messaging |
 | **Native Module Access** | `node-pty` has full system access | Runs with user privileges only |
@@ -2415,7 +2416,7 @@ flowchart TB
 
 | Layer | Primary Technologies | Purpose |
 | ------- | --------------------- | --------- |
-| **Application Shell** | Electron 34.5.8 | Cross-platform desktop framework |
+| **Application Shell** | Electron 40.2.1 | Cross-platform desktop framework |
 | **Main Process** | Node.js/TypeScript, node-pty | OS integration, PTY management |
 | **Renderer Process** | React 19.2.4, Redux 5.0.1 | UI components, state management |
 | **Terminal Rendering** | xterm.js 5.3.0 + WebGL addon | Terminal emulation and display |
@@ -2436,7 +2437,7 @@ flowchart TB
 
 | Item | Priority | Description |
 | ------ | ---------- | ------------- |
-| **Electron Upgrade** | Critical | Electron 34 is an interim milestone; continue upgrade to 40 |
+| **Electron Upgrade** | Critical | Electron 40 baseline adopted; keep patch releases current |
 | **xterm.js Package Migration** | Medium | Migrate from `xterm` to scoped `@xterm/*` packages |
 | **IPC Modernization** | Medium | Replace `@electron/remote` with explicit IPC |
 | **Plugin Sandboxing** | Low | Investigate capability-based plugin permissions |
@@ -2483,7 +2484,7 @@ flowchart TB
 
 | Source | Information Retrieved |
 | -------- | ---------------------- |
-| Electron Documentation | Electron 34 release/runtime compatibility details |
+| Electron Documentation | Electron 40 release/runtime compatibility details |
 | npm Registry | xterm.js 5.3.0 current status, package deprecation notices |
 | xterm.js GitHub | Package migration to @xterm/* scoped packages |
 
@@ -4221,7 +4222,7 @@ Plugin extensions compose with core functionality through decoration:
 
 **Technologies and Frameworks**:
 
-- Electron 34.5.8 (Chromium 132.0.6834.83, Node.js 20.18.1)
+- Electron 40.2.1 (Chromium 144.0.7559.60, Node.js 24.11.1)
 
 - `@electron/remote` 2.1.2 for cross-process module access
 
@@ -4661,7 +4662,7 @@ flowchart TB
 
 | Decision | Choice | Rationale | Tradeoffs |
 | ---------- | -------- | ----------- | ----------- |
-| Application Shell | Electron 34.5.8 | Cross-platform desktop with web tech UI; deep codebase integration | Larger binary (~100MB), Chromium memory overhead, interim baseline pending Electron 40 |
+| Application Shell | Electron 40.2.1 | Cross-platform desktop with web tech UI; deep codebase integration | Larger binary (~100MB), Chromium memory overhead, current baseline on ADR-004 path |
 | Process Model | Main/Renderer split | Security isolation, native access in main, web UI in renderer | IPC overhead, state synchronization complexity |
 | UI Framework | React 19.2.4 | Component composition model enables plugin decoration pattern | Bundle size, rendering overhead vs. native UI |
 | State Management | Redux 5.0.1 | Predictable state, plugin middleware integration, time-travel debugging | Boilerplate, performance overhead for high-frequency updates |
@@ -4723,7 +4724,7 @@ flowchart TB
 
 | Concern | Current State | Risk Level | Mitigation Path |
 | --------- | -------------- | ------------ | ----------------- |
-| Electron Version | 34.5.8 (interim baseline) | **High** | Continue staged upgrade to 40 |
+| Electron Version | 40.2.1 (current baseline) | **High** | Keep Electron 40 patch releases current |
 | Plugin Trust Model | Full trust execution | **High** | User education; future sandbox consideration |
 | `@electron/remote` | Enabled for cross-process access | **Medium** | Migrate to explicit IPC messaging |
 | Node Integration | Enabled in renderer | **Medium** | Required for plugin system architecture |
@@ -7613,19 +7614,19 @@ flowchart LR
 
 | Concern | Current State | Risk Level | Evidence |
 | --------- | -------------- | ------------ | ---------- |
-| Electron Version | 34.5.8 (interim baseline) | **Critical** | `app/package.json` |
-| Chromium Version | 132.0.6834.83 | **Critical** | Bundled with Electron 34 |
-| Node.js Version | 20.18.1 (bundled) | **High** | Bundled with Electron 34 |
+| Electron Version | 40.2.1 (current baseline) | **Critical** | `app/package.json` |
+| Chromium Version | 144.0.7559.60 | **Critical** | Bundled with Electron 40 |
+| Node.js Version | 24.11.1 (bundled) | **High** | Bundled with Electron 40 |
 | Plugin Trust Model | Full trust, no sandboxing | **High** | Architectural decision |
 | `@electron/remote` | Enabled (deprecated) | **Medium** | `app/index.ts`, `app/ui/window.ts` |
 | Node Integration | Enabled in renderer | **Medium** | `app/ui/window.ts` |
 | Context Isolation | Disabled | **Medium** | `app/ui/window.ts` |
 
-##### 6.4.8.2 Electron 34 baseline risk profile
+##### 6.4.8.2 Electron 40 baseline risk profile
 
-| Area | Observation | Status in 34.5.8 |
+| Area | Observation | Status in 40.2.1 |
 | ------ | ------------- | ------------------- |
-| Chromium baseline | Bundled Chromium 132.0.6834.83 is newer than prior baseline but still requires staged upgrades | Track roadmap item 1.4.13 |
+| Chromium baseline | Bundled Chromium 144.0.7559.60 aligns with the current staged target | Roadmap item 1.4.13 complete |
 | Main/renderer hardening | `nodeIntegration` enabled and `contextIsolation` disabled | Outstanding hardening debt |
 | Cross-process access | `@electron/remote` remains enabled | Planned migration to explicit IPC |
 
@@ -7638,7 +7639,7 @@ flowchart LR
 | Disable `@electron/remote` | Enabled | **Non-compliant** | Cross-process access |
 | Enable `sandbox` | Disabled | **Non-compliant** | Plugin Node.js access |
 | Define CSP | Partial (`'unsafe-inline'`) | **Partial** | styled-jsx requirement |
-| Use current Electron | 34.5.8 (interim baseline) | **Partial** | Continue roadmap upgrades |
+| Use current Electron | 40.2.1 (current baseline) | **Partial** | Keep Electron 40 patch releases current |
 
 ---
 
@@ -8375,7 +8376,7 @@ flowchart TB
     
     subgraph CIPipeline["CI Pipeline (nodejs.yml)"]
         Checkout["Checkout Code"]
-        SetupNode["Setup Node.js 20.x"]
+        SetupNode["Setup Node.js 24.x"]
         InstallDeps["bun install<br/>(with caching)"]
         LintCheck["bun lint"]
         BuildApp["bun run build"]
@@ -9126,7 +9127,7 @@ flowchart TB
     
     subgraph CIPipeline["CI Pipeline (nodejs.yml)"]
         Checkout["Checkout Code"]
-        SetupNode["Setup Node.js 20.x"]
+        SetupNode["Setup Node.js 24.x"]
         InstallDeps["bun install<br/>(with caching)"]
         LintTest["bun run test<br/>(lint + unit)"]
         BuildDist["bun run dist<br/>(package)"]
@@ -9284,7 +9285,7 @@ flowchart LR
 | Gap | Risk | Recommendation |
 | ----- | ------ | ---------------- |
 | Plugin security | High—full trust model | User education, trusted sources |
-| Electron version | High—interim Electron 34 baseline | Continue staged upgrade path to 40 |
+| Electron version | High—Electron 40 baseline | Keep Electron 40 patch releases current |
 | Context isolation | Medium—disabled | Evaluate migration feasibility |
 | CSP validation | Low—`unsafe-inline` | Review styled-jsx alternatives |
 
@@ -9371,7 +9372,7 @@ flowchart TB
 flowchart TB
     subgraph LocalDev["Local Development Testing"]
         DevMachine["Developer Machine"]
-        NodeRuntime["Node.js 20.x"]
+        NodeRuntime["Node.js 24.x"]
         BunPM["Bun Package Manager"]
     end
     
@@ -9630,7 +9631,7 @@ architecture:
 
 | Technology | Version | Purpose | Justification |
 | ------------ | --------- | --------- | --------------- |
-| **Electron** | 34.5.8 | Application shell (Chromium 132.0.6834.83) | Cross-platform desktop integration |
+| **Electron** | 40.2.1 | Application shell (Chromium 144.0.7559.60) | Cross-platform desktop integration |
 | **React** | 19.2.4 | Component-based UI framework | Enables plugin decoration pattern |
 | **Redux** | 5.0.1 | Centralized state management | Predictable state for complex multi-session UI |
 | **styled-jsx** | 5.1.2 | Scoped CSS-in-JS styling | Component-local styles without global conflicts |
@@ -10977,7 +10978,7 @@ flowchart TB
 flowchart LR
     subgraph Stage1["Stage 1: Setup"]
         Checkout["Checkout Code"]
-        NodeSetup["Setup Node.js 20.x"]
+        NodeSetup["Setup Node.js 24.x"]
         CacheRestore["Restore Bun Cache"]
     end
     
@@ -11547,9 +11548,9 @@ versions used in Velocetty:
 
 | Technology | Version | Purpose | Evidence |
 | ------------ | --------- | --------- | ---------- |
-| Electron | 34.5.8 | Desktop application framework | `app/package.json` |
-| Chromium | 132.0.6834.83 | Renderer engine (bundled) | Electron 34 bundle |
-| Node.js | 20.18.1 | Main process runtime (bundled) | Electron 34 bundle |
+| Electron | 40.2.1 | Desktop application framework | `app/package.json` |
+| Chromium | 144.0.7559.60 | Renderer engine (bundled) | Electron 40 bundle |
+| Node.js | 24.11.1 | Main process runtime (bundled) | Electron 40 bundle |
 | TypeScript | 5.4.5 | Primary development language | `package.json` |
 | React | 19.2.4 | UI component framework | `package.json` |
 | Redux | 5.0.1 | State management library | `package.json` |

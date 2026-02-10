@@ -99,8 +99,8 @@ const updater = (win: BrowserWindow) => {
   };
 
   /**
-   * Electron 34 types `update-available` as a zero-argument event, while our
-   * Linux shim emits metadata arguments. Keep a typed zero-arg listener for
+   * Electron types `update-available` as a zero-argument event, while our Linux
+   * shim emits metadata arguments. Keep a typed zero-arg listener for
    * subscription and parse optional payload args for Linux runtime parity.
    */
   const onLinuxUpdateAvailable = (...args: LinuxUpdateAvailableArgs) => {
