@@ -8,15 +8,18 @@ import {expect, test} from 'bun:test';
 
 import {copyHyperAppArtifacts, copyRendererArtifacts} from '../../build/esbuild/copy-artifacts';
 import {createCliBuildOptions, createRendererBuildOptions} from '../../build/esbuild/run-esbuild';
-import {shouldIgnoreImportPath, createIgnoreImportsPlugin} from '../../build/esbuild/plugins/ignore-imports-plugin';
+import {
+  shouldIgnoreImportPath,
+  createIgnoreImportsPlugin
+} from '../../build/esbuild/esbuild-plugins/ignore-imports-plugin';
 import {
   createRendererExternalsPlugin,
   resolveRendererExternalPath
-} from '../../build/esbuild/plugins/renderer-externals-plugin';
+} from '../../build/esbuild/esbuild-plugins/renderer-externals-plugin';
 import {
   createStyledJsxBabelBridgePlugin,
   usesStyledJsx
-} from '../../build/esbuild/plugins/styled-jsx-babel-bridge-plugin';
+} from '../../build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin';
 
 const createTempDir = () => mkdtemp(path.join(tmpdir(), 'velocetty-esbuild-'));
 

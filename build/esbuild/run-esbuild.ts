@@ -4,9 +4,9 @@ import path from 'node:path';
 import {build, context, type BuildContext, type BuildOptions} from 'esbuild';
 
 import {copyHyperAppArtifacts, copyRendererArtifacts} from './copy-artifacts';
-import {createIgnoreImportsPlugin} from './plugins/ignore-imports-plugin';
-import {createRendererExternalsPlugin} from './plugins/renderer-externals-plugin';
-import {createStyledJsxBabelBridgePlugin} from './plugins/styled-jsx-babel-bridge-plugin';
+import {createIgnoreImportsPlugin} from './esbuild-plugins/ignore-imports-plugin';
+import {createRendererExternalsPlugin} from './esbuild-plugins/renderer-externals-plugin';
+import {createStyledJsxBabelBridgePlugin} from './esbuild-plugins/styled-jsx-babel-bridge-plugin';
 
 export type BuildMode = 'development' | 'production';
 export type BuildTarget = 'hyper-app' | 'renderer' | 'cli';
