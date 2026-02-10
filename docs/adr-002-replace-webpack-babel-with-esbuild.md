@@ -111,10 +111,14 @@ once plugin and asset handling are validated.
 
 ### Loader and transform inventory for this repository
 
+The inventory below captures observed current-state behaviours and migration
+risks. It is intentionally descriptive rather than prescriptive so that
+implementation choices can evolve independently.
+
 | Current behaviour | Current implementation | esbuild-native replacement | Plugin or bespoke work |
 | --- | --- | --- | --- |
 | TypeScript + JSX compilation | `babel-loader` + `@babel/preset-typescript` + `@babel/preset-react` in `webpack.config.ts` and `babel.config.json` | esbuild parses and transforms TS/JSX natively[^esbuild][^esbuild-content] | No plugin expected |
-| `styled-jsx` scoping transform for `<style jsx>` and `<style jsx global>` | `styled-jsx/babel` plugin + JSX typings augmentation in `typings/styled-jsx.d.ts` | No first-party esbuild equivalent; `styled-jsx` documents Babel plugin integration[^styled-jsx-babel] | **Required**: targeted Babel bridge plugin or source rewrite |
+| `styled-jsx` scoping transform for `<style jsx>` and `<style jsx global>` | `styled-jsx/babel` plugin + JSX typings augmentation in `typings/styled-jsx.d.ts` | No first-party esbuild equivalent; `styled-jsx` documents Babel plugin integration[^styled-jsx-babel] | **Required**: targeted Babel bridge plugin for Phase 1; source rewrite is Phase 2+ |
 | Numeric separators, class properties, object rest/spread, optional chaining | Babel proposal plugins in `babel.config.json` | esbuild already supports these syntax features and can lower them by target[^esbuild-content] | No plugin expected |
 | CSS injection for renderer dependencies (xterm) | `style-loader` + `css-loader` in `webpack.config.ts` | esbuild CSS loader and bundling[^esbuild-content] | No plugin expected |
 | JSON module loading | `json-loader` in `webpack.config.ts` | esbuild JSON loader[^esbuild-content] | No plugin expected |
@@ -128,6 +132,21 @@ once plugin and asset handling are validated.
 | Webpack-specific runtime escape hatch | `__non_webpack_require__` in `lib/v8-snapshot-util.ts` | esbuild does not provide this identifier | **Required**: rewrite shim for bundler-agnostic runtime require |
 
 ### Required plugin and bespoke-transform analysis
+
+The subsection below is the proposed implementation approach for addressing the
+risks above. If implementation details change, this subsection should be
+updated without reclassifying the observed risk inventory.
+
+#### Phase scope for initial rollout
+
+- Phase 1 hard requirements:
+  - preserve `styled-jsx` compatibility (via a focused bridge transform);
+  - replace copy-only Webpack behaviours with an explicit copy pipeline;
+  - reproduce externals and ignore semantics used by renderer/CLI bundles;
+  - provide a CSP-safe replacement for the `__non_webpack_require__` shim;
+  - move to an esbuild JavaScript build entrypoint to host plugin logic.
+- Phase 2+ cleanups:
+  - rewrite `styled-jsx` usage to remove the remaining Babel bridge path.
 
 #### 1. `styled-jsx` transform path (highest migration risk)
 
