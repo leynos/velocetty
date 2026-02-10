@@ -90,5 +90,10 @@ is enabled in `tsconfig.base.json`.
 
 ### `Invalid header: Does not start with Cr24`
 
-This comes from `electron-devtools-installer` failing to download CRX files on
-Linux arm64. The app now logs a warning and continues to open.
+This usually indicates a stale `target/node_modules` tree still using an old
+`electron-devtools-installer` build. Refresh app dependencies and retry:
+
+```bash
+bun run build:hyper-app
+bun bin/run-electron-builder.cjs install-app-deps
+```
