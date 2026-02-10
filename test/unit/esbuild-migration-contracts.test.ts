@@ -3,7 +3,7 @@ import {mkdtemp, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 
-import {build as runEsbuildBuild} from 'esbuild';
+import {build as runEsbuildBuild, type BuildOptions} from 'esbuild';
 import {expect, test} from 'bun:test';
 
 import {copyHyperAppArtifacts, copyRendererArtifacts} from '../../build/esbuild/copy-artifacts';
@@ -27,6 +27,28 @@ const createTempDir = () => mkdtemp(path.join(tmpdir(), 'velocetty-esbuild-'));
 const writeFixtureFile = async (filePath: string, content: string) => {
   await mkdir(path.dirname(filePath), {recursive: true});
   await writeFile(filePath, content, 'utf8');
+};
+
+type PluginFixtureBuildOptions = Pick<BuildOptions, 'platform' | 'format' | 'plugins'>;
+
+const testPluginWithFixture = async (fixtureCode: string, buildOptions: PluginFixtureBuildOptions) => {
+  const rootDir = await createTempDir();
+  try {
+    const entryPoint = path.join(rootDir, 'entry.ts');
+    await writeFixtureFile(entryPoint, fixtureCode);
+
+    const buildResult = await runEsbuildBuild({
+      entryPoints: [entryPoint],
+      bundle: true,
+      write: false,
+      outfile: path.join(rootDir, 'bundle.js'),
+      ...buildOptions
+    });
+
+    return buildResult.outputFiles.find((file) => file.path.endsWith('.js'))?.text ?? '';
+  } finally {
+    await rm(rootDir, {recursive: true, force: true});
+  }
 };
 
 test('translation: styled-jsx bridge transforms JSX style blocks', async () => {
@@ -104,26 +126,12 @@ test('plugin validation: renderer externals map to legacy runtime require paths'
   const resolved = resolveRendererExternalPath('lodash');
   expect(resolved).toBe('./node_modules/lodash/lodash.js');
 
-  const rootDir = await createTempDir();
-  try {
-    const entryPoint = path.join(rootDir, 'entry.ts');
-    await writeFixtureFile(entryPoint, "import lodash from 'lodash'; console.log(lodash);");
-
-    const buildResult = await runEsbuildBuild({
-      entryPoints: [entryPoint],
-      bundle: true,
-      write: false,
-      outfile: path.join(rootDir, 'bundle.js'),
-      platform: 'browser',
-      format: 'iife',
-      plugins: [createRendererExternalsPlugin()]
-    });
-
-    const bundleOutput = buildResult.outputFiles.find((file) => file.path.endsWith('.js'))?.text ?? '';
-    expect(bundleOutput.includes('require("./node_modules/lodash/lodash.js")')).toBe(true);
-  } finally {
-    await rm(rootDir, {recursive: true, force: true});
-  }
+  const bundleOutput = await testPluginWithFixture("import lodash from 'lodash'; console.log(lodash);", {
+    platform: 'browser',
+    format: 'iife',
+    plugins: [createRendererExternalsPlugin()]
+  });
+  expect(bundleOutput.includes('require("./node_modules/lodash/lodash.js")')).toBe(true);
 });
 
 test('plugin validation: ignored imports remain unresolved externals', async () => {
@@ -131,26 +139,12 @@ test('plugin validation: ignored imports remain unresolved externals', async () 
   expect(shouldIgnoreImportPath('something.js.map')).toBe(true);
   expect(shouldIgnoreImportPath('react')).toBe(false);
 
-  const rootDir = await createTempDir();
-  try {
-    const entryPoint = path.join(rootDir, 'entry.ts');
-    await writeFixtureFile(entryPoint, "import spawnSync from 'spawn-sync'; console.log(spawnSync);");
-
-    const buildResult = await runEsbuildBuild({
-      entryPoints: [entryPoint],
-      bundle: true,
-      write: false,
-      outfile: path.join(rootDir, 'bundle.js'),
-      platform: 'node',
-      format: 'cjs',
-      plugins: [createIgnoreImportsPlugin()]
-    });
-
-    const bundleOutput = buildResult.outputFiles.find((file) => file.path.endsWith('.js'))?.text ?? '';
-    expect(bundleOutput.includes('require("spawn-sync")')).toBe(true);
-  } finally {
-    await rm(rootDir, {recursive: true, force: true});
-  }
+  const bundleOutput = await testPluginWithFixture("import spawnSync from 'spawn-sync'; console.log(spawnSync);", {
+    platform: 'node',
+    format: 'cjs',
+    plugins: [createIgnoreImportsPlugin()]
+  });
+  expect(bundleOutput.includes('require("spawn-sync")')).toBe(true);
 });
 
 test('plugin validation: node built-ins are externalized for runtime resolution', async () => {
@@ -158,26 +152,12 @@ test('plugin validation: node built-ins are externalized for runtime resolution'
   expect(isNodeBuiltinImport('fs')).toBe(true);
   expect(isNodeBuiltinImport('lodash')).toBe(false);
 
-  const rootDir = await createTempDir();
-  try {
-    const entryPoint = path.join(rootDir, 'entry.ts');
-    await writeFixtureFile(entryPoint, "import fs from 'node:fs'; console.log(Boolean(fs));");
-
-    const buildResult = await runEsbuildBuild({
-      entryPoints: [entryPoint],
-      bundle: true,
-      write: false,
-      outfile: path.join(rootDir, 'bundle.js'),
-      platform: 'browser',
-      format: 'iife',
-      plugins: [createNodeBuiltinsPlugin()]
-    });
-
-    const bundleOutput = buildResult.outputFiles.find((file) => file.path.endsWith('.js'))?.text ?? '';
-    expect(bundleOutput.includes('require("node:fs")')).toBe(true);
-  } finally {
-    await rm(rootDir, {recursive: true, force: true});
-  }
+  const bundleOutput = await testPluginWithFixture("import fs from 'node:fs'; console.log(Boolean(fs));", {
+    platform: 'browser',
+    format: 'iife',
+    plugins: [createNodeBuiltinsPlugin()]
+  });
+  expect(bundleOutput.includes('require("node:fs")')).toBe(true);
 });
 
 test('translation: build options keep source maps in development and minify in production', () => {
