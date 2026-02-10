@@ -3,6 +3,7 @@ import type {Plugin} from 'esbuild';
 
 import {rendererExternalRequireMap, type RendererExternalModule} from '../constants';
 
+/** Narrows arbitrary module ids to known renderer external mappings. */
 const isRendererExternalModule = (moduleName: string): moduleName is RendererExternalModule => {
   return Object.hasOwn(rendererExternalRequireMap, moduleName);
 };

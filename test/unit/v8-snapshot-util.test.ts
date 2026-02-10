@@ -119,47 +119,64 @@ const testSnapshotBootstrap = async (
   return {moduleContainer, runtimeRequire, snapshotResult, setGlobalsCalls};
 };
 
+const assertSnapshotBootstrapResult = ({
+  moduleContainer,
+  runtimeRequire,
+  snapshotResult,
+  setGlobalsCalls,
+  virtualModuleName
+}: {
+  moduleContainer: ModuleContainer;
+  runtimeRequire: (moduleName: string) => unknown;
+  snapshotResult: SnapshotResultShape;
+  setGlobalsCalls: unknown[][];
+  virtualModuleName: string;
+}) => {
+  const loadedVirtualModule = moduleContainer._load(virtualModuleName);
+  const loadedNativeModule = moduleContainer._load('native:module');
+
+  expect(loadedVirtualModule).toBe(`custom:${virtualModuleName}`);
+  expect(loadedNativeModule).toEqual({native: 'native:module'});
+  expect(snapshotResult.customRequire.cache[virtualModuleName]).toEqual({
+    exports: `custom:${virtualModuleName}`
+  });
+  expect(setGlobalsCalls).toHaveLength(1);
+  expect(setGlobalsCalls[0].at(-1)).toBe(runtimeRequire);
+};
+
 afterEach(() => {
   cleanupGlobals();
 });
 
-test('uses runtime require and snapshot cache/definitions when available', async () => {
-  const {moduleContainer, runtimeRequire, snapshotResult, setGlobalsCalls} = await testSnapshotBootstrap(
-    'virtual:plugin',
-    'bootstrap_case',
-    'global'
-  );
+const snapshotBootstrapCases = [
+  {
+    testName: 'uses runtime require and snapshot cache/definitions when available',
+    virtualModuleName: 'virtual:plugin',
+    testCaseName: 'bootstrap_case',
+    requireLocation: 'global' as const
+  },
+  {
+    testName: 'falls back to window.require when global require is unavailable',
+    virtualModuleName: 'virtual:renderer',
+    testCaseName: 'window_require_case',
+    requireLocation: 'window' as const
+  }
+];
 
-  const loadedVirtualModule = moduleContainer._load('virtual:plugin');
-  const loadedNativeModule = moduleContainer._load('native:module');
+for (const snapshotBootstrapCase of snapshotBootstrapCases) {
+  test(snapshotBootstrapCase.testName, async () => {
+    const snapshotBootstrapResult = await testSnapshotBootstrap(
+      snapshotBootstrapCase.virtualModuleName,
+      snapshotBootstrapCase.testCaseName,
+      snapshotBootstrapCase.requireLocation
+    );
 
-  expect(loadedVirtualModule).toBe('custom:virtual:plugin');
-  expect(loadedNativeModule).toEqual({native: 'native:module'});
-  expect(snapshotResult.customRequire.cache['virtual:plugin']).toEqual({
-    exports: 'custom:virtual:plugin'
+    assertSnapshotBootstrapResult({
+      ...snapshotBootstrapResult,
+      virtualModuleName: snapshotBootstrapCase.virtualModuleName
+    });
   });
-  expect(setGlobalsCalls).toHaveLength(1);
-  expect(setGlobalsCalls[0].at(-1)).toBe(runtimeRequire);
-});
-
-test('falls back to window.require when global require is unavailable', async () => {
-  const {moduleContainer, runtimeRequire, snapshotResult, setGlobalsCalls} = await testSnapshotBootstrap(
-    'virtual:renderer',
-    'window_require_case',
-    'window'
-  );
-
-  const loadedVirtualModule = moduleContainer._load('virtual:renderer');
-  const loadedNativeModule = moduleContainer._load('native:module');
-
-  expect(loadedVirtualModule).toBe('custom:virtual:renderer');
-  expect(loadedNativeModule).toEqual({native: 'native:module'});
-  expect(snapshotResult.customRequire.cache['virtual:renderer']).toEqual({
-    exports: 'custom:virtual:renderer'
-  });
-  expect(setGlobalsCalls).toHaveLength(1);
-  expect(setGlobalsCalls[0].at(-1)).toBe(runtimeRequire);
-});
+}
 
 test('throws when snapshot bootstrap cannot find runtime require', async () => {
   setupSnapshotGlobals({

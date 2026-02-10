@@ -23,15 +23,19 @@ import {
   usesStyledJsx
 } from '../../build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin';
 
+/** Creates an isolated temporary directory for build fixture tests. */
 const createTempDir = () => mkdtemp(path.join(tmpdir(), 'velocetty-esbuild-'));
 
+/** Writes fixture source content, creating parent directories as needed. */
 const writeFixtureFile = async (filePath: string, content: string) => {
   await mkdir(path.dirname(filePath), {recursive: true});
   await writeFile(filePath, content, 'utf8');
 };
 
+/** Minimal esbuild options used by plugin fixture tests. */
 type PluginFixtureBuildOptions = Pick<BuildOptions, 'platform' | 'format' | 'plugins'>;
 
+/** Builds an inline fixture and returns the emitted JavaScript output text. */
 const testPluginWithFixture = async (fixtureCode: string, buildOptions: PluginFixtureBuildOptions) => {
   const rootDir = await createTempDir();
   try {
@@ -110,13 +114,19 @@ test('packaging: hyper-app and renderer copy flows preserve required files', asy
     });
 
     const copiedHtml = await readFile(path.join(rootDir, 'target', 'index.html'), 'utf8');
+    const copiedPackageJson = await readFile(path.join(rootDir, 'target', 'package.json'), 'utf8');
+    const copiedTsconfig = await readFile(path.join(rootDir, 'target', 'tsconfig.json'), 'utf8');
     const copiedConfig = await readFile(path.join(rootDir, 'target', 'config', 'schema.json'), 'utf8');
     const copiedKeymap = await readFile(path.join(rootDir, 'target', 'keymaps', 'linux.json'), 'utf8');
+    const copiedStaticIcon = await readFile(path.join(rootDir, 'target', 'static', 'icon.png'), 'utf8');
     const copiedAsset = await readFile(path.join(rootDir, 'target', 'renderer', 'assets', 'icons.svg'), 'utf8');
 
     expect(copiedHtml).toBe('<html></html>');
+    expect(copiedPackageJson).toBe('{"name":"fixture"}');
+    expect(copiedTsconfig).toBe('{"extends":"../tsconfig.base.json"}');
     expect(copiedConfig).toBe('{"type":"object"}');
     expect(copiedKeymap).toBe('{"key":"value"}');
+    expect(copiedStaticIcon).toBe('png-data');
     expect(copiedAsset).toBe('<svg></svg>');
   } finally {
     await rm(rootDir, {recursive: true, force: true});
@@ -216,18 +226,25 @@ test('translation: build options keep source maps in development and minify in p
 });
 
 test('translation: styled-jsx usage detection only flags matching files', () => {
-  expect(usesStyledJsx('<style jsx={true}>{``}</style>')).toBe(true);
-  expect(usesStyledJsx('<style jsx>{``}</style>')).toBe(true);
-  expect(usesStyledJsx('<style jsx global>{``}</style>')).toBe(true);
-  expect(
-    usesStyledJsx(`<style
+  const detectionCases = [
+    {source: '<style jsx={true}>{``}</style>', expected: true},
+    {source: '<style jsx>{``}</style>', expected: true},
+    {source: '<style jsx global>{``}</style>', expected: true},
+    {
+      source: `<style
   jsx
   global={true}
->{\`\`}</style>`)
-  ).toBe(true);
-  expect(usesStyledJsx('<style jsxx>{``}</style>')).toBe(false);
-  expect(usesStyledJsx('<style data-jsx>{``}</style>')).toBe(false);
-  expect(usesStyledJsx('<style>{``}</style>')).toBe(false);
+>{\`\`}</style>`,
+      expected: true
+    },
+    {source: '<style jsxx>{``}</style>', expected: false},
+    {source: '<style data-jsx>{``}</style>', expected: false},
+    {source: '<style>{``}</style>', expected: false}
+  ];
+
+  for (const detectionCase of detectionCases) {
+    expect(usesStyledJsx(detectionCase.source)).toBe(detectionCase.expected);
+  }
 });
 
 test('translation: styled-jsx transform emits inline source maps when requested', async () => {
@@ -249,6 +266,7 @@ test('translation: styled-jsx transform emits inline source maps when requested'
 test('translation: esbuild handles shebang-bearing dependencies without shebang-loader', async () => {
   const rootDir = await createTempDir();
   try {
+    // This fixture intentionally uses a Node shebang to match third-party package output.
     await writeFixtureFile(
       path.join(rootDir, 'node_modules', 'rc', 'index.js'),
       ['#!/usr/bin/env node', 'module.exports = {name: "rc"};'].join('\n')

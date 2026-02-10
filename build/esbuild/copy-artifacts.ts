@@ -2,15 +2,18 @@
 import {cp, mkdir, readdir, rm} from 'node:fs/promises';
 import path from 'node:path';
 
+/** Paths used by copy operations, rooted at the repository directory by default. */
 type CopyOptions = {
   rootDir?: string;
   targetDir?: string;
 };
 
+/** Returns true when a filesystem error indicates a missing file or directory. */
 const isNotFoundError = (error: unknown): error is NodeJS.ErrnoException => {
   return (error as NodeJS.ErrnoException).code === 'ENOENT';
 };
 
+/** Lists files with the requested extension in deterministic lexical order. */
 const sortedFileNames = async (directoryPath: string, extension: string) => {
   const entries = await readdir(directoryPath, {withFileTypes: true});
   return entries
@@ -19,6 +22,7 @@ const sortedFileNames = async (directoryPath: string, extension: string) => {
     .sort((left, right) => left.localeCompare(right));
 };
 
+/** Copies a single file and optionally tolerates missing source paths. */
 const copySingleFile = async (sourcePath: string, targetPath: string, allowMissing = false) => {
   try {
     await cp(sourcePath, targetPath, {force: true});
@@ -30,6 +34,7 @@ const copySingleFile = async (sourcePath: string, targetPath: string, allowMissi
   }
 };
 
+/** Copies all files with a matching extension from source to target. */
 const copyFilesByExtension = async (
   sourceDirectory: string,
   targetDirectory: string,
@@ -52,6 +57,7 @@ const copyFilesByExtension = async (
   }
 };
 
+/** Copies an entire directory tree and optionally tolerates missing sources. */
 const copyDirectory = async (sourceDirectory: string, targetDirectory: string, allowMissing = false) => {
   try {
     await mkdir(path.dirname(targetDirectory), {recursive: true});
