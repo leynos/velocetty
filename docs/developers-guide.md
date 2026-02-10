@@ -88,6 +88,20 @@ issues caused by problematic GPU drivers:
 When this switch is enabled, the main process disables hardware acceleration
 before Electron readiness and applies software-rendering Chromium flags.
 
+## Chromium startup log noise suppression
+
+Electron 40 on Linux can emit repetitive Chromium DBus startup alerts during
+local runs, including transient `StartTransientUnit` scope collisions. The app
+now sets Chromium `log-level=3` at startup by default to suppress this known
+noise.
+
+Use environment variables to adjust this behaviour:
+
+- `VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS=0 bun run app` keeps Chromium error
+  logs enabled.
+- `VELOCETTY_CHROMIUM_LOG_LEVEL=2 bun run app` overrides the default Chromium
+  log level used for suppression.
+
 ## React version alignment
 
 The renderer runtime depends on React in both the root `package.json` and the
