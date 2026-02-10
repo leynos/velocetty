@@ -78,7 +78,15 @@ Scope notes:
 - [x] 1.4.10. Migrate to React 19.x (see adr-003)
 - [x] 1.4.11. Migrate to Electron 28 (see adr-004)
 - [x] 1.4.12. Migrate to Electron 34 (see adr-004)
-- [ ] 1.4.13. Migrate to Electron 40 (see adr-004)
+- [x] 1.4.13. Migrate to Electron 40 (see adr-004). See
+  [velocetty-design.md](velocetty-design.md) §Host migration: Electron to
+  Tauri and
+  [adr-004-update-electron-40.md](adr-004-update-electron-40.md)
+  §Phase 3: Electron 40 validation.
+  - [x] Align runtime anchors (`electron`, `electron-mksnapshot`,
+    `@types/node`, rebuild target, and CI Node baseline).
+  - [x] Success criteria: `bun install`, `make build`, `make check-fmt`,
+    `make lint`, and `make test` pass.
 
 ## 2. Rendering overhaul
 

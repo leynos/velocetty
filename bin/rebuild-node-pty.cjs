@@ -5,6 +5,34 @@ const fs = require('node:fs');
 const repoRoot = path.resolve(__dirname, '..');
 const moduleRoot = path.join(repoRoot, 'target', 'node_modules', 'node-pty');
 const nodeGypPath = path.join(repoRoot, 'node_modules', 'node-gyp', 'bin', 'node-gyp.js');
+const packageJsonPath = path.join(repoRoot, 'package.json');
+
+const normalizeVersion = (value) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  // npm ranges like ^40.2.1 are invalid for node-gyp --target.
+  return value.replace(/^[^\d]*/, '');
+};
+
+const readElectronTargetFromPackageJson = () => {
+  if (!fs.existsSync(packageJsonPath)) {
+    return '';
+  }
+
+  try {
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    return normalizeVersion(packageJson?.devDependencies?.electron);
+  } catch (error) {
+    const details = error instanceof Error ? error.message : String(error);
+    console.error(`Failed to parse ${packageJsonPath}: ${details}`);
+    return '';
+  }
+};
+
+const electronTarget =
+  normalizeVersion(process.env.npm_package_devDependencies_electron) || readElectronTargetFromPackageJson();
 
 if (!fs.existsSync(moduleRoot)) {
   console.error(`node-pty module not found at ${moduleRoot}. Run bun install first.`);
@@ -16,13 +44,18 @@ if (!fs.existsSync(nodeGypPath)) {
   process.exit(1);
 }
 
+if (!electronTarget) {
+  console.error(`Unable to determine Electron target version from npm env or ${packageJsonPath}.`);
+  process.exit(1);
+}
+
 const result = spawnSync(
   process.execPath,
   [
     nodeGypPath,
     'rebuild',
     '--runtime=electron',
-    `--target=${process.env.npm_package_devDependencies_electron || '34.5.8'}`,
+    `--target=${electronTarget}`,
     '--dist-url=https://www.electronjs.org/headers',
     '--build-from-source',
     '--verbose'
