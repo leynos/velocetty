@@ -122,7 +122,7 @@ once plugin and asset handling are validated.
 | "Copy-only" `hyper-app` bundle that discards entry code | `null-loader` on app entry in `webpack.config.ts` | No direct equivalent | **Required**: replace with explicit copy pipeline |
 | Shebang handling for CLI dependency edge case | `shebang-loader` for `node_modules/rc/index.js` | esbuild understands hashbang grammar[^esbuild-content] | **Likely bespoke**: verify output; add `banner` fallback if needed[^esbuild-api] |
 | Build-time constants | `DefinePlugin` (`process.env.NODE_ENV`) | esbuild `define` option[^esbuild-api] | No plugin expected |
-| Ignoring sourcemap and `spawn-sync` imports | `IgnorePlugin` | esbuild `external` patterns and/or resolve filtering[^esbuild-api] | Possible small bespoke resolver plugin |
+| Ignoring source map and `spawn-sync` imports | `IgnorePlugin` | esbuild `external` patterns and/or resolve filtering[^esbuild-api] | Possible small bespoke resolver plugin |
 | Renderer externals with explicit `require("./node_modules/...")` paths | Webpack `externals` object in `webpack.config.ts` | esbuild supports externals, but path mapping semantics must be reproduced carefully[^esbuild-api] | **Required**: bespoke import-path mapping (likely `onResolve`) |
 | Production minification/no comments | `TerserPlugin` + post-bundle Babel CLI minify in `package.json` | esbuild `minify` and `legalComments` options[^esbuild-api] | No plugin expected |
 | Webpack-specific runtime escape hatch | `__non_webpack_require__` in `lib/v8-snapshot-util.ts` | esbuild does not provide this identifier | **Required**: rewrite shim for bundler-agnostic runtime require |
@@ -172,8 +172,11 @@ once plugin and asset handling are validated.
 - Why this is risky:
   - That identifier is Webpack-specific and will not exist in esbuild output.
 - Recommended migration path:
-  - Rewrite the shim to use a bundler-agnostic runtime require escape hatch
-    (for example `eval('require')`) and isolate it behind one utility module.
+  - Rewrite the shim to use a CSP-safe runtime require path (for example,
+    `createRequire` from `node:module`, or a preload/main-injected require
+    reference) and isolate it behind one utility module.
+  - Avoid `eval` or `Function`-based require escape hatches because they are
+    incompatible with a `script-src` policy that omits `'unsafe-eval'`.
   - Add an integration test that validates snapshot bootstrap in production
     renderer builds.
 
@@ -189,7 +192,7 @@ once plugin and asset handling are validated.
 - Recommended migration path:
   - Implement one small `onResolve` plugin to normalize these cases:
     - map selected imports to the exact runtime `require` path shape used today;
-    - mark `spawn-sync` and sourcemap artefacts external/ignored.
+    - mark `spawn-sync` and source map artefacts external/ignored.
   - Validate with smoke tests that runtime dependency loading is unchanged.
 
 #### 5. Build API adoption risk
@@ -217,10 +220,10 @@ requirements are implemented and passing in CI.
 | --- | --- | --- |
 | `styled-jsx` transform parity | No assertions that `<style jsx>` and `<style jsx global>` compile to equivalent runtime styling under the new pipeline | Add renderer integration tests that build with esbuild and verify scoped and global style application in representative components |
 | Static copy and copy-only flow (`hyper-app`) | No contract tests for copied artefacts currently managed by `copy-webpack-plugin` and `null-loader` | Add build contract tests that assert required files and directory structure in `target/` after build |
-| Externals/ignore mapping | No tests that prove require path shape and ignored modules (`spawn-sync`, sourcemap artefacts) remain correct | Add bundle inspection tests and runtime smoke tests for modules currently in Webpack `externals` and `IgnorePlugin` rules |
+| Externals/ignore mapping | No tests that prove require path shape and ignored modules (`spawn-sync`, source map artefacts) remain correct | Add bundle inspection tests and runtime smoke tests for modules currently in Webpack `externals` and `IgnorePlugin` rules |
 | Snapshot bootstrap shim | No migration-era test for replacing `__non_webpack_require__` semantics | Add production-mode integration test that boots renderer snapshot path and confirms module loading succeeds |
 | CLI shebang behaviour | No assertion that bundled CLI output preserves executable shebang behaviour after removing `shebang-loader` | Add CLI artefact test that checks shebang presence/position and executes a basic command path |
-| Minification/source-map expectations | No explicit contract test for production minification and development source-map quality after switching off Terser/Babel post-pass | Add build mode tests that assert minified production output properties and development source-map availability |
+| Minification/source map expectations | No explicit contract test for production minification and development source map quality after switching off Terser/Babel post-pass | Add build mode tests that assert minified production output properties and development source map availability |
 
 Required CI acceptance criteria for migration PRs:
 
