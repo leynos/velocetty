@@ -131,6 +131,9 @@ implementation choices can evolve independently.
 | Production minification/no comments | `TerserPlugin` + post-bundle Babel CLI minify in `package.json` | esbuild `minify` and `legalComments` options[^esbuild-api] | No plugin expected |
 | Webpack-specific runtime escape hatch | `__non_webpack_require__` in `lib/v8-snapshot-util.ts` | esbuild does not provide this identifier | **Required**: rewrite shim for bundler-agnostic runtime require |
 
+Table 2: Loader/transform inventory - current Webpack/Babel behaviours,
+esbuild-native replacements, and required plugin or bespoke work.
+
 ### Required plugin and bespoke-transform analysis
 
 The subsection below is the proposed implementation approach for addressing the
@@ -244,6 +247,8 @@ requirements are implemented and passing in CI.
 | Snapshot bootstrap shim | No migration-era test for replacing `__non_webpack_require__` semantics | Add production-mode integration test that boots renderer snapshot path and confirms module loading succeeds |
 | CLI shebang behaviour | No assertion that bundled CLI output preserves executable shebang behaviour after removing `shebang-loader` | Add CLI artefact test that checks shebang presence/position and executes a basic command path |
 | Minification/source map expectations | No explicit contract test for production minification and development source map quality after switching off Terser/Babel post-pass | Add build mode tests that assert minified production output properties and development source map availability |
+
+Table 3: Validation gaps and required tests for the esbuild migration.
 
 Required CI acceptance criteria for migration PRs:
 
