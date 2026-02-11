@@ -7,7 +7,6 @@
   },
   "include": [
     "./**/*",
-    "../lib/**/*.ts",
     "./package.json",
     "../typings/extend-electron.d.ts",
     "../typings/ext-modules.d.ts",
