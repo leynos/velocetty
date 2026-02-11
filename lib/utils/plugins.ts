@@ -16,7 +16,6 @@ import pathModule from 'node:path';
 import React, {PureComponent} from 'react';
 import type {ComponentType} from 'react';
 
-import {require as remoteRequire} from '@electron/remote';
 // TODO: Should be updates to new async API https://medium.com/@nornagon/electrons-remote-module-considered-harmful-70d69500f31
 import ReactDOM from 'react-dom';
 import {connect as reduxConnect} from 'react-redux';
@@ -41,11 +40,12 @@ import Notification from '../components/notification';
 import IPCChildProcess from './ipc-child-process';
 import notify from './notify';
 import {ObjectTypedKeys} from './object';
+import {loadRemotePluginsModule} from './remote-plugins';
 
 type ConnectOptions = NonNullable<Parameters<typeof reduxConnect>[3]>;
 
 // remote interface to `../plugins`
-const plugins = remoteRequire('./plugins') as typeof import('../../app/plugins');
+const plugins = loadRemotePluginsModule();
 
 // `require`d modules
 let modules: hyperPlugin[];

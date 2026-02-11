@@ -39,6 +39,11 @@ import {configureGpuMode} from './utils/configure-gpu';
 import * as windowUtils from './utils/window-utils';
 
 const windowSet = new Set<BrowserWindow>([]);
+type VelocettyRuntimeGlobal = typeof globalThis & {__velocettyAppRoot?: string};
+
+// Expose app root so renderer remote module lookups can resolve app-side
+// modules without depending on renderer bundle location.
+(global as VelocettyRuntimeGlobal).__velocettyAppRoot = isDev ? __dirname : app.getAppPath();
 
 // expose to plugins
 app.config = config;

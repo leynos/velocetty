@@ -31,6 +31,7 @@ const windowTimeoutMs = 10_000;
 const rendererReadyTimeoutMs = 12_000;
 const closeTimeoutMs = 5_000;
 const spawnStabilityTimeoutMs = 1_000;
+const developmentAppLaunchArgs = ['node_modules/electron/cli.js', 'target'];
 const shouldCapture = process.env.E2E_CAPTURE === '1';
 const debugE2E = process.env.E2E_DEBUG === '1';
 const driverOverride = process.env.E2E_DRIVER;
@@ -39,6 +40,57 @@ if (shouldRunE2E && driverOverride && !validDrivers.has(driverOverride)) {
   throw new Error(`E2E_DRIVER must be "playwright" or "spawn", received "${driverOverride}".`);
 }
 const shouldUsePlaywright = driverOverride === 'playwright';
+
+const createSpawnOutputTracker = () => {
+  let spawnOutput = '';
+  let outputWatchers: Array<{matcher: RegExp; resolve: () => void}> = [];
+
+  const notifyOutputWatchers = () => {
+    outputWatchers.forEach((watcher) => {
+      if (watcher.matcher.test(spawnOutput)) {
+        watcher.resolve();
+      }
+    });
+  };
+
+  const appendOutputChunk = (chunk: string) => {
+    spawnOutput += chunk;
+    notifyOutputWatchers();
+  };
+
+  const waitForSpawnOutput = async (matcher: RegExp, timeoutMs: number) =>
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        if (matcher.test(spawnOutput)) {
+          resolve();
+          return;
+        }
+        const watcher = {
+          matcher,
+          resolve: () => {
+            outputWatchers = outputWatchers.filter((entry) => entry !== watcher);
+            resolve();
+          }
+        };
+        outputWatchers.push(watcher);
+      }),
+      timeoutMs
+    );
+
+  const extractCriticalRendererErrors = () =>
+    spawnOutput
+      .split('\n')
+      .filter((line) => line.includes('[e2e][renderer-error]') && line.trim().length > 0)
+      .map((line) => extractRendererErrorMessage(line))
+      .filter((message) => !isNonCriticalRendererError(message));
+
+  return {
+    appendOutputChunk,
+    extractCriticalRendererErrors,
+    getOutput: () => spawnOutput,
+    waitForSpawnOutput
+  };
+};
 
 e2eTest(
   'launches the packaged app',
@@ -55,33 +107,7 @@ e2eTest(
     let spawned: ReturnType<typeof spawn> | null = null;
     let rendererConsoleMonitor: ReturnType<typeof startRendererConsoleMonitor> | null = null;
     const isolatedEnvironment = await createIsolatedE2EEnvironment();
-    let spawnOutput = '';
-    let outputWatchers: Array<{matcher: RegExp; resolve: () => void}> = [];
-    const notifyOutputWatchers = () => {
-      outputWatchers.forEach((watcher) => {
-        if (watcher.matcher.test(spawnOutput)) {
-          watcher.resolve();
-        }
-      });
-    };
-    const waitForSpawnOutput = async (matcher: RegExp, timeoutMs: number) =>
-      await withTimeout(
-        new Promise<void>((resolve) => {
-          if (matcher.test(spawnOutput)) {
-            resolve();
-            return;
-          }
-          const watcher = {
-            matcher,
-            resolve: () => {
-              outputWatchers = outputWatchers.filter((entry) => entry !== watcher);
-              resolve();
-            }
-          };
-          outputWatchers.push(watcher);
-        }),
-        timeoutMs
-      );
+    const outputTracker = createSpawnOutputTracker();
     try {
       const {pathToBinary, launchArgs} = resolveLaunchConfig();
       if (!(await fs.pathExists(pathToBinary))) {
@@ -115,16 +141,14 @@ e2eTest(
         });
         spawned.stdout?.on('data', (data) => {
           const chunk = data.toString();
-          spawnOutput += chunk;
-          notifyOutputWatchers();
+          outputTracker.appendOutputChunk(chunk);
           if (debugE2E) {
             process.stdout.write(chunk);
           }
         });
         spawned.stderr?.on('data', (data) => {
           const chunk = data.toString();
-          spawnOutput += chunk;
-          notifyOutputWatchers();
+          outputTracker.appendOutputChunk(chunk);
           if (debugE2E) {
             process.stderr.write(chunk);
           }
@@ -141,8 +165,8 @@ e2eTest(
           launchTimeoutMs
         );
         log(`Spawned Electron PID: ${spawned.pid ?? 'unknown'}.`);
-        await waitForSpawnOutput(/running in prod mode|electron will open/i, windowTimeoutMs);
-        await waitForSpawnOutput(/\[e2e\] renderer-ready/i, rendererReadyTimeoutMs);
+        await outputTracker.waitForSpawnOutput(/running in prod mode|electron will open/i, windowTimeoutMs);
+        await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, rendererReadyTimeoutMs);
         await withTimeout(
           new Promise<void>((resolve) => {
             setTimeout(() => resolve(), spawnStabilityTimeoutMs);
@@ -150,14 +174,9 @@ e2eTest(
           spawnStabilityTimeoutMs + 100
         );
         if (spawned.exitCode != null) {
-          throw new Error(`Electron exited early with code ${spawned.exitCode}. Output:\n${spawnOutput}`);
+          throw new Error(`Electron exited early with code ${spawned.exitCode}. Output:\n${outputTracker.getOutput()}`);
         }
-        const rendererErrorLines = spawnOutput
-          .split('\n')
-          .filter((line) => line.includes('[e2e][renderer-error]') && line.trim().length > 0)
-          .map((line) => extractRendererErrorMessage(line))
-          .filter((message) => !isNonCriticalRendererError(message));
-        expect(rendererErrorLines).toHaveLength(0);
+        expect(outputTracker.extractCriticalRendererErrors()).toHaveLength(0);
       }
     } finally {
       rendererConsoleMonitor?.stop();
@@ -194,6 +213,73 @@ e2eTest(
           console.warn('E2E cleanup timed out; force-killed Electron.', error);
         }
       }
+      if (spawned) {
+        spawned.kill('SIGTERM');
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        if (spawned.exitCode == null) {
+          spawned.kill('SIGKILL');
+        }
+      }
+      await isolatedEnvironment.cleanup();
+    }
+  },
+  e2eTimeoutMs
+);
+
+e2eTest(
+  'launches the development target without critical renderer errors',
+  async () => {
+    const isolatedEnvironment = await createIsolatedE2EEnvironment();
+    const outputTracker = createSpawnOutputTracker();
+    let spawned: ReturnType<typeof spawn> | null = null;
+
+    try {
+      spawned = spawn(process.execPath, developmentAppLaunchArgs, {
+        cwd: process.cwd(),
+        env: {
+          ...isolatedEnvironment.env,
+          RUN_E2E: '1',
+          ELECTRONMON_LOGLEVEL: 'error'
+        },
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+
+      spawned.stdout?.on('data', (data) => {
+        outputTracker.appendOutputChunk(data.toString());
+      });
+      spawned.stderr?.on('data', (data) => {
+        outputTracker.appendOutputChunk(data.toString());
+      });
+
+      await withTimeout(
+        new Promise<void>((resolve, reject) => {
+          if (spawned?.pid) {
+            resolve();
+            return;
+          }
+          spawned?.once('error', reject);
+          spawned?.once('spawn', () => resolve());
+        }),
+        launchTimeoutMs
+      );
+
+      await outputTracker.waitForSpawnOutput(/running in dev mode|electron will open/i, windowTimeoutMs);
+      await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, rendererReadyTimeoutMs);
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          setTimeout(() => resolve(), spawnStabilityTimeoutMs);
+        }),
+        spawnStabilityTimeoutMs + 100
+      );
+
+      if (spawned.exitCode != null) {
+        throw new Error(
+          `Development Electron exited early with code ${spawned.exitCode}. Output:\n${outputTracker.getOutput()}`
+        );
+      }
+
+      expect(outputTracker.extractCriticalRendererErrors()).toHaveLength(0);
+    } finally {
       if (spawned) {
         spawned.kill('SIGTERM');
         await new Promise((resolve) => setTimeout(resolve, 500));
