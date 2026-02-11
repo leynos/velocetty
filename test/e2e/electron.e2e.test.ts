@@ -32,7 +32,10 @@ const rendererReadyTimeoutMs = 12_000;
 const developmentRendererReadyTimeoutMs = 20_000;
 const closeTimeoutMs = 5_000;
 const spawnStabilityTimeoutMs = 1_000;
-const developmentAppLaunchArgs = ['node_modules/electron/cli.js', 'target'];
+const developmentAppLaunchArgs =
+  process.platform === 'linux' && (process.env.CI === 'true' || process.env.ELECTRON_DISABLE_SANDBOX === '1')
+    ? ['node_modules/electron/cli.js', '--no-sandbox', '--disable-setuid-sandbox', 'target']
+    : ['node_modules/electron/cli.js', 'target'];
 const shouldCapture = process.env.E2E_CAPTURE === '1';
 const debugE2E = process.env.E2E_DEBUG === '1';
 const driverOverride = process.env.E2E_DRIVER;
