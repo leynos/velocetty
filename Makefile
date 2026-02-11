@@ -1,4 +1,4 @@
-.PHONY: all check-fmt typecheck lint test coverage build clean markdownlint nixie
+.PHONY: all check-fmt typecheck lint test coverage build build-fast clean markdownlint nixie
 
 MDLINT ?= markdownlint-cli2
 XARGS_R := $(shell if xargs --help 2>&1 | grep -q '\\-r'; then printf -- '-r'; fi)
@@ -23,6 +23,9 @@ coverage:
 
 build:
 	bun run build && bun bin/run-electron-builder.cjs
+
+build-fast:
+	bun run build && bun bin/run-electron-builder.cjs --dir
 
 clean:
 	bun run clean
