@@ -270,7 +270,7 @@ const captureE2EScreenshot = async (app: ElectronApplication) => {
       2_000
     );
     if (encodedImage) {
-      await fs.writeFile(`dist/tmp/${process.platform}_test.png`, Buffer.from(encodedImage, 'base64'));
+      await fs.outputFile(`dist/tmp/${process.platform}_test.png`, Buffer.from(encodedImage, 'base64'));
     }
   } catch (error) {
     console.warn('Skipping E2E screenshot capture:', error);
