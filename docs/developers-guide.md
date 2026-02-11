@@ -99,12 +99,12 @@ noise.
 
 Use environment variables to adjust this behaviour:
 
-- `VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS=0 bun run app` keeps Chromium error
-  logs enabled.
-- `VELOCETTY_CHROMIUM_LOG_LEVEL=2 bun run app` overrides the default Chromium
-  log level used for suppression.
-- `VELOCETTY_GPU_DIAGNOSTICS=1 bun run app` emits GPU launch diagnostics in
-  stdout.
+- `VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS=0 bun run app`
+  keeps Chromium error logs enabled.
+- `VELOCETTY_CHROMIUM_LOG_LEVEL=2 bun run app`
+  overrides the default Chromium log level used for suppression.
+- `VELOCETTY_GPU_DIAGNOSTICS=1 bun run app`
+  emits GPU launch diagnostics in stdout.
 
 ## React version alignment
 
