@@ -2,10 +2,9 @@
 import path from 'node:path';
 
 import {getGlobal, require as remoteRequire} from '@electron/remote';
+import type {VelocettyRuntimeGlobals} from '../../typings/runtime-globals';
 
-export type VelocettyRuntimeGlobals = {
-  __velocettyAppRoot?: string;
-};
+export type {VelocettyRuntimeGlobals};
 
 const getCandidatePluginModulePaths = (): string[] => {
   const appRootPath = getGlobal('__velocettyAppRoot') as VelocettyRuntimeGlobals['__velocettyAppRoot'];

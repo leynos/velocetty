@@ -30,7 +30,7 @@ import {app, BrowserWindow, Menu, screen, session} from 'electron';
 import isDev from 'electron-is-dev';
 import {gitDescribe} from 'git-describe';
 import parseUrl from 'parse-url';
-import type {VelocettyRuntimeGlobals} from '../lib/utils/remote-plugins';
+import type {VelocettyRuntimeGlobals} from '../typings/runtime-globals';
 
 import * as AppMenu from './menus/menu';
 import * as plugins from './plugins';
