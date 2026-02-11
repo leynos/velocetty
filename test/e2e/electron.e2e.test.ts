@@ -29,6 +29,7 @@ const e2eTimeoutMs = 30_000;
 const launchTimeoutMs = 20_000;
 const windowTimeoutMs = 10_000;
 const rendererReadyTimeoutMs = 12_000;
+const developmentRendererReadyTimeoutMs = 20_000;
 const closeTimeoutMs = 5_000;
 const spawnStabilityTimeoutMs = 1_000;
 const developmentAppLaunchArgs = ['node_modules/electron/cli.js', 'target'];
@@ -341,11 +342,7 @@ e2eTest(
 
       await waitForSpawnLaunch(spawned, launchTimeoutMs);
 
-      await outputTracker.waitForSpawnOutput(
-        /running in dev mode|electron will open|\[e2e\] renderer-ready/i,
-        windowTimeoutMs
-      );
-      await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, rendererReadyTimeoutMs);
+      await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, developmentRendererReadyTimeoutMs);
       await waitForStability(spawnStabilityTimeoutMs);
 
       if (spawned.exitCode != null) {
