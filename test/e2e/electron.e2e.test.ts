@@ -92,6 +92,47 @@ const createSpawnOutputTracker = () => {
   };
 };
 
+const setupSpawnWithOutputTracking = (
+  spawned: ReturnType<typeof spawn>,
+  outputTracker: ReturnType<typeof createSpawnOutputTracker>
+) => {
+  spawned.stdout?.on('data', (data) => {
+    outputTracker.appendOutputChunk(data.toString());
+  });
+  spawned.stderr?.on('data', (data) => {
+    outputTracker.appendOutputChunk(data.toString());
+  });
+};
+
+const waitForSpawnLaunch = async (spawned: ReturnType<typeof spawn>, timeoutMs: number) =>
+  await withTimeout(
+    new Promise<void>((resolve, reject) => {
+      if (spawned.pid) {
+        resolve();
+        return;
+      }
+      spawned.once('error', reject);
+      spawned.once('spawn', () => resolve());
+    }),
+    timeoutMs
+  );
+
+const waitForStability = async (durationMs: number) =>
+  await withTimeout(
+    new Promise<void>((resolve) => {
+      setTimeout(() => resolve(), durationMs);
+    }),
+    durationMs + 100
+  );
+
+const cleanupSpawnProcess = async (spawned: ReturnType<typeof spawn>) => {
+  spawned.kill('SIGTERM');
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  if (spawned.exitCode == null) {
+    spawned.kill('SIGKILL');
+  }
+};
+
 e2eTest(
   'launches the packaged app',
   async () => {
@@ -244,33 +285,13 @@ e2eTest(
         stdio: ['ignore', 'pipe', 'pipe']
       });
 
-      spawned.stdout?.on('data', (data) => {
-        outputTracker.appendOutputChunk(data.toString());
-      });
-      spawned.stderr?.on('data', (data) => {
-        outputTracker.appendOutputChunk(data.toString());
-      });
+      setupSpawnWithOutputTracking(spawned, outputTracker);
 
-      await withTimeout(
-        new Promise<void>((resolve, reject) => {
-          if (spawned?.pid) {
-            resolve();
-            return;
-          }
-          spawned?.once('error', reject);
-          spawned?.once('spawn', () => resolve());
-        }),
-        launchTimeoutMs
-      );
+      await waitForSpawnLaunch(spawned, launchTimeoutMs);
 
       await outputTracker.waitForSpawnOutput(/running in dev mode|electron will open/i, windowTimeoutMs);
       await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, rendererReadyTimeoutMs);
-      await withTimeout(
-        new Promise<void>((resolve) => {
-          setTimeout(() => resolve(), spawnStabilityTimeoutMs);
-        }),
-        spawnStabilityTimeoutMs + 100
-      );
+      await waitForStability(spawnStabilityTimeoutMs);
 
       if (spawned.exitCode != null) {
         throw new Error(
@@ -281,11 +302,7 @@ e2eTest(
       expect(outputTracker.extractCriticalRendererErrors()).toHaveLength(0);
     } finally {
       if (spawned) {
-        spawned.kill('SIGTERM');
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        if (spawned.exitCode == null) {
-          spawned.kill('SIGKILL');
-        }
+        await cleanupSpawnProcess(spawned);
       }
       await isolatedEnvironment.cleanup();
     }
