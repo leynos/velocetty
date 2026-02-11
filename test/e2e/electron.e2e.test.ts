@@ -341,7 +341,10 @@ e2eTest(
 
       await waitForSpawnLaunch(spawned, launchTimeoutMs);
 
-      await outputTracker.waitForSpawnOutput(/running in dev mode|electron will open/i, windowTimeoutMs);
+      await outputTracker.waitForSpawnOutput(
+        /running in dev mode|electron will open|\[e2e\] renderer-ready/i,
+        windowTimeoutMs
+      );
       await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, rendererReadyTimeoutMs);
       await waitForStability(spawnStabilityTimeoutMs);
 
