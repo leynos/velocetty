@@ -92,15 +92,23 @@ const createSpawnOutputTracker = () => {
   };
 };
 
-const setupSpawnWithOutputTracking = (
+const setupSpawnOutputHandlers = (
   spawned: ReturnType<typeof spawn>,
   outputTracker: ReturnType<typeof createSpawnOutputTracker>
 ) => {
   spawned.stdout?.on('data', (data) => {
-    outputTracker.appendOutputChunk(data.toString());
+    const chunk = data.toString();
+    outputTracker.appendOutputChunk(chunk);
+    if (debugE2E) {
+      process.stdout.write(chunk);
+    }
   });
   spawned.stderr?.on('data', (data) => {
-    outputTracker.appendOutputChunk(data.toString());
+    const chunk = data.toString();
+    outputTracker.appendOutputChunk(chunk);
+    if (debugE2E) {
+      process.stderr.write(chunk);
+    }
   });
 };
 
@@ -124,14 +132,6 @@ const waitForStability = async (durationMs: number) =>
     }),
     durationMs + 100
   );
-
-const cleanupSpawnProcess = async (spawned: ReturnType<typeof spawn>) => {
-  spawned.kill('SIGTERM');
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  if (spawned.exitCode == null) {
-    spawned.kill('SIGKILL');
-  }
-};
 
 interface TestContext {
   isolatedEnvironment: Awaited<ReturnType<typeof createIsolatedE2EEnvironment>>;
@@ -164,69 +164,64 @@ const setupTestContext = async (): Promise<TestContext> => {
   };
 };
 
-const launchAndVerifyWithPlaywright = async (
-  context: TestContext,
+const launchWithPlaywright = async (
   pathToBinary: string,
-  launchArgs: readonly string[]
+  launchArgs: readonly string[],
+  isolatedEnvironment: Awaited<ReturnType<typeof createIsolatedE2EEnvironment>>,
+  log: (message: string) => void
 ) => {
-  context.app = await withTimeout(
+  const app = await withTimeout(
     _electron.launch({
       executablePath: pathToBinary,
       args: launchArgs,
-      env: context.isolatedEnvironment.env,
+      env: isolatedEnvironment.env,
       timeout: launchTimeoutMs
     }),
     launchTimeoutMs
   );
-  context.log('Electron launch completed.');
-  context.log('Waiting for first window.');
+  log('Electron launch completed.');
+  log('Waiting for first window.');
 
-  const window = await withTimeout(context.app.firstWindow(), windowTimeoutMs);
+  const window = await withTimeout(app.firstWindow(), windowTimeoutMs);
   expect(window).toBeDefined();
-  context.rendererConsoleMonitor = startRendererConsoleMonitor(window);
-  context.log('Waiting for renderer readiness markers.');
+  const rendererConsoleMonitor = startRendererConsoleMonitor(window);
+  log('Waiting for renderer readiness markers.');
   await waitForRendererReady(window, rendererReadyTimeoutMs);
-  expect(context.rendererConsoleMonitor.criticalErrors).toHaveLength(0);
-  context.log('First window resolved.');
+  expect(rendererConsoleMonitor.criticalErrors).toHaveLength(0);
+  log('First window resolved.');
+
+  return {app, rendererConsoleMonitor};
 };
 
-const launchAndVerifyWithSpawn = async (context: TestContext, pathToBinary: string, launchArgs: readonly string[]) => {
-  context.spawned = spawn(pathToBinary, launchArgs, {
-    env: context.isolatedEnvironment.env,
+const launchWithSpawn = async (
+  pathToBinary: string,
+  launchArgs: readonly string[],
+  isolatedEnvironment: Awaited<ReturnType<typeof createIsolatedE2EEnvironment>>,
+  outputTracker: ReturnType<typeof createSpawnOutputTracker>,
+  log: (message: string) => void
+) => {
+  const spawned = spawn(pathToBinary, launchArgs, {
+    env: isolatedEnvironment.env,
     stdio: ['ignore', 'pipe', 'pipe']
   });
-  setupSpawnWithOutputTracking(context.spawned, context.outputTracker);
+  setupSpawnOutputHandlers(spawned, outputTracker);
 
-  if (debugE2E) {
-    context.spawned.stdout?.on('data', (data) => {
-      process.stdout.write(data.toString());
-    });
-    context.spawned.stderr?.on('data', (data) => {
-      process.stderr.write(data.toString());
-    });
-  }
+  await waitForSpawnLaunch(spawned, launchTimeoutMs);
 
-  await waitForSpawnLaunch(context.spawned, launchTimeoutMs);
-
-  context.log(`Spawned Electron PID: ${context.spawned.pid ?? 'unknown'}.`);
-  await context.outputTracker.waitForSpawnOutput(/running in prod mode|electron will open/i, windowTimeoutMs);
-  await context.outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, rendererReadyTimeoutMs);
+  log(`Spawned Electron PID: ${spawned.pid ?? 'unknown'}.`);
+  await outputTracker.waitForSpawnOutput(/running in prod mode|electron will open/i, windowTimeoutMs);
+  await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, rendererReadyTimeoutMs);
   await waitForStability(spawnStabilityTimeoutMs);
 
-  if (context.spawned.exitCode != null) {
-    throw new Error(
-      `Electron exited early with code ${context.spawned.exitCode}. Output:\n${context.outputTracker.getOutput()}`
-    );
+  if (spawned.exitCode != null) {
+    throw new Error(`Electron exited early with code ${spawned.exitCode}. Output:\n${outputTracker.getOutput()}`);
   }
 
-  expect(context.outputTracker.extractCriticalRendererErrors()).toHaveLength(0);
+  expect(outputTracker.extractCriticalRendererErrors()).toHaveLength(0);
+  return spawned;
 };
 
-const captureScreenshotIfNeeded = async (app: ElectronApplication | null) => {
-  if (!app || !shouldCapture) {
-    return;
-  }
-
+const captureE2EScreenshot = async (app: ElectronApplication) => {
   try {
     const encodedImage = await withTimeout(
       app.evaluate(async ({BrowserWindow}) => {
@@ -247,28 +242,43 @@ const captureScreenshotIfNeeded = async (app: ElectronApplication | null) => {
   }
 };
 
+const cleanupElectronApp = async (app: ElectronApplication | null, log: (message: string) => void) => {
+  if (!app) {
+    return;
+  }
+
+  if (shouldCapture) {
+    await captureE2EScreenshot(app);
+  }
+
+  try {
+    log('Closing Electron.');
+    await withTimeout(app.close(), closeTimeoutMs);
+    log('Electron closed.');
+  } catch (error) {
+    const process = app.process();
+    if (process && !process.killed) {
+      process.kill('SIGKILL');
+    }
+    console.warn('E2E cleanup timed out; force-killed Electron.', error);
+  }
+};
+
+const cleanupSpawnedProcess = async (spawned: ReturnType<typeof spawn> | null) => {
+  if (!spawned) {
+    return;
+  }
+  spawned.kill('SIGTERM');
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  if (spawned.exitCode == null) {
+    spawned.kill('SIGKILL');
+  }
+};
+
 const cleanupTestContext = async (context: TestContext) => {
   context.rendererConsoleMonitor?.stop();
-  await captureScreenshotIfNeeded(context.app);
-
-  if (context.app) {
-    try {
-      context.log('Closing Electron.');
-      await withTimeout(context.app.close(), closeTimeoutMs);
-      context.log('Electron closed.');
-    } catch (error) {
-      const process = context.app.process();
-      if (process && !process.killed) {
-        process.kill('SIGKILL');
-      }
-      console.warn('E2E cleanup timed out; force-killed Electron.', error);
-    }
-  }
-
-  if (context.spawned) {
-    await cleanupSpawnProcess(context.spawned);
-  }
-
+  await cleanupElectronApp(context.app, context.log);
+  await cleanupSpawnedProcess(context.spawned);
   await context.isolatedEnvironment.cleanup();
 };
 
@@ -285,9 +295,22 @@ e2eTest(
       context.log(`Launching ${pathToBinary} with args: ${launchArgs.join(' ') || '(none)'}`);
 
       if (shouldUsePlaywright) {
-        await launchAndVerifyWithPlaywright(context, pathToBinary, launchArgs);
+        const {app, rendererConsoleMonitor} = await launchWithPlaywright(
+          pathToBinary,
+          launchArgs,
+          context.isolatedEnvironment,
+          context.log
+        );
+        context.app = app;
+        context.rendererConsoleMonitor = rendererConsoleMonitor;
       } else {
-        await launchAndVerifyWithSpawn(context, pathToBinary, launchArgs);
+        context.spawned = await launchWithSpawn(
+          pathToBinary,
+          launchArgs,
+          context.isolatedEnvironment,
+          context.outputTracker,
+          context.log
+        );
       }
     } finally {
       await cleanupTestContext(context);
@@ -314,7 +337,7 @@ e2eTest(
         stdio: ['ignore', 'pipe', 'pipe']
       });
 
-      setupSpawnWithOutputTracking(spawned, outputTracker);
+      setupSpawnOutputHandlers(spawned, outputTracker);
 
       await waitForSpawnLaunch(spawned, launchTimeoutMs);
 
@@ -330,9 +353,7 @@ e2eTest(
 
       expect(outputTracker.extractCriticalRendererErrors()).toHaveLength(0);
     } finally {
-      if (spawned) {
-        await cleanupSpawnProcess(spawned);
-      }
+      await cleanupSpawnedProcess(spawned);
       await isolatedEnvironment.cleanup();
     }
   },
