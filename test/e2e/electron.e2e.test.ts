@@ -134,6 +134,35 @@ const waitForStability = async (durationMs: number) =>
     durationMs + 100
   );
 
+const buildDevelopmentTimeoutDiagnostics = (
+  spawned: ReturnType<typeof spawn> | null,
+  outputTracker: ReturnType<typeof createSpawnOutputTracker>,
+  timeoutMs: number,
+  error: unknown
+) => {
+  const output = outputTracker.getOutput();
+  const markers = [
+    ['running in dev mode', /running in dev mode/i],
+    ['electron will open', /electron will open/i],
+    ['[e2e] renderer-ready', /\[e2e\] renderer-ready/i]
+  ] as const;
+  const markerStatus = markers.map(([label, matcher]) => `${label}: ${matcher.test(output) ? 'seen' : 'missing'}`);
+  const waitError = error instanceof Error ? error.message : String(error);
+  const spawnState = spawned
+    ? `pid=${spawned.pid ?? 'unknown'} exitCode=${spawned.exitCode ?? 'null'} signalCode=${spawned.signalCode ?? 'null'} killed=${spawned.killed}`
+    : 'spawned process: null';
+  const outputTail = output.split('\n').slice(-120).join('\n').slice(-16_000);
+  const lines = [
+    `Development Electron did not emit [e2e] renderer-ready within ${timeoutMs}ms.`,
+    `Underlying wait error: ${waitError}`,
+    `Spawn state: ${spawnState}`,
+    `Marker status: ${markerStatus.join(', ')}`,
+    'Output tail (last 120 lines, max 16000 chars):',
+    outputTail
+  ];
+  return lines.join('\n');
+};
+
 interface TestContext {
   isolatedEnvironment: Awaited<ReturnType<typeof createIsolatedE2EEnvironment>>;
   outputTracker: ReturnType<typeof createSpawnOutputTracker>;
@@ -141,7 +170,6 @@ interface TestContext {
   spawned: ReturnType<typeof spawn> | null;
   rendererConsoleMonitor: ReturnType<typeof startRendererConsoleMonitor> | null;
   log: (message: string) => void;
-  startTime: number;
 }
 
 const setupTestContext = async (): Promise<TestContext> => {
@@ -160,8 +188,7 @@ const setupTestContext = async (): Promise<TestContext> => {
     app: null,
     spawned: null,
     rendererConsoleMonitor: null,
-    log,
-    startTime
+    log
   };
 };
 
@@ -342,7 +369,13 @@ e2eTest(
 
       await waitForSpawnLaunch(spawned, launchTimeoutMs);
 
-      await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, developmentRendererReadyTimeoutMs);
+      try {
+        await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, developmentRendererReadyTimeoutMs);
+      } catch (error) {
+        throw new Error(
+          buildDevelopmentTimeoutDiagnostics(spawned, outputTracker, developmentRendererReadyTimeoutMs, error)
+        );
+      }
       await waitForStability(spawnStabilityTimeoutMs);
 
       if (spawned.exitCode != null) {
