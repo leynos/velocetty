@@ -355,42 +355,42 @@ e2eTest(
 e2eTest(
   'launches the development target without critical renderer errors',
   async () => {
-    // This lane needs custom spawn env fields and no packaged-app fields.
-    // Keep it separate from TestContext to avoid unused state plumbing.
-    const isolatedEnvironment = await createIsolatedE2EEnvironment();
-    const outputTracker = createSpawnOutputTracker();
-    let spawned: ReturnType<typeof spawn> | null = null;
+    const context = await setupTestContext();
     try {
-      spawned = spawn(process.execPath, developmentAppLaunchArgs, {
+      context.spawned = spawn(process.execPath, developmentAppLaunchArgs, {
         cwd: process.cwd(),
         env: {
-          ...isolatedEnvironment.env,
+          ...context.isolatedEnvironment.env,
           RUN_E2E: '1',
           ELECTRONMON_LOGLEVEL: 'error'
         },
         stdio: ['ignore', 'pipe', 'pipe']
       });
-      setupSpawnOutputHandlers(spawned, outputTracker);
-      await waitForSpawnLaunch(spawned, launchTimeoutMs);
+      setupSpawnOutputHandlers(context.spawned, context.outputTracker);
+      await waitForSpawnLaunch(context.spawned, launchTimeoutMs);
       try {
-        await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, developmentRendererReadyTimeoutMs);
+        await context.outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, developmentRendererReadyTimeoutMs);
       } catch (error) {
         throw new Error(
-          buildDevelopmentTimeoutDiagnostics(spawned, outputTracker, developmentRendererReadyTimeoutMs, error)
+          buildDevelopmentTimeoutDiagnostics(
+            context.spawned,
+            context.outputTracker,
+            developmentRendererReadyTimeoutMs,
+            error
+          )
         );
       }
       await waitForStability(spawnStabilityTimeoutMs);
 
-      if (spawned.exitCode != null) {
+      if (context.spawned.exitCode != null) {
         throw new Error(
-          `Development Electron exited early with code ${spawned.exitCode}. Output:\n${outputTracker.getOutput()}`
+          `Development Electron exited early with code ${context.spawned.exitCode}. Output:\n${context.outputTracker.getOutput()}`
         );
       }
 
-      expect(outputTracker.extractCriticalRendererErrors()).toHaveLength(0);
+      expect(context.outputTracker.extractCriticalRendererErrors()).toHaveLength(0);
     } finally {
-      await cleanupSpawnedProcess(spawned);
-      await isolatedEnvironment.cleanup();
+      await cleanupTestContext(context);
     }
   },
   e2eTimeoutMs
