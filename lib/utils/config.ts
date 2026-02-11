@@ -1,3 +1,4 @@
+/** @file Exposes renderer access to decorated config and config-change events. */
 import {getCurrentWindow} from '@electron/remote';
 // TODO: Should be updates to new async API https://medium.com/@nornagon/electrons-remote-module-considered-harmful-70d69500f31
 

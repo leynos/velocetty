@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import {getGlobal, require as remoteRequire} from '@electron/remote';
 
-type VelocettyRuntimeGlobals = {
+export type VelocettyRuntimeGlobals = {
   __velocettyAppRoot?: string;
 };
 

@@ -83,7 +83,9 @@ avoid merging partial baseline updates.
 Use the `VELOCETTY_DISABLE_GPU` environment variable when debugging renderer
 issues caused by problematic GPU drivers:
 
-- `VELOCETTY_DISABLE_GPU=1 bun run app`
+```bash
+VELOCETTY_DISABLE_GPU=1 bun run app
+```
 
 When this switch is enabled, the main process disables hardware acceleration
 before Electron readiness and applies software-rendering Chromium flags.
@@ -101,6 +103,8 @@ Use environment variables to adjust this behaviour:
   logs enabled.
 - `VELOCETTY_CHROMIUM_LOG_LEVEL=2 bun run app` overrides the default Chromium
   log level used for suppression.
+- `VELOCETTY_GPU_DIAGNOSTICS=1 bun run app` emits GPU launch diagnostics in
+  stdout.
 
 ## React version alignment
 

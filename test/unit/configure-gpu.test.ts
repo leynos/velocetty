@@ -72,6 +72,22 @@ test('configureGpuMode keeps Chromium error logs when suppression is disabled', 
   expect(stub.getSwitchCalls()).toEqual([{switchName: 'ignore-gpu-blacklist'}]);
 });
 
+test('configureGpuMode disables GPU without log-level override when suppression is disabled', () => {
+  const stub = createAppStub();
+
+  configureGpuMode(stub.app, {
+    VELOCETTY_DISABLE_GPU: '1',
+    VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS: '0'
+  });
+
+  expect(stub.getHardwareAccelerationDisabledCount()).toBe(1);
+  expect(stub.getSwitchCalls()).toEqual([
+    {switchName: 'disable-gpu'},
+    {switchName: 'disable-gpu-compositing'},
+    {switchName: 'disable-features', value: 'VaapiVideoDecoder'}
+  ]);
+});
+
 test('configureGpuMode allows overriding Chromium log level', () => {
   const stub = createAppStub();
 

@@ -1,15 +1,14 @@
 /** @file Configures Electron GPU startup behaviour from environment flags. */
 
-type CommandLineSwitchAppender = {
-  appendSwitch: (switchName: string, value?: string) => void;
-};
-
-type GpuConfigurableApp = {
-  disableHardwareAcceleration: () => void;
-  commandLine: CommandLineSwitchAppender;
-};
-
 const DEFAULT_CHROMIUM_LOG_LEVEL = '3';
+const shouldEmitGpuDiagnostics = (env: NodeJS.ProcessEnv = process.env) =>
+  env.VELOCETTY_GPU_DIAGNOSTICS === '1' || env.VELOCETTY_DEBUG === '1';
+
+const logGpuDiagnostics = (message: string, env: NodeJS.ProcessEnv) => {
+  if (shouldEmitGpuDiagnostics(env)) {
+    console.log(message);
+  }
+};
 
 /**
  * Returns whether the app should force Chromium into software rendering mode.
@@ -30,20 +29,6 @@ export const shouldDisableGpu = (env: NodeJS.ProcessEnv = process.env) => env.VE
 export const shouldSuppressChromiumErrorLogs = (env: NodeJS.ProcessEnv = process.env) =>
   env.VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS !== '0';
 
-const resolveChromiumLogLevel = (env: NodeJS.ProcessEnv) =>
-  env.VELOCETTY_CHROMIUM_LOG_LEVEL?.trim() || DEFAULT_CHROMIUM_LOG_LEVEL;
-
-const configureChromiumLogging = (electronApp: GpuConfigurableApp, env: NodeJS.ProcessEnv) => {
-  if (!shouldSuppressChromiumErrorLogs(env)) {
-    console.log('VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS=0 detected, keeping Chromium error logs enabled');
-    return;
-  }
-
-  const logLevel = resolveChromiumLogLevel(env);
-  console.log(`Applying Chromium log-level=${logLevel} to reduce known startup log noise`);
-  electronApp.commandLine.appendSwitch('log-level', logLevel);
-};
-
 /**
  * Applies Chromium GPU-related startup switches before the app is ready.
  *
@@ -51,11 +36,23 @@ const configureChromiumLogging = (electronApp: GpuConfigurableApp, env: NodeJS.P
  * - `configureGpuMode(app, {VELOCETTY_DISABLE_GPU: '1'})` disables hardware acceleration.
  * - `configureGpuMode(app)` keeps the default GPU path and ignores the GPU blacklist.
  */
-export const configureGpuMode = (electronApp: GpuConfigurableApp, env: NodeJS.ProcessEnv = process.env) => {
-  configureChromiumLogging(electronApp, env);
+export const configureGpuMode = (
+  electronApp: {
+    disableHardwareAcceleration: () => void;
+    commandLine: {appendSwitch: (switchName: string, value?: string) => void};
+  },
+  env: NodeJS.ProcessEnv = process.env
+) => {
+  if (!shouldSuppressChromiumErrorLogs(env)) {
+    logGpuDiagnostics('VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS=0 detected, keeping Chromium error logs enabled', env);
+  } else {
+    const logLevel = env.VELOCETTY_CHROMIUM_LOG_LEVEL?.trim() || DEFAULT_CHROMIUM_LOG_LEVEL;
+    logGpuDiagnostics(`Applying Chromium log-level=${logLevel} to reduce known startup log noise`, env);
+    electronApp.commandLine.appendSwitch('log-level', logLevel);
+  }
 
   if (shouldDisableGpu(env)) {
-    console.log('VELOCETTY_DISABLE_GPU=1 detected, disabling hardware acceleration');
+    logGpuDiagnostics('VELOCETTY_DISABLE_GPU=1 detected, disabling hardware acceleration', env);
     electronApp.disableHardwareAcceleration();
     electronApp.commandLine.appendSwitch('disable-gpu');
     electronApp.commandLine.appendSwitch('disable-gpu-compositing');
@@ -63,6 +60,6 @@ export const configureGpuMode = (electronApp: GpuConfigurableApp, env: NodeJS.Pr
     return;
   }
 
-  console.log('Disabling Chromium GPU blacklist');
+  logGpuDiagnostics('Disabling Chromium GPU blacklist', env);
   electronApp.commandLine.appendSwitch('ignore-gpu-blacklist');
 };

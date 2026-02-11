@@ -123,8 +123,16 @@ const waitForSpawnLaunch = async (spawned: ReturnType<typeof spawn>, timeoutMs: 
         resolve();
         return;
       }
-      spawned.once('error', reject);
-      spawned.once('spawn', () => resolve());
+      const onError = (error: Error) => {
+        spawned.off('spawn', onSpawn);
+        reject(error);
+      };
+      const onSpawn = () => {
+        spawned.off('error', onError);
+        resolve();
+      };
+      spawned.once('error', onError);
+      spawned.once('spawn', onSpawn);
     }),
     timeoutMs
   );
@@ -134,6 +142,7 @@ const waitForStability = async (durationMs: number) =>
     new Promise<void>((resolve) => {
       setTimeout(() => resolve(), durationMs);
     }),
+    // Add a small buffer so the outer timeout does not race the inner delay.
     durationMs + 100
   );
 
@@ -212,7 +221,6 @@ const launchWithPlaywright = async (
   );
   log('Electron launch completed.');
   log('Waiting for first window.');
-
   const window = await withTimeout(app.firstWindow(), windowTimeoutMs);
   expect(window).toBeDefined();
   const rendererConsoleMonitor = startRendererConsoleMonitor(window);
@@ -220,7 +228,6 @@ const launchWithPlaywright = async (
   await waitForRendererReady(window, rendererReadyTimeoutMs);
   expect(rendererConsoleMonitor.criticalErrors).toHaveLength(0);
   log('First window resolved.');
-
   return {app, rendererConsoleMonitor};
 };
 
@@ -236,14 +243,11 @@ const launchWithSpawn = async (
     stdio: ['ignore', 'pipe', 'pipe']
   });
   setupSpawnOutputHandlers(spawned, outputTracker);
-
   await waitForSpawnLaunch(spawned, launchTimeoutMs);
-
   log(`Spawned Electron PID: ${spawned.pid ?? 'unknown'}.`);
   await outputTracker.waitForSpawnOutput(/running in prod mode|electron will open/i, windowTimeoutMs);
   await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, rendererReadyTimeoutMs);
   await waitForStability(spawnStabilityTimeoutMs);
-
   if (spawned.exitCode != null) {
     throw new Error(`Electron exited early with code ${spawned.exitCode}. Output:\n${outputTracker.getOutput()}`);
   }
@@ -277,11 +281,9 @@ const cleanupElectronApp = async (app: ElectronApplication | null, log: (message
   if (!app) {
     return;
   }
-
   if (shouldCapture) {
     await captureE2EScreenshot(app);
   }
-
   try {
     log('Closing Electron.');
     await withTimeout(app.close(), closeTimeoutMs);
@@ -353,10 +355,11 @@ e2eTest(
 e2eTest(
   'launches the development target without critical renderer errors',
   async () => {
+    // This lane needs custom spawn env fields and no packaged-app fields.
+    // Keep it separate from TestContext to avoid unused state plumbing.
     const isolatedEnvironment = await createIsolatedE2EEnvironment();
     const outputTracker = createSpawnOutputTracker();
     let spawned: ReturnType<typeof spawn> | null = null;
-
     try {
       spawned = spawn(process.execPath, developmentAppLaunchArgs, {
         cwd: process.cwd(),
@@ -367,11 +370,8 @@ e2eTest(
         },
         stdio: ['ignore', 'pipe', 'pipe']
       });
-
       setupSpawnOutputHandlers(spawned, outputTracker);
-
       await waitForSpawnLaunch(spawned, launchTimeoutMs);
-
       try {
         await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, developmentRendererReadyTimeoutMs);
       } catch (error) {
