@@ -23,7 +23,7 @@ import {
   UI_OPEN_SSH_URL,
   UI_CONTEXTMENU_OPEN,
   UI_COMMAND_EXEC
-} from '../../typings/constants/ui';
+} from '@shared/constants/ui';
 import type {HyperState, HyperDispatch, HyperActions, ITermGroups} from '../../typings/hyper';
 import rpc from '../rpc';
 import {getRootGroups} from '../selectors';

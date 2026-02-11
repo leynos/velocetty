@@ -13,7 +13,7 @@ import type {
   MainEvents,
   RendererEvents,
   TypedEmitter
-} from '../../typings/common';
+} from '@shared/types/common';
 
 import {ipcRenderer} from './ipc';
 

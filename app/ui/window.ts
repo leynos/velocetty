@@ -11,8 +11,8 @@ import isDev from 'electron-is-dev';
 import {getWorkingDirectoryFromPID} from 'native-process-working-directory';
 import {v4 as uuidv4} from 'uuid';
 
-import type {sessionExtraOptions} from '../../typings/common';
-import type {configOptions} from '../../typings/config';
+import type {sessionExtraOptions} from '@shared/types/common';
+import type {configOptions} from '@shared/types/config';
 import {execCommand} from '../commands';
 import {getDefaultProfile} from '../config';
 import {icon, homeDirectory} from '../config/paths';

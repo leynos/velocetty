@@ -2,7 +2,7 @@ import vm from 'node:vm';
 
 import merge from 'lodash/merge';
 
-import type {parsedConfig, rawConfig, configOptions} from '../../typings/config';
+import type {parsedConfig, rawConfig, configOptions} from '@shared/types/config';
 import notify from '../notify';
 import mapKeys from '../utils/map-keys';
 

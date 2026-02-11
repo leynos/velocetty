@@ -10,7 +10,7 @@
  */
 import type {Dispatch, Middleware} from 'redux';
 
-import type {SessionPtyDataAction} from '../../typings/constants/sessions';
+import type {SessionPtyDataAction} from '@shared/constants/sessions';
 import type {HyperActions, HyperState} from '../../typings/hyper';
 import terms from '../terms';
 

@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "outDir": "../dist/tmp/shared",
+    "rootDir": "./src",
+    "tsBuildInfoFile": "../dist/tmp/shared/tsconfig.tsbuildinfo"
+  },
+  "include": ["./src/**/*"],
+  "exclude": ["../dist/", "../node_modules/", "../target/"]
+}

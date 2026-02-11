@@ -88,7 +88,14 @@ function resolveMacBundleName(context) {
 }
 
 exports.default = async (context) => {
-  const archToCopy = Arch[context.arch];
+  const archToCopy =
+    typeof context.arch === 'string'
+      ? context.arch
+      : Arch && context.arch !== undefined
+        ? Arch[context.arch]
+        : process.arch.startsWith('arm')
+          ? 'arm64'
+          : 'x64';
   const pathToElectron =
     process.platform === 'darwin'
       ? path.join(

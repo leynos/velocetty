@@ -1,4 +1,4 @@
-import {UPDATE_INSTALL, UPDATE_AVAILABLE} from '../../typings/constants/updater';
+import {UPDATE_INSTALL, UPDATE_AVAILABLE} from '@shared/constants/updater';
 import type {HyperActions} from '../../typings/hyper';
 import rpc from '../rpc';
 

@@ -1,11 +1,11 @@
-import {SESSION_REQUEST} from '../../typings/constants/sessions';
+import {SESSION_REQUEST} from '@shared/constants/sessions';
 import {
   DIRECTION,
   TERM_GROUP_RESIZE,
   TERM_GROUP_REQUEST,
   TERM_GROUP_EXIT,
   TERM_GROUP_EXIT_ACTIVE
-} from '../../typings/constants/term-groups';
+} from '@shared/constants/term-groups';
 import type {ITermState, ITermGroup, HyperState, HyperDispatch, HyperActions} from '../../typings/hyper';
 import rpc from '../rpc';
 import {getRootGroups} from '../selectors';

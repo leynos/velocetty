@@ -3,8 +3,8 @@ import {release} from 'node:os';
 import Immutable from 'seamless-immutable';
 import type {Immutable as ImmutableType} from 'seamless-immutable';
 
-import {CONFIG_LOAD, CONFIG_RELOAD} from '../../typings/constants/config';
-import {NOTIFICATION_MESSAGE, NOTIFICATION_DISMISS} from '../../typings/constants/notifications';
+import {CONFIG_LOAD, CONFIG_RELOAD} from '@shared/constants/config';
+import {NOTIFICATION_MESSAGE, NOTIFICATION_DISMISS} from '@shared/constants/notifications';
 import {
   SESSION_ADD,
   SESSION_RESIZE,
@@ -12,7 +12,7 @@ import {
   SESSION_PTY_EXIT,
   SESSION_SET_ACTIVE,
   SESSION_SET_CWD
-} from '../../typings/constants/sessions';
+} from '@shared/constants/sessions';
 import {
   UI_FONT_SIZE_SET,
   UI_FONT_SIZE_RESET,
@@ -22,8 +22,8 @@ import {
   UI_WINDOW_GEOMETRY_CHANGED,
   UI_ENTER_FULLSCREEN,
   UI_LEAVE_FULLSCREEN
-} from '../../typings/constants/ui';
-import {UPDATE_AVAILABLE} from '../../typings/constants/updater';
+} from '@shared/constants/ui';
+import {UPDATE_AVAILABLE} from '@shared/constants/updater';
 import type {uiState, Mutable, IUiReducer} from '../../typings/hyper';
 import {decorateUIReducer} from '../utils/plugins';
 

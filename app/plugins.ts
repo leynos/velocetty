@@ -12,8 +12,8 @@ import Config from 'electron-store';
 import ms from 'ms';
 import ReactDom from 'react-dom';
 
-import type {IpcMainWithCommands} from '../typings/common';
-import type {configOptions} from '../typings/config';
+import type {IpcMainWithCommands} from '@shared/types/common';
+import type {configOptions} from '@shared/types/config';
 
 import * as config from './config';
 import {plugs} from './config/paths';

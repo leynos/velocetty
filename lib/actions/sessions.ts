@@ -1,4 +1,4 @@
-import type {Session} from '../../typings/common';
+import type {Session} from '@shared/types/common';
 import {
   SESSION_ADD,
   SESSION_RESIZE,
@@ -12,7 +12,7 @@ import {
   SESSION_USER_DATA,
   SESSION_SET_XTERM_TITLE,
   SESSION_SEARCH
-} from '../../typings/constants/sessions';
+} from '@shared/constants/sessions';
 import type {HyperState, HyperDispatch, HyperActions} from '../../typings/hyper';
 import rpc from '../rpc';
 import {keys} from '../utils/object';

@@ -2,7 +2,7 @@ import {app} from 'electron';
 
 import chokidar from 'chokidar';
 
-import type {parsedConfig, configOptions} from '../typings/config';
+import type {parsedConfig, configOptions} from '@shared/types/config';
 
 import {_import, getDefaultConfig} from './config/import';
 import _openConfig from './config/open';

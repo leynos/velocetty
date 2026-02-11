@@ -1,5 +1,5 @@
-import type {configOptions} from '../../typings/config';
-import {CONFIG_LOAD, CONFIG_RELOAD} from '../../typings/constants/config';
+import type {configOptions} from '@shared/types/config';
+import {CONFIG_LOAD, CONFIG_RELOAD} from '@shared/constants/config';
 import type {HyperActions} from '../../typings/hyper';
 
 export function loadConfig(config: configOptions): HyperActions {

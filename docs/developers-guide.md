@@ -25,6 +25,39 @@ must follow locally.
   for renderer, CLI, and app copy artefacts.
 - Keep documentation wrapped to 80 columns and code blocks to 120 columns.
 
+## Package boundaries
+
+Roadmap item `1.1.1` establishes explicit package boundaries for new
+development:
+
+- `frontend/`: frontend package boundary for renderer-facing code.
+- `backend/`: backend package boundary for privileged main-process code.
+- `shared/`: shared contracts (types, constants, and schemas).
+
+Dependency direction must remain one-way:
+
+- `frontend -> shared`
+- `backend -> shared`
+
+`frontend` must not import `backend`, and `backend` must not import
+`frontend`.
+
+Use shared imports via TypeScript path aliases:
+
+- `@frontend/*`
+- `@backend/*`
+- `@shared/*`
+
+Boundary validation is enforced by `bun run check:boundaries`, which runs as
+part of `bun run lint` and therefore `make lint`.
+
+Package-local build checks are available via:
+
+- `bun run build:shared`
+- `bun run build:frontend`
+- `bun run build:backend`
+- `bun run build:packages`
+
 ## esbuild build pipeline and safeguards
 
 The repository now bundles with esbuild by default:

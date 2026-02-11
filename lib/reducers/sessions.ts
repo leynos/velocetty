@@ -11,7 +11,7 @@ import {
   SESSION_SET_XTERM_TITLE,
   SESSION_SET_CWD,
   SESSION_SEARCH
-} from '../../typings/constants/sessions';
+} from '@shared/constants/sessions';
 import type {sessionState, session, Mutable, ISessionReducer} from '../../typings/hyper';
 import {decorateSessionsReducer} from '../utils/plugins';
 
