@@ -78,6 +78,34 @@ Current repository runtime baseline after roadmap item `1.4.13`:
 When preparing future Electron upgrades, update these anchors together and
 avoid merging partial baseline updates.
 
+## GPU fallback launch switch
+
+Use the `VELOCETTY_DISABLE_GPU` environment variable when debugging renderer
+issues caused by problematic GPU drivers:
+
+```bash
+VELOCETTY_DISABLE_GPU=1 bun run app
+```
+
+When this switch is enabled, the main process disables hardware acceleration
+before Electron readiness and applies software-rendering Chromium flags.
+
+## Chromium startup log noise suppression
+
+Electron 40 on Linux can emit repetitive Chromium DBus startup alerts during
+local runs, including transient `StartTransientUnit` scope collisions. The app
+now sets Chromium `log-level=3` at startup by default to suppress this known
+noise.
+
+Use environment variables to adjust this behaviour:
+
+- `VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS=0 bun run app`
+  keeps Chromium error logs enabled.
+- `VELOCETTY_CHROMIUM_LOG_LEVEL=2 bun run app`
+  overrides the default Chromium log level used for suppression.
+- `VELOCETTY_GPU_DIAGNOSTICS=1 bun run app`
+  emits GPU launch diagnostics in stdout.
+
 ## React version alignment
 
 The renderer runtime depends on React in both the root `package.json` and the

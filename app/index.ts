@@ -25,19 +25,26 @@ config.setup();
 import {resolve} from 'node:path';
 
 // Packages
-import {app, BrowserWindow, Menu, screen} from 'electron';
+import {app, BrowserWindow, Menu, screen, session} from 'electron';
 
 import isDev from 'electron-is-dev';
 import {gitDescribe} from 'git-describe';
 import parseUrl from 'parse-url';
+import type {VelocettyRuntimeGlobals} from '../typings/runtime-globals';
 
 import * as AppMenu from './menus/menu';
 import * as plugins from './plugins';
 import {newWindow} from './ui/window';
 import {installCLI} from './utils/cli-install';
+import {configureGpuMode} from './utils/configure-gpu';
 import * as windowUtils from './utils/window-utils';
 
 const windowSet = new Set<BrowserWindow>([]);
+type VelocettyRuntimeGlobal = typeof globalThis & VelocettyRuntimeGlobals;
+
+// Expose app root so renderer remote module lookups can resolve app-side
+// modules without depending on renderer bundle location.
+(global as VelocettyRuntimeGlobal).__velocettyAppRoot = isDev ? __dirname : app.getAppPath();
 
 // expose to plugins
 app.config = config;
@@ -55,8 +62,7 @@ app.getLastFocusedWindow = () => {
   });
 };
 
-console.log('Disabling Chromium GPU blacklist');
-app.commandLine.appendSwitch('ignore-gpu-blacklist');
+configureGpuMode(app);
 
 if (isDev) {
   console.log('running in dev mode');
@@ -78,13 +84,27 @@ async function installDevExtensions(isDev_: boolean) {
   if (!isDev_) {
     return [];
   }
-  const {default: installer, REACT_DEVELOPER_TOOLS, REDUX_DEVTOOLS} = await import('electron-devtools-installer');
+  const {REACT_DEVELOPER_TOOLS, REDUX_DEVTOOLS} = await import('electron-devtools-installer');
+  // electron-devtools-installer 3.x does not expose this helper from its
+  // public API; keep the dependency pinned to 3.x when using this path.
+  const {default: downloadChromeExtension} = await import('electron-devtools-installer/dist/downloadChromeExtension');
 
   const extensions = [REACT_DEVELOPER_TOOLS, REDUX_DEVTOOLS];
   const forceDownload = Boolean(process.env.UPGRADE_EXTENSIONS);
 
   const results = await Promise.allSettled(
-    extensions.map((extension) => installer(extension, {forceDownload, loadExtensionOptions: {allowFileAccess: true}}))
+    extensions.map(async (extensionReference) => {
+      const extensionId = typeof extensionReference === 'string' ? extensionReference : extensionReference.id;
+      const extensionFolder = await downloadChromeExtension(extensionId, forceDownload);
+      const installedExtension = session.defaultSession.extensions.getExtension(extensionId);
+      if (installedExtension) {
+        session.defaultSession.extensions.removeExtension(extensionId);
+      }
+      const loadedExtension = await session.defaultSession.extensions.loadExtension(extensionFolder, {
+        allowFileAccess: true
+      });
+      return loadedExtension.name;
+    })
   );
 
   for (const result of results) {
