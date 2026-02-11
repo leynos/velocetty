@@ -1,7 +1,7 @@
 /** @file Verifies environment-based GPU startup configuration. */
 import {expect, test} from 'bun:test';
 
-import {configureGpuMode, shouldDisableGpu, shouldSuppressChromiumErrorLogs} from '../../app/utils/configure-gpu';
+import {configureGpuMode} from '../../app/utils/configure-gpu';
 
 type SwitchCall = {
   switchName: string;
@@ -28,17 +28,32 @@ const createAppStub = () => {
   };
 };
 
-test('shouldDisableGpu returns true only when VELOCETTY_DISABLE_GPU is 1', () => {
-  expect(shouldDisableGpu({VELOCETTY_DISABLE_GPU: '1'})).toBe(true);
-  expect(shouldDisableGpu({VELOCETTY_DISABLE_GPU: '0'})).toBe(false);
-  expect(shouldDisableGpu({VELOCETTY_DISABLE_GPU: 'true'})).toBe(false);
-  expect(shouldDisableGpu({})).toBe(false);
+test('configureGpuMode enables log-level suppression unless explicitly disabled', () => {
+  const defaultStub = createAppStub();
+  const explicitSuppressStub = createAppStub();
+  const explicitDisabledStub = createAppStub();
+
+  configureGpuMode(defaultStub.app, {});
+  configureGpuMode(explicitSuppressStub.app, {VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS: '1'});
+  configureGpuMode(explicitDisabledStub.app, {VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS: '0'});
+
+  expect(defaultStub.getSwitchCalls()).toContainEqual({switchName: 'log-level', value: '3'});
+  expect(explicitSuppressStub.getSwitchCalls()).toContainEqual({switchName: 'log-level', value: '3'});
+  expect(explicitDisabledStub.getSwitchCalls()).not.toContainEqual({switchName: 'log-level', value: '3'});
 });
 
-test('shouldSuppressChromiumErrorLogs defaults to true unless explicitly disabled', () => {
-  expect(shouldSuppressChromiumErrorLogs({})).toBe(true);
-  expect(shouldSuppressChromiumErrorLogs({VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS: '1'})).toBe(true);
-  expect(shouldSuppressChromiumErrorLogs({VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS: '0'})).toBe(false);
+test('configureGpuMode disables GPU only when VELOCETTY_DISABLE_GPU is exactly 1', () => {
+  const enabledStub = createAppStub();
+  const disabledByZeroStub = createAppStub();
+  const disabledByTrueStub = createAppStub();
+
+  configureGpuMode(enabledStub.app, {VELOCETTY_DISABLE_GPU: '1'});
+  configureGpuMode(disabledByZeroStub.app, {VELOCETTY_DISABLE_GPU: '0'});
+  configureGpuMode(disabledByTrueStub.app, {VELOCETTY_DISABLE_GPU: 'true'});
+
+  expect(enabledStub.getHardwareAccelerationDisabledCount()).toBe(1);
+  expect(disabledByZeroStub.getHardwareAccelerationDisabledCount()).toBe(0);
+  expect(disabledByTrueStub.getHardwareAccelerationDisabledCount()).toBe(0);
 });
 
 test('configureGpuMode keeps GPU enabled by default', () => {
