@@ -6,7 +6,7 @@
  * CLI launches used by development-lane E2E tests.
  */
 
-const {existsSync} = require('node:fs');
+const {existsSync, rmSync} = require('node:fs');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 
@@ -17,6 +17,14 @@ const requiredTargetFiles = [
   'target/package.json',
   'target/renderer/bundle.js'
 ];
+
+const tsBuildInfoPath = path.join(repositoryRoot, 'target/tsconfig.tsbuildinfo');
+
+const clearStaleTsBuildInfo = () => {
+  if (existsSync(tsBuildInfoPath)) {
+    rmSync(tsBuildInfoPath);
+  }
+};
 
 const getMissingTargetFiles = () => {
   return requiredTargetFiles.filter((relativePath) => !existsSync(path.join(repositoryRoot, relativePath)));
@@ -56,7 +64,9 @@ const ensureDevelopmentTarget = () => {
     '--target=hyper-app,renderer'
   ]);
 
-  runBunCommand('Compile Electron main-process target', ['x', 'tsgo', '--project', 'app/tsconfig.json', '-v']);
+  clearStaleTsBuildInfo();
+
+  runBunCommand('Compile Electron main-process target', ['x', 'tsgo', '--project', 'app/tsconfig.json']);
 
   const missingAfterBuild = getMissingTargetFiles();
   if (missingAfterBuild.length > 0) {
