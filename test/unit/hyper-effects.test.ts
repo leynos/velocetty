@@ -93,7 +93,8 @@ const buildRpcWindowStub = () => {
 };
 
 mock.module('../../lib/actions/ui', () => ({
-  execCommand: () => ({type: 'exec'})
+  execCommand: () => ({type: 'exec'}),
+  setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'})
 }));
 
 mock.module('../../lib/utils/plugins', () => ({

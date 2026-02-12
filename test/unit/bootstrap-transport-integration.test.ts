@@ -171,6 +171,12 @@ test('bootstrap session-add/update flow is wired through the transport event bus
     ])
   );
 
+  const readyListener = getListener('ready');
+  readyListener(null);
+
+  expect(dispatchMock.mock.calls).toContainEqual([{type: 'INIT_ACTION'}]);
+  expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_SET_FONT_SMOOTHING'}]);
+
   const sessionListener = getListener('session add');
   sessionListener({uid: 'session-1', shell: '/bin/bash', pid: 100, profile: 'default'} as never);
   sessionListener({uid: 'session-2', shell: '/bin/bash', pid: 101, profile: 'default'} as never);
