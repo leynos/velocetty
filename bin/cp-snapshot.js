@@ -5,9 +5,12 @@ const {Arch} = require('electron-builder');
 
 const SUPPORTED_ARCHITECTURES = ['x64', 'arm64'];
 const ARCH_ALIASES = {
-  aarch64: 'arm64',
-  amd64: 'x64'
+  x64: 'x64',
+  amd64: 'x64',
+  arm64: 'arm64',
+  aarch64: 'arm64'
 };
+const UNSUPPORTED_ARCHES = new Set(['arm']);
 
 const ARCH_ENUM_TO_NAME = {
   0: 'ia32',
@@ -17,22 +20,22 @@ const ARCH_ENUM_TO_NAME = {
   4: 'universal'
 };
 
-const isValidArchString = (arch) => typeof arch === 'string' && arch.length > 0;
-const isSupportedArch = (arch) => SUPPORTED_ARCHITECTURES.includes(arch);
-const isUnsupportedArmArch = (arch) => arch === 'arm';
-
-function normalizeArch(arch, sourceLabel) {
-  if (!isValidArchString(arch)) {
+function validateArchInput(arch, sourceLabel) {
+  if (typeof arch !== 'string' || arch.length === 0) {
     throw new Error(`Expected a string architecture from ${sourceLabel}, received "${String(arch)}".`);
   }
+}
 
-  const canonicalArch = ARCH_ALIASES[arch] ?? arch;
-  if (isUnsupportedArmArch(canonicalArch)) {
-    throw new Error('Unsupported architecture "arm". Snapshot artifacts are available only for x64 and arm64.');
+function normalizeArch(arch, sourceLabel) {
+  validateArchInput(arch, sourceLabel);
+
+  const normalized = ARCH_ALIASES[arch];
+  if (normalized) {
+    return normalized;
   }
 
-  if (isSupportedArch(canonicalArch)) {
-    return canonicalArch;
+  if (UNSUPPORTED_ARCHES.has(arch)) {
+    throw new Error('Unsupported architecture "arm". Snapshot artifacts are available only for x64 and arm64.');
   }
 
   throw new Error(
