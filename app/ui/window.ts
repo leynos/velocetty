@@ -41,6 +41,97 @@ class InvalidSessionExtraOptionsError extends Error {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const parseCwd = (value: unknown): string => {
+  if (typeof value !== 'string') {
+    throw new InvalidSessionExtraOptionsError('Session option "cwd" must be a string.');
+  }
+
+  return value;
+};
+
+const parseSplitDirection = (value: unknown): 'HORIZONTAL' | 'VERTICAL' => {
+  if (typeof value !== 'string' || !SESSION_SPLIT_DIRECTIONS.has(value)) {
+    throw new InvalidSessionExtraOptionsError(
+      'Session option "splitDirection" must be either "HORIZONTAL" or "VERTICAL".'
+    );
+  }
+
+  return value as 'HORIZONTAL' | 'VERTICAL';
+};
+
+const parseActiveUid = (value: unknown): string | null => {
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    throw new InvalidSessionExtraOptionsError('Session option "activeUid" must be a string or null.');
+  }
+
+  return asSessionId(value);
+};
+
+const parseIsNewGroup = (value: unknown): boolean => {
+  if (typeof value !== 'boolean') {
+    throw new InvalidSessionExtraOptionsError('Session option "isNewGroup" must be a boolean.');
+  }
+
+  return value;
+};
+
+const parseRows = (value: unknown): number => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new InvalidSessionExtraOptionsError('Session option "rows" must be a finite number.');
+  }
+
+  return value;
+};
+
+const parseCols = (value: unknown): number => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new InvalidSessionExtraOptionsError('Session option "cols" must be a finite number.');
+  }
+
+  return value;
+};
+
+const parseShell = (value: unknown): string => {
+  if (typeof value !== 'string') {
+    throw new InvalidSessionExtraOptionsError('Session option "shell" must be a string.');
+  }
+
+  return value;
+};
+
+const parseShellArgs = (value: unknown): string[] => {
+  if (!Array.isArray(value) || value.some((arg) => typeof arg !== 'string')) {
+    throw new InvalidSessionExtraOptionsError('Session option "shellArgs" must be an array of strings.');
+  }
+
+  return [...value];
+};
+
+const parseProfile = (value: unknown): string => {
+  if (typeof value !== 'string') {
+    throw new InvalidSessionExtraOptionsError('Session option "profile" must be a string.');
+  }
+
+  return asProfileId(value);
+};
+
+type OptionParser = (value: unknown) => unknown;
+
+const optionParsers: Record<string, OptionParser> = {
+  cwd: parseCwd,
+  splitDirection: parseSplitDirection,
+  activeUid: parseActiveUid,
+  isNewGroup: parseIsNewGroup,
+  rows: parseRows,
+  cols: parseCols,
+  shell: parseShell,
+  shellArgs: parseShellArgs,
+  profile: parseProfile
+};
 const parseSessionExtraOptions = (payload: unknown): sessionExtraOptions => {
   if (payload === undefined) {
     return {};
@@ -56,72 +147,12 @@ const parseSessionExtraOptions = (payload: unknown): sessionExtraOptions => {
       continue;
     }
 
-    switch (key) {
-      case 'cwd':
-        if (typeof value !== 'string') {
-          throw new InvalidSessionExtraOptionsError('Session option "cwd" must be a string.');
-        }
-        parsedOptions.cwd = value;
-        break;
-      case 'splitDirection':
-        if (typeof value !== 'string' || !SESSION_SPLIT_DIRECTIONS.has(value)) {
-          throw new InvalidSessionExtraOptionsError(
-            'Session option "splitDirection" must be either "HORIZONTAL" or "VERTICAL".'
-          );
-        }
-        parsedOptions.splitDirection = value as 'HORIZONTAL' | 'VERTICAL';
-        break;
-      case 'activeUid':
-        if (value === null) {
-          parsedOptions.activeUid = null;
-          break;
-        }
-
-        if (typeof value !== 'string') {
-          throw new InvalidSessionExtraOptionsError('Session option "activeUid" must be a string or null.');
-        }
-
-        parsedOptions.activeUid = asSessionId(value);
-        break;
-      case 'isNewGroup':
-        if (typeof value !== 'boolean') {
-          throw new InvalidSessionExtraOptionsError('Session option "isNewGroup" must be a boolean.');
-        }
-        parsedOptions.isNewGroup = value;
-        break;
-      case 'rows':
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-          throw new InvalidSessionExtraOptionsError('Session option "rows" must be a finite number.');
-        }
-        parsedOptions.rows = value;
-        break;
-      case 'cols':
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-          throw new InvalidSessionExtraOptionsError('Session option "cols" must be a finite number.');
-        }
-        parsedOptions.cols = value;
-        break;
-      case 'shell':
-        if (typeof value !== 'string') {
-          throw new InvalidSessionExtraOptionsError('Session option "shell" must be a string.');
-        }
-        parsedOptions.shell = value;
-        break;
-      case 'shellArgs':
-        if (!Array.isArray(value) || value.some((arg) => typeof arg !== 'string')) {
-          throw new InvalidSessionExtraOptionsError('Session option "shellArgs" must be an array of strings.');
-        }
-        parsedOptions.shellArgs = [...value];
-        break;
-      case 'profile':
-        if (typeof value !== 'string') {
-          throw new InvalidSessionExtraOptionsError('Session option "profile" must be a string.');
-        }
-        parsedOptions.profile = asProfileId(value);
-        break;
-      default:
-        throw new InvalidSessionExtraOptionsError(`Session option "${key}" is not supported.`);
+    const parser = optionParsers[key];
+    if (!parser) {
+      throw new InvalidSessionExtraOptionsError(`Session option "${key}" is not supported.`);
     }
+
+    (parsedOptions as Record<string, unknown>)[key] = parser(value);
   }
 
   return parsedOptions;
