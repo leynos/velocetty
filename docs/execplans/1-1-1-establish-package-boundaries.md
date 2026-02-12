@@ -16,7 +16,7 @@ This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
 `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: IN PROGRESS
+Status: DONE (2026-02-12)
 
 No `PLANS.md` exists at repository root as of 2026-02-11, so this document is
 self-contained.
@@ -206,6 +206,23 @@ repointed application imports to `@shared/*`, and added automated
 cross-layer boundary validation. The required gates (`bun install`,
 `make build`, `make check-fmt`, `make lint`, and `make test`) all pass, and
 roadmap item `1.1.1` is now marked done.
+
+## Post-completion follow-up resolutions
+
+The core acceptance criteria for roadmap item `1.1.1` are complete. The
+following follow-up tracks resolve known limitations identified during the
+post-implementation review:
+
+- `BOUNDARY-001`: extend `scripts/check-package-boundaries.mjs` so boundary
+  checks parse both ESM imports and CommonJS `require(...)` usage. Preferred
+  approach: move from regex-only parsing to a TypeScript AST walk, then add
+  regression tests covering alias imports, relative imports, dynamic imports,
+  and `require` forms.
+- `CONTRACT-001`: make schema generation source directly from
+  `shared/src/types/config.ts` and retain `typings/` re-exports as
+  compatibility-only until all legacy consumers are removed. Success means
+  `generate-schema` no longer depends on `typings/config.d.ts` as its source
+  input.
 
 ## Context and orientation
 

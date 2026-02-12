@@ -34,6 +34,11 @@ development:
 - `backend/`: backend package boundary for privileged main-process code.
 - `shared/`: shared contracts (types, constants, and schemas).
 
+This split is currently an architectural boundary with incremental migration.
+Runtime modules still live primarily in `lib/` (frontend) and `app/` (backend).
+Treat those folders as the active implementation roots until follow-on migration
+work moves modules under `frontend/src` and `backend/src`.
+
 Dependency direction must remain one-way:
 
 - `frontend -> shared`
@@ -50,6 +55,12 @@ Use shared imports via TypeScript path aliases:
 
 Boundary validation is enforced by `bun run check:boundaries`, which runs as
 part of `bun run lint` and therefore `make lint`.
+
+Follow-up hardening tracked in `docs/tracking-issues.md`:
+
+- `BOUNDARY-001`: include CommonJS `require(...)` imports in boundary checks.
+- `CONTRACT-001`: make `shared/` schema generation independent of legacy
+  `typings/` compatibility re-exports.
 
 Package-local build checks are available via:
 
