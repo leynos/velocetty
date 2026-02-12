@@ -36,6 +36,10 @@ Electron without changing command/UI modules.
 
 Done criteria for this roadmap item:
 
+- coverage-first gate is complete before transport implementation starts:
+  direct unit coverage exists for `lib/command-registry.ts`,
+  `lib/utils/rpc.ts`, and `app/rpc.ts`, plus at least one behavioural assertion
+  for command-dispatch continuity,
 - a transport interface exists for command invocation and event streams,
 - an Electron adapter implements that interface using current RPC/IPC wiring,
 - command invocation path runs through the adapter end-to-end,
@@ -56,6 +60,8 @@ Done criteria for this roadmap item:
 - Place shared contracts in `shared/` and avoid introducing new direct
   `frontend <-> backend` imports.
 - Do not add new third-party dependencies.
+- Do not begin transport abstraction refactor edits until the coverage-first
+  gate is complete and committed.
 - Update `docs/developers-guide.md` for any developer workflow changes created
   by this transport seam.
 - Mark roadmap entry `1.1.2` done only after all required gates succeed.
@@ -109,13 +115,16 @@ Done criteria for this roadmap item:
   `lib/actions/ui.ts`, `lib/command-registry.ts`, `lib/utils/rpc.ts`,
   `lib/index.tsx`, `app/rpc.ts`, and `app/ui/window.ts`.
 - [x] (2026-02-12 00:00Z) Drafted this ExecPlan.
+- [x] (2026-02-12 00:00Z) Recorded user requirement that IPC/command-registry
+  coverage must be in place before any implementation work.
 - [ ] Await explicit approval to begin implementation.
-- [ ] Stage A complete: finalise transport boundary and migration map.
-- [ ] Stage B complete: add shared transport contracts.
-- [ ] Stage C complete: implement Electron transport adapter.
-- [ ] Stage D complete: migrate command path and event subscriptions.
-- [ ] Stage E complete: add regression tests and documentation updates.
-- [ ] Stage F complete: run required gates, update roadmap status, and commit.
+- [ ] Stage A complete: add and commit coverage-first IPC/registry tests.
+- [ ] Stage B complete: finalise transport boundary and migration map.
+- [ ] Stage C complete: add shared transport contracts.
+- [ ] Stage D complete: implement Electron transport adapter.
+- [ ] Stage E complete: migrate command path and event subscriptions.
+- [ ] Stage F complete: documentation updates, full gates, roadmap status, and
+  final commits.
 
 ## Surprises & discoveries
 
@@ -133,6 +142,15 @@ Done criteria for this roadmap item:
   Impact: adapter design must support both fire-and-forget command dispatch and
   request/response calls.
 
+- Observation: there is currently no direct unit test coverage for
+  `lib/utils/rpc.ts`, `app/rpc.ts`, or concrete behaviour in
+  `lib/command-registry.ts`; existing coverage mocks the registry surface.
+  Evidence: `test/unit/hyper-effects.test.ts` mocks
+  `../../lib/command-registry`, and test searches show no direct unit tests
+  targeting `lib/utils/rpc.ts` or `app/rpc.ts`.
+  Impact: continuity risk is too high for a refactor unless the coverage-first
+  gate is implemented before transport changes.
+
 ## Decision log
 
 - Decision: define transport contracts in `shared/` and implement the Electron
@@ -148,6 +166,12 @@ Done criteria for this roadmap item:
 
 - Decision: keep existing RPC event names and payload contracts unchanged.
   Rationale: roadmap `1.1.2` targets abstraction, not protocol redesign.
+  Date/Author: 2026-02-12 / Codex
+
+- Decision: enforce coverage-first sequencing so targeted IPC/registry tests are
+  added and committed before any transport refactor edits.
+  Rationale: user requirement and current coverage gap indicate continuity risk
+  if refactor work starts first.
   Date/Author: 2026-02-12 / Codex
 
 ## Outcomes & retrospective
@@ -191,40 +215,48 @@ Key files expected in this milestone:
 
 ## Plan of work
 
-Stage A: Transport boundary definition and migration map (no behaviour changes).
+Stage A: Coverage-first hardening gate (no transport refactor edits).
+
+Add direct unit tests for:
+
+- `lib/command-registry.ts` (`getRegisteredKeys`, handler registration, and
+  role-command prevention),
+- `lib/utils/rpc.ts` (init handshake, cached `window.__rpcId` path, emit
+  readiness guard, listener cleanup),
+- `app/rpc.ts` (channel wiring, destroyed-window emit guard, and destroy
+  cleanup),
+- one behavioural assertion that validates command dispatch continuity through
+  command surface plumbing.
+
+Commit this test-only change first after full gates pass.
+
+Stage B: Transport boundary definition and migration map (no behaviour changes).
 
 Define the minimal host-agnostic interfaces needed now: command invocation,
 request/response invocation, and event subscription lifecycle. Document which
 existing modules will depend on the new transport contract and which stay
 unchanged in this milestone.
 
-Stage B: Shared contract scaffolding.
+Stage C: Shared contract scaffolding.
 
 Add transport interfaces to `shared/` with explicit typed methods that map to
 existing `MainEvents`, `RendererEvents`, and IPC command contracts. Export these
 contracts via `shared/src/index.ts`.
 
-Stage C: Electron adapter implementation.
+Stage D: Electron adapter implementation.
 
 Implement an Electron adapter that delegates to existing renderer RPC client and
 `ipcRenderer.invoke` wiring. The adapter must satisfy the shared transport
 interface and keep runtime behaviour unchanged.
 
-Stage D: Command-layer and event-stream integration.
+Stage E: Command-layer and event-stream integration.
 
 Migrate command-layer modules to consume the transport adapter instead of direct
 `rpc` or `ipcRenderer` imports. Update bootstrap event wiring to consume the
 transport event stream abstraction where this can be done safely in this
 milestone.
 
-Stage E: Tests and documentation.
-
-Add regression tests proving command invocation now routes via the adapter and
-that event subscription semantics remain intact. Update
-`docs/developers-guide.md` with the new rule: command-layer code must depend on
-transport contracts/adapters, not Electron primitives.
-
-Stage F: Validation, roadmap completion, and commits.
+Stage F: Documentation, validation, roadmap completion, and commits.
 
 Run required gates with logged output, resolve any failures, and only then mark
 roadmap entry `1.1.2` done. Record outcomes in this ExecPlan and keep commits
@@ -232,28 +264,29 @@ atomic.
 
 ## Concrete steps
 
-1. Create shared transport contracts in `shared/src/types/transport.ts` and
+1. Add and commit coverage-first tests before any transport refactor:
+
+   - direct unit tests for `lib/command-registry.ts`,
+   - direct unit tests for `lib/utils/rpc.ts`,
+   - direct unit tests for `app/rpc.ts`,
+   - one behavioural assertion for command-dispatch continuity.
+
+2. Create shared transport contracts in `shared/src/types/transport.ts` and
    export them from `shared/src/index.ts`.
 
-2. Implement `ElectronIpcTransport` in a renderer transport module (for
+3. Implement `ElectronIpcTransport` in a renderer transport module (for
    example `lib/transport/electron-ipc-transport.ts`) by composing existing
    `lib/rpc.ts` and `lib/utils/ipc.ts` capabilities behind the new interface.
 
-3. Replace direct command-layer transport usage:
+4. Replace direct command-layer transport usage:
 
    - update `lib/actions/ui.ts::execCommand` to call adapter command invocation,
    - update `lib/command-registry.ts::getRegisteredKeys` to call adapter
      request/response invocation,
    - ensure these modules no longer import `../rpc` or `./utils/ipc` directly.
 
-4. Migrate selected renderer bootstrap subscriptions in `lib/index.tsx` to use
+5. Migrate selected renderer bootstrap subscriptions in `lib/index.tsx` to use
    adapter event-stream methods, keeping event names/payloads unchanged.
-
-5. Add unit tests covering:
-
-   - adapter delegation and subscription/unsubscription behaviour,
-   - command execution action path using adapter,
-   - keymap lookup path using adapter invoke contract.
 
 6. Update documentation:
 
@@ -276,14 +309,19 @@ atomic.
 
 9. Commit strategy (atomic):
 
-   - Commit 1: shared transport contracts + Electron adapter scaffold.
-   - Commit 2: command-layer migration + tests.
-   - Commit 3: docs updates + roadmap check-off + final gate evidence updates.
+   - Commit 1: coverage-first IPC/command-registry tests only.
+   - Commit 2: shared transport contracts + Electron adapter scaffold.
+   - Commit 3: command-layer migration to transport abstraction.
+   - Commit 4: docs updates + roadmap check-off + final gate evidence updates.
 
 ## Validation and acceptance
 
 Roadmap `1.1.2` is complete when all of the following are true:
 
+- Coverage-first gate passed before refactor start:
+  - direct unit tests exist for `lib/command-registry.ts`,
+    `lib/utils/rpc.ts`, and `app/rpc.ts`,
+  - behavioural command-dispatch continuity assertion exists and passes.
 - Transport interface exists for command invocation and event streams.
 - Electron adapter implements that interface using existing RPC/IPC plumbing.
 - Command invocation still works end-to-end from renderer command dispatch to
@@ -330,3 +368,5 @@ and record the deferred event migration in `Decision log`.
 
 - 2026-02-12: Initial draft created from roadmap `1.1.2` context and current
   codebase wiring.
+- 2026-02-12: Revised sequencing to enforce coverage-first gate before any
+  transport abstraction implementation work, per user requirement.
