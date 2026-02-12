@@ -1,3 +1,4 @@
+/** @file Shared process, IPC, and typed event contracts used across packages. */
 import type {ExecFileOptions, ExecOptions} from 'node:child_process';
 
 import type {IpcMain, IpcRenderer} from 'electron';
@@ -6,6 +7,7 @@ import type parseUrl from 'parse-url';
 
 import type {configOptions} from './config';
 
+/** Session state synchronized between backend and renderer layers. */
 export type Session = {
   uid: string;
   rows?: number | null;
@@ -17,6 +19,7 @@ export type Session = {
   profile: string;
 };
 
+/** Optional arguments accepted when creating or splitting sessions. */
 export type sessionExtraOptions = {
   cwd?: string;
   splitDirection?: 'HORIZONTAL' | 'VERTICAL';
@@ -29,6 +32,7 @@ export type sessionExtraOptions = {
   profile?: string;
 };
 
+/** Events emitted from the renderer and consumed by the privileged process. */
 export type MainEvents = {
   close: never;
   command: string;
@@ -47,6 +51,7 @@ export type MainEvents = {
   unmaximize: never;
 };
 
+/** Events emitted from the privileged process and consumed by the renderer. */
 export type RendererEvents = {
   ready: never;
   'add notification': {text: string; url: string; dismissable: boolean};
@@ -92,11 +97,10 @@ export type RendererEvents = {
   'session data send': {uid: string | null; data: string; escaped?: boolean};
 };
 
-/**
- * Get keys of T where the value is not never
- */
+/** Get keys of T where the value is not never. */
 export type FilterNever<T> = {[K in keyof T]: T[K] extends never ? never : K}[keyof T];
 
+/** Minimal typed emitter contract shared by frontend and backend event bridges. */
 export interface TypedEmitter<Events> {
   on<E extends keyof Events>(event: E, listener: (args: Events[E]) => void): this;
   once<E extends keyof Events>(event: E, listener: (args: Events[E]) => void): this;
@@ -109,6 +113,7 @@ export interface TypedEmitter<Events> {
 
 type OptionalPromise<T> = T | Promise<T>;
 
+/** IPC command signatures available over Electron invoke handlers. */
 export type IpcCommands = {
   'child_process.exec': (command: string, options: ExecOptions) => {stdout: string | Buffer; stderr: string | Buffer};
   'child_process.execFile': (
@@ -127,6 +132,7 @@ export type IpcCommands = {
   getDecoratedKeymaps: () => Record<string, string[]>;
 };
 
+/** Type-safe wrapper around Electron IpcMain.handle for shared command contracts. */
 export interface IpcMainWithCommands extends IpcMain {
   handle<E extends keyof IpcCommands>(
     channel: E,
@@ -137,6 +143,7 @@ export interface IpcMainWithCommands extends IpcMain {
   ): void;
 }
 
+/** Type-safe wrapper around Electron IpcRenderer.invoke for shared command contracts. */
 export interface IpcRendererWithCommands extends IpcRenderer {
   invoke<E extends keyof IpcCommands>(
     channel: E,

@@ -3,6 +3,46 @@ const fs = require('node:fs');
 const childProcess = require('node:child_process');
 const {Arch} = require('electron-builder');
 
+const SUPPORTED_ARCHITECTURES = new Set(['x64', 'arm64']);
+
+function normalizeArch(arch, sourceLabel) {
+  if (typeof arch !== 'string' || arch.length === 0) {
+    throw new Error(`Expected a string architecture from ${sourceLabel}, received "${String(arch)}".`);
+  }
+
+  if (arch === 'x64' || arch === 'amd64') {
+    return 'x64';
+  }
+
+  if (arch === 'arm64' || arch === 'aarch64') {
+    return 'arm64';
+  }
+
+  if (arch === 'arm') {
+    throw new Error('Unsupported architecture "arm". Snapshot artifacts are available only for x64 and arm64.');
+  }
+
+  throw new Error(
+    `Unsupported architecture "${arch}" from ${sourceLabel}. Supported values: ${Array.from(SUPPORTED_ARCHITECTURES).join(', ')}.`
+  );
+}
+
+function resolveContextArch(context) {
+  if (typeof context.arch === 'string') {
+    return normalizeArch(context.arch, 'afterPack context.arch');
+  }
+
+  if (typeof context.arch === 'number' && Arch && Arch[context.arch]) {
+    return normalizeArch(Arch[context.arch], 'electron-builder Arch enum');
+  }
+
+  if (context.arch === undefined) {
+    return normalizeArch(process.arch, 'process.arch fallback');
+  }
+
+  throw new Error(`Unsupported context.arch type "${typeof context.arch}".`);
+}
+
 function copySnapshot(pathToElectron, archToCopy) {
   const snapshotFileName = 'snapshot_blob.bin';
   const v8ContextFileName = getV8ContextFileName(archToCopy);
@@ -88,14 +128,7 @@ function resolveMacBundleName(context) {
 }
 
 exports.default = async (context) => {
-  const archToCopy =
-    typeof context.arch === 'string'
-      ? context.arch
-      : Arch && context.arch !== undefined
-        ? Arch[context.arch]
-        : process.arch.startsWith('arm')
-          ? 'arm64'
-          : 'x64';
+  const archToCopy = resolveContextArch(context);
   const pathToElectron =
     process.platform === 'darwin'
       ? path.join(
@@ -113,10 +146,16 @@ exports.default = async (context) => {
 };
 
 if (require.main === module) {
-  const archToCopy = process.env.npm_config_arch;
+  const targetArch = process.env.npm_config_arch;
+  if (!targetArch) {
+    throw new Error('npm_config_arch must be set when running cp-snapshot.js directly.');
+  }
+
+  const archToCopy = normalizeArch(targetArch, 'npm_config_arch');
+  const currentArch = normalizeArch(process.arch, 'process.arch');
   const pathToElectron = getPathToElectron();
   ensureElectronDist(pathToElectron);
-  if ((process.arch.startsWith('arm') ? 'arm64' : 'x64') === archToCopy) {
+  if (currentArch === archToCopy) {
     copySnapshot(pathToElectron, archToCopy);
   }
 }

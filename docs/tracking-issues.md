@@ -30,9 +30,11 @@ Issue: [#23](https://github.com/leynos/velocetty/issues/23)
 ### BOUNDARY-001 summary
 
 - Extend `scripts/check-package-boundaries.mjs` to detect boundary violations in
-  CommonJS `require(...)` usage as well as ESM `import`/`export` forms.
-- Prefer AST-based parsing over regex-only matching so alias, relative,
-  dynamic, and CommonJS import forms are evaluated consistently.
+  CommonJS `require(...)` usage as well as ECMAScript modules (ESM)
+  `import`/`export` forms.
+- Prefer Abstract Syntax Tree (AST)-based parsing over regex-only
+  matching so alias, relative, dynamic, and CommonJS import forms are
+  evaluated consistently.
 - Add targeted unit tests for the checker to prevent regressions in import
   detection logic.
 
@@ -63,3 +65,22 @@ Issue: [#22](https://github.com/leynos/velocetty/issues/22)
 - `bun run generate-schema` reads source types from `shared/` directly.
 - `typings/config.d.ts` is no longer part of schema generation inputs.
 - Generated schema remains identical for runtime consumers and all gates pass.
+
+## CONFIG-001 Support hot-reload for WebGL renderer setting
+
+Status: Open  
+Owner: TBD  
+Last updated: 2026-02-12
+
+### CONFIG-001 summary
+
+- Remove the current requirement to restart terminal sessions after changing
+  `webGLRenderer`.
+- Apply renderer-setting changes to existing sessions without reopening tabs.
+- Preserve fallback behavior when WebGL contexts are unavailable.
+
+### CONFIG-001 exit criteria
+
+- Changing `webGLRenderer` takes effect for active sessions without restart.
+- Unit or integration tests cover hot-reload behavior and fallback handling.
+- `make lint` and `make test` remain green.

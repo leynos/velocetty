@@ -1,5 +1,7 @@
+/** @file Shared configuration schema and runtime configuration type contracts. */
 import type {FontWeight} from 'xterm';
 
+/** Terminal color palette model used by profile configuration. */
 export type ColorMap = {
   black: string;
   blue: string;
@@ -177,10 +179,13 @@ type profileConfigOptions = {
   uiFontFamily?: string;
   /**
    * Whether to use the WebGL renderer. Set it to false to use canvas-based
-   * rendering (slower, but supports transparent backgrounds)
+   * rendering (slower, but supports transparent backgrounds).
+   *
+   * In the current architecture, changing this setting requires terminal
+   * restart. Track hot-reload support under CONFIG-001 in
+   * docs/tracking-issues.md.
    */
   webGLRenderer: boolean;
-  // TODO: does not pick up config changes automatically, need to restart terminal
   /**
    * keypress required for weblink activation: [ctrl | alt | meta | shift]
    */
@@ -191,6 +196,7 @@ type profileConfigOptions = {
   workingDirectory: string;
 };
 
+/** Fully resolved configuration shape after profile defaults and overrides are applied. */
 export type configOptions = rootConfigOptions &
   profileConfigOptions & {
     /**
@@ -210,6 +216,7 @@ export type configOptions = rootConfigOptions &
     }[];
   };
 
+/** Raw user configuration payload as stored in config files. */
 export type rawConfig = {
   config?: configOptions;
   /**
@@ -234,6 +241,7 @@ export type rawConfig = {
   keymaps?: {[k: string]: string | string[]};
 };
 
+/** Parsed configuration with normalized plugin and keymap arrays. */
 export type parsedConfig = {
   config: configOptions;
   plugins: string[];

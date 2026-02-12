@@ -2,24 +2,20 @@
 import path from 'node:path';
 
 import {getGlobal, require as remoteRequire} from '@electron/remote';
-import type {configOptions} from '@shared/types/config';
+import type {IpcCommands} from '@shared/types/common';
 import type {VelocettyRuntimeGlobals} from '../../typings/runtime-globals';
 
 export type {VelocettyRuntimeGlobals};
 
-type LoadedPluginVersion = {name: string; version: string};
-type PluginPaths = {plugins: string[]; localPlugins: string[]};
-type PluginBasePaths = {path: string; localPath: string};
-type DeprecatedConfigMap = Record<string, {css: string[]}>;
-
-export type RemotePluginsModule = {
-  getLoadedPluginVersions: () => LoadedPluginVersion[];
-  getPaths: () => PluginPaths;
-  getBasePaths: () => PluginBasePaths;
-  getDeprecatedConfig: () => DeprecatedConfigMap;
-  getDecoratedConfig: (profile: string) => configOptions;
-  getDecoratedKeymaps: () => Record<string, string[]>;
-};
+export type RemotePluginsModule = Pick<
+  IpcCommands,
+  | 'getLoadedPluginVersions'
+  | 'getPaths'
+  | 'getBasePaths'
+  | 'getDeprecatedConfig'
+  | 'getDecoratedConfig'
+  | 'getDecoratedKeymaps'
+>;
 
 const getCandidatePluginModulePaths = (): string[] => {
   const appRootPath = getGlobal('__velocettyAppRoot') as VelocettyRuntimeGlobals['__velocettyAppRoot'];

@@ -2,6 +2,7 @@
 /** @file Enforces one-way imports across frontend, backend, and shared layers. */
 import {readdirSync, readFileSync, statSync} from 'node:fs';
 import {dirname, extname, relative, resolve} from 'node:path';
+import ts from 'typescript';
 
 const rootDir = process.cwd();
 const sourceExtensions = new Set(['.ts', '.tsx', '.mts', '.cts']);
@@ -29,23 +30,66 @@ const layerRules = {
 
 const isSourceFile = (filePath) => sourceExtensions.has(extname(filePath));
 
+const getScriptKind = (filePath) => {
+  if (filePath.endsWith('.tsx')) {
+    return ts.ScriptKind.TSX;
+  }
+
+  if (filePath.endsWith('.mts')) {
+    return ts.ScriptKind.MTS;
+  }
+
+  if (filePath.endsWith('.cts')) {
+    return ts.ScriptKind.CTS;
+  }
+
+  return ts.ScriptKind.TS;
+};
+
 const readImports = (filePath) => {
   const source = readFileSync(filePath, 'utf8');
-  const importExportPattern = /(?:import|export)\s+(?:[^'"`]*?\s+from\s+)?['"]([^'"]+)['"]/g;
-  const dynamicImportPattern = /import\(\s*['"]([^'"]+)['"]\s*\)/g;
+  const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, getScriptKind(filePath));
+  const importSpecifiers = [];
 
-  return [...source.matchAll(importExportPattern), ...source.matchAll(dynamicImportPattern)].map((match) => match[1]);
+  const visit = (node) => {
+    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier) {
+      if (ts.isStringLiteralLike(node.moduleSpecifier)) {
+        importSpecifiers.push(node.moduleSpecifier.text);
+      }
+    }
+
+    if (ts.isCallExpression(node) && node.arguments.length === 1) {
+      const [firstArgument] = node.arguments;
+      if (ts.isStringLiteralLike(firstArgument)) {
+        const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
+        const isCommonJsRequire = ts.isIdentifier(node.expression) && node.expression.text === 'require';
+
+        if (isDynamicImport || isCommonJsRequire) {
+          importSpecifiers.push(firstArgument.text);
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+
+  return importSpecifiers;
 };
 
 const collectFiles = (directoryPath, output = []) => {
-  const stats = statSync(directoryPath, {throwIfNoEntry: false});
-  if (!stats || !stats.isDirectory()) {
+  const directoryStats = statSync(directoryPath, {throwIfNoEntry: false});
+  if (!directoryStats || !directoryStats.isDirectory()) {
     return output;
   }
 
   for (const entry of readdirSync(directoryPath)) {
     const fullPath = resolve(directoryPath, entry);
-    const entryStats = statSync(fullPath);
+    const entryStats = statSync(fullPath, {throwIfNoEntry: false});
+    if (!entryStats) {
+      continue;
+    }
 
     if (entryStats.isDirectory()) {
       collectFiles(fullPath, output);
@@ -83,6 +127,14 @@ const resolvesToDisallowedRoot = (fromFile, importSpecifier, disallowedRoots) =>
   return disallowedRoots.some((root) => relativeCandidate.startsWith(`${root}/`) || relativeCandidate === root);
 };
 
+const isBareDisallowedRootSpecifier = (importSpecifier, disallowedRoots) => {
+  if (importSpecifier.startsWith('.') || importSpecifier.startsWith('@') || importSpecifier.includes(':')) {
+    return false;
+  }
+
+  return disallowedRoots.some((root) => importSpecifier === root || importSpecifier.startsWith(`${root}/`));
+};
+
 const violations = [];
 
 for (const roots of Object.values(layerDefinitions)) {
@@ -97,8 +149,9 @@ for (const roots of Object.values(layerDefinitions)) {
       for (const importSpecifier of readImports(filePath)) {
         const aliasViolation = rules.disallowedAliases.some((aliasPrefix) => importSpecifier.startsWith(aliasPrefix));
         const relativeViolation = resolvesToDisallowedRoot(filePath, importSpecifier, rules.disallowedRoots);
+        const bareRootViolation = isBareDisallowedRootSpecifier(importSpecifier, rules.disallowedRoots);
 
-        if (aliasViolation || relativeViolation) {
+        if (aliasViolation || relativeViolation || bareRootViolation) {
           violations.push({
             file: relative(rootDir, filePath),
             importSpecifier,

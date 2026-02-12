@@ -12,8 +12,9 @@
   `docs/velocetty-product-requirements-document.md`, and
   `docs/developers-guide.md`.
 
-This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
+This Execution Plan (ExecPlan) is a living document.
+The sections `Constraints`, `Tolerances`, `Risks`, `Progress`,
+`Surprises & Discoveries`, `Decision Log`, and
 `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: DONE (2026-02-12)
@@ -26,9 +27,10 @@ Implementation approval received on 2026-02-11 and execution is underway.
 ## Purpose / Big picture
 
 Roadmap item `1.1.1` requires explicit package boundaries and one-way
-cross-package imports. The design and PRD both define the target split:
-`frontend/` for UI code, `backend/` for privileged code, and `shared/` for
-contracts reused by both sides.
+cross-package imports. The design and Product Requirements Document
+(PRD) both define the target split:
+`frontend/` for user interface (UI) code, `backend/` for privileged
+code, and `shared/` for contracts reused by both sides.
 
 Success is observable when:
 
@@ -131,7 +133,7 @@ After all acceptance checks pass, roadmap entry `1.1.1` is marked done in
   and must be incremental.
 
 - Observation: many renderer and main-process files import from `typings/`, and
-  at least one CLI file imports `app/package.json` directly.
+  at least one command-line interface (CLI) file imports `app/package.json` directly.
   Evidence: import scans over `app/`, `lib/`, and `cli/`.
   Impact: shared contract migration requires both path aliasing and import
   cleanup to enforce one-way boundaries.
@@ -173,7 +175,7 @@ After all acceptance checks pass, roadmap entry `1.1.1` is marked done in
 
 - Decision: keep runtime packaging outputs stable while introducing package
   build outputs for isolated verification.
-  Rationale: this minimises blast radius and keeps compatibility with current
+  Rationale: this minimizes blast radius and keeps compatibility with current
   `make build` pipeline.
   Date/Author: 2026-02-11 / Codex
 
@@ -194,7 +196,7 @@ After all acceptance checks pass, roadmap entry `1.1.1` is marked done in
 - Decision: keep package-isolation checks as package-local `tsgo --project`
   runs with `noEmit`, while the production build keeps app compilation focused
   on `app/tsconfig.json`.
-  Rationale: this proves isolation without destabilising the existing
+  Rationale: this proves isolation without destabilizing the existing
   application build pipeline.
   Date/Author: 2026-02-11 / Codex
 
@@ -214,8 +216,9 @@ following follow-up tracks resolve known limitations identified during the
 post-implementation review:
 
 - `BOUNDARY-001`: extend `scripts/check-package-boundaries.mjs` so boundary
-  checks parse both ESM imports and CommonJS `require(...)` usage. Preferred
-  approach: move from regex-only parsing to a TypeScript AST walk, then add
+  checks parse both ECMAScript modules (ESM) imports and CommonJS
+  `require(...)` usage. Preferred approach: move from regex-only
+  parsing to a TypeScript Abstract Syntax Tree (AST) walk, then add
   regression tests covering alias imports, relative imports, dynamic imports,
   and `require` forms.
 - `CONTRACT-001`: make schema generation source directly from
@@ -270,7 +273,7 @@ Stage D: Import migration and boundary enforcement.
 
 Update frontend and backend imports to consume shared contracts via aliases.
 Remove direct frontend/backend cross-imports. Add an automated boundary check so
-future imports violating directionality fail CI/local gates.
+future imports violating directionality fail continuous integration (CI)/local gates.
 
 Stage E: Documentation and roadmap updates.
 

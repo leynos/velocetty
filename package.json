@@ -13,7 +13,7 @@
     "build:frontend": "bunx tsgo --project frontend/tsconfig.json -v",
     "build:backend": "bunx tsgo --project backend/tsconfig.json -v",
     "build:packages": "bun run build:shared && bun run build:frontend && bun run build:backend",
-    "build": "bun run build:packages && bun node_modules/cross-env/src/bin/cross-env.js NODE_ENV=production bun ./build/esbuild/build.ts --mode=production && bunx tsgo --build app/tsconfig.json -v",
+    "build": "bun run build:packages && bun node_modules/cross-env/src/bin/cross-env.js NODE_ENV=production bun ./build/esbuild/build.ts --mode=production && bunx tsgo --project app/tsconfig.json -v",
     "build:hyper-app": "bun ./build/esbuild/build.ts --mode=production --target=hyper-app",
     "lint": "bun node_modules/@biomejs/biome/bin/biome check . && bun run check:boundaries",
     "check:types": "bunx tsgo --project tsconfig.typecheck.json",
@@ -42,7 +42,7 @@
     "mk-snapshot": "bun node_modules/cross-env/src/bin/cross-env.js ELECTRON_CUSTOM_VERSION=$npm_package_devDependencies_electron bun bin/download-mksnapshot.js && bun bin/mk-snapshot.js",
     "cp-snapshot": "bun bin/cp-snapshot.js",
     "check:boundaries": "bun ./scripts/check-package-boundaries.mjs",
-    "generate-schema": "bunx typescript-json-schema ./typings/config.d.ts rawConfig -o ./shared/schemas/schema.json --required --ignoreErrors && bun ./bin/sync-shared-schema.cjs && bun node_modules/@biomejs/biome/bin/biome format --write ./shared/schemas/schema.json ./app/config/schema.json"
+    "generate-schema": "bunx typescript-json-schema ./typings/config.d.ts rawConfig -o ./shared/schemas/schema.json --required --ignoreErrors && bun ./bin/sync-shared-schema.mjs && bun node_modules/@biomejs/biome/bin/biome format --write ./shared/schemas/schema.json ./app/config/schema.json"
   },
   "license": "MIT",
   "author": {
