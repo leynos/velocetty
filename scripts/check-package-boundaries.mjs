@@ -46,28 +46,59 @@ const getScriptKind = (filePath) => {
   return ts.ScriptKind.TS;
 };
 
+const isStaticImportOrExport = (node) =>
+  (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && Boolean(node.moduleSpecifier);
+
+const extractStaticImportSpecifier = (node) => {
+  if (!isStaticImportOrExport(node)) {
+    return null;
+  }
+
+  if (!ts.isStringLiteralLike(node.moduleSpecifier)) {
+    return null;
+  }
+
+  return node.moduleSpecifier.text;
+};
+
+const isDynamicImportCall = (node) =>
+  ts.isCallExpression(node) && node.arguments.length === 1 && node.expression.kind === ts.SyntaxKind.ImportKeyword;
+
+const isCommonJsRequireCall = (node) =>
+  ts.isCallExpression(node) &&
+  node.arguments.length === 1 &&
+  ts.isIdentifier(node.expression) &&
+  node.expression.text === 'require';
+
+const extractDynamicImportSpecifier = (node) => {
+  if (!isDynamicImportCall(node) && !isCommonJsRequireCall(node)) {
+    return null;
+  }
+
+  const [firstArgument] = node.arguments;
+  if (!ts.isStringLiteralLike(firstArgument)) {
+    return null;
+  }
+
+  return firstArgument.text;
+};
+
 const readImports = (filePath) => {
   const source = readFileSync(filePath, 'utf8');
   const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, getScriptKind(filePath));
   const importSpecifiers = [];
 
   const visit = (node) => {
-    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier) {
-      if (ts.isStringLiteralLike(node.moduleSpecifier)) {
-        importSpecifiers.push(node.moduleSpecifier.text);
+    if (isStaticImportOrExport(node)) {
+      const staticImportSpecifier = extractStaticImportSpecifier(node);
+      if (staticImportSpecifier !== null) {
+        importSpecifiers.push(staticImportSpecifier);
       }
     }
 
-    if (ts.isCallExpression(node) && node.arguments.length === 1) {
-      const [firstArgument] = node.arguments;
-      if (ts.isStringLiteralLike(firstArgument)) {
-        const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
-        const isCommonJsRequire = ts.isIdentifier(node.expression) && node.expression.text === 'require';
-
-        if (isDynamicImport || isCommonJsRequire) {
-          importSpecifiers.push(firstArgument.text);
-        }
-      }
+    const dynamicImportSpecifier = extractDynamicImportSpecifier(node);
+    if (dynamicImportSpecifier !== null) {
+      importSpecifiers.push(dynamicImportSpecifier);
     }
 
     ts.forEachChild(node, visit);
