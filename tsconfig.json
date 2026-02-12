@@ -2,7 +2,7 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist/tmp/root/",
-    "noImplicitAny": false
+    "noImplicitAny": true
   },
   "include": ["./app/", "./lib/", "./cli/", "./typings/", "./shared/src/"],
   "references": [
