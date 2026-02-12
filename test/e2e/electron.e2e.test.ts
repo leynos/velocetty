@@ -167,42 +167,18 @@ const waitForStability = async (durationMs: number) =>
     durationMs + 100
   );
 
-const buildPackagedTimeoutDiagnostics = (
-  spawned: ReturnType<typeof spawn>,
-  outputTracker: ReturnType<typeof createSpawnOutputTracker>,
-  timeoutMs: number,
-  error: unknown
-) => {
-  const output = outputTracker.getOutput();
-  const markers = [
-    ['running in prod mode', /running in prod mode/i],
-    ['electron will open', /electron will open/i],
-    ['[e2e] renderer-ready', /\[e2e\] renderer-ready/i]
-  ] as const;
-  const markerStatus = markers.map(([label, matcher]) => `${label}: ${matcher.test(output) ? 'seen' : 'missing'}`);
-  const waitError = error instanceof Error ? error.message : String(error);
-  const spawnState = `pid=${spawned.pid ?? 'unknown'} exitCode=${spawned.exitCode ?? 'null'} signalCode=${spawned.signalCode ?? 'null'} killed=${spawned.killed}`;
-  const outputTail = output.split('\n').slice(-120).join('\n').slice(-16_000);
-  const lines = [
-    `Packaged Electron did not emit [e2e] renderer-ready within ${timeoutMs}ms.`,
-    `Underlying wait error: ${waitError}`,
-    `Spawn state: ${spawnState}`,
-    `Marker status: ${markerStatus.join(', ')}`,
-    'Output tail (last 120 lines, max 16000 chars):',
-    outputTail
-  ];
-  return lines.join('\n');
-};
-
-const buildDevelopmentTimeoutDiagnostics = (
+const buildTimeoutDiagnostics = (
+  modeLabel: string,
+  modeMarker: RegExp,
   spawned: ReturnType<typeof spawn> | null,
   outputTracker: ReturnType<typeof createSpawnOutputTracker>,
   timeoutMs: number,
   error: unknown
 ) => {
   const output = outputTracker.getOutput();
+  const runningModeLabel = modeLabel === 'Packaged' ? 'running in prod mode' : 'running in dev mode';
   const markers = [
-    ['running in dev mode', /running in dev mode/i],
+    [runningModeLabel, modeMarker],
     ['electron will open', /electron will open/i],
     ['[e2e] renderer-ready', /\[e2e\] renderer-ready/i]
   ] as const;
@@ -213,7 +189,7 @@ const buildDevelopmentTimeoutDiagnostics = (
     : 'spawned process: null';
   const outputTail = output.split('\n').slice(-120).join('\n').slice(-16_000);
   const lines = [
-    `Development Electron did not emit [e2e] renderer-ready within ${timeoutMs}ms.`,
+    `${modeLabel} Electron did not emit [e2e] renderer-ready within ${timeoutMs}ms.`,
     `Underlying wait error: ${waitError}`,
     `Spawn state: ${spawnState}`,
     `Marker status: ${markerStatus.join(', ')}`,
@@ -221,6 +197,24 @@ const buildDevelopmentTimeoutDiagnostics = (
     outputTail
   ];
   return lines.join('\n');
+};
+
+const buildPackagedTimeoutDiagnostics = (
+  spawned: ReturnType<typeof spawn>,
+  outputTracker: ReturnType<typeof createSpawnOutputTracker>,
+  timeoutMs: number,
+  error: unknown
+) => {
+  return buildTimeoutDiagnostics('Packaged', /running in prod mode/i, spawned, outputTracker, timeoutMs, error);
+};
+
+const buildDevelopmentTimeoutDiagnostics = (
+  spawned: ReturnType<typeof spawn> | null,
+  outputTracker: ReturnType<typeof createSpawnOutputTracker>,
+  timeoutMs: number,
+  error: unknown
+) => {
+  return buildTimeoutDiagnostics('Development', /running in dev mode/i, spawned, outputTracker, timeoutMs, error);
 };
 
 interface TestContext {
