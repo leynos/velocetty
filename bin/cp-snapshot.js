@@ -12,14 +12,6 @@ const ARCH_ALIASES = {
 };
 const UNSUPPORTED_ARCHES = new Set(['arm']);
 
-const ARCH_ENUM_TO_NAME = {
-  0: 'ia32',
-  1: 'x64',
-  2: 'armv7l',
-  3: 'arm64',
-  4: 'universal'
-};
-
 function validateArchInput(arch, sourceLabel) {
   if (typeof arch !== 'string' || arch.length === 0) {
     throw new Error(`Expected a string architecture from ${sourceLabel}, received "${String(arch)}".`);
@@ -48,7 +40,7 @@ const isEnumArch = (context) => typeof context.arch === 'number';
 const isUndefinedArch = (context) => context.arch === undefined;
 
 const resolveEnumArch = (contextArch) => {
-  const resolvedArch = Arch?.[contextArch] ?? ARCH_ENUM_TO_NAME[contextArch];
+  const resolvedArch = Arch?.[contextArch];
   if (typeof resolvedArch === 'string') {
     return normalizeArch(resolvedArch, 'electron-builder Arch enum');
   }
@@ -56,7 +48,7 @@ const resolveEnumArch = (contextArch) => {
   return normalizeArch(process.arch, 'process.arch fallback for unknown context.arch enum');
 };
 
-const isValidArchEnum = (arch) => typeof arch === 'number' && Arch && Arch[arch];
+const isValidArchEnum = (arch) => typeof arch === 'number' && typeof Arch?.[arch] === 'string';
 
 function resolveContextArch(context) {
   if (isStringArch(context)) {
@@ -225,5 +217,7 @@ if (require.main === module) {
   ensureElectronDist(pathToElectron);
   if (currentArch === archToCopy) {
     copySnapshot(pathToElectron, archToCopy);
+  } else {
+    console.log(`Skipping snapshot copy: current architecture ${currentArch} does not match requested ${archToCopy}.`);
   }
 }

@@ -1,4 +1,9 @@
-/** @file Shared updater action constants and action contracts. */
+/**
+ * @file Shared updater action constants and action contracts.
+ * Invariant: action type literals in this module are stable reducer and IPC
+ * contracts and must not be renamed without coordinated migration.
+ * Cross-links: consumed by app/updater.ts and lib/reducers/ui.ts.
+ */
 /** Action type constant for requesting update installation. */
 export const UPDATE_INSTALL = 'UPDATE_INSTALL';
 /** Action type constant for reporting available updates. */

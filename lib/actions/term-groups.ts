@@ -1,3 +1,4 @@
+/** @file Terminal group action creators and split-session orchestration. */
 import {asProfileId, asSessionId, asTermGroupId} from '@shared/types/common';
 import {SESSION_REQUEST} from '@shared/constants/sessions';
 import {
