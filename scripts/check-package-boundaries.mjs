@@ -83,30 +83,20 @@ const extractDynamicImportSpecifier = (node) => {
   return firstArgument.text;
 };
 
+const pushSpecifierIfPresent = (importSpecifiers, specifier) => {
+  if (specifier !== null) {
+    importSpecifiers.push(specifier);
+  }
+};
+
 const handleImportExportNode = (node, importSpecifiers) => {
-  if (!isStaticImportOrExport(node)) {
-    return;
-  }
-
   const staticImportSpecifier = extractStaticImportSpecifier(node);
-  if (staticImportSpecifier === null) {
-    return;
-  }
-
-  importSpecifiers.push(staticImportSpecifier);
+  pushSpecifierIfPresent(importSpecifiers, staticImportSpecifier);
 };
 
 const handleCallExpressionNode = (node, importSpecifiers) => {
-  if (!ts.isCallExpression(node)) {
-    return;
-  }
-
   const dynamicImportSpecifier = extractDynamicImportSpecifier(node);
-  if (dynamicImportSpecifier === null) {
-    return;
-  }
-
-  importSpecifiers.push(dynamicImportSpecifier);
+  pushSpecifierIfPresent(importSpecifiers, dynamicImportSpecifier);
 };
 
 const readImports = (filePath) => {
