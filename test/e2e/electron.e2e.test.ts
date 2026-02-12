@@ -167,14 +167,15 @@ const waitForStability = async (durationMs: number) =>
     durationMs + 100
   );
 
-const buildTimeoutDiagnostics = (
-  modeLabel: string,
-  modeMarker: RegExp,
-  spawned: ReturnType<typeof spawn> | null,
-  outputTracker: ReturnType<typeof createSpawnOutputTracker>,
-  timeoutMs: number,
-  error: unknown
-) => {
+interface DiagnosticContext {
+  spawned: ReturnType<typeof spawn> | null;
+  outputTracker: ReturnType<typeof createSpawnOutputTracker>;
+  timeoutMs: number;
+  error: unknown;
+}
+
+const buildTimeoutDiagnostics = (modeLabel: string, modeMarker: RegExp, context: DiagnosticContext) => {
+  const {spawned, outputTracker, timeoutMs, error} = context;
   const output = outputTracker.getOutput();
   const runningModeLabel = modeLabel === 'Packaged' ? 'running in prod mode' : 'running in dev mode';
   const markers = [
@@ -205,7 +206,7 @@ const buildPackagedTimeoutDiagnostics = (
   timeoutMs: number,
   error: unknown
 ) => {
-  return buildTimeoutDiagnostics('Packaged', /running in prod mode/i, spawned, outputTracker, timeoutMs, error);
+  return buildTimeoutDiagnostics('Packaged', /running in prod mode/i, {spawned, outputTracker, timeoutMs, error});
 };
 
 const buildDevelopmentTimeoutDiagnostics = (
@@ -214,7 +215,7 @@ const buildDevelopmentTimeoutDiagnostics = (
   timeoutMs: number,
   error: unknown
 ) => {
-  return buildTimeoutDiagnostics('Development', /running in dev mode/i, spawned, outputTracker, timeoutMs, error);
+  return buildTimeoutDiagnostics('Development', /running in dev mode/i, {spawned, outputTracker, timeoutMs, error});
 };
 
 interface TestContext {
