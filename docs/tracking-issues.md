@@ -4,7 +4,8 @@
 
 Status: Open  
 Owner: TBD  
-Last updated: 2026-01-28
+Last updated: 2026-01-28  
+Issue: [#24](https://github.com/leynos/velocetty/issues/24)
 
 ### BIOME-001 summary
 
@@ -23,7 +24,8 @@ Last updated: 2026-01-28
 
 Status: Open  
 Owner: TBD  
-Last updated: 2026-02-12
+Last updated: 2026-02-12  
+Issue: [#23](https://github.com/leynos/velocetty/issues/23)
 
 ### BOUNDARY-001 summary
 
@@ -45,7 +47,8 @@ Last updated: 2026-02-12
 
 Status: Open  
 Owner: TBD  
-Last updated: 2026-02-12
+Last updated: 2026-02-12  
+Issue: [#22](https://github.com/leynos/velocetty/issues/22)
 
 ### CONTRACT-001 summary
 
