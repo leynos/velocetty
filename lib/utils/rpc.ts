@@ -17,6 +17,7 @@ import type {
 
 import {ipcRenderer} from './ipc';
 
+/** Renderer-side RPC client that forwards typed events over IPC. */
 export default class Client {
   emitter: TypedEmitter<RendererEvents>;
   ipc: IpcRendererWithCommands;

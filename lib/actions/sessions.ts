@@ -1,3 +1,4 @@
+/** @file Session action creators for state transitions and IPC effects. */
 import {asProfileId, asSessionId, type Session} from '@shared/types/common';
 import {
   SESSION_ADD,
@@ -18,6 +19,7 @@ import rpc from '../rpc';
 import {keys} from '../utils/object';
 import findBySession from '../utils/term-groups';
 
+/** Add a session to state and emit initial metadata. */
 export function addSession({uid, shell, pid, cols = null, rows = null, splitDirection, activeUid, profile}: Session) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     const {sessions} = getState();
@@ -37,6 +39,7 @@ export function addSession({uid, shell, pid, cols = null, rows = null, splitDire
   };
 }
 
+/** Request a new session and forward decorated profile context to RPC. */
 export function requestSession(profile: string | undefined) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     dispatch({
@@ -50,6 +53,7 @@ export function requestSession(profile: string | undefined) {
   };
 }
 
+/** Queue incoming PTY data and stamp it with the current timestamp. */
 export function addSessionData(uid: string, data: string) {
   return (dispatch: HyperDispatch) => {
     dispatch({
@@ -90,9 +94,12 @@ function createExitAction(type: typeof SESSION_USER_EXIT | typeof SESSION_PTY_EX
 
 // we want to distinguish an exit
 // that's UI initiated vs pty initiated
+/** Create an action creator for user-initiated session exits. */
 export const userExitSession = createExitAction(SESSION_USER_EXIT);
+/** Create an action creator for PTY-initiated session exits. */
 export const ptyExitSession = createExitAction(SESSION_PTY_EXIT);
 
+/** Set the active session identifier in state. */
 export function setActiveSession(uid: string) {
   return (dispatch: HyperDispatch) => {
     dispatch({
@@ -102,12 +109,14 @@ export function setActiveSession(uid: string) {
   };
 }
 
+/** Clear any active session reference from state. */
 export function clearActiveSession(): HyperActions {
   return {
     type: SESSION_CLEAR_ACTIVE
   };
 }
 
+/** Set the xterm title for the given session identifier. */
 export function setSessionXtermTitle(uid: string, title: string): HyperActions {
   return {
     type: SESSION_SET_XTERM_TITLE,
@@ -116,6 +125,7 @@ export function setSessionXtermTitle(uid: string, title: string): HyperActions {
   };
 }
 
+/** Resize a session and forward dimensions to the backend PTY. */
 export function resizeSession(uid: string, cols: number, rows: number) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     const {termGroups} = getState();
@@ -137,6 +147,7 @@ export function resizeSession(uid: string, cols: number, rows: number) {
   };
 }
 
+/** Open the session search overlay for the target or active session. */
 export function openSearch(uid?: string) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     const targetUid = uid || getState().sessions.activeUid!;
@@ -148,6 +159,7 @@ export function openSearch(uid?: string) {
   };
 }
 
+/** Close the session search overlay or release key handling when inactive. */
 export function closeSearch(uid?: string, keyEvent?: any) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     const targetUid = uid || getState().sessions.activeUid!;
@@ -165,6 +177,7 @@ export function closeSearch(uid?: string, keyEvent?: any) {
   };
 }
 
+/** Send session input data to RPC with optional shell escaping. */
 export function sendSessionData(uid: string | null, data: string, escaped?: boolean) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     dispatch({

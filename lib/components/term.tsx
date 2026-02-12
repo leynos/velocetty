@@ -1,3 +1,4 @@
+/** @file Terminal renderer component and xterm integration. */
 import {clipboard, shell} from 'electron';
 import React from 'react';
 
@@ -98,6 +99,7 @@ const getTermOptions = (props: TermProps): ITerminalOptions => {
   };
 };
 
+/** Terminal view component that wraps xterm and renderer-specific behaviour. */
 export default class Term extends React.PureComponent<
   TermProps,
   {

@@ -1,3 +1,4 @@
+/** @file Application command handlers and command dispatch wiring. */
 import {app, Menu} from 'electron';
 import type {BrowserWindow} from 'electron';
 
@@ -163,6 +164,7 @@ getConfig().profiles.forEach((profile) => {
   };
 });
 
+/** Execute a named command against the focused window when available. */
 export const execCommand = (command: string, focusedWindow?: BrowserWindow) => {
   const fn = commands[command];
   if (fn) {

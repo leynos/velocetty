@@ -1,3 +1,4 @@
+/** @file Main-process RPC server wiring for renderer IPC. */
 import {EventEmitter} from 'node:events';
 
 import {ipcMain} from 'electron';
@@ -7,6 +8,7 @@ import {v4 as uuidv4} from 'uuid';
 
 import type {FilterNever, MainEvents, RendererEvents, TypedEmitter} from '@shared/types/common';
 
+/** Main-process RPC server that routes renderer events over IPC. */
 export class Server {
   emitter: TypedEmitter<MainEvents>;
   destroyed = false;
