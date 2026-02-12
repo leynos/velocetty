@@ -83,23 +83,40 @@ const extractDynamicImportSpecifier = (node) => {
   return firstArgument.text;
 };
 
+const handleImportExportNode = (node, importSpecifiers) => {
+  if (!isStaticImportOrExport(node)) {
+    return;
+  }
+
+  const staticImportSpecifier = extractStaticImportSpecifier(node);
+  if (staticImportSpecifier === null) {
+    return;
+  }
+
+  importSpecifiers.push(staticImportSpecifier);
+};
+
+const handleCallExpressionNode = (node, importSpecifiers) => {
+  if (!ts.isCallExpression(node)) {
+    return;
+  }
+
+  const dynamicImportSpecifier = extractDynamicImportSpecifier(node);
+  if (dynamicImportSpecifier === null) {
+    return;
+  }
+
+  importSpecifiers.push(dynamicImportSpecifier);
+};
+
 const readImports = (filePath) => {
   const source = readFileSync(filePath, 'utf8');
   const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, getScriptKind(filePath));
   const importSpecifiers = [];
 
   const visit = (node) => {
-    if (isStaticImportOrExport(node)) {
-      const staticImportSpecifier = extractStaticImportSpecifier(node);
-      if (staticImportSpecifier !== null) {
-        importSpecifiers.push(staticImportSpecifier);
-      }
-    }
-
-    const dynamicImportSpecifier = extractDynamicImportSpecifier(node);
-    if (dynamicImportSpecifier !== null) {
-      importSpecifiers.push(dynamicImportSpecifier);
-    }
+    handleImportExportNode(node, importSpecifiers);
+    handleCallExpressionNode(node, importSpecifiers);
 
     ts.forEachChild(node, visit);
   };
