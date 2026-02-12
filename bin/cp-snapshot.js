@@ -53,13 +53,19 @@ const resolveEnumArch = (contextArch) => {
   return normalizeArch(process.arch, 'process.arch fallback for unknown context.arch enum');
 };
 
+const isValidArchEnum = (arch) => typeof arch === 'number' && Arch && Arch[arch];
+
 function resolveContextArch(context) {
   if (isStringArch(context)) {
     return normalizeArch(context.arch, 'afterPack context.arch');
   }
 
-  if (isEnumArch(context)) {
+  if (isValidArchEnum(context.arch)) {
     return resolveEnumArch(context.arch);
+  }
+
+  if (isEnumArch(context)) {
+    return normalizeArch(process.arch, 'process.arch fallback for unknown context.arch enum');
   }
 
   if (isUndefinedArch(context)) {
