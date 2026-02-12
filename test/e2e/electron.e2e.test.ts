@@ -137,6 +137,26 @@ const waitForSpawnLaunch = async (spawned: ReturnType<typeof spawn>, timeoutMs: 
     timeoutMs
   );
 
+const waitForOptionalLaunchMarker = async (
+  spawned: ReturnType<typeof spawn>,
+  outputTracker: ReturnType<typeof createSpawnOutputTracker>,
+  log: (message: string) => void
+) => {
+  try {
+    await outputTracker.waitForSpawnOutput(/running in prod mode|electron will open/i, windowTimeoutMs);
+  } catch (error) {
+    if (spawned.exitCode != null) {
+      throw new Error(
+        `Electron exited before emitting launch markers. Exit code: ${spawned.exitCode}. Output:
+${outputTracker.getOutput()}`
+      );
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    log(`Proceeding without launch marker output after ${windowTimeoutMs}ms (${message}).`);
+  }
+};
+
 const waitForStability = async (durationMs: number) =>
   await withTimeout(
     new Promise<void>((resolve) => {
@@ -245,7 +265,7 @@ const launchWithSpawn = async (
   setupSpawnOutputHandlers(spawned, outputTracker);
   await waitForSpawnLaunch(spawned, launchTimeoutMs);
   log(`Spawned Electron PID: ${spawned.pid ?? 'unknown'}.`);
-  await outputTracker.waitForSpawnOutput(/running in prod mode|electron will open/i, windowTimeoutMs);
+  await waitForOptionalLaunchMarker(spawned, outputTracker, log);
   await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, rendererReadyTimeoutMs);
   await waitForStability(spawnStabilityTimeoutMs);
   if (spawned.exitCode != null) {
