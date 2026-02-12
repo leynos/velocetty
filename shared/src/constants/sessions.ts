@@ -1,4 +1,6 @@
 /** @file Shared session action constants and action contracts. */
+import type {ProfileId, SessionId} from '../types/common';
+
 export const SESSION_ADD = 'SESSION_ADD';
 export const SESSION_RESIZE = 'SESSION_RESIZE';
 export const SESSION_REQUEST = 'SESSION_REQUEST';
@@ -15,22 +17,22 @@ export const SESSION_SEARCH = 'SESSION_SEARCH';
 
 /** Adds a newly created session to state. */
 export interface SessionAddAction {
-  type: typeof SESSION_ADD;
-  readonly uid: string;
+  readonly type: typeof SESSION_ADD;
+  readonly uid: SessionId;
   readonly shell: string | null;
   readonly pid: number | null;
   readonly cols: number | null;
   readonly rows: number | null;
   readonly splitDirection?: 'HORIZONTAL' | 'VERTICAL';
-  readonly activeUid: string | null;
+  readonly activeUid: SessionId | null;
   readonly now: number;
-  readonly profile: string;
+  readonly profile: ProfileId;
 }
 
 /** Resizes an existing session terminal viewport. */
 export interface SessionResizeAction {
-  type: typeof SESSION_RESIZE;
-  readonly uid: string;
+  readonly type: typeof SESSION_RESIZE;
+  readonly uid: SessionId;
   readonly cols: number;
   readonly rows: number;
   readonly isStandaloneTerm: boolean;
@@ -39,67 +41,67 @@ export interface SessionResizeAction {
 
 /** Requests a new session from the backend. */
 export interface SessionRequestAction {
-  type: typeof SESSION_REQUEST;
+  readonly type: typeof SESSION_REQUEST;
 }
 
 /** Marks that data is pending for a session. */
 export interface SessionAddDataAction {
-  type: typeof SESSION_ADD_DATA;
+  readonly type: typeof SESSION_ADD_DATA;
 }
 
 /** Appends PTY data for a session. */
 export interface SessionPtyDataAction {
-  type: typeof SESSION_PTY_DATA;
+  readonly type: typeof SESSION_PTY_DATA;
   readonly data: string;
-  readonly uid: string;
+  readonly uid: SessionId;
   readonly now: number;
 }
 
 /** Handles backend PTY exit events for a session. */
 export interface SessionPtyExitAction {
-  type: typeof SESSION_PTY_EXIT;
-  readonly uid: string;
+  readonly type: typeof SESSION_PTY_EXIT;
+  readonly uid: SessionId;
 }
 
 /** Handles user-triggered session exits. */
 export interface SessionUserExitAction {
-  type: typeof SESSION_USER_EXIT;
-  readonly uid: string;
+  readonly type: typeof SESSION_USER_EXIT;
+  readonly uid: SessionId;
 }
 
 /** Marks a specific session as active. */
 export interface SessionSetActiveAction {
-  type: typeof SESSION_SET_ACTIVE;
-  readonly uid: string;
+  readonly type: typeof SESSION_SET_ACTIVE;
+  readonly uid: SessionId;
 }
 
 /** Clears the currently active session reference. */
 export interface SessionClearActiveAction {
-  type: typeof SESSION_CLEAR_ACTIVE;
+  readonly type: typeof SESSION_CLEAR_ACTIVE;
 }
 
 /** Records user data updates for session metadata. */
 export interface SessionUserDataAction {
-  type: typeof SESSION_USER_DATA;
+  readonly type: typeof SESSION_USER_DATA;
 }
 
 /** Updates the xterm title for a session. */
 export interface SessionSetXtermTitleAction {
-  type: typeof SESSION_SET_XTERM_TITLE;
-  readonly uid: string;
+  readonly type: typeof SESSION_SET_XTERM_TITLE;
+  readonly uid: SessionId;
   readonly title: string;
 }
 
 /** Updates the working directory shown for a session. */
 export interface SessionSetCwdAction {
-  type: typeof SESSION_SET_CWD;
+  readonly type: typeof SESSION_SET_CWD;
   readonly cwd: string;
 }
 
 /** Toggles search UI visibility for a session. */
 export interface SessionSearchAction {
-  type: typeof SESSION_SEARCH;
-  readonly uid: string;
+  readonly type: typeof SESSION_SEARCH;
+  readonly uid: SessionId;
   readonly value: boolean;
 }
 

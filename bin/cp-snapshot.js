@@ -3,41 +3,32 @@ const fs = require('node:fs');
 const childProcess = require('node:child_process');
 const {Arch} = require('electron-builder');
 
-const SUPPORTED_ARCHITECTURES = new Set(['x64', 'arm64']);
+const {normaliseSnapshotArch} = require('./shared/arch.cjs');
 
-function normalizeArch(arch, sourceLabel) {
-  if (typeof arch !== 'string' || arch.length === 0) {
-    throw new Error(`Expected a string architecture from ${sourceLabel}, received "${String(arch)}".`);
-  }
-
-  if (arch === 'x64' || arch === 'amd64') {
-    return 'x64';
-  }
-
-  if (arch === 'arm64' || arch === 'aarch64') {
-    return 'arm64';
-  }
-
-  if (arch === 'arm') {
-    throw new Error('Unsupported architecture "arm". Snapshot artifacts are available only for x64 and arm64.');
-  }
-
-  throw new Error(
-    `Unsupported architecture "${arch}" from ${sourceLabel}. Supported values: ${Array.from(SUPPORTED_ARCHITECTURES).join(', ')}.`
-  );
-}
+const ARCH_ENUM_TO_NAME = {
+  0: 'ia32',
+  1: 'x64',
+  2: 'armv7l',
+  3: 'arm64',
+  4: 'universal'
+};
 
 function resolveContextArch(context) {
   if (typeof context.arch === 'string') {
-    return normalizeArch(context.arch, 'afterPack context.arch');
+    return normaliseSnapshotArch(context.arch, 'afterPack context.arch');
   }
 
-  if (typeof context.arch === 'number' && Arch && Arch[context.arch]) {
-    return normalizeArch(Arch[context.arch], 'electron-builder Arch enum');
+  if (typeof context.arch === 'number') {
+    const resolvedArch = Arch?.[context.arch] ?? ARCH_ENUM_TO_NAME[context.arch];
+    if (typeof resolvedArch === 'string') {
+      return normaliseSnapshotArch(resolvedArch, 'electron-builder Arch enum');
+    }
+
+    return normaliseSnapshotArch(process.arch, 'process.arch fallback for unknown context.arch enum');
   }
 
   if (context.arch === undefined) {
-    return normalizeArch(process.arch, 'process.arch fallback');
+    return normaliseSnapshotArch(process.arch, 'process.arch fallback');
   }
 
   throw new Error(`Unsupported context.arch type "${typeof context.arch}".`);
@@ -151,8 +142,8 @@ if (require.main === module) {
     throw new Error('npm_config_arch must be set when running cp-snapshot.js directly.');
   }
 
-  const archToCopy = normalizeArch(targetArch, 'npm_config_arch');
-  const currentArch = normalizeArch(process.arch, 'process.arch');
+  const archToCopy = normaliseSnapshotArch(targetArch, 'npm_config_arch');
+  const currentArch = normaliseSnapshotArch(process.arch, 'process.arch');
   const pathToElectron = getPathToElectron();
   ensureElectronDist(pathToElectron);
   if (currentArch === archToCopy) {

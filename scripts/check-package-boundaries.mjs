@@ -127,13 +127,27 @@ const resolvesToDisallowedRoot = (fromFile, importSpecifier, disallowedRoots) =>
   return disallowedRoots.some((root) => relativeCandidate.startsWith(`${root}/`) || relativeCandidate === root);
 };
 
+const isNonBareImport = (specifier) => {
+  const isRelativePath = specifier.startsWith('.');
+  const isScopedPackage = specifier.startsWith('@');
+  const isProtocolImport = specifier.includes(':');
+
+  return isRelativePath || isScopedPackage || isProtocolImport;
+};
+
 const isBareDisallowedRootSpecifier = (importSpecifier, disallowedRoots) => {
-  if (importSpecifier.startsWith('.') || importSpecifier.startsWith('@') || importSpecifier.includes(':')) {
+  if (isNonBareImport(importSpecifier)) {
     return false;
   }
 
   return disallowedRoots.some((root) => importSpecifier === root || importSpecifier.startsWith(`${root}/`));
 };
+
+const isDisallowedAliasSpecifier = (importSpecifier, disallowedAliases) =>
+  disallowedAliases.some((aliasPrefix) => {
+    const aliasRoot = aliasPrefix.endsWith('/') ? aliasPrefix.slice(0, -1) : aliasPrefix;
+    return importSpecifier === aliasRoot || importSpecifier.startsWith(aliasPrefix);
+  });
 
 const violations = [];
 
@@ -147,7 +161,7 @@ for (const roots of Object.values(layerDefinitions)) {
 
       const rules = layerRules[layer];
       for (const importSpecifier of readImports(filePath)) {
-        const aliasViolation = rules.disallowedAliases.some((aliasPrefix) => importSpecifier.startsWith(aliasPrefix));
+        const aliasViolation = isDisallowedAliasSpecifier(importSpecifier, rules.disallowedAliases);
         const relativeViolation = resolvesToDisallowedRoot(filePath, importSpecifier, rules.disallowedRoots);
         const bareRootViolation = isBareDisallowedRootSpecifier(importSpecifier, rules.disallowedRoots);
 

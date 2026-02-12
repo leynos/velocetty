@@ -11,7 +11,7 @@ import isDev from 'electron-is-dev';
 import {getWorkingDirectoryFromPID} from 'native-process-working-directory';
 import {v4 as uuidv4} from 'uuid';
 
-import type {sessionExtraOptions} from '@shared/types/common';
+import {asProfileId, asSessionId, type sessionExtraOptions} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
 import {execCommand} from '../commands';
 import {getDefaultProfile} from '../config';
@@ -169,8 +169,8 @@ export function newWindow(
       },
       extraOptionsFiltered,
       {
-        profile: extraOptionsFiltered.profile || profileName,
-        uid
+        profile: asProfileId(extraOptionsFiltered.profile || profileName),
+        uid: asSessionId(uid)
       }
     );
     const options = decorateSessionOptions(defaultOptions);
@@ -187,12 +187,12 @@ export function newWindow(
     rpc.emit('session add', {
       rows: options.rows,
       cols: options.cols,
-      uid: options.uid,
+      uid: asSessionId(options.uid),
       splitDirection: options.splitDirection,
       shell: session.shell,
       pid: session.pty ? session.pty.pid : null,
-      activeUid: options.activeUid ?? undefined,
-      profile: options.profile
+      activeUid: options.activeUid ? asSessionId(options.activeUid) : undefined,
+      profile: asProfileId(options.profile)
     });
 
     session.on('data', (data: string) => {
@@ -200,7 +200,7 @@ export function newWindow(
     });
 
     session.on('exit', () => {
-      rpc.emit('session exit', {uid: options.uid});
+      rpc.emit('session exit', {uid: asSessionId(options.uid)});
       unsetRendererType(options.uid);
       sessions.delete(options.uid);
     });

@@ -7,38 +7,52 @@ import type parseUrl from 'parse-url';
 
 import type {configOptions} from './config';
 
+/** Branded identifier for session entities. */
+export type SessionId = string & {readonly brand: 'SessionId'};
+/** Branded identifier for terminal profile names. */
+export type ProfileId = string & {readonly brand: 'ProfileId'};
+/** Branded identifier for terminal group entities. */
+export type TermGroupId = string & {readonly brand: 'TermGroupId'};
+
+/** Casts a raw session identifier into the shared branded type. */
+export const asSessionId = (value: string): SessionId => value as SessionId;
+/** Casts a raw profile name into the shared branded type. */
+export const asProfileId = (value: string): ProfileId => value as ProfileId;
+/** Casts a raw terminal-group identifier into the shared branded type. */
+export const asTermGroupId = (value: string): TermGroupId => value as TermGroupId;
+
 /** Session state synchronized between backend and renderer layers. */
 export type Session = {
-  uid: string;
+  uid: SessionId;
   rows?: number | null;
   cols?: number | null;
   splitDirection?: 'HORIZONTAL' | 'VERTICAL';
   shell: string | null;
   pid: number | null;
-  activeUid?: string;
-  profile: string;
+  activeUid?: SessionId;
+  profile: ProfileId;
 };
 
 /** Optional arguments accepted when creating or splitting sessions. */
 export type sessionExtraOptions = {
   cwd?: string;
   splitDirection?: 'HORIZONTAL' | 'VERTICAL';
-  activeUid?: string | null;
+  activeUid?: SessionId | null;
   isNewGroup?: boolean;
   rows?: number;
   cols?: number;
   shell?: string;
   shellArgs?: string[];
-  profile?: string;
+  profile?: ProfileId;
 };
 
 /** Events emitted from the renderer and consumed by the privileged process. */
 export type MainEvents = {
   close: never;
   command: string;
-  data: {uid: string | null; data: string; escaped?: boolean};
-  exit: {uid: string};
-  'info renderer': {uid: string; type: string};
+  data: {uid: SessionId | null; data: string; escaped?: boolean};
+  exit: {uid: SessionId};
+  'info renderer': {uid: SessionId; type: string};
   init: null;
   maximize: never;
   minimize: never;
@@ -47,7 +61,7 @@ export type MainEvents = {
   'open external': {url: string};
   'open hamburger menu': {x: number; y: number};
   'quit and install': never;
-  resize: {uid: string; cols: number; rows: number};
+  resize: {uid: SessionId; cols: number; rows: number};
   unmaximize: never;
 };
 
@@ -83,18 +97,18 @@ export type RendererEvents = {
   'term selectAll': never;
   reload: never;
   'session clear req': never;
-  'split request horizontal': {activeUid?: string; profile?: string};
-  'split request vertical': {activeUid?: string; profile?: string};
-  'termgroup add req': {activeUid?: string; profile?: string};
+  'split request horizontal': {activeUid?: SessionId; profile?: ProfileId};
+  'split request vertical': {activeUid?: SessionId; profile?: ProfileId};
+  'termgroup add req': {activeUid?: SessionId; profile?: ProfileId};
   'termgroup close req': never;
   'session add': Session;
   'session data': string;
-  'session exit': {uid: string};
+  'session exit': {uid: SessionId};
   'windowGeometry change': {isMaximized: boolean};
   move: {bounds: {x: number; y: number}};
   'enter full screen': never;
   'leave full screen': never;
-  'session data send': {uid: string | null; data: string; escaped?: boolean};
+  'session data send': {uid: SessionId | null; data: string; escaped?: boolean};
 };
 
 /** Get keys of T where the value is not never. */
@@ -106,7 +120,6 @@ export interface TypedEmitter<Events> {
   once<E extends keyof Events>(event: E, listener: (args: Events[E]) => void): this;
   emit<E extends Exclude<keyof Events, FilterNever<Events>>>(event: E): boolean;
   emit<E extends FilterNever<Events>>(event: E, data: Events[E]): boolean;
-  emit<E extends keyof Events>(event: E, data?: Events[E]): boolean;
   removeListener<E extends keyof Events>(event: E, listener: (args: Events[E]) => void): this;
   removeAllListeners<E extends keyof Events>(event?: E): this;
 }

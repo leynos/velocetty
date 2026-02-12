@@ -46,10 +46,18 @@ export default class Client {
     }
   }
 
+  private emitRendererEvent<U extends keyof RendererEvents>(ch: U, data: RendererEvents[U] | undefined) {
+    if (data === undefined) {
+      return this.emitter.emit(ch as Exclude<keyof RendererEvents, FilterNever<RendererEvents>>);
+    }
+
+    return this.emitter.emit(ch as FilterNever<RendererEvents>, data as RendererEvents[FilterNever<RendererEvents>]);
+  }
+
   ipcListener = <U extends keyof RendererEvents>(
     _event: IpcRendererEvent,
-    {ch, data}: {ch: U; data: RendererEvents[U]}
-  ) => this.emitter.emit(ch, data);
+    {ch, data}: {ch: U; data?: RendererEvents[U]}
+  ) => this.emitRendererEvent(ch, data);
 
   on = <U extends keyof RendererEvents>(ev: U, fn: (arg0: RendererEvents[U]) => void) => {
     this.emitter.on(ev, fn);

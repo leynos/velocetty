@@ -241,7 +241,7 @@
           "type": "string"
         },
         "webGLRenderer": {
-          "description": "Whether to use the WebGL renderer. Set it to false to use canvas-based\nrendering (slower, but supports transparent backgrounds)",
+          "description": "Whether to use the WebGL renderer. Set it to false to use canvas-based\nrendering (slower, but supports transparent backgrounds).\n\nIn the current architecture, changing this setting requires terminal\nrestart. Track hot-reload support under CONFIG-001 in\ndocs/tracking-issues.md.",
           "type": "boolean"
         },
         "webLinksActivationKey": {
@@ -526,7 +526,7 @@
               "type": "string"
             },
             "webGLRenderer": {
-              "description": "Whether to use the WebGL renderer. Set it to false to use canvas-based\nrendering (slower, but supports transparent backgrounds)",
+              "description": "Whether to use the WebGL renderer. Set it to false to use canvas-based\nrendering (slower, but supports transparent backgrounds).\n\nIn the current architecture, changing this setting requires terminal\nrestart. Track hot-reload support under CONFIG-001 in\ndocs/tracking-issues.md.",
               "type": "boolean"
             },
             "webLinksActivationKey": {
@@ -621,9 +621,11 @@
           "required": ["defaultProfile", "profiles"],
           "type": "object"
         }
-      ]
+      ],
+      "description": "Fully resolved configuration shape after profile defaults and overrides are applied."
     }
   },
+  "description": "Raw user configuration payload as stored in config files.",
   "properties": {
     "config": {
       "$ref": "#/definitions/configOptions"
