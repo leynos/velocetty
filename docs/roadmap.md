@@ -23,12 +23,12 @@ Scope notes:
   - [x] Move shared types, schemas, and constants into `shared/`.
   - [x] Success criteria: each package builds in isolation; cross-package
     imports are one-directional (`frontend` → `shared`, `backend` → `shared`).
-- [ ] 1.1.2. Introduce a transport abstraction with an Electron IPC adapter.
+- [x] 1.1.2. Introduce a transport abstraction with an Electron IPC adapter.
   See [velocetty-design.md](velocetty-design.md) §Host migration: Electron to
   Tauri.
-  - [ ] Define a transport interface for command invocation and event streams.
-  - [ ] Implement Electron IPC adapter using existing RPC wiring.
-  - [ ] Success criteria: command invocation works end-to-end via the adapter
+  - [x] Define a transport interface for command invocation and event streams.
+  - [x] Implement Electron IPC adapter using existing RPC wiring.
+  - [x] Success criteria: command invocation works end-to-end via the adapter
     without direct Electron calls inside the command layer.
 
 ### 1.2. Command primitives and context key engine

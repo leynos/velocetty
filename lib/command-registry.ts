@@ -1,7 +1,7 @@
 import type {HyperDispatch} from '../typings/hyper';
 
 import {closeSearch} from './actions/sessions';
-import {ipcRenderer} from './utils/ipc';
+import {transport} from './transport/electron-ipc-transport';
 
 let commands: Record<string, (event: any, dispatch: HyperDispatch) => void> = {
   'editor:search-close': (e, dispatch) => {
@@ -11,7 +11,7 @@ let commands: Record<string, (event: any, dispatch: HyperDispatch) => void> = {
 };
 
 export const getRegisteredKeys = async () => {
-  const keymaps = await ipcRenderer.invoke('getDecoratedKeymaps');
+  const keymaps = await transport.invoke('getDecoratedKeymaps');
 
   return Object.keys(keymaps).reduce((result: Record<string, string>, actionName) => {
     const commandKeys = keymaps[actionName];

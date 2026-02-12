@@ -120,12 +120,16 @@ Done criteria for this roadmap item:
 - [x] (2026-02-12 20:12Z) Await explicit approval to begin implementation.
 - [x] (2026-02-12 20:22Z) Stage A complete: add and commit coverage-first
   IPC/registry tests.
-- [ ] Stage B complete: finalise transport boundary and migration map.
-- [ ] Stage C complete: add shared transport contracts.
-- [ ] Stage D complete: implement Electron transport adapter.
-- [ ] Stage E complete: migrate command path and event subscriptions.
-- [ ] Stage F complete: documentation updates, full gates, roadmap status, and
-  final commits.
+- [x] (2026-02-12 20:35Z) Stage B complete: finalise transport
+  boundary and migration map.
+- [x] (2026-02-12 20:38Z) Stage C complete: add shared transport
+  contracts.
+- [x] (2026-02-12 20:41Z) Stage D complete: implement Electron transport
+  adapter.
+- [x] (2026-02-12 20:42Z) Stage E complete: migrate command path and event
+  subscriptions.
+- [x] (2026-02-12 21:05Z) Stage F complete: documentation updates, full gates,
+  roadmap status, and final commits.
 
 ## Surprises & discoveries
 
@@ -153,10 +157,15 @@ Done criteria for this roadmap item:
   gate is implemented before transport changes.
 
 - Additional discovery: full-suite stability required shared Electron mock wiring in
-  `test/unit/rpc-server.test.ts` because `updater.test.ts` can register a global
-  Electron mock without `ipcMain`.
+  `test/unit/rpc-server.test.ts` because `updater.test.ts` can register a
+  global Electron mock without `ipcMain`.
   Impact: transport-related tests need a single reusable mock surface to avoid
   stale IPC imports under Bun's module mock cache.
+- Additional discovery: `make build` initially failed because two files imported the
+  transport adapter from incorrect relative paths.
+  Impact: the transport boundary migration remains sensitive to module-location
+  assumptions and must be validated with `make build` before any partial refactor
+  merges.
 
 ## Decision log
 
@@ -188,10 +197,32 @@ Done criteria for this roadmap item:
   import ordering.
   Date/Author: 2026-02-12 / Codex
 
+- Decision: expose transport contracts from shared and centralize host implementation
+  in `lib/transport/electron-ipc-transport.ts`.
+  Rationale: this keeps command-layer modules importable in future host swaps while
+  preserving current Electron IPC event and invoke semantics.
+  Date/Author: 2026-02-12 / Codex
+
 ## Outcomes & retrospective
 
-Not implemented yet. This section will be updated once implementation starts
-and validation evidence is available.
+Completed in this milestone:
+
+- Added shared transport contract in `shared/src/types/transport.ts` and exported it
+  from `shared/src/index.ts`.
+- Added `lib/transport/electron-ipc-transport.ts` backed by existing renderer
+  `ipcRenderer.invoke` and `lib/utils/rpc` event transport.
+- Migrated `lib/command-registry.ts` `getDecoratedKeymaps` reads to use
+  `transport.invoke`.
+- Migrated `lib/actions/ui.ts` key command event dispatch and session handoff
+  subscriptions from direct `rpc` usage to the transport adapter.
+- Added `test/unit/electron-ipc-transport.test.ts` for adapter delegation.
+- Updated `docs/developers-guide.md` and `docs/roadmap.md`; 1.1.2 is marked done.
+- Re-ran all mandatory gates and captured log output:
+  - `bun install`
+  - `make check-fmt`
+  - `make lint`
+  - `make build`
+  - `make test`
 
 ## Context and orientation
 
@@ -199,9 +230,9 @@ Current command invocation path:
 
 - Keybindings resolve via `lib/command-registry.ts`.
 - `lib/containers/hyper.tsx` dispatches `uiActions.execCommand(...)`.
-- `lib/actions/ui.ts` calls `rpc.emit('command', command)` when no local
+- `lib/actions/ui.ts` uses `transport.emit('command', command)` when no local
   command handler exists.
-- Main process handles `rpc.on('command', ...)` in `app/ui/window.ts` and then
+- Main process handles `window.rpc.on('command', ...)` in `app/ui/window.ts` and then
   executes `app/commands.ts::execCommand`.
 
 Current event-stream path:
@@ -212,8 +243,8 @@ Current event-stream path:
 
 Current direct Electron access in command-adjacent code:
 
-- `lib/command-registry.ts` imports `ipcRenderer` through `lib/utils/ipc.ts`
-  for `getDecoratedKeymaps`.
+- `lib/command-registry.ts` calls `transport.invoke('getDecoratedKeymaps')` and no
+  longer imports `lib/utils/ipc.ts` directly.
 
 Key files expected in this milestone:
 
@@ -222,7 +253,8 @@ Key files expected in this milestone:
 - `lib/utils/rpc.ts`, `lib/rpc.ts`, and new `lib/transport/*`
   (Electron adapter implementation).
 - `lib/command-registry.ts` and `lib/actions/ui.ts`
-  (command-layer migration to transport).
+  (command-layer migration to transport; `lib/index.tsx` remains on `window.rpc`
+  for bootstrap subscriptions in this milestone).
 - `lib/index.tsx` (event-stream usage via transport wrapper where practical).
 - `test/unit/*` (transport and command-path regression tests).
 - `docs/developers-guide.md` and `docs/roadmap.md`.
@@ -301,6 +333,8 @@ atomic.
 
 5. Migrate selected renderer bootstrap subscriptions in `lib/index.tsx` to use
    adapter event-stream methods, keeping event names/payloads unchanged.
+   (Not required for this milestone because bootstrap flow is still coupled to
+   `window.rpc` in this implementation.)
 
 6. Update documentation:
 
