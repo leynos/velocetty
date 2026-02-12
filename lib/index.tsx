@@ -4,7 +4,7 @@ import {webFrame} from 'electron';
 import {createRoot} from 'react-dom/client';
 import {Provider} from 'react-redux';
 
-import type {configOptions} from '../typings/config';
+import type {configOptions} from '@shared/types/config';
 
 import {loadConfig, reloadConfig} from './actions/config';
 import init from './actions/index';

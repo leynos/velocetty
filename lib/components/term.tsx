@@ -1,3 +1,4 @@
+/** @file Terminal renderer component and xterm integration. */
 import {clipboard, shell} from 'electron';
 import React from 'react';
 
@@ -17,6 +18,7 @@ import {WebLinksAddon} from 'xterm-addon-web-links';
 import {WebglAddon} from 'xterm-addon-webgl';
 
 import type {TermProps} from '../../typings/hyper';
+import {asSessionId} from '@shared/types/common';
 import terms from '../terms';
 import processClipboard from '../utils/paste';
 import {decorate} from '../utils/plugins';
@@ -97,6 +99,7 @@ const getTermOptions = (props: TermProps): ITerminalOptions => {
   };
 };
 
+/** Terminal view component that wraps xterm and renderer-specific behaviour. */
 export default class Term extends React.PureComponent<
   TermProps,
   {
@@ -161,7 +164,7 @@ export default class Term extends React.PureComponent<
     if (rendererTypes[uid] !== type) {
       rendererTypes[uid] = type;
       Term.rendererTypes = rendererTypes;
-      window.rpc.emit('info renderer', {uid, type});
+      window.rpc.emit('info renderer', {uid: asSessionId(uid), type});
     }
   }
 

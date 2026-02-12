@@ -3,7 +3,7 @@ import {useRef, useState} from 'react';
 import {VscChevronDown} from '@react-icons/all-files/vsc/VscChevronDown';
 import useClickAway from 'react-use/lib/useClickAway';
 
-import type {configOptions} from '../../typings/config';
+import type {configOptions} from '@shared/types/config';
 
 interface Props {
   defaultProfile: string;

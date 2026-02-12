@@ -1,7 +1,2 @@
-export const INIT = 'INIT';
-
-export interface InitAction {
-  type: typeof INIT;
-}
-
-export type InitActions = InitAction;
+/** @file Compatibility re-export for shared bootstrap action constants. */
+export * from '../../shared/src/constants';

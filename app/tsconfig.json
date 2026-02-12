@@ -8,6 +8,7 @@
   "include": [
     "./**/*",
     "./package.json",
+    "../shared/src/**/*",
     "../typings/extend-electron.d.ts",
     "../typings/ext-modules.d.ts",
     "../typings/runtime-globals.d.ts"

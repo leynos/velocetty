@@ -2,9 +2,20 @@
 import path from 'node:path';
 
 import {getGlobal, require as remoteRequire} from '@electron/remote';
+import type {IpcCommands} from '@shared/types/common';
 import type {VelocettyRuntimeGlobals} from '../../typings/runtime-globals';
 
 export type {VelocettyRuntimeGlobals};
+
+export type RemotePluginsModule = Pick<
+  IpcCommands,
+  | 'getLoadedPluginVersions'
+  | 'getPaths'
+  | 'getBasePaths'
+  | 'getDeprecatedConfig'
+  | 'getDecoratedConfig'
+  | 'getDecoratedKeymaps'
+>;
 
 const getCandidatePluginModulePaths = (): string[] => {
   const appRootPath = getGlobal('__velocettyAppRoot') as VelocettyRuntimeGlobals['__velocettyAppRoot'];
@@ -22,7 +33,7 @@ export const loadRemotePluginsModule = () => {
 
   for (const modulePath of candidates) {
     try {
-      return remoteRequire(modulePath) as typeof import('../../app/plugins');
+      return remoteRequire(modulePath) as RemotePluginsModule;
     } catch (error) {
       lastError = error;
     }

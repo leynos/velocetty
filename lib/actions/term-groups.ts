@@ -1,17 +1,19 @@
-import {SESSION_REQUEST} from '../../typings/constants/sessions';
+/** @file Terminal group action creators and split-session orchestration. */
+import {asProfileId, asSessionId, asTermGroupId} from '@shared/types/common';
+import {SESSION_REQUEST} from '@shared/constants/sessions';
 import {
   DIRECTION,
   TERM_GROUP_RESIZE,
   TERM_GROUP_REQUEST,
   TERM_GROUP_EXIT,
   TERM_GROUP_EXIT_ACTIVE
-} from '../../typings/constants/term-groups';
+} from '@shared/constants/term-groups';
 import type {ITermState, ITermGroup, HyperState, HyperDispatch, HyperActions} from '../../typings/hyper';
 import rpc from '../rpc';
 import {getRootGroups} from '../selectors';
 import findBySession from '../utils/term-groups';
 
-import {setActiveSession, ptyExitSession, userExitSession} from './sessions';
+import {ptyExitSession, setActiveSession, userExitSession} from './sessions';
 
 function requestSplit(direction: 'VERTICAL' | 'HORIZONTAL') {
   return (_activeUid: string | undefined, _profile: string | undefined) =>
@@ -25,8 +27,8 @@ function requestSplit(direction: 'VERTICAL' | 'HORIZONTAL') {
           rpc.emit('new', {
             splitDirection: direction,
             cwd: ui.cwd,
-            activeUid,
-            profile
+            activeUid: activeUid ? asSessionId(activeUid) : undefined,
+            profile: profile ? asProfileId(profile) : undefined
           });
         }
       });
@@ -38,7 +40,7 @@ export const requestHorizontalSplit = requestSplit(DIRECTION.HORIZONTAL);
 
 export function resizeTermGroup(uid: string, sizes: number[]): HyperActions {
   return {
-    uid,
+    uid: asTermGroupId(uid),
     type: TERM_GROUP_RESIZE,
     sizes
   };
@@ -56,8 +58,8 @@ export function requestTermGroup(_activeUid: string | undefined, _profile: strin
         rpc.emit('new', {
           isNewGroup: true,
           cwd,
-          activeUid,
-          profile
+          activeUid: activeUid ? asSessionId(activeUid) : undefined,
+          profile: profile ? asProfileId(profile) : undefined
         });
       }
     });
@@ -122,7 +124,7 @@ export function ptyExitTermGroup(sessionUid: string) {
 
     dispatch({
       type: TERM_GROUP_EXIT,
-      uid: group.uid,
+      uid: asTermGroupId(group.uid),
       effect: () => {
         const activeSessionUid = termGroups.activeSessions[termGroups.activeRootGroup!];
         if (Object.keys(termGroups.termGroups).length > 1 && activeSessionUid === sessionUid) {
@@ -141,7 +143,7 @@ export function userExitTermGroup(uid: string) {
     const {termGroups} = getState();
     dispatch({
       type: TERM_GROUP_EXIT,
-      uid,
+      uid: asTermGroupId(uid),
       effect: () => {
         const group = termGroups.termGroups[uid];
         if (Object.keys(termGroups.termGroups).length <= 1) {

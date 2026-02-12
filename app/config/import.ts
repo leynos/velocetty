@@ -1,6 +1,7 @@
+/** @file Imports and normalizes user and default configuration files. */
 import {readFileSync, mkdirpSync} from 'fs-extra';
 
-import type {rawConfig} from '../../typings/config';
+import type {rawConfig} from '@shared/types/config';
 import notify from '../notify';
 
 import {_init} from './init';

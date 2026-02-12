@@ -2,9 +2,9 @@ import Immutable from 'seamless-immutable';
 import type {Immutable as ImmutableType} from 'seamless-immutable';
 import {v4 as uuidv4} from 'uuid';
 
-import {SESSION_ADD, SESSION_SET_ACTIVE} from '../../typings/constants/sessions';
-import type {SessionAddAction} from '../../typings/constants/sessions';
-import {TERM_GROUP_EXIT, TERM_GROUP_RESIZE} from '../../typings/constants/term-groups';
+import {SESSION_ADD, SESSION_SET_ACTIVE} from '@shared/constants/sessions';
+import type {SessionAddAction} from '@shared/constants/sessions';
+import {TERM_GROUP_EXIT, TERM_GROUP_RESIZE} from '@shared/constants/term-groups';
 import type {ITermGroup, ITermState, ITermGroups, ITermGroupReducer, Mutable} from '../../typings/hyper';
 import {decorateTermGroupsReducer} from '../utils/plugins';
 import findBySession from '../utils/term-groups';

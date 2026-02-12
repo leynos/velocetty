@@ -1,4 +1,4 @@
-import {INIT} from '../../typings/constants';
+import {INIT} from '@shared/constants';
 import type {HyperDispatch} from '../../typings/hyper';
 import rpc from '../rpc';
 

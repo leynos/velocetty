@@ -11,8 +11,9 @@ import isDev from 'electron-is-dev';
 import {getWorkingDirectoryFromPID} from 'native-process-working-directory';
 import {v4 as uuidv4} from 'uuid';
 
-import type {sessionExtraOptions} from '../../typings/common';
-import type {configOptions} from '../../typings/config';
+import type {sessionExtraOptions} from '@shared/types/common';
+import type {configOptions} from '@shared/types/config';
+import {asProfileId, asSessionId} from '../utils/shared-ids';
 import {execCommand} from '../commands';
 import {getDefaultProfile} from '../config';
 import {icon, homeDirectory} from '../config/paths';
@@ -26,6 +27,137 @@ import {setRendererType, unsetRendererType} from '../utils/renderer-utils';
 import toElectronBackgroundColor from '../utils/to-electron-background-color';
 
 import contextMenuTemplate from './contextmenu';
+
+const SESSION_SPLIT_DIRECTIONS = new Set(['HORIZONTAL', 'VERTICAL']);
+
+class InvalidSessionExtraOptionsError extends Error {
+  readonly code = 'INVALID_SESSION_EXTRA_OPTIONS';
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidSessionExtraOptionsError';
+  }
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const validateCwd = (value: unknown): string => {
+  if (typeof value !== 'string') {
+    throw new InvalidSessionExtraOptionsError('Session option "cwd" must be a string.');
+  }
+
+  return value;
+};
+
+const validateSplitDirection = (value: unknown): 'HORIZONTAL' | 'VERTICAL' => {
+  if (typeof value !== 'string' || !SESSION_SPLIT_DIRECTIONS.has(value)) {
+    throw new InvalidSessionExtraOptionsError(
+      'Session option "splitDirection" must be either "HORIZONTAL" or "VERTICAL".'
+    );
+  }
+
+  return value as 'HORIZONTAL' | 'VERTICAL';
+};
+
+const validateActiveUid = (value: unknown): string | null => {
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    throw new InvalidSessionExtraOptionsError('Session option "activeUid" must be a string or null.');
+  }
+
+  return asSessionId(value);
+};
+
+const validateIsNewGroup = (value: unknown): boolean => {
+  if (typeof value !== 'boolean') {
+    throw new InvalidSessionExtraOptionsError('Session option "isNewGroup" must be a boolean.');
+  }
+
+  return value;
+};
+
+const validateRows = (value: unknown): number => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new InvalidSessionExtraOptionsError('Session option "rows" must be a finite number.');
+  }
+
+  return value;
+};
+
+const validateCols = (value: unknown): number => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new InvalidSessionExtraOptionsError('Session option "cols" must be a finite number.');
+  }
+
+  return value;
+};
+
+const validateShell = (value: unknown): string => {
+  if (typeof value !== 'string') {
+    throw new InvalidSessionExtraOptionsError('Session option "shell" must be a string.');
+  }
+
+  return value;
+};
+
+const validateShellArgs = (value: unknown): string[] => {
+  if (!Array.isArray(value) || value.some((arg) => typeof arg !== 'string')) {
+    throw new InvalidSessionExtraOptionsError('Session option "shellArgs" must be an array of strings.');
+  }
+
+  return [...value];
+};
+
+const validateProfile = (value: unknown): string => {
+  if (typeof value !== 'string') {
+    throw new InvalidSessionExtraOptionsError('Session option "profile" must be a string.');
+  }
+
+  return asProfileId(value);
+};
+
+type OptionValidator = (value: unknown) => unknown;
+
+const OPTION_VALIDATORS: Record<string, OptionValidator> = {
+  cwd: validateCwd,
+  splitDirection: validateSplitDirection,
+  activeUid: validateActiveUid,
+  isNewGroup: validateIsNewGroup,
+  rows: validateRows,
+  cols: validateCols,
+  shell: validateShell,
+  shellArgs: validateShellArgs,
+  profile: validateProfile
+};
+const parseSessionExtraOptions = (payload: unknown): sessionExtraOptions => {
+  if (payload === undefined) {
+    return {};
+  }
+
+  if (!isRecord(payload)) {
+    throw new InvalidSessionExtraOptionsError('Session options payload must be an object.');
+  }
+
+  const parsedOptions: sessionExtraOptions = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined) {
+      continue;
+    }
+
+    const validator = OPTION_VALIDATORS[key];
+    if (!validator) {
+      throw new InvalidSessionExtraOptionsError(`Session option "${key}" is not supported.`);
+    }
+
+    (parsedOptions as Record<string, unknown>)[key] = validator(value);
+  }
+
+  return parsedOptions;
+};
 
 export function newWindow(
   options_: BrowserWindowConstructorOptions,
@@ -120,12 +252,9 @@ export function newWindow(
     }
   });
 
-  function createSession(extraOptions: sessionExtraOptions = {}) {
+  function createSession(extraOptions: unknown = {}) {
     const uid = uuidv4();
-    const extraOptionsFiltered: sessionExtraOptions = {};
-    Object.keys(extraOptions).forEach((key) => {
-      if (extraOptions[key] !== undefined) extraOptionsFiltered[key] = extraOptions[key];
-    });
+    const extraOptionsFiltered = parseSessionExtraOptions(extraOptions);
 
     const profile = extraOptionsFiltered.profile || profileName;
     const activeSession = extraOptionsFiltered.activeUid ? sessions.get(extraOptionsFiltered.activeUid) : undefined;
@@ -169,8 +298,8 @@ export function newWindow(
       },
       extraOptionsFiltered,
       {
-        profile: extraOptionsFiltered.profile || profileName,
-        uid
+        profile: asProfileId(extraOptionsFiltered.profile || profileName),
+        uid: asSessionId(uid)
       }
     );
     const options = decorateSessionOptions(defaultOptions);
@@ -181,29 +310,42 @@ export function newWindow(
   }
 
   rpc.on('new', (extraOptions) => {
-    const {session, options} = createSession(extraOptions);
+    try {
+      const {session, options} = createSession(extraOptions);
 
-    sessions.set(options.uid, session);
-    rpc.emit('session add', {
-      rows: options.rows,
-      cols: options.cols,
-      uid: options.uid,
-      splitDirection: options.splitDirection,
-      shell: session.shell,
-      pid: session.pty ? session.pty.pid : null,
-      activeUid: options.activeUid ?? undefined,
-      profile: options.profile
-    });
+      sessions.set(options.uid, session);
+      rpc.emit('session add', {
+        rows: options.rows,
+        cols: options.cols,
+        uid: asSessionId(options.uid),
+        splitDirection: options.splitDirection,
+        shell: session.shell,
+        pid: session.pty ? session.pty.pid : null,
+        activeUid: options.activeUid ? asSessionId(options.activeUid) : undefined,
+        profile: asProfileId(options.profile)
+      });
 
-    session.on('data', (data: string) => {
-      rpc.emit('session data', data);
-    });
+      session.on('data', (data: string) => {
+        rpc.emit('session data', data);
+      });
 
-    session.on('exit', () => {
-      rpc.emit('session exit', {uid: options.uid});
-      unsetRendererType(options.uid);
-      sessions.delete(options.uid);
-    });
+      session.on('exit', () => {
+        rpc.emit('session exit', {uid: asSessionId(options.uid)});
+        unsetRendererType(options.uid);
+        sessions.delete(options.uid);
+      });
+    } catch (error) {
+      if (error instanceof InvalidSessionExtraOptionsError) {
+        rpc.emit('add notification', {
+          text: `Unable to create session: ${error.message}`,
+          url: '',
+          dismissable: true
+        });
+        return;
+      }
+
+      throw error;
+    }
   });
 
   rpc.on('exit', ({uid}) => {

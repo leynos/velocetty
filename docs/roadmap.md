@@ -16,12 +16,12 @@ Scope notes:
 
 ### 1.1. Repository split and build foundations
 
-- [ ] 1.1.1. Establish `frontend/`, `backend/`, and `shared/` package
+- [x] 1.1.1. Establish `frontend/`, `backend/`, and `shared/` package
   boundaries. See [velocetty-design.md](velocetty-design.md) §Repository layout
   and module boundaries.
-  - [ ] Define TypeScript path aliases and build outputs for each package.
-  - [ ] Move shared types, schemas, and constants into `shared/`.
-  - [ ] Success criteria: each package builds in isolation; cross-package
+  - [x] Define TypeScript path aliases and build outputs for each package.
+  - [x] Move shared types, schemas, and constants into `shared/`.
+  - [x] Success criteria: each package builds in isolation; cross-package
     imports are one-directional (`frontend` → `shared`, `backend` → `shared`).
 - [ ] 1.1.2. Introduce a transport abstraction with an Electron IPC adapter.
   See [velocetty-design.md](velocetty-design.md) §Host migration: Electron to

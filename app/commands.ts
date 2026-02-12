@@ -1,7 +1,9 @@
+/** @file Application command handlers and command dispatch wiring. */
 import {app, Menu} from 'electron';
 import type {BrowserWindow} from 'electron';
 
 import {openConfig, getConfig} from './config';
+import {asProfileId} from './utils/shared-ids';
 import {updatePlugins} from './plugins';
 import {installCLI} from './utils/cli-install';
 import * as systemContextMenu from './utils/system-context-menu';
@@ -152,16 +154,17 @@ getConfig().profiles.forEach((profile) => {
     setTimeout(() => app.createWindow(undefined, undefined, profile.name), 0);
   };
   commands[`tab:new:${profile.name}`] = (focusedWindow) => {
-    focusedWindow?.rpc.emit('termgroup add req', {profile: profile.name});
+    focusedWindow?.rpc.emit('termgroup add req', {profile: asProfileId(profile.name)});
   };
   commands[`pane:splitRight:${profile.name}`] = (focusedWindow) => {
-    focusedWindow?.rpc.emit('split request vertical', {profile: profile.name});
+    focusedWindow?.rpc.emit('split request vertical', {profile: asProfileId(profile.name)});
   };
   commands[`pane:splitDown:${profile.name}`] = (focusedWindow) => {
-    focusedWindow?.rpc.emit('split request horizontal', {profile: profile.name});
+    focusedWindow?.rpc.emit('split request horizontal', {profile: asProfileId(profile.name)});
   };
 });
 
+/** Execute a named command against the focused window when available. */
 export const execCommand = (command: string, focusedWindow?: BrowserWindow) => {
   const fn = commands[command];
   if (fn) {

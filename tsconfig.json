@@ -1,9 +1,10 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "./dist/tmp/root/"
+    "outDir": "./dist/tmp/root/",
+    "noImplicitAny": true
   },
-  "include": ["./app/", "./lib/", "./cli/", "./typings/"],
+  "include": ["./app/", "./lib/", "./cli/", "./typings/", "./shared/src/"],
   "references": [
     {
       "path": "./app/tsconfig.json"

@@ -1,3 +1,4 @@
+/** @file Main-process RPC server wiring for renderer IPC. */
 import {EventEmitter} from 'node:events';
 
 import {ipcMain} from 'electron';
@@ -5,8 +6,9 @@ import type {BrowserWindow, IpcMainEvent} from 'electron';
 
 import {v4 as uuidv4} from 'uuid';
 
-import type {TypedEmitter, MainEvents, RendererEvents, FilterNever} from '../typings/common';
+import type {FilterNever, MainEvents, RendererEvents, TypedEmitter} from '@shared/types/common';
 
+/** Main-process RPC server that routes renderer events over IPC. */
 export class Server {
   emitter: TypedEmitter<MainEvents>;
   destroyed = false;
@@ -52,8 +54,16 @@ export class Server {
     return this.win.webContents;
   }
 
-  ipcListener = <U extends keyof MainEvents>(_event: IpcMainEvent, {ev, data}: {ev: U; data: MainEvents[U]}) =>
-    this.emitter.emit(ev, data);
+  private emitMainEvent<U extends keyof MainEvents>(ev: U, data: MainEvents[U] | undefined) {
+    if (data === undefined) {
+      return this.emitter.emit(ev as Exclude<keyof MainEvents, FilterNever<MainEvents>>);
+    }
+
+    return this.emitter.emit(ev as FilterNever<MainEvents>, data as MainEvents[FilterNever<MainEvents>]);
+  }
+
+  ipcListener = <U extends keyof MainEvents>(_event: IpcMainEvent, {ev, data}: {ev: U; data?: MainEvents[U]}) =>
+    this.emitMainEvent(ev, data);
 
   on = <U extends keyof MainEvents>(ev: U, fn: (arg0: MainEvents[U]) => void) => {
     this.emitter.on(ev, fn);

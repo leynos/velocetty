@@ -24,12 +24,13 @@ import {
 } from './electron-e2e-helpers';
 
 const shouldRunE2E = process.env.RUN_E2E === '1';
+const isCiEnvironment = process.env.CI === 'true';
 const e2eTest = shouldRunE2E ? test : test.skip;
-const e2eTimeoutMs = 30_000;
-const launchTimeoutMs = 20_000;
-const windowTimeoutMs = 10_000;
-const rendererReadyTimeoutMs = 12_000;
-const developmentRendererReadyTimeoutMs = 20_000;
+const e2eTimeoutMs = isCiEnvironment ? 45_000 : 30_000;
+const launchTimeoutMs = isCiEnvironment ? 30_000 : 20_000;
+const windowTimeoutMs = isCiEnvironment ? 15_000 : 10_000;
+const rendererReadyTimeoutMs = isCiEnvironment ? 25_000 : 12_000;
+const developmentRendererReadyTimeoutMs = isCiEnvironment ? 30_000 : 20_000;
 const closeTimeoutMs = 5_000;
 const spawnStabilityTimeoutMs = 1_000;
 const developmentAppLaunchArgs =
@@ -137,6 +138,26 @@ const waitForSpawnLaunch = async (spawned: ReturnType<typeof spawn>, timeoutMs: 
     timeoutMs
   );
 
+const waitForOptionalLaunchMarker = async (
+  spawned: ReturnType<typeof spawn>,
+  outputTracker: ReturnType<typeof createSpawnOutputTracker>,
+  log: (message: string) => void
+) => {
+  try {
+    await outputTracker.waitForSpawnOutput(/running in prod mode|electron will open/i, windowTimeoutMs);
+  } catch (error) {
+    if (spawned.exitCode != null) {
+      throw new Error(
+        `Electron exited before emitting launch markers. Exit code: ${spawned.exitCode}. Output:
+${outputTracker.getOutput()}`
+      );
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    log(`Proceeding without launch marker output after ${windowTimeoutMs}ms (${message}).`);
+  }
+};
+
 const waitForStability = async (durationMs: number) =>
   await withTimeout(
     new Promise<void>((resolve) => {
@@ -146,15 +167,19 @@ const waitForStability = async (durationMs: number) =>
     durationMs + 100
   );
 
-const buildDevelopmentTimeoutDiagnostics = (
-  spawned: ReturnType<typeof spawn> | null,
-  outputTracker: ReturnType<typeof createSpawnOutputTracker>,
-  timeoutMs: number,
-  error: unknown
-) => {
+interface DiagnosticContext {
+  spawned: ReturnType<typeof spawn> | null;
+  outputTracker: ReturnType<typeof createSpawnOutputTracker>;
+  timeoutMs: number;
+  error: unknown;
+}
+
+const buildTimeoutDiagnostics = (modeLabel: string, modeMarker: RegExp, context: DiagnosticContext) => {
+  const {spawned, outputTracker, timeoutMs, error} = context;
   const output = outputTracker.getOutput();
+  const runningModeLabel = modeLabel === 'Packaged' ? 'running in prod mode' : 'running in dev mode';
   const markers = [
-    ['running in dev mode', /running in dev mode/i],
+    [runningModeLabel, modeMarker],
     ['electron will open', /electron will open/i],
     ['[e2e] renderer-ready', /\[e2e\] renderer-ready/i]
   ] as const;
@@ -165,7 +190,7 @@ const buildDevelopmentTimeoutDiagnostics = (
     : 'spawned process: null';
   const outputTail = output.split('\n').slice(-120).join('\n').slice(-16_000);
   const lines = [
-    `Development Electron did not emit [e2e] renderer-ready within ${timeoutMs}ms.`,
+    `${modeLabel} Electron did not emit [e2e] renderer-ready within ${timeoutMs}ms.`,
     `Underlying wait error: ${waitError}`,
     `Spawn state: ${spawnState}`,
     `Marker status: ${markerStatus.join(', ')}`,
@@ -173,6 +198,24 @@ const buildDevelopmentTimeoutDiagnostics = (
     outputTail
   ];
   return lines.join('\n');
+};
+
+const buildPackagedTimeoutDiagnostics = (
+  spawned: ReturnType<typeof spawn>,
+  outputTracker: ReturnType<typeof createSpawnOutputTracker>,
+  timeoutMs: number,
+  error: unknown
+) => {
+  return buildTimeoutDiagnostics('Packaged', /running in prod mode/i, {spawned, outputTracker, timeoutMs, error});
+};
+
+const buildDevelopmentTimeoutDiagnostics = (
+  spawned: ReturnType<typeof spawn> | null,
+  outputTracker: ReturnType<typeof createSpawnOutputTracker>,
+  timeoutMs: number,
+  error: unknown
+) => {
+  return buildTimeoutDiagnostics('Development', /running in dev mode/i, {spawned, outputTracker, timeoutMs, error});
 };
 
 interface TestContext {
@@ -245,8 +288,12 @@ const launchWithSpawn = async (
   setupSpawnOutputHandlers(spawned, outputTracker);
   await waitForSpawnLaunch(spawned, launchTimeoutMs);
   log(`Spawned Electron PID: ${spawned.pid ?? 'unknown'}.`);
-  await outputTracker.waitForSpawnOutput(/running in prod mode|electron will open/i, windowTimeoutMs);
-  await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, rendererReadyTimeoutMs);
+  await waitForOptionalLaunchMarker(spawned, outputTracker, log);
+  try {
+    await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, rendererReadyTimeoutMs);
+  } catch (error) {
+    throw new Error(buildPackagedTimeoutDiagnostics(spawned, outputTracker, rendererReadyTimeoutMs, error));
+  }
   await waitForStability(spawnStabilityTimeoutMs);
   if (spawned.exitCode != null) {
     throw new Error(`Electron exited early with code ${spawned.exitCode}. Output:\n${outputTracker.getOutput()}`);

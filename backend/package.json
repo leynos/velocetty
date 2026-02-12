@@ -1,0 +1,7 @@
+{
+  "name": "@velocetty/backend",
+  "private": true,
+  "scripts": {
+    "build": "bunx tsgo --project tsconfig.json"
+  }
+}
