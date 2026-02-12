@@ -41,7 +41,7 @@ class InvalidSessionExtraOptionsError extends Error {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const parseCwd = (value: unknown): string => {
+const validateCwd = (value: unknown): string => {
   if (typeof value !== 'string') {
     throw new InvalidSessionExtraOptionsError('Session option "cwd" must be a string.');
   }
@@ -49,7 +49,7 @@ const parseCwd = (value: unknown): string => {
   return value;
 };
 
-const parseSplitDirection = (value: unknown): 'HORIZONTAL' | 'VERTICAL' => {
+const validateSplitDirection = (value: unknown): 'HORIZONTAL' | 'VERTICAL' => {
   if (typeof value !== 'string' || !SESSION_SPLIT_DIRECTIONS.has(value)) {
     throw new InvalidSessionExtraOptionsError(
       'Session option "splitDirection" must be either "HORIZONTAL" or "VERTICAL".'
@@ -59,7 +59,7 @@ const parseSplitDirection = (value: unknown): 'HORIZONTAL' | 'VERTICAL' => {
   return value as 'HORIZONTAL' | 'VERTICAL';
 };
 
-const parseActiveUid = (value: unknown): string | null => {
+const validateActiveUid = (value: unknown): string | null => {
   if (value === null) {
     return null;
   }
@@ -71,7 +71,7 @@ const parseActiveUid = (value: unknown): string | null => {
   return asSessionId(value);
 };
 
-const parseIsNewGroup = (value: unknown): boolean => {
+const validateIsNewGroup = (value: unknown): boolean => {
   if (typeof value !== 'boolean') {
     throw new InvalidSessionExtraOptionsError('Session option "isNewGroup" must be a boolean.');
   }
@@ -79,7 +79,7 @@ const parseIsNewGroup = (value: unknown): boolean => {
   return value;
 };
 
-const parseRows = (value: unknown): number => {
+const validateRows = (value: unknown): number => {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new InvalidSessionExtraOptionsError('Session option "rows" must be a finite number.');
   }
@@ -87,7 +87,7 @@ const parseRows = (value: unknown): number => {
   return value;
 };
 
-const parseCols = (value: unknown): number => {
+const validateCols = (value: unknown): number => {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new InvalidSessionExtraOptionsError('Session option "cols" must be a finite number.');
   }
@@ -95,7 +95,7 @@ const parseCols = (value: unknown): number => {
   return value;
 };
 
-const parseShell = (value: unknown): string => {
+const validateShell = (value: unknown): string => {
   if (typeof value !== 'string') {
     throw new InvalidSessionExtraOptionsError('Session option "shell" must be a string.');
   }
@@ -103,7 +103,7 @@ const parseShell = (value: unknown): string => {
   return value;
 };
 
-const parseShellArgs = (value: unknown): string[] => {
+const validateShellArgs = (value: unknown): string[] => {
   if (!Array.isArray(value) || value.some((arg) => typeof arg !== 'string')) {
     throw new InvalidSessionExtraOptionsError('Session option "shellArgs" must be an array of strings.');
   }
@@ -111,7 +111,7 @@ const parseShellArgs = (value: unknown): string[] => {
   return [...value];
 };
 
-const parseProfile = (value: unknown): string => {
+const validateProfile = (value: unknown): string => {
   if (typeof value !== 'string') {
     throw new InvalidSessionExtraOptionsError('Session option "profile" must be a string.');
   }
@@ -119,18 +119,18 @@ const parseProfile = (value: unknown): string => {
   return asProfileId(value);
 };
 
-type OptionParser = (value: unknown) => unknown;
+type OptionValidator = (value: unknown) => unknown;
 
-const optionParsers: Record<string, OptionParser> = {
-  cwd: parseCwd,
-  splitDirection: parseSplitDirection,
-  activeUid: parseActiveUid,
-  isNewGroup: parseIsNewGroup,
-  rows: parseRows,
-  cols: parseCols,
-  shell: parseShell,
-  shellArgs: parseShellArgs,
-  profile: parseProfile
+const OPTION_VALIDATORS: Record<string, OptionValidator> = {
+  cwd: validateCwd,
+  splitDirection: validateSplitDirection,
+  activeUid: validateActiveUid,
+  isNewGroup: validateIsNewGroup,
+  rows: validateRows,
+  cols: validateCols,
+  shell: validateShell,
+  shellArgs: validateShellArgs,
+  profile: validateProfile
 };
 const parseSessionExtraOptions = (payload: unknown): sessionExtraOptions => {
   if (payload === undefined) {
@@ -147,12 +147,12 @@ const parseSessionExtraOptions = (payload: unknown): sessionExtraOptions => {
       continue;
     }
 
-    const parser = optionParsers[key];
-    if (!parser) {
+    const validator = OPTION_VALIDATORS[key];
+    if (!validator) {
       throw new InvalidSessionExtraOptionsError(`Session option "${key}" is not supported.`);
     }
 
-    (parsedOptions as Record<string, unknown>)[key] = parser(value);
+    (parsedOptions as Record<string, unknown>)[key] = validator(value);
   }
 
   return parsedOptions;
