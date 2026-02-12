@@ -31,11 +31,16 @@ type ElectronMock = {
     runningUnderARM64Translation?: boolean;
     config?: {subscribe?: () => void};
   };
+  ipcMain: {
+    on: (..._args: unknown[]) => void;
+    removeListener: (..._args: unknown[]) => void;
+  };
 };
 
 type ElectronMockOverrides = {
   default?: Partial<ElectronMock['default']>;
   app?: Partial<ElectronMock['app']>;
+  ipcMain?: Partial<ElectronMock['ipcMain']>;
 };
 
 const electronMock: ElectronMock = {
@@ -47,6 +52,10 @@ const electronMock: ElectronMock = {
   app: {
     runningUnderARM64Translation: false,
     config: {subscribe: () => {}}
+  },
+  ipcMain: {
+    on: () => {},
+    removeListener: () => {}
   }
 };
 
@@ -77,6 +86,8 @@ export const resetElectronMock = () => {
   electronMock.default.screen.getAllDisplays = () => [];
   electronMock.app.runningUnderARM64Translation = false;
   electronMock.app.config = {subscribe: () => {}};
+  electronMock.ipcMain.on = () => {};
+  electronMock.ipcMain.removeListener = () => {};
 };
 
 /**
@@ -100,6 +111,12 @@ export const configureElectronMock = (overrides: ElectronMockOverrides) => {
     electronMock.app = {
       ...electronMock.app,
       ...overrides.app
+    };
+  }
+  if (overrides.ipcMain) {
+    electronMock.ipcMain = {
+      ...electronMock.ipcMain,
+      ...overrides.ipcMain
     };
   }
 };

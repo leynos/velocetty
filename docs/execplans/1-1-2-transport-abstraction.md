@@ -17,7 +17,7 @@ The sections `Constraints`, `Tolerances`, `Risks`, `Progress`,
 `Surprises & discoveries`, `Decision log`, and
 `Outcomes & retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT (2026-02-12)
+Status: IN_PROGRESS (2026-02-12)
 
 No `PLANS.md` exists at repository root as of 2026-02-12, so this plan is
 self-contained.
@@ -117,8 +117,9 @@ Done criteria for this roadmap item:
 - [x] (2026-02-12 00:00Z) Drafted this ExecPlan.
 - [x] (2026-02-12 00:00Z) Recorded user requirement that IPC/command-registry
   coverage must be in place before any implementation work.
-- [ ] Await explicit approval to begin implementation.
-- [ ] Stage A complete: add and commit coverage-first IPC/registry tests.
+- [x] (2026-02-12 20:12Z) Await explicit approval to begin implementation.
+- [x] (2026-02-12 20:22Z) Stage A complete: add and commit coverage-first
+  IPC/registry tests.
 - [ ] Stage B complete: finalise transport boundary and migration map.
 - [ ] Stage C complete: add shared transport contracts.
 - [ ] Stage D complete: implement Electron transport adapter.
@@ -151,6 +152,12 @@ Done criteria for this roadmap item:
   Impact: continuity risk is too high for a refactor unless the coverage-first
   gate is implemented before transport changes.
 
+- Additional discovery: full-suite stability required shared Electron mock wiring in
+  `test/unit/rpc-server.test.ts` because `updater.test.ts` can register a global
+  Electron mock without `ipcMain`.
+  Impact: transport-related tests need a single reusable mock surface to avoid
+  stale IPC imports under Bun's module mock cache.
+
 ## Decision log
 
 - Decision: define transport contracts in `shared/` and implement the Electron
@@ -172,6 +179,13 @@ Done criteria for this roadmap item:
   added and committed before any transport refactor edits.
   Rationale: user requirement and current coverage gap indicate continuity risk
   if refactor work starts first.
+  Date/Author: 2026-02-12 / Codex
+
+- Decision: reuse `test/testUtils/electron-path.ts` in transport-related tests and
+  wire `ipcMain` spies onto its shared Electron mock before importing
+  `app/rpc.ts`.
+  Rationale: avoid brittle path-specific mock overrides that break under full-suite
+  import ordering.
   Date/Author: 2026-02-12 / Codex
 
 ## Outcomes & retrospective

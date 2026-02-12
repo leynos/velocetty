@@ -36,6 +36,7 @@ let registerCalls = 0;
 let bindCalls = 0;
 let resetCalls = 0;
 let registeredKeys: Record<string, string> = {};
+let commandHandlers: Record<string, ((event: unknown, dispatch: unknown) => void) | undefined> = {};
 let shouldPreventDefaultResult = false;
 let boundKeyHandlers: KeyHandler[] = [];
 let termsRef: TermsRef = {
@@ -115,7 +116,7 @@ mock.module('../../lib/command-registry', () => ({
     registerCalls += 1;
     return registeredKeys;
   },
-  getCommandHandler: () => () => {},
+  getCommandHandler: (command: string) => commandHandlers[command],
   shouldPreventDefault: () => shouldPreventDefaultResult
 }));
 
@@ -128,6 +129,7 @@ beforeEach(() => {
   bindCalls = 0;
   resetCalls = 0;
   registeredKeys = {};
+  commandHandlers = {};
   shouldPreventDefaultResult = false;
   boundKeyHandlers = [];
   termsRef = {
@@ -308,6 +310,59 @@ test.serial('Hyper does not call preventDefault when key handlers allow default 
 
   expect(commandCalls).toBe(1);
   expect(preventedDefaultCalls).toBe(0);
+
+  await act(async () => {
+    root.unmount();
+  });
+  cleanup();
+});
+
+test.serial('Hyper forwards local handlers and fallback commands to execCommand', async () => {
+  const cleanup = await setupHappyDom();
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  buildRpcWindowStub();
+
+  const localHandler = mock((_event: unknown, _dispatch: unknown) => {});
+  registeredKeys = {
+    localShortcut: 'editor:search-close',
+    remoteShortcut: 'tab:new'
+  };
+  commandHandlers = {
+    'editor:search-close': localHandler
+  };
+
+  const execCommandCalls: Array<{command: string; handler: unknown; event: unknown}> = [];
+
+  await act(async () => {
+    renderHyper(root, {
+      execCommand: (command: string, handler: unknown, event: unknown) => {
+        execCommandCalls.push({command, handler, event});
+      }
+    });
+    await waitFor(0);
+  });
+
+  expect(boundKeyHandlers).toHaveLength(2);
+
+  const firstEvent = {preventDefault: () => {}};
+  const secondEvent = {preventDefault: () => {}};
+  boundKeyHandlers[0](firstEvent);
+  boundKeyHandlers[1](secondEvent);
+
+  expect(execCommandCalls).toHaveLength(2);
+  expect(execCommandCalls[0]).toMatchObject({
+    command: 'editor:search-close',
+    handler: localHandler
+  });
+  expect(execCommandCalls[1]).toMatchObject({
+    command: 'tab:new',
+    handler: undefined
+  });
+  expect(execCommandCalls[0].event).toBe(firstEvent);
+  expect(execCommandCalls[1].event).toBe(secondEvent);
 
   await act(async () => {
     root.unmount();
