@@ -3,7 +3,11 @@ const fs = require('node:fs');
 const childProcess = require('node:child_process');
 const {Arch} = require('electron-builder');
 
-const {normaliseSnapshotArch} = require('./shared/arch.cjs');
+const SUPPORTED_ARCHITECTURES = ['x64', 'arm64'];
+const ARCH_ALIASES = {
+  aarch64: 'arm64',
+  amd64: 'x64'
+};
 
 const ARCH_ENUM_TO_NAME = {
   0: 'ia32',
@@ -13,41 +17,100 @@ const ARCH_ENUM_TO_NAME = {
   4: 'universal'
 };
 
+const isValidArchString = (arch) => typeof arch === 'string' && arch.length > 0;
+const isSupportedArch = (arch) => SUPPORTED_ARCHITECTURES.includes(arch);
+const isUnsupportedArmArch = (arch) => arch === 'arm';
+
+function normalizeArch(arch, sourceLabel) {
+  if (!isValidArchString(arch)) {
+    throw new Error(`Expected a string architecture from ${sourceLabel}, received "${String(arch)}".`);
+  }
+
+  const canonicalArch = ARCH_ALIASES[arch] ?? arch;
+  if (isUnsupportedArmArch(canonicalArch)) {
+    throw new Error('Unsupported architecture "arm". Snapshot artifacts are available only for x64 and arm64.');
+  }
+
+  if (isSupportedArch(canonicalArch)) {
+    return canonicalArch;
+  }
+
+  throw new Error(
+    `Unsupported architecture "${arch}" from ${sourceLabel}. Supported values: ${SUPPORTED_ARCHITECTURES.join(', ')}.`
+  );
+}
+
+const isStringArch = (context) => typeof context.arch === 'string';
+const isEnumArch = (context) => typeof context.arch === 'number';
+const isUndefinedArch = (context) => context.arch === undefined;
+
+const resolveEnumArch = (contextArch) => {
+  const resolvedArch = Arch?.[contextArch] ?? ARCH_ENUM_TO_NAME[contextArch];
+  if (typeof resolvedArch === 'string') {
+    return normalizeArch(resolvedArch, 'electron-builder Arch enum');
+  }
+
+  return normalizeArch(process.arch, 'process.arch fallback for unknown context.arch enum');
+};
+
 function resolveContextArch(context) {
-  if (typeof context.arch === 'string') {
-    return normaliseSnapshotArch(context.arch, 'afterPack context.arch');
+  if (isStringArch(context)) {
+    return normalizeArch(context.arch, 'afterPack context.arch');
   }
 
-  if (typeof context.arch === 'number') {
-    const resolvedArch = Arch?.[context.arch] ?? ARCH_ENUM_TO_NAME[context.arch];
-    if (typeof resolvedArch === 'string') {
-      return normaliseSnapshotArch(resolvedArch, 'electron-builder Arch enum');
-    }
-
-    return normaliseSnapshotArch(process.arch, 'process.arch fallback for unknown context.arch enum');
+  if (isEnumArch(context)) {
+    return resolveEnumArch(context.arch);
   }
 
-  if (context.arch === undefined) {
-    return normaliseSnapshotArch(process.arch, 'process.arch fallback');
+  if (isUndefinedArch(context)) {
+    return normalizeArch(process.arch, 'process.arch fallback');
   }
 
   throw new Error(`Unsupported context.arch type "${typeof context.arch}".`);
 }
 
-function copySnapshot(pathToElectron, archToCopy) {
+function getSnapshotPaths(archToCopy) {
   const snapshotFileName = 'snapshot_blob.bin';
   const v8ContextFileName = getV8ContextFileName(archToCopy);
   const pathToBlob = path.resolve(__dirname, '..', 'cache', archToCopy, snapshotFileName);
   const pathToBlobV8 = path.resolve(__dirname, '..', 'cache', archToCopy, v8ContextFileName);
 
-  console.log('Copying v8 snapshots from', pathToBlob, 'to', pathToElectron);
+  return {
+    snapshotFileName,
+    v8ContextFileName,
+    pathToBlob,
+    pathToBlobV8
+  };
+}
+
+function validateSnapshotFiles(snapshotPaths) {
+  const {snapshotFileName, v8ContextFileName, pathToBlob, pathToBlobV8} = snapshotPaths;
   if (!fs.existsSync(pathToBlob) || !fs.existsSync(pathToBlobV8)) {
     throw new Error(
       `Missing snapshot output. Expected ${snapshotFileName} and ${v8ContextFileName} in ${path.dirname(pathToBlob)}`
     );
   }
-  fs.copyFileSync(pathToBlob, path.join(pathToElectron, snapshotFileName));
-  fs.copyFileSync(pathToBlobV8, path.join(pathToElectron, v8ContextFileName));
+}
+
+function copySnapshot(pathToElectron, archToCopy) {
+  const snapshotPaths = getSnapshotPaths(archToCopy);
+
+  console.log('Copying v8 snapshots from', snapshotPaths.pathToBlob, 'to', pathToElectron);
+  validateSnapshotFiles(snapshotPaths);
+  fs.copyFileSync(snapshotPaths.pathToBlob, path.join(pathToElectron, snapshotPaths.snapshotFileName));
+  fs.copyFileSync(snapshotPaths.pathToBlobV8, path.join(pathToElectron, snapshotPaths.v8ContextFileName));
+}
+
+function getDarwinElectronPath() {
+  return path.resolve(
+    __dirname,
+    '..',
+    'node_modules/electron/dist/Electron.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Resources'
+  );
+}
+
+function getDefaultElectronPath() {
+  return path.resolve(__dirname, '..', 'node_modules', 'electron', 'dist');
 }
 
 function getPathToElectron() {
@@ -57,34 +120,20 @@ function getPathToElectron() {
 
   switch (process.platform) {
     case 'darwin':
-      return path.resolve(
-        __dirname,
-        '..',
-        'node_modules/electron/dist/Electron.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Resources'
-      );
+      return getDarwinElectronPath();
     case 'win32':
     case 'linux':
-      return path.resolve(__dirname, '..', 'node_modules', 'electron', 'dist');
+      return getDefaultElectronPath();
   }
 }
 
-function ensureElectronDist(pathToElectron) {
-  if (process.env.ELECTRON_OVERRIDE_DIST_PATH) {
-    if (!fs.existsSync(pathToElectron)) {
-      throw new Error(`ELECTRON_OVERRIDE_DIST_PATH is set to "${pathToElectron}" but the path does not exist.`);
-    }
-    return;
+function validateOverridePath(pathToElectron) {
+  if (!fs.existsSync(pathToElectron)) {
+    throw new Error(`ELECTRON_OVERRIDE_DIST_PATH is set to "${pathToElectron}" but the path does not exist.`);
   }
+}
 
-  if (fs.existsSync(pathToElectron)) {
-    return;
-  }
-
-  const installScript = path.resolve(__dirname, '..', 'node_modules', 'electron', 'install.js');
-  if (!fs.existsSync(installScript)) {
-    throw new Error('Electron install script not found. Run bun install first.');
-  }
-
+function runElectronInstall(installScript) {
   console.log('Electron dist not found. Running electron install script...');
   const result = childProcess.spawnSync(process.execPath, [installScript], {
     stdio: 'inherit',
@@ -98,6 +147,24 @@ function ensureElectronDist(pathToElectron) {
   if (result.status !== 0) {
     throw new Error(`Electron install failed with exit code ${result.status ?? 1}.`);
   }
+}
+
+function ensureElectronDist(pathToElectron) {
+  if (process.env.ELECTRON_OVERRIDE_DIST_PATH) {
+    validateOverridePath(pathToElectron);
+    return;
+  }
+
+  if (fs.existsSync(pathToElectron)) {
+    return;
+  }
+
+  const installScript = path.resolve(__dirname, '..', 'node_modules', 'electron', 'install.js');
+  if (!fs.existsSync(installScript)) {
+    throw new Error('Electron install script not found. Run bun install first.');
+  }
+
+  runElectronInstall(installScript);
 
   if (!fs.existsSync(pathToElectron)) {
     throw new Error(`Electron dist still missing at ${pathToElectron}.`);
@@ -118,21 +185,22 @@ function resolveMacBundleName(context) {
   return `${bundleName}.app`;
 }
 
+function getDarwinAppPath(context) {
+  return path.join(
+    context.appOutDir,
+    resolveMacBundleName(context),
+    'Contents',
+    'Frameworks',
+    'Electron Framework.framework',
+    'Versions',
+    'A',
+    'Resources'
+  );
+}
+
 exports.default = async (context) => {
   const archToCopy = resolveContextArch(context);
-  const pathToElectron =
-    process.platform === 'darwin'
-      ? path.join(
-          context.appOutDir,
-          resolveMacBundleName(context),
-          'Contents',
-          'Frameworks',
-          'Electron Framework.framework',
-          'Versions',
-          'A',
-          'Resources'
-        )
-      : context.appOutDir;
+  const pathToElectron = process.platform === 'darwin' ? getDarwinAppPath(context) : context.appOutDir;
   copySnapshot(pathToElectron, archToCopy);
 };
 
@@ -142,8 +210,8 @@ if (require.main === module) {
     throw new Error('npm_config_arch must be set when running cp-snapshot.js directly.');
   }
 
-  const archToCopy = normaliseSnapshotArch(targetArch, 'npm_config_arch');
-  const currentArch = normaliseSnapshotArch(process.arch, 'process.arch');
+  const archToCopy = normalizeArch(targetArch, 'npm_config_arch');
+  const currentArch = normalizeArch(process.arch, 'process.arch');
   const pathToElectron = getPathToElectron();
   ensureElectronDist(pathToElectron);
   if (currentArch === archToCopy) {
