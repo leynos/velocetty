@@ -3,7 +3,7 @@ import {app, Menu} from 'electron';
 import type {BrowserWindow} from 'electron';
 
 import {openConfig, getConfig} from './config';
-import {asProfileId} from '@shared/types/common';
+import {asProfileId} from './utils/shared-ids';
 import {updatePlugins} from './plugins';
 import {installCLI} from './utils/cli-install';
 import * as systemContextMenu from './utils/system-context-menu';

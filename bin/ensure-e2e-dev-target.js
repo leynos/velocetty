@@ -6,7 +6,7 @@
  * CLI launches used by development-lane E2E tests.
  */
 
-const {existsSync, rmSync} = require('node:fs');
+const {cpSync, existsSync, rmSync, symlinkSync} = require('node:fs');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 
@@ -20,10 +20,36 @@ const requiredTargetFiles = [
 
 const tsBuildInfoPath = path.join(repositoryRoot, 'target/tsconfig.tsbuildinfo');
 
+const targetNodeModulesPath = path.join(repositoryRoot, 'target/node_modules');
+const appNodeModulesPath = path.join(repositoryRoot, 'app/node_modules');
+
 const clearStaleTsBuildInfo = () => {
   if (existsSync(tsBuildInfoPath)) {
     rmSync(tsBuildInfoPath);
   }
+};
+
+const ensureTargetNodeModules = () => {
+  if (existsSync(targetNodeModulesPath)) {
+    return;
+  }
+
+  if (!existsSync(appNodeModulesPath)) {
+    throw new Error('[e2e:prepare] app/node_modules is required to run the development Electron target.');
+  }
+
+  const symlinkTarget = path.relative(path.dirname(targetNodeModulesPath), appNodeModulesPath);
+
+  try {
+    symlinkSync(symlinkTarget, targetNodeModulesPath, process.platform === 'win32' ? 'junction' : 'dir');
+    console.log('[e2e:prepare] Linked target/node_modules to app/node_modules.');
+    return;
+  } catch (error) {
+    console.warn('[e2e:prepare] Could not create node_modules symlink, falling back to copy.', error);
+  }
+
+  cpSync(appNodeModulesPath, targetNodeModulesPath, {recursive: true, dereference: false});
+  console.log('[e2e:prepare] Copied app/node_modules into target/node_modules.');
 };
 
 const getMissingTargetFiles = () => {
@@ -50,6 +76,7 @@ const runBunCommand = (description, args) => {
 const ensureDevelopmentTarget = () => {
   const missingBeforeBuild = getMissingTargetFiles();
   if (missingBeforeBuild.length === 0) {
+    ensureTargetNodeModules();
     console.log('[e2e:prepare] Development target already present.');
     return;
   }
@@ -67,6 +94,8 @@ const ensureDevelopmentTarget = () => {
   clearStaleTsBuildInfo();
 
   runBunCommand('Compile Electron main-process target', ['x', 'tsgo', '--project', 'app/tsconfig.json']);
+
+  ensureTargetNodeModules();
 
   const missingAfterBuild = getMissingTargetFiles();
   if (missingAfterBuild.length > 0) {
