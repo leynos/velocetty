@@ -237,14 +237,16 @@ Current command invocation path:
 
 Current event-stream path:
 
-- `lib/index.tsx` subscribes to renderer events via `rpc.on(...)` for session,
-  UI, and updater flows.
+- `lib/index.tsx` subscribes to renderer events via `transport.on(...)` for
+  session, UI, and updater flows.
 - `app/ui/window.ts` emits those events over `app/rpc.ts` server wiring.
 
 Current direct Electron access in command-adjacent code:
 
 - `lib/command-registry.ts` calls `transport.invoke('getDecoratedKeymaps')` and no
   longer imports `lib/utils/ipc.ts` directly.
+- `lib/actions/*` now emit via `RendererCommandTransport`, including updater and
+  session/group/header/shell action handlers.
 
 Key files expected in this milestone:
 
@@ -252,10 +254,9 @@ Key files expected in this milestone:
   (transport contract definitions).
 - `lib/utils/rpc.ts`, `lib/rpc.ts`, and new `lib/transport/*`
   (Electron adapter implementation).
-- `lib/command-registry.ts` and `lib/actions/ui.ts`
-  (command-layer migration to transport; `lib/index.tsx` remains on `window.rpc`
-  for bootstrap subscriptions in this milestone).
-- `lib/index.tsx` (event-stream usage via transport wrapper where practical).
+- `lib/command-registry.ts`, `lib/actions/*`, and `lib/actions/updater.ts`
+  (command-layer migration to transport).
+- `lib/index.tsx` (event-stream usage via transport listener wrappers).
 - `test/unit/*` (transport and command-path regression tests).
 - `docs/developers-guide.md` and `docs/roadmap.md`.
 
@@ -388,6 +389,16 @@ Additional observable checks:
 
 - existing fast E2E path remains green,
 - no regressions in session creation, split, or keybinding-triggered commands.
+- bootstrap stream coverage now includes transport listener assertions for ready,
+  session add, and update available events.
+
+Open follow-up concerns:
+
+- `lib/containers/hyper.tsx` and `lib/components/term.tsx` still use
+  `window.rpc` directly; migrate these paths in the next transport cycle.
+- Add a transport composition seam for renderer bootstrap to avoid hard-coding
+  the Electron adapter at entrypoint.
+- keep a follow-on assertion for sustained high-frequency bootstrap stream throughput.
 
 ## Idempotence and recovery
 

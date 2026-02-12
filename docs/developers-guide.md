@@ -73,6 +73,8 @@ Follow-up hardening tracked in `docs/tracking-issues.md`:
   modules only concerned with transport contracts.
 - Add or update transport adapter tests when changing invocation or subscription
   paths (for example, `test/unit/electron-ipc-transport.test.ts`).
+- Track progress against `lib/TRANSPORT_MIGRATION_MAP.md` and keep all
+  transport-facing command and bootstrap-path follow-ups visible before any PR.
 
 Package-local build checks are available via:
 

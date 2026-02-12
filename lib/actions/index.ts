@@ -1,13 +1,13 @@
 import {INIT} from '@shared/constants';
 import type {HyperDispatch} from '../../typings/hyper';
-import rpc from '../rpc';
+import {transport} from '../transport/electron-ipc-transport';
 
 export default function init() {
   return (dispatch: HyperDispatch) => {
     dispatch({
       type: INIT,
       effect: () => {
-        rpc.emit('init', null);
+        transport.emit('init', null);
       }
     });
   };

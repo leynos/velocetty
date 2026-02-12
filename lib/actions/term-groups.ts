@@ -9,7 +9,7 @@ import {
   TERM_GROUP_EXIT_ACTIVE
 } from '@shared/constants/term-groups';
 import type {ITermState, ITermGroup, HyperState, HyperDispatch, HyperActions} from '../../typings/hyper';
-import rpc from '../rpc';
+import {transport} from '../transport/electron-ipc-transport';
 import {getRootGroups} from '../selectors';
 import findBySession from '../utils/term-groups';
 
@@ -24,7 +24,7 @@ function requestSplit(direction: 'VERTICAL' | 'HORIZONTAL') {
           const {ui, sessions} = getState();
           const activeUid = _activeUid ? _activeUid : sessions.activeUid;
           const profile = _profile ? _profile : activeUid ? sessions.sessions[activeUid].profile : window.profileName;
-          rpc.emit('new', {
+          transport.emit('new', {
             splitDirection: direction,
             cwd: ui.cwd,
             activeUid: activeUid ? asSessionId(activeUid) : undefined,
@@ -55,7 +55,7 @@ export function requestTermGroup(_activeUid: string | undefined, _profile: strin
         const {cwd} = ui;
         const activeUid = _activeUid ? _activeUid : sessions.activeUid;
         const profile = _profile ? _profile : activeUid ? sessions.sessions[activeUid].profile : window.profileName;
-        rpc.emit('new', {
+        transport.emit('new', {
           isNewGroup: true,
           cwd,
           activeUid: activeUid ? asSessionId(activeUid) : undefined,

@@ -15,7 +15,7 @@ import {
   SESSION_SEARCH
 } from '@shared/constants/sessions';
 import type {HyperState, HyperDispatch, HyperActions} from '../../typings/hyper';
-import rpc from '../rpc';
+import {transport} from '../transport/electron-ipc-transport';
 import {keys} from '../utils/object';
 import findBySession from '../utils/term-groups';
 
@@ -47,7 +47,7 @@ export function requestSession(profile: string | undefined) {
       effect: () => {
         const {ui} = getState();
         const {cwd} = ui;
-        rpc.emit('new', {cwd, profile: profile ? asProfileId(profile) : undefined});
+        transport.emit('new', {cwd, profile: profile ? asProfileId(profile) : undefined});
       }
     });
   };
@@ -80,7 +80,7 @@ function createExitAction(type: typeof SESSION_USER_EXIT | typeof SESSION_PTY_EX
       uid: sessionUid,
       effect() {
         if (type === SESSION_USER_EXIT) {
-          rpc.emit('exit', {uid: sessionUid});
+          transport.emit('exit', {uid: sessionUid});
         }
 
         const sessions = keys(getState().sessions.sessions);
@@ -141,7 +141,7 @@ export function resizeSession(uid: string, cols: number, rows: number) {
       isStandaloneTerm,
       now,
       effect() {
-        rpc.emit('resize', {uid: sessionUid, cols, rows});
+        transport.emit('resize', {uid: sessionUid, cols, rows});
       }
     });
   };
@@ -187,7 +187,7 @@ export function sendSessionData(uid: string | null, data: string, escaped?: bool
         // If no uid is passed, data is sent to the active session.
         const targetUid = uid || getState().sessions.activeUid;
 
-        rpc.emit('data', {uid: targetUid ? asSessionId(targetUid) : null, data, escaped});
+        transport.emit('data', {uid: targetUid ? asSessionId(targetUid) : null, data, escaped});
       }
     });
   };

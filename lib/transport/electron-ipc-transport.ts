@@ -7,12 +7,7 @@ import type {RendererCommandTransport} from '@shared/types/transport';
 /** Host-agnostic transport for command invocation and event streams. */
 export const transport: RendererCommandTransport = {
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
-  emit: (event, payload) => {
-    const rpcEvent = event as Parameters<typeof rpc.emit>[0];
-    const rpcPayload = payload as Parameters<typeof rpc.emit>[1];
-
-    return rpc.emit(rpcEvent, rpcPayload);
-  },
+  emit: (...args) => rpc.emit(...args),
   on: (event, listener) => {
     rpc.on(event, listener);
     return transport;

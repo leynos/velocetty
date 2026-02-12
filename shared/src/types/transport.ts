@@ -1,6 +1,5 @@
 /** @file Shared transport contracts for command invocation and event streams. */
 import type {IpcCommands, MainEvents, RendererEvents} from './common';
-import type {FilterNever} from './common';
 
 /** Transport contract for renderer-side command dispatch and event subscription. */
 export interface RendererCommandTransport {
@@ -11,8 +10,10 @@ export interface RendererCommandTransport {
   ): Promise<ReturnType<IpcCommands[Command]>>;
 
   /** Emit an event to the host from the renderer. */
-  emit<Event extends Exclude<keyof MainEvents, FilterNever<MainEvents>>>(event: Event): boolean;
-  emit<Event extends FilterNever<MainEvents>>(event: Event, payload: MainEvents[Event]): boolean;
+  emit<Event extends keyof MainEvents>(
+    event: Event,
+    ...payload: [MainEvents[Event]] extends [never] ? [] : [payload: MainEvents[Event]]
+  ): boolean;
 
   /** Register renderer event handlers for host event streams. */
   on<Event extends keyof RendererEvents>(
@@ -33,7 +34,7 @@ export interface RendererCommandTransport {
   ): RendererCommandTransport;
 
   /** Remove all host event handlers from this transport. */
-  removeAllListeners: () => void;
+  removeAllListeners: () => RendererCommandTransport;
 
   /** Dispose resources created by the transport. */
   destroy?(): void;

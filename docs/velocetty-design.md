@@ -1824,6 +1824,18 @@ loopback WebSocket using the same protocol used for remote connections. This
 
 reduces duplication: the UI always speaks one protocol.
 
+### Migration follow-up concerns
+
+Current Electron transport work provides a functional command/event façade, but the
+architecture is not yet fully host-agnostic:
+
+- `window.rpc` remains available for legacy renderer consumers outside the command
+  layer, so the migration map should treat those consumers as follow-up work.
+- Renderer bootstrap still uses the Electron transport directly; a host selection
+  seam should be introduced once transport composition is stabilised.
+- Continue to harden bootstrap event-path assertions (for example: `ready`,
+  `session add`, and `update available`) to defend transport-swap regressions.
+
 
 
 ## Remote frontend: protobuf/WebSocket protocol

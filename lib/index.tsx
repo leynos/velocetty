@@ -15,6 +15,7 @@ import * as uiActions from './actions/ui';
 import * as updaterActions from './actions/updater';
 import HyperContainer from './containers/hyper';
 import rpc from './rpc';
+import {transport} from './transport/electron-ipc-transport';
 import configureStore from './store/configure-store';
 import * as config from './utils/config';
 import {getBase64FileData} from './utils/file';
@@ -68,167 +69,167 @@ config.subscribe(() => {
 
 // initialize communication with main electron process
 // and subscribe to all user intents for example from menus
-rpc.on('ready', () => {
+transport.on('ready', () => {
   store_.dispatch(init());
   store_.dispatch(uiActions.setFontSmoothing());
 });
 
-rpc.on('session add', (data) => {
+transport.on('session add', (data) => {
   store_.dispatch(sessionActions.addSession(data));
 });
 
-rpc.on('session data', (d: string) => {
+transport.on('session data', (d: string) => {
   // the uid is a uuid v4 so it's 36 chars long
   const uid = d.slice(0, 36);
   const data = d.slice(36);
   store_.dispatch(sessionActions.addSessionData(uid, data));
 });
 
-rpc.on('session data send', ({uid, data, escaped}) => {
+transport.on('session data send', ({uid, data, escaped}) => {
   store_.dispatch(sessionActions.sendSessionData(uid, data, escaped));
 });
 
-rpc.on('session exit', ({uid}) => {
+transport.on('session exit', ({uid}) => {
   store_.dispatch(termGroupActions.ptyExitTermGroup(uid));
 });
 
-rpc.on('termgroup close req', () => {
+transport.on('termgroup close req', () => {
   store_.dispatch(termGroupActions.exitActiveTermGroup());
 });
 
-rpc.on('session clear req', () => {
+transport.on('session clear req', () => {
   store_.dispatch(sessionActions.clearActiveSession());
 });
 
-rpc.on('session move word left req', () => {
+transport.on('session move word left req', () => {
   store_.dispatch(sessionActions.sendSessionData(null, '\x1bb'));
 });
 
-rpc.on('session move word right req', () => {
+transport.on('session move word right req', () => {
   store_.dispatch(sessionActions.sendSessionData(null, '\x1bf'));
 });
 
-rpc.on('session move line beginning req', () => {
+transport.on('session move line beginning req', () => {
   store_.dispatch(sessionActions.sendSessionData(null, '\x1bOH'));
 });
 
-rpc.on('session move line end req', () => {
+transport.on('session move line end req', () => {
   store_.dispatch(sessionActions.sendSessionData(null, '\x1bOF'));
 });
 
-rpc.on('session del word left req', () => {
+transport.on('session del word left req', () => {
   store_.dispatch(sessionActions.sendSessionData(null, '\x1b\x7f'));
 });
 
-rpc.on('session del word right req', () => {
+transport.on('session del word right req', () => {
   store_.dispatch(sessionActions.sendSessionData(null, '\x1bd'));
 });
 
-rpc.on('session del line beginning req', () => {
+transport.on('session del line beginning req', () => {
   store_.dispatch(sessionActions.sendSessionData(null, '\x1bw'));
 });
 
-rpc.on('session del line end req', () => {
+transport.on('session del line end req', () => {
   store_.dispatch(sessionActions.sendSessionData(null, '\x10B'));
 });
 
-rpc.on('session break req', () => {
+transport.on('session break req', () => {
   store_.dispatch(sessionActions.sendSessionData(null, '\x03'));
 });
 
-rpc.on('session stop req', () => {
+transport.on('session stop req', () => {
   store_.dispatch(sessionActions.sendSessionData(null, '\x1a'));
 });
 
-rpc.on('session quit req', () => {
+transport.on('session quit req', () => {
   store_.dispatch(sessionActions.sendSessionData(null, '\x1c'));
 });
 
-rpc.on('session tmux req', () => {
+transport.on('session tmux req', () => {
   store_.dispatch(sessionActions.sendSessionData(null, '\x02'));
 });
 
-rpc.on('session search', () => {
+transport.on('session search', () => {
   store_.dispatch(sessionActions.openSearch());
 });
 
-rpc.on('session search close', () => {
+transport.on('session search close', () => {
   store_.dispatch(sessionActions.closeSearch());
 });
 
-rpc.on('termgroup add req', ({activeUid, profile}) => {
+transport.on('termgroup add req', ({activeUid, profile}) => {
   store_.dispatch(termGroupActions.requestTermGroup(activeUid, profile));
 });
 
-rpc.on('split request horizontal', ({activeUid, profile}) => {
+transport.on('split request horizontal', ({activeUid, profile}) => {
   store_.dispatch(termGroupActions.requestHorizontalSplit(activeUid, profile));
 });
 
-rpc.on('split request vertical', ({activeUid, profile}) => {
+transport.on('split request vertical', ({activeUid, profile}) => {
   store_.dispatch(termGroupActions.requestVerticalSplit(activeUid, profile));
 });
 
-rpc.on('reset fontSize req', () => {
+transport.on('reset fontSize req', () => {
   store_.dispatch(uiActions.resetFontSize());
 });
 
-rpc.on('increase fontSize req', () => {
+transport.on('increase fontSize req', () => {
   store_.dispatch(uiActions.increaseFontSize());
 });
 
-rpc.on('decrease fontSize req', () => {
+transport.on('decrease fontSize req', () => {
   store_.dispatch(uiActions.decreaseFontSize());
 });
 
-rpc.on('move left req', () => {
+transport.on('move left req', () => {
   store_.dispatch(uiActions.moveLeft());
 });
 
-rpc.on('move right req', () => {
+transport.on('move right req', () => {
   store_.dispatch(uiActions.moveRight());
 });
 
-rpc.on('move jump req', (index) => {
+transport.on('move jump req', (index) => {
   store_.dispatch(uiActions.moveTo(index));
 });
 
-rpc.on('next pane req', () => {
+transport.on('next pane req', () => {
   store_.dispatch(uiActions.moveToNextPane());
 });
 
-rpc.on('prev pane req', () => {
+transport.on('prev pane req', () => {
   store_.dispatch(uiActions.moveToPreviousPane());
 });
 
-rpc.on('open file', ({path}) => {
+transport.on('open file', ({path}) => {
   store_.dispatch(uiActions.openFile(path));
 });
 
-rpc.on('open ssh', (parsedUrl) => {
+transport.on('open ssh', (parsedUrl) => {
   store_.dispatch(uiActions.openSSH(parsedUrl));
 });
 
-rpc.on('update available', ({releaseName, releaseNotes, releaseUrl, canInstall}) => {
+transport.on('update available', ({releaseName, releaseNotes, releaseUrl, canInstall}) => {
   store_.dispatch(updaterActions.updateAvailable(releaseName, releaseNotes, releaseUrl, canInstall));
 });
 
-rpc.on('move', (window) => {
+transport.on('move', (window) => {
   store_.dispatch(uiActions.windowMove(window));
 });
 
-rpc.on('windowGeometry change', (data) => {
+transport.on('windowGeometry change', (data) => {
   store_.dispatch(uiActions.windowGeometryUpdated(data));
 });
 
-rpc.on('add notification', ({text, url, dismissable}) => {
+transport.on('add notification', ({text, url, dismissable}) => {
   store_.dispatch(addNotificationMessage(text, url, dismissable));
 });
 
-rpc.on('enter full screen', () => {
+transport.on('enter full screen', () => {
   store_.dispatch(uiActions.enterFullScreen());
 });
 
-rpc.on('leave full screen', () => {
+transport.on('leave full screen', () => {
   store_.dispatch(uiActions.leaveFullScreen());
 });
 
@@ -240,6 +241,6 @@ root.render(
   </Provider>
 );
 
-rpc.on('reload', () => {
+transport.on('reload', () => {
   plugins.reload();
 });

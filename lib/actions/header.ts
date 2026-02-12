@@ -7,7 +7,7 @@ import {
   UI_WINDOW_CLOSE
 } from '@shared/constants/ui';
 import type {HyperDispatch} from '../../typings/hyper';
-import rpc from '../rpc';
+import {transport} from '../transport/electron-ipc-transport';
 
 import {userExitTermGroup, setActiveGroup} from './term-groups';
 
@@ -40,7 +40,7 @@ export function maximize() {
     dispatch({
       type: UI_WINDOW_MAXIMIZE,
       effect() {
-        rpc.emit('maximize');
+        transport.emit('maximize');
       }
     });
   };
@@ -51,7 +51,7 @@ export function unmaximize() {
     dispatch({
       type: UI_WINDOW_UNMAXIMIZE,
       effect() {
-        rpc.emit('unmaximize');
+        transport.emit('unmaximize');
       }
     });
   };
@@ -62,7 +62,7 @@ export function openHamburgerMenu(coordinates: {x: number; y: number}) {
     dispatch({
       type: UI_OPEN_HAMBURGER_MENU,
       effect() {
-        rpc.emit('open hamburger menu', coordinates);
+        transport.emit('open hamburger menu', coordinates);
       }
     });
   };
@@ -73,7 +73,7 @@ export function minimize() {
     dispatch({
       type: UI_WINDOW_MINIMIZE,
       effect() {
-        rpc.emit('minimize');
+        transport.emit('minimize');
       }
     });
   };
@@ -84,7 +84,7 @@ export function close() {
     dispatch({
       type: UI_WINDOW_CLOSE,
       effect() {
-        rpc.emit('close');
+        transport.emit('close');
       }
     });
   };
