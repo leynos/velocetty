@@ -1829,12 +1829,15 @@ reduces duplication: the UI always speaks one protocol.
 Current Electron transport work provides a functional command/event façade, but the
 architecture is not yet fully host-agnostic:
 
-- `window.rpc` remains available for legacy renderer consumers outside the command
+* `window.rpc` remains available for legacy renderer consumers outside the command
   layer, so the migration map should treat those consumers as follow-up work.
-- Renderer bootstrap still uses the Electron transport directly; a host selection
+* Renderer bootstrap still uses the Electron transport directly; a host selection
   seam should be introduced once transport composition is stabilised.
-- Continue to harden bootstrap event-path assertions (for example: `ready`,
+* Continue to harden bootstrap event-path assertions (for example: `ready`,
   `session add`, and `update available`) to defend transport-swap regressions.
+* Keep bootstrap transport integration assertions in a process-isolated Bun lane
+  while file-scope module mocks are still required; remove this quarantine after
+  bootstrap wiring is refactored to dependency injection.
 
 
 
@@ -2065,6 +2068,8 @@ Design:
 &nbsp; \* Keybinding capture integration with xterm focus.
 
 &nbsp; \* Plugin contribution loading and enable/disable flows.
+&nbsp; \* Process-isolated transport bootstrap event-path assertion until
+&nbsp;   module-mock blast-radius removal in roadmap item 9.3.1 is complete.
 
 * Performance tests:
 

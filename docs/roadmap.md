@@ -35,8 +35,8 @@ Scope notes:
       surfaces (`lib/containers/hyper.tsx`, `lib/components/term.tsx`) and migrate
       them behind transport abstractions once a host-agnostic facade is agreed.
     - [ ] replace direct `lib/transport/electron-ipc-transport.ts` import in
-      renderer bootstrap with a transport factory so host backend can be swapped at
-      composition boundary.
+      renderer bootstrap with a transport factory so host backend can be
+      swapped at composition boundary.
     - [ ] add end-to-end bootstrap regression coverage for high-frequency streams
       and continue using transport-path assertions beyond this milestone.
 
@@ -396,8 +396,13 @@ Scope notes:
 
 - [ ] 9.3.1. Eliminate cross-suite global state leakage in unit tests. Requires
   1.1.2 and 9.1.1. See [velocetty-design.md](velocetty-design.md) §Testing.
+  - [x] Quarantine `test/unit/bootstrap-transport-integration.test.ts` behind
+    `VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1` and execute it in a
+    dedicated Bun process from `make test`.
   - [ ] Remove file-scope `mock.module(...)` blast radius in suites that mutate
     shared renderer/runtime globals (`window`, `document`, transport mocks).
+  - [ ] Replace bootstrap module-mock wiring with explicit dependency injection
+    so the dedicated-process quarantine can be removed.
   - [ ] Ensure each suite that calls `setupHappyDom()` performs deterministic
     teardown in the same file and restores module mocks after use.
   - [ ] Success criteria: repeated `bun test --randomize --seed <N>` runs are

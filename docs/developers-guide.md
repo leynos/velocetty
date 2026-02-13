@@ -204,9 +204,19 @@ Unit tests run under Bun's built-in test runner. Use one of the following:
 
 - `bun run test:unit`
 - `bun test test/unit`
+- `bun run test:unit:bootstrap-transport` (runs only the transport bootstrap
+  integration assertion in an isolated process)
 - `bun run test:coverage` (writes text output and an LCOV coverage report under
   `coverage/`)
 - `make coverage`
+
+`make test` now executes two stages:
+
+- `bun test --max-concurrency=1` for the general suite.
+- `bun run test:unit:bootstrap-transport` with
+  `VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1` so file-scope module mocks
+  in the bootstrap transport integration suite cannot leak into other test
+  files.
 
 ### End-to-end (E2E) tests (layered strategy)
 

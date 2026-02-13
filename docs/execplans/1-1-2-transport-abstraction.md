@@ -156,12 +156,14 @@ Done criteria for this roadmap item:
   Impact: continuity risk is too high for a refactor unless the coverage-first
   gate is implemented before transport changes.
 
-- Additional discovery: full-suite stability required shared Electron mock wiring in
+- Additional discovery: full-suite stability required shared Electron mock
+  wiring in
   `test/unit/rpc-server.test.ts` because `updater.test.ts` can register a
   global Electron mock without `ipcMain`.
   Impact: transport-related tests need a single reusable mock surface to avoid
   stale IPC imports under Bun's module mock cache.
-- Additional discovery: `make build` initially failed because two files imported the
+- Additional discovery: `make build` initially failed because two files
+  imported the
   transport adapter from incorrect relative paths.
   Impact: the transport boundary migration remains sensitive to module-location
   assumptions and must be validated with `make build` before any partial refactor
@@ -207,7 +209,8 @@ Done criteria for this roadmap item:
 
 Completed in this milestone:
 
-- Added shared transport contract in `shared/src/types/transport.ts` and exported it
+- Added shared transport contract in `shared/src/types/transport.ts` and
+  exported it
   from `shared/src/index.ts`.
 - Added `lib/transport/electron-ipc-transport.ts` backed by existing renderer
   `ipcRenderer.invoke` and `lib/utils/rpc` event transport.
@@ -232,7 +235,8 @@ Current command invocation path:
 - `lib/containers/hyper.tsx` dispatches `uiActions.execCommand(...)`.
 - `lib/actions/ui.ts` uses `transport.emit('command', command)` when no local
   command handler exists.
-- Main process handles `window.rpc.on('command', ...)` in `app/ui/window.ts` and then
+- Main process handles `window.rpc.on('command', ...)` in `app/ui/window.ts`
+  and then
   executes `app/commands.ts::execCommand`.
 
 Current event-stream path:
@@ -243,7 +247,8 @@ Current event-stream path:
 
 Current direct Electron access in command-adjacent code:
 
-- `lib/command-registry.ts` calls `transport.invoke('getDecoratedKeymaps')` and no
+- `lib/command-registry.ts` calls `transport.invoke('getDecoratedKeymaps')`
+  and no
   longer imports `lib/utils/ipc.ts` directly.
 - `lib/actions/*` now emit via `RendererCommandTransport`, including updater and
   session/group/header/shell action handlers.
@@ -429,3 +434,8 @@ and record the deferred event migration in `Decision log`.
   codebase wiring.
 - 2026-02-12: Revised sequencing to enforce coverage-first gate before any
   transport abstraction implementation work, per user requirement.
+- 2026-02-13: CI order-dependent Bun failures traced to file-scope module mocks
+  in `test/unit/bootstrap-transport-integration.test.ts`; added a
+  process-isolated execution lane (`test:unit:bootstrap-transport`) guarded by
+  `VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1` and recorded long-term
+  de-quarantine follow-up under roadmap `9.3.1`.

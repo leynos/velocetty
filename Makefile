@@ -17,6 +17,7 @@ lint:
 
 test:
 	bun test --max-concurrency=1
+	bun run test:unit:bootstrap-transport
 
 coverage:
 	bun run test:coverage

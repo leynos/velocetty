@@ -4,27 +4,17 @@ import {resolve} from 'node:path';
 
 let decoratedKeymaps: Record<string, string[]> = {};
 const invokeMock = mock(async (_channel: string) => decoratedKeymaps);
-const ipcOnMock = mock((_channel: string, _listener: unknown) => {});
-const ipcSendMock = mock((_channel: string, _payload: unknown) => {});
-const ipcRemoveAllListenersMock = mock((_channel: string) => {});
+const transportModulePath = resolve('lib/transport/electron-ipc-transport.ts');
 
-const ipcModulePath = resolve('lib/utils/ipc.ts');
-
-mock.module('../../lib/utils/ipc', () => ({
-  ipcRenderer: {
-    invoke: invokeMock,
-    on: ipcOnMock,
-    send: ipcSendMock,
-    removeAllListeners: ipcRemoveAllListenersMock
+mock.module('../../lib/transport/electron-ipc-transport', () => ({
+  transport: {
+    invoke: invokeMock
   }
 }));
 
-mock.module(ipcModulePath, () => ({
-  ipcRenderer: {
-    invoke: invokeMock,
-    on: ipcOnMock,
-    send: ipcSendMock,
-    removeAllListeners: ipcRemoveAllListenersMock
+mock.module(transportModulePath, () => ({
+  transport: {
+    invoke: invokeMock
   }
 }));
 
@@ -43,9 +33,6 @@ beforeAll(async () => {
 
 beforeEach(() => {
   invokeMock.mockClear();
-  ipcOnMock.mockClear();
-  ipcSendMock.mockClear();
-  ipcRemoveAllListenersMock.mockClear();
   decoratedKeymaps = {};
 });
 
