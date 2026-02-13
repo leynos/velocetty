@@ -238,7 +238,7 @@ if (!shouldRunBootstrapTransportIntegration) {
       expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_SET_FONT_SMOOTHING'}]);
     });
 
-    test('session lifecycle events dispatch correct actions', () => {
+    test('session add event dispatches SESSION_ADD actions', () => {
       clearDispatch();
 
       getListener('session add')({uid: 's-1', shell: '/bin/bash', pid: 100, profile: 'default'} as never);
@@ -250,10 +250,18 @@ if (!shouldRunBootstrapTransportIntegration) {
         {type: 'SESSION_ADD', session: {uid: 's-2', shell: '/bin/bash', pid: 101, profile: 'default'}}
       ]);
       expect(dispatchMock.mock.calls.filter((c) => c[0]?.type === 'SESSION_ADD')).toHaveLength(2);
+    });
+
+    test('session data event dispatches SESSION_DATA action', () => {
+      clearDispatch();
 
       const uid = '01234567-89ab-cdef-0123-456789abcdef';
       getListener('session data')(`${uid}hello world`);
       expect(dispatchMock.mock.calls).toContainEqual([{type: 'SESSION_DATA', uid, data: 'hello world'}]);
+    });
+
+    test('session exit event dispatches PTY_EXIT_TERM_GROUP action', () => {
+      clearDispatch();
 
       getListener('session exit')({uid: 's-1'});
       expect(dispatchMock.mock.calls).toContainEqual([{type: 'PTY_EXIT_TERM_GROUP', uid: 's-1'}]);
