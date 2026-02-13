@@ -1,5 +1,5 @@
 /** @file Asserts bootstrap stream handlers use transport-on callbacks. */
-import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
 
@@ -64,6 +64,8 @@ mock.module('../../lib/actions/sessions', () => ({
   addSession: (session: unknown) => ({type: 'SESSION_ADD', session}),
   addSessionData: (uid: string, data: string) => ({type: 'SESSION_DATA', uid, data}),
   sendSessionData: (uid: string, data: string) => ({type: 'SESSION_DATA_SEND', uid, data}),
+  openSearch: () => ({type: 'SESSION_SEARCH'}),
+  closeSearch: () => ({type: 'SESSION_SEARCH_CLOSE'}),
   clearActiveSession: () => ({type: 'SESSION_CLEAR_ACTIVE'}),
   ptyExitTermGroup: (uid: string) => ({type: 'PTY_EXIT_TERM_GROUP', uid}),
   userExitSession: (uid: string) => ({type: 'USER_EXIT_SESSION', uid}),
@@ -140,9 +142,16 @@ mock.module('../../lib/utils/plugins', () => ({
 }));
 
 let importCounter = 0;
+let cleanupHappyDom: (() => void) | null = null;
 
 beforeAll(async () => {
-  await setupHappyDom();
+  cleanupHappyDom = await setupHappyDom();
+});
+
+afterAll(() => {
+  cleanupHappyDom?.();
+  cleanupHappyDom = null;
+  mock.restore();
 });
 
 beforeEach(() => {
