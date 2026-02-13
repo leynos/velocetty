@@ -193,51 +193,49 @@ if (!shouldRunBootstrapTransportIntegration) {
         ['ready', expect.any(Function)],
         ['session add', expect.any(Function)],
         ['session data', expect.any(Function)],
+        ['session exit', expect.any(Function)],
+        ['session clear req', expect.any(Function)],
+        ['session search', expect.any(Function)],
+        ['session search close', expect.any(Function)],
+        ['termgroup close req', expect.any(Function)],
+        ['termgroup add req', expect.any(Function)],
+        ['split request horizontal', expect.any(Function)],
+        ['split request vertical', expect.any(Function)],
+        ['reset fontSize req', expect.any(Function)],
+        ['increase fontSize req', expect.any(Function)],
+        ['decrease fontSize req', expect.any(Function)],
         ['reload', expect.any(Function)],
         ['move left req', expect.any(Function)],
+        ['move right req', expect.any(Function)],
+        ['move jump req', expect.any(Function)],
+        ['next pane req', expect.any(Function)],
+        ['prev pane req', expect.any(Function)],
+        ['open file', expect.any(Function)],
+        ['enter full screen', expect.any(Function)],
+        ['leave full screen', expect.any(Function)],
+        ['add notification', expect.any(Function)],
         ['windowGeometry change', expect.any(Function)],
         ['update available', expect.any(Function)]
       ])
     );
 
+    // ready: dispatches init and font smoothing
     const readyListener = getListener('ready');
     readyListener(null);
 
     expect(dispatchMock.mock.calls).toContainEqual([{type: 'INIT_ACTION'}]);
     expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_SET_FONT_SMOOTHING'}]);
 
+    // session add: dispatches SESSION_ADD per session
     const sessionListener = getListener('session add');
     sessionListener({uid: 'session-1', shell: '/bin/bash', pid: 100, profile: 'default'} as never);
     sessionListener({uid: 'session-2', shell: '/bin/bash', pid: 101, profile: 'default'} as never);
 
-    const updateListener = getListener('update available');
-    updateListener({
-      releaseName: 'v0.0.1',
-      releaseNotes: 'notes',
-      releaseUrl: 'https://example.org',
-      canInstall: true
-    });
-
     expect(dispatchMock.mock.calls).toContainEqual([
-      {
-        type: 'SESSION_ADD',
-        session: {uid: 'session-1', shell: '/bin/bash', pid: 100, profile: 'default'}
-      }
+      {type: 'SESSION_ADD', session: {uid: 'session-1', shell: '/bin/bash', pid: 100, profile: 'default'}}
     ]);
     expect(dispatchMock.mock.calls).toContainEqual([
-      {
-        type: 'SESSION_ADD',
-        session: {uid: 'session-2', shell: '/bin/bash', pid: 101, profile: 'default'}
-      }
-    ]);
-    expect(dispatchMock.mock.calls).toContainEqual([
-      {
-        type: 'UPDATE_AVAILABLE',
-        releaseName: 'v0.0.1',
-        notes: 'notes',
-        releaseUrl: 'https://example.org',
-        canInstall: true
-      }
+      {type: 'SESSION_ADD', session: {uid: 'session-2', shell: '/bin/bash', pid: 101, profile: 'default'}}
     ]);
 
     const sessionAddDispatches = dispatchMock.mock.calls.filter((call) => call[0]?.type === 'SESSION_ADD');
@@ -249,20 +247,91 @@ if (!shouldRunBootstrapTransportIntegration) {
     sessionDataListener(`${uid}hello world`);
     expect(dispatchMock.mock.calls).toContainEqual([{type: 'SESSION_DATA', uid, data: 'hello world'}]);
 
+    // session exit: dispatches PTY_EXIT_TERM_GROUP
+    const sessionExitListener = getListener('session exit');
+    sessionExitListener({uid: 'session-1'});
+    expect(dispatchMock.mock.calls).toContainEqual([{type: 'PTY_EXIT_TERM_GROUP', uid: 'session-1'}]);
+
     // reload: invokes plugins.reload
     const reloadListener = getListener('reload');
     reloadListener(null);
     expect(pluginsReloadMock).toHaveBeenCalledTimes(1);
 
-    // move left req: dispatches UI_MOVE_LEFT
-    const moveLeftListener = getListener('move left req');
-    moveLeftListener(null);
-    expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_MOVE_LEFT'}]);
+    // update available: dispatches UPDATE_AVAILABLE
+    const updateListener = getListener('update available');
+    updateListener({
+      releaseName: 'v0.0.1',
+      releaseNotes: 'notes',
+      releaseUrl: 'https://example.org',
+      canInstall: true
+    });
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {
+        type: 'UPDATE_AVAILABLE',
+        releaseName: 'v0.0.1',
+        notes: 'notes',
+        releaseUrl: 'https://example.org',
+        canInstall: true
+      }
+    ]);
+
+    // Table-driven assertions for parameterless dispatch events
+    const parameterlessEvents: Array<{event: string; actionType: string}> = [
+      {event: 'session clear req', actionType: 'SESSION_CLEAR_ACTIVE'},
+      {event: 'session search', actionType: 'SESSION_SEARCH'},
+      {event: 'session search close', actionType: 'SESSION_SEARCH_CLOSE'},
+      {event: 'termgroup close req', actionType: 'TERM_GROUP_EXIT_ACTIVE'},
+      {event: 'reset fontSize req', actionType: 'UI_RESET_FONT_SIZE'},
+      {event: 'increase fontSize req', actionType: 'UI_INCREASE_FONT_SIZE'},
+      {event: 'decrease fontSize req', actionType: 'UI_DECREASE_FONT_SIZE'},
+      {event: 'move left req', actionType: 'UI_MOVE_LEFT'},
+      {event: 'move right req', actionType: 'UI_MOVE_RIGHT'},
+      {event: 'next pane req', actionType: 'UI_MOVE_NEXT_PANE'},
+      {event: 'prev pane req', actionType: 'UI_MOVE_PREVIOUS_PANE'},
+      {event: 'enter full screen', actionType: 'UI_ENTER_FULL_SCREEN'},
+      {event: 'leave full screen', actionType: 'UI_LEAVE_FULL_SCREEN'}
+    ];
+    for (const {event, actionType} of parameterlessEvents) {
+      getListener(event)(null);
+      expect(dispatchMock.mock.calls).toContainEqual([{type: actionType}]);
+    }
+
+    // Table-driven assertions for events with payloads
+    // termgroup add req: dispatches TERM_GROUP_REQUEST
+    getListener('termgroup add req')({activeUid: 'session-1', profile: 'default'});
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {type: 'TERM_GROUP_REQUEST', activeUid: 'session-1', profile: 'default'}
+    ]);
+
+    // split request horizontal: dispatches TERM_GROUP_SPLIT_HORIZONTAL
+    getListener('split request horizontal')({activeUid: 'session-1', profile: 'default'});
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {type: 'TERM_GROUP_SPLIT_HORIZONTAL', activeUid: 'session-1', profile: 'default'}
+    ]);
+
+    // split request vertical: dispatches TERM_GROUP_SPLIT_VERTICAL
+    getListener('split request vertical')({activeUid: 'session-1', profile: 'default'});
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {type: 'TERM_GROUP_SPLIT_VERTICAL', activeUid: 'session-1', profile: 'default'}
+    ]);
+
+    // move jump req: dispatches UI_MOVE_TO with index
+    getListener('move jump req')(3);
+    expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_MOVE_TO', index: 3}]);
+
+    // open file: dispatches UI_OPEN_FILE
+    getListener('open file')({path: '/tmp/test.txt'});
+    expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_OPEN_FILE', path: '/tmp/test.txt'}]);
+
+    // add notification: dispatches ADD_NOTIFICATION
+    getListener('add notification')({text: 'hello', url: 'https://example.org', dismissable: true});
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {type: 'ADD_NOTIFICATION', text: 'hello', url: 'https://example.org', dismissable: true}
+    ]);
 
     // windowGeometry change: dispatches UI_WINDOW_GEOMETRY_UPDATED
-    const geometryListener = getListener('windowGeometry change');
     const geometryPayload = {isMaximized: false};
-    geometryListener(geometryPayload);
+    getListener('windowGeometry change')(geometryPayload);
     expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_WINDOW_GEOMETRY_UPDATED', data: geometryPayload}]);
   });
 }
