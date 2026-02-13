@@ -201,7 +201,7 @@ Done criteria for this roadmap item:
   import ordering.
   Date/Author: 2026-02-12 / Codex
 
-- Decision: expose transport contracts from shared and centralise host implementation
+- Decision: expose transport contracts from shared and centralize host implementation
   in `lib/transport/electron-ipc-transport.ts`.
   Rationale: this keeps command-layer modules importable in future host swaps while
   preserving current Electron IPC event and invoke semantics.
