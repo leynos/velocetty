@@ -392,6 +392,23 @@ Scope notes:
   - [x] Retain deep-lane failure artefacts (stdout/stderr, renderer console,
     screenshots, and traces).
 
+### 9.3. Unit-test isolation and concurrency safety
+
+- [ ] 9.3.1. Eliminate cross-suite global state leakage in unit tests. Requires
+  1.1.2 and 9.1.1. See [velocetty-design.md](velocetty-design.md) §Testing.
+  - [ ] Remove file-scope `mock.module(...)` blast radius in suites that mutate
+    shared renderer/runtime globals (`window`, `document`, transport mocks).
+  - [ ] Ensure each suite that calls `setupHappyDom()` performs deterministic
+    teardown in the same file and restores module mocks after use.
+  - [ ] Success criteria: repeated `bun test --randomize --seed <N>` runs are
+    stable with no order-dependent failures across at least three seeds.
+- [ ] 9.3.2. Restore parallel unit-test execution after isolation hardening.
+  Requires 9.3.1. See [velocetty-design.md](velocetty-design.md) §Testing.
+  - [ ] Remove serialized Bun execution guardrails from default lint/test gates.
+  - [ ] Re-enable parallel execution in CI and local default test gates.
+  - [ ] Success criteria: CI and local runs pass with default Bun concurrency
+    and no test timeouts caused by cross-file interference.
+
 ## Out of scope for this roadmap
 
 - Marketplace, payments, or plugin monetisation flows.
