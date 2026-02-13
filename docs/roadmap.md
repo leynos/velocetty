@@ -31,14 +31,21 @@ Scope notes:
   - [x] Success criteria: command invocation works end-to-end via the adapter
     without direct Electron calls inside the command layer.
   - [ ] Outstanding concerns (deferred follow-ups):
-    - [ ] Remove remaining `window.rpc`-based UI event subscriptions in renderer
-      surfaces (`lib/containers/hyper.tsx`, `lib/components/term.tsx`) and migrate
-      them behind transport abstractions once a host-agnostic facade is agreed.
-    - [ ] Replace direct `lib/transport/electron-ipc-transport.ts` import in
-      renderer bootstrap with a transport factory so host backend can be
-      swapped at composition boundary.
-    - [ ] Add end-to-end bootstrap regression coverage for high-frequency streams
-      and continue using transport-path assertions beyond this milestone.
+    - [ ] Remove remaining `window.rpc`-based UI event subscriptions in
+      renderer surfaces (`lib/containers/hyper.tsx`,
+      `lib/components/term.tsx`) and migrate them behind transport
+      abstractions once a host-agnostic facade is agreed. See
+      [velocetty-design.md](velocetty-design.md) §Host migration:
+      Electron to Tauri.
+    - [ ] Replace direct `lib/transport/electron-ipc-transport.ts`
+      import in renderer bootstrap with a transport factory so host
+      backend can be swapped at composition boundary. See
+      [velocetty-design.md](velocetty-design.md) §Host migration:
+      Electron to Tauri.
+    - [ ] Add end-to-end bootstrap regression coverage for
+      high-frequency streams and continue using transport-path
+      assertions beyond this milestone. See
+      [velocetty-design.md](velocetty-design.md) §Testing.
 
 ### 1.2. Command primitives and context key engine
 

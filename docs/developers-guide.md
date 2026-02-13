@@ -64,8 +64,8 @@ Follow-up hardening tracked in `docs/tracking-issues.md`:
 
 ## Transport abstraction practice
 
-- Command-layer renderer code must avoid direct Electron IPC imports and call
-  `lib/transport/` adapters instead.
+- Command-layer renderer code must avoid direct Electron inter-process
+  communication (IPC) imports and call `lib/transport/` adapters instead.
 - For command execution and renderer event streams, use `RendererCommandTransport`
   from `@shared/types/transport` and `transport` from
   `lib/transport/electron-ipc-transport.ts`.
@@ -213,7 +213,7 @@ Unit tests run under Bun's built-in test runner. Use one of the following:
 
 `make test` now executes two stages:
 
-- `bun test --max-concurrency=1` for the general suite.
+- `bun run test:unit:run` for the general suite.
 - `bun run test:unit:bootstrap-transport` with
   `VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1` so file-scope module mocks
   in the bootstrap transport integration suite cannot leak into other test
