@@ -89,8 +89,8 @@ export default class Client {
     return this;
   };
 
-  removeAllListeners = () => {
-    this.emitter.removeAllListeners();
+  removeAllListeners = <U extends keyof RendererEvents>(event?: U) => {
+    this.emitter.removeAllListeners(event);
     return this;
   };
 

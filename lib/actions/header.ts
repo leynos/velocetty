@@ -7,7 +7,7 @@ import {
   UI_WINDOW_CLOSE
 } from '@shared/constants/ui';
 import type {HyperDispatch} from '../../typings/hyper';
-import {transport} from '../transport/electron-ipc-transport';
+import {transport} from '../transport';
 
 import {userExitTermGroup, setActiveGroup} from './term-groups';
 

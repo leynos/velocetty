@@ -9,7 +9,7 @@ import {
   TERM_GROUP_EXIT_ACTIVE
 } from '@shared/constants/term-groups';
 import type {ITermState, ITermGroup, HyperState, HyperDispatch, HyperActions} from '../../typings/hyper';
-import {transport} from '../transport/electron-ipc-transport';
+import {transport} from '../transport';
 import {getRootGroups} from '../selectors';
 import findBySession from '../utils/term-groups';
 

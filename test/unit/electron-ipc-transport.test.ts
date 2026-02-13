@@ -84,3 +84,9 @@ test('delegates event-stream subscriptions and cleanup to rpc transport', () => 
   expect(removeAllListenersMock).toHaveBeenCalledTimes(1);
   expect(destroyMock).toHaveBeenCalledTimes(1);
 });
+
+test('forwards event argument to rpc removeAllListeners when provided', () => {
+  expect(transport.removeAllListeners('session data')).toBe(transport);
+
+  expect(removeAllListenersMock).toHaveBeenCalledWith('session data');
+});

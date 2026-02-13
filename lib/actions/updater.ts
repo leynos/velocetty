@@ -1,6 +1,6 @@
 import {UPDATE_INSTALL, UPDATE_AVAILABLE} from '@shared/constants/updater';
 import type {HyperActions} from '../../typings/hyper';
-import {transport} from '../transport/electron-ipc-transport';
+import {transport} from '../transport';
 
 export function installUpdate(): HyperActions {
   return {

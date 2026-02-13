@@ -15,7 +15,7 @@ import {
   SESSION_SEARCH
 } from '@shared/constants/sessions';
 import type {HyperState, HyperDispatch, HyperActions} from '../../typings/hyper';
-import {transport} from '../transport/electron-ipc-transport';
+import {transport} from '../transport';
 import {keys} from '../utils/object';
 import findBySession from '../utils/term-groups';
 

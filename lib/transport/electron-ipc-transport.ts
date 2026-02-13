@@ -24,8 +24,8 @@ export const transport: RendererCommandTransport = {
     rpc.off(event, listener);
     return transport;
   },
-  removeAllListeners: () => {
-    rpc.removeAllListeners();
+  removeAllListeners: (event?) => {
+    rpc.removeAllListeners(event);
     return transport;
   },
   destroy: () => {

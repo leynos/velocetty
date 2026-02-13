@@ -37,9 +37,9 @@ Scope notes:
       abstractions once a host-agnostic facade is agreed. See
       [velocetty-design.md](velocetty-design.md) §Host migration:
       Electron to Tauri.
-    - [ ] Replace direct `lib/transport/electron-ipc-transport.ts`
-      import in renderer bootstrap with a transport factory so host
-      backend can be swapped at composition boundary. See
+    - [x] Replace direct `lib/transport/electron-ipc-transport.ts`
+      imports with a barrel module (`lib/transport/index.ts`) so the
+      host backend can be swapped at a single composition boundary. See
       [velocetty-design.md](velocetty-design.md) §Host migration:
       Electron to Tauri.
     - [ ] Add end-to-end bootstrap regression coverage for

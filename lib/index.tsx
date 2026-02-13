@@ -15,7 +15,7 @@ import * as uiActions from './actions/ui';
 import * as updaterActions from './actions/updater';
 import HyperContainer from './containers/hyper';
 import rpc from './rpc';
-import {transport} from './transport/electron-ipc-transport';
+import {transport} from './transport';
 import configureStore from './store/configure-store';
 import * as config from './utils/config';
 import {getBase64FileData} from './utils/file';

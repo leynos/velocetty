@@ -18,7 +18,7 @@ if (!shouldRunBootstrapTransportIntegration) {
     emit: mock(() => true),
     off: mock((_event: string, _listener: Listener) => transport),
     once: mock((_event: string, _listener: Listener) => transport),
-    removeAllListeners: mock(() => transport),
+    removeAllListeners: mock((_event?: string) => transport),
     destroy: mock(() => {}),
     on: mock((event: string, listener: Listener) => {
       transportOnCalls[event] = transportOnCalls[event] ? [...transportOnCalls[event], listener] : [listener];

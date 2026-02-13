@@ -29,7 +29,7 @@ import {getRootGroups} from '../selectors';
 import {isExecutable} from '../utils/file';
 import notify from '../utils/notify';
 import findBySession from '../utils/term-groups';
-import {transport} from '../transport/electron-ipc-transport';
+import {transport} from '../transport';
 
 import {requestSession, sendSessionData, setActiveSession} from './sessions';
 import {setActiveGroup} from './term-groups';

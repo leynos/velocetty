@@ -67,8 +67,8 @@ Follow-up hardening tracked in `docs/tracking-issues.md`:
 - Command-layer renderer code must avoid direct Electron inter-process
   communication (IPC) imports and call `lib/transport/` adapters instead.
 - For command execution and renderer event streams, use `RendererCommandTransport`
-  from `@shared/types/transport` and `transport` from
-  `lib/transport/electron-ipc-transport.ts`.
+  from `@shared/types/transport` and `transport` from `lib/transport`
+  (barrel module). Do not import the Electron-specific adapter directly.
 - Keep host-specific IPC details inside `lib/transport` adapters and keep command
   modules only concerned with transport contracts.
 - Add or update transport adapter tests when changing invocation or subscription

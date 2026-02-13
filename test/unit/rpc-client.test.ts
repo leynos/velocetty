@@ -105,3 +105,18 @@ test('forwards renderer events and cleans up listeners on destroy', async () => 
   client.destroy();
   expect(removeAllListenersMock).toHaveBeenCalledWith('forwarded-rpc-id');
 });
+
+test('removeAllListeners forwards event argument to emitter', async () => {
+  (globalThis as any).window.__rpcId = 'per-event-rpc-id';
+  const client = new Client();
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  const listener = mock(() => {});
+  client.on('session data', listener);
+
+  client.removeAllListeners('session data');
+
+  emitChannel('per-event-rpc-id', {ch: 'session data', data: 'late'});
+  expect(listener).not.toHaveBeenCalled();
+});

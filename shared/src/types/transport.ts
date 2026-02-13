@@ -34,7 +34,7 @@ export interface RendererCommandTransport {
   ): RendererCommandTransport;
 
   /** Remove all host event handlers from this transport. */
-  removeAllListeners: () => RendererCommandTransport;
+  removeAllListeners: (event?: keyof RendererEvents) => RendererCommandTransport;
 
   /** Dispose resources created by the transport. */
   destroy?(): void;

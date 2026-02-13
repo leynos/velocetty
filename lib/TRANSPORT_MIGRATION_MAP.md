@@ -19,8 +19,8 @@
 - [ ] Replace remaining `window.rpc` direct event hooks outside the
   command layer (notably `lib/containers/hyper.tsx` and
   `lib/components/term.tsx`).
-- [ ] Introduce a backend-agnostic transport factory (Electron adapter
-  currently imported directly from renderer bootstrap).
+- [x] Introduce a backend-agnostic transport factory (barrel module
+  `lib/transport/index.ts` now encapsulates the Electron adapter).
 - [ ] Remove direct Electron IPC coupling from the command layer in
   main-process and privileged-window code paths as they are added.
 
@@ -37,7 +37,9 @@
 ## Current owners
 
 - `lib/command-registry.ts` and command emitters in `lib/actions/*`:
-  migrated.
+  migrated — import from `lib/transport` (barrel).
+- `lib/transport/index.ts`: barrel module, single composition boundary
+  for swapping the host adapter.
 - `lib/transport/electron-ipc-transport.ts`: contract adapter source of
   truth.
 - `lib/index.tsx`: transport-backed bootstrap wiring currently complete.

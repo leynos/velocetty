@@ -1,6 +1,6 @@
 import {INIT} from '@shared/constants';
 import type {HyperDispatch} from '../../typings/hyper';
-import {transport} from '../transport/electron-ipc-transport';
+import {transport} from '../transport';
 
 export default function init() {
   return (dispatch: HyperDispatch) => {

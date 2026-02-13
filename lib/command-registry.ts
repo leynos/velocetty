@@ -1,7 +1,7 @@
 import type {HyperDispatch} from '../typings/hyper';
 
 import {closeSearch} from './actions/sessions';
-import {transport} from './transport/electron-ipc-transport';
+import {transport} from './transport';
 
 let commands: Record<string, (event: any, dispatch: HyperDispatch) => void> = {
   'editor:search-close': (e, dispatch) => {
