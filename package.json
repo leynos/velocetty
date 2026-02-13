@@ -19,7 +19,7 @@
     "check:types": "bunx tsgo --project tsconfig.typecheck.json",
     "audit": "bun scripts/run-audit.mjs",
     "test": "bun run lint && bun run test:unit",
-    "test:unit:run": "bun test test/unit",
+    "test:unit:run": "bun test --max-concurrency=1 test/unit",
     "test:unit": "bun run test:unit:run",
     "test:unit:watch": "bun test --watch test/unit",
     "test:coverage:prepare": "bun ./bin/rimraf-standalone.js coverage",
