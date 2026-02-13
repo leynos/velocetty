@@ -7,7 +7,11 @@ import type {RendererCommandTransport} from '@shared/types/transport';
 /** Host-agnostic transport for command invocation and event streams. */
 export const transport: RendererCommandTransport = {
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
-  emit: (...args) => rpc.emit(...args),
+  emit: (event, ...payload) =>
+    // The rpc client uses overloads (no-data vs data) while the transport
+    // contract uses a conditional rest tuple.  Cast to the implementation
+    // signature so the spread satisfies both overloads.
+    (rpc.emit as (ev: typeof event, data?: (typeof payload)[0]) => boolean)(event, ...payload),
   on: (event, listener) => {
     rpc.on(event, listener);
     return transport;

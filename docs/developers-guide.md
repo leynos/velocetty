@@ -206,7 +206,8 @@ Unit tests run under Bun's built-in test runner. Use one of the following:
 - `bun test test/unit`
 - `bun run test:unit:bootstrap-transport` (runs only the transport bootstrap
   integration assertion in an isolated process)
-- `bun run test:coverage` (writes text output and an LCOV coverage report under
+- `bun run test:coverage` (writes text output and an LCOV (line coverage)
+  report under
   `coverage/`)
 - `make coverage`
 

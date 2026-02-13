@@ -4,7 +4,8 @@
 
 - Purpose: define and execute roadmap item `1.1.2` by introducing a transport
   abstraction for command invocation and event streams, with an interim
-  Electron IPC adapter built on existing RPC wiring.
+  Electron inter-process communication (IPC) adapter built on existing
+  remote procedure call (RPC) wiring.
 - Invariants: preserve current runtime behaviour while removing direct
   Electron/RPC coupling from the command layer.
 - Cross-links: `docs/roadmap.md`, `docs/velocetty-design.md`,
@@ -109,7 +110,8 @@ Done criteria for this roadmap item:
 
 ## Progress
 
-- [x] (2026-02-12 00:00Z) Captured roadmap/design/PRD constraints for task
+- [x] (2026-02-12 00:00Z) Captured roadmap/design/product requirements
+  document (PRD) constraints for task
   `1.1.2`.
 - [x] (2026-02-12 00:00Z) Mapped current command and IPC wiring in
   `lib/actions/ui.ts`, `lib/command-registry.ts`, `lib/utils/rpc.ts`,
@@ -120,7 +122,7 @@ Done criteria for this roadmap item:
 - [x] (2026-02-12 20:12Z) Await explicit approval to begin implementation.
 - [x] (2026-02-12 20:22Z) Stage A complete: add and commit coverage-first
   IPC/registry tests.
-- [x] (2026-02-12 20:35Z) Stage B complete: finalise transport
+- [x] (2026-02-12 20:35Z) Stage B complete: finalize transport
   boundary and migration map.
 - [x] (2026-02-12 20:38Z) Stage C complete: add shared transport
   contracts.
@@ -177,7 +179,7 @@ Done criteria for this roadmap item:
   current migration phase.
   Date/Author: 2026-02-12 / Codex
 
-- Decision: prioritise command-layer decoupling first, then widen event-stream
+- Decision: prioritize command-layer decoupling first, then widen event-stream
   adoption in bootstrap wiring as a separate stage within this milestone.
   Rationale: directly satisfies success criteria while reducing regression risk.
   Date/Author: 2026-02-12 / Codex
@@ -392,7 +394,7 @@ Roadmap `1.1.2` is complete when all of the following are true:
 
 Additional observable checks:
 
-- existing fast E2E path remains green,
+- existing fast end-to-end (E2E) path remains green,
 - no regressions in session creation, split, or keybinding-triggered commands.
 - bootstrap stream coverage now includes transport listener assertions for ready,
   session add, and update available events.

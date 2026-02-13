@@ -6,7 +6,7 @@ import {setupHappyDom} from '../testUtils/happy-dom';
 const shouldRunBootstrapTransportIntegration = process.env.VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION === '1';
 
 if (!shouldRunBootstrapTransportIntegration) {
-  test.skip('bootstrap session-add/update flow is wired through the transport event bus', () => {});
+  test.skip('bootstrap event wiring delegates to transport event bus', () => {});
 } else {
   const dispatchMock = mock((_action: unknown) => {});
   const transportOnCalls: Record<string, Array<(...args: unknown[]) => void>> = {};
@@ -149,10 +149,11 @@ if (!shouldRunBootstrapTransportIntegration) {
     subscribe: () => {}
   }));
   mock.module('../../lib/containers/hyper', () => ({default: () => null}));
+  const pluginsReloadMock = mock(() => {});
   mock.module('../../lib/utils/plugins', () => ({
     connect: () => (Component: unknown) => Component,
     default: {},
-    reload: mock(() => {})
+    reload: pluginsReloadMock
   }));
 
   let importCounter = 0;
@@ -178,18 +179,23 @@ if (!shouldRunBootstrapTransportIntegration) {
     transport.removeAllListeners.mockClear();
     transport.destroy.mockClear();
     transport.on.mockClear();
+    pluginsReloadMock.mockClear();
     Object.keys(transportOnCalls).forEach((key) => {
       transportOnCalls[key].length = 0;
     });
   });
 
-  test('bootstrap session-add/update flow is wired through the transport event bus', async () => {
+  test('bootstrap event wiring delegates to transport event bus', async () => {
     await import(`../../lib/index.tsx?transport_integration=${importCounter}`);
 
     expect(transport.on.mock.calls).toEqual(
       expect.arrayContaining([
         ['ready', expect.any(Function)],
         ['session add', expect.any(Function)],
+        ['session data', expect.any(Function)],
+        ['reload', expect.any(Function)],
+        ['move left req', expect.any(Function)],
+        ['windowGeometry change', expect.any(Function)],
         ['update available', expect.any(Function)]
       ])
     );
@@ -236,5 +242,27 @@ if (!shouldRunBootstrapTransportIntegration) {
 
     const sessionAddDispatches = dispatchMock.mock.calls.filter((call) => call[0]?.type === 'SESSION_ADD');
     expect(sessionAddDispatches).toHaveLength(2);
+
+    // session data: uid is a 36-char prefix, remainder is payload
+    const sessionDataListener = getListener('session data');
+    const uid = '01234567-89ab-cdef-0123-456789abcdef';
+    sessionDataListener(`${uid}hello world`);
+    expect(dispatchMock.mock.calls).toContainEqual([{type: 'SESSION_DATA', uid, data: 'hello world'}]);
+
+    // reload: invokes plugins.reload
+    const reloadListener = getListener('reload');
+    reloadListener(null);
+    expect(pluginsReloadMock).toHaveBeenCalledTimes(1);
+
+    // move left req: dispatches UI_MOVE_LEFT
+    const moveLeftListener = getListener('move left req');
+    moveLeftListener(null);
+    expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_MOVE_LEFT'}]);
+
+    // windowGeometry change: dispatches UI_WINDOW_GEOMETRY_UPDATED
+    const geometryListener = getListener('windowGeometry change');
+    const geometryPayload = {isMaximized: false};
+    geometryListener(geometryPayload);
+    expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_WINDOW_GEOMETRY_UPDATED', data: geometryPayload}]);
   });
 }

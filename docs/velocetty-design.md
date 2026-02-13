@@ -1832,7 +1832,7 @@ architecture is not yet fully host-agnostic:
 * `window.rpc` remains available for legacy renderer consumers outside the command
   layer, so the migration map should treat those consumers as follow-up work.
 * Renderer bootstrap still uses the Electron transport directly; a host selection
-  seam should be introduced once transport composition is stabilised.
+  seam should be introduced once transport composition is stabilized.
 * Continue to harden bootstrap event-path assertions (for example: `ready`,
   `session add`, and `update available`) to defend transport-swap regressions.
 * Keep bootstrap transport integration assertions in a process-isolated Bun lane
