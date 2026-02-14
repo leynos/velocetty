@@ -202,33 +202,72 @@ if (!shouldRunBootstrapTransportIntegration) {
     test('registers all expected transport listeners', () => {
       expect(transport.on.mock.calls).toEqual(
         expect.arrayContaining([
+          // bootstrap lifecycle
           ['ready', expect.any(Function)],
+
+          // session lifecycle and data
           ['session add', expect.any(Function)],
           ['session data', expect.any(Function)],
+          ['session data send', expect.any(Function)],
           ['session exit', expect.any(Function)],
           ['session clear req', expect.any(Function)],
+
+          // session navigation / word and line shortcuts
+          ['session move word left req', expect.any(Function)],
+          ['session move word right req', expect.any(Function)],
+          ['session move line beginning req', expect.any(Function)],
+          ['session move line end req', expect.any(Function)],
+
+          // session deletion shortcuts
+          ['session del word left req', expect.any(Function)],
+          ['session del word right req', expect.any(Function)],
+          ['session del line beginning req', expect.any(Function)],
+          ['session del line end req', expect.any(Function)],
+
+          // session control shortcuts
+          ['session break req', expect.any(Function)],
+          ['session stop req', expect.any(Function)],
+          ['session quit req', expect.any(Function)],
+          ['session tmux req', expect.any(Function)],
+
+          // session search
           ['session search', expect.any(Function)],
           ['session search close', expect.any(Function)],
+
+          // termgroup control
           ['termgroup close req', expect.any(Function)],
           ['termgroup add req', expect.any(Function)],
           ['split request horizontal', expect.any(Function)],
           ['split request vertical', expect.any(Function)],
+
+          // font size
           ['reset fontSize req', expect.any(Function)],
           ['increase fontSize req', expect.any(Function)],
           ['decrease fontSize req', expect.any(Function)],
-          ['reload', expect.any(Function)],
+
+          // tab and pane navigation
           ['move left req', expect.any(Function)],
           ['move right req', expect.any(Function)],
           ['move jump req', expect.any(Function)],
           ['next pane req', expect.any(Function)],
           ['prev pane req', expect.any(Function)],
+
+          // file and SSH
           ['open file', expect.any(Function)],
           ['open ssh', expect.any(Function)],
+
+          // window
+          ['move', expect.any(Function)],
           ['enter full screen', expect.any(Function)],
           ['leave full screen', expect.any(Function)],
-          ['add notification', expect.any(Function)],
           ['windowGeometry change', expect.any(Function)],
-          ['update available', expect.any(Function)]
+
+          // notifications and updates
+          ['add notification', expect.any(Function)],
+          ['update available', expect.any(Function)],
+
+          // plugin reload
+          ['reload', expect.any(Function)]
         ])
       );
     });

@@ -2,6 +2,7 @@
  * operations correctly.
  */
 import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import {ZodError} from 'zod';
 
 const invokeMock = mock(async (_channel: string) => ({'editor:break': ['ctrl+c']}));
 const emitMock = mock(() => true);
@@ -63,7 +64,7 @@ test('delegates request-response invocation to IPC invoke', async () => {
 test('rejects with ZodError when IPC response fails schema validation', async () => {
   invokeMock.mockResolvedValueOnce('not-a-record');
 
-  await expect(transport.invoke('getDecoratedKeymaps')).rejects.toThrow();
+  await expect(transport.invoke('getDecoratedKeymaps')).rejects.toBeInstanceOf(ZodError);
 });
 
 test('delegates host-command emits to rpc transport', () => {

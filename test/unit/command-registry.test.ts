@@ -1,18 +1,10 @@
 /** @file Verifies command-registry keymap and handler behaviour. */
 import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
-import {resolve} from 'node:path';
 
 let decoratedKeymaps: Record<string, string[]> = {};
 const invokeMock = mock(async (_channel: string) => decoratedKeymaps);
-const transportModulePath = resolve('lib/transport/electron-ipc-transport.ts');
 
 mock.module('../../lib/transport/electron-ipc-transport', () => ({
-  transport: {
-    invoke: invokeMock
-  }
-}));
-
-mock.module(transportModulePath, () => ({
   transport: {
     invoke: invokeMock
   }
