@@ -1,12 +1,21 @@
 /** @file Electron IPC transport adapter for renderer-side command and event APIs. */
 import {ipcRenderer} from '../utils/ipc';
+import {ipcResponseSchemas} from './ipc-schemas';
 
 import rpc from '../rpc';
+import type {IpcCommands} from '@shared/types/common';
 import type {RendererCommandTransport} from '@shared/types/transport';
 
 /** Host-agnostic transport for command invocation and event streams. */
 export const transport: RendererCommandTransport = {
-  invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
+  invoke: async (channel, ...args) => {
+    const result = await ipcRenderer.invoke(channel, ...args);
+    // The interface contract on RendererCommandTransport.invoke already
+    // constrains the return type per command.  The cast is safe because the
+    // schema validates the shape at runtime; the generic key simply widens the
+    // inferred parse output to `unknown`.
+    return ipcResponseSchemas[channel].parse(result) as ReturnType<IpcCommands[typeof channel]>;
+  },
   emit: (event, ...payload) =>
     // The rpc client uses overloads (no-data vs data) while the transport
     // contract uses a conditional rest tuple.  Cast to the implementation

@@ -71,6 +71,10 @@ Follow-up hardening tracked in `docs/tracking-issues.md`:
   (barrel module). Do not import the Electron-specific adapter directly.
 - Keep host-specific IPC details inside `lib/transport` adapters and keep command
   modules only concerned with transport contracts.
+- IPC responses are validated at the transport boundary via zod schemas
+  in `lib/transport/ipc-schemas.ts`. When adding a new `IpcCommands`
+  entry, add a corresponding schema to the registry so responses are
+  validated before reaching application code.
 - Add or update transport adapter tests when changing invocation or subscription
   paths (for example, `test/unit/electron-ipc-transport.test.ts`).
 - Track progress against `lib/TRANSPORT_MIGRATION_MAP.md` and keep all

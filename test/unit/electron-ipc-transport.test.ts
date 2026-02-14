@@ -3,7 +3,7 @@
  */
 import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
-const invokeMock = mock(async (_channel: string) => ({payload: 'ok'}));
+const invokeMock = mock(async (_channel: string) => ({'editor:break': ['ctrl+c']}));
 const emitMock = mock(() => true);
 const onMock = mock(() => null);
 const onceMock = mock(() => null);
@@ -54,9 +54,16 @@ beforeEach(() => {
 });
 
 test('delegates request-response invocation to IPC invoke', async () => {
-  await transport.invoke('getDecoratedKeymaps');
+  const result = await transport.invoke('getDecoratedKeymaps');
 
   expect(invokeMock).toHaveBeenCalledWith('getDecoratedKeymaps');
+  expect(result).toEqual({'editor:break': ['ctrl+c']});
+});
+
+test('rejects with ZodError when IPC response fails schema validation', async () => {
+  invokeMock.mockResolvedValueOnce('not-a-record');
+
+  await expect(transport.invoke('getDecoratedKeymaps')).rejects.toThrow();
 });
 
 test('delegates host-command emits to rpc transport', () => {
