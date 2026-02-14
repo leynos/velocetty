@@ -185,7 +185,7 @@ if (!shouldRunBootstrapTransportIntegration) {
     transport.on.mockClear();
     pluginsReloadMock.mockClear();
     Object.keys(transportOnCalls).forEach((key) => {
-      transportOnCalls[key].length = 0;
+      transportOnCalls[key] = [];
     });
     await import(`../../lib/index.tsx?transport_integration=${importCounter}`);
   };
