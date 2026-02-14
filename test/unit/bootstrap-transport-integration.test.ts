@@ -116,7 +116,7 @@ if (!shouldRunBootstrapTransportIntegration) {
       moveToNextPane: () => ({type: 'UI_MOVE_NEXT_PANE'}),
       moveToPreviousPane: () => ({type: 'UI_MOVE_PREVIOUS_PANE'}),
       openFile: (path: string) => ({type: 'UI_OPEN_FILE', path}),
-      openSSH: (parsedUrl: ReturnType<typeof URL> | unknown) => ({type: 'UI_OPEN_SSH', parsedUrl}),
+      openSSH: (parsedUrl: unknown) => ({type: 'UI_OPEN_SSH', parsedUrl}),
       windowGeometryUpdated: (data: {isMaximized: boolean}) => ({type: 'UI_WINDOW_GEOMETRY_UPDATED', data}),
       windowMove: (window: {bounds: {x: number; y: number}}) => ({type: 'UI_WINDOW_MOVE', window}),
       enterFullScreen: () => ({type: 'UI_ENTER_FULL_SCREEN'}),
