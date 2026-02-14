@@ -16,7 +16,8 @@ lint:
 	@if command -v actionlint >/dev/null 2>&1; then actionlint; else echo "actionlint not installed; skipping"; fi
 
 test:
-	bun run test
+	bun run test:unit:run
+	bun run test:unit:bootstrap-transport
 
 coverage:
 	bun run test:coverage

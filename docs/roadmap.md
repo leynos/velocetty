@@ -23,13 +23,29 @@ Scope notes:
   - [x] Move shared types, schemas, and constants into `shared/`.
   - [x] Success criteria: each package builds in isolation; cross-package
     imports are one-directional (`frontend` → `shared`, `backend` → `shared`).
-- [ ] 1.1.2. Introduce a transport abstraction with an Electron IPC adapter.
+- [x] 1.1.2. Introduce a transport abstraction with an Electron IPC adapter.
   See [velocetty-design.md](velocetty-design.md) §Host migration: Electron to
   Tauri.
-  - [ ] Define a transport interface for command invocation and event streams.
-  - [ ] Implement Electron IPC adapter using existing RPC wiring.
-  - [ ] Success criteria: command invocation works end-to-end via the adapter
+  - [x] Define a transport interface for command invocation and event streams.
+  - [x] Implement Electron IPC adapter using existing RPC wiring.
+  - [x] Success criteria: command invocation works end-to-end via the adapter
     without direct Electron calls inside the command layer.
+  - [ ] Outstanding concerns (deferred follow-ups):
+    - [ ] Remove remaining `window.rpc`-based UI event subscriptions in
+      renderer surfaces (`lib/containers/hyper.tsx`,
+      `lib/components/term.tsx`) and migrate them behind transport
+      abstractions once a host-agnostic facade is agreed. See
+      [velocetty-design.md](velocetty-design.md) §Host migration:
+      Electron to Tauri.
+    - [x] Replace direct `lib/transport/electron-ipc-transport.ts`
+      imports with a barrel module (`lib/transport/index.ts`) so the
+      host backend can be swapped at a single composition boundary. See
+      [velocetty-design.md](velocetty-design.md) §Host migration:
+      Electron to Tauri.
+    - [ ] Add end-to-end bootstrap regression coverage for
+      high-frequency streams and continue using transport-path
+      assertions beyond this milestone. See
+      [velocetty-design.md](velocetty-design.md) §Testing.
 
 ### 1.2. Command primitives and context key engine
 
@@ -382,6 +398,28 @@ Scope notes:
     pushes to `master` and `canary`.
   - [x] Retain deep-lane failure artefacts (stdout/stderr, renderer console,
     screenshots, and traces).
+
+### 9.3. Unit-test isolation and concurrency safety
+
+- [ ] 9.3.1. Eliminate cross-suite global state leakage in unit tests. Requires
+  1.1.2 and 9.1.1. See [velocetty-design.md](velocetty-design.md) §Testing.
+  - [x] Quarantine `test/unit/bootstrap-transport-integration.test.ts` behind
+    `VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1` and execute it in a
+    dedicated Bun process from `make test`.
+  - [ ] Remove file-scope `mock.module(...)` blast radius in suites that mutate
+    shared renderer/runtime globals (`window`, `document`, transport mocks).
+  - [ ] Replace bootstrap module-mock wiring with explicit dependency injection
+    so the dedicated-process quarantine can be removed.
+  - [ ] Ensure each suite that calls `setupHappyDom()` performs deterministic
+    teardown in the same file and restores module mocks after use.
+  - [ ] Success criteria: repeated `bun test --randomize --seed <N>` runs are
+    stable with no order-dependent failures across at least three seeds.
+- [ ] 9.3.2. Restore parallel unit-test execution after isolation hardening.
+  Requires 9.3.1. See [velocetty-design.md](velocetty-design.md) §Testing.
+  - [ ] Remove serialized Bun execution guardrails from default lint/test gates.
+  - [ ] Re-enable parallel execution in CI and local default test gates.
+  - [ ] Success criteria: CI and local runs pass with default Bun concurrency
+    and no test timeouts caused by cross-file interference.
 
 ## Out of scope for this roadmap
 

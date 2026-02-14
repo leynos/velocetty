@@ -25,11 +25,11 @@ import {
   UI_COMMAND_EXEC
 } from '@shared/constants/ui';
 import type {HyperState, HyperDispatch, HyperActions, ITermGroups} from '../../typings/hyper';
-import rpc from '../rpc';
 import {getRootGroups} from '../selectors';
 import {isExecutable} from '../utils/file';
 import notify from '../utils/notify';
 import findBySession from '../utils/term-groups';
+import {transport} from '../transport';
 
 import {requestSession, sendSessionData, setActiveSession} from './sessions';
 import {setActiveGroup} from './term-groups';
@@ -43,7 +43,7 @@ export function openContextMenu(uid: string, selection: string) {
         const state = getState();
         const show = !state.ui.quickEdit;
         if (show) {
-          rpc.emit('open context menu', selection);
+          transport.emit('open context menu', selection);
         }
       }
     });
@@ -270,8 +270,8 @@ export function openFile(path: string) {
             } else if (stats.isFile() && isExecutable(stats)) {
               command += '\n';
             }
-            rpc.once('session add', ({uid}) => {
-              rpc.once('session data', () => {
+            transport.once('session add', ({uid}) => {
+              transport.once('session data', () => {
                 dispatch(sendSessionData(uid, command));
               });
             });
@@ -306,8 +306,8 @@ export function openSSH(parsedUrl: ReturnType<typeof parseUrl>) {
 
         command += '\n';
 
-        rpc.once('session add', ({uid}) => {
-          rpc.once('session data', () => {
+        transport.once('session add', ({uid}) => {
+          transport.once('session data', () => {
             dispatch(sendSessionData(uid, command));
           });
         });
@@ -327,7 +327,7 @@ export function execCommand(command: string, fn: (e: any, dispatch: HyperDispatc
         if (fn) {
           fn(e, dispatch);
         } else {
-          rpc.emit('command', command);
+          transport.emit('command', command);
         }
       }
     });

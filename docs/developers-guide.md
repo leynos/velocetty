@@ -62,6 +62,24 @@ Follow-up hardening tracked in `docs/tracking-issues.md`:
 - `CONTRACT-001`: make `shared/` schema generation independent of legacy
   `typings/` compatibility re-exports.
 
+## Transport abstraction practice
+
+- Command-layer renderer code must avoid direct Electron inter-process
+  communication (IPC) imports and call `lib/transport/` adapters instead.
+- For command execution and renderer event streams, use `RendererCommandTransport`
+  from `@shared/types/transport` and `transport` from `lib/transport`
+  (barrel module). Do not import the Electron-specific adapter directly.
+- Keep host-specific IPC details inside `lib/transport` adapters and keep command
+  modules only concerned with transport contracts.
+- IPC responses are validated at the transport boundary via zod schemas
+  in `lib/transport/ipc-schemas.ts`. When adding a new `IpcCommands`
+  entry, add a corresponding schema to the registry so responses are
+  validated before reaching application code.
+- Add or update transport adapter tests when changing invocation or subscription
+  paths (for example, `test/unit/electron-ipc-transport.test.ts`).
+- Track progress against `lib/TRANSPORT_MIGRATION_MAP.md` and keep all
+  transport-facing command and bootstrap-path follow-ups visible before any PR.
+
 Package-local build checks are available via:
 
 - `bun run build:shared`
@@ -190,9 +208,20 @@ Unit tests run under Bun's built-in test runner. Use one of the following:
 
 - `bun run test:unit`
 - `bun test test/unit`
-- `bun run test:coverage` (writes text output and an LCOV coverage report under
+- `bun run test:unit:bootstrap-transport` (runs only the transport bootstrap
+  integration assertion in an isolated process)
+- `bun run test:coverage` (writes text output and an LCOV (line coverage)
+  report under
   `coverage/`)
 - `make coverage`
+
+`make test` now executes two stages:
+
+- `bun run test:unit:run` for the general suite.
+- `bun run test:unit:bootstrap-transport` with
+  `VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1` so file-scope module mocks
+  in the bootstrap transport integration suite cannot leak into other test
+  files.
 
 ### End-to-end (E2E) tests (layered strategy)
 

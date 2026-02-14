@@ -19,10 +19,10 @@
     "check:types": "bunx tsgo --project tsconfig.typecheck.json",
     "audit": "bun scripts/run-audit.mjs",
     "test": "bun run lint && bun run test:unit",
-    "test:unit:prepare": "bun ./bin/rimraf-standalone.js dist/tmp/root/test",
-    "test:unit:run": "bun test test/unit",
-    "test:unit": "bun run test:unit:prepare && bun run test:unit:run",
-    "test:unit:watch": "bun run test:unit:prepare && bun test --watch test/unit",
+    "test:unit:run": "bun test --max-concurrency=1 test/unit",
+    "test:unit:bootstrap-transport": "bun node_modules/cross-env/src/bin/cross-env.js VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1 bun test --max-concurrency=1 test/unit/bootstrap-transport-integration.test.ts",
+    "test:unit": "bun run test:unit:run && bun run test:unit:bootstrap-transport",
+    "test:unit:watch": "bun test --watch test/unit",
     "test:coverage:prepare": "bun ./bin/rimraf-standalone.js coverage",
     "test:coverage:run": "bun test --coverage test/unit",
     "test:coverage": "bun run test:coverage:prepare && bun run test:coverage:run",
@@ -87,7 +87,8 @@
     "xterm-addon-search": "^0.13.0",
     "xterm-addon-unicode11": "^0.6.0",
     "xterm-addon-web-links": "^0.9.0",
-    "xterm-addon-webgl": "^0.16.0"
+    "xterm-addon-webgl": "^0.16.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
