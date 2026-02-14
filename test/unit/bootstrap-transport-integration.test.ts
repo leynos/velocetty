@@ -1,6 +1,8 @@
 /** @file Asserts bootstrap stream handlers use transport-on callbacks. */
 import {afterAll, beforeAll, describe, expect, mock, test} from 'bun:test';
 
+import type {Session} from '@shared/types/common';
+
 import {setupHappyDom} from '../testUtils/happy-dom';
 
 const shouldRunBootstrapTransportIntegration = process.env.VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION === '1';
@@ -242,8 +244,8 @@ if (!shouldRunBootstrapTransportIntegration) {
     test('session add event dispatches SESSION_ADD actions', () => {
       clearDispatch();
 
-      getListener('session add')({uid: 's-1', shell: '/bin/bash', pid: 100, profile: 'default'} as never);
-      getListener('session add')({uid: 's-2', shell: '/bin/bash', pid: 101, profile: 'default'} as never);
+      getListener('session add')({uid: 's-1', shell: '/bin/bash', pid: 100, profile: 'default'} as unknown as Session);
+      getListener('session add')({uid: 's-2', shell: '/bin/bash', pid: 101, profile: 'default'} as unknown as Session);
       expect(dispatchMock.mock.calls).toContainEqual([
         {type: 'SESSION_ADD', session: {uid: 's-1', shell: '/bin/bash', pid: 100, profile: 'default'}}
       ]);
