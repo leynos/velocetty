@@ -79,7 +79,12 @@ if (!shouldRunBootstrapTransportIntegration) {
   mock.module('../../lib/actions/sessions', () => ({
     addSession: (session: unknown) => ({type: 'SESSION_ADD', session}),
     addSessionData: (uid: string, data: string) => ({type: 'SESSION_DATA', uid, data}),
-    sendSessionData: (uid: string, data: string) => ({type: 'SESSION_DATA_SEND', uid, data}),
+    sendSessionData: (uid: string | null, data: string, escaped?: boolean) => ({
+      type: 'SESSION_DATA_SEND',
+      uid,
+      data,
+      ...(escaped !== undefined && {escaped})
+    }),
     openSearch: () => ({type: 'SESSION_SEARCH'}),
     closeSearch: () => ({type: 'SESSION_SEARCH_CLOSE'}),
     clearActiveSession: () => ({type: 'SESSION_CLEAR_ACTIVE'}),
@@ -200,37 +205,87 @@ if (!shouldRunBootstrapTransportIntegration) {
     const clearDispatch = () => dispatchMock.mockClear();
 
     test('registers all expected transport listeners', () => {
-      expect(transport.on.mock.calls).toEqual(
-        expect.arrayContaining([
-          ['ready', expect.any(Function)],
-          ['session add', expect.any(Function)],
-          ['session data', expect.any(Function)],
-          ['session exit', expect.any(Function)],
-          ['session clear req', expect.any(Function)],
-          ['session search', expect.any(Function)],
-          ['session search close', expect.any(Function)],
-          ['termgroup close req', expect.any(Function)],
-          ['termgroup add req', expect.any(Function)],
-          ['split request horizontal', expect.any(Function)],
-          ['split request vertical', expect.any(Function)],
-          ['reset fontSize req', expect.any(Function)],
-          ['increase fontSize req', expect.any(Function)],
-          ['decrease fontSize req', expect.any(Function)],
-          ['reload', expect.any(Function)],
-          ['move left req', expect.any(Function)],
-          ['move right req', expect.any(Function)],
-          ['move jump req', expect.any(Function)],
-          ['next pane req', expect.any(Function)],
-          ['prev pane req', expect.any(Function)],
-          ['open file', expect.any(Function)],
-          ['open ssh', expect.any(Function)],
-          ['enter full screen', expect.any(Function)],
-          ['leave full screen', expect.any(Function)],
-          ['add notification', expect.any(Function)],
-          ['windowGeometry change', expect.any(Function)],
-          ['update available', expect.any(Function)]
-        ])
-      );
+      const expectedEvents = [
+        // bootstrap lifecycle
+        'ready',
+
+        // session lifecycle and data
+        'session add',
+        'session data',
+        'session data send',
+        'session exit',
+        'session clear req',
+
+        // session navigation / word and line shortcuts
+        'session move word left req',
+        'session move word right req',
+        'session move line beginning req',
+        'session move line end req',
+
+        // session deletion shortcuts
+        'session del word left req',
+        'session del word right req',
+        'session del line beginning req',
+        'session del line end req',
+
+        // session control shortcuts
+        'session break req',
+        'session stop req',
+        'session quit req',
+        'session tmux req',
+
+        // session search
+        'session search',
+        'session search close',
+
+        // termgroup control
+        'termgroup close req',
+        'termgroup add req',
+        'split request horizontal',
+        'split request vertical',
+
+        // font size
+        'reset fontSize req',
+        'increase fontSize req',
+        'decrease fontSize req',
+
+        // tab and pane navigation
+        'move left req',
+        'move right req',
+        'move jump req',
+        'next pane req',
+        'prev pane req',
+
+        // file and SSH
+        'open file',
+        'open ssh',
+
+        // window
+        'move',
+        'enter full screen',
+        'leave full screen',
+        'windowGeometry change',
+
+        // notifications and updates
+        'add notification',
+        'update available',
+
+        // plugin reload
+        'reload'
+      ];
+
+      const registeredEvents = transport.on.mock.calls.map(([name]: [string]) => name);
+
+      // Exact count guards against missing or extra listeners
+      expect(registeredEvents).toHaveLength(expectedEvents.length);
+
+      // Sorted set equality catches renames, additions, and removals
+      expect([...registeredEvents].sort()).toEqual([...expectedEvents].sort());
+
+      // Each listener must be a function
+      for (const event of expectedEvents) {
+        expect(transport.on.mock.calls).toContainEqual([event, expect.any(Function)]);
+      }
     });
 
     test('ready dispatches init and font smoothing', () => {
@@ -295,6 +350,36 @@ if (!shouldRunBootstrapTransportIntegration) {
       ]);
     });
 
+    test('session data send dispatches SESSION_DATA_SEND with escaped flag', () => {
+      clearDispatch();
+      getListener('session data send')({uid: 's-1', data: 'input', escaped: true});
+      expect(dispatchMock.mock.calls).toContainEqual([
+        {type: 'SESSION_DATA_SEND', uid: 's-1', data: 'input', escaped: true}
+      ]);
+    });
+
+    test('session shortcut events dispatch sendSessionData with escape sequences', () => {
+      clearDispatch();
+      const cases: Array<{event: string; data: string}> = [
+        {event: 'session move word left req', data: '\x1bb'},
+        {event: 'session move word right req', data: '\x1bf'},
+        {event: 'session move line beginning req', data: '\x1bOH'},
+        {event: 'session move line end req', data: '\x1bOF'},
+        {event: 'session del word left req', data: '\x1b\x7f'},
+        {event: 'session del word right req', data: '\x1bd'},
+        {event: 'session del line beginning req', data: '\x1bw'},
+        {event: 'session del line end req', data: '\x10B'},
+        {event: 'session break req', data: '\x03'},
+        {event: 'session stop req', data: '\x1a'},
+        {event: 'session quit req', data: '\x1c'},
+        {event: 'session tmux req', data: '\x02'}
+      ];
+      for (const {event, data} of cases) {
+        getListener(event)(null);
+        expect(dispatchMock.mock.calls).toContainEqual([{type: 'SESSION_DATA_SEND', uid: null, data}]);
+      }
+    });
+
     test('parameterless events dispatch correct actions', () => {
       clearDispatch();
       const cases: Array<{event: string; actionType: string}> = [
@@ -346,6 +431,9 @@ if (!shouldRunBootstrapTransportIntegration) {
       expect(dispatchMock.mock.calls).toContainEqual([
         {type: 'ADD_NOTIFICATION', text: 'hello', url: 'https://example.org', dismissable: true}
       ]);
+
+      getListener('move')({bounds: {x: 100, y: 200}});
+      expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_WINDOW_MOVE', window: {bounds: {x: 100, y: 200}}}]);
 
       getListener('windowGeometry change')({isMaximized: false});
       expect(dispatchMock.mock.calls).toContainEqual([

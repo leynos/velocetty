@@ -7,14 +7,20 @@
 import {z} from 'zod';
 
 import type {ZodType} from 'zod';
+import type {FontWeight} from 'xterm';
 import type {IpcCommands} from '@shared/types/common';
 
 // ---------------------------------------------------------------------------
 // Composable sub-schemas
 // ---------------------------------------------------------------------------
 
-/** Buffer or string — child-process stdio union. */
-const stdioValueSchema = z.union([z.string(), z.instanceof(Buffer)]);
+/** Uint8Array or string — child-process stdio union.
+ *
+ * Uses Uint8Array rather than Buffer because IPC serialization (structured
+ * clone) converts Buffer instances to Uint8Array.  Since Buffer extends
+ * Uint8Array, this also accepts Buffer values in the main process.
+ */
+const stdioValueSchema = z.union([z.string(), z.instanceof(Uint8Array)]);
 
 const childProcessResultSchema = z.object({
   stdout: stdioValueSchema,
@@ -22,7 +28,7 @@ const childProcessResultSchema = z.object({
 });
 
 /** xterm FontWeight: named weights, CSS numeric strings, or raw numbers. */
-const fontWeightSchema: ZodType<import('xterm').FontWeight> = z.union([
+const fontWeightSchema: ZodType<FontWeight> = z.union([
   z.enum(['normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900']),
   z.number()
 ]);
