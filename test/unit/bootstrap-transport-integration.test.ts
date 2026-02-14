@@ -221,6 +221,7 @@ if (!shouldRunBootstrapTransportIntegration) {
           ['next pane req', expect.any(Function)],
           ['prev pane req', expect.any(Function)],
           ['open file', expect.any(Function)],
+          ['open ssh', expect.any(Function)],
           ['enter full screen', expect.any(Function)],
           ['leave full screen', expect.any(Function)],
           ['add notification', expect.any(Function)],
