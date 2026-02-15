@@ -16,6 +16,7 @@ import type {HyperState, HyperProps, HyperDispatch} from '../../typings/hyper';
 import * as uiActions from '../actions/ui';
 import {getRegisteredKeys, getCommandHandler, shouldPreventDefault} from '../command-registry';
 import type Terms from '../components/terms';
+import {transport} from '../transport';
 import {connect} from '../utils/plugins';
 
 import {HeaderContainer} from './header';
@@ -79,9 +80,9 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
 
   useEffect(() => {
     const onSelectAll = handleSelectAll;
-    window.rpc.on('term selectAll', onSelectAll);
+    transport.on('term selectAll', onSelectAll);
     return () => {
-      window.rpc.off('term selectAll', onSelectAll);
+      transport.off('term selectAll', onSelectAll);
     };
   }, []);
 

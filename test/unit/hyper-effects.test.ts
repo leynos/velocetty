@@ -76,20 +76,35 @@ const renderHyper = (root: ReturnType<typeof createRoot>, overrides: Partial<Hyp
   root.render(React.createElement(Hyper, buildHyperProps(overrides)));
 };
 
+/** Transport mock that captures on/off calls for select-all wiring. */
+const transportListeners: Record<string, () => void> = {};
+const transportRemovedListeners: string[] = [];
+const transportMock = {
+  invoke: mock(async () => ({})),
+  emit: mock(() => true),
+  on: mock((event: string, listener: () => void) => {
+    transportListeners[event] = listener;
+    return transportMock;
+  }),
+  once: mock((_event: string, _listener: () => void) => transportMock),
+  off: mock((event: string, _listener: () => void) => {
+    transportRemovedListeners.push(event);
+    return transportMock;
+  }),
+  removeAllListeners: mock((_event?: string) => transportMock),
+  destroy: mock(() => {})
+};
+
+mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
+
 const buildRpcWindowStub = () => {
-  const listeners: Record<string, () => void> = {};
-  const removedListeners: string[] = [];
   const rpcWindow = window as RpcWindow;
   rpcWindow.rpc = {
-    on: (event, callback) => {
-      listeners[event] = callback;
-    },
-    off: (event) => {
-      removedListeners.push(event);
-    },
+    on: () => {},
+    off: () => {},
     removeListener: () => {}
   };
-  return {listeners, removedListeners, rpcWindow};
+  return {rpcWindow};
 };
 
 mock.module('../../lib/actions/ui', () => ({
@@ -98,7 +113,8 @@ mock.module('../../lib/actions/ui', () => ({
 }));
 
 mock.module('../../lib/utils/plugins', () => ({
-  connect: () => (Component: React.ComponentType<unknown>) => Component
+  connect: () => (Component: React.ComponentType<unknown>) => Component,
+  decorate: (Component: React.ComponentType<unknown>) => Component
 }));
 
 mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));
@@ -137,6 +153,13 @@ beforeEach(() => {
     getTermByUid: () => null,
     getActiveTerm: () => null
   };
+  // Reset transport mock state
+  for (const key of Object.keys(transportListeners)) {
+    delete transportListeners[key];
+  }
+  transportRemovedListeners.length = 0;
+  transportMock.on.mockClear();
+  transportMock.off.mockClear();
 });
 
 test.serial('Hyper attaches key listeners on mount and config updates', async () => {
@@ -222,7 +245,7 @@ test.serial('Hyper routes key handlers and select-all callbacks through terms', 
   document.body.appendChild(container);
   const root = createRoot(container);
 
-  const {listeners, removedListeners, rpcWindow} = buildRpcWindowStub();
+  const {rpcWindow} = buildRpcWindowStub();
 
   let commandCalls = 0;
   let preventedDefaultCalls = 0;
@@ -261,10 +284,11 @@ test.serial('Hyper routes key handlers and select-all callbacks through terms', 
   expect(commandCalls).toBe(1);
   expect(preventedDefaultCalls).toBe(1);
 
-  const onSelectAll = listeners['term selectAll'];
+  // select-all now wired through transport, not window.rpc
+  const onSelectAll = transportListeners['term selectAll'];
   expect(onSelectAll).toBeDefined();
   if (!onSelectAll) {
-    throw new Error('Expected term selectAll listener to be registered.');
+    throw new Error('Expected transport listener for term selectAll.');
   }
   onSelectAll();
   expect(selectAllCalls).toBe(1);
@@ -276,7 +300,7 @@ test.serial('Hyper routes key handlers and select-all callbacks through terms', 
     root.unmount();
     await waitFor(0);
   });
-  expect(removedListeners).toContain('term selectAll');
+  expect(transportRemovedListeners).toContain('term selectAll');
   cleanup();
 });
 
