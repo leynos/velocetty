@@ -16,7 +16,7 @@
   `rpc` usage to `transport`.
 - [x] Migrate bootstrap event-stream subscriptions in `lib/index.tsx`
   to transport `on(...)`.
-- [ ] Replace remaining `window.rpc` direct event hooks outside the
+- [x] Replace remaining `window.rpc` direct event hooks outside the
   command layer (notably `lib/containers/hyper.tsx` and
   `lib/components/term.tsx`).
 - [x] Introduce a backend-agnostic transport factory (barrel module
@@ -26,10 +26,10 @@
 
 ## Risk and follow-up checklist
 
-- [ ] High-frequency event throughput verification should include the
+- [x] High-frequency event throughput verification should include the
   full bootstrap path (`ready -> init -> session add`) in automated
   coverage.
-- [ ] `window.rpc` contract consumers should be migrated once transport
+- [x] `window.rpc` contract consumers should be migrated once transport
   consumer APIs are stabilized for all UI entry points.
 - [ ] Keep `removeAllListeners()` return chaining semantics tested when
   transport lifecycles are added for teardown paths.
@@ -43,3 +43,7 @@
 - `lib/transport/electron-ipc-transport.ts`: contract adapter source of
   truth.
 - `lib/index.tsx`: transport-backed bootstrap wiring currently complete.
+- `lib/containers/hyper.tsx`: component-level transport migration
+  complete (select-all subscription).
+- `lib/components/term.tsx`: component-level transport migration
+  complete (renderer info emit).

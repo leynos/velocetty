@@ -401,11 +401,13 @@ Additional observable checks:
 
 Open follow-up concerns:
 
-- `lib/containers/hyper.tsx` and `lib/components/term.tsx` still use
-  `window.rpc` directly; migrate these paths in the next transport cycle.
-- Add a transport composition seam for renderer bootstrap to avoid hard-coding
-  the Electron adapter at entrypoint.
-- keep a follow-on assertion for sustained high-frequency bootstrap stream throughput.
+- ~~`lib/containers/hyper.tsx` and `lib/components/term.tsx` still use
+  `window.rpc` directly; migrate these paths in the next transport
+  cycle.~~ Completed in roadmap 1.1.2d (2026-02-14).
+- Add a transport composition seam for renderer bootstrap to avoid
+  hard-coding the Electron adapter at entrypoint.
+- ~~Keep a follow-on assertion for sustained high-frequency bootstrap
+  stream throughput.~~ Completed in roadmap 1.1.2d (2026-02-14).
 
 ## Idempotence and recovery
 
@@ -441,3 +443,7 @@ and record the deferred event migration in `Decision log`.
   process-isolated execution lane (`test:unit:bootstrap-transport`) guarded by
   `VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1` and recorded long-term
   de-quarantine follow-up under roadmap `9.3.1`.
+- 2026-02-14: Deferred follow-ups completed in roadmap 1.1.2d —
+  `hyper.tsx` and `term.tsx` migrated from `window.rpc` to transport;
+  bootstrap regression tests added for ordered sequence,
+  high-frequency throughput, and ready-prerequisite coverage.
