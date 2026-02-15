@@ -98,4 +98,13 @@ describe('Term.reportRenderer transport emit', () => {
     expect(transportMock.emit).toHaveBeenCalledTimes(2);
     expect(transportMock.emit).toHaveBeenLastCalledWith('info renderer', {uid: 'uid-3', type: 'Canvas'});
   });
+
+  test('deduplication is per-uid, not global by type', () => {
+    Term.reportRenderer('uid-4', 'WebGL');
+    Term.reportRenderer('uid-5', 'WebGL');
+
+    expect(transportMock.emit).toHaveBeenCalledTimes(2);
+    expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {uid: 'uid-4', type: 'WebGL'});
+    expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {uid: 'uid-5', type: 'WebGL'});
+  });
 });

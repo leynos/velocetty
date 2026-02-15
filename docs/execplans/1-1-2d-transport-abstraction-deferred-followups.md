@@ -2,7 +2,7 @@
 
 ## Module header
 
-- Purpose: complete the two deferred follow-ups from roadmap item `1.1.2`:
+- Purpose: complete the deferred follow-ups from roadmap item `1.1.2`:
   migrate remaining `window.rpc` UI subscriptions behind the transport
   abstraction and add bootstrap regression coverage for high-frequency
   streams.
@@ -13,7 +13,7 @@
   `docs/execplans/1-1-2-transport-abstraction.md`,
   `lib/TRANSPORT_MIGRATION_MAP.md`, `docs/developers-guide.md`.
 
-This ExecPlan is a living document. The sections Constraints,
+This execution plan (ExecPlan) is a living document. The sections Constraints,
 Tolerances, Risks, Progress, Surprises & discoveries, Decision log,
 and Outcomes & retrospective must be kept up to date as work proceeds.
 
@@ -27,7 +27,7 @@ Electron IPC adapter (`lib/transport/electron-ipc-transport.ts`). The
 command layer and bootstrap event wiring in `lib/index.tsx` were
 migrated to use the transport barrel (`lib/transport/index.ts`).
 
-Two follow-ups were explicitly deferred:
+The following follow-ups were explicitly deferred:
 
 1. `lib/containers/hyper.tsx` (line 82) still subscribes to
    `'term selectAll'` via `window.rpc.on(...)` / `window.rpc.off(...)`.
