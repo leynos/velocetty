@@ -95,59 +95,52 @@ const buildHyperProps = (overrides: Partial<HyperProps> = {}): HyperProps => ({
   ...overrides
 });
 
+const setupHyperContainer = () => {
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  return createRoot(container);
+};
+
+const mountHyper = async (root: ReturnType<typeof createRoot>, overrides: Partial<HyperProps> = {}) => {
+  await act(async () => {
+    root.render(React.createElement(Hyper, buildHyperProps(overrides)));
+    await waitFor(0);
+  });
+};
+
+const unmountHyper = async (root: ReturnType<typeof createRoot>) => {
+  await act(async () => {
+    root.unmount();
+    await waitFor(0);
+  });
+};
+
 describe('Hyper transport subscription lifecycle', () => {
   test.serial('subscribes to term selectAll on mount via transport', async () => {
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(React.createElement(Hyper, buildHyperProps()));
-      await waitFor(0);
-    });
+    const root = setupHyperContainer();
+    await mountHyper(root);
 
     expect(transportMock.on).toHaveBeenCalledWith('term selectAll', expect.any(Function));
 
-    await act(async () => {
-      root.unmount();
-    });
+    await unmountHyper(root);
   });
 
   test.serial('unsubscribes from term selectAll on unmount via transport', async () => {
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(React.createElement(Hyper, buildHyperProps()));
-      await waitFor(0);
-    });
-
-    await act(async () => {
-      root.unmount();
-      await waitFor(0);
-    });
+    const root = setupHyperContainer();
+    await mountHyper(root);
+    await unmountHyper(root);
 
     expect(transportMock.off).toHaveBeenCalledWith('term selectAll', expect.any(Function));
   });
 
   test.serial('uses the same listener reference for on and off', async () => {
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(React.createElement(Hyper, buildHyperProps()));
-      await waitFor(0);
-    });
+    const root = setupHyperContainer();
+    await mountHyper(root);
 
     const onCall = transportMock.on.mock.calls.find(([event]: [string]) => event === 'term selectAll');
     const onListener = onCall?.[1];
 
-    await act(async () => {
-      root.unmount();
-      await waitFor(0);
-    });
+    await unmountHyper(root);
 
     const offCall = transportMock.off.mock.calls.find(([event]: [string]) => event === 'term selectAll');
     const offListener = offCall?.[1];
