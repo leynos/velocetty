@@ -6,8 +6,8 @@
   migrate remaining `window.rpc` UI subscriptions behind the transport
   abstraction and add bootstrap regression coverage for high-frequency
   streams.
-- Invariants: preserve current runtime behaviour; keep existing RPC
-  event names and payload shapes unchanged.
+- Invariants: preserve current runtime behaviour; keep existing Remote
+  Procedure Call (RPC) event names and payload shapes unchanged.
 - Cross-links: `docs/roadmap.md`, `docs/velocetty-design.md`
   (sections: Host migration: Electron to Tauri, Testing),
   `docs/execplans/1-1-2-transport-abstraction.md`,
@@ -23,7 +23,8 @@ Status: COMPLETE (2026-02-14)
 
 Roadmap item `1.1.2` introduced the transport abstraction
 (`RendererCommandTransport` in `shared/src/types/transport.ts`) and an
-Electron IPC adapter (`lib/transport/electron-ipc-transport.ts`). The
+Electron Inter‑Process Communication (IPC) adapter
+(`lib/transport/electron-ipc-transport.ts`). The
 command layer and bootstrap event wiring in `lib/index.tsx` were
 migrated to use the transport barrel (`lib/transport/index.ts`).
 
