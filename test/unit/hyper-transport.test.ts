@@ -5,20 +5,11 @@ import {createRoot} from 'react-dom/client';
 import {afterAll, beforeAll, beforeEach, describe, expect, mock, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
+import {createTransportMock} from '../testUtils/transport-mock';
 
 const waitFor = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-type Listener = (...args: unknown[]) => void;
-
-const transportMock = {
-  invoke: mock(async () => ({})),
-  emit: mock(() => true),
-  on: mock((_event: string, _listener: Listener) => transportMock),
-  once: mock((_event: string, _listener: Listener) => transportMock),
-  off: mock((_event: string, _listener: Listener) => transportMock),
-  removeAllListeners: mock((_event?: string) => transportMock),
-  destroy: mock(() => {})
-};
+const {transportMock, resetTransportMock} = createTransportMock();
 
 mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
 
@@ -77,8 +68,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
-  transportMock.on.mockClear();
-  transportMock.off.mockClear();
+  resetTransportMock();
 });
 
 const buildHyperProps = (overrides: Partial<HyperProps> = {}): HyperProps => ({
@@ -120,7 +110,10 @@ describe('Hyper transport subscription lifecycle', () => {
     const root = setupHyperContainer();
     await mountHyper(root);
 
-    expect(transportMock.on).toHaveBeenCalledWith('term selectAll', expect.any(Function));
+    const onCall = transportMock.on.mock.calls.find((call) => call[0] === 'term selectAll');
+
+    expect(onCall).toBeDefined();
+    expect(typeof onCall?.[1]).toBe('function');
 
     await unmountHyper(root);
   });
@@ -130,19 +123,22 @@ describe('Hyper transport subscription lifecycle', () => {
     await mountHyper(root);
     await unmountHyper(root);
 
-    expect(transportMock.off).toHaveBeenCalledWith('term selectAll', expect.any(Function));
+    const offCall = transportMock.off.mock.calls.find((call) => call[0] === 'term selectAll');
+
+    expect(offCall).toBeDefined();
+    expect(typeof offCall?.[1]).toBe('function');
   });
 
   test.serial('uses the same listener reference for on and off', async () => {
     const root = setupHyperContainer();
     await mountHyper(root);
 
-    const onCall = transportMock.on.mock.calls.find(([event]: [string]) => event === 'term selectAll');
+    const onCall = transportMock.on.mock.calls.find((call) => call[0] === 'term selectAll');
     const onListener = onCall?.[1];
 
     await unmountHyper(root);
 
-    const offCall = transportMock.off.mock.calls.find(([event]: [string]) => event === 'term selectAll');
+    const offCall = transportMock.off.mock.calls.find((call) => call[0] === 'term selectAll');
     const offListener = offCall?.[1];
 
     expect(onListener).toBe(offListener);

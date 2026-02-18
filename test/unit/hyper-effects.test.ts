@@ -5,6 +5,7 @@ import {createRoot} from 'react-dom/client';
 import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
+import {createTransportMock} from '../testUtils/transport-mock';
 
 const waitFor = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -77,23 +78,9 @@ const renderHyper = (root: ReturnType<typeof createRoot>, overrides: Partial<Hyp
 };
 
 /** Transport mock that captures on/off calls for select-all wiring. */
-const transportListeners: Record<string, () => void> = {};
-const transportRemovedListeners: string[] = [];
-const transportMock = {
-  invoke: mock(async () => ({})),
-  emit: mock(() => true),
-  on: mock((event: string, listener: () => void) => {
-    transportListeners[event] = listener;
-    return transportMock;
-  }),
-  once: mock((_event: string, _listener: () => void) => transportMock),
-  off: mock((event: string, _listener: () => void) => {
-    transportRemovedListeners.push(event);
-    return transportMock;
-  }),
-  removeAllListeners: mock((_event?: string) => transportMock),
-  destroy: mock(() => {})
-};
+const {transportMock, state: transportMockState, resetTransportMock} = createTransportMock();
+const transportListeners = transportMockState.listenersByEvent;
+const transportRemovedListeners = transportMockState.removedEvents;
 
 mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
 
@@ -153,13 +140,7 @@ beforeEach(() => {
     getTermByUid: () => null,
     getActiveTerm: () => null
   };
-  // Reset transport mock state
-  for (const key of Object.keys(transportListeners)) {
-    delete transportListeners[key];
-  }
-  transportRemovedListeners.length = 0;
-  transportMock.on.mockClear();
-  transportMock.off.mockClear();
+  resetTransportMock();
 });
 
 test.serial('Hyper attaches key listeners on mount and config updates', async () => {

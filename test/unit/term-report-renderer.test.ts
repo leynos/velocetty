@@ -2,18 +2,9 @@
 import {afterAll, beforeAll, beforeEach, describe, expect, mock, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
+import {createTransportMock} from '../testUtils/transport-mock';
 
-type Listener = (...args: unknown[]) => void;
-
-const transportMock = {
-  invoke: mock(async () => ({})),
-  emit: mock(() => true),
-  on: mock((_event: string, _listener: Listener) => transportMock),
-  once: mock((_event: string, _listener: Listener) => transportMock),
-  off: mock((_event: string, _listener: Listener) => transportMock),
-  removeAllListeners: mock((_event?: string) => transportMock),
-  destroy: mock(() => {})
-};
+const {transportMock, resetTransportMock} = createTransportMock();
 
 mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
 
@@ -71,7 +62,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
-  transportMock.emit.mockClear();
+  resetTransportMock();
   // Reset the static renderer type cache between tests.
   Term.rendererTypes = {};
 });
