@@ -167,7 +167,7 @@ transport-swap regressions in future host migration work.
   definitions in test files that mock `../../lib/utils/plugins`.
   Rationale: avoids cross-test mock leakage when Bun runs test files
   sequentially in the same process (`--max-concurrency=1`).
-  Date/Author: 2026-02-14 / agent
+  Date/Author: 2026-02-14 / agent.
 
 ## Outcomes & retrospective
 
@@ -209,6 +209,6 @@ All implementation and validation steps are safe to rerun. If a gate
 fails:
 
 - Inspect the log output.
-- Apply the smallest focused fix.
+- Apply the smallest, focused fix.
 - Rerun only the failed gate.
 - Rerun the full gate sequence before roadmap check-off.
