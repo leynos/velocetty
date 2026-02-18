@@ -49,7 +49,14 @@ export const createTransportMock = (): {
       state.listenersByEvent[event] = [...(state.listenersByEvent[event] ?? []), listener];
       return transportMock;
     }),
-    once: mock((_event: string, _listener: Listener) => transportMock),
+    once: mock((event: string, listener: Listener) => {
+      const onceListener: Listener = (...payload: unknown[]) => {
+        transportMock.off(event, onceListener);
+        listener(...payload);
+      };
+      state.listenersByEvent[event] = [...(state.listenersByEvent[event] ?? []), onceListener];
+      return transportMock;
+    }),
     off: mock((event: string, listener: Listener) => {
       const listeners = state.listenersByEvent[event];
       if (listeners && listeners.length > 0) {
