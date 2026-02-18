@@ -6,8 +6,7 @@ import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {createTransportMock} from '../testUtils/transport-mock';
-
-const waitFor = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+import {waitFor} from '../testUtils/waitFor';
 
 /**
  * Terms ref used by Hyper to resolve focus and selection targets.
@@ -79,7 +78,6 @@ const renderHyper = (root: ReturnType<typeof createRoot>, overrides: Partial<Hyp
 
 /** Transport mock that captures on/off calls for select-all wiring. */
 const {transportMock, state: transportMockState, resetTransportMock} = createTransportMock();
-const transportListeners = transportMockState.listenersByEvent;
 const transportRemovedListeners = transportMockState.removedEvents;
 
 mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
@@ -266,12 +264,14 @@ test.serial('Hyper routes key handlers and select-all callbacks through terms', 
   expect(preventedDefaultCalls).toBe(1);
 
   // select-all now wired through transport, not window.rpc
-  const onSelectAll = transportListeners['term selectAll'];
-  expect(onSelectAll).toBeDefined();
-  if (!onSelectAll) {
+  const selectAllListeners = transportMockState.listenersByEvent['term selectAll'];
+  expect(selectAllListeners).toBeDefined();
+  if (!selectAllListeners) {
     throw new Error('Expected transport listener for term selectAll.');
   }
-  onSelectAll();
+  for (const listener of selectAllListeners) {
+    listener();
+  }
   expect(selectAllCalls).toBe(1);
 
   rpcWindow.focusActiveTerm?.();

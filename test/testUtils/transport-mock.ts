@@ -14,7 +14,7 @@ type TransportMock = {
 };
 
 type TransportMockState = {
-  listenersByEvent: Record<string, Listener>;
+  listenersByEvent: Record<string, Listener[]>;
   removedEvents: string[];
 };
 
@@ -34,24 +34,51 @@ export const createTransportMock = (): {
 
   const transportMock = {
     invoke: mock(async () => ({})),
-    emit: mock(() => true),
+    emit: mock((event: string, ...payload: unknown[]) => {
+      const listeners = state.listenersByEvent[event];
+      if (!listeners || listeners.length === 0) {
+        return true;
+      }
+
+      for (const listener of [...listeners]) {
+        listener(...payload);
+      }
+      return true;
+    }),
     on: mock((event: string, listener: Listener) => {
-      state.listenersByEvent[event] = listener;
+      state.listenersByEvent[event] = [...(state.listenersByEvent[event] ?? []), listener];
       return transportMock;
     }),
     once: mock((_event: string, _listener: Listener) => transportMock),
-    off: mock((event: string, _listener: Listener) => {
+    off: mock((event: string, listener: Listener) => {
+      const listeners = state.listenersByEvent[event];
+      if (listeners && listeners.length > 0) {
+        const listenerIndex = listeners.indexOf(listener);
+        if (listenerIndex >= 0) {
+          listeners.splice(listenerIndex, 1);
+        }
+        if (listeners.length > 0) {
+          state.listenersByEvent[event] = listeners;
+        } else {
+          delete state.listenersByEvent[event];
+        }
+      }
       state.removedEvents.push(event);
       return transportMock;
     }),
-    removeAllListeners: mock((_event?: string) => transportMock),
+    removeAllListeners: mock((event?: string) => {
+      if (event) {
+        delete state.listenersByEvent[event];
+      } else {
+        state.listenersByEvent = {};
+      }
+      return transportMock;
+    }),
     destroy: mock(() => {})
   };
 
   const resetTransportMock = () => {
-    for (const event of Object.keys(state.listenersByEvent)) {
-      delete state.listenersByEvent[event];
-    }
+    state.listenersByEvent = {};
     state.removedEvents.length = 0;
     transportMock.invoke.mockClear();
     transportMock.emit.mockClear();

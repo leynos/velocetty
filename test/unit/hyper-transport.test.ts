@@ -6,8 +6,7 @@ import {afterAll, beforeAll, beforeEach, describe, expect, mock, test} from 'bun
 
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {createTransportMock} from '../testUtils/transport-mock';
-
-const waitFor = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+import {waitFor} from '../testUtils/waitFor';
 
 const {transportMock, resetTransportMock} = createTransportMock();
 
