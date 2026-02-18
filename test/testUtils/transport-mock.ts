@@ -35,10 +35,10 @@ export const createTransportMock = (): {
   /**
    * Emits an event payload to all listeners currently registered for the event.
    */
-  const handleEmit = (event: string, ...payload: unknown[]): true => {
+  const handleEmit = (event: string, ...payload: unknown[]): boolean => {
     const listeners = state.listenersByEvent[event];
     if (!listeners || listeners.length === 0) {
-      return true;
+      return false;
     }
 
     for (const listener of [...listeners]) {
