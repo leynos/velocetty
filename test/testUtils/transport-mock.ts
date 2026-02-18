@@ -32,21 +32,58 @@ export const createTransportMock = (): {
     removedEvents: []
   };
 
+  /**
+   * Emits an event payload to all listeners currently registered for the event.
+   */
+  const handleEmit = (event: string, ...payload: unknown[]): true => {
+    const listeners = state.listenersByEvent[event];
+    if (!listeners || listeners.length === 0) {
+      return true;
+    }
+
+    for (const listener of [...listeners]) {
+      listener(...payload);
+    }
+    return true;
+  };
+
+  /**
+   * Removes a specific listener from an event registration list and
+   * deletes the event entry when no listeners remain.
+   */
+  const handleRemoveListener = (event: string, listener: Listener): void => {
+    const listeners = state.listenersByEvent[event];
+    if (!listeners || listeners.length === 0) {
+      return;
+    }
+
+    const listenerIndex = listeners.indexOf(listener);
+    if (listenerIndex < 0) {
+      return;
+    }
+
+    listeners.splice(listenerIndex, 1);
+    if (listeners.length > 0) {
+      state.listenersByEvent[event] = listeners;
+      return;
+    }
+
+    delete state.listenersByEvent[event];
+  };
+
+  /**
+   * Registers a listener for an event by appending it to the event's
+   * listener list.
+   */
+  const registerListener = (event: string, listener: Listener): void => {
+    state.listenersByEvent[event] = [...(state.listenersByEvent[event] ?? []), listener];
+  };
+
   const transportMock = {
     invoke: mock(async () => ({})),
-    emit: mock((event: string, ...payload: unknown[]) => {
-      const listeners = state.listenersByEvent[event];
-      if (!listeners || listeners.length === 0) {
-        return true;
-      }
-
-      for (const listener of [...listeners]) {
-        listener(...payload);
-      }
-      return true;
-    }),
+    emit: mock((event: string, ...payload: unknown[]) => handleEmit(event, ...payload)),
     on: mock((event: string, listener: Listener) => {
-      state.listenersByEvent[event] = [...(state.listenersByEvent[event] ?? []), listener];
+      registerListener(event, listener);
       return transportMock;
     }),
     once: mock((event: string, listener: Listener) => {
@@ -54,22 +91,11 @@ export const createTransportMock = (): {
         transportMock.off(event, onceListener);
         listener(...payload);
       };
-      state.listenersByEvent[event] = [...(state.listenersByEvent[event] ?? []), onceListener];
+      registerListener(event, onceListener);
       return transportMock;
     }),
     off: mock((event: string, listener: Listener) => {
-      const listeners = state.listenersByEvent[event];
-      if (listeners && listeners.length > 0) {
-        const listenerIndex = listeners.indexOf(listener);
-        if (listenerIndex >= 0) {
-          listeners.splice(listenerIndex, 1);
-        }
-        if (listeners.length > 0) {
-          state.listenersByEvent[event] = listeners;
-        } else {
-          delete state.listenersByEvent[event];
-        }
-      }
+      handleRemoveListener(event, listener);
       state.removedEvents.push(event);
       return transportMock;
     }),
