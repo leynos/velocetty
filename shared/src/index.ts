@@ -3,4 +3,5 @@ export * from './constants';
 export * from './types/common';
 export * from './types/commands';
 export * from './types/config';
+export * from './types/context-keys';
 export * from './types/transport';

@@ -55,12 +55,12 @@ Scope notes:
   - [x] Implement registry CRUD with deterministic ordering.
   - [x] Success criteria: registry can enumerate commands, and arg schema
     validation returns structured errors for invalid input.
-- [ ] 1.2.2. Implement the context key service and `when` parser/evaluator. See
+- [x] 1.2.2. Implement the context key service and `when` parser/evaluator. See
   [velocetty-design.md](velocetty-design.md) §Context keys and “when”
   expressions.
-  - [ ] Implement AST parsing for logical operators, comparisons, and grouping.
-  - [ ] Provide evaluation against a key/value map with explicit types.
-  - [ ] Success criteria: unit tests cover all operators and precedence, and
+  - [x] Implement AST parsing for logical operators, comparisons, and grouping.
+  - [x] Provide evaluation against a key/value map with explicit types.
+  - [x] Success criteria: unit tests cover all operators and precedence, and
     evaluation is deterministic across runs.
 
 ### 1.3. Golden path example plugin
