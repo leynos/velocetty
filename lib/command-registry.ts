@@ -86,6 +86,18 @@ const assignLegacyHandler = (commandId: CommandId, handler: CommandHandler) => {
   const definition = registry.get(commandId) ?? createLegacyDefinition(commandId);
   upsertCommand(definition, handler);
 };
+
+/**
+ * Validates command arguments against a command's registered args schema.
+ *
+ * Returns `COMMAND_NOT_FOUND` when the command does not exist,
+ * `INVALID_COMMAND_SCHEMA` when schema compilation fails, and
+ * `INVALID_COMMAND_ARGS` with structured issues when validation fails.
+ *
+ * @param commandId Command identifier whose args contract should be checked.
+ * @param args Candidate argument payload to validate.
+ * @returns Validation result containing accepted args or a structured validation error.
+ */
 export const validateArgs = (commandId: CommandId | string, args: unknown): CommandValidationResult => {
   const commandKey = asCommandId(commandId);
   const command = registry.get(commandKey);
@@ -147,43 +159,84 @@ assignLegacyHandler(asCommandId('editor:search-close'), (e, dispatch) => {
   window.focusActiveTerm();
 });
 
+/** Registers or updates a command definition with an optional handler. */
 export const register = upsertCommand;
+/** Updates a command definition with an optional handler (alias for `register`). */
 export const update = upsertCommand;
 
+/**
+ * Removes a command from the registry.
+ *
+ * @param commandId Command identifier to remove.
+ * @returns `true` when the command existed and was removed, otherwise `false`.
+ */
 export const remove = (commandId: CommandId | string) => {
   const commandKey = asCommandId(commandId);
   validatorsByCommandId.delete(commandKey);
   return registry.delete(commandKey);
 };
 
+/**
+ * Retrieves a command definition by identifier.
+ *
+ * @param commandId Command identifier to retrieve.
+ * @returns The registered command definition, or `undefined` when not found.
+ */
 export const get = (commandId: CommandId | string) => {
   const command = registry.get(asCommandId(commandId));
   return command ? cloneCommandDefinition(command) : undefined;
 };
 
+/**
+ * Lists all registered commands in deterministic order sorted by command ID.
+ *
+ * @returns All registered command definitions sorted lexically by ID.
+ */
 export const list = () => {
   return Array.from(registry.values()).map(cloneCommandDefinition).sort(compareByCommandId);
 };
 
+/**
+ * Checks whether a command exists in the registry.
+ *
+ * @param commandId Command identifier to check.
+ * @returns `true` when the command exists, otherwise `false`.
+ */
 export const has = (commandId: CommandId | string) => {
   return registry.has(asCommandId(commandId));
 };
 
+/** Public aliases for the primary registry APIs. */
+/** Alias of `register` for command creation workflows. */
 export const registerCommand = register;
+/** Alias of `register` retained for legacy compatibility. */
 export const createCommand = register;
+/** Alias of `update` for explicit update call sites. */
 export const updateCommand = update;
+/** Alias of `update` retained for replace semantics. */
 export const replaceCommand = update;
+/** Alias of `remove` for command deletion workflows. */
 export const removeCommand = remove;
+/** Alias of `remove` retained for legacy delete naming. */
 export const deleteCommand = remove;
+/** Alias of `get` for command lookup by identifier. */
 export const getCommand = get;
+/** Alias of `get` retained for definition-oriented call sites. */
 export const getCommandDefinition = get;
+/** Alias of `list` for command enumeration workflows. */
 export const listCommands = list;
+/** Alias of `list` retained for legacy enumerate naming. */
 export const enumerateCommands = list;
+/** Alias of `has` for command existence checks. */
 export const hasCommand = has;
+/** Alias of `has` retained for definition-oriented call sites. */
 export const hasCommandDefinition = has;
+/** Alias of `validateArgs` for command-args validation helpers. */
 export const validateCommandArgs = validateArgs;
+/** Alias of `validateArgs` retained for legacy helper naming. */
 export const validateCommandArgsFor = validateArgs;
 
+/** Public `CommandRegistry<CommandHandler>` entry point with CRUD and validation APIs. */
 export const commandRegistry: CommandRegistry<CommandHandler> = {
   register,
   update,

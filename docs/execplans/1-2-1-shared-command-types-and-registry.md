@@ -4,8 +4,8 @@
 
 - Purpose: define and execute roadmap item `1.2.1` by introducing shared
   command definition contracts, metadata, schema-aware validation, and
-  deterministic registry create, read, update, delete (CRUD) APIs that can be
-  reused by renderer and backend command dispatch paths.
+  deterministic registry create, read, update, and delete (CRUD) APIs that
+  can be reused by renderer and backend command dispatch paths.
 - Invariants: preserve current keyboard/menu command behaviour while replacing
   ad-hoc string-to-handler maps with typed, enumerable registry surfaces.
 - Cross-links: `docs/roadmap.md`, `docs/velocetty-design.md`,
@@ -204,8 +204,8 @@ Implementation is complete. Outcomes:
 
 - shared command definition and registry contracts are available from `shared/`,
 - deterministic registry CRUD APIs are covered by unit tests,
-- invalid command args produce structured validation errors including machine-
-  readable issue details,
+- invalid command args produce structured validation errors including
+  machine-readable issue details,
 - compatibility command entry points remain stable for existing renderer/plugin
   flows,
 - `docs/developers-guide.md` documents command-registry practice and full

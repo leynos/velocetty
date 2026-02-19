@@ -12,6 +12,7 @@ import Mousetrap from 'mousetrap';
 import type {MousetrapInstance} from 'mousetrap';
 import stylis from 'stylis';
 
+import type {CommandId} from '@shared/types/commands';
 import type {HyperState, HyperProps, HyperDispatch} from '../../typings/hyper';
 import * as uiActions from '../actions/ui';
 import {getRegisteredKeys, getCommandHandler, shouldPreventDefault} from '../command-registry';
@@ -67,7 +68,7 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
       mousetrap.current?.bind(
         commandKeys,
         (e) => {
-          const command = keys[commandKeys];
+          const command = keys[commandKeys] as CommandId;
           // We should tell xterm to ignore this event.
           (e as any).catched = true;
           props.execCommand(command, getCommandHandler(command), e);
@@ -164,7 +165,7 @@ const mapStateToProps = (state: HyperState) => {
 
 const mapDispatchToProps = (dispatch: HyperDispatch) => {
   return {
-    execCommand: (command: string, fn: ((e: unknown, dispatch: HyperDispatch) => void) | undefined, e: unknown) => {
+    execCommand: (command: CommandId, fn: ((e: unknown, dispatch: HyperDispatch) => void) | undefined, e: unknown) => {
       dispatch(uiActions.execCommand(command, fn, e));
     }
   };
