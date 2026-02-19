@@ -124,7 +124,7 @@ Scope notes:
     gates.
   - [ ] Resolve macOS aarch64 CI failures across install, build, lint, and test
     gates.
-  - [ ] Stabilize Windows CI on x64 and add a Windows aarch64 lane if runner and
+  - [ ] Stabilise Windows CI on x64 and add a Windows aarch64 lane if runner and
     toolchain support is available.
   - [ ] If Windows aarch64 cannot be enabled, document the blocker and create a
     tracked follow-up item with explicit ownership.

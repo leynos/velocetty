@@ -20,6 +20,13 @@ interface RegisteredCommand extends CommandDefinition {
 }
 
 const compareByCommandId: CommandOrderingComparator = (left, right) => left.id.localeCompare(right.id);
+const cloneSchema = <TSchema>(schema: TSchema | undefined): TSchema | undefined => {
+  if (!schema) {
+    return schema;
+  }
+
+  return JSON.parse(JSON.stringify(schema)) as TSchema;
+};
 
 const createLegacyDefinition = (id: CommandId): CommandDefinition => ({
   id,
@@ -37,8 +44,8 @@ const cloneCommandDefinition = (command: RegisteredCommand): CommandDefinition =
   },
   kind: command.kind,
   defaultWhen: command.defaultWhen,
-  argsSchema: command.argsSchema,
-  resultSchema: command.resultSchema
+  argsSchema: cloneSchema(command.argsSchema),
+  resultSchema: cloneSchema(command.resultSchema)
 });
 
 const serializeAjvErrors = (errors: ErrorObject[] | null | undefined): CommandValidationIssue[] =>
@@ -61,8 +68,11 @@ const upsertCommand = (definition: CommandDefinition, handler?: CommandHandler) 
     ...existingCommand,
     ...definition,
     metadata: {
-      ...definition.metadata
+      ...definition.metadata,
+      keywords: definition.metadata.keywords ? [...definition.metadata.keywords] : undefined
     },
+    argsSchema: cloneSchema(definition.argsSchema),
+    resultSchema: cloneSchema(definition.resultSchema),
     handler: handler ?? existingCommand?.handler
   });
 
@@ -70,22 +80,10 @@ const upsertCommand = (definition: CommandDefinition, handler?: CommandHandler) 
 };
 
 const assignLegacyHandler = (commandId: CommandId, handler: CommandHandler) => {
-  const existingCommand = registry.get(commandId);
-  if (existingCommand) {
-    registry.set(commandId, {
-      ...existingCommand,
-      handler
-    });
-    return;
-  }
-
-  registry.set(commandId, {
-    ...createLegacyDefinition(commandId),
-    handler
-  });
+  const definition = registry.get(commandId) ?? createLegacyDefinition(commandId);
+  upsertCommand(definition, handler);
 };
-
-const runCommandArgsValidation = (commandId: CommandId, args: unknown): CommandValidationResult => {
+export const validateArgs = (commandId: CommandId, args: unknown): CommandValidationResult => {
   const command = registry.get(commandId);
   if (!command) {
     const error: CommandValidationError = {
@@ -145,13 +143,8 @@ assignLegacyHandler('editor:search-close', (e, dispatch) => {
   window.focusActiveTerm();
 });
 
-export const register = (definition: CommandDefinition, handler?: CommandHandler) => {
-  upsertCommand(definition, handler);
-};
-
-export const update = (definition: CommandDefinition, handler?: CommandHandler) => {
-  upsertCommand(definition, handler);
-};
+export const register = upsertCommand;
+export const update = upsertCommand;
 
 export const remove = (commandId: CommandId) => {
   validatorsByCommandId.delete(commandId);
@@ -169,10 +162,6 @@ export const list = () => {
 
 export const has = (commandId: CommandId) => {
   return registry.has(commandId);
-};
-
-export const validateArgs = (commandId: CommandId, args: unknown) => {
-  return runCommandArgsValidation(commandId, args);
 };
 
 export const registerCommand = register;

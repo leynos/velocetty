@@ -4,8 +4,8 @@
 
 - Purpose: define and execute roadmap item `1.2.1` by introducing shared
   command definition contracts, metadata, schema-aware validation, and
-  deterministic registry CRUD APIs that can be reused by renderer and backend
-  command dispatch paths.
+  deterministic registry create, read, update, delete (CRUD) APIs that can be
+  reused by renderer and backend command dispatch paths.
 - Invariants: preserve current keyboard/menu command behaviour while replacing
   ad-hoc string-to-handler maps with typed, enumerable registry surfaces.
 - Cross-links: `docs/roadmap.md`, `docs/velocetty-design.md`,

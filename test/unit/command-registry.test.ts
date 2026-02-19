@@ -22,6 +22,7 @@ let get: typeof import('../../lib/command-registry').get;
 let list: typeof import('../../lib/command-registry').list;
 let has: typeof import('../../lib/command-registry').has;
 let validateArgs: typeof import('../../lib/command-registry').validateArgs;
+let commandRegistry: typeof import('../../lib/command-registry').commandRegistry;
 
 const TEST_COMMAND_PREFIX = 'test:command-registry';
 
@@ -47,7 +48,8 @@ beforeAll(async () => {
     get,
     list,
     has,
-    validateArgs
+    validateArgs,
+    commandRegistry
   } = await import('../../lib/command-registry.ts?command_registry_unit'));
 });
 
@@ -135,6 +137,11 @@ test('registry CRUD supports create/get/update/has/remove semantics', () => {
   register(definition);
   expect(has(commandId)).toBe(true);
   expect(get(commandId)).toEqual(definition);
+  expect(
+    list()
+      .filter((command) => command.id.startsWith(TEST_COMMAND_PREFIX))
+      .map((command) => command.id)
+  ).toContain(commandId);
 
   const updatedDefinition = {
     ...definition,
@@ -145,11 +152,119 @@ test('registry CRUD supports create/get/update/has/remove semantics', () => {
   };
   update(updatedDefinition);
   expect(get(commandId)).toEqual(updatedDefinition);
+  expect(list().find((command) => command.id === commandId)).toEqual(updatedDefinition);
 
   expect(remove(commandId)).toBe(true);
   expect(remove(commandId)).toBe(false);
   expect(has(commandId)).toBe(false);
   expect(get(commandId)).toBeUndefined();
+  expect(list().some((command) => command.id === commandId)).toBe(false);
+});
+
+test('commandRegistry facade mirrors top-level CRUD behaviour', () => {
+  const commandId = `${TEST_COMMAND_PREFIX}:facade:${Date.now()}`;
+  const definition = createCommandDefinition(commandId, 'Facade Command');
+
+  expect(has(commandId)).toBe(false);
+  expect(get(commandId)).toBeUndefined();
+
+  commandRegistry.register(definition);
+  expect(commandRegistry.has(commandId)).toBe(true);
+  expect(commandRegistry.get(commandId)).toEqual(definition);
+  expect(has(commandId)).toBe(true);
+  expect(get(commandId)).toEqual(definition);
+
+  const updatedDefinition = {
+    ...definition,
+    metadata: {
+      title: 'Facade Command Updated'
+    }
+  };
+
+  commandRegistry.update(updatedDefinition);
+  expect(commandRegistry.get(commandId)).toEqual(updatedDefinition);
+  expect(get(commandId)).toEqual(updatedDefinition);
+
+  const facadeListIds = commandRegistry
+    .list()
+    .filter((command) => command.id.startsWith(TEST_COMMAND_PREFIX))
+    .map((command) => command.id);
+
+  const topLevelListIds = list()
+    .filter((command) => command.id.startsWith(TEST_COMMAND_PREFIX))
+    .map((command) => command.id);
+
+  expect(facadeListIds).toEqual(topLevelListIds);
+  expect(facadeListIds).toContain(commandId);
+  expect(commandRegistry.validateArgs(commandId, {})).toMatchObject({ok: true});
+
+  commandRegistry.remove(commandId);
+  expect(commandRegistry.has(commandId)).toBe(false);
+  expect(commandRegistry.get(commandId)).toBeUndefined();
+  expect(has(commandId)).toBe(false);
+  expect(get(commandId)).toBeUndefined();
+});
+
+test('get/list defensively clone schema and metadata definitions', () => {
+  const commandId = `${TEST_COMMAND_PREFIX}:clone:${Date.now()}`;
+  const definition: CommandDefinition = {
+    id: commandId,
+    kind: 'frontend',
+    metadata: {
+      title: 'Clone Test Command',
+      category: 'clone-test',
+      keywords: ['a', 'b']
+    },
+    argsSchema: {
+      type: 'object',
+      properties: {
+        enabled: {type: 'boolean'}
+      },
+      required: ['enabled'],
+      additionalProperties: false
+    },
+    resultSchema: {
+      type: 'object',
+      properties: {
+        ok: {type: 'boolean'}
+      },
+      required: ['ok'],
+      additionalProperties: false
+    }
+  };
+
+  register(definition);
+
+  const fromGet = get(commandId);
+  expect(fromGet).toEqual(definition);
+  if (!fromGet) {
+    throw new Error('Expected command to be registered');
+  }
+
+  fromGet.defaultWhen = 'mutatedExpression > 0';
+  fromGet.metadata.title = 'Mutated Title';
+  fromGet.metadata.keywords?.push('mutated');
+  const argsSchemaFromGet = fromGet.argsSchema as {properties: {enabled: {type: string}}};
+  const resultSchemaFromGet = fromGet.resultSchema as {properties: {ok: {type: string}}};
+  argsSchemaFromGet.properties.enabled.type = 'string';
+  resultSchemaFromGet.properties.ok.type = 'string';
+
+  const afterMutationGet = get(commandId);
+  const afterMutationListEntry = list().find((command) => command.id === commandId);
+  expect(afterMutationGet).toEqual(definition);
+  expect(afterMutationListEntry).toEqual(definition);
+
+  const firstListEntry = list().find((command) => command.id === commandId);
+  const secondListEntry = list().find((command) => command.id === commandId);
+  if (!firstListEntry || !secondListEntry) {
+    throw new Error('Expected command to be present in list');
+  }
+
+  firstListEntry.metadata.title = 'Mutated List Title';
+  const argsSchemaFromList = firstListEntry.argsSchema as {properties: {enabled: {type: string}}};
+  argsSchemaFromList.properties.enabled.type = 'number';
+  expect(secondListEntry).toEqual(definition);
+  expect(get(commandId)).toEqual(definition);
 });
 
 test('validateArgs returns structured errors for invalid command arguments', () => {
