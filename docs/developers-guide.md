@@ -98,6 +98,24 @@ Package-local build checks are available via:
 - `bun run build:backend`
 - `bun run build:packages`
 
+## Command registry practice
+
+Roadmap item `1.2.1` introduces shared command contracts and deterministic
+registry APIs. Follow these rules for command-system changes:
+
+- Define command contracts in `shared/src/types/commands.ts` and import them via
+  `@shared/types/commands` from runtime modules.
+- Keep registry implementations deterministic by returning `list()` output in a
+  stable order (`CommandId` lexical ordering).
+- When a command includes `argsSchema`, validate arguments via registry helpers
+  and return structured `CommandValidationError` objects with `code`,
+  `commandId`, and schema `issues`.
+- Preserve compatibility surfaces used by current runtime/plugin paths
+  (`registerCommandHandlers`, `getCommandHandler`, and `getRegisteredKeys`)
+  until dispatcher migration milestones replace those entry points.
+- Add or update unit coverage in `test/unit/command-registry.test.ts` for
+  CRUD semantics, deterministic ordering, and validation error behaviour.
+
 ## esbuild build pipeline and safeguards
 
 The repository now bundles with esbuild by default:
@@ -194,6 +212,15 @@ Run the standard gates before opening a pull request:
 
 - `make check-fmt`
 - `make lint`
+
+When changes affect command/transport runtime seams or dependency baselines, run
+the full release gate set in this order:
+
+- `bun install`
+- `make build`
+- `make check-fmt`
+- `make lint`
+- `make test`
 
 When documentation changes, also run:
 

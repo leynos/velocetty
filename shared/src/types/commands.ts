@@ -2,6 +2,8 @@
 
 /** Stable identifier used across keymaps, menus, dispatchers, and handlers. */
 export type CommandId = string;
+/** Execution location for a command handler. */
+export type CommandKind = 'frontend' | 'backend';
 
 declare const commandSchemaPayload: unique symbol;
 
@@ -24,7 +26,7 @@ export interface CommandMetadata {
 export interface CommandDefinition<TArgs = unknown, TResult = unknown> {
   id: CommandId;
   metadata: CommandMetadata;
-  kind: 'frontend' | 'backend';
+  kind: CommandKind;
   defaultWhen?: string;
   argsSchema?: CommandSchema<TArgs>;
   resultSchema?: CommandSchema<TResult>;
@@ -40,18 +42,27 @@ export interface CommandValidationIssue {
 }
 
 /** Structured validation error used by registry validation APIs. */
+export type CommandValidationTarget = 'args' | 'result';
+/** Error codes returned by command validation helpers. */
+export type CommandValidationErrorCode =
+  | 'INVALID_COMMAND_ARGS'
+  | 'INVALID_COMMAND_RESULT'
+  | 'INVALID_COMMAND_SCHEMA'
+  | 'COMMAND_NOT_FOUND';
+
+/** Structured validation error used by registry validation APIs. */
 export interface CommandValidationError {
-  code: 'INVALID_COMMAND_ARGS' | 'INVALID_COMMAND_RESULT';
+  code: CommandValidationErrorCode;
   commandId: CommandId;
-  target: 'args' | 'result';
+  target?: CommandValidationTarget;
   message: string;
-  issues: CommandValidationIssue[];
+  issues?: CommandValidationIssue[];
 }
 
 /** Validation success payload for schema checks. */
 export interface CommandValidationSuccess<TValue = unknown> {
   ok: true;
-  value: TValue;
+  value?: TValue;
 }
 
 /** Validation failure payload for schema checks. */
@@ -61,12 +72,21 @@ export interface CommandValidationFailure {
 }
 
 /** Discriminated union returned by command argument/result validators. */
-export type CommandValidationResult<TValue = unknown> =
-  | CommandValidationSuccess<TValue>
-  | CommandValidationFailure;
+export type CommandValidationResult<TValue = unknown> = CommandValidationSuccess<TValue> | CommandValidationFailure;
 
 /** Deterministic comparator contract used when listing command definitions. */
 export type CommandOrderingComparator<TCommand extends Pick<CommandDefinition, 'id'> = CommandDefinition> = (
   left: TCommand,
   right: TCommand
 ) => number;
+
+/** CRUD and validation contract shared by command registries. */
+export interface CommandRegistry<THandler = unknown> {
+  register(definition: CommandDefinition, handler?: THandler): void;
+  update(definition: CommandDefinition, handler?: THandler): void;
+  remove(commandId: CommandId): boolean;
+  get(commandId: CommandId): CommandDefinition | undefined;
+  list(): CommandDefinition[];
+  has(commandId: CommandId): boolean;
+  validateArgs(commandId: CommandId, args: unknown): CommandValidationResult;
+}

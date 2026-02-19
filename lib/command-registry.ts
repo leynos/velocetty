@@ -1,65 +1,25 @@
 import type {HyperDispatch} from '../typings/hyper';
+import type {
+  CommandDefinition,
+  CommandId,
+  CommandOrderingComparator,
+  CommandRegistry,
+  CommandValidationError,
+  CommandValidationIssue,
+  CommandValidationResult
+} from '@shared/types/commands';
 import Ajv, {type ErrorObject, type ValidateFunction} from 'ajv';
 
 import {closeSearch} from './actions/sessions';
 import {transport} from './transport';
 
-export type CommandId = string;
-export type CommandKind = 'frontend' | 'backend';
 export type CommandHandler = (event: any, dispatch: HyperDispatch) => void;
-export type CommandArgsSchema = Record<string, unknown>;
-
-export interface CommandMetadata {
-  title: string;
-  category?: string;
-  description?: string;
-  keywords?: string[];
-  icon?: string;
-}
-
-export interface CommandDefinition {
-  id: CommandId;
-  metadata: CommandMetadata;
-  kind: CommandKind;
-  defaultWhen?: string;
-  argsSchema?: CommandArgsSchema;
-  resultSchema?: CommandArgsSchema;
-}
 
 interface RegisteredCommand extends CommandDefinition {
   handler?: CommandHandler;
 }
 
-interface SerializableValidationError {
-  instancePath: string;
-  schemaPath: string;
-  keyword: string;
-  message: string;
-  params: Record<string, unknown>;
-}
-
-export interface CommandValidationError {
-  code: 'INVALID_COMMAND_ARGS' | 'COMMAND_NOT_FOUND' | 'INVALID_COMMAND_SCHEMA';
-  message: string;
-  details: {
-    commandId: CommandId;
-    errors?: SerializableValidationError[];
-  };
-}
-
-export type CommandValidationResult = {ok: true} | {ok: false; error: CommandValidationError};
-
-export interface CommandRegistry {
-  register(definition: CommandDefinition, handler?: CommandHandler): void;
-  update(definition: CommandDefinition, handler?: CommandHandler): void;
-  remove(commandId: CommandId): boolean;
-  get(commandId: CommandId): CommandDefinition | undefined;
-  list(): CommandDefinition[];
-  has(commandId: CommandId): boolean;
-  validateArgs(commandId: CommandId, args: unknown): CommandValidationResult;
-}
-
-const compareByCommandId = (left: CommandDefinition, right: CommandDefinition) => left.id.localeCompare(right.id);
+const compareByCommandId: CommandOrderingComparator = (left, right) => left.id.localeCompare(right.id);
 
 const createLegacyDefinition = (id: CommandId): CommandDefinition => ({
   id,
@@ -72,7 +32,8 @@ const createLegacyDefinition = (id: CommandId): CommandDefinition => ({
 const cloneCommandDefinition = (command: RegisteredCommand): CommandDefinition => ({
   id: command.id,
   metadata: {
-    ...command.metadata
+    ...command.metadata,
+    keywords: command.metadata.keywords ? [...command.metadata.keywords] : undefined
   },
   kind: command.kind,
   defaultWhen: command.defaultWhen,
@@ -80,7 +41,7 @@ const cloneCommandDefinition = (command: RegisteredCommand): CommandDefinition =
   resultSchema: command.resultSchema
 });
 
-const serializeAjvErrors = (errors: ErrorObject[] | null | undefined): SerializableValidationError[] =>
+const serializeAjvErrors = (errors: ErrorObject[] | null | undefined): CommandValidationIssue[] =>
   (errors ?? []).map((error) => ({
     instancePath: error.instancePath,
     schemaPath: error.schemaPath,
@@ -127,20 +88,20 @@ const assignLegacyHandler = (commandId: CommandId, handler: CommandHandler) => {
 const runCommandArgsValidation = (commandId: CommandId, args: unknown): CommandValidationResult => {
   const command = registry.get(commandId);
   if (!command) {
+    const error: CommandValidationError = {
+      code: 'COMMAND_NOT_FOUND',
+      commandId,
+      target: 'args',
+      message: `Cannot validate args for unknown command: ${commandId}`
+    };
     return {
       ok: false,
-      error: {
-        code: 'COMMAND_NOT_FOUND',
-        message: `Cannot validate args for unknown command: ${commandId}`,
-        details: {
-          commandId
-        }
-      }
+      error
     };
   }
 
   if (!command.argsSchema) {
-    return {ok: true};
+    return {ok: true, value: args};
   }
 
   try {
@@ -151,30 +112,30 @@ const runCommandArgsValidation = (commandId: CommandId, args: unknown): CommandV
     }
 
     if (validator(args)) {
-      return {ok: true};
+      return {ok: true, value: args};
     }
 
+    const error: CommandValidationError = {
+      code: 'INVALID_COMMAND_ARGS',
+      commandId,
+      target: 'args',
+      message: `Invalid args for command: ${commandId}`,
+      issues: serializeAjvErrors(validator.errors)
+    };
     return {
       ok: false,
-      error: {
-        code: 'INVALID_COMMAND_ARGS',
-        message: `Invalid args for command: ${commandId}`,
-        details: {
-          commandId,
-          errors: serializeAjvErrors(validator.errors)
-        }
-      }
+      error
     };
   } catch (error) {
+    const validationError: CommandValidationError = {
+      code: 'INVALID_COMMAND_SCHEMA',
+      commandId,
+      target: 'args',
+      message: error instanceof Error ? error.message : `Invalid schema for command: ${commandId}`
+    };
     return {
       ok: false,
-      error: {
-        code: 'INVALID_COMMAND_SCHEMA',
-        message: error instanceof Error ? error.message : `Invalid schema for command: ${commandId}`,
-        details: {
-          commandId
-        }
-      }
+      error: validationError
     };
   }
 };
@@ -229,7 +190,7 @@ export const hasCommandDefinition = has;
 export const validateCommandArgs = validateArgs;
 export const validateCommandArgsFor = validateArgs;
 
-export const commandRegistry: CommandRegistry = {
+export const commandRegistry: CommandRegistry<CommandHandler> = {
   register,
   update,
   remove,
@@ -265,7 +226,7 @@ export const getCommandHandler = (command: string) => {
   return registry.get(command)?.handler;
 };
 
-// Some commands are directly excuted by Electron menuItem role.
+// Some commands are directly executed by Electron menuItem role.
 // They should not be prevented to reach Electron.
 const roleCommands = [
   'window:close',

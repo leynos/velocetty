@@ -18,7 +18,7 @@ The sections `Constraints`, `Tolerances`, `Risks`, `Progress`,
 `Surprises & discoveries`, `Decision log`, and
 `Outcomes & retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT (2026-02-19)
+Status: COMPLETE (2026-02-19)
 
 No `PLANS.md` exists at repository root as of 2026-02-19, so this plan is
 self-contained.
@@ -127,12 +127,19 @@ after all required gates pass: `bun install`, `make build`, `make check-fmt`,
 - [x] (2026-02-19 00:00Z) Collected gate and development-practice requirements
   from `Makefile` and `docs/developers-guide.md`.
 - [x] (2026-02-19 00:00Z) Drafted this ExecPlan.
-- [ ] Await explicit approval before implementation.
-- [ ] Stage A complete: shared contracts and validation error model landed.
-- [ ] Stage B complete: deterministic registry CRUD implementation and tests.
-- [ ] Stage C complete: compatibility integration with existing command paths.
-- [ ] Stage D complete: docs updates, full gates, roadmap completion, and
-  implementation commits.
+- [x] (2026-02-19 11:15Z) Received explicit approval to begin implementation.
+- [x] (2026-02-19 11:16Z) Stage A complete: shared command contracts landed in
+  `shared/src/types/commands.ts` and are exported through `shared/src/index.ts`.
+- [x] (2026-02-19 11:17Z) Stage B complete: deterministic registry CRUD and
+  argument-schema validation landed in `lib/command-registry.ts` with unit
+  coverage in `test/unit/command-registry.test.ts`.
+- [x] (2026-02-19 11:18Z) Stage C complete: compatibility wrappers remain in
+  place for `registerCommandHandlers`, `getCommandHandler`, and
+  `getRegisteredKeys`.
+- [x] (2026-02-19 11:22Z) Stage D complete: updated
+  `docs/developers-guide.md`, marked roadmap item `1.2.1` done, and validated
+  required gates (`bun install`, `make build`, `make check-fmt`, `make lint`,
+  `make test`) plus docs gates (`markdownlint`, `nixie`).
 
 ## Surprises & discoveries
 
@@ -158,6 +165,13 @@ after all required gates pass: `bun install`, `make build`, `make check-fmt`,
   Impact: this milestone can add shared command contracts without adding new
   packages.
 
+- Observation: initial registry implementation duplicated command contract types
+  in `lib/command-registry.ts` instead of importing shared contracts.
+  Evidence: first implementation pass declared local `CommandDefinition` and
+  `CommandValidationError` interfaces in `lib/command-registry.ts`.
+  Impact: follow-up alignment was required to ensure runtime registry APIs
+  consume `@shared/types/commands`.
+
 ## Decision log
 
 - Decision: treat existing map-based command plumbing as replace-with-shim,
@@ -178,17 +192,34 @@ after all required gates pass: `bun install`, `make build`, `make check-fmt`,
   changes begin.
   Date/Author: 2026-02-19 / Codex
 
+- Decision: retain compatibility wrappers in `lib/command-registry.ts` while
+  introducing CRUD and validation APIs.
+  Rationale: preserves current plugin/runtime integration paths while enabling
+  new registry surfaces for follow-on dispatcher milestones.
+  Date/Author: 2026-02-19 / Codex
+
 ## Outcomes & retrospective
 
-Implementation has not started yet. Expected completion outcomes:
+Implementation is complete. Outcomes:
 
 - shared command definition and registry contracts are available from `shared/`,
 - deterministic registry CRUD APIs are covered by unit tests,
-- invalid command args produce structured validation errors,
-- developers guide is updated for new command registration/validation practice,
-- roadmap entry `1.2.1` is marked done only after required gates are green.
+- invalid command args produce structured validation errors including machine-
+  readable issue details,
+- compatibility command entry points remain stable for existing renderer/plugin
+  flows,
+- `docs/developers-guide.md` documents command-registry practice and full
+  release gate sequencing,
+- `docs/roadmap.md` item `1.2.1` and its success-criteria subitems are marked
+  complete.
 
-Retrospective notes will be added after implementation stages complete.
+Retrospective:
+
+- Shared contracts prevented drift between registry runtime types and design
+  expectations, but this milestone still leaves backend command-registry wiring
+  for follow-on roadmap items.
+- Generated JS/definition artefacts can appear during local build/install
+  workflows; keep the tree clean before format gates to avoid false failures.
 
 ## Context and orientation
 
@@ -431,5 +462,5 @@ Dependencies and rationale:
 ## Revision note
 
 Initial draft created on 2026-02-19.
-This revision captures implementation scope, constraints, and gate sequence for
-roadmap item `1.2.1` and explicitly records approval gating before code changes.
+This revision marks the plan `COMPLETE`, records Stage D evidence, and captures
+final outcomes after all required gates passed.

@@ -49,11 +49,11 @@ Scope notes:
 
 ### 1.2. Command primitives and context key engine
 
-- [ ] 1.2.1. Implement shared command definition types and registry APIs. See
+- [x] 1.2.1. Implement shared command definition types and registry APIs. See
   [velocetty-design.md](velocetty-design.md) §Command system design.
-  - [ ] Define `CommandDefinition`, metadata, and optional arg/result schemas.
-  - [ ] Implement registry CRUD with deterministic ordering.
-  - [ ] Success criteria: registry can enumerate commands, and arg schema
+  - [x] Define `CommandDefinition`, metadata, and optional arg/result schemas.
+  - [x] Implement registry CRUD with deterministic ordering.
+  - [x] Success criteria: registry can enumerate commands, and arg schema
     validation returns structured errors for invalid input.
 - [ ] 1.2.2. Implement the context key service and `when` parser/evaluator. See
   [velocetty-design.md](velocetty-design.md) §Context keys and “when”

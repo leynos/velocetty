@@ -1,5 +1,6 @@
 /** @file Verifies command-registry keymap and handler behaviour. */
 import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import type {CommandDefinition} from '@shared/types/commands';
 
 let decoratedKeymaps: Record<string, string[]> = {};
 const invokeMock = mock(async (_channel: string) => decoratedKeymaps);
@@ -24,10 +25,7 @@ let validateArgs: typeof import('../../lib/command-registry').validateArgs;
 
 const TEST_COMMAND_PREFIX = 'test:command-registry';
 
-const createCommandDefinition = (
-  commandId: string,
-  title = commandId
-): import('../../lib/command-registry').CommandDefinition => ({
+const createCommandDefinition = (commandId: string, title = commandId): CommandDefinition => ({
   id: commandId,
   kind: 'frontend',
   metadata: {
@@ -50,9 +48,7 @@ beforeAll(async () => {
     list,
     has,
     validateArgs
-  } = await import(
-    '../../lib/command-registry.ts?command_registry_unit'
-  ));
+  } = await import('../../lib/command-registry.ts?command_registry_unit'));
 });
 
 beforeEach(() => {
@@ -179,10 +175,10 @@ test('validateArgs returns structured errors for invalid command arguments', () 
 
   expect(invalidResult.error.code).toBe('INVALID_COMMAND_ARGS');
   expect(invalidResult.error.message).toContain(commandId);
-  expect(invalidResult.error.details.commandId).toBe(commandId);
-  expect(Array.isArray(invalidResult.error.details.errors)).toBe(true);
-  expect(invalidResult.error.details.errors?.length).toBeGreaterThan(0);
-  expect(invalidResult.error.details.errors?.[0]).toMatchObject({
+  expect(invalidResult.error.commandId).toBe(commandId);
+  expect(Array.isArray(invalidResult.error.issues)).toBe(true);
+  expect(invalidResult.error.issues?.length).toBeGreaterThan(0);
+  expect(invalidResult.error.issues?.[0]).toMatchObject({
     instancePath: expect.any(String),
     schemaPath: expect.any(String),
     keyword: expect.any(String),
@@ -190,7 +186,7 @@ test('validateArgs returns structured errors for invalid command arguments', () 
     params: expect.any(Object)
   });
 
-  expect(validateArgs(commandId, {name: 'alpha', count: 2})).toEqual({ok: true});
+  expect(validateArgs(commandId, {name: 'alpha', count: 2})).toMatchObject({ok: true});
 });
 
 test('validateArgs returns structured errors for unknown commands', () => {
@@ -203,9 +199,7 @@ test('validateArgs returns structured errors for unknown commands', () => {
   }
 
   expect(result.error.code).toBe('COMMAND_NOT_FOUND');
-  expect(result.error.details).toEqual({
-    commandId
-  });
+  expect(result.error.commandId).toBe(commandId);
 });
 
 test('shouldPreventDefault keeps Electron role commands unblocked', () => {
