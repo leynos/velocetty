@@ -114,8 +114,8 @@ registry APIs. Follow these rules for command-system changes:
   (`registerCommandHandlers`, `getCommandHandler`, and `getRegisteredKeys`)
   until dispatcher migration milestones replace those entry points.
 - Add or update unit coverage in `test/unit/command-registry.test.ts` for
-  create, read, update, delete (CRUD) semantics, deterministic ordering, and
-  validation error behaviour.
+  create, read, update, and delete (CRUD) semantics, deterministic ordering,
+  and validation error behaviour.
 
 ## esbuild build pipeline and safeguards
 

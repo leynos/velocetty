@@ -1,3 +1,4 @@
+/** @file Command registry and validation helpers for renderer command dispatch. */
 import type {HyperDispatch} from '../typings/hyper';
 import type {
   CommandDefinition,
