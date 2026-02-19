@@ -316,46 +316,58 @@ Use log files so truncated terminal output can still be reviewed.
 
 Set reusable log variables:
 
-    PROJECT="$(get-project 2>/dev/null || basename "$PWD")"
-    BRANCH_SAFE="$(git branch --show | tr '/' '-')"
+```bash
+PROJECT="$(get-project 2>/dev/null || basename "$PWD")"
+BRANCH_SAFE="$(git branch --show | tr '/' '-')"
+```
 
 Implementation sequence:
 
 1. Baseline install/build prerequisites.
 
-       bun install 2>&1 | tee "/tmp/bun-install-${PROJECT}-${BRANCH_SAFE}.out"
+   ```bash
+   bun install 2>&1 | tee "/tmp/bun-install-${PROJECT}-${BRANCH_SAFE}.out"
+   ```
 
    Expected signal: install completes successfully, including postinstall steps
    (`v8-snapshot`, app deps, schema sync).
 
 2. Implement Stage A and Stage B changes with focused unit tests.
 
-       bun run test:unit:run test/unit/command-registry.test.ts 2>&1 | tee \
-         "/tmp/test-unit-command-registry-${PROJECT}-${BRANCH_SAFE}.out"
+   ```bash
+   bun run test:unit:run test/unit/command-registry.test.ts 2>&1 | tee \
+     "/tmp/test-unit-command-registry-${PROJECT}-${BRANCH_SAFE}.out"
+   ```
 
    Expected signal: new tests for deterministic ordering and structured schema
    validation errors pass.
 
 3. Implement Stage C compatibility wiring and rerun unit tests.
 
-       make test 2>&1 | tee "/tmp/test-${PROJECT}-${BRANCH_SAFE}.out"
+   ```bash
+   make test 2>&1 | tee "/tmp/test-${PROJECT}-${BRANCH_SAFE}.out"
+   ```
 
    Expected signal: existing command-path tests and new registry tests pass.
 
 4. Run required final gates in required order.
 
-       make build 2>&1 | tee "/tmp/build-${PROJECT}-${BRANCH_SAFE}.out"
-       make check-fmt 2>&1 | tee "/tmp/check-fmt-${PROJECT}-${BRANCH_SAFE}.out"
-       make lint 2>&1 | tee "/tmp/lint-${PROJECT}-${BRANCH_SAFE}.out"
-       make test 2>&1 | tee "/tmp/test-${PROJECT}-${BRANCH_SAFE}.out"
+   ```bash
+   make build 2>&1 | tee "/tmp/build-${PROJECT}-${BRANCH_SAFE}.out"
+   make check-fmt 2>&1 | tee "/tmp/check-fmt-${PROJECT}-${BRANCH_SAFE}.out"
+   make lint 2>&1 | tee "/tmp/lint-${PROJECT}-${BRANCH_SAFE}.out"
+   make test 2>&1 | tee "/tmp/test-${PROJECT}-${BRANCH_SAFE}.out"
+   ```
 
    Expected signal: each command exits zero; logs contain no fatal errors.
 
 5. Final documentation and roadmap updates.
 
-       bunx markdownlint-cli2 "docs/**/*.md" 2>&1 | tee \
-         "/tmp/markdownlint-${PROJECT}-${BRANCH_SAFE}.out"
-       nixie --no-sandbox 2>&1 | tee "/tmp/nixie-${PROJECT}-${BRANCH_SAFE}.out"
+   ```bash
+   bunx markdownlint-cli2 "docs/**/*.md" 2>&1 | tee \
+     "/tmp/markdownlint-${PROJECT}-${BRANCH_SAFE}.out"
+   nixie --no-sandbox 2>&1 | tee "/tmp/nixie-${PROJECT}-${BRANCH_SAFE}.out"
+   ```
 
    Expected signal: docs validation passes after developer-guide and roadmap
    edits.
@@ -397,9 +409,9 @@ Quality method:
 - If unexpected unrelated working-tree changes appear, stop and ask for
   direction before continuing.
 
-## Artifacts and notes
+## Artefacts and notes
 
-Expected artifacts after implementation:
+Expected artefacts after implementation:
 
 - New shared command type definitions in `shared/src/types/commands.ts`.
 - Updated registry implementation and tests proving deterministic ordering and
@@ -414,42 +426,45 @@ Expected artifacts after implementation:
 Planned shared interfaces (final names may differ only if needed for repository
 conventions):
 
-    export type CommandId = string;
+```typescript
+declare const commandIdBrand: unique symbol;
+export type CommandId = string & {[commandIdBrand]: 'CommandId'};
 
-    export interface CommandMetadata {
-      title: string;
-      category?: string;
-      description?: string;
-      keywords?: string[];
-      icon?: string;
-    }
+export interface CommandMetadata {
+  title: string;
+  category?: string;
+  description?: string;
+  keywords?: string[];
+  icon?: string;
+}
 
-    export interface CommandDefinition<TArgs = unknown, TResult = unknown> {
-      id: CommandId;
-      metadata: CommandMetadata;
-      kind: 'frontend' | 'backend';
-      defaultWhen?: string;
-      argsSchema?: object;
-      resultSchema?: object;
-    }
+export interface CommandDefinition<TArgs = unknown, TResult = unknown> {
+  id: CommandId;
+  metadata: CommandMetadata;
+  kind: 'frontend' | 'backend';
+  defaultWhen?: string;
+  argsSchema?: object;
+  resultSchema?: object;
+}
 
-    export interface CommandValidationError {
-      code: 'INVALID_COMMAND_ARGS';
-      message: string;
-      details: unknown;
-    }
+export interface CommandValidationError {
+  code: 'INVALID_COMMAND_ARGS';
+  message: string;
+  details: unknown;
+}
 
-    export interface CommandRegistry {
-      register(definition: CommandDefinition): void;
-      update(definition: CommandDefinition): void;
-      remove(commandId: CommandId): boolean;
-      get(commandId: CommandId): CommandDefinition | undefined;
-      list(): CommandDefinition[];
-      has(commandId: CommandId): boolean;
-      validateArgs(commandId: CommandId, args: unknown):
-        | {ok: true}
-        | {ok: false; error: CommandValidationError};
-    }
+export interface CommandRegistry {
+  register(definition: CommandDefinition): void;
+  update(definition: CommandDefinition): void;
+  remove(commandId: CommandId): boolean;
+  get(commandId: CommandId): CommandDefinition | undefined;
+  list(): CommandDefinition[];
+  has(commandId: CommandId): boolean;
+  validateArgs(commandId: CommandId, args: unknown):
+    | {ok: true}
+    | {ok: false; error: CommandValidationError};
+}
+```
 
 Dependencies and rationale:
 

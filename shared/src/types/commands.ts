@@ -1,7 +1,8 @@
 /** @file Shared command contracts for metadata, schemas, and validation outcomes. */
 
 /** Stable identifier used across keymaps, menus, dispatchers, and handlers. */
-export type CommandId = string;
+declare const commandIdBrand: unique symbol;
+export type CommandId = string & {[commandIdBrand]: 'CommandId'};
 /** Execution location for a command handler. */
 export type CommandKind = 'frontend' | 'backend';
 

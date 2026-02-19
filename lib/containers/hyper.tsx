@@ -164,7 +164,7 @@ const mapStateToProps = (state: HyperState) => {
 
 const mapDispatchToProps = (dispatch: HyperDispatch) => {
   return {
-    execCommand: (command: string, fn: (e: any, dispatch: HyperDispatch) => void, e: any) => {
+    execCommand: (command: string, fn: ((e: unknown, dispatch: HyperDispatch) => void) | undefined, e: unknown) => {
       dispatch(uiActions.execCommand(command, fn, e));
     }
   };

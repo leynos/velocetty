@@ -1,6 +1,6 @@
 /** @file Verifies command-registry keymap and handler behaviour. */
 import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
-import type {CommandDefinition} from '@shared/types/commands';
+import type {CommandDefinition, CommandId} from '@shared/types/commands';
 
 let decoratedKeymaps: Record<string, string[]> = {};
 const invokeMock = mock(async (_channel: string) => decoratedKeymaps);
@@ -25,9 +25,10 @@ let validateArgs: typeof import('../../lib/command-registry').validateArgs;
 let commandRegistry: typeof import('../../lib/command-registry').commandRegistry;
 
 const TEST_COMMAND_PREFIX = 'test:command-registry';
+const asCommandId = (value: string): CommandId => value as CommandId;
 
 const createCommandDefinition = (commandId: string, title = commandId): CommandDefinition => ({
-  id: commandId,
+  id: asCommandId(commandId),
   kind: 'frontend',
   metadata: {
     title
@@ -206,7 +207,7 @@ test('commandRegistry facade mirrors top-level CRUD behaviour', () => {
 });
 
 test('get/list defensively clone schema and metadata definitions', () => {
-  const commandId = `${TEST_COMMAND_PREFIX}:clone:${Date.now()}`;
+  const commandId = asCommandId(`${TEST_COMMAND_PREFIX}:clone:${Date.now()}`);
   const definition: CommandDefinition = {
     id: commandId,
     kind: 'frontend',

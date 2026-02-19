@@ -13,13 +13,15 @@ import Ajv, {type ErrorObject, type ValidateFunction} from 'ajv';
 import {closeSearch} from './actions/sessions';
 import {transport} from './transport';
 
-export type CommandHandler = (event: any, dispatch: HyperDispatch) => void;
+export type CommandHandler = (event: unknown, dispatch: HyperDispatch) => void;
 
 interface RegisteredCommand extends CommandDefinition {
   handler?: CommandHandler;
 }
 
-const compareByCommandId: CommandOrderingComparator = (left, right) => left.id.localeCompare(right.id);
+const compareByCommandId: CommandOrderingComparator = (left, right) =>
+  left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+const asCommandId = (value: string | CommandId): CommandId => value as CommandId;
 const cloneSchema = <TSchema>(schema: TSchema | undefined): TSchema | undefined => {
   if (!schema) {
     return schema;
@@ -83,14 +85,15 @@ const assignLegacyHandler = (commandId: CommandId, handler: CommandHandler) => {
   const definition = registry.get(commandId) ?? createLegacyDefinition(commandId);
   upsertCommand(definition, handler);
 };
-export const validateArgs = (commandId: CommandId, args: unknown): CommandValidationResult => {
-  const command = registry.get(commandId);
+export const validateArgs = (commandId: CommandId | string, args: unknown): CommandValidationResult => {
+  const commandKey = asCommandId(commandId);
+  const command = registry.get(commandKey);
   if (!command) {
     const error: CommandValidationError = {
       code: 'COMMAND_NOT_FOUND',
-      commandId,
+      commandId: commandKey,
       target: 'args',
-      message: `Cannot validate args for unknown command: ${commandId}`
+      message: `Cannot validate args for unknown command: ${commandKey}`
     };
     return {
       ok: false,
@@ -103,10 +106,10 @@ export const validateArgs = (commandId: CommandId, args: unknown): CommandValida
   }
 
   try {
-    let validator = validatorsByCommandId.get(commandId);
+    let validator = validatorsByCommandId.get(commandKey);
     if (!validator) {
       validator = ajv.compile(command.argsSchema);
-      validatorsByCommandId.set(commandId, validator);
+      validatorsByCommandId.set(commandKey, validator);
     }
 
     if (validator(args)) {
@@ -115,9 +118,9 @@ export const validateArgs = (commandId: CommandId, args: unknown): CommandValida
 
     const error: CommandValidationError = {
       code: 'INVALID_COMMAND_ARGS',
-      commandId,
+      commandId: commandKey,
       target: 'args',
-      message: `Invalid args for command: ${commandId}`,
+      message: `Invalid args for command: ${commandKey}`,
       issues: serializeAjvErrors(validator.errors)
     };
     return {
@@ -127,9 +130,9 @@ export const validateArgs = (commandId: CommandId, args: unknown): CommandValida
   } catch (error) {
     const validationError: CommandValidationError = {
       code: 'INVALID_COMMAND_SCHEMA',
-      commandId,
+      commandId: commandKey,
       target: 'args',
-      message: error instanceof Error ? error.message : `Invalid schema for command: ${commandId}`
+      message: error instanceof Error ? error.message : `Invalid schema for command: ${commandKey}`
     };
     return {
       ok: false,
@@ -138,7 +141,7 @@ export const validateArgs = (commandId: CommandId, args: unknown): CommandValida
   }
 };
 
-assignLegacyHandler('editor:search-close', (e, dispatch) => {
+assignLegacyHandler(asCommandId('editor:search-close'), (e, dispatch) => {
   dispatch(closeSearch(undefined, e));
   window.focusActiveTerm();
 });
@@ -146,13 +149,14 @@ assignLegacyHandler('editor:search-close', (e, dispatch) => {
 export const register = upsertCommand;
 export const update = upsertCommand;
 
-export const remove = (commandId: CommandId) => {
-  validatorsByCommandId.delete(commandId);
-  return registry.delete(commandId);
+export const remove = (commandId: CommandId | string) => {
+  const commandKey = asCommandId(commandId);
+  validatorsByCommandId.delete(commandKey);
+  return registry.delete(commandKey);
 };
 
-export const get = (commandId: CommandId) => {
-  const command = registry.get(commandId);
+export const get = (commandId: CommandId | string) => {
+  const command = registry.get(asCommandId(commandId));
   return command ? cloneCommandDefinition(command) : undefined;
 };
 
@@ -160,8 +164,8 @@ export const list = () => {
   return Array.from(registry.values()).map(cloneCommandDefinition).sort(compareByCommandId);
 };
 
-export const has = (commandId: CommandId) => {
-  return registry.has(commandId);
+export const has = (commandId: CommandId | string) => {
+  return registry.has(asCommandId(commandId));
 };
 
 export const registerCommand = register;
@@ -207,12 +211,12 @@ export const registerCommandHandlers = (cmds: Record<string, CommandHandler> | u
   }
 
   Object.keys(cmds).forEach((commandId) => {
-    assignLegacyHandler(commandId, cmds[commandId]);
+    assignLegacyHandler(asCommandId(commandId), cmds[commandId]);
   });
 };
 
-export const getCommandHandler = (command: string) => {
-  return registry.get(command)?.handler;
+export const getCommandHandler = (command: CommandId | string) => {
+  return registry.get(asCommandId(command))?.handler;
 };
 
 // Some commands are directly executed by Electron menuItem role.

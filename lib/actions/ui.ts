@@ -318,7 +318,11 @@ export function openSSH(parsedUrl: ReturnType<typeof parseUrl>) {
   };
 }
 
-export function execCommand(command: string, fn: (e: any, dispatch: HyperDispatch) => void, e: any) {
+export function execCommand(
+  command: string,
+  fn: ((e: unknown, dispatch: HyperDispatch) => void) | undefined,
+  e: unknown
+) {
   return (dispatch: HyperDispatch) =>
     dispatch({
       type: UI_COMMAND_EXEC,
