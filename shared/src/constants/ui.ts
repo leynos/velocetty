@@ -1,4 +1,6 @@
 /** @file Shared user interface action constants and action contracts. */
+import type {CommandId} from '../types/commands';
+
 /** Action type constant for setting font size directly. */
 export const UI_FONT_SIZE_SET = 'UI_FONT_SIZE_SET';
 /** Action type constant for increasing font size. */
@@ -169,7 +171,7 @@ export interface UIContextmenuOpenAction {
 /** Action contract for executing command palette actions. */
 export interface UICommandExecAction {
   readonly type: typeof UI_COMMAND_EXEC;
-  readonly command: string;
+  readonly command: CommandId;
 }
 
 /** Union of every shared UI action contract. */

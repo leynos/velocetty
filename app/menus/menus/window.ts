@@ -1,7 +1,10 @@
 /** @file Builds the Window menu template for tab and pane navigation. */
 import type {MenuItemConstructorOptions} from 'electron';
+import type {CommandId} from '@shared/types/commands';
 
 import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
+
+const asCommandId = (command: string): CommandId => command as CommandId;
 
 const windowMenu = (
   commandKeys: Record<string, string>,
@@ -18,7 +21,7 @@ const windowMenu = (
       label,
       accelerator: commandKeys[`tab:jump:${label.toLowerCase()}`],
       click: (_item, focusedWindow) => {
-        execWithBrowserWindow(`tab:jump:${label.toLowerCase()}`, focusedWindow);
+        execWithBrowserWindow(asCommandId(`tab:jump:${label.toLowerCase()}`), focusedWindow);
       }
     });
   }
@@ -45,14 +48,14 @@ const windowMenu = (
             label: 'Previous',
             accelerator: commandKeys['tab:prev'],
             click: (_item, focusedWindow) => {
-              execWithBrowserWindow('tab:prev', focusedWindow);
+              execWithBrowserWindow(asCommandId('tab:prev'), focusedWindow);
             }
           },
           {
             label: 'Next',
             accelerator: commandKeys['tab:next'],
             click: (_item, focusedWindow) => {
-              execWithBrowserWindow('tab:next', focusedWindow);
+              execWithBrowserWindow(asCommandId('tab:next'), focusedWindow);
             }
           },
           {
@@ -71,14 +74,14 @@ const windowMenu = (
             label: 'Previous',
             accelerator: commandKeys['pane:prev'],
             click: (_item, focusedWindow) => {
-              execWithBrowserWindow('pane:prev', focusedWindow);
+              execWithBrowserWindow(asCommandId('pane:prev'), focusedWindow);
             }
           },
           {
             label: 'Next',
             accelerator: commandKeys['pane:next'],
             click: (_item, focusedWindow) => {
-              execWithBrowserWindow('pane:next', focusedWindow);
+              execWithBrowserWindow(asCommandId('pane:next'), focusedWindow);
             }
           }
         ]
@@ -92,7 +95,7 @@ const windowMenu = (
       {
         label: 'Toggle Always on Top',
         click: (_item, focusedWindow) => {
-          execWithBrowserWindow('window:toggleKeepOnTop', focusedWindow);
+          execWithBrowserWindow(asCommandId('window:toggleKeepOnTop'), focusedWindow);
         }
       },
       {

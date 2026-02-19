@@ -5,6 +5,7 @@ import type {IpcMain, IpcRenderer} from 'electron';
 
 import type parseUrl from 'parse-url';
 
+import type {CommandId} from './commands';
 import type {configOptions} from './config';
 
 /** Branded identifier for session entities. */
@@ -49,7 +50,7 @@ export type sessionExtraOptions = {
 /** Events emitted from the renderer and consumed by the privileged process. */
 export type MainEvents = {
   close: never;
-  command: string;
+  command: CommandId;
   data: {uid: SessionId | null; data: string; escaped?: boolean};
   exit: {uid: SessionId};
   'info renderer': {uid: SessionId; type: string};

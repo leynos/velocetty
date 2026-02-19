@@ -2,10 +2,11 @@
 // The label is set to appName here so it matches actual behavior
 import {app} from 'electron';
 import type {BrowserWindow, MenuItemConstructorOptions} from 'electron';
+import type {CommandId} from '@shared/types/commands';
 
 const darwinMenu = (
   commandKeys: Record<string, string>,
-  execCommand: (command: string, focusedWindow?: BrowserWindow) => void,
+  execCommand: (command: CommandId, focusedWindow?: BrowserWindow) => void,
   showAbout: () => void
 ): MenuItemConstructorOptions => {
   return {
@@ -24,7 +25,7 @@ const darwinMenu = (
         label: 'Preferences...',
         accelerator: commandKeys['window:preferences'],
         click() {
-          execCommand('window:preferences');
+          execCommand('window:preferences' as CommandId);
         }
       },
       {

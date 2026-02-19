@@ -1,7 +1,10 @@
 /** @file Defines the Edit menu template and command bindings. */
 import type {MenuItemConstructorOptions} from 'electron';
+import type {CommandId} from '@shared/types/commands';
 
 import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
+
+const asCommandId = (command: string): CommandId => command as CommandId;
 
 const editMenu = (commandKeys: Record<string, string>, execCommand: MenuCommandRunner) => {
   const execWithBrowserWindow = makeMenuCommandExecutor(execCommand);
@@ -39,7 +42,7 @@ const editMenu = (commandKeys: Record<string, string>, execCommand: MenuCommandR
       label: 'Select All',
       accelerator: commandKeys['editor:selectAll'],
       click(_item, focusedWindow) {
-        execWithBrowserWindow('editor:selectAll', focusedWindow);
+        execWithBrowserWindow(asCommandId('editor:selectAll'), focusedWindow);
       }
     },
     {
@@ -52,28 +55,28 @@ const editMenu = (commandKeys: Record<string, string>, execCommand: MenuCommandR
           label: 'Previous word',
           accelerator: commandKeys['editor:movePreviousWord'],
           click(_item, focusedWindow) {
-            execWithBrowserWindow('editor:movePreviousWord', focusedWindow);
+            execWithBrowserWindow(asCommandId('editor:movePreviousWord'), focusedWindow);
           }
         },
         {
           label: 'Next word',
           accelerator: commandKeys['editor:moveNextWord'],
           click(_item, focusedWindow) {
-            execWithBrowserWindow('editor:moveNextWord', focusedWindow);
+            execWithBrowserWindow(asCommandId('editor:moveNextWord'), focusedWindow);
           }
         },
         {
           label: 'Line beginning',
           accelerator: commandKeys['editor:moveBeginningLine'],
           click(_item, focusedWindow) {
-            execWithBrowserWindow('editor:moveBeginningLine', focusedWindow);
+            execWithBrowserWindow(asCommandId('editor:moveBeginningLine'), focusedWindow);
           }
         },
         {
           label: 'Line end',
           accelerator: commandKeys['editor:moveEndLine'],
           click(_item, focusedWindow) {
-            execWithBrowserWindow('editor:moveEndLine', focusedWindow);
+            execWithBrowserWindow(asCommandId('editor:moveEndLine'), focusedWindow);
           }
         }
       ]
@@ -85,28 +88,28 @@ const editMenu = (commandKeys: Record<string, string>, execCommand: MenuCommandR
           label: 'Previous word',
           accelerator: commandKeys['editor:deletePreviousWord'],
           click(_item, focusedWindow) {
-            execWithBrowserWindow('editor:deletePreviousWord', focusedWindow);
+            execWithBrowserWindow(asCommandId('editor:deletePreviousWord'), focusedWindow);
           }
         },
         {
           label: 'Next word',
           accelerator: commandKeys['editor:deleteNextWord'],
           click(_item, focusedWindow) {
-            execWithBrowserWindow('editor:deleteNextWord', focusedWindow);
+            execWithBrowserWindow(asCommandId('editor:deleteNextWord'), focusedWindow);
           }
         },
         {
           label: 'Line beginning',
           accelerator: commandKeys['editor:deleteBeginningLine'],
           click(_item, focusedWindow) {
-            execWithBrowserWindow('editor:deleteBeginningLine', focusedWindow);
+            execWithBrowserWindow(asCommandId('editor:deleteBeginningLine'), focusedWindow);
           }
         },
         {
           label: 'Line end',
           accelerator: commandKeys['editor:deleteEndLine'],
           click(_item, focusedWindow) {
-            execWithBrowserWindow('editor:deleteEndLine', focusedWindow);
+            execWithBrowserWindow(asCommandId('editor:deleteEndLine'), focusedWindow);
           }
         }
       ]
@@ -118,14 +121,14 @@ const editMenu = (commandKeys: Record<string, string>, execCommand: MenuCommandR
       label: 'Clear Buffer',
       accelerator: commandKeys['editor:clearBuffer'],
       click(_item, focusedWindow) {
-        execWithBrowserWindow('editor:clearBuffer', focusedWindow);
+        execWithBrowserWindow(asCommandId('editor:clearBuffer'), focusedWindow);
       }
     },
     {
       label: 'Search',
       accelerator: commandKeys['editor:search'],
       click(_item, focusedWindow) {
-        execWithBrowserWindow('editor:search', focusedWindow);
+        execWithBrowserWindow(asCommandId('editor:search'), focusedWindow);
       }
     }
   ];
@@ -137,7 +140,7 @@ const editMenu = (commandKeys: Record<string, string>, execCommand: MenuCommandR
         label: 'Preferences...',
         accelerator: commandKeys['window:preferences'],
         click() {
-          execWithBrowserWindow('window:preferences');
+          execWithBrowserWindow(asCommandId('window:preferences'));
         }
       }
     );

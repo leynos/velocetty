@@ -13,7 +13,7 @@ import {v4 as uuidv4} from 'uuid';
 
 import type {sessionExtraOptions} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
-import {asProfileId, asSessionId} from '../utils/shared-ids';
+import {asCommandId, asProfileId, asSessionId} from '../utils/shared-ids';
 import {execCommand} from '../commands';
 import {getDefaultProfile} from '../config';
 import {icon, homeDirectory} from '../config/paths';
@@ -414,7 +414,7 @@ export function newWindow(
   });
   rpc.on('command', (command) => {
     const focusedWindow = BrowserWindow.getFocusedWindow();
-    execCommand(command, focusedWindow!);
+    execCommand(asCommandId(command), focusedWindow!);
   });
   // pass on the full screen events from the window to react
   rpc.win.on('enter-full-screen', () => {

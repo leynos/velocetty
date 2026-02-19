@@ -24,6 +24,7 @@ import {
   UI_CONTEXTMENU_OPEN,
   UI_COMMAND_EXEC
 } from '@shared/constants/ui';
+import type {CommandId} from '@shared/types/commands';
 import type {HyperState, HyperDispatch, HyperActions, ITermGroups} from '../../typings/hyper';
 import {getRootGroups} from '../selectors';
 import {isExecutable} from '../utils/file';
@@ -318,7 +319,11 @@ export function openSSH(parsedUrl: ReturnType<typeof parseUrl>) {
   };
 }
 
-export function execCommand(command: string, fn: (e: any, dispatch: HyperDispatch) => void, e: any) {
+export function execCommand(
+  command: CommandId,
+  fn: ((e: unknown, dispatch: HyperDispatch) => void) | undefined,
+  e: unknown
+) {
   return (dispatch: HyperDispatch) =>
     dispatch({
       type: UI_COMMAND_EXEC,
