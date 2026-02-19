@@ -440,5 +440,100 @@ if (!shouldRunBootstrapTransportIntegration) {
         {type: 'UI_WINDOW_GEOMETRY_UPDATED', data: {isMaximized: false}}
       ]);
     });
+
+    test('ordered bootstrap sequence: ready → session add → session data', () => {
+      clearDispatch();
+
+      // Simulate ordered bootstrap pipeline.
+      getListener('ready')(null);
+      getListener('session add')({
+        uid: 'seq-1',
+        shell: '/bin/bash',
+        pid: 200,
+        profile: 'default'
+      } as unknown as Session);
+      const uid = '01234567-89ab-cdef-0123-456789abcdef';
+      getListener('session data')(`${uid}initial output`);
+      getListener('update available')({
+        releaseName: 'v1.0.0',
+        releaseNotes: 'release',
+        releaseUrl: 'https://example.org',
+        canInstall: false
+      });
+
+      const types = dispatchMock.mock.calls.map((c) => c[0]?.type as string);
+
+      // Verify the expected dispatch order across the full sequence.
+      const initIdx = types.indexOf('INIT_ACTION');
+      const fontIdx = types.indexOf('UI_SET_FONT_SMOOTHING');
+      const addIdx = types.indexOf('SESSION_ADD');
+      const dataIdx = types.indexOf('SESSION_DATA');
+      const updateIdx = types.indexOf('UPDATE_AVAILABLE');
+
+      expect(initIdx).toBeGreaterThanOrEqual(0);
+      expect(fontIdx).toBeGreaterThan(initIdx);
+      expect(addIdx).toBeGreaterThan(fontIdx);
+      expect(dataIdx).toBeGreaterThan(addIdx);
+      expect(updateIdx).toBeGreaterThan(dataIdx);
+    });
+
+    test('high-frequency session data: 100 events dispatch correctly', () => {
+      clearDispatch();
+
+      const uid = '01234567-89ab-cdef-0123-456789abcdef';
+      const count = 100;
+
+      for (let i = 0; i < count; i++) {
+        getListener('session data')(`${uid}chunk-${i}`);
+      }
+
+      const dataActions = dispatchMock.mock.calls.filter((c) => c[0]?.type === 'SESSION_DATA');
+
+      expect(dataActions).toHaveLength(count);
+
+      // Verify each dispatch received the correct uid and data slice.
+      for (let i = 0; i < count; i++) {
+        expect(dataActions[i][0]).toEqual({
+          type: 'SESSION_DATA',
+          uid,
+          data: `chunk-${i}`
+        });
+      }
+    });
+
+    test('ready prerequisite: session add and data dispatch after ready', () => {
+      clearDispatch();
+
+      // Fire ready first to initialize bootstrap state.
+      getListener('ready')(null);
+
+      // Then fire session lifecycle events.
+      getListener('session add')({
+        uid: 'prereq-1',
+        shell: '/bin/zsh',
+        pid: 300,
+        profile: 'default'
+      } as unknown as Session);
+      const uid = '01234567-89ab-cdef-0123-456789abcdef';
+      getListener('session data')(`${uid}post-ready output`);
+
+      // Verify all dispatched correctly after ready.
+      expect(dispatchMock.mock.calls).toContainEqual([{type: 'INIT_ACTION'}]);
+      expect(dispatchMock.mock.calls).toContainEqual([
+        {
+          type: 'SESSION_ADD',
+          session: {uid: 'prereq-1', shell: '/bin/zsh', pid: 300, profile: 'default'}
+        }
+      ]);
+      expect(dispatchMock.mock.calls).toContainEqual([{type: 'SESSION_DATA', uid, data: 'post-ready output'}]);
+
+      // Confirm ordering: init comes before session events.
+      const types = dispatchMock.mock.calls.map((c) => c[0]?.type as string);
+      const initIdx = types.indexOf('INIT_ACTION');
+      const addIdx = types.indexOf('SESSION_ADD');
+      const dataIdx = types.indexOf('SESSION_DATA');
+      expect(addIdx).toBeGreaterThan(initIdx);
+      expect(dataIdx).toBeGreaterThan(initIdx);
+    });
   });
 }

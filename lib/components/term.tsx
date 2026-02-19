@@ -20,6 +20,7 @@ import {WebglAddon} from 'xterm-addon-webgl';
 import type {TermProps} from '../../typings/hyper';
 import {asSessionId} from '@shared/types/common';
 import terms from '../terms';
+import {transport} from '../transport';
 import processClipboard from '../utils/paste';
 import {decorate} from '../utils/plugins';
 
@@ -164,7 +165,7 @@ export default class Term extends React.PureComponent<
     if (rendererTypes[uid] !== type) {
       rendererTypes[uid] = type;
       Term.rendererTypes = rendererTypes;
-      window.rpc.emit('info renderer', {uid: asSessionId(uid), type});
+      transport.emit('info renderer', {uid: asSessionId(uid), type});
     }
   }
 

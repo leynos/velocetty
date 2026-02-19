@@ -64,21 +64,32 @@ Follow-up hardening tracked in `docs/tracking-issues.md`:
 
 ## Transport abstraction practice
 
-- Command-layer renderer code must avoid direct Electron inter-process
-  communication (IPC) imports and call `lib/transport/` adapters instead.
-- For command execution and renderer event streams, use `RendererCommandTransport`
-  from `@shared/types/transport` and `transport` from `lib/transport`
-  (barrel module). Do not import the Electron-specific adapter directly.
-- Keep host-specific IPC details inside `lib/transport` adapters and keep command
-  modules only concerned with transport contracts.
+- All internal Velocetty renderer code (command-layer modules **and**
+  component-level UI modules) must use `lib/transport/` adapters instead
+  of direct Electron inter-process communication (IPC) imports or
+  `window.rpc` calls.
+- `window.rpc` remains available as a global for backward-compatible
+  plugin API access only; internal Velocetty modules must not depend on
+  it.
+- For command execution and renderer event streams, use
+  `RendererCommandTransport` from `@shared/types/transport` and
+  `transport` from `lib/transport` (barrel module). Do not import the
+  Electron-specific adapter directly.
+- Keep host-specific IPC details inside `lib/transport` adapters and
+  keep command modules only concerned with transport contracts.
 - IPC responses are validated at the transport boundary via zod schemas
   in `lib/transport/ipc-schemas.ts`. When adding a new `IpcCommands`
   entry, add a corresponding schema to the registry so responses are
   validated before reaching application code.
-- Add or update transport adapter tests when changing invocation or subscription
-  paths (for example, `test/unit/electron-ipc-transport.test.ts`).
+- Add or update transport adapter tests when changing invocation or
+  subscription paths (for example,
+  `test/unit/electron-ipc-transport.test.ts`). For component-level
+  transport usage, mock `lib/transport/electron-ipc-transport` and
+  verify `on`/`off`/`emit` calls to confirm correct wiring without
+  coupling to internal component rendering behaviour.
 - Track progress against `lib/TRANSPORT_MIGRATION_MAP.md` and keep all
-  transport-facing command and bootstrap-path follow-ups visible before any PR.
+  transport-facing command and bootstrap-path follow-ups visible before
+  any PR.
 
 Package-local build checks are available via:
 
