@@ -75,12 +75,12 @@ const isWhitespace = (char: string) => /\s/u.test(char);
 const isDigit = (char: string) => /[0-9]/u.test(char);
 const isIdentifierStart = (char: string) => /[A-Za-z_$]/u.test(char);
 const isIdentifierPart = (char: string) => /[A-Za-z0-9_.$]/u.test(char);
-const isNumberStart = (source: string, cursor: number): boolean => {
-  const char = source[cursor];
+const isNumberStart = (reader: SourceReader, pos: Position): boolean => {
+  const char = reader.source[pos.value];
   if (isDigit(char)) {
     return true;
   }
-  if (char === '-' && isDigit(source[cursor + 1] ?? '')) {
+  if (char === '-' && isDigit(reader.source[pos.value + 1] ?? '')) {
     return true;
   }
   return false;
@@ -159,24 +159,24 @@ const isExponentMarker = (char: string): boolean => {
   return char === 'e' || char === 'E';
 };
 
-const advanceAfterOptionalSign = (source: string, pos: Position): Position => {
-  const char = source[pos.value];
+const advanceAfterOptionalSign = (reader: SourceReader, pos: Position): Position => {
+  const char = reader.source[pos.value];
   if (char === '+' || char === '-') {
     return pos.advance();
   }
   return pos;
 };
 
-const readExponentDigits = (source: string, pos: Position, start: Position): Position => {
+const readExponentDigits = (reader: SourceReader, pos: Position, start: Position): Position => {
   const digitStart = pos;
   let current = pos;
 
-  while (current.value < source.length && isDigit(source[current.value])) {
+  while (current.value < reader.source.length && isDigit(reader.source[current.value])) {
     current = current.advance();
   }
 
   if (digitStart.value === current.value) {
-    throw new WhenExpressionSyntaxError('Invalid numeric literal exponent', source, start.value);
+    throw new WhenExpressionSyntaxError('Invalid numeric literal exponent', reader.source, start.value);
   }
 
   return current;
@@ -189,8 +189,8 @@ const readExponentPart = (reader: SourceReader, pos: Position, start: Position):
   }
 
   const afterMarker = pos.advance();
-  const afterOptionalSign = advanceAfterOptionalSign(source, afterMarker);
-  return readExponentDigits(source, afterOptionalSign, start);
+  const afterOptionalSign = advanceAfterOptionalSign(reader, afterMarker);
+  return readExponentDigits(reader, afterOptionalSign, start);
 };
 
 const readNumber = (reader: SourceReader, startPos: Position): ReadResult => {
@@ -294,8 +294,7 @@ const tryTokenizeString = (reader: SourceReader, pos: Position): TokenizeResult 
 };
 
 const tryTokenizeNumber = (reader: SourceReader, pos: Position): TokenizeResult => {
-  const cursor = pos.value;
-  if (!isNumberStart(reader.source, cursor)) {
+  if (!isNumberStart(reader, pos)) {
     return null;
   }
 
