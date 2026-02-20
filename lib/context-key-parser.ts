@@ -57,6 +57,17 @@ class SourceReader {
   }
 }
 
+/** Encapsulates a position in source text for type-safe position tracking. */
+class Position {
+  constructor(readonly value: number) {}
+
+  advance(count: number = 1): Position {
+    return new Position(this.value + count);
+  }
+
+  static readonly ZERO = new Position(0);
+}
+
 type ReadResult = {token: Token; consumed: number};
 
 const isWhitespace = (char: string) => /\s/u.test(char);
@@ -68,239 +79,241 @@ const mapEscapeSequence = (escaped: string): string => {
   return escaped === 'n' ? '\n' : escaped === 'r' ? '\r' : escaped === 't' ? '\t' : escaped;
 };
 
-const processEscapeSequence = (source: string, cursor: number): {value: string; nextCursor: number} => {
-  const escaped = source[cursor + 1];
+const processEscapeSequence = (reader: SourceReader, pos: Position): {value: string; nextPosition: Position} => {
+  const escaped = reader.source[pos.value + 1];
   if (escaped === undefined) {
-    throw new WhenExpressionSyntaxError('Unterminated string literal', source, cursor);
+    throw new WhenExpressionSyntaxError('Unterminated string literal', reader.source, pos.value);
   }
 
   return {
     value: mapEscapeSequence(escaped),
-    nextCursor: cursor + 2
+    nextPosition: pos.advance(2)
   };
 };
 
-const readString = (reader: SourceReader, startPos: number): ReadResult => {
+const readString = (reader: SourceReader, startPos: Position): ReadResult => {
   const {source} = reader;
-  const quote = source[startPos];
-  let cursor = startPos + 1;
+  const quote = source[startPos.value];
+  let cursor = startPos.advance();
   let value = '';
 
-  while (cursor < source.length) {
-    const char = source[cursor];
+  while (cursor.value < source.length) {
+    const char = source[cursor.value];
     if (char === quote) {
       return {
         token: {
           kind: 'literal',
-          lexeme: source.slice(startPos, cursor + 1),
-          index: startPos,
+          lexeme: source.slice(startPos.value, cursor.value + 1),
+          index: startPos.value,
           literal: value
         },
-        consumed: cursor + 1 - startPos
+        consumed: cursor.value + 1 - startPos.value
       };
     }
 
     if (char === '\\') {
-      const {value: escapedValue, nextCursor} = processEscapeSequence(source, cursor);
+      const {value: escapedValue, nextPosition} = processEscapeSequence(reader, cursor);
       value += escapedValue;
-      cursor = nextCursor;
+      cursor = nextPosition;
       continue;
     }
 
     value += char;
-    cursor += 1;
+    cursor = cursor.advance();
   }
 
-  throw new WhenExpressionSyntaxError('Unterminated string literal', source, startPos);
+  throw new WhenExpressionSyntaxError('Unterminated string literal', source, startPos.value);
 };
 
-const readFractionalPart = (source: string, cursor: number, start: number): number => {
-  if (source[cursor] !== '.') {
-    return cursor;
+const readFractionalPart = (reader: SourceReader, pos: Position, start: Position): Position => {
+  const {source} = reader;
+  if (source[pos.value] !== '.') {
+    return pos;
   }
 
-  let nextCursor = cursor + 1;
-  const fractionStart = nextCursor;
-  while (nextCursor < source.length && isDigit(source[nextCursor])) {
-    nextCursor += 1;
+  let current = pos.advance();
+  const fractionStart = current;
+  while (current.value < source.length && isDigit(source[current.value])) {
+    current = current.advance();
   }
 
-  if (fractionStart === nextCursor) {
-    throw new WhenExpressionSyntaxError('Invalid numeric literal', source, start);
+  if (fractionStart.value === current.value) {
+    throw new WhenExpressionSyntaxError('Invalid numeric literal', source, start.value);
   }
 
-  return nextCursor;
+  return current;
 };
 
-const readExponentPart = (source: string, cursor: number, start: number): number => {
-  if (source[cursor] !== 'e' && source[cursor] !== 'E') {
-    return cursor;
+const readExponentPart = (reader: SourceReader, pos: Position, start: Position): Position => {
+  const {source} = reader;
+  if (source[pos.value] !== 'e' && source[pos.value] !== 'E') {
+    return pos;
   }
 
-  let nextCursor = cursor + 1;
-  if (source[nextCursor] === '+' || source[nextCursor] === '-') {
-    nextCursor += 1;
+  let current = pos.advance();
+  if (source[current.value] === '+' || source[current.value] === '-') {
+    current = current.advance();
   }
 
-  const exponentStart = nextCursor;
-  while (nextCursor < source.length && isDigit(source[nextCursor])) {
-    nextCursor += 1;
+  const exponentStart = current;
+  while (current.value < source.length && isDigit(source[current.value])) {
+    current = current.advance();
   }
 
-  if (exponentStart === nextCursor) {
-    throw new WhenExpressionSyntaxError('Invalid numeric literal exponent', source, start);
+  if (exponentStart.value === current.value) {
+    throw new WhenExpressionSyntaxError('Invalid numeric literal exponent', source, start.value);
   }
 
-  return nextCursor;
+  return current;
 };
 
-const readNumber = (reader: SourceReader, startPos: number): ReadResult => {
+const readNumber = (reader: SourceReader, startPos: Position): ReadResult => {
   const {source} = reader;
   let cursor = startPos;
-  if (source[cursor] === '-') {
-    cursor += 1;
+  if (source[cursor.value] === '-') {
+    cursor = cursor.advance();
   }
 
-  while (cursor < source.length && isDigit(source[cursor])) {
-    cursor += 1;
+  while (cursor.value < source.length && isDigit(source[cursor.value])) {
+    cursor = cursor.advance();
   }
 
-  cursor = readFractionalPart(source, cursor, startPos);
-  cursor = readExponentPart(source, cursor, startPos);
+  cursor = readFractionalPart(reader, cursor, startPos);
+  cursor = readExponentPart(reader, cursor, startPos);
 
-  const lexeme = source.slice(startPos, cursor);
+  const lexeme = source.slice(startPos.value, cursor.value);
   const literal = Number(lexeme);
   if (!Number.isFinite(literal)) {
-    throw new WhenExpressionSyntaxError(`Invalid numeric literal '${lexeme}'`, source, startPos);
+    throw new WhenExpressionSyntaxError(`Invalid numeric literal '${lexeme}'`, source, startPos.value);
   }
 
   return {
-    token: {kind: 'literal', lexeme, index: startPos, literal},
-    consumed: cursor - startPos
+    token: {kind: 'literal', lexeme, index: startPos.value, literal},
+    consumed: cursor.value - startPos.value
   };
 };
 
-const readIdentifier = (reader: SourceReader, startPos: number): ReadResult => {
+const readIdentifier = (reader: SourceReader, startPos: Position): ReadResult => {
   const {source} = reader;
-  let cursor = startPos + 1;
-  while (cursor < source.length && isIdentifierPart(source[cursor])) {
-    cursor += 1;
+  let cursor = startPos.advance();
+  while (cursor.value < source.length && isIdentifierPart(source[cursor.value])) {
+    cursor = cursor.advance();
   }
 
-  const lexeme = source.slice(startPos, cursor);
+  const lexeme = source.slice(startPos.value, cursor.value);
   const literal = lexeme === 'true' ? true : lexeme === 'false' ? false : lexeme === 'null' ? null : undefined;
   if (literal !== undefined || lexeme === 'null') {
     return {
-      token: {kind: 'literal', lexeme, index: startPos, literal},
-      consumed: cursor - startPos
+      token: {kind: 'literal', lexeme, index: startPos.value, literal},
+      consumed: cursor.value - startPos.value
     };
   }
 
   return {
-    token: {kind: 'identifier', lexeme, index: startPos},
-    consumed: cursor - startPos
+    token: {kind: 'identifier', lexeme, index: startPos.value},
+    consumed: cursor.value - startPos.value
   };
 };
 
 type TokenizeResult = {token: Token; next: number} | null;
 
-const tryTokenizeWhitespace = (reader: SourceReader, cursor: number): number | null => {
-  return isWhitespace(reader.source[cursor]) ? cursor + 1 : null;
+const tryTokenizeWhitespace = (reader: SourceReader, pos: Position): number | null => {
+  return isWhitespace(reader.source[pos.value]) ? pos.value + 1 : null;
 };
 
-const tryTokenizeParenthesis = (reader: SourceReader, cursor: number): TokenizeResult => {
-  const char = reader.source[cursor];
+const tryTokenizeParenthesis = (reader: SourceReader, pos: Position): TokenizeResult => {
+  const char = reader.source[pos.value];
   if (char !== '(' && char !== ')') {
     return null;
   }
 
   return {
-    token: {kind: char === '(' ? 'lparen' : 'rparen', lexeme: char, index: cursor},
-    next: cursor + 1
+    token: {kind: char === '(' ? 'lparen' : 'rparen', lexeme: char, index: pos.value},
+    next: pos.value + 1
   };
 };
 
-const tryTokenizeTwoCharOperator = (reader: SourceReader, cursor: number): TokenizeResult => {
-  const twoChar = reader.source.slice(cursor, cursor + 2);
+const tryTokenizeTwoCharOperator = (reader: SourceReader, pos: Position): TokenizeResult => {
+  const twoChar = reader.source.slice(pos.value, pos.value + 2);
   if (!TWO_CHAR_OPERATORS.includes(twoChar as (typeof TWO_CHAR_OPERATORS)[number])) {
     return null;
   }
 
   return {
-    token: {kind: 'operator', lexeme: twoChar, index: cursor},
-    next: cursor + 2
+    token: {kind: 'operator', lexeme: twoChar, index: pos.value},
+    next: pos.value + 2
   };
 };
 
-const tryTokenizeSingleCharOperator = (reader: SourceReader, cursor: number): TokenizeResult => {
-  const char = reader.source[cursor];
+const tryTokenizeSingleCharOperator = (reader: SourceReader, pos: Position): TokenizeResult => {
+  const char = reader.source[pos.value];
   if (char !== '!' && char !== '<' && char !== '>') {
     return null;
   }
 
   return {
-    token: {kind: 'operator', lexeme: char, index: cursor},
-    next: cursor + 1
+    token: {kind: 'operator', lexeme: char, index: pos.value},
+    next: pos.value + 1
   };
 };
 
-const tryTokenizeString = (reader: SourceReader, cursor: number): TokenizeResult => {
-  const char = reader.source[cursor];
+const tryTokenizeString = (reader: SourceReader, pos: Position): TokenizeResult => {
+  const char = reader.source[pos.value];
   if (char !== '"' && char !== "'") {
     return null;
   }
 
-  const result = readString(reader, cursor);
-  return {token: result.token, next: cursor + result.consumed};
+  const result = readString(reader, pos);
+  return {token: result.token, next: pos.value + result.consumed};
 };
 
-const tryTokenizeNumber = (reader: SourceReader, cursor: number): TokenizeResult => {
-  const char = reader.source[cursor];
-  if (!isDigit(char) && !(char === '-' && isDigit(reader.source[cursor + 1] ?? ''))) {
+const tryTokenizeNumber = (reader: SourceReader, pos: Position): TokenizeResult => {
+  const char = reader.source[pos.value];
+  if (!isDigit(char) && !(char === '-' && isDigit(reader.source[pos.value + 1] ?? ''))) {
     return null;
   }
 
-  const result = readNumber(reader, cursor);
-  return {token: result.token, next: cursor + result.consumed};
+  const result = readNumber(reader, pos);
+  return {token: result.token, next: pos.value + result.consumed};
 };
 
-const tryTokenizeIdentifier = (reader: SourceReader, cursor: number): TokenizeResult => {
-  if (!isIdentifierStart(reader.source[cursor])) {
+const tryTokenizeIdentifier = (reader: SourceReader, pos: Position): TokenizeResult => {
+  if (!isIdentifierStart(reader.source[pos.value])) {
     return null;
   }
 
-  const result = readIdentifier(reader, cursor);
-  return {token: result.token, next: cursor + result.consumed};
+  const result = readIdentifier(reader, pos);
+  return {token: result.token, next: pos.value + result.consumed};
 };
 
 const tokenize = (source: string): Token[] => {
   const reader = new SourceReader(source);
   const tokens: Token[] = [];
-  let cursor = reader.position;
+  let pos = Position.ZERO;
 
-  while (cursor < reader.source.length) {
-    const whitespaceCursor = tryTokenizeWhitespace(reader, cursor);
+  while (pos.value < reader.source.length) {
+    const whitespaceCursor = tryTokenizeWhitespace(reader, pos);
     if (whitespaceCursor !== null) {
-      cursor = whitespaceCursor;
+      pos = new Position(whitespaceCursor);
       continue;
     }
 
     const tokenized =
-      tryTokenizeParenthesis(reader, cursor) ??
-      tryTokenizeTwoCharOperator(reader, cursor) ??
-      tryTokenizeSingleCharOperator(reader, cursor) ??
-      tryTokenizeString(reader, cursor) ??
-      tryTokenizeNumber(reader, cursor) ??
-      tryTokenizeIdentifier(reader, cursor);
+      tryTokenizeParenthesis(reader, pos) ??
+      tryTokenizeTwoCharOperator(reader, pos) ??
+      tryTokenizeSingleCharOperator(reader, pos) ??
+      tryTokenizeString(reader, pos) ??
+      tryTokenizeNumber(reader, pos) ??
+      tryTokenizeIdentifier(reader, pos);
 
     if (tokenized) {
       tokens.push(tokenized.token);
-      cursor = tokenized.next;
+      pos = new Position(tokenized.next);
       continue;
     }
 
-    const char = source[cursor];
-    throw new WhenExpressionSyntaxError(`Unexpected token '${char}'`, source, cursor);
+    const char = source[pos.value];
+    throw new WhenExpressionSyntaxError(`Unexpected token '${char}'`, source, pos.value);
   }
 
   tokens.push({kind: 'eof', lexeme: '<eof>', index: source.length});
