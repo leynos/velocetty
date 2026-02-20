@@ -26,7 +26,7 @@ self-contained.
 
 Roadmap item `1.2.2` is the foundation for context-aware keybinding resolution
 and command enablement. The design requires explicit context keys,
-`when` expressions parsed into an AST, and deterministic evaluation against a
+`when` expressions parsed into an abstract syntax tree (AST), and deterministic evaluation against a
 key/value map. Without this milestone, downstream roadmap items that depend on
 `when` semantics remain blocked.
 
@@ -93,7 +93,7 @@ After this work:
 
 - [x] (2026-02-19 18:55Z) Confirmed roadmap `1.2.2` scope and success criteria
   in `docs/roadmap.md`.
-- [x] (2026-02-19 18:55Z) Collected design and PRD constraints for context keys
+- [x] (2026-02-19 18:55Z) Collected design and product requirements document (PRD) constraints for context keys
   and `when` expressions.
 - [x] (2026-02-19 18:55Z) Audited current command registry and test patterns in
   `lib/command-registry.ts` and `test/unit/command-registry.test.ts`.
@@ -220,4 +220,4 @@ Success criteria:
 - required commands complete successfully,
 - unit tests include deterministic `when` parser/evaluator coverage,
 - roadmap `1.2.2` and its sub-items are marked done,
-- developers guide reflects the new context-key service practice.
+- developers' guide reflects the new context-key service practice.

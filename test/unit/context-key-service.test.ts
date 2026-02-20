@@ -18,6 +18,19 @@ const createMap = (entries: readonly [string, ContextKeyValue][]): ContextKeyMap
   return map;
 };
 
+const assertSyntaxError = (expression: string, index: number, messagePart: string) => {
+  try {
+    parseWhenExpression(expression);
+    throw new Error('Expected parse failure');
+  } catch (error) {
+    expect(error).toBeInstanceOf(WhenExpressionSyntaxError);
+    const parseError = error as WhenExpressionSyntaxError;
+    expect(parseError.index).toBe(index);
+    expect(parseError.source).toBe(expression);
+    expect(parseError.message).toContain(messagePart);
+  }
+};
+
 test('parses logical precedence and grouping into stable AST shapes', () => {
   const precedenceAst = parseWhenExpression('terminalFocus || settingsOpen && !findWidgetVisible');
 
@@ -74,6 +87,26 @@ test('parses logical precedence and grouping into stable AST shapes', () => {
   } satisfies WhenExpressionNode);
 });
 
+test('parses literals and escape sequences into stable AST values', () => {
+  expect(parseWhenExpression(`'foo\\'bar\\n'`)).toEqual({
+    kind: 'literal',
+    value: "foo'bar\n"
+  } satisfies WhenExpressionNode);
+
+  expect(parseWhenExpression('"foo\\"bar\\t"')).toEqual({
+    kind: 'literal',
+    value: 'foo"bar\t'
+  } satisfies WhenExpressionNode);
+
+  expect(parseWhenExpression('true')).toEqual({kind: 'literal', value: true} satisfies WhenExpressionNode);
+  expect(parseWhenExpression('false')).toEqual({kind: 'literal', value: false} satisfies WhenExpressionNode);
+  expect(parseWhenExpression('null')).toEqual({kind: 'literal', value: null} satisfies WhenExpressionNode);
+
+  expect(parseWhenExpression('-42')).toEqual({kind: 'literal', value: -42} satisfies WhenExpressionNode);
+  expect(parseWhenExpression('3.125')).toEqual({kind: 'literal', value: 3.125} satisfies WhenExpressionNode);
+  expect(parseWhenExpression('1.23e-4')).toEqual({kind: 'literal', value: 1.23e-4} satisfies WhenExpressionNode);
+});
+
 test('evaluates logical operators and unary negation deterministically', () => {
   const context = createMap([
     ['terminalFocus', true],
@@ -86,6 +119,36 @@ test('evaluates logical operators and unary negation deterministically', () => {
   expect(evaluateWhenExpression('settingsOpen || findWidgetVisible', context)).toBe(false);
   expect(evaluateWhenExpression('terminalFocus && paneCount', context)).toBe(true);
   expect(evaluateWhenExpression('settingsOpen || paneCount > 1', context)).toBe(true);
+});
+
+test('coerces booleans and enforces type-aware comparison semantics', () => {
+  const context = createMap([
+    ['zero', 0],
+    ['negativeOne', -1],
+    ['empty', ''],
+    ['text', 'x'],
+    ['nothing', null],
+    ['notANumber', Number.NaN]
+  ]);
+
+  expect(evaluateWhenExpression('zero', context)).toBe(false);
+  expect(evaluateWhenExpression('negativeOne', context)).toBe(true);
+  expect(evaluateWhenExpression('empty', context)).toBe(false);
+  expect(evaluateWhenExpression('text', context)).toBe(true);
+  expect(evaluateWhenExpression('nothing', context)).toBe(false);
+  expect(evaluateWhenExpression('notANumber', context)).toBe(false);
+
+  expect(evaluateWhenExpression('!zero', context)).toBe(true);
+  expect(evaluateWhenExpression('!negativeOne', context)).toBe(false);
+  expect(evaluateWhenExpression('!empty', context)).toBe(true);
+  expect(evaluateWhenExpression('!text', context)).toBe(false);
+  expect(evaluateWhenExpression('!nothing', context)).toBe(true);
+  expect(evaluateWhenExpression('!notANumber', context)).toBe(true);
+
+  expect(evaluateWhenExpression('"2" == 2', context)).toBe(false);
+  expect(evaluateWhenExpression('true == 1', context)).toBe(false);
+  expect(evaluateWhenExpression('false == 0', context)).toBe(false);
+  expect(evaluateWhenExpression('2 < "3"', context)).toBe(false);
 });
 
 test('supports comparison operators with type-aware semantics', () => {
@@ -117,22 +180,15 @@ test('supports comparison operators with type-aware semantics', () => {
 });
 
 test('reports parse errors with stable source indices', () => {
-  const assertParseError = (expression: string, index: number, messagePart: string) => {
-    try {
-      parseWhenExpression(expression);
-      throw new Error('Expected parse failure');
-    } catch (error) {
-      expect(error).toBeInstanceOf(WhenExpressionSyntaxError);
-      const parseError = error as WhenExpressionSyntaxError;
-      expect(parseError.index).toBe(index);
-      expect(parseError.source).toBe(expression);
-      expect(parseError.message).toContain(messagePart);
-    }
-  };
+  assertSyntaxError('terminalFocus &&', 16, 'Unexpected token');
+  assertSyntaxError('(terminalFocus || settingsOpen', 30, 'Expected rparen');
+  assertSyntaxError('paneCount >>> 1', 11, 'Unexpected token');
+});
 
-  assertParseError('terminalFocus &&', 16, 'Unexpected token');
-  assertParseError('(terminalFocus || settingsOpen', 30, 'Expected rparen');
-  assertParseError('paneCount >>> 1', 11, 'Unexpected token');
+test('reports literal parse errors with stable syntax diagnostics', () => {
+  assertSyntaxError("'unterminated", 0, 'Unterminated string literal');
+  assertSyntaxError('1.', 0, 'Invalid numeric literal');
+  assertSyntaxError('1e', 0, 'Invalid numeric literal exponent');
 });
 
 test('service snapshots are deterministic and independent of insertion order', () => {
@@ -168,6 +224,68 @@ test('service snapshots are deterministic and independent of insertion order', (
   expect(serviceA.evaluateCompiled(serviceA.compile(expression))).toBe(true);
 });
 
+test('service respects initial context and returns sorted frozen snapshots', () => {
+  const service = createContextKeyService({zKey: 3, aKey: 1, mKey: 2});
+  const snapshot = service.snapshot();
+
+  expect(Object.isFrozen(snapshot)).toBe(true);
+  expect(Object.keys(snapshot)).toEqual(['aKey', 'mKey', 'zKey']);
+  expect(snapshot).toEqual({aKey: 1, mKey: 2, zKey: 3});
+
+  expect(service.has('aKey')).toBe(true);
+  expect(service.has('mKey')).toBe(true);
+  expect(service.has('zKey')).toBe(true);
+});
+
+test('service lifecycle operations update snapshots and evaluations', () => {
+  const service = createContextKeyService();
+  const compiled = service.compile('a && !b');
+
+  service.set('a', true);
+  service.set('b', false);
+  expect(service.has('a')).toBe(true);
+  expect(service.has('b')).toBe(true);
+  expect(service.snapshot()).toEqual({a: true, b: false});
+  expect(service.evaluateCompiled(compiled)).toBe(true);
+
+  service.delete('b');
+  expect(service.has('b')).toBe(false);
+  expect(service.snapshot()).toEqual({a: true});
+  expect(service.evaluateCompiled(compiled)).toBe(true);
+
+  service.clear();
+  expect(service.has('a')).toBe(false);
+  expect(service.snapshot()).toEqual({});
+  expect(service.evaluateCompiled(compiled)).toBe(false);
+});
+
+test('service snapshots are independent and compile cache is stable', () => {
+  const service = createContextKeyService();
+  service.set('x', 1);
+  service.set('y', 2);
+
+  const first = service.snapshot();
+  const second = service.snapshot();
+
+  expect(first).not.toBe(second);
+  expect(first).toEqual(second);
+  expect(Object.isFrozen(first)).toBe(true);
+  expect(Object.isFrozen(second)).toBe(true);
+
+  service.set('x', 3);
+  const third = service.snapshot();
+  expect(third).toEqual({x: 3, y: 2});
+  expect(first).toEqual({x: 1, y: 2});
+
+  const compiledA = service.compile('x > 1 && y == 2');
+  const compiledB = service.compile('x > 1 && y == 2');
+  expect(compiledA).toBe(compiledB);
+  expect(service.evaluateCompiled(compiledA)).toBe(true);
+
+  service.set('x', 1);
+  expect(service.evaluateCompiled(compiledA)).toBe(false);
+});
+
 test('evaluateWhenExpressionAst respects missing keys as null and supports repeated evaluation', () => {
   const ast = parseWhenExpression('missingKey == null || paneCount >= 3');
   const context = createMap([['paneCount', 2]]);
@@ -175,4 +293,23 @@ test('evaluateWhenExpressionAst respects missing keys as null and supports repea
   const sequence = Array.from({length: 6}, () => evaluateWhenExpressionAst(ast, context));
 
   expect(sequence).toEqual([true, true, true, true, true, true]);
+});
+
+test('evaluateWhenExpressionAst is deterministic for object and map contexts and ignores prototype keys', () => {
+  const ast = parseWhenExpression('count > 1 && ownFlag && inheritedFlag == null');
+  const prototypeContext = {inheritedFlag: true};
+  const objectContext = Object.assign(Object.create(prototypeContext), {
+    count: 2,
+    ownFlag: true
+  }) as ContextKeyMap;
+  const mapContext = new Map<string, ContextKeyValue>([
+    ['count', 2],
+    ['ownFlag', true]
+  ]);
+
+  const objectResults = Array.from({length: 4}, () => evaluateWhenExpressionAst(ast, objectContext));
+  const mapResults = Array.from({length: 4}, () => evaluateWhenExpressionAst(ast, mapContext));
+
+  expect(objectResults).toEqual([true, true, true, true]);
+  expect(mapResults).toEqual(objectResults);
 });

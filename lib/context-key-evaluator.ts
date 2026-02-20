@@ -30,7 +30,7 @@ const toBoolean = (value: ContextKeyValue): boolean => {
   }
 
   if (typeof value === 'number') {
-    return value !== 0;
+    return Boolean(value);
   }
 
   return value.length > 0;
