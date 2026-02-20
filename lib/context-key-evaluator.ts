@@ -38,41 +38,61 @@ const toBoolean = (value: ContextKeyValue): boolean => {
 
 const typeTag = (value: ContextKeyValue) => (value === null ? 'null' : typeof value);
 
+const evaluateEquality = (operator: '==' | '!=', left: ContextKeyValue, right: ContextKeyValue): boolean => {
+  const sameType = typeTag(left) === typeTag(right);
+  const isEqual = sameType && left === right;
+
+  return operator === '==' ? isEqual : !isEqual;
+};
+
+const performOrderedComparison = (
+  operator: '<' | '<=' | '>' | '>=',
+  left: number | string,
+  right: number | string
+): boolean => {
+  switch (operator) {
+    case '<':
+      return left < right;
+    case '<=':
+      return left <= right;
+    case '>':
+      return left > right;
+    case '>=':
+      return left >= right;
+  }
+};
+
+const evaluateOrderedComparison = (
+  operator: '<' | '<=' | '>' | '>=',
+  left: ContextKeyValue,
+  right: ContextKeyValue
+): boolean => {
+  if (typeof left === 'number' && typeof right === 'number') {
+    return performOrderedComparison(operator, left, right);
+  }
+
+  if (typeof left === 'string' && typeof right === 'string') {
+    return performOrderedComparison(operator, left, right);
+  }
+
+  return false;
+};
+
 const evaluateComparison = (
   operator: WhenComparisonOperator,
   left: ContextKeyValue,
   right: ContextKeyValue
 ): boolean => {
-  const sameType = typeTag(left) === typeTag(right);
-  if (operator === '==') {
-    return sameType && left === right;
+  switch (operator) {
+    case '==':
+    case '!=':
+      return evaluateEquality(operator, left, right);
+    case '<':
+    case '<=':
+    case '>':
+    case '>=':
+      return evaluateOrderedComparison(operator, left, right);
   }
-
-  if (operator === '!=') {
-    return !(sameType && left === right);
-  }
-
-  if (typeof left === 'number' && typeof right === 'number') {
-    return operator === '<'
-      ? left < right
-      : operator === '<='
-        ? left <= right
-        : operator === '>'
-          ? left > right
-          : left >= right;
-  }
-
-  if (typeof left === 'string' && typeof right === 'string') {
-    return operator === '<'
-      ? left < right
-      : operator === '<='
-        ? left <= right
-        : operator === '>'
-          ? left > right
-          : left >= right;
-  }
-
-  return false;
 };
 
 const evalValue = (node: WhenExpressionNode, lookup: ContextLookup): ContextKeyValue => {
