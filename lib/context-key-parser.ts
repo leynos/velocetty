@@ -12,6 +12,7 @@ type Token = {kind: TokenKind; lexeme: string; index: number; literal?: ContextK
 
 const COMPARISON_OPERATORS: readonly WhenComparisonOperator[] = ['==', '!=', '<', '<=', '>', '>='];
 const TWO_CHAR_OPERATORS = ['&&', '||', ...COMPARISON_OPERATORS] as const;
+const SINGLE_CHAR_OPERATORS = ['!', '<', '>'] as const;
 
 /** Structured parse error with stable source/index metadata. */
 export class WhenExpressionSyntaxError extends SyntaxError implements WhenExpressionParseError {
@@ -257,7 +258,7 @@ const tryTokenizeTwoCharOperator = (reader: SourceReader, pos: Position): Tokeni
 
 const tryTokenizeSingleCharOperator = (reader: SourceReader, pos: Position): TokenizeResult => {
   const char = reader.source[pos.value];
-  if (char !== '!' && char !== '<' && char !== '>') {
+  if (!SINGLE_CHAR_OPERATORS.includes(char as (typeof SINGLE_CHAR_OPERATORS)[number])) {
     return null;
   }
 
