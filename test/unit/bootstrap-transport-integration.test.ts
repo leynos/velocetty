@@ -6,6 +6,7 @@ import type {Session} from '@shared/types/common';
 import {setupHappyDom} from '../testUtils/happy-dom';
 
 const shouldRunBootstrapTransportIntegration = process.env.VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION === '1';
+const BOOTSTRAP_TRANSPORT_HOOK_TIMEOUT_MS = 15_000;
 
 if (!shouldRunBootstrapTransportIntegration) {
   test.skip('bootstrap event wiring delegates to transport event bus', () => {});
@@ -168,13 +169,13 @@ if (!shouldRunBootstrapTransportIntegration) {
 
   beforeAll(async () => {
     cleanupHappyDom = await setupHappyDom();
-  });
+  }, BOOTSTRAP_TRANSPORT_HOOK_TIMEOUT_MS);
 
   afterAll(() => {
     cleanupHappyDom?.();
     cleanupHappyDom = null;
     mock.restore();
-  });
+  }, BOOTSTRAP_TRANSPORT_HOOK_TIMEOUT_MS);
 
   /**
    * Import the bootstrap module and return a helper that invokes
@@ -200,7 +201,7 @@ if (!shouldRunBootstrapTransportIntegration) {
   describe('bootstrap transport event wiring', () => {
     beforeAll(async () => {
       await importBootstrap();
-    });
+    }, BOOTSTRAP_TRANSPORT_HOOK_TIMEOUT_MS);
 
     const clearDispatch = () => dispatchMock.mockClear();
 

@@ -117,6 +117,28 @@ registry APIs. Follow these rules for command-system changes:
   create, read, update, and delete (CRUD) semantics, deterministic ordering,
   and validation error behaviour.
 
+## Context key and `when` practice
+
+Roadmap item `1.2.2` introduces shared context-key contracts and deterministic
+`when` expression evaluation. Follow these rules when changing context-aware
+command or keybinding behaviour:
+
+- Define context-key and `when` AST contracts in
+  `shared/src/types/context-keys.ts` and import those contracts through
+  `@shared/types/context-keys`.
+- Keep parser grammar constrained to the documented operators in
+  `docs/velocetty-design.md` (`&&`, `||`, `!`, `==`, `!=`, `<`, `<=`, `>`,
+  `>=`, and parentheses).
+- Use `lib/context-key-service.ts` for runtime context-key management and
+  expression evaluation, and reuse compiled expressions (`compile(...)`) when
+  evaluating the same expression repeatedly.
+- Treat context values as explicit primitives (`boolean`, `string`, `number`,
+  or `null`) and avoid ad-hoc component booleans outside the context-key
+  service.
+- Add or update unit coverage in `test/unit/context-key-service.test.ts` for
+  all operators, precedence/grouping, parse failure indices, and deterministic
+  repeated evaluation.
+
 ## esbuild build pipeline and safeguards
 
 The repository now bundles with esbuild by default:
