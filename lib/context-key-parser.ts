@@ -80,6 +80,46 @@ const readString = (source: string, start: number): {token: Token; next: number}
   throw new WhenExpressionSyntaxError('Unterminated string literal', source, start);
 };
 
+const readFractionalPart = (source: string, cursor: number, start: number): number => {
+  if (source[cursor] !== '.') {
+    return cursor;
+  }
+
+  let nextCursor = cursor + 1;
+  const fractionStart = nextCursor;
+  while (nextCursor < source.length && isDigit(source[nextCursor])) {
+    nextCursor += 1;
+  }
+
+  if (fractionStart === nextCursor) {
+    throw new WhenExpressionSyntaxError('Invalid numeric literal', source, start);
+  }
+
+  return nextCursor;
+};
+
+const readExponentPart = (source: string, cursor: number, start: number): number => {
+  if (source[cursor] !== 'e' && source[cursor] !== 'E') {
+    return cursor;
+  }
+
+  let nextCursor = cursor + 1;
+  if (source[nextCursor] === '+' || source[nextCursor] === '-') {
+    nextCursor += 1;
+  }
+
+  const exponentStart = nextCursor;
+  while (nextCursor < source.length && isDigit(source[nextCursor])) {
+    nextCursor += 1;
+  }
+
+  if (exponentStart === nextCursor) {
+    throw new WhenExpressionSyntaxError('Invalid numeric literal exponent', source, start);
+  }
+
+  return nextCursor;
+};
+
 const readNumber = (source: string, start: number): {token: Token; next: number} => {
   let cursor = start;
   if (source[cursor] === '-') {
@@ -90,33 +130,8 @@ const readNumber = (source: string, start: number): {token: Token; next: number}
     cursor += 1;
   }
 
-  if (source[cursor] === '.') {
-    cursor += 1;
-    const fractionStart = cursor;
-    while (cursor < source.length && isDigit(source[cursor])) {
-      cursor += 1;
-    }
-
-    if (fractionStart === cursor) {
-      throw new WhenExpressionSyntaxError('Invalid numeric literal', source, start);
-    }
-  }
-
-  if (source[cursor] === 'e' || source[cursor] === 'E') {
-    cursor += 1;
-    if (source[cursor] === '+' || source[cursor] === '-') {
-      cursor += 1;
-    }
-
-    const exponentStart = cursor;
-    while (cursor < source.length && isDigit(source[cursor])) {
-      cursor += 1;
-    }
-
-    if (exponentStart === cursor) {
-      throw new WhenExpressionSyntaxError('Invalid numeric literal exponent', source, start);
-    }
-  }
+  cursor = readFractionalPart(source, cursor, start);
+  cursor = readExponentPart(source, cursor, start);
 
   const lexeme = source.slice(start, cursor);
   const literal = Number(lexeme);
