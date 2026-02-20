@@ -133,6 +133,26 @@ const configOptionsSchema = rootConfigSchema
   })
   .passthrough();
 
+/** Shared command-definition payload used by runtime plugin command sync. */
+const commandDefinitionSchema = z
+  .object({
+    id: z.string(),
+    kind: z.enum(['frontend', 'backend']),
+    metadata: z
+      .object({
+        title: z.string(),
+        category: z.string().optional(),
+        description: z.string().optional(),
+        keywords: z.array(z.string()).optional(),
+        icon: z.string().optional()
+      })
+      .passthrough(),
+    defaultWhen: z.string().optional(),
+    argsSchema: z.record(z.string(), z.unknown()).optional(),
+    resultSchema: z.record(z.string(), z.unknown()).optional()
+  })
+  .passthrough();
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -157,5 +177,6 @@ export const ipcResponseSchemas = {
   getBasePaths: z.object({path: z.string(), localPath: z.string()}),
   getDeprecatedConfig: z.record(z.string(), z.object({css: z.array(z.string())}).passthrough()),
   getDecoratedConfig: configOptionsSchema,
-  getDecoratedKeymaps: z.record(z.string(), z.array(z.string()))
+  getDecoratedKeymaps: z.record(z.string(), z.array(z.string())),
+  getRuntimePluginCommands: z.array(commandDefinitionSchema)
 } satisfies Record<keyof IpcCommands, ZodType>;

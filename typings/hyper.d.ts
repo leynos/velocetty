@@ -141,6 +141,7 @@ import type {Middleware, Reducer} from 'redux';
 export type hyperPlugin = {
   getTabProps: any;
   getTabsProps: any;
+  getTabDecorationProviders?: any;
   getTermGroupProps: any;
   getTermProps: any;
   mapHeaderDispatch: any;
@@ -228,6 +229,12 @@ export type TabProps = {
   onClose: () => void;
   onSelect: () => void;
   text: string;
+  tabDecoration?: {
+    title?: string;
+    subtitle?: string;
+    badges?: Array<{text?: string; icon?: string; tooltip?: string; kind?: 'info' | 'warn' | 'error'}>;
+    widgets?: Array<{icon: string; command: string; tooltip?: string}>;
+  };
 } & extensionProps;
 
 export type ITab = {

@@ -1,9 +1,9 @@
 /** @file Renders the tabs strip and new tab controls. */
 import type React from 'react';
-import {forwardRef} from 'react';
+import {forwardRef, useEffect, useReducer} from 'react';
 
 import type {TabsProps} from '../../typings/hyper';
-import {decorate, getTabProps} from '../utils/plugins';
+import {decorate, getTabProps, subscribeTabDecorationUpdates} from '../utils/plugins';
 
 import DropdownButton from './new-tab';
 import Tab_ from './tab';
@@ -12,9 +12,16 @@ const Tab = decorate(Tab_, 'Tab');
 const isMac = /Mac/.test(navigator.userAgent);
 
 const Tabs = forwardRef(function Tabs(props: TabsProps, ref: React.ForwardedRef<HTMLElement>) {
+  const [, forceDecorationRender] = useReducer((version: number) => version + 1, 0);
   const {tabs = [], borderColor, onChange, onClose, fullScreen} = props;
 
   const hide = !isMac && tabs.length === 1;
+
+  useEffect(() => {
+    return subscribeTabDecorationUpdates(() => {
+      forceDecorationRender();
+    });
+  }, []);
 
   return (
     <nav className={`tabs_nav ${hide ? 'tabs_hiddenNav' : ''}`} ref={ref}>
@@ -25,7 +32,7 @@ const Tabs = forwardRef(function Tabs(props: TabsProps, ref: React.ForwardedRef<
           <ul key="list" className={`tabs_list ${fullScreen && isMac ? 'tabs_fullScreen' : ''}`}>
             {tabs.map((tab, i) => {
               const {uid, title, isActive, hasActivity} = tab;
-              const tabProps = getTabProps(tab, props, {
+              const tabProps = getTabProps({...tab, tabIndex: i}, props, {
                 text: title === '' ? 'Shell' : title,
                 isFirst: i === 0,
                 isLast: tabs.length - 1 === i,

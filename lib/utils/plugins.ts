@@ -22,6 +22,12 @@ import {connect as reduxConnect} from 'react-redux';
 import type {Dispatch, Middleware} from 'redux';
 
 import type {
+  RuntimePluginManifest,
+  RuntimeTabDecorationProvider,
+  RuntimeTabDecoration as RuntimePluginTabDecoration
+} from '@shared/runtime/golden-path-demo';
+import {runtimePluginManifests} from '@shared/runtime/golden-path-demo';
+import type {
   hyperPlugin,
   IUiReducer,
   ISessionReducer,
@@ -38,9 +44,18 @@ import type {
 import Notification from '../components/notification';
 
 import IPCChildProcess from './ipc-child-process';
+import {getConfig as getRendererConfig, subscribe as subscribeRendererConfig} from './config';
 import notify from './notify';
 import {ObjectTypedKeys} from './object';
 import {loadRemotePluginsModule} from './remote-plugins';
+import {
+  registerTabDecorationProvider,
+  resolveTabDecoration,
+  subscribeTabDecorationProviderChanges,
+  tabDecorationProviders,
+  type TabDecorationContext,
+  type TabDecorationProvider
+} from './tab-decoration-providers';
 
 type ConnectOptions = NonNullable<Parameters<typeof reduxConnect>[3]>;
 
@@ -78,6 +93,99 @@ let reducersDecorators: {
   reduceUI: IUiReducer[];
   reduceSessions: ISessionReducer[];
   reduceTermGroups: ITermGroupReducer[];
+};
+
+const buildProviderId = (pluginName: string, providerId: string) => `${pluginName}.${providerId}`;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const resolveRuntimePluginSettings = (manifest: RuntimePluginManifest): Record<string, unknown> => {
+  const config = getRendererConfig();
+  const pluginNamespace = isRecord(config.plugins) ? config.plugins : {};
+  const candidate = pluginNamespace[manifest.id];
+  if (isRecord(candidate)) {
+    return {...manifest.settingsDefaults, ...candidate};
+  }
+  return {...manifest.settingsDefaults};
+};
+
+const isRuntimePluginEnabled = (manifest: RuntimePluginManifest) => {
+  const enabled = resolveRuntimePluginSettings(manifest).enabled;
+  return typeof enabled === 'boolean' ? enabled : true;
+};
+
+const registerRuntimeProvider = (
+  manifest: RuntimePluginManifest,
+  provider: RuntimeTabDecorationProvider,
+  providerIndex: number
+) => {
+  const providerId = provider.id.trim().length > 0 ? provider.id.trim() : `provider-${providerIndex + 1}`;
+  registerTabDecorationProvider({
+    id: buildProviderId(`runtime:${manifest.id}`, providerId),
+    priority: provider.priority,
+    provideDecoration: (context) => {
+      const runtimeSettings = resolveRuntimePluginSettings(manifest);
+      if (runtimeSettings.enabled === false) {
+        return undefined;
+      }
+
+      return provider.provideDecoration(context, runtimeSettings) as RuntimePluginTabDecoration;
+    },
+    // Emit explicit updates when config reload events occur.
+    subscribe: (onDidChange) => subscribeRendererConfig(() => onDidChange())
+  });
+};
+
+const registerRuntimeTabDecorationProviders = () => {
+  runtimePluginManifests.forEach((manifest) => {
+    if (!isRuntimePluginEnabled(manifest)) {
+      return;
+    }
+
+    manifest.tabDecorationProviders.forEach((provider, providerIndex) => {
+      registerRuntimeProvider(manifest, provider, providerIndex);
+    });
+  });
+};
+
+const registerProvidersFromPlugin = (pluginName: string, providerList: unknown) => {
+  if (!Array.isArray(providerList)) {
+    return;
+  }
+
+  providerList.forEach((candidate, providerIndex) => {
+    if (!candidate || typeof candidate !== 'object') {
+      return;
+    }
+
+    const provider = candidate as Partial<TabDecorationProvider>;
+    if (typeof provider.provideDecoration !== 'function') {
+      return;
+    }
+
+    const baseProviderId =
+      typeof provider.id === 'string' && provider.id.trim().length > 0
+        ? provider.id.trim()
+        : `provider-${providerIndex + 1}`;
+
+    registerTabDecorationProvider({
+      ...provider,
+      id: buildProviderId(pluginName, baseProviderId),
+      priority: typeof provider.priority === 'number' ? provider.priority : 0,
+      provideDecoration: provider.provideDecoration
+    });
+  });
+};
+
+const getTabDecorationContext = (tab: any): TabDecorationContext => {
+  return {
+    tabId: String(tab.uid),
+    tabIndex: typeof tab.tabIndex === 'number' ? tab.tabIndex : 0,
+    active: Boolean(tab.isActive),
+    hasActivity: Boolean(tab.hasActivity),
+    title: typeof tab.title === 'string' ? tab.title : undefined
+  };
 };
 
 // expose decorated component instance to the higher-order components
@@ -244,6 +352,8 @@ const getPluginVersion = (path: string): string | null => {
 const loadModules = () => {
   console.log('(re)loading renderer plugins');
   const paths = plugins.getPaths();
+  tabDecorationProviders.clear();
+  registerRuntimeTabDecorationProviders();
 
   // initialize cache that we populate with extension methods
   connectors = {
@@ -383,6 +493,20 @@ const loadModules = () => {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         mod.onRendererWindow(window);
       }
+
+      if (typeof mod.getTabDecorationProviders === 'function') {
+        try {
+          const providerList = mod.getTabDecorationProviders();
+          registerProvidersFromPlugin(pluginName, providerList);
+        } catch (err) {
+          notify(
+            'Plugin error',
+            `${pluginName}: Error occurred in \`getTabDecorationProviders\`. Check Developer Tools for details.`,
+            {error: err}
+          );
+        }
+      }
+
       console.log(`Plugin ${pluginName} (${pluginVersion}) loaded.`);
 
       return mod;
@@ -408,6 +532,10 @@ export function reload() {
   // get re-rendered
   decorated = {};
 }
+
+export const subscribeTabDecorationUpdates = (listener: () => void) => {
+  return subscribeTabDecorationProviderChanges(listener);
+};
 
 function getProps(name: keyof typeof propsDecorators, props: any, ...fnArgs: any[]) {
   const decorators = propsDecorators[name];
@@ -458,7 +586,19 @@ export function getTabsProps<T extends Assignable<TabsProps, T>>(parentProps: an
 }
 
 export function getTabProps<T extends Assignable<TabProps, T>>(tab: any, parentProps: any, props: T): T {
-  return getProps('getTabProps', props, tab, parentProps);
+  const decoration = resolveTabDecoration(getTabDecorationContext(tab));
+  const decoratedProps = decoration.title
+    ? ({
+        ...props,
+        text: decoration.title,
+        tabDecoration: decoration
+      } as T)
+    : ({
+        ...props,
+        tabDecoration: decoration
+      } as T);
+
+  return getProps('getTabProps', decoratedProps, tab, parentProps);
 }
 
 // connects + decorates a class

@@ -1,6 +1,8 @@
 /** @file Covers install, uninstall, and listing branches in CLI plugin APIs. */
 import {beforeEach, expect, mock, test} from 'bun:test';
 
+import JSON5 from 'json5';
+
 import {buildNodeFsModuleMock} from '../testUtils/mock-node-fs';
 
 type ConfigData = {
@@ -28,7 +30,7 @@ const fsMock = {
   // Assumes cli/api only reads the single config file under test.
   readFileSync: () => (hasReadFileSyncOverride ? fsReadFileSyncValue : JSON.stringify(configData)),
   writeFileSync: (_path: string, contents: string) => {
-    const parsed = JSON.parse(contents) as ConfigData;
+    const parsed = JSON5.parse(contents) as ConfigData;
     savedConfigs.push(parsed);
     configData = parsed;
   }
@@ -78,6 +80,20 @@ test('list() and isInstalled() read configured plugin state', async () => {
 
   expect(list()).toBe('plugin-alpha\nplugin-beta');
   expect(isInstalled('plugin-beta')).toBe(true);
+  expect(isInstalled('local-alpha', true)).toBe(true);
+});
+
+test('list() accepts JSON5 plugin config with comments and trailing commas', async () => {
+  hasReadFileSyncOverride = true;
+  fsReadFileSyncValue = `{
+    // plugin sources
+    plugins: ['plugin-alpha',],
+    localPlugins: ['local-alpha',],
+  }`;
+  const {list, isInstalled} = await loadCliApi();
+
+  expect(list()).toBe('plugin-alpha');
+  expect(isInstalled('plugin-alpha')).toBe(true);
   expect(isInstalled('local-alpha', true)).toBe(true);
 });
 

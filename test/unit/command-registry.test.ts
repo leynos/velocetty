@@ -1,9 +1,19 @@
 /** @file Verifies command-registry keymap and handler behaviour. */
 import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 import type {CommandDefinition, CommandId} from '@shared/types/commands';
+import {goldenPathCommandDefinition, GOLDEN_PATH_COMMAND_ID} from '@shared/runtime/golden-path-demo';
 
 let decoratedKeymaps: Record<string, string[]> = {};
-const invokeMock = mock(async (_channel: string) => decoratedKeymaps);
+let runtimeCommands: CommandDefinition[] = [];
+const invokeMock = mock(async (channel: string) => {
+  if (channel === 'getRuntimePluginCommands') {
+    return runtimeCommands;
+  }
+  if (channel === 'getDecoratedKeymaps') {
+    return decoratedKeymaps;
+  }
+  return {};
+});
 
 mock.module('../../lib/transport/electron-ipc-transport', () => ({
   transport: {
@@ -57,6 +67,7 @@ beforeAll(async () => {
 beforeEach(() => {
   invokeMock.mockClear();
   decoratedKeymaps = {};
+  runtimeCommands = [];
 
   list()
     .filter((command) => command.id.startsWith(TEST_COMMAND_PREFIX))
@@ -79,6 +90,23 @@ test('getRegisteredKeys flattens decorated keymaps into shortcut-command pairs',
     'ctrl+alt+n': 'window:new',
     'ctrl+t': 'tab:new'
   });
+});
+
+test('getRegisteredKeys synchronizes runtime plugin command registrations', async () => {
+  runtimeCommands = [{...goldenPathCommandDefinition}];
+  decoratedKeymaps = {
+    [GOLDEN_PATH_COMMAND_ID]: ['ctrl+alt+shift+g']
+  };
+
+  const registeredKeys = await getRegisteredKeys();
+  expect(registeredKeys['ctrl+alt+shift+g']).toBe(GOLDEN_PATH_COMMAND_ID);
+  expect(get(GOLDEN_PATH_COMMAND_ID)).toEqual(goldenPathCommandDefinition);
+
+  runtimeCommands = [];
+  decoratedKeymaps = {};
+  await getRegisteredKeys();
+
+  expect(get(GOLDEN_PATH_COMMAND_ID)).toBeUndefined();
 });
 
 test('registerCommandHandlers merges new handlers into registry', () => {

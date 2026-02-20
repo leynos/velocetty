@@ -17,7 +17,7 @@ This Execution Plan (ExecPlan) is a living document. The sections
 `Surprises & Discoveries`, `Decision Log`, and
 `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT (2026-02-20, awaiting explicit implementation approval)
+Status: IMPLEMENTED (2026-02-20, approved and executed)
 
 No `PLANS.md` exists at repository root as of 2026-02-20, so this plan is
 self-contained.
@@ -124,12 +124,18 @@ item `1.3.1` done in `docs/roadmap.md`, and passing required gates:
   `app/plugins.ts`, `lib/utils/plugins.ts`, `lib/command-registry.ts`, and
   `app/config/import.ts`.
 - [x] (2026-02-20 00:00Z) Drafted this ExecPlan.
-- [ ] Await explicit approval to begin implementation.
-- [ ] Execute Stage A (contracts and scaffolding).
-- [ ] Execute Stage B (JSON5 + plugin settings persistence).
-- [ ] Execute Stage C (golden plugin runtime command/keybinding registration).
-- [ ] Execute Stage D (tab decoration provider + event-driven update path).
-- [ ] Execute Stage E (tests, docs, roadmap update, gates, and commits).
+- [x] (2026-02-20 19:00Z) Received explicit approval to proceed with
+  implementation.
+- [x] (2026-02-20 19:30Z) Executed Stage A contracts/scaffolding by adding
+  runtime plugin manifest contracts and tab-decoration provider registry seams.
+- [x] (2026-02-20 19:35Z) Executed Stage B by switching config read/write
+  paths to JSON5 and removing legacy migration logic.
+- [x] (2026-02-20 19:40Z) Executed Stage C by wiring runtime command and
+  keybinding contributions through main/renderer command flow.
+- [x] (2026-02-20 19:45Z) Executed Stage D by wiring deterministic tab
+  decoration providers with explicit event-driven refresh subscriptions.
+- [x] (2026-02-20 20:00Z) Executed Stage E by updating docs, marking roadmap
+  item `1.3.1` done, and running required gates with captured logs.
 
 ## Surprises & Discoveries
 
@@ -153,6 +159,13 @@ item `1.3.1` done in `docs/roadmap.md`, and passing required gates:
   `lib/containers/hyper.tsx`.
   Impact: the golden-path command/keybinding path should integrate with these
   seams, then be gradually aligned toward the design runtime contract.
+
+- Observation: `make build` can generate transient compiled JS/`d.ts` artefacts
+  under `shared/src` that are not tracked source files.
+  Evidence: build run created untracked files such as
+  `shared/src/runtime/golden-path-demo.js` and `shared/src/types/common.d.ts`.
+  Impact: clean these generated artefacts before `make check-fmt` so formatter
+  gates run only on repository source files.
 
 ## Decision Log
 
@@ -178,14 +191,49 @@ item `1.3.1` done in `docs/roadmap.md`, and passing required gates:
   milestone.
   Date/Author: 2026-02-20 / User/Codex
 
+- Decision: represent plugin enablement as `config.plugins.<pluginId>.enabled`
+  and gate runtime command/keybinding/decorations from that setting.
+  Rationale: this keeps enable/disable behaviour deterministic and directly
+  observable in JSON5 config persistence tests.
+  Date/Author: 2026-02-20 / Codex
+
+- Decision: keep tab-decoration updates event-driven through provider
+  subscriptions and config change events, with no polling fallback.
+  Rationale: this satisfies roadmap success criteria and aligns with design
+  guidance for explicit event-driven runtime behaviour.
+  Date/Author: 2026-02-20 / Codex
+
 ## Outcomes & Retrospective
 
-Pending implementation. This section will be updated after execution with:
+Delivered behaviour matches roadmap `1.3.1` scope:
 
-- delivered behaviour vs planned behaviour,
-- command/test evidence,
-- regressions avoided or accepted trade-offs,
-- follow-up items for later roadmap phases.
+- Added a built-in golden-path runtime plugin manifest with settings schema and
+  defaults, one command, one keybinding, and one deterministic tab-decoration
+  provider.
+- Added runtime plugin settings persistence helpers under
+  `config.plugins.<pluginId>` using JSON5 parse/stringify semantics.
+- Removed legacy config migration logic by deleting `app/config/migrate.ts`
+  and removing migration-path dependencies from config bootstrap.
+- Wired renderer and backend command/keybinding paths to include runtime plugin
+  contributions only when enabled.
+- Added a deterministic tab-decoration provider registry with explicit
+  subscription-driven update notifications and bounded merged decoration slots.
+- Added/updated focused unit tests for JSON5 config import, runtime plugin
+  settings persistence, runtime command registration, provider ordering, and
+  event-driven tab re-render updates.
+
+Validation evidence (all passed in this implementation turn):
+
+- `bun install`:
+  `/tmp/install-velocetty-1-3-1-ship-a-golden-path-demonstration-plugin.out`
+- `make build`:
+  `/tmp/build-velocetty-1-3-1-ship-a-golden-path-demonstration-plugin.out`
+- `make check-fmt`:
+  `/tmp/check-fmt-velocetty-1-3-1-ship-a-golden-path-demonstration-plugin.out`
+- `make lint`:
+  `/tmp/lint-velocetty-1-3-1-ship-a-golden-path-demonstration-plugin.out`
+- `make test`:
+  `/tmp/test-velocetty-1-3-1-ship-a-golden-path-demonstration-plugin.out`
 
 ## Context and orientation
 

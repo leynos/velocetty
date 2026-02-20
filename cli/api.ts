@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import got from 'got';
+import JSON5 from 'json5';
 import registryUrlModule from 'registry-url';
 
 const registryUrl = registryUrlModule();
@@ -45,7 +46,7 @@ const getFileContents = memoize(() => {
   return fs.readFileSync(fileName, 'utf8');
 });
 
-const getParsedFile = memoize(() => JSON.parse(getFileContents()));
+const getParsedFile = memoize(() => JSON5.parse(getFileContents()));
 
 const getPluginsByKey = (key: string): any[] => getParsedFile()[key] || [];
 
@@ -70,7 +71,7 @@ function isInstalled(plugin: string, locally?: boolean) {
 }
 
 function save(config: any) {
-  return fs.writeFileSync(fileName, JSON.stringify(config, null, 2), 'utf8');
+  return fs.writeFileSync(fileName, `${JSON5.stringify(config, null, 2)}\n`, 'utf8');
 }
 
 function getPackageName(plugin: string) {

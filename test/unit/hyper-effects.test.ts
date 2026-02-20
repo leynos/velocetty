@@ -99,7 +99,9 @@ mock.module('../../lib/actions/ui', () => ({
 
 mock.module('../../lib/utils/plugins', () => ({
   connect: () => (Component: React.ComponentType<unknown>) => Component,
-  decorate: (Component: React.ComponentType<unknown>) => Component
+  decorate: (Component: React.ComponentType<unknown>) => Component,
+  getTabProps: (_tab: unknown, _parentProps: unknown, props: unknown) => props,
+  subscribeTabDecorationUpdates: () => () => {}
 }));
 
 mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));

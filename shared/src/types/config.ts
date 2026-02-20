@@ -196,9 +196,14 @@ type profileConfigOptions = {
   workingDirectory: string;
 };
 
+/** Namespaced plugin settings persisted under `config.plugins`. */
+export type pluginSettingsNamespace = Record<string, Record<string, unknown>>;
+
 /** Fully resolved configuration shape after profile defaults and overrides are applied. */
 export type configOptions = rootConfigOptions &
   profileConfigOptions & {
+    /** Namespaced plugin settings keyed by plugin identifier. */
+    plugins?: pluginSettingsNamespace;
     /**
      * The default profile name to use when launching a new session
      */

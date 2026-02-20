@@ -161,7 +161,9 @@ if (!shouldRunBootstrapTransportIntegration) {
   mock.module('../../lib/utils/plugins', () => ({
     connect: () => (Component: unknown) => Component,
     default: {},
-    reload: pluginsReloadMock
+    getTabProps: (_tab: unknown, _parentProps: unknown, props: unknown) => props,
+    reload: pluginsReloadMock,
+    subscribeTabDecorationUpdates: () => () => {}
   }));
 
   let importCounter = 0;

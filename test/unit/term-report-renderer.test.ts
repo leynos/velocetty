@@ -44,7 +44,9 @@ mock.module('../../lib/terms', () => ({default: {}}));
 mock.module('../../lib/utils/paste', () => ({default: () => null}));
 mock.module('../../lib/utils/plugins', () => ({
   decorate: (Component: unknown) => Component,
-  connect: () => (Component: unknown) => Component
+  connect: () => (Component: unknown) => Component,
+  getTabProps: (_tab: unknown, _parentProps: unknown, props: unknown) => props,
+  subscribeTabDecorationUpdates: () => () => {}
 }));
 mock.module('../../lib/components/searchBox', () => ({default: () => null}));
 

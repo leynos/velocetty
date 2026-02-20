@@ -65,16 +65,19 @@ Scope notes:
 
 ### 1.3. Golden path example plugin
 
-- [ ] 1.3.1. Ship a golden path plugin demonstrating commands, settings, and
+- [x] 1.3.1. Ship a golden path plugin demonstrating commands, settings, and
   tab decorations. See [velocetty-design.md](velocetty-design.md) §Plugin
   runtime and §Tab decoration API; see
   [PRD](velocetty-product-requirements-document.md) §Workstreams and
   deliverables.
-  - [ ] Provide a plugin manifest with settings schema and defaults.
-  - [ ] Register one command and one keybinding from the plugin runtime.
-  - [ ] Register one tab decoration provider with deterministic output.
-  - [ ] Success criteria: plugin can be enabled/disabled, settings persist to
+  - [x] Provide a plugin manifest with settings schema and defaults.
+  - [x] Register one command and one keybinding from the plugin runtime.
+  - [x] Register one tab decoration provider with deterministic output.
+  - [x] Success criteria: plugin can be enabled/disabled, settings persist to
     JSON5, and decoration updates are event-driven.
+  - [x] Integrator gate: keep `1.3.1` unchecked until `bun install`,
+    `make build`, `make check-fmt`, `make lint`, and `make test` pass on the
+    integration branch.
 
 ### 1.4. Quality gates and supply-chain hygiene
 

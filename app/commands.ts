@@ -2,12 +2,27 @@
 import {app, Menu} from 'electron';
 import type {BrowserWindow} from 'electron';
 import type {CommandId} from '@shared/types/commands';
+import {
+  GOLDEN_PATH_COMMAND_ID,
+  GOLDEN_PATH_PLUGIN_ID,
+  goldenPathSettingsDefaults
+} from '@shared/runtime/golden-path-demo';
 
 import {openConfig, getConfig} from './config';
 import {asProfileId} from './utils/shared-ids';
 import {updatePlugins} from './plugins';
+import {getRuntimePluginSettings} from './runtime/plugin-runtime';
 import {installCLI} from './utils/cli-install';
 import * as systemContextMenu from './utils/system-context-menu';
+
+const getGoldenPathNotificationMessage = () => {
+  const runtimeSettings = getRuntimePluginSettings(getConfig(), GOLDEN_PATH_PLUGIN_ID);
+  const configuredMessage = runtimeSettings.message;
+  if (typeof configuredMessage === 'string' && configuredMessage.trim().length > 0) {
+    return configuredMessage;
+  }
+  return goldenPathSettingsDefaults.message;
+};
 
 const commands: Record<string, (focusedWindow?: BrowserWindow) => void> = {
   'window:new': () => {
@@ -138,6 +153,17 @@ const commands: Record<string, (focusedWindow?: BrowserWindow) => void> = {
   },
   'window:toggleKeepOnTop': (focusedWindow) => {
     focusedWindow?.setAlwaysOnTop(!focusedWindow.isAlwaysOnTop());
+  },
+  [GOLDEN_PATH_COMMAND_ID]: (focusedWindow) => {
+    if (!focusedWindow) {
+      return;
+    }
+
+    focusedWindow.rpc.emit('add notification', {
+      text: getGoldenPathNotificationMessage(),
+      url: '',
+      dismissable: true
+    });
   }
 };
 

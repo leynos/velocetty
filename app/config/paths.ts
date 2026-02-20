@@ -26,15 +26,6 @@ let cfgDir = process.env.XDG_CONFIG_HOME
     ? app.getPath('userData')
     : join(homeDirectory, '.config', 'Hyper');
 
-const legacyCfgPath = join(
-  process.env.XDG_CONFIG_HOME !== undefined
-    ? join(process.env.XDG_CONFIG_HOME, 'hyper')
-    : process.platform === 'win32'
-      ? app.getPath('userData')
-      : homedir(),
-  '.hyper.js'
-);
-
 let cfgPath = join(cfgDir, cfgFile);
 const schemaPath = resolve(__dirname, schemaFile);
 
@@ -109,7 +100,6 @@ const defaultPlatformKeyPath = () => {
 export {
   cfgDir,
   cfgPath,
-  legacyCfgPath,
   cfgFile,
   defaultCfg,
   icon,
