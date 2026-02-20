@@ -5,8 +5,8 @@
 - Purpose: deliver roadmap item `1.3.1` by shipping one example plugin that
   demonstrates plugin manifest metadata, settings schema/defaults, command and
   keybinding registration, and deterministic tab decoration output.
-- Invariants: preserve existing runtime plugin compatibility while introducing
-  the new golden-path APIs and JSON5-backed plugin settings persistence.
+- Invariants: introduce the golden-path APIs and JSON5-backed plugin settings
+  persistence without retaining legacy JSON-only config compatibility.
 - Cross-links: `docs/roadmap.md`, `docs/velocetty-design.md`,
   `docs/velocetty-hyper-codebase.md`,
   `docs/velocetty-product-requirements-document.md`,
@@ -51,11 +51,12 @@ item `1.3.1` done in `docs/roadmap.md`, and passing required gates:
   plugin-system rewrites that belong to later roadmap items.
 - Align runtime contracts with design sections:
   `docs/velocetty-design.md` plugin runtime and tab decoration API.
-- Preserve backward compatibility for existing plugin hooks in
-  `app/plugins/extensions.ts` and renderer decoration pipelines while adding the
-  golden path.
 - Persist plugin settings in JSON5 format and namespaced location compatible
   with the design intent (`plugins.<pluginId>.*`).
+- Backwards compatibility for legacy config-file format is explicitly out of
+  scope for this milestone.
+- Remove existing legacy migration logic in `app/config/migrate.ts` and related
+  invocation paths as part of the config-format cut-over.
 - Ensure deterministic tab decoration output. No randomness, wall-clock output,
   or non-deterministic provider ordering.
 - Drive decoration refresh from explicit runtime events (for example, tab or
@@ -69,8 +70,6 @@ item `1.3.1` done in `docs/roadmap.md`, and passing required gates:
 
 - Scope tolerance: if implementation exceeds 18 files or 900 net changed lines,
   stop and escalate with options.
-- Compatibility tolerance: if existing plugin hook compatibility requires
-  breaking changes, stop and escalate before removing current surfaces.
 - JSON5 tolerance: if JSON5 persistence cannot be implemented without changing
   unrelated config semantics, stop and split a safe migration strategy.
 - Eventing tolerance: if event-driven decoration updates require introducing a
@@ -83,12 +82,13 @@ item `1.3.1` done in `docs/roadmap.md`, and passing required gates:
 ## Risks
 
 - Risk: existing config import/migration paths use `JSON.parse` and
-  `JSON.stringify`, so JSON5 syntax and round-trip comments/trailing commas are
-  currently unsupported.
+  `JSON.stringify`, so JSON5 syntax is currently unsupported and migration
+  removal can create a one-way format transition.
   Severity: high
   Likelihood: high
   Mitigation: centralize parse/stringify helpers for config I/O, switch load and
-  write paths together, and add tests that cover JSON5-specific syntax.
+  write paths together, remove migration entry points in the same change, and
+  add tests that cover JSON5-specific syntax.
 
 - Risk: runtime plugin APIs are still Hyper-style hook methods rather than the
   design's explicit plugin context registration surface.
@@ -171,6 +171,12 @@ item `1.3.1` done in `docs/roadmap.md`, and passing required gates:
   Rationale: the milestone crosses backend config I/O, plugin runtime, renderer
   command/keybinding paths, decoration logic, tests, and docs.
   Date/Author: 2026-02-20 / Codex
+
+- Decision: intentionally drop legacy config-format backward compatibility and
+  remove migration logic.
+  Rationale: user direction states backward compatibility is not a goal for this
+  milestone.
+  Date/Author: 2026-02-20 / User/Codex
 
 ## Outcomes & Retrospective
 
@@ -266,12 +272,15 @@ Implementation outline:
 1. Switch config read/write helpers from plain JSON to JSON5 parse/stringify
    where user config is loaded and persisted.
 2. Introduce namespaced plugin settings storage under `plugins.<pluginId>`.
-3. Add runtime helpers that allow getting and setting plugin settings while
+3. Remove legacy migration logic (`app/config/migrate.ts` and its invocation
+   path) so startup no longer performs old-format migration.
+4. Add runtime helpers that allow getting and setting plugin settings while
    preserving existing config merge/default behaviour.
-4. Add tests covering:
+5. Add tests covering:
    comments/trailing commas in config,
    namespaced plugin defaults,
-   plugin enable/disable persistence path.
+   plugin enable/disable persistence path,
+   and startup behaviour without migration fallback.
 
 Observable check:
 
@@ -362,5 +371,5 @@ If a stage regresses runtime behaviour:
 2. Re-run focused tests for affected seam.
 3. Re-apply a narrower patch and continue from the same stage.
 
-If JSON5 migration introduces parse regressions, add compatibility handling for
-legacy JSON-only files and keep explicit tests for both formats.
+If JSON5 cut-over introduces parse regressions, fix parser/writer behaviour
+without reintroducing legacy-format migration paths.
