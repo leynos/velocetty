@@ -155,27 +155,42 @@ const readFractionalPart = (reader: SourceReader, pos: Position, start: Position
   return current;
 };
 
-const readExponentPart = (reader: SourceReader, pos: Position, start: Position): Position => {
-  const {source} = reader;
-  if (source[pos.value] !== 'e' && source[pos.value] !== 'E') {
-    return pos;
-  }
+const isExponentMarker = (char: string): boolean => {
+  return char === 'e' || char === 'E';
+};
 
-  let current = pos.advance();
-  if (source[current.value] === '+' || source[current.value] === '-') {
-    current = current.advance();
+const advanceAfterOptionalSign = (source: string, pos: Position): Position => {
+  const char = source[pos.value];
+  if (char === '+' || char === '-') {
+    return pos.advance();
   }
+  return pos;
+};
 
-  const exponentStart = current;
+const readExponentDigits = (source: string, pos: Position, start: Position): Position => {
+  const digitStart = pos;
+  let current = pos;
+
   while (current.value < source.length && isDigit(source[current.value])) {
     current = current.advance();
   }
 
-  if (exponentStart.value === current.value) {
+  if (digitStart.value === current.value) {
     throw new WhenExpressionSyntaxError('Invalid numeric literal exponent', source, start.value);
   }
 
   return current;
+};
+
+const readExponentPart = (reader: SourceReader, pos: Position, start: Position): Position => {
+  const {source} = reader;
+  if (!isExponentMarker(source[pos.value])) {
+    return pos;
+  }
+
+  const afterMarker = pos.advance();
+  const afterOptionalSign = advanceAfterOptionalSign(source, afterMarker);
+  return readExponentDigits(source, afterOptionalSign, start);
 };
 
 const readNumber = (reader: SourceReader, startPos: Position): ReadResult => {
