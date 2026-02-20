@@ -74,6 +74,16 @@ const isWhitespace = (char: string) => /\s/u.test(char);
 const isDigit = (char: string) => /[0-9]/u.test(char);
 const isIdentifierStart = (char: string) => /[A-Za-z_$]/u.test(char);
 const isIdentifierPart = (char: string) => /[A-Za-z0-9_.$]/u.test(char);
+const isNumberStart = (source: string, cursor: number): boolean => {
+  const char = source[cursor];
+  if (isDigit(char)) {
+    return true;
+  }
+  if (char === '-' && isDigit(source[cursor + 1] ?? '')) {
+    return true;
+  }
+  return false;
+};
 
 const mapEscapeSequence = (escaped: string): string => {
   return escaped === 'n' ? '\n' : escaped === 'r' ? '\r' : escaped === 't' ? '\t' : escaped;
@@ -268,8 +278,8 @@ const tryTokenizeString = (reader: SourceReader, pos: Position): TokenizeResult 
 };
 
 const tryTokenizeNumber = (reader: SourceReader, pos: Position): TokenizeResult => {
-  const char = reader.source[pos.value];
-  if (!isDigit(char) && !(char === '-' && isDigit(reader.source[pos.value + 1] ?? ''))) {
+  const cursor = pos.value;
+  if (!isNumberStart(reader.source, cursor)) {
     return null;
   }
 
