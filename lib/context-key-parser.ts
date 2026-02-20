@@ -31,6 +31,22 @@ const isDigit = (char: string) => /[0-9]/u.test(char);
 const isIdentifierStart = (char: string) => /[A-Za-z_$]/u.test(char);
 const isIdentifierPart = (char: string) => /[A-Za-z0-9_.$]/u.test(char);
 
+const mapEscapeSequence = (escaped: string): string => {
+  return escaped === 'n' ? '\n' : escaped === 'r' ? '\r' : escaped === 't' ? '\t' : escaped;
+};
+
+const processEscapeSequence = (source: string, cursor: number): {value: string; nextCursor: number} => {
+  const escaped = source[cursor + 1];
+  if (escaped === undefined) {
+    throw new WhenExpressionSyntaxError('Unterminated string literal', source, cursor);
+  }
+
+  return {
+    value: mapEscapeSequence(escaped),
+    nextCursor: cursor + 2
+  };
+};
+
 const readString = (source: string, start: number): {token: Token; next: number} => {
   const quote = source[start];
   let cursor = start + 1;
@@ -51,13 +67,9 @@ const readString = (source: string, start: number): {token: Token; next: number}
     }
 
     if (char === '\\') {
-      const escaped = source[cursor + 1];
-      if (escaped === undefined) {
-        throw new WhenExpressionSyntaxError('Unterminated string literal', source, cursor);
-      }
-
-      value += escaped === 'n' ? '\n' : escaped === 'r' ? '\r' : escaped === 't' ? '\t' : escaped;
-      cursor += 2;
+      const {value: escapedValue, nextCursor} = processEscapeSequence(source, cursor);
+      value += escapedValue;
+      cursor = nextCursor;
       continue;
     }
 
