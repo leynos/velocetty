@@ -166,57 +166,100 @@ const readIdentifier = (source: string, start: number): {token: Token; next: num
   };
 };
 
+type TokenizeResult = {token: Token; next: number} | null;
+
+const tryTokenizeWhitespace = (source: string, cursor: number): number | null => {
+  return isWhitespace(source[cursor]) ? cursor + 1 : null;
+};
+
+const tryTokenizeParenthesis = (source: string, cursor: number): TokenizeResult => {
+  const char = source[cursor];
+  if (char !== '(' && char !== ')') {
+    return null;
+  }
+
+  return {
+    token: {kind: char === '(' ? 'lparen' : 'rparen', lexeme: char, index: cursor},
+    next: cursor + 1
+  };
+};
+
+const tryTokenizeTwoCharOperator = (source: string, cursor: number): TokenizeResult => {
+  const twoChar = source.slice(cursor, cursor + 2);
+  if (!TWO_CHAR_OPERATORS.includes(twoChar as (typeof TWO_CHAR_OPERATORS)[number])) {
+    return null;
+  }
+
+  return {
+    token: {kind: 'operator', lexeme: twoChar, index: cursor},
+    next: cursor + 2
+  };
+};
+
+const tryTokenizeSingleCharOperator = (source: string, cursor: number): TokenizeResult => {
+  const char = source[cursor];
+  if (char !== '!' && char !== '<' && char !== '>') {
+    return null;
+  }
+
+  return {
+    token: {kind: 'operator', lexeme: char, index: cursor},
+    next: cursor + 1
+  };
+};
+
+const tryTokenizeString = (source: string, cursor: number): TokenizeResult => {
+  const char = source[cursor];
+  if (char !== '"' && char !== "'") {
+    return null;
+  }
+
+  return readString(source, cursor);
+};
+
+const tryTokenizeNumber = (source: string, cursor: number): TokenizeResult => {
+  const char = source[cursor];
+  if (!isDigit(char) && !(char === '-' && isDigit(source[cursor + 1] ?? ''))) {
+    return null;
+  }
+
+  return readNumber(source, cursor);
+};
+
+const tryTokenizeIdentifier = (source: string, cursor: number): TokenizeResult => {
+  if (!isIdentifierStart(source[cursor])) {
+    return null;
+  }
+
+  return readIdentifier(source, cursor);
+};
+
 const tokenize = (source: string): Token[] => {
   const tokens: Token[] = [];
   let cursor = 0;
 
   while (cursor < source.length) {
+    const whitespaceCursor = tryTokenizeWhitespace(source, cursor);
+    if (whitespaceCursor !== null) {
+      cursor = whitespaceCursor;
+      continue;
+    }
+
+    const tokenized =
+      tryTokenizeParenthesis(source, cursor) ??
+      tryTokenizeTwoCharOperator(source, cursor) ??
+      tryTokenizeSingleCharOperator(source, cursor) ??
+      tryTokenizeString(source, cursor) ??
+      tryTokenizeNumber(source, cursor) ??
+      tryTokenizeIdentifier(source, cursor);
+
+    if (tokenized) {
+      tokens.push(tokenized.token);
+      cursor = tokenized.next;
+      continue;
+    }
+
     const char = source[cursor];
-    if (isWhitespace(char)) {
-      cursor += 1;
-      continue;
-    }
-
-    if (char === '(' || char === ')') {
-      tokens.push({kind: char === '(' ? 'lparen' : 'rparen', lexeme: char, index: cursor});
-      cursor += 1;
-      continue;
-    }
-
-    const twoChar = source.slice(cursor, cursor + 2);
-    if (TWO_CHAR_OPERATORS.includes(twoChar as (typeof TWO_CHAR_OPERATORS)[number])) {
-      tokens.push({kind: 'operator', lexeme: twoChar, index: cursor});
-      cursor += 2;
-      continue;
-    }
-
-    if (char === '!' || char === '<' || char === '>') {
-      tokens.push({kind: 'operator', lexeme: char, index: cursor});
-      cursor += 1;
-      continue;
-    }
-
-    if (char === '"' || char === "'") {
-      const parsed = readString(source, cursor);
-      tokens.push(parsed.token);
-      cursor = parsed.next;
-      continue;
-    }
-
-    if (isDigit(char) || (char === '-' && isDigit(source[cursor + 1] ?? ''))) {
-      const parsed = readNumber(source, cursor);
-      tokens.push(parsed.token);
-      cursor = parsed.next;
-      continue;
-    }
-
-    if (isIdentifierStart(char)) {
-      const parsed = readIdentifier(source, cursor);
-      tokens.push(parsed.token);
-      cursor = parsed.next;
-      continue;
-    }
-
     throw new WhenExpressionSyntaxError(`Unexpected token '${char}'`, source, cursor);
   }
 
