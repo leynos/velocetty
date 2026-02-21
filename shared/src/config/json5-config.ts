@@ -2,6 +2,27 @@
 import JSON5 from 'json5';
 import type {z} from 'zod';
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+export const sortKeys = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => sortKeys(item));
+  }
+
+  if (isRecord(value)) {
+    const sortedObject: Record<string, unknown> = {};
+    Object.keys(value)
+      .sort()
+      .forEach((key) => {
+        sortedObject[key] = sortKeys(value[key]);
+      });
+    return sortedObject;
+  }
+
+  return value;
+};
+
 export const parseJson5WithSchema = <T>(
   raw: string,
   source: string,
@@ -27,4 +48,4 @@ export const parseJson5StrictWithSchema = <T>(raw: string, schema: z.ZodType<T>)
   return schema.parse(JSON5.parse(raw) as unknown);
 };
 
-export const stringifyJson5 = (value: unknown): string => `${JSON5.stringify(value, null, 2)}\n`;
+export const stringifyJson5 = (value: unknown): string => `${JSON5.stringify(sortKeys(value), null, 2)}\n`;

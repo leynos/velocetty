@@ -32,6 +32,8 @@ const parseKeymapConfig = (raw: string, source: string): Record<string, string |
   return parseJson5WithSchema(raw, source, keymapSchema, {}, 'keymap');
 };
 
+const stringifyConfig = (config: rawConfig): string => stringifyJson5(config);
+
 const ensureSchemaFile = () => {
   try {
     copySync(schemaPath, resolve(cfgDir, schemaFile), {overwrite: true});
@@ -46,7 +48,7 @@ const ensureUserConfigFile = (defaultCfgRaw: string) => {
   }
 
   const parsedDefaultConfig = parseRawConfig(defaultCfgRaw, 'default config bootstrap') ?? {};
-  writeFileSync(cfgPath, stringifyJson5(parsedDefaultConfig), 'utf8');
+  writeFileSync(cfgPath, stringifyConfig(parsedDefaultConfig), 'utf8');
 };
 
 const _importConf = () => {

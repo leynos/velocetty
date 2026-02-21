@@ -7,7 +7,7 @@ import path from 'node:path';
 import got from 'got';
 import registryUrlModule from 'registry-url';
 import {z} from 'zod';
-import {parseJson5StrictWithSchema, stringifyJson5} from '@shared/config/json5-config';
+import {parseJson5StrictWithSchema, sortKeys, stringifyJson5} from '@shared/config/json5-config';
 
 const registryUrl = registryUrlModule();
 
@@ -65,24 +65,6 @@ const getPlugins = memoize(() => {
 const getLocalPlugins = memoize(() => {
   return getPluginsByKey('localPlugins');
 });
-
-const sortKeys = (value: unknown): unknown => {
-  if (Array.isArray(value)) {
-    return value.map((item) => sortKeys(item));
-  }
-
-  if (value && typeof value === 'object') {
-    const sortedObject: Record<string, unknown> = {};
-    Object.keys(value)
-      .sort()
-      .forEach((key) => {
-        sortedObject[key] = sortKeys((value as Record<string, unknown>)[key]);
-      });
-    return sortedObject;
-  }
-
-  return value;
-};
 
 function exists() {
   return getFileContents() !== undefined;

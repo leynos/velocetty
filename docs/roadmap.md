@@ -70,9 +70,9 @@ Scope notes:
   runtime and §Tab decoration API; see
   [PRD](velocetty-product-requirements-document.md) §Workstreams and
   deliverables.
-  - [x] Provide a plugin manifest with settings schema and defaults.
-  - [x] Register one command and one keybinding from the plugin runtime.
-  - [x] Register one tab decoration provider with deterministic output.
+  - [x] Plugin manifest created with settings schema and sensible defaults.
+  - [x] Command and keybinding registered and working in the plugin runtime.
+  - [x] Tab decoration provider registered producing deterministic decorations.
   - [x] Success criteria: plugin can be enabled/disabled, settings persist to
     JSON5, and decoration updates are event-driven.
   - [x] Integrator gate: passed on the integration branch — `bun install`,

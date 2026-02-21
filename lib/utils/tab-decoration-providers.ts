@@ -55,8 +55,17 @@ type RegisteredProvider = {
   disposeChangeListener?: () => void;
 };
 
+type RegistryLogger = {
+  warn: (message: string) => void;
+  error: (message: string, error?: unknown) => void;
+};
+
 const MAX_BADGES = 3;
 const MAX_WIDGETS = 2;
+const defaultRegistryLogger: RegistryLogger = {
+  warn: (message) => console.warn(message),
+  error: (message, error) => console.error(message, error)
+};
 
 const badgeKey = (badge: TabDecorationBadge) =>
   `${badge.icon ?? ''}:${badge.text ?? ''}:${badge.tooltip ?? ''}:${badge.kind ?? ''}`;
@@ -140,10 +149,12 @@ export class TabDecorationProviderRegistry {
   private listeners = new Set<() => void>();
   private registrationCount = 0;
 
+  constructor(private readonly logger: RegistryLogger = defaultRegistryLogger) {}
+
   register(provider: TabDecorationProvider): () => void {
     const normalizedId = provider.id.trim();
     if (!normalizedId) {
-      console.warn('Ignoring tab decoration provider registration with empty id.');
+      this.logger.warn('Ignoring tab decoration provider registration with empty id.');
       return () => {};
     }
 
@@ -201,7 +212,7 @@ export class TabDecorationProviderRegistry {
         }
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
-        console.warn(`Tab decoration provider "${provider.id}" failed: ${reason}`);
+        this.logger.warn(`Tab decoration provider "${provider.id}" failed: ${reason}`);
       }
     }
 
@@ -220,7 +231,7 @@ export class TabDecorationProviderRegistry {
       try {
         listener();
       } catch (error) {
-        console.error('Tab decoration listener failed during update notification.', error);
+        this.logger.error('Tab decoration listener failed during update notification.', error);
       }
     });
   }

@@ -78,7 +78,7 @@ item `1.3.1` done in `docs/roadmap.md`, and passing required gates:
 - Validation tolerance: if any required gate fails after two focused remediation
   attempts, stop and report with log excerpts.
 - Ambiguity tolerance: if roadmap/design wording implies incompatible runtime
-  contracts, pause and request direction before coding further.
+  contracts, pause, and request direction before coding further.
 
 ## Risks
 
@@ -397,7 +397,7 @@ Implementation outline:
 
 Observable check:
 
-- all required gates exit successfully and roadmap checkbox is updated to done.
+- all required gates exit successfully and roadmap checkbox is marked as done.
 
 ## Validation and evidence capture
 
