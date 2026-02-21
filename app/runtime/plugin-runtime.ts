@@ -28,12 +28,23 @@ const findRuntimePluginManifest = (pluginId: string): RuntimePluginManifest | un
 
 const getDefaultConfigPath = (): string => cfgPath;
 
-const getConfigPluginNamespace = (cfg: configOptions): RuntimePluginSettingsNamespace => {
+const getPluginsNamespace = (cfg: configOptions): RuntimePluginSettingsNamespace => {
   return isRecord(cfg.plugins) ? (cfg.plugins as RuntimePluginSettingsNamespace) : {};
 };
 
+const getOrInitPluginsNamespace = (cfg: rawConfig): RuntimePluginSettingsNamespace => {
+  if (!isRecord(cfg.config)) {
+    cfg.config = {} as configOptions;
+  }
+  const configSection = cfg.config as configOptions;
+  if (!isRecord(configSection.plugins)) {
+    configSection.plugins = {};
+  }
+  return configSection.plugins as RuntimePluginSettingsNamespace;
+};
+
 const resolvePluginSettings = (cfg: configOptions, manifest: RuntimePluginManifest): RuntimePluginSettings => {
-  const namespace = getConfigPluginNamespace(cfg);
+  const namespace = getPluginsNamespace(cfg);
   return merge({}, manifest.settingsDefaults, asSettingsRecord(namespace[manifest.id])) as RuntimePluginSettings;
 };
 
@@ -64,31 +75,6 @@ const parseConfigJson5 = (raw: string): rawConfig => {
 
 const stringifyConfigJson5 = (cfg: rawConfig): string => `${JSON5.stringify(cfg, null, 2)}\n`;
 
-/**
- * Ensures `cfg.config` exists.
- *
- * Warning: this helper mutates `cfg` by assigning a default `config` object.
- */
-const ensureConfigSection = (cfg: rawConfig): configOptions => {
-  if (!isRecord(cfg.config)) {
-    cfg.config = {} as configOptions;
-  }
-  return cfg.config as configOptions;
-};
-
-/**
- * Ensures `cfg.plugins` exists.
- *
- * Warning: this helper mutates `cfg` by assigning a default `plugins`
- * namespace object.
- */
-const ensureSettingsNamespace = (cfg: configOptions): RuntimePluginSettingsNamespace => {
-  if (!isRecord(cfg.plugins)) {
-    cfg.plugins = {};
-  }
-  return cfg.plugins as RuntimePluginSettingsNamespace;
-};
-
 const isRuntimePluginManifestEnabled = (cfg: configOptions, manifest: RuntimePluginManifest): boolean => {
   const resolvedSettings = resolvePluginSettings(cfg, manifest);
   const enabled = resolvedSettings.enabled;
@@ -99,7 +85,7 @@ const isRuntimePluginManifestEnabled = (cfg: configOptions, manifest: RuntimePlu
 export const getRuntimePluginSettings = (cfg: configOptions, pluginId: string): RuntimePluginSettings => {
   const manifest = findRuntimePluginManifest(pluginId);
   if (!manifest) {
-    return asSettingsRecord(getConfigPluginNamespace(cfg)[pluginId]);
+    return asSettingsRecord(getPluginsNamespace(cfg)[pluginId]);
   }
   return resolvePluginSettings(cfg, manifest);
 };
@@ -156,8 +142,7 @@ export const ensureRuntimePluginSettingsPersisted = (
 ): RuntimePluginSettingsNamespace => {
   try {
     const rawConfig = parseConfigJson5(readFile(configFilePath, 'utf8'));
-    const configSection = ensureConfigSection(rawConfig);
-    const namespace = ensureSettingsNamespace(configSection);
+    const namespace = getOrInitPluginsNamespace(rawConfig);
 
     let didChange = false;
 
@@ -200,8 +185,7 @@ export const setRuntimePluginEnabledPersisted = (
 
   try {
     const rawConfig = parseConfigJson5(readFile(configFilePath, 'utf8'));
-    const configSection = ensureConfigSection(rawConfig);
-    const namespace = ensureSettingsNamespace(configSection);
+    const namespace = getOrInitPluginsNamespace(rawConfig);
     const existing = asSettingsRecord(namespace[pluginId]);
     const merged = merge({}, manifestDefaults, existing, {enabled}) as RuntimePluginSettings;
 
