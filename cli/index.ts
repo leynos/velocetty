@@ -59,8 +59,9 @@ args.command(
     checkConfig();
     const pluginName = args_[0];
     assertPluginName(pluginName);
+    const specifier = api.pluginSpecifier(pluginName);
     commandPromise = api
-      .install(pluginName)
+      .install(specifier)
       .then(() => console.log(chalk.green(`${pluginName} installed successfully!`)))
       .catch((err) => console.error(chalk.red(err)));
   },
@@ -74,8 +75,9 @@ args.command(
     checkConfig();
     const pluginName = args_[0];
     assertPluginName(pluginName);
+    const specifier = api.pluginSpecifier(pluginName);
     commandPromise = api
-      .uninstall(pluginName)
+      .uninstall(specifier)
       .then(() => console.log(chalk.green(`${pluginName} uninstalled successfully!`)))
       .catch((err) => console.error(chalk.red(err)));
   },

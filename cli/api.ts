@@ -12,6 +12,23 @@ import {parseJson5StrictWithSchema, stringifyJson5} from '@shared/config/json5-c
 
 const registryUrl = registryUrlModule();
 
+/** Branded type for plugin specifiers (e.g., 'hyper-plugin', '@scope/plugin@1.0.0') */
+type PluginSpecifier = string & {readonly __brand: 'PluginSpecifier'};
+
+/** Branded type for normalized npm package names (e.g., 'hyper-plugin', '@scope%2fplugin') */
+type PackageName = string & {readonly __brand: 'PackageName'};
+
+/** Smart constructor for PluginSpecifier with runtime validation */
+const pluginSpecifier = (value: string): PluginSpecifier => {
+  if (!value || value.trim().length === 0) {
+    throw new Error('Plugin specifier cannot be empty');
+  }
+  return value as PluginSpecifier;
+};
+
+/** Smart constructor for PackageName (output of normalization) */
+const packageName = (value: string): PackageName => value as PackageName;
+
 // If the user defines XDG_CONFIG_HOME they definitely want their config there,
 // otherwise use the home directory in linux/mac and userdata in windows
 const applicationDirectory = process.env.XDG_CONFIG_HOME
@@ -57,7 +74,8 @@ const cliConfigSchema = z
 
 const getParsedFile = memoize(() => parseJson5StrictWithSchema(getFileContents(), cliConfigSchema));
 
-const getPluginsByKey = (key: 'plugins' | 'localPlugins'): string[] => getParsedFile()[key];
+const getPluginsByKey = (key: 'plugins' | 'localPlugins'): PluginSpecifier[] =>
+  getParsedFile()[key] as PluginSpecifier[];
 
 const getPlugins = memoize(() => {
   return getPluginsByKey('plugins');
@@ -71,10 +89,11 @@ function exists() {
   return getFileContents() !== undefined;
 }
 
-function isInstalled(plugin: string, locally?: boolean) {
+function isInstalled(plugin: PluginSpecifier, locally?: boolean) {
+  const normalizedPlugin = pluginSpecifier(plugin);
   const array = locally ? getLocalPlugins() : getPlugins();
   if (array && Array.isArray(array)) {
-    return array.includes(plugin);
+    return array.includes(normalizedPlugin);
   }
   return false;
 }
@@ -83,15 +102,16 @@ function save(config: unknown) {
   return fs.writeFileSync(fileName, stringifyJson5(config), 'utf8');
 }
 
-function getPackageName(plugin: string) {
-  const isScoped = plugin[0] === '@';
-  const nameWithoutVersion = plugin.split('#')[0];
+function getPackageName(plugin: PluginSpecifier): PackageName {
+  const normalizedPlugin = pluginSpecifier(plugin);
+  const isScoped = normalizedPlugin[0] === '@';
+  const nameWithoutVersion = normalizedPlugin.split('#')[0];
 
   if (isScoped) {
-    return `@${nameWithoutVersion.split('@')[1].replace('/', '%2f')}`;
+    return packageName(`@${nameWithoutVersion.split('@')[1].replace('/', '%2f')}`);
   }
 
-  return nameWithoutVersion.split('@')[0];
+  return packageName(nameWithoutVersion.split('@')[0]);
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -112,8 +132,9 @@ const getErrorMessage = (value: unknown): string => {
   return String(value);
 };
 
-function existsOnNpm(plugin: string, signal?: AbortSignal) {
-  const name = getPackageName(plugin);
+function existsOnNpm(plugin: PluginSpecifier, signal?: AbortSignal) {
+  const normalizedPlugin = pluginSpecifier(plugin);
+  const name = getPackageName(normalizedPlugin);
   return got
     .get<unknown>(registryUrl + name.toLowerCase(), {timeout: {request: 10000}, responseType: 'json', signal})
     .then((res) => {
@@ -126,38 +147,41 @@ function existsOnNpm(plugin: string, signal?: AbortSignal) {
     });
 }
 
-const handleNpmCheckError = (err: unknown, plugin: string): Promise<never> => {
+const handleNpmCheckError = (err: unknown, plugin: PluginSpecifier): Promise<never> => {
+  const normalizedPlugin = pluginSpecifier(plugin);
   const statusCode = isRecord(err) && typeof err.statusCode === 'number' ? err.statusCode : undefined;
   if (statusCode && (statusCode === 404 || statusCode === 200)) {
-    return Promise.reject(`${plugin} not found on npm`);
+    return Promise.reject(`${normalizedPlugin} not found on npm`);
   }
 
   const errorMessage = getErrorMessage(err);
   return Promise.reject(`${errorMessage}\nPlugin check failed. Check your internet connection or retry later.`);
 };
 
-function install(plugin: string, locally?: boolean, signal?: AbortSignal) {
+function install(plugin: PluginSpecifier, locally?: boolean, signal?: AbortSignal) {
+  const normalizedPlugin = pluginSpecifier(plugin);
   const array = locally ? getLocalPlugins() : getPlugins();
-  return existsOnNpm(plugin, signal)
-    .catch((err: unknown) => handleNpmCheckError(err, plugin))
+  return existsOnNpm(normalizedPlugin, signal)
+    .catch((err: unknown) => handleNpmCheckError(err, normalizedPlugin))
     .then(() => {
-      if (isInstalled(plugin, locally)) {
-        return Promise.reject(`${plugin} is already installed`);
+      if (isInstalled(normalizedPlugin, locally)) {
+        return Promise.reject(`${normalizedPlugin} is already installed`);
       }
 
       const config = getParsedFile();
-      config[locally ? 'localPlugins' : 'plugins'] = [...array, plugin];
+      config[locally ? 'localPlugins' : 'plugins'] = [...array, normalizedPlugin];
       save(config);
     });
 }
 
-async function uninstall(plugin: string) {
-  if (!isInstalled(plugin)) {
-    return Promise.reject(`${plugin} is not installed`);
+async function uninstall(plugin: PluginSpecifier) {
+  const normalizedPlugin = pluginSpecifier(plugin);
+  if (!isInstalled(normalizedPlugin)) {
+    return Promise.reject(`${normalizedPlugin} is not installed`);
   }
 
   const config = getParsedFile();
-  config.plugins = getPlugins().filter((p) => p !== plugin);
+  config.plugins = getPlugins().filter((p) => p !== normalizedPlugin);
   save(config);
 }
 
@@ -169,4 +193,4 @@ function list() {
 }
 
 export const configPath = fileName;
-export {exists, existsOnNpm, isInstalled, install, uninstall, list};
+export {exists, existsOnNpm, isInstalled, install, uninstall, list, pluginSpecifier};
