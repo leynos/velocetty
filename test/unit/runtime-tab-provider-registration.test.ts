@@ -73,6 +73,7 @@ test('registers runtime tab providers for live enablement toggles', async () => 
 
   const disabledProps = plugins.getTabProps(tab, {}, {text: 'Shell'});
   expect(disabledProps.text).toBe('Shell');
+  expect(disabledProps.tabIndex).toBe(tab.tabIndex);
 
   rendererConfig = {
     plugins: {

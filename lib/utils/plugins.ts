@@ -655,7 +655,8 @@ export function getTabProps<T extends Assignable<TabProps, T>>(
   const decoration = resolveTabDecoration(getTabDecorationContext(tab));
   const decoratedProps = {
     ...props,
-    tabDecoration: decoration
+    tabDecoration: decoration,
+    tabIndex: tab.tabIndex
   };
   if (decoration.title) {
     decoratedProps.text = decoration.title;
