@@ -86,12 +86,58 @@ const compareProviders = (a: RegisteredProvider, b: RegisteredProvider) => {
   return a.registrationOrder - b.registrationOrder;
 };
 
+const collectBadges = (decorations: TabDecoration[]): TabDecorationBadge[] => {
+  const badges: TabDecorationBadge[] = [];
+  const seenBadgeKeys = new Set<string>();
+
+  for (const decoration of decorations) {
+    if (!Array.isArray(decoration.badges) || badges.length >= MAX_BADGES) {
+      continue;
+    }
+
+    for (const badge of decoration.badges) {
+      if (badges.length >= MAX_BADGES) {
+        break;
+      }
+      const key = badgeKey(badge);
+      if (seenBadgeKeys.has(key)) {
+        continue;
+      }
+      seenBadgeKeys.add(key);
+      badges.push(badge);
+    }
+  }
+
+  return badges;
+};
+
+const collectWidgets = (decorations: TabDecoration[]): TabDecorationWidget[] => {
+  const widgets: TabDecorationWidget[] = [];
+  const seenWidgetKeys = new Set<string>();
+
+  for (const decoration of decorations) {
+    if (!Array.isArray(decoration.widgets) || widgets.length >= MAX_WIDGETS) {
+      continue;
+    }
+
+    for (const widget of decoration.widgets) {
+      if (widgets.length >= MAX_WIDGETS) {
+        break;
+      }
+      const key = widgetKey(widget);
+      if (seenWidgetKeys.has(key)) {
+        continue;
+      }
+      seenWidgetKeys.add(key);
+      widgets.push(widget);
+    }
+  }
+
+  return widgets;
+};
+
 export const mergeTabDecorations = (decorations: TabDecoration[]): TabDecoration => {
   const merged: TabDecoration = {};
-  const badges: TabDecorationBadge[] = [];
-  const widgets: TabDecorationWidget[] = [];
-  const seenBadgeKeys = new Set<string>();
-  const seenWidgetKeys = new Set<string>();
 
   for (const decoration of decorations) {
     if (!merged.icon && decoration.icon) {
@@ -103,38 +149,10 @@ export const mergeTabDecorations = (decorations: TabDecoration[]): TabDecoration
     if (!merged.subtitle && decoration.subtitle) {
       merged.subtitle = decoration.subtitle;
     }
-
-    const badgeList = Array.isArray(decoration.badges) ? decoration.badges : undefined;
-    const widgetList = Array.isArray(decoration.widgets) ? decoration.widgets : undefined;
-
-    if (badgeList && badges.length < MAX_BADGES) {
-      for (const badge of badgeList) {
-        if (badges.length >= MAX_BADGES) {
-          break;
-        }
-        const key = badgeKey(badge);
-        if (seenBadgeKeys.has(key)) {
-          continue;
-        }
-        seenBadgeKeys.add(key);
-        badges.push(badge);
-      }
-    }
-
-    if (widgetList && widgets.length < MAX_WIDGETS) {
-      for (const widget of widgetList) {
-        if (widgets.length >= MAX_WIDGETS) {
-          break;
-        }
-        const key = widgetKey(widget);
-        if (seenWidgetKeys.has(key)) {
-          continue;
-        }
-        seenWidgetKeys.add(key);
-        widgets.push(widget);
-      }
-    }
   }
+
+  const badges = collectBadges(decorations);
+  const widgets = collectWidgets(decorations);
 
   if (badges.length > 0) {
     merged.badges = badges;
@@ -145,6 +163,41 @@ export const mergeTabDecorations = (decorations: TabDecoration[]): TabDecoration
   }
 
   return merged;
+};
+
+const normalizeProvider = (provider: TabDecorationProvider, registrationOrder: number): RegisteredProvider => {
+  const normalizedPriority = Number.isFinite(provider.priority) ? provider.priority : 0;
+  return {
+    provider: {
+      ...provider,
+      id: provider.id.trim(),
+      priority: normalizedPriority
+    },
+    registrationOrder
+  };
+};
+
+const setupProviderSubscription = (
+  registered: RegisteredProvider,
+  onDidChange: () => void,
+  logger: RegistryLogger
+): void => {
+  if (!registered.provider.subscribe) {
+    return;
+  }
+
+  try {
+    const dispose = registered.provider.subscribe(() => {
+      onDidChange();
+    });
+
+    if (typeof dispose === 'function') {
+      registered.disposeChangeListener = dispose;
+    }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    logger.warn(`Tab decoration provider "${registered.provider.id}" subscribe failed: ${reason}`);
+  }
 };
 
 export class TabDecorationProviderRegistry {
@@ -161,30 +214,8 @@ export class TabDecorationProviderRegistry {
       return () => {};
     }
 
-    const normalizedPriority = Number.isFinite(provider.priority) ? provider.priority : 0;
-    const registered: RegisteredProvider = {
-      provider: {
-        ...provider,
-        id: normalizedId,
-        priority: normalizedPriority
-      },
-      registrationOrder: this.registrationCount++
-    };
-
-    if (registered.provider.subscribe) {
-      try {
-        const dispose = registered.provider.subscribe(() => {
-          this.emitChange();
-        });
-
-        if (typeof dispose === 'function') {
-          registered.disposeChangeListener = dispose;
-        }
-      } catch (error) {
-        const reason = error instanceof Error ? error.message : String(error);
-        this.logger.warn(`Tab decoration provider "${registered.provider.id}" subscribe failed: ${reason}`);
-      }
-    }
+    const registered = normalizeProvider(provider, this.registrationCount++);
+    setupProviderSubscription(registered, () => this.emitChange(), this.logger);
 
     this.providers.push(registered);
     this.emitChange();
