@@ -4,17 +4,20 @@ import {readFileSync, writeFileSync} from 'node:fs';
 import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
 import {cfgPath} from '../config/paths';
-import {parseJson5WithSchema, stringifyJson5, type ParseSchema} from '../config/json5-config';
-import {isRecord, safeParseRawConfig} from '../config/raw-config-validation';
+import {parseJson5WithSchema, stringifyJson5, type ParseResult, type ParseSchema} from '../config/json5-config';
 
 import type {CommandDefinition} from '@shared/types/commands';
 import type {configOptions, rawConfig} from '@shared/types/config';
+import {validateRawConfig} from '@shared/config/json5-config';
 import {runtimePluginManifests, type RuntimePluginManifest} from './golden-path-demo';
 
 type RuntimePluginSettings = Record<string, unknown>;
 type RuntimePluginSettingsNamespace = Record<string, RuntimePluginSettings>;
 type ReadTextFile = (path: string, encoding: BufferEncoding) => string;
 type WriteTextFile = (path: string, content: string, encoding: BufferEncoding) => void;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const cloneValue = <T>(value: T): T => structuredClone(value);
 
@@ -44,6 +47,14 @@ const getOrInitPluginsNamespace = (cfg: rawConfig): RuntimePluginSettingsNamespa
     configSection.plugins = {};
   }
   return configSection.plugins as RuntimePluginSettingsNamespace;
+};
+
+const safeParseRawConfig = (value: unknown): ParseResult<rawConfig> => {
+  const result = validateRawConfig(value);
+  if (!result.success) {
+    return result;
+  }
+  return {success: true, data: result.data as rawConfig};
 };
 
 const rawConfigSchema: ParseSchema<rawConfig> = {

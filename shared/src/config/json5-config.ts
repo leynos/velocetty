@@ -2,8 +2,64 @@
 import JSON5 from 'json5';
 import type {z} from 'zod';
 
+type ParseSuccess<T> = {success: true; data: T};
+type ParseFailure = {success: false; error: Error};
+type ParseResult<T> = ParseSuccess<T> | ParseFailure;
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
+  isRecord(value) &&
+  Object.values(value).every((entry) => typeof entry === 'string' || (Array.isArray(entry) && isStringArray(entry)));
+
+type FieldValidator = (value: Record<string, unknown>, field: string) => Error | null;
+
+const validateRecordField: FieldValidator = (value, field) => {
+  if (value[field] !== undefined && !isRecord(value[field])) {
+    return new Error(`Expected \`${field}\` to be an object when present.`);
+  }
+  return null;
+};
+
+const validateStringArrayField: FieldValidator = (value, field) => {
+  if (value[field] !== undefined && !isStringArray(value[field])) {
+    return new Error(`Expected \`${field}\` to be an array of strings when present.`);
+  }
+  return null;
+};
+
+const validateKeymapField: FieldValidator = (value, field) => {
+  if (value[field] !== undefined && !isKeymapConfig(value[field])) {
+    return new Error(`Expected \`${field}\` values to be strings or string arrays when present.`);
+  }
+  return null;
+};
+
+export const validateRawConfig = (value: unknown): ParseResult<Record<string, unknown>> => {
+  if (!isRecord(value)) {
+    return {success: false, error: new Error('Expected config payload to be an object.')};
+  }
+
+  const validators: Array<[string, FieldValidator]> = [
+    ['config', validateRecordField],
+    ['plugins', validateStringArrayField],
+    ['localPlugins', validateStringArrayField],
+    ['keymaps', validateKeymapField]
+  ];
+
+  for (const [field, validator] of validators) {
+    const error = validator(value, field);
+    if (error) {
+      return {success: false, error};
+    }
+  }
+
+  return {success: true, data: value};
+};
 
 export const sortKeys = (value: unknown): unknown => {
   if (Array.isArray(value)) {

@@ -3,15 +3,26 @@ import {resolve} from 'node:path';
 
 import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
 
+import {validateRawConfig} from '@shared/config/json5-config';
 import type {rawConfig} from '@shared/types/config';
 import notify from '../notify';
 import {parseJson5WithSchema, stringifyJson5, type ParseSchema} from './json5-config';
-import {isKeymapConfig, safeParseRawConfig} from './raw-config-validation';
 
 import {_init} from './init';
 import {cfgDir, cfgPath, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath} from './paths';
 
 let defaultConfig: rawConfig;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+const isKeymapValue = (value: unknown): value is string | string[] => typeof value === 'string' || isStringArray(value);
+
+const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
+  isRecord(value) && Object.values(value).every((entry) => isKeymapValue(entry));
 
 const keymapSchema: ParseSchema<Record<string, string | string[]>> = {
   safeParse: (value) => {
@@ -27,7 +38,13 @@ const keymapSchema: ParseSchema<Record<string, string | string[]>> = {
 };
 
 const rawConfigSchema: ParseSchema<rawConfig> = {
-  safeParse: safeParseRawConfig
+  safeParse: (value) => {
+    const result = validateRawConfig(value);
+    if (!result.success) {
+      return result;
+    }
+    return {success: true, data: result.data as rawConfig};
+  }
 };
 
 const parseRawConfig = (raw: string, source: string): rawConfig | null => {
