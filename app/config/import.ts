@@ -2,32 +2,31 @@
 import {resolve} from 'node:path';
 
 import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
+import {z} from 'zod';
 
 import type {rawConfig} from '@shared/types/config';
 import notify from '../notify';
-import {
-  isKeymapConfig,
-  parseJson5WithSchema,
-  safeParseRawConfig,
-  stringifyJson5,
-  type ParseSchema
-} from './json5-config';
+import {parseJson5WithSchema, safeParseRawConfig, stringifyJson5, type ParseSchema} from './json5-config';
 
 import {_init} from './init';
 import {cfgDir, cfgPath, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath} from './paths';
 
 let defaultConfig: rawConfig;
 
+const keymapValueSchema = z.union([z.string(), z.array(z.string())]);
+const keymapRecordSchema = z.record(z.string(), keymapValueSchema);
+
 const keymapSchema: ParseSchema<Record<string, string | string[]>> = {
   safeParse: (value) => {
-    if (!isKeymapConfig(value)) {
+    const parsed = keymapRecordSchema.safeParse(value);
+    if (!parsed.success) {
       return {
         success: false,
-        error: new Error('Expected keymap object values to be strings or string arrays.')
+        error: parsed.error
       };
     }
 
-    return {success: true, data: value};
+    return {success: true, data: parsed.data};
   }
 };
 
@@ -36,11 +35,11 @@ const rawConfigSchema: ParseSchema<rawConfig> = {
 };
 
 const parseRawConfig = (raw: string, source: string): rawConfig | null => {
-  return parseJson5WithSchema(raw, {source, schema: rawConfigSchema, fallback: null, itemType: 'config'});
+  return parseJson5WithSchema({raw, source, schema: rawConfigSchema, fallback: null, itemType: 'config'});
 };
 
 const parseKeymapConfig = (raw: string, source: string): Record<string, string | string[]> => {
-  return parseJson5WithSchema(raw, {source, schema: keymapSchema, fallback: {}, itemType: 'keymap'});
+  return parseJson5WithSchema({raw, source, schema: keymapSchema, fallback: {}, itemType: 'keymap'});
 };
 
 const stringifyConfig = (config: rawConfig): string => stringifyJson5(config);

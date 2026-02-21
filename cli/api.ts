@@ -34,7 +34,7 @@ const packageName = (value: string): PackageName => value as PackageName;
 const applicationDirectory = process.env.XDG_CONFIG_HOME
   ? path.join(process.env.XDG_CONFIG_HOME, 'Hyper')
   : process.platform === 'win32'
-    ? path.join(process.env.APPDATA!, 'Hyper')
+    ? path.join(process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming'), 'Hyper')
     : path.join(os.homedir(), '.config', 'Hyper');
 
 const devConfigFileName = path.join(__dirname, `../hyper.json`);
@@ -67,7 +67,6 @@ const getFileContents = memoize(() => {
 
 const pluginNameSchema = z
   .string()
-  .min(1)
   .refine((value) => value.trim().length > 0, {message: 'Plugin identifiers must not be empty or whitespace-only.'});
 
 const cliConfigSchema = z
@@ -95,10 +94,9 @@ function exists() {
 }
 
 function isInstalled(plugin: PluginSpecifier, locally?: boolean) {
-  const normalizedPlugin = pluginSpecifier(plugin);
   const array = locally ? getLocalPlugins() : getPlugins();
   if (array && Array.isArray(array)) {
-    return array.includes(normalizedPlugin);
+    return array.includes(plugin);
   }
   return false;
 }
@@ -108,9 +106,8 @@ function save(config: unknown) {
 }
 
 function getPackageName(plugin: PluginSpecifier): PackageName {
-  const normalizedPlugin = pluginSpecifier(plugin);
-  const isScoped = normalizedPlugin[0] === '@';
-  const nameWithoutVersion = normalizedPlugin.split('#')[0];
+  const isScoped = plugin[0] === '@';
+  const nameWithoutVersion = plugin.split('#')[0];
 
   if (isScoped) {
     return packageName(`@${nameWithoutVersion.split('@')[1].replace('/', '%2f')}`);
@@ -138,8 +135,7 @@ const getErrorMessage = (value: unknown): string => {
 };
 
 function existsOnNpm(plugin: PluginSpecifier, signal?: AbortSignal) {
-  const normalizedPlugin = pluginSpecifier(plugin);
-  const name = getPackageName(normalizedPlugin);
+  const name = getPackageName(plugin);
   return got
     .get<unknown>(registryUrl + name.toLowerCase(), {timeout: {request: 10000}, responseType: 'json', signal})
     .then((res) => {
@@ -153,10 +149,12 @@ function existsOnNpm(plugin: PluginSpecifier, signal?: AbortSignal) {
 }
 
 const handleNpmCheckError = (err: unknown, plugin: PluginSpecifier): Promise<never> => {
-  const normalizedPlugin = pluginSpecifier(plugin);
   const statusCode = isRecord(err) && typeof err.statusCode === 'number' ? err.statusCode : undefined;
-  if (statusCode && (statusCode === 404 || statusCode === 200)) {
-    return Promise.reject(`${normalizedPlugin} not found on npm`);
+  if (statusCode === 404) {
+    return Promise.reject(`${plugin} not found on npm`);
+  }
+  if (statusCode === 200) {
+    return Promise.reject(`Malformed npm registry response for ${plugin}`);
   }
 
   const errorMessage = getErrorMessage(err);
@@ -170,29 +168,27 @@ type InstallOptions = {
 
 function install(plugin: PluginSpecifier, options: InstallOptions = {}) {
   const {locally = false, signal} = options;
-  const normalizedPlugin = pluginSpecifier(plugin);
   const array = locally ? getLocalPlugins() : getPlugins();
-  return existsOnNpm(normalizedPlugin, signal)
-    .catch((err: unknown) => handleNpmCheckError(err, normalizedPlugin))
+  return existsOnNpm(plugin, signal)
+    .catch((err: unknown) => handleNpmCheckError(err, plugin))
     .then(() => {
-      if (isInstalled(normalizedPlugin, locally)) {
-        return Promise.reject(`${normalizedPlugin} is already installed`);
+      if (isInstalled(plugin, locally)) {
+        return Promise.reject(`${plugin} is already installed`);
       }
 
       const config = getParsedFile();
-      config[locally ? 'localPlugins' : 'plugins'] = [...array, normalizedPlugin];
+      config[locally ? 'localPlugins' : 'plugins'] = [...array, plugin];
       save(config);
     });
 }
 
 async function uninstall(plugin: PluginSpecifier) {
-  const normalizedPlugin = pluginSpecifier(plugin);
-  if (!isInstalled(normalizedPlugin)) {
-    return Promise.reject(`${normalizedPlugin} is not installed`);
+  if (!isInstalled(plugin)) {
+    throw new Error(`${plugin} is not installed`);
   }
 
   const config = getParsedFile();
-  config.plugins = getPlugins().filter((p) => p !== normalizedPlugin);
+  config.plugins = getPlugins().filter((p) => p !== plugin);
   save(config);
 }
 

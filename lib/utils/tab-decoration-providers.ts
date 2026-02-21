@@ -172,12 +172,17 @@ export class TabDecorationProviderRegistry {
     };
 
     if (registered.provider.subscribe) {
-      const dispose = registered.provider.subscribe(() => {
-        this.emitChange();
-      });
+      try {
+        const dispose = registered.provider.subscribe(() => {
+          this.emitChange();
+        });
 
-      if (typeof dispose === 'function') {
-        registered.disposeChangeListener = dispose;
+        if (typeof dispose === 'function') {
+          registered.disposeChangeListener = dispose;
+        }
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Tab decoration provider "${registered.provider.id}" subscribe failed: ${reason}`);
       }
     }
 

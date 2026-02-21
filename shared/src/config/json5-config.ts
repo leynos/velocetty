@@ -2,8 +2,8 @@
 import JSON5 from 'json5';
 import {z} from 'zod';
 
-type ParseSuccess<T> = {success: true; data: T};
-type ParseFailure = {success: false; error: Error};
+export type ParseSuccess<T> = {success: true; data: T};
+export type ParseFailure = {success: false; error: Error};
 export type ParseResult<T> = ParseSuccess<T> | ParseFailure;
 export type ParseSchema<T> = {
   readonly safeParse: (value: unknown) => ParseResult<T>;
@@ -111,6 +111,8 @@ export interface ParseJson5Options<T> {
   readonly fallback: T;
   readonly itemType?: string;
 }
+
+export type ParseOptions<T> = ParseJson5Options<T>;
 
 export const parseJson5WithSchema = <T>(options: ParseJson5Options<T>): T => {
   const {raw, source, schema, fallback, itemType = 'config'} = options;

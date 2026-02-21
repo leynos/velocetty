@@ -160,7 +160,7 @@ test('uninstall() removes installed plugins and rejects unknown plugins', async 
     localPlugins: []
   });
 
-  await expect(uninstall('plugin-z')).rejects.toBe('plugin-z is not installed');
+  await expect(uninstall('plugin-z')).rejects.toThrow('plugin-z is not installed');
 });
 
 test('exists(), list(), and isInstalled() handle empty or malformed plugin arrays', async () => {
