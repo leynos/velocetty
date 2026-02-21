@@ -4,7 +4,7 @@ import type {z} from 'zod';
 
 type ParseSuccess<T> = {success: true; data: T};
 type ParseFailure = {success: false; error: Error};
-type ParseResult<T> = ParseSuccess<T> | ParseFailure;
+export type ParseResult<T> = ParseSuccess<T> | ParseFailure;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
