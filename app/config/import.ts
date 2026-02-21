@@ -63,6 +63,7 @@ const ensureUserConfigFile = (defaultCfgRaw: string) => {
 };
 
 const _importConf = () => {
+  console.warn('[config-import] Initializing config import using app-local JSON5 helpers.');
   // init plugin directories if not present
   mkdirpSync(plugs.base);
   mkdirpSync(plugs.local);
