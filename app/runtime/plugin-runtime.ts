@@ -5,6 +5,7 @@ import JSON5 from 'json5';
 import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
 import {z} from 'zod';
+import {cfgPath} from '../config/paths';
 
 import type {CommandDefinition} from '@shared/types/commands';
 import type {configOptions, rawConfig} from '@shared/types/config';
@@ -25,13 +26,7 @@ const cloneValue = <T>(value: T): T => structuredClone(value);
 const findRuntimePluginManifest = (pluginId: string): RuntimePluginManifest | undefined =>
   runtimePluginManifests.find((manifest) => manifest.id === pluginId);
 
-const getDefaultConfigPath = (): string => {
-  // Keep this helper synchronous because callers run in synchronous startup
-  // paths and expect a concrete path immediately.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const {cfgPath} = require('../config/paths') as typeof import('../config/paths');
-  return cfgPath;
-};
+const getDefaultConfigPath = (): string => cfgPath;
 
 const getConfigPluginNamespace = (cfg: configOptions): RuntimePluginSettingsNamespace => {
   return isRecord(cfg.plugins) ? (cfg.plugins as RuntimePluginSettingsNamespace) : {};
