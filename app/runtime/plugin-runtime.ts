@@ -1,10 +1,10 @@
 /** @file Runtime plugin manifest evaluation and JSON5-backed settings persistence. */
 import {readFileSync, writeFileSync} from 'node:fs';
 
-import JSON5 from 'json5';
 import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
 import {cfgPath} from '../config/paths';
+import {parseJson5WithSchema, stringifyJson5, type ParseSchema, type ParseResult} from '../config/json5-config';
 
 import type {CommandDefinition} from '@shared/types/commands';
 import type {configOptions, rawConfig} from '@shared/types/config';
@@ -14,17 +14,6 @@ type RuntimePluginSettings = Record<string, unknown>;
 type RuntimePluginSettingsNamespace = Record<string, RuntimePluginSettings>;
 type ReadTextFile = (path: string, encoding: BufferEncoding) => string;
 type WriteTextFile = (path: string, content: string, encoding: BufferEncoding) => void;
-type ParseSuccess<T> = {
-  success: true;
-  data: T;
-};
-
-type ParseFailure = {
-  success: false;
-  error: Error;
-};
-
-type ParseResult<T> = ParseSuccess<T> | ParseFailure;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -33,8 +22,6 @@ const isStringArray = (value: unknown): value is string[] =>
 const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
   isRecord(value) &&
   Object.values(value).every((entry) => typeof entry === 'string' || (Array.isArray(entry) && isStringArray(entry)));
-
-const asSettingsRecord = (value: unknown): RuntimePluginSettings => (isRecord(value) ? value : {});
 
 const cloneValue = <T>(value: T): T => structuredClone(value);
 
@@ -56,11 +43,6 @@ const getOrInitPluginsNamespace = (cfg: rawConfig): RuntimePluginSettingsNamespa
     configSection.plugins = {};
   }
   return configSection.plugins as RuntimePluginSettingsNamespace;
-};
-
-const resolvePluginSettings = (cfg: configOptions, manifest: RuntimePluginManifest): RuntimePluginSettings => {
-  const namespace = getPluginsNamespace(cfg);
-  return merge({}, manifest.settingsDefaults, asSettingsRecord(namespace[manifest.id])) as RuntimePluginSettings;
 };
 
 const safeParseRawConfig = (value: unknown): ParseResult<rawConfig> => {
@@ -90,54 +72,42 @@ const safeParseRawConfig = (value: unknown): ParseResult<rawConfig> => {
   return {success: true, data: value as rawConfig};
 };
 
+const rawConfigSchema: ParseSchema<rawConfig> = {
+  safeParse: safeParseRawConfig
+};
+
 const parseConfigJson5 = (raw: string): rawConfig => {
-  try {
-    const parsed = JSON5.parse(raw) as unknown;
-    const validated = safeParseRawConfig(parsed);
-    if (!validated.success) {
-      console.warn('Invalid JSON5 config shape from runtime plugin config.', validated.error);
-      return {};
-    }
-    return validated.data;
-  } catch (error) {
-    console.warn('Failed to parse JSON5 config from runtime plugin config.', error);
-    return {};
-  }
+  return parseJson5WithSchema(raw, {
+    source: 'runtime plugin config',
+    schema: rawConfigSchema,
+    fallback: {},
+    itemType: 'config'
+  });
 };
 
-const sortKeys = (value: unknown): unknown => {
-  if (Array.isArray(value)) {
-    return value.map((item) => sortKeys(item));
-  }
-
-  if (!isRecord(value)) {
-    return value;
-  }
-
-  const sortedObject: Record<string, unknown> = {};
-  Object.keys(value)
-    .sort()
-    .forEach((key) => {
-      sortedObject[key] = sortKeys(value[key]);
-    });
-  return sortedObject;
-};
-
-const stringifyConfigJson5 = (cfg: rawConfig): string => `${JSON5.stringify(sortKeys(cfg), null, 2)}\n`;
+const stringifyConfigJson5 = (cfg: rawConfig): string => stringifyJson5(cfg);
 
 const isRuntimePluginManifestEnabled = (cfg: configOptions, manifest: RuntimePluginManifest): boolean => {
-  const resolvedSettings = resolvePluginSettings(cfg, manifest);
+  const namespace = getPluginsNamespace(cfg);
+  const existing = namespace[manifest.id];
+  const resolvedSettings = merge(
+    {},
+    manifest.settingsDefaults,
+    isRecord(existing) ? existing : {}
+  ) as RuntimePluginSettings;
   const enabled = resolvedSettings.enabled;
   return typeof enabled === 'boolean' ? enabled : true;
 };
 
 /** Returns resolved settings for a runtime plugin from in-memory config state. */
 export const getRuntimePluginSettings = (cfg: configOptions, pluginId: string): RuntimePluginSettings => {
+  const namespace = getPluginsNamespace(cfg);
+  const existing = namespace[pluginId];
   const manifest = findRuntimePluginManifest(pluginId);
   if (!manifest) {
-    return asSettingsRecord(getPluginsNamespace(cfg)[pluginId]);
+    return isRecord(existing) ? existing : {};
   }
-  return resolvePluginSettings(cfg, manifest);
+  return merge({}, manifest.settingsDefaults, isRecord(existing) ? existing : {}) as RuntimePluginSettings;
 };
 
 /** Returns command definitions contributed by currently enabled runtime plugins. */
@@ -197,7 +167,7 @@ export const ensureRuntimePluginSettingsPersisted = (
     let didChange = false;
 
     runtimePluginManifests.forEach((manifest) => {
-      const existing = asSettingsRecord(namespace[manifest.id]);
+      const existing = isRecord(namespace[manifest.id]) ? namespace[manifest.id] : {};
       const merged = merge({}, manifest.settingsDefaults, existing) as RuntimePluginSettings;
       if (!isEqual(existing, merged)) {
         namespace[manifest.id] = merged;
@@ -236,7 +206,7 @@ export const setRuntimePluginEnabledPersisted = (
   try {
     const rawConfig = parseConfigJson5(readFile(configFilePath, 'utf8'));
     const namespace = getOrInitPluginsNamespace(rawConfig);
-    const existing = asSettingsRecord(namespace[pluginId]);
+    const existing = isRecord(namespace[pluginId]) ? namespace[pluginId] : {};
     const merged = merge({}, manifestDefaults, existing, {enabled}) as RuntimePluginSettings;
 
     if (!isEqual(existing, merged)) {
