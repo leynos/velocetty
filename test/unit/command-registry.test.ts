@@ -93,6 +93,9 @@ test('getRegisteredKeys flattens decorated keymaps into shortcut-command pairs',
 });
 
 test('getRegisteredKeys synchronizes runtime plugin command registrations', async () => {
+  const nonRuntimeCommandId = `${TEST_COMMAND_PREFIX}:non-runtime`;
+  register(createCommandDefinition(nonRuntimeCommandId, 'Non-runtime command'));
+
   runtimeCommands = [{...goldenPathCommandDefinition}];
   decoratedKeymaps = {
     [GOLDEN_PATH_COMMAND_ID]: ['ctrl+alt+shift+g']
@@ -101,12 +104,14 @@ test('getRegisteredKeys synchronizes runtime plugin command registrations', asyn
   const registeredKeys = await getRegisteredKeys();
   expect(registeredKeys['ctrl+alt+shift+g']).toBe(GOLDEN_PATH_COMMAND_ID);
   expect(get(GOLDEN_PATH_COMMAND_ID)).toEqual(goldenPathCommandDefinition);
+  expect(get(nonRuntimeCommandId)).toEqual(createCommandDefinition(nonRuntimeCommandId, 'Non-runtime command'));
 
   runtimeCommands = [];
   decoratedKeymaps = {};
   await getRegisteredKeys();
 
   expect(get(GOLDEN_PATH_COMMAND_ID)).toBeUndefined();
+  expect(get(nonRuntimeCommandId)).toEqual(createCommandDefinition(nonRuntimeCommandId, 'Non-runtime command'));
 });
 
 test('registerCommandHandlers merges new handlers into registry', () => {

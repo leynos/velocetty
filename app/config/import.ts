@@ -1,9 +1,9 @@
 /** @file Imports and normalizes user and default configuration files. */
 import {resolve} from 'node:path';
 
-import JSON5 from 'json5';
 import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
 import {z} from 'zod';
+import {parseJson5WithSchema, stringifyJson5} from '@shared/config/json5-config';
 
 import type {rawConfig} from '@shared/types/config';
 import notify from '../notify';
@@ -24,27 +24,6 @@ const rawConfigSchema: z.ZodType<rawConfig> = z
   })
   .passthrough() as z.ZodType<rawConfig>;
 
-const parseJson5WithSchema = <T>(
-  raw: string,
-  source: string,
-  schema: z.ZodType<T>,
-  fallback: T,
-  itemType: string = 'config'
-): T => {
-  try {
-    const parsed = JSON5.parse(raw) as unknown;
-    const validated = schema.safeParse(parsed);
-    if (!validated.success) {
-      console.warn(`Invalid JSON5 ${itemType} shape from ${source}.`, validated.error);
-      return fallback;
-    }
-    return validated.data;
-  } catch (error) {
-    console.warn(`Failed to parse JSON5 ${itemType} from ${source}.`, error);
-    return fallback;
-  }
-};
-
 const parseRawConfig = (raw: string, source: string): rawConfig | null => {
   return parseJson5WithSchema(raw, source, rawConfigSchema, null, 'config');
 };
@@ -52,8 +31,6 @@ const parseRawConfig = (raw: string, source: string): rawConfig | null => {
 const parseKeymapConfig = (raw: string, source: string): Record<string, string | string[]> => {
   return parseJson5WithSchema(raw, source, keymapSchema, {}, 'keymap');
 };
-
-const stringifyConfig = (value: unknown) => `${JSON5.stringify(value, null, 2)}\n`;
 
 const ensureSchemaFile = () => {
   try {
@@ -69,7 +46,7 @@ const ensureUserConfigFile = (defaultCfgRaw: string) => {
   }
 
   const parsedDefaultConfig = parseRawConfig(defaultCfgRaw, 'default config bootstrap') ?? {};
-  writeFileSync(cfgPath, stringifyConfig(parsedDefaultConfig), 'utf8');
+  writeFileSync(cfgPath, stringifyJson5(parsedDefaultConfig), 'utf8');
 };
 
 const _importConf = () => {

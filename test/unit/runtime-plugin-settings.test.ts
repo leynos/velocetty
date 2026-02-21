@@ -57,6 +57,28 @@ test('ensureRuntimePluginSettingsPersisted writes missing defaults to config.plu
   expect(persisted.config.plugins[GOLDEN_PATH_PLUGIN_ID]).toEqual(goldenPathSettingsDefaults);
 });
 
+test('ensureRuntimePluginSettingsPersisted is idempotent after defaults are written', () => {
+  const {readFile, writeFile, getContent, getWrites} = createReadWritePair(`{
+    config: {
+      defaultProfile: 'default',
+      profiles: [{name: 'default', config: {}}],
+    },
+    plugins: [],
+    localPlugins: [],
+    keymaps: {},
+  }`);
+
+  const firstNamespace = ensureRuntimePluginSettingsPersisted('/tmp/hyper.json', readFile, writeFile);
+  const firstContent = getContent();
+
+  const secondNamespace = ensureRuntimePluginSettingsPersisted('/tmp/hyper.json', readFile, writeFile);
+  const secondContent = getContent();
+
+  expect(firstNamespace).toEqual(secondNamespace);
+  expect(secondContent).toEqual(firstContent);
+  expect(getWrites()).toHaveLength(1);
+});
+
 test('setRuntimePluginEnabledPersisted updates enabled flag in JSON5 namespace', () => {
   const {readFile, writeFile, getContent, getWrites} = createReadWritePair(`{
     config: {

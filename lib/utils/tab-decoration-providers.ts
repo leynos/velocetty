@@ -77,66 +77,59 @@ const compareProviders = (a: RegisteredProvider, b: RegisteredProvider) => {
   return a.registrationOrder - b.registrationOrder;
 };
 
-const dedupeBounded = <T>(items: T[], keyFn: (item: T) => string, limit: number): T[] => {
-  const result: T[] = [];
-  const seen = new Set<string>();
-
-  for (const item of items) {
-    const key = keyFn(item);
-    if (seen.has(key)) {
-      continue;
-    }
-
-    seen.add(key);
-    result.push(item);
-    if (result.length >= limit) {
-      break;
-    }
-  }
-
-  return result;
-};
-
-// Helper to merge a simple optional property (first non-null wins).
-const mergeSimpleProperty = <T extends TabDecoration, K extends keyof T>(
-  merged: T,
-  decoration: TabDecoration,
-  key: K
-): void => {
-  if (!merged[key] && decoration[key]) {
-    merged[key] = decoration[key] as T[K];
-  }
-};
-
-// Helper to collect array items from decorations.
-const collectArrayItems = <T>(decorations: TabDecoration[], key: 'badges' | 'widgets'): T[] => {
-  const collected: T[] = [];
-  for (const decoration of decorations) {
-    const items = decoration[key];
-    if (items && items.length > 0) {
-      collected.push(...(items as T[]));
-    }
-  }
-  return collected;
-};
-
 export const mergeTabDecorations = (decorations: TabDecoration[]): TabDecoration => {
   const merged: TabDecoration = {};
+  const badges: TabDecorationBadge[] = [];
+  const widgets: TabDecorationWidget[] = [];
+  const seenBadgeKeys = new Set<string>();
+  const seenWidgetKeys = new Set<string>();
 
   for (const decoration of decorations) {
-    mergeSimpleProperty(merged, decoration, 'icon');
-    mergeSimpleProperty(merged, decoration, 'title');
-    mergeSimpleProperty(merged, decoration, 'subtitle');
+    if (!merged.icon && decoration.icon) {
+      merged.icon = decoration.icon;
+    }
+    if (!merged.title && decoration.title) {
+      merged.title = decoration.title;
+    }
+    if (!merged.subtitle && decoration.subtitle) {
+      merged.subtitle = decoration.subtitle;
+    }
+
+    if (decoration.badges && badges.length < MAX_BADGES) {
+      for (const badge of decoration.badges) {
+        if (badges.length >= MAX_BADGES) {
+          break;
+        }
+        const key = badgeKey(badge);
+        if (seenBadgeKeys.has(key)) {
+          continue;
+        }
+        seenBadgeKeys.add(key);
+        badges.push(badge);
+      }
+    }
+
+    if (decoration.widgets && widgets.length < MAX_WIDGETS) {
+      for (const widget of decoration.widgets) {
+        if (widgets.length >= MAX_WIDGETS) {
+          break;
+        }
+        const key = widgetKey(widget);
+        if (seenWidgetKeys.has(key)) {
+          continue;
+        }
+        seenWidgetKeys.add(key);
+        widgets.push(widget);
+      }
+    }
   }
 
-  const mergedBadges = collectArrayItems<TabDecorationBadge>(decorations, 'badges');
-  if (mergedBadges.length > 0) {
-    merged.badges = dedupeBounded(mergedBadges, badgeKey, MAX_BADGES);
+  if (badges.length > 0) {
+    merged.badges = badges;
   }
 
-  const mergedWidgets = collectArrayItems<TabDecorationWidget>(decorations, 'widgets');
-  if (mergedWidgets.length > 0) {
-    merged.widgets = dedupeBounded(mergedWidgets, widgetKey, MAX_WIDGETS);
+  if (widgets.length > 0) {
+    merged.widgets = widgets;
   }
 
   return merged;
@@ -150,7 +143,8 @@ export class TabDecorationProviderRegistry {
   register(provider: TabDecorationProvider): () => void {
     const normalizedId = provider.id.trim();
     if (!normalizedId) {
-      throw new Error('Tab decoration provider id must be non-empty.');
+      console.warn('Ignoring tab decoration provider registration with empty id.');
+      return () => {};
     }
 
     const normalizedPriority = Number.isFinite(provider.priority) ? provider.priority : 0;

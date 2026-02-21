@@ -58,6 +58,33 @@ afterAll(() => {
   removeSync(workspaceRoot);
 });
 
+test.serial('notifies and falls back to default config on invalid JSON5 user config', async () => {
+  mkdirpSync(mockPaths.cfgDir);
+  const defaultConfigFixture = `{
+    config: { defaultProfile: 'default', profiles: [{ name: 'default', config: {} }] },
+    plugins: [],
+    localPlugins: [],
+    keymaps: {}
+  }`;
+  writeFileSync(mockPaths.defaultCfg, defaultConfigFixture, 'utf8');
+  writeFileSync(mockPaths.defaultPlatformKeyPath(), `{"window:new": ["ctrl+n"]}`, 'utf8');
+  writeFileSync(
+    mockPaths.cfgPath,
+    `{
+      config: { defaultProfile: 'broken' profiles: [{ name: 'broken', config: {} }] },
+      plugins: [],
+    }`,
+    'utf8'
+  );
+  writeFileSync(mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+
+  const configModule = await loadConfigImport();
+  const importedConfig = configModule._import();
+
+  expect(notifyMock).toHaveBeenCalledTimes(1);
+  expect(importedConfig.userCfg).toEqual(JSON5.parse(defaultConfigFixture));
+});
+
 test.serial('imports user config with JSON5 comments and trailing commas', async () => {
   mkdirpSync(mockPaths.cfgDir);
   writeFileSync(

@@ -1,5 +1,5 @@
 /** @file Covers deterministic tab-decoration provider ordering and update events. */
-import {describe, expect, test} from 'bun:test';
+import {describe, expect, mock, test} from 'bun:test';
 
 import {TabDecorationProviderRegistry} from '../../lib/utils/tab-decoration-providers';
 
@@ -104,5 +104,64 @@ describe('TabDecorationProviderRegistry', () => {
 
     unregister();
     expect(updateReasons).toHaveLength(3);
+  });
+
+  test('clear disposes provider subscriptions and emits one change event', () => {
+    const registry = new TabDecorationProviderRegistry();
+    const updateListener = mock(() => {});
+    const disposeProvider = mock(() => {});
+
+    registry.subscribe(updateListener);
+    registry.register({
+      id: 'subscribed-provider',
+      priority: 1,
+      provideDecoration: () => ({title: 'one'}),
+      subscribe: () => disposeProvider
+    });
+    registry.register({
+      id: 'plain-provider',
+      priority: 1,
+      provideDecoration: () => ({title: 'two'})
+    });
+
+    const updatesBeforeClear = updateListener.mock.calls.length;
+    registry.clear();
+
+    expect(disposeProvider).toHaveBeenCalledTimes(1);
+    expect(registry.listProviders()).toHaveLength(0);
+    expect(updateListener.mock.calls.length).toBe(updatesBeforeClear + 1);
+  });
+
+  test('resolve continues when one provider throws', () => {
+    const registry = new TabDecorationProviderRegistry();
+
+    registry.register({
+      id: 'failing-provider',
+      priority: 10,
+      provideDecoration: () => {
+        throw new Error('boom');
+      }
+    });
+    registry.register({
+      id: 'healthy-provider',
+      priority: 5,
+      provideDecoration: () => ({title: 'healthy'})
+    });
+
+    const resolved = registry.resolve(buildContext());
+    expect(resolved.title).toBe('healthy');
+  });
+
+  test('ignores provider registrations with empty ids', () => {
+    const registry = new TabDecorationProviderRegistry();
+
+    const unregister = registry.register({
+      id: '   ',
+      priority: 1,
+      provideDecoration: () => ({title: 'ignored'})
+    });
+
+    expect(typeof unregister).toBe('function');
+    expect(registry.listProviders()).toEqual([]);
   });
 });

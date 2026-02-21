@@ -1,10 +1,10 @@
 /** @file Runtime plugin manifest evaluation and JSON5-backed settings persistence. */
 import {readFileSync, writeFileSync} from 'node:fs';
 
-import JSON5 from 'json5';
 import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
 import {z} from 'zod';
+import {parseJson5WithSchema, stringifyJson5} from '@shared/config/json5-config';
 import {cfgPath} from '../config/paths';
 
 import type {CommandDefinition} from '@shared/types/commands';
@@ -49,31 +49,20 @@ const resolvePluginSettings = (cfg: configOptions, manifest: RuntimePluginManife
 };
 
 const keymapsSchema = z.record(z.string(), z.union([z.string(), z.array(z.string())]));
-const rawConfigSchema = z
+const rawConfigSchema: z.ZodType<rawConfig> = z
   .object({
     config: z.record(z.string(), z.unknown()).optional(),
     plugins: z.array(z.string()).optional(),
     localPlugins: z.array(z.string()).optional(),
     keymaps: keymapsSchema.optional()
   })
-  .passthrough();
+  .passthrough() as z.ZodType<rawConfig>;
 
 const parseConfigJson5 = (raw: string): rawConfig => {
-  try {
-    const parsed = JSON5.parse(raw) as unknown;
-    const validated = rawConfigSchema.safeParse(parsed);
-    if (!validated.success) {
-      console.warn('Invalid runtime plugin config shape detected; falling back to empty config.', validated.error);
-      return {};
-    }
-    return validated.data as rawConfig;
-  } catch (error) {
-    console.warn('Failed to parse runtime plugin JSON5 config; falling back to empty config.', error);
-    return {};
-  }
+  return parseJson5WithSchema(raw, 'runtime plugin config', rawConfigSchema, {}, 'config');
 };
 
-const stringifyConfigJson5 = (cfg: rawConfig): string => `${JSON5.stringify(cfg, null, 2)}\n`;
+const stringifyConfigJson5 = (cfg: rawConfig): string => stringifyJson5(cfg);
 
 const isRuntimePluginManifestEnabled = (cfg: configOptions, manifest: RuntimePluginManifest): boolean => {
   const resolvedSettings = resolvePluginSettings(cfg, manifest);

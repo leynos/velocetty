@@ -5,9 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 
 import got from 'got';
-import JSON5 from 'json5';
 import registryUrlModule from 'registry-url';
 import {z} from 'zod';
+import {parseJson5StrictWithSchema, stringifyJson5} from '@shared/config/json5-config';
 
 const registryUrl = registryUrlModule();
 
@@ -54,7 +54,7 @@ const cliConfigSchema = z
   })
   .passthrough();
 
-const getParsedFile = memoize(() => cliConfigSchema.parse(JSON5.parse(getFileContents()) as unknown));
+const getParsedFile = memoize(() => parseJson5StrictWithSchema(getFileContents(), cliConfigSchema));
 
 const getPluginsByKey = (key: 'plugins' | 'localPlugins'): string[] => getParsedFile()[key];
 
@@ -97,7 +97,7 @@ function isInstalled(plugin: string, locally?: boolean) {
 }
 
 function save(config: unknown) {
-  return fs.writeFileSync(fileName, `${JSON5.stringify(sortKeys(config), null, 2)}\n`, 'utf8');
+  return fs.writeFileSync(fileName, stringifyJson5(sortKeys(config)), 'utf8');
 }
 
 function getPackageName(plugin: string) {

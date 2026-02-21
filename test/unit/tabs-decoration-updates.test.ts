@@ -82,6 +82,8 @@ test('re-renders tabs when provider update callback fires', async () => {
   await mountTabs(root);
   expect(typeof decorationListener).toBe('function');
   expect(getTabPropsMock).toHaveBeenCalledTimes(2);
+  expect((getTabPropsMock.mock.calls[0]?.[0] as {tabIndex?: number}).tabIndex).toBe(0);
+  expect((getTabPropsMock.mock.calls[1]?.[0] as {tabIndex?: number}).tabIndex).toBe(1);
 
   await act(async () => {
     decorationListener?.();
@@ -89,6 +91,8 @@ test('re-renders tabs when provider update callback fires', async () => {
   });
 
   expect(getTabPropsMock).toHaveBeenCalledTimes(4);
+  expect((getTabPropsMock.mock.calls[2]?.[0] as {tabIndex?: number}).tabIndex).toBe(0);
+  expect((getTabPropsMock.mock.calls[3]?.[0] as {tabIndex?: number}).tabIndex).toBe(1);
 
   await act(async () => {
     root.unmount();
