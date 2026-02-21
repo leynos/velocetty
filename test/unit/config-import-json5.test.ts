@@ -162,5 +162,6 @@ test.serial('bootstraps missing config with JSON5 output without legacy migratio
 
   const writtenConfig = JSON5.parse(readFileSync(mockPaths.cfgPath, 'utf8'));
   const expectedConfig = JSON5.parse(defaultConfigFixture);
+  expect(writtenConfig.plugins).toEqual(['plugin-a']);
   expect(writtenConfig).toEqual(expectedConfig);
 });

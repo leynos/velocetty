@@ -31,15 +31,15 @@ const fileName =
  * statically analyze the hyper configuration isn't fatal for all kinds of
  * subcommands. We can use memoization to make reading and parsing lazy.
  */
-function memoize<T extends (...args: any[]) => any>(fn: T): T {
+function memoize<T extends (...args: any[]) => unknown>(fn: T): T {
   let hasResult = false;
-  let result: any;
-  return ((...args: Parameters<T>) => {
+  let result: ReturnType<T> | undefined;
+  return ((...args: Parameters<T>): ReturnType<T> => {
     if (!hasResult) {
       result = fn(...args);
       hasResult = true;
     }
-    return result;
+    return result as ReturnType<T>;
   }) as T;
 }
 
@@ -93,12 +93,28 @@ function getPackageName(plugin: string) {
   return nameWithoutVersion.split('@')[0];
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const hasVersions = (value: unknown): value is {versions: unknown} =>
+  isRecord(value) && 'versions' in value && value.versions !== undefined;
+
+const getErrorMessage = (value: unknown): string => {
+  if (value instanceof Error) {
+    return value.message;
+  }
+  if (isRecord(value) && typeof value.message === 'string') {
+    return value.message;
+  }
+  return String(value);
+};
+
 function existsOnNpm(plugin: string) {
   const name = getPackageName(plugin);
   return got
-    .get<any>(registryUrl + name.toLowerCase(), {timeout: {request: 10000}, responseType: 'json'})
+    .get<unknown>(registryUrl + name.toLowerCase(), {timeout: {request: 10000}, responseType: 'json'})
     .then((res) => {
-      if (!res.body.versions) {
+      if (!hasVersions(res.body)) {
         return Promise.reject(res);
       } else {
         return res;
@@ -109,12 +125,13 @@ function existsOnNpm(plugin: string) {
 function install(plugin: string, locally?: boolean) {
   const array = locally ? getLocalPlugins() : getPlugins();
   return existsOnNpm(plugin)
-    .catch((err: any) => {
-      const {statusCode} = err;
+    .catch((err: unknown) => {
+      const statusCode = isRecord(err) && typeof err.statusCode === 'number' ? err.statusCode : undefined;
       if (statusCode && (statusCode === 404 || statusCode === 200)) {
         return Promise.reject(`${plugin} not found on npm`);
       }
-      return Promise.reject(`${err.message}\nPlugin check failed. Check your internet connection or retry later.`);
+      const errorMessage = getErrorMessage(err);
+      return Promise.reject(`${errorMessage}\nPlugin check failed. Check your internet connection or retry later.`);
     })
     .then(() => {
       if (isInstalled(plugin, locally)) {

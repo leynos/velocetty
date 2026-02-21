@@ -34,6 +34,13 @@ const getPluginsNamespace = (cfg: configOptions): RuntimePluginSettingsNamespace
   return isRecord(cfg.plugins) ? (cfg.plugins as RuntimePluginSettingsNamespace) : {};
 };
 
+/**
+ * Returns the runtime plugin namespace, creating it in place when absent.
+ *
+ * This function mutates `cfg` by assigning `cfg.config` and
+ * `configSection.plugins` when either value is missing or invalid. Callers
+ * that require immutability should pass a cloned config object.
+ */
 const getOrInitPluginsNamespace = (cfg: rawConfig): RuntimePluginSettingsNamespace => {
   if (!isRecord(cfg.config)) {
     cfg.config = {} as configOptions;
