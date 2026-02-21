@@ -1,6 +1,8 @@
 /** @file Runtime-safe JSON5 parsing and deterministic serialization helpers for app config I/O. */
 import JSON5 from 'json5';
 
+import type {rawConfig} from '@shared/types/config';
+
 type ParseSuccess<T> = {
   success: true;
   data: T;
@@ -26,7 +28,7 @@ export interface ParseOptions<T> {
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const isStringArray = (value: unknown): value is string[] =>
+export const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 
 export const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
@@ -75,6 +77,14 @@ export const validateRawConfig = (value: unknown): ParseResult<Record<string, un
   }
 
   return {success: true, data: value};
+};
+
+export const safeParseRawConfig = (value: unknown): ParseResult<rawConfig> => {
+  const result = validateRawConfig(value);
+  if (!result.success) {
+    return result;
+  }
+  return {success: true, data: result.data as rawConfig};
 };
 
 export const parseJson5WithSchema = <T>(raw: string, options: ParseOptions<T>): T => {

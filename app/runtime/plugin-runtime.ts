@@ -7,9 +7,8 @@ import {cfgPath} from '../config/paths';
 import {
   isRecord,
   parseJson5WithSchema,
+  safeParseRawConfig,
   stringifyJson5,
-  validateRawConfig,
-  type ParseResult,
   type ParseSchema
 } from '../config/json5-config';
 
@@ -55,14 +54,6 @@ const getOrInitPluginsNamespace = (cfg: rawConfig): RuntimePluginSettingsNamespa
     configSection.plugins = {};
   }
   return configSection.plugins as RuntimePluginSettingsNamespace;
-};
-
-const safeParseRawConfig = (value: unknown): ParseResult<rawConfig> => {
-  const result = validateRawConfig(value);
-  if (!result.success) {
-    return result;
-  }
-  return {success: true, data: result.data as rawConfig};
 };
 
 const rawConfigSchema: ParseSchema<rawConfig> = {
