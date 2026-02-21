@@ -149,19 +149,23 @@ const collectWidgets = (decorations: TabDecoration[]): TabDecorationWidget[] => 
   return widgets;
 };
 
+const mergeSimpleProperty = <K extends 'icon' | 'title' | 'subtitle'>(
+  merged: TabDecoration,
+  decoration: TabDecoration,
+  key: K
+): void => {
+  if (!merged[key] && decoration[key]) {
+    merged[key] = decoration[key];
+  }
+};
+
 export const mergeTabDecorations = (decorations: TabDecoration[]): TabDecoration => {
   const merged: TabDecoration = {};
 
   for (const decoration of decorations) {
-    if (!merged.icon && decoration.icon) {
-      merged.icon = decoration.icon;
-    }
-    if (!merged.title && decoration.title) {
-      merged.title = decoration.title;
-    }
-    if (!merged.subtitle && decoration.subtitle) {
-      merged.subtitle = decoration.subtitle;
-    }
+    mergeSimpleProperty(merged, decoration, 'icon');
+    mergeSimpleProperty(merged, decoration, 'title');
+    mergeSimpleProperty(merged, decoration, 'subtitle');
   }
 
   const badges = collectBadges(decorations);
