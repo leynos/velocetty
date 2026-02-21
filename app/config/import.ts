@@ -2,8 +2,9 @@
 import {resolve} from 'node:path';
 
 import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
+import JSON5 from 'json5';
 import {z} from 'zod';
-import {parseJson5WithSchema, stringifyJson5} from '@shared/config/json5-config';
+import {stringifyJson5} from '@shared/config/json5-config';
 
 import type {rawConfig} from '@shared/types/config';
 import notify from '../notify';
@@ -24,12 +25,35 @@ const rawConfigSchema: z.ZodType<rawConfig> = z
   })
   .passthrough() as z.ZodType<rawConfig>;
 
+interface ParseOptions<T> {
+  readonly source: string;
+  readonly schema: z.ZodType<T>;
+  readonly fallback: T;
+  readonly itemType?: string;
+}
+
+const parseJson5WithSchema = <T>(raw: string, options: ParseOptions<T>): T => {
+  const {source, schema, fallback, itemType = 'config'} = options;
+  try {
+    const parsed = JSON5.parse(raw) as unknown;
+    const validated = schema.safeParse(parsed);
+    if (!validated.success) {
+      console.warn(`Invalid JSON5 ${itemType} shape from ${source}.`, validated.error);
+      return fallback;
+    }
+    return validated.data;
+  } catch (error) {
+    console.warn(`Failed to parse JSON5 ${itemType} from ${source}.`, error);
+    return fallback;
+  }
+};
+
 const parseRawConfig = (raw: string, source: string): rawConfig | null => {
-  return parseJson5WithSchema(raw, source, rawConfigSchema, null, 'config');
+  return parseJson5WithSchema(raw, {source, schema: rawConfigSchema, fallback: null, itemType: 'config'});
 };
 
 const parseKeymapConfig = (raw: string, source: string): Record<string, string | string[]> => {
-  return parseJson5WithSchema(raw, source, keymapSchema, {}, 'keymap');
+  return parseJson5WithSchema(raw, {source, schema: keymapSchema, fallback: {}, itemType: 'keymap'});
 };
 
 const stringifyConfig = (config: rawConfig): string => stringifyJson5(config);
