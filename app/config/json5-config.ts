@@ -31,7 +31,7 @@ export const parseJson5WithSchema = <T>(raw: string, options: ParseOptions<T>): 
   try {
     const parsed = JSON5.parse(raw) as unknown;
     const validated = schema.safeParse(parsed);
-    if (!validated.success) {
+    if (validated.success === false) {
       console.warn(`Invalid JSON5 ${itemType} shape from ${source}.`, validated.error);
       return fallback;
     }

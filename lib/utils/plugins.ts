@@ -123,7 +123,7 @@ const mapRuntimeToTabDecoration = (
   runtimeDecoration: RuntimePluginTabDecoration | null | undefined
 ): TabDecoration | null | undefined => {
   if (!runtimeDecoration) {
-    return runtimeDecoration;
+    return undefined;
   }
 
   const mappedDecoration: TabDecoration = {

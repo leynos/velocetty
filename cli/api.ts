@@ -1,3 +1,4 @@
+/** @file CLI helpers for reading, validating, and mutating Hyper plugin config. */
 // eslint-disable-next-line eslint-comments/disable-enable-pair
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import fs from 'node:fs';
@@ -31,12 +32,12 @@ const fileName =
  * statically analyze the hyper configuration isn't fatal for all kinds of
  * subcommands. We can use memoization to make reading and parsing lazy.
  */
-function memoize<T extends (...args: any[]) => unknown>(fn: T): T {
+function memoize<T extends (...args: unknown[]) => unknown>(fn: T): T {
   let hasResult = false;
   let result: ReturnType<T> | undefined;
   return ((...args: Parameters<T>): ReturnType<T> => {
     if (!hasResult) {
-      result = fn(...args);
+      result = fn(...args) as ReturnType<T>;
       hasResult = true;
     }
     return result as ReturnType<T>;

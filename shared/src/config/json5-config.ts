@@ -79,13 +79,15 @@ export const sortKeys = (value: unknown): unknown => {
   return value;
 };
 
-export const parseJson5WithSchema = <T>(
-  raw: string,
-  source: string,
-  schema: z.ZodType<T>,
-  fallback: T,
-  itemType: string = 'config'
-): T => {
+export type ParseJson5Options<T> = {
+  source: string;
+  schema: z.ZodType<T>;
+  fallback: T;
+  itemType?: string;
+};
+
+export const parseJson5WithSchema = <T>(raw: string, options: ParseJson5Options<T>): T => {
+  const {source, schema, fallback, itemType = 'config'} = options;
   try {
     const parsed = JSON5.parse(raw) as unknown;
     const validated = schema.safeParse(parsed);

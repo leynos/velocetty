@@ -48,7 +48,7 @@ test('ensureRuntimePluginSettingsPersisted writes missing defaults to config.plu
     keymaps: {},
   }`);
 
-  const namespace = ensureRuntimePluginSettingsPersisted('/tmp/hyper.json', readFile, writeFile);
+  const namespace = ensureRuntimePluginSettingsPersisted({configFilePath: '/tmp/hyper.json', readFile, writeFile});
 
   expect(getWrites()).toHaveLength(1);
   expect(namespace[GOLDEN_PATH_PLUGIN_ID]).toEqual(goldenPathSettingsDefaults);
@@ -68,10 +68,14 @@ test('ensureRuntimePluginSettingsPersisted is idempotent after defaults are writ
     keymaps: {},
   }`);
 
-  const firstNamespace = ensureRuntimePluginSettingsPersisted('/tmp/hyper.json', readFile, writeFile);
+  const firstNamespace = ensureRuntimePluginSettingsPersisted({configFilePath: '/tmp/hyper.json', readFile, writeFile});
   const firstContent = getContent();
 
-  const secondNamespace = ensureRuntimePluginSettingsPersisted('/tmp/hyper.json', readFile, writeFile);
+  const secondNamespace = ensureRuntimePluginSettingsPersisted({
+    configFilePath: '/tmp/hyper.json',
+    readFile,
+    writeFile
+  });
   const secondContent = getContent();
 
   expect(firstNamespace).toEqual(secondNamespace);
@@ -88,13 +92,11 @@ test('setRuntimePluginEnabledPersisted updates enabled flag in JSON5 namespace',
     },
   }`);
 
-  const updated = setRuntimePluginEnabledPersisted(
-    GOLDEN_PATH_PLUGIN_ID,
-    false,
-    '/tmp/hyper.json',
+  const updated = setRuntimePluginEnabledPersisted(GOLDEN_PATH_PLUGIN_ID, false, {
+    configFilePath: '/tmp/hyper.json',
     readFile,
     writeFile
-  );
+  });
 
   expect(updated.enabled).toBe(false);
   expect(getWrites()).toHaveLength(1);

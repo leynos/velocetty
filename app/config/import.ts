@@ -110,7 +110,7 @@ const _importConf = () => {
 
   if (!userCfg) {
     notify("Couldn't parse config file. Using default config instead.");
-    userCfg = parseRawConfig(defaultCfgRaw, 'default config fallback') ?? {};
+    userCfg = _defaultCfg;
   }
 
   return {userCfg, defaultCfg: _defaultCfg};

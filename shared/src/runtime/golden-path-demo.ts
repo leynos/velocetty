@@ -140,4 +140,4 @@ export const goldenPathPluginManifest: RuntimePluginManifest = {
 };
 
 /** Deterministic list of runtime manifests loaded by the plugin runtime. */
-export const runtimePluginManifests: RuntimePluginManifest[] = [goldenPathPluginManifest];
+export const runtimePluginManifests: readonly RuntimePluginManifest[] = [goldenPathPluginManifest];

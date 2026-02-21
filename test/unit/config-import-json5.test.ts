@@ -82,7 +82,9 @@ test.serial('notifies and falls back to default config on invalid JSON5 user con
   const importedConfig = configModule._import();
 
   expect(notifyMock).toHaveBeenCalledTimes(1);
-  expect(importedConfig.userCfg).toEqual(JSON5.parse(defaultConfigFixture));
+  const expectedFallbackConfig = JSON5.parse(defaultConfigFixture) as Record<string, unknown>;
+  expectedFallbackConfig.keymaps = {'window:new': ['ctrl+n']};
+  expect(importedConfig.userCfg).toEqual(expectedFallbackConfig);
 });
 
 test.serial('imports user config with JSON5 comments and trailing commas', async () => {

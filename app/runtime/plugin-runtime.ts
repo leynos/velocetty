@@ -15,6 +15,11 @@ type RuntimePluginSettings = Record<string, unknown>;
 type RuntimePluginSettingsNamespace = Record<string, RuntimePluginSettings>;
 type ReadTextFile = (path: string, encoding: BufferEncoding) => string;
 type WriteTextFile = (path: string, content: string, encoding: BufferEncoding) => void;
+type PersistenceOptions = {
+  configFilePath?: string;
+  readFile?: ReadTextFile;
+  writeFile?: WriteTextFile;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -71,6 +76,11 @@ const parseConfigJson5 = (raw: string): rawConfig => {
 };
 
 const stringifyConfigJson5 = (cfg: rawConfig): string => stringifyJson5(cfg);
+
+const resolvePersistenceOptions = (options: PersistenceOptions = {}) => {
+  const {configFilePath = getDefaultConfigPath(), readFile = readFileSync, writeFile = writeFileSync} = options;
+  return {configFilePath, readFile, writeFile};
+};
 
 const isRuntimePluginManifestEnabled = (cfg: configOptions, manifest: RuntimePluginManifest): boolean => {
   const namespace = getPluginsNamespace(cfg);
@@ -141,10 +151,9 @@ export const mergeRuntimePluginKeybindings = (
  * merged.
  */
 export const ensureRuntimePluginSettingsPersisted = (
-  configFilePath: string = getDefaultConfigPath(),
-  readFile: ReadTextFile = readFileSync,
-  writeFile: WriteTextFile = writeFileSync
+  options: PersistenceOptions = {}
 ): RuntimePluginSettingsNamespace => {
+  const {configFilePath, readFile, writeFile} = resolvePersistenceOptions(options);
   try {
     const rawConfig = parseConfigJson5(readFile(configFilePath, 'utf8'));
     const namespace = getOrInitPluginsNamespace(rawConfig);
@@ -181,10 +190,9 @@ export const ensureRuntimePluginSettingsPersisted = (
 export const setRuntimePluginEnabledPersisted = (
   pluginId: string,
   enabled: boolean,
-  configFilePath: string = getDefaultConfigPath(),
-  readFile: ReadTextFile = readFileSync,
-  writeFile: WriteTextFile = writeFileSync
+  options: PersistenceOptions = {}
 ): RuntimePluginSettings => {
+  const {configFilePath, readFile, writeFile} = resolvePersistenceOptions(options);
   const manifestDefaults = findRuntimePluginManifest(pluginId)?.settingsDefaults ?? {};
   const fallbackSettings = merge({}, manifestDefaults, {enabled}) as RuntimePluginSettings;
 
