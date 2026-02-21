@@ -7,7 +7,12 @@ import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {waitFor} from '../testUtils/waitFor';
 
-const getTabPropsMock = mock((_: unknown, __: unknown, props: any) => props);
+type MockTabProps = {
+  text?: string;
+  tabDecoration?: unknown;
+};
+
+const getTabPropsMock = mock((_: unknown, __: unknown, props: MockTabProps) => props);
 const unsubscribeDecorationUpdates = mock(() => {
   decorationListener = null;
 });

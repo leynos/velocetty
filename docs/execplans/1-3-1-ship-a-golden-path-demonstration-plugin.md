@@ -5,8 +5,9 @@
 - Purpose: deliver roadmap item `1.3.1` by shipping one example plugin that
   demonstrates plugin manifest metadata, settings schema/defaults, command and
   keybinding registration, and deterministic tab decoration output.
-- Invariants: introduce the golden-path APIs and JSON5-backed plugin settings
-  persistence without retaining legacy JSON-only config compatibility.
+- Invariants: introduce the golden-path APIs and JSON5 (a JSON-compatible
+  format with comments and trailing commas)-backed plugin settings persistence
+  without retaining legacy JSON-only config compatibility.
 - Cross-links: `docs/roadmap.md`, `docs/velocetty-design.md`,
   `docs/velocetty-hyper-codebase.md`,
   `docs/velocetty-product-requirements-document.md`,
@@ -118,8 +119,9 @@ item `1.3.1` done in `docs/roadmap.md`, and passing required gates:
   criteria in `docs/roadmap.md`.
 - [x] (2026-02-20 00:00Z) Mapped design constraints for plugin runtime,
   settings persistence, and tab decoration APIs in `docs/velocetty-design.md`.
-- [x] (2026-02-20 00:00Z) Mapped PRD workstream expectations for golden path
-  plugin deliverables in `docs/velocetty-product-requirements-document.md`.
+- [x] (2026-02-20 00:00Z) Mapped Product Requirements Document (PRD)
+  workstream expectations for golden path plugin deliverables in
+  `docs/velocetty-product-requirements-document.md`.
 - [x] (2026-02-20 00:00Z) Audited current runtime seams in
   `app/plugins.ts`, `lib/utils/plugins.ts`, `lib/command-registry.ts`, and
   `app/config/import.ts`.
@@ -150,8 +152,8 @@ item `1.3.1` done in `docs/roadmap.md`, and passing required gates:
   keymap decoration, but has no explicit plugin manifest/settings contract.
   Evidence: `app/plugins/extensions.ts`, `app/plugins.ts`, and
   `lib/utils/plugins.ts` load and execute hook-based APIs.
-  Impact: we need an additive manifest/settings layer and one golden plugin that
-  exercises it without breaking old hooks.
+  Impact: an additive manifest/settings layer and one golden plugin are
+  required to exercise the runtime without breaking old hooks.
 
 - Observation: command registration is currently achieved via renderer-side
   `registerCommands` plumbing and keymaps from `getDecoratedKeymaps`.
@@ -176,7 +178,8 @@ item `1.3.1` done in `docs/roadmap.md`, and passing required gates:
 
 - Decision: structure implementation as additive compatibility layers rather
   than runtime replacement.
-  Rationale: minimises blast radius and keeps existing plugin ecosystem working.
+  Rationale: minimizes blast radius and keeps existing plugin ecosystem
+  working.
   Date/Author: 2026-02-20 / Codex
 
 - Decision: run implementation with a small agent team and clearly owned

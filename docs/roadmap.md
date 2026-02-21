@@ -75,9 +75,9 @@ Scope notes:
   - [x] Register one tab decoration provider with deterministic output.
   - [x] Success criteria: plugin can be enabled/disabled, settings persist to
     JSON5, and decoration updates are event-driven.
-  - [x] Integrator gate: keep `1.3.1` unchecked until `bun install`,
-    `make build`, `make check-fmt`, `make lint`, and `make test` pass on the
-    integration branch.
+  - [x] Integrator gate: passed on the integration branch — `bun install`,
+    `make build`, `make check-fmt`, `make lint`, and `make test` all
+    succeeded.
 
 ### 1.4. Quality gates and supply-chain hygiene
 

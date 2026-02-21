@@ -7,6 +7,7 @@ import path from 'node:path';
 import got from 'got';
 import JSON5 from 'json5';
 import registryUrlModule from 'registry-url';
+import {z} from 'zod';
 
 const registryUrl = registryUrlModule();
 
@@ -46,9 +47,16 @@ const getFileContents = memoize(() => {
   return fs.readFileSync(fileName, 'utf8');
 });
 
-const getParsedFile = memoize(() => JSON5.parse(getFileContents()));
+const cliConfigSchema = z
+  .object({
+    plugins: z.preprocess((value) => (Array.isArray(value) ? value : []), z.array(z.string())).default([]),
+    localPlugins: z.preprocess((value) => (Array.isArray(value) ? value : []), z.array(z.string())).default([])
+  })
+  .passthrough();
 
-const getPluginsByKey = (key: string): any[] => getParsedFile()[key] || [];
+const getParsedFile = memoize(() => cliConfigSchema.parse(JSON5.parse(getFileContents()) as unknown));
+
+const getPluginsByKey = (key: 'plugins' | 'localPlugins'): string[] => getParsedFile()[key];
 
 const getPlugins = memoize(() => {
   return getPluginsByKey('plugins');
@@ -57,6 +65,24 @@ const getPlugins = memoize(() => {
 const getLocalPlugins = memoize(() => {
   return getPluginsByKey('localPlugins');
 });
+
+const sortKeys = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => sortKeys(item));
+  }
+
+  if (value && typeof value === 'object') {
+    const sortedObject: Record<string, unknown> = {};
+    Object.keys(value)
+      .sort()
+      .forEach((key) => {
+        sortedObject[key] = sortKeys((value as Record<string, unknown>)[key]);
+      });
+    return sortedObject;
+  }
+
+  return value;
+};
 
 function exists() {
   return getFileContents() !== undefined;
@@ -70,8 +96,8 @@ function isInstalled(plugin: string, locally?: boolean) {
   return false;
 }
 
-function save(config: any) {
-  return fs.writeFileSync(fileName, `${JSON5.stringify(config, null, 2)}\n`, 'utf8');
+function save(config: unknown) {
+  return fs.writeFileSync(fileName, `${JSON5.stringify(sortKeys(config), null, 2)}\n`, 'utf8');
 }
 
 function getPackageName(plugin: string) {

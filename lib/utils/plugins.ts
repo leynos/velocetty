@@ -53,8 +53,11 @@ import {
   resolveTabDecoration,
   subscribeTabDecorationProviderChanges,
   tabDecorationProviders,
+  type TabDecoration,
+  type TabDecorationBadge,
   type TabDecorationContext,
-  type TabDecorationProvider
+  type TabDecorationProvider,
+  type TabDecorationWidget
 } from './tab-decoration-providers';
 
 type ConnectOptions = NonNullable<Parameters<typeof reduxConnect>[3]>;
@@ -110,6 +113,38 @@ const resolveRuntimePluginSettings = (manifest: RuntimePluginManifest): Record<s
   return {...manifest.settingsDefaults};
 };
 
+const mapRuntimeToTabDecoration = (
+  runtimeDecoration: RuntimePluginTabDecoration | null | undefined
+): TabDecoration | null | undefined => {
+  if (!runtimeDecoration) {
+    return runtimeDecoration;
+  }
+
+  const mappedDecoration: TabDecoration = {
+    title: runtimeDecoration.title,
+    subtitle: runtimeDecoration.subtitle
+  };
+
+  if (runtimeDecoration.badges && runtimeDecoration.badges.length > 0) {
+    mappedDecoration.badges = runtimeDecoration.badges.map<TabDecorationBadge>((badge) => ({
+      text: badge.text,
+      icon: badge.icon,
+      tooltip: badge.tooltip,
+      kind: badge.kind
+    }));
+  }
+
+  if (runtimeDecoration.widgets && runtimeDecoration.widgets.length > 0) {
+    mappedDecoration.widgets = runtimeDecoration.widgets.map<TabDecorationWidget>((widget) => ({
+      icon: widget.icon,
+      command: widget.command,
+      tooltip: widget.tooltip
+    }));
+  }
+
+  return mappedDecoration;
+};
+
 const registerRuntimeProvider = (
   manifest: RuntimePluginManifest,
   provider: RuntimeTabDecorationProvider,
@@ -125,7 +160,7 @@ const registerRuntimeProvider = (
         return undefined;
       }
 
-      return provider.provideDecoration(context, runtimeSettings) as RuntimePluginTabDecoration;
+      return mapRuntimeToTabDecoration(provider.provideDecoration(context, runtimeSettings));
     },
     // Emit explicit updates when config reload events occur.
     subscribe: (onDidChange) => subscribeRendererConfig(() => onDidChange())
@@ -169,7 +204,15 @@ const registerProvidersFromPlugin = (pluginName: string, providerList: unknown) 
   });
 };
 
-const getTabDecorationContext = (tab: any): TabDecorationContext => {
+type DecoratedTab = {
+  uid: string | number;
+  tabIndex?: number;
+  isActive?: boolean;
+  hasActivity?: boolean;
+  title?: string;
+};
+
+const getTabDecorationContext = (tab: DecoratedTab): TabDecorationContext => {
   return {
     tabId: String(tab.uid),
     tabIndex: typeof tab.tabIndex === 'number' ? tab.tabIndex : 0,

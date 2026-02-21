@@ -10,9 +10,9 @@ export const GOLDEN_PATH_KEYBINDING = 'ctrl+alt+shift+g';
 
 /** Settings payload persisted under `config.plugins[pluginId]`. */
 export type GoldenPathPluginSettings = {
-  enabled: boolean;
-  message: string;
-  tabPrefix: string;
+  readonly enabled: boolean;
+  readonly message: string;
+  readonly tabPrefix: string;
 };
 
 /** Default settings for the golden path demonstration plugin. */
@@ -58,27 +58,40 @@ export const goldenPathCommandDefinition: CommandDefinition = {
 };
 
 /** Shared tab decoration shape returned by runtime plugin providers. */
+export type RuntimeTabDecorationBadge = {
+  readonly text?: string;
+  readonly icon?: string;
+  readonly tooltip?: string;
+  readonly kind?: 'info' | 'warn' | 'error';
+};
+
+export type RuntimeTabDecorationWidget = {
+  readonly icon: string;
+  readonly command: CommandId;
+  readonly tooltip?: string;
+};
+
 export type RuntimeTabDecoration = {
-  title?: string;
-  subtitle?: string;
-  badges?: Array<{text?: string; icon?: string; tooltip?: string; kind?: 'info' | 'warn' | 'error'}>;
-  widgets?: Array<{icon: string; command: CommandId | string; tooltip?: string}>;
+  readonly title?: string;
+  readonly subtitle?: string;
+  readonly badges?: readonly RuntimeTabDecorationBadge[];
+  readonly widgets?: readonly RuntimeTabDecorationWidget[];
 };
 
 /** Context passed to runtime tab decoration providers. */
 export type RuntimeTabDecorationContext = {
-  tabId: string;
-  tabIndex: number;
-  active: boolean;
-  hasActivity: boolean;
-  title?: string;
+  readonly tabId: string;
+  readonly tabIndex: number;
+  readonly active: boolean;
+  readonly hasActivity: boolean;
+  readonly title?: string;
 };
 
 /** Runtime tab decoration provider contribution contract. */
 export type RuntimeTabDecorationProvider = {
-  id: string;
-  priority: number;
-  provideDecoration: (
+  readonly id: string;
+  readonly priority: number;
+  readonly provideDecoration: (
     context: RuntimeTabDecorationContext,
     settings: Record<string, unknown>
   ) => RuntimeTabDecoration | null | undefined;
@@ -86,15 +99,15 @@ export type RuntimeTabDecorationProvider = {
 
 /** Runtime plugin manifest contract for roadmap 1.3.1 contributions. */
 export type RuntimePluginManifest = {
-  id: string;
-  version: string;
-  displayName: string;
-  description: string;
-  settingsSchema: Record<string, unknown>;
-  settingsDefaults: Record<string, unknown>;
-  commands: CommandDefinition[];
-  keybindings: Record<string, string[]>;
-  tabDecorationProviders: RuntimeTabDecorationProvider[];
+  readonly id: string;
+  readonly version: string;
+  readonly displayName: string;
+  readonly description: string;
+  readonly settingsSchema: Readonly<Record<string, unknown>>;
+  readonly settingsDefaults: Readonly<Record<string, unknown>>;
+  readonly commands: readonly CommandDefinition[];
+  readonly keybindings: Readonly<Record<string, readonly string[]>>;
+  readonly tabDecorationProviders: readonly RuntimeTabDecorationProvider[];
 };
 
 /** Manifest for the built-in golden path demonstration plugin. */

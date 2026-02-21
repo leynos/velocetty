@@ -4,6 +4,7 @@ import {readFileSync, writeFileSync} from 'node:fs';
 import JSON5 from 'json5';
 import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
+import {z} from 'zod';
 
 import type {CommandDefinition} from '@shared/types/commands';
 import type {configOptions, rawConfig} from '@shared/types/config';
@@ -19,12 +20,14 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const asSettingsRecord = (value: unknown): RuntimePluginSettings => (isRecord(value) ? value : {});
 
-const cloneValue = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+const cloneValue = <T>(value: T): T => structuredClone(value);
 
 const findRuntimePluginManifest = (pluginId: string): RuntimePluginManifest | undefined =>
   runtimePluginManifests.find((manifest) => manifest.id === pluginId);
 
 const getDefaultConfigPath = (): string => {
+  // Keep this helper synchronous because callers run in synchronous startup
+  // paths and expect a concrete path immediately.
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const {cfgPath} = require('../config/paths') as typeof import('../config/paths');
   return cfgPath;
@@ -39,13 +42,38 @@ const resolvePluginSettings = (cfg: configOptions, manifest: RuntimePluginManife
   return merge({}, manifest.settingsDefaults, asSettingsRecord(namespace[manifest.id])) as RuntimePluginSettings;
 };
 
+const keymapsSchema = z.record(z.string(), z.union([z.string(), z.array(z.string())]));
+const rawConfigSchema = z
+  .object({
+    config: z.record(z.string(), z.unknown()).optional(),
+    plugins: z.array(z.string()).optional(),
+    localPlugins: z.array(z.string()).optional(),
+    keymaps: keymapsSchema.optional()
+  })
+  .passthrough();
+
 const parseConfigJson5 = (raw: string): rawConfig => {
-  const parsed = JSON5.parse(raw) as unknown;
-  return isRecord(parsed) ? (parsed as rawConfig) : {};
+  try {
+    const parsed = JSON5.parse(raw) as unknown;
+    const validated = rawConfigSchema.safeParse(parsed);
+    if (!validated.success) {
+      console.warn('Invalid runtime plugin config shape detected; falling back to empty config.', validated.error);
+      return {};
+    }
+    return validated.data as rawConfig;
+  } catch (error) {
+    console.warn('Failed to parse runtime plugin JSON5 config; falling back to empty config.', error);
+    return {};
+  }
 };
 
 const stringifyConfigJson5 = (cfg: rawConfig): string => `${JSON5.stringify(cfg, null, 2)}\n`;
 
+/**
+ * Ensures `cfg.config` exists.
+ *
+ * Warning: this helper mutates `cfg` by assigning a default `config` object.
+ */
 const ensureConfigSection = (cfg: rawConfig): configOptions => {
   if (!isRecord(cfg.config)) {
     cfg.config = {} as configOptions;
@@ -53,6 +81,12 @@ const ensureConfigSection = (cfg: rawConfig): configOptions => {
   return cfg.config as configOptions;
 };
 
+/**
+ * Ensures `cfg.plugins` exists.
+ *
+ * Warning: this helper mutates `cfg` by assigning a default `plugins`
+ * namespace object.
+ */
 const ensureSettingsNamespace = (cfg: configOptions): RuntimePluginSettingsNamespace => {
   if (!isRecord(cfg.plugins)) {
     cfg.plugins = {};
@@ -125,26 +159,34 @@ export const ensureRuntimePluginSettingsPersisted = (
   readFile: ReadTextFile = readFileSync,
   writeFile: WriteTextFile = writeFileSync
 ): RuntimePluginSettingsNamespace => {
-  const rawConfig = parseConfigJson5(readFile(configFilePath, 'utf8'));
-  const configSection = ensureConfigSection(rawConfig);
-  const namespace = ensureSettingsNamespace(configSection);
+  try {
+    const rawConfig = parseConfigJson5(readFile(configFilePath, 'utf8'));
+    const configSection = ensureConfigSection(rawConfig);
+    const namespace = ensureSettingsNamespace(configSection);
 
-  let didChange = false;
+    let didChange = false;
 
-  runtimePluginManifests.forEach((manifest) => {
-    const existing = asSettingsRecord(namespace[manifest.id]);
-    const merged = merge({}, manifest.settingsDefaults, existing) as RuntimePluginSettings;
-    if (!isEqual(existing, merged)) {
-      namespace[manifest.id] = merged;
-      didChange = true;
+    runtimePluginManifests.forEach((manifest) => {
+      const existing = asSettingsRecord(namespace[manifest.id]);
+      const merged = merge({}, manifest.settingsDefaults, existing) as RuntimePluginSettings;
+      if (!isEqual(existing, merged)) {
+        namespace[manifest.id] = merged;
+        didChange = true;
+      }
+    });
+
+    if (didChange) {
+      writeFile(configFilePath, stringifyConfigJson5(rawConfig), 'utf8');
     }
-  });
 
-  if (didChange) {
-    writeFile(configFilePath, stringifyConfigJson5(rawConfig), 'utf8');
+    return namespace;
+  } catch (error) {
+    console.error(
+      `Failed to persist runtime plugin settings defaults from "${configFilePath}". Returning empty namespace.`,
+      error
+    );
+    return {};
   }
-
-  return namespace;
 };
 
 /**
@@ -158,17 +200,27 @@ export const setRuntimePluginEnabledPersisted = (
   readFile: ReadTextFile = readFileSync,
   writeFile: WriteTextFile = writeFileSync
 ): RuntimePluginSettings => {
-  const rawConfig = parseConfigJson5(readFile(configFilePath, 'utf8'));
-  const configSection = ensureConfigSection(rawConfig);
-  const namespace = ensureSettingsNamespace(configSection);
   const manifestDefaults = findRuntimePluginManifest(pluginId)?.settingsDefaults ?? {};
-  const existing = asSettingsRecord(namespace[pluginId]);
-  const merged = merge({}, manifestDefaults, existing, {enabled}) as RuntimePluginSettings;
+  const fallbackSettings = merge({}, manifestDefaults, {enabled}) as RuntimePluginSettings;
 
-  if (!isEqual(existing, merged)) {
-    namespace[pluginId] = merged;
-    writeFile(configFilePath, stringifyConfigJson5(rawConfig), 'utf8');
+  try {
+    const rawConfig = parseConfigJson5(readFile(configFilePath, 'utf8'));
+    const configSection = ensureConfigSection(rawConfig);
+    const namespace = ensureSettingsNamespace(configSection);
+    const existing = asSettingsRecord(namespace[pluginId]);
+    const merged = merge({}, manifestDefaults, existing, {enabled}) as RuntimePluginSettings;
+
+    if (!isEqual(existing, merged)) {
+      namespace[pluginId] = merged;
+      writeFile(configFilePath, stringifyConfigJson5(rawConfig), 'utf8');
+    }
+
+    return merged;
+  } catch (error) {
+    console.error(
+      `Failed to persist runtime plugin enabled state for "${pluginId}" in "${configFilePath}". Returning fallback settings.`,
+      error
+    );
+    return fallbackSettings;
   }
-
-  return merged;
 };

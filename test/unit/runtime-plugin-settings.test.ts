@@ -135,6 +135,8 @@ test('golden path runtime tab provider output is deterministic for identical con
 
   const first = provider.provideDecoration(context, settings);
   const second = provider.provideDecoration(context, settings);
+  const expectedPrefix = `${goldenPathSettingsDefaults.tabPrefix}${context.hasActivity ? '!' : ''}`;
+  const expectedTitle = `[${expectedPrefix}] ${context.title}`;
   expect(first).toEqual(second);
-  expect(first?.title).toBe('[GP!] Shell');
+  expect(first?.title).toBe(expectedTitle);
 });

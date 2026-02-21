@@ -223,7 +223,11 @@ export class TabDecorationProviderRegistry {
 
   private emitChange() {
     this.listeners.forEach((listener) => {
-      listener();
+      try {
+        listener();
+      } catch (error) {
+        console.error('Tab decoration listener failed during update notification.', error);
+      }
     });
   }
 }
