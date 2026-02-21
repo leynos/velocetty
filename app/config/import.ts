@@ -3,8 +3,6 @@ import {resolve} from 'node:path';
 
 import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
 import JSON5 from 'json5';
-import {z} from 'zod';
-import {stringifyJson5} from '@shared/config/json5-config';
 
 import type {rawConfig} from '@shared/types/config';
 import notify from '../notify';
@@ -14,20 +12,77 @@ import {cfgDir, cfgPath, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, 
 
 let defaultConfig: rawConfig;
 
-const keymapValueSchema = z.union([z.string(), z.array(z.string())]);
-const keymapSchema = z.record(z.string(), keymapValueSchema);
-const rawConfigSchema: z.ZodType<rawConfig> = z
-  .object({
-    config: z.record(z.string(), z.unknown()).optional(),
-    plugins: z.array(z.string()).optional(),
-    localPlugins: z.array(z.string()).optional(),
-    keymaps: keymapSchema.optional()
-  })
-  .passthrough() as z.ZodType<rawConfig>;
+type ParseSuccess<T> = {
+  success: true;
+  data: T;
+};
+
+type ParseFailure = {
+  success: false;
+  error: Error;
+};
+
+type ParseResult<T> = ParseSuccess<T> | ParseFailure;
+type ParseSchema<T> = {
+  safeParse: (value: unknown) => ParseResult<T>;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+const isKeymapValue = (value: unknown): value is string | string[] => typeof value === 'string' || isStringArray(value);
+
+const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
+  isRecord(value) && Object.values(value).every((entry) => isKeymapValue(entry));
+
+const keymapSchema: ParseSchema<Record<string, string | string[]>> = {
+  safeParse: (value) => {
+    if (!isKeymapConfig(value)) {
+      return {
+        success: false,
+        error: new Error('Expected keymap object values to be strings or string arrays.')
+      };
+    }
+
+    return {success: true, data: value};
+  }
+};
+
+const rawConfigSchema: ParseSchema<rawConfig> = {
+  safeParse: (value) => {
+    if (!isRecord(value)) {
+      return {success: false, error: new Error('Expected config payload to be an object.')};
+    }
+
+    if (value.config !== undefined && !isRecord(value.config)) {
+      return {success: false, error: new Error('Expected `config` to be an object when present.')};
+    }
+
+    if (value.plugins !== undefined && !isStringArray(value.plugins)) {
+      return {success: false, error: new Error('Expected `plugins` to be an array of strings when present.')};
+    }
+
+    if (value.localPlugins !== undefined && !isStringArray(value.localPlugins)) {
+      return {success: false, error: new Error('Expected `localPlugins` to be an array of strings when present.')};
+    }
+
+    if (value.keymaps !== undefined && !isKeymapConfig(value.keymaps)) {
+      return {
+        success: false,
+        error: new Error('Expected `keymaps` values to be strings or string arrays when present.')
+      };
+    }
+
+    return {success: true, data: value as rawConfig};
+  }
+};
 
 interface ParseOptions<T> {
   readonly source: string;
-  readonly schema: z.ZodType<T>;
+  readonly schema: ParseSchema<T>;
   readonly fallback: T;
   readonly itemType?: string;
 }
@@ -56,7 +111,25 @@ const parseKeymapConfig = (raw: string, source: string): Record<string, string |
   return parseJson5WithSchema(raw, {source, schema: keymapSchema, fallback: {}, itemType: 'keymap'});
 };
 
-const stringifyConfig = (config: rawConfig): string => stringifyJson5(config);
+const sortKeys = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => sortKeys(item));
+  }
+
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const sortedObject: Record<string, unknown> = {};
+  Object.keys(value)
+    .sort()
+    .forEach((key) => {
+      sortedObject[key] = sortKeys(value[key]);
+    });
+  return sortedObject;
+};
+
+const stringifyConfig = (config: rawConfig): string => `${JSON5.stringify(sortKeys(config), null, 2)}\n`;
 
 const ensureSchemaFile = () => {
   try {

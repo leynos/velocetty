@@ -1,10 +1,9 @@
 /** @file Runtime plugin manifest evaluation and JSON5-backed settings persistence. */
 import {readFileSync, writeFileSync} from 'node:fs';
 
+import JSON5 from 'json5';
 import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
-import {z} from 'zod';
-import {parseJson5WithSchema, stringifyJson5} from '@shared/config/json5-config';
 import {cfgPath} from '../config/paths';
 
 import type {CommandDefinition} from '@shared/types/commands';
@@ -15,9 +14,25 @@ type RuntimePluginSettings = Record<string, unknown>;
 type RuntimePluginSettingsNamespace = Record<string, RuntimePluginSettings>;
 type ReadTextFile = (path: string, encoding: BufferEncoding) => string;
 type WriteTextFile = (path: string, content: string, encoding: BufferEncoding) => void;
+type ParseSuccess<T> = {
+  success: true;
+  data: T;
+};
+
+type ParseFailure = {
+  success: false;
+  error: Error;
+};
+
+type ParseResult<T> = ParseSuccess<T> | ParseFailure;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
+const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
+  isRecord(value) &&
+  Object.values(value).every((entry) => typeof entry === 'string' || (Array.isArray(entry) && isStringArray(entry)));
 
 const asSettingsRecord = (value: unknown): RuntimePluginSettings => (isRecord(value) ? value : {});
 
@@ -48,21 +63,67 @@ const resolvePluginSettings = (cfg: configOptions, manifest: RuntimePluginManife
   return merge({}, manifest.settingsDefaults, asSettingsRecord(namespace[manifest.id])) as RuntimePluginSettings;
 };
 
-const keymapsSchema = z.record(z.string(), z.union([z.string(), z.array(z.string())]));
-const rawConfigSchema: z.ZodType<rawConfig> = z
-  .object({
-    config: z.record(z.string(), z.unknown()).optional(),
-    plugins: z.array(z.string()).optional(),
-    localPlugins: z.array(z.string()).optional(),
-    keymaps: keymapsSchema.optional()
-  })
-  .passthrough() as z.ZodType<rawConfig>;
+const safeParseRawConfig = (value: unknown): ParseResult<rawConfig> => {
+  if (!isRecord(value)) {
+    return {success: false, error: new Error('Expected config payload to be an object.')};
+  }
 
-const parseConfigJson5 = (raw: string): rawConfig => {
-  return parseJson5WithSchema(raw, 'runtime plugin config', rawConfigSchema, {}, 'config');
+  if (value.config !== undefined && !isRecord(value.config)) {
+    return {success: false, error: new Error('Expected `config` to be an object when present.')};
+  }
+
+  if (value.plugins !== undefined && !isStringArray(value.plugins)) {
+    return {success: false, error: new Error('Expected `plugins` to be an array of strings when present.')};
+  }
+
+  if (value.localPlugins !== undefined && !isStringArray(value.localPlugins)) {
+    return {success: false, error: new Error('Expected `localPlugins` to be an array of strings when present.')};
+  }
+
+  if (value.keymaps !== undefined && !isKeymapConfig(value.keymaps)) {
+    return {
+      success: false,
+      error: new Error('Expected `keymaps` values to be strings or string arrays when present.')
+    };
+  }
+
+  return {success: true, data: value as rawConfig};
 };
 
-const stringifyConfigJson5 = (cfg: rawConfig): string => stringifyJson5(cfg);
+const parseConfigJson5 = (raw: string): rawConfig => {
+  try {
+    const parsed = JSON5.parse(raw) as unknown;
+    const validated = safeParseRawConfig(parsed);
+    if (!validated.success) {
+      console.warn('Invalid JSON5 config shape from runtime plugin config.', validated.error);
+      return {};
+    }
+    return validated.data;
+  } catch (error) {
+    console.warn('Failed to parse JSON5 config from runtime plugin config.', error);
+    return {};
+  }
+};
+
+const sortKeys = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => sortKeys(item));
+  }
+
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const sortedObject: Record<string, unknown> = {};
+  Object.keys(value)
+    .sort()
+    .forEach((key) => {
+      sortedObject[key] = sortKeys(value[key]);
+    });
+  return sortedObject;
+};
+
+const stringifyConfigJson5 = (cfg: rawConfig): string => `${JSON5.stringify(sortKeys(cfg), null, 2)}\n`;
 
 const isRuntimePluginManifestEnabled = (cfg: configOptions, manifest: RuntimePluginManifest): boolean => {
   const resolvedSettings = resolvePluginSettings(cfg, manifest);
