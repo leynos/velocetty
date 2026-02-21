@@ -4,7 +4,8 @@ import {readFileSync, writeFileSync} from 'node:fs';
 import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
 import {cfgPath} from '../config/paths';
-import {parseJson5WithSchema, stringifyJson5, type ParseSchema, type ParseResult} from '../config/json5-config';
+import {parseJson5WithSchema, stringifyJson5, type ParseSchema} from '../config/json5-config';
+import {isRecord, safeParseRawConfig} from '../config/raw-config-validation';
 
 import type {CommandDefinition} from '@shared/types/commands';
 import type {configOptions, rawConfig} from '@shared/types/config';
@@ -14,14 +15,6 @@ type RuntimePluginSettings = Record<string, unknown>;
 type RuntimePluginSettingsNamespace = Record<string, RuntimePluginSettings>;
 type ReadTextFile = (path: string, encoding: BufferEncoding) => string;
 type WriteTextFile = (path: string, content: string, encoding: BufferEncoding) => void;
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-const isStringArray = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((item) => typeof item === 'string');
-const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
-  isRecord(value) &&
-  Object.values(value).every((entry) => typeof entry === 'string' || (Array.isArray(entry) && isStringArray(entry)));
 
 const cloneValue = <T>(value: T): T => structuredClone(value);
 
@@ -51,33 +44,6 @@ const getOrInitPluginsNamespace = (cfg: rawConfig): RuntimePluginSettingsNamespa
     configSection.plugins = {};
   }
   return configSection.plugins as RuntimePluginSettingsNamespace;
-};
-
-const safeParseRawConfig = (value: unknown): ParseResult<rawConfig> => {
-  if (!isRecord(value)) {
-    return {success: false, error: new Error('Expected config payload to be an object.')};
-  }
-
-  if (value.config !== undefined && !isRecord(value.config)) {
-    return {success: false, error: new Error('Expected `config` to be an object when present.')};
-  }
-
-  if (value.plugins !== undefined && !isStringArray(value.plugins)) {
-    return {success: false, error: new Error('Expected `plugins` to be an array of strings when present.')};
-  }
-
-  if (value.localPlugins !== undefined && !isStringArray(value.localPlugins)) {
-    return {success: false, error: new Error('Expected `localPlugins` to be an array of strings when present.')};
-  }
-
-  if (value.keymaps !== undefined && !isKeymapConfig(value.keymaps)) {
-    return {
-      success: false,
-      error: new Error('Expected `keymaps` values to be strings or string arrays when present.')
-    };
-  }
-
-  return {success: true, data: value as rawConfig};
 };
 
 const rawConfigSchema: ParseSchema<rawConfig> = {

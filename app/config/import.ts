@@ -6,22 +6,12 @@ import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-
 import type {rawConfig} from '@shared/types/config';
 import notify from '../notify';
 import {parseJson5WithSchema, stringifyJson5, type ParseSchema} from './json5-config';
+import {isKeymapConfig, safeParseRawConfig} from './raw-config-validation';
 
 import {_init} from './init';
 import {cfgDir, cfgPath, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath} from './paths';
 
 let defaultConfig: rawConfig;
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const isStringArray = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((item) => typeof item === 'string');
-
-const isKeymapValue = (value: unknown): value is string | string[] => typeof value === 'string' || isStringArray(value);
-
-const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
-  isRecord(value) && Object.values(value).every((entry) => isKeymapValue(entry));
 
 const keymapSchema: ParseSchema<Record<string, string | string[]>> = {
   safeParse: (value) => {
@@ -37,32 +27,7 @@ const keymapSchema: ParseSchema<Record<string, string | string[]>> = {
 };
 
 const rawConfigSchema: ParseSchema<rawConfig> = {
-  safeParse: (value) => {
-    if (!isRecord(value)) {
-      return {success: false, error: new Error('Expected config payload to be an object.')};
-    }
-
-    if (value.config !== undefined && !isRecord(value.config)) {
-      return {success: false, error: new Error('Expected `config` to be an object when present.')};
-    }
-
-    if (value.plugins !== undefined && !isStringArray(value.plugins)) {
-      return {success: false, error: new Error('Expected `plugins` to be an array of strings when present.')};
-    }
-
-    if (value.localPlugins !== undefined && !isStringArray(value.localPlugins)) {
-      return {success: false, error: new Error('Expected `localPlugins` to be an array of strings when present.')};
-    }
-
-    if (value.keymaps !== undefined && !isKeymapConfig(value.keymaps)) {
-      return {
-        success: false,
-        error: new Error('Expected `keymaps` values to be strings or string arrays when present.')
-      };
-    }
-
-    return {success: true, data: value as rawConfig};
-  }
+  safeParse: safeParseRawConfig
 };
 
 const parseRawConfig = (raw: string, source: string): rawConfig | null => {
