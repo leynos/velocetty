@@ -110,11 +110,6 @@ const resolveRuntimePluginSettings = (manifest: RuntimePluginManifest): Record<s
   return {...manifest.settingsDefaults};
 };
 
-const isRuntimePluginEnabled = (manifest: RuntimePluginManifest) => {
-  const enabled = resolveRuntimePluginSettings(manifest).enabled;
-  return typeof enabled === 'boolean' ? enabled : true;
-};
-
 const registerRuntimeProvider = (
   manifest: RuntimePluginManifest,
   provider: RuntimeTabDecorationProvider,
@@ -139,10 +134,6 @@ const registerRuntimeProvider = (
 
 const registerRuntimeTabDecorationProviders = () => {
   runtimePluginManifests.forEach((manifest) => {
-    if (!isRuntimePluginEnabled(manifest)) {
-      return;
-    }
-
     manifest.tabDecorationProviders.forEach((provider, providerIndex) => {
       registerRuntimeProvider(manifest, provider, providerIndex);
     });
