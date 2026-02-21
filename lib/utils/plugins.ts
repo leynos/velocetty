@@ -424,6 +424,69 @@ const initializePluginCaches = () => {
   };
 };
 
+const registerDeprecatedHooks = (mod: hyperPlugin) => {
+  // mapHyperTermState mapping for backwards compatibility with hyperterm
+  if (mod.mapHyperTermState) {
+    mod.mapHyperState = mod.mapHyperTermState;
+    console.error('mapHyperTermState is deprecated. Use mapHyperState instead.');
+  }
+
+  // mapHyperTermDispatch mapping for backwards compatibility with hyperterm
+  if (mod.mapHyperTermDispatch) {
+    mod.mapHyperDispatch = mod.mapHyperTermDispatch;
+    console.error('mapHyperTermDispatch is deprecated. Use mapHyperDispatch instead.');
+  }
+};
+
+const registerSimpleHooks = (mod: hyperPlugin) => {
+  const simpleHooks: Array<{hook: keyof hyperPlugin; target: unknown[]}> = [
+    {hook: 'middleware', target: middlewares},
+    {hook: 'reduceUI', target: uiReducers},
+    {hook: 'reduceSessions', target: sessionsReducers},
+    {hook: 'reduceTermGroups', target: termGroupsReducers},
+    {hook: 'getTermGroupProps', target: termGroupPropsDecorators},
+    {hook: 'getTermProps', target: termPropsDecorators},
+    {hook: 'getTabProps', target: tabPropsDecorators},
+    {hook: 'getTabsProps', target: tabsPropsDecorators}
+  ];
+
+  simpleHooks.forEach(({hook, target}) => {
+    const pluginHook = mod[hook];
+    if (pluginHook) {
+      target.push(pluginHook);
+    }
+  });
+};
+
+const registerConnectorHooks = (mod: hyperPlugin) => {
+  const connectorHooks: Array<{
+    stateHook: keyof hyperPlugin;
+    dispatchHook: keyof hyperPlugin;
+    connector: keyof typeof connectors;
+  }> = [
+    {stateHook: 'mapTermsState', dispatchHook: 'mapTermsDispatch', connector: 'Terms'},
+    {stateHook: 'mapHeaderState', dispatchHook: 'mapHeaderDispatch', connector: 'Header'},
+    {stateHook: 'mapHyperState', dispatchHook: 'mapHyperDispatch', connector: 'Hyper'},
+    {
+      stateHook: 'mapNotificationsState',
+      dispatchHook: 'mapNotificationsDispatch',
+      connector: 'Notifications'
+    }
+  ];
+
+  connectorHooks.forEach(({stateHook, dispatchHook, connector}) => {
+    const stateDecorator = mod[stateHook];
+    if (stateDecorator) {
+      connectors[connector].state.push(stateDecorator);
+    }
+
+    const dispatchDecorator = mod[dispatchHook];
+    if (dispatchDecorator) {
+      connectors[connector].dispatch.push(dispatchDecorator);
+    }
+  });
+};
+
 const registerPluginHooks = (mod: hyperPlugin, pluginName: string, pluginVersion: string | null) => {
   ObjectTypedKeys(mod).forEach((i) => {
     if (!Object.hasOwn(mod, i)) {
@@ -437,81 +500,9 @@ const registerPluginHooks = (mod: hyperPlugin, pluginName: string, pluginVersion
     }
   });
 
-  // mapHyperTermState mapping for backwards compatibility with hyperterm
-  if (mod.mapHyperTermState) {
-    mod.mapHyperState = mod.mapHyperTermState;
-    console.error('mapHyperTermState is deprecated. Use mapHyperState instead.');
-  }
-
-  // mapHyperTermDispatch mapping for backwards compatibility with hyperterm
-  if (mod.mapHyperTermDispatch) {
-    mod.mapHyperDispatch = mod.mapHyperTermDispatch;
-    console.error('mapHyperTermDispatch is deprecated. Use mapHyperDispatch instead.');
-  }
-
-  if (mod.middleware) {
-    middlewares.push(mod.middleware);
-  }
-
-  if (mod.reduceUI) {
-    uiReducers.push(mod.reduceUI);
-  }
-
-  if (mod.reduceSessions) {
-    sessionsReducers.push(mod.reduceSessions);
-  }
-
-  if (mod.reduceTermGroups) {
-    termGroupsReducers.push(mod.reduceTermGroups);
-  }
-
-  if (mod.mapTermsState) {
-    connectors.Terms.state.push(mod.mapTermsState);
-  }
-
-  if (mod.mapTermsDispatch) {
-    connectors.Terms.dispatch.push(mod.mapTermsDispatch);
-  }
-
-  if (mod.mapHeaderState) {
-    connectors.Header.state.push(mod.mapHeaderState);
-  }
-
-  if (mod.mapHeaderDispatch) {
-    connectors.Header.dispatch.push(mod.mapHeaderDispatch);
-  }
-
-  if (mod.mapHyperState) {
-    connectors.Hyper.state.push(mod.mapHyperState);
-  }
-
-  if (mod.mapHyperDispatch) {
-    connectors.Hyper.dispatch.push(mod.mapHyperDispatch);
-  }
-
-  if (mod.mapNotificationsState) {
-    connectors.Notifications.state.push(mod.mapNotificationsState);
-  }
-
-  if (mod.mapNotificationsDispatch) {
-    connectors.Notifications.dispatch.push(mod.mapNotificationsDispatch);
-  }
-
-  if (mod.getTermGroupProps) {
-    termGroupPropsDecorators.push(mod.getTermGroupProps);
-  }
-
-  if (mod.getTermProps) {
-    termPropsDecorators.push(mod.getTermProps);
-  }
-
-  if (mod.getTabProps) {
-    tabPropsDecorators.push(mod.getTabProps);
-  }
-
-  if (mod.getTabsProps) {
-    tabsPropsDecorators.push(mod.getTabsProps);
-  }
+  registerDeprecatedHooks(mod);
+  registerSimpleHooks(mod);
+  registerConnectorHooks(mod);
 
   if (mod.onRendererWindow) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
