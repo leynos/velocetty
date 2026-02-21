@@ -122,17 +122,20 @@ function existsOnNpm(plugin: string) {
     });
 }
 
+const handleNpmCheckError = (err: unknown, plugin: string): Promise<never> => {
+  const statusCode = isRecord(err) && typeof err.statusCode === 'number' ? err.statusCode : undefined;
+  if (statusCode && (statusCode === 404 || statusCode === 200)) {
+    return Promise.reject(`${plugin} not found on npm`);
+  }
+
+  const errorMessage = getErrorMessage(err);
+  return Promise.reject(`${errorMessage}\nPlugin check failed. Check your internet connection or retry later.`);
+};
+
 function install(plugin: string, locally?: boolean) {
   const array = locally ? getLocalPlugins() : getPlugins();
   return existsOnNpm(plugin)
-    .catch((err: unknown) => {
-      const statusCode = isRecord(err) && typeof err.statusCode === 'number' ? err.statusCode : undefined;
-      if (statusCode && (statusCode === 404 || statusCode === 200)) {
-        return Promise.reject(`${plugin} not found on npm`);
-      }
-      const errorMessage = getErrorMessage(err);
-      return Promise.reject(`${errorMessage}\nPlugin check failed. Check your internet connection or retry later.`);
-    })
+    .catch((err: unknown) => handleNpmCheckError(err, plugin))
     .then(() => {
       if (isInstalled(plugin, locally)) {
         return Promise.reject(`${plugin} is already installed`);
