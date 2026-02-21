@@ -181,34 +181,49 @@ const registerRuntimeTabDecorationProviders = () => {
   });
 };
 
+const isValidProviderCandidate = (candidate: unknown): candidate is Partial<TabDecorationProvider> => {
+  if (!candidate || typeof candidate !== 'object') {
+    return false;
+  }
+  const provider = candidate as Partial<TabDecorationProvider>;
+  return typeof provider.provideDecoration === 'function';
+};
+
+const normalizeProviderId = (provider: Partial<TabDecorationProvider>, providerIndex: number): string => {
+  if (typeof provider.id === 'string' && provider.id.trim().length > 0) {
+    return provider.id.trim();
+  }
+  return `provider-${providerIndex + 1}`;
+};
+
+const normalizeSubscribe = (
+  provider: Partial<TabDecorationProvider>
+): TabDecorationProvider['subscribe'] | undefined => {
+  if (typeof provider.subscribe === 'function') {
+    return provider.subscribe as TabDecorationProvider['subscribe'];
+  }
+  return undefined;
+};
+
+const normalizePriority = (provider: Partial<TabDecorationProvider>): number => {
+  return typeof provider.priority === 'number' ? provider.priority : 0;
+};
+
 const registerProvidersFromPlugin = (pluginName: string, providerList: unknown) => {
   if (!Array.isArray(providerList)) {
     return;
   }
 
   providerList.forEach((candidate, providerIndex) => {
-    if (!candidate || typeof candidate !== 'object') {
+    if (!isValidProviderCandidate(candidate)) {
       return;
     }
-
-    const provider = candidate as Partial<TabDecorationProvider>;
-    if (typeof provider.provideDecoration !== 'function') {
-      return;
-    }
-
-    const baseProviderId =
-      typeof provider.id === 'string' && provider.id.trim().length > 0
-        ? provider.id.trim()
-        : `provider-${providerIndex + 1}`;
-
-    const subscribe =
-      typeof provider.subscribe === 'function' ? (provider.subscribe as TabDecorationProvider['subscribe']) : undefined;
 
     registerTabDecorationProvider({
-      id: buildProviderId(pluginName, baseProviderId),
-      priority: typeof provider.priority === 'number' ? provider.priority : 0,
-      provideDecoration: provider.provideDecoration,
-      subscribe
+      id: buildProviderId(pluginName, normalizeProviderId(candidate, providerIndex)),
+      priority: normalizePriority(candidate),
+      provideDecoration: candidate.provideDecoration,
+      subscribe: normalizeSubscribe(candidate)
     });
   });
 };
