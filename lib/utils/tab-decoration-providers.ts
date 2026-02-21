@@ -97,37 +97,44 @@ const dedupeBounded = <T>(items: T[], keyFn: (item: T) => string, limit: number)
   return result;
 };
 
-export const mergeTabDecorations = (decorations: TabDecoration[]): TabDecoration => {
-  const merged: TabDecoration = {};
-  const mergedBadges: TabDecorationBadge[] = [];
-  const mergedWidgets: TabDecorationWidget[] = [];
+// Helper to merge a simple optional property (first non-null wins).
+const mergeSimpleProperty = <T extends TabDecoration, K extends keyof T>(
+  merged: T,
+  decoration: TabDecoration,
+  key: K
+): void => {
+  if (!merged[key] && decoration[key]) {
+    merged[key] = decoration[key] as T[K];
+  }
+};
 
+// Helper to collect array items from decorations.
+const collectArrayItems = <T>(decorations: TabDecoration[], key: 'badges' | 'widgets'): T[] => {
+  const collected: T[] = [];
   for (const decoration of decorations) {
-    if (!merged.icon && decoration.icon) {
-      merged.icon = decoration.icon;
-    }
-
-    if (!merged.title && decoration.title) {
-      merged.title = decoration.title;
-    }
-
-    if (!merged.subtitle && decoration.subtitle) {
-      merged.subtitle = decoration.subtitle;
-    }
-
-    if (decoration.badges && decoration.badges.length > 0) {
-      mergedBadges.push(...decoration.badges);
-    }
-
-    if (decoration.widgets && decoration.widgets.length > 0) {
-      mergedWidgets.push(...decoration.widgets);
+    const items = decoration[key];
+    if (items && items.length > 0) {
+      collected.push(...(items as T[]));
     }
   }
+  return collected;
+};
 
+export const mergeTabDecorations = (decorations: TabDecoration[]): TabDecoration => {
+  const merged: TabDecoration = {};
+
+  for (const decoration of decorations) {
+    mergeSimpleProperty(merged, decoration, 'icon');
+    mergeSimpleProperty(merged, decoration, 'title');
+    mergeSimpleProperty(merged, decoration, 'subtitle');
+  }
+
+  const mergedBadges = collectArrayItems<TabDecorationBadge>(decorations, 'badges');
   if (mergedBadges.length > 0) {
     merged.badges = dedupeBounded(mergedBadges, badgeKey, MAX_BADGES);
   }
 
+  const mergedWidgets = collectArrayItems<TabDecorationWidget>(decorations, 'widgets');
   if (mergedWidgets.length > 0) {
     merged.widgets = dedupeBounded(mergedWidgets, widgetKey, MAX_WIDGETS);
   }
