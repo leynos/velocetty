@@ -86,15 +86,16 @@ const compareProviders = (a: RegisteredProvider, b: RegisteredProvider) => {
   return a.registrationOrder - b.registrationOrder;
 };
 
-const collectBadges = (decorations: TabDecoration[]): TabDecorationBadge[] => {
-  const badges: TabDecorationBadge[] = [];
-  const seenBadgeKeys = new Set<string>();
+const processBadgesFromDecoration = (
+  decoration: TabDecoration,
+  badges: TabDecorationBadge[],
+  seenBadgeKeys: Set<string>
+): void => {
+  if (!Array.isArray(decoration.badges)) {
+    return;
+  }
 
-  // Stage 1: Flatten all badges from all decorations into a single array.
-  const allBadges = decorations.flatMap((decoration) => (Array.isArray(decoration.badges) ? decoration.badges : []));
-
-  // Stage 2: Collect unique badges up to MAX_BADGES with early exits.
-  for (const badge of allBadges) {
+  for (const badge of decoration.badges) {
     if (badges.length >= MAX_BADGES) {
       break;
     }
@@ -106,6 +107,18 @@ const collectBadges = (decorations: TabDecoration[]): TabDecorationBadge[] => {
 
     seenBadgeKeys.add(key);
     badges.push(badge);
+  }
+};
+
+const collectBadges = (decorations: TabDecoration[]): TabDecorationBadge[] => {
+  const badges: TabDecorationBadge[] = [];
+  const seenBadgeKeys = new Set<string>();
+
+  for (const decoration of decorations) {
+    if (badges.length >= MAX_BADGES) {
+      break;
+    }
+    processBadgesFromDecoration(decoration, badges, seenBadgeKeys);
   }
 
   return badges;
