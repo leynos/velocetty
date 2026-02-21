@@ -97,8 +97,10 @@ function getPackageName(plugin: string) {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const hasVersions = (value: unknown): value is {versions: unknown} =>
-  isRecord(value) && 'versions' in value && value.versions !== undefined;
+const npmRegistryResponseSchema = z.object({
+  name: z.string().optional(),
+  versions: z.unknown().refine((value) => value !== undefined, {message: 'versions must be defined'})
+});
 
 const getErrorMessage = (value: unknown): string => {
   if (value instanceof Error) {
@@ -110,12 +112,13 @@ const getErrorMessage = (value: unknown): string => {
   return String(value);
 };
 
-function existsOnNpm(plugin: string) {
+function existsOnNpm(plugin: string, signal?: AbortSignal) {
   const name = getPackageName(plugin);
   return got
-    .get<unknown>(registryUrl + name.toLowerCase(), {timeout: {request: 10000}, responseType: 'json'})
+    .get<unknown>(registryUrl + name.toLowerCase(), {timeout: {request: 10000}, responseType: 'json', signal})
     .then((res) => {
-      if (!hasVersions(res.body)) {
+      const validated = npmRegistryResponseSchema.safeParse(res.body);
+      if (!validated.success) {
         return Promise.reject(res);
       } else {
         return res;
@@ -133,9 +136,9 @@ const handleNpmCheckError = (err: unknown, plugin: string): Promise<never> => {
   return Promise.reject(`${errorMessage}\nPlugin check failed. Check your internet connection or retry later.`);
 };
 
-function install(plugin: string, locally?: boolean) {
+function install(plugin: string, locally?: boolean, signal?: AbortSignal) {
   const array = locally ? getLocalPlugins() : getPlugins();
-  return existsOnNpm(plugin)
+  return existsOnNpm(plugin, signal)
     .catch((err: unknown) => handleNpmCheckError(err, plugin))
     .then(() => {
       if (isInstalled(plugin, locally)) {
