@@ -36,8 +36,8 @@ test('app and shared golden-path runtime exports remain equivalent', () => {
     sharedRuntimeGoldenPath.goldenPathPluginManifest.keybindings
   );
 
-  const appProvider = appRuntimeGoldenPath.goldenPathPluginManifest.tabDecorationProviders[0];
-  const sharedProvider = sharedRuntimeGoldenPath.goldenPathPluginManifest.tabDecorationProviders[0];
+  const appProviders = appRuntimeGoldenPath.goldenPathPluginManifest.tabDecorationProviders;
+  const sharedProviders = sharedRuntimeGoldenPath.goldenPathPluginManifest.tabDecorationProviders;
   const context = {
     tabId: 'tab-1',
     tabIndex: 0,
@@ -49,7 +49,13 @@ test('app and shared golden-path runtime exports remain equivalent', () => {
     ...sharedRuntimeGoldenPath.goldenPathSettingsDefaults
   };
 
-  expect(appProvider.id).toBe(sharedProvider.id);
-  expect(appProvider.priority).toBe(sharedProvider.priority);
-  expect(appProvider.provideDecoration(context, settings)).toEqual(sharedProvider.provideDecoration(context, settings));
+  expect(appProviders.length).toBe(sharedProviders.length);
+  appProviders.forEach((appProvider, index) => {
+    const sharedProvider = sharedProviders[index];
+    expect(appProvider.id).toBe(sharedProvider.id);
+    expect(appProvider.priority).toBe(sharedProvider.priority);
+    expect(appProvider.provideDecoration(context, settings)).toEqual(
+      sharedProvider.provideDecoration(context, settings)
+    );
+  });
 });

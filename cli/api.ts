@@ -1,4 +1,17 @@
-/** @file CLI helpers for reading, validating, and mutating Hyper plugin config. */
+/**
+ * @file CLI helpers for reading, validating, and mutating Hyper plugin config.
+ *
+ * Invariants:
+ * - `parseJson5StrictWithSchema` must reject malformed JSON5 or schema-invalid
+ *   input so CLI operations only run against validated config.
+ * - `stringifyJson5` must emit deterministic, stable output so config
+ *   round-trips preserve formatting expectations.
+ *
+ * Cross-links:
+ * - Shared JSON5 helper implementation:
+ *   `shared/src/config/json5-config.ts` (`parseJson5StrictWithSchema`,
+ *   `stringifyJson5`).
+ */
 // eslint-disable-next-line eslint-comments/disable-enable-pair
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import fs from 'node:fs';
@@ -20,10 +33,11 @@ type PackageName = string & {readonly __brand: 'PackageName'};
 
 /** Smart constructor for PluginSpecifier with runtime validation */
 const pluginSpecifier = (value: string): PluginSpecifier => {
-  if (!value || value.trim().length === 0) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
     throw new Error('Plugin specifier cannot be empty');
   }
-  return value as PluginSpecifier;
+  return trimmedValue as PluginSpecifier;
 };
 
 /** Smart constructor for PackageName (output of normalization) */
