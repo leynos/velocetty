@@ -50,31 +50,40 @@ const rawConfigSchema = z
   })
   .passthrough();
 
-export const validateRawConfig = (value: unknown): ParseResult<Record<string, unknown>> => {
-  const parsed = rawConfigSchema.safeParse(value);
-  if (!parsed.success) {
-    if (!isRecord(value)) {
-      return {success: false, error: new Error('Expected config payload to be an object.')};
+const validateFields = (value: Record<string, unknown>): Error | null => {
+  const validators: Array<[string, FieldValidator]> = [
+    ['config', validateRecordField],
+    ['plugins', validateStringArrayField],
+    ['localPlugins', validateStringArrayField],
+    ['keymaps', validateKeymapField]
+  ];
+
+  for (const [field, validator] of validators) {
+    const error = validator(value, field);
+    if (error) {
+      return error;
     }
-
-    const validators: Array<[string, FieldValidator]> = [
-      ['config', validateRecordField],
-      ['plugins', validateStringArrayField],
-      ['localPlugins', validateStringArrayField],
-      ['keymaps', validateKeymapField]
-    ];
-
-    for (const [field, validator] of validators) {
-      const error = validator(value, field);
-      if (error) {
-        return {success: false, error};
-      }
-    }
-
-    return {success: false, error: parsed.error};
   }
 
-  return {success: true, data: parsed.data as Record<string, unknown>};
+  return null;
+};
+
+export const validateRawConfig = (value: unknown): ParseResult<Record<string, unknown>> => {
+  const parsed = rawConfigSchema.safeParse(value);
+  if (parsed.success) {
+    return {success: true, data: parsed.data as Record<string, unknown>};
+  }
+
+  if (!isRecord(value)) {
+    return {success: false, error: new Error('Expected config payload to be an object.')};
+  }
+
+  const fieldError = validateFields(value);
+  if (fieldError) {
+    return {success: false, error: fieldError};
+  }
+
+  return {success: false, error: parsed.error};
 };
 
 export const sortKeys = (value: unknown): unknown => {
