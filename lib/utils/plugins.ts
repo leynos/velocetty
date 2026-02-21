@@ -349,13 +349,7 @@ const getPluginVersion = (path: string): string | null => {
   return version;
 };
 
-const loadModules = () => {
-  console.log('(re)loading renderer plugins');
-  const paths = plugins.getPaths();
-  tabDecorationProviders.clear();
-  registerRuntimeTabDecorationProviders();
-
-  // initialize cache that we populate with extension methods
+const initializePluginCaches = () => {
   connectors = {
     Terms: {state: [], dispatch: []},
     Header: {state: [], dispatch: []},
@@ -383,134 +377,155 @@ const loadModules = () => {
     reduceSessions: sessionsReducers,
     reduceTermGroups: termGroupsReducers
   };
+};
+
+const registerPluginHooks = (mod: hyperPlugin, pluginName: string, pluginVersion: string | null) => {
+  ObjectTypedKeys(mod).forEach((i) => {
+    if (Object.hasOwn(mod, i)) {
+      mod[i]._pluginName = pluginName;
+      mod[i]._pluginVersion = pluginVersion;
+    }
+  });
+
+  // mapHyperTermState mapping for backwards compatibility with hyperterm
+  if (mod.mapHyperTermState) {
+    mod.mapHyperState = mod.mapHyperTermState;
+    console.error('mapHyperTermState is deprecated. Use mapHyperState instead.');
+  }
+
+  // mapHyperTermDispatch mapping for backwards compatibility with hyperterm
+  if (mod.mapHyperTermDispatch) {
+    mod.mapHyperDispatch = mod.mapHyperTermDispatch;
+    console.error('mapHyperTermDispatch is deprecated. Use mapHyperDispatch instead.');
+  }
+
+  if (mod.middleware) {
+    middlewares.push(mod.middleware);
+  }
+
+  if (mod.reduceUI) {
+    uiReducers.push(mod.reduceUI);
+  }
+
+  if (mod.reduceSessions) {
+    sessionsReducers.push(mod.reduceSessions);
+  }
+
+  if (mod.reduceTermGroups) {
+    termGroupsReducers.push(mod.reduceTermGroups);
+  }
+
+  if (mod.mapTermsState) {
+    connectors.Terms.state.push(mod.mapTermsState);
+  }
+
+  if (mod.mapTermsDispatch) {
+    connectors.Terms.dispatch.push(mod.mapTermsDispatch);
+  }
+
+  if (mod.mapHeaderState) {
+    connectors.Header.state.push(mod.mapHeaderState);
+  }
+
+  if (mod.mapHeaderDispatch) {
+    connectors.Header.dispatch.push(mod.mapHeaderDispatch);
+  }
+
+  if (mod.mapHyperState) {
+    connectors.Hyper.state.push(mod.mapHyperState);
+  }
+
+  if (mod.mapHyperDispatch) {
+    connectors.Hyper.dispatch.push(mod.mapHyperDispatch);
+  }
+
+  if (mod.mapNotificationsState) {
+    connectors.Notifications.state.push(mod.mapNotificationsState);
+  }
+
+  if (mod.mapNotificationsDispatch) {
+    connectors.Notifications.dispatch.push(mod.mapNotificationsDispatch);
+  }
+
+  if (mod.getTermGroupProps) {
+    termGroupPropsDecorators.push(mod.getTermGroupProps);
+  }
+
+  if (mod.getTermProps) {
+    termPropsDecorators.push(mod.getTermProps);
+  }
+
+  if (mod.getTabProps) {
+    tabPropsDecorators.push(mod.getTabProps);
+  }
+
+  if (mod.getTabsProps) {
+    tabsPropsDecorators.push(mod.getTabsProps);
+  }
+
+  if (mod.onRendererWindow) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+    mod.onRendererWindow(window);
+  }
+
+  if (typeof mod.getTabDecorationProviders === 'function') {
+    try {
+      const providerList = mod.getTabDecorationProviders();
+      registerProvidersFromPlugin(pluginName, providerList);
+    } catch (err) {
+      notify(
+        'Plugin error',
+        `${pluginName}: Error occurred in \`getTabDecorationProviders\`. Check Developer Tools for details.`,
+        {
+          error: err
+        }
+      );
+    }
+  }
+
+  console.log(`Plugin ${pluginName} (${pluginVersion}) loaded.`);
+};
+
+const loadPluginModule = (pluginPath: string, loadedPlugins: string[]): hyperPlugin | undefined => {
+  if (!loadedPlugins.includes(pathModule.basename(pluginPath))) {
+    return undefined;
+  }
+
+  const pluginName = getPluginName(pluginPath);
+  const pluginVersion = getPluginVersion(pluginPath);
+  let mod: hyperPlugin;
+
+  // window.require allows us to ensure this doesn't get
+  // in the way of our build
+  try {
+    mod = window.require(pluginPath);
+  } catch (err) {
+    notify(
+      'Plugin load error',
+      `"${pluginName}" failed to load in the renderer process. Check Developer Tools for details.`,
+      {
+        error: err
+      }
+    );
+    return undefined;
+  }
+
+  registerPluginHooks(mod, pluginName, pluginVersion);
+  return mod;
+};
+
+const loadModules = () => {
+  console.log('(re)loading renderer plugins');
+  const paths = plugins.getPaths();
+  tabDecorationProviders.clear();
+  registerRuntimeTabDecorationProviders();
+
+  initializePluginCaches();
 
   const loadedPlugins = plugins.getLoadedPluginVersions().map((plugin: any) => plugin.name);
   modules = paths.plugins
     .concat(paths.localPlugins)
-    .filter((pluginPath: string) => loadedPlugins.indexOf(pathModule.basename(pluginPath)) !== -1)
-    .map((pluginPath: string) => {
-      let mod: hyperPlugin;
-      const pluginName = getPluginName(pluginPath);
-      const pluginVersion = getPluginVersion(pluginPath);
-
-      // window.require allows us to ensure this doesn't get
-      // in the way of our build
-      try {
-        mod = window.require(pluginPath);
-      } catch (err) {
-        notify(
-          'Plugin load error',
-          `"${pluginName}" failed to load in the renderer process. Check Developer Tools for details.`,
-          {error: err}
-        );
-        return undefined;
-      }
-
-      ObjectTypedKeys(mod).forEach((i) => {
-        if (Object.hasOwn(mod, i)) {
-          mod[i]._pluginName = pluginName;
-          mod[i]._pluginVersion = pluginVersion;
-        }
-      });
-
-      // mapHyperTermState mapping for backwards compatibility with hyperterm
-      if (mod.mapHyperTermState) {
-        mod.mapHyperState = mod.mapHyperTermState;
-        console.error('mapHyperTermState is deprecated. Use mapHyperState instead.');
-      }
-
-      // mapHyperTermDispatch mapping for backwards compatibility with hyperterm
-      if (mod.mapHyperTermDispatch) {
-        mod.mapHyperDispatch = mod.mapHyperTermDispatch;
-        console.error('mapHyperTermDispatch is deprecated. Use mapHyperDispatch instead.');
-      }
-
-      if (mod.middleware) {
-        middlewares.push(mod.middleware);
-      }
-
-      if (mod.reduceUI) {
-        uiReducers.push(mod.reduceUI);
-      }
-
-      if (mod.reduceSessions) {
-        sessionsReducers.push(mod.reduceSessions);
-      }
-
-      if (mod.reduceTermGroups) {
-        termGroupsReducers.push(mod.reduceTermGroups);
-      }
-
-      if (mod.mapTermsState) {
-        connectors.Terms.state.push(mod.mapTermsState);
-      }
-
-      if (mod.mapTermsDispatch) {
-        connectors.Terms.dispatch.push(mod.mapTermsDispatch);
-      }
-
-      if (mod.mapHeaderState) {
-        connectors.Header.state.push(mod.mapHeaderState);
-      }
-
-      if (mod.mapHeaderDispatch) {
-        connectors.Header.dispatch.push(mod.mapHeaderDispatch);
-      }
-
-      if (mod.mapHyperState) {
-        connectors.Hyper.state.push(mod.mapHyperState);
-      }
-
-      if (mod.mapHyperDispatch) {
-        connectors.Hyper.dispatch.push(mod.mapHyperDispatch);
-      }
-
-      if (mod.mapNotificationsState) {
-        connectors.Notifications.state.push(mod.mapNotificationsState);
-      }
-
-      if (mod.mapNotificationsDispatch) {
-        connectors.Notifications.dispatch.push(mod.mapNotificationsDispatch);
-      }
-
-      if (mod.getTermGroupProps) {
-        termGroupPropsDecorators.push(mod.getTermGroupProps);
-      }
-
-      if (mod.getTermProps) {
-        termPropsDecorators.push(mod.getTermProps);
-      }
-
-      if (mod.getTabProps) {
-        tabPropsDecorators.push(mod.getTabProps);
-      }
-
-      if (mod.getTabsProps) {
-        tabsPropsDecorators.push(mod.getTabsProps);
-      }
-
-      if (mod.onRendererWindow) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        mod.onRendererWindow(window);
-      }
-
-      if (typeof mod.getTabDecorationProviders === 'function') {
-        try {
-          const providerList = mod.getTabDecorationProviders();
-          registerProvidersFromPlugin(pluginName, providerList);
-        } catch (err) {
-          notify(
-            'Plugin error',
-            `${pluginName}: Error occurred in \`getTabDecorationProviders\`. Check Developer Tools for details.`,
-            {error: err}
-          );
-        }
-      }
-
-      console.log(`Plugin ${pluginName} (${pluginVersion}) loaded.`);
-
-      return mod;
-    })
+    .map((pluginPath: string) => loadPluginModule(pluginPath, loadedPlugins))
     .filter((mod: hyperPlugin | undefined): mod is hyperPlugin => Boolean(mod));
 
   const deprecatedPlugins = plugins.getDeprecatedConfig();
