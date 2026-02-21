@@ -201,11 +201,14 @@ const registerProvidersFromPlugin = (pluginName: string, providerList: unknown) 
         ? provider.id.trim()
         : `provider-${providerIndex + 1}`;
 
+    const subscribe =
+      typeof provider.subscribe === 'function' ? (provider.subscribe as TabDecorationProvider['subscribe']) : undefined;
+
     registerTabDecorationProvider({
-      ...provider,
       id: buildProviderId(pluginName, baseProviderId),
       priority: typeof provider.priority === 'number' ? provider.priority : 0,
-      provideDecoration: provider.provideDecoration
+      provideDecoration: provider.provideDecoration,
+      subscribe
     });
   });
 };

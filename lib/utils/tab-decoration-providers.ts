@@ -22,7 +22,7 @@ export type TabDecorationBadge = {
 
 export type TabDecorationWidget = {
   icon: string;
-  command: CommandId | string;
+  command: CommandId;
   tooltip?: string;
 };
 
@@ -133,8 +133,10 @@ export const mergeTabDecorations = (decorations: TabDecoration[]): TabDecoration
     mergeSimpleProperty(merged, decoration, 'icon');
     mergeSimpleProperty(merged, decoration, 'title');
     mergeSimpleProperty(merged, decoration, 'subtitle');
-    appendUniqueBounded(badges, decoration.badges, seenBadgeKeys, badgeKey, MAX_BADGES);
-    appendUniqueBounded(widgets, decoration.widgets, seenWidgetKeys, widgetKey, MAX_WIDGETS);
+    const badgeList = Array.isArray(decoration.badges) ? decoration.badges : undefined;
+    const widgetList = Array.isArray(decoration.widgets) ? decoration.widgets : undefined;
+    appendUniqueBounded(badges, badgeList, seenBadgeKeys, badgeKey, MAX_BADGES);
+    appendUniqueBounded(widgets, widgetList, seenWidgetKeys, widgetKey, MAX_WIDGETS);
   }
 
   if (badges.length > 0) {

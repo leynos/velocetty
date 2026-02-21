@@ -1,6 +1,6 @@
 /** @file Shared JSON5 parsing and serialization helpers with optional schema validation. */
 import JSON5 from 'json5';
-import type {z} from 'zod';
+import {z} from 'zod';
 
 type ParseSuccess<T> = {success: true; data: T};
 type ParseFailure = {success: false; error: Error};
@@ -41,26 +41,40 @@ const validateKeymapField: FieldValidator = (value, field) => {
   return null;
 };
 
+const rawConfigSchema = z
+  .object({
+    config: z.record(z.string(), z.unknown()).optional(),
+    plugins: z.array(z.string()).optional(),
+    localPlugins: z.array(z.string()).optional(),
+    keymaps: z.record(z.string(), z.union([z.string(), z.array(z.string())])).optional()
+  })
+  .passthrough();
+
 export const validateRawConfig = (value: unknown): ParseResult<Record<string, unknown>> => {
-  if (!isRecord(value)) {
-    return {success: false, error: new Error('Expected config payload to be an object.')};
-  }
-
-  const validators: Array<[string, FieldValidator]> = [
-    ['config', validateRecordField],
-    ['plugins', validateStringArrayField],
-    ['localPlugins', validateStringArrayField],
-    ['keymaps', validateKeymapField]
-  ];
-
-  for (const [field, validator] of validators) {
-    const error = validator(value, field);
-    if (error) {
-      return {success: false, error};
+  const parsed = rawConfigSchema.safeParse(value);
+  if (!parsed.success) {
+    if (!isRecord(value)) {
+      return {success: false, error: new Error('Expected config payload to be an object.')};
     }
+
+    const validators: Array<[string, FieldValidator]> = [
+      ['config', validateRecordField],
+      ['plugins', validateStringArrayField],
+      ['localPlugins', validateStringArrayField],
+      ['keymaps', validateKeymapField]
+    ];
+
+    for (const [field, validator] of validators) {
+      const error = validator(value, field);
+      if (error) {
+        return {success: false, error};
+      }
+    }
+
+    return {success: false, error: parsed.error};
   }
 
-  return {success: true, data: value};
+  return {success: true, data: parsed.data as Record<string, unknown>};
 };
 
 export const sortKeys = (value: unknown): unknown => {

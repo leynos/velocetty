@@ -112,7 +112,7 @@ test('install() persists plugin entries from npm checks', async () => {
 test('install() persists local plugin entries when local install is requested', async () => {
   const {install} = await loadCliApi();
 
-  await install('local-plugin', true);
+  await install('local-plugin', {locally: true});
 
   expect(requestedUrls).toEqual(['https://registry.npmjs.org/local-plugin']);
   expect(savedConfigs.at(-1)).toEqual({
@@ -125,7 +125,7 @@ test('install() rejects duplicate local plugins that already exist in config', a
   configData = {plugins: [], localPlugins: ['local-plugin']};
   const {install} = await loadCliApi();
 
-  await expect(install('local-plugin', true)).rejects.toBe('local-plugin is already installed');
+  await expect(install('local-plugin', {locally: true})).rejects.toBe('local-plugin is already installed');
 });
 
 test('install() maps npm and transport errors to stable user-facing messages', async () => {

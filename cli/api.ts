@@ -65,17 +65,22 @@ const getFileContents = memoize(() => {
   return fs.readFileSync(fileName, 'utf8');
 });
 
+const pluginNameSchema = z
+  .string()
+  .min(1)
+  .refine((value) => value.trim().length > 0, {message: 'Plugin identifiers must not be empty or whitespace-only.'});
+
 const cliConfigSchema = z
   .object({
-    plugins: z.preprocess((value) => (Array.isArray(value) ? value : []), z.array(z.string())).default([]),
-    localPlugins: z.preprocess((value) => (Array.isArray(value) ? value : []), z.array(z.string())).default([])
+    plugins: z.preprocess((value) => (Array.isArray(value) ? value : []), z.array(pluginNameSchema)).default([]),
+    localPlugins: z.preprocess((value) => (Array.isArray(value) ? value : []), z.array(pluginNameSchema)).default([])
   })
   .passthrough();
 
 const getParsedFile = memoize(() => parseJson5StrictWithSchema(getFileContents(), cliConfigSchema));
 
 const getPluginsByKey = (key: 'plugins' | 'localPlugins'): PluginSpecifier[] =>
-  getParsedFile()[key] as PluginSpecifier[];
+  getParsedFile()[key].map((entry) => pluginSpecifier(entry));
 
 const getPlugins = memoize(() => {
   return getPluginsByKey('plugins');
@@ -158,7 +163,13 @@ const handleNpmCheckError = (err: unknown, plugin: PluginSpecifier): Promise<nev
   return Promise.reject(`${errorMessage}\nPlugin check failed. Check your internet connection or retry later.`);
 };
 
-function install(plugin: PluginSpecifier, locally?: boolean, signal?: AbortSignal) {
+type InstallOptions = {
+  readonly locally?: boolean;
+  readonly signal?: AbortSignal;
+};
+
+function install(plugin: PluginSpecifier, options: InstallOptions = {}) {
+  const {locally = false, signal} = options;
   const normalizedPlugin = pluginSpecifier(plugin);
   const array = locally ? getLocalPlugins() : getPlugins();
   return existsOnNpm(normalizedPlugin, signal)

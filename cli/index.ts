@@ -19,11 +19,13 @@ import * as api from './api';
 
 let commandPromise: Promise<void> | undefined;
 
-const assertPluginName = (pluginName: string) => {
-  if (!pluginName) {
+const assertPluginName = (pluginName: string): string => {
+  const normalizedPluginName = pluginName.trim();
+  if (!normalizedPluginName) {
     console.error(chalk.red('Plugin name is required'));
     process.exit(1);
   }
+  return normalizedPluginName;
 };
 
 const checkConfig = () => {
@@ -57,8 +59,7 @@ args.command(
   'Install a plugin',
   (_name, args_) => {
     checkConfig();
-    const pluginName = args_[0];
-    assertPluginName(pluginName);
+    const pluginName = assertPluginName(String(args_[0] ?? ''));
     const specifier = api.pluginSpecifier(pluginName);
     commandPromise = api
       .install(specifier)
@@ -73,8 +74,7 @@ args.command(
   'Uninstall a plugin',
   (_name, args_) => {
     checkConfig();
-    const pluginName = args_[0];
-    assertPluginName(pluginName);
+    const pluginName = assertPluginName(String(args_[0] ?? ''));
     const specifier = api.pluginSpecifier(pluginName);
     commandPromise = api
       .uninstall(specifier)
@@ -169,8 +169,7 @@ args.command(
   'docs',
   'Open the npm page of a plugin',
   (_name, args_) => {
-    const pluginName = args_[0];
-    assertPluginName(pluginName);
+    const pluginName = assertPluginName(String(args_[0] ?? ''));
     void open(`http://ghub.io/${pluginName}`, {wait: false});
     process.exit(0);
   },

@@ -5,6 +5,7 @@ import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
 import {cfgPath} from '../config/paths';
 import {
+  isRecord,
   parseJson5WithSchema,
   stringifyJson5,
   validateRawConfig,
@@ -25,9 +26,6 @@ type PersistenceOptions = {
   readFile?: ReadTextFile;
   writeFile?: WriteTextFile;
 };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const cloneValue = <T>(value: T): T => structuredClone(value);
 
