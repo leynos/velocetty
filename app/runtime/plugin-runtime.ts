@@ -4,11 +4,16 @@ import {readFileSync, writeFileSync} from 'node:fs';
 import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
 import {cfgPath} from '../config/paths';
-import {parseJson5WithSchema, stringifyJson5, type ParseSchema} from '../config/json5-config';
+import {
+  parseJson5WithSchema,
+  stringifyJson5,
+  validateRawConfig,
+  type ParseResult,
+  type ParseSchema
+} from '@shared/config/json5-config';
 
 import type {CommandDefinition} from '@shared/types/commands';
 import type {configOptions, rawConfig} from '@shared/types/config';
-import {validateRawConfig, type ParseResult} from '@shared/config/json5-config';
 import {runtimePluginManifests, type RuntimePluginManifest} from './golden-path-demo';
 
 type RuntimePluginSettings = Record<string, unknown>;

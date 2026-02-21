@@ -5,6 +5,9 @@ import type {z} from 'zod';
 type ParseSuccess<T> = {success: true; data: T};
 type ParseFailure = {success: false; error: Error};
 export type ParseResult<T> = ParseSuccess<T> | ParseFailure;
+export type ParseSchema<T> = {
+  readonly safeParse: (value: unknown) => ParseResult<T>;
+};
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -80,7 +83,7 @@ export const sortKeys = (value: unknown): unknown => {
 
 export type ParseJson5Options<T> = {
   source: string;
-  schema: z.ZodType<T>;
+  schema: ParseSchema<T>;
   fallback: T;
   itemType?: string;
 };
@@ -90,7 +93,7 @@ export const parseJson5WithSchema = <T>(raw: string, options: ParseJson5Options<
   try {
     const parsed = JSON5.parse(raw) as unknown;
     const validated = schema.safeParse(parsed);
-    if (!validated.success) {
+    if (validated.success === false) {
       console.warn(`Invalid JSON5 ${itemType} shape from ${source}.`, validated.error);
       return fallback;
     }
