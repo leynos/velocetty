@@ -86,67 +86,44 @@ const compareProviders = (a: RegisteredProvider, b: RegisteredProvider) => {
   return a.registrationOrder - b.registrationOrder;
 };
 
-const processBadgesFromDecoration = (
-  decoration: TabDecoration,
-  badges: TabDecorationBadge[],
-  seenBadgeKeys: Set<string>
-): void => {
-  if (!Array.isArray(decoration.badges)) {
-    return;
-  }
+type DecorationItemKey<T> = (item: T) => string;
 
-  for (const badge of decoration.badges) {
-    if (badges.length >= MAX_BADGES) {
+const collectDecorationItems = <T>(
+  decorations: TabDecoration[],
+  propertyKey: 'badges' | 'widgets',
+  itemKey: DecorationItemKey<T>,
+  maxItems: number
+): T[] => {
+  const items: T[] = [];
+  const seenKeys = new Set<string>();
+  const allItems = decorations.flatMap((decoration) => {
+    const decorationItems = decoration[propertyKey];
+    return Array.isArray(decorationItems) ? (decorationItems as T[]) : [];
+  });
+
+  for (const item of allItems) {
+    if (items.length >= maxItems) {
       break;
     }
 
-    const key = badgeKey(badge);
-    if (seenBadgeKeys.has(key)) {
+    const key = itemKey(item);
+    if (seenKeys.has(key)) {
       continue;
     }
 
-    seenBadgeKeys.add(key);
-    badges.push(badge);
+    seenKeys.add(key);
+    items.push(item);
   }
+
+  return items;
 };
 
 const collectBadges = (decorations: TabDecoration[]): TabDecorationBadge[] => {
-  const badges: TabDecorationBadge[] = [];
-  const seenBadgeKeys = new Set<string>();
-
-  for (const decoration of decorations) {
-    if (badges.length >= MAX_BADGES) {
-      break;
-    }
-    processBadgesFromDecoration(decoration, badges, seenBadgeKeys);
-  }
-
-  return badges;
+  return collectDecorationItems<TabDecorationBadge>(decorations, 'badges', badgeKey, MAX_BADGES);
 };
 
 const collectWidgets = (decorations: TabDecoration[]): TabDecorationWidget[] => {
-  const widgets: TabDecorationWidget[] = [];
-  const seenWidgetKeys = new Set<string>();
-
-  // Stage 1: Flatten all widgets from all decorations into a single array.
-  const allWidgets = decorations.flatMap((decoration) => (Array.isArray(decoration.widgets) ? decoration.widgets : []));
-
-  // Stage 2: Collect unique widgets up to MAX_WIDGETS with early exits.
-  for (const widget of allWidgets) {
-    if (widgets.length >= MAX_WIDGETS) {
-      break;
-    }
-
-    const key = widgetKey(widget);
-    if (seenWidgetKeys.has(key)) {
-      continue;
-    }
-
-    seenWidgetKeys.add(key);
-    widgets.push(widget);
-  }
-
-  return widgets;
+  return collectDecorationItems<TabDecorationWidget>(decorations, 'widgets', widgetKey, MAX_WIDGETS);
 };
 
 const mergeSimpleProperty = <K extends 'icon' | 'title' | 'subtitle'>(
