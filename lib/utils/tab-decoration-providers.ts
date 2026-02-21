@@ -90,22 +90,22 @@ const collectBadges = (decorations: TabDecoration[]): TabDecorationBadge[] => {
   const badges: TabDecorationBadge[] = [];
   const seenBadgeKeys = new Set<string>();
 
-  for (const decoration of decorations) {
-    if (!Array.isArray(decoration.badges) || badges.length >= MAX_BADGES) {
+  // Stage 1: Flatten all badges from all decorations into a single array.
+  const allBadges = decorations.flatMap((decoration) => (Array.isArray(decoration.badges) ? decoration.badges : []));
+
+  // Stage 2: Collect unique badges up to MAX_BADGES with early exits.
+  for (const badge of allBadges) {
+    if (badges.length >= MAX_BADGES) {
+      break;
+    }
+
+    const key = badgeKey(badge);
+    if (seenBadgeKeys.has(key)) {
       continue;
     }
 
-    for (const badge of decoration.badges) {
-      if (badges.length >= MAX_BADGES) {
-        break;
-      }
-      const key = badgeKey(badge);
-      if (seenBadgeKeys.has(key)) {
-        continue;
-      }
-      seenBadgeKeys.add(key);
-      badges.push(badge);
-    }
+    seenBadgeKeys.add(key);
+    badges.push(badge);
   }
 
   return badges;
@@ -115,22 +115,22 @@ const collectWidgets = (decorations: TabDecoration[]): TabDecorationWidget[] => 
   const widgets: TabDecorationWidget[] = [];
   const seenWidgetKeys = new Set<string>();
 
-  for (const decoration of decorations) {
-    if (!Array.isArray(decoration.widgets) || widgets.length >= MAX_WIDGETS) {
+  // Stage 1: Flatten all widgets from all decorations into a single array.
+  const allWidgets = decorations.flatMap((decoration) => (Array.isArray(decoration.widgets) ? decoration.widgets : []));
+
+  // Stage 2: Collect unique widgets up to MAX_WIDGETS with early exits.
+  for (const widget of allWidgets) {
+    if (widgets.length >= MAX_WIDGETS) {
+      break;
+    }
+
+    const key = widgetKey(widget);
+    if (seenWidgetKeys.has(key)) {
       continue;
     }
 
-    for (const widget of decoration.widgets) {
-      if (widgets.length >= MAX_WIDGETS) {
-        break;
-      }
-      const key = widgetKey(widget);
-      if (seenWidgetKeys.has(key)) {
-        continue;
-      }
-      seenWidgetKeys.add(key);
-      widgets.push(widget);
-    }
+    seenWidgetKeys.add(key);
+    widgets.push(widget);
   }
 
   return widgets;
