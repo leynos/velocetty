@@ -6,15 +6,14 @@ type ParseSuccess<T> = {success: true; data: T};
 type ParseFailure = {success: false; error: Error};
 export type ParseResult<T> = ParseSuccess<T> | ParseFailure;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const isStringArray = (value: unknown): value is string[] =>
+export const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 
-const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
-  isRecord(value) &&
-  Object.values(value).every((entry) => typeof entry === 'string' || (Array.isArray(entry) && isStringArray(entry)));
+export const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
+  isRecord(value) && Object.values(value).every((entry) => typeof entry === 'string' || isStringArray(entry));
 
 type FieldValidator = (value: Record<string, unknown>, field: string) => Error | null;
 
