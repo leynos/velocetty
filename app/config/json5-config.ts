@@ -34,57 +34,56 @@ export const isStringArray = (value: unknown): value is string[] =>
 export const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
   isRecord(value) && Object.values(value).every((entry) => typeof entry === 'string' || isStringArray(entry));
 
-type FieldValidator = (value: Record<string, unknown>, field: string) => Error | null;
+type FieldValidator = (value: unknown) => boolean;
+interface FieldValidation {
+  readonly field: string;
+  readonly validator: FieldValidator;
+  readonly errorMessage: string;
+}
 
-const validateRecordField: FieldValidator = (value, field) => {
-  if (value[field] !== undefined && !isRecord(value[field])) {
-    return new Error(`Expected \`${field}\` to be an object when present.`);
-  }
-  return null;
-};
-
-const validateStringArrayField: FieldValidator = (value, field) => {
-  if (value[field] !== undefined && !isStringArray(value[field])) {
-    return new Error(`Expected \`${field}\` to be an array of strings when present.`);
-  }
-  return null;
-};
-
-const validateKeymapField: FieldValidator = (value, field) => {
-  if (value[field] !== undefined && !isKeymapConfig(value[field])) {
-    return new Error(`Expected \`${field}\` values to be strings or string arrays when present.`);
-  }
-  return null;
-};
-
-export const validateRawConfig = (value: unknown): ParseResult<Record<string, unknown>> => {
+export const safeParseRawConfig = (value: unknown): ParseResult<rawConfig> => {
   if (!isRecord(value)) {
     return {success: false, error: new Error('Expected config payload to be an object.')};
   }
 
-  const validators: Array<[string, FieldValidator]> = [
-    ['config', validateRecordField],
-    ['plugins', validateStringArrayField],
-    ['localPlugins', validateStringArrayField],
-    ['keymaps', validateKeymapField]
+  const fieldValidations: FieldValidation[] = [
+    {
+      field: 'config',
+      validator: isRecord,
+      errorMessage: 'Expected `config` to be an object when present.'
+    },
+    {
+      field: 'plugins',
+      validator: isStringArray,
+      errorMessage: 'Expected `plugins` to be an array of strings when present.'
+    },
+    {
+      field: 'localPlugins',
+      validator: isStringArray,
+      errorMessage: 'Expected `localPlugins` to be an array of strings when present.'
+    },
+    {
+      field: 'keymaps',
+      validator: isKeymapConfig,
+      errorMessage: 'Expected `keymaps` values to be strings or string arrays when present.'
+    }
   ];
 
-  for (const [field, validator] of validators) {
-    const error = validator(value, field);
-    if (error) {
-      return {success: false, error};
+  for (const {field, validator, errorMessage} of fieldValidations) {
+    if (value[field] !== undefined && !validator(value[field])) {
+      return {success: false, error: new Error(errorMessage)};
     }
   }
 
-  return {success: true, data: value};
+  return {success: true, data: value as rawConfig};
 };
 
-export const safeParseRawConfig = (value: unknown): ParseResult<rawConfig> => {
-  const result = validateRawConfig(value);
+export const validateRawConfig = (value: unknown): ParseResult<Record<string, unknown>> => {
+  const result = safeParseRawConfig(value);
   if (!result.success) {
     return result;
   }
-  return {success: true, data: result.data as rawConfig};
+  return {success: true, data: result.data as Record<string, unknown>};
 };
 
 export const parseJson5WithSchema = <T>(raw: string, options: ParseOptions<T>): T => {
