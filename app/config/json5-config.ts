@@ -8,14 +8,8 @@ import {
   sortKeys,
   stringifyJson5,
   validateRawConfig
-} from '../../shared/src/config/json5-config';
-import type {
-  ParseFailure,
-  ParseOptions,
-  ParseResult,
-  ParseSchema,
-  ParseSuccess
-} from '../../shared/src/config/json5-config';
+} from '@shared/config/json5-config';
+import type {ParseFailure, ParseOptions, ParseResult, ParseSchema, ParseSuccess} from '@shared/config/json5-config';
 
 export type {ParseFailure, ParseOptions, ParseResult, ParseSchema, ParseSuccess};
 export {isKeymapConfig, isRecord, isStringArray, sortKeys, stringifyJson5, validateRawConfig};

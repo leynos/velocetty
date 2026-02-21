@@ -58,6 +58,7 @@ const ensureUserConfigFile = (defaultCfgRaw: string) => {
   }
 
   const parsedDefaultConfig = parseRawConfig(defaultCfgRaw, 'default config bootstrap') ?? {};
+  console.warn(`[config-import] User config file missing at "${cfgPath}". Bootstrapping from default config template.`);
   writeFileSync(cfgPath, stringifyConfig(parsedDefaultConfig), 'utf8');
 };
 
@@ -96,6 +97,9 @@ const _importConf = () => {
   }
 
   if (!userCfg) {
+    console.warn(
+      `[config-import] Using default config fallback after user config parse failure. userPath="${cfgPath}" defaultPath="${defaultCfg}"`
+    );
     notify("Couldn't parse config file. Using default config instead.");
     userCfg = _defaultCfg;
   }
