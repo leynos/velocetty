@@ -3,7 +3,6 @@ import {resolve} from 'node:path';
 
 import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
 
-import {validateRawConfig} from '@shared/config/json5-config';
 import type {rawConfig} from '@shared/types/config';
 import notify from '../notify';
 import {parseJson5WithSchema, stringifyJson5, type ParseSchema} from './json5-config';
@@ -24,6 +23,24 @@ const isKeymapValue = (value: unknown): value is string | string[] => typeof val
 const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
   isRecord(value) && Object.values(value).every((entry) => isKeymapValue(entry));
 
+type ParseFailure = {success: false; error: Error};
+type FieldValidator<T> = (value: unknown) => value is T;
+
+const validateOptionalField = <T>(
+  obj: Record<string, unknown>,
+  fieldName: string,
+  validator: FieldValidator<T>,
+  errorMessage: string
+): ParseFailure | null => {
+  if (obj[fieldName] !== undefined && !validator(obj[fieldName])) {
+    return {
+      success: false,
+      error: new Error(errorMessage)
+    };
+  }
+  return null;
+};
+
 const keymapSchema: ParseSchema<Record<string, string | string[]>> = {
   safeParse: (value) => {
     if (!isKeymapConfig(value)) {
@@ -39,11 +56,39 @@ const keymapSchema: ParseSchema<Record<string, string | string[]>> = {
 
 const rawConfigSchema: ParseSchema<rawConfig> = {
   safeParse: (value) => {
-    const result = validateRawConfig(value);
-    if (!result.success) {
-      return result;
+    if (!isRecord(value)) {
+      return {success: false, error: new Error('Expected config payload to be an object.')};
     }
-    return {success: true, data: result.data as rawConfig};
+
+    const validations: Array<ParseFailure | null> = [
+      validateOptionalField(value, 'config', isRecord, 'Expected `config` to be an object when present.'),
+      validateOptionalField(
+        value,
+        'plugins',
+        isStringArray,
+        'Expected `plugins` to be an array of strings when present.'
+      ),
+      validateOptionalField(
+        value,
+        'localPlugins',
+        isStringArray,
+        'Expected `localPlugins` to be an array of strings when present.'
+      ),
+      validateOptionalField(
+        value,
+        'keymaps',
+        isKeymapConfig,
+        'Expected `keymaps` values to be strings or string arrays when present.'
+      )
+    ];
+
+    for (const validation of validations) {
+      if (validation) {
+        return validation;
+      }
+    }
+
+    return {success: true, data: value as rawConfig};
   }
 };
 
