@@ -72,42 +72,6 @@ const badgeKey = (badge: TabDecorationBadge) =>
 
 const widgetKey = (widget: TabDecorationWidget) => `${widget.icon}:${widget.command}:${widget.tooltip ?? ''}`;
 
-const mergeSimpleProperty = <K extends 'icon' | 'title' | 'subtitle'>(
-  merged: TabDecoration,
-  decoration: TabDecoration,
-  key: K
-) => {
-  if (!merged[key] && decoration[key]) {
-    merged[key] = decoration[key];
-  }
-};
-
-const appendUniqueBounded = <T>(
-  target: T[],
-  source: readonly T[] | undefined,
-  seenKeys: Set<string>,
-  keyFn: (item: T) => string,
-  limit: number
-) => {
-  if (!source || target.length >= limit) {
-    return;
-  }
-
-  for (const item of source) {
-    if (target.length >= limit) {
-      return;
-    }
-
-    const key = keyFn(item);
-    if (seenKeys.has(key)) {
-      continue;
-    }
-
-    seenKeys.add(key);
-    target.push(item);
-  }
-};
-
 const compareProviders = (a: RegisteredProvider, b: RegisteredProvider) => {
   const byPriority = b.provider.priority - a.provider.priority;
   if (byPriority !== 0) {
@@ -130,13 +94,46 @@ export const mergeTabDecorations = (decorations: TabDecoration[]): TabDecoration
   const seenWidgetKeys = new Set<string>();
 
   for (const decoration of decorations) {
-    mergeSimpleProperty(merged, decoration, 'icon');
-    mergeSimpleProperty(merged, decoration, 'title');
-    mergeSimpleProperty(merged, decoration, 'subtitle');
+    if (!merged.icon && decoration.icon) {
+      merged.icon = decoration.icon;
+    }
+    if (!merged.title && decoration.title) {
+      merged.title = decoration.title;
+    }
+    if (!merged.subtitle && decoration.subtitle) {
+      merged.subtitle = decoration.subtitle;
+    }
+
     const badgeList = Array.isArray(decoration.badges) ? decoration.badges : undefined;
     const widgetList = Array.isArray(decoration.widgets) ? decoration.widgets : undefined;
-    appendUniqueBounded(badges, badgeList, seenBadgeKeys, badgeKey, MAX_BADGES);
-    appendUniqueBounded(widgets, widgetList, seenWidgetKeys, widgetKey, MAX_WIDGETS);
+
+    if (badgeList && badges.length < MAX_BADGES) {
+      for (const badge of badgeList) {
+        if (badges.length >= MAX_BADGES) {
+          break;
+        }
+        const key = badgeKey(badge);
+        if (seenBadgeKeys.has(key)) {
+          continue;
+        }
+        seenBadgeKeys.add(key);
+        badges.push(badge);
+      }
+    }
+
+    if (widgetList && widgets.length < MAX_WIDGETS) {
+      for (const widget of widgetList) {
+        if (widgets.length >= MAX_WIDGETS) {
+          break;
+        }
+        const key = widgetKey(widget);
+        if (seenWidgetKeys.has(key)) {
+          continue;
+        }
+        seenWidgetKeys.add(key);
+        widgets.push(widget);
+      }
+    }
   }
 
   if (badges.length > 0) {
