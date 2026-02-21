@@ -72,7 +72,8 @@ const rawConfigSchema: ParseSchema<rawConfig> = {
 };
 
 const parseConfigJson5 = (raw: string): rawConfig => {
-  return parseJson5WithSchema(raw, {
+  return parseJson5WithSchema({
+    raw,
     source: 'runtime plugin config',
     schema: rawConfigSchema,
     fallback: {},

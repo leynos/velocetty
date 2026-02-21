@@ -81,15 +81,16 @@ export const sortKeys = (value: unknown): unknown => {
   return value;
 };
 
-export type ParseJson5Options<T> = {
-  source: string;
-  schema: ParseSchema<T>;
-  fallback: T;
-  itemType?: string;
-};
+export interface ParseJson5Options<T> {
+  readonly raw: string;
+  readonly source: string;
+  readonly schema: ParseSchema<T>;
+  readonly fallback: T;
+  readonly itemType?: string;
+}
 
-export const parseJson5WithSchema = <T>(raw: string, options: ParseJson5Options<T>): T => {
-  const {source, schema, fallback, itemType = 'config'} = options;
+export const parseJson5WithSchema = <T>(options: ParseJson5Options<T>): T => {
+  const {raw, source, schema, fallback, itemType = 'config'} = options;
   try {
     const parsed = JSON5.parse(raw) as unknown;
     const validated = schema.safeParse(parsed);
