@@ -9,6 +9,7 @@ type RendererConfig = {
 
 const rendererConfigSubscriptions: Array<() => void> = [];
 let rendererConfig: RendererConfig = {};
+let importNonce = 0;
 
 const subscribeRendererConfigMock = mock((listener: () => void) => {
   rendererConfigSubscriptions.push(listener);
@@ -58,7 +59,7 @@ test('registers runtime tab providers for live enablement toggles', async () => 
     }
   };
 
-  const plugins = await import(`../../lib/utils/plugins.ts?runtime_tab_provider_${Date.now()}`);
+  const plugins = await import(`../../lib/utils/plugins.ts?runtime_tab_provider_${importNonce++}`);
 
   expect(subscribeRendererConfigMock.mock.calls.length).toBeGreaterThan(0);
 

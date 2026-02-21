@@ -47,7 +47,7 @@ import IPCChildProcess from './ipc-child-process';
 import {getConfig as getRendererConfig, subscribe as subscribeRendererConfig} from './config';
 import notify from './notify';
 import {ObjectTypedKeys} from './object';
-import {loadRemotePluginsModule} from './remote-plugins';
+import {loadRemotePluginsModule, type RemotePluginsModule} from './remote-plugins';
 import {
   registerTabDecorationProvider,
   resolveTabDecoration,
@@ -61,6 +61,11 @@ import {
 } from './tab-decoration-providers';
 
 type ConnectOptions = NonNullable<Parameters<typeof reduxConnect>[3]>;
+type LoadedPluginVersion = ReturnType<RemotePluginsModule['getLoadedPluginVersions']>[number];
+type PluginHook = ((...args: unknown[]) => unknown) & {
+  _pluginName?: string;
+  _pluginVersion?: string | null;
+};
 
 // remote interface to `../plugins`
 const plugins = loadRemotePluginsModule();
@@ -102,6 +107,7 @@ const buildProviderId = (pluginName: string, providerId: string) => `${pluginNam
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+const isPluginHook = (value: unknown): value is PluginHook => typeof value === 'function';
 
 const resolveRuntimePluginSettings = (manifest: RuntimePluginManifest): Record<string, unknown> => {
   const config = getRendererConfig();
@@ -204,15 +210,17 @@ const registerProvidersFromPlugin = (pluginName: string, providerList: unknown) 
   });
 };
 
-type DecoratedTab = {
-  uid: string | number;
-  tabIndex?: number;
+type TabLike = {
+  uid: string;
+  tabIndex: number;
   isActive?: boolean;
   hasActivity?: boolean;
   title?: string;
 };
 
-const getTabDecorationContext = (tab: DecoratedTab): TabDecorationContext => {
+type ParentPropsLike = Record<string, unknown>;
+
+const getTabDecorationContext = (tab: TabLike): TabDecorationContext => {
   return {
     tabId: String(tab.uid),
     tabIndex: typeof tab.tabIndex === 'number' ? tab.tabIndex : 0,
@@ -415,9 +423,14 @@ const initializePluginCaches = () => {
 
 const registerPluginHooks = (mod: hyperPlugin, pluginName: string, pluginVersion: string | null) => {
   ObjectTypedKeys(mod).forEach((i) => {
-    if (Object.hasOwn(mod, i)) {
-      mod[i]._pluginName = pluginName;
-      mod[i]._pluginVersion = pluginVersion;
+    if (!Object.hasOwn(mod, i)) {
+      return;
+    }
+
+    const pluginHook = mod[i];
+    if (isPluginHook(pluginHook)) {
+      pluginHook._pluginName = pluginName;
+      pluginHook._pluginVersion = pluginVersion;
     }
   });
 
@@ -556,7 +569,7 @@ const loadModules = () => {
 
   initializePluginCaches();
 
-  const loadedPlugins = plugins.getLoadedPluginVersions().map((plugin: any) => plugin.name);
+  const loadedPlugins = plugins.getLoadedPluginVersions().map((plugin: LoadedPluginVersion) => plugin.name);
   modules = paths.plugins
     .concat(paths.localPlugins)
     .map((pluginPath: string) => loadPluginModule(pluginPath, loadedPlugins))
@@ -634,18 +647,19 @@ export function getTabsProps<T extends Assignable<TabsProps, T>>(parentProps: an
   return getProps('getTabsProps', props, parentProps);
 }
 
-export function getTabProps<T extends Assignable<TabProps, T>>(tab: any, parentProps: any, props: T): T {
+export function getTabProps<T extends Assignable<TabProps, T>>(
+  tab: TabLike,
+  parentProps: ParentPropsLike,
+  props: T
+): T {
   const decoration = resolveTabDecoration(getTabDecorationContext(tab));
-  const decoratedProps = decoration.title
-    ? ({
-        ...props,
-        text: decoration.title,
-        tabDecoration: decoration
-      } as T)
-    : ({
-        ...props,
-        tabDecoration: decoration
-      } as T);
+  const decoratedProps = {
+    ...props,
+    tabDecoration: decoration
+  };
+  if (decoration.title) {
+    decoratedProps.text = decoration.title;
+  }
 
   return getProps('getTabProps', decoratedProps, tab, parentProps);
 }
