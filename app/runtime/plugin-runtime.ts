@@ -101,6 +101,20 @@ export const getRuntimePluginKeybindings = (cfg: configOptions): Record<string, 
 };
 
 /**
+ * Merges runtime keybinding contributions with resolved keymaps.
+ *
+ * Resolved keymaps from `config.getKeymaps()` already include default+user
+ * precedence, so they must override runtime defaults for the same command.
+ */
+export const mergeRuntimePluginKeybindings = (
+  resolvedKeymaps: Record<string, string[]>,
+  runtimeKeybindings: Record<string, string[]>
+): Record<string, string[]> => ({
+  ...runtimeKeybindings,
+  ...resolvedKeymaps
+});
+
+/**
  * Ensures runtime plugin settings defaults are present in the JSON5 config file.
  *
  * Returns the persisted runtime plugin namespace after defaults have been

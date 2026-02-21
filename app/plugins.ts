@@ -23,7 +23,8 @@ import {install} from './plugins/install';
 import {
   ensureRuntimePluginSettingsPersisted,
   getRuntimePluginCommandDefinitions,
-  getRuntimePluginKeybindings
+  getRuntimePluginKeybindings,
+  mergeRuntimePluginKeybindings
 } from './runtime/plugin-runtime';
 import mapKeys from './utils/map-keys';
 
@@ -455,7 +456,7 @@ export const getDecoratedKeymaps = () => {
   ensureRuntimeDefaultsPersisted();
   const baseKeymaps = config.getKeymaps();
   const runtimeKeymaps = getRuntimePluginKeybindings(config.getConfig());
-  const keymapsWithRuntimeContributions = {...baseKeymaps, ...runtimeKeymaps};
+  const keymapsWithRuntimeContributions = mergeRuntimePluginKeybindings(baseKeymaps, runtimeKeymaps);
   // Ensure that all keys are in an array and don't use deprecated key combination`
   const decoratedKeymaps = mapKeys(decorateObject(keymapsWithRuntimeContributions, 'decorateKeymaps'));
   return decoratedKeymaps;

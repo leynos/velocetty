@@ -13,6 +13,7 @@ import {
   ensureRuntimePluginSettingsPersisted,
   getRuntimePluginCommandDefinitions,
   getRuntimePluginKeybindings,
+  mergeRuntimePluginKeybindings,
   setRuntimePluginEnabledPersisted
 } from '../../app/runtime/plugin-runtime';
 
@@ -103,6 +104,19 @@ test('runtime command and keybinding contributions follow enabled setting', () =
 
   expect(Array.isArray(getRuntimePluginKeybindings(enabledConfig)[GOLDEN_PATH_COMMAND_ID])).toBe(true);
   expect(getRuntimePluginKeybindings(disabledConfig)).toEqual({});
+});
+
+test('mergeRuntimePluginKeybindings preserves resolved user keymap overrides', () => {
+  const runtimeKeybindings = {
+    [GOLDEN_PATH_COMMAND_ID]: ['ctrl+alt+shift+g']
+  };
+  const resolvedKeymaps = {
+    [GOLDEN_PATH_COMMAND_ID]: ['ctrl+shift+g']
+  };
+
+  expect(mergeRuntimePluginKeybindings(resolvedKeymaps, runtimeKeybindings)[GOLDEN_PATH_COMMAND_ID]).toEqual([
+    'ctrl+shift+g'
+  ]);
 });
 
 test('golden path runtime tab provider output is deterministic for identical context', () => {
