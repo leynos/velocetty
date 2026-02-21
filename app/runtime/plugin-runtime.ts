@@ -10,7 +10,7 @@ import {
   validateRawConfig,
   type ParseResult,
   type ParseSchema
-} from '@shared/config/json5-config';
+} from '../config/json5-config';
 
 import type {CommandDefinition} from '@shared/types/commands';
 import type {configOptions, rawConfig} from '@shared/types/config';
@@ -72,8 +72,7 @@ const rawConfigSchema: ParseSchema<rawConfig> = {
 };
 
 const parseConfigJson5 = (raw: string): rawConfig => {
-  return parseJson5WithSchema({
-    raw,
+  return parseJson5WithSchema(raw, {
     source: 'runtime plugin config',
     schema: rawConfigSchema,
     fallback: {},

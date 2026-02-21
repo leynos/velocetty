@@ -3,10 +3,15 @@ import {resolve} from 'node:path';
 
 import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
 
-import {isKeymapConfig, validateRawConfig} from '@shared/config/json5-config';
 import type {rawConfig} from '@shared/types/config';
 import notify from '../notify';
-import {parseJson5WithSchema, stringifyJson5, type ParseSchema} from './json5-config';
+import {
+  isKeymapConfig,
+  parseJson5WithSchema,
+  stringifyJson5,
+  validateRawConfig,
+  type ParseSchema
+} from './json5-config';
 
 import {_init} from './init';
 import {cfgDir, cfgPath, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath} from './paths';
