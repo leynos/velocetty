@@ -2,15 +2,11 @@
 import {app, Menu} from 'electron';
 import type {BrowserWindow} from 'electron';
 import type {CommandId} from '@shared/types/commands';
-import {
-  GOLDEN_PATH_COMMAND_ID,
-  GOLDEN_PATH_PLUGIN_ID,
-  goldenPathSettingsDefaults
-} from '@shared/runtime/golden-path-demo';
 
 import {openConfig, getConfig} from './config';
 import {asProfileId} from './utils/shared-ids';
 import {updatePlugins} from './plugins';
+import {GOLDEN_PATH_COMMAND_ID, GOLDEN_PATH_PLUGIN_ID, goldenPathSettingsDefaults} from './runtime/golden-path-demo';
 import {getRuntimePluginSettings} from './runtime/plugin-runtime';
 import {installCLI} from './utils/cli-install';
 import * as systemContextMenu from './utils/system-context-menu';

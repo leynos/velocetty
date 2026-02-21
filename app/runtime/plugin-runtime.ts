@@ -5,9 +5,9 @@ import JSON5 from 'json5';
 import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
 
-import {runtimePluginManifests, type RuntimePluginManifest} from '@shared/runtime/golden-path-demo';
 import type {CommandDefinition} from '@shared/types/commands';
 import type {configOptions, rawConfig} from '@shared/types/config';
+import {runtimePluginManifests, type RuntimePluginManifest} from './golden-path-demo';
 
 type RuntimePluginSettings = Record<string, unknown>;
 type RuntimePluginSettingsNamespace = Record<string, RuntimePluginSettings>;
