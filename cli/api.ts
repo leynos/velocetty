@@ -7,7 +7,7 @@ import path from 'node:path';
 import got from 'got';
 import registryUrlModule from 'registry-url';
 import {z} from 'zod';
-import {parseJson5StrictWithSchema, sortKeys, stringifyJson5} from '@shared/config/json5-config';
+import {parseJson5StrictWithSchema, stringifyJson5} from '@shared/config/json5-config';
 
 const registryUrl = registryUrlModule();
 
@@ -79,7 +79,7 @@ function isInstalled(plugin: string, locally?: boolean) {
 }
 
 function save(config: unknown) {
-  return fs.writeFileSync(fileName, stringifyJson5(sortKeys(config)), 'utf8');
+  return fs.writeFileSync(fileName, stringifyJson5(config), 'utf8');
 }
 
 function getPackageName(plugin: string) {
