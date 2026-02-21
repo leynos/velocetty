@@ -15,43 +15,42 @@ let defaultConfig: rawConfig;
 
 const keymapValueSchema = z.union([z.string(), z.array(z.string())]);
 const keymapSchema = z.record(z.string(), keymapValueSchema);
-const rawConfigSchema = z
+const rawConfigSchema: z.ZodType<rawConfig> = z
   .object({
     config: z.record(z.string(), z.unknown()).optional(),
     plugins: z.array(z.string()).optional(),
     localPlugins: z.array(z.string()).optional(),
     keymaps: keymapSchema.optional()
   })
-  .passthrough();
+  .passthrough() as z.ZodType<rawConfig>;
 
-const parseRawConfig = (raw: string, source: string): rawConfig | null => {
+const parseJson5WithSchema = <T>(
+  raw: string,
+  source: string,
+  schema: z.ZodType<T>,
+  fallback: T,
+  itemType: string = 'config'
+): T => {
   try {
     const parsed = JSON5.parse(raw) as unknown;
-    const validated = rawConfigSchema.safeParse(parsed);
+    const validated = schema.safeParse(parsed);
     if (!validated.success) {
-      console.warn(`Invalid JSON5 config shape from ${source}.`, validated.error);
-      return null;
-    }
-    return validated.data as rawConfig;
-  } catch (error) {
-    console.warn(`Failed to parse JSON5 config from ${source}.`, error);
-    return null;
-  }
-};
-
-const parseKeymapConfig = (raw: string, source: string): Record<string, string | string[]> => {
-  try {
-    const parsed = JSON5.parse(raw) as unknown;
-    const validated = keymapSchema.safeParse(parsed);
-    if (!validated.success) {
-      console.warn(`Invalid keymap JSON5 shape from ${source}.`, validated.error);
-      return {};
+      console.warn(`Invalid JSON5 ${itemType} shape from ${source}.`, validated.error);
+      return fallback;
     }
     return validated.data;
   } catch (error) {
-    console.warn(`Failed to parse keymap JSON5 from ${source}.`, error);
-    return {};
+    console.warn(`Failed to parse JSON5 ${itemType} from ${source}.`, error);
+    return fallback;
   }
+};
+
+const parseRawConfig = (raw: string, source: string): rawConfig | null => {
+  return parseJson5WithSchema(raw, source, rawConfigSchema, null, 'config');
+};
+
+const parseKeymapConfig = (raw: string, source: string): Record<string, string | string[]> => {
+  return parseJson5WithSchema(raw, source, keymapSchema, {}, 'keymap');
 };
 
 const stringifyConfig = (value: unknown) => `${JSON5.stringify(value, null, 2)}\n`;
