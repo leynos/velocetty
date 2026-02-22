@@ -197,7 +197,11 @@ type profileConfigOptions = {
 };
 
 /** Namespaced plugin settings persisted under `config.plugins`. */
-export type pluginSettingsNamespace = Record<string, Record<string, unknown>>;
+export type pluginSettingsNamespace = {
+  [pluginId: string]: {
+    [settingKey: string]: unknown;
+  };
+};
 
 /** Fully resolved configuration shape after profile defaults and overrides are applied. */
 export type configOptions = rootConfigOptions &
