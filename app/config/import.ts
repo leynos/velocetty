@@ -98,8 +98,12 @@ const ensureUserConfigFile = (defaultConfigTemplate: rawConfig) => {
   }
 };
 
+const isConfigImportDebugEnabled = () => process.env.DEBUG_CONFIG_IMPORT === '1';
+
 const _importConf = () => {
-  console.warn('[config-import] Initializing config import using app-local JSON5 helpers.');
+  if (isConfigImportDebugEnabled()) {
+    console.warn('[config-import] Initializing config import using app-local JSON5 helpers.');
+  }
   // init plugin directories if not present
   mkdirpSync(plugs.base);
   mkdirpSync(plugs.local);
@@ -125,20 +129,22 @@ const _importConf = () => {
   ensureUserConfigFile(_defaultCfg);
 
   // Importing platform specific keymap
+  const platformKeyPath = defaultPlatformKeyPath();
   let content = '{}';
   try {
-    content = readFileSync(defaultPlatformKeyPath(), 'utf8');
+    content = readFileSync(platformKeyPath, 'utf8');
   } catch (err) {
     console.error(err);
   }
-  const mapping = parseKeymapConfig(content, defaultPlatformKeyPath());
+  const mapping = parseKeymapConfig(content, platformKeyPath);
   _defaultCfg.keymaps = mapping;
 
   // Import user config
   let userCfg: rawConfig | null;
   try {
     userCfg = parseRawConfig(readFileSync(cfgPath, 'utf8'), cfgPath);
-  } catch (_err) {
+  } catch (err) {
+    console.error(`[config-import] Failed to read or parse user config at "${cfgPath}".`, err);
     userCfg = null;
   }
 
