@@ -166,6 +166,16 @@ export const _import = () => {
   return result;
 };
 
+/**
+ * Returns the cached default config payload.
+ *
+ * When `_import` has not run yet, this method lazily calls `_importConf` to
+ * initialize `defaultConfig`. That initialization performs filesystem side
+ * effects:
+ * - plugin directory creation (`mkdirpSync`)
+ * - schema copy into the config directory (`ensureSchemaFile`)
+ * - user config bootstrapping when missing (`ensureUserConfigFile`)
+ */
 export const getDefaultConfig = () => {
   if (!defaultConfig) {
     defaultConfig = _importConf().defaultCfg;
