@@ -113,7 +113,7 @@ const _importConf = () => {
   try {
     defaultCfgRaw = readFileSync(defaultCfg, 'utf8');
   } catch (err) {
-    console.error(err);
+    console.error(`[config-import] Failed to read bundled default config at "${defaultCfg}".`, err);
   }
   const parsedDefaultConfig = parseRawConfig(defaultCfgRaw, defaultCfg);
   const _defaultCfg =
@@ -134,7 +134,7 @@ const _importConf = () => {
   try {
     content = readFileSync(platformKeyPath, 'utf8');
   } catch (err) {
-    console.error(err);
+    console.error(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`, err);
   }
   const mapping = parseKeymapConfig(content, platformKeyPath);
   _defaultCfg.keymaps = mapping;
