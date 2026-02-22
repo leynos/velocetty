@@ -280,6 +280,22 @@ When documentation changes, also run:
 - `bunx markdownlint-cli2 "docs/**/*.md"`
 - `nixie --no-sandbox`
 
+## Vulnerability auditing practice
+
+Supply-chain changes must include a vulnerability scan pass before merge:
+
+- Run `bun install` first so audit output reflects the current lockfile and
+  postinstall build graph.
+- Run `bun audit` for the human-readable advisory report.
+- Run `bun audit --audit-level=moderate` to verify there are no
+  `critical`, `high`, or `moderate` advisories.
+- Run `bun audit --json --audit-level=moderate` when machine-readable evidence
+  is needed for logs or follow-up automation.
+
+Roadmap item `1.4.2` is satisfied only when the moderate-threshold audit run is
+clean. If remediation requires dependency overrides, keep overrides in
+`package.json` and re-run the full gate sequence before marking work complete.
+
 ## Type checking
 
 Type checking runs via `tsgo` and the shared `tsconfig.typecheck.json` project:

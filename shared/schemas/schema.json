@@ -629,9 +629,6 @@
       "description": "Fully resolved configuration shape after profile defaults and overrides are applied."
     },
     "pluginSettingsNamespace": {
-      "additionalProperties": {
-        "type": "object"
-      },
       "description": "Namespaced plugin settings persisted under `config.plugins`.",
       "type": "object"
     }
