@@ -101,13 +101,11 @@ export const sortKeys = (value: unknown): unknown => {
   }
 
   if (isRecord(value)) {
-    const sortedObject: Record<string, unknown> = {};
-    Object.keys(value)
-      .sort()
-      .forEach((key) => {
-        sortedObject[key] = sortKeys(value[key]);
-      });
-    return sortedObject;
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+        .map(([key, item]) => [key, sortKeys(item)])
+    );
   }
 
   return value;

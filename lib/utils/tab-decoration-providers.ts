@@ -216,13 +216,13 @@ export class TabDecorationProviderRegistry {
 
     return () => {
       this.providers = this.providers.filter((candidate) => candidate !== registered);
-      registered.disposeChangeListener?.();
+      this.disposeProviderChangeListener(registered);
       this.emitChange();
     };
   }
 
   clear() {
-    this.providers.forEach((provider) => provider.disposeChangeListener?.());
+    this.providers.forEach((provider) => this.disposeProviderChangeListener(provider));
     this.providers = [];
     this.emitChange();
   }
@@ -267,6 +267,21 @@ export class TabDecorationProviderRegistry {
         this.logger.error('Tab decoration listener failed during update notification.', error);
       }
     });
+  }
+
+  private disposeProviderChangeListener(registered: RegisteredProvider) {
+    if (!registered.disposeChangeListener) {
+      return;
+    }
+
+    try {
+      registered.disposeChangeListener();
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Tab decoration provider "${registered.provider.id}" dispose failed: ${reason}`);
+    } finally {
+      registered.disposeChangeListener = undefined;
+    }
   }
 }
 

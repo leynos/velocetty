@@ -12,6 +12,13 @@ import {_init} from './init';
 import {cfgDir, cfgPath, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath} from './paths';
 
 let defaultConfig: rawConfig;
+const defaultRawConfigFallback: rawConfig = {
+  plugins: [],
+  localPlugins: [],
+  keymaps: {}
+};
+
+const cloneRawConfig = (config: rawConfig): rawConfig => structuredClone(config);
 
 const keymapValueSchema = z.union([z.string(), z.array(z.string())]);
 const keymapRecordSchema = z.record(z.string(), keymapValueSchema);
@@ -52,14 +59,18 @@ const ensureSchemaFile = () => {
   }
 };
 
-const ensureUserConfigFile = (defaultCfgRaw: string) => {
+const ensureUserConfigFile = (defaultConfigTemplate: rawConfig) => {
   if (existsSync(cfgPath)) {
     return;
   }
 
-  const parsedDefaultConfig = parseRawConfig(defaultCfgRaw, 'default config bootstrap') ?? {};
   console.warn(`[config-import] User config file missing at "${cfgPath}". Bootstrapping from default config template.`);
-  writeFileSync(cfgPath, stringifyConfig(parsedDefaultConfig), 'utf8');
+  try {
+    writeFileSync(cfgPath, stringifyConfig(defaultConfigTemplate), 'utf8');
+  } catch (error) {
+    console.error(`[config-import] Failed to write bootstrapped user config at "${cfgPath}".`, error);
+    notify("Couldn't create a user config file. Check permissions and available disk space.");
+  }
 };
 
 const _importConf = () => {
@@ -75,9 +86,18 @@ const _importConf = () => {
   } catch (err) {
     console.log(err);
   }
-  const _defaultCfg = parseRawConfig(defaultCfgRaw, defaultCfg) ?? {};
+  const parsedDefaultConfig = parseRawConfig(defaultCfgRaw, defaultCfg);
+  const _defaultCfg =
+    parsedDefaultConfig ??
+    (() => {
+      console.error(
+        `[config-import] Failed to parse bundled default config at "${defaultCfg}". Using safe fallback defaults.`
+      );
+      notify("Couldn't parse the bundled default config. Falling back to safe defaults.");
+      return cloneRawConfig(defaultRawConfigFallback);
+    })();
 
-  ensureUserConfigFile(defaultCfgRaw);
+  ensureUserConfigFile(_defaultCfg);
 
   // Importing platform specific keymap
   let content = '{}';
@@ -102,7 +122,7 @@ const _importConf = () => {
       `[config-import] Using default config fallback after user config parse failure. userPath="${cfgPath}" defaultPath="${defaultCfg}"`
     );
     notify("Couldn't parse config file. Using default config instead.");
-    userCfg = _defaultCfg;
+    userCfg = cloneRawConfig(_defaultCfg);
   }
 
   return {userCfg, defaultCfg: _defaultCfg};
