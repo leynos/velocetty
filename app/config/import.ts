@@ -16,7 +16,7 @@ const defaultRawConfigFallback: rawConfig = {
   plugins: [],
   localPlugins: [],
   keymaps: {}
-};
+} as const;
 
 /** Creates an isolated copy of a raw config payload for safe mutation. */
 const cloneRawConfig = (config: rawConfig): rawConfig => structuredClone(config);
@@ -63,6 +63,12 @@ const parseKeymapConfig = (raw: string, source: string): Record<string, string |
 /** Serializes config using deterministic JSON5 formatting for stable snapshots. */
 const stringifyConfig = (config: rawConfig): string => stringifyJson5(config);
 
+/**
+ * Copies the bundled JSON schema into the user config directory.
+ *
+ * Logs and notifies when copying fails so schema-backed editor metadata issues
+ * are visible to users.
+ */
 const ensureSchemaFile = () => {
   const destinationPath = resolve(cfgDir, schemaFile);
   try {
@@ -73,6 +79,11 @@ const ensureSchemaFile = () => {
   }
 };
 
+/**
+ * Bootstraps the user config file from the provided default template.
+ *
+ * When writing fails, emits contextual error logs and notifies the user.
+ */
 const ensureUserConfigFile = (defaultConfigTemplate: rawConfig) => {
   if (existsSync(cfgPath)) {
     return;
