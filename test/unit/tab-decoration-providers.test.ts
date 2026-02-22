@@ -1,10 +1,18 @@
 /** @file Covers deterministic tab-decoration provider ordering and update events. */
 import {describe, expect, mock, test} from 'bun:test';
 
-import {TabDecorationProviderRegistry} from '../../lib/utils/tab-decoration-providers';
+import type {CommandId} from '@shared/types/commands';
+import {
+  asTabDecorationProviderId,
+  asTabId,
+  type TabDecorationProviderId,
+  TabDecorationProviderRegistry
+} from '../../lib/utils/tab-decoration-providers';
+
+const asCommandId = (value: string): CommandId => value as CommandId;
 
 const buildContext = () => ({
-  tabId: 'tab-1',
+  tabId: asTabId('tab-1'),
   tabIndex: 0,
   active: true,
   hasActivity: false,
@@ -16,17 +24,17 @@ describe('TabDecorationProviderRegistry', () => {
     const registry = new TabDecorationProviderRegistry();
 
     registry.register({
-      id: 'zeta',
+      id: asTabDecorationProviderId('zeta'),
       priority: 10,
       provideDecoration: () => ({title: 'zeta'})
     });
     registry.register({
-      id: 'alpha',
+      id: asTabDecorationProviderId('alpha'),
       priority: 10,
       provideDecoration: () => ({title: 'alpha'})
     });
     registry.register({
-      id: 'middle',
+      id: asTabDecorationProviderId('middle'),
       priority: 20,
       provideDecoration: () => ({title: 'middle'})
     });
@@ -39,25 +47,25 @@ describe('TabDecorationProviderRegistry', () => {
     const registry = new TabDecorationProviderRegistry();
 
     registry.register({
-      id: 'beta',
+      id: asTabDecorationProviderId('beta'),
       priority: 20,
       provideDecoration: () => ({
         title: 'beta-title',
         badges: [{text: 'beta-1'}, {text: 'beta-2'}, {text: 'beta-2'}],
         widgets: [
-          {icon: 'zap', command: 'workbench.action.one'},
-          {icon: 'zap', command: 'workbench.action.one'},
-          {icon: 'bolt', command: 'workbench.action.two'}
+          {icon: 'zap', command: asCommandId('workbench.action.one')},
+          {icon: 'zap', command: asCommandId('workbench.action.one')},
+          {icon: 'bolt', command: asCommandId('workbench.action.two')}
         ]
       })
     });
     registry.register({
-      id: 'alpha',
+      id: asTabDecorationProviderId('alpha'),
       priority: 20,
       provideDecoration: () => ({
         title: 'alpha-title',
         badges: [{text: 'alpha-1'}, {text: 'alpha-2'}],
-        widgets: [{icon: 'rocket', command: 'workbench.action.three'}]
+        widgets: [{icon: 'rocket', command: asCommandId('workbench.action.three')}]
       })
     });
 
@@ -69,8 +77,8 @@ describe('TabDecorationProviderRegistry', () => {
     expect(decoration.badges).toEqual([{text: 'alpha-1'}, {text: 'alpha-2'}, {text: 'beta-1'}]);
     // Widget output is deduplicated and capped to two entries.
     expect(decoration.widgets).toEqual([
-      {icon: 'rocket', command: 'workbench.action.three'},
-      {icon: 'zap', command: 'workbench.action.one'}
+      {icon: 'rocket', command: asCommandId('workbench.action.three')},
+      {icon: 'zap', command: asCommandId('workbench.action.one')}
     ]);
   });
 
@@ -78,7 +86,7 @@ describe('TabDecorationProviderRegistry', () => {
     const registry = new TabDecorationProviderRegistry();
 
     registry.register({
-      id: 'delimiter-provider',
+      id: asTabDecorationProviderId('delimiter-provider'),
       priority: 1,
       provideDecoration: () => ({
         badges: [
@@ -86,8 +94,8 @@ describe('TabDecorationProviderRegistry', () => {
           {icon: 'a', text: 'b:c'}
         ],
         widgets: [
-          {icon: 'alpha:beta', command: 'workbench.action.one'},
-          {icon: 'alpha', command: 'beta:workbench.action.one'}
+          {icon: 'alpha:beta', command: asCommandId('workbench.action.one')},
+          {icon: 'alpha', command: asCommandId('beta:workbench.action.one')}
         ]
       })
     });
@@ -98,8 +106,8 @@ describe('TabDecorationProviderRegistry', () => {
       {icon: 'a', text: 'b:c'}
     ]);
     expect(decoration.widgets).toEqual([
-      {icon: 'alpha:beta', command: 'workbench.action.one'},
-      {icon: 'alpha', command: 'beta:workbench.action.one'}
+      {icon: 'alpha:beta', command: asCommandId('workbench.action.one')},
+      {icon: 'alpha', command: asCommandId('beta:workbench.action.one')}
     ]);
   });
 
@@ -113,7 +121,7 @@ describe('TabDecorationProviderRegistry', () => {
     });
 
     const unregister = registry.register({
-      id: 'provider',
+      id: asTabDecorationProviderId('provider'),
       priority: 1,
       provideDecoration: () => ({title: 'stable'}),
       subscribe: (onDidChange) => {
@@ -142,13 +150,13 @@ describe('TabDecorationProviderRegistry', () => {
 
     registry.subscribe(updateListener);
     registry.register({
-      id: 'subscribed-provider',
+      id: asTabDecorationProviderId('subscribed-provider'),
       priority: 1,
       provideDecoration: () => ({title: 'one'}),
       subscribe: () => disposeProvider
     });
     registry.register({
-      id: 'plain-provider',
+      id: asTabDecorationProviderId('plain-provider'),
       priority: 1,
       provideDecoration: () => ({title: 'two'})
     });
@@ -165,14 +173,14 @@ describe('TabDecorationProviderRegistry', () => {
     const registry = new TabDecorationProviderRegistry();
 
     registry.register({
-      id: 'failing-provider',
+      id: asTabDecorationProviderId('failing-provider'),
       priority: 10,
       provideDecoration: () => {
         throw new Error('boom');
       }
     });
     registry.register({
-      id: 'healthy-provider',
+      id: asTabDecorationProviderId('healthy-provider'),
       priority: 5,
       provideDecoration: () => ({title: 'healthy'})
     });
@@ -184,11 +192,11 @@ describe('TabDecorationProviderRegistry', () => {
   test.each([
     {
       description: 'empty ids',
-      invalidId: '   ' as string
+      invalidId: '   ' as unknown as TabDecorationProviderId
     },
     {
       description: 'non-string ids',
-      invalidId: 123 as unknown as string
+      invalidId: 123 as unknown as TabDecorationProviderId
     }
   ])('ignores provider registrations with $description', ({invalidId}) => {
     const registry = new TabDecorationProviderRegistry();

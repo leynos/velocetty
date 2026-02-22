@@ -49,6 +49,8 @@ import notify from './notify';
 import {ObjectTypedKeys} from './object';
 import {loadRemotePluginsModule, type RemotePluginsModule} from './remote-plugins';
 import {
+  asTabDecorationProviderId,
+  asTabId,
   registerTabDecorationProvider,
   resolveTabDecoration,
   subscribeTabDecorationProviderChanges,
@@ -56,6 +58,7 @@ import {
   type TabDecoration,
   type TabDecorationBadge,
   type TabDecorationContext,
+  type TabDecorationProviderId,
   type TabDecorationProvider,
   type TabDecorationWidget
 } from './tab-decoration-providers';
@@ -103,7 +106,8 @@ let reducersDecorators: {
   reduceTermGroups: ITermGroupReducer[];
 };
 
-const buildProviderId = (pluginName: string, providerId: string) => `${pluginName}.${providerId}`;
+const buildProviderId = (pluginName: string, providerId: string): TabDecorationProviderId =>
+  asTabDecorationProviderId(`${pluginName}.${providerId}`);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -240,7 +244,7 @@ type ParentPropsLike = Record<string, unknown>;
 
 const getTabDecorationContext = (tab: TabLike): TabDecorationContext => {
   return {
-    tabId: String(tab.uid),
+    tabId: asTabId(String(tab.uid)),
     tabIndex: typeof tab.tabIndex === 'number' ? tab.tabIndex : 0,
     active: Boolean(tab.isActive),
     hasActivity: Boolean(tab.hasActivity),

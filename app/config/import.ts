@@ -18,6 +18,7 @@ const defaultRawConfigFallback: rawConfig = {
   keymaps: {}
 };
 
+/** Creates an isolated copy of a raw config payload for safe mutation. */
 const cloneRawConfig = (config: rawConfig): rawConfig => structuredClone(config);
 
 const keymapValueSchema = z.union([z.string(), z.array(z.string())]);
@@ -41,21 +42,34 @@ const rawConfigSchema: ParseSchema<rawConfig> = {
   safeParse: (value) => safeParseRawConfig(value)
 };
 
+/**
+ * Parses JSON5 config text into a validated raw config payload.
+ *
+ * Returns `null` when parsing or validation fails.
+ */
 const parseRawConfig = (raw: string, source: string): rawConfig | null => {
   return parseJson5WithSchema({raw, source, schema: rawConfigSchema, fallback: null, itemType: 'config'});
 };
 
+/**
+ * Parses JSON5 keymap text and validates that each entry is a string or string array.
+ *
+ * Returns an empty object when parsing or validation fails.
+ */
 const parseKeymapConfig = (raw: string, source: string): Record<string, string | string[]> => {
   return parseJson5WithSchema({raw, source, schema: keymapSchema, fallback: {}, itemType: 'keymap'});
 };
 
+/** Serializes config using deterministic JSON5 formatting for stable snapshots. */
 const stringifyConfig = (config: rawConfig): string => stringifyJson5(config);
 
 const ensureSchemaFile = () => {
+  const destinationPath = resolve(cfgDir, schemaFile);
   try {
-    copySync(schemaPath, resolve(cfgDir, schemaFile), {overwrite: true});
+    copySync(schemaPath, destinationPath, {overwrite: true});
   } catch (err) {
-    console.error(err);
+    console.error(`[config-import] Failed to copy schema file from "${schemaPath}" to "${destinationPath}".`, err);
+    notify("Couldn't update config schema metadata. Config editor validation may be stale.");
   }
 };
 

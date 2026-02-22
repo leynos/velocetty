@@ -13,6 +13,19 @@
 
 import type {CommandId} from '@shared/types/commands';
 
+declare const tabIdBrand: unique symbol;
+declare const tabDecorationProviderIdBrand: unique symbol;
+
+/** Branded identifier for tab-decoration context targets. */
+export type TabId = string & {[tabIdBrand]: 'TabId'};
+/** Branded identifier for tab-decoration providers. */
+export type TabDecorationProviderId = string & {[tabDecorationProviderIdBrand]: 'TabDecorationProviderId'};
+
+/** Cast a raw tab identifier into the branded tab ID type. */
+export const asTabId = (value: string): TabId => value as TabId;
+/** Cast a raw provider identifier into the branded provider ID type. */
+export const asTabDecorationProviderId = (value: string): TabDecorationProviderId => value as TabDecorationProviderId;
+
 /** Badge contribution shown alongside a tab label. */
 export type TabDecorationBadge = {
   text?: string;
@@ -39,7 +52,7 @@ export type TabDecoration = {
 
 /** Runtime context passed to tab-decoration providers. */
 export type TabDecorationContext = {
-  tabId: string;
+  tabId: TabId;
   tabIndex: number;
   active: boolean;
   hasActivity: boolean;
@@ -48,7 +61,7 @@ export type TabDecorationContext = {
 
 /** Contract for tab-decoration providers registered by plugins. */
 export type TabDecorationProvider = {
-  id: string;
+  id: TabDecorationProviderId;
   priority: number;
   provideDecoration: (context: TabDecorationContext) => TabDecoration | null | undefined;
   subscribe?: (onDidChange: () => void) => undefined | (() => void);
@@ -84,7 +97,7 @@ const compareProviders = (a: RegisteredProvider, b: RegisteredProvider) => {
     return byPriority;
   }
 
-  const byId = a.provider.id.localeCompare(b.provider.id);
+  const byId = a.provider.id.localeCompare(b.provider.id, 'en-US');
   if (byId !== 0) {
     return byId;
   }
@@ -177,7 +190,7 @@ export const mergeTabDecorations = (decorations: TabDecoration[]): TabDecoration
 
 const normalizeProvider = (provider: TabDecorationProvider, registrationOrder: number): RegisteredProvider => {
   const normalizedPriority = Number.isFinite(provider.priority) ? provider.priority : 0;
-  const normalizedId = provider.id.trim();
+  const normalizedId = asTabDecorationProviderId(provider.id.trim());
   return {
     provider: {
       ...provider,
