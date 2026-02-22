@@ -295,6 +295,10 @@ Supply-chain changes must include a vulnerability scan pass before merge:
 Roadmap item `1.4.2` is satisfied only when the moderate-threshold audit run is
 clean. If remediation requires dependency overrides, keep overrides in
 `package.json` and re-run the full gate sequence before marking work complete.
+For the current Electron 40 toolchain (`electron-builder@24.x`), keep `ajv`
+aligned with `@develar/schema-utils` and `ajv-keywords@3` by pinning it to
+`6.14.0`; moving back to Ajv 8 without upgrading that stack will break
+`bun install` during postinstall.
 
 ## Type checking
 

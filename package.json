@@ -112,7 +112,7 @@
     "@types/seamless-immutable": "^7.1.19",
     "@types/uuid": "^9.0.8",
     "@typescript/native-preview": "^7.0.0-dev.20260128.1",
-    "ajv": "^8.18.0",
+    "ajv": "6.14.0",
     "concurrently": "^8.2.2",
     "cpy-cli": "^7.0.0",
     "cross-env": "^10.1.0",
@@ -140,7 +140,7 @@
     "@electron/rebuild>node-gyp": "^10.0.0",
     "cross-spawn": "^7.0.6",
     "tar": "^7.5.9",
-    "ajv": "^8.18.0",
+    "ajv": "6.14.0",
     "lodash": "^4.17.23",
     "micromatch": "^4.0.8",
     "braces": "^3.0.3",
@@ -158,8 +158,6 @@
     ]
   },
   "patchedDependencies": {
-    "@develar/schema-utils@2.6.5": "patches/@develar+schema-utils@2.6.5.patch",
-    "ajv-keywords@3.5.2": "patches/ajv-keywords@3.5.2.patch",
     "leveldown@5.6.0": "patches/leveldown@5.6.0.patch",
     "node-gyp-build@4.7.1": "patches/node-gyp-build@4.7.1.patch"
   }

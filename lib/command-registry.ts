@@ -51,14 +51,27 @@ const cloneCommandDefinition = (command: RegisteredCommand): CommandDefinition =
   resultSchema: cloneSchema(command.resultSchema)
 });
 
+type AjvErrorWithLegacyPath = ErrorObject & {
+  dataPath?: string;
+};
+
+const asIssuePath = (value: string | undefined): string => (typeof value === 'string' ? value : '');
+const asIssueParams = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+
 const serializeAjvErrors = (errors: ErrorObject[] | null | undefined): CommandValidationIssue[] =>
-  (errors ?? []).map((error) => ({
-    instancePath: error.instancePath,
-    schemaPath: error.schemaPath,
-    keyword: error.keyword,
-    message: error.message ?? 'Schema validation failed',
-    params: error.params as Record<string, unknown>
-  }));
+  (errors ?? []).map((error) => {
+    const maybeLegacyError = error as AjvErrorWithLegacyPath;
+    const instancePath = asIssuePath(error.instancePath) || asIssuePath(maybeLegacyError.dataPath);
+
+    return {
+      instancePath,
+      schemaPath: asIssuePath(error.schemaPath),
+      keyword: error.keyword,
+      message: error.message ?? 'Schema validation failed',
+      params: asIssueParams(error.params)
+    };
+  });
 
 const ajv = new Ajv({allErrors: true, strict: false});
 const validatorsByCommandId = new Map<CommandId, ValidateFunction>();
