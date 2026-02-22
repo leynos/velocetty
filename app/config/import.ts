@@ -84,7 +84,7 @@ const _importConf = () => {
   try {
     defaultCfgRaw = readFileSync(defaultCfg, 'utf8');
   } catch (err) {
-    console.log(err);
+    console.error(err);
   }
   const parsedDefaultConfig = parseRawConfig(defaultCfgRaw, defaultCfg);
   const _defaultCfg =

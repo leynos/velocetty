@@ -13,6 +13,7 @@
 
 import type {CommandId} from '@shared/types/commands';
 
+/** Badge contribution shown alongside a tab label. */
 export type TabDecorationBadge = {
   text?: string;
   icon?: string;
@@ -20,12 +21,14 @@ export type TabDecorationBadge = {
   kind?: 'info' | 'warn' | 'error';
 };
 
+/** Actionable widget contribution shown on a tab. */
 export type TabDecorationWidget = {
   icon: string;
   command: CommandId;
   tooltip?: string;
 };
 
+/** Combined decoration output for a single tab. */
 export type TabDecoration = {
   icon?: {name: string; tooltip?: string};
   title?: string;
@@ -34,6 +37,7 @@ export type TabDecoration = {
   widgets?: TabDecorationWidget[];
 };
 
+/** Runtime context passed to tab-decoration providers. */
 export type TabDecorationContext = {
   tabId: string;
   tabIndex: number;
@@ -42,6 +46,7 @@ export type TabDecorationContext = {
   title?: string;
 };
 
+/** Contract for tab-decoration providers registered by plugins. */
 export type TabDecorationProvider = {
   id: string;
   priority: number;
@@ -68,9 +73,10 @@ const defaultRegistryLogger: RegistryLogger = {
 };
 
 const badgeKey = (badge: TabDecorationBadge) =>
-  `${badge.icon ?? ''}:${badge.text ?? ''}:${badge.tooltip ?? ''}:${badge.kind ?? ''}`;
+  JSON.stringify([badge.icon ?? null, badge.text ?? null, badge.tooltip ?? null, badge.kind ?? null]);
 
-const widgetKey = (widget: TabDecorationWidget) => `${widget.icon}:${widget.command}:${widget.tooltip ?? ''}`;
+const widgetKey = (widget: TabDecorationWidget) =>
+  JSON.stringify([widget.icon, widget.command, widget.tooltip ?? null]);
 
 const compareProviders = (a: RegisteredProvider, b: RegisteredProvider) => {
   const byPriority = b.provider.priority - a.provider.priority;
@@ -87,13 +93,14 @@ const compareProviders = (a: RegisteredProvider, b: RegisteredProvider) => {
 };
 
 type DecorationItemKey<T> = (item: T) => string;
+type DecorationCollectionOptions<T> = {
+  propertyKey: 'badges' | 'widgets';
+  itemKey: DecorationItemKey<T>;
+  maxItems: number;
+};
 
-const collectDecorationItems = <T>(
-  decorations: TabDecoration[],
-  propertyKey: 'badges' | 'widgets',
-  itemKey: DecorationItemKey<T>,
-  maxItems: number
-): T[] => {
+const collectDecorationItems = <T>(decorations: TabDecoration[], options: DecorationCollectionOptions<T>): T[] => {
+  const {propertyKey, itemKey, maxItems} = options;
   const items: T[] = [];
   const seenKeys = new Set<string>();
   const allItems = decorations.flatMap((decoration) => {
@@ -119,11 +126,19 @@ const collectDecorationItems = <T>(
 };
 
 const collectBadges = (decorations: TabDecoration[]): TabDecorationBadge[] => {
-  return collectDecorationItems<TabDecorationBadge>(decorations, 'badges', badgeKey, MAX_BADGES);
+  return collectDecorationItems<TabDecorationBadge>(decorations, {
+    propertyKey: 'badges',
+    itemKey: badgeKey,
+    maxItems: MAX_BADGES
+  });
 };
 
 const collectWidgets = (decorations: TabDecoration[]): TabDecorationWidget[] => {
-  return collectDecorationItems<TabDecorationWidget>(decorations, 'widgets', widgetKey, MAX_WIDGETS);
+  return collectDecorationItems<TabDecorationWidget>(decorations, {
+    propertyKey: 'widgets',
+    itemKey: widgetKey,
+    maxItems: MAX_WIDGETS
+  });
 };
 
 const mergeSimpleProperty = <K extends 'icon' | 'title' | 'subtitle'>(
@@ -136,6 +151,7 @@ const mergeSimpleProperty = <K extends 'icon' | 'title' | 'subtitle'>(
   }
 };
 
+/** Merge provider outputs into a deterministic single tab-decoration object. */
 export const mergeTabDecorations = (decorations: TabDecoration[]): TabDecoration => {
   const merged: TabDecoration = {};
 
@@ -161,10 +177,11 @@ export const mergeTabDecorations = (decorations: TabDecoration[]): TabDecoration
 
 const normalizeProvider = (provider: TabDecorationProvider, registrationOrder: number): RegisteredProvider => {
   const normalizedPriority = Number.isFinite(provider.priority) ? provider.priority : 0;
+  const normalizedId = provider.id.trim();
   return {
     provider: {
       ...provider,
-      id: provider.id.trim(),
+      id: normalizedId,
       priority: normalizedPriority
     },
     registrationOrder
@@ -194,6 +211,7 @@ const setupProviderSubscription = (
   }
 };
 
+/** In-memory registry for ordered provider resolution and change notifications. */
 export class TabDecorationProviderRegistry {
   private providers: RegisteredProvider[] = [];
   private listeners = new Set<() => void>();
@@ -201,7 +219,18 @@ export class TabDecorationProviderRegistry {
 
   constructor(private readonly logger: RegistryLogger = defaultRegistryLogger) {}
 
+  /**
+   * Register a provider and return an unregister callback.
+   *
+   * Invalid provider identifiers are ignored to prevent plugin errors from
+   * breaking renderer decoration updates.
+   */
   register(provider: TabDecorationProvider): () => void {
+    if (typeof provider.id !== 'string') {
+      this.logger.warn('Ignoring tab decoration provider registration with non-string id.');
+      return () => {};
+    }
+
     const normalizedId = provider.id.trim();
     if (!normalizedId) {
       this.logger.warn('Ignoring tab decoration provider registration with empty id.');
@@ -221,12 +250,14 @@ export class TabDecorationProviderRegistry {
     };
   }
 
+  /** Remove all registered providers and detach their subscriptions. */
   clear() {
     this.providers.forEach((provider) => this.disposeProviderChangeListener(provider));
     this.providers = [];
     this.emitChange();
   }
 
+  /** Return providers sorted by deterministic priority and id ordering. */
   listProviders(): TabDecorationProvider[] {
     return this.providers
       .slice()
@@ -234,6 +265,7 @@ export class TabDecorationProviderRegistry {
       .map((registered) => registered.provider);
   }
 
+  /** Resolve the final merged decoration for the provided tab context. */
   resolve(context: TabDecorationContext): TabDecoration {
     const resolvedDecorations: TabDecoration[] = [];
 
@@ -252,6 +284,7 @@ export class TabDecorationProviderRegistry {
     return mergeTabDecorations(resolvedDecorations);
   }
 
+  /** Subscribe to provider registry changes. */
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => {
@@ -285,16 +318,20 @@ export class TabDecorationProviderRegistry {
   }
 }
 
+/** Singleton registry used by renderer tab-decoration wiring. */
 export const tabDecorationProviders = new TabDecorationProviderRegistry();
 
+/** Register a global tab-decoration provider. */
 export const registerTabDecorationProvider = (provider: TabDecorationProvider) => {
   return tabDecorationProviders.register(provider);
 };
 
+/** Subscribe to tab-decoration provider change events. */
 export const subscribeTabDecorationProviderChanges = (listener: () => void) => {
   return tabDecorationProviders.subscribe(listener);
 };
 
+/** Resolve the merged decoration for a tab context. */
 export const resolveTabDecoration = (context: TabDecorationContext) => {
   return tabDecorationProviders.resolve(context);
 };

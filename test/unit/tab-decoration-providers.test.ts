@@ -74,6 +74,35 @@ describe('TabDecorationProviderRegistry', () => {
     ]);
   });
 
+  test('does not collide dedupe keys when values contain delimiters', () => {
+    const registry = new TabDecorationProviderRegistry();
+
+    registry.register({
+      id: 'delimiter-provider',
+      priority: 1,
+      provideDecoration: () => ({
+        badges: [
+          {icon: 'a:b', text: 'c'},
+          {icon: 'a', text: 'b:c'}
+        ],
+        widgets: [
+          {icon: 'alpha:beta', command: 'workbench.action.one'},
+          {icon: 'alpha', command: 'beta:workbench.action.one'}
+        ]
+      })
+    });
+
+    const decoration = registry.resolve(buildContext());
+    expect(decoration.badges).toEqual([
+      {icon: 'a:b', text: 'c'},
+      {icon: 'a', text: 'b:c'}
+    ]);
+    expect(decoration.widgets).toEqual([
+      {icon: 'alpha:beta', command: 'workbench.action.one'},
+      {icon: 'alpha', command: 'beta:workbench.action.one'}
+    ]);
+  });
+
   test('emits updates only from explicit provider-change events', async () => {
     const registry = new TabDecorationProviderRegistry();
     const updateReasons: string[] = [];
@@ -157,6 +186,19 @@ describe('TabDecorationProviderRegistry', () => {
 
     const unregister = registry.register({
       id: '   ',
+      priority: 1,
+      provideDecoration: () => ({title: 'ignored'})
+    });
+
+    expect(typeof unregister).toBe('function');
+    expect(registry.listProviders()).toEqual([]);
+  });
+
+  test('ignores provider registrations with non-string ids', () => {
+    const registry = new TabDecorationProviderRegistry();
+
+    const unregister = registry.register({
+      id: 123 as unknown as string,
       priority: 1,
       provideDecoration: () => ({title: 'ignored'})
     });
