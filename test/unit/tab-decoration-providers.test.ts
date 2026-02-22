@@ -181,24 +181,20 @@ describe('TabDecorationProviderRegistry', () => {
     expect(resolved.title).toBe('healthy');
   });
 
-  test('ignores provider registrations with empty ids', () => {
+  test.each([
+    {
+      description: 'empty ids',
+      invalidId: '   ' as string
+    },
+    {
+      description: 'non-string ids',
+      invalidId: 123 as unknown as string
+    }
+  ])('ignores provider registrations with $description', ({invalidId}) => {
     const registry = new TabDecorationProviderRegistry();
 
     const unregister = registry.register({
-      id: '   ',
-      priority: 1,
-      provideDecoration: () => ({title: 'ignored'})
-    });
-
-    expect(typeof unregister).toBe('function');
-    expect(registry.listProviders()).toEqual([]);
-  });
-
-  test('ignores provider registrations with non-string ids', () => {
-    const registry = new TabDecorationProviderRegistry();
-
-    const unregister = registry.register({
-      id: 123 as unknown as string,
+      id: invalidId,
       priority: 1,
       provideDecoration: () => ({title: 'ignored'})
     });
