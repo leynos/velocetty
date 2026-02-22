@@ -117,6 +117,36 @@ registry APIs. Follow these rules for command-system changes:
   create, read, update, and delete (CRUD) semantics, deterministic ordering,
   and validation error behaviour.
 
+## Configuration format practice
+
+Roadmap item `1.3.1` moves repository config handling to JSON5-only semantics
+for active configuration files:
+
+- Parse and write `hyper.json` as JSON5 (including comments and trailing
+  commas).
+- Do not rely on `.hyper.js` migration; legacy migration paths were removed.
+- Persist runtime plugin settings under `config.plugins.<plugin-id>` in
+  `hyper.json`.
+
+## Tab decoration provider practice
+
+Roadmap item `1.3.1` introduces the golden-path tab-decoration provider seam.
+When adding or changing provider behaviour:
+
+- Register providers through renderer plugin hooks
+  (`getTabDecorationProviders`) rather than ad hoc tab polling logic.
+- Keep provider ordering deterministic by sorting with this precedence:
+  `priority` descending, then provider `id` lexicographically, then stable
+  registration index.
+- Keep list-slot output bounded and deterministic:
+  `badges` max 3 entries and `widgets` max 2 entries after deduplication.
+- Trigger tab-decoration refreshes from explicit events (`subscribe` callbacks
+  or provider registration lifecycle), never from `setInterval` polling loops.
+- Add or update focused coverage in
+  `test/unit/tab-decoration-providers.test.ts` and
+  `test/unit/tabs-decoration-updates.test.ts` whenever merge or update logic
+  changes.
+
 ## Context key and `when` practice
 
 Roadmap item `1.2.2` introduces shared context-key contracts and deterministic

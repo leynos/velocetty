@@ -41,6 +41,7 @@ export type ITermState = Immutable<{
 export type cursorShapes = 'BEAM' | 'UNDERLINE' | 'BLOCK';
 import type {FontWeight, IWindowsPty, Terminal} from 'xterm';
 import type {ColorMap, configOptions} from './config';
+import type {TabDecorationProvider} from '../lib/utils/tab-decoration-providers';
 
 export type uiState = Immutable<{
   _lastUpdate: number | null;
@@ -141,6 +142,7 @@ import type {Middleware, Reducer} from 'redux';
 export type hyperPlugin = {
   getTabProps: any;
   getTabsProps: any;
+  getTabDecorationProviders?: () => TabDecorationProvider[];
   getTermGroupProps: any;
   getTermProps: any;
   mapHeaderDispatch: any;
@@ -228,6 +230,12 @@ export type TabProps = {
   onClose: () => void;
   onSelect: () => void;
   text: string;
+  tabDecoration?: {
+    title?: string;
+    subtitle?: string;
+    badges?: Array<{text?: string; icon?: string; tooltip?: string; kind?: 'info' | 'warn' | 'error'}>;
+    widgets?: Array<{icon: string; command: string; tooltip?: string}>;
+  };
 } & extensionProps;
 
 export type ITab = {

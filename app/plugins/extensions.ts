@@ -30,6 +30,7 @@ export const availableExtensions = new Set([
   'getTermProps',
   'getTabProps',
   'getTabsProps',
+  'getTabDecorationProviders',
   'getTermGroupProps',
   'mapHyperTermState',
   'mapTermsState',

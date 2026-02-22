@@ -1,6 +1,8 @@
 /** @file Covers install, uninstall, and listing branches in CLI plugin APIs. */
 import {beforeEach, expect, mock, test} from 'bun:test';
 
+import JSON5 from 'json5';
+
 import {buildNodeFsModuleMock} from '../testUtils/mock-node-fs';
 
 type ConfigData = {
@@ -28,7 +30,7 @@ const fsMock = {
   // Assumes cli/api only reads the single config file under test.
   readFileSync: () => (hasReadFileSyncOverride ? fsReadFileSyncValue : JSON.stringify(configData)),
   writeFileSync: (_path: string, contents: string) => {
-    const parsed = JSON.parse(contents) as ConfigData;
+    const parsed = JSON5.parse(contents) as ConfigData;
     savedConfigs.push(parsed);
     configData = parsed;
   }
@@ -81,6 +83,20 @@ test('list() and isInstalled() read configured plugin state', async () => {
   expect(isInstalled('local-alpha', true)).toBe(true);
 });
 
+test('list() accepts JSON5 plugin config with comments and trailing commas', async () => {
+  hasReadFileSyncOverride = true;
+  fsReadFileSyncValue = `{
+    // plugin sources
+    plugins: ['plugin-alpha',],
+    localPlugins: ['local-alpha',],
+  }`;
+  const {list, isInstalled} = await loadCliApi();
+
+  expect(list()).toBe('plugin-alpha');
+  expect(isInstalled('plugin-alpha')).toBe(true);
+  expect(isInstalled('local-alpha', true)).toBe(true);
+});
+
 test('install() persists plugin entries from npm checks', async () => {
   const {install} = await loadCliApi();
 
@@ -96,7 +112,7 @@ test('install() persists plugin entries from npm checks', async () => {
 test('install() persists local plugin entries when local install is requested', async () => {
   const {install} = await loadCliApi();
 
-  await install('local-plugin', true);
+  await install('local-plugin', {locally: true});
 
   expect(requestedUrls).toEqual(['https://registry.npmjs.org/local-plugin']);
   expect(savedConfigs.at(-1)).toEqual({
@@ -109,7 +125,7 @@ test('install() rejects duplicate local plugins that already exist in config', a
   configData = {plugins: [], localPlugins: ['local-plugin']};
   const {install} = await loadCliApi();
 
-  await expect(install('local-plugin', true)).rejects.toBe('local-plugin is already installed');
+  await expect(install('local-plugin', {locally: true})).rejects.toBe('local-plugin is already installed');
 });
 
 test('install() maps npm and transport errors to stable user-facing messages', async () => {
@@ -144,7 +160,7 @@ test('uninstall() removes installed plugins and rejects unknown plugins', async 
     localPlugins: []
   });
 
-  await expect(uninstall('plugin-z')).rejects.toBe('plugin-z is not installed');
+  await expect(uninstall('plugin-z')).rejects.toThrow('plugin-z is not installed');
 });
 
 test('exists(), list(), and isInstalled() handle empty or malformed plugin arrays', async () => {

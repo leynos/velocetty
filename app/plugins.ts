@@ -20,6 +20,12 @@ import {plugs} from './config/paths';
 import notify from './notify';
 import {availableExtensions} from './plugins/extensions';
 import {install} from './plugins/install';
+import {
+  ensureRuntimePluginSettingsPersisted,
+  getRuntimePluginCommandDefinitions,
+  getRuntimePluginKeybindings,
+  mergeRuntimePluginKeybindings
+} from './runtime/plugin-runtime';
 import mapKeys from './utils/map-keys';
 
 // local storage
@@ -29,6 +35,21 @@ const path = plugs.base;
 const localPath = plugs.local;
 
 patchModuleLoad();
+
+let runtimePluginDefaultsPersisted = false;
+
+const ensureRuntimeDefaultsPersisted = () => {
+  if (runtimePluginDefaultsPersisted) {
+    return;
+  }
+
+  try {
+    ensureRuntimePluginSettingsPersisted();
+    runtimePluginDefaultsPersisted = true;
+  } catch (error) {
+    console.warn('Failed to persist runtime plugin settings defaults.', error);
+  }
+};
 
 // caches
 let plugins = config.getPlugins();
@@ -311,13 +332,7 @@ function requirePlugins(): any[] {
     }
   };
 
-  return [
-    ...localPlugins.filter((p) => basename(p) === 'migrated-hyper3-config'),
-    ...plugins_,
-    ...localPlugins.filter((p) => basename(p) !== 'migrated-hyper3-config')
-  ]
-    .map(load)
-    .filter((v): v is Record<string, any> => Boolean(v));
+  return [...plugins_, ...localPlugins].map(load).filter((v): v is Record<string, any> => Boolean(v));
 }
 
 export const onApp = (app_: App) => {
@@ -429,6 +444,7 @@ export const getDecoratedEnv = (baseEnv: Record<string, string>) => {
 };
 
 export const getDecoratedConfig = (profile: string) => {
+  ensureRuntimeDefaultsPersisted();
   const baseConfig = config.getProfileConfig(profile);
   const decoratedConfig = decorateObject(baseConfig, 'decorateConfig');
   const fixedConfig = config.fixConfigDefaults(decoratedConfig);
@@ -437,10 +453,18 @@ export const getDecoratedConfig = (profile: string) => {
 };
 
 export const getDecoratedKeymaps = () => {
+  ensureRuntimeDefaultsPersisted();
   const baseKeymaps = config.getKeymaps();
+  const runtimeKeymaps = getRuntimePluginKeybindings(config.getConfig());
+  const keymapsWithRuntimeContributions = mergeRuntimePluginKeybindings(baseKeymaps, runtimeKeymaps);
   // Ensure that all keys are in an array and don't use deprecated key combination`
-  const decoratedKeymaps = mapKeys(decorateObject(baseKeymaps, 'decorateKeymaps'));
+  const decoratedKeymaps = mapKeys(decorateObject(keymapsWithRuntimeContributions, 'decorateKeymaps'));
   return decoratedKeymaps;
+};
+
+export const getRuntimePluginCommands = () => {
+  ensureRuntimeDefaultsPersisted();
+  return getRuntimePluginCommandDefinitions(config.getConfig());
 };
 
 export const getDecoratedBrowserOptions = <T>(defaults: T): T => {
@@ -477,3 +501,4 @@ ipcMain.handle('getBasePaths', () => getBasePaths());
 ipcMain.handle('getDeprecatedConfig', () => getDeprecatedConfig());
 ipcMain.handle('getDecoratedConfig', (_e, profile) => getDecoratedConfig(profile));
 ipcMain.handle('getDecoratedKeymaps', () => getDecoratedKeymaps());
+ipcMain.handle('getRuntimePluginCommands', () => getRuntimePluginCommands());

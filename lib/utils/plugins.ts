@@ -22,6 +22,12 @@ import {connect as reduxConnect} from 'react-redux';
 import type {Dispatch, Middleware} from 'redux';
 
 import type {
+  RuntimePluginManifest,
+  RuntimeTabDecorationProvider,
+  RuntimeTabDecoration as RuntimePluginTabDecoration
+} from '@shared/runtime/golden-path-demo';
+import {runtimePluginManifests} from '@shared/runtime/golden-path-demo';
+import type {
   hyperPlugin,
   IUiReducer,
   ISessionReducer,
@@ -38,11 +44,31 @@ import type {
 import Notification from '../components/notification';
 
 import IPCChildProcess from './ipc-child-process';
+import {getConfig as getRendererConfig, subscribe as subscribeRendererConfig} from './config';
 import notify from './notify';
 import {ObjectTypedKeys} from './object';
-import {loadRemotePluginsModule} from './remote-plugins';
+import {loadRemotePluginsModule, type RemotePluginsModule} from './remote-plugins';
+import {
+  asTabDecorationProviderId,
+  asTabId,
+  registerTabDecorationProvider,
+  resolveTabDecoration,
+  subscribeTabDecorationProviderChanges,
+  tabDecorationProviders,
+  type TabDecoration,
+  type TabDecorationBadge,
+  type TabDecorationContext,
+  type TabDecorationProviderId,
+  type TabDecorationProvider,
+  type TabDecorationWidget
+} from './tab-decoration-providers';
 
 type ConnectOptions = NonNullable<Parameters<typeof reduxConnect>[3]>;
+type LoadedPluginVersion = ReturnType<RemotePluginsModule['getLoadedPluginVersions']>[number];
+type PluginHook = ((...args: unknown[]) => unknown) & {
+  _pluginName?: string;
+  _pluginVersion?: string | null;
+};
 
 // remote interface to `../plugins`
 const plugins = loadRemotePluginsModule();
@@ -78,6 +104,152 @@ let reducersDecorators: {
   reduceUI: IUiReducer[];
   reduceSessions: ISessionReducer[];
   reduceTermGroups: ITermGroupReducer[];
+};
+
+const buildProviderId = (pluginName: string, providerId: string): TabDecorationProviderId =>
+  asTabDecorationProviderId(`${pluginName}.${providerId}`);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+const isPluginHook = (value: unknown): value is PluginHook => typeof value === 'function';
+
+const resolveRuntimePluginSettings = (manifest: RuntimePluginManifest): Record<string, unknown> => {
+  const config = getRendererConfig();
+  const pluginNamespace = isRecord(config.plugins) ? config.plugins : {};
+  const candidate = pluginNamespace[manifest.id];
+  if (isRecord(candidate)) {
+    return {...manifest.settingsDefaults, ...candidate};
+  }
+  return {...manifest.settingsDefaults};
+};
+
+const mapRuntimeToTabDecoration = (
+  runtimeDecoration: RuntimePluginTabDecoration | null | undefined
+): TabDecoration | null | undefined => {
+  if (!runtimeDecoration) {
+    return undefined;
+  }
+
+  const mappedDecoration: TabDecoration = {
+    title: runtimeDecoration.title,
+    subtitle: runtimeDecoration.subtitle
+  };
+
+  if (runtimeDecoration.badges && runtimeDecoration.badges.length > 0) {
+    mappedDecoration.badges = runtimeDecoration.badges.map<TabDecorationBadge>((badge) => ({
+      text: badge.text,
+      icon: badge.icon,
+      tooltip: badge.tooltip,
+      kind: badge.kind
+    }));
+  }
+
+  if (runtimeDecoration.widgets && runtimeDecoration.widgets.length > 0) {
+    mappedDecoration.widgets = runtimeDecoration.widgets.map<TabDecorationWidget>((widget) => ({
+      icon: widget.icon,
+      command: widget.command,
+      tooltip: widget.tooltip
+    }));
+  }
+
+  return mappedDecoration;
+};
+
+const registerRuntimeProvider = (
+  manifest: RuntimePluginManifest,
+  provider: RuntimeTabDecorationProvider,
+  providerIndex: number
+) => {
+  const providerId = provider.id.trim().length > 0 ? provider.id.trim() : `provider-${providerIndex + 1}`;
+  registerTabDecorationProvider({
+    id: buildProviderId(`runtime:${manifest.id}`, providerId),
+    priority: provider.priority,
+    provideDecoration: (context) => {
+      const runtimeSettings = resolveRuntimePluginSettings(manifest);
+      if (runtimeSettings.enabled === false) {
+        return undefined;
+      }
+
+      return mapRuntimeToTabDecoration(provider.provideDecoration(context, runtimeSettings));
+    },
+    // Emit explicit updates when config reload events occur.
+    subscribe: (onDidChange) => subscribeRendererConfig(() => onDidChange())
+  });
+};
+
+const registerRuntimeTabDecorationProviders = () => {
+  runtimePluginManifests.forEach((manifest) => {
+    manifest.tabDecorationProviders.forEach((provider, providerIndex) => {
+      registerRuntimeProvider(manifest, provider, providerIndex);
+    });
+  });
+};
+
+const isValidProviderCandidate = (candidate: unknown): candidate is Partial<TabDecorationProvider> => {
+  if (!candidate || typeof candidate !== 'object') {
+    return false;
+  }
+  const provider = candidate as Partial<TabDecorationProvider>;
+  return typeof provider.provideDecoration === 'function';
+};
+
+const normalizeProviderId = (provider: Partial<TabDecorationProvider>, providerIndex: number): string => {
+  if (typeof provider.id === 'string' && provider.id.trim().length > 0) {
+    return provider.id.trim();
+  }
+  return `provider-${providerIndex + 1}`;
+};
+
+const normalizeSubscribe = (
+  provider: Partial<TabDecorationProvider>
+): TabDecorationProvider['subscribe'] | undefined => {
+  if (typeof provider.subscribe === 'function') {
+    return provider.subscribe as TabDecorationProvider['subscribe'];
+  }
+  return undefined;
+};
+
+const normalizePriority = (provider: Partial<TabDecorationProvider>): number => {
+  return typeof provider.priority === 'number' ? provider.priority : 0;
+};
+
+const registerProvidersFromPlugin = (pluginName: string, providerList: unknown) => {
+  if (!Array.isArray(providerList)) {
+    return;
+  }
+
+  providerList.forEach((candidate, providerIndex) => {
+    if (!isValidProviderCandidate(candidate)) {
+      return;
+    }
+
+    registerTabDecorationProvider({
+      id: buildProviderId(pluginName, normalizeProviderId(candidate, providerIndex)),
+      priority: normalizePriority(candidate),
+      provideDecoration: candidate.provideDecoration,
+      subscribe: normalizeSubscribe(candidate)
+    });
+  });
+};
+
+type TabLike = {
+  uid: string;
+  tabIndex: number;
+  isActive?: boolean;
+  hasActivity?: boolean;
+  title?: string;
+};
+
+type ParentPropsLike = Record<string, unknown>;
+
+const getTabDecorationContext = (tab: TabLike): TabDecorationContext => {
+  return {
+    tabId: asTabId(String(tab.uid)),
+    tabIndex: typeof tab.tabIndex === 'number' ? tab.tabIndex : 0,
+    active: Boolean(tab.isActive),
+    hasActivity: Boolean(tab.hasActivity),
+    title: typeof tab.title === 'string' ? tab.title : undefined
+  };
 };
 
 // expose decorated component instance to the higher-order components
@@ -241,11 +413,7 @@ const getPluginVersion = (path: string): string | null => {
   return version;
 };
 
-const loadModules = () => {
-  console.log('(re)loading renderer plugins');
-  const paths = plugins.getPaths();
-
-  // initialize cache that we populate with extension methods
+const initializePluginCaches = () => {
   connectors = {
     Terms: {state: [], dispatch: []},
     Header: {state: [], dispatch: []},
@@ -273,120 +441,151 @@ const loadModules = () => {
     reduceSessions: sessionsReducers,
     reduceTermGroups: termGroupsReducers
   };
+};
 
-  const loadedPlugins = plugins.getLoadedPluginVersions().map((plugin: any) => plugin.name);
+const registerDeprecatedHooks = (mod: hyperPlugin) => {
+  // mapHyperTermState mapping for backwards compatibility with hyperterm
+  if (mod.mapHyperTermState) {
+    mod.mapHyperState = mod.mapHyperTermState;
+    console.error('mapHyperTermState is deprecated. Use mapHyperState instead.');
+  }
+
+  // mapHyperTermDispatch mapping for backwards compatibility with hyperterm
+  if (mod.mapHyperTermDispatch) {
+    mod.mapHyperDispatch = mod.mapHyperTermDispatch;
+    console.error('mapHyperTermDispatch is deprecated. Use mapHyperDispatch instead.');
+  }
+};
+
+const registerSimpleHooks = (mod: hyperPlugin) => {
+  const simpleHooks: Array<{hook: keyof hyperPlugin; target: unknown[]}> = [
+    {hook: 'middleware', target: middlewares},
+    {hook: 'reduceUI', target: uiReducers},
+    {hook: 'reduceSessions', target: sessionsReducers},
+    {hook: 'reduceTermGroups', target: termGroupsReducers},
+    {hook: 'getTermGroupProps', target: termGroupPropsDecorators},
+    {hook: 'getTermProps', target: termPropsDecorators},
+    {hook: 'getTabProps', target: tabPropsDecorators},
+    {hook: 'getTabsProps', target: tabsPropsDecorators}
+  ];
+
+  simpleHooks.forEach(({hook, target}) => {
+    const pluginHook = mod[hook];
+    if (pluginHook) {
+      target.push(pluginHook);
+    }
+  });
+};
+
+const registerConnectorHooks = (mod: hyperPlugin) => {
+  const connectorHooks: Array<{
+    stateHook: keyof hyperPlugin;
+    dispatchHook: keyof hyperPlugin;
+    connector: keyof typeof connectors;
+  }> = [
+    {stateHook: 'mapTermsState', dispatchHook: 'mapTermsDispatch', connector: 'Terms'},
+    {stateHook: 'mapHeaderState', dispatchHook: 'mapHeaderDispatch', connector: 'Header'},
+    {stateHook: 'mapHyperState', dispatchHook: 'mapHyperDispatch', connector: 'Hyper'},
+    {
+      stateHook: 'mapNotificationsState',
+      dispatchHook: 'mapNotificationsDispatch',
+      connector: 'Notifications'
+    }
+  ];
+
+  connectorHooks.forEach(({stateHook, dispatchHook, connector}) => {
+    const stateDecorator = mod[stateHook];
+    if (stateDecorator) {
+      connectors[connector].state.push(stateDecorator);
+    }
+
+    const dispatchDecorator = mod[dispatchHook];
+    if (dispatchDecorator) {
+      connectors[connector].dispatch.push(dispatchDecorator);
+    }
+  });
+};
+
+const registerPluginHooks = (mod: hyperPlugin, pluginName: string, pluginVersion: string | null) => {
+  ObjectTypedKeys(mod).forEach((i) => {
+    if (!Object.hasOwn(mod, i)) {
+      return;
+    }
+
+    const pluginHook = mod[i];
+    if (isPluginHook(pluginHook)) {
+      pluginHook._pluginName = pluginName;
+      pluginHook._pluginVersion = pluginVersion;
+    }
+  });
+
+  registerDeprecatedHooks(mod);
+  registerSimpleHooks(mod);
+  registerConnectorHooks(mod);
+
+  if (mod.onRendererWindow) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+    mod.onRendererWindow(window);
+  }
+
+  if (typeof mod.getTabDecorationProviders === 'function') {
+    try {
+      const providerList = mod.getTabDecorationProviders();
+      registerProvidersFromPlugin(pluginName, providerList);
+    } catch (err) {
+      notify(
+        'Plugin error',
+        `${pluginName}: Error occurred in \`getTabDecorationProviders\`. Check Developer Tools for details.`,
+        {
+          error: err
+        }
+      );
+    }
+  }
+
+  console.log(`Plugin ${pluginName} (${pluginVersion}) loaded.`);
+};
+
+const loadPluginModule = (pluginPath: string, loadedPlugins: string[]): hyperPlugin | undefined => {
+  if (!loadedPlugins.includes(pathModule.basename(pluginPath))) {
+    return undefined;
+  }
+
+  const pluginName = getPluginName(pluginPath);
+  const pluginVersion = getPluginVersion(pluginPath);
+  let mod: hyperPlugin;
+
+  // window.require allows us to ensure this doesn't get
+  // in the way of our build
+  try {
+    mod = window.require(pluginPath);
+  } catch (err) {
+    notify(
+      'Plugin load error',
+      `"${pluginName}" failed to load in the renderer process. Check Developer Tools for details.`,
+      {
+        error: err
+      }
+    );
+    return undefined;
+  }
+
+  registerPluginHooks(mod, pluginName, pluginVersion);
+  return mod;
+};
+
+const loadModules = () => {
+  console.log('(re)loading renderer plugins');
+  const paths = plugins.getPaths();
+  tabDecorationProviders.clear();
+  registerRuntimeTabDecorationProviders();
+
+  initializePluginCaches();
+
+  const loadedPlugins = plugins.getLoadedPluginVersions().map((plugin: LoadedPluginVersion) => plugin.name);
   modules = paths.plugins
     .concat(paths.localPlugins)
-    .filter((pluginPath: string) => loadedPlugins.indexOf(pathModule.basename(pluginPath)) !== -1)
-    .map((pluginPath: string) => {
-      let mod: hyperPlugin;
-      const pluginName = getPluginName(pluginPath);
-      const pluginVersion = getPluginVersion(pluginPath);
-
-      // window.require allows us to ensure this doesn't get
-      // in the way of our build
-      try {
-        mod = window.require(pluginPath);
-      } catch (err) {
-        notify(
-          'Plugin load error',
-          `"${pluginName}" failed to load in the renderer process. Check Developer Tools for details.`,
-          {error: err}
-        );
-        return undefined;
-      }
-
-      ObjectTypedKeys(mod).forEach((i) => {
-        if (Object.hasOwn(mod, i)) {
-          mod[i]._pluginName = pluginName;
-          mod[i]._pluginVersion = pluginVersion;
-        }
-      });
-
-      // mapHyperTermState mapping for backwards compatibility with hyperterm
-      if (mod.mapHyperTermState) {
-        mod.mapHyperState = mod.mapHyperTermState;
-        console.error('mapHyperTermState is deprecated. Use mapHyperState instead.');
-      }
-
-      // mapHyperTermDispatch mapping for backwards compatibility with hyperterm
-      if (mod.mapHyperTermDispatch) {
-        mod.mapHyperDispatch = mod.mapHyperTermDispatch;
-        console.error('mapHyperTermDispatch is deprecated. Use mapHyperDispatch instead.');
-      }
-
-      if (mod.middleware) {
-        middlewares.push(mod.middleware);
-      }
-
-      if (mod.reduceUI) {
-        uiReducers.push(mod.reduceUI);
-      }
-
-      if (mod.reduceSessions) {
-        sessionsReducers.push(mod.reduceSessions);
-      }
-
-      if (mod.reduceTermGroups) {
-        termGroupsReducers.push(mod.reduceTermGroups);
-      }
-
-      if (mod.mapTermsState) {
-        connectors.Terms.state.push(mod.mapTermsState);
-      }
-
-      if (mod.mapTermsDispatch) {
-        connectors.Terms.dispatch.push(mod.mapTermsDispatch);
-      }
-
-      if (mod.mapHeaderState) {
-        connectors.Header.state.push(mod.mapHeaderState);
-      }
-
-      if (mod.mapHeaderDispatch) {
-        connectors.Header.dispatch.push(mod.mapHeaderDispatch);
-      }
-
-      if (mod.mapHyperState) {
-        connectors.Hyper.state.push(mod.mapHyperState);
-      }
-
-      if (mod.mapHyperDispatch) {
-        connectors.Hyper.dispatch.push(mod.mapHyperDispatch);
-      }
-
-      if (mod.mapNotificationsState) {
-        connectors.Notifications.state.push(mod.mapNotificationsState);
-      }
-
-      if (mod.mapNotificationsDispatch) {
-        connectors.Notifications.dispatch.push(mod.mapNotificationsDispatch);
-      }
-
-      if (mod.getTermGroupProps) {
-        termGroupPropsDecorators.push(mod.getTermGroupProps);
-      }
-
-      if (mod.getTermProps) {
-        termPropsDecorators.push(mod.getTermProps);
-      }
-
-      if (mod.getTabProps) {
-        tabPropsDecorators.push(mod.getTabProps);
-      }
-
-      if (mod.getTabsProps) {
-        tabsPropsDecorators.push(mod.getTabsProps);
-      }
-
-      if (mod.onRendererWindow) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        mod.onRendererWindow(window);
-      }
-      console.log(`Plugin ${pluginName} (${pluginVersion}) loaded.`);
-
-      return mod;
-    })
+    .map((pluginPath: string) => loadPluginModule(pluginPath, loadedPlugins))
     .filter((mod: hyperPlugin | undefined): mod is hyperPlugin => Boolean(mod));
 
   const deprecatedPlugins = plugins.getDeprecatedConfig();
@@ -408,6 +607,10 @@ export function reload() {
   // get re-rendered
   decorated = {};
 }
+
+export const subscribeTabDecorationUpdates = (listener: () => void) => {
+  return subscribeTabDecorationProviderChanges(listener);
+};
 
 function getProps(name: keyof typeof propsDecorators, props: any, ...fnArgs: any[]) {
   const decorators = propsDecorators[name];
@@ -457,8 +660,22 @@ export function getTabsProps<T extends Assignable<TabsProps, T>>(parentProps: an
   return getProps('getTabsProps', props, parentProps);
 }
 
-export function getTabProps<T extends Assignable<TabProps, T>>(tab: any, parentProps: any, props: T): T {
-  return getProps('getTabProps', props, tab, parentProps);
+export function getTabProps<T extends Assignable<TabProps, T>>(
+  tab: TabLike,
+  parentProps: ParentPropsLike,
+  props: T
+): T {
+  const decoration = resolveTabDecoration(getTabDecorationContext(tab));
+  const decoratedProps = {
+    ...props,
+    tabDecoration: decoration,
+    tabIndex: tab.tabIndex
+  };
+  if (decoration.title) {
+    decoratedProps.text = decoration.title;
+  }
+
+  return getProps('getTabProps', decoratedProps, tab, parentProps);
 }
 
 // connects + decorates a class

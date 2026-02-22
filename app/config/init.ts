@@ -1,33 +1,8 @@
-import vm from 'node:vm';
-
 import merge from 'lodash/merge';
 
 import type {parsedConfig, rawConfig, configOptions} from '@shared/types/config';
 import notify from '../notify';
 import mapKeys from '../utils/map-keys';
-
-const _extract = (script?: vm.Script): Record<string, any> => {
-  const module: Record<string, any> = {};
-  script?.runInNewContext({module}, {displayErrors: true});
-  if (!module.exports) {
-    throw new Error('Error reading configuration: `module.exports` not set');
-  }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-  return module.exports;
-};
-
-const _syntaxValidation = (cfg: string) => {
-  try {
-    return new vm.Script(cfg, {filename: '.hyper.js'});
-  } catch (_err) {
-    const err = _err as {name: string};
-    notify(`Error loading config: ${err.name}`, JSON.stringify(err), {error: err});
-  }
-};
-
-const _extractDefault = (cfg: string) => {
-  return _extract(_syntaxValidation(cfg));
-};
 
 // init config
 const _init = (userCfg: rawConfig, defaultCfg: rawConfig): parsedConfig => {
@@ -60,4 +35,4 @@ const _init = (userCfg: rawConfig, defaultCfg: rawConfig): parsedConfig => {
   };
 };
 
-export {_init, _extractDefault};
+export {_init};

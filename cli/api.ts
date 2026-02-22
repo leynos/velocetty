@@ -1,3 +1,17 @@
+/**
+ * @file CLI helpers for reading, validating, and mutating Hyper plugin config.
+ *
+ * Invariants:
+ * - `parseJson5StrictWithSchema` must reject malformed JSON5 or schema-invalid
+ *   input so CLI operations only run against validated config.
+ * - `stringifyJson5` must emit deterministic, stable output so config
+ *   round-trips preserve formatting expectations.
+ *
+ * Cross-links:
+ * - Shared JSON5 helper implementation:
+ *   `shared/src/config/json5-config.ts` (`parseJson5StrictWithSchema`,
+ *   `stringifyJson5`).
+ */
 // eslint-disable-next-line eslint-comments/disable-enable-pair
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import fs from 'node:fs';
@@ -6,15 +20,35 @@ import path from 'node:path';
 
 import got from 'got';
 import registryUrlModule from 'registry-url';
+import {z} from 'zod';
+import {parseJson5StrictWithSchema, stringifyJson5} from '@shared/config/json5-config';
 
 const registryUrl = registryUrlModule();
+
+/** Branded type for plugin specifiers (e.g., 'hyper-plugin', '@scope/plugin@1.0.0') */
+type PluginSpecifier = string & {readonly __brand: 'PluginSpecifier'};
+
+/** Branded type for normalized npm package names (e.g., 'hyper-plugin', '@scope%2fplugin') */
+type PackageName = string & {readonly __brand: 'PackageName'};
+
+/** Smart constructor for PluginSpecifier with runtime validation */
+const pluginSpecifier = (value: string): PluginSpecifier => {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    throw new Error('Plugin specifier cannot be empty');
+  }
+  return trimmedValue as PluginSpecifier;
+};
+
+/** Smart constructor for PackageName (output of normalization) */
+const packageName = (value: string): PackageName => value as PackageName;
 
 // If the user defines XDG_CONFIG_HOME they definitely want their config there,
 // otherwise use the home directory in linux/mac and userdata in windows
 const applicationDirectory = process.env.XDG_CONFIG_HOME
   ? path.join(process.env.XDG_CONFIG_HOME, 'Hyper')
   : process.platform === 'win32'
-    ? path.join(process.env.APPDATA!, 'Hyper')
+    ? path.join(process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming'), 'Hyper')
     : path.join(os.homedir(), '.config', 'Hyper');
 
 const devConfigFileName = path.join(__dirname, `../hyper.json`);
@@ -29,15 +63,15 @@ const fileName =
  * statically analyze the hyper configuration isn't fatal for all kinds of
  * subcommands. We can use memoization to make reading and parsing lazy.
  */
-function memoize<T extends (...args: any[]) => any>(fn: T): T {
+function memoize<T extends (...args: unknown[]) => unknown>(fn: T): T {
   let hasResult = false;
-  let result: any;
-  return ((...args: Parameters<T>) => {
+  let result: ReturnType<T> | undefined;
+  return ((...args: Parameters<T>): ReturnType<T> => {
     if (!hasResult) {
-      result = fn(...args);
+      result = fn(...args) as ReturnType<T>;
       hasResult = true;
     }
-    return result;
+    return result as ReturnType<T>;
   }) as T;
 }
 
@@ -45,9 +79,21 @@ const getFileContents = memoize(() => {
   return fs.readFileSync(fileName, 'utf8');
 });
 
-const getParsedFile = memoize(() => JSON.parse(getFileContents()));
+const pluginNameSchema = z
+  .string()
+  .refine((value) => value.trim().length > 0, {message: 'Plugin identifiers must not be empty or whitespace-only.'});
 
-const getPluginsByKey = (key: string): any[] => getParsedFile()[key] || [];
+const cliConfigSchema = z
+  .object({
+    plugins: z.preprocess((value) => (Array.isArray(value) ? value : []), z.array(pluginNameSchema)).default([]),
+    localPlugins: z.preprocess((value) => (Array.isArray(value) ? value : []), z.array(pluginNameSchema)).default([])
+  })
+  .passthrough();
+
+const getParsedFile = memoize(() => parseJson5StrictWithSchema(getFileContents(), cliConfigSchema));
+
+const getPluginsByKey = (key: 'plugins' | 'localPlugins'): PluginSpecifier[] =>
+  getParsedFile()[key].map((entry) => pluginSpecifier(entry));
 
 const getPlugins = memoize(() => {
   return getPluginsByKey('plugins');
@@ -61,7 +107,7 @@ function exists() {
   return getFileContents() !== undefined;
 }
 
-function isInstalled(plugin: string, locally?: boolean) {
+function isInstalled(plugin: PluginSpecifier, locally?: boolean) {
   const array = locally ? getLocalPlugins() : getPlugins();
   if (array && Array.isArray(array)) {
     return array.includes(plugin);
@@ -69,27 +115,46 @@ function isInstalled(plugin: string, locally?: boolean) {
   return false;
 }
 
-function save(config: any) {
-  return fs.writeFileSync(fileName, JSON.stringify(config, null, 2), 'utf8');
+function save(config: unknown) {
+  return fs.writeFileSync(fileName, stringifyJson5(config), 'utf8');
 }
 
-function getPackageName(plugin: string) {
+function getPackageName(plugin: PluginSpecifier): PackageName {
   const isScoped = plugin[0] === '@';
   const nameWithoutVersion = plugin.split('#')[0];
 
   if (isScoped) {
-    return `@${nameWithoutVersion.split('@')[1].replace('/', '%2f')}`;
+    return packageName(`@${nameWithoutVersion.split('@')[1].replace('/', '%2f')}`);
   }
 
-  return nameWithoutVersion.split('@')[0];
+  return packageName(nameWithoutVersion.split('@')[0]);
 }
 
-function existsOnNpm(plugin: string) {
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const npmRegistryResponseSchema = z.object({
+  name: z.string().optional(),
+  versions: z.unknown().refine((value) => value !== undefined, {message: 'versions must be defined'})
+});
+
+const getErrorMessage = (value: unknown): string => {
+  if (value instanceof Error) {
+    return value.message;
+  }
+  if (isRecord(value) && typeof value.message === 'string') {
+    return value.message;
+  }
+  return String(value);
+};
+
+function existsOnNpm(plugin: PluginSpecifier, signal?: AbortSignal) {
   const name = getPackageName(plugin);
   return got
-    .get<any>(registryUrl + name.toLowerCase(), {timeout: {request: 10000}, responseType: 'json'})
+    .get<unknown>(registryUrl + name.toLowerCase(), {timeout: {request: 10000}, responseType: 'json', signal})
     .then((res) => {
-      if (!res.body.versions) {
+      const validated = npmRegistryResponseSchema.safeParse(res.body);
+      if (!validated.success) {
         return Promise.reject(res);
       } else {
         return res;
@@ -97,16 +162,29 @@ function existsOnNpm(plugin: string) {
     });
 }
 
-function install(plugin: string, locally?: boolean) {
+const handleNpmCheckError = (err: unknown, plugin: PluginSpecifier): Promise<never> => {
+  const statusCode = isRecord(err) && typeof err.statusCode === 'number' ? err.statusCode : undefined;
+  if (statusCode === 404) {
+    return Promise.reject(`${plugin} not found on npm`);
+  }
+  if (statusCode === 200) {
+    return Promise.reject(`Malformed npm registry response for ${plugin}`);
+  }
+
+  const errorMessage = getErrorMessage(err);
+  return Promise.reject(`${errorMessage}\nPlugin check failed. Check your internet connection or retry later.`);
+};
+
+type InstallOptions = {
+  readonly locally?: boolean;
+  readonly signal?: AbortSignal;
+};
+
+function install(plugin: PluginSpecifier, options: InstallOptions = {}) {
+  const {locally = false, signal} = options;
   const array = locally ? getLocalPlugins() : getPlugins();
-  return existsOnNpm(plugin)
-    .catch((err: any) => {
-      const {statusCode} = err;
-      if (statusCode && (statusCode === 404 || statusCode === 200)) {
-        return Promise.reject(`${plugin} not found on npm`);
-      }
-      return Promise.reject(`${err.message}\nPlugin check failed. Check your internet connection or retry later.`);
-    })
+  return existsOnNpm(plugin, signal)
+    .catch((err: unknown) => handleNpmCheckError(err, plugin))
     .then(() => {
       if (isInstalled(plugin, locally)) {
         return Promise.reject(`${plugin} is already installed`);
@@ -118,9 +196,9 @@ function install(plugin: string, locally?: boolean) {
     });
 }
 
-async function uninstall(plugin: string) {
+async function uninstall(plugin: PluginSpecifier) {
   if (!isInstalled(plugin)) {
-    return Promise.reject(`${plugin} is not installed`);
+    throw new Error(`${plugin} is not installed`);
   }
 
   const config = getParsedFile();
@@ -136,4 +214,4 @@ function list() {
 }
 
 export const configPath = fileName;
-export {exists, existsOnNpm, isInstalled, install, uninstall, list};
+export {exists, existsOnNpm, isInstalled, install, uninstall, list, pluginSpecifier};

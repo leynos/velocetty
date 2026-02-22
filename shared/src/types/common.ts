@@ -5,7 +5,7 @@ import type {IpcMain, IpcRenderer} from 'electron';
 
 import type parseUrl from 'parse-url';
 
-import type {CommandId} from './commands';
+import type {CommandDefinition, CommandId} from './commands';
 import type {configOptions} from './config';
 
 /** Branded identifier for session entities. */
@@ -144,6 +144,7 @@ export type IpcCommands = {
   getDeprecatedConfig: () => Record<string, {css: string[]}>;
   getDecoratedConfig: (profile: string) => configOptions;
   getDecoratedKeymaps: () => Record<string, string[]>;
+  getRuntimePluginCommands: () => CommandDefinition[];
 };
 
 /** Type-safe wrapper around Electron IpcMain.handle for shared command contracts. */

@@ -63,6 +63,7 @@ const serializeAjvErrors = (errors: ErrorObject[] | null | undefined): CommandVa
 const ajv = new Ajv({allErrors: true, strict: false});
 const validatorsByCommandId = new Map<CommandId, ValidateFunction>();
 const registry = new Map<CommandId, RegisteredCommand>();
+const runtimeManagedCommands = new Set<CommandId>();
 
 const upsertCommand = (definition: CommandDefinition, handler?: CommandHandler) => {
   const existingCommand = registry.get(definition.id);
@@ -85,6 +86,27 @@ const upsertCommand = (definition: CommandDefinition, handler?: CommandHandler) 
 const assignLegacyHandler = (commandId: CommandId, handler: CommandHandler) => {
   const definition = registry.get(commandId) ?? createLegacyDefinition(commandId);
   upsertCommand(definition, handler);
+};
+
+const syncRuntimePluginCommands = (runtimeCommands: CommandDefinition[]) => {
+  const activeRuntimeCommands = new Set<CommandId>();
+
+  runtimeCommands.forEach((command) => {
+    const commandId = asCommandId(command.id);
+    upsertCommand({...command, id: commandId});
+    activeRuntimeCommands.add(commandId);
+  });
+
+  runtimeManagedCommands.forEach((commandId) => {
+    if (!activeRuntimeCommands.has(commandId)) {
+      remove(commandId);
+    }
+  });
+
+  runtimeManagedCommands.clear();
+  activeRuntimeCommands.forEach((commandId) => {
+    runtimeManagedCommands.add(commandId);
+  });
 };
 
 /**
@@ -248,6 +270,8 @@ export const commandRegistry: CommandRegistry<CommandHandler> = {
 };
 
 export const getRegisteredKeys = async () => {
+  const runtimeCommands = await transport.invoke('getRuntimePluginCommands');
+  syncRuntimePluginCommands(runtimeCommands);
   const keymaps = await transport.invoke('getDecoratedKeymaps');
 
   return Object.keys(keymaps).reduce((result: Record<string, string>, actionName) => {
