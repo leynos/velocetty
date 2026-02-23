@@ -284,13 +284,14 @@ When documentation changes, also run:
 
 Supply-chain changes must include a vulnerability scan pass before merge:
 
-- Run `bun install` first so audit output reflects the current lockfile and
+- Run `bun install` first, so audit output reflects the current lockfile and
   postinstall build graph.
-- Run `bun audit` for the human-readable advisory report.
-- Run `bun audit --audit-level=moderate` to verify there are no
-  `critical`, `high`, or `moderate` advisories.
-- Run `bun audit --json --audit-level=moderate` when machine-readable evidence
-  is needed for logs or follow-up automation.
+- Generate a human-readable advisory report with `bun audit`.
+- Verify there are no `critical`, `high`, or `moderate` advisories with
+  `bun audit --audit-level=moderate`.
+- Produce machine-readable evidence with `bun audit --json
+  --audit-level=moderate` when machine-readable evidence is needed for logs or
+  follow-up automation.
 
 Roadmap item `1.4.2` is satisfied only when the moderate-threshold audit run is
 clean. If remediation requires dependency overrides, keep overrides in
