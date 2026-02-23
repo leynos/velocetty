@@ -290,8 +290,7 @@ Supply-chain changes must include a vulnerability scan pass before merge:
 - Verify there are no `critical`, `high`, or `moderate` advisories with
   `bun audit --audit-level=moderate`.
 - Produce machine-readable evidence with `bun audit --json
-  --audit-level=moderate` when machine-readable evidence is needed for logs or
-  follow-up automation.
+  --audit-level=moderate` when logs or follow-up automation require it.
 
 Roadmap item `1.4.2` is satisfied only when the moderate-threshold audit run is
 clean. If remediation requires dependency overrides, keep overrides in
