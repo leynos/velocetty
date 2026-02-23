@@ -51,12 +51,15 @@ const cloneCommandDefinition = (command: RegisteredCommand): CommandDefinition =
   resultSchema: cloneSchema(command.resultSchema)
 });
 
+/** Extends Ajv ErrorObject with legacy v6 path fields for instance/data paths. */
 type AjvErrorWithLegacyPath = ErrorObject & {
   instancePath?: string;
   dataPath?: string;
 };
 
+/** Accepts an optional path string and normalizes it to a guaranteed string. */
 const asIssuePath = (value: string | undefined): string => (typeof value === 'string' ? value : '');
+/** Coerces unknown params into a Record<string, unknown> or an empty object. */
 const asIssueParams = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
