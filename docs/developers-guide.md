@@ -219,6 +219,19 @@ Current repository runtime baseline after roadmap item `1.4.13`:
 - `@types/node`: `^24.10.12`
 - CI workflow `NODE_VERSION`: `24.11.1`
 
+Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
+
+- Linux ARM CI coverage is Linux aarch64 only; do not reintroduce arm7
+  (`armv7l`) lanes or release artefact targets.
+- Prefer native ARM runners for Linux aarch64 CI lanes instead of emulated
+  copy-to-image flows, which previously failed with disk-exhaustion errors.
+- Keep Linux dependency installation shared via
+  `.github/actions/install-linux-e2e-runtime-deps/action.yml` so fast-lane and
+  deep-lane jobs stay in sync.
+- For Linux aarch64 native-module rebuild reliability, run `bun install`
+  before other gates and keep `npm_config_node_gyp` pointed at the workspace
+  `node-gyp` entrypoint in CI jobs that rebuild native modules.
+
 When preparing future Electron upgrades, update these anchors together and
 avoid merging partial baseline updates.
 
