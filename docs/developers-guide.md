@@ -230,7 +230,11 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   deep-lane jobs stay in sync.
 - Before running `bun install` on Linux aarch64 CI lanes, provision
   `qemu-x86_64` and export `QEMU_LD_PREFIX` to an x86_64 sysroot (for example,
-  `/tmp/x86_64-sysroot`) so Electron's x64 `mksnapshot` binary can run.
+  `/usr/x86_64-linux-gnu` from `libc6-amd64-cross` and
+  `libstdc++6-amd64-cross`) so Electron's x64 `mksnapshot` binary can run.
+- For Linux aarch64 lanes that package only arm64 artefacts, set
+  `SKIP_X64_V8_SNAPSHOT=1` during `bun install` to avoid generating the
+  additional x64 snapshot pass under QEMU.
 - For Linux aarch64 native-module rebuild reliability, run `bun install`
   before other gates and keep `npm_config_node_gyp` pointed at the workspace
   `node-gyp` entrypoint in CI jobs that rebuild native modules.

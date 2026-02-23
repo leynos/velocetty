@@ -13,9 +13,32 @@ requires QEMU user emulation plus an x86_64 sysroot.
 On Fedora aarch64, the default repositories do not provide x86_64 runtime
 packages, so a sysroot must be supplied separately.
 
-## Option A: Container-backed sysroot (recommended)
+## Option A: Package-backed sysroot (recommended for CI)
 
-This is the simplest way to obtain a working x86_64 sysroot on Fedora aarch64.
+On Ubuntu/Debian hosts, use cross-runtime packages instead of exporting a full
+x86_64 container filesystem:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends \
+  qemu-user-static \
+  libc6-amd64-cross \
+  libstdc++6-amd64-cross \
+  libarchive-tools
+export QEMU_LD_PREFIX=/usr/x86_64-linux-gnu
+```
+
+Verify the emulator and loader:
+
+```bash
+test -x /usr/bin/qemu-x86_64-static
+ls /usr/x86_64-linux-gnu/lib64/ld-linux-x86-64.so.2
+```
+
+## Option B: Container-backed sysroot (Fedora fallback)
+
+If cross-runtime packages are unavailable, export an x86_64 rootfs and point
+`QEMU_LD_PREFIX` to it:
 
 ```bash
 mkdir -p /tmp/x86_64-sysroot
@@ -24,12 +47,6 @@ podman create --arch x86_64 --name fedora-x64 fedora:40
 podman export fedora-x64 | tar -C /tmp/x86_64-sysroot -xf -
 podman rm fedora-x64
 export QEMU_LD_PREFIX=/tmp/x86_64-sysroot
-```
-
-Verify the loader exists:
-
-```bash
-ls /tmp/x86_64-sysroot/lib64/ld-linux-x86-64.so.2
 ```
 
 ## Run the snapshot step
@@ -44,6 +61,14 @@ For the full postinstall chain, run:
 
 ```bash
 bun run postinstall
+```
+
+For Linux aarch64 lanes that package only arm64 artefacts, set
+`SKIP_X64_V8_SNAPSHOT=1` during `bun install` to skip the additional x64
+snapshot pass:
+
+```bash
+SKIP_X64_V8_SNAPSHOT=1 bun install
 ```
 
 This project uses `bun ./build/esbuild/build.ts` inside scripts for bundling.
@@ -72,6 +97,11 @@ loader exists and export `QEMU_LD_PREFIX` to the sysroot path.
 
 Install QEMU user emulation for the distribution, or ensure the
 distribution-provided `qemu-x86_64` binary is on `PATH`.
+
+### `E: Unable to locate package libc6-amd64-cross`
+
+Your distribution does not provide Debian cross-runtime packages. Use
+Option B and set `QEMU_LD_PREFIX` to the exported x86_64 sysroot path.
 
 ### Bundler command errors
 

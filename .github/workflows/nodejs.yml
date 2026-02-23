@@ -187,19 +187,15 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y qemu-user-static
-          mkdir -p /tmp/x86_64-sysroot
-          sudo docker pull --platform linux/amd64 fedora:40
-          cid="$(sudo docker create --platform linux/amd64 fedora:40)"
-          sudo docker export "$cid" | sudo tar -C /tmp/x86_64-sysroot -xf -
-          sudo docker rm "$cid"
+          sudo apt-get install -y qemu-user-static libc6-amd64-cross libstdc++6-amd64-cross
           test -x /usr/bin/qemu-x86_64-static
-          ls /tmp/x86_64-sysroot/lib64/ld-linux-x86-64.so.2
-          echo "QEMU_LD_PREFIX=/tmp/x86_64-sysroot" >> "$GITHUB_ENV"
+          test -f /usr/x86_64-linux-gnu/lib64/ld-linux-x86-64.so.2
+          echo "QEMU_LD_PREFIX=/usr/x86_64-linux-gnu" >> "$GITHUB_ENV"
       - name: Install
         run: bun install
         env:
           npm_config_node_gyp: ${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
+          SKIP_X64_V8_SNAPSHOT: '1'
       - name: Install Linux build and E2E runtime deps
         uses: ./.github/actions/install-linux-e2e-runtime-deps
         with:

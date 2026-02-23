@@ -92,6 +92,11 @@ Success is observable when:
   `bun install`, `make build`, `make check-fmt`, `make lint`, `make test`.
 - [x] (2026-02-23 00:00Z) Added Linux aarch64 CI bootstrap for x64 snapshot
   emulation (`qemu-user-static` plus `QEMU_LD_PREFIX` sysroot export).
+- [x] (2026-02-23 00:00Z) Replaced slow container-export sysroot bootstrap with
+  cross-runtime packages (`libc6-amd64-cross`, `libstdc++6-amd64-cross`).
+- [x] (2026-02-23 00:00Z) Added `SKIP_X64_V8_SNAPSHOT=1` support and set it in
+  the Linux aarch64 install gate to avoid redundant x64 snapshot generation in
+  arm64-only packaging lanes.
 
 ## Surprises & discoveries
 
@@ -108,6 +113,13 @@ Success is observable when:
   `ld-linux-x86-64.so.2`.
   Impact: the Linux aarch64 lane must prepare `qemu-user-static` and export
   `QEMU_LD_PREFIX` before running install.
+- Observation: Linux aarch64 `Install` can remain in progress for hours because
+  postinstall executes both x64 and arm64 snapshot passes, and x64 runs under
+  QEMU emulation.
+  Evidence: GitHub Actions run `22308987524` shows `build-linux-aarch64` stuck
+  in `Install` for multiple hours while pre-install sysroot prep completed in
+  under one minute.
+  Impact: arm64-only packaging lanes should skip x64 snapshot generation.
 
 ## Decision Log
 
@@ -128,9 +140,15 @@ Success is observable when:
   build, lint, and test, not just packaging.
   Date/Author: 2026-02-23 / Codex
 - Decision: bootstrap x64 snapshot emulation in the Linux aarch64 lane before
-  install by preparing `qemu-user-static` and a container-exported sysroot.
+  install by preparing `qemu-user-static` and an x86_64 cross-runtime sysroot.
   Rationale: this matches documented aarch64 snapshot requirements and unblocks
   the install gate on native ARM runners.
+  Date/Author: 2026-02-23 / Codex
+- Decision: add `SKIP_X64_V8_SNAPSHOT` handling to snapshot orchestration and
+  set it in the Linux aarch64 CI install environment.
+  Rationale: Linux aarch64 CI lane packages arm64 artefacts only, so generating
+  an additional x64 snapshot adds substantial install latency without affecting
+  arm64 packaging outcomes.
   Date/Author: 2026-02-23 / Codex
 
 ## Outcomes & Retrospective
@@ -144,6 +162,10 @@ Observed outcomes:
 - Linux ARM workflow now runs as Linux aarch64 on `ubuntu-22.04-arm`.
 - Linux aarch64 workflow now bootstraps `qemu-x86_64` and `QEMU_LD_PREFIX`
   sysroot setup before `bun install`.
+- Linux aarch64 bootstrap now uses cross-runtime packages rather than container
+  export to avoid very long install times in CI.
+- Linux aarch64 install now skips x64 snapshot generation when the lane targets
+  arm64-only artefacts, reducing CI install time and emulation load.
 - Linux aarch64 lane now runs install/lint/test/build checks and packages arm64
   Linux artefacts.
 - `docs/developers-guide.md` now records Linux aarch64 runtime-alignment and CI
