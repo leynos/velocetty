@@ -237,7 +237,10 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   source entries (`ports` for `arm64` and `archive.ubuntu.com` plus
   `security.ubuntu.com` for `amd64`) before installing `:amd64` packages.
   Otherwise apt tries to resolve `amd64` indexes from `ports` and fails with
-  `404 Not Found`.
+  `404 Not Found`. Keep this source pinning for all later apt invocations in
+  the same job after adding `amd64`; the Linux dependency installation action
+  now applies it automatically when it detects an Ubuntu arm64 host with
+  `amd64` multiarch enabled.
 - After provisioning amd64 runtime packages on Linux aarch64 CI lanes, export
   `QEMU_LD_PREFIX=/` so QEMU resolves x86_64 shared libraries from the host
   multiarch rootfs.

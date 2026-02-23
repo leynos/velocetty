@@ -14,7 +14,40 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        sudo apt-get update
+        apt_options=()
+        host_arch=$(dpkg --print-architecture)
+        if [ "$host_arch" = "arm64" ] \
+          && dpkg --print-foreign-architectures | grep -qx "amd64" \
+          && [ -r /etc/os-release ]; then
+          . /etc/os-release
+          if [ "${ID:-}" = "ubuntu" ]; then
+            codename="${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}"
+            if [ -z "$codename" ]; then
+              echo "Unable to determine Ubuntu codename for mixed-arch apt sources." >&2
+              exit 1
+            fi
+
+            mixed_arch_sources="/tmp/velocetty-aarch64-runtime-deps.sources.list"
+            cat <<EOF | sudo tee "$mixed_arch_sources" >/dev/null
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${codename} main restricted universe multiverse
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${codename}-updates main restricted universe multiverse
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${codename}-backports main restricted universe multiverse
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports ${codename}-security main restricted universe multiverse
+        deb [arch=amd64] http://archive.ubuntu.com/ubuntu ${codename} main restricted universe multiverse
+        deb [arch=amd64] http://archive.ubuntu.com/ubuntu ${codename}-updates main restricted universe multiverse
+        deb [arch=amd64] http://archive.ubuntu.com/ubuntu ${codename}-backports main restricted universe multiverse
+        deb [arch=amd64] http://security.ubuntu.com/ubuntu ${codename}-security main restricted universe multiverse
+        EOF
+            apt_options=(
+              -o
+              "Dir::Etc::sourcelist=${mixed_arch_sources}"
+              -o
+              "Dir::Etc::sourceparts=-"
+            )
+          fi
+        fi
+
+        sudo apt-get "${apt_options[@]}" update
 
         packages=(
           xauth
@@ -43,4 +76,4 @@ runs:
           packages+=(libarchive-tools)
         fi
 
-        sudo apt-get install -y "${packages[@]}"
+        sudo apt-get "${apt_options[@]}" install -y "${packages[@]}"

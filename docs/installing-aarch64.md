@@ -128,7 +128,10 @@ Option B and set `QEMU_LD_PREFIX` to the exported x86_64 sysroot path.
 
 The apt source configuration is querying Ubuntu ports for amd64 indexes. Keep
 `ports.ubuntu.com` entries for `arm64` only, and add amd64 entries from
-`archive.ubuntu.com` plus `security.ubuntu.com`.
+`archive.ubuntu.com` plus `security.ubuntu.com`. After adding `amd64`, keep
+this split for subsequent apt commands in the same job. In repository CI, the
+shared `.github/actions/install-linux-e2e-runtime-deps` action now applies the
+same mixed-source configuration automatically on Ubuntu arm64 runners.
 
 ### Bundler command errors
 

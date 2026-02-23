@@ -103,6 +103,9 @@ Success is observable when:
 - [x] (2026-02-23 00:00Z) Corrected apt source selection for mixed architectures
   on Ubuntu arm runners by using explicit `arm64` `ports.ubuntu.com` entries
   and `amd64` `archive.ubuntu.com`/`security.ubuntu.com` entries.
+- [x] (2026-02-23 00:00Z) Extended mixed-architecture apt source pinning into
+  the shared `install-linux-e2e-runtime-deps` action so downstream package
+  installation stays reliable after adding `amd64` on arm64 runners.
 
 ## Surprises & discoveries
 
@@ -140,6 +143,13 @@ Success is observable when:
   `http://ports.ubuntu.com/ubuntu-ports/.../binary-amd64/Packages`.
   Impact: mixed-architecture bootstrap must pin apt sources by architecture,
   not rely on default runner source lists.
+- Observation: fixing only the pre-install bootstrap step was insufficient; the
+  later shared Linux dependency action still ran `apt-get update` against the
+  runner defaults and failed on the same `ports` amd64 404s.
+  Evidence: GitHub Actions logs for `Install Linux build and E2E runtime deps`
+  failed with `E: Failed to fetch ... binary-amd64/Packages`.
+  Impact: all apt invocations after enabling foreign architectures must use the
+  same per-architecture source mapping.
 
 ## Decision Log
 
@@ -182,6 +192,11 @@ Success is observable when:
   Rationale: avoids amd64 index lookups against `ports` mirrors and makes
   package resolution deterministic on Ubuntu arm runners.
   Date/Author: 2026-02-23 / Codex
+- Decision: add mixed-arch source auto-detection to the shared
+  `.github/actions/install-linux-e2e-runtime-deps` action.
+  Rationale: keeps fast/deep Linux dependency installation aligned with the
+  aarch64 bootstrap once `amd64` is enabled, without changing x64 lanes.
+  Date/Author: 2026-02-23 / Codex
 
 ## Outcomes & Retrospective
 
@@ -204,6 +219,9 @@ Observed outcomes:
   execute its x64 helper binaries.
 - Linux aarch64 apt bootstrap now uses explicit per-arch mirrors to prevent
   `ports.ubuntu.com` amd64 index fetch failures.
+- Shared Linux runtime dependency installation now reuses mixed-arch source
+  pinning on Ubuntu arm64 runners with `amd64` enabled so post-install apt
+  updates do not regress with `ports` amd64 404 errors.
 - Linux aarch64 lane now runs install/lint/test/build checks and packages arm64
   Linux artefacts.
 - `docs/developers-guide.md` now records Linux aarch64 runtime-alignment and CI
