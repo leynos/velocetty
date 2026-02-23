@@ -100,6 +100,9 @@ Success is observable when:
 - [x] (2026-02-23 00:00Z) Reworked Linux aarch64 QEMU runtime provisioning to
   amd64 multiarch libraries after CI install failed in arm64 snapshot
   generation with missing `libglib-2.0.so.0`.
+- [x] (2026-02-23 00:00Z) Corrected apt source selection for mixed architectures
+  on Ubuntu arm runners by using explicit `arm64` `ports.ubuntu.com` entries
+  and `amd64` `archive.ubuntu.com`/`security.ubuntu.com` entries.
 
 ## Surprises & discoveries
 
@@ -131,6 +134,12 @@ Success is observable when:
   Impact: Linux aarch64 lanes need amd64 multiarch runtime libraries available
   in the QEMU loader path, not only glibc/libstdc++ cross-runtime sysroot
   packages.
+- Observation: adding amd64 architecture on the runner triggered apt index
+  fetches against `ports.ubuntu.com` for amd64, which return `404 Not Found`.
+  Evidence: CI logs show repeated failures for
+  `http://ports.ubuntu.com/ubuntu-ports/.../binary-amd64/Packages`.
+  Impact: mixed-architecture bootstrap must pin apt sources by architecture,
+  not rely on default runner source lists.
 
 ## Decision Log
 
@@ -167,6 +176,12 @@ Success is observable when:
   related libraries that are not present in the previous minimal cross-runtime
   sysroot path.
   Date/Author: 2026-02-23 / Codex
+- Decision: use an explicit temporary apt source list in Linux aarch64
+  bootstrap with `ports.ubuntu.com` limited to `arm64` and
+  `archive.ubuntu.com`/`security.ubuntu.com` limited to `amd64`.
+  Rationale: avoids amd64 index lookups against `ports` mirrors and makes
+  package resolution deterministic on Ubuntu arm runners.
+  Date/Author: 2026-02-23 / Codex
 
 ## Outcomes & Retrospective
 
@@ -187,6 +202,8 @@ Observed outcomes:
   libraries (`libc6`, `libstdc++6`, `libgcc-s1`, `libglib2.0-0`, `libexpat1`,
   and `libpcre2-8-0`) with `QEMU_LD_PREFIX=/` so arm64 snapshot generation can
   execute its x64 helper binaries.
+- Linux aarch64 apt bootstrap now uses explicit per-arch mirrors to prevent
+  `ports.ubuntu.com` amd64 index fetch failures.
 - Linux aarch64 lane now runs install/lint/test/build checks and packages arm64
   Linux artefacts.
 - `docs/developers-guide.md` now records Linux aarch64 runtime-alignment and CI

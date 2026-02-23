@@ -233,6 +233,11 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   x86_64 runtime libraries (`libc6`, `libstdc++6`, `libglib2.0-0`,
   `libexpat1`, and `libpcre2-8-0`) so Electron's x64 `mksnapshot` and
   `v8_context_snapshot_generator` binaries can run.
+- On Ubuntu arm runners that default to `ports.ubuntu.com`, use explicit apt
+  source entries (`ports` for `arm64` and `archive.ubuntu.com` plus
+  `security.ubuntu.com` for `amd64`) before installing `:amd64` packages.
+  Otherwise apt tries to resolve `amd64` indexes from `ports` and fails with
+  `404 Not Found`.
 - After provisioning amd64 runtime packages on Linux aarch64 CI lanes, export
   `QEMU_LD_PREFIX=/` so QEMU resolves x86_64 shared libraries from the host
   multiarch rootfs.

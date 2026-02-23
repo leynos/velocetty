@@ -20,8 +20,24 @@ multiarch rootfs:
 
 ```bash
 sudo dpkg --add-architecture amd64
-sudo apt-get update
-sudo apt-get install -y --no-install-recommends \
+cat <<'EOF' | sudo tee /tmp/velocetty-aarch64-bootstrap.sources.list >/dev/null
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu jammy-backports main restricted universe multiverse
+deb [arch=amd64] http://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
+EOF
+sudo apt-get \
+  -o Dir::Etc::sourcelist=/tmp/velocetty-aarch64-bootstrap.sources.list \
+  -o Dir::Etc::sourceparts=- \
+  update
+sudo apt-get \
+  -o Dir::Etc::sourcelist=/tmp/velocetty-aarch64-bootstrap.sources.list \
+  -o Dir::Etc::sourceparts=- \
+  install -y --no-install-recommends \
   qemu-user-static \
   libc6:amd64 \
   libstdc++6:amd64 \
@@ -107,6 +123,12 @@ distribution-provided `qemu-x86_64` binary is on `PATH`.
 
 Your distribution does not provide Debian multiarch runtime packages. Use
 Option B and set `QEMU_LD_PREFIX` to the exported x86_64 sysroot path.
+
+### `404 Not Found` for `.../binary-amd64/Packages` on `ports.ubuntu.com`
+
+The apt source configuration is querying Ubuntu ports for amd64 indexes. Keep
+`ports.ubuntu.com` entries for `arm64` only, and add amd64 entries from
+`archive.ubuntu.com` plus `security.ubuntu.com`.
 
 ### Bundler command errors
 
