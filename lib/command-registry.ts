@@ -51,14 +51,31 @@ const cloneCommandDefinition = (command: RegisteredCommand): CommandDefinition =
   resultSchema: cloneSchema(command.resultSchema)
 });
 
+/** Extends Ajv ErrorObject with legacy v6 path fields for instance/data paths. */
+type AjvErrorWithLegacyPath = ErrorObject & {
+  instancePath?: string;
+  dataPath?: string;
+};
+
+/** Accepts an optional path string and normalizes it to a guaranteed string. */
+const asIssuePath = (value: string | undefined): string => (typeof value === 'string' ? value : '');
+/** Coerces unknown params into a Record<string, unknown> or an empty object. */
+const asIssueParams = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+
 const serializeAjvErrors = (errors: ErrorObject[] | null | undefined): CommandValidationIssue[] =>
-  (errors ?? []).map((error) => ({
-    instancePath: error.instancePath,
-    schemaPath: error.schemaPath,
-    keyword: error.keyword,
-    message: error.message ?? 'Schema validation failed',
-    params: error.params as Record<string, unknown>
-  }));
+  (errors ?? []).map((error) => {
+    const maybeLegacyError = error as AjvErrorWithLegacyPath;
+    const instancePath = asIssuePath(maybeLegacyError.instancePath) || asIssuePath(maybeLegacyError.dataPath);
+
+    return {
+      instancePath,
+      schemaPath: asIssuePath(error.schemaPath),
+      keyword: error.keyword,
+      message: error.message ?? 'Schema validation failed',
+      params: asIssueParams(error.params)
+    };
+  });
 
 const ajv = new Ajv({allErrors: true, strict: false});
 const validatorsByCommandId = new Map<CommandId, ValidateFunction>();

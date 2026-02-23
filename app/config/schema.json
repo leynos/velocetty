@@ -686,8 +686,12 @@
                             "type": "string"
                         },
                         "plugins": {
-                            "$ref": "#/definitions/pluginSettingsNamespace",
-                            "description": "Namespaced plugin settings keyed by plugin identifier."
+                            "additionalProperties": {
+                                "additionalProperties": {},
+                                "type": "object"
+                            },
+                            "description": "Namespaced plugin settings keyed by plugin identifier.",
+                            "type": "object"
                         },
                         "profiles": {
                             "description": "A list of profiles to use",
@@ -718,10 +722,6 @@
                 }
             ],
             "description": "Fully resolved configuration shape after profile defaults and overrides are applied."
-        },
-        "pluginSettingsNamespace": {
-            "description": "Namespaced plugin settings persisted under `config.plugins`.",
-            "type": "object"
         }
     },
     "description": "Raw user configuration payload as stored in config files.",

@@ -280,6 +280,26 @@ When documentation changes, also run:
 - `bunx markdownlint-cli2 "docs/**/*.md"`
 - `nixie --no-sandbox`
 
+## Vulnerability auditing practice
+
+Supply-chain changes must include a vulnerability scan pass before merge:
+
+- Run `bun install` first, so audit output reflects the current lockfile and
+  postinstall build graph.
+- Generate a human-readable advisory report with `bun audit`.
+- Verify there are no `critical`, `high`, or `moderate` advisories with
+  `bun audit --audit-level=moderate`.
+- Produce machine-readable evidence with `bun audit --json
+  --audit-level=moderate` when logs or follow-up automation require it.
+
+Roadmap item `1.4.2` is satisfied only when the moderate-threshold audit run is
+clean. If remediation requires dependency overrides, keep overrides in
+`package.json` and re-run the full gate sequence before marking work complete.
+For the current Electron 40 toolchain (`electron-builder@24.x`), keep `ajv`
+aligned with `@develar/schema-utils` and `ajv-keywords@3` by pinning it to
+`6.14.0`; moving back to Ajv 8 without upgrading that stack will break
+`bun install` during postinstall.
+
 ## Type checking
 
 Type checking runs via `tsgo` and the shared `tsconfig.typecheck.json` project:
