@@ -165,8 +165,9 @@ ExecPlan current.
 Primary files in scope:
 
 - `.github/workflows/nodejs.yml`
-  - Current Linux ARM job uses an `armv7l` + `arm64` matrix and `arm-runner`.
-  - Current failure occurs in the `rebuild node-pty` arm-runner step.
+  - Linux ARM lane is now `build-linux-aarch64` on `ubuntu-22.04-arm`.
+  - Lane includes install/lint/test/build gates plus arm64 Linux packaging.
+  - Legacy `armv7l` matrix and `arm-runner` emulation flow were removed.
 - `docs/developers-guide.md`
   - `Electron runtime alignment` section is the policy for Node/Electron/native
     rebuild consistency.
