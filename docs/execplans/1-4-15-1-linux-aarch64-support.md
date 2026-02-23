@@ -90,6 +90,8 @@ Success is observable when:
   entries under `docs/roadmap.md`.
 - [x] (2026-02-23 00:00Z) Ran required gates with `tee` logs:
   `bun install`, `make build`, `make check-fmt`, `make lint`, `make test`.
+- [x] (2026-02-23 00:00Z) Added Linux aarch64 CI bootstrap for x64 snapshot
+  emulation (`qemu-user-static` plus `QEMU_LD_PREFIX` sysroot export).
 
 ## Surprises & discoveries
 
@@ -99,6 +101,13 @@ Success is observable when:
   arm-runner mount path before rebuild completes.
   Impact: replacing emulated copy-based runners with native ARM runners is the
   lowest-risk first move.
+- Observation: native Linux aarch64 `bun install` still fails without the
+  documented x64 snapshot prerequisites.
+  Evidence: the install path runs `v8-snapshot` for x64 and arm64, and x64
+  snapshot execution on arm64 requires `qemu-x86_64` plus a sysroot containing
+  `ld-linux-x86-64.so.2`.
+  Impact: the Linux aarch64 lane must prepare `qemu-user-static` and export
+  `QEMU_LD_PREFIX` before running install.
 
 ## Decision Log
 
@@ -118,6 +127,11 @@ Success is observable when:
   Rationale: roadmap scope requires Linux aarch64 reliability across install,
   build, lint, and test, not just packaging.
   Date/Author: 2026-02-23 / Codex
+- Decision: bootstrap x64 snapshot emulation in the Linux aarch64 lane before
+  install by preparing `qemu-user-static` and a container-exported sysroot.
+  Rationale: this matches documented aarch64 snapshot requirements and unblocks
+  the install gate on native ARM runners.
+  Date/Author: 2026-02-23 / Codex
 
 ## Outcomes & Retrospective
 
@@ -128,6 +142,8 @@ Observed outcomes:
 
 - arm7 (`armv7l`) Linux CI lane and arm7 Linux artefact targets were removed.
 - Linux ARM workflow now runs as Linux aarch64 on `ubuntu-22.04-arm`.
+- Linux aarch64 workflow now bootstraps `qemu-x86_64` and `QEMU_LD_PREFIX`
+  sysroot setup before `bun install`.
 - Linux aarch64 lane now runs install/lint/test/build checks and packages arm64
   Linux artefacts.
 - `docs/developers-guide.md` now records Linux aarch64 runtime-alignment and CI

@@ -228,6 +228,9 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
 - Keep Linux dependency installation shared via
   `.github/actions/install-linux-e2e-runtime-deps/action.yml` so fast-lane and
   deep-lane jobs stay in sync.
+- Before running `bun install` on Linux aarch64 CI lanes, provision
+  `qemu-x86_64` and export `QEMU_LD_PREFIX` to an x86_64 sysroot (for example,
+  `/tmp/x86_64-sysroot`) so Electron's x64 `mksnapshot` binary can run.
 - For Linux aarch64 native-module rebuild reliability, run `bun install`
   before other gates and keep `npm_config_node_gyp` pointed at the workspace
   `node-gyp` entrypoint in CI jobs that rebuild native modules.
