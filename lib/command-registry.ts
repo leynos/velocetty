@@ -52,6 +52,7 @@ const cloneCommandDefinition = (command: RegisteredCommand): CommandDefinition =
 });
 
 type AjvErrorWithLegacyPath = ErrorObject & {
+  instancePath?: string;
   dataPath?: string;
 };
 
@@ -62,7 +63,7 @@ const asIssueParams = (value: unknown): Record<string, unknown> =>
 const serializeAjvErrors = (errors: ErrorObject[] | null | undefined): CommandValidationIssue[] =>
   (errors ?? []).map((error) => {
     const maybeLegacyError = error as AjvErrorWithLegacyPath;
-    const instancePath = asIssuePath(error.instancePath) || asIssuePath(maybeLegacyError.dataPath);
+    const instancePath = asIssuePath(maybeLegacyError.instancePath) || asIssuePath(maybeLegacyError.dataPath);
 
     return {
       instancePath,
