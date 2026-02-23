@@ -97,6 +97,9 @@ Success is observable when:
 - [x] (2026-02-23 00:00Z) Added `SKIP_X64_V8_SNAPSHOT=1` support and set it in
   the Linux aarch64 install gate to avoid redundant x64 snapshot generation in
   arm64-only packaging lanes.
+- [x] (2026-02-23 00:00Z) Reworked Linux aarch64 QEMU runtime provisioning to
+  amd64 multiarch libraries after CI install failed in arm64 snapshot
+  generation with missing `libglib-2.0.so.0`.
 
 ## Surprises & discoveries
 
@@ -120,6 +123,14 @@ Success is observable when:
   in `Install` for multiple hours while pre-install sysroot prep completed in
   under one minute.
   Impact: arm64-only packaging lanes should skip x64 snapshot generation.
+- Observation: after skipping x64 snapshots for arm64-only lanes, arm64
+  snapshot generation still failed under QEMU because
+  `v8_context_snapshot_generator` could not load `libglib-2.0.so.0`.
+  Evidence: GitHub Actions run `22315578120` failed in `Install` with status
+  `127` while running `bun run mk-snapshot`.
+  Impact: Linux aarch64 lanes need amd64 multiarch runtime libraries available
+  in the QEMU loader path, not only glibc/libstdc++ cross-runtime sysroot
+  packages.
 
 ## Decision Log
 
@@ -150,6 +161,12 @@ Success is observable when:
   an additional x64 snapshot adds substantial install latency without affecting
   arm64 packaging outcomes.
   Date/Author: 2026-02-23 / Codex
+- Decision: provision x86_64 runtime libraries via dpkg multiarch (`amd64`) and
+  set `QEMU_LD_PREFIX=/` in the Linux aarch64 lane.
+  Rationale: `v8_context_snapshot_generator` dynamically links against glib and
+  related libraries that are not present in the previous minimal cross-runtime
+  sysroot path.
+  Date/Author: 2026-02-23 / Codex
 
 ## Outcomes & Retrospective
 
@@ -166,6 +183,10 @@ Observed outcomes:
   export to avoid very long install times in CI.
 - Linux aarch64 install now skips x64 snapshot generation when the lane targets
   arm64-only artefacts, reducing CI install time and emulation load.
+- Linux aarch64 snapshot bootstrap now installs amd64 multiarch runtime
+  libraries (`libc6`, `libstdc++6`, `libgcc-s1`, `libglib2.0-0`, `libexpat1`,
+  and `libpcre2-8-0`) with `QEMU_LD_PREFIX=/` so arm64 snapshot generation can
+  execute its x64 helper binaries.
 - Linux aarch64 lane now runs install/lint/test/build checks and packages arm64
   Linux artefacts.
 - `docs/developers-guide.md` now records Linux aarch64 runtime-alignment and CI

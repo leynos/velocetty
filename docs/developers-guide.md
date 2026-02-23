@@ -229,9 +229,13 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   `.github/actions/install-linux-e2e-runtime-deps/action.yml` so fast-lane and
   deep-lane jobs stay in sync.
 - Before running `bun install` on Linux aarch64 CI lanes, provision
-  `qemu-x86_64` and export `QEMU_LD_PREFIX` to an x86_64 sysroot (for example,
-  `/usr/x86_64-linux-gnu` from `libc6-amd64-cross` and
-  `libstdc++6-amd64-cross`) so Electron's x64 `mksnapshot` binary can run.
+  `qemu-x86_64`, add the `amd64` dpkg architecture, and install the required
+  x86_64 runtime libraries (`libc6`, `libstdc++6`, `libglib2.0-0`,
+  `libexpat1`, and `libpcre2-8-0`) so Electron's x64 `mksnapshot` and
+  `v8_context_snapshot_generator` binaries can run.
+- After provisioning amd64 runtime packages on Linux aarch64 CI lanes, export
+  `QEMU_LD_PREFIX=/` so QEMU resolves x86_64 shared libraries from the host
+  multiarch rootfs.
 - For Linux aarch64 lanes that package only arm64 artefacts, set
   `SKIP_X64_V8_SNAPSHOT=1` during `bun install` to avoid generating the
   additional x64 snapshot pass under QEMU.

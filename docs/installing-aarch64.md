@@ -15,24 +15,29 @@ packages, so a sysroot must be supplied separately.
 
 ## Option A: Package-backed sysroot (recommended for CI)
 
-On Ubuntu/Debian hosts, use cross-runtime packages instead of exporting a full
-x86_64 container filesystem:
+On Ubuntu/Debian hosts, install amd64 runtime libraries directly into the
+multiarch rootfs:
 
 ```bash
+sudo dpkg --add-architecture amd64
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
   qemu-user-static \
-  libc6-amd64-cross \
-  libstdc++6-amd64-cross \
+  libc6:amd64 \
+  libstdc++6:amd64 \
+  libgcc-s1:amd64 \
+  libglib2.0-0:amd64 \
+  libexpat1:amd64 \
+  libpcre2-8-0:amd64 \
   libarchive-tools
-export QEMU_LD_PREFIX=/usr/x86_64-linux-gnu
+export QEMU_LD_PREFIX=/
 ```
 
 Verify the emulator and loader:
 
 ```bash
 test -x /usr/bin/qemu-x86_64-static
-ls /usr/x86_64-linux-gnu/lib64/ld-linux-x86-64.so.2
+ls /lib64/ld-linux-x86-64.so.2
 ```
 
 ## Option B: Container-backed sysroot (Fedora fallback)
@@ -98,9 +103,9 @@ loader exists and export `QEMU_LD_PREFIX` to the sysroot path.
 Install QEMU user emulation for the distribution, or ensure the
 distribution-provided `qemu-x86_64` binary is on `PATH`.
 
-### `E: Unable to locate package libc6-amd64-cross`
+### `E: Unable to locate package ...:amd64`
 
-Your distribution does not provide Debian cross-runtime packages. Use
+Your distribution does not provide Debian multiarch runtime packages. Use
 Option B and set `QEMU_LD_PREFIX` to the exported x86_64 sysroot path.
 
 ### Bundler command errors
