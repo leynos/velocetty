@@ -36,7 +36,7 @@ jobs:
         with:
           bun-version: 1.3.8
       - name: Fix node-gyp and Python
-        run: .github/scripts/setup-node-gyp-python.sh
+        run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
       - name: Install
         run: bun install
         env:
@@ -135,7 +135,7 @@ jobs:
         with:
           bun-version: 1.3.8
       - name: Fix node-gyp and Python
-        run: .github/scripts/setup-node-gyp-python.sh
+        run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
       - name: Install
         run: bun install
         env:
@@ -182,7 +182,7 @@ jobs:
         with:
           bun-version: 1.3.8
       - name: Fix node-gyp and Python
-        run: .github/scripts/setup-node-gyp-python.sh
+        run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
       - name: Prepare x64 snapshot sysroot for Linux aarch64
         run: |
           set -euo pipefail

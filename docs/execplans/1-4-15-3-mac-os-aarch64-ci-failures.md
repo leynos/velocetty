@@ -256,6 +256,9 @@ Local command validation:
   `/tmp/check-fmt-velocetty-1-4-15-3-mac-os-aarch64-ci-failures.out`,
   `/tmp/lint-velocetty-1-4-15-3-mac-os-aarch64-ci-failures.out`, and
   `/tmp/test-velocetty-1-4-15-3-mac-os-aarch64-ci-failures.out`.
+- [x] (2026-02-24 19:05Z) Addressed Ubuntu lint regression by moving the CI
+  node-gyp Python virtual environment under `$RUNNER_TEMP` and adding
+  `.node-gyp-python` to `.biomeignore` as a workspace-level safeguard.
 - [ ] Validate macOS CI lane success and capture run evidence.
 - [ ] Finalise outcomes and retrospective.
 
@@ -278,6 +281,13 @@ Local command validation:
   Evidence: macOS and Windows bullets are separate checklist entries.
   Impact: mark only the macOS bullet done for this task; leave Windows bullets
   unchanged.
+- Observation: creating the virtual environment under the repository root caused
+  Biome lint failures on `ubuntu-latest` because workflow-generated Python
+  package files were scanned as format violations.
+  Evidence: CI lint output reported format diffs under
+  `.node-gyp-python/lib/python3.12/site-packages/setuptools/...`.
+  Impact: CI bootstrap artefacts must be placed outside the workspace or ignored
+  by lint tooling.
 
 ## Decision log
 
