@@ -219,6 +219,19 @@ Current repository runtime baseline after roadmap item `1.4.13`:
 - `@types/node`: `^24.10.12`
 - CI workflow `NODE_VERSION`: `24.11.1`
 
+CI Python/node-gyp baseline after roadmap item `1.4.15` macOS scope:
+
+- In CI jobs that prepare native-module builds, create a per-job Python virtual
+  environment for node-gyp bootstrap packages instead of running system-level
+  `pip install`.
+- Install `packaging` and `setuptools` inside that virtual environment and
+  export `npm_config_python` to the virtual-environment interpreter path.
+- Keep `npm_config_node_gyp` aligned to the workspace `node-gyp` entrypoint in
+  the same job so Python and node-gyp resolution stay deterministic.
+- Run this isolated Python bootstrap before `bun install`; this keeps hosted
+  macOS lanes compliant with PEP 668 (`externally-managed-environment`) and
+  avoids host-level Python mutation.
+
 Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
 
 - Linux ARM CI coverage is Linux aarch64 only; do not reintroduce armv7
