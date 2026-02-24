@@ -272,6 +272,9 @@ Local command validation:
 - [x] (2026-02-24 22:10Z) Addressed Linux aarch64 CI freeze in
   `bun run v8-snapshot` by removing the dedicated arm64 snapshot-generation
   step and setting `SKIP_V8_SNAPSHOT_COPY=1` for Linux aarch64 packaging.
+- [x] (2026-02-24 22:40Z) Addressed Linux aarch64 `rebuild-node-pty` stall by
+  rebuilding `node-pty` during `bun install` and removing the separate rebuild
+  step from the Linux aarch64 lane.
 - [ ] Validate macOS CI lane success and capture run evidence.
 - [ ] Finalise outcomes and retrospective.
 
@@ -331,6 +334,13 @@ Local command validation:
   `Generating V8 snapshots for arm64...` with no completion output.
   Impact: Linux aarch64 packaging should avoid custom snapshot generation in CI
   and use Electron's default snapshot artefacts instead.
+- Observation: Linux aarch64 CI can also stall in the standalone
+  `bun run rebuild-node-pty` step while node-gyp downloads and extracts Electron
+  headers with verbose logging.
+  Evidence: CI logs remained in `gyp verb extracted file from tarball ...`
+  output during the dedicated rebuild step.
+  Impact: rebuilding `node-pty` in the install step keeps Python/node-gyp
+  environment alignment consistent and removes an extra long-running stage.
 
 ## Decision log
 
@@ -382,6 +392,12 @@ Local command validation:
   reliability gates.
   Date/author: 2026-02-24 / Codex
 
+- Decision: remove the dedicated Linux aarch64 `rebuild-node-pty` step and run
+  rebuild during `bun install` instead.
+  Rationale: avoids repeated long-running native-rebuild phases and keeps
+  node-gyp/Python environment wiring in one deterministic install step.
+  Date/author: 2026-02-24 / Codex
+
 ## Outcomes & retrospective
 
 Implementation is in progress.
@@ -409,6 +425,8 @@ Current outcomes:
   overrun the CI test timeout and force Bun to kill dangling processes.
 - Updated Linux aarch64 packaging flow to bypass custom snapshot copy in CI so
   the lane cannot freeze in arm64 snapshot generation.
+- Updated Linux aarch64 workflow sequencing so `node-pty` rebuild happens in
+  install and no separate rebuild stage can stall later in the lane.
 - Completed required local gates successfully:
   `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`.
 
