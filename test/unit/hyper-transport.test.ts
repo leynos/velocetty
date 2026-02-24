@@ -10,12 +10,6 @@ import {waitFor} from '../testUtils/waitFor';
 
 const {transportMock, resetTransportMock} = createTransportMock();
 
-mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
-
-mock.module('../../lib/actions/ui', () => ({
-  execCommand: () => ({type: 'exec'}),
-  setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'})
-}));
 const createPluginExports = () => ({
   connect: () => (Component: React.ComponentType<unknown>) => Component,
   decorate: (Component: React.ComponentType<unknown>) => Component,
@@ -28,31 +22,42 @@ const pluginModuleFactory = () => {
   return {...pluginExports, default: pluginExports};
 };
 
-mock.module('../../lib/utils/plugins', pluginModuleFactory);
-mock.module('../../lib/utils/plugins.ts', pluginModuleFactory);
-mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));
-mock.module('../../lib/containers/notifications', () => ({default: () => null}));
-mock.module('../../lib/containers/terms', () => ({
-  default: (props: {ref_: (terms: unknown) => void}) => {
-    props.ref_({
-      getTermByUid: () => null,
-      getActiveTerm: () => null
-    });
-    return null;
-  }
-}));
-mock.module('mousetrap', () => ({
-  default: class {
-    stopCallback = () => false;
-    bind() {}
-    reset() {}
-  }
-}));
-mock.module('../../lib/command-registry', () => ({
-  getRegisteredKeys: async () => ({}),
-  getCommandHandler: () => undefined,
-  shouldPreventDefault: () => false
-}));
+const registerHyperModuleMocks = () => {
+  // Re-register before importing Hyper to keep this suite stable if another
+  // file calls mock.restore() earlier in the same Bun process.
+  mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
+  mock.module('../../lib/actions/ui', () => ({
+    execCommand: () => ({type: 'exec'}),
+    setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'})
+  }));
+  mock.module('../../lib/utils/plugins', pluginModuleFactory);
+  mock.module('../../lib/utils/plugins.ts', pluginModuleFactory);
+  mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));
+  mock.module('../../lib/containers/notifications', () => ({default: () => null}));
+  mock.module('../../lib/containers/terms', () => ({
+    default: (props: {ref_: (terms: unknown) => void}) => {
+      props.ref_({
+        getTermByUid: () => null,
+        getActiveTerm: () => null
+      });
+      return null;
+    }
+  }));
+  mock.module('mousetrap', () => ({
+    default: class {
+      stopCallback = () => false;
+      bind() {}
+      reset() {}
+    }
+  }));
+  mock.module('../../lib/command-registry', () => ({
+    getRegisteredKeys: async () => ({}),
+    getCommandHandler: () => undefined,
+    shouldPreventDefault: () => false
+  }));
+};
+
+registerHyperModuleMocks();
 
 type HyperComponent = typeof import('../../lib/containers/hyper').default;
 type HyperProps = React.ComponentProps<HyperComponent>;
@@ -61,6 +66,7 @@ let Hyper: HyperComponent;
 let cleanupHappyDom: (() => void) | null = null;
 
 beforeAll(async () => {
+  registerHyperModuleMocks();
   cleanupHappyDom = await setupHappyDom();
   // Provide window.rpc stub for any residual plugin-API references.
   (window as unknown as {rpc: Record<string, () => void>}).rpc = {

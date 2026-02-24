@@ -80,8 +80,6 @@ const renderHyper = (root: ReturnType<typeof createRoot>, overrides: Partial<Hyp
 const {transportMock, state: transportMockState, resetTransportMock} = createTransportMock();
 const transportRemovedListeners = transportMockState.removedEvents;
 
-mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
-
 const buildRpcWindowStub = () => {
   const rpcWindow = window as RpcWindow;
   rpcWindow.rpc = {
@@ -91,11 +89,6 @@ const buildRpcWindowStub = () => {
   };
   return {rpcWindow};
 };
-
-mock.module('../../lib/actions/ui', () => ({
-  execCommand: () => ({type: 'exec'}),
-  setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'})
-}));
 
 const createPluginExports = () => ({
   connect: () => (Component: React.ComponentType<unknown>) => Component,
@@ -109,30 +102,39 @@ const pluginModuleFactory = () => {
   return {...pluginExports, default: pluginExports};
 };
 
-mock.module('../../lib/utils/plugins', pluginModuleFactory);
-mock.module('../../lib/utils/plugins.ts', pluginModuleFactory);
+const registerHyperModuleMocks = () => {
+  // Re-register before importing Hyper to keep this suite stable if another
+  // file calls mock.restore() earlier in the same Bun process.
+  mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
+  mock.module('../../lib/actions/ui', () => ({
+    execCommand: () => ({type: 'exec'}),
+    setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'})
+  }));
+  mock.module('../../lib/utils/plugins', pluginModuleFactory);
+  mock.module('../../lib/utils/plugins.ts', pluginModuleFactory);
+  mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));
+  mock.module('../../lib/containers/notifications', () => ({default: () => null}));
+  mock.module('../../lib/containers/terms', () => ({
+    default: (props: {ref_: (terms: TermsRef) => void}) => {
+      props.ref_(termsRef);
+      return null;
+    }
+  }));
+  mock.module('mousetrap', () => ({default: MousetrapMock}));
+  mock.module('../../lib/command-registry', () => ({
+    getRegisteredKeys: async () => {
+      registerCalls += 1;
+      return registeredKeys;
+    },
+    getCommandHandler: (command: string) => commandHandlers[command],
+    shouldPreventDefault: () => shouldPreventDefaultResult
+  }));
+};
 
-mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));
-mock.module('../../lib/containers/notifications', () => ({default: () => null}));
-mock.module('../../lib/containers/terms', () => ({
-  default: (props: {ref_: (terms: TermsRef) => void}) => {
-    props.ref_(termsRef);
-    return null;
-  }
-}));
-
-mock.module('mousetrap', () => ({default: MousetrapMock}));
-
-mock.module('../../lib/command-registry', () => ({
-  getRegisteredKeys: async () => {
-    registerCalls += 1;
-    return registeredKeys;
-  },
-  getCommandHandler: (command: string) => commandHandlers[command],
-  shouldPreventDefault: () => shouldPreventDefaultResult
-}));
+registerHyperModuleMocks();
 
 beforeAll(async () => {
+  registerHyperModuleMocks();
   ({default: Hyper} = await import('../../lib/containers/hyper'));
 });
 
