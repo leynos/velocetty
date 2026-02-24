@@ -266,6 +266,9 @@ Local command validation:
   regression by restoring spawn as the default fast-lane driver and adding a
   macOS CI packaged-launch fallback stability wait when
   `[e2e] renderer-ready` markers are absent but the process remains alive.
+- [x] (2026-02-24 21:10Z) Addressed macOS dangling-process timeout regression by
+  bounding packaged-launch fallback stability wait to the remaining test-timeout
+  budget so the test can complete cleanup before Bun's 45-second CI deadline.
 - [ ] Validate macOS CI lane success and capture run evidence.
 - [ ] Finalise outcomes and retrospective.
 
@@ -311,6 +314,13 @@ Local command validation:
   Impact: macOS CI fast-lane driver selection must remain spawn-default, with
   Playwright only as an explicit override and targeted fallback handling for
   packaged-launch marker gaps.
+- Observation: fixed-duration fallback waits could consume the entire 45-second
+  CI test timeout budget and cause Bun to kill a dangling packaged Electron
+  process before cleanup finished.
+  Evidence: CI reported `killed 1 dangling process` and
+  `this test timed out after 45000ms` for the packaged fast-lane test.
+  Impact: fallback waits must be budget-aware and leave explicit headroom for
+  final stability checks and process cleanup.
 
 ## Decision log
 
@@ -349,6 +359,12 @@ Local command validation:
   early-exit and critical-renderer-error checks.
   Date/author: 2026-02-24 / Codex
 
+- Decision: bound macOS packaged-launch fallback waits to the remaining
+  per-test timeout budget with fixed safety headroom.
+  Rationale: prevents fallback logic from exhausting Bun's 45-second CI timeout
+  and avoids dangling-process termination before cleanup can run.
+  Date/author: 2026-02-24 / Codex
+
 ## Outcomes & retrospective
 
 Implementation is in progress.
@@ -372,6 +388,8 @@ Current outcomes:
   `[e2e] renderer-ready` marker output can be tolerated when the process stays
   alive through an additional stability window and no critical renderer errors
   are detected.
+- Updated macOS fallback timing to be budget-aware so fallback waits cannot
+  overrun the CI test timeout and force Bun to kill dangling processes.
 - Completed required local gates successfully:
   `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`.
 

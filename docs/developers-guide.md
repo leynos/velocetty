@@ -407,7 +407,7 @@ Fast lane (required on pull requests):
 - Supports `E2E_DRIVER=playwright|spawn` overrides; CI defaults to spawn-mode
   markers, with a macOS packaged-launch fallback that accepts missing
   renderer-ready marker output only when the process remains alive through an
-  additional stability window.
+  additional stability window bounded by remaining test-timeout budget.
 - Supports `E2E_DEBUG=1` for verbose launch logs and `E2E_CAPTURE=1` for
   screenshot capture.
 
