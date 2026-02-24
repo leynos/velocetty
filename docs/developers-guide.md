@@ -221,7 +221,7 @@ Current repository runtime baseline after roadmap item `1.4.13`:
 
 Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
 
-- Linux ARM CI coverage is Linux aarch64 only; do not reintroduce arm7
+- Linux ARM CI coverage is Linux aarch64 only; do not reintroduce armv7
   (`armv7l`) lanes or release artefact targets.
 - Prefer native ARM runners for Linux aarch64 CI lanes instead of emulated
   copy-to-image flows, which previously failed with disk-exhaustion errors.
