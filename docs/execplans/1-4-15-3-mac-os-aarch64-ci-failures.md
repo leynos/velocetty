@@ -1,4 +1,4 @@
-# Resolve macOS aarch64 CI install/build/lint/test failures
+# Resolve macOS aarch64 Continuous Integration (CI) install/build/lint/test failures
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
@@ -13,8 +13,8 @@ Implementation is in progress as of 2026-02-24.
 
 ## Purpose / big picture
 
-Roadmap item `1.4.15` requires reliable cross-architecture continuous
-integration (CI) on host platforms.
+Roadmap item `1.4.15` requires reliable cross-architecture Continuous
+Integration (CI) on host platforms.
 The Linux aarch64 scope is already complete, and this plan tracks the macOS
 aarch64 closure work recorded in `docs/roadmap.md`.
 
@@ -44,7 +44,7 @@ In scope:
 
 Out of scope for this plan:
 
-- Windows x64 stabilisation and Windows aarch64 enablement in roadmap `1.4.15`.
+- Windows x64 stabilization and Windows aarch64 enablement in roadmap `1.4.15`.
 - New feature work outside CI/developer-documentation reliability.
 - Broad refactors unrelated to the Python/node-gyp CI bootstrap failure.
 
@@ -279,7 +279,7 @@ Local command validation:
   rebuilding `node-pty` during `bun install` and removing the separate rebuild
   step from the Linux aarch64 lane.
 - [ ] Validate macOS CI lane success and capture run evidence.
-- [ ] Finalise outcomes and retrospective.
+- [ ] Finalize outcomes and retrospective.
 
 ## Surprises & discoveries
 
@@ -349,7 +349,7 @@ Local command validation:
 
 - Decision: move this ExecPlan to `Status: IN PROGRESS` and keep the living
   sections current during implementation.
-  Rationale: implementation work is now authorised and underway for this branch.
+  Rationale: implementation work is now authorized and underway for this branch.
   Date/author: 2026-02-24 / Codex
 
 - Decision: target the Python bootstrap step instead of introducing broad build
