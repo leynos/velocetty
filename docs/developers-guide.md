@@ -269,9 +269,9 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   install, set `SKIP_NODE_PTY_REBUILD=1` during `bun install` to avoid
   duplicate native rebuild work in postinstall.
 - When Linux aarch64 CI lanes package artefacts after install-time snapshot
-  skipping, run `SKIP_X64_V8_SNAPSHOT=1 bun run v8-snapshot` before
-  `electron-builder` so `cache/arm64` contains the snapshot blobs required by
-  `bin/cp-snapshot.js`.
+  skipping, set `SKIP_V8_SNAPSHOT_COPY=1` for the packaging step so CI uses
+  Electron's default snapshots instead of waiting on arm64 custom snapshot
+  generation that can stall under QEMU.
 - For local Linux aarch64 validation where snapshots are still required, set
   `SKIP_X64_V8_SNAPSHOT=1` to avoid generating the additional x64 snapshot pass
   under QEMU.

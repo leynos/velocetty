@@ -269,6 +269,9 @@ Local command validation:
 - [x] (2026-02-24 21:10Z) Addressed macOS dangling-process timeout regression by
   bounding packaged-launch fallback stability wait to the remaining test-timeout
   budget so the test can complete cleanup before Bun's 45-second CI deadline.
+- [x] (2026-02-24 22:10Z) Addressed Linux aarch64 CI freeze in
+  `bun run v8-snapshot` by removing the dedicated arm64 snapshot-generation
+  step and setting `SKIP_V8_SNAPSHOT_COPY=1` for Linux aarch64 packaging.
 - [ ] Validate macOS CI lane success and capture run evidence.
 - [ ] Finalise outcomes and retrospective.
 
@@ -321,6 +324,13 @@ Local command validation:
   `this test timed out after 45000ms` for the packaged fast-lane test.
   Impact: fallback waits must be budget-aware and leave explicit headroom for
   final stability checks and process cleanup.
+- Observation: Linux aarch64 CI can freeze for hours in
+  `bun run v8-snapshot` at `bun bin/mk-snapshot.js` even after skipping x64
+  snapshots.
+  Evidence: CI logs stalled after
+  `Generating V8 snapshots for arm64...` with no completion output.
+  Impact: Linux aarch64 packaging should avoid custom snapshot generation in CI
+  and use Electron's default snapshot artefacts instead.
 
 ## Decision log
 
@@ -365,6 +375,13 @@ Local command validation:
   and avoids dangling-process termination before cleanup can run.
   Date/author: 2026-02-24 / Codex
 
+- Decision: skip V8 snapshot copy in Linux aarch64 packaging CI by setting
+  `SKIP_V8_SNAPSHOT_COPY=1` and removing the dedicated arm64 snapshot step.
+  Rationale: snapshot generation under QEMU is non-deterministic and can freeze
+  lane execution; default Electron snapshots are sufficient for CI packaging
+  reliability gates.
+  Date/author: 2026-02-24 / Codex
+
 ## Outcomes & retrospective
 
 Implementation is in progress.
@@ -390,6 +407,8 @@ Current outcomes:
   are detected.
 - Updated macOS fallback timing to be budget-aware so fallback waits cannot
   overrun the CI test timeout and force Bun to kill dangling processes.
+- Updated Linux aarch64 packaging flow to bypass custom snapshot copy in CI so
+  the lane cannot freeze in arm64 snapshot generation.
 - Completed required local gates successfully:
   `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`.
 

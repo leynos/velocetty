@@ -236,14 +236,11 @@ jobs:
         run: bun run rebuild-node-pty
         env:
           npm_config_node_gyp: ${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
-      - name: Generate arm64 V8 snapshots
-        run: bun run v8-snapshot
-        env:
-          SKIP_X64_V8_SNAPSHOT: '1'
       - name: Build
         run: bun bin/run-electron-builder.cjs -l deb rpm AppImage pacman --arm64 -c electron-builder-linux-ci.json
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SKIP_V8_SNAPSHOT_COPY: '1'
       - name: Archive Build Artifacts
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:

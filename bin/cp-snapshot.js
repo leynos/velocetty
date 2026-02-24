@@ -11,6 +11,7 @@ const ARCH_ALIASES = {
   aarch64: 'arm64'
 };
 const UNSUPPORTED_ARCHES = new Set(['arm']);
+const shouldSkipSnapshotCopy = () => process.env.SKIP_V8_SNAPSHOT_COPY === '1';
 
 function validateArchInput(arch, sourceLabel) {
   if (typeof arch !== 'string' || arch.length === 0) {
@@ -200,12 +201,22 @@ function getDarwinAppPath(context) {
 }
 
 exports.default = async (context) => {
+  if (shouldSkipSnapshotCopy()) {
+    console.log('Skipping V8 snapshot copy because SKIP_V8_SNAPSHOT_COPY=1.');
+    return;
+  }
+
   const archToCopy = resolveContextArch(context);
   const pathToElectron = process.platform === 'darwin' ? getDarwinAppPath(context) : context.appOutDir;
   copySnapshot(pathToElectron, archToCopy);
 };
 
 if (require.main === module) {
+  if (shouldSkipSnapshotCopy()) {
+    console.log('Skipping V8 snapshot copy because SKIP_V8_SNAPSHOT_COPY=1.');
+    process.exit(0);
+  }
+
   const targetArch = process.env.npm_config_arch;
   if (!targetArch) {
     throw new Error('npm_config_arch must be set when running cp-snapshot.js directly.');
