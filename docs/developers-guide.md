@@ -250,6 +250,10 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   multiarch rootfs.
 - For Linux aarch64 CI lanes, set `SKIP_V8_SNAPSHOT=1` during `bun install` so
   snapshot generation cannot stall install for hours under emulation.
+- When Linux aarch64 CI lanes package artefacts after install-time snapshot
+  skipping, run `SKIP_X64_V8_SNAPSHOT=1 bun run v8-snapshot` before
+  `electron-builder` so `cache/arm64` contains the snapshot blobs required by
+  `bin/cp-snapshot.js`.
 - For local Linux aarch64 validation where snapshots are still required, set
   `SKIP_X64_V8_SNAPSHOT=1` to avoid generating the additional x64 snapshot pass
   under QEMU.

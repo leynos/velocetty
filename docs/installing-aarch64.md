@@ -150,6 +150,15 @@ same mixed-source configuration automatically on Ubuntu arm64 runners.
 Use `SKIP_V8_SNAPSHOT=1` for Linux aarch64 CI installs. This bypasses snapshot
 generation in postinstall and avoids long-running emulated snapshot steps.
 
+### `Missing snapshot output` during Linux aarch64 packaging
+
+If install ran with `SKIP_V8_SNAPSHOT=1`, generate arm64 snapshots before
+invoking `electron-builder`:
+
+```bash
+SKIP_X64_V8_SNAPSHOT=1 bun run v8-snapshot
+```
+
 ### Bundler command errors
 
 Do not run ad hoc bundler binaries directly on aarch64. Use the Bun scripts

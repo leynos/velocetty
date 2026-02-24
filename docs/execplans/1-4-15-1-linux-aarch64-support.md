@@ -118,6 +118,10 @@ Success is observable when:
 - [x] (2026-02-24 13:00Z) Addressed follow-up review comments by extracting
   mixed-arch apt source generation into a shared CI script and factoring plugin
   mock module setup into a shared unit-test helper.
+- [x] (2026-02-24 14:00Z) Added an explicit Linux aarch64 CI snapshot-generation
+  step (`SKIP_X64_V8_SNAPSHOT=1 bun run v8-snapshot`) before packaging so
+  `afterPack` snapshot copy checks pass on clean runners even when install uses
+  `SKIP_V8_SNAPSHOT=1`.
 
 ## Surprises & discoveries
 
@@ -258,6 +262,11 @@ Success is observable when:
   `test/testUtils/plugins-mock.ts`.
   Rationale: keeps Bun path-mocking behavior consistent across the Hyper and
   renderer unit suites and reduces duplicated `createPluginExports` factories.
+  Date/Author: 2026-02-24 / Codex
+- Decision: keep `SKIP_V8_SNAPSHOT=1` for Linux aarch64 install speed, but add a
+  dedicated arm64 snapshot generation step before `electron-builder` packaging.
+  Rationale: `bin/cp-snapshot.js` validates `cache/arm64` snapshot outputs in
+  `afterPack`, so packaging must regenerate arm64 blobs on fresh CI runners.
   Date/Author: 2026-02-24 / Codex
 
 ## Outcomes & Retrospective

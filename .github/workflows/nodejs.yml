@@ -227,6 +227,10 @@ jobs:
         run: npm run rebuild-node-pty
         env:
           npm_config_node_gyp: ${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
+      - name: Generate arm64 V8 snapshots
+        run: bun run v8-snapshot
+        env:
+          SKIP_X64_V8_SNAPSHOT: '1'
       - name: Build
         run: bun bin/run-electron-builder.cjs -l deb rpm AppImage pacman --arm64 -c electron-builder-linux-ci.json
         env:
