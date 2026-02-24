@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+venv_dir="${1:-.node-gyp-python}"
+
+if command -v python3 >/dev/null 2>&1; then
+  python_cmd=python3
+elif command -v python >/dev/null 2>&1; then
+  python_cmd=python
+else
+  echo "Unable to find python3 or python on PATH." >&2
+  exit 1
+fi
+
+"$python_cmd" -m venv "$venv_dir"
+
+python_bin="$venv_dir/bin/python"
+if [ ! -x "$python_bin" ]; then
+  python_bin="$venv_dir/Scripts/python.exe"
+fi
+
+if [ ! -x "$python_bin" ]; then
+  echo "Unable to find Python executable in virtualenv at $venv_dir." >&2
+  exit 1
+fi
+
+"$python_bin" -m pip install --upgrade pip setuptools packaging
+
+resolved_python=$("$python_bin" -c 'import sys; print(sys.executable)')
+
+if [ -z "${GITHUB_ENV:-}" ]; then
+  echo "GITHUB_ENV is not set." >&2
+  exit 1
+fi
+
+{
+  echo "PYTHON=$resolved_python"
+  echo "npm_config_python=$resolved_python"
+} >>"$GITHUB_ENV"
