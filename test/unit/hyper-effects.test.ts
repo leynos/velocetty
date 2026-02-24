@@ -25,11 +25,19 @@ type RpcWindow = Window & {
   focusActiveTerm?: (uid?: string) => void;
 };
 
-/**
- * Hyper component type derived from the container export.
- */
-type HyperComponent = typeof import('../../lib/containers/hyper').default;
-type HyperProps = React.ComponentProps<HyperComponent>;
+type HyperProps = {
+  activeSession: string | null;
+  backgroundColor: string;
+  borderColor: string;
+  customCSS: string;
+  execCommand: (...args: unknown[]) => void;
+  fullScreen: boolean;
+  isMac: boolean;
+  lastConfigUpdate: number;
+  maximized: boolean;
+  uiFontFamily: string;
+};
+type HyperComponent = React.ComponentType<HyperProps>;
 
 let Hyper: HyperComponent;
 let registerCalls = 0;
