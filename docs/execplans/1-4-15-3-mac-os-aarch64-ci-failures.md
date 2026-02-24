@@ -243,12 +243,19 @@ Local command validation:
   externally-managed-environment.
 - [x] (2026-02-24 00:00Z) Drafted this ExecPlan with explicit agent-team roles,
   milestones, and gate evidence requirements.
-- [ ] Implement Milestone 1 workflow updates.
+- [x] (2026-02-24 18:41Z) Implemented Milestone 1 workflow updates in
+  `.github/workflows/nodejs.yml` by replacing system-level pip installs with
+  `.github/scripts/setup-node-gyp-python.sh` across CI jobs.
 - [x] (2026-02-24 18:39Z) Implemented Milestone 2 documentation updates:
   refreshed `docs/developers-guide.md` with CI Python/node-gyp virtual
   environment practice and marked the macOS aarch64 `1.4.15` roadmap sub-item
   done.
-- [ ] Run required local gate stack and collect `/tmp` logs.
+- [x] (2026-02-24 18:50Z) Ran required local gates with `tee` logs:
+  `/tmp/bun-install-velocetty-1-4-15-3-mac-os-aarch64-ci-failures.out`,
+  `/tmp/build-velocetty-1-4-15-3-mac-os-aarch64-ci-failures.out`,
+  `/tmp/check-fmt-velocetty-1-4-15-3-mac-os-aarch64-ci-failures.out`,
+  `/tmp/lint-velocetty-1-4-15-3-mac-os-aarch64-ci-failures.out`, and
+  `/tmp/test-velocetty-1-4-15-3-mac-os-aarch64-ci-failures.out`.
 - [ ] Validate macOS CI lane success and capture run evidence.
 - [ ] Finalise outcomes and retrospective.
 
@@ -302,12 +309,19 @@ Implementation is in progress.
 
 Current outcomes:
 
+- Updated `.github/workflows/nodejs.yml` to use a PEP 668-safe Python bootstrap
+  helper in all CI jobs that prepare node-gyp tooling.
+- Added `.github/scripts/setup-node-gyp-python.sh` to create an isolated virtual
+  environment, install `pip`/`setuptools`/`packaging`, and export
+  `PYTHON`/`npm_config_python` through `GITHUB_ENV`.
 - Updated `docs/developers-guide.md` with the CI Python/node-gyp virtual
   environment bootstrap practice to avoid macOS PEP 668 failures.
 - Updated `docs/roadmap.md` to mark the macOS aarch64 `1.4.15` sub-item as
   done while leaving Windows-related checklist items unchanged.
 - Updated this ExecPlan status, progress, and decision records to reflect
   active implementation.
+- Completed required local gates successfully:
+  `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`.
 
 Remaining closure criteria:
 
