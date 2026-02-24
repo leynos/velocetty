@@ -55,6 +55,7 @@ beforeEach(() => {
 });
 
 afterAll(() => {
+  mock.restore();
   removeSync(workspaceRoot);
 });
 
