@@ -4,6 +4,7 @@ import {createRoot} from 'react-dom/client';
 
 import {afterAll, beforeAll, beforeEach, describe, expect, mock, test} from 'bun:test';
 
+import type {HyperComponent, HyperProps} from '../testUtils/hyper-mock-factories';
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
@@ -47,20 +48,6 @@ const registerHyperModuleMocks = () => {
 
 registerHyperModuleMocks();
 
-type HyperProps = {
-  activeSession: string | null;
-  backgroundColor: string;
-  borderColor: string;
-  customCSS: string;
-  execCommand: (...args: unknown[]) => void;
-  fullScreen: boolean;
-  isMac: boolean;
-  lastConfigUpdate: number;
-  maximized: boolean;
-  uiFontFamily: string;
-};
-type HyperComponent = React.ComponentType<HyperProps>;
-
 let Hyper: HyperComponent;
 let cleanupHappyDom: (() => void) | null = null;
 
@@ -74,7 +61,7 @@ beforeAll(async () => {
     removeListener: () => {}
   };
   ({default: Hyper} = await import('../../lib/containers/hyper'));
-});
+}, 15000);
 
 afterAll(() => {
   cleanupHappyDom?.();

@@ -55,6 +55,7 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
+  mock.restore();
   cleanupHappyDom?.();
   cleanupHappyDom = null;
 });

@@ -229,14 +229,14 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   `.github/actions/install-linux-e2e-runtime-deps/action.yml` so fast-lane and
   deep-lane jobs stay in sync.
 - Before running `bun install` on Linux aarch64 CI lanes, provision
-  `qemu-x86_64`, add the `amd64` dpkg architecture, and install the required
+  `qemu-x86_64-static`, add the `amd64` dpkg architecture, and install the required
   x86_64 runtime libraries (`libc6`, `libstdc++6`, `libglib2.0-0`,
   `libexpat1`, and `libpcre2-8-0`) so Electron's x64 `mksnapshot` and
   `v8_context_snapshot_generator` binaries can run.
 - On Ubuntu arm runners that default to `ports.ubuntu.com`, use explicit apt
   source entries (`ports` for `arm64` and `archive.ubuntu.com` plus
   `security.ubuntu.com` for `amd64`) before installing `:amd64` packages.
-  Otherwise apt tries to resolve `amd64` indexes from `ports` and fails with
+  Otherwise, apt tries to resolve `amd64` indexes from `ports` and fails with
   `404 Not Found`. Keep this source pinning for all later apt invocations in
   the same job after adding `amd64`; the Linux dependency installation action
   now applies it automatically when it detects an Ubuntu arm64 host with

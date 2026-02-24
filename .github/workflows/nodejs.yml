@@ -224,7 +224,7 @@ jobs:
       - name: Run build gate
         run: bun run build
       - name: Rebuild node-pty
-        run: npm run rebuild-node-pty
+        run: bun run rebuild-node-pty
         env:
           npm_config_node_gyp: ${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
       - name: Generate arm64 V8 snapshots

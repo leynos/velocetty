@@ -7,7 +7,7 @@ requires QEMU user emulation plus an x86_64 sysroot.
 
 ## Prerequisites
 
-- QEMU user emulation providing `qemu-x86_64` in the `PATH`.
+- QEMU user emulation providing `qemu-x86_64-static` in the `PATH`.
 - An x86_64 sysroot that contains the dynamic loader and standard C++ runtime.
 
 On Fedora aarch64, the default repositories do not provide x86_64 runtime
@@ -15,7 +15,7 @@ packages, so a sysroot must be supplied separately.
 
 ## Option A: Package-backed sysroot (recommended for CI)
 
-On Ubuntu/Debian hosts, install amd64 runtime libraries directly into the
+On Ubuntu 22.04 (Jammy) hosts, install amd64 runtime libraries directly into the
 multiarch rootfs:
 
 ```bash
@@ -53,7 +53,7 @@ Verify the emulator and loader:
 
 ```bash
 test -x /usr/bin/qemu-x86_64-static
-ls /lib64/ld-linux-x86-64.so.2
+test -f /lib64/ld-linux-x86-64.so.2 || test -f /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
 ```
 
 ## Option B: Container-backed sysroot (Fedora fallback)
@@ -115,19 +115,19 @@ bun node_modules/concurrently/dist/bin/concurrently.js --help
 
 ## Troubleshooting
 
-### `qemu-x86_64: Could not open '/lib64/ld-linux-x86-64.so.2'`
+### `qemu-x86_64-static: Could not open '/lib64/ld-linux-x86-64.so.2'`
 
 The sysroot is missing the loader, or QEMU is not pointed at it. Ensure the
 loader exists and export `QEMU_LD_PREFIX` to the sysroot path.
 
-### `qemu-x86_64` not found
+### `qemu-x86_64-static` not found
 
 Install QEMU user emulation for the distribution, or ensure the
-distribution-provided `qemu-x86_64` binary is on `PATH`.
+distribution-provided `qemu-x86_64-static` binary is on `PATH`.
 
 ### `E: Unable to locate package ...:amd64`
 
-This distribution does not provide Debian multiarch runtime packages. Use
+If the distribution does not provide Debian multiarch runtime packages, use
 Option B and set `QEMU_LD_PREFIX` to the exported x86_64 sysroot path.
 
 ### `E: Unable to locate package libasound2t64`

@@ -93,7 +93,9 @@ Success is observable when:
 - [x] (2026-02-23 00:00Z) Added Linux aarch64 CI bootstrap for x64 snapshot
   emulation (`qemu-user-static` plus `QEMU_LD_PREFIX` sysroot export).
 - [x] (2026-02-23 00:00Z) Replaced slow container-export sysroot bootstrap with
-  cross-runtime packages (`libc6-amd64-cross`, `libstdc++6-amd64-cross`).
+  Ubuntu mixed-arch runtime provisioning (`libc6:amd64`, `libstdc++6:amd64`,
+  `libgcc-s1:amd64`, `libglib2.0-0:amd64`, `libexpat1:amd64`, and
+  `libpcre2-8-0:amd64`) plus pinned per-architecture apt sources.
 - [x] (2026-02-23 00:00Z) Added `SKIP_X64_V8_SNAPSHOT=1` support and set it in
   the Linux aarch64 install gate to avoid redundant x64 snapshot generation in
   arm64-only packaging lanes.
@@ -134,8 +136,8 @@ Success is observable when:
 - Observation: native Linux aarch64 `bun install` still fails without the
   documented x64 snapshot prerequisites.
   Evidence: the install path runs `v8-snapshot` for x64 and arm64, and x64
-  snapshot execution on arm64 requires `qemu-x86_64` plus a sysroot containing
-  `ld-linux-x86-64.so.2`.
+  snapshot execution on arm64 requires `qemu-x86_64-static` plus a sysroot
+  containing `ld-linux-x86-64.so.2`.
   Impact: the Linux aarch64 lane must prepare `qemu-user-static` and export
   `QEMU_LD_PREFIX` before running install.
 - Observation: Linux aarch64 `Install` can remain in progress for hours because
@@ -151,8 +153,7 @@ Success is observable when:
   Evidence: GitHub Actions run `22315578120` failed in `Install` with status
   `127` while running `bun run mk-snapshot`.
   Impact: Linux aarch64 lanes need amd64 multiarch runtime libraries available
-  in the QEMU loader path, not only glibc/libstdc++ cross-runtime sysroot
-  packages.
+  in the QEMU loader path, not only a minimal glibc/libstdc++ package set.
 - Observation: adding amd64 architecture on the runner triggered apt index
   fetches against `ports.ubuntu.com` for amd64, which return `404 Not Found`.
   Evidence: CI logs show repeated failures for
@@ -207,7 +208,8 @@ Success is observable when:
   build, lint, and test, not just packaging.
   Date/Author: 2026-02-23 / Codex
 - Decision: bootstrap x64 snapshot emulation in the Linux aarch64 lane before
-  install by preparing `qemu-user-static` and an x86_64 cross-runtime sysroot.
+  install by preparing `qemu-user-static`, enabling dpkg `amd64`, and
+  provisioning required `:amd64` runtime libraries.
   Rationale: this matches documented aarch64 snapshot requirements and unblocks
   the install gate on native ARM runners.
   Date/Author: 2026-02-23 / Codex
@@ -220,8 +222,9 @@ Success is observable when:
 - Decision: provision x86_64 runtime libraries via dpkg multiarch (`amd64`) and
   set `QEMU_LD_PREFIX=/` in the Linux aarch64 lane.
   Rationale: `v8_context_snapshot_generator` dynamically links against glib and
-  related libraries that are not present in the previous minimal cross-runtime
-  sysroot path.
+  related libraries, so the lane installs `libc6:amd64`, `libstdc++6:amd64`,
+  `libgcc-s1:amd64`, `libglib2.0-0:amd64`, `libexpat1:amd64`, and
+  `libpcre2-8-0:amd64` with pinned per-architecture apt sources.
   Date/Author: 2026-02-23 / Codex
 - Decision: use an explicit temporary apt source list in Linux aarch64
   bootstrap with `ports.ubuntu.com` limited to `arm64` and
@@ -278,10 +281,12 @@ Observed outcomes:
 
 - arm7 (`armv7l`) Linux CI lane and arm7 Linux artefact targets were removed.
 - Linux ARM workflow now runs as Linux aarch64 on `ubuntu-22.04-arm`.
-- Linux aarch64 workflow now bootstraps `qemu-x86_64` and `QEMU_LD_PREFIX`
+- Linux aarch64 workflow now bootstraps `qemu-x86_64-static` and `QEMU_LD_PREFIX`
   sysroot setup before `bun install`.
-- Linux aarch64 bootstrap now uses cross-runtime packages rather than container
-  export to avoid very long install times in CI.
+- Linux aarch64 bootstrap now uses `:amd64` multiarch runtime packages
+  (`libc6`, `libstdc++6`, `libgcc-s1`, `libglib2.0-0`, `libexpat1`, and
+  `libpcre2-8-0`) plus pinned per-architecture apt sources rather than
+  container export to avoid very long install times in CI.
 - Linux aarch64 install now skips x64 snapshot generation when the lane targets
   arm64-only artefacts, reducing CI install time and emulation load.
 - Linux aarch64 snapshot bootstrap now installs amd64 multiarch runtime
@@ -442,3 +447,5 @@ Use one log file per gate, for example:
 - `/tmp/check-fmt-velocetty-$(git branch --show-current).out`
 - `/tmp/lint-velocetty-$(git branch --show-current).out`
 - `/tmp/test-velocetty-$(git branch --show-current).out`
+
+Last validated: CI #LAST_VALIDATED_CI on LAST_VALIDATED_DATE
