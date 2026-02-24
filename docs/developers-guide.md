@@ -4,8 +4,8 @@
 
 - Purpose: Summarize local development practices and validation commands for
   the Velocetty repository.
-- Invariants: Keep Makefile targets and validation steps aligned with CI and
-  tooling changes.
+- Invariants: Keep Makefile targets and validation steps aligned with
+  Continuous Integration (CI) and tooling changes.
 - Cross-links: [Testing with Bun](testing-with-bun.md),
   [ADR 001](adr-001-replace-ava-with-bun-test.md),
   [ADR 002](adr-002-replace-webpack-babel-with-esbuild.md), and
@@ -241,13 +241,14 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   the same job after adding `amd64`; the Linux dependency installation action
   now applies it automatically when it detects an Ubuntu arm64 host with
   `amd64` multiarch enabled.
-- The shared Linux dependency installation action resolves the ALSA runtime
-  package by availability (`libasound2t64` on newer Ubuntu releases,
+- The shared Linux dependency installation action resolves the
+  Advanced Linux Sound Architecture (ALSA) runtime package by availability
+  (`libasound2t64` on newer Ubuntu releases,
   `libasound2` on Ubuntu 22.04) so the same workflow configuration works across
   Jammy and Noble runners.
 - After provisioning amd64 runtime packages on Linux aarch64 CI lanes, export
-  `QEMU_LD_PREFIX=/` so QEMU resolves x86_64 shared libraries from the host
-  multiarch rootfs.
+  `QEMU_LD_PREFIX=/` so Quick Emulator (QEMU) resolves x86_64 shared libraries
+  from the host multiarch rootfs.
 - For Linux aarch64 CI lanes, set `SKIP_V8_SNAPSHOT=1` during `bun install` so
   snapshot generation cannot stall install for hours under emulation.
 - For Linux aarch64 CI lanes that run a dedicated `node-pty` rebuild step after
