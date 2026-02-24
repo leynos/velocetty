@@ -2,6 +2,7 @@
 import {afterAll, beforeAll, beforeEach, describe, expect, mock, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
+import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
 
 const {transportMock, resetTransportMock} = createTransportMock();
@@ -42,15 +43,7 @@ mock.module('xterm-addon-webgl', () => ({WebglAddon: class {}}));
 mock.module('xterm/css/xterm.css', () => ({}));
 mock.module('../../lib/terms', () => ({default: {}}));
 mock.module('../../lib/utils/paste', () => ({default: () => null}));
-const createPluginsMock = () => ({
-  decorate: (Component: unknown) => Component,
-  connect: () => (Component: unknown) => Component,
-  getTabProps: (_tab: unknown, _parentProps: unknown, props: unknown) => props,
-  subscribeTabDecorationUpdates: () => () => {}
-});
-
-mock.module('../../lib/utils/plugins', createPluginsMock);
-mock.module('../../lib/utils/plugins.ts', createPluginsMock);
+registerPluginsModuleMocks();
 mock.module('../../lib/components/searchBox', () => ({default: () => null}));
 
 let Term: typeof import('../../lib/components/term').default;

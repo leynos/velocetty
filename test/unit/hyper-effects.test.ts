@@ -5,6 +5,7 @@ import {createRoot} from 'react-dom/client';
 import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
+import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
 import {waitFor} from '../testUtils/waitFor';
 
@@ -98,18 +99,6 @@ const buildRpcWindowStub = () => {
   return {rpcWindow};
 };
 
-const createPluginExports = () => ({
-  connect: () => (Component: React.ComponentType<unknown>) => Component,
-  decorate: (Component: React.ComponentType<unknown>) => Component,
-  getTabProps: (_tab: unknown, _parentProps: unknown, props: unknown) => props,
-  subscribeTabDecorationUpdates: () => () => {}
-});
-
-const pluginModuleFactory = () => {
-  const pluginExports = createPluginExports();
-  return {...pluginExports, default: pluginExports};
-};
-
 const registerHyperModuleMocks = () => {
   // Re-register before importing Hyper to keep this suite stable if another
   // file calls mock.restore() earlier in the same Bun process.
@@ -118,8 +107,7 @@ const registerHyperModuleMocks = () => {
     execCommand: () => ({type: 'exec'}),
     setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'})
   }));
-  mock.module('../../lib/utils/plugins', pluginModuleFactory);
-  mock.module('../../lib/utils/plugins.ts', pluginModuleFactory);
+  registerPluginsModuleMocks({}, {defaultExportMode: 'self'});
   mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));
   mock.module('../../lib/containers/notifications', () => ({default: () => null}));
   mock.module('../../lib/containers/terms', () => ({

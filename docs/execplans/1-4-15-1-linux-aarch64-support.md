@@ -115,6 +115,9 @@ Success is observable when:
   without the `.ts` suffix) in the affected unit suites so Bun's aarch64
   loader always observes the fake `connect` export and the transport/decoration
   tests pass locally.
+- [x] (2026-02-24 13:00Z) Addressed follow-up review comments by extracting
+  mixed-arch apt source generation into a shared CI script and factoring plugin
+  mock module setup into a shared unit-test helper.
 
 ## Surprises & discoveries
 
@@ -244,6 +247,17 @@ Success is observable when:
   Rationale: Bun's Linux aarch64 resolver canonicalizes the import as
   `lib/utils/plugins.ts`, so the previous mock targets were skipped and the
   real module triggered the `connect` export error.
+  Date/Author: 2026-02-24 / Codex
+- Decision: centralize Ubuntu arm64 mixed-arch apt source list generation in
+  `.github/scripts/configure-ubuntu-mixed-arch-apt-sources.sh` and call it from
+  both the workflow bootstrap and shared Linux dependency action.
+  Rationale: avoids drift between duplicated source-list blocks when mirrors or
+  codename handling change.
+  Date/Author: 2026-02-24 / Codex
+- Decision: factor repeated plugin module mock wiring into
+  `test/testUtils/plugins-mock.ts`.
+  Rationale: keeps Bun path-mocking behavior consistent across the Hyper and
+  renderer unit suites and reduces duplicated `createPluginExports` factories.
   Date/Author: 2026-02-24 / Codex
 
 ## Outcomes & Retrospective

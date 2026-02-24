@@ -127,7 +127,7 @@ distribution-provided `qemu-x86_64` binary is on `PATH`.
 
 ### `E: Unable to locate package ...:amd64`
 
-Your distribution does not provide Debian multiarch runtime packages. Use
+This distribution does not provide Debian multiarch runtime packages. Use
 Option B and set `QEMU_LD_PREFIX` to the exported x86_64 sysroot path.
 
 ### `E: Unable to locate package libasound2t64`

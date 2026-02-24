@@ -187,22 +187,14 @@ jobs:
         run: |
           set -euo pipefail
           sudo dpkg --add-architecture amd64
-          cat <<'EOF' | sudo tee /tmp/velocetty-aarch64-bootstrap.sources.list >/dev/null
-          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
-          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
-          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse
-          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
-          deb [arch=amd64] http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
-          deb [arch=amd64] http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
-          deb [arch=amd64] http://archive.ubuntu.com/ubuntu jammy-backports main restricted universe multiverse
-          deb [arch=amd64] http://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
-          EOF
+          mixed_arch_sources=/tmp/velocetty-aarch64-bootstrap.sources.list
+          bash .github/scripts/configure-ubuntu-mixed-arch-apt-sources.sh "$mixed_arch_sources"
           sudo apt-get \
-            -o Dir::Etc::sourcelist=/tmp/velocetty-aarch64-bootstrap.sources.list \
+            -o Dir::Etc::sourcelist="$mixed_arch_sources" \
             -o Dir::Etc::sourceparts=- \
             update
           sudo apt-get \
-            -o Dir::Etc::sourcelist=/tmp/velocetty-aarch64-bootstrap.sources.list \
+            -o Dir::Etc::sourcelist="$mixed_arch_sources" \
             -o Dir::Etc::sourceparts=- \
             install -y --no-install-recommends \
             qemu-user-static \
