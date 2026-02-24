@@ -25,9 +25,11 @@ const registryUrl = () => 'https://registry.npmjs.org/';
 mock.module('got', () => ({default: gotMock}));
 mock.module('registry-url', () => ({default: registryUrl}));
 
+const CLI_API_IMPORT_TIMEOUT_MS = 15_000;
+
 beforeAll(async () => {
   ({existsOnNpm} = await import('../../cli/api'));
-});
+}, CLI_API_IMPORT_TIMEOUT_MS);
 
 beforeEach(() => {
   getUrl = '';
