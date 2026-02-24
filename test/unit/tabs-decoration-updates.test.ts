@@ -18,14 +18,17 @@ const unsubscribeDecorationUpdates = mock(() => {
 });
 let decorationListener: (() => void) | null = null;
 
-mock.module('../../lib/utils/plugins', () => ({
+const createPluginsMock = () => ({
   decorate: (Component: React.ComponentType<unknown>) => Component,
   getTabProps: (tab: unknown, parentProps: unknown, props: unknown) => getTabPropsMock(tab, parentProps, props),
   subscribeTabDecorationUpdates: (listener: () => void) => {
     decorationListener = listener;
     return unsubscribeDecorationUpdates;
   }
-}));
+});
+
+mock.module('../../lib/utils/plugins', createPluginsMock);
+mock.module('../../lib/utils/plugins.ts', createPluginsMock);
 
 mock.module('../../lib/components/new-tab', () => ({
   default: () => null

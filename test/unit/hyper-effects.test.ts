@@ -97,12 +97,20 @@ mock.module('../../lib/actions/ui', () => ({
   setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'})
 }));
 
-mock.module('../../lib/utils/plugins', () => ({
+const createPluginExports = () => ({
   connect: () => (Component: React.ComponentType<unknown>) => Component,
   decorate: (Component: React.ComponentType<unknown>) => Component,
   getTabProps: (_tab: unknown, _parentProps: unknown, props: unknown) => props,
   subscribeTabDecorationUpdates: () => () => {}
-}));
+});
+
+const pluginModuleFactory = () => {
+  const pluginExports = createPluginExports();
+  return {...pluginExports, default: pluginExports};
+};
+
+mock.module('../../lib/utils/plugins', pluginModuleFactory);
+mock.module('../../lib/utils/plugins.ts', pluginModuleFactory);
 
 mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));
 mock.module('../../lib/containers/notifications', () => ({default: () => null}));

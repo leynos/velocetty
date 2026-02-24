@@ -158,13 +158,16 @@ if (!shouldRunBootstrapTransportIntegration) {
   }));
   mock.module('../../lib/containers/hyper', () => ({default: () => null}));
   const pluginsReloadMock = mock(() => {});
-  mock.module('../../lib/utils/plugins', () => ({
+  const createPluginsMock = () => ({
     connect: () => (Component: unknown) => Component,
     default: {},
     getTabProps: (_tab: unknown, _parentProps: unknown, props: unknown) => props,
     reload: pluginsReloadMock,
     subscribeTabDecorationUpdates: () => () => {}
-  }));
+  });
+
+  mock.module('../../lib/utils/plugins', createPluginsMock);
+  mock.module('../../lib/utils/plugins.ts', createPluginsMock);
 
   let importCounter = 0;
   let cleanupHappyDom: (() => void) | null = null;
