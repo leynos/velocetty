@@ -111,6 +111,10 @@ Success is observable when:
 - [x] (2026-02-23 00:00Z) Added runtime package variant detection in the shared
   Linux dependency action so Ubuntu Jammy runners install `libasound2` when
   `libasound2t64` is unavailable.
+- [x] (2026-02-24 12:00Z) Added dual mocks for `lib/utils/plugins` (with and
+  without the `.ts` suffix) in the affected unit suites so Bun's aarch64
+  loader always observes the fake `connect` export and the transport/decoration
+  tests pass locally.
 
 ## Surprises & discoveries
 
@@ -168,6 +172,14 @@ Success is observable when:
   update success followed by package resolution failure on `libasound2t64`.
   Impact: runtime package naming differs across Ubuntu releases, so static
   package names are not reliable for shared Linux dependency steps.
+- Observation: Bun's TypeScript resolver on Linux aarch64 canonicalizes the
+  renderer `lib/utils/plugins` import as `lib/utils/plugins.ts`, so mocks that
+  only matched the extensionless spec were skipped and the real plugin module
+  loaded, triggering the `connect` export failure reported in CI.
+  Evidence: the aarch64 job logged `SyntaxError: Export named 'connect' not found
+  in module lib/utils/plugins.ts` even though the stub exports `connect`.
+  Impact: register mocks for both path forms to guarantee the fake exports on
+  every architecture.
 
 ## Decision Log
 
@@ -227,6 +239,12 @@ Success is observable when:
   Rationale: preserves one CI action implementation across Jammy and Noble
   without per-runner forks.
   Date/Author: 2026-02-23 / Codex
+- Decision: register plugin mocks for both the extensionless and `.ts` spec
+  strings in the renderer unit suites.
+  Rationale: Bun's Linux aarch64 resolver canonicalizes the import as
+  `lib/utils/plugins.ts`, so the previous mock targets were skipped and the
+  real module triggered the `connect` export error.
+  Date/Author: 2026-02-24 / Codex
 
 ## Outcomes & Retrospective
 
@@ -262,6 +280,9 @@ Observed outcomes:
 - `docs/developers-guide.md` now records Linux aarch64 runtime-alignment and CI
   practice.
 - `docs/roadmap.md` Linux-specific `1.4.15` checklist items are marked done.
+- Unit suites now mock `lib/utils/plugins` for both extensionless and `.ts`
+  import specifiers so Bun's Linux aarch64 loader always sees the fake
+  `connect` export.
 
 Validation command evidence (local):
 
