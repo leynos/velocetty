@@ -12,7 +12,12 @@ else
   exit 1
 fi
 
-"$python_cmd" -m venv "$venv_dir"
+if ! "$python_cmd" -m venv "$venv_dir"; then
+  echo "Failed to create Python virtual environment at \"$venv_dir\"." >&2
+  echo "Command: $python_cmd -m venv \"$venv_dir\"" >&2
+  echo "Ensure the Python 'venv' module is installed (for Debian/Ubuntu, install python3-venv)." >&2
+  exit 1
+fi
 
 python_bin="$venv_dir/bin/python"
 if [ ! -x "$python_bin" ]; then

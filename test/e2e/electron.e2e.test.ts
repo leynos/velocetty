@@ -6,6 +6,7 @@
  */
 // Native
 import {spawn} from 'node:child_process';
+import {performance} from 'node:perf_hooks';
 
 // Packages
 import {expect, test} from 'bun:test';
@@ -172,6 +173,19 @@ const waitForStability = async (durationMs: number) =>
     durationMs + 100
   );
 
+const resolveMacCiFallbackStabilityMs = (launchStartedAtMs: number) => {
+  const elapsedMs = performance.now() - launchStartedAtMs;
+  const remainingBudgetMs = e2eTimeoutMs - elapsedMs - spawnStabilityTimeoutMs - e2eTimeoutHeadroomMs;
+  if (remainingBudgetMs <= 0) {
+    return {fallbackStabilityMs: 0, remainingBudgetMs: 0};
+  }
+
+  return {
+    fallbackStabilityMs: Math.min(macCiFallbackStabilityTimeoutMs, remainingBudgetMs),
+    remainingBudgetMs
+  };
+};
+
 interface DiagnosticContext {
   spawned: ReturnType<typeof spawn> | null;
   outputTracker: ReturnType<typeof createSpawnOutputTracker>;
@@ -286,7 +300,7 @@ const launchWithSpawn = async (
   outputTracker: ReturnType<typeof createSpawnOutputTracker>,
   log: (message: string) => void
 ) => {
-  const launchStartedAtMs = Date.now();
+  const launchStartedAtMs = performance.now();
   const spawned = spawn(pathToBinary, launchArgs, {
     env: isolatedEnvironment.env,
     stdio: ['ignore', 'pipe', 'pipe']
@@ -300,16 +314,19 @@ const launchWithSpawn = async (
   } catch (error) {
     if (isCiEnvironment && process.platform === 'darwin' && spawned.exitCode == null) {
       const markerError = error instanceof Error ? error.message : String(error);
-      const elapsedMs = Date.now() - launchStartedAtMs;
-      const remainingBudgetMs = e2eTimeoutMs - elapsedMs - spawnStabilityTimeoutMs - e2eTimeoutHeadroomMs;
-      const boundedFallbackStabilityMs = Math.max(0, Math.min(macCiFallbackStabilityTimeoutMs, remainingBudgetMs));
-      log(
-        `Packaged macOS CI launch did not emit [e2e] renderer-ready after ${rendererReadyTimeoutMs}ms; ` +
-          `continuing after fallback stability check (${markerError}). ` +
-          `fallback=${boundedFallbackStabilityMs}ms remainingBudget=${Math.max(0, Math.floor(remainingBudgetMs))}ms`
-      );
-      if (boundedFallbackStabilityMs > 0) {
-        await waitForStability(boundedFallbackStabilityMs);
+      const {fallbackStabilityMs, remainingBudgetMs} = resolveMacCiFallbackStabilityMs(launchStartedAtMs);
+      if (fallbackStabilityMs <= 0) {
+        log(
+          `Packaged macOS CI launch did not emit [e2e] renderer-ready after ${rendererReadyTimeoutMs}ms; ` +
+            `skipping fallback stability check because timeout budget is exhausted (${markerError}).`
+        );
+      } else {
+        log(
+          `Packaged macOS CI launch did not emit [e2e] renderer-ready after ${rendererReadyTimeoutMs}ms; ` +
+            `continuing after fallback stability check (${markerError}). ` +
+            `fallback=${Math.floor(fallbackStabilityMs)}ms remainingBudget=${Math.max(0, Math.floor(remainingBudgetMs))}ms`
+        );
+        await waitForStability(fallbackStabilityMs);
       }
     } else {
       throw new Error(buildPackagedTimeoutDiagnostics(spawned, outputTracker, rendererReadyTimeoutMs, error));

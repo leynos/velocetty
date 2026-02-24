@@ -13,13 +13,15 @@ Implementation is in progress as of 2026-02-24.
 
 ## Purpose / big picture
 
-Roadmap item `1.4.15` requires reliable cross-architecture CI on host platforms.
+Roadmap item `1.4.15` requires reliable cross-architecture continuous
+integration (CI) on host platforms.
 The Linux aarch64 scope is already complete, and this plan tracks the macOS
 aarch64 closure work recorded in `docs/roadmap.md`.
 
 The current macOS failure happens before install/build/lint/test gates run:
 `.github/workflows/nodejs.yml` executes `python3 -m pip install packaging
-setuptools`, and `macos-latest` now rejects this with PEP 668
+setuptools`, and `macos-latest` now rejects this with Python Enhancement
+Proposal (PEP) 668
 (`externally-managed-environment`).
 
 After this plan is implemented, success is observable when:
@@ -52,8 +54,9 @@ Primary references and why they matter:
 
 - `docs/roadmap.md` (`1.4.15`): defines the exact macOS checklist and success
   criteria wording.
-- `docs/adr-004-update-electron-40.md` (Phase 3): requires Electron 40
-  validation, including macOS packaging verification.
+- `docs/adr-004-update-electron-40.md` (Architecture Decision Record (ADR) 004,
+  Phase 3): requires Electron 40 validation, including macOS packaging
+  verification.
 - `docs/developers-guide.md` (Electron runtime alignment): defines required
   alignment between Electron, Node, native rebuild tooling, and CI settings.
 - `docs/velocetty-hyper-codebase.md`: records CI architecture intent (matrix
@@ -346,7 +349,7 @@ Local command validation:
 
 - Decision: move this ExecPlan to `Status: IN PROGRESS` and keep the living
   sections current during implementation.
-  Rationale: implementation work is now authorized and underway for this branch.
+  Rationale: implementation work is now authorised and underway for this branch.
   Date/author: 2026-02-24 / Codex
 
 - Decision: target the Python bootstrap step instead of introducing broad build
