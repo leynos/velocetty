@@ -404,9 +404,10 @@ Fast lane (required on pull requests):
 - Run `bun run test:e2e:fast` (or `bun run test:e2e`).
 - Executes Bun-driven smoke checks in `test/e2e/`.
 - Asserts renderer readiness and fails on critical renderer console errors.
-- Supports `E2E_DRIVER=playwright|spawn` overrides; CI defaults to Playwright
-  driver mode on macOS (spawn-mode markers can be absent there) and spawn-mode
-  markers on other platforms to gate renderer readiness and renderer errors.
+- Supports `E2E_DRIVER=playwright|spawn` overrides; CI defaults to spawn-mode
+  markers, with a macOS packaged-launch fallback that accepts missing
+  renderer-ready marker output only when the process remains alive through an
+  additional stability window.
 - Supports `E2E_DEBUG=1` for verbose launch logs and `E2E_CAPTURE=1` for
   screenshot capture.
 

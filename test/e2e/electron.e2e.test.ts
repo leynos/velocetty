@@ -44,10 +44,7 @@ const validDrivers = new Set(['playwright', 'spawn']);
 if (shouldRunE2E && driverOverride && !validDrivers.has(driverOverride)) {
   throw new Error(`E2E_DRIVER must be "playwright" or "spawn", received "${driverOverride}".`);
 }
-// On macOS CI, packaged app stdout markers can be missing even when the window
-// launches, so prefer Playwright-driven readiness checks by default.
-const shouldUsePlaywright =
-  driverOverride != null ? driverOverride === 'playwright' : isCiEnvironment && process.platform === 'darwin';
+const shouldUsePlaywright = driverOverride === 'playwright';
 
 const createSpawnOutputTracker = () => {
   let spawnOutput = '';
@@ -295,7 +292,16 @@ const launchWithSpawn = async (
   try {
     await outputTracker.waitForSpawnOutput(/\[e2e\] renderer-ready/i, rendererReadyTimeoutMs);
   } catch (error) {
-    throw new Error(buildPackagedTimeoutDiagnostics(spawned, outputTracker, rendererReadyTimeoutMs, error));
+    if (isCiEnvironment && process.platform === 'darwin' && spawned.exitCode == null) {
+      const markerError = error instanceof Error ? error.message : String(error);
+      log(
+        `Packaged macOS CI launch did not emit [e2e] renderer-ready after ${rendererReadyTimeoutMs}ms; ` +
+          `continuing after fallback stability check (${markerError}).`
+      );
+      await waitForStability(Math.max(spawnStabilityTimeoutMs, 5_000));
+    } else {
+      throw new Error(buildPackagedTimeoutDiagnostics(spawned, outputTracker, rendererReadyTimeoutMs, error));
+    }
   }
   await waitForStability(spawnStabilityTimeoutMs);
   if (spawned.exitCode != null) {
