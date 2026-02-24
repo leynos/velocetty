@@ -2,6 +2,10 @@ import {spawnSync} from 'node:child_process';
 
 import {normaliseArch} from './shared/arch.js';
 
+function shouldSkipAllSnapshots() {
+  return process.env.SKIP_V8_SNAPSHOT === '1';
+}
+
 function resolveTargetArchitectures() {
   const hostArch = normaliseArch(process.arch);
   const isArm64Host = hostArch === 'arm64';
@@ -32,6 +36,10 @@ function runSnapshotForArch(arch) {
   }
 }
 
-for (const arch of resolveTargetArchitectures()) {
-  runSnapshotForArch(arch);
+if (shouldSkipAllSnapshots()) {
+  console.log('Skipping V8 snapshot generation because SKIP_V8_SNAPSHOT=1.');
+} else {
+  for (const arch of resolveTargetArchitectures()) {
+    runSnapshotForArch(arch);
+  }
 }

@@ -84,9 +84,15 @@ For the full postinstall chain, run:
 bun run postinstall
 ```
 
-For Linux aarch64 lanes that package only arm64 artefacts, set
-`SKIP_X64_V8_SNAPSHOT=1` during `bun install` to skip the additional x64
-snapshot pass:
+For Linux aarch64 CI lanes, set `SKIP_V8_SNAPSHOT=1` during `bun install` to
+skip snapshot generation entirely and avoid long-running snapshot emulation:
+
+```bash
+SKIP_V8_SNAPSHOT=1 bun install
+```
+
+For local Linux aarch64 validation where arm64 snapshots are still required,
+set `SKIP_X64_V8_SNAPSHOT=1` so only the arm64 snapshot pass runs:
 
 ```bash
 SKIP_X64_V8_SNAPSHOT=1 bun install
@@ -132,6 +138,11 @@ The apt source configuration is querying Ubuntu ports for amd64 indexes. Keep
 this split for subsequent apt commands in the same job. In repository CI, the
 shared `.github/actions/install-linux-e2e-runtime-deps` action now applies the
 same mixed-source configuration automatically on Ubuntu arm64 runners.
+
+### `bun install` stalls for hours in `bun run v8-snapshot`
+
+Use `SKIP_V8_SNAPSHOT=1` for Linux aarch64 CI installs. This bypasses snapshot
+generation in postinstall and avoids long-running emulated snapshot steps.
 
 ### Bundler command errors
 

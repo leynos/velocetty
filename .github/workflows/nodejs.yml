@@ -219,6 +219,7 @@ jobs:
         run: bun install
         env:
           npm_config_node_gyp: ${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
+          SKIP_V8_SNAPSHOT: '1'
           SKIP_X64_V8_SNAPSHOT: '1'
       - name: Install Linux build and E2E runtime deps
         uses: ./.github/actions/install-linux-e2e-runtime-deps

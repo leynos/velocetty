@@ -106,6 +106,8 @@ Success is observable when:
 - [x] (2026-02-23 00:00Z) Extended mixed-architecture apt source pinning into
   the shared `install-linux-e2e-runtime-deps` action so downstream package
   installation stays reliable after adding `amd64` on arm64 runners.
+- [x] (2026-02-23 00:00Z) Added CI-level snapshot skip for Linux aarch64
+  installs (`SKIP_V8_SNAPSHOT=1`) to prevent multi-hour stalls in postinstall.
 
 ## Surprises & discoveries
 
@@ -150,6 +152,13 @@ Success is observable when:
   failed with `E: Failed to fetch ... binary-amd64/Packages`.
   Impact: all apt invocations after enabling foreign architectures must use the
   same per-architecture source mapping.
+- Observation: even with x64 snapshots disabled, Linux aarch64 CI installs can
+  stall for hours in `bun run v8-snapshot` while generating arm64 snapshots.
+  Evidence: CI `Install` step remained stuck at
+  `bun bin/download-mksnapshot.js && bun bin/mk-snapshot.js` until the
+  six-hour job timeout.
+  Impact: arm64 snapshot generation is too expensive/unpredictable for the CI
+  install gate and needs an explicit skip path.
 
 ## Decision Log
 
@@ -197,6 +206,12 @@ Success is observable when:
   Rationale: keeps fast/deep Linux dependency installation aligned with the
   aarch64 bootstrap once `amd64` is enabled, without changing x64 lanes.
   Date/Author: 2026-02-23 / Codex
+- Decision: add `SKIP_V8_SNAPSHOT` support to `bin/run-v8-snapshot.js` and set
+  it in Linux aarch64 CI install.
+  Rationale: makes `bun install` deterministic on aarch64 lanes by bypassing
+  the long-running emulated snapshot phase, while retaining the snapshot flow
+  for non-CI and non-aarch64 contexts.
+  Date/Author: 2026-02-23 / Codex
 
 ## Outcomes & Retrospective
 
@@ -222,6 +237,8 @@ Observed outcomes:
 - Shared Linux runtime dependency installation now reuses mixed-arch source
   pinning on Ubuntu arm64 runners with `amd64` enabled so post-install apt
   updates do not regress with `ports` amd64 404 errors.
+- Linux aarch64 CI `bun install` now sets `SKIP_V8_SNAPSHOT=1`, preventing
+  six-hour stalls in the snapshot generation stage.
 - Linux aarch64 lane now runs install/lint/test/build checks and packages arm64
   Linux artefacts.
 - `docs/developers-guide.md` now records Linux aarch64 runtime-alignment and CI

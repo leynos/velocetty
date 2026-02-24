@@ -244,9 +244,11 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
 - After provisioning amd64 runtime packages on Linux aarch64 CI lanes, export
   `QEMU_LD_PREFIX=/` so QEMU resolves x86_64 shared libraries from the host
   multiarch rootfs.
-- For Linux aarch64 lanes that package only arm64 artefacts, set
-  `SKIP_X64_V8_SNAPSHOT=1` during `bun install` to avoid generating the
-  additional x64 snapshot pass under QEMU.
+- For Linux aarch64 CI lanes, set `SKIP_V8_SNAPSHOT=1` during `bun install` so
+  snapshot generation cannot stall install for hours under emulation.
+- For local Linux aarch64 validation where snapshots are still required, set
+  `SKIP_X64_V8_SNAPSHOT=1` to avoid generating the additional x64 snapshot pass
+  under QEMU.
 - For Linux aarch64 native-module rebuild reliability, run `bun install`
   before other gates and keep `npm_config_node_gyp` pointed at the workspace
   `node-gyp` entrypoint in CI jobs that rebuild native modules.
