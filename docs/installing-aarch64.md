@@ -91,6 +91,14 @@ skip snapshot generation entirely and avoid long-running snapshot emulation:
 SKIP_V8_SNAPSHOT=1 bun install
 ```
 
+If the CI workflow runs a dedicated `bun run rebuild-node-pty` step after
+install, also set `SKIP_NODE_PTY_REBUILD=1` during `bun install` to avoid
+duplicating the native rebuild in postinstall:
+
+```bash
+SKIP_V8_SNAPSHOT=1 SKIP_NODE_PTY_REBUILD=1 bun install
+```
+
 For local Linux aarch64 validation where arm64 snapshots are still required,
 set `SKIP_X64_V8_SNAPSHOT=1` so only the arm64 snapshot pass runs:
 
