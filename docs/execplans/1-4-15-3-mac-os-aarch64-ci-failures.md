@@ -358,8 +358,8 @@ Current outcomes:
 - Updated `.github/workflows/nodejs.yml` to use a PEP 668-safe Python bootstrap
   helper in all CI jobs that prepare node-gyp tooling.
 - Added `.github/scripts/setup-node-gyp-python.sh` to create an isolated virtual
-  environment, install `pip`/`setuptools`/`packaging`, and export
-  `PYTHON`/`npm_config_python` through `GITHUB_ENV`.
+  environment, install `pip`/`setuptools`/`packaging`, and publish the Python
+  interpreter path through workflow step outputs consumed only by install steps.
 - Updated `docs/developers-guide.md` with the CI Python/node-gyp virtual
   environment bootstrap practice to avoid macOS PEP 668 failures.
 - Updated `docs/roadmap.md` to mark the macOS aarch64 `1.4.15` sub-item as
