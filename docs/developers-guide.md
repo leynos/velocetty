@@ -230,9 +230,9 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   deep-lane jobs stay in sync.
 - Before running `bun install` on Linux aarch64 CI lanes, provision
   `qemu-x86_64-static`, add the `amd64` dpkg architecture, and install the required
-  x86_64 runtime libraries (`libc6`, `libstdc++6`, `libglib2.0-0`,
-  `libexpat1`, and `libpcre2-8-0`) so Electron's x64 `mksnapshot` and
-  `v8_context_snapshot_generator` binaries can run.
+  x86_64 runtime libraries (`libc6`, `libstdc++6`, `libgcc-s1`,
+  `libglib2.0-0`, `libexpat1`, and `libpcre2-8-0`) so Electron's x64
+  `mksnapshot` and `v8_context_snapshot_generator` binaries can run.
 - On Ubuntu arm runners that default to `ports.ubuntu.com`, use explicit apt
   source entries (`ports` for `arm64` and `archive.ubuntu.com` plus
   `security.ubuntu.com` for `amd64`) before installing `:amd64` packages.

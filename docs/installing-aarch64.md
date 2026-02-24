@@ -84,7 +84,8 @@ For the full postinstall chain, run:
 bun run postinstall
 ```
 
-For Linux aarch64 CI lanes, set `SKIP_V8_SNAPSHOT=1` during `bun install` to
+For Linux aarch64 Continuous Integration (CI) lanes, set
+`SKIP_V8_SNAPSHOT=1` during `bun install` to
 skip snapshot generation entirely and avoid long-running snapshot emulation:
 
 ```bash
