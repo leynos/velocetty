@@ -259,6 +259,9 @@ Local command validation:
 - [x] (2026-02-24 19:05Z) Addressed Ubuntu lint regression by moving the CI
   node-gyp Python virtual environment under `$RUNNER_TEMP` and adding
   `.node-gyp-python` to `.biomeignore` as a workspace-level safeguard.
+- [x] (2026-02-24 19:30Z) Addressed macOS fast-lane E2E regression by scoping
+  `PYTHON`/`npm_config_python` to `bun install` environments via workflow step
+  outputs instead of exporting them job-wide through `GITHUB_ENV`.
 - [ ] Validate macOS CI lane success and capture run evidence.
 - [ ] Finalise outcomes and retrospective.
 
@@ -288,6 +291,14 @@ Local command validation:
   `.node-gyp-python/lib/python3.12/site-packages/setuptools/...`.
   Impact: CI bootstrap artefacts must be placed outside the workspace or ignored
   by lint tooling.
+- Observation: exporting `PYTHON` and `npm_config_python` through `GITHUB_ENV`
+  made those variables job-global and they were inherited by macOS fast-lane
+  E2E packaged-app runs.
+  Evidence: failing E2E step environment included
+  `PYTHON=/Users/runner/work/_temp/node-gyp-python/bin/python` and
+  `npm_config_python=...`, with packaged launch markers missing before timeout.
+  Impact: node-gyp Python environment variables should be scoped to install/
+  rebuild steps only, not retained for runtime/E2E steps.
 
 ## Decision log
 

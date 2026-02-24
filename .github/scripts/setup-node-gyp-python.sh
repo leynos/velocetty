@@ -28,12 +28,10 @@ fi
 
 resolved_python=$("$python_bin" -c 'import sys; print(sys.executable)')
 
-if [ -z "${GITHUB_ENV:-}" ]; then
-  echo "GITHUB_ENV is not set." >&2
-  exit 1
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  {
+    echo "python=$resolved_python"
+  } >>"$GITHUB_OUTPUT"
+else
+  echo "$resolved_python"
 fi
-
-{
-  echo "PYTHON=$resolved_python"
-  echo "npm_config_python=$resolved_python"
-} >>"$GITHUB_ENV"
