@@ -4,7 +4,7 @@ import {createRoot} from 'react-dom/client';
 
 import {afterAll, beforeAll, beforeEach, describe, expect, mock, test} from 'bun:test';
 
-import type {HyperComponent, HyperProps} from '../testUtils/hyper-mock-factories';
+import type {HyperProps} from '../../typings/hyper';
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
@@ -12,6 +12,11 @@ import {waitFor} from '../testUtils/waitFor';
 
 const {transportMock, resetTransportMock} = createTransportMock();
 
+type HyperComponent = React.ComponentType<HyperProps>;
+
+/**
+ * Register module mocks needed by Hyper transport lifecycle tests.
+ */
 const registerHyperModuleMocks = () => {
   // Re-register before importing Hyper to keep this suite stable if another
   // file calls mock.restore() earlier in the same Bun process.

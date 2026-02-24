@@ -4,7 +4,7 @@ import {createRoot} from 'react-dom/client';
 
 import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
-import type {HyperComponent, HyperProps} from '../testUtils/hyper-mock-factories';
+import type {HyperProps} from '../../typings/hyper';
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
@@ -26,6 +26,8 @@ type RpcWindow = Window & {
   };
   focusActiveTerm?: (uid?: string) => void;
 };
+
+type HyperComponent = React.ComponentType<HyperProps>;
 
 let Hyper: HyperComponent;
 let registerCalls = 0;
@@ -86,6 +88,9 @@ const buildRpcWindowStub = () => {
   return {rpcWindow};
 };
 
+/**
+ * Register module mocks used by Hyper effects tests before loading Hyper.
+ */
 const registerHyperModuleMocks = () => {
   // Re-register before importing Hyper to keep this suite stable if another
   // file calls mock.restore() earlier in the same Bun process.

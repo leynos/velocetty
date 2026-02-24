@@ -1,8 +1,8 @@
-# Restore Linux aarch64 CI reliability
+# Restore Linux aarch64 Continuous Integration (CI) reliability
 
 This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept current as work
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
+`Decision log`, and `Outcomes & retrospective` must be kept current as work
 proceeds.
 
 Status: COMPLETE
@@ -189,7 +189,7 @@ Success is observable when:
   Impact: register mocks for both path forms to guarantee the fake exports on
   every architecture.
 
-## Decision Log
+## Decision log
 
 - Decision: scope this plan to the Linux sub-items of roadmap `1.4.15` only.
   Rationale: user request is specifically Linux aarch64 support and arm7
@@ -199,7 +199,7 @@ Success is observable when:
   Rationale: avoids copy-to-image disk exhaustion and simplifies
   reproducibility.
   Date/Author: 2026-02-23 / Codex
-- Decision: keep this as a draft-only artifact until user approval.
+- Decision: keep this as a draft-only artefact until user approval.
   Rationale: follows ExecPlan approval-gate requirements.
   Date/Author: 2026-02-23 / Codex
 - Decision: include explicit lint/test gates in the Linux aarch64 workflow lane
@@ -272,7 +272,7 @@ Success is observable when:
   `afterPack`, so packaging must regenerate arm64 blobs on fresh CI runners.
   Date/Author: 2026-02-24 / Codex
 
-## Outcomes & Retrospective
+## Outcomes & retrospective
 
 Implemented Linux aarch64 workflow and documentation updates for the Linux
 scope of roadmap `1.4.15`.
@@ -412,7 +412,7 @@ Stage E: Roadmap closure for this slice
    practice.
 4. Update `docs/roadmap.md` to mark Linux `1.4.15` checklist items done.
 5. Run required gates with `tee` logs, resolve failures, then rerun until green.
-6. Update this ExecPlan `Progress`, `Decision Log`, and `Outcomes` sections.
+6. Update this ExecPlan `Progress`, `Decision log`, and `Outcomes` sections.
 
 ## Validation and acceptance
 

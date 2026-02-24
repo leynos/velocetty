@@ -13,7 +13,7 @@ requires QEMU user emulation plus an x86_64 sysroot.
 On Fedora aarch64, the default repositories do not provide x86_64 runtime
 packages, so a sysroot must be supplied separately.
 
-## Option A: Package-backed sysroot (recommended for CI)
+## Option A: package-backed sysroot (recommended for Continuous Integration)
 
 On Ubuntu 22.04 (Jammy) hosts, install amd64 runtime libraries directly into the
 multiarch rootfs:
@@ -56,7 +56,7 @@ test -x /usr/bin/qemu-x86_64-static
 test -f /lib64/ld-linux-x86-64.so.2 || test -f /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
 ```
 
-## Option B: Container-backed sysroot (Fedora fallback)
+## Option B: container-backed sysroot (Fedora fallback)
 
 If cross-runtime packages are unavailable, export an x86_64 rootfs and point
 `QEMU_LD_PREFIX` to it:
