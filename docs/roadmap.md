@@ -121,9 +121,9 @@ Scope notes:
   See [adr-004-update-electron-40.md](adr-004-update-electron-40.md) §Phase 3:
   Electron 40 validation and [developers-guide.md](developers-guide.md)
   §Electron runtime alignment.
-  - [ ] Retire arm7 CI lanes and release artefact targets, and replace required
+  - [x] Retire arm7 CI lanes and release artefact targets, and replace required
     Linux ARM coverage with Linux aarch64.
-  - [ ] Resolve Linux aarch64 CI failures across install, build, lint, and test
+  - [x] Resolve Linux aarch64 CI failures across install, build, lint, and test
     gates.
   - [ ] Resolve macOS aarch64 CI failures across install, build, lint, and test
     gates.

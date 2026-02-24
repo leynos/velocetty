@@ -14,11 +14,78 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        sudo apt-get update
+        apt_options=()
+        host_arch=$(dpkg --print-architecture)
+        if [ "$host_arch" = "arm64" ] \
+          && dpkg --print-foreign-architectures | grep -qx "amd64" \
+          && [ -r /etc/os-release ]; then
+          . /etc/os-release
+          if [ "${ID:-}" = "ubuntu" ]; then
+            mixed_arch_sources="/tmp/velocetty-aarch64-runtime-deps.sources.list"
+            bash "$GITHUB_ACTION_PATH/../../scripts/configure-ubuntu-mixed-arch-apt-sources.sh" "$mixed_arch_sources"
+            apt_options=(
+              -o
+              "Dir::Etc::sourcelist=${mixed_arch_sources}"
+              -o
+              "Dir::Etc::sourceparts=-"
+            )
+            if [ -n "${GITHUB_ENV:-}" ]; then
+              echo "MIXED_ARCH_SOURCES=${mixed_arch_sources}" >> "$GITHUB_ENV"
+            fi
+          fi
+        fi
+
+        print_apt_debug_context() {
+          echo "apt debug context (host architecture: ${host_arch})" >&2
+          apt-cache "${apt_options[@]}" policy "libasound2t64:${host_arch}" || true
+          apt-cache "${apt_options[@]}" policy "libasound2:${host_arch}" || true
+          if [ -n "${libasound_package:-}" ]; then
+            apt-cache "${apt_options[@]}" policy "${libasound_package}:${host_arch}" || true
+          fi
+        }
+
+        run_apt_with_debug() {
+          local apt_command="$1"
+          shift
+
+          if sudo apt-get "${apt_options[@]}" "$apt_command" "$@"; then
+            return 0
+          fi
+
+          echo "apt-get ${apt_command} failed; retrying with Debug::pkgProblemResolver=yes." >&2
+          if sudo apt-get "${apt_options[@]}" -o Debug::pkgProblemResolver=yes "$apt_command" "$@"; then
+            return 0
+          fi
+
+          print_apt_debug_context
+          exit 1
+        }
+
+        run_apt_with_debug update
+
+        resolve_package_variant() {
+          local package_name
+          local package_probe
+          for package_name in "$@"; do
+            package_probe="${package_name}:${host_arch}"
+            if apt-cache "${apt_options[@]}" show "$package_probe" >/dev/null 2>&1; then
+              printf '%s\n' "$package_name"
+              return 0
+            fi
+          done
+
+          return 1
+        }
+
+        libasound_package="$(resolve_package_variant libasound2t64 libasound2 || true)"
+        if [ -z "$libasound_package" ]; then
+          echo "Unable to resolve libasound package variant (tried libasound2t64, libasound2)." >&2
+          exit 1
+        fi
 
         packages=(
           xauth
-          libasound2t64
+          "$libasound_package"
           libatk-bridge2.0-0
           libatspi2.0-0
           libdrm2
@@ -43,4 +110,4 @@ runs:
           packages+=(libarchive-tools)
         fi
 
-        sudo apt-get install -y "${packages[@]}"
+        run_apt_with_debug install -y "${packages[@]}"

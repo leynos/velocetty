@@ -7,15 +7,59 @@ requires QEMU user emulation plus an x86_64 sysroot.
 
 ## Prerequisites
 
-- QEMU user emulation providing `qemu-x86_64` in the `PATH`.
+- QEMU user emulation providing `qemu-x86_64-static` in the `PATH`.
 - An x86_64 sysroot that contains the dynamic loader and standard C++ runtime.
 
 On Fedora aarch64, the default repositories do not provide x86_64 runtime
 packages, so a sysroot must be supplied separately.
 
-## Option A: Container-backed sysroot (recommended)
+## Option A: package-backed sysroot (recommended for Continuous Integration)
 
-This is the simplest way to obtain a working x86_64 sysroot on Fedora aarch64.
+On Ubuntu 22.04 (Jammy) hosts, install amd64 runtime libraries directly into the
+multiarch rootfs:
+
+```bash
+sudo dpkg --add-architecture amd64
+cat <<'EOF' | sudo tee /tmp/velocetty-aarch64-bootstrap.sources.list >/dev/null
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse
+deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
+deb [arch=amd64] http://archive.ubuntu.com/ubuntu jammy-backports main restricted universe multiverse
+deb [arch=amd64] http://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
+EOF
+sudo apt-get \
+  -o Dir::Etc::sourcelist=/tmp/velocetty-aarch64-bootstrap.sources.list \
+  -o Dir::Etc::sourceparts=- \
+  update
+sudo apt-get \
+  -o Dir::Etc::sourcelist=/tmp/velocetty-aarch64-bootstrap.sources.list \
+  -o Dir::Etc::sourceparts=- \
+  install -y --no-install-recommends \
+  qemu-user-static \
+  libc6:amd64 \
+  libstdc++6:amd64 \
+  libgcc-s1:amd64 \
+  libglib2.0-0:amd64 \
+  libexpat1:amd64 \
+  libpcre2-8-0:amd64 \
+  libarchive-tools
+export QEMU_LD_PREFIX=/
+```
+
+Verify the emulator and loader:
+
+```bash
+test -x /usr/bin/qemu-x86_64-static
+test -f /lib64/ld-linux-x86-64.so.2 || test -f /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+```
+
+## Option B: container-backed sysroot (Fedora fallback)
+
+If cross-runtime packages are unavailable, export an x86_64 rootfs and point
+`QEMU_LD_PREFIX` to it:
 
 ```bash
 mkdir -p /tmp/x86_64-sysroot
@@ -24,12 +68,6 @@ podman create --arch x86_64 --name fedora-x64 fedora:40
 podman export fedora-x64 | tar -C /tmp/x86_64-sysroot -xf -
 podman rm fedora-x64
 export QEMU_LD_PREFIX=/tmp/x86_64-sysroot
-```
-
-Verify the loader exists:
-
-```bash
-ls /tmp/x86_64-sysroot/lib64/ld-linux-x86-64.so.2
 ```
 
 ## Run the snapshot step
@@ -44,6 +82,29 @@ For the full postinstall chain, run:
 
 ```bash
 bun run postinstall
+```
+
+For Linux aarch64 Continuous Integration (CI) lanes, set
+`SKIP_V8_SNAPSHOT=1` during `bun install` to
+skip snapshot generation entirely and avoid long-running snapshot emulation:
+
+```bash
+SKIP_V8_SNAPSHOT=1 bun install
+```
+
+If the CI workflow runs a dedicated `bun run rebuild-node-pty` step after
+install, also set `SKIP_NODE_PTY_REBUILD=1` during `bun install` to avoid
+duplicating the native rebuild in postinstall:
+
+```bash
+SKIP_V8_SNAPSHOT=1 SKIP_NODE_PTY_REBUILD=1 bun install
+```
+
+For local Linux aarch64 validation where arm64 snapshots are still required,
+set `SKIP_X64_V8_SNAPSHOT=1` so only the arm64 snapshot pass runs:
+
+```bash
+SKIP_X64_V8_SNAPSHOT=1 bun install
 ```
 
 This project uses `bun ./build/esbuild/build.ts` inside scripts for bundling.
@@ -63,15 +124,49 @@ bun node_modules/concurrently/dist/bin/concurrently.js --help
 
 ## Troubleshooting
 
-### `qemu-x86_64: Could not open '/lib64/ld-linux-x86-64.so.2'`
+### `qemu-x86_64-static: Could not open '/lib64/ld-linux-x86-64.so.2'`
 
 The sysroot is missing the loader, or QEMU is not pointed at it. Ensure the
 loader exists and export `QEMU_LD_PREFIX` to the sysroot path.
 
-### `qemu-x86_64` not found
+### `qemu-x86_64-static` not found
 
 Install QEMU user emulation for the distribution, or ensure the
-distribution-provided `qemu-x86_64` binary is on `PATH`.
+distribution-provided `qemu-x86_64-static` binary is on `PATH`.
+
+### `E: Unable to locate package ...:amd64`
+
+If the distribution does not provide amd64 multiarch runtime packages, use
+Option B and set `QEMU_LD_PREFIX` to the exported x86_64 sysroot path.
+
+### `E: Unable to locate package libasound2t64`
+
+Ubuntu 22.04 (Jammy) ships `libasound2` instead of `libasound2t64`. The
+repository CI action now resolves the correct package automatically; for manual
+commands on Jammy, install `libasound2`.
+
+### `404 Not Found` for `.../binary-amd64/Packages` on `ports.ubuntu.com`
+
+The apt source configuration is querying Ubuntu ports for amd64 indexes. Keep
+`ports.ubuntu.com` entries for `arm64` only, and add amd64 entries from
+`archive.ubuntu.com` plus `security.ubuntu.com`. After adding `amd64`, keep
+this split for subsequent apt commands in the same job. In repository CI, the
+shared `.github/actions/install-linux-e2e-runtime-deps` action now applies the
+same mixed-source configuration automatically on Ubuntu arm64 runners.
+
+### `bun install` stalls for hours in `bun run v8-snapshot`
+
+Use `SKIP_V8_SNAPSHOT=1` for Linux aarch64 CI installs. This bypasses snapshot
+generation in postinstall and avoids long-running emulated snapshot steps.
+
+### `Missing snapshot output` during Linux aarch64 packaging
+
+If install ran with `SKIP_V8_SNAPSHOT=1`, generate arm64 snapshots before
+invoking `electron-builder`:
+
+```bash
+SKIP_X64_V8_SNAPSHOT=1 bun run v8-snapshot
+```
 
 ### Bundler command errors
 

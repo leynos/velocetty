@@ -34,6 +34,11 @@ const readElectronTargetFromPackageJson = () => {
 const electronTarget =
   normalizeVersion(process.env.npm_package_devDependencies_electron) || readElectronTargetFromPackageJson();
 
+if (process.env.SKIP_NODE_PTY_REBUILD === '1') {
+  console.log('Skipping node-pty rebuild because SKIP_NODE_PTY_REBUILD=1.');
+  process.exit(0);
+}
+
 if (!fs.existsSync(moduleRoot)) {
   console.error(`node-pty module not found at ${moduleRoot}. Run bun install first.`);
   process.exit(1);

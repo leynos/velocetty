@@ -4,8 +4,8 @@
 
 - Purpose: Summarize local development practices and validation commands for
   the Velocetty repository.
-- Invariants: Keep Makefile targets and validation steps aligned with CI and
-  tooling changes.
+- Invariants: Keep Makefile targets and validation steps aligned with
+  Continuous Integration (CI) and tooling changes.
 - Cross-links: [Testing with Bun](testing-with-bun.md),
   [ADR 001](adr-001-replace-ava-with-bun-test.md),
   [ADR 002](adr-002-replace-webpack-babel-with-esbuild.md), and
@@ -218,6 +218,52 @@ Current repository runtime baseline after roadmap item `1.4.13`:
 - `electron` and `electron-mksnapshot`: `^40.2.1`
 - `@types/node`: `^24.10.12`
 - CI workflow `NODE_VERSION`: `24.11.1`
+
+Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
+
+- Linux ARM CI coverage is Linux aarch64 only; do not reintroduce armv7
+  (`armv7l`) lanes or release artefact targets.
+- Prefer native ARM runners for Linux aarch64 CI lanes instead of emulated
+  copy-to-image flows, which previously failed with disk-exhaustion errors.
+- Keep Linux dependency installation shared via
+  `.github/actions/install-linux-e2e-runtime-deps/action.yml` so fast-lane and
+  deep-lane jobs stay in sync.
+- Before running `bun install` on Linux aarch64 CI lanes, provision
+  `qemu-x86_64-static`, add the `amd64` dpkg architecture, and install the required
+  x86_64 runtime libraries (`libc6`, `libstdc++6`, `libgcc-s1`,
+  `libglib2.0-0`, `libexpat1`, and `libpcre2-8-0`) so Electron's x64
+  `mksnapshot` and `v8_context_snapshot_generator` binaries can run.
+- On Ubuntu arm runners that default to `ports.ubuntu.com`, use explicit apt
+  source entries (`ports` for `arm64` and `archive.ubuntu.com` plus
+  `security.ubuntu.com` for `amd64`) before installing `:amd64` packages.
+  Otherwise, apt tries to resolve `amd64` indexes from `ports` and fails with
+  `404 Not Found`. Keep this source pinning for all later apt invocations in
+  the same job after adding `amd64`; the Linux dependency installation action
+  now applies it automatically when it detects an Ubuntu arm64 host with
+  `amd64` multiarch enabled.
+- The shared Linux dependency installation action resolves the
+  Advanced Linux Sound Architecture (ALSA) runtime package by availability
+  (`libasound2t64` on newer Ubuntu releases,
+  `libasound2` on Ubuntu 22.04) so the same workflow configuration works across
+  Jammy and Noble runners.
+- After provisioning amd64 runtime packages on Linux aarch64 CI lanes, export
+  `QEMU_LD_PREFIX=/` so Quick Emulator (QEMU) resolves x86_64 shared libraries
+  from the host multiarch rootfs.
+- For Linux aarch64 CI lanes, set `SKIP_V8_SNAPSHOT=1` during `bun install` so
+  snapshot generation cannot stall install for hours under emulation.
+- For Linux aarch64 CI lanes that run a dedicated `node-pty` rebuild step after
+  install, set `SKIP_NODE_PTY_REBUILD=1` during `bun install` to avoid
+  duplicate native rebuild work in postinstall.
+- When Linux aarch64 CI lanes package artefacts after install-time snapshot
+  skipping, run `SKIP_X64_V8_SNAPSHOT=1 bun run v8-snapshot` before
+  `electron-builder` so `cache/arm64` contains the snapshot blobs required by
+  `bin/cp-snapshot.js`.
+- For local Linux aarch64 validation where snapshots are still required, set
+  `SKIP_X64_V8_SNAPSHOT=1` to avoid generating the additional x64 snapshot pass
+  under QEMU.
+- For Linux aarch64 native-module rebuild reliability, run `bun install`
+  before other gates and keep `npm_config_node_gyp` pointed at the workspace
+  `node-gyp` entrypoint in CI jobs that rebuild native modules.
 
 When preparing future Electron upgrades, update these anchors together and
 avoid merging partial baseline updates.

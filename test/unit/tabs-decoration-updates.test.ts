@@ -5,6 +5,7 @@ import {createRoot} from 'react-dom/client';
 import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
+import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {waitFor} from '../testUtils/waitFor';
 
 type MockTabProps = {
@@ -18,14 +19,13 @@ const unsubscribeDecorationUpdates = mock(() => {
 });
 let decorationListener: (() => void) | null = null;
 
-mock.module('../../lib/utils/plugins', () => ({
-  decorate: (Component: React.ComponentType<unknown>) => Component,
+registerPluginsModuleMocks({
   getTabProps: (tab: unknown, parentProps: unknown, props: unknown) => getTabPropsMock(tab, parentProps, props),
   subscribeTabDecorationUpdates: (listener: () => void) => {
     decorationListener = listener;
     return unsubscribeDecorationUpdates;
   }
-}));
+});
 
 mock.module('../../lib/components/new-tab', () => ({
   default: () => null

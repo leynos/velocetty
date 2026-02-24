@@ -4,55 +4,60 @@ import {createRoot} from 'react-dom/client';
 
 import {afterAll, beforeAll, beforeEach, describe, expect, mock, test} from 'bun:test';
 
+import type {HyperProps} from '../../typings/hyper';
 import {setupHappyDom} from '../testUtils/happy-dom';
+import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
 import {waitFor} from '../testUtils/waitFor';
 
 const {transportMock, resetTransportMock} = createTransportMock();
 
-mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
+type HyperComponent = React.ComponentType<HyperProps>;
 
-mock.module('../../lib/actions/ui', () => ({
-  execCommand: () => ({type: 'exec'}),
-  setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'})
-}));
-mock.module('../../lib/utils/plugins', () => ({
-  connect: () => (Component: React.ComponentType<unknown>) => Component,
-  decorate: (Component: React.ComponentType<unknown>) => Component,
-  getTabProps: (_tab: unknown, _parentProps: unknown, props: unknown) => props,
-  subscribeTabDecorationUpdates: () => () => {}
-}));
-mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));
-mock.module('../../lib/containers/notifications', () => ({default: () => null}));
-mock.module('../../lib/containers/terms', () => ({
-  default: (props: {ref_: (terms: unknown) => void}) => {
-    props.ref_({
-      getTermByUid: () => null,
-      getActiveTerm: () => null
-    });
-    return null;
-  }
-}));
-mock.module('mousetrap', () => ({
-  default: class {
-    stopCallback = () => false;
-    bind() {}
-    reset() {}
-  }
-}));
-mock.module('../../lib/command-registry', () => ({
-  getRegisteredKeys: async () => ({}),
-  getCommandHandler: () => undefined,
-  shouldPreventDefault: () => false
-}));
+/**
+ * Register module mocks needed by Hyper transport lifecycle tests.
+ */
+const registerHyperModuleMocks = () => {
+  // Re-register before importing Hyper to keep this suite stable if another
+  // file calls mock.restore() earlier in the same Bun process.
+  mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
+  mock.module('../../lib/actions/ui', () => ({
+    execCommand: () => ({type: 'exec'}),
+    setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'})
+  }));
+  registerPluginsModuleMocks({}, {defaultExportMode: 'self'});
+  mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));
+  mock.module('../../lib/containers/notifications', () => ({default: () => null}));
+  mock.module('../../lib/containers/terms', () => ({
+    default: (props: {ref_: (terms: unknown) => void}) => {
+      props.ref_({
+        getTermByUid: () => null,
+        getActiveTerm: () => null
+      });
+      return null;
+    }
+  }));
+  mock.module('mousetrap', () => ({
+    default: class {
+      stopCallback = () => false;
+      bind() {}
+      reset() {}
+    }
+  }));
+  mock.module('../../lib/command-registry', () => ({
+    getRegisteredKeys: async () => ({}),
+    getCommandHandler: () => undefined,
+    shouldPreventDefault: () => false
+  }));
+};
 
-type HyperComponent = typeof import('../../lib/containers/hyper').default;
-type HyperProps = React.ComponentProps<HyperComponent>;
+registerHyperModuleMocks();
 
 let Hyper: HyperComponent;
 let cleanupHappyDom: (() => void) | null = null;
 
 beforeAll(async () => {
+  registerHyperModuleMocks();
   cleanupHappyDom = await setupHappyDom();
   // Provide window.rpc stub for any residual plugin-API references.
   (window as unknown as {rpc: Record<string, () => void>}).rpc = {
@@ -61,7 +66,7 @@ beforeAll(async () => {
     removeListener: () => {}
   };
   ({default: Hyper} = await import('../../lib/containers/hyper'));
-});
+}, 15000);
 
 afterAll(() => {
   cleanupHappyDom?.();

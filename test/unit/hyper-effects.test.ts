@@ -4,7 +4,9 @@ import {createRoot} from 'react-dom/client';
 
 import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
+import type {HyperProps} from '../../typings/hyper';
 import {setupHappyDom} from '../testUtils/happy-dom';
+import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
 import {waitFor} from '../testUtils/waitFor';
 
@@ -25,11 +27,7 @@ type RpcWindow = Window & {
   focusActiveTerm?: (uid?: string) => void;
 };
 
-/**
- * Hyper component type derived from the container export.
- */
-type HyperComponent = typeof import('../../lib/containers/hyper').default;
-type HyperProps = React.ComponentProps<HyperComponent>;
+type HyperComponent = React.ComponentType<HyperProps>;
 
 let Hyper: HyperComponent;
 let registerCalls = 0;
@@ -80,8 +78,6 @@ const renderHyper = (root: ReturnType<typeof createRoot>, overrides: Partial<Hyp
 const {transportMock, state: transportMockState, resetTransportMock} = createTransportMock();
 const transportRemovedListeners = transportMockState.removedEvents;
 
-mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
-
 const buildRpcWindowStub = () => {
   const rpcWindow = window as RpcWindow;
   rpcWindow.rpc = {
@@ -92,41 +88,43 @@ const buildRpcWindowStub = () => {
   return {rpcWindow};
 };
 
-mock.module('../../lib/actions/ui', () => ({
-  execCommand: () => ({type: 'exec'}),
-  setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'})
-}));
+/**
+ * Register module mocks used by Hyper effects tests before loading Hyper.
+ */
+const registerHyperModuleMocks = () => {
+  // Re-register before importing Hyper to keep this suite stable if another
+  // file calls mock.restore() earlier in the same Bun process.
+  mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
+  mock.module('../../lib/actions/ui', () => ({
+    execCommand: () => ({type: 'exec'}),
+    setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'})
+  }));
+  registerPluginsModuleMocks({}, {defaultExportMode: 'self'});
+  mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));
+  mock.module('../../lib/containers/notifications', () => ({default: () => null}));
+  mock.module('../../lib/containers/terms', () => ({
+    default: (props: {ref_: (terms: TermsRef) => void}) => {
+      props.ref_(termsRef);
+      return null;
+    }
+  }));
+  mock.module('mousetrap', () => ({default: MousetrapMock}));
+  mock.module('../../lib/command-registry', () => ({
+    getRegisteredKeys: async () => {
+      registerCalls += 1;
+      return registeredKeys;
+    },
+    getCommandHandler: (command: string) => commandHandlers[command],
+    shouldPreventDefault: () => shouldPreventDefaultResult
+  }));
+};
 
-mock.module('../../lib/utils/plugins', () => ({
-  connect: () => (Component: React.ComponentType<unknown>) => Component,
-  decorate: (Component: React.ComponentType<unknown>) => Component,
-  getTabProps: (_tab: unknown, _parentProps: unknown, props: unknown) => props,
-  subscribeTabDecorationUpdates: () => () => {}
-}));
-
-mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));
-mock.module('../../lib/containers/notifications', () => ({default: () => null}));
-mock.module('../../lib/containers/terms', () => ({
-  default: (props: {ref_: (terms: TermsRef) => void}) => {
-    props.ref_(termsRef);
-    return null;
-  }
-}));
-
-mock.module('mousetrap', () => ({default: MousetrapMock}));
-
-mock.module('../../lib/command-registry', () => ({
-  getRegisteredKeys: async () => {
-    registerCalls += 1;
-    return registeredKeys;
-  },
-  getCommandHandler: (command: string) => commandHandlers[command],
-  shouldPreventDefault: () => shouldPreventDefaultResult
-}));
+registerHyperModuleMocks();
 
 beforeAll(async () => {
+  registerHyperModuleMocks();
   ({default: Hyper} = await import('../../lib/containers/hyper'));
-});
+}, 15000);
 
 beforeEach(() => {
   registerCalls = 0;
