@@ -44,7 +44,10 @@ const validDrivers = new Set(['playwright', 'spawn']);
 if (shouldRunE2E && driverOverride && !validDrivers.has(driverOverride)) {
   throw new Error(`E2E_DRIVER must be "playwright" or "spawn", received "${driverOverride}".`);
 }
-const shouldUsePlaywright = driverOverride === 'playwright';
+// On macOS CI, packaged app stdout markers can be missing even when the window
+// launches, so prefer Playwright-driven readiness checks by default.
+const shouldUsePlaywright =
+  driverOverride != null ? driverOverride === 'playwright' : isCiEnvironment && process.platform === 'darwin';
 
 const createSpawnOutputTracker = () => {
   let spawnOutput = '';

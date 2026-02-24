@@ -262,6 +262,9 @@ Local command validation:
 - [x] (2026-02-24 19:30Z) Addressed macOS fast-lane E2E regression by scoping
   `PYTHON`/`npm_config_python` to `bun install` environments via workflow step
   outputs instead of exporting them job-wide through `GITHUB_ENV`.
+- [x] (2026-02-24 20:00Z) Addressed remaining macOS fast-lane packaged-launch
+  regression by defaulting CI on macOS to Playwright driver mode for packaged
+  readiness checks instead of spawn-marker-only gating.
 - [ ] Validate macOS CI lane success and capture run evidence.
 - [ ] Finalise outcomes and retrospective.
 
@@ -299,6 +302,13 @@ Local command validation:
   `npm_config_python=...`, with packaged launch markers missing before timeout.
   Impact: node-gyp Python environment variables should be scoped to install/
   rebuild steps only, not retained for runtime/E2E steps.
+- Observation: after scoping Python variables, macOS packaged E2E still timed
+  out with no spawn markers (`running in prod mode`, `electron will open`, or
+  `[e2e] renderer-ready`) even though the process remained alive.
+  Evidence: CI failure showed `exitCode=null`, `signalCode=null`, and empty
+  output tail from the spawned packaged app.
+  Impact: macOS CI packaged readiness should use Playwright window readiness
+  checks by default instead of relying only on spawned process stdout markers.
 
 ## Decision log
 
