@@ -19,6 +19,7 @@ const unsubscribeDecorationUpdates = mock(() => {
 let decorationListener: (() => void) | null = null;
 
 const createPluginsMock = () => ({
+  connect: () => (Component: React.ComponentType<unknown>) => Component,
   decorate: (Component: React.ComponentType<unknown>) => Component,
   getTabProps: (tab: unknown, parentProps: unknown, props: unknown) => getTabPropsMock(tab, parentProps, props),
   subscribeTabDecorationUpdates: (listener: () => void) => {
