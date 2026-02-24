@@ -130,6 +130,12 @@ distribution-provided `qemu-x86_64` binary is on `PATH`.
 Your distribution does not provide Debian multiarch runtime packages. Use
 Option B and set `QEMU_LD_PREFIX` to the exported x86_64 sysroot path.
 
+### `E: Unable to locate package libasound2t64`
+
+Ubuntu 22.04 (Jammy) ships `libasound2` instead of `libasound2t64`. The
+repository CI action now resolves the correct package automatically; for manual
+commands on Jammy, install `libasound2`.
+
 ### `404 Not Found` for `.../binary-amd64/Packages` on `ports.ubuntu.com`
 
 The apt source configuration is querying Ubuntu ports for amd64 indexes. Keep

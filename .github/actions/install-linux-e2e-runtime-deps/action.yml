@@ -49,9 +49,27 @@ runs:
 
         sudo apt-get "${apt_options[@]}" update
 
+        resolve_package_variant() {
+          local package_name
+          for package_name in "$@"; do
+            if apt-cache "${apt_options[@]}" show "$package_name" >/dev/null 2>&1; then
+              printf '%s\n' "$package_name"
+              return 0
+            fi
+          done
+
+          return 1
+        }
+
+        libasound_package="$(resolve_package_variant libasound2t64 libasound2 || true)"
+        if [ -z "$libasound_package" ]; then
+          echo "Unable to resolve libasound package variant (tried libasound2t64, libasound2)." >&2
+          exit 1
+        fi
+
         packages=(
           xauth
-          libasound2t64
+          "$libasound_package"
           libatk-bridge2.0-0
           libatspi2.0-0
           libdrm2

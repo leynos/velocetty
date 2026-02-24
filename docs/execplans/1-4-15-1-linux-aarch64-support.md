@@ -108,6 +108,9 @@ Success is observable when:
   installation stays reliable after adding `amd64` on arm64 runners.
 - [x] (2026-02-23 00:00Z) Added CI-level snapshot skip for Linux aarch64
   installs (`SKIP_V8_SNAPSHOT=1`) to prevent multi-hour stalls in postinstall.
+- [x] (2026-02-23 00:00Z) Added runtime package variant detection in the shared
+  Linux dependency action so Ubuntu Jammy runners install `libasound2` when
+  `libasound2t64` is unavailable.
 
 ## Surprises & discoveries
 
@@ -159,6 +162,12 @@ Success is observable when:
   six-hour job timeout.
   Impact: arm64 snapshot generation is too expensive/unpredictable for the CI
   install gate and needs an explicit skip path.
+- Observation: Ubuntu 22.04 arm64 runners fail Linux dependency installation on
+  `libasound2t64` with `E: Unable to locate package libasound2t64`.
+  Evidence: CI logs from `Install Linux build and E2E runtime deps` show apt
+  update success followed by package resolution failure on `libasound2t64`.
+  Impact: runtime package naming differs across Ubuntu releases, so static
+  package names are not reliable for shared Linux dependency steps.
 
 ## Decision Log
 
@@ -212,6 +221,12 @@ Success is observable when:
   the long-running emulated snapshot phase, while retaining the snapshot flow
   for non-CI and non-aarch64 contexts.
   Date/Author: 2026-02-23 / Codex
+- Decision: resolve ALSA dependency package names dynamically in the shared
+  Linux dependency action by checking availability of `libasound2t64` then
+  falling back to `libasound2`.
+  Rationale: preserves one CI action implementation across Jammy and Noble
+  without per-runner forks.
+  Date/Author: 2026-02-23 / Codex
 
 ## Outcomes & Retrospective
 
@@ -239,6 +254,9 @@ Observed outcomes:
   updates do not regress with `ports` amd64 404 errors.
 - Linux aarch64 CI `bun install` now sets `SKIP_V8_SNAPSHOT=1`, preventing
   six-hour stalls in the snapshot generation stage.
+- Shared Linux runtime dependency installation now selects the available ALSA
+  package variant (`libasound2t64` or `libasound2`) so Ubuntu 22.04 and newer
+  runners both pass the install gate.
 - Linux aarch64 lane now runs install/lint/test/build checks and packages arm64
   Linux artefacts.
 - `docs/developers-guide.md` now records Linux aarch64 runtime-alignment and CI
