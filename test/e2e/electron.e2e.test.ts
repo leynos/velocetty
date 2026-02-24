@@ -6,7 +6,6 @@
  */
 // Native
 import {spawn} from 'node:child_process';
-import {performance} from 'node:perf_hooks';
 
 // Packages
 import {expect, test} from 'bun:test';
@@ -18,6 +17,7 @@ import {
   createIsolatedE2EEnvironment,
   extractRendererErrorMessage,
   isNonCriticalRendererError,
+  nowMs,
   resolveLaunchConfig,
   startRendererConsoleMonitor,
   waitForRendererReady,
@@ -173,11 +173,11 @@ const waitForStability = async (durationMs: number) =>
     durationMs + 100
   );
 
-const resolveMacCiFallbackStabilityMs = (launchStartedAtMs: number) => {
-  const elapsedMs = performance.now() - launchStartedAtMs;
+const resolveMacCiFallbackStabilityMs = (testStartedAtMs: number) => {
+  const elapsedMs = nowMs() - testStartedAtMs;
   const remainingBudgetMs = e2eTimeoutMs - elapsedMs - spawnStabilityTimeoutMs - e2eTimeoutHeadroomMs;
   if (remainingBudgetMs <= 0) {
-    return {fallbackStabilityMs: 0, remainingBudgetMs: 0};
+    return {fallbackStabilityMs: 0, remainingBudgetMs};
   }
 
   return {
@@ -298,9 +298,9 @@ const launchWithSpawn = async (
   launchArgs: readonly string[],
   isolatedEnvironment: Awaited<ReturnType<typeof createIsolatedE2EEnvironment>>,
   outputTracker: ReturnType<typeof createSpawnOutputTracker>,
+  testStartedAtMs: number,
   log: (message: string) => void
 ) => {
-  const launchStartedAtMs = performance.now();
   const spawned = spawn(pathToBinary, launchArgs, {
     env: isolatedEnvironment.env,
     stdio: ['ignore', 'pipe', 'pipe']
@@ -314,11 +314,11 @@ const launchWithSpawn = async (
   } catch (error) {
     if (isCiEnvironment && process.platform === 'darwin' && spawned.exitCode == null) {
       const markerError = error instanceof Error ? error.message : String(error);
-      const {fallbackStabilityMs, remainingBudgetMs} = resolveMacCiFallbackStabilityMs(launchStartedAtMs);
+      const {fallbackStabilityMs, remainingBudgetMs} = resolveMacCiFallbackStabilityMs(testStartedAtMs);
       if (fallbackStabilityMs <= 0) {
-        log(
-          `Packaged macOS CI launch did not emit [e2e] renderer-ready after ${rendererReadyTimeoutMs}ms; ` +
-            `skipping fallback stability check because timeout budget is exhausted (${markerError}).`
+        throw new Error(
+          `${buildPackagedTimeoutDiagnostics(spawned, outputTracker, rendererReadyTimeoutMs, error)}\n` +
+            `Budget exhausted: no time remaining for fallback stability check (${markerError}).`
         );
       } else {
         log(
@@ -403,6 +403,7 @@ const cleanupTestContext = async (context: TestContext) => {
 e2eTest(
   'launches the packaged app',
   async () => {
+    const testStartedAtMs = nowMs();
     const context = await setupTestContext();
     try {
       const {pathToBinary, launchArgs} = resolveLaunchConfig();
@@ -427,6 +428,7 @@ e2eTest(
           launchArgs,
           context.isolatedEnvironment,
           context.outputTracker,
+          testStartedAtMs,
           context.log
         );
       }

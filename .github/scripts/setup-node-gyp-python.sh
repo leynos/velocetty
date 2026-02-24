@@ -5,7 +5,7 @@ venv_dir="${1:-.node-gyp-python}"
 
 if command -v python3 >/dev/null 2>&1; then
   python_cmd=python3
-elif command -v python >/dev/null 2>&1; then
+elif command -v python >/dev/null 2>&1 && python -c 'import sys; raise SystemExit(0 if sys.version_info.major == 3 else 1)' >/dev/null 2>&1; then
   python_cmd=python
 else
   echo "Unable to find python3 or python on PATH." >&2
@@ -34,9 +34,7 @@ fi
 resolved_python=$("$python_bin" -c 'import sys; print(sys.executable)')
 
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
-  {
-    echo "python=$resolved_python"
-  } >>"$GITHUB_OUTPUT"
+  echo "python=$resolved_python" >>"$GITHUB_OUTPUT"
 else
   echo "$resolved_python"
 fi

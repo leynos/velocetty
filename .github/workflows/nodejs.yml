@@ -38,7 +38,6 @@ jobs:
       - name: Fix node-gyp and Python
         id: setup_node_gyp_python
         run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
-        shell: bash
       - name: Install
         run: bun install
         env:
@@ -141,7 +140,6 @@ jobs:
       - name: Fix node-gyp and Python
         id: setup_node_gyp_python
         run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
-        shell: bash
       - name: Install
         run: bun install
         env:
@@ -192,7 +190,6 @@ jobs:
       - name: Fix node-gyp and Python
         id: setup_node_gyp_python
         run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
-        shell: bash
       - name: Prepare x64 snapshot sysroot for Linux aarch64
         run: |
           set -euo pipefail

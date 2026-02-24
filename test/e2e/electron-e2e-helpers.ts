@@ -22,6 +22,8 @@ type ReadActiveTerminalBufferOptions = Readonly<{
 
 type SupportedPlatform = 'linux' | 'darwin' | 'win32';
 
+export const nowMs = (): number => performance.now();
+
 const isSupportedPlatform = (platform: NodeJS.Platform): platform is SupportedPlatform =>
   platform === 'linux' || platform === 'darwin' || platform === 'win32';
 
