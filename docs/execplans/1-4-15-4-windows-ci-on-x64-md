@@ -235,7 +235,7 @@ Current branch is the task branch; workflow shows windows-latest in matrix and
 no Windows aarch64 lane.
 ```
 
-2. Recommended CI evidence collection (if `gh` is available):
+1. Recommended CI evidence collection (if `gh` is available):
 
 ```bash
 gh run list --workflow nodejs.yml --limit 20
@@ -244,7 +244,7 @@ gh run view <run-id> --log-failed
 
 Fallback: gather the same evidence from the GitHub Actions web UI.
 
-3. Required local gates with repository log naming convention:
+1. Required local gates with repository log naming convention:
 
 ```bash
 set -o pipefail
@@ -330,6 +330,9 @@ Dependencies and contracts to preserve:
 - [x] (2026-02-25 16:13Z) Captured Bun release evidence for Windows aarch64
   feasibility: latest release `bun-v1.3.9` (published 2026-02-08) includes
   `bun-windows-x64*` assets and no Windows arm64 asset.
+- [x] (2026-02-25) Captured Windows CI failure run `22405749378`: step
+  `Install (Windows)` failed during `bun install` with
+  `Executable not found in $PATH: "node-gyp.cmd"`.
 - [ ] Implement Stage B Windows x64 stabilization.
 - [x] Implement Stage C Windows aarch64 supported-or-blocked path (Path B:
   documented blocker with explicit ownership).
@@ -357,6 +360,14 @@ Dependencies and contracts to preserve:
   `npm_config_node_gyp`/`TMP`/`TEMP`/`npm_config_tmp` environment settings.
   Impact: these constraints must be documented as the Windows x64 baseline to
   prevent regression from shared cross-OS simplifications.
+
+- Observation: a new Windows x64 install failure mode appeared in CI run
+  `22405749378` on 2026-02-25.
+  Evidence: `Install (Windows)` failed in `bun install` with
+  `Executable not found in $PATH: "node-gyp.cmd"` during native rebuild.
+  Impact: Stage B needs an extra Windows-specific pre-install bootstrap that
+  installs a pinned global `node-gyp` executable so `node-gyp.cmd` resolves on
+  `PATH`.
 
 - Observation: latest Bun upstream release does not provide a Windows arm64
   runtime artefact.
@@ -396,6 +407,12 @@ Dependencies and contracts to preserve:
   evidence set aligned to the final diff.
   Date/Author: 2026-02-25 / Codex
 
+- Decision: remediate run `22405749378` by adding a Windows-only bootstrap step
+  that installs a pinned global `node-gyp` executable before `bun install`.
+  Rationale: the failed `Install (Windows)` step shows `node-gyp.cmd` is not
+  guaranteed to exist on `PATH` during native rebuild.
+  Date/Author: 2026-02-25 / Codex
+
 ## Outcomes & retrospective
 
 Implementation is in progress.
@@ -416,7 +433,7 @@ Current outcomes:
 Remaining closure criteria:
 
 - Complete Stage B verification evidence for Windows x64 CI stabilization in
-  workflow/CI run artefacts.
+  workflow/CI run artefacts, including the `node-gyp.cmd` PATH bootstrap fix.
 - Run required local gates and capture `/tmp/*-$(get-project)-$(git branch
   --show).out` logs (not executed in this turn).
 - Finalize retrospective after CI evidence and gate outcomes are available.
@@ -429,3 +446,7 @@ Remaining closure criteria:
 - 2026-02-25: Moved to in-progress implementation, recorded Bun Windows arm64
   blocker evidence, updated developer/tracking/roadmap docs for Stage C Path B,
   and queued one full validation pass after workflow reconciliation.
+- 2026-02-25: Recorded CI run `22405749378` (`Install (Windows)` failure:
+  `Executable not found in $PATH: "node-gyp.cmd"`) and set Stage B remediation
+  direction to bootstrap a pinned global `node-gyp` executable before
+  Windows `bun install`.
