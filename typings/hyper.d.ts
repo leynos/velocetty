@@ -105,6 +105,7 @@ export type uiState = Immutable<{
   updateReleaseUrl: string | null;
   updateVersion: string | null;
   webGLRenderer: boolean;
+  webGLRendererMaxContexts: number;
   webLinksActivationKey: 'ctrl' | 'alt' | 'meta' | 'shift' | '';
   windowsPty?: IWindowsPty;
   defaultProfile: string;
@@ -280,6 +281,7 @@ import type Term from '../lib/components/term';
 export type TermGroupOwnProps = {
   cursorAccentColor?: string;
   fontSmoothing?: string;
+  isActiveRootGroup: boolean;
   parentProps: TermsProps;
   ref_: (uid: string, term: Term | null) => void;
   termGroup: ITermGroup;
@@ -322,6 +324,7 @@ export type TermGroupOwnProps = {
   | 'sessions'
   | 'uiFontFamily'
   | 'webGLRenderer'
+  | 'webGLRendererMaxContexts'
   | 'webLinksActivationKey'
   | 'windowsPty'
   | 'imageSupport'
@@ -398,8 +401,10 @@ export type TermProps = {
   uid: string;
   uiFontFamily: string;
   webGLRenderer: boolean;
+  webGLRendererMaxContexts: number;
   webLinksActivationKey: 'ctrl' | 'alt' | 'meta' | 'shift' | '';
   windowsPty?: IWindowsPty;
+  isActiveRootGroup: boolean;
   ref_: (uid: string, term: Term | null) => void;
 } & extensionProps;
 

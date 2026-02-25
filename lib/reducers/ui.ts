@@ -112,6 +112,7 @@ const initial: uiState = Immutable<Mutable<uiState>>({
   showWindowControls: '',
   quickEdit: false,
   webGLRenderer: true,
+  webGLRendererMaxContexts: 16,
   webLinksActivationKey: '',
   macOptionSelectionMode: 'vertical',
   disableLigatures: true,
@@ -260,6 +261,10 @@ const reducer: IUiReducer = (state = initial, action) => {
 
             if (config.webGLRenderer !== undefined) {
               ret.webGLRenderer = config.webGLRenderer;
+            }
+
+            if (Number.isInteger(config.webGLRendererMaxContexts) && config.webGLRendererMaxContexts > 0) {
+              ret.webGLRendererMaxContexts = config.webGLRendererMaxContexts;
             }
 
             if (config.webLinksActivationKey !== undefined) {

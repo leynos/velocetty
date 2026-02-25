@@ -128,6 +128,23 @@ for active configuration files:
 - Persist runtime plugin settings under `config.plugins.<plugin-id>` in
   `hyper.json`.
 
+## Visible-only WebGL rendering practice
+
+Roadmap item `2.1.1` introduces visible-only WebGL allocation. Follow these
+rules when changing terminal rendering behaviour:
+
+- Use the pane visibility model in `lib/utils/pane-visibility.ts`, which treats
+  a pane as visible only when it is on the active tab, has non-zero bounds,
+  and is not occluded.
+- Use `lib/utils/webgl-context-pool.ts` for WebGL allocation bookkeeping. Do
+  not add ad hoc per-component context counters.
+- Keep renderer switching in `lib/components/term.tsx` and continue reporting
+  renderer changes through `Term.reportRenderer(...)` so diagnostics and About
+  dialog reporting stay consistent.
+- Respect the `webGLRendererMaxContexts` config value (default `16`, positive
+  integer). Runtime changes require active terminals to restart before the new
+  pool size takes effect.
+
 ## Tab decoration provider practice
 
 Roadmap item `1.3.1` introduces the golden-path tab-decoration provider seam.

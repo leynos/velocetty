@@ -21,8 +21,10 @@ import type {TermProps} from '../../typings/hyper';
 import {asSessionId} from '@shared/types/common';
 import terms from '../terms';
 import {transport} from '../transport';
+import {isPaneVisible} from '../utils/pane-visibility';
 import processClipboard from '../utils/paste';
 import {decorate} from '../utils/plugins';
+import {WebGLContextPool} from '../utils/webgl-context-pool';
 
 import _SearchBox from './searchBox';
 
@@ -50,6 +52,37 @@ const isWebgl2Supported = (() => {
     return isSupported;
   };
 })();
+
+const DEFAULT_WEBGL_MAX_CONTEXTS = 16;
+
+type WebGLPoolContext = Readonly<{paneId: string}>;
+
+let sharedWebGLContextPool: WebGLContextPool<WebGLPoolContext> | null = null;
+let sharedWebGLContextPoolMax: number | null = null;
+const webGLPoolReleaseHandlers = new Map<string, () => void>();
+
+const resolveWebGLMaxContexts = (value: number) => {
+  return Number.isInteger(value) && value > 0 ? value : DEFAULT_WEBGL_MAX_CONTEXTS;
+};
+
+const getWebGLContextPool = (maxContexts: number) => {
+  const resolvedMaxContexts = resolveWebGLMaxContexts(maxContexts);
+
+  if (!sharedWebGLContextPool) {
+    sharedWebGLContextPool = new WebGLContextPool<WebGLPoolContext>({maxContexts: resolvedMaxContexts});
+    sharedWebGLContextPoolMax = resolvedMaxContexts;
+    return sharedWebGLContextPool;
+  }
+
+  if (sharedWebGLContextPoolMax !== resolvedMaxContexts) {
+    console.warn(
+      'Changing `webGLRendererMaxContexts` at runtime requires restarting active terminals. ' +
+        `Continuing with ${sharedWebGLContextPoolMax}.`
+    );
+  }
+
+  return sharedWebGLContextPool;
+};
 
 const getTermOptions = (props: TermProps): ITerminalOptions => {
   // Set a background color only if it is opaque
@@ -125,10 +158,16 @@ export default class Term extends React.PureComponent<
   bellSound: HTMLAudioElement | null;
   fitAddon: FitAddon;
   searchAddon: SearchAddon;
+  canvasAddon: CanvasAddon | null;
+  webglAddon: WebglAddon | null;
+  ligaturesAddon: LigaturesAddon | null;
   static rendererTypes: Record<string, string>;
   term!: Terminal;
-  resizeObserver!: ResizeObserver;
-  resizeTimeout!: NodeJS.Timeout;
+  resizeObserver?: ResizeObserver;
+  resizeTimeout?: NodeJS.Timeout;
+  visibilityFrame: number | null;
+  hasWarnedAboutTransparentWebGL: boolean;
+  hasWarnedAboutUnsupportedWebGL: boolean;
   searchDecorations: ISearchDecorationOptions;
   state = {
     searchOptions: {
@@ -150,6 +189,12 @@ export default class Term extends React.PureComponent<
     this.bellSound = null;
     this.fitAddon = new FitAddon();
     this.searchAddon = new SearchAddon();
+    this.canvasAddon = null;
+    this.webglAddon = null;
+    this.ligaturesAddon = null;
+    this.visibilityFrame = null;
+    this.hasWarnedAboutTransparentWebGL = false;
+    this.hasWarnedAboutUnsupportedWebGL = false;
     this.searchDecorations = {
       activeMatchColorOverviewRuler: Color(this.props.cursorColor).hex(),
       matchOverviewRuler: Color(this.props.borderColor).hex(),
@@ -191,24 +236,6 @@ export default class Term extends React.PureComponent<
     this.termWrapperRef?.appendChild(this.termRef);
 
     if (!props.term) {
-      const needTransparency = Color(props.backgroundColor).alpha() < 1;
-      let useWebGL = false;
-      if (props.webGLRenderer) {
-        if (needTransparency) {
-          console.warn(
-            'WebGL Renderer has been disabled since it does not support transparent backgrounds yet. ' +
-              'Falling back to canvas-based rendering.'
-          );
-        } else if (!isWebgl2Supported()) {
-          console.warn('WebGL2 is not supported on your machine. Falling back to canvas-based rendering.');
-        } else {
-          // Experimental WebGL renderer needs some more glue-code to make it work on Hyper.
-          // If you're working on enabling back WebGL, you will also need to look into `xterm-addon-ligatures` support for that renderer.
-          useWebGL = true;
-        }
-      }
-      Term.reportRenderer(props.uid, useWebGL ? 'WebGL' : 'Canvas');
-
       const shallActivateWebLink = (event: MouseEvent): boolean => {
         if (!event) return false;
         return props.webLinksActivationKey ? event[`${props.webLinksActivationKey}Key`] : true;
@@ -224,22 +251,6 @@ export default class Term extends React.PureComponent<
         })
       );
       this.term.open(this.termRef);
-
-      if (useWebGL) {
-        const webglAddon = new WebglAddon();
-        this.term.loadAddon(webglAddon);
-        webglAddon.onContextLoss(() => {
-          console.warn('WebGL context lost. Falling back to canvas-based rendering.');
-          webglAddon.dispose();
-          this.term.loadAddon(new CanvasAddon());
-        });
-      } else {
-        this.term.loadAddon(new CanvasAddon());
-      }
-
-      if (props.disableLigatures !== true && !useWebGL) {
-        this.term.loadAddon(new LigaturesAddon());
-      }
 
       this.term.loadAddon(new Unicode11Addon());
       this.term.unicode.activeVersion = '11';
@@ -258,6 +269,7 @@ export default class Term extends React.PureComponent<
     }
 
     this.fitAddon.fit();
+    this.syncRendererForVisibility();
 
     if (this.props.isTermActive) {
       this.term.focus();
@@ -321,6 +333,9 @@ export default class Term extends React.PureComponent<
     window.addEventListener('paste', this.onWindowPaste, {
       capture: true
     });
+    window.addEventListener('resize', this.scheduleRendererVisibilitySync, {passive: true});
+    window.addEventListener('scroll', this.scheduleRendererVisibilitySync, true);
+    this.scheduleRendererVisibilitySync();
 
     terms[this.props.uid] = this;
   }
@@ -435,6 +450,161 @@ export default class Term extends React.PureComponent<
     void this.bellSound?.play();
   }
 
+  onWebGLContextLoss = () => {
+    console.warn('WebGL context lost. Falling back to canvas-based rendering.');
+    this.detachWebGLRenderer();
+    this.ensureCanvasRenderer();
+    this.scheduleRendererVisibilitySync();
+  };
+
+  onWebGLEvicted = () => {
+    this.detachWebGLRenderer();
+    this.ensureCanvasRenderer();
+  };
+
+  scheduleRendererVisibilitySync = () => {
+    if (this.visibilityFrame !== null) {
+      return;
+    }
+
+    this.visibilityFrame = window.requestAnimationFrame(() => {
+      this.visibilityFrame = null;
+      this.syncRendererForVisibility();
+    });
+  };
+
+  canUseWebGLRenderer() {
+    if (!this.props.webGLRenderer) {
+      return false;
+    }
+
+    const needTransparency = Color(this.props.backgroundColor).alpha() < 1;
+    if (needTransparency) {
+      if (!this.hasWarnedAboutTransparentWebGL) {
+        console.warn(
+          'WebGL Renderer has been disabled since it does not support transparent backgrounds yet. ' +
+            'Falling back to canvas-based rendering.'
+        );
+        this.hasWarnedAboutTransparentWebGL = true;
+      }
+      return false;
+    }
+
+    if (!isWebgl2Supported()) {
+      if (!this.hasWarnedAboutUnsupportedWebGL) {
+        console.warn('WebGL2 is not supported on your machine. Falling back to canvas-based rendering.');
+        this.hasWarnedAboutUnsupportedWebGL = true;
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  isPaneOccluded(bounds: DOMRect) {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    if (bounds.right <= 0 || bounds.bottom <= 0 || bounds.left >= viewportWidth || bounds.top >= viewportHeight) {
+      return true;
+    }
+
+    const sampleX = Math.max(0, Math.min(viewportWidth - 1, bounds.left + bounds.width / 2));
+    const sampleY = Math.max(0, Math.min(viewportHeight - 1, bounds.top + bounds.height / 2));
+    const topElement = document.elementFromPoint(sampleX, sampleY);
+
+    if (!topElement) {
+      return false;
+    }
+
+    return this.termWrapperRef ? !this.termWrapperRef.contains(topElement) : true;
+  }
+
+  isPaneVisible() {
+    if (!this.termWrapperRef) {
+      return false;
+    }
+
+    const bounds = this.termWrapperRef.getBoundingClientRect();
+    return isPaneVisible({
+      isActiveTab: this.props.isActiveRootGroup,
+      bounds: {width: bounds.width, height: bounds.height},
+      isOccluded: this.isPaneOccluded(bounds)
+    });
+  }
+
+  ensureCanvasRenderer() {
+    if (!this.canvasAddon) {
+      this.canvasAddon = new CanvasAddon();
+      this.term.loadAddon(this.canvasAddon);
+    }
+
+    if (this.props.disableLigatures) {
+      this.ligaturesAddon?.dispose();
+      this.ligaturesAddon = null;
+    } else if (!this.ligaturesAddon) {
+      this.ligaturesAddon = new LigaturesAddon();
+      this.term.loadAddon(this.ligaturesAddon);
+    }
+
+    Term.reportRenderer(this.props.uid, 'Canvas');
+  }
+
+  detachWebGLRenderer() {
+    webGLPoolReleaseHandlers.delete(this.props.uid);
+    sharedWebGLContextPool?.release(this.props.uid);
+
+    if (this.webglAddon) {
+      this.webglAddon.dispose();
+      this.webglAddon = null;
+    }
+  }
+
+  ensureWebGLRenderer() {
+    const webGLContextPool = getWebGLContextPool(this.props.webGLRendererMaxContexts);
+    webGLContextPool.acquire(
+      this.props.uid,
+      () => ({paneId: this.props.uid}),
+      (_context, paneId) => {
+        const releaseHandler = webGLPoolReleaseHandlers.get(paneId);
+        releaseHandler?.();
+      }
+    );
+    webGLPoolReleaseHandlers.set(this.props.uid, this.onWebGLEvicted);
+
+    if (!this.webglAddon) {
+      this.webglAddon = new WebglAddon();
+      this.term.loadAddon(this.webglAddon);
+      this.webglAddon.onContextLoss(this.onWebGLContextLoss);
+    }
+
+    if (this.canvasAddon) {
+      this.canvasAddon.dispose();
+      this.canvasAddon = null;
+    }
+
+    if (this.ligaturesAddon) {
+      this.ligaturesAddon.dispose();
+      this.ligaturesAddon = null;
+    }
+
+    Term.reportRenderer(this.props.uid, 'WebGL');
+  }
+
+  syncRendererForVisibility() {
+    if (!this.termRef) {
+      return;
+    }
+
+    if (!this.isPaneVisible() || !this.canUseWebGLRenderer()) {
+      this.detachWebGLRenderer();
+      this.ensureCanvasRenderer();
+      return;
+    }
+
+    this.ensureWebGLRenderer();
+  }
+
   componentDidUpdate(prevProps: TermProps) {
     if (!prevProps.cleared && this.props.cleared) {
       this.clear();
@@ -475,6 +645,16 @@ export default class Term extends React.PureComponent<
     if (prevProps.rows !== this.props.rows || prevProps.cols !== this.props.cols) {
       this.resize(this.props.cols!, this.props.rows!);
     }
+
+    if (
+      prevProps.isActiveRootGroup !== this.props.isActiveRootGroup ||
+      prevProps.webGLRenderer !== this.props.webGLRenderer ||
+      prevProps.webGLRendererMaxContexts !== this.props.webGLRendererMaxContexts ||
+      prevProps.backgroundColor !== this.props.backgroundColor ||
+      prevProps.disableLigatures !== this.props.disableLigatures
+    ) {
+      this.scheduleRendererVisibilitySync();
+    }
   }
 
   onTermWrapperRef = (component: HTMLElement | null) => {
@@ -485,11 +665,12 @@ export default class Term extends React.PureComponent<
         clearTimeout(this.resizeTimeout);
         this.resizeTimeout = setTimeout(() => {
           this.fitResize();
+          this.scheduleRendererVisibilitySync();
         }, 500);
       });
       this.resizeObserver.observe(component);
     } else {
-      this.resizeObserver.disconnect();
+      this.resizeObserver?.disconnect();
     }
   };
 
@@ -508,6 +689,20 @@ export default class Term extends React.PureComponent<
     // to do in case of splitting, see `componentDidMount`
     this.disposableListeners.forEach((handler) => handler.dispose());
     this.disposableListeners = [];
+
+    this.detachWebGLRenderer();
+    this.canvasAddon?.dispose();
+    this.canvasAddon = null;
+    this.ligaturesAddon?.dispose();
+    this.ligaturesAddon = null;
+    if (this.visibilityFrame !== null) {
+      window.cancelAnimationFrame(this.visibilityFrame);
+      this.visibilityFrame = null;
+    }
+    this.resizeObserver?.disconnect();
+    clearTimeout(this.resizeTimeout);
+    window.removeEventListener('resize', this.scheduleRendererVisibilitySync);
+    window.removeEventListener('scroll', this.scheduleRendererVisibilitySync, true);
 
     window.removeEventListener('paste', this.onWindowPaste, {
       capture: true

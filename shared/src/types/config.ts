@@ -187,6 +187,11 @@ type profileConfigOptions = {
    */
   webGLRenderer: boolean;
   /**
+   * Maximum number of terminal panes allowed to use WebGL concurrently before
+   * falling back to canvas rendering.
+   */
+  webGLRendererMaxContexts: number;
+  /**
    * keypress required for weblink activation: [ctrl | alt | meta | shift]
    */
   webLinksActivationKey: 'ctrl' | 'alt' | 'meta' | 'shift' | '';

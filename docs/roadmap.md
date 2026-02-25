@@ -143,13 +143,13 @@ Scope notes:
 
 ### 2.1. Visible-only rendering and WebGL context pool
 
-- [ ] 2.1.1. Implement pane visibility detection and a WebGL context pool. See
+- [x] 2.1.1. Implement pane visibility detection and a WebGL context pool. See
   [velocetty-design.md](velocetty-design.md) §Rendering: WebGL only for visible
   panes.
-  - [ ] Define a visibility model based on active tab, layout bounds, and
+  - [x] Define a visibility model based on active tab, layout bounds, and
     occlusion.
-  - [ ] Allocate WebGL contexts only to visible panes with LRU eviction.
-  - [ ] Success criteria: hidden panes use Canvas, and WebGL usage never exceeds
+  - [x] Allocate WebGL contexts only to visible panes with LRU eviction.
+  - [x] Success criteria: hidden panes use Canvas, and WebGL usage never exceeds
     the configured maximum.
 - [ ] 2.1.2. Add context-loss recovery and fallbacks. See
   [velocetty-design.md](velocetty-design.md) §WebGL context pool.
