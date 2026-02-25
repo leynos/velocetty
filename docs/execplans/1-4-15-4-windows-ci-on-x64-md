@@ -366,8 +366,8 @@ Dependencies and contracts to preserve:
   Evidence: `Install (Windows)` failed in `bun install` with
   `Executable not found in $PATH: "node-gyp.cmd"` during native rebuild.
   Impact: Stage B needs an extra Windows-specific pre-install bootstrap that
-  installs a pinned global `node-gyp` executable so `node-gyp.cmd` resolves on
-  `PATH`.
+  installs a pinned workspace `node-gyp` package and prepends
+  `node_modules/.bin` so `node-gyp.cmd` resolves on `PATH`.
 
 - Observation: latest Bun upstream release does not provide a Windows arm64
   runtime artefact.
@@ -408,7 +408,7 @@ Dependencies and contracts to preserve:
   Date/Author: 2026-02-25 / Codex
 
 - Decision: remediate run `22405749378` by adding a Windows-only bootstrap step
-  that installs a pinned global `node-gyp` executable before `bun install`.
+  that installs a pinned workspace `node-gyp` package before `bun install`.
   Rationale: the failed `Install (Windows)` step shows `node-gyp.cmd` is not
   guaranteed to exist on `PATH` during native rebuild.
   Date/Author: 2026-02-25 / Codex
@@ -448,5 +448,5 @@ Remaining closure criteria:
   and queued one full validation pass after workflow reconciliation.
 - 2026-02-25: Recorded CI run `22405749378` (`Install (Windows)` failure:
   `Executable not found in $PATH: "node-gyp.cmd"`) and set Stage B remediation
-  direction to bootstrap a pinned global `node-gyp` executable before
-  Windows `bun install`.
+  direction to bootstrap a pinned workspace `node-gyp` package and
+  `node_modules/.bin` `PATH` override before Windows `bun install`.

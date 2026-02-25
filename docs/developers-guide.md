@@ -292,9 +292,10 @@ scope:
 - Windows CI run `22405749378` (2026-02-25) exposed a native rebuild failure in
   `Install (Windows)`: `bun install` can fail with `Executable not found in
   $PATH: "node-gyp.cmd"`.
-- Mitigate this Windows-only failure mode by bootstrapping a pinned global
-  `node-gyp` executable before the Windows install step so `node-gyp.cmd` is
-  available on `PATH` during native rebuild.
+- Mitigate this Windows-only failure mode by bootstrapping a pinned workspace
+  `node-gyp` package before the Windows install step and prepending
+  `node_modules/.bin` to `PATH` so `node-gyp.cmd` is available during native
+  rebuild.
 - For Windows install, map `TMP`, `TEMP`, and `npm_config_tmp` to
   `${{ runner.temp }}` so `node-gyp` extraction uses a deterministic writable
   path instead of the short-name `%LOCALAPPDATA%` alias.
