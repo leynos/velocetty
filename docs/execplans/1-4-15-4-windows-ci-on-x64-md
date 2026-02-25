@@ -376,6 +376,14 @@ Dependencies and contracts to preserve:
   Impact: Stage B must keep the bootstrap on Bun tooling (`bun add --no-save`)
   to avoid npm override resolution failures in this repository.
 
+- Observation: Bun bootstrap alone still regressed in CI run `22406525103` on
+  2026-02-25.
+  Evidence: `bun add --no-save --ignore-scripts node-gyp@10.3.1` succeeded, but
+  `Install (Windows)` still failed before `bun install` because
+  `node_modules/.bin/node-gyp.cmd` was missing.
+  Impact: Stage B needs an explicit Windows `node-gyp.cmd` shim after Bun
+  bootstrap so native rebuild helpers that spawn `node-gyp.cmd` can resolve.
+
 - Observation: latest Bun upstream release does not provide a Windows arm64
   runtime artefact.
   Evidence: GitHub API query to `oven-sh/bun` latest release on 2026-02-25:
@@ -426,6 +434,12 @@ Dependencies and contracts to preserve:
   override graph before the install lane starts.
   Date/Author: 2026-02-25 / Codex
 
+- Decision: after Bun bootstrap, generate `node_modules/.bin/node-gyp.cmd`
+  when it is absent and point it at `..\\node-gyp\\bin\\node-gyp.js`.
+  Rationale: CI run `22406525103` shows Bun can install `node-gyp` without the
+  `.cmd` launcher expected by Windows native rebuild scripts.
+  Date/Author: 2026-02-25 / Codex
+
 ## Outcomes & retrospective
 
 Implementation is in progress.
@@ -467,3 +481,6 @@ Remaining closure criteria:
   failure: `Override without name: @electron/rebuild>node-gyp`) and switched
   the bootstrap command to
   `bun add --no-save --ignore-scripts node-gyp@10.3.1`.
+- 2026-02-25: Recorded CI run `22406525103` (Bun bootstrap succeeded but
+  `node-gyp.cmd` missing), and added a Windows launcher shim step for
+  `node_modules/.bin/node-gyp.cmd` before `bun install`.

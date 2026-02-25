@@ -49,6 +49,9 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           bun add --no-save --ignore-scripts node-gyp@10.3.1
+          if [ ! -f node_modules/.bin/node-gyp.cmd ]; then
+            printf '@ECHO OFF\r\nnode "%~dp0\\..\\node-gyp\\bin\\node-gyp.js" %%*\r\n' > node_modules/.bin/node-gyp.cmd
+          fi
           test -f node_modules/.bin/node-gyp.cmd
           export PATH="$GITHUB_WORKSPACE/node_modules/.bin:$PATH"
           bun install

@@ -300,6 +300,10 @@ scope:
   Do not use `npm install` for the same purpose in this repository: npm can
   fail early on the repository override graph (`Override without name`) before
   `bun install` starts.
+- After the Bun bootstrap, ensure `node_modules/.bin/node-gyp.cmd` exists.
+  Bun's Windows package shim can expose `node-gyp` without the `.cmd` wrapper;
+  create a minimal `node-gyp.cmd` launcher that delegates to
+  `..\\node-gyp\\bin\\node-gyp.js` before running `bun install`.
 - For Windows install, map `TMP`, `TEMP`, and `npm_config_tmp` to
   `${{ runner.temp }}` so `node-gyp` extraction uses a deterministic writable
   path instead of the short-name `%LOCALAPPDATA%` alias.
