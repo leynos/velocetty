@@ -20,6 +20,29 @@ const env = {...process.env};
 delete env.npm_execpath;
 delete env.npm_node_execpath;
 
+const preserveNpmAuth = process.env.ELECTRON_BUILDER_PRESERVE_NPM_AUTH === '1';
+if (!preserveNpmAuth) {
+  // electron-builder install-app-deps shells out to npm and can inherit auth tokens
+  // from the CI environment. Invalid tokens trigger 403 when fetching public packages
+  // such as p-finally. Drop the auth variables by default so the CLI reads from the
+  // public registry anonymously; set ELECTRON_BUILDER_PRESERVE_NPM_AUTH=1 to keep them
+  // if you need a private registry.
+  const npmAuthVars = [
+    'NPM_TOKEN',
+    'npm_token',
+    'NPM_CONFIG__AUTH',
+    'NPM_CONFIG__AUTH_TOKEN',
+    'NPM_CONFIG_AUTH_TOKEN',
+    'npm_config__auth',
+    'npm_config__authToken',
+    'npm_config_auth',
+    'npm_config_auth_token'
+  ];
+  for (const key of npmAuthVars) {
+    delete env[key];
+  }
+}
+
 const buildPlatformMap = {
   darwin: 'mac',
   win32: 'win',

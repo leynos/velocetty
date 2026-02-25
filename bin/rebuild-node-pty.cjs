@@ -6,6 +6,7 @@ const repoRoot = path.resolve(__dirname, '..');
 const moduleRoot = path.join(repoRoot, 'target', 'node_modules', 'node-pty');
 const nodeGypPath = path.join(repoRoot, 'node_modules', 'node-gyp', 'bin', 'node-gyp.js');
 const packageJsonPath = path.join(repoRoot, 'package.json');
+const nodeExecutable = process.env.NODE || 'node';
 
 const normalizeVersion = (value) => {
   if (typeof value !== 'string') {
@@ -55,7 +56,7 @@ if (!electronTarget) {
 }
 
 const result = spawnSync(
-  process.execPath,
+  nodeExecutable,
   [
     nodeGypPath,
     'rebuild',

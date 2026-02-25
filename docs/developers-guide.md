@@ -281,6 +281,56 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   before other gates and keep `npm_config_node_gyp` pointed at the workspace
   `node-gyp` entrypoint in CI jobs that rebuild native modules.
 
+Windows runtime reliability baseline after roadmap item `1.4.15` Windows
+scope:
+
+- Keep Windows CI on `windows-latest` (x64) in the shared build matrix and run
+  Windows install in a dedicated workflow step.
+- Run `.github/scripts/setup-node-gyp-python.sh`
+  `"$RUNNER_TEMP/node-gyp-python"` before `bun install`, then set `PYTHON`,
+  `npm_config_python`, and `npm_config_node_gyp` from step outputs for the
+  install step.
+- Windows CI run `22405749378` (2026-02-25) exposed a native rebuild failure in
+  `Install (Windows)`: `bun install` can fail with `Executable not found in
+  $PATH: "node-gyp.cmd"`.
+- Mitigate this Windows-only failure mode by running
+  `bun install --ignore-scripts` before the full `bun install`, then prepending
+  `node_modules/.bin` to `PATH` so `node-gyp.cmd` is available during native
+  rebuild.
+- Do not use `npm install` for this bootstrap in this repository: npm can fail
+  early on the repository override graph (`Override without name`) before Bun
+  install starts.
+- After the scriptless Bun bootstrap, ensure `node_modules/.bin/node-gyp.cmd`
+  exists.
+  Bun's Windows package shim can expose `node-gyp` without the `.cmd` wrapper;
+  create a minimal `node-gyp.cmd` launcher that delegates to
+  `..\node-gyp\bin\node-gyp.js` before running `bun install`.
+- For Windows install, map `TMP`, `TEMP`, and `npm_config_tmp` to
+  `${{ runner.temp }}` so `node-gyp` extraction uses a deterministic writable
+  path instead of the short-name `%LOCALAPPDATA%` alias.
+- Keep `npm_config_node_gyp` in the forward-slash form used by the
+  `Install (Windows)` step in `.github/workflows/nodejs.yml`:
+  `${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js`.
+  Preserve this forward-slash `npm_config_node_gyp` value to avoid introducing
+  path-separator regressions.
+- Keep `bin/rebuild-node-pty.cjs` running node-gyp through the Node executable
+  (`NODE` environment variable when present, otherwise `node` on `PATH`), not
+  `process.execPath`. CI runs this script via Bun; invoking node-gyp with Bun
+  can trigger Windows header-extraction `EINVAL` failures.
+- Keep repository script/config text files normalized to LF in
+  `.gitattributes` for extensions checked by Biome (`*.json`, `*.jsonc`,
+  `*.js`, `*.cjs`, `*.mjs`, `*.ts`, and `*.tsx`). Windows checkout can
+  otherwise convert those files to CRLF and trip `make lint`/Biome formatting
+  checks.
+- Windows aarch64 CI is currently blocked by upstream Bun distribution support.
+  Evidence (captured 2026-02-25): latest Bun release `bun-v1.3.9` (published
+  2026-02-08) includes `bun-windows-x64*` assets and no Windows arm64 asset.
+- Mitigation and ownership are tracked in `WINARM64-001` in
+  `docs/tracking-issues.md` (issue:
+  [#35](https://github.com/leynos/velocetty/issues/35), owner: `@leynos`).
+  Re-evaluate lane enablement when a Bun release publishes a Windows arm64
+  artefact and `setup-bun` supports it.
+
 When preparing future Electron upgrades, update these anchors together and
 avoid merging partial baseline updates.
 

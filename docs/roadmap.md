@@ -117,22 +117,23 @@ Scope notes:
   - [x] Rewrite snapshot bootstrap loading to remove Webpack-specific globals.
   - [x] Success criteria: `bun install`, `make build`, `make check-fmt`,
     `make lint`, and `make test` pass after cut-over.
-- [ ] 1.4.15. Restore cross-architecture CI reliability for host platforms.
+- [x] 1.4.15. Restore cross-architecture CI reliability for host platforms.
   See [adr-004-update-electron-40.md](adr-004-update-electron-40.md) §Phase 3:
   Electron 40 validation and [developers-guide.md](developers-guide.md)
   §Electron runtime alignment.
-  - [x] Retire arm7 CI lanes and release artefact targets, and replace required
+  - [x] Retire armv7 CI lanes and release artefact targets, and replace required
     Linux ARM coverage with Linux aarch64.
   - [x] Resolve Linux aarch64 CI failures across install, build, lint, and test
     gates.
   - [x] Resolve macOS aarch64 CI failures across install, build, lint, and test
     gates.
-  - [ ] Stabilize Windows CI on x64 and add a Windows aarch64 lane if runner and
+  - [x] Stabilize Windows CI on x64 and add a Windows aarch64 lane if runner and
     toolchain support is available.
-  - [ ] If Windows aarch64 cannot be enabled, document the blocker and create a
-    tracked follow-up item with explicit ownership.
-  - [ ] Success criteria: CI lanes are green for macOS aarch64, Linux aarch64,
-    and Windows x64; arm7 lanes are removed; Windows aarch64 is either running
+  - [x] If Windows aarch64 cannot be enabled, document the blocker and create a
+    tracked follow-up item with explicit ownership. Tracking issue:
+    `WINARM64-001` in `docs/tracking-issues.md`.
+  - [x] Success criteria: CI lanes are green for macOS aarch64, Linux aarch64,
+    and Windows x64; armv7 lanes are removed; Windows aarch64 is either running
     in CI or explicitly tracked as blocked with a documented mitigation path.
 
 ## 2. Rendering overhaul
