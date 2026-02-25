@@ -5,12 +5,12 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision log`, and `Outcomes & retrospective` must be kept current as work
 proceeds.
 
-Status: IN PROGRESS (2026-02-25)
+Status: DONE (2026-02-25)
 
 No `PLANS.md` exists in this repository, so this plan stands alone.
 
-Implementation is now in progress for documentation deliverables in this turn.
-Workflow edits and gate execution remain pending.
+Implementation is complete in this turn, including workflow stabilization,
+documentation updates, roadmap closure, and CI verification evidence.
 
 ## Purpose / big picture
 
@@ -342,14 +342,17 @@ Dependencies and contracts to preserve:
 - [x] (2026-02-25) Captured CI run `22409492277`: Windows lint still failed on
   CRLF conversion for `.cjs`, `.mjs`, and `.jsonc` files; Ubuntu test failures
   were traced to non-deterministic Electron mock ordering in Bun unit tests.
-- [ ] Implement Stage B Windows x64 stabilization.
+- [x] (2026-02-25) Captured PR run `22410017452` with all required lanes green
+  (`build (windows-latest)`, `build (ubuntu-latest)`, `build (macos-latest)`,
+  and `build-linux-aarch64`).
+- [x] Implement Stage B Windows x64 stabilization.
 - [x] Implement Stage C Windows aarch64 supported-or-blocked path (Path B:
   documented blocker with explicit ownership).
 - [x] Update docs and roadmap based on evidence.
 - [x] (2026-02-25) Ran required local gates and collected logs:
   `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`
   using `/tmp/*-velocetty-1-4-15-4-windows-ci-on-x64-md.out`.
-- [ ] Finalize outcomes and retrospective.
+- [x] Finalize outcomes and retrospective.
 
 ## Surprises & discoveries
 
@@ -542,7 +545,7 @@ Dependencies and contracts to preserve:
 
 ## Outcomes & retrospective
 
-Implementation is in progress.
+Implementation is complete.
 
 Current outcomes:
 
@@ -572,12 +575,12 @@ Current outcomes:
 - Completed the required local quality-gate stack for this task:
   `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`.
 
-Remaining closure criteria:
+Closure evidence:
 
-- Complete Stage B verification evidence for Windows x64 CI stabilization in
-  workflow/CI run artefacts, including the `node-gyp.cmd` PATH bootstrap fix,
-  Node-runtime `node-gyp` invocation, and JSON LF checkout normalization.
-- Finalize retrospective after CI evidence and gate outcomes are available.
+- PR run `22410017452` completed successfully on 2026-02-25 with all required
+  host-platform lanes green, including Windows x64.
+- Required local gates passed on this branch:
+  `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`.
 
 ## Revision note
 
@@ -613,3 +616,5 @@ Remaining closure criteria:
   CRLF in `.jsonc`/`.cjs`/`.mjs` files and Ubuntu exposed order-dependent
   Electron mock failures; expanded `.gitattributes` LF rules and hardened
   Electron test mock registration.
+- 2026-02-25: Captured PR run `22410017452` with all primary host-platform CI
+  lanes green and marked Stage B/retrospective closure complete.
