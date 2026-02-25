@@ -44,7 +44,7 @@ jobs:
         env:
           PYTHON: ${{ steps.setup_node_gyp_python.outputs.python }}
           npm_config_python: ${{ steps.setup_node_gyp_python.outputs.python }}
-          npm_config_node_gyp: ${{ github.workspace }}${{ runner.os == 'Windows' && '\node_modules\node-gyp\bin\node-gyp.js' || '/node_modules/node-gyp/bin/node-gyp.js' }}
+          npm_config_node_gyp: ${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
       - name: Install (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -58,7 +58,7 @@ jobs:
         env:
           PYTHON: ${{ steps.setup_node_gyp_python.outputs.python }}
           npm_config_python: ${{ steps.setup_node_gyp_python.outputs.python }}
-          npm_config_node_gyp: ${{ github.workspace }}\node_modules\node-gyp\bin\node-gyp.js
+          npm_config_node_gyp: ${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
           TMP: ${{ runner.temp }}
           TEMP: ${{ runner.temp }}
           npm_config_tmp: ${{ runner.temp }}

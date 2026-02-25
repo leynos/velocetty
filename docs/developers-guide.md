@@ -286,9 +286,10 @@ scope:
 
 - Keep Windows CI on `windows-latest` (x64) in the shared build matrix and run
   Windows install in a dedicated workflow step.
-- Run `.github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"`
-  before `bun install`, then set `PYTHON`, `npm_config_python`, and
-  `npm_config_node_gyp` from step outputs for the install step.
+- Run `.github/scripts/setup-node-gyp-python.sh`
+  `"$RUNNER_TEMP/node-gyp-python"` before `bun install`, then set `PYTHON`,
+  `npm_config_python`, and `npm_config_node_gyp` from step outputs for the
+  install step.
 - Windows CI run `22405749378` (2026-02-25) exposed a native rebuild failure in
   `Install (Windows)`: `bun install` can fail with `Executable not found in
   $PATH: "node-gyp.cmd"`.
@@ -303,12 +304,12 @@ scope:
 - After the Bun bootstrap, ensure `node_modules/.bin/node-gyp.cmd` exists.
   Bun's Windows package shim can expose `node-gyp` without the `.cmd` wrapper;
   create a minimal `node-gyp.cmd` launcher that delegates to
-  `..\\node-gyp\\bin\\node-gyp.js` before running `bun install`.
+  `..\node-gyp\bin\node-gyp.js` before running `bun install`.
 - For Windows install, map `TMP`, `TEMP`, and `npm_config_tmp` to
   `${{ runner.temp }}` so `node-gyp` extraction uses a deterministic writable
   path instead of the short-name `%LOCALAPPDATA%` alias.
 - Keep `npm_config_node_gyp` on the Windows-specific path form
-  (`\\node_modules\\node-gyp\\bin\\node-gyp.js`) to avoid path-separator drift
+  (`\node_modules\node-gyp\bin\node-gyp.js`) to avoid path-separator drift
   across operating systems.
 - Keep `bin/rebuild-node-pty.cjs` running node-gyp through the Node executable
   (`NODE` environment variable when present, otherwise `node` on `PATH`), not
@@ -323,9 +324,10 @@ scope:
   Evidence (captured 2026-02-25): latest Bun release `bun-v1.3.9` (published
   2026-02-08) includes `bun-windows-x64*` assets and no Windows arm64 asset.
 - Mitigation and ownership are tracked in `WINARM64-001` in
-  `docs/tracking-issues.md` (owner: `@leynos`). Re-evaluate lane enablement
-  when a Bun release publishes a Windows arm64 artefact and `setup-bun`
-  supports it.
+  `docs/tracking-issues.md` (issue:
+  [#35](https://github.com/leynos/velocetty/issues/35), owner: `@leynos`).
+  Re-evaluate lane enablement when a Bun release publishes a Windows arm64
+  artefact and `setup-bun` supports it.
 
 When preparing future Electron upgrades, update these anchors together and
 avoid merging partial baseline updates.

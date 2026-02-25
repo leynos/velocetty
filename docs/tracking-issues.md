@@ -90,7 +90,7 @@ Last updated: 2026-02-12
 Status: Open  
 Owner: @leynos  
 Last updated: 2026-02-25  
-Issue: Not filed (roadmap `1.4.15` blocker tracker)
+Issue: [#35](https://github.com/leynos/velocetty/issues/35)
 
 ### WINARM64-001 summary
 

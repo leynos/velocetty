@@ -121,7 +121,7 @@ Scope notes:
   See [adr-004-update-electron-40.md](adr-004-update-electron-40.md) §Phase 3:
   Electron 40 validation and [developers-guide.md](developers-guide.md)
   §Electron runtime alignment.
-  - [x] Retire arm7 CI lanes and release artefact targets, and replace required
+  - [x] Retire armv7 CI lanes and release artefact targets, and replace required
     Linux ARM coverage with Linux aarch64.
   - [x] Resolve Linux aarch64 CI failures across install, build, lint, and test
     gates.
@@ -133,7 +133,7 @@ Scope notes:
     tracked follow-up item with explicit ownership. Tracking issue:
     `WINARM64-001` in `docs/tracking-issues.md`.
   - [x] Success criteria: CI lanes are green for macOS aarch64, Linux aarch64,
-    and Windows x64; arm7 lanes are removed; Windows aarch64 is either running
+    and Windows x64; armv7 lanes are removed; Windows aarch64 is either running
     in CI or explicitly tracked as blocked with a documented mitigation path.
 
 ## 2. Rendering overhaul

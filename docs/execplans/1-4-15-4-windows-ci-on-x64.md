@@ -72,24 +72,6 @@ Primary files and why they matter:
   `docs/velocetty-product-requirements-document.md`: architecture and quality
   rationale that CI lanes must satisfy.
 
-## Agent team model
-
-Use a three-agent implementation team, then consolidate in the main workspace:
-
-1. CI workflow agent (owner: `.github/workflows/nodejs.yml` and any helper
-   scripts under `.github/scripts/`).
-   Deliverable: stable Windows x64 lane and Windows aarch64 decision path.
-2. Documentation agent (owner: `docs/developers-guide.md`,
-   `docs/tracking-issues.md`, `docs/roadmap.md`).
-   Deliverable: updated developer practice, blocker tracking (if needed), and
-   roadmap checklist closure.
-3. Validation agent (owner: `/tmp/*-$(get-project)-$(git branch --show).out`
-   evidence logs and CI run evidence).
-   Deliverable: reproducible local gate logs and CI lane pass/fail evidence.
-
-If parallel edits conflict, rebase and preserve all valid intent. Do not drop
-any requested checklist item.
-
 ## Constraints
 
 - Keep roadmap semantics exact for `1.4.15`; do not mark an item done before
@@ -218,7 +200,7 @@ Go/no-go gate:
 
 ## Concrete steps
 
-Run from repository root (`/data/leynos/Projects/velocetty`).
+Run from the repository root.
 
 1. Baseline commands:
 
@@ -235,7 +217,7 @@ Current branch is the task branch; workflow shows windows-latest in matrix and
 no Windows aarch64 lane.
 ```
 
-1. Recommended CI evidence collection (if `gh` is available):
+2. Recommended CI evidence collection (if `gh` is available):
 
 ```bash
 gh run list --workflow nodejs.yml --limit 20
@@ -244,18 +226,19 @@ gh run view <run-id> --log-failed
 
 Fallback: gather the same evidence from the GitHub Actions web UI.
 
-1. Required local gates with repository log naming convention:
+3. Required local gates with repository log naming convention:
 
 ```bash
 set -o pipefail
 PROJECT_NAME="$(get-project 2>/dev/null || basename "$PWD")"
 BRANCH_NAME="$(git branch --show)"
+BRANCH_SAFE="$(printf '%s' "$BRANCH_NAME" | tr '/:' '--')"
 
-bun install 2>&1 | tee "/tmp/install-${PROJECT_NAME}-${BRANCH_NAME}.out"
-make build 2>&1 | tee "/tmp/build-${PROJECT_NAME}-${BRANCH_NAME}.out"
-make check-fmt 2>&1 | tee "/tmp/check-fmt-${PROJECT_NAME}-${BRANCH_NAME}.out"
-make lint 2>&1 | tee "/tmp/lint-${PROJECT_NAME}-${BRANCH_NAME}.out"
-make test 2>&1 | tee "/tmp/test-${PROJECT_NAME}-${BRANCH_NAME}.out"
+bun install 2>&1 | tee "/tmp/install-${PROJECT_NAME}-${BRANCH_SAFE}.out"
+make build 2>&1 | tee "/tmp/build-${PROJECT_NAME}-${BRANCH_SAFE}.out"
+make check-fmt 2>&1 | tee "/tmp/check-fmt-${PROJECT_NAME}-${BRANCH_SAFE}.out"
+make lint 2>&1 | tee "/tmp/lint-${PROJECT_NAME}-${BRANCH_SAFE}.out"
+make test 2>&1 | tee "/tmp/test-${PROJECT_NAME}-${BRANCH_SAFE}.out"
 ```
 
 Expected gate signal:
@@ -503,7 +486,7 @@ Dependencies and contracts to preserve:
   Date/Author: 2026-02-25 / Codex
 
 - Decision: after Bun bootstrap, generate `node_modules/.bin/node-gyp.cmd`
-  when it is absent and point it at `..\\node-gyp\\bin\\node-gyp.js`.
+  when it is absent and point it at `..\node-gyp\bin\node-gyp.js`.
   Rationale: CI run `22406525103` shows Bun can install `node-gyp` without the
   `.cmd` launcher expected by Windows native rebuild scripts.
   Date/Author: 2026-02-25 / Codex
