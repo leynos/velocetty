@@ -268,10 +268,10 @@ Local command validation:
 - [x] (2026-02-24 20:00Z) Addressed remaining macOS fast-lane packaged-launch
   regression by restoring spawn as the default fast-lane driver and adding a
   macOS CI packaged-launch fallback stability wait when
-  `[e2e] renderer-ready` markers are absent but the process remains alive.
+  `[e2e] renderer-ready` markers are absent, but the process remains alive.
 - [x] (2026-02-24 21:10Z) Addressed macOS dangling-process timeout regression by
   bounding packaged-launch fallback stability wait to the remaining test-timeout
-  budget so the test can complete cleanup before Bun's 45-second CI deadline.
+  budget, so the test can complete cleanup before Bun's 45-second CI deadline.
 - [x] (2026-02-24 22:10Z) Addressed Linux aarch64 CI freeze in
   `bun run v8-snapshot` by removing the dedicated arm64 snapshot-generation
   step and setting `SKIP_V8_SNAPSHOT_COPY=1` for Linux aarch64 packaging.
@@ -386,7 +386,7 @@ Local command validation:
   Date/author: 2026-02-24 / Codex
 
 - Decision: add a macOS CI packaged-launch fallback stability window when
-  spawn markers are missing but the process is still alive.
+  spawn markers are missing, but the process is still alive.
   Rationale: packaged macOS launches can remain healthy without emitting
   stdout markers in CI; the fallback reduces false negatives while preserving
   early-exit and critical-renderer-error checks.
@@ -436,13 +436,13 @@ Current outcomes:
   active implementation.
 - Reverted macOS CI fast-lane default driver selection to spawn mode and kept
   Playwright as an explicit opt-in via `E2E_DRIVER=playwright`.
-- Added a packaged-launch fallback for macOS CI spawn runs so missing
+- Added a packaged-launch fallback for macOS CI spawn runs, so missing
   `[e2e] renderer-ready` marker output can be tolerated when the process stays
   alive through an additional stability window and no critical renderer errors
   are detected.
-- Updated macOS fallback timing to be budget-aware so fallback waits cannot
+- Updated macOS fallback timing to be budget-aware, so fallback waits cannot
   overrun the CI test timeout and force Bun to kill dangling processes.
-- Updated Linux aarch64 packaging flow to bypass custom snapshot copy in CI so
+- Updated Linux aarch64 packaging flow to bypass custom snapshot copy in CI, so
   the lane cannot freeze in arm64 snapshot generation.
 - Updated Linux aarch64 workflow sequencing so `node-pty` rebuild happens in
   install and no separate rebuild stage can stall later in the lane.
