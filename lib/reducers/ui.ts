@@ -121,6 +121,218 @@ const initial: uiState = Immutable<Mutable<uiState>>({
   profiles: []
 });
 
+type UiStatePartial = Immutable.DeepPartial<Mutable<uiState>>;
+
+const processFontConfig = (config: any, state: uiState): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (state.fontSizeOverride && config.fontSize !== state.fontSize) {
+    ret.fontSizeOverride = null;
+  }
+
+  if (config.fontSize) {
+    ret.fontSize = config.fontSize;
+  }
+
+  if (config.fontFamily) {
+    ret.fontFamily = config.fontFamily;
+  }
+
+  if (config.uiFontFamily) {
+    ret.uiFontFamily = config.uiFontFamily;
+  }
+
+  if (config.fontWeight) {
+    ret.fontWeight = config.fontWeight;
+  }
+
+  if (config.fontWeightBold) {
+    ret.fontWeightBold = config.fontWeightBold;
+  }
+
+  if (Number.isFinite(config.lineHeight)) {
+    ret.lineHeight = config.lineHeight;
+  }
+
+  if (Number.isFinite(config.letterSpacing)) {
+    ret.letterSpacing = config.letterSpacing;
+  }
+
+  if (config.uiFontFamily) {
+    ret.uiFontFamily = config.uiFontFamily;
+  }
+
+  return ret;
+};
+
+const processCursorConfig = (config: any): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.cursorColor) {
+    ret.cursorColor = config.cursorColor;
+  }
+
+  if (config.cursorAccentColor) {
+    ret.cursorAccentColor = config.cursorAccentColor;
+  }
+
+  if (allowedCursorShapes.has(config.cursorShape)) {
+    ret.cursorShape = config.cursorShape;
+  }
+
+  if (allowedCursorBlinkValues.has(config.cursorBlink)) {
+    ret.cursorBlink = config.cursorBlink;
+  }
+
+  return ret;
+};
+
+const processColorConfig = (config: any, state: uiState): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.borderColor) {
+    ret.borderColor = config.borderColor;
+  }
+
+  if (config.selectionColor) {
+    ret.selectionColor = config.selectionColor;
+  }
+
+  if (config.foregroundColor) {
+    ret.foregroundColor = config.foregroundColor;
+  }
+
+  if (config.backgroundColor) {
+    ret.backgroundColor = config.backgroundColor;
+  }
+
+  if (config.colors) {
+    if (JSON.stringify(state.colors) !== JSON.stringify(config.colors)) {
+      ret.colors = config.colors;
+    }
+  }
+
+  return ret;
+};
+
+const processRendererConfig = (config: any): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.webGLRenderer !== undefined) {
+    ret.webGLRenderer = config.webGLRenderer;
+  }
+
+  if (Number.isInteger(config.webGLRendererMaxContexts) && config.webGLRendererMaxContexts > 0) {
+    ret.webGLRendererMaxContexts = config.webGLRendererMaxContexts;
+  }
+
+  return ret;
+};
+
+const processMiscConfig = (config: any, state: uiState): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.scrollback) {
+    ret.scrollback = config.scrollback;
+  }
+
+  if (typeof config.padding !== 'undefined' && config.padding !== null) {
+    ret.padding = config.padding;
+  }
+
+  if (config.css || config.css === '') {
+    ret.css = config.css;
+  }
+
+  if (config.termCSS) {
+    ret.termCSS = config.termCSS;
+  }
+
+  if (allowedBells.has(config.bell)) {
+    ret.bell = (config.bell as any) === 'false' ? false : config.bell;
+  }
+
+  if (config.bellSoundURL !== state.bellSoundURL) {
+    ret.bellSoundURL = config.bellSoundURL || initial.bellSoundURL;
+  }
+
+  if (config.bellSound !== state.bellSound) {
+    ret.bellSound = config.bellSound || initial.bellSound;
+  }
+
+  if (typeof config.copyOnSelect !== 'undefined' && config.copyOnSelect !== null) {
+    ret.copyOnSelect = config.copyOnSelect;
+  }
+
+  if (config.modifierKeys) {
+    ret.modifierKeys = config.modifierKeys;
+  }
+
+  if (allowedHamburgerMenuValues.has(config.showHamburgerMenu)) {
+    ret.showHamburgerMenu = config.showHamburgerMenu;
+  }
+
+  if (allowedWindowControlsValues.has(config.showWindowControls)) {
+    ret.showWindowControls = config.showWindowControls;
+  }
+
+  if (process.platform === 'win32' && (config.quickEdit === undefined || config.quickEdit === null)) {
+    ret.quickEdit = true;
+  } else if (typeof config.quickEdit !== 'undefined' && config.quickEdit !== null) {
+    ret.quickEdit = config.quickEdit;
+  }
+
+  if (config.webLinksActivationKey !== undefined) {
+    ret.webLinksActivationKey = config.webLinksActivationKey;
+  }
+
+  if (config.macOptionSelectionMode) {
+    ret.macOptionSelectionMode = config.macOptionSelectionMode;
+  }
+
+  if (config.disableLigatures !== undefined) {
+    ret.disableLigatures = config.disableLigatures;
+  }
+
+  if (config.screenReaderMode !== undefined) {
+    ret.screenReaderMode = config.screenReaderMode;
+  }
+
+  const buildNumber = parseInt(release().split('.').at(-1) || '0', 10);
+  if (isWindows && !Number.isNaN(buildNumber) && buildNumber > 0) {
+    const useConpty = typeof config.useConpty === 'boolean' ? config.useConpty : buildNumber >= 18309;
+    ret.windowsPty = {
+      backend: useConpty ? 'conpty' : 'winpty',
+      buildNumber
+    };
+  }
+
+  if (config.imageSupport !== undefined) {
+    ret.imageSupport = config.imageSupport;
+  }
+
+  if (config.defaultProfile !== undefined) {
+    ret.defaultProfile = config.defaultProfile;
+  }
+
+  if (config.profiles !== undefined) {
+    ret.profiles = config.profiles;
+  }
+
+  return ret;
+};
+
+const mergeConfigIntoState = (config: any, state: uiState, now: number): UiStatePartial => {
+  return {
+    ...processFontConfig(config, state),
+    ...processCursorConfig(config),
+    ...processColorConfig(config, state),
+    ...processRendererConfig(config),
+    ...processMiscConfig(config, state),
+    _lastUpdate: now
+  };
+};
+
 const reducer: IUiReducer = (state = initial, action) => {
   let state_ = state;
   let isMax;
@@ -131,184 +343,7 @@ const reducer: IUiReducer = (state = initial, action) => {
       state_ = state
         // unset the user font size override if the
         // font size changed from the config
-        .merge(
-          (() => {
-            const ret: Immutable.DeepPartial<Mutable<uiState>> = {};
-
-            if (config.scrollback) {
-              ret.scrollback = config.scrollback;
-            }
-
-            if (state.fontSizeOverride && config.fontSize !== state.fontSize) {
-              ret.fontSizeOverride = null;
-            }
-
-            if (config.fontSize) {
-              ret.fontSize = config.fontSize;
-            }
-
-            if (config.fontFamily) {
-              ret.fontFamily = config.fontFamily;
-            }
-
-            if (config.uiFontFamily) {
-              ret.uiFontFamily = config.uiFontFamily;
-            }
-
-            if (config.fontWeight) {
-              ret.fontWeight = config.fontWeight;
-            }
-
-            if (config.fontWeightBold) {
-              ret.fontWeightBold = config.fontWeightBold;
-            }
-
-            if (Number.isFinite(config.lineHeight)) {
-              ret.lineHeight = config.lineHeight;
-            }
-
-            if (Number.isFinite(config.letterSpacing)) {
-              ret.letterSpacing = config.letterSpacing;
-            }
-
-            if (config.uiFontFamily) {
-              ret.uiFontFamily = config.uiFontFamily;
-            }
-
-            if (config.cursorColor) {
-              ret.cursorColor = config.cursorColor;
-            }
-
-            if (config.cursorAccentColor) {
-              ret.cursorAccentColor = config.cursorAccentColor;
-            }
-
-            if (allowedCursorShapes.has(config.cursorShape)) {
-              ret.cursorShape = config.cursorShape;
-            }
-
-            if (allowedCursorBlinkValues.has(config.cursorBlink)) {
-              ret.cursorBlink = config.cursorBlink;
-            }
-
-            if (config.borderColor) {
-              ret.borderColor = config.borderColor;
-            }
-
-            if (config.selectionColor) {
-              ret.selectionColor = config.selectionColor;
-            }
-
-            if (typeof config.padding !== 'undefined' && config.padding !== null) {
-              ret.padding = config.padding;
-            }
-
-            if (config.foregroundColor) {
-              ret.foregroundColor = config.foregroundColor;
-            }
-
-            if (config.backgroundColor) {
-              ret.backgroundColor = config.backgroundColor;
-            }
-
-            if (config.css || config.css === '') {
-              ret.css = config.css;
-            }
-
-            if (config.termCSS) {
-              ret.termCSS = config.termCSS;
-            }
-
-            if (allowedBells.has(config.bell)) {
-              ret.bell = (config.bell as any) === 'false' ? false : config.bell;
-            }
-
-            if (config.bellSoundURL !== state.bellSoundURL) {
-              ret.bellSoundURL = config.bellSoundURL || initial.bellSoundURL;
-            }
-
-            if (config.bellSound !== state.bellSound) {
-              ret.bellSound = config.bellSound || initial.bellSound;
-            }
-
-            if (typeof config.copyOnSelect !== 'undefined' && config.copyOnSelect !== null) {
-              ret.copyOnSelect = config.copyOnSelect;
-            }
-
-            if (config.colors) {
-              if (JSON.stringify(state.colors) !== JSON.stringify(config.colors)) {
-                ret.colors = config.colors;
-              }
-            }
-
-            if (config.modifierKeys) {
-              ret.modifierKeys = config.modifierKeys;
-            }
-
-            if (allowedHamburgerMenuValues.has(config.showHamburgerMenu)) {
-              ret.showHamburgerMenu = config.showHamburgerMenu;
-            }
-
-            if (allowedWindowControlsValues.has(config.showWindowControls)) {
-              ret.showWindowControls = config.showWindowControls;
-            }
-
-            if (process.platform === 'win32' && (config.quickEdit === undefined || config.quickEdit === null)) {
-              ret.quickEdit = true;
-            } else if (typeof config.quickEdit !== 'undefined' && config.quickEdit !== null) {
-              ret.quickEdit = config.quickEdit;
-            }
-
-            if (config.webGLRenderer !== undefined) {
-              ret.webGLRenderer = config.webGLRenderer;
-            }
-
-            if (Number.isInteger(config.webGLRendererMaxContexts) && config.webGLRendererMaxContexts > 0) {
-              ret.webGLRendererMaxContexts = config.webGLRendererMaxContexts;
-            }
-
-            if (config.webLinksActivationKey !== undefined) {
-              ret.webLinksActivationKey = config.webLinksActivationKey;
-            }
-
-            if (config.macOptionSelectionMode) {
-              ret.macOptionSelectionMode = config.macOptionSelectionMode;
-            }
-
-            if (config.disableLigatures !== undefined) {
-              ret.disableLigatures = config.disableLigatures;
-            }
-
-            if (config.screenReaderMode !== undefined) {
-              ret.screenReaderMode = config.screenReaderMode;
-            }
-
-            const buildNumber = parseInt(release().split('.').at(-1) || '0', 10);
-            if (isWindows && !Number.isNaN(buildNumber) && buildNumber > 0) {
-              const useConpty = typeof config.useConpty === 'boolean' ? config.useConpty : buildNumber >= 18309;
-              ret.windowsPty = {
-                backend: useConpty ? 'conpty' : 'winpty',
-                buildNumber
-              };
-            }
-
-            if (config.imageSupport !== undefined) {
-              ret.imageSupport = config.imageSupport;
-            }
-
-            if (config.defaultProfile !== undefined) {
-              ret.defaultProfile = config.defaultProfile;
-            }
-
-            if (config.profiles !== undefined) {
-              ret.profiles = config.profiles;
-            }
-
-            ret._lastUpdate = now;
-
-            return ret;
-          })()
-        );
+        .merge(mergeConfigIntoState(config, state, now));
       break;
     }
     case SESSION_ADD:
