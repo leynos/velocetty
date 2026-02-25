@@ -38,13 +38,14 @@ jobs:
       - name: Fix node-gyp and Python
         id: setup_node_gyp_python
         run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
+      - name: Export node-gyp environment
+        run: |
+          printf 'PYTHON=%s\n' "${{ steps.setup_node_gyp_python.outputs.python }}" >> "$GITHUB_ENV"
+          printf 'npm_config_python=%s\n' "${{ steps.setup_node_gyp_python.outputs.python }}" >> "$GITHUB_ENV"
+          printf 'npm_config_node_gyp=%s\n' "${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
       - name: Install
         if: runner.os != 'Windows'
         run: bun install
-        env:
-          PYTHON: ${{ steps.setup_node_gyp_python.outputs.python }}
-          npm_config_python: ${{ steps.setup_node_gyp_python.outputs.python }}
-          npm_config_node_gyp: ${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
       - name: Install (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -56,9 +57,6 @@ jobs:
           export PATH="$GITHUB_WORKSPACE/node_modules/.bin:$PATH"
           bun install
         env:
-          PYTHON: ${{ steps.setup_node_gyp_python.outputs.python }}
-          npm_config_python: ${{ steps.setup_node_gyp_python.outputs.python }}
-          npm_config_node_gyp: ${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
           TMP: ${{ runner.temp }}
           TEMP: ${{ runner.temp }}
           npm_config_tmp: ${{ runner.temp }}
