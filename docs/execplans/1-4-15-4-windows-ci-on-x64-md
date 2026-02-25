@@ -336,6 +336,9 @@ Dependencies and contracts to preserve:
 - [x] (2026-02-25) Captured a second Windows native rebuild failure signature:
   node-gyp header tar extraction `EINVAL` when `bin/rebuild-node-pty.cjs`
   launches node-gyp using Bun `process.execPath`.
+- [x] (2026-02-25) Captured CI run `22408893713` after the Node-runtime patch:
+  `Install (Windows)` progressed past `rebuild-node-pty`, but
+  `Run Makefile lint and unit-test gates` failed on CRLF-formatted JSON files.
 - [ ] Implement Stage B Windows x64 stabilization.
 - [x] Implement Stage C Windows aarch64 supported-or-blocked path (Path B:
   documented blocker with explicit ownership).
@@ -421,6 +424,14 @@ Dependencies and contracts to preserve:
   Impact: this branch needed a deterministic node-gyp runtime fix and a fresh
   post-push CI rerun for final Stage B verification evidence.
 
+- Observation: post-patch CI run `22408893713` still failed Windows in the lint
+  phase due JSON line-ending drift.
+  Evidence: `Run Makefile lint and unit-test gates` reported Biome formatter
+  diffs where repository JSON files were checked out with CRLF (`␍`) on
+  Windows.
+  Impact: Stage B also requires repository-level JSON EOL normalization so
+  Windows checkout line endings do not create formatting-only failures.
+
 ## Decision log
 
 - Decision: move this ExecPlan to `Status: IN PROGRESS` and execute the
@@ -481,6 +492,11 @@ Dependencies and contracts to preserve:
   Windows can fail in header tar extraction with `EINVAL`.
   Date/Author: 2026-02-25 / Codex
 
+- Decision: enforce `*.json text eol=lf` in `.gitattributes`.
+  Rationale: CI run `22408893713` shows Windows checkout line-ending conversion
+  can trigger formatting failures unrelated to functional changes.
+  Date/Author: 2026-02-25 / Codex
+
 ## Outcomes & retrospective
 
 Implementation is in progress.
@@ -494,6 +510,8 @@ Current outcomes:
   (`NODE` override or `node` on `PATH`) instead of Bun `process.execPath`.
 - Added a Windows runtime-alignment note in `docs/developers-guide.md` for this
   Node runtime-selection requirement in `rebuild-node-pty`.
+- Updated `.gitattributes` to enforce `*.json text eol=lf` and documented this
+  as part of the Windows reliability baseline.
 - Added `WINARM64-001` to `docs/tracking-issues.md` with explicit ownership
   (`@leynos`), blocker context, and mitigation/exit criteria.
 - Updated `docs/roadmap.md` item `1.4.15` to mark Windows x64 stabilization,
@@ -507,7 +525,8 @@ Current outcomes:
 Remaining closure criteria:
 
 - Complete Stage B verification evidence for Windows x64 CI stabilization in
-  workflow/CI run artefacts, including the `node-gyp.cmd` PATH bootstrap fix.
+  workflow/CI run artefacts, including the `node-gyp.cmd` PATH bootstrap fix,
+  Node-runtime `node-gyp` invocation, and JSON LF checkout normalization.
 - Finalize retrospective after CI evidence and gate outcomes are available.
 
 ## Revision note
@@ -537,3 +556,6 @@ Remaining closure criteria:
 - 2026-02-25: Completed local gate verification with
   `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`
   (logs under `/tmp/*-velocetty-1-4-15-4-windows-ci-on-x64-md.out`).
+- 2026-02-25: Captured PR run `22408893713` where Windows advanced through
+  `Install (Windows)` after the Node-runtime fix and then failed on CRLF JSON
+  formatting diffs; added `*.json text eol=lf` to `.gitattributes`.
