@@ -132,6 +132,9 @@ Scope notes:
   - [x] If Windows aarch64 cannot be enabled, document the blocker and create a
     tracked follow-up item with explicit ownership. Tracking issue:
     `WINARM64-001` in `docs/tracking-issues.md`.
+    Upstream blocker:
+    [oven-sh/bun#9824](https://github.com/oven-sh/bun/issues/9824) (Bun on
+    Windows aarch64).
   - [x] Success criteria: CI lanes are green for macOS aarch64, Linux aarch64,
     and Windows x64; armv7 lanes are removed; Windows aarch64 is either running
     in CI or explicitly tracked as blocked with a documented mitigation path.
