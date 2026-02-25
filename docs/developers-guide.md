@@ -296,6 +296,10 @@ scope:
   `node-gyp` package before the Windows install step and prepending
   `node_modules/.bin` to `PATH` so `node-gyp.cmd` is available during native
   rebuild.
+- Use `bun add --no-save --ignore-scripts node-gyp@10.3.1` for this bootstrap.
+  Do not use `npm install` for the same purpose in this repository: npm can
+  fail early on the repository override graph (`Override without name`) before
+  `bun install` starts.
 - For Windows install, map `TMP`, `TEMP`, and `npm_config_tmp` to
   `${{ runner.temp }}` so `node-gyp` extraction uses a deterministic writable
   path instead of the short-name `%LOCALAPPDATA%` alias.

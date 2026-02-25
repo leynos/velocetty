@@ -369,6 +369,13 @@ Dependencies and contracts to preserve:
   installs a pinned workspace `node-gyp` package and prepends
   `node_modules/.bin` so `node-gyp.cmd` resolves on `PATH`.
 
+- Observation: replacing the bootstrap with `npm install` regressed in CI run
+  `22406276433` on 2026-02-25.
+  Evidence: `Install (Windows)` failed before `bun install` with
+  `npm error Override without name: @electron/rebuild>node-gyp`.
+  Impact: Stage B must keep the bootstrap on Bun tooling (`bun add --no-save`)
+  to avoid npm override resolution failures in this repository.
+
 - Observation: latest Bun upstream release does not provide a Windows arm64
   runtime artefact.
   Evidence: GitHub API query to `oven-sh/bun` latest release on 2026-02-25:
@@ -413,6 +420,12 @@ Dependencies and contracts to preserve:
   guaranteed to exist on `PATH` during native rebuild.
   Date/Author: 2026-02-25 / Codex
 
+- Decision: implement the Windows bootstrap with
+  `bun add --no-save --ignore-scripts node-gyp@10.3.1`, not `npm install`.
+  Rationale: CI run `22406276433` proves npm bootstrap fails on the repository
+  override graph before the install lane starts.
+  Date/Author: 2026-02-25 / Codex
+
 ## Outcomes & retrospective
 
 Implementation is in progress.
@@ -450,3 +463,7 @@ Remaining closure criteria:
   `Executable not found in $PATH: "node-gyp.cmd"`) and set Stage B remediation
   direction to bootstrap a pinned workspace `node-gyp` package and
   `node_modules/.bin` `PATH` override before Windows `bun install`.
+- 2026-02-25: Recorded CI run `22406276433` (`Install (Windows)` npm bootstrap
+  failure: `Override without name: @electron/rebuild>node-gyp`) and switched
+  the bootstrap command to
+  `bun add --no-save --ignore-scripts node-gyp@10.3.1`.

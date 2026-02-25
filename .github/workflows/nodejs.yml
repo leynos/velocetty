@@ -48,7 +48,7 @@ jobs:
       - name: Install (Windows)
         if: runner.os == 'Windows'
         run: |
-          npm install --no-save --no-package-lock --ignore-scripts node-gyp@10.3.1
+          bun add --no-save --ignore-scripts node-gyp@10.3.1
           test -f node_modules/.bin/node-gyp.cmd
           export PATH="$GITHUB_WORKSPACE/node_modules/.bin:$PATH"
           bun install
