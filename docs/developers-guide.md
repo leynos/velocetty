@@ -317,7 +317,7 @@ scope:
   (`NODE` environment variable when present, otherwise `node` on `PATH`), not
   `process.execPath`. CI runs this script via Bun; invoking node-gyp with Bun
   can trigger Windows header-extraction `EINVAL` failures.
-- Keep repository script/config text files normalized to LF in
+- Keep repository script/config text files normalised to LF in
   `.gitattributes` for extensions checked by Biome (`*.json`, `*.jsonc`,
   `*.js`, `*.cjs`, `*.mjs`, `*.ts`, and `*.tsx`). Windows checkout can
   otherwise convert those files to CRLF and trip `make lint`/Biome formatting

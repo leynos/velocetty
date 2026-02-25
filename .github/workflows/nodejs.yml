@@ -156,12 +156,13 @@ jobs:
       - name: Fix node-gyp and Python
         id: setup_node_gyp_python
         run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
+      - name: Export node-gyp environment
+        run: |
+          printf 'PYTHON=%s\n' "${{ steps.setup_node_gyp_python.outputs.python }}" >> "$GITHUB_ENV"
+          printf 'npm_config_python=%s\n' "${{ steps.setup_node_gyp_python.outputs.python }}" >> "$GITHUB_ENV"
+          printf 'npm_config_node_gyp=%s\n' "${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
       - name: Install
         run: bun install
-        env:
-          PYTHON: ${{ steps.setup_node_gyp_python.outputs.python }}
-          npm_config_python: ${{ steps.setup_node_gyp_python.outputs.python }}
-          npm_config_node_gyp: ${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
       - name: Install Linux build and E2E runtime deps
         uses: ./.github/actions/install-linux-e2e-runtime-deps
         with:
@@ -206,6 +207,11 @@ jobs:
       - name: Fix node-gyp and Python
         id: setup_node_gyp_python
         run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
+      - name: Export node-gyp environment
+        run: |
+          printf 'PYTHON=%s\n' "${{ steps.setup_node_gyp_python.outputs.python }}" >> "$GITHUB_ENV"
+          printf 'npm_config_python=%s\n' "${{ steps.setup_node_gyp_python.outputs.python }}" >> "$GITHUB_ENV"
+          printf 'npm_config_node_gyp=%s\n' "${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
       - name: Prepare x64 snapshot sysroot for Linux aarch64
         run: |
           set -euo pipefail
@@ -233,9 +239,6 @@ jobs:
       - name: Install
         run: bun install
         env:
-          PYTHON: ${{ steps.setup_node_gyp_python.outputs.python }}
-          npm_config_python: ${{ steps.setup_node_gyp_python.outputs.python }}
-          npm_config_node_gyp: ${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
           SKIP_V8_SNAPSHOT: '1'
           SKIP_NODE_PTY_REBUILD: '1'
       - name: Install Linux build and E2E runtime deps
