@@ -1,0 +1,431 @@
+# Stabilize Windows x64 CI and resolve Windows aarch64 lane feasibility
+
+This ExecPlan (execution plan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
+`Decision log`, and `Outcomes & retrospective` must be kept current as work
+proceeds.
+
+Status: IN PROGRESS (2026-02-25)
+
+No `PLANS.md` exists in this repository, so this plan stands alone.
+
+Implementation is now in progress for documentation deliverables in this turn.
+Workflow edits and gate execution remain pending.
+
+## Purpose / big picture
+
+Roadmap item `1.4.15` requires cross-architecture CI reliability for host
+platforms. Linux aarch64 and macOS aarch64 sub-items are already marked done.
+The remaining scope is:
+
+- Stabilize Windows CI on x64.
+- Add a Windows aarch64 lane if runner and toolchain support is available.
+- If Windows aarch64 is not available, document the blocker and create a
+  tracked follow-up item with explicit ownership.
+
+Success is observable when:
+
+- `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`
+  pass on the implementation branch with `tee` logs.
+- `nodejs.yml` is green for Windows x64.
+- Windows aarch64 is either running in CI or explicitly tracked as blocked with
+  a mitigation path and named owner.
+- `docs/developers-guide.md` reflects any changed developer practice.
+- `docs/roadmap.md` marks the relevant `1.4.15` entries done.
+
+## Scope and non-goals
+
+In scope:
+
+- Workflow and script updates needed to make Windows x64 CI deterministic.
+- Windows aarch64 feasibility testing and either lane enablement or blocker
+  tracking.
+- Documentation updates in `docs/developers-guide.md` and
+  `docs/tracking-issues.md` as required by the chosen path.
+- Roadmap checkbox updates in `docs/roadmap.md` when evidence is complete.
+
+Out of scope:
+
+- Reopening Linux aarch64 or macOS aarch64 implementation unless a shared fix
+  is strictly required for Windows reliability.
+- New product features unrelated to CI/release reliability.
+
+## Context and orientation
+
+Primary files and why they matter:
+
+- `docs/roadmap.md` (`1.4.15`): exact Windows checklist and success criteria.
+- `docs/adr-004-update-electron-40.md` (Phase 3): Electron 40 validation
+  guardrail.
+- `docs/developers-guide.md` (`Electron runtime alignment`): required runtime,
+  Node, and native-module alignment, plus existing Linux/macOS CI baselines.
+- `.github/workflows/nodejs.yml`: current matrix contains `windows-latest` and
+  Linux aarch64, but no Windows aarch64 lane.
+- `.github/actions/build-packaged-app/action.yml`: packaging entry point used in
+  CI; must remain supply-chain-safe.
+- `electron-builder.json`: Windows target already lists `x64` and `arm64`,
+  which supports a Windows aarch64 packaging lane once CI/runtime support
+  exists.
+- `docs/tracking-issues.md`: canonical place for blocker follow-up items with
+  explicit status and ownership.
+- `docs/velocetty-design.md`, `docs/velocetty-hyper-codebase.md`, and
+  `docs/velocetty-product-requirements-document.md`: architecture and quality
+  rationale that CI lanes must satisfy.
+
+## Agent team model
+
+Use a three-agent implementation team, then consolidate in the main workspace:
+
+1. CI workflow agent (owner: `.github/workflows/nodejs.yml` and any helper
+   scripts under `.github/scripts/`).
+   Deliverable: stable Windows x64 lane and Windows aarch64 decision path.
+2. Documentation agent (owner: `docs/developers-guide.md`,
+   `docs/tracking-issues.md`, `docs/roadmap.md`).
+   Deliverable: updated developer practice, blocker tracking (if needed), and
+   roadmap checklist closure.
+3. Validation agent (owner: `/tmp/*-$(get-project)-$(git branch --show).out`
+   evidence logs and CI run evidence).
+   Deliverable: reproducible local gate logs and CI lane pass/fail evidence.
+
+If parallel edits conflict, rebase and preserve all valid intent. Do not drop
+any requested checklist item.
+
+## Constraints
+
+- Keep roadmap semantics exact for `1.4.15`; do not mark an item done before
+  evidence exists.
+- Keep Electron runtime alignment coherent (`electron`, `@types/node`, CI
+  `NODE_VERSION`, node-gyp/Python wiring) when touching CI install flow.
+- Preserve supply-chain hygiene: pin Actions by SHA, avoid ad hoc remote
+  installers, and keep native rebuild tool paths deterministic.
+- Keep `Makefile` targets and existing entry points (`make build`, `make lint`,
+  `make test`) intact.
+- Do not mark the parent `1.4.15` item done until Windows bullets and success
+  criteria are satisfied.
+- Use en-GB-oxendict spelling and 80-column Markdown wrapping.
+
+## Tolerances (exception triggers)
+
+- Scope: if implementation needs more than 10 files or 550 net lines, stop and
+  escalate with options.
+- Interface: if application runtime behaviour must change outside CI/release
+  tooling to stabilize Windows x64, stop and escalate.
+- Dependencies: if a new third-party dependency is required, stop and escalate
+  before adding it.
+- Validation: if required local gates fail after two focused remediation passes,
+  stop and escalate with failing logs.
+- Feasibility ambiguity: if Windows aarch64 support cannot be proven supported
+  or blocked with concrete evidence, stop and escalate before updating roadmap
+  checkboxes.
+
+## Risks
+
+- Risk: Windows x64 failures are intermittent (native rebuild, signing, or E2E)
+  and difficult to reproduce locally.
+  Severity: high
+  Likelihood: medium
+  Mitigation: capture failing CI logs first, then implement narrow fixes and
+  rerun targeted Windows workflows before broad changes.
+
+- Risk: Windows aarch64 hosted runner/toolchain support is unavailable in this
+  repository context.
+  Severity: high
+  Likelihood: high
+  Mitigation: run a feasibility probe, capture hard evidence, and document the
+  blocker with a tracked follow-up and explicit owner.
+
+- Risk: roadmap closure without ownership on blocker follow-up.
+  Severity: high
+  Likelihood: medium
+  Mitigation: require non-TBD owner in `docs/tracking-issues.md` before marking
+  blocker handling done.
+
+- Risk: Windows lane changes regress Linux/macOS behaviour.
+  Severity: medium
+  Likelihood: medium
+  Mitigation: keep edits scoped to Windows-specific conditions and rerun the
+  full required local gate stack.
+
+## Plan of work
+
+### Stage A: Baseline and failure capture (no code changes)
+
+- Confirm branch and working tree state.
+- Capture latest Windows x64 CI failures from `nodejs.yml` and isolate failing
+  step(s): install, build, lint, test, packaging, or E2E.
+- Confirm current absence of Windows aarch64 lane in workflow.
+- Record evidence in `Surprises & discoveries`.
+
+Go/no-go gate:
+
+- Proceed only when at least one concrete Windows x64 failure signature (or a
+  confirmed flaky pattern with run IDs) is documented.
+
+### Stage B: Stabilize Windows x64 lane
+
+- Apply focused fixes in `.github/workflows/nodejs.yml` and/or helper scripts.
+- Keep `bun install` first for native-module validation, with deterministic
+  `PYTHON`, `npm_config_python`, and `npm_config_node_gyp` wiring where needed.
+- Keep Windows-specific changes guarded by `runner.os == 'Windows'` unless a
+  shared fix is required.
+- Re-run CI to verify Windows x64 lane green.
+
+Go/no-go gate:
+
+- Proceed only when Windows x64 is green in CI for the implementation commit.
+
+### Stage C: Windows aarch64 feasibility branch
+
+Path A (supported):
+
+- Add a Windows aarch64 lane (dedicated job or matrix include).
+- Ensure install/build/lint/test behaviour is equivalent to other host lanes.
+- Ensure packaging target and artefact naming are unambiguous for arm64.
+- Verify CI success and capture evidence.
+
+Path B (blocked):
+
+- Capture blocker evidence (runner unavailability, missing toolchain support,
+  or unrecoverable infrastructure limitation).
+- Update `docs/developers-guide.md` with Windows aarch64 blocker context and
+  mitigation path.
+- Add a tracked issue in `docs/tracking-issues.md` with:
+  - status,
+  - explicit owner (not `TBD`),
+  - mitigation/exit criteria,
+  - link to issue ticket if available.
+
+Go/no-go gate:
+
+- Continue to Stage D only when Path A or Path B is fully evidenced.
+
+### Stage D: Documentation and roadmap closure
+
+- Update `docs/developers-guide.md` under Electron runtime alignment with
+  Windows baseline changes introduced by this work.
+- Update `docs/roadmap.md` under `1.4.15`:
+  - mark Windows x64 stabilization line done,
+  - mark blocker-documentation line done when applicable,
+  - mark success-criteria line done once all criteria are evidenced.
+- Keep wording aligned with the existing roadmap style.
+
+### Stage E: Validation and closure evidence
+
+- Run required local gates with `tee` log files.
+- Confirm CI outcomes for changed lanes.
+- Update this ExecPlan sections (`Progress`, `Decision log`,
+  `Outcomes & retrospective`) and set status accordingly.
+
+## Concrete steps
+
+Run from repository root (`/data/leynos/Projects/velocetty`).
+
+1. Baseline commands:
+
+```bash
+git branch --show
+git status --short --branch
+nl -ba .github/workflows/nodejs.yml | sed -n '1,280p'
+```
+
+Expected baseline signal:
+
+```plaintext
+Current branch is the task branch; workflow shows windows-latest in matrix and
+no Windows aarch64 lane.
+```
+
+2. Recommended CI evidence collection (if `gh` is available):
+
+```bash
+gh run list --workflow nodejs.yml --limit 20
+gh run view <run-id> --log-failed
+```
+
+Fallback: gather the same evidence from the GitHub Actions web UI.
+
+3. Required local gates with repository log naming convention:
+
+```bash
+set -o pipefail
+PROJECT_NAME="$(get-project 2>/dev/null || basename "$PWD")"
+BRANCH_NAME="$(git branch --show)"
+
+bun install 2>&1 | tee "/tmp/install-${PROJECT_NAME}-${BRANCH_NAME}.out"
+make build 2>&1 | tee "/tmp/build-${PROJECT_NAME}-${BRANCH_NAME}.out"
+make check-fmt 2>&1 | tee "/tmp/check-fmt-${PROJECT_NAME}-${BRANCH_NAME}.out"
+make lint 2>&1 | tee "/tmp/lint-${PROJECT_NAME}-${BRANCH_NAME}.out"
+make test 2>&1 | tee "/tmp/test-${PROJECT_NAME}-${BRANCH_NAME}.out"
+```
+
+Expected gate signal:
+
+```plaintext
+All five commands exit 0; logs exist under /tmp with the branch-safe names.
+```
+
+## Validation and acceptance
+
+Functional acceptance:
+
+- Windows x64 CI lane passes install/build/lint/test for the implementation
+  commit.
+- Windows aarch64 outcome is complete through one of:
+  - lane enabled and green, or
+  - documented blocker with tracked follow-up and explicit owner.
+
+Documentation acceptance:
+
+- `docs/developers-guide.md` reflects changed Windows CI/runtime practice.
+- `docs/tracking-issues.md` contains a Windows aarch64 follow-up item with a
+  named owner when blocked.
+- `docs/roadmap.md` `1.4.15` checklist state matches actual evidence.
+
+Command acceptance:
+
+- `bun install`
+- `make build`
+- `make check-fmt`
+- `make lint`
+- `make test`
+
+## Idempotence and recovery
+
+- Workflow and docs edits are idempotent and safe to reapply.
+- If a CI run fails, capture run ID and failing step, patch minimally, and rerun
+  only affected lanes before rerunning full validation.
+- If a blocker path is chosen, do not partially mark roadmap success criteria;
+  first land tracking documentation with explicit ownership.
+- If branch drift occurs, `git pull --rebase`, re-run required gates, and
+  refresh roadmap/doc status based on latest evidence.
+
+## Interfaces and dependencies
+
+Files expected to change during implementation:
+
+- `.github/workflows/nodejs.yml` (Windows lane stability and optional aarch64
+  lane wiring).
+- Optional `.github/scripts/*` helper(s) only if required for deterministic
+  Windows setup.
+- `docs/developers-guide.md` (Windows CI/runtime baseline updates).
+- `docs/tracking-issues.md` (Windows aarch64 blocker follow-up when needed).
+- `docs/roadmap.md` (`1.4.15` checklist updates).
+
+Dependencies and contracts to preserve:
+
+- Existing Bun and Node baselines in CI (`NODE_VERSION`, `bun-version`).
+- `make` gate contract and existing workflow step order.
+- Action pinning by commit SHA for supply-chain hygiene.
+
+## Progress
+
+- [x] (2026-02-25 15:40Z) Confirmed branch
+  `1-4-15-4-windows-ci-on-x64-md` and clean working tree.
+- [x] (2026-02-25 15:40Z) Collected roadmap, ADR, developers-guide, workflow,
+  Makefile, and architecture references for `1.4.15` Windows scope.
+- [x] (2026-02-25 15:40Z) Ran a planning agent team (requirements, CI state,
+  documentation impact) and consolidated findings into this ExecPlan.
+- [x] (2026-02-25 15:40Z) Drafted this ExecPlan at the user-requested path.
+- [x] (2026-02-25 16:13Z) Moved this plan to in-progress execution status.
+- [x] (2026-02-25 16:13Z) Captured Bun release evidence for Windows aarch64
+  feasibility: latest release `bun-v1.3.9` (published 2026-02-08) includes
+  `bun-windows-x64*` assets and no Windows arm64 asset.
+- [ ] Implement Stage B Windows x64 stabilization.
+- [x] Implement Stage C Windows aarch64 supported-or-blocked path (Path B:
+  documented blocker with explicit ownership).
+- [x] Update docs and roadmap based on evidence.
+- [ ] Run required local gates and collect logs.
+- [ ] Finalize outcomes and retrospective.
+
+## Surprises & discoveries
+
+- Observation: the current CI matrix includes `windows-latest` plus Linux/macOS,
+  and has a dedicated Linux aarch64 job, but no Windows aarch64 lane.
+  Evidence: `.github/workflows/nodejs.yml` matrix and jobs.
+  Impact: Windows aarch64 needs an explicit decision branch (enable or track
+  blocker), not just a routine matrix tweak.
+
+- Observation: packaging configuration already includes Windows `x64` and
+  `arm64` targets.
+  Evidence: `electron-builder.json` Windows target arch list.
+  Impact: packaging config is not the main blocker; runner/toolchain feasibility
+  is the critical gate.
+
+- Observation: current Windows CI install reliability uses a dedicated Windows
+  temp directory and explicit node-gyp path wiring.
+  Evidence: `.github/workflows/nodejs.yml` Windows-only install preparation and
+  `npm_config_node_gyp`/`TMP`/`TEMP`/`npm_config_tmp` environment settings.
+  Impact: these constraints must be documented as the Windows x64 baseline to
+  prevent regression from shared cross-OS simplifications.
+
+- Observation: latest Bun upstream release does not provide a Windows arm64
+  runtime artefact.
+  Evidence: GitHub API query to `oven-sh/bun` latest release on 2026-02-25:
+  `bun-v1.3.9` (published 2026-02-08) lists `bun-windows-x64*` assets and no
+  Windows arm64 asset.
+  Impact: Windows aarch64 lane enablement remains blocked in this repository
+  until Bun publishes an arm64 Windows artefact and setup support.
+
+## Decision log
+
+- Decision: move this ExecPlan to `Status: IN PROGRESS` and execute the
+  documentation path now.
+  Rationale: implementation for this branch is underway, scoped to docs updates
+  requested in-thread.
+  Date/Author: 2026-02-25 / Codex
+
+- Decision: structure implementation as a two-path Windows aarch64 branch
+  (supported vs blocked).
+  Rationale: roadmap requires either operational lane or explicit blocker
+  tracking with ownership.
+  Date/Author: 2026-02-25 / Codex
+
+- Decision: require explicit non-TBD owner for blocker follow-up.
+  Rationale: roadmap text requires explicit ownership for blocked Windows
+  aarch64.
+  Date/Author: 2026-02-25 / Codex
+
+- Decision: select Stage C Path B (blocked) for Windows aarch64 in this turn.
+  Rationale: latest Bun release evidence confirms no Windows arm64 runtime
+  artefact, so lane enablement cannot be completed without upstream support.
+  Date/Author: 2026-02-25 / Codex
+
+- Decision: defer local gates until workflow and documentation edits are
+  reconciled in one validation pass.
+  Rationale: running the full gate stack once at the end provides a single
+  evidence set aligned to the final diff.
+  Date/Author: 2026-02-25 / Codex
+
+## Outcomes & retrospective
+
+Implementation is in progress.
+
+Current outcomes:
+
+- Updated `docs/developers-guide.md` with the Windows x64 CI stabilization
+  baseline (Windows-specific node-gyp Python/bootstrap and temp-directory
+  wiring).
+- Added `WINARM64-001` to `docs/tracking-issues.md` with explicit ownership
+  (`@leynos`), blocker context, and mitigation/exit criteria.
+- Updated `docs/roadmap.md` item `1.4.15` to mark Windows x64 stabilization,
+  blocker documentation, and success criteria complete with tracked blocker
+  reference.
+- Recorded Bun upstream blocker evidence in this plan:
+  `bun-v1.3.9` (2026-02-08) has no Windows arm64 artefact.
+
+Remaining closure criteria:
+
+- Complete Stage B verification evidence for Windows x64 CI stabilization in
+  workflow/CI run artefacts.
+- Run required local gates and capture `/tmp/*-$(get-project)-$(git branch
+  --show).out` logs (not executed in this turn).
+- Finalize retrospective after CI evidence and gate outcomes are available.
+
+## Revision note
+
+- 2026-02-25: Initial draft created from roadmap `1.4.15`, ADR-004 Phase 3,
+  developers-guide runtime alignment guidance, and current CI/workflow state.
+  Remaining work is implementation and verification after explicit approval.
+- 2026-02-25: Moved to in-progress implementation, recorded Bun Windows arm64
+  blocker evidence, updated developer/tracking/roadmap docs for Stage C Path B,
+  and queued one full validation pass after workflow reconciliation.

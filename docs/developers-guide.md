@@ -281,6 +281,28 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   before other gates and keep `npm_config_node_gyp` pointed at the workspace
   `node-gyp` entrypoint in CI jobs that rebuild native modules.
 
+Windows runtime reliability baseline after roadmap item `1.4.15` Windows
+scope:
+
+- Keep Windows CI on `windows-latest` (x64) in the shared build matrix and run
+  Windows install in a dedicated workflow step.
+- Run `.github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"`
+  before `bun install`, then set `PYTHON`, `npm_config_python`, and
+  `npm_config_node_gyp` from step outputs for the install step.
+- For Windows install, map `TMP`, `TEMP`, and `npm_config_tmp` to
+  `${{ runner.temp }}` so `node-gyp` extraction uses a deterministic writable
+  path instead of the short-name `%LOCALAPPDATA%` alias.
+- Keep `npm_config_node_gyp` on the Windows-specific path form
+  (`\\node_modules\\node-gyp\\bin\\node-gyp.js`) to avoid path-separator drift
+  across operating systems.
+- Windows aarch64 CI is currently blocked by upstream Bun distribution support.
+  Evidence (captured 2026-02-25): latest Bun release `bun-v1.3.9` (published
+  2026-02-08) includes `bun-windows-x64*` assets and no Windows arm64 asset.
+- Mitigation and ownership are tracked in `WINARM64-001` in
+  `docs/tracking-issues.md` (owner: `@leynos`). Re-evaluate lane enablement
+  when a Bun release publishes a Windows arm64 artefact and `setup-bun`
+  supports it.
+
 When preparing future Electron upgrades, update these anchors together and
 avoid merging partial baseline updates.
 

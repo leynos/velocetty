@@ -84,3 +84,30 @@ Last updated: 2026-02-12
 - Changing `webGLRenderer` takes effect for active sessions without restart.
 - Unit or integration tests cover hot-reload behavior and fallback handling.
 - `make lint` and `make test` remain green.
+
+## WINARM64-001 Track Windows aarch64 CI enablement after Bun support lands
+
+Status: Open  
+Owner: @leynos  
+Last updated: 2026-02-25  
+Issue: Not filed (roadmap `1.4.15` blocker tracker)
+
+### WINARM64-001 summary
+
+- Roadmap item `1.4.15` currently uses the blocker path for Windows aarch64
+  because Bun does not publish a Windows arm64 runtime artefact.
+- Evidence captured on 2026-02-25 from the latest Bun release
+  (`bun-v1.3.9`, published 2026-02-08): assets include `bun-windows-x64*`
+  and no Windows arm64 asset.
+- Mitigation: keep Windows x64 CI as the required host-platform lane and
+  re-evaluate Windows aarch64 lane enablement on each Bun release.
+
+### WINARM64-001 exit criteria
+
+- Latest Bun release publishes a Windows arm64 asset suitable for
+  `oven-sh/setup-bun` installation.
+- A Windows aarch64 CI lane is enabled and green for install, build, lint, and
+  test gates, or a replacement upstream-supported installation path is
+  documented.
+- `docs/developers-guide.md` and roadmap item `1.4.15` are updated to reflect
+  the unblocked state.

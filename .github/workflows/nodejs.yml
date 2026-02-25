@@ -39,11 +39,22 @@ jobs:
         id: setup_node_gyp_python
         run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
       - name: Install
+        if: runner.os != 'Windows'
         run: bun install
         env:
           PYTHON: ${{ steps.setup_node_gyp_python.outputs.python }}
           npm_config_python: ${{ steps.setup_node_gyp_python.outputs.python }}
           npm_config_node_gyp: ${{ github.workspace }}${{ runner.os == 'Windows' && '\node_modules\node-gyp\bin\node-gyp.js' || '/node_modules/node-gyp/bin/node-gyp.js' }}
+      - name: Install (Windows)
+        if: runner.os == 'Windows'
+        run: bun install
+        env:
+          PYTHON: ${{ steps.setup_node_gyp_python.outputs.python }}
+          npm_config_python: ${{ steps.setup_node_gyp_python.outputs.python }}
+          npm_config_node_gyp: ${{ github.workspace }}\node_modules\node-gyp\bin\node-gyp.js
+          TMP: ${{ runner.temp }}
+          TEMP: ${{ runner.temp }}
+          npm_config_tmp: ${{ runner.temp }}
       - name: Install libarchive-tools
         if: runner.os == 'Linux'
         run: |
