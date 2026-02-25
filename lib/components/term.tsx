@@ -605,6 +605,25 @@ export default class Term extends React.PureComponent<
     this.ensureWebGLRenderer();
   }
 
+  private hasFontPropsChanged(prevProps: TermProps): boolean {
+    return (
+      this.props.fontSize !== prevProps.fontSize ||
+      this.props.fontFamily !== prevProps.fontFamily ||
+      this.props.lineHeight !== prevProps.lineHeight ||
+      this.props.letterSpacing !== prevProps.letterSpacing
+    );
+  }
+
+  private hasRendererPropsChanged(prevProps: TermProps): boolean {
+    return (
+      prevProps.isActiveRootGroup !== this.props.isActiveRootGroup ||
+      prevProps.webGLRenderer !== this.props.webGLRenderer ||
+      prevProps.webGLRendererMaxContexts !== this.props.webGLRendererMaxContexts ||
+      prevProps.backgroundColor !== this.props.backgroundColor ||
+      prevProps.disableLigatures !== this.props.disableLigatures
+    );
+  }
+
   componentDidUpdate(prevProps: TermProps) {
     if (!prevProps.cleared && this.props.cleared) {
       this.clear();
@@ -632,12 +651,7 @@ export default class Term extends React.PureComponent<
       this.term.element.style.padding = this.props.padding;
     }
 
-    if (
-      this.props.fontSize !== prevProps.fontSize ||
-      this.props.fontFamily !== prevProps.fontFamily ||
-      this.props.lineHeight !== prevProps.lineHeight ||
-      this.props.letterSpacing !== prevProps.letterSpacing
-    ) {
+    if (this.hasFontPropsChanged(prevProps)) {
       // resize to fit the container
       this.fitResize();
     }
@@ -646,13 +660,7 @@ export default class Term extends React.PureComponent<
       this.resize(this.props.cols!, this.props.rows!);
     }
 
-    if (
-      prevProps.isActiveRootGroup !== this.props.isActiveRootGroup ||
-      prevProps.webGLRenderer !== this.props.webGLRenderer ||
-      prevProps.webGLRendererMaxContexts !== this.props.webGLRendererMaxContexts ||
-      prevProps.backgroundColor !== this.props.backgroundColor ||
-      prevProps.disableLigatures !== this.props.disableLigatures
-    ) {
+    if (this.hasRendererPropsChanged(prevProps)) {
       this.scheduleRendererVisibilitySync();
     }
   }
