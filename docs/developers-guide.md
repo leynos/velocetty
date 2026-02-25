@@ -293,24 +293,24 @@ scope:
 - Windows CI run `22405749378` (2026-02-25) exposed a native rebuild failure in
   `Install (Windows)`: `bun install` can fail with `Executable not found in
   $PATH: "node-gyp.cmd"`.
-- Mitigate this Windows-only failure mode by bootstrapping a pinned workspace
-  `node-gyp` package before the Windows install step and prepending
+- Mitigate this Windows-only failure mode by running
+  `bun install --ignore-scripts` before the full `bun install`, then prepending
   `node_modules/.bin` to `PATH` so `node-gyp.cmd` is available during native
   rebuild.
-- Use `bun add --no-save --ignore-scripts node-gyp@10.3.1` for this bootstrap.
-  Do not use `npm install` for the same purpose in this repository: npm can
-  fail early on the repository override graph (`Override without name`) before
-  `bun install` starts.
-- After the Bun bootstrap, ensure `node_modules/.bin/node-gyp.cmd` exists.
+- Do not use `npm install` for this bootstrap in this repository: npm can fail
+  early on the repository override graph (`Override without name`) before Bun
+  install starts.
+- After the scriptless Bun bootstrap, ensure `node_modules/.bin/node-gyp.cmd`
+  exists.
   Bun's Windows package shim can expose `node-gyp` without the `.cmd` wrapper;
   create a minimal `node-gyp.cmd` launcher that delegates to
   `..\node-gyp\bin\node-gyp.js` before running `bun install`.
 - For Windows install, map `TMP`, `TEMP`, and `npm_config_tmp` to
   `${{ runner.temp }}` so `node-gyp` extraction uses a deterministic writable
   path instead of the short-name `%LOCALAPPDATA%` alias.
-- Keep `npm_config_node_gyp` on the Windows-specific path form
-  (`\node_modules\node-gyp\bin\node-gyp.js`) to avoid path-separator drift
-  across operating systems.
+- Keep `npm_config_node_gyp` on
+  `${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js` so all host
+  lanes use the same workspace-relative path form.
 - Keep `bin/rebuild-node-pty.cjs` running node-gyp through the Node executable
   (`NODE` environment variable when present, otherwise `node` on `PATH`), not
   `process.execPath`. CI runs this script via Bun; invoking node-gyp with Bun
