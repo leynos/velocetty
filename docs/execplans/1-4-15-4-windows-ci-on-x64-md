@@ -384,6 +384,14 @@ Dependencies and contracts to preserve:
   Impact: Stage B needs an explicit Windows `node-gyp.cmd` shim after Bun
   bootstrap so native rebuild helpers that spawn `node-gyp.cmd` can resolve.
 
+- Observation: the first launcher-shim attempt regressed in CI run
+  `22407440178` on 2026-02-25.
+  Evidence: `Install (Windows)` failed with
+  `"printf: '~': invalid format character"` when writing `%~dp0` in the batch
+  file template.
+  Impact: Stage B needs literal-string `printf` arguments (or escaped `%`)
+  while generating `node-gyp.cmd`.
+
 - Observation: latest Bun upstream release does not provide a Windows arm64
   runtime artefact.
   Evidence: GitHub API query to `oven-sh/bun` latest release on 2026-02-25:
@@ -440,6 +448,12 @@ Dependencies and contracts to preserve:
   `.cmd` launcher expected by Windows native rebuild scripts.
   Date/Author: 2026-02-25 / Codex
 
+- Decision: generate the Windows launcher via
+  `printf '%s\r\n' ...` literal lines instead of `%`-formatted templates.
+  Rationale: CI run `22407440178` failed because `%~dp0` was parsed as a format
+  sequence by `printf`.
+  Date/Author: 2026-02-25 / Codex
+
 ## Outcomes & retrospective
 
 Implementation is in progress.
@@ -484,3 +498,5 @@ Remaining closure criteria:
 - 2026-02-25: Recorded CI run `22406525103` (Bun bootstrap succeeded but
   `node-gyp.cmd` missing), and added a Windows launcher shim step for
   `node_modules/.bin/node-gyp.cmd` before `bun install`.
+- 2026-02-25: Recorded CI run `22407440178` (`printf` format parsing on `%~dp0`)
+  and switched launcher generation to literal-line `printf '%s\r\n'` output.
