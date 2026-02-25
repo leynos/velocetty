@@ -509,11 +509,15 @@ export default class Term extends React.PureComponent<
     return true;
   }
 
+  private isCompletelyOutsideViewport(bounds: DOMRect, viewportWidth: number, viewportHeight: number) {
+    return bounds.right <= 0 || bounds.bottom <= 0 || bounds.left >= viewportWidth || bounds.top >= viewportHeight;
+  }
+
   isPaneOccluded(bounds: DOMRect) {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
-    if (bounds.right <= 0 || bounds.bottom <= 0 || bounds.left >= viewportWidth || bounds.top >= viewportHeight) {
+    if (this.isCompletelyOutsideViewport(bounds, viewportWidth, viewportHeight)) {
       return true;
     }
 
