@@ -11,4 +11,5 @@ bin
 dist
 target
 cache
+.node-gyp-python
 **/schema.json

@@ -125,7 +125,7 @@ Scope notes:
     Linux ARM coverage with Linux aarch64.
   - [x] Resolve Linux aarch64 CI failures across install, build, lint, and test
     gates.
-  - [ ] Resolve macOS aarch64 CI failures across install, build, lint, and test
+  - [x] Resolve macOS aarch64 CI failures across install, build, lint, and test
     gates.
   - [ ] Stabilize Windows CI on x64 and add a Windows aarch64 lane if runner and
     toolchain support is available.

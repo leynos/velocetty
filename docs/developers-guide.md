@@ -219,6 +219,21 @@ Current repository runtime baseline after roadmap item `1.4.13`:
 - `@types/node`: `^24.10.12`
 - CI workflow `NODE_VERSION`: `24.11.1`
 
+CI Python/node-gyp baseline after roadmap item `1.4.15` macOS scope:
+
+- In CI jobs that prepare native-module builds, create a per-job Python virtual
+  environment for node-gyp bootstrap packages instead of running system-level
+  `pip install`.
+- Install `pip`, `packaging`, and `setuptools` inside that virtual environment,
+  then set `PYTHON` and `npm_config_python` to the virtual-environment
+  interpreter path for the install/rebuild steps that need node-gyp.
+- Keep `npm_config_node_gyp` aligned to the workspace `node-gyp` entrypoint in
+  the same job, so Python and node-gyp resolution stay deterministic.
+- Run this isolated Python bootstrap before `bun install`; this keeps hosted
+  macOS lanes compliant with Python Enhancement Proposal (PEP) 668
+  (`externally-managed-environment`) and
+  avoids host-level Python mutation.
+
 Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
 
 - Linux ARM CI coverage is Linux aarch64 only; do not reintroduce armv7
@@ -251,13 +266,14 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   from the host multiarch rootfs.
 - For Linux aarch64 CI lanes, set `SKIP_V8_SNAPSHOT=1` during `bun install` so
   snapshot generation cannot stall install for hours under emulation.
-- For Linux aarch64 CI lanes that run a dedicated `node-pty` rebuild step after
-  install, set `SKIP_NODE_PTY_REBUILD=1` during `bun install` to avoid
-  duplicate native rebuild work in postinstall.
+- For Linux aarch64 CI lanes, set `SKIP_NODE_PTY_REBUILD=1` during
+  `bun install` so the lane does not hang in long-running `node-gyp` Electron
+  header extraction for `node-pty`; keep `npm_config_node_gyp` and Python
+  toolchain wiring in place for the remaining native-module install steps.
 - When Linux aarch64 CI lanes package artefacts after install-time snapshot
-  skipping, run `SKIP_X64_V8_SNAPSHOT=1 bun run v8-snapshot` before
-  `electron-builder` so `cache/arm64` contains the snapshot blobs required by
-  `bin/cp-snapshot.js`.
+  skipping, set `SKIP_V8_SNAPSHOT_COPY=1` for the packaging step, so CI uses
+  Electron's default snapshots instead of waiting on arm64 custom snapshot
+  generation that can stall under QEMU.
 - For local Linux aarch64 validation where snapshots are still required, set
   `SKIP_X64_V8_SNAPSHOT=1` to avoid generating the additional x64 snapshot pass
   under QEMU.
@@ -390,8 +406,10 @@ Fast lane (required on pull requests):
 - Run `bun run test:e2e:fast` (or `bun run test:e2e`).
 - Executes Bun-driven smoke checks in `test/e2e/`.
 - Asserts renderer readiness and fails on critical renderer console errors.
-- Supports `E2E_DRIVER=playwright|spawn` overrides; CI uses spawn-mode markers
-  emitted by the main process to gate renderer readiness and renderer errors.
+- Supports `E2E_DRIVER=playwright|spawn` overrides; CI defaults to spawn-mode
+  markers, with a macOS packaged-launch fallback that accepts missing
+  renderer-ready marker output only when the process remains alive through an
+  additional stability window bounded by remaining test-timeout budget.
 - Supports `E2E_DEBUG=1` for verbose launch logs and `E2E_CAPTURE=1` for
   screenshot capture.
 
