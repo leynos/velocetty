@@ -308,9 +308,11 @@ scope:
 - For Windows install, map `TMP`, `TEMP`, and `npm_config_tmp` to
   `${{ runner.temp }}` so `node-gyp` extraction uses a deterministic writable
   path instead of the short-name `%LOCALAPPDATA%` alias.
-- Keep `npm_config_node_gyp` on
-  `${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js` so all host
-  lanes use the same workspace-relative path form.
+- Keep `npm_config_node_gyp` in the forward-slash form used by the
+  `Install (Windows)` step in `.github/workflows/nodejs.yml`:
+  `${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js`.
+  Preserve this forward-slash `npm_config_node_gyp` value to avoid introducing
+  path-separator regressions.
 - Keep `bin/rebuild-node-pty.cjs` running node-gyp through the Node executable
   (`NODE` environment variable when present, otherwise `node` on `PATH`), not
   `process.execPath`. CI runs this script via Bun; invoking node-gyp with Bun
