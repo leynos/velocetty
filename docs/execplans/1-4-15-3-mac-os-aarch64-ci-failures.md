@@ -278,6 +278,9 @@ Local command validation:
 - [x] (2026-02-24 22:40Z) Addressed Linux aarch64 `rebuild-node-pty` stall by
   rebuilding `node-pty` during `bun install` and removing the separate rebuild
   step from the Linux aarch64 lane.
+- [x] (2026-02-25 01:15Z) Addressed residual Linux aarch64 install hangs by
+  setting `SKIP_NODE_PTY_REBUILD=1` for the Linux aarch64 `bun install` step so
+  postinstall skips the long-running `node-gyp` `rebuild-node-pty` path.
 - [ ] Validate macOS CI lane success and capture run evidence.
 - [ ] Finalize outcomes and retrospective.
 
@@ -344,6 +347,13 @@ Local command validation:
   output during the dedicated rebuild step.
   Impact: rebuilding `node-pty` in the install step keeps Python/node-gyp
   environment alignment consistent and removes an extra long-running stage.
+- Observation: Linux aarch64 CI can still stall when `bun install` triggers
+  postinstall `bun run rebuild-node-pty` in the same lane.
+  Evidence: CI logs were killed after 360 minutes in
+  `gyp verb extracted file from tarball ...` output while running
+  `bun run rebuild-node-pty`.
+  Impact: Linux aarch64 install steps should set
+  `SKIP_NODE_PTY_REBUILD=1` to bypass this non-deterministic rebuild path.
 
 ## Decision log
 
@@ -401,6 +411,12 @@ Local command validation:
   node-gyp/Python environment wiring in one deterministic install step.
   Date/author: 2026-02-24 / Codex
 
+- Decision: skip `rebuild-node-pty` during Linux aarch64 CI install by setting
+  `SKIP_NODE_PTY_REBUILD=1`.
+  Rationale: postinstall rebuild still hangs in node-gyp header extraction for
+  this lane; skipping restores deterministic CI completion.
+  Date/author: 2026-02-25 / Codex
+
 ## Outcomes & retrospective
 
 Implementation is in progress.
@@ -430,6 +446,9 @@ Current outcomes:
   the lane cannot freeze in arm64 snapshot generation.
 - Updated Linux aarch64 workflow sequencing so `node-pty` rebuild happens in
   install and no separate rebuild stage can stall later in the lane.
+- Updated Linux aarch64 install environment to set
+  `SKIP_NODE_PTY_REBUILD=1` so postinstall skips the long-running
+  `rebuild-node-pty` node-gyp phase.
 - Completed required local gates successfully:
   `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`.
 

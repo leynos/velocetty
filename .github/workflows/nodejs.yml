@@ -221,6 +221,7 @@ jobs:
           npm_config_python: ${{ steps.setup_node_gyp_python.outputs.python }}
           npm_config_node_gyp: ${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
           SKIP_V8_SNAPSHOT: '1'
+          SKIP_NODE_PTY_REBUILD: '1'
       - name: Install Linux build and E2E runtime deps
         uses: ./.github/actions/install-linux-e2e-runtime-deps
         with:
