@@ -339,6 +339,9 @@ Dependencies and contracts to preserve:
 - [x] (2026-02-25) Captured CI run `22408893713` after the Node-runtime patch:
   `Install (Windows)` progressed past `rebuild-node-pty`, but
   `Run Makefile lint and unit-test gates` failed on CRLF-formatted JSON files.
+- [x] (2026-02-25) Captured CI run `22409492277`: Windows lint still failed on
+  CRLF conversion for `.cjs`, `.mjs`, and `.jsonc` files; Ubuntu test failures
+  were traced to non-deterministic Electron mock ordering in Bun unit tests.
 - [ ] Implement Stage B Windows x64 stabilization.
 - [x] Implement Stage C Windows aarch64 supported-or-blocked path (Path B:
   documented blocker with explicit ownership).
@@ -432,6 +435,28 @@ Dependencies and contracts to preserve:
   Impact: Stage B also requires repository-level JSON EOL normalization so
   Windows checkout line endings do not create formatting-only failures.
 
+- Observation: CI run `22409492277` still failed the Windows lint phase after
+  JSON-only normalization.
+  Evidence: failed formatter files were `.markdownlint-cli2.jsonc`, multiple
+  `bin/*.cjs`, and `scripts/*.mjs`, all showing CRLF (`␍`) diffs.
+  Impact: Stage B needs LF normalization widened to the full script/config
+  extension set checked by Biome, not JSON alone.
+
+- Observation: Ubuntu failures in run `22409492277` were test-order dependent,
+  not platform-native-module regressions.
+  Evidence: `runtime-plugin-settings.test.ts` fails when run alone with
+  `TypeError: Not running in an Electron environment!`; full-suite runs can
+  pass when earlier files leave Electron mocks registered.
+  Impact: Stage B stabilization needs deterministic Electron mock registration
+  in unit tests so Linux CI does not depend on file ordering or prior mocks.
+
+- Observation: `registerElectronMock()` used an internal `isRegistered` guard
+  that survived `mock.restore()` calls from other test files.
+  Evidence: Bun `mock.restore()` clears module mocks globally, but the helper's
+  guard prevented re-registering Electron later in the same process.
+  Impact: suites that call `registerElectronMock()` after a restore can fail
+  with `app`/`ipcMain` export errors unless the helper always re-registers.
+
 ## Decision log
 
 - Decision: move this ExecPlan to `Status: IN PROGRESS` and execute the
@@ -497,6 +522,24 @@ Dependencies and contracts to preserve:
   can trigger formatting failures unrelated to functional changes.
   Date/Author: 2026-02-25 / Codex
 
+- Decision: expand LF enforcement in `.gitattributes` to include
+  `*.jsonc`, `*.cjs`, and `*.mjs` alongside existing JS/TS/JSON rules.
+  Rationale: CI run `22409492277` shows Windows lint failures in those
+  extensions after JSON-only normalization.
+  Date/Author: 2026-02-25 / Codex
+
+- Decision: make `registerElectronMock()` always register mocks and remove the
+  stale in-memory registration guard.
+  Rationale: `mock.restore()` clears mocks process-wide; the prior guard made
+  later re-registration attempts no-op and caused order-dependent failures.
+  Date/Author: 2026-02-25 / Codex
+
+- Decision: load `app/runtime/plugin-runtime` in
+  `runtime-plugin-settings.test.ts` only after registering the Electron mock.
+  Rationale: that module imports `app/config/paths` at module init time and can
+  fail outside Electron unless the mock is active first.
+  Date/Author: 2026-02-25 / Codex
+
 ## Outcomes & retrospective
 
 Implementation is in progress.
@@ -510,8 +553,15 @@ Current outcomes:
   (`NODE` override or `node` on `PATH`) instead of Bun `process.execPath`.
 - Added a Windows runtime-alignment note in `docs/developers-guide.md` for this
   Node runtime-selection requirement in `rebuild-node-pty`.
-- Updated `.gitattributes` to enforce `*.json text eol=lf` and documented this
-  as part of the Windows reliability baseline.
+- Updated `.gitattributes` to enforce LF for script/config extensions used by
+  Biome (`*.json`, `*.jsonc`, `*.js`, `*.cjs`, `*.mjs`, `*.ts`, `*.tsx`) and
+  documented this as part of the Windows reliability baseline.
+- Updated `test/testUtils/electron-path.ts` so `registerElectronMock()` can
+  re-register Electron after any `mock.restore()` call in the same Bun
+  process.
+- Updated `test/unit/runtime-plugin-settings.test.ts` to register Electron
+  mocks before importing `app/runtime/plugin-runtime`, removing test-order
+  coupling in Linux CI.
 - Added `WINARM64-001` to `docs/tracking-issues.md` with explicit ownership
   (`@leynos`), blocker context, and mitigation/exit criteria.
 - Updated `docs/roadmap.md` item `1.4.15` to mark Windows x64 stabilization,
@@ -559,3 +609,7 @@ Remaining closure criteria:
 - 2026-02-25: Captured PR run `22408893713` where Windows advanced through
   `Install (Windows)` after the Node-runtime fix and then failed on CRLF JSON
   formatting diffs; added `*.json text eol=lf` to `.gitattributes`.
+- 2026-02-25: Captured PR run `22409492277` where Windows still failed lint on
+  CRLF in `.jsonc`/`.cjs`/`.mjs` files and Ubuntu exposed order-dependent
+  Electron mock failures; expanded `.gitattributes` LF rules and hardened
+  Electron test mock registration.

@@ -1,5 +1,5 @@
 /** @file Covers runtime plugin settings persistence and enable/disable evaluation. */
-import {expect, test} from 'bun:test';
+import {beforeAll, expect, test} from 'bun:test';
 import JSON5 from 'json5';
 
 import {
@@ -9,16 +9,38 @@ import {
   runtimePluginManifests
 } from '@shared/runtime/golden-path-demo';
 import type {configOptions} from '@shared/types/config';
-import {
-  ensureRuntimePluginSettingsPersisted,
-  getRuntimePluginCommandDefinitions,
-  getRuntimePluginKeybindings,
-  mergeRuntimePluginKeybindings,
-  setRuntimePluginEnabledPersisted
+import type {
+  ensureRuntimePluginSettingsPersisted as ensureRuntimePluginSettingsPersistedType,
+  getRuntimePluginCommandDefinitions as getRuntimePluginCommandDefinitionsType,
+  getRuntimePluginKeybindings as getRuntimePluginKeybindingsType,
+  mergeRuntimePluginKeybindings as mergeRuntimePluginKeybindingsType,
+  setRuntimePluginEnabledPersisted as setRuntimePluginEnabledPersistedType
 } from '../../app/runtime/plugin-runtime';
+import {registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
 
 type ReadTextFile = (path: string, encoding: BufferEncoding) => string;
 type WriteTextFile = (path: string, content: string, encoding: BufferEncoding) => void;
+
+let ensureRuntimePluginSettingsPersisted: typeof ensureRuntimePluginSettingsPersistedType;
+let getRuntimePluginCommandDefinitions: typeof getRuntimePluginCommandDefinitionsType;
+let getRuntimePluginKeybindings: typeof getRuntimePluginKeybindingsType;
+let mergeRuntimePluginKeybindings: typeof mergeRuntimePluginKeybindingsType;
+let setRuntimePluginEnabledPersisted: typeof setRuntimePluginEnabledPersistedType;
+
+beforeAll(async () => {
+  // plugin-runtime imports app/config/paths, which imports Electron at module
+  // initialization time. Register the Electron mock first so this suite is
+  // deterministic regardless of test-file ordering.
+  resetElectronMock();
+  registerElectronMock();
+  ({
+    ensureRuntimePluginSettingsPersisted,
+    getRuntimePluginCommandDefinitions,
+    getRuntimePluginKeybindings,
+    mergeRuntimePluginKeybindings,
+    setRuntimePluginEnabledPersisted
+  } = await import('../../app/runtime/plugin-runtime.ts?runtime_plugin_settings_unit'));
+});
 
 const createReadWritePair = (
   initialContent: string

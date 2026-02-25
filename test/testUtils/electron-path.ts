@@ -59,8 +59,6 @@ const electronMock: ElectronMock = {
   }
 };
 
-let isRegistered = false;
-
 /**
  * Returns the shared Electron mock instance.
  *
@@ -124,7 +122,8 @@ export const configureElectronMock = (overrides: ElectronMockOverrides) => {
 /**
  * Registers the Electron mock for both module specifiers used in the app
  * (`electron` and the app-resolved `appElectronPath`).
- * Idempotent—subsequent calls return immediately if already registered.
+ * Safe to call repeatedly so suites can recover after `mock.restore()` in
+ * other files resets module mocks in the same Bun process.
  *
  * @example
  * ```ts
@@ -132,10 +131,6 @@ export const configureElectronMock = (overrides: ElectronMockOverrides) => {
  * ```
  */
 export const registerElectronMock = () => {
-  if (isRegistered) {
-    return;
-  }
   mock.module('electron', () => electronMock);
   mock.module(appElectronPath, () => electronMock);
-  isRegistered = true;
 };

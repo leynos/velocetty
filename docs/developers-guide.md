@@ -314,9 +314,11 @@ scope:
   (`NODE` environment variable when present, otherwise `node` on `PATH`), not
   `process.execPath`. CI runs this script via Bun; invoking node-gyp with Bun
   can trigger Windows header-extraction `EINVAL` failures.
-- Keep repository JSON files normalized to LF by enforcing
-  `*.json text eol=lf` in `.gitattributes`; Windows checkout can otherwise
-  convert JSON to CRLF and trip `make lint`/Biome formatting checks.
+- Keep repository script/config text files normalized to LF in
+  `.gitattributes` for extensions checked by Biome (`*.json`, `*.jsonc`,
+  `*.js`, `*.cjs`, `*.mjs`, `*.ts`, and `*.tsx`). Windows checkout can
+  otherwise convert those files to CRLF and trip `make lint`/Biome formatting
+  checks.
 - Windows aarch64 CI is currently blocked by upstream Bun distribution support.
   Evidence (captured 2026-02-25): latest Bun release `bun-v1.3.9` (published
   2026-02-08) includes `bun-windows-x64*` assets and no Windows arm64 asset.
