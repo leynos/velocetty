@@ -473,6 +473,23 @@ export default class Term extends React.PureComponent<
     });
   };
 
+  private warnAboutTransparentWebGL() {
+    if (!this.hasWarnedAboutTransparentWebGL) {
+      console.warn(
+        'WebGL Renderer has been disabled since it does not support transparent backgrounds yet. ' +
+          'Falling back to canvas-based rendering.'
+      );
+      this.hasWarnedAboutTransparentWebGL = true;
+    }
+  }
+
+  private warnAboutUnsupportedWebGL() {
+    if (!this.hasWarnedAboutUnsupportedWebGL) {
+      console.warn('WebGL2 is not supported on your machine. Falling back to canvas-based rendering.');
+      this.hasWarnedAboutUnsupportedWebGL = true;
+    }
+  }
+
   canUseWebGLRenderer() {
     if (!this.props.webGLRenderer) {
       return false;
@@ -480,21 +497,12 @@ export default class Term extends React.PureComponent<
 
     const needTransparency = Color(this.props.backgroundColor).alpha() < 1;
     if (needTransparency) {
-      if (!this.hasWarnedAboutTransparentWebGL) {
-        console.warn(
-          'WebGL Renderer has been disabled since it does not support transparent backgrounds yet. ' +
-            'Falling back to canvas-based rendering.'
-        );
-        this.hasWarnedAboutTransparentWebGL = true;
-      }
+      this.warnAboutTransparentWebGL();
       return false;
     }
 
     if (!isWebgl2Supported()) {
-      if (!this.hasWarnedAboutUnsupportedWebGL) {
-        console.warn('WebGL2 is not supported on your machine. Falling back to canvas-based rendering.');
-        this.hasWarnedAboutUnsupportedWebGL = true;
-      }
+      this.warnAboutUnsupportedWebGL();
       return false;
     }
 
