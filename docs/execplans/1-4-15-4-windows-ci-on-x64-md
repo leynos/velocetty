@@ -333,11 +333,16 @@ Dependencies and contracts to preserve:
 - [x] (2026-02-25) Captured Windows CI failure run `22405749378`: step
   `Install (Windows)` failed during `bun install` with
   `Executable not found in $PATH: "node-gyp.cmd"`.
+- [x] (2026-02-25) Captured a second Windows native rebuild failure signature:
+  node-gyp header tar extraction `EINVAL` when `bin/rebuild-node-pty.cjs`
+  launches node-gyp using Bun `process.execPath`.
 - [ ] Implement Stage B Windows x64 stabilization.
 - [x] Implement Stage C Windows aarch64 supported-or-blocked path (Path B:
   documented blocker with explicit ownership).
 - [x] Update docs and roadmap based on evidence.
-- [ ] Run required local gates and collect logs.
+- [x] (2026-02-25) Ran required local gates and collected logs:
+  `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`
+  using `/tmp/*-velocetty-1-4-15-4-windows-ci-on-x64-md.out`.
 - [ ] Finalize outcomes and retrospective.
 
 ## Surprises & discoveries
@@ -400,6 +405,22 @@ Dependencies and contracts to preserve:
   Impact: Windows aarch64 lane enablement remains blocked in this repository
   until Bun publishes an arm64 Windows artefact and setup support.
 
+- Observation: `bin/rebuild-node-pty.cjs` used Bun `process.execPath` to run
+  node-gyp whenever CI invoked the script with Bun.
+  Evidence: script implementation and Windows CI `node-gyp` header extraction
+  failures with tar `EINVAL` during Bun-driven rebuild execution.
+  Impact: Windows reliability requires launching node-gyp with a Node runtime
+  binary (`NODE` env override or `node` from `PATH`), while keeping existing
+  node-gyp arguments unchanged.
+
+- Observation: CI rerun `22407832513` changed failure signatures before the
+  Node-runtime patch reached CI.
+  Evidence: Windows advanced past `install-app-deps` but failed in
+  `rebuild-node-pty` with node-gyp tar extraction `EINVAL`; Ubuntu failed in
+  `make test` with Electron import/environment errors.
+  Impact: this branch needed a deterministic node-gyp runtime fix and a fresh
+  post-push CI rerun for final Stage B verification evidence.
+
 ## Decision log
 
 - Decision: move this ExecPlan to `Status: IN PROGRESS` and execute the
@@ -454,6 +475,12 @@ Dependencies and contracts to preserve:
   sequence by `printf`.
   Date/Author: 2026-02-25 / Codex
 
+- Decision: in `bin/rebuild-node-pty.cjs`, run node-gyp through the Node
+  executable (`process.env.NODE || 'node'`) instead of `process.execPath`.
+  Rationale: CI invokes this script via Bun; Bun-driven node-gyp execution on
+  Windows can fail in header tar extraction with `EINVAL`.
+  Date/Author: 2026-02-25 / Codex
+
 ## Outcomes & retrospective
 
 Implementation is in progress.
@@ -463,6 +490,10 @@ Current outcomes:
 - Updated `docs/developers-guide.md` with the Windows x64 CI stabilization
   baseline (Windows-specific node-gyp Python/bootstrap and temp-directory
   wiring).
+- Updated `bin/rebuild-node-pty.cjs` to execute node-gyp with the Node runtime
+  (`NODE` override or `node` on `PATH`) instead of Bun `process.execPath`.
+- Added a Windows runtime-alignment note in `docs/developers-guide.md` for this
+  Node runtime-selection requirement in `rebuild-node-pty`.
 - Added `WINARM64-001` to `docs/tracking-issues.md` with explicit ownership
   (`@leynos`), blocker context, and mitigation/exit criteria.
 - Updated `docs/roadmap.md` item `1.4.15` to mark Windows x64 stabilization,
@@ -470,13 +501,13 @@ Current outcomes:
   reference.
 - Recorded Bun upstream blocker evidence in this plan:
   `bun-v1.3.9` (2026-02-08) has no Windows arm64 artefact.
+- Completed the required local quality-gate stack for this task:
+  `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`.
 
 Remaining closure criteria:
 
 - Complete Stage B verification evidence for Windows x64 CI stabilization in
   workflow/CI run artefacts, including the `node-gyp.cmd` PATH bootstrap fix.
-- Run required local gates and capture `/tmp/*-$(get-project)-$(git branch
-  --show).out` logs (not executed in this turn).
 - Finalize retrospective after CI evidence and gate outcomes are available.
 
 ## Revision note
@@ -500,3 +531,9 @@ Remaining closure criteria:
   `node_modules/.bin/node-gyp.cmd` before `bun install`.
 - 2026-02-25: Recorded CI run `22407440178` (`printf` format parsing on `%~dp0`)
   and switched launcher generation to literal-line `printf '%s\r\n'` output.
+- 2026-02-25: Recorded the Windows `node-gyp` tar `EINVAL` discovery and
+  decided to launch node-gyp from `bin/rebuild-node-pty.cjs` with Node
+  (`process.env.NODE || 'node'`) instead of Bun `process.execPath`.
+- 2026-02-25: Completed local gate verification with
+  `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`
+  (logs under `/tmp/*-velocetty-1-4-15-4-windows-ci-on-x64-md.out`).

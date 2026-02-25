@@ -310,6 +310,10 @@ scope:
 - Keep `npm_config_node_gyp` on the Windows-specific path form
   (`\\node_modules\\node-gyp\\bin\\node-gyp.js`) to avoid path-separator drift
   across operating systems.
+- Keep `bin/rebuild-node-pty.cjs` running node-gyp through the Node executable
+  (`NODE` environment variable when present, otherwise `node` on `PATH`), not
+  `process.execPath`. CI runs this script via Bun; invoking node-gyp with Bun
+  can trigger Windows header-extraction `EINVAL` failures.
 - Windows aarch64 CI is currently blocked by upstream Bun distribution support.
   Evidence (captured 2026-02-25): latest Bun release `bun-v1.3.9` (published
   2026-02-08) includes `bun-windows-x64*` assets and no Windows arm64 asset.
