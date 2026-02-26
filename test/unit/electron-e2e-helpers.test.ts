@@ -8,6 +8,7 @@ import {
   createIsolatedE2EEnvironment,
   extractRendererErrorMessage,
   isNonCriticalRendererError,
+  removeDirectoryWithRetry,
   readActiveTerminalBuffer,
   resolveLaunchConfig,
   startRendererConsoleMonitor,
@@ -170,6 +171,52 @@ test('readActiveTerminalBuffer() surfaces clear failures when renderer document 
   await expect(readActiveTerminalBuffer(mockPage as never)).rejects.toThrow(
     '[e2e] unable to read active terminal buffer: renderer document is unavailable'
   );
+});
+
+test('removeDirectoryWithRetry() retries transient Windows cleanup errors', async () => {
+  let attempt = 0;
+  const removeDirectory = async () => {
+    attempt += 1;
+    if (attempt < 3) {
+      throw Object.assign(new Error('busy'), {code: 'EBUSY'});
+    }
+  };
+
+  const delays: number[] = [];
+  await expect(
+    removeDirectoryWithRetry('/tmp/unused', {
+      maxAttempts: 4,
+      baseDelayMs: 5,
+      isWindows: true,
+      removeDirectory,
+      sleepFn: async (ms) => {
+        delays.push(ms);
+      }
+    })
+  ).resolves.toBeUndefined();
+
+  expect(attempt).toBe(3);
+  expect(delays).toEqual([5, 10]);
+});
+
+test('removeDirectoryWithRetry() does not retry non-retriable cleanup errors', async () => {
+  let attempt = 0;
+  const removeDirectory = async () => {
+    attempt += 1;
+    throw Object.assign(new Error('invalid path'), {code: 'EINVAL'});
+  };
+
+  await expect(
+    removeDirectoryWithRetry('/tmp/unused', {
+      maxAttempts: 4,
+      baseDelayMs: 5,
+      isWindows: true,
+      removeDirectory,
+      sleepFn: async () => {}
+    })
+  ).rejects.toThrow('invalid path');
+
+  expect(attempt).toBe(1);
 });
 
 test('createIsolatedE2EEnvironment() creates and cleans temp home paths', async () => {
