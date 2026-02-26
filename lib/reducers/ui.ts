@@ -1,5 +1,6 @@
 import {release} from 'node:os';
 
+import isEqual from 'lodash/isEqual';
 import Immutable from 'seamless-immutable';
 import type {Immutable as ImmutableType} from 'seamless-immutable';
 
@@ -122,8 +123,11 @@ const initial: uiState = Immutable<Mutable<uiState>>({
 });
 
 type UiStatePartial = Immutable.DeepPartial<Mutable<uiState>>;
+type UiConfig = Partial<Mutable<uiState>> & {
+  useConpty?: boolean;
+};
 
-const processFontSizeConfig = (config: any, state: uiState): UiStatePartial => {
+const processFontSizeConfig = (config: UiConfig, state: uiState): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (state.fontSizeOverride && config.fontSize !== state.fontSize) {
@@ -137,7 +141,7 @@ const processFontSizeConfig = (config: any, state: uiState): UiStatePartial => {
   return ret;
 };
 
-const processFontFamilyConfig = (config: any): UiStatePartial => {
+const processFontFamilyConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (config.fontFamily) {
@@ -148,14 +152,10 @@ const processFontFamilyConfig = (config: any): UiStatePartial => {
     ret.uiFontFamily = config.uiFontFamily;
   }
 
-  if (config.uiFontFamily) {
-    ret.uiFontFamily = config.uiFontFamily;
-  }
-
   return ret;
 };
 
-const processFontWeightConfig = (config: any): UiStatePartial => {
+const processFontWeightConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (config.fontWeight) {
@@ -169,7 +169,7 @@ const processFontWeightConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
-const processFontSpacingConfig = (config: any): UiStatePartial => {
+const processFontSpacingConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (Number.isFinite(config.lineHeight)) {
@@ -183,7 +183,7 @@ const processFontSpacingConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
-const processFontConfig = (config: any, state: uiState): UiStatePartial => {
+const processFontConfig = (config: UiConfig, state: uiState): UiStatePartial => {
   return {
     ...processFontSizeConfig(config, state),
     ...processFontFamilyConfig(config),
@@ -192,7 +192,7 @@ const processFontConfig = (config: any, state: uiState): UiStatePartial => {
   };
 };
 
-const processCursorConfig = (config: any): UiStatePartial => {
+const processCursorConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (config.cursorColor) {
@@ -215,10 +215,10 @@ const processCursorConfig = (config: any): UiStatePartial => {
 };
 
 const hasColorConfigChanged = (stateColors: uiState['colors'], configColors: uiState['colors']) => {
-  return JSON.stringify(stateColors) !== JSON.stringify(configColors);
+  return !isEqual(stateColors, configColors);
 };
 
-const processColorConfig = (config: any, state: uiState): UiStatePartial => {
+const processColorConfig = (config: UiConfig, state: uiState): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (config.borderColor) {
@@ -244,7 +244,7 @@ const processColorConfig = (config: any, state: uiState): UiStatePartial => {
   return ret;
 };
 
-const processRendererConfig = (config: any): UiStatePartial => {
+const processRendererConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (config.webGLRenderer !== undefined) {
@@ -258,7 +258,7 @@ const processRendererConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
-const processBellConfig = (config: any, state: uiState): UiStatePartial => {
+const processBellConfig = (config: UiConfig, state: uiState): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (allowedBells.has(config.bell)) {
@@ -276,7 +276,7 @@ const processBellConfig = (config: any, state: uiState): UiStatePartial => {
   return ret;
 };
 
-const processUIControlsConfig = (config: any): UiStatePartial => {
+const processUIControlsConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (allowedHamburgerMenuValues.has(config.showHamburgerMenu)) {
@@ -294,7 +294,7 @@ const processUIControlsConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
-const processQuickEditConfig = (config: any): UiStatePartial => {
+const processQuickEditConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (process.platform === 'win32' && (config.quickEdit === undefined || config.quickEdit === null)) {
@@ -306,7 +306,7 @@ const processQuickEditConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
-const processMacOptionsConfig = (config: any): UiStatePartial => {
+const processMacOptionsConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (config.macOptionSelectionMode) {
@@ -316,7 +316,7 @@ const processMacOptionsConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
-const processWindowsPtyConfig = (config: any): UiStatePartial => {
+const processWindowsPtyConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (!isWindows) {
@@ -337,7 +337,7 @@ const processWindowsPtyConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
-const processPlatformSpecificConfig = (config: any): UiStatePartial => {
+const processPlatformSpecificConfig = (config: UiConfig): UiStatePartial => {
   return {
     ...processQuickEditConfig(config),
     ...processMacOptionsConfig(config),
@@ -345,7 +345,7 @@ const processPlatformSpecificConfig = (config: any): UiStatePartial => {
   };
 };
 
-const processScrollAndPaddingConfig = (config: any): UiStatePartial => {
+const processScrollAndPaddingConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (config.scrollback) {
@@ -359,7 +359,7 @@ const processScrollAndPaddingConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
-const processInputBehaviourConfig = (config: any): UiStatePartial => {
+const processInputBehaviourConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (typeof config.copyOnSelect !== 'undefined' && config.copyOnSelect !== null) {
@@ -373,7 +373,7 @@ const processInputBehaviourConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
-const processAccessibilityConfig = (config: any): UiStatePartial => {
+const processAccessibilityConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (config.disableLigatures !== undefined) {
@@ -391,7 +391,7 @@ const processAccessibilityConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
-const processTerminalBehaviourConfig = (config: any): UiStatePartial => {
+const processTerminalBehaviourConfig = (config: UiConfig): UiStatePartial => {
   return {
     ...processScrollAndPaddingConfig(config),
     ...processInputBehaviourConfig(config),
@@ -399,7 +399,7 @@ const processTerminalBehaviourConfig = (config: any): UiStatePartial => {
   };
 };
 
-const processStyleConfig = (config: any): UiStatePartial => {
+const processStyleConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (config.css || config.css === '') {
@@ -413,7 +413,7 @@ const processStyleConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
-const processProfileConfig = (config: any): UiStatePartial => {
+const processProfileConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (config.defaultProfile !== undefined) {
@@ -427,7 +427,7 @@ const processProfileConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
-const mergeConfigIntoState = (config: any, state: uiState, now: number): UiStatePartial => {
+const mergeConfigIntoState = (config: UiConfig, state: uiState, now: number): UiStatePartial => {
   return {
     ...processFontConfig(config, state),
     ...processCursorConfig(config),

@@ -57,6 +57,8 @@ const DEFAULT_WEBGL_MAX_CONTEXTS = 16;
 
 type WebGLPoolContext = Readonly<{paneId: string}>;
 
+// These module-level singletons coordinate WebGL ownership across all Term instances.
+// The pool is created on first access and intentionally lives for the renderer lifetime.
 let sharedWebGLContextPool: WebGLContextPool<WebGLPoolContext> | null = null;
 let sharedWebGLContextPoolMax: number | null = null;
 const webGLPoolReleaseHandlers = new Map<string, () => void>();
@@ -76,9 +78,16 @@ const getWebGLContextPool = (maxContexts: number) => {
 
   if (sharedWebGLContextPoolMax !== resolvedMaxContexts) {
     console.warn(
-      'Changing `webGLRendererMaxContexts` at runtime requires restarting active terminals. ' +
-        `Continuing with ${sharedWebGLContextPoolMax}.`
+      'Changing `webGLRendererMaxContexts` at runtime recreates the shared pool and re-syncs active terminals. ' +
+        `Applying ${resolvedMaxContexts}.`
     );
+
+    sharedWebGLContextPool = new WebGLContextPool<WebGLPoolContext>({maxContexts: resolvedMaxContexts});
+    sharedWebGLContextPoolMax = resolvedMaxContexts;
+
+    for (const releaseHandler of [...webGLPoolReleaseHandlers.values()]) {
+      releaseHandler();
+    }
   }
 
   return sharedWebGLContextPool;
@@ -572,8 +581,7 @@ export default class Term extends React.PureComponent<
     }
   }
 
-  ensureWebGLRenderer() {
-    const webGLContextPool = getWebGLContextPool(this.props.webGLRendererMaxContexts);
+  ensureWebGLRenderer(webGLContextPool = getWebGLContextPool(this.props.webGLRendererMaxContexts)) {
     webGLContextPool.acquire(
       this.props.uid,
       () => ({paneId: this.props.uid}),
@@ -614,7 +622,15 @@ export default class Term extends React.PureComponent<
       return;
     }
 
-    this.ensureWebGLRenderer();
+    const webGLContextPool = getWebGLContextPool(this.props.webGLRendererMaxContexts);
+    const hasAvailableWebGLSlot =
+      webGLContextPool.has(this.props.uid) || webGLContextPool.size < webGLContextPool.maxContexts;
+    if (!this.webglAddon && !hasAvailableWebGLSlot) {
+      this.ensureCanvasRenderer();
+      return;
+    }
+
+    this.ensureWebGLRenderer(webGLContextPool);
   }
 
   private hasFontPropsChanged(prevProps: TermProps): boolean {

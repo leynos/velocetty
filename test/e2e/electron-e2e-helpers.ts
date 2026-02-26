@@ -64,6 +64,14 @@ export const removeDirectoryWithRetry = async (directory: string, options: Remov
   const removeDirectory = options.removeDirectory ?? removeDirectoryRecursive;
   const sleepFn = options.sleepFn ?? sleep;
 
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
+    throw new RangeError('removeDirectoryWithRetry maxAttempts must be an integer greater than 0.');
+  }
+
+  if (!Number.isFinite(baseDelayMs) || baseDelayMs <= 0) {
+    throw new RangeError('removeDirectoryWithRetry baseDelayMs must be a finite number greater than 0.');
+  }
+
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       await removeDirectory(directory);

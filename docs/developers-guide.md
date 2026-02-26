@@ -327,7 +327,7 @@ scope:
   path instead of the short-name `%LOCALAPPDATA%` alias.
 - `bin/download-mksnapshot.js` now retries transient artifact download failures
   (for example, `ECONNRESET`, timeout/DNS errors, and 5xx/429 responses) with
-  exponential backoff before failing the install.
+  exponential backoff before failing the installation.
 - Tune retry behaviour with `MKSNAPSHOT_DOWNLOAD_RETRY_ATTEMPTS` (default `4`)
   and `MKSNAPSHOT_DOWNLOAD_RETRY_DELAY_MS` (default `1000`) when debugging
   unstable network environments.

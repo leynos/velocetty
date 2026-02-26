@@ -36,6 +36,19 @@ describe('WebGLContextPool', () => {
     expect(pool.has('pane-c')).toBe(true);
   });
 
+  test('eviction invokes the disposer callback with pane and context details', () => {
+    const disposedPairs: string[] = [];
+    const pool = new WebGLContextPool<MockContext>({maxContexts: 1});
+    const createContext = createFactory();
+
+    const first = pool.acquire('pane-a', createContext);
+    pool.acquire('pane-b', createContext, (context, paneId) => {
+      disposedPairs.push(`${paneId}:${context.id}`);
+    });
+
+    expect(disposedPairs).toEqual([`pane-a:${first.context.id}`]);
+  });
+
   test('reuses an existing pane allocation and does not call the factory twice', () => {
     const pool = new WebGLContextPool<MockContext>({maxContexts: 1});
     let factoryCalls = 0;
@@ -86,6 +99,41 @@ describe('WebGLContextPool', () => {
     expect(acquired.evictedPaneId).toBe('pane-b');
     expect(pool.has('pane-a')).toBe(true);
     expect(pool.has('pane-c')).toBe(true);
+  });
+
+  test('clear removes all panes, disposes each context, and resets size', () => {
+    const disposedPairs: string[] = [];
+    const pool = new WebGLContextPool<MockContext>({maxContexts: 3});
+    const createContext = createFactory();
+
+    pool.acquire('pane-a', createContext);
+    pool.acquire('pane-b', createContext);
+    pool.acquire('pane-c', createContext);
+
+    pool.clear((context, paneId) => {
+      disposedPairs.push(`${paneId}:${context.id}`);
+    });
+
+    expect(pool.size).toBe(0);
+    expect(pool.has('pane-a')).toBe(false);
+    expect(pool.has('pane-b')).toBe(false);
+    expect(pool.has('pane-c')).toBe(false);
+    expect(disposedPairs.sort()).toEqual(['pane-a:ctx-1', 'pane-b:ctx-2', 'pane-c:ctx-3']);
+  });
+
+  test('release returns undefined for unknown panes without invoking disposer', () => {
+    const pool = new WebGLContextPool<MockContext>({maxContexts: 1});
+    const createContext = createFactory();
+    pool.acquire('pane-known', createContext);
+
+    const disposedPairs: string[] = [];
+    const released = pool.release('pane-missing', (context, paneId) => {
+      disposedPairs.push(`${paneId}:${context.id}`);
+    });
+
+    expect(released).toBeUndefined();
+    expect(disposedPairs).toEqual([]);
+    expect(pool.has('pane-known')).toBe(true);
   });
 
   test('rejects invalid maximum context values', () => {

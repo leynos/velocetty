@@ -37,7 +37,7 @@ Success is observable when:
 - hidden panes report Canvas renderer usage;
 - visible panes can obtain WebGL up to the configured maximum;
 - when the limit is reached, LRU eviction reclaims WebGL from less-recently
-  visible panes so the cap is never exceeded.
+  visible panes, so the cap is never exceeded.
 
 ## Constraints
 
@@ -135,7 +135,7 @@ Success is observable when:
 
 - Observation: `bun install` can fail in this workspace when the symlinked
   cache path (`/tmp/velocetty-ci-work/cache`) does not exist.
-  Evidence: failed install with `OpenError` on `cache/LOCK`.
+  Evidence: failed installation with `OpenError` on `cache/LOCK`.
   Impact: gate replay required creating cache/dist directories before rerunning
   required commands.
 
@@ -153,19 +153,19 @@ Success is observable when:
   hard-coding `16` only.
   Rationale: roadmap success criteria references the configured maximum, and
   design calls out a default with configurability.
-  Date/Author: 2026-02-25 / Codex
+  Date/Author: 2026-02-25 / Codex.
 
 - Decision: model occlusion using viewport hit-testing
   (`document.elementFromPoint`) combined with active-tab and bounds checks.
   Rationale: this captures modal overlays without introducing new global UI
   state contracts in this milestone.
-  Date/Author: 2026-02-25 / Codex
+  Date/Author: 2026-02-25 / Codex.
 
 - Decision: treat `webGLRendererMaxContexts` as a positive integer and fall
   back to default when invalid values are encountered.
   Rationale: the pool requires an integer capacity and roadmap success criteria
   depend on deterministic cap enforcement.
-  Date/Author: 2026-02-25 / Codex
+  Date/Author: 2026-02-25 / Codex.
 
 ## Outcomes & retrospective
 

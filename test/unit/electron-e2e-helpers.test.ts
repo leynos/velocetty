@@ -219,6 +219,59 @@ test('removeDirectoryWithRetry() does not retry non-retriable cleanup errors', a
   expect(attempt).toBe(1);
 });
 
+test('removeDirectoryWithRetry() does not retry retriable cleanup errors on non-Windows platforms', async () => {
+  let attempt = 0;
+  const removeDirectory = async () => {
+    attempt += 1;
+    throw Object.assign(new Error('busy'), {code: 'EBUSY'});
+  };
+
+  await expect(
+    removeDirectoryWithRetry('/tmp/unused', {
+      maxAttempts: 4,
+      baseDelayMs: 5,
+      isWindows: false,
+      removeDirectory,
+      sleepFn: async () => {}
+    })
+  ).rejects.toThrow('busy');
+
+  expect(attempt).toBe(1);
+});
+
+test('removeDirectoryWithRetry() respects maxAttempts=1 for retriable cleanup errors', async () => {
+  let attempt = 0;
+  const removeDirectory = async () => {
+    attempt += 1;
+    throw Object.assign(new Error('busy'), {code: 'EBUSY'});
+  };
+
+  let sleepCalls = 0;
+  await expect(
+    removeDirectoryWithRetry('/tmp/unused', {
+      maxAttempts: 1,
+      baseDelayMs: 5,
+      isWindows: true,
+      removeDirectory,
+      sleepFn: async () => {
+        sleepCalls += 1;
+      }
+    })
+  ).rejects.toThrow('busy');
+
+  expect(attempt).toBe(1);
+  expect(sleepCalls).toBe(0);
+});
+
+test('removeDirectoryWithRetry() rejects invalid retry options', async () => {
+  await expect(removeDirectoryWithRetry('/tmp/unused', {maxAttempts: 0})).rejects.toThrow(
+    'maxAttempts must be an integer greater than 0'
+  );
+  await expect(removeDirectoryWithRetry('/tmp/unused', {baseDelayMs: 0})).rejects.toThrow(
+    'baseDelayMs must be a finite number greater than 0'
+  );
+});
+
 test('createIsolatedE2EEnvironment() creates and cleans temp home paths', async () => {
   const isolated = await createIsolatedE2EEnvironment();
   const {HOME, APPDATA, LOCALAPPDATA} = isolated.env;
