@@ -215,12 +215,31 @@ const processColorPalette = (config: UiConfig, state: uiState): UiStatePartial =
   return ret;
 };
 
+const processBasicColorProperties = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.borderColor) {
+    ret.borderColor = config.borderColor;
+  }
+
+  if (config.selectionColor) {
+    ret.selectionColor = config.selectionColor;
+  }
+
+  if (config.foregroundColor) {
+    ret.foregroundColor = config.foregroundColor;
+  }
+
+  if (config.backgroundColor) {
+    ret.backgroundColor = config.backgroundColor;
+  }
+
+  return ret;
+};
+
 const processColorConfig = (config: UiConfig, state: uiState): UiStatePartial => {
   return {
-    ...(config.borderColor ? {borderColor: config.borderColor} : {}),
-    ...(config.selectionColor ? {selectionColor: config.selectionColor} : {}),
-    ...(config.foregroundColor ? {foregroundColor: config.foregroundColor} : {}),
-    ...(config.backgroundColor ? {backgroundColor: config.backgroundColor} : {}),
+    ...processBasicColorProperties(config),
     ...processColorPalette(config, state)
   };
 };
@@ -766,6 +785,18 @@ const updateNotifications = (prev: uiState, next: uiState, actionType: string): 
   return updateStateNotifications(prev, configNotifications);
 };
 
+const handleSessionAdd = (state: uiState, action: SessionAddAction): uiState => {
+  return setActiveUidAndMerge(state, action.uid, 'openAt', action.now);
+};
+
+const handleSessionSetActive = (state: uiState, action: SessionSetActiveAction): uiState => {
+  return setActiveUidAndMerge(state, action.uid, 'activityMarkers', false);
+};
+
+const handleSessionSetCwd = (state: uiState, action: SessionSetCwdAction): uiState => {
+  return state.set('cwd', action.cwd);
+};
+
 const reducer: IUiReducer = (state = initial, action) => {
   let state_ = state;
   const typedAction = action as UiReducerAction;
@@ -776,7 +807,7 @@ const reducer: IUiReducer = (state = initial, action) => {
       break;
 
     case SESSION_ADD:
-      state_ = setActiveUidAndMerge(state, typedAction.uid, 'openAt', typedAction.now);
+      state_ = handleSessionAdd(state, typedAction);
       break;
 
     case SESSION_RESIZE:
@@ -788,7 +819,7 @@ const reducer: IUiReducer = (state = initial, action) => {
       break;
 
     case SESSION_SET_ACTIVE:
-      state_ = setActiveUidAndMerge(state, typedAction.uid, 'activityMarkers', false);
+      state_ = handleSessionSetActive(state, typedAction);
       break;
 
     case SESSION_PTY_DATA:
@@ -796,7 +827,7 @@ const reducer: IUiReducer = (state = initial, action) => {
       break;
 
     case SESSION_SET_CWD:
-      state_ = state.set('cwd', typedAction.cwd);
+      state_ = handleSessionSetCwd(state, typedAction);
       break;
 
     case UI_FONT_SIZE_SET:
