@@ -325,6 +325,12 @@ scope:
 - For Windows install, map `TMP`, `TEMP`, and `npm_config_tmp` to
   `${{ runner.temp }}` so `node-gyp` extraction uses a deterministic writable
   path instead of the short-name `%LOCALAPPDATA%` alias.
+- `bin/download-mksnapshot.js` now retries transient artifact download failures
+  (for example, `ECONNRESET`, timeout/DNS errors, and 5xx/429 responses) with
+  exponential backoff before failing the install.
+- Tune retry behaviour with `MKSNAPSHOT_DOWNLOAD_RETRY_ATTEMPTS` (default `4`)
+  and `MKSNAPSHOT_DOWNLOAD_RETRY_DELAY_MS` (default `1000`) when debugging
+  unstable network environments.
 - Keep `npm_config_node_gyp` in the forward-slash form used by the
   `Install (Windows)` step in `.github/workflows/nodejs.yml`:
   `${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js`.
