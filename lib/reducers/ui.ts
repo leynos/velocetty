@@ -229,24 +229,8 @@ const processRendererConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
-const processMiscConfig = (config: any, state: uiState): UiStatePartial => {
+const processBellConfig = (config: any, state: uiState): UiStatePartial => {
   const ret: UiStatePartial = {};
-
-  if (config.scrollback) {
-    ret.scrollback = config.scrollback;
-  }
-
-  if (typeof config.padding !== 'undefined' && config.padding !== null) {
-    ret.padding = config.padding;
-  }
-
-  if (config.css || config.css === '') {
-    ret.css = config.css;
-  }
-
-  if (config.termCSS) {
-    ret.termCSS = config.termCSS;
-  }
 
   if (allowedBells.has(config.bell)) {
     ret.bell = (config.bell as any) === 'false' ? false : config.bell;
@@ -260,13 +244,11 @@ const processMiscConfig = (config: any, state: uiState): UiStatePartial => {
     ret.bellSound = config.bellSound || initial.bellSound;
   }
 
-  if (typeof config.copyOnSelect !== 'undefined' && config.copyOnSelect !== null) {
-    ret.copyOnSelect = config.copyOnSelect;
-  }
+  return ret;
+};
 
-  if (config.modifierKeys) {
-    ret.modifierKeys = config.modifierKeys;
-  }
+const processUIControlsConfig = (config: any): UiStatePartial => {
+  const ret: UiStatePartial = {};
 
   if (allowedHamburgerMenuValues.has(config.showHamburgerMenu)) {
     ret.showHamburgerMenu = config.showHamburgerMenu;
@@ -276,26 +258,24 @@ const processMiscConfig = (config: any, state: uiState): UiStatePartial => {
     ret.showWindowControls = config.showWindowControls;
   }
 
+  if (config.webLinksActivationKey !== undefined) {
+    ret.webLinksActivationKey = config.webLinksActivationKey;
+  }
+
+  return ret;
+};
+
+const processPlatformSpecificConfig = (config: any): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
   if (process.platform === 'win32' && (config.quickEdit === undefined || config.quickEdit === null)) {
     ret.quickEdit = true;
   } else if (typeof config.quickEdit !== 'undefined' && config.quickEdit !== null) {
     ret.quickEdit = config.quickEdit;
   }
 
-  if (config.webLinksActivationKey !== undefined) {
-    ret.webLinksActivationKey = config.webLinksActivationKey;
-  }
-
   if (config.macOptionSelectionMode) {
     ret.macOptionSelectionMode = config.macOptionSelectionMode;
-  }
-
-  if (config.disableLigatures !== undefined) {
-    ret.disableLigatures = config.disableLigatures;
-  }
-
-  if (config.screenReaderMode !== undefined) {
-    ret.screenReaderMode = config.screenReaderMode;
   }
 
   const buildNumber = parseInt(release().split('.').at(-1) || '0', 10);
@@ -307,9 +287,59 @@ const processMiscConfig = (config: any, state: uiState): UiStatePartial => {
     };
   }
 
+  return ret;
+};
+
+const processTerminalBehaviourConfig = (config: any): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.scrollback) {
+    ret.scrollback = config.scrollback;
+  }
+
+  if (typeof config.padding !== 'undefined' && config.padding !== null) {
+    ret.padding = config.padding;
+  }
+
+  if (typeof config.copyOnSelect !== 'undefined' && config.copyOnSelect !== null) {
+    ret.copyOnSelect = config.copyOnSelect;
+  }
+
+  if (config.modifierKeys) {
+    ret.modifierKeys = config.modifierKeys;
+  }
+
+  if (config.disableLigatures !== undefined) {
+    ret.disableLigatures = config.disableLigatures;
+  }
+
+  if (config.screenReaderMode !== undefined) {
+    ret.screenReaderMode = config.screenReaderMode;
+  }
+
   if (config.imageSupport !== undefined) {
     ret.imageSupport = config.imageSupport;
   }
+
+  return ret;
+};
+
+const processStyleConfig = (config: any): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.css || config.css === '') {
+    ret.css = config.css;
+  }
+
+  if (config.termCSS) {
+    ret.termCSS = config.termCSS;
+  }
+
+  return ret;
+};
+
+const processProfileConfig = (config: any): UiStatePartial => {
+  const ret: UiStatePartial = {};
 
   if (config.defaultProfile !== undefined) {
     ret.defaultProfile = config.defaultProfile;
@@ -328,9 +358,95 @@ const mergeConfigIntoState = (config: any, state: uiState, now: number): UiState
     ...processCursorConfig(config),
     ...processColorConfig(config, state),
     ...processRendererConfig(config),
-    ...processMiscConfig(config, state),
+    ...processBellConfig(config, state),
+    ...processUIControlsConfig(config),
+    ...processPlatformSpecificConfig(config),
+    ...processTerminalBehaviourConfig(config),
+    ...processStyleConfig(config),
+    ...processProfileConfig(config),
     _lastUpdate: now
   };
+};
+
+const handleSessionAdd = (state: uiState, action: any): uiState => {
+  return state.merge(
+    {
+      activeUid: action.uid,
+      openAt: {
+        [action.uid]: action.now
+      }
+    },
+    {deep: true}
+  );
+};
+
+const handleSessionResize = (state: uiState, action: any): uiState => {
+  // only care about the sizes
+  // of standalone terms (i.e. not splits):
+  if (!action.isStandaloneTerm) {
+    return state;
+  }
+
+  return state.merge({
+    rows: action.rows,
+    cols: action.cols,
+    resizeAt: action.now
+  });
+};
+
+const handleSessionPtyExit = (state: uiState, action: any): uiState => {
+  return state
+    .updateIn(['openAt'], (times: ImmutableType<Record<string, number>>) => {
+      const times_ = times.asMutable();
+      delete times_[action.uid];
+      return times_;
+    })
+    .updateIn(['activityMarkers'], (markers: ImmutableType<Record<string, boolean>>) => {
+      const markers_ = markers.asMutable();
+      delete markers_[action.uid];
+      return markers_;
+    });
+};
+
+const handleSessionSetActive = (state: uiState, action: any): uiState => {
+  return state.merge(
+    {
+      activeUid: action.uid,
+      activityMarkers: {
+        [action.uid]: false
+      }
+    },
+    {deep: true}
+  );
+};
+
+const handleSessionPtyData = (state: uiState, action: any): uiState => {
+  // ignore activity markers for current tab
+  if (action.uid === state.activeUid) {
+    return state;
+  }
+
+  // if first data events after open, ignore
+  if (action.now - state.openAt[action.uid] < 1000) {
+    return state;
+  }
+
+  // ignore activity markers that are within
+  // proximity of a resize event, since we
+  // expect to get data packets from the resize
+  // of the ptys as a result
+  if (!state.resizeAt || action.now - state.resizeAt > 1000) {
+    return state.merge(
+      {
+        activityMarkers: {
+          [action.uid]: true
+        }
+      },
+      {deep: true}
+    );
+  }
+
+  return state;
 };
 
 const reducer: IUiReducer = (state = initial, action) => {
@@ -347,82 +463,23 @@ const reducer: IUiReducer = (state = initial, action) => {
       break;
     }
     case SESSION_ADD:
-      state_ = state.merge(
-        {
-          activeUid: action.uid,
-          openAt: {
-            [action.uid]: action.now
-          }
-        },
-        {deep: true}
-      );
+      state_ = handleSessionAdd(state, action);
       break;
 
     case SESSION_RESIZE:
-      // only care about the sizes
-      // of standalone terms (i.e. not splits):
-      if (!action.isStandaloneTerm) {
-        break;
-      }
-
-      state_ = state.merge({
-        rows: action.rows,
-        cols: action.cols,
-        resizeAt: action.now
-      });
+      state_ = handleSessionResize(state, action);
       break;
 
     case SESSION_PTY_EXIT:
-      state_ = state
-        .updateIn(['openAt'], (times: ImmutableType<Record<string, number>>) => {
-          const times_ = times.asMutable();
-          delete times_[action.uid];
-          return times_;
-        })
-        .updateIn(['activityMarkers'], (markers: ImmutableType<Record<string, boolean>>) => {
-          const markers_ = markers.asMutable();
-          delete markers_[action.uid];
-          return markers_;
-        });
+      state_ = handleSessionPtyExit(state, action);
       break;
 
     case SESSION_SET_ACTIVE:
-      state_ = state.merge(
-        {
-          activeUid: action.uid,
-          activityMarkers: {
-            [action.uid]: false
-          }
-        },
-        {deep: true}
-      );
+      state_ = handleSessionSetActive(state, action);
       break;
 
     case SESSION_PTY_DATA:
-      // ignore activity markers for current tab
-      if (action.uid === state.activeUid) {
-        break;
-      }
-
-      // if first data events after open, ignore
-      if (action.now - state.openAt[action.uid] < 1000) {
-        break;
-      }
-
-      // ignore activity markers that are within
-      // proximity of a resize event, since we
-      // expect to get data packets from the resize
-      // of the ptys as a result
-      if (!state.resizeAt || action.now - state.resizeAt > 1000) {
-        state_ = state.merge(
-          {
-            activityMarkers: {
-              [action.uid]: true
-            }
-          },
-          {deep: true}
-        );
-      }
+      state_ = handleSessionPtyData(state, action);
       break;
 
     case SESSION_SET_CWD:
