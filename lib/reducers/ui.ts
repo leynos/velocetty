@@ -368,18 +368,6 @@ const mergeConfigIntoState = (config: any, state: uiState, now: number): UiState
   };
 };
 
-const handleSessionAdd = (state: uiState, action: any): uiState => {
-  return state.merge(
-    {
-      activeUid: action.uid,
-      openAt: {
-        [action.uid]: action.now
-      }
-    },
-    {deep: true}
-  );
-};
-
 const handleSessionResize = (state: uiState, action: any): uiState => {
   // only care about the sizes
   // of standalone terms (i.e. not splits):
@@ -408,12 +396,12 @@ const handleSessionPtyExit = (state: uiState, action: any): uiState => {
     });
 };
 
-const handleSessionSetActive = (state: uiState, action: any): uiState => {
+const setActiveUidAndMerge = (state: uiState, uid: string, propertyName: string, propertyValue: any): uiState => {
   return state.merge(
     {
-      activeUid: action.uid,
-      activityMarkers: {
-        [action.uid]: false
+      activeUid: uid,
+      [propertyName]: {
+        [uid]: propertyValue
       }
     },
     {deep: true}
@@ -463,7 +451,7 @@ const reducer: IUiReducer = (state = initial, action) => {
       break;
     }
     case SESSION_ADD:
-      state_ = handleSessionAdd(state, action);
+      state_ = setActiveUidAndMerge(state, action.uid, 'openAt', action.now);
       break;
 
     case SESSION_RESIZE:
@@ -475,7 +463,7 @@ const reducer: IUiReducer = (state = initial, action) => {
       break;
 
     case SESSION_SET_ACTIVE:
-      state_ = handleSessionSetActive(state, action);
+      state_ = setActiveUidAndMerge(state, action.uid, 'activityMarkers', false);
       break;
 
     case SESSION_PTY_DATA:
