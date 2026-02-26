@@ -142,34 +142,6 @@ const processFontSize = (config: UiConfig, state: uiState): UiStatePartial => {
   return ret;
 };
 
-const processFontFamily = (config: UiConfig): UiStatePartial => {
-  const ret: UiStatePartial = {};
-
-  if (config.fontFamily) {
-    ret.fontFamily = config.fontFamily;
-  }
-
-  if (config.uiFontFamily) {
-    ret.uiFontFamily = config.uiFontFamily;
-  }
-
-  return ret;
-};
-
-const processFontWeight = (config: UiConfig): UiStatePartial => {
-  const ret: UiStatePartial = {};
-
-  if (config.fontWeight) {
-    ret.fontWeight = config.fontWeight;
-  }
-
-  if (config.fontWeightBold) {
-    ret.fontWeightBold = config.fontWeightBold;
-  }
-
-  return ret;
-};
-
 const processFontMetrics = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
@@ -187,8 +159,10 @@ const processFontMetrics = (config: UiConfig): UiStatePartial => {
 const applyFontConfig = (config: UiConfig, state: uiState): UiStatePartial => {
   return {
     ...processFontSize(config, state),
-    ...processFontFamily(config),
-    ...processFontWeight(config),
+    ...(config.fontFamily ? {fontFamily: config.fontFamily} : {}),
+    ...(config.uiFontFamily ? {uiFontFamily: config.uiFontFamily} : {}),
+    ...(config.fontWeight ? {fontWeight: config.fontWeight} : {}),
+    ...(config.fontWeightBold ? {fontWeightBold: config.fontWeightBold} : {}),
     ...processFontMetrics(config)
   };
 };
@@ -219,34 +193,6 @@ const hasColorConfigChanged = (stateColors: uiState['colors'], configColors: Non
   return !isEqual(stateColors, configColors);
 };
 
-const processBasicColors = (config: UiConfig): UiStatePartial => {
-  const ret: UiStatePartial = {};
-
-  if (config.borderColor) {
-    ret.borderColor = config.borderColor;
-  }
-
-  if (config.selectionColor) {
-    ret.selectionColor = config.selectionColor;
-  }
-
-  return ret;
-};
-
-const processTextColors = (config: UiConfig): UiStatePartial => {
-  const ret: UiStatePartial = {};
-
-  if (config.foregroundColor) {
-    ret.foregroundColor = config.foregroundColor;
-  }
-
-  if (config.backgroundColor) {
-    ret.backgroundColor = config.backgroundColor;
-  }
-
-  return ret;
-};
-
 const processColorPalette = (config: UiConfig, state: uiState): UiStatePartial => {
   const ret: UiStatePartial = {};
 
@@ -259,8 +205,10 @@ const processColorPalette = (config: UiConfig, state: uiState): UiStatePartial =
 
 const processColorConfig = (config: UiConfig, state: uiState): UiStatePartial => {
   return {
-    ...processBasicColors(config),
-    ...processTextColors(config),
+    ...(config.borderColor ? {borderColor: config.borderColor} : {}),
+    ...(config.selectionColor ? {selectionColor: config.selectionColor} : {}),
+    ...(config.foregroundColor ? {foregroundColor: config.foregroundColor} : {}),
+    ...(config.backgroundColor ? {backgroundColor: config.backgroundColor} : {}),
     ...processColorPalette(config, state)
   };
 };
