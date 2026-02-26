@@ -139,11 +139,27 @@ const processFontSize = (config: UiConfig, state: uiState): UiStatePartial => {
     ret.fontSize = config.fontSize;
   }
 
+  if (config.fontFamily) {
+    ret.fontFamily = config.fontFamily;
+  }
+
+  if (config.uiFontFamily) {
+    ret.uiFontFamily = config.uiFontFamily;
+  }
+
   return ret;
 };
 
 const processFontMetrics = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
+
+  if (config.fontWeight) {
+    ret.fontWeight = config.fontWeight;
+  }
+
+  if (config.fontWeightBold) {
+    ret.fontWeightBold = config.fontWeightBold;
+  }
 
   if (Number.isFinite(config.lineHeight)) {
     ret.lineHeight = config.lineHeight;
@@ -159,10 +175,6 @@ const processFontMetrics = (config: UiConfig): UiStatePartial => {
 const applyFontConfig = (config: UiConfig, state: uiState): UiStatePartial => {
   return {
     ...processFontSize(config, state),
-    ...(config.fontFamily ? {fontFamily: config.fontFamily} : {}),
-    ...(config.uiFontFamily ? {uiFontFamily: config.uiFontFamily} : {}),
-    ...(config.fontWeight ? {fontWeight: config.fontWeight} : {}),
-    ...(config.fontWeightBold ? {fontWeightBold: config.fontWeightBold} : {}),
     ...processFontMetrics(config)
   };
 };
@@ -539,7 +551,7 @@ const handleConfigLoad = (state: uiState, action: ConfigLoadAction): uiState => 
   return state.merge(mergeConfigIntoState(config, state, now));
 };
 
-const handleUIActions = (state: uiState, action: UIDisplayAction): uiState => {
+const handleFontActions = (state: uiState, action: UIDisplayAction): uiState => {
   switch (action.type) {
     case UI_FONT_SIZE_SET:
       return state.set('fontSizeOverride', action.value);
@@ -550,6 +562,13 @@ const handleUIActions = (state: uiState, action: UIDisplayAction): uiState => {
     case UI_FONT_SMOOTHING_SET:
       return state.set('fontSmoothingOverride', action.fontSmoothing);
 
+    default:
+      return state;
+  }
+};
+
+const handleWindowActions = (state: uiState, action: UIDisplayAction): uiState => {
+  switch (action.type) {
     case UI_WINDOW_MAXIMIZE:
       return state.set('maximized', true);
 
@@ -559,6 +578,13 @@ const handleUIActions = (state: uiState, action: UIDisplayAction): uiState => {
     case UI_WINDOW_GEOMETRY_CHANGED:
       return state.maximized !== action.isMaximized ? state.set('maximized', action.isMaximized) : state;
 
+    default:
+      return state;
+  }
+};
+
+const handleFullscreenActions = (state: uiState, action: UIDisplayAction): uiState => {
+  switch (action.type) {
     case UI_ENTER_FULLSCREEN:
       return state.set('fullScreen', true);
 
@@ -568,6 +594,20 @@ const handleUIActions = (state: uiState, action: UIDisplayAction): uiState => {
     default:
       return state;
   }
+};
+
+const handleUIActions = (state: uiState, action: UIDisplayAction): uiState => {
+  const fontResult = handleFontActions(state, action);
+  if (fontResult !== state) {
+    return fontResult;
+  }
+
+  const windowResult = handleWindowActions(state, action);
+  if (windowResult !== state) {
+    return windowResult;
+  }
+
+  return handleFullscreenActions(state, action);
 };
 
 const handleNotifications = (state: uiState, action: NotificationAction): uiState => {
