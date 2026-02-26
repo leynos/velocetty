@@ -127,7 +127,7 @@ type UiConfig = Partial<Mutable<uiState>> & {
   useConpty?: boolean;
 };
 
-const processFontSizeConfig = (config: UiConfig, state: uiState): UiStatePartial => {
+const applyFontConfig = (config: UiConfig, state: uiState): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (state.fontSizeOverride && config.fontSize !== state.fontSize) {
@@ -138,12 +138,6 @@ const processFontSizeConfig = (config: UiConfig, state: uiState): UiStatePartial
     ret.fontSize = config.fontSize;
   }
 
-  return ret;
-};
-
-const processFontFamilyConfig = (config: UiConfig): UiStatePartial => {
-  const ret: UiStatePartial = {};
-
   if (config.fontFamily) {
     ret.fontFamily = config.fontFamily;
   }
@@ -152,12 +146,6 @@ const processFontFamilyConfig = (config: UiConfig): UiStatePartial => {
     ret.uiFontFamily = config.uiFontFamily;
   }
 
-  return ret;
-};
-
-const processFontWeightConfig = (config: UiConfig): UiStatePartial => {
-  const ret: UiStatePartial = {};
-
   if (config.fontWeight) {
     ret.fontWeight = config.fontWeight;
   }
@@ -165,12 +153,6 @@ const processFontWeightConfig = (config: UiConfig): UiStatePartial => {
   if (config.fontWeightBold) {
     ret.fontWeightBold = config.fontWeightBold;
   }
-
-  return ret;
-};
-
-const processFontSpacingConfig = (config: UiConfig): UiStatePartial => {
-  const ret: UiStatePartial = {};
 
   if (Number.isFinite(config.lineHeight)) {
     ret.lineHeight = config.lineHeight;
@@ -181,15 +163,6 @@ const processFontSpacingConfig = (config: UiConfig): UiStatePartial => {
   }
 
   return ret;
-};
-
-const processFontConfig = (config: UiConfig, state: uiState): UiStatePartial => {
-  return {
-    ...processFontSizeConfig(config, state),
-    ...processFontFamilyConfig(config),
-    ...processFontWeightConfig(config),
-    ...processFontSpacingConfig(config)
-  };
 };
 
 const processCursorConfig = (config: UiConfig): UiStatePartial => {
@@ -429,7 +402,7 @@ const processProfileConfig = (config: UiConfig): UiStatePartial => {
 
 const mergeConfigIntoState = (config: UiConfig, state: uiState, now: number): UiStatePartial => {
   return {
-    ...processFontConfig(config, state),
+    ...applyFontConfig(config, state),
     ...processCursorConfig(config),
     ...processColorConfig(config, state),
     ...processRendererConfig(config),
@@ -450,10 +423,6 @@ const handleConfigLoad = (state: uiState, action: any): uiState => {
   return state.merge(mergeConfigIntoState(config, state, now));
 };
 
-const shouldUpdateMaximized = (state: uiState, isMaximized: boolean) => {
-  return state.maximized !== isMaximized;
-};
-
 const handleUIActions = (state: uiState, action: any): uiState => {
   switch (action.type) {
     case UI_FONT_SIZE_SET:
@@ -472,7 +441,7 @@ const handleUIActions = (state: uiState, action: any): uiState => {
       return state.set('maximized', false);
 
     case UI_WINDOW_GEOMETRY_CHANGED:
-      return shouldUpdateMaximized(state, action.isMaximized) ? state.set('maximized', action.isMaximized) : state;
+      return state.maximized !== action.isMaximized ? state.set('maximized', action.isMaximized) : state;
 
     case UI_ENTER_FULLSCREEN:
       return state.set('fullScreen', true);
@@ -594,45 +563,28 @@ const handleSessionPtyData = (state: uiState, action: any): uiState => {
   );
 };
 
-const updateFontNotification = (state: uiState, state_: uiState, actionType: string): uiState => {
-  if (CONFIG_LOAD === actionType) {
-    return state_;
+const updateNotifications = (prev: uiState, next: uiState, actionType: string): uiState => {
+  let result = next;
+
+  if (
+    actionType !== CONFIG_LOAD &&
+    (result.fontSize !== prev.fontSize || result.fontSizeOverride !== prev.fontSizeOverride)
+  ) {
+    result = result.merge({notifications: {font: true}}, {deep: true});
   }
 
-  if (state_.fontSize !== state.fontSize || state_.fontSizeOverride !== state.fontSizeOverride) {
-    return state_.merge({notifications: {font: true}}, {deep: true});
+  if (prev.cols !== null && prev.rows !== null && (prev.rows !== result.rows || prev.cols !== result.cols)) {
+    result = result.merge({notifications: {resize: true}}, {deep: true});
   }
 
-  return state_;
-};
-
-const updateResizeNotification = (state: uiState, state_: uiState): uiState => {
-  if (state.cols !== null && state.rows !== null && (state.rows !== state_.rows || state.cols !== state_.cols)) {
-    return state_.merge({notifications: {resize: true}}, {deep: true});
+  if (prev.messageText !== result.messageText || prev.messageURL !== result.messageURL) {
+    result = result.merge({notifications: {message: true}}, {deep: true});
   }
-  return state_;
-};
 
-const updateMessageNotification = (state: uiState, state_: uiState): uiState => {
-  if (state.messageText !== state_.messageText || state.messageURL !== state_.messageURL) {
-    return state_.merge({notifications: {message: true}}, {deep: true});
+  if (prev.updateVersion !== result.updateVersion) {
+    result = result.merge({notifications: {updates: true}}, {deep: true});
   }
-  return state_;
-};
 
-const updateVersionNotification = (state: uiState, state_: uiState): uiState => {
-  if (state.updateVersion !== state_.updateVersion) {
-    return state_.merge({notifications: {updates: true}}, {deep: true});
-  }
-  return state_;
-};
-
-const applyNotificationUpdates = (state: uiState, state_: uiState, actionType: string): uiState => {
-  let result = state_;
-  result = updateFontNotification(state, result, actionType);
-  result = updateResizeNotification(state, result);
-  result = updateMessageNotification(state, result);
-  result = updateVersionNotification(state, result);
   return result;
 };
 
@@ -686,7 +638,7 @@ const reducer: IUiReducer = (state = initial, action) => {
       break;
   }
 
-  state_ = applyNotificationUpdates(state, state_, action.type);
+  state_ = updateNotifications(state, state_, action.type);
 
   return state_;
 };
