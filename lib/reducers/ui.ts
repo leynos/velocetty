@@ -437,6 +437,48 @@ const handleSessionPtyData = (state: uiState, action: any): uiState => {
   return state;
 };
 
+const updateFontNotification = (state: uiState, state_: uiState, actionType: string): uiState => {
+  if (CONFIG_LOAD === actionType) {
+    return state_;
+  }
+
+  if (state_.fontSize !== state.fontSize || state_.fontSizeOverride !== state.fontSizeOverride) {
+    return state_.merge({notifications: {font: true}}, {deep: true});
+  }
+
+  return state_;
+};
+
+const updateResizeNotification = (state: uiState, state_: uiState): uiState => {
+  if (state.cols !== null && state.rows !== null && (state.rows !== state_.rows || state.cols !== state_.cols)) {
+    return state_.merge({notifications: {resize: true}}, {deep: true});
+  }
+  return state_;
+};
+
+const updateMessageNotification = (state: uiState, state_: uiState): uiState => {
+  if (state.messageText !== state_.messageText || state.messageURL !== state_.messageURL) {
+    return state_.merge({notifications: {message: true}}, {deep: true});
+  }
+  return state_;
+};
+
+const updateVersionNotification = (state: uiState, state_: uiState): uiState => {
+  if (state.updateVersion !== state_.updateVersion) {
+    return state_.merge({notifications: {updates: true}}, {deep: true});
+  }
+  return state_;
+};
+
+const applyNotificationUpdates = (state: uiState, state_: uiState, actionType: string): uiState => {
+  let result = state_;
+  result = updateFontNotification(state, result, actionType);
+  result = updateResizeNotification(state, result);
+  result = updateMessageNotification(state, result);
+  result = updateVersionNotification(state, result);
+  return result;
+};
+
 const reducer: IUiReducer = (state = initial, action) => {
   let state_ = state;
   let isMax;
@@ -539,24 +581,7 @@ const reducer: IUiReducer = (state = initial, action) => {
       break;
   }
 
-  // Show a notification if any of the font size values have changed
-  if (CONFIG_LOAD !== action.type) {
-    if (state_.fontSize !== state.fontSize || state_.fontSizeOverride !== state.fontSizeOverride) {
-      state_ = state_.merge({notifications: {font: true}}, {deep: true});
-    }
-  }
-
-  if (state.cols !== null && state.rows !== null && (state.rows !== state_.rows || state.cols !== state_.cols)) {
-    state_ = state_.merge({notifications: {resize: true}}, {deep: true});
-  }
-
-  if (state.messageText !== state_.messageText || state.messageURL !== state_.messageURL) {
-    state_ = state_.merge({notifications: {message: true}}, {deep: true});
-  }
-
-  if (state.updateVersion !== state_.updateVersion) {
-    state_ = state_.merge({notifications: {updates: true}}, {deep: true});
-  }
+  state_ = applyNotificationUpdates(state, state_, action.type);
 
   return state_;
 };
