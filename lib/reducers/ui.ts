@@ -128,7 +128,7 @@ type UiConfig = Omit<Partial<Mutable<uiState>>, 'bell'> & {
   bell?: uiState['bell'] | 'false';
 };
 
-const applyFontConfig = (config: UiConfig, state: uiState): UiStatePartial => {
+const processFontSize = (config: UiConfig, state: uiState): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (state.fontSizeOverride && config.fontSize !== state.fontSize) {
@@ -139,6 +139,12 @@ const applyFontConfig = (config: UiConfig, state: uiState): UiStatePartial => {
     ret.fontSize = config.fontSize;
   }
 
+  return ret;
+};
+
+const processFontFamily = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
   if (config.fontFamily) {
     ret.fontFamily = config.fontFamily;
   }
@@ -147,6 +153,12 @@ const applyFontConfig = (config: UiConfig, state: uiState): UiStatePartial => {
     ret.uiFontFamily = config.uiFontFamily;
   }
 
+  return ret;
+};
+
+const processFontWeight = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
   if (config.fontWeight) {
     ret.fontWeight = config.fontWeight;
   }
@@ -154,6 +166,12 @@ const applyFontConfig = (config: UiConfig, state: uiState): UiStatePartial => {
   if (config.fontWeightBold) {
     ret.fontWeightBold = config.fontWeightBold;
   }
+
+  return ret;
+};
+
+const processFontMetrics = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
 
   if (Number.isFinite(config.lineHeight)) {
     ret.lineHeight = config.lineHeight;
@@ -164,6 +182,15 @@ const applyFontConfig = (config: UiConfig, state: uiState): UiStatePartial => {
   }
 
   return ret;
+};
+
+const applyFontConfig = (config: UiConfig, state: uiState): UiStatePartial => {
+  return {
+    ...processFontSize(config, state),
+    ...processFontFamily(config),
+    ...processFontWeight(config),
+    ...processFontMetrics(config)
+  };
 };
 
 const processCursorConfig = (config: UiConfig): UiStatePartial => {
@@ -188,11 +215,11 @@ const processCursorConfig = (config: UiConfig): UiStatePartial => {
   return ret;
 };
 
-const hasColorConfigChanged = (stateColors: uiState['colors'], configColors: uiState['colors']) => {
+const hasColorConfigChanged = (stateColors: uiState['colors'], configColors: NonNullable<UiConfig['colors']>) => {
   return !isEqual(stateColors, configColors);
 };
 
-const processColorConfig = (config: UiConfig, state: uiState): UiStatePartial => {
+const processBasicColors = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (config.borderColor) {
@@ -203,6 +230,12 @@ const processColorConfig = (config: UiConfig, state: uiState): UiStatePartial =>
     ret.selectionColor = config.selectionColor;
   }
 
+  return ret;
+};
+
+const processTextColors = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
   if (config.foregroundColor) {
     ret.foregroundColor = config.foregroundColor;
   }
@@ -211,11 +244,25 @@ const processColorConfig = (config: UiConfig, state: uiState): UiStatePartial =>
     ret.backgroundColor = config.backgroundColor;
   }
 
+  return ret;
+};
+
+const processColorPalette = (config: UiConfig, state: uiState): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
   if (config.colors && hasColorConfigChanged(state.colors, config.colors)) {
     ret.colors = config.colors;
   }
 
   return ret;
+};
+
+const processColorConfig = (config: UiConfig, state: uiState): UiStatePartial => {
+  return {
+    ...processBasicColors(config),
+    ...processTextColors(config),
+    ...processColorPalette(config, state)
+  };
 };
 
 const processRendererConfig = (config: UiConfig): UiStatePartial => {
@@ -695,7 +742,7 @@ const handleSessionPtyData = (state: uiState, action: SessionPtyDataAction): uiS
   );
 };
 
-const updateNotifications = (prev: uiState, next: uiState, actionType: string): uiState => {
+const updateConfigNotifications = (prev: uiState, next: uiState, actionType: string): uiState => {
   let result = next;
 
   if (
@@ -709,6 +756,12 @@ const updateNotifications = (prev: uiState, next: uiState, actionType: string): 
     result = result.merge({notifications: {resize: true}}, {deep: true});
   }
 
+  return result;
+};
+
+const updateStateNotifications = (prev: uiState, next: uiState): uiState => {
+  let result = next;
+
   if (prev.messageText !== result.messageText || prev.messageURL !== result.messageURL) {
     result = result.merge({notifications: {message: true}}, {deep: true});
   }
@@ -718,6 +771,11 @@ const updateNotifications = (prev: uiState, next: uiState, actionType: string): 
   }
 
   return result;
+};
+
+const updateNotifications = (prev: uiState, next: uiState, actionType: string): uiState => {
+  const configNotifications = updateConfigNotifications(prev, next, actionType);
+  return updateStateNotifications(prev, configNotifications);
 };
 
 const reducer: IUiReducer = (state = initial, action) => {

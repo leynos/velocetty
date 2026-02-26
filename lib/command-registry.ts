@@ -77,7 +77,7 @@ const serializeAjvErrors = (errors: ErrorObject[] | null | undefined): CommandVa
     };
   });
 
-const ajv = new Ajv({allErrors: true, strict: false});
+const ajv = new Ajv({allErrors: true});
 const validatorsByCommandId = new Map<CommandId, ValidateFunction>();
 const registry = new Map<CommandId, RegisteredCommand>();
 const runtimeManagedCommands = new Set<CommandId>();
