@@ -659,7 +659,7 @@ export default class Term extends React.PureComponent<
       return;
     }
 
-    if (!this.isPaneVisible() || this.hasWebGLFailureCooldown() || !this.canUseWebGLRenderer()) {
+    if (!this.isPaneVisible() || !this.canUseWebGLRenderer()) {
       this.detachWebGLRenderer();
       this.ensureCanvasRenderer();
       return;

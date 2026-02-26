@@ -1,3 +1,15 @@
+/**
+ * @file UI reducer for terminal presentation state and configuration merging.
+ *
+ * Invariants:
+ * - Configuration input is validated and normalised before being merged.
+ * - Session/UI/notification actions only mutate UI-owned state slices.
+ * - Unknown actions fall through and return the prior state unchanged.
+ *
+ * Related modules:
+ * - `lib/reducers/index.ts` for root reducer composition.
+ * - `lib/reducers/sessions.ts` and `lib/reducers/term-groups.ts` for adjacent state domains.
+ */
 import {release} from 'node:os';
 
 import isEqual from 'lodash/isEqual';
@@ -718,8 +730,13 @@ const shouldIgnoreActivityMarker = (state: uiState, action: SessionPtyDataAction
     return true;
   }
 
+  const openAt = state.openAt[action.uid];
+  if (openAt === undefined) {
+    return true;
+  }
+
   // if first data events after open, ignore
-  if (action.now - state.openAt[action.uid] < 1000) {
+  if (action.now - openAt < 1000) {
     return true;
   }
 
@@ -799,6 +816,8 @@ const handleSessionSetCwd = (state: uiState, action: SessionSetCwdAction): uiSta
 
 const reducer: IUiReducer = (state = initial, action) => {
   let state_ = state;
+  // In `reducer` (typed as `IUiReducer`) we cast the broader Hyper action union
+  // to the `UiReducerAction` subset handled here; non-matching actions fall through unchanged.
   const typedAction = action as UiReducerAction;
   switch (typedAction.type) {
     case CONFIG_LOAD:
