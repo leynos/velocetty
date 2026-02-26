@@ -34,7 +34,7 @@ const allowedCursorShapes = new Set(['BEAM', 'BLOCK', 'UNDERLINE']);
 const allowedCursorBlinkValues = new Set([true, false]);
 const allowedBells = new Set(['SOUND', 'false', false]);
 const allowedHamburgerMenuValues = new Set([true, false, ''] as const);
-const allowedWindowControlsValues = new Set([true, false, 'left']);
+const allowedWindowControlsValues = new Set([true, false, 'left', ''] as const);
 
 // Populate `config-default.js` from this :)
 const initial: uiState = Immutable<Mutable<uiState>>({
@@ -123,8 +123,9 @@ const initial: uiState = Immutable<Mutable<uiState>>({
 });
 
 type UiStatePartial = Immutable.DeepPartial<Mutable<uiState>>;
-type UiConfig = Partial<Mutable<uiState>> & {
+type UiConfig = Omit<Partial<Mutable<uiState>>, 'bell'> & {
   useConpty?: boolean;
+  bell?: uiState['bell'] | 'false';
 };
 
 const applyFontConfig = (config: UiConfig, state: uiState): UiStatePartial => {
@@ -234,8 +235,9 @@ const processRendererConfig = (config: UiConfig): UiStatePartial => {
 const processBellConfig = (config: UiConfig, state: uiState): UiStatePartial => {
   const ret: UiStatePartial = {};
 
-  if (allowedBells.has(config.bell)) {
-    ret.bell = (config.bell as any) === 'false' ? false : config.bell;
+  const bellValue = config.bell;
+  if (bellValue !== undefined && allowedBells.has(bellValue)) {
+    ret.bell = bellValue === 'false' ? false : bellValue;
   }
 
   if (config.bellSoundURL !== state.bellSoundURL) {
@@ -321,7 +323,7 @@ const processPlatformSpecificConfig = (config: UiConfig): UiStatePartial => {
 const processScrollAndPaddingConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
-  if (config.scrollback) {
+  if (typeof config.scrollback === 'number') {
     ret.scrollback = config.scrollback;
   }
 
@@ -379,7 +381,7 @@ const processStyleConfig = (config: UiConfig): UiStatePartial => {
     ret.css = config.css;
   }
 
-  if (config.termCSS) {
+  if (config.termCSS !== undefined && config.termCSS !== null) {
     ret.termCSS = config.termCSS;
   }
 
@@ -416,14 +418,133 @@ const mergeConfigIntoState = (config: UiConfig, state: uiState, now: number): Ui
   };
 };
 
-const handleConfigLoad = (state: uiState, action: any): uiState => {
+type ConfigLoadAction = Readonly<{
+  type: typeof CONFIG_LOAD | typeof CONFIG_RELOAD;
+  config: UiConfig;
+  now: number;
+}>;
+
+type SessionAddAction = Readonly<{
+  type: typeof SESSION_ADD;
+  uid: string;
+  now: number;
+}>;
+
+type SessionResizeAction = Readonly<{
+  type: typeof SESSION_RESIZE;
+  rows: number;
+  cols: number;
+  now: number;
+  isStandaloneTerm: boolean;
+}>;
+
+type SessionPtyExitAction = Readonly<{
+  type: typeof SESSION_PTY_EXIT;
+  uid: string;
+}>;
+
+type SessionSetActiveAction = Readonly<{
+  type: typeof SESSION_SET_ACTIVE;
+  uid: string;
+}>;
+
+type SessionPtyDataAction = Readonly<{
+  type: typeof SESSION_PTY_DATA;
+  uid: string;
+  now: number;
+}>;
+
+type SessionSetCwdAction = Readonly<{
+  type: typeof SESSION_SET_CWD;
+  cwd: string;
+}>;
+
+type UIFontSizeSetAction = Readonly<{
+  type: typeof UI_FONT_SIZE_SET;
+  value: uiState['fontSizeOverride'];
+}>;
+
+type UIFontSizeResetAction = Readonly<{
+  type: typeof UI_FONT_SIZE_RESET;
+}>;
+
+type UIFontSmoothingSetAction = Readonly<{
+  type: typeof UI_FONT_SMOOTHING_SET;
+  fontSmoothing: uiState['fontSmoothingOverride'];
+}>;
+
+type UIWindowMaximizeAction = Readonly<{
+  type: typeof UI_WINDOW_MAXIMIZE;
+}>;
+
+type UIWindowUnmaximizeAction = Readonly<{
+  type: typeof UI_WINDOW_UNMAXIMIZE;
+}>;
+
+type UIWindowGeometryChangedAction = Readonly<{
+  type: typeof UI_WINDOW_GEOMETRY_CHANGED;
+  isMaximized: boolean;
+}>;
+
+type UIEnterFullscreenAction = Readonly<{
+  type: typeof UI_ENTER_FULLSCREEN;
+}>;
+
+type UILeaveFullscreenAction = Readonly<{
+  type: typeof UI_LEAVE_FULLSCREEN;
+}>;
+
+type UIDisplayAction =
+  | UIFontSizeSetAction
+  | UIFontSizeResetAction
+  | UIFontSmoothingSetAction
+  | UIWindowMaximizeAction
+  | UIWindowUnmaximizeAction
+  | UIWindowGeometryChangedAction
+  | UIEnterFullscreenAction
+  | UILeaveFullscreenAction;
+
+type NotificationDismissAction = Readonly<{
+  type: typeof NOTIFICATION_DISMISS;
+  id: keyof uiState['notifications'];
+}>;
+
+type NotificationMessageAction = Readonly<{
+  type: typeof NOTIFICATION_MESSAGE;
+  text: uiState['messageText'];
+  url: uiState['messageURL'];
+  dismissable: boolean;
+}>;
+
+type UpdateAvailableAction = Readonly<{
+  type: typeof UPDATE_AVAILABLE;
+  version: uiState['updateVersion'];
+  notes: uiState['updateNotes'];
+  releaseUrl: uiState['updateReleaseUrl'];
+  canInstall: uiState['updateCanInstall'];
+}>;
+
+type NotificationAction = NotificationDismissAction | NotificationMessageAction | UpdateAvailableAction;
+
+type UiReducerAction =
+  | ConfigLoadAction
+  | SessionAddAction
+  | SessionResizeAction
+  | SessionPtyExitAction
+  | SessionSetActiveAction
+  | SessionPtyDataAction
+  | SessionSetCwdAction
+  | UIDisplayAction
+  | NotificationAction;
+
+const handleConfigLoad = (state: uiState, action: ConfigLoadAction): uiState => {
   const {config, now} = action;
   // unset the user font size override if the
   // font size changed from the config
   return state.merge(mergeConfigIntoState(config, state, now));
 };
 
-const handleUIActions = (state: uiState, action: any): uiState => {
+const handleUIActions = (state: uiState, action: UIDisplayAction): uiState => {
   switch (action.type) {
     case UI_FONT_SIZE_SET:
       return state.set('fontSizeOverride', action.value);
@@ -454,7 +575,7 @@ const handleUIActions = (state: uiState, action: any): uiState => {
   }
 };
 
-const handleNotifications = (state: uiState, action: any): uiState => {
+const handleNotifications = (state: uiState, action: NotificationAction): uiState => {
   switch (action.type) {
     case NOTIFICATION_DISMISS:
       return state.merge(
@@ -486,7 +607,7 @@ const handleNotifications = (state: uiState, action: any): uiState => {
   }
 };
 
-const handleSessionResize = (state: uiState, action: any): uiState => {
+const handleSessionResize = (state: uiState, action: SessionResizeAction): uiState => {
   // only care about the sizes
   // of standalone terms (i.e. not splits):
   if (!action.isStandaloneTerm) {
@@ -500,7 +621,7 @@ const handleSessionResize = (state: uiState, action: any): uiState => {
   });
 };
 
-const handleSessionPtyExit = (state: uiState, action: any): uiState => {
+const handleSessionPtyExit = (state: uiState, action: SessionPtyExitAction): uiState => {
   return state
     .updateIn(['openAt'], (times: ImmutableType<Record<string, number>>) => {
       const times_ = times.asMutable();
@@ -514,7 +635,18 @@ const handleSessionPtyExit = (state: uiState, action: any): uiState => {
     });
 };
 
-const setActiveUidAndMerge = (state: uiState, uid: string, propertyName: string, propertyValue: any): uiState => {
+type ActiveMergeProperty = 'openAt' | 'activityMarkers';
+type ActiveMergeValueMap = {
+  openAt: number;
+  activityMarkers: boolean;
+};
+
+const setActiveUidAndMerge = <K extends ActiveMergeProperty>(
+  state: uiState,
+  uid: string,
+  propertyName: K,
+  propertyValue: ActiveMergeValueMap[K]
+): uiState => {
   return state.merge(
     {
       activeUid: uid,
@@ -526,7 +658,7 @@ const setActiveUidAndMerge = (state: uiState, uid: string, propertyName: string,
   );
 };
 
-const shouldIgnoreActivityMarker = (state: uiState, action: any): boolean => {
+const shouldIgnoreActivityMarker = (state: uiState, action: SessionPtyDataAction): boolean => {
   // ignore activity markers for current tab
   if (action.uid === state.activeUid) {
     return true;
@@ -548,7 +680,7 @@ const shouldIgnoreActivityMarker = (state: uiState, action: any): boolean => {
   return false;
 };
 
-const handleSessionPtyData = (state: uiState, action: any): uiState => {
+const handleSessionPtyData = (state: uiState, action: SessionPtyDataAction): uiState => {
   if (shouldIgnoreActivityMarker(state, action)) {
     return state;
   }
@@ -590,34 +722,35 @@ const updateNotifications = (prev: uiState, next: uiState, actionType: string): 
 
 const reducer: IUiReducer = (state = initial, action) => {
   let state_ = state;
-  switch (action.type) {
+  const typedAction = action as UiReducerAction;
+  switch (typedAction.type) {
     case CONFIG_LOAD:
     case CONFIG_RELOAD:
-      state_ = handleConfigLoad(state, action);
+      state_ = handleConfigLoad(state, typedAction);
       break;
 
     case SESSION_ADD:
-      state_ = setActiveUidAndMerge(state, action.uid, 'openAt', action.now);
+      state_ = setActiveUidAndMerge(state, typedAction.uid, 'openAt', typedAction.now);
       break;
 
     case SESSION_RESIZE:
-      state_ = handleSessionResize(state, action);
+      state_ = handleSessionResize(state, typedAction);
       break;
 
     case SESSION_PTY_EXIT:
-      state_ = handleSessionPtyExit(state, action);
+      state_ = handleSessionPtyExit(state, typedAction);
       break;
 
     case SESSION_SET_ACTIVE:
-      state_ = setActiveUidAndMerge(state, action.uid, 'activityMarkers', false);
+      state_ = setActiveUidAndMerge(state, typedAction.uid, 'activityMarkers', false);
       break;
 
     case SESSION_PTY_DATA:
-      state_ = handleSessionPtyData(state, action);
+      state_ = handleSessionPtyData(state, typedAction);
       break;
 
     case SESSION_SET_CWD:
-      state_ = state.set('cwd', action.cwd);
+      state_ = state.set('cwd', typedAction.cwd);
       break;
 
     case UI_FONT_SIZE_SET:
@@ -628,17 +761,17 @@ const reducer: IUiReducer = (state = initial, action) => {
     case UI_WINDOW_GEOMETRY_CHANGED:
     case UI_ENTER_FULLSCREEN:
     case UI_LEAVE_FULLSCREEN:
-      state_ = handleUIActions(state, action);
+      state_ = handleUIActions(state, typedAction);
       break;
 
     case NOTIFICATION_DISMISS:
     case NOTIFICATION_MESSAGE:
     case UPDATE_AVAILABLE:
-      state_ = handleNotifications(state, action);
+      state_ = handleNotifications(state, typedAction);
       break;
   }
 
-  state_ = updateNotifications(state, state_, action.type);
+  state_ = updateNotifications(state, state_, typedAction.type);
 
   return state_;
 };

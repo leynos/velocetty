@@ -626,13 +626,6 @@ export default class Term extends React.PureComponent<
     }
 
     const webGLContextPool = getWebGLContextPool(this.props.webGLRendererMaxContexts);
-    const hasAvailableWebGLSlot =
-      webGLContextPool.has(this.props.uid) || webGLContextPool.size < webGLContextPool.maxContexts;
-    if (!this.webglAddon && !hasAvailableWebGLSlot) {
-      this.ensureCanvasRenderer();
-      return;
-    }
-
     this.ensureWebGLRenderer(webGLContextPool);
   }
 

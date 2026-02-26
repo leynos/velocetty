@@ -297,6 +297,18 @@ test('removeDirectoryWithRetry() rejects invalid retry options', async () => {
   );
 });
 
+test('removeDirectoryWithRetry() rejects non-integer maxAttempts values', async () => {
+  await expect(removeDirectoryWithRetry('/tmp/unused', {maxAttempts: 2.5})).rejects.toThrow(
+    'maxAttempts must be an integer greater than 0'
+  );
+});
+
+test('removeDirectoryWithRetry() rejects non-finite baseDelayMs values', async () => {
+  await expect(removeDirectoryWithRetry('/tmp/unused', {baseDelayMs: Number.POSITIVE_INFINITY})).rejects.toThrow(
+    'baseDelayMs must be a finite number greater than 0'
+  );
+});
+
 test('createIsolatedE2EEnvironment() creates and cleans temp home paths', async () => {
   const isolated = await createIsolatedE2EEnvironment();
   const {HOME, APPDATA, LOCALAPPDATA} = isolated.env;
