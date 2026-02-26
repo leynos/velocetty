@@ -441,6 +441,82 @@ const mergeConfigIntoState = (config: any, state: uiState, now: number): UiState
   };
 };
 
+const handleConfigLoad = (state: uiState, action: any): uiState => {
+  const {config, now} = action;
+  // unset the user font size override if the
+  // font size changed from the config
+  return state.merge(mergeConfigIntoState(config, state, now));
+};
+
+const handleUIActions = (state: uiState, action: any): uiState => {
+  switch (action.type) {
+    case UI_FONT_SIZE_SET:
+      return state.set('fontSizeOverride', action.value);
+
+    case UI_FONT_SIZE_RESET:
+      return state.set('fontSizeOverride', null);
+
+    case UI_FONT_SMOOTHING_SET:
+      return state.set('fontSmoothingOverride', action.fontSmoothing);
+
+    case UI_WINDOW_MAXIMIZE:
+      return state.set('maximized', true);
+
+    case UI_WINDOW_UNMAXIMIZE:
+      return state.set('maximized', false);
+
+    case UI_WINDOW_GEOMETRY_CHANGED: {
+      const isMax = action.isMaximized;
+      if (state.maximized !== isMax) {
+        return state.set('maximized', isMax);
+      }
+
+      return state;
+    }
+
+    case UI_ENTER_FULLSCREEN:
+      return state.set('fullScreen', true);
+
+    case UI_LEAVE_FULLSCREEN:
+      return state.set('fullScreen', false);
+
+    default:
+      return state;
+  }
+};
+
+const handleNotifications = (state: uiState, action: any): uiState => {
+  switch (action.type) {
+    case NOTIFICATION_DISMISS:
+      return state.merge(
+        {
+          notifications: {
+            [action.id]: false
+          }
+        },
+        {deep: true}
+      );
+
+    case NOTIFICATION_MESSAGE:
+      return state.merge({
+        messageText: action.text,
+        messageURL: action.url,
+        messageDismissable: action.dismissable === true
+      });
+
+    case UPDATE_AVAILABLE:
+      return state.merge({
+        updateVersion: action.version,
+        updateNotes: action.notes || '',
+        updateReleaseUrl: action.releaseUrl,
+        updateCanInstall: !!action.canInstall
+      });
+
+    default:
+      return state;
+  }
+};
+
 const handleSessionResize = (state: uiState, action: any): uiState => {
   // only care about the sizes
   // of standalone terms (i.e. not splits):
@@ -554,17 +630,12 @@ const applyNotificationUpdates = (state: uiState, state_: uiState, actionType: s
 
 const reducer: IUiReducer = (state = initial, action) => {
   let state_ = state;
-  let isMax;
   switch (action.type) {
     case CONFIG_LOAD:
-    case CONFIG_RELOAD: {
-      const {config, now} = action;
-      state_ = state
-        // unset the user font size override if the
-        // font size changed from the config
-        .merge(mergeConfigIntoState(config, state, now));
+    case CONFIG_RELOAD:
+      state_ = handleConfigLoad(state, action);
       break;
-    }
+
     case SESSION_ADD:
       state_ = setActiveUidAndMerge(state, action.uid, 'openAt', action.now);
       break;
@@ -590,67 +661,20 @@ const reducer: IUiReducer = (state = initial, action) => {
       break;
 
     case UI_FONT_SIZE_SET:
-      state_ = state.set('fontSizeOverride', action.value);
-      break;
-
     case UI_FONT_SIZE_RESET:
-      state_ = state.set('fontSizeOverride', null);
-      break;
-
     case UI_FONT_SMOOTHING_SET:
-      state_ = state.set('fontSmoothingOverride', action.fontSmoothing);
-      break;
-
     case UI_WINDOW_MAXIMIZE:
-      state_ = state.set('maximized', true);
-      break;
-
     case UI_WINDOW_UNMAXIMIZE:
-      state_ = state.set('maximized', false);
-      break;
-
     case UI_WINDOW_GEOMETRY_CHANGED:
-      isMax = action.isMaximized;
-      if (state.maximized !== isMax) {
-        state_ = state.set('maximized', isMax);
-      }
-
+    case UI_ENTER_FULLSCREEN:
+    case UI_LEAVE_FULLSCREEN:
+      state_ = handleUIActions(state, action);
       break;
 
     case NOTIFICATION_DISMISS:
-      state_ = state.merge(
-        {
-          notifications: {
-            [action.id]: false
-          }
-        },
-        {deep: true}
-      );
-      break;
-
     case NOTIFICATION_MESSAGE:
-      state_ = state.merge({
-        messageText: action.text,
-        messageURL: action.url,
-        messageDismissable: action.dismissable === true
-      });
-      break;
-
     case UPDATE_AVAILABLE:
-      state_ = state.merge({
-        updateVersion: action.version,
-        updateNotes: action.notes || '',
-        updateReleaseUrl: action.releaseUrl,
-        updateCanInstall: !!action.canInstall
-      });
-      break;
-
-    case UI_ENTER_FULLSCREEN:
-      state_ = state.set('fullScreen', true);
-      break;
-
-    case UI_LEAVE_FULLSCREEN:
-      state_ = state.set('fullScreen', false);
+      state_ = handleNotifications(state, action);
       break;
   }
 
