@@ -5,6 +5,11 @@ import {setupHappyDom} from '../testUtils/happy-dom';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
 
+/** Type guard to identify WebGL addons by their onContextLoss method. */
+function isWebGLAddon(addon: unknown): addon is {onContextLoss: () => void} {
+  return addon !== null && typeof addon === 'object' && 'onContextLoss' in addon;
+}
+
 const {transportMock, resetTransportMock} = createTransportMock();
 
 mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
@@ -138,7 +143,7 @@ describe('Term.ensureWebGLRenderer fallback handling', () => {
     } as any);
     termInstance.term = {
       loadAddon: mock((addon: unknown) => {
-        if (addon && typeof addon === 'object' && 'onContextLoss' in addon) {
+        if (isWebGLAddon(addon)) {
           throw new Error('webgl attach failed');
         }
       })
