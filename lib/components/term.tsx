@@ -55,11 +55,12 @@ const isWebgl2Supported = (() => {
 
 const DEFAULT_WEBGL_MAX_CONTEXTS = 16;
 
-type WebGLPoolContext = Readonly<{paneId: string}>;
+// Pool entries are logical slot tokens, not reusable WebGL context objects.
+type WebGLPoolSlot = Readonly<{paneId: string}>;
 
 // These module-level singletons coordinate WebGL ownership across all Term instances.
 // The pool is created on first access and intentionally lives for the renderer lifetime.
-let sharedWebGLContextPool: WebGLContextPool<WebGLPoolContext> | null = null;
+let sharedWebGLContextPool: WebGLContextPool<WebGLPoolSlot> | null = null;
 let sharedWebGLContextPoolMax: number | null = null;
 const webGLPoolReleaseHandlers = new Map<string, () => void>();
 
@@ -71,7 +72,7 @@ const getWebGLContextPool = (maxContexts: number) => {
   const resolvedMaxContexts = resolveWebGLMaxContexts(maxContexts);
 
   if (!sharedWebGLContextPool) {
-    sharedWebGLContextPool = new WebGLContextPool<WebGLPoolContext>({maxContexts: resolvedMaxContexts});
+    sharedWebGLContextPool = new WebGLContextPool<WebGLPoolSlot>({maxContexts: resolvedMaxContexts});
     sharedWebGLContextPoolMax = resolvedMaxContexts;
     return sharedWebGLContextPool;
   }
@@ -82,7 +83,7 @@ const getWebGLContextPool = (maxContexts: number) => {
         `Applying ${resolvedMaxContexts}.`
     );
 
-    sharedWebGLContextPool = new WebGLContextPool<WebGLPoolContext>({maxContexts: resolvedMaxContexts});
+    sharedWebGLContextPool = new WebGLContextPool<WebGLPoolSlot>({maxContexts: resolvedMaxContexts});
     sharedWebGLContextPoolMax = resolvedMaxContexts;
 
     for (const releaseHandler of [...webGLPoolReleaseHandlers.values()]) {
@@ -582,6 +583,8 @@ export default class Term extends React.PureComponent<
   }
 
   ensureWebGLRenderer(webGLContextPool = getWebGLContextPool(this.props.webGLRendererMaxContexts)) {
+    // Acquire/release manages logical slot ownership only. Each pane still
+    // owns its own WebglAddon instance and underlying browser WebGL context.
     webGLContextPool.acquire(
       this.props.uid,
       () => ({paneId: this.props.uid}),
