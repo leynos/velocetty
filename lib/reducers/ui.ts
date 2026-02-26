@@ -214,6 +214,10 @@ const processCursorConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
+const hasColorConfigChanged = (stateColors: uiState['colors'], configColors: uiState['colors']) => {
+  return JSON.stringify(stateColors) !== JSON.stringify(configColors);
+};
+
 const processColorConfig = (config: any, state: uiState): UiStatePartial => {
   const ret: UiStatePartial = {};
 
@@ -233,10 +237,8 @@ const processColorConfig = (config: any, state: uiState): UiStatePartial => {
     ret.backgroundColor = config.backgroundColor;
   }
 
-  if (config.colors) {
-    if (JSON.stringify(state.colors) !== JSON.stringify(config.colors)) {
-      ret.colors = config.colors;
-    }
+  if (config.colors && hasColorConfigChanged(state.colors, config.colors)) {
+    ret.colors = config.colors;
   }
 
   return ret;
@@ -448,6 +450,10 @@ const handleConfigLoad = (state: uiState, action: any): uiState => {
   return state.merge(mergeConfigIntoState(config, state, now));
 };
 
+const shouldUpdateMaximized = (state: uiState, isMaximized: boolean) => {
+  return state.maximized !== isMaximized;
+};
+
 const handleUIActions = (state: uiState, action: any): uiState => {
   switch (action.type) {
     case UI_FONT_SIZE_SET:
@@ -465,14 +471,8 @@ const handleUIActions = (state: uiState, action: any): uiState => {
     case UI_WINDOW_UNMAXIMIZE:
       return state.set('maximized', false);
 
-    case UI_WINDOW_GEOMETRY_CHANGED: {
-      const isMax = action.isMaximized;
-      if (state.maximized !== isMax) {
-        return state.set('maximized', isMax);
-      }
-
-      return state;
-    }
+    case UI_WINDOW_GEOMETRY_CHANGED:
+      return shouldUpdateMaximized(state, action.isMaximized) ? state.set('maximized', action.isMaximized) : state;
 
     case UI_ENTER_FULLSCREEN:
       return state.set('fullScreen', true);
@@ -557,33 +557,41 @@ const setActiveUidAndMerge = (state: uiState, uid: string, propertyName: string,
   );
 };
 
-const handleSessionPtyData = (state: uiState, action: any): uiState => {
+const shouldIgnoreActivityMarker = (state: uiState, action: any): boolean => {
   // ignore activity markers for current tab
   if (action.uid === state.activeUid) {
-    return state;
+    return true;
   }
 
   // if first data events after open, ignore
   if (action.now - state.openAt[action.uid] < 1000) {
-    return state;
+    return true;
   }
 
   // ignore activity markers that are within
   // proximity of a resize event, since we
   // expect to get data packets from the resize
   // of the ptys as a result
-  if (!state.resizeAt || action.now - state.resizeAt > 1000) {
-    return state.merge(
-      {
-        activityMarkers: {
-          [action.uid]: true
-        }
-      },
-      {deep: true}
-    );
+  if (state.resizeAt && action.now - state.resizeAt <= 1000) {
+    return true;
   }
 
-  return state;
+  return false;
+};
+
+const handleSessionPtyData = (state: uiState, action: any): uiState => {
+  if (shouldIgnoreActivityMarker(state, action)) {
+    return state;
+  }
+
+  return state.merge(
+    {
+      activityMarkers: {
+        [action.uid]: true
+      }
+    },
+    {deep: true}
+  );
 };
 
 const updateFontNotification = (state: uiState, state_: uiState, actionType: string): uiState => {
