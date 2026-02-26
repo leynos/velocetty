@@ -288,6 +288,22 @@ test('removeDirectoryWithRetry() respects maxAttempts=1 for retriable cleanup er
   expect(sleepCalls).toBe(0);
 });
 
+test('removeDirectoryWithRetry() retries until maxAttempts and then throws the final error', async () => {
+  const {removeDirectory, getAttempts} = createMockRemove({failCount: Number.POSITIVE_INFINITY});
+  const {sleepFn, getDelays} = createDelayTracker();
+
+  await expect(
+    removeDirectoryWithRetry('/tmp/unused', {
+      ...createRetryOptions({maxAttempts: 4}),
+      removeDirectory,
+      sleepFn
+    })
+  ).rejects.toThrow('busy');
+
+  expect(getAttempts()).toBe(4);
+  expect(getDelays()).toEqual([5, 10, 20]);
+});
+
 test('removeDirectoryWithRetry() rejects invalid retry options', async () => {
   await expect(removeDirectoryWithRetry('/tmp/unused', {maxAttempts: 0})).rejects.toThrow(
     'maxAttempts must be an integer greater than 0'

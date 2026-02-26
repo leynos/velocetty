@@ -178,6 +178,11 @@ export default class Term extends React.PureComponent<
   visibilityFrame: number | null;
   hasWarnedAboutTransparentWebGL: boolean;
   hasWarnedAboutUnsupportedWebGL: boolean;
+  webglFailureCount: number;
+  webglLastFailureAt: number;
+  webglCooldownMs: number;
+  webglFailureThreshold: number;
+  webglFailureDecayMs: number;
   searchDecorations: ISearchDecorationOptions;
   state = {
     searchOptions: {
@@ -205,6 +210,11 @@ export default class Term extends React.PureComponent<
     this.visibilityFrame = null;
     this.hasWarnedAboutTransparentWebGL = false;
     this.hasWarnedAboutUnsupportedWebGL = false;
+    this.webglFailureCount = 0;
+    this.webglLastFailureAt = 0;
+    this.webglCooldownMs = 500;
+    this.webglFailureThreshold = 3;
+    this.webglFailureDecayMs = 15_000;
     this.searchDecorations = {
       activeMatchColorOverviewRuler: Color(this.props.cursorColor).hex(),
       matchOverviewRuler: Color(this.props.borderColor).hex(),
@@ -462,6 +472,8 @@ export default class Term extends React.PureComponent<
 
   onWebGLContextLoss = () => {
     console.warn('WebGL context lost. Falling back to canvas-based rendering.');
+    this.webglFailureCount += 1;
+    this.webglLastFailureAt = Date.now();
     this.detachWebGLRenderer();
     this.ensureCanvasRenderer();
     this.scheduleRendererVisibilitySync();
@@ -500,6 +512,29 @@ export default class Term extends React.PureComponent<
     }
   }
 
+  private hasWebGLFailureCooldown(now = Date.now()) {
+    if (this.webglFailureCount === 0) {
+      return false;
+    }
+
+    if (this.webglLastFailureAt > 0 && now - this.webglLastFailureAt >= this.webglFailureDecayMs) {
+      this.webglFailureCount = 0;
+      this.webglLastFailureAt = 0;
+      return false;
+    }
+
+    if (this.webglFailureCount > this.webglFailureThreshold) {
+      return true;
+    }
+
+    return now < this.webglLastFailureAt + this.webglCooldownMs;
+  }
+
+  private markWebGLInitSuccess() {
+    this.webglFailureCount = 0;
+    this.webglLastFailureAt = 0;
+  }
+
   canUseWebGLRenderer() {
     if (!this.props.webGLRenderer) {
       return false;
@@ -513,6 +548,10 @@ export default class Term extends React.PureComponent<
 
     if (!isWebgl2Supported()) {
       this.warnAboutUnsupportedWebGL();
+      return false;
+    }
+
+    if (this.hasWebGLFailureCooldown()) {
       return false;
     }
 
@@ -611,6 +650,7 @@ export default class Term extends React.PureComponent<
       this.ligaturesAddon = null;
     }
 
+    this.markWebGLInitSuccess();
     Term.reportRenderer(this.props.uid, 'WebGL');
   }
 
@@ -619,7 +659,7 @@ export default class Term extends React.PureComponent<
       return;
     }
 
-    if (!this.isPaneVisible() || !this.canUseWebGLRenderer()) {
+    if (!this.isPaneVisible() || this.hasWebGLFailureCooldown() || !this.canUseWebGLRenderer()) {
       this.detachWebGLRenderer();
       this.ensureCanvasRenderer();
       return;
