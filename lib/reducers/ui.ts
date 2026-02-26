@@ -123,7 +123,7 @@ const initial: uiState = Immutable<Mutable<uiState>>({
 
 type UiStatePartial = Immutable.DeepPartial<Mutable<uiState>>;
 
-const processFontConfig = (config: any, state: uiState): UiStatePartial => {
+const processFontSizeConfig = (config: any, state: uiState): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (state.fontSizeOverride && config.fontSize !== state.fontSize) {
@@ -134,6 +134,12 @@ const processFontConfig = (config: any, state: uiState): UiStatePartial => {
     ret.fontSize = config.fontSize;
   }
 
+  return ret;
+};
+
+const processFontFamilyConfig = (config: any): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
   if (config.fontFamily) {
     ret.fontFamily = config.fontFamily;
   }
@@ -141,6 +147,16 @@ const processFontConfig = (config: any, state: uiState): UiStatePartial => {
   if (config.uiFontFamily) {
     ret.uiFontFamily = config.uiFontFamily;
   }
+
+  if (config.uiFontFamily) {
+    ret.uiFontFamily = config.uiFontFamily;
+  }
+
+  return ret;
+};
+
+const processFontWeightConfig = (config: any): UiStatePartial => {
+  const ret: UiStatePartial = {};
 
   if (config.fontWeight) {
     ret.fontWeight = config.fontWeight;
@@ -150,6 +166,12 @@ const processFontConfig = (config: any, state: uiState): UiStatePartial => {
     ret.fontWeightBold = config.fontWeightBold;
   }
 
+  return ret;
+};
+
+const processFontSpacingConfig = (config: any): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
   if (Number.isFinite(config.lineHeight)) {
     ret.lineHeight = config.lineHeight;
   }
@@ -158,11 +180,16 @@ const processFontConfig = (config: any, state: uiState): UiStatePartial => {
     ret.letterSpacing = config.letterSpacing;
   }
 
-  if (config.uiFontFamily) {
-    ret.uiFontFamily = config.uiFontFamily;
-  }
-
   return ret;
+};
+
+const processFontConfig = (config: any, state: uiState): UiStatePartial => {
+  return {
+    ...processFontSizeConfig(config, state),
+    ...processFontFamilyConfig(config),
+    ...processFontWeightConfig(config),
+    ...processFontSpacingConfig(config)
+  };
 };
 
 const processCursorConfig = (config: any): UiStatePartial => {
@@ -265,7 +292,7 @@ const processUIControlsConfig = (config: any): UiStatePartial => {
   return ret;
 };
 
-const processPlatformSpecificConfig = (config: any): UiStatePartial => {
+const processQuickEditConfig = (config: any): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (process.platform === 'win32' && (config.quickEdit === undefined || config.quickEdit === null)) {
@@ -274,23 +301,49 @@ const processPlatformSpecificConfig = (config: any): UiStatePartial => {
     ret.quickEdit = config.quickEdit;
   }
 
+  return ret;
+};
+
+const processMacOptionsConfig = (config: any): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
   if (config.macOptionSelectionMode) {
     ret.macOptionSelectionMode = config.macOptionSelectionMode;
-  }
-
-  const buildNumber = parseInt(release().split('.').at(-1) || '0', 10);
-  if (isWindows && !Number.isNaN(buildNumber) && buildNumber > 0) {
-    const useConpty = typeof config.useConpty === 'boolean' ? config.useConpty : buildNumber >= 18309;
-    ret.windowsPty = {
-      backend: useConpty ? 'conpty' : 'winpty',
-      buildNumber
-    };
   }
 
   return ret;
 };
 
-const processTerminalBehaviourConfig = (config: any): UiStatePartial => {
+const processWindowsPtyConfig = (config: any): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (!isWindows) {
+    return ret;
+  }
+
+  const buildNumber = parseInt(release().split('.').at(-1) || '0', 10);
+  if (Number.isNaN(buildNumber) || buildNumber <= 0) {
+    return ret;
+  }
+
+  const useConpty = typeof config.useConpty === 'boolean' ? config.useConpty : buildNumber >= 18309;
+  ret.windowsPty = {
+    backend: useConpty ? 'conpty' : 'winpty',
+    buildNumber
+  };
+
+  return ret;
+};
+
+const processPlatformSpecificConfig = (config: any): UiStatePartial => {
+  return {
+    ...processQuickEditConfig(config),
+    ...processMacOptionsConfig(config),
+    ...processWindowsPtyConfig(config)
+  };
+};
+
+const processScrollAndPaddingConfig = (config: any): UiStatePartial => {
   const ret: UiStatePartial = {};
 
   if (config.scrollback) {
@@ -301,6 +354,12 @@ const processTerminalBehaviourConfig = (config: any): UiStatePartial => {
     ret.padding = config.padding;
   }
 
+  return ret;
+};
+
+const processInputBehaviourConfig = (config: any): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
   if (typeof config.copyOnSelect !== 'undefined' && config.copyOnSelect !== null) {
     ret.copyOnSelect = config.copyOnSelect;
   }
@@ -308,6 +367,12 @@ const processTerminalBehaviourConfig = (config: any): UiStatePartial => {
   if (config.modifierKeys) {
     ret.modifierKeys = config.modifierKeys;
   }
+
+  return ret;
+};
+
+const processAccessibilityConfig = (config: any): UiStatePartial => {
+  const ret: UiStatePartial = {};
 
   if (config.disableLigatures !== undefined) {
     ret.disableLigatures = config.disableLigatures;
@@ -322,6 +387,14 @@ const processTerminalBehaviourConfig = (config: any): UiStatePartial => {
   }
 
   return ret;
+};
+
+const processTerminalBehaviourConfig = (config: any): UiStatePartial => {
+  return {
+    ...processScrollAndPaddingConfig(config),
+    ...processInputBehaviourConfig(config),
+    ...processAccessibilityConfig(config)
+  };
 };
 
 const processStyleConfig = (config: any): UiStatePartial => {
