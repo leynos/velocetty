@@ -16,6 +16,15 @@ const createFactory = () => {
 };
 
 describe('WebGLContextPool', () => {
+  const createDisposerTracker = () => {
+    const pairs: string[] = [];
+    const disposer = (context: MockContext, paneId: string) => {
+      pairs.push(`${paneId}:${context.id}`);
+    };
+
+    return {pairs, disposer};
+  };
+
   test('enforces the configured maximum and evicts the least recently visible pane', () => {
     const pool = new WebGLContextPool<MockContext>({maxContexts: 2});
     const createContext = createFactory();
@@ -73,13 +82,11 @@ describe('WebGLContextPool', () => {
 
     pool.acquire('pane-a', createContext);
 
-    const releasedPairs: string[] = [];
-    const released = pool.release('pane-a', (context, paneId) => {
-      releasedPairs.push(`${paneId}:${context.id}`);
-    });
+    const {pairs, disposer} = createDisposerTracker();
+    const released = pool.release('pane-a', disposer);
 
     expect(released?.id).toBe('ctx-1');
-    expect(releasedPairs).toEqual(['pane-a:ctx-1']);
+    expect(pairs).toEqual(['pane-a:ctx-1']);
     expect(pool.size).toBe(0);
     expect(pool.has('pane-a')).toBe(false);
   });
@@ -126,13 +133,11 @@ describe('WebGLContextPool', () => {
     const createContext = createFactory();
     pool.acquire('pane-known', createContext);
 
-    const disposedPairs: string[] = [];
-    const released = pool.release('pane-missing', (context, paneId) => {
-      disposedPairs.push(`${paneId}:${context.id}`);
-    });
+    const {pairs, disposer} = createDisposerTracker();
+    const released = pool.release('pane-missing', disposer);
 
     expect(released).toBeUndefined();
-    expect(disposedPairs).toEqual([]);
+    expect(pairs).toEqual([]);
     expect(pool.has('pane-known')).toBe(true);
   });
 
