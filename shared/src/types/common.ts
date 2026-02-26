@@ -47,13 +47,16 @@ export type sessionExtraOptions = {
   profile?: ProfileId;
 };
 
+/** Structured fallback reasons emitted alongside renderer-type transitions. */
+export type RendererFallbackReason = 'context-loss' | 'pool-evicted' | 'webgl-init-failed';
+
 /** Events emitted from the renderer and consumed by the privileged process. */
 export type MainEvents = {
   close: never;
   command: CommandId;
   data: {uid: SessionId | null; data: string; escaped?: boolean};
   exit: {uid: SessionId};
-  'info renderer': {uid: SessionId; type: string};
+  'info renderer': {uid: SessionId; type: string; reason?: RendererFallbackReason};
   init: null;
   maximize: never;
   minimize: never;

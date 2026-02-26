@@ -18,7 +18,7 @@ import {WebLinksAddon} from 'xterm-addon-web-links';
 import {WebglAddon} from 'xterm-addon-webgl';
 
 import type {TermProps} from '../../typings/hyper';
-import {asSessionId} from '@shared/types/common';
+import {asSessionId, type RendererFallbackReason} from '@shared/types/common';
 import terms from '../terms';
 import {transport} from '../transport';
 import {isPaneVisible} from '../utils/pane-visibility';
@@ -183,6 +183,7 @@ export default class Term extends React.PureComponent<
   webglCooldownMs: number;
   webglFailureThreshold: number;
   webglFailureDecayMs: number;
+  webglRetryTimer: ReturnType<typeof window.setTimeout> | null;
   searchDecorations: ISearchDecorationOptions;
   state = {
     searchOptions: {
@@ -215,6 +216,7 @@ export default class Term extends React.PureComponent<
     this.webglCooldownMs = 500;
     this.webglFailureThreshold = 3;
     this.webglFailureDecayMs = 15_000;
+    this.webglRetryTimer = null;
     this.searchDecorations = {
       activeMatchColorOverviewRuler: Color(this.props.cursorColor).hex(),
       matchOverviewRuler: Color(this.props.borderColor).hex(),
@@ -225,13 +227,22 @@ export default class Term extends React.PureComponent<
   }
 
   // The main process shows this in the About dialog
-  static reportRenderer(uid: string, type: string) {
+  static reportRenderer(uid: string, type: string, reason?: RendererFallbackReason) {
     const rendererTypes = Term.rendererTypes || {};
-    if (rendererTypes[uid] !== type) {
-      rendererTypes[uid] = type;
-      Term.rendererTypes = rendererTypes;
-      transport.emit('info renderer', {uid: asSessionId(uid), type});
+    const hasTypeChanged = rendererTypes[uid] !== type;
+    rendererTypes[uid] = type;
+    Term.rendererTypes = rendererTypes;
+
+    if (!hasTypeChanged && !reason) {
+      return;
     }
+
+    if (reason) {
+      transport.emit('info renderer', {uid: asSessionId(uid), type, reason});
+      return;
+    }
+
+    transport.emit('info renderer', {uid: asSessionId(uid), type});
   }
 
   componentDidMount() {
@@ -470,18 +481,57 @@ export default class Term extends React.PureComponent<
     void this.bellSound?.play();
   }
 
+  private recordWebGLFailure(now = Date.now()) {
+    this.webglFailureCount += 1;
+    this.webglLastFailureAt = now;
+  }
+
+  private clearRendererRetryTimer() {
+    if (this.webglRetryTimer === null) {
+      return;
+    }
+
+    clearTimeout(this.webglRetryTimer);
+    this.webglRetryTimer = null;
+  }
+
+  private getWebGLRetryDelayMs(now = Date.now()) {
+    if (this.webglFailureCount === 0 || this.webglLastFailureAt === 0) {
+      return this.webglCooldownMs;
+    }
+
+    if (this.webglFailureCount > this.webglFailureThreshold) {
+      return Math.max(this.webglCooldownMs, this.webglLastFailureAt + this.webglFailureDecayMs - now);
+    }
+
+    return Math.max(this.webglCooldownMs, this.webglLastFailureAt + this.webglCooldownMs - now);
+  }
+
   onWebGLContextLoss = () => {
     console.warn('WebGL context lost. Falling back to canvas-based rendering.');
-    this.webglFailureCount += 1;
-    this.webglLastFailureAt = Date.now();
+    this.recordWebGLFailure();
     this.detachWebGLRenderer();
-    this.ensureCanvasRenderer();
+    this.ensureCanvasRenderer('context-loss');
     this.scheduleRendererVisibilitySync();
+    this.scheduleDeterministicRendererRetry();
   };
 
   onWebGLEvicted = () => {
     this.detachWebGLRenderer();
-    this.ensureCanvasRenderer();
+    this.ensureCanvasRenderer('pool-evicted');
+    this.scheduleRendererVisibilitySync();
+    this.scheduleDeterministicRendererRetry();
+  };
+
+  scheduleDeterministicRendererRetry = () => {
+    if (this.webglRetryTimer !== null) {
+      return;
+    }
+
+    this.webglRetryTimer = window.setTimeout(() => {
+      this.webglRetryTimer = null;
+      this.syncRendererForVisibility();
+    }, this.getWebGLRetryDelayMs());
   };
 
   scheduleRendererVisibilitySync = () => {
@@ -535,7 +585,7 @@ export default class Term extends React.PureComponent<
     this.webglLastFailureAt = 0;
   }
 
-  canUseWebGLRenderer() {
+  canUseWebGLRenderer(hasFailureCooldown = this.hasWebGLFailureCooldown()) {
     if (!this.props.webGLRenderer) {
       return false;
     }
@@ -551,7 +601,7 @@ export default class Term extends React.PureComponent<
       return false;
     }
 
-    if (this.hasWebGLFailureCooldown()) {
+    if (hasFailureCooldown) {
       return false;
     }
 
@@ -594,7 +644,7 @@ export default class Term extends React.PureComponent<
     });
   }
 
-  ensureCanvasRenderer() {
+  ensureCanvasRenderer(reason?: RendererFallbackReason) {
     if (!this.canvasAddon) {
       this.canvasAddon = new CanvasAddon();
       this.term.loadAddon(this.canvasAddon);
@@ -608,7 +658,7 @@ export default class Term extends React.PureComponent<
       this.term.loadAddon(this.ligaturesAddon);
     }
 
-    Term.reportRenderer(this.props.uid, 'Canvas');
+    Term.reportRenderer(this.props.uid, 'Canvas', reason);
   }
 
   detachWebGLRenderer() {
@@ -622,36 +672,45 @@ export default class Term extends React.PureComponent<
   }
 
   ensureWebGLRenderer(webGLContextPool = getWebGLContextPool(this.props.webGLRendererMaxContexts)) {
-    // Acquire/release manages logical slot ownership only. Each pane still
-    // owns its own WebglAddon instance and underlying browser WebGL context.
-    webGLContextPool.acquire(
-      this.props.uid,
-      () => ({paneId: this.props.uid}),
-      (_context, paneId) => {
-        const releaseHandler = webGLPoolReleaseHandlers.get(paneId);
-        releaseHandler?.();
+    try {
+      // Acquire/release manages logical slot ownership only. Each pane still
+      // owns its own WebglAddon instance and underlying browser WebGL context.
+      webGLContextPool.acquire(
+        this.props.uid,
+        () => ({paneId: this.props.uid}),
+        (_context, paneId) => {
+          const releaseHandler = webGLPoolReleaseHandlers.get(paneId);
+          releaseHandler?.();
+        }
+      );
+      webGLPoolReleaseHandlers.set(this.props.uid, this.onWebGLEvicted);
+
+      if (!this.webglAddon) {
+        this.webglAddon = new WebglAddon();
+        this.term.loadAddon(this.webglAddon);
+        this.webglAddon.onContextLoss(this.onWebGLContextLoss);
       }
-    );
-    webGLPoolReleaseHandlers.set(this.props.uid, this.onWebGLEvicted);
 
-    if (!this.webglAddon) {
-      this.webglAddon = new WebglAddon();
-      this.term.loadAddon(this.webglAddon);
-      this.webglAddon.onContextLoss(this.onWebGLContextLoss);
+      if (this.canvasAddon) {
+        this.canvasAddon.dispose();
+        this.canvasAddon = null;
+      }
+
+      if (this.ligaturesAddon) {
+        this.ligaturesAddon.dispose();
+        this.ligaturesAddon = null;
+      }
+
+      this.markWebGLInitSuccess();
+      this.clearRendererRetryTimer();
+      Term.reportRenderer(this.props.uid, 'WebGL');
+    } catch (error) {
+      console.warn('WebGL renderer initialization failed. Falling back to canvas-based rendering.', error);
+      this.recordWebGLFailure();
+      this.detachWebGLRenderer();
+      this.ensureCanvasRenderer('webgl-init-failed');
+      this.scheduleDeterministicRendererRetry();
     }
-
-    if (this.canvasAddon) {
-      this.canvasAddon.dispose();
-      this.canvasAddon = null;
-    }
-
-    if (this.ligaturesAddon) {
-      this.ligaturesAddon.dispose();
-      this.ligaturesAddon = null;
-    }
-
-    this.markWebGLInitSuccess();
-    Term.reportRenderer(this.props.uid, 'WebGL');
   }
 
   syncRendererForVisibility() {
@@ -659,9 +718,14 @@ export default class Term extends React.PureComponent<
       return;
     }
 
-    if (!this.isPaneVisible() || !this.canUseWebGLRenderer()) {
+    const paneVisible = this.isPaneVisible();
+    const hasFailureCooldown = this.hasWebGLFailureCooldown();
+    if (!paneVisible || !this.canUseWebGLRenderer(hasFailureCooldown)) {
       this.detachWebGLRenderer();
       this.ensureCanvasRenderer();
+      if (paneVisible && hasFailureCooldown) {
+        this.scheduleDeterministicRendererRetry();
+      }
       return;
     }
 
@@ -771,6 +835,7 @@ export default class Term extends React.PureComponent<
       window.cancelAnimationFrame(this.visibilityFrame);
       this.visibilityFrame = null;
     }
+    this.clearRendererRetryTimer();
     this.resizeObserver?.disconnect();
     clearTimeout(this.resizeTimeout);
     window.removeEventListener('resize', this.scheduleRendererVisibilitySync);

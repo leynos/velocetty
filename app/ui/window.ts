@@ -383,9 +383,9 @@ export function newWindow(
       }
     }
   });
-  rpc.on('info renderer', ({uid, type}) => {
+  rpc.on('info renderer', ({uid, type, reason}) => {
     // Used in the "About" dialog
-    setRendererType(uid, type);
+    setRendererType(uid, type, reason);
   });
   rpc.on('open external', ({url}) => {
     void shell.openExternal(url);

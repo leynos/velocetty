@@ -22,14 +22,14 @@ mock.module('electron', () => ({
   }
 }));
 mock.module('color', () => ({
-  default: class Color {
+  default: () => ({
     alpha() {
       return 1;
-    }
+    },
     hex() {
       return '#000000';
     }
-  }
+  })
 }));
 mock.module('xterm', () => ({Terminal: class {}}));
 mock.module('xterm-addon-canvas', () => ({CanvasAddon: class {}}));
@@ -39,7 +39,12 @@ mock.module('xterm-addon-ligatures', () => ({LigaturesAddon: class {}}));
 mock.module('xterm-addon-search', () => ({SearchAddon: class {}}));
 mock.module('xterm-addon-unicode11', () => ({Unicode11Addon: class {}}));
 mock.module('xterm-addon-web-links', () => ({WebLinksAddon: class {}}));
-mock.module('xterm-addon-webgl', () => ({WebglAddon: class {}}));
+mock.module('xterm-addon-webgl', () => ({
+  WebglAddon: class {
+    onContextLoss() {}
+    dispose() {}
+  }
+}));
 mock.module('xterm/css/xterm.css', () => ({}));
 mock.module('../../lib/terms', () => ({default: {}}));
 mock.module('../../lib/utils/paste', () => ({default: () => null}));
@@ -96,5 +101,56 @@ describe('Term.reportRenderer transport emit', () => {
     expect(transportMock.emit).toHaveBeenCalledTimes(2);
     expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {uid: 'uid-4', type: 'WebGL'});
     expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {uid: 'uid-5', type: 'WebGL'});
+  });
+
+  test('emits fallback reason even when renderer type is unchanged', () => {
+    Term.reportRenderer('uid-6', 'Canvas');
+    Term.reportRenderer('uid-6', 'Canvas', 'context-loss');
+
+    expect(transportMock.emit).toHaveBeenCalledTimes(2);
+    expect(transportMock.emit).toHaveBeenLastCalledWith('info renderer', {
+      uid: 'uid-6',
+      type: 'Canvas',
+      reason: 'context-loss'
+    });
+  });
+
+  test('keeps plain renderer deduplication after a reasoned fallback event', () => {
+    Term.reportRenderer('uid-7', 'Canvas', 'pool-evicted');
+    Term.reportRenderer('uid-7', 'Canvas');
+
+    expect(transportMock.emit).toHaveBeenCalledTimes(1);
+    expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {
+      uid: 'uid-7',
+      type: 'Canvas',
+      reason: 'pool-evicted'
+    });
+  });
+});
+
+describe('Term.ensureWebGLRenderer fallback handling', () => {
+  test('does not throw when WebGL addon attach fails', () => {
+    const termInstance = new Term({
+      uid: 'uid-webgl-failure',
+      ref_: mock(() => {}),
+      cursorColor: '#ffffff',
+      borderColor: '#000000'
+    } as any);
+    termInstance.term = {
+      loadAddon: mock((addon: unknown) => {
+        if (addon && typeof addon === 'object' && 'onContextLoss' in addon) {
+          throw new Error('webgl attach failed');
+        }
+      })
+    } as any;
+
+    const webGLContextPool = {acquire: mock(() => {})};
+
+    expect(() => termInstance.ensureWebGLRenderer(webGLContextPool as any)).not.toThrow();
+    expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {
+      uid: 'uid-webgl-failure',
+      type: 'Canvas',
+      reason: 'webgl-init-failed'
+    });
   });
 });
