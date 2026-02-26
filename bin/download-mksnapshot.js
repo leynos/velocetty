@@ -36,11 +36,11 @@ function sleep(ms) {
 }
 
 function getErrorCode(error) {
-  if (error && typeof error.code === 'string') {
+  if (typeof error?.code === 'string') {
     return error.code;
   }
 
-  if (error && error.cause && typeof error.cause.code === 'string') {
+  if (typeof error?.cause?.code === 'string') {
     return error.cause.code;
   }
 
@@ -48,11 +48,11 @@ function getErrorCode(error) {
 }
 
 function getStatusCode(error) {
-  if (error && error.response && Number.isInteger(error.response.statusCode)) {
+  if (Number.isInteger(error?.response?.statusCode)) {
     return error.response.statusCode;
   }
 
-  if (error && Number.isInteger(error.statusCode)) {
+  if (Number.isInteger(error?.statusCode)) {
     return error.statusCode;
   }
 
