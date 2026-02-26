@@ -244,6 +244,11 @@
           "description": "Whether to use the WebGL renderer. Set it to false to use canvas-based\nrendering (slower, but supports transparent backgrounds).\n\nIn the current architecture, changing this setting requires terminal\nrestart. Track hot-reload support under CONFIG-001 in\ndocs/tracking-issues.md.",
           "type": "boolean"
         },
+        "webGLRendererMaxContexts": {
+          "description": "Maximum number of terminal panes allowed to use WebGL concurrently before\nfalling back to canvas rendering.",
+          "minimum": 1,
+          "type": "integer"
+        },
         "webLinksActivationKey": {
           "description": "keypress required for weblink activation: [ctrl | alt | meta | shift]",
           "enum": ["", "alt", "ctrl", "meta", "shift"],
@@ -529,6 +534,11 @@
               "description": "Whether to use the WebGL renderer. Set it to false to use canvas-based\nrendering (slower, but supports transparent backgrounds).\n\nIn the current architecture, changing this setting requires terminal\nrestart. Track hot-reload support under CONFIG-001 in\ndocs/tracking-issues.md.",
               "type": "boolean"
             },
+            "webGLRendererMaxContexts": {
+              "description": "Maximum number of terminal panes allowed to use WebGL concurrently before\nfalling back to canvas rendering.",
+              "minimum": 1,
+              "type": "integer"
+            },
             "webLinksActivationKey": {
               "description": "keypress required for weblink activation: [ctrl | alt | meta | shift]",
               "enum": ["", "alt", "ctrl", "meta", "shift"],
@@ -589,6 +599,7 @@
             "showWindowControls",
             "termCSS",
             "webGLRenderer",
+            "webGLRendererMaxContexts",
             "webLinksActivationKey",
             "workingDirectory"
           ],

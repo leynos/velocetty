@@ -16,6 +16,14 @@ type IsolatedE2EEnvironment = Readonly<{
   cleanup: () => Promise<void>;
 }>;
 
+type RemoveDirectoryWithRetryOptions = Readonly<{
+  maxAttempts?: number;
+  baseDelayMs?: number;
+  isWindows?: boolean;
+  removeDirectory?: (directory: string) => Promise<void>;
+  sleepFn?: (ms: number) => Promise<void>;
+}>;
+
 type ReadActiveTerminalBufferOptions = Readonly<{
   lineLimit?: number;
 }>;
@@ -32,6 +40,52 @@ const assertNever = (value: never): never => {
 };
 
 const defaultNonCriticalRendererErrorPatterns = [/Download the React DevTools/i, /DevTools failed to load source map/i];
+const windowsRetriableCleanupErrorCodes = new Set(['EBUSY', 'EPERM', 'ENOTEMPTY']);
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const removeDirectoryRecursive = async (directory: string) => {
+  await fs.rm(directory, {recursive: true, force: true});
+};
+
+const isRetriableCleanupError = (error: unknown, isWindows: boolean) => {
+  if (!isWindows) {
+    return false;
+  }
+
+  const code = (error as {code?: unknown})?.code;
+  return typeof code === 'string' && windowsRetriableCleanupErrorCodes.has(code);
+};
+
+export const removeDirectoryWithRetry = async (directory: string, options: RemoveDirectoryWithRetryOptions = {}) => {
+  const maxAttempts = options.maxAttempts ?? 5;
+  const baseDelayMs = options.baseDelayMs ?? 100;
+  const isWindows = options.isWindows ?? process.platform === 'win32';
+  const removeDirectory = options.removeDirectory ?? removeDirectoryRecursive;
+  const sleepFn = options.sleepFn ?? sleep;
+
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
+    throw new RangeError('removeDirectoryWithRetry maxAttempts must be an integer greater than 0.');
+  }
+
+  if (!Number.isFinite(baseDelayMs) || baseDelayMs <= 0) {
+    throw new RangeError('removeDirectoryWithRetry baseDelayMs must be a finite number greater than 0.');
+  }
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await removeDirectory(directory);
+      return;
+    } catch (error) {
+      if (attempt >= maxAttempts || !isRetriableCleanupError(error, isWindows)) {
+        throw error;
+      }
+
+      const delayMs = baseDelayMs * 2 ** (attempt - 1);
+      await sleepFn(delayMs);
+    }
+  }
+};
 
 export const isNonCriticalRendererError = (
   text: string,
@@ -75,7 +129,7 @@ export const createIsolatedE2EEnvironment = async (): Promise<IsolatedE2EEnviron
   return {
     env,
     cleanup: async () => {
-      await fs.rm(tempHome, {recursive: true, force: true});
+      await removeDirectoryWithRetry(tempHome);
     }
   };
 };

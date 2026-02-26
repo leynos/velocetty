@@ -8,12 +8,62 @@ import {
   createIsolatedE2EEnvironment,
   extractRendererErrorMessage,
   isNonCriticalRendererError,
+  removeDirectoryWithRetry,
   readActiveTerminalBuffer,
   resolveLaunchConfig,
   startRendererConsoleMonitor,
   waitForRendererReady,
   withTimeout
 } from '../e2e/electron-e2e-helpers';
+
+interface MockRemoveOptions {
+  failCount?: number;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
+type RetryOptions = {
+  maxAttempts: number;
+  baseDelayMs: number;
+  isWindows: boolean;
+  removeDirectory?: (directory: string) => Promise<void>;
+  sleepFn?: (ms: number) => Promise<void>;
+};
+
+const createMockRemove = (options: MockRemoveOptions = {}) => {
+  const {failCount = 0, errorCode = 'EBUSY', errorMessage = 'busy'} = options;
+  let attempt = 0;
+
+  return {
+    removeDirectory: async () => {
+      attempt += 1;
+      if (attempt <= failCount) {
+        throw Object.assign(new Error(errorMessage), {code: errorCode});
+      }
+    },
+    getAttempts: () => attempt
+  };
+};
+
+const createDelayTracker = () => {
+  const delays: number[] = [];
+
+  return {
+    sleepFn: async (ms: number) => {
+      delays.push(ms);
+    },
+    getDelays: () => delays
+  };
+};
+
+const createRetryOptions = (overrides: Partial<RetryOptions> = {}): RetryOptions => {
+  return {
+    maxAttempts: 4,
+    baseDelayMs: 5,
+    isWindows: true,
+    ...overrides
+  };
+};
 
 const baseDir = '/tmp/velocetty/test/e2e';
 
@@ -169,6 +219,109 @@ test('readActiveTerminalBuffer() surfaces clear failures when renderer document 
 
   await expect(readActiveTerminalBuffer(mockPage as never)).rejects.toThrow(
     '[e2e] unable to read active terminal buffer: renderer document is unavailable'
+  );
+});
+
+test('removeDirectoryWithRetry() retries transient Windows cleanup errors', async () => {
+  const {removeDirectory, getAttempts} = createMockRemove({failCount: 2});
+  const {sleepFn, getDelays} = createDelayTracker();
+
+  await expect(
+    removeDirectoryWithRetry('/tmp/unused', {
+      ...createRetryOptions(),
+      removeDirectory,
+      sleepFn
+    })
+  ).resolves.toBeUndefined();
+
+  expect(getAttempts()).toBe(3);
+  expect(getDelays()).toEqual([5, 10]);
+});
+
+test('removeDirectoryWithRetry() does not retry non-retriable cleanup errors', async () => {
+  const {removeDirectory, getAttempts} = createMockRemove({
+    failCount: Number.POSITIVE_INFINITY,
+    errorCode: 'EINVAL',
+    errorMessage: 'invalid path'
+  });
+
+  await expect(
+    removeDirectoryWithRetry('/tmp/unused', {
+      ...createRetryOptions(),
+      removeDirectory,
+      sleepFn: async () => {}
+    })
+  ).rejects.toThrow('invalid path');
+
+  expect(getAttempts()).toBe(1);
+});
+
+test('removeDirectoryWithRetry() does not retry retriable cleanup errors on non-Windows platforms', async () => {
+  const {removeDirectory, getAttempts} = createMockRemove({failCount: Number.POSITIVE_INFINITY});
+
+  await expect(
+    removeDirectoryWithRetry('/tmp/unused', {
+      ...createRetryOptions({isWindows: false}),
+      removeDirectory,
+      sleepFn: async () => {}
+    })
+  ).rejects.toThrow('busy');
+
+  expect(getAttempts()).toBe(1);
+});
+
+test('removeDirectoryWithRetry() respects maxAttempts=1 for retriable cleanup errors', async () => {
+  const {removeDirectory, getAttempts} = createMockRemove({failCount: Number.POSITIVE_INFINITY});
+
+  let sleepCalls = 0;
+  await expect(
+    removeDirectoryWithRetry('/tmp/unused', {
+      ...createRetryOptions({maxAttempts: 1}),
+      removeDirectory,
+      sleepFn: async () => {
+        sleepCalls += 1;
+      }
+    })
+  ).rejects.toThrow('busy');
+
+  expect(getAttempts()).toBe(1);
+  expect(sleepCalls).toBe(0);
+});
+
+test('removeDirectoryWithRetry() retries until maxAttempts and then throws the final error', async () => {
+  const {removeDirectory, getAttempts} = createMockRemove({failCount: Number.POSITIVE_INFINITY});
+  const {sleepFn, getDelays} = createDelayTracker();
+
+  await expect(
+    removeDirectoryWithRetry('/tmp/unused', {
+      ...createRetryOptions({maxAttempts: 4}),
+      removeDirectory,
+      sleepFn
+    })
+  ).rejects.toThrow('busy');
+
+  expect(getAttempts()).toBe(4);
+  expect(getDelays()).toEqual([5, 10, 20]);
+});
+
+test('removeDirectoryWithRetry() rejects invalid retry options', async () => {
+  await expect(removeDirectoryWithRetry('/tmp/unused', {maxAttempts: 0})).rejects.toThrow(
+    'maxAttempts must be an integer greater than 0'
+  );
+  await expect(removeDirectoryWithRetry('/tmp/unused', {baseDelayMs: 0})).rejects.toThrow(
+    'baseDelayMs must be a finite number greater than 0'
+  );
+});
+
+test('removeDirectoryWithRetry() rejects non-integer maxAttempts values', async () => {
+  await expect(removeDirectoryWithRetry('/tmp/unused', {maxAttempts: 2.5})).rejects.toThrow(
+    'maxAttempts must be an integer greater than 0'
+  );
+});
+
+test('removeDirectoryWithRetry() rejects non-finite baseDelayMs values', async () => {
+  await expect(removeDirectoryWithRetry('/tmp/unused', {baseDelayMs: Number.POSITIVE_INFINITY})).rejects.toThrow(
+    'baseDelayMs must be a finite number greater than 0'
   );
 });
 

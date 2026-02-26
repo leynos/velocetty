@@ -1,5 +1,18 @@
+/**
+ * @file UI reducer for terminal presentation state and configuration merging.
+ *
+ * Invariants:
+ * - Configuration input is validated and normalised before being merged.
+ * - Session/UI/notification actions only mutate UI-owned state slices.
+ * - Unknown actions fall through and return the prior state unchanged.
+ *
+ * Related modules:
+ * - `lib/reducers/index.ts` for root reducer composition.
+ * - `lib/reducers/sessions.ts` and `lib/reducers/term-groups.ts` for adjacent state domains.
+ */
 import {release} from 'node:os';
 
+import isEqual from 'lodash/isEqual';
 import Immutable from 'seamless-immutable';
 import type {Immutable as ImmutableType} from 'seamless-immutable';
 
@@ -33,7 +46,7 @@ const allowedCursorShapes = new Set(['BEAM', 'BLOCK', 'UNDERLINE']);
 const allowedCursorBlinkValues = new Set([true, false]);
 const allowedBells = new Set(['SOUND', 'false', false]);
 const allowedHamburgerMenuValues = new Set([true, false, ''] as const);
-const allowedWindowControlsValues = new Set([true, false, 'left']);
+const allowedWindowControlsValues = new Set([true, false, 'left', ''] as const);
 
 // Populate `config-default.js` from this :)
 const initial: uiState = Immutable<Mutable<uiState>>({
@@ -112,6 +125,7 @@ const initial: uiState = Immutable<Mutable<uiState>>({
   showWindowControls: '',
   quickEdit: false,
   webGLRenderer: true,
+  webGLRendererMaxContexts: 16,
   webLinksActivationKey: '',
   macOptionSelectionMode: 'vertical',
   disableLigatures: true,
@@ -120,305 +134,517 @@ const initial: uiState = Immutable<Mutable<uiState>>({
   profiles: []
 });
 
-const reducer: IUiReducer = (state = initial, action) => {
-  let state_ = state;
-  let isMax;
+type UiStatePartial = Immutable.DeepPartial<Mutable<uiState>>;
+type UiConfig = Omit<Partial<Mutable<uiState>>, 'bell'> & {
+  useConpty?: boolean;
+  bell?: uiState['bell'] | 'false';
+};
+
+const processFontSize = (config: UiConfig, state: uiState): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (state.fontSizeOverride && config.fontSize !== state.fontSize) {
+    ret.fontSizeOverride = null;
+  }
+
+  if (config.fontSize) {
+    ret.fontSize = config.fontSize;
+  }
+
+  if (config.fontFamily) {
+    ret.fontFamily = config.fontFamily;
+  }
+
+  if (config.uiFontFamily) {
+    ret.uiFontFamily = config.uiFontFamily;
+  }
+
+  return ret;
+};
+
+const processFontMetrics = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.fontWeight) {
+    ret.fontWeight = config.fontWeight;
+  }
+
+  if (config.fontWeightBold) {
+    ret.fontWeightBold = config.fontWeightBold;
+  }
+
+  if (Number.isFinite(config.lineHeight)) {
+    ret.lineHeight = config.lineHeight;
+  }
+
+  if (Number.isFinite(config.letterSpacing)) {
+    ret.letterSpacing = config.letterSpacing;
+  }
+
+  return ret;
+};
+
+const applyFontConfig = (config: UiConfig, state: uiState): UiStatePartial => {
+  return {
+    ...processFontSize(config, state),
+    ...processFontMetrics(config)
+  };
+};
+
+const processCursorConfig = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.cursorColor) {
+    ret.cursorColor = config.cursorColor;
+  }
+
+  if (config.cursorAccentColor) {
+    ret.cursorAccentColor = config.cursorAccentColor;
+  }
+
+  if (allowedCursorShapes.has(config.cursorShape)) {
+    ret.cursorShape = config.cursorShape;
+  }
+
+  if (allowedCursorBlinkValues.has(config.cursorBlink)) {
+    ret.cursorBlink = config.cursorBlink;
+  }
+
+  return ret;
+};
+
+const hasColorConfigChanged = (stateColors: uiState['colors'], configColors: NonNullable<UiConfig['colors']>) => {
+  return !isEqual(stateColors, configColors);
+};
+
+const processColorPalette = (config: UiConfig, state: uiState): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.colors && hasColorConfigChanged(state.colors, config.colors)) {
+    ret.colors = config.colors;
+  }
+
+  return ret;
+};
+
+const processBasicColorProperties = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.borderColor) {
+    ret.borderColor = config.borderColor;
+  }
+
+  if (config.selectionColor) {
+    ret.selectionColor = config.selectionColor;
+  }
+
+  if (config.foregroundColor) {
+    ret.foregroundColor = config.foregroundColor;
+  }
+
+  if (config.backgroundColor) {
+    ret.backgroundColor = config.backgroundColor;
+  }
+
+  return ret;
+};
+
+const processColorConfig = (config: UiConfig, state: uiState): UiStatePartial => {
+  return {
+    ...processBasicColorProperties(config),
+    ...processColorPalette(config, state)
+  };
+};
+
+const processRendererConfig = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.webGLRenderer !== undefined) {
+    ret.webGLRenderer = config.webGLRenderer;
+  }
+
+  if (Number.isInteger(config.webGLRendererMaxContexts) && config.webGLRendererMaxContexts > 0) {
+    ret.webGLRendererMaxContexts = config.webGLRendererMaxContexts;
+  }
+
+  return ret;
+};
+
+const processBellConfig = (config: UiConfig, state: uiState): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  const bellValue = config.bell;
+  if (bellValue !== undefined && allowedBells.has(bellValue)) {
+    ret.bell = bellValue === 'false' ? false : bellValue;
+  }
+
+  if (config.bellSoundURL !== state.bellSoundURL) {
+    ret.bellSoundURL = config.bellSoundURL || initial.bellSoundURL;
+  }
+
+  if (config.bellSound !== state.bellSound) {
+    ret.bellSound = config.bellSound || initial.bellSound;
+  }
+
+  return ret;
+};
+
+const processUIControlsConfig = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (allowedHamburgerMenuValues.has(config.showHamburgerMenu)) {
+    ret.showHamburgerMenu = config.showHamburgerMenu;
+  }
+
+  if (allowedWindowControlsValues.has(config.showWindowControls)) {
+    ret.showWindowControls = config.showWindowControls;
+  }
+
+  if (config.webLinksActivationKey !== undefined) {
+    ret.webLinksActivationKey = config.webLinksActivationKey;
+  }
+
+  return ret;
+};
+
+const processQuickEditConfig = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (process.platform === 'win32' && (config.quickEdit === undefined || config.quickEdit === null)) {
+    ret.quickEdit = true;
+  } else if (typeof config.quickEdit !== 'undefined' && config.quickEdit !== null) {
+    ret.quickEdit = config.quickEdit;
+  }
+
+  return ret;
+};
+
+const processMacOptionsConfig = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.macOptionSelectionMode) {
+    ret.macOptionSelectionMode = config.macOptionSelectionMode;
+  }
+
+  return ret;
+};
+
+const processWindowsPtyConfig = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (!isWindows) {
+    return ret;
+  }
+
+  const buildNumber = parseInt(release().split('.').at(-1) || '0', 10);
+  if (Number.isNaN(buildNumber) || buildNumber <= 0) {
+    return ret;
+  }
+
+  const useConpty = typeof config.useConpty === 'boolean' ? config.useConpty : buildNumber >= 18309;
+  ret.windowsPty = {
+    backend: useConpty ? 'conpty' : 'winpty',
+    buildNumber
+  };
+
+  return ret;
+};
+
+const processPlatformSpecificConfig = (config: UiConfig): UiStatePartial => {
+  return {
+    ...processQuickEditConfig(config),
+    ...processMacOptionsConfig(config),
+    ...processWindowsPtyConfig(config)
+  };
+};
+
+const processScrollAndPaddingConfig = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (typeof config.scrollback === 'number') {
+    ret.scrollback = config.scrollback;
+  }
+
+  if (typeof config.padding !== 'undefined' && config.padding !== null) {
+    ret.padding = config.padding;
+  }
+
+  return ret;
+};
+
+const processInputBehaviourConfig = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (typeof config.copyOnSelect !== 'undefined' && config.copyOnSelect !== null) {
+    ret.copyOnSelect = config.copyOnSelect;
+  }
+
+  if (config.modifierKeys) {
+    ret.modifierKeys = config.modifierKeys;
+  }
+
+  return ret;
+};
+
+const processAccessibilityConfig = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.disableLigatures !== undefined) {
+    ret.disableLigatures = config.disableLigatures;
+  }
+
+  if (config.screenReaderMode !== undefined) {
+    ret.screenReaderMode = config.screenReaderMode;
+  }
+
+  if (config.imageSupport !== undefined) {
+    ret.imageSupport = config.imageSupport;
+  }
+
+  return ret;
+};
+
+const processTerminalBehaviourConfig = (config: UiConfig): UiStatePartial => {
+  return {
+    ...processScrollAndPaddingConfig(config),
+    ...processInputBehaviourConfig(config),
+    ...processAccessibilityConfig(config)
+  };
+};
+
+const processStyleConfig = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.css || config.css === '') {
+    ret.css = config.css;
+  }
+
+  if (config.termCSS !== undefined && config.termCSS !== null) {
+    ret.termCSS = config.termCSS;
+  }
+
+  return ret;
+};
+
+const processProfileConfig = (config: UiConfig): UiStatePartial => {
+  const ret: UiStatePartial = {};
+
+  if (config.defaultProfile !== undefined) {
+    ret.defaultProfile = config.defaultProfile;
+  }
+
+  if (config.profiles !== undefined) {
+    ret.profiles = config.profiles;
+  }
+
+  return ret;
+};
+
+const mergeConfigIntoState = (config: UiConfig, state: uiState, now: number): UiStatePartial => {
+  return {
+    ...applyFontConfig(config, state),
+    ...processCursorConfig(config),
+    ...processColorConfig(config, state),
+    ...processRendererConfig(config),
+    ...processBellConfig(config, state),
+    ...processUIControlsConfig(config),
+    ...processPlatformSpecificConfig(config),
+    ...processTerminalBehaviourConfig(config),
+    ...processStyleConfig(config),
+    ...processProfileConfig(config),
+    _lastUpdate: now
+  };
+};
+
+type ConfigLoadAction = Readonly<{
+  type: typeof CONFIG_LOAD | typeof CONFIG_RELOAD;
+  config: UiConfig;
+  now: number;
+}>;
+
+type SessionAddAction = Readonly<{
+  type: typeof SESSION_ADD;
+  uid: string;
+  now: number;
+}>;
+
+type SessionResizeAction = Readonly<{
+  type: typeof SESSION_RESIZE;
+  rows: number;
+  cols: number;
+  now: number;
+  isStandaloneTerm: boolean;
+}>;
+
+type SessionPtyExitAction = Readonly<{
+  type: typeof SESSION_PTY_EXIT;
+  uid: string;
+}>;
+
+type SessionSetActiveAction = Readonly<{
+  type: typeof SESSION_SET_ACTIVE;
+  uid: string;
+}>;
+
+type SessionPtyDataAction = Readonly<{
+  type: typeof SESSION_PTY_DATA;
+  uid: string;
+  now: number;
+}>;
+
+type SessionSetCwdAction = Readonly<{
+  type: typeof SESSION_SET_CWD;
+  cwd: string;
+}>;
+
+type UIFontSizeSetAction = Readonly<{
+  type: typeof UI_FONT_SIZE_SET;
+  value: uiState['fontSizeOverride'];
+}>;
+
+type UIFontSizeResetAction = Readonly<{
+  type: typeof UI_FONT_SIZE_RESET;
+}>;
+
+type UIFontSmoothingSetAction = Readonly<{
+  type: typeof UI_FONT_SMOOTHING_SET;
+  fontSmoothing: uiState['fontSmoothingOverride'];
+}>;
+
+type UIWindowMaximizeAction = Readonly<{
+  type: typeof UI_WINDOW_MAXIMIZE;
+}>;
+
+type UIWindowUnmaximizeAction = Readonly<{
+  type: typeof UI_WINDOW_UNMAXIMIZE;
+}>;
+
+type UIWindowGeometryChangedAction = Readonly<{
+  type: typeof UI_WINDOW_GEOMETRY_CHANGED;
+  isMaximized: boolean;
+}>;
+
+type UIEnterFullscreenAction = Readonly<{
+  type: typeof UI_ENTER_FULLSCREEN;
+}>;
+
+type UILeaveFullscreenAction = Readonly<{
+  type: typeof UI_LEAVE_FULLSCREEN;
+}>;
+
+type UIDisplayAction =
+  | UIFontSizeSetAction
+  | UIFontSizeResetAction
+  | UIFontSmoothingSetAction
+  | UIWindowMaximizeAction
+  | UIWindowUnmaximizeAction
+  | UIWindowGeometryChangedAction
+  | UIEnterFullscreenAction
+  | UILeaveFullscreenAction;
+
+type NotificationDismissAction = Readonly<{
+  type: typeof NOTIFICATION_DISMISS;
+  id: keyof uiState['notifications'];
+}>;
+
+type NotificationMessageAction = Readonly<{
+  type: typeof NOTIFICATION_MESSAGE;
+  text: uiState['messageText'];
+  url: uiState['messageURL'];
+  dismissable: boolean;
+}>;
+
+type UpdateAvailableAction = Readonly<{
+  type: typeof UPDATE_AVAILABLE;
+  version: uiState['updateVersion'];
+  notes: uiState['updateNotes'];
+  releaseUrl: uiState['updateReleaseUrl'];
+  canInstall: uiState['updateCanInstall'];
+}>;
+
+type NotificationAction = NotificationDismissAction | NotificationMessageAction | UpdateAvailableAction;
+
+type UiReducerAction =
+  | ConfigLoadAction
+  | SessionAddAction
+  | SessionResizeAction
+  | SessionPtyExitAction
+  | SessionSetActiveAction
+  | SessionPtyDataAction
+  | SessionSetCwdAction
+  | UIDisplayAction
+  | NotificationAction;
+
+const handleConfigLoad = (state: uiState, action: ConfigLoadAction): uiState => {
+  const {config, now} = action;
+  // unset the user font size override if the
+  // font size changed from the config
+  return state.merge(mergeConfigIntoState(config, state, now));
+};
+
+const handleFontActions = (state: uiState, action: UIDisplayAction): uiState => {
   switch (action.type) {
-    case CONFIG_LOAD:
-    case CONFIG_RELOAD: {
-      const {config, now} = action;
-      state_ = state
-        // unset the user font size override if the
-        // font size changed from the config
-        .merge(
-          (() => {
-            const ret: Immutable.DeepPartial<Mutable<uiState>> = {};
-
-            if (config.scrollback) {
-              ret.scrollback = config.scrollback;
-            }
-
-            if (state.fontSizeOverride && config.fontSize !== state.fontSize) {
-              ret.fontSizeOverride = null;
-            }
-
-            if (config.fontSize) {
-              ret.fontSize = config.fontSize;
-            }
-
-            if (config.fontFamily) {
-              ret.fontFamily = config.fontFamily;
-            }
-
-            if (config.uiFontFamily) {
-              ret.uiFontFamily = config.uiFontFamily;
-            }
-
-            if (config.fontWeight) {
-              ret.fontWeight = config.fontWeight;
-            }
-
-            if (config.fontWeightBold) {
-              ret.fontWeightBold = config.fontWeightBold;
-            }
-
-            if (Number.isFinite(config.lineHeight)) {
-              ret.lineHeight = config.lineHeight;
-            }
-
-            if (Number.isFinite(config.letterSpacing)) {
-              ret.letterSpacing = config.letterSpacing;
-            }
-
-            if (config.uiFontFamily) {
-              ret.uiFontFamily = config.uiFontFamily;
-            }
-
-            if (config.cursorColor) {
-              ret.cursorColor = config.cursorColor;
-            }
-
-            if (config.cursorAccentColor) {
-              ret.cursorAccentColor = config.cursorAccentColor;
-            }
-
-            if (allowedCursorShapes.has(config.cursorShape)) {
-              ret.cursorShape = config.cursorShape;
-            }
-
-            if (allowedCursorBlinkValues.has(config.cursorBlink)) {
-              ret.cursorBlink = config.cursorBlink;
-            }
-
-            if (config.borderColor) {
-              ret.borderColor = config.borderColor;
-            }
-
-            if (config.selectionColor) {
-              ret.selectionColor = config.selectionColor;
-            }
-
-            if (typeof config.padding !== 'undefined' && config.padding !== null) {
-              ret.padding = config.padding;
-            }
-
-            if (config.foregroundColor) {
-              ret.foregroundColor = config.foregroundColor;
-            }
-
-            if (config.backgroundColor) {
-              ret.backgroundColor = config.backgroundColor;
-            }
-
-            if (config.css || config.css === '') {
-              ret.css = config.css;
-            }
-
-            if (config.termCSS) {
-              ret.termCSS = config.termCSS;
-            }
-
-            if (allowedBells.has(config.bell)) {
-              ret.bell = (config.bell as any) === 'false' ? false : config.bell;
-            }
-
-            if (config.bellSoundURL !== state.bellSoundURL) {
-              ret.bellSoundURL = config.bellSoundURL || initial.bellSoundURL;
-            }
-
-            if (config.bellSound !== state.bellSound) {
-              ret.bellSound = config.bellSound || initial.bellSound;
-            }
-
-            if (typeof config.copyOnSelect !== 'undefined' && config.copyOnSelect !== null) {
-              ret.copyOnSelect = config.copyOnSelect;
-            }
-
-            if (config.colors) {
-              if (JSON.stringify(state.colors) !== JSON.stringify(config.colors)) {
-                ret.colors = config.colors;
-              }
-            }
-
-            if (config.modifierKeys) {
-              ret.modifierKeys = config.modifierKeys;
-            }
-
-            if (allowedHamburgerMenuValues.has(config.showHamburgerMenu)) {
-              ret.showHamburgerMenu = config.showHamburgerMenu;
-            }
-
-            if (allowedWindowControlsValues.has(config.showWindowControls)) {
-              ret.showWindowControls = config.showWindowControls;
-            }
-
-            if (process.platform === 'win32' && (config.quickEdit === undefined || config.quickEdit === null)) {
-              ret.quickEdit = true;
-            } else if (typeof config.quickEdit !== 'undefined' && config.quickEdit !== null) {
-              ret.quickEdit = config.quickEdit;
-            }
-
-            if (config.webGLRenderer !== undefined) {
-              ret.webGLRenderer = config.webGLRenderer;
-            }
-
-            if (config.webLinksActivationKey !== undefined) {
-              ret.webLinksActivationKey = config.webLinksActivationKey;
-            }
-
-            if (config.macOptionSelectionMode) {
-              ret.macOptionSelectionMode = config.macOptionSelectionMode;
-            }
-
-            if (config.disableLigatures !== undefined) {
-              ret.disableLigatures = config.disableLigatures;
-            }
-
-            if (config.screenReaderMode !== undefined) {
-              ret.screenReaderMode = config.screenReaderMode;
-            }
-
-            const buildNumber = parseInt(release().split('.').at(-1) || '0', 10);
-            if (isWindows && !Number.isNaN(buildNumber) && buildNumber > 0) {
-              const useConpty = typeof config.useConpty === 'boolean' ? config.useConpty : buildNumber >= 18309;
-              ret.windowsPty = {
-                backend: useConpty ? 'conpty' : 'winpty',
-                buildNumber
-              };
-            }
-
-            if (config.imageSupport !== undefined) {
-              ret.imageSupport = config.imageSupport;
-            }
-
-            if (config.defaultProfile !== undefined) {
-              ret.defaultProfile = config.defaultProfile;
-            }
-
-            if (config.profiles !== undefined) {
-              ret.profiles = config.profiles;
-            }
-
-            ret._lastUpdate = now;
-
-            return ret;
-          })()
-        );
-      break;
-    }
-    case SESSION_ADD:
-      state_ = state.merge(
-        {
-          activeUid: action.uid,
-          openAt: {
-            [action.uid]: action.now
-          }
-        },
-        {deep: true}
-      );
-      break;
-
-    case SESSION_RESIZE:
-      // only care about the sizes
-      // of standalone terms (i.e. not splits):
-      if (!action.isStandaloneTerm) {
-        break;
-      }
-
-      state_ = state.merge({
-        rows: action.rows,
-        cols: action.cols,
-        resizeAt: action.now
-      });
-      break;
-
-    case SESSION_PTY_EXIT:
-      state_ = state
-        .updateIn(['openAt'], (times: ImmutableType<Record<string, number>>) => {
-          const times_ = times.asMutable();
-          delete times_[action.uid];
-          return times_;
-        })
-        .updateIn(['activityMarkers'], (markers: ImmutableType<Record<string, boolean>>) => {
-          const markers_ = markers.asMutable();
-          delete markers_[action.uid];
-          return markers_;
-        });
-      break;
-
-    case SESSION_SET_ACTIVE:
-      state_ = state.merge(
-        {
-          activeUid: action.uid,
-          activityMarkers: {
-            [action.uid]: false
-          }
-        },
-        {deep: true}
-      );
-      break;
-
-    case SESSION_PTY_DATA:
-      // ignore activity markers for current tab
-      if (action.uid === state.activeUid) {
-        break;
-      }
-
-      // if first data events after open, ignore
-      if (action.now - state.openAt[action.uid] < 1000) {
-        break;
-      }
-
-      // ignore activity markers that are within
-      // proximity of a resize event, since we
-      // expect to get data packets from the resize
-      // of the ptys as a result
-      if (!state.resizeAt || action.now - state.resizeAt > 1000) {
-        state_ = state.merge(
-          {
-            activityMarkers: {
-              [action.uid]: true
-            }
-          },
-          {deep: true}
-        );
-      }
-      break;
-
-    case SESSION_SET_CWD:
-      state_ = state.set('cwd', action.cwd);
-      break;
-
     case UI_FONT_SIZE_SET:
-      state_ = state.set('fontSizeOverride', action.value);
-      break;
+      return state.set('fontSizeOverride', action.value);
 
     case UI_FONT_SIZE_RESET:
-      state_ = state.set('fontSizeOverride', null);
-      break;
+      return state.set('fontSizeOverride', null);
 
     case UI_FONT_SMOOTHING_SET:
-      state_ = state.set('fontSmoothingOverride', action.fontSmoothing);
-      break;
+      return state.set('fontSmoothingOverride', action.fontSmoothing);
 
+    default:
+      return state;
+  }
+};
+
+const handleWindowActions = (state: uiState, action: UIDisplayAction): uiState => {
+  switch (action.type) {
     case UI_WINDOW_MAXIMIZE:
-      state_ = state.set('maximized', true);
-      break;
+      return state.set('maximized', true);
 
     case UI_WINDOW_UNMAXIMIZE:
-      state_ = state.set('maximized', false);
-      break;
+      return state.set('maximized', false);
 
     case UI_WINDOW_GEOMETRY_CHANGED:
-      isMax = action.isMaximized;
-      if (state.maximized !== isMax) {
-        state_ = state.set('maximized', isMax);
-      }
+      return state.maximized !== action.isMaximized ? state.set('maximized', action.isMaximized) : state;
 
-      break;
+    default:
+      return state;
+  }
+};
 
+const handleFullscreenActions = (state: uiState, action: UIDisplayAction): uiState => {
+  switch (action.type) {
+    case UI_ENTER_FULLSCREEN:
+      return state.set('fullScreen', true);
+
+    case UI_LEAVE_FULLSCREEN:
+      return state.set('fullScreen', false);
+
+    default:
+      return state;
+  }
+};
+
+const handleUIActions = (state: uiState, action: UIDisplayAction): uiState => {
+  const fontResult = handleFontActions(state, action);
+  if (fontResult !== state) {
+    return fontResult;
+  }
+
+  const windowResult = handleWindowActions(state, action);
+  if (windowResult !== state) {
+    return windowResult;
+  }
+
+  return handleFullscreenActions(state, action);
+};
+
+const handleNotifications = (state: uiState, action: NotificationAction): uiState => {
+  switch (action.type) {
     case NOTIFICATION_DISMISS:
-      state_ = state.merge(
+      return state.merge(
         {
           notifications: {
             [action.id]: false
@@ -426,52 +652,222 @@ const reducer: IUiReducer = (state = initial, action) => {
         },
         {deep: true}
       );
-      break;
 
     case NOTIFICATION_MESSAGE:
-      state_ = state.merge({
+      return state.merge({
         messageText: action.text,
         messageURL: action.url,
         messageDismissable: action.dismissable === true
       });
-      break;
 
     case UPDATE_AVAILABLE:
-      state_ = state.merge({
+      return state.merge({
         updateVersion: action.version,
         updateNotes: action.notes || '',
         updateReleaseUrl: action.releaseUrl,
         updateCanInstall: !!action.canInstall
       });
+
+    default:
+      return state;
+  }
+};
+
+const handleSessionResize = (state: uiState, action: SessionResizeAction): uiState => {
+  // only care about the sizes
+  // of standalone terms (i.e. not splits):
+  if (!action.isStandaloneTerm) {
+    return state;
+  }
+
+  return state.merge({
+    rows: action.rows,
+    cols: action.cols,
+    resizeAt: action.now
+  });
+};
+
+const handleSessionPtyExit = (state: uiState, action: SessionPtyExitAction): uiState => {
+  return state
+    .updateIn(['openAt'], (times: ImmutableType<Record<string, number>>) => {
+      const times_ = times.asMutable();
+      delete times_[action.uid];
+      return times_;
+    })
+    .updateIn(['activityMarkers'], (markers: ImmutableType<Record<string, boolean>>) => {
+      const markers_ = markers.asMutable();
+      delete markers_[action.uid];
+      return markers_;
+    });
+};
+
+type ActiveMergeProperty = 'openAt' | 'activityMarkers';
+type ActiveMergeValueMap = {
+  openAt: number;
+  activityMarkers: boolean;
+};
+
+const setActiveUidAndMerge = <K extends ActiveMergeProperty>(
+  state: uiState,
+  uid: string,
+  propertyName: K,
+  propertyValue: ActiveMergeValueMap[K]
+): uiState => {
+  return state.merge(
+    {
+      activeUid: uid,
+      [propertyName]: {
+        [uid]: propertyValue
+      }
+    },
+    {deep: true}
+  );
+};
+
+const shouldIgnoreActivityMarker = (state: uiState, action: SessionPtyDataAction): boolean => {
+  // ignore activity markers for current tab
+  if (action.uid === state.activeUid) {
+    return true;
+  }
+
+  const openAt = state.openAt[action.uid];
+  if (openAt === undefined) {
+    return true;
+  }
+
+  // if first data events after open, ignore
+  if (action.now - openAt < 1000) {
+    return true;
+  }
+
+  // ignore activity markers that are within
+  // proximity of a resize event, since we
+  // expect to get data packets from the resize
+  // of the ptys as a result
+  if (state.resizeAt && action.now - state.resizeAt <= 1000) {
+    return true;
+  }
+
+  return false;
+};
+
+const handleSessionPtyData = (state: uiState, action: SessionPtyDataAction): uiState => {
+  if (shouldIgnoreActivityMarker(state, action)) {
+    return state;
+  }
+
+  return state.merge(
+    {
+      activityMarkers: {
+        [action.uid]: true
+      }
+    },
+    {deep: true}
+  );
+};
+
+const updateConfigNotifications = (prev: uiState, next: uiState, actionType: string): uiState => {
+  let result = next;
+
+  if (
+    actionType !== CONFIG_LOAD &&
+    (result.fontSize !== prev.fontSize || result.fontSizeOverride !== prev.fontSizeOverride)
+  ) {
+    result = result.merge({notifications: {font: true}}, {deep: true});
+  }
+
+  if (prev.cols !== null && prev.rows !== null && (prev.rows !== result.rows || prev.cols !== result.cols)) {
+    result = result.merge({notifications: {resize: true}}, {deep: true});
+  }
+
+  return result;
+};
+
+const updateStateNotifications = (prev: uiState, next: uiState): uiState => {
+  let result = next;
+
+  if (prev.messageText !== result.messageText || prev.messageURL !== result.messageURL) {
+    result = result.merge({notifications: {message: true}}, {deep: true});
+  }
+
+  if (prev.updateVersion !== result.updateVersion) {
+    result = result.merge({notifications: {updates: true}}, {deep: true});
+  }
+
+  return result;
+};
+
+const updateNotifications = (prev: uiState, next: uiState, actionType: string): uiState => {
+  const configNotifications = updateConfigNotifications(prev, next, actionType);
+  return updateStateNotifications(prev, configNotifications);
+};
+
+const handleSessionAdd = (state: uiState, action: SessionAddAction): uiState => {
+  return setActiveUidAndMerge(state, action.uid, 'openAt', action.now);
+};
+
+const handleSessionSetActive = (state: uiState, action: SessionSetActiveAction): uiState => {
+  return setActiveUidAndMerge(state, action.uid, 'activityMarkers', false);
+};
+
+const handleSessionSetCwd = (state: uiState, action: SessionSetCwdAction): uiState => {
+  return state.set('cwd', action.cwd);
+};
+
+const reducer: IUiReducer = (state = initial, action) => {
+  let state_ = state;
+  // In `reducer` (typed as `IUiReducer`) we cast the broader Hyper action union
+  // to the `UiReducerAction` subset handled here; non-matching actions fall through unchanged.
+  const typedAction = action as UiReducerAction;
+  switch (typedAction.type) {
+    case CONFIG_LOAD:
+    case CONFIG_RELOAD:
+      state_ = handleConfigLoad(state, typedAction);
       break;
 
+    case SESSION_ADD:
+      state_ = handleSessionAdd(state, typedAction);
+      break;
+
+    case SESSION_RESIZE:
+      state_ = handleSessionResize(state, typedAction);
+      break;
+
+    case SESSION_PTY_EXIT:
+      state_ = handleSessionPtyExit(state, typedAction);
+      break;
+
+    case SESSION_SET_ACTIVE:
+      state_ = handleSessionSetActive(state, typedAction);
+      break;
+
+    case SESSION_PTY_DATA:
+      state_ = handleSessionPtyData(state, typedAction);
+      break;
+
+    case SESSION_SET_CWD:
+      state_ = handleSessionSetCwd(state, typedAction);
+      break;
+
+    case UI_FONT_SIZE_SET:
+    case UI_FONT_SIZE_RESET:
+    case UI_FONT_SMOOTHING_SET:
+    case UI_WINDOW_MAXIMIZE:
+    case UI_WINDOW_UNMAXIMIZE:
+    case UI_WINDOW_GEOMETRY_CHANGED:
     case UI_ENTER_FULLSCREEN:
-      state_ = state.set('fullScreen', true);
-      break;
-
     case UI_LEAVE_FULLSCREEN:
-      state_ = state.set('fullScreen', false);
+      state_ = handleUIActions(state, typedAction);
+      break;
+
+    case NOTIFICATION_DISMISS:
+    case NOTIFICATION_MESSAGE:
+    case UPDATE_AVAILABLE:
+      state_ = handleNotifications(state, typedAction);
       break;
   }
 
-  // Show a notification if any of the font size values have changed
-  if (CONFIG_LOAD !== action.type) {
-    if (state_.fontSize !== state.fontSize || state_.fontSizeOverride !== state.fontSizeOverride) {
-      state_ = state_.merge({notifications: {font: true}}, {deep: true});
-    }
-  }
-
-  if (state.cols !== null && state.rows !== null && (state.rows !== state_.rows || state.cols !== state_.cols)) {
-    state_ = state_.merge({notifications: {resize: true}}, {deep: true});
-  }
-
-  if (state.messageText !== state_.messageText || state.messageURL !== state_.messageURL) {
-    state_ = state_.merge({notifications: {message: true}}, {deep: true});
-  }
-
-  if (state.updateVersion !== state_.updateVersion) {
-    state_ = state_.merge({notifications: {updates: true}}, {deep: true});
-  }
+  state_ = updateNotifications(state, state_, typedAction.type);
 
   return state_;
 };

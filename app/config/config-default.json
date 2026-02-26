@@ -54,6 +54,7 @@
     "quickEdit": false,
     "macOptionSelectionMode": "vertical",
     "webGLRenderer": false,
+    "webGLRendererMaxContexts": 16,
     "webLinksActivationKey": "",
     "disableLigatures": true,
     "disableAutoUpdates": false,
