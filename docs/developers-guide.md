@@ -148,7 +148,8 @@ rules when changing terminal rendering behaviour:
 ## WebGL context-loss recovery practice
 
 Roadmap item `2.1.2` introduces context-loss fallback and retry behaviour.
-Follow these rules when changing context-loss handling:
+Roadmap item `2.2.1` adds WebGL allocation and fallback metrics. Follow these
+rules when changing context-loss handling and renderer instrumentation:
 
 - Keep context-loss handling in `lib/components/term.tsx` wired through
   `onWebGLContextLoss`.
@@ -168,9 +169,21 @@ Follow these rules when changing context-loss handling:
   and renderer mode events from `Term.reportRenderer(...)` (`info renderer`,
   with optional `reason` values such as `context-loss`, `pool-evicted`, and
   `webgl-init-failed`), which feed renderer summaries in the About dialog.
+- Keep allocation metrics aligned with renderer telemetry from
+  `Term.reportRenderer(...)` and main-process aggregation in
+  `app/utils/renderer-utils.ts`:
+  - Current WebGL context count (`current`) tracks active WebGL renderer
+    assignments.
+  - Peak WebGL context count (`peak`) tracks the highest observed `current`
+    value during the process lifetime.
+- Keep diagnostics visibility in the About dialog detail output by including:
+  - `WebGL contexts: current <n>, peak <n>`
+  - `Renderer fallbacks: total <n>; reasons: ...`
 - When tuning context-loss retry thresholds or fallback behaviour, update
   `docs/roadmap.md`, this guide, and the related renderer/pool unit tests in
   the same change to avoid docs/runtime drift.
+- When adding or renaming fallback reasons or allocation metric fields, update
+  this guide, `docs/roadmap.md`, and diagnostics tests in the same change.
 
 ## Tab decoration provider practice
 

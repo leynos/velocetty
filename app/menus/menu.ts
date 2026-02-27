@@ -6,7 +6,11 @@ import {execCommand} from '../commands';
 import {getConfig} from '../config';
 import {icon} from '../config/paths';
 import {getDecoratedKeymaps} from '../plugins';
-import {getRendererTypes, getRendererFallbackReasonCounts} from '../utils/renderer-utils';
+import {
+  getRendererTypes,
+  getRendererFallbackReasonCounts,
+  getRendererWebGLContextCounts
+} from '../utils/renderer-utils';
 
 import darwinMenu from './menus/darwin';
 import editMenu from './menus/edit';
@@ -49,15 +53,20 @@ export const createMenu = (getLoadedPluginVersions: () => {name: string; version
       .map(([type, count]) => type + (count > 1 ? ` (${count})` : ''))
       .join(', ');
     const fallbackReasonCounts = getRendererFallbackReasonCounts();
+    const fallbackTotal = Object.values(fallbackReasonCounts).reduce((total, count) => total + count, 0);
     const fallbackReasons = Object.entries(fallbackReasonCounts)
       .map(([reason, count]) => reason + (count > 1 ? ` (${count})` : ''))
       .join(', ');
+    const webGLContextCounts = getRendererWebGLContextCounts();
 
     void dialog.showMessageBox({
       title: `About ${appName}`,
       message: `${appName} ${appVersion} (${updateChannel})`,
       detail:
-        `Renderers: ${renderers}\nRenderer fallbacks: ${fallbackReasons || 'none'}\nPlugins: ${pluginList}\n\n` +
+        `Renderers: ${renderers}\n` +
+        `WebGL contexts: current ${webGLContextCounts.current}, peak ${webGLContextCounts.peak}\n` +
+        `Renderer fallbacks: total ${fallbackTotal}; reasons: ${fallbackReasons || 'none'}\n` +
+        `Plugins: ${pluginList}\n\n` +
         'Created by Guillermo Rauch\nCopyright © 2022 Vercel, Inc.',
       buttons: [],
       icon: icon as any

@@ -4,27 +4,31 @@ import {beforeEach, describe, expect, test} from 'bun:test';
 import {
   getRendererFallbackReasonCounts,
   getRendererTypes,
+  getRendererWebGLContextCounts,
+  resetRendererTracking,
   setRendererType,
   unsetRendererType
 } from '../../app/utils/renderer-utils';
 
-const clearRecord = (record: Record<string, unknown>) => {
-  for (const key of Object.keys(record)) {
-    delete record[key];
-  }
-};
-
 beforeEach(() => {
-  clearRecord(getRendererTypes());
-  clearRecord(getRendererFallbackReasonCounts());
+  resetRendererTracking();
 });
 
 describe('renderer-utils', () => {
-  test('tracks renderer type by uid', () => {
+  test('tracks renderer type by uid and records WebGL current/peak context counts', () => {
     setRendererType('uid-1', 'WebGL');
+    setRendererType('uid-2', 'Canvas');
+    setRendererType('uid-3', 'WebGL');
+    setRendererType('uid-1', 'Canvas');
+    unsetRendererType('uid-3');
 
     expect(getRendererTypes()).toEqual({
-      'uid-1': 'WebGL'
+      'uid-1': 'Canvas',
+      'uid-2': 'Canvas'
+    });
+    expect(getRendererWebGLContextCounts()).toEqual({
+      current: 0,
+      peak: 2
     });
     expect(getRendererFallbackReasonCounts()).toEqual({});
   });
