@@ -145,6 +145,33 @@ rules when changing terminal rendering behaviour:
   integer). Runtime changes require active terminals to restart before the new
   pool size takes effect.
 
+## WebGL context-loss recovery practice
+
+Roadmap item `2.1.2` introduces context-loss fallback and retry behaviour.
+Follow these rules when changing context-loss handling:
+
+- Keep context-loss handling in `lib/components/term.tsx` wired through
+  `onWebGLContextLoss`.
+- On context-loss or pool-eviction events, immediately detach the WebGL addon
+  and attach Canvas.
+- Keep retry behaviour bounded via existing failure controls:
+  `webglFailureCount`, `webglLastFailureAt`, `webglCooldownMs`,
+  `webglFailureThreshold`, and `webglFailureDecayMs`.
+- Keep deterministic retry scheduling in
+  `scheduleDeterministicRendererRetry()` and preserve timer cleanup in
+  `componentWillUnmount()` to avoid leaked retries.
+- Keep retry entry through visibility/pool coordination
+  (`syncRendererForVisibility` and `getWebGLContextPool(...)`) so retries occur
+  only when pane visibility and pool capacity allow a safe WebGL reattach.
+- Keep fallback instrumentation observable through:
+  `console.warn('WebGL context lost. Falling back to canvas-based rendering.')`
+  and renderer mode events from `Term.reportRenderer(...)` (`info renderer`,
+  with optional `reason` values such as `context-loss`, `pool-evicted`, and
+  `webgl-init-failed`), which feed renderer summaries in the About dialog.
+- When tuning context-loss retry thresholds or fallback behaviour, update
+  `docs/roadmap.md`, this guide, and the related renderer/pool unit tests in
+  the same change to avoid docs/runtime drift.
+
 ## Tab decoration provider practice
 
 Roadmap item `1.3.1` introduces the golden-path tab-decoration provider seam.

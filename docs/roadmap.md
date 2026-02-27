@@ -151,11 +151,11 @@ Scope notes:
   - [x] Allocate WebGL contexts only to visible panes with LRU eviction.
   - [x] Success criteria: hidden panes use Canvas, and WebGL usage never exceeds
     the configured maximum.
-- [ ] 2.1.2. Add context-loss recovery and fallbacks. See
+- [x] 2.1.2. Add context-loss recovery and fallbacks. See
   [velocetty-design.md](velocetty-design.md) §WebGL context pool.
-  - [ ] Detect context loss and immediately detach WebGL addons.
-  - [ ] Retry allocation when resources are freed.
-  - [ ] Success criteria: context loss does not crash the renderer and is
+  - [x] Detect context loss and immediately detach WebGL addons.
+  - [x] Retry allocation when resources are freed.
+  - [x] Success criteria: context loss does not crash the renderer and is
     observable via instrumentation.
 
 ### 2.2. Rendering instrumentation and performance baselines
