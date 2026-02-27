@@ -284,7 +284,7 @@ User approval received on `2026-02-27` to proceed with implementation.
 ## Surprises & Discoveries
 
 - Existing docs already define WebGL fallback reason observability and renderer
-  reporting conventions from roadmap `2.1.2`, which reduces ambiguity for
+  reporting conventions from roadmap `2.1.2`, which reduces ambiguity for the
   reason taxonomy.
 - Existing diagnostics flow appears to have an established developer-facing
   surface (About dialog renderer summary), so roadmap visibility can likely be
@@ -346,8 +346,8 @@ Delivered behaviour summary:
    state changes in `app/utils/renderer-utils.ts`.
 2. Preserved and continued fallback reason event counting from
    `RendererFallbackReason` telemetry.
-3. Exposed metrics in developer diagnostics output (About dialog) with lines
-   for
+3. Exposed the following metrics in the developer diagnostics output (About
+   dialog):
    - `WebGL contexts: current <n>, peak <n>`
    - `Renderer fallbacks: total <n>; reasons: ...`
 4. Updated developer practice documentation in `docs/developers-guide.md`.
