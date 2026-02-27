@@ -21,6 +21,7 @@ import type {TermProps} from '../../typings/hyper';
 import {asSessionId, type RendererFallbackReason} from '@shared/types/common';
 import terms from '../terms';
 import {transport} from '../transport';
+import {clock} from '../utils/clock';
 import {isPaneVisible} from '../utils/pane-visibility';
 import processClipboard from '../utils/paste';
 import {decorate} from '../utils/plugins';
@@ -54,7 +55,6 @@ const isWebgl2Supported = (() => {
 })();
 
 const DEFAULT_WEBGL_MAX_CONTEXTS = 16;
-const now = () => Date.now();
 
 // Pool entries are logical slot tokens, not reusable WebGL context objects.
 type WebGLPoolSlot = Readonly<{paneId: string}>;
@@ -482,7 +482,7 @@ export default class Term extends React.PureComponent<
     void this.bellSound?.play();
   }
 
-  private recordWebGLFailure(timestamp = now()) {
+  private recordWebGLFailure(timestamp = clock.now()) {
     this.webglFailureCount += 1;
     this.webglLastFailureAt = timestamp;
   }
@@ -496,7 +496,7 @@ export default class Term extends React.PureComponent<
     this.webglRetryTimer = null;
   }
 
-  private getWebGLRetryDelayMs(currentTime = now()) {
+  private getWebGLRetryDelayMs(currentTime = clock.now()) {
     if (this.webglFailureCount === 0 || this.webglLastFailureAt === 0) {
       return this.webglCooldownMs;
     }
@@ -563,7 +563,7 @@ export default class Term extends React.PureComponent<
     }
   }
 
-  private hasWebGLFailureCooldown(currentTime = now()) {
+  private hasWebGLFailureCooldown(currentTime = clock.now()) {
     if (this.webglFailureCount === 0) {
       return false;
     }
