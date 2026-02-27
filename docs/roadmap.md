@@ -160,11 +160,11 @@ Scope notes:
 
 ### 2.2. Rendering instrumentation and performance baselines
 
-- [ ] 2.2.1. Add WebGL allocation and fallback metrics. See
+- [x] 2.2.1. Add WebGL allocation and fallback metrics. See
   [velocetty-design.md](velocetty-design.md) §Observability.
-  - [ ] Record current and peak context counts.
-  - [ ] Record fallback events and reasons.
-  - [ ] Success criteria: metrics are visible in a developer diagnostics view or
+  - [x] Record current and peak context counts.
+  - [x] Record fallback events and reasons.
+  - [x] Success criteria: metrics are visible in a developer diagnostics view or
     log output.
 - [ ] 2.2.2. Add PTY output batching and frame timing metrics. See
   [velocetty-design.md](velocetty-design.md) §Render scheduling and
