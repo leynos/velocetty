@@ -107,4 +107,19 @@ describe('renderer-utils', () => {
       peak: 1
     });
   });
+
+  test('returns WebGL context counts as an immutable snapshot', () => {
+    resetRendererTracking();
+    setRendererType('uid-1', 'WebGL');
+    setRendererType('uid-2', 'WebGL');
+
+    const snapshot = getRendererWebGLContextCounts();
+    snapshot.current = 0;
+    snapshot.peak = 0;
+
+    expect(getRendererWebGLContextCounts()).toEqual({
+      current: 2,
+      peak: 2
+    });
+  });
 });

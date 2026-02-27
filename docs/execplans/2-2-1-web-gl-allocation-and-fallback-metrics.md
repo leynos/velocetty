@@ -193,13 +193,13 @@ Expected result: coverage proves metric correctness and diagnostics visibility.
 
 Update developer-facing docs and close roadmap work only after verified success.
 
-1. Update `docs/developers-guide.md` with development practice for:
+1. Update `docs/developers-guide.md` with development practice for
    - metric field definitions,
    - diagnostics visibility location,
    - fallback reason handling expectations, and
    - test/doc sync requirements for future renderer changes.
 2. Mark roadmap item `2.2.1` and sub-items as done in `docs/roadmap.md` only
-   after:
+   after
    - metric visibility is verified, and
    - all required gates pass.
 3. Keep plan progress and decision sections updated with final evidence.
@@ -266,8 +266,10 @@ User approval received on `2026-02-27` to proceed with implementation.
   `docs/developers-guide.md` WebGL guidance for roadmap `2.2.1`.
 - [x] (2026-02-27 02:13 UTC) Passed full required gates with durable logs:
   `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`.
-- [x] (2026-02-27 02:13 UTC) Updated roadmap `2.2.1` and sub-items to done in
+- [x] (2026-02-27 02:13 UTC) Updated roadmap `2.2.1` and sub-items as done in
   `docs/roadmap.md`.
+- [x] (2026-02-27 02:15 UTC) Normalized milestone wording in the `2.2.1`
+  section by removing preposition colons and aligning progress phrasing.
 
 ## Surprises & Discoveries
 
@@ -321,6 +323,11 @@ User approval received on `2026-02-27` to proceed with implementation.
   Rationale: Regenerated schema diffs were unrelated to roadmap `2.2.1` and
   would broaden the change beyond requested rendering instrumentation work.
 
+- Decision: Normalize milestone phrasing in the roadmap `2.2.1` section by
+  removing preposition-colon patterns and correcting progress wording.
+  Rationale: Keeps procedural text consistent with repo grammar expectations and
+  review guidance.
+
 ## Outcomes & Retrospective
 
 Delivered behaviour summary:
@@ -330,7 +337,7 @@ Delivered behaviour summary:
 2. Preserved and continued fallback reason event counting from
    `RendererFallbackReason` telemetry.
 3. Exposed metrics in developer diagnostics output (About dialog) with lines
-   for:
+   for
    - `WebGL contexts: current <n>, peak <n>`
    - `Renderer fallbacks: total <n>; reasons: ...`
 4. Updated developer practice documentation in `docs/developers-guide.md`.
