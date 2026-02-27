@@ -32,7 +32,7 @@ Success is observable when:
 - context-loss paths do not crash renderer terminals;
 - terminals fall back to Canvas immediately after loss events;
 - retry behaviour is bounded and routed through visibility/pool resync paths;
-- renderer-mode and fallback behaviour remains visible via instrumentation.
+- renderer-mode and fallback behaviour remain visible via instrumentation.
 
 ## Scope and non-goals
 
@@ -67,8 +67,8 @@ Out of scope:
 
 - Scope: if required updates exceed the three owned documentation files, stop
   and confirm expanded scope.
-- Behaviour: if documenting `2.1.2` requires changing runtime contracts or IPC
-  event names, stop and escalate.
+- Behaviour: if documenting `2.1.2` requires changing runtime contracts or
+  inter-process communication (IPC) event names, stop and escalate.
 - Evidence: if gate evidence is missing, keep status as in progress and do not
   state completion.
 - Tooling: if required tooling for source verification is unavailable, record
@@ -100,8 +100,8 @@ Primary references and implementation surfaces:
 
 - `lib/components/term.tsx`: context-loss callback, fallback attach/detach, and
   retry cooldown/threshold logic.
-- `lib/utils/webgl-context-pool.ts`: capped allocation and LRU eviction
-  behaviour that determines retry opportunities.
+- `lib/utils/webgl-context-pool.ts`: capped allocation and least recently used
+  (LRU) eviction behaviour that determines retry opportunities.
 - `app/ui/window.ts` and `app/utils/renderer-utils.ts`: renderer event handling
   used by About-dialog observability.
 - `docs/velocetty-design.md` (`WebGL context pool`, `Observability`):
@@ -109,7 +109,7 @@ Primary references and implementation surfaces:
 
 ## Milestones
 
-### Milestone 0 - Baseline and constraints capture
+### Milestone 0 - baseline and constraints capture
 
 Confirm branch and current roadmap/developer-guide state before edits:
 
@@ -119,7 +119,7 @@ nl -ba docs/roadmap.md | sed -n '146,170p'
 nl -ba docs/developers-guide.md | sed -n '130,220p'
 ```
 
-### Milestone 1 - Update this ExecPlan (living document)
+### Milestone 1 - update this execplan (living document)
 
 Create/update `docs/execplans/2-1-2-add-context-loss-recovery.md` with:
 
@@ -128,7 +128,7 @@ Create/update `docs/execplans/2-1-2-add-context-loss-recovery.md` with:
 - concrete gate commands and evidence paths;
 - truthful pending-state notes where validation is not yet run.
 
-### Milestone 2 - Update developer practice guidance
+### Milestone 2 - update developer practice guidance
 
 Add context-loss recovery guidance to `docs/developers-guide.md`, covering:
 
@@ -137,11 +137,11 @@ Add context-loss recovery guidance to `docs/developers-guide.md`, covering:
 - instrumentation expectations (`console.warn` fallback signal and
   `Term.reportRenderer(...)` event flow).
 
-### Milestone 3 - Mark roadmap item 2.1.2 done
+### Milestone 3 - mark roadmap item 2.1.2 done
 
 Update `docs/roadmap.md` so `2.1.2` and all sub-bullets are checked.
 
-### Milestone 4 - Required gate replay with durable logs
+### Milestone 4 - required gate replay with durable logs
 
 Run required gates in order with `tee` logs:
 
@@ -175,7 +175,7 @@ git clean -f \
   shared/src/types/transport.js.map
 ```
 
-### Milestone 5 - Close out outcomes and status
+### Milestone 5 - close out outcomes and status
 
 After gate evidence is captured, update this file with:
 
@@ -225,7 +225,7 @@ Gate validation (required for final closure):
 - [x] (2026-02-26 00:00Z) Finalized outcomes and retrospective after gate
   evidence capture.
 
-## Surprises & Discoveries
+## Surprises & discoveries
 
 - Observation: `docs/execplans/2-1-2-add-context-loss-recovery.md` did not
   exist and needed creation for roadmap `2.1.2`.
@@ -247,7 +247,7 @@ Gate validation (required for final closure):
   Impact: developer guidance must describe this current instrumentation path
   accurately.
 
-## Decision Log
+## Decision log
 
 - Decision: mark plan status as `COMPLETE` after all required gate commands
   succeeded with durable logs.
@@ -267,7 +267,7 @@ Gate validation (required for final closure):
   false completion signalling.
   Date/Author: 2026-02-26 / Codex.
 
-## Outcomes & Retrospective
+## Outcomes & retrospective
 
 Current outcome:
 

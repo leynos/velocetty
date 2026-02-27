@@ -54,6 +54,7 @@ const isWebgl2Supported = (() => {
 })();
 
 const DEFAULT_WEBGL_MAX_CONTEXTS = 16;
+const now = () => Date.now();
 
 // Pool entries are logical slot tokens, not reusable WebGL context objects.
 type WebGLPoolSlot = Readonly<{paneId: string}>;
@@ -481,9 +482,9 @@ export default class Term extends React.PureComponent<
     void this.bellSound?.play();
   }
 
-  private recordWebGLFailure(now = Date.now()) {
+  private recordWebGLFailure(timestamp = now()) {
     this.webglFailureCount += 1;
-    this.webglLastFailureAt = now;
+    this.webglLastFailureAt = timestamp;
   }
 
   private clearRendererRetryTimer() {
@@ -495,16 +496,16 @@ export default class Term extends React.PureComponent<
     this.webglRetryTimer = null;
   }
 
-  private getWebGLRetryDelayMs(now = Date.now()) {
+  private getWebGLRetryDelayMs(currentTime = now()) {
     if (this.webglFailureCount === 0 || this.webglLastFailureAt === 0) {
       return this.webglCooldownMs;
     }
 
     if (this.webglFailureCount > this.webglFailureThreshold) {
-      return Math.max(this.webglCooldownMs, this.webglLastFailureAt + this.webglFailureDecayMs - now);
+      return Math.max(this.webglCooldownMs, this.webglLastFailureAt + this.webglFailureDecayMs - currentTime);
     }
 
-    return Math.max(this.webglCooldownMs, this.webglLastFailureAt + this.webglCooldownMs - now);
+    return Math.max(this.webglCooldownMs, this.webglLastFailureAt + this.webglCooldownMs - currentTime);
   }
 
   onWebGLContextLoss = () => {
@@ -517,9 +518,9 @@ export default class Term extends React.PureComponent<
   };
 
   onWebGLEvicted = () => {
+    this.recordWebGLFailure();
     this.detachWebGLRenderer();
     this.ensureCanvasRenderer('pool-evicted');
-    this.scheduleRendererVisibilitySync();
     this.scheduleDeterministicRendererRetry();
   };
 
@@ -562,12 +563,12 @@ export default class Term extends React.PureComponent<
     }
   }
 
-  private hasWebGLFailureCooldown(now = Date.now()) {
+  private hasWebGLFailureCooldown(currentTime = now()) {
     if (this.webglFailureCount === 0) {
       return false;
     }
 
-    if (this.webglLastFailureAt > 0 && now - this.webglLastFailureAt >= this.webglFailureDecayMs) {
+    if (this.webglLastFailureAt > 0 && currentTime - this.webglLastFailureAt >= this.webglFailureDecayMs) {
       this.webglFailureCount = 0;
       this.webglLastFailureAt = 0;
       return false;
@@ -577,7 +578,7 @@ export default class Term extends React.PureComponent<
       return true;
     }
 
-    return now < this.webglLastFailureAt + this.webglCooldownMs;
+    return currentTime < this.webglLastFailureAt + this.webglCooldownMs;
   }
 
   private markWebGLInitSuccess() {

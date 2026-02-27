@@ -7,7 +7,9 @@ import {createTransportMock} from '../testUtils/transport-mock';
 
 /** Type guard to identify WebGL addons by their onContextLoss method. */
 function isWebGLAddon(addon: unknown): addon is {onContextLoss: () => void} {
-  return addon !== null && typeof addon === 'object' && 'onContextLoss' in addon;
+  return (
+    addon !== null && typeof addon === 'object' && 'onContextLoss' in addon && typeof addon.onContextLoss === 'function'
+  );
 }
 
 const {transportMock, resetTransportMock} = createTransportMock();
@@ -58,6 +60,16 @@ mock.module('../../lib/components/searchBox', () => ({default: () => null}));
 
 let Term: typeof import('../../lib/components/term').default;
 let cleanupHappyDom: (() => void) | null = null;
+
+const createTermInstanceForWebGLFallbackTest = (uid: string) => {
+  // @ts-expect-error Test constructor setup intentionally uses a minimal prop subset.
+  return new Term({
+    uid,
+    ref_: mock(() => {}),
+    cursorColor: '#ffffff',
+    borderColor: '#000000'
+  });
+};
 
 beforeAll(async () => {
   cleanupHappyDom = await setupHappyDom();
@@ -135,27 +147,58 @@ describe('Term.reportRenderer transport emit', () => {
 
 describe('Term.ensureWebGLRenderer fallback handling', () => {
   test('does not throw when WebGL addon attach fails', () => {
-    const termInstance = new Term({
-      uid: 'uid-webgl-failure',
-      ref_: mock(() => {}),
-      cursorColor: '#ffffff',
-      borderColor: '#000000'
-    } as any);
+    const termInstance = createTermInstanceForWebGLFallbackTest('uid-webgl-failure');
+    // @ts-expect-error Test double only needs loadAddon for this focused path.
     termInstance.term = {
       loadAddon: mock((addon: unknown) => {
         if (isWebGLAddon(addon)) {
           throw new Error('webgl attach failed');
         }
       })
-    } as any;
+    };
 
     const webGLContextPool = {acquire: mock(() => {})};
 
-    expect(() => termInstance.ensureWebGLRenderer(webGLContextPool as any)).not.toThrow();
+    // @ts-expect-error Pool double intentionally provides only the acquire hook.
+    expect(() => termInstance.ensureWebGLRenderer(webGLContextPool)).not.toThrow();
     expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {
       uid: 'uid-webgl-failure',
       type: 'Canvas',
       reason: 'webgl-init-failed'
     });
+  });
+});
+
+describe('Term WebGL context-loss and eviction handlers', () => {
+  test('onWebGLContextLoss emits context-loss fallback and schedules retry', () => {
+    const termInstance = createTermInstanceForWebGLFallbackTest('uid-context-loss');
+    termInstance.detachWebGLRenderer = mock(() => {});
+    termInstance.ensureCanvasRenderer = mock(() => {});
+    termInstance.scheduleRendererVisibilitySync = mock(() => {});
+    termInstance.scheduleDeterministicRendererRetry = mock(() => {});
+    termInstance.webglFailureCount = 0;
+
+    termInstance.onWebGLContextLoss();
+
+    expect(termInstance.webglFailureCount).toBe(1);
+    expect(termInstance.ensureCanvasRenderer).toHaveBeenCalledWith('context-loss');
+    expect(termInstance.scheduleRendererVisibilitySync).toHaveBeenCalledTimes(1);
+    expect(termInstance.scheduleDeterministicRendererRetry).toHaveBeenCalledTimes(1);
+  });
+
+  test('onWebGLEvicted emits pool-evicted fallback and uses delayed retry path only', () => {
+    const termInstance = createTermInstanceForWebGLFallbackTest('uid-evicted');
+    termInstance.detachWebGLRenderer = mock(() => {});
+    termInstance.ensureCanvasRenderer = mock(() => {});
+    termInstance.scheduleRendererVisibilitySync = mock(() => {});
+    termInstance.scheduleDeterministicRendererRetry = mock(() => {});
+    termInstance.webglFailureCount = 0;
+
+    termInstance.onWebGLEvicted();
+
+    expect(termInstance.webglFailureCount).toBe(1);
+    expect(termInstance.ensureCanvasRenderer).toHaveBeenCalledWith('pool-evicted');
+    expect(termInstance.scheduleRendererVisibilitySync).not.toHaveBeenCalled();
+    expect(termInstance.scheduleDeterministicRendererRetry).toHaveBeenCalledTimes(1);
   });
 });
