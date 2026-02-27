@@ -14,7 +14,10 @@ function getRendererFallbackReasonCounts() {
 }
 
 function getRendererWebGLContextCounts() {
-  return rendererWebGLContextCounts;
+  return {
+    current: rendererWebGLContextCounts.current,
+    peak: rendererWebGLContextCounts.peak
+  };
 }
 
 function setRendererType(uid: string, type: string, reason?: RendererFallbackReason) {

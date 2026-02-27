@@ -1,4 +1,4 @@
-# Implement WebGL Allocation and Fallback Metrics (Roadmap 2.2.1)
+# Implement WebGL allocation and fallback metrics (Roadmap 2.2.1)
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -213,11 +213,16 @@ Run required gates with branch-safe logs. Use this command form exactly:
 
 ```bash
 set -o pipefail
-bun install 2>&1 | tee /tmp/install-$(get-project)-$(git branch --show).out
-make build 2>&1 | tee /tmp/build-$(get-project)-$(git branch --show).out
-make check-fmt 2>&1 | tee /tmp/check-fmt-$(get-project)-$(git branch --show).out
-make lint 2>&1 | tee /tmp/lint-$(get-project)-$(git branch --show).out
-make test 2>&1 | tee /tmp/test-$(get-project)-$(git branch --show).out
+project_name="$(get-project 2>/dev/null || basename "$(git rev-parse --show-toplevel)")"
+branch_name="$(git branch --show-current)"
+if [ -z "$branch_name" ]; then
+  branch_name="detached-head"
+fi
+bun install 2>&1 | tee /tmp/install-${project_name}-${branch_name}.out
+make build 2>&1 | tee /tmp/build-${project_name}-${branch_name}.out
+make check-fmt 2>&1 | tee /tmp/check-fmt-${project_name}-${branch_name}.out
+make lint 2>&1 | tee /tmp/lint-${project_name}-${branch_name}.out
+make test 2>&1 | tee /tmp/test-${project_name}-${branch_name}.out
 ```
 
 If any command fails, stop and record partial status with exact failing log
