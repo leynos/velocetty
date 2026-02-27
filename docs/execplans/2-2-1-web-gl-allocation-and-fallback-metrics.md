@@ -218,11 +218,21 @@ branch_name="$(git branch --show-current)"
 if [ -z "$branch_name" ]; then
   branch_name="detached-head"
 fi
-bun install 2>&1 | tee /tmp/install-${project_name}-${branch_name}.out
-make build 2>&1 | tee /tmp/build-${project_name}-${branch_name}.out
-make check-fmt 2>&1 | tee /tmp/check-fmt-${project_name}-${branch_name}.out
-make lint 2>&1 | tee /tmp/lint-${project_name}-${branch_name}.out
-make test 2>&1 | tee /tmp/test-${project_name}-${branch_name}.out
+safe_project_name="${project_name//\//-}"
+safe_branch_name="${branch_name//\//-}"
+safe_project_name="$(printf '%s' "$safe_project_name" | tr -cs 'A-Za-z0-9._-' '-')"
+safe_branch_name="$(printf '%s' "$safe_branch_name" | tr -cs 'A-Za-z0-9._-' '-')"
+if [ -z "$safe_project_name" ]; then
+  safe_project_name="project"
+fi
+if [ -z "$safe_branch_name" ]; then
+  safe_branch_name="branch"
+fi
+bun install 2>&1 | tee "/tmp/install-${safe_project_name}-${safe_branch_name}.out"
+make build 2>&1 | tee "/tmp/build-${safe_project_name}-${safe_branch_name}.out"
+make check-fmt 2>&1 | tee "/tmp/check-fmt-${safe_project_name}-${safe_branch_name}.out"
+make lint 2>&1 | tee "/tmp/lint-${safe_project_name}-${safe_branch_name}.out"
+make test 2>&1 | tee "/tmp/test-${safe_project_name}-${safe_branch_name}.out"
 ```
 
 If any command fails, stop and record partial status with exact failing log
