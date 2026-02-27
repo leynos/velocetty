@@ -3,6 +3,7 @@ import type {RendererFallbackReason} from '@shared/types/common';
 const rendererTypes: Record<string, string> = {};
 const rendererFallbackReasonCounts: Partial<Record<RendererFallbackReason, number>> = {};
 const rendererWebGLContextCounts = {current: 0, peak: 0};
+const isWebGLRenderer = (type: string | undefined) => type === 'WebGL';
 
 function getRendererTypes() {
   return rendererTypes;
@@ -16,19 +17,19 @@ function getRendererWebGLContextCounts() {
   return rendererWebGLContextCounts;
 }
 
-function getCurrentWebGLContextCount() {
-  return Object.values(rendererTypes).filter((type) => type === 'WebGL').length;
-}
-
-function syncRendererWebGLContextCounts() {
-  const current = getCurrentWebGLContextCount();
-  rendererWebGLContextCounts.current = current;
-  rendererWebGLContextCounts.peak = Math.max(rendererWebGLContextCounts.peak, current);
-}
-
 function setRendererType(uid: string, type: string, reason?: RendererFallbackReason) {
+  const previousType = rendererTypes[uid];
+  const wasWebGL = isWebGLRenderer(previousType);
+  const isWebGL = isWebGLRenderer(type);
+
+  if (!wasWebGL && isWebGL) {
+    rendererWebGLContextCounts.current += 1;
+    rendererWebGLContextCounts.peak = Math.max(rendererWebGLContextCounts.peak, rendererWebGLContextCounts.current);
+  } else if (wasWebGL && !isWebGL) {
+    rendererWebGLContextCounts.current = Math.max(0, rendererWebGLContextCounts.current - 1);
+  }
+
   rendererTypes[uid] = type;
-  syncRendererWebGLContextCounts();
   if (!reason) {
     return;
   }
@@ -37,8 +38,11 @@ function setRendererType(uid: string, type: string, reason?: RendererFallbackRea
 }
 
 function unsetRendererType(uid: string) {
+  if (isWebGLRenderer(rendererTypes[uid])) {
+    rendererWebGLContextCounts.current = Math.max(0, rendererWebGLContextCounts.current - 1);
+  }
+
   delete rendererTypes[uid];
-  syncRendererWebGLContextCounts();
 }
 
 function resetRendererTracking() {

@@ -15,6 +15,48 @@ beforeEach(() => {
 });
 
 describe('renderer-utils', () => {
+  describe('resetRendererTracking', () => {
+    test('clears all tracked renderer metrics', () => {
+      setRendererType('uid-1', 'WebGL');
+      setRendererType('uid-2', 'Canvas', 'context-loss');
+      setRendererType('uid-3', 'WebGL');
+
+      expect(getRendererTypes()).toEqual({
+        'uid-1': 'WebGL',
+        'uid-2': 'Canvas',
+        'uid-3': 'WebGL'
+      });
+      expect(getRendererFallbackReasonCounts()).toEqual({
+        'context-loss': 1
+      });
+      expect(getRendererWebGLContextCounts()).toEqual({
+        current: 2,
+        peak: 2
+      });
+
+      resetRendererTracking();
+
+      expect(getRendererTypes()).toEqual({});
+      expect(getRendererFallbackReasonCounts()).toEqual({});
+      expect(getRendererWebGLContextCounts()).toEqual({
+        current: 0,
+        peak: 0
+      });
+    });
+
+    test('is idempotent when called repeatedly', () => {
+      resetRendererTracking();
+      expect(() => resetRendererTracking()).not.toThrow();
+
+      expect(getRendererTypes()).toEqual({});
+      expect(getRendererFallbackReasonCounts()).toEqual({});
+      expect(getRendererWebGLContextCounts()).toEqual({
+        current: 0,
+        peak: 0
+      });
+    });
+  });
+
   test('tracks renderer type by uid and records WebGL current/peak context counts', () => {
     setRendererType('uid-1', 'WebGL');
     setRendererType('uid-2', 'Canvas');
@@ -51,6 +93,18 @@ describe('renderer-utils', () => {
     expect(getRendererTypes()).toEqual({});
     expect(getRendererFallbackReasonCounts()).toEqual({
       'webgl-init-failed': 1
+    });
+  });
+
+  test('only updates WebGL counts when WebGL classification changes', () => {
+    setRendererType('uid-1', 'WebGL');
+    setRendererType('uid-1', 'WebGL');
+    setRendererType('uid-1', 'Canvas');
+    setRendererType('uid-1', 'Canvas');
+
+    expect(getRendererWebGLContextCounts()).toEqual({
+      current: 0,
+      peak: 1
     });
   });
 });

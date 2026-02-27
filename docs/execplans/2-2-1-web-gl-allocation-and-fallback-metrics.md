@@ -36,7 +36,7 @@ The implementation is expected to concentrate in these areas:
 
 - Renderer allocation and fallback flows:
   `lib/components/term.tsx` and `lib/utils/webgl-context-pool.ts`.
-- IPC payload contracts for renderer telemetry:
+- IPC (inter-process communication) payload contracts for renderer telemetry:
   `shared/src/types/common.ts`.
 - Main-process aggregation and diagnostics presentation:
   `app/ui/window.ts`, `app/utils/renderer-utils.ts`, and `app/menus/menu.ts`.
@@ -50,7 +50,7 @@ Reference sources that define scope and acceptance:
 
 - `docs/roadmap.md` section `2.2.1`.
 - `docs/velocetty-design.md` section `Observability`.
-- `docs/velocetty-product-requirements-document.md` phase `2`.
+- `docs/velocetty-product-requirements-document.md` (PRD) phase `2`.
 - `docs/velocetty-hyper-codebase.md` observability and WebGL capacity sections.
 - `docs/developers-guide.md` WebGL rendering and context-loss practice.
 
@@ -58,7 +58,7 @@ Reference sources that define scope and acceptance:
 
 - Do not implement any optimization work from roadmap `2.2.2` in this item.
   This scope is instrumentation and diagnostics visibility only.
-- Preserve current renderer-allocation behavior and retry policy from `2.1.1`
+- Preserve current renderer-allocation behaviour and retry policy from `2.1.1`
   and `2.1.2`. This task adds metrics and reporting, not allocator redesign.
 - Preserve fallback reason taxonomy and keep reason values deterministic and
   documented.
@@ -154,7 +154,7 @@ Implement metric production at allocation and fallback boundaries.
 1. Extend WebGL pool bookkeeping to provide current and peak context counts.
 2. Extend renderer event emission to carry fallback reasons and allocation
    metric data when renderer mode changes.
-3. Preserve existing fallback and retry behavior while adding metric updates.
+3. Preserve existing fallback and retry behaviour while adding metric updates.
 4. Ensure teardown paths (session close, release, clear) keep current count
    accurate and prevent stale metric state.
 
@@ -204,7 +204,7 @@ Update developer-facing docs and close roadmap work only after verified success.
    - all required gates pass.
 3. Keep plan progress and decision sections updated with final evidence.
 
-Expected result: docs reflect implemented behavior and roadmap status is
+Expected result: docs reflect implemented behaviour and roadmap status is
 truthful.
 
 ## Milestone 6: Full gates with durable evidence
@@ -278,7 +278,7 @@ User approval received on `2026-02-27` to proceed with implementation.
 - Running `bun install` regenerates schema artifacts (`app/config/schema.json`
   and `shared/schemas/schema.json`) as part of repository bootstrap hooks.
   These changes were reverted for this feature to keep scope limited to roadmap
-  `2.2.1` behavior.
+  `2.2.1` behaviour.
 
 ## Decision Log
 
@@ -291,7 +291,7 @@ User approval received on `2026-02-27` to proceed with implementation.
   `app/utils/renderer-utils.ts` and exposing the metrics in the existing About
   dialog diagnostics output.
   Rationale: Satisfies roadmap `2.2.1` observability requirements without
-  introducing new renderer allocation behavior or additional IPC contracts.
+  introducing new renderer allocation behaviour or additional IPC contracts.
 
 - Decision: Use current diagnostics surface as primary visibility path, with
   logs as fallback path.
@@ -318,7 +318,7 @@ User approval received on `2026-02-27` to proceed with implementation.
 
 ## Outcomes & Retrospective
 
-Delivered behavior summary:
+Delivered behaviour summary:
 
 1. Added WebGL allocation metrics (current and peak) by tracking renderer-type
    state changes in `app/utils/renderer-utils.ts`.
