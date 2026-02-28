@@ -23,7 +23,7 @@ import {decorateSessionOptions, decorateSessionClass} from '../plugins';
 import createRPC from '../rpc';
 import Session from '../session';
 import updater from '../updater';
-import {setRendererType, unsetRendererType} from '../utils/renderer-utils';
+import {recordInputSendToWriteLatency, setRendererType, unsetRendererType} from '../utils/renderer-utils';
 import toElectronBackgroundColor from '../utils/to-electron-background-color';
 
 import contextMenuTemplate from './contextmenu';
@@ -369,23 +369,25 @@ export function newWindow(
       session.resize({cols, rows});
     }
   });
-  rpc.on('data', ({uid, data, escaped}) => {
+  rpc.on('data', ({uid, data, escaped, inputSentAtMs}) => {
     const session = uid && sessions.get(uid);
-    if (session) {
-      if (escaped) {
-        const escapedData = session.shell?.endsWith('cmd.exe')
+    if (session && uid) {
+      const payload = escaped
+        ? session.shell?.endsWith('cmd.exe')
           ? `"${data}"` // This is how cmd.exe does it
-          : `'${data.replace(/'/g, `'\\''`)}'`; // Inside a single-quoted string nothing is interpreted
+          : `'${data.replace(/'/g, `'\\''`)}'` // Inside a single-quoted string nothing is interpreted
+        : data;
+      const writeTimestampMs = Date.now();
 
-        session.write(escapedData);
-      } else {
-        session.write(data);
+      session.write(payload);
+      if (typeof inputSentAtMs === 'number') {
+        recordInputSendToWriteLatency(uid, writeTimestampMs - inputSentAtMs);
       }
     }
   });
-  rpc.on('info renderer', ({uid, type, reason}) => {
+  rpc.on('info renderer', ({uid, type, reason, runtimeMetrics}) => {
     // Used in the "About" dialog
-    setRendererType(uid, type, reason);
+    setRendererType(uid, type, reason, runtimeMetrics);
   });
   rpc.on('open external', ({url}) => {
     void shell.openExternal(url);

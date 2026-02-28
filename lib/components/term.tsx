@@ -18,7 +18,13 @@ import {WebLinksAddon} from 'xterm-addon-web-links';
 import {WebglAddon} from 'xterm-addon-webgl';
 
 import type {TermProps} from '../../typings/hyper';
-import {asSessionId, type RendererFallbackReason} from '@shared/types/common';
+import {
+  LONG_FRAME_THRESHOLD_MS,
+  RUNTIME_METRICS_REPORT_INTERVAL_MS,
+  clearInputSendTimestamps,
+  enqueueInputSendTimestamp
+} from '@shared/constants/runtime-telemetry';
+import {asSessionId, type RendererFallbackReason, type RendererRuntimeMetrics} from '@shared/types/common';
 import terms from '../terms';
 import {transport} from '../transport';
 import {clock} from '../utils/clock';
@@ -55,6 +61,19 @@ const isWebgl2Supported = (() => {
 })();
 
 const DEFAULT_WEBGL_MAX_CONTEXTS = 16;
+const KEYDOWN_TIMESTAMP_QUEUE_LIMIT = 64;
+const KEYDOWN_TIMESTAMP_MAX_AGE_MS = 5000;
+const NON_WRITING_KEYS = new Set([
+  'Alt',
+  'CapsLock',
+  'Control',
+  'Fn',
+  'FnLock',
+  'Meta',
+  'NumLock',
+  'ScrollLock',
+  'Shift'
+]);
 
 // Pool entries are logical slot tokens, not reusable WebGL context objects.
 type WebGLPoolSlot = Readonly<{paneId: string}>;
@@ -144,6 +163,22 @@ const getTermOptions = (props: TermProps): ITerminalOptions => {
   };
 };
 
+const createRuntimeLatencyMetrics = () => ({
+  sampleCount: 0,
+  totalMs: 0,
+  maxMs: 0,
+  lastMs: 0
+});
+
+const createRuntimeFrameTimingMetrics = () => ({
+  sampleCount: 0,
+  totalMs: 0,
+  maxMs: 0,
+  lastMs: 0,
+  longFrameCount: 0,
+  longFrameThresholdMs: LONG_FRAME_THRESHOLD_MS
+});
+
 /** Terminal view component that wraps xterm and renderer-specific behaviour. */
 export default class Term extends React.PureComponent<
   TermProps,
@@ -184,7 +219,14 @@ export default class Term extends React.PureComponent<
   webglCooldownMs: number;
   webglFailureThreshold: number;
   webglFailureDecayMs: number;
-  webglRetryTimer: ReturnType<typeof window.setTimeout> | null;
+  webglRetryTimer: number | NodeJS.Timeout | null;
+  frameTimingRaf: number | null;
+  lastFrameTimestamp: number | null;
+  keydownTimestamps: number[];
+  hasUnreportedRuntimeMetrics: boolean;
+  lastRuntimeMetricsReportAt: number;
+  runtimeInputLatencyMetrics: ReturnType<typeof createRuntimeLatencyMetrics>;
+  runtimeFrameTimingMetrics: ReturnType<typeof createRuntimeFrameTimingMetrics>;
   searchDecorations: ISearchDecorationOptions;
   state = {
     searchOptions: {
@@ -218,6 +260,13 @@ export default class Term extends React.PureComponent<
     this.webglFailureThreshold = 3;
     this.webglFailureDecayMs = 15_000;
     this.webglRetryTimer = null;
+    this.frameTimingRaf = null;
+    this.lastFrameTimestamp = null;
+    this.keydownTimestamps = [];
+    this.hasUnreportedRuntimeMetrics = false;
+    this.lastRuntimeMetricsReportAt = 0;
+    this.runtimeInputLatencyMetrics = createRuntimeLatencyMetrics();
+    this.runtimeFrameTimingMetrics = createRuntimeFrameTimingMetrics();
     this.searchDecorations = {
       activeMatchColorOverviewRuler: Color(this.props.cursorColor).hex(),
       matchOverviewRuler: Color(this.props.borderColor).hex(),
@@ -228,22 +277,22 @@ export default class Term extends React.PureComponent<
   }
 
   // The main process shows this in the About dialog
-  static reportRenderer(uid: string, type: string, reason?: RendererFallbackReason) {
+  static reportRenderer(
+    uid: string,
+    type: string,
+    reason?: RendererFallbackReason,
+    runtimeMetrics?: RendererRuntimeMetrics
+  ) {
     const rendererTypes = Term.rendererTypes || {};
     const hasTypeChanged = rendererTypes[uid] !== type;
     rendererTypes[uid] = type;
     Term.rendererTypes = rendererTypes;
 
-    if (!hasTypeChanged && !reason) {
+    if (!hasTypeChanged && !reason && !runtimeMetrics) {
       return;
     }
 
-    if (reason) {
-      transport.emit('info renderer', {uid: asSessionId(uid), type, reason});
-      return;
-    }
-
-    transport.emit('info renderer', {uid: asSessionId(uid), type});
+    transport.emit('info renderer', {uid: asSessionId(uid), type, reason, runtimeMetrics});
   }
 
   componentDidMount() {
@@ -273,7 +322,6 @@ export default class Term extends React.PureComponent<
         return props.webLinksActivationKey ? event[`${props.webLinksActivationKey}Key`] : true;
       };
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       this.term.attachCustomKeyEventHandler(this.keyboardHandler);
       this.term.loadAddon(this.fitAddon);
       this.term.loadAddon(this.searchAddon);
@@ -319,7 +367,20 @@ export default class Term extends React.PureComponent<
     }
 
     if (props.onData) {
-      this.disposableListeners.push(this.term.onData(props.onData));
+      this.disposableListeners.push(
+        this.term.onData((data) => {
+          const inputSentAtMs = clock.now();
+          enqueueInputSendTimestamp(this.props.uid, inputSentAtMs);
+
+          const keydownAtMs = this.dequeueKeydownTimestamp(inputSentAtMs);
+          if (keydownAtMs !== undefined) {
+            this.recordLatencySample(this.runtimeInputLatencyMetrics, inputSentAtMs - keydownAtMs);
+          }
+
+          props.onData(data);
+          this.maybeReportRuntimeMetrics();
+        })
+      );
     }
 
     this.term.onBell(() => {
@@ -368,6 +429,9 @@ export default class Term extends React.PureComponent<
     window.addEventListener('resize', this.scheduleRendererVisibilitySync, {passive: true});
     window.addEventListener('scroll', this.scheduleRendererVisibilitySync, true);
     this.scheduleRendererVisibilitySync();
+    if (this.props.isActiveRootGroup) {
+      this.startFrameTimingLoop();
+    }
 
     terms[this.props.uid] = this;
   }
@@ -465,9 +529,129 @@ export default class Term extends React.PureComponent<
     this.fitAddon.fit();
   }
 
-  keyboardHandler(e: any) {
+  keyboardHandler = (e: KeyboardEvent & {catched?: boolean}) => {
     // Has Mousetrap flagged this event as a command?
-    return !e.catched;
+    const shouldProcess = !e.catched;
+    if (shouldProcess && this.shouldTrackKeydownForLatency(e)) {
+      this.keydownTimestamps.push(clock.now());
+      if (this.keydownTimestamps.length > KEYDOWN_TIMESTAMP_QUEUE_LIMIT) {
+        this.keydownTimestamps.splice(0, this.keydownTimestamps.length - KEYDOWN_TIMESTAMP_QUEUE_LIMIT);
+      }
+    }
+
+    return shouldProcess;
+  };
+
+  private shouldTrackKeydownForLatency(event: KeyboardEvent) {
+    if (event.type !== 'keydown') {
+      return false;
+    }
+
+    return !NON_WRITING_KEYS.has(event.key);
+  }
+
+  private dequeueKeydownTimestamp(nowMs = clock.now()) {
+    while (this.keydownTimestamps.length > 0) {
+      const timestamp = this.keydownTimestamps.shift();
+      if (timestamp === undefined) {
+        return undefined;
+      }
+
+      if (nowMs - timestamp <= KEYDOWN_TIMESTAMP_MAX_AGE_MS) {
+        return timestamp;
+      }
+    }
+
+    return undefined;
+  }
+
+  private recordLatencySample(metrics: ReturnType<typeof createRuntimeLatencyMetrics>, sampleMs: number) {
+    const sanitizedSampleMs = Math.max(0, sampleMs);
+    metrics.sampleCount += 1;
+    metrics.totalMs += sanitizedSampleMs;
+    metrics.maxMs = Math.max(metrics.maxMs, sanitizedSampleMs);
+    metrics.lastMs = sanitizedSampleMs;
+    this.hasUnreportedRuntimeMetrics = true;
+  }
+
+  private recordFrameTimingSample(frameDurationMs: number) {
+    const sanitizedFrameDurationMs = Math.max(0, frameDurationMs);
+    this.runtimeFrameTimingMetrics.sampleCount += 1;
+    this.runtimeFrameTimingMetrics.totalMs += sanitizedFrameDurationMs;
+    this.runtimeFrameTimingMetrics.maxMs = Math.max(this.runtimeFrameTimingMetrics.maxMs, sanitizedFrameDurationMs);
+    this.runtimeFrameTimingMetrics.lastMs = sanitizedFrameDurationMs;
+    if (sanitizedFrameDurationMs > this.runtimeFrameTimingMetrics.longFrameThresholdMs) {
+      this.runtimeFrameTimingMetrics.longFrameCount += 1;
+    }
+    this.hasUnreportedRuntimeMetrics = true;
+  }
+
+  private getCurrentRendererType() {
+    return Term.rendererTypes?.[this.props.uid] || 'Canvas';
+  }
+
+  private createRuntimeMetricsSnapshot(): RendererRuntimeMetrics {
+    return {
+      inputKeydownToSend: {...this.runtimeInputLatencyMetrics},
+      frameTiming: {...this.runtimeFrameTimingMetrics},
+      reportIntervalMs: RUNTIME_METRICS_REPORT_INTERVAL_MS,
+      updatedAtMs: clock.now()
+    };
+  }
+
+  private maybeReportRuntimeMetrics(force = false) {
+    if (!this.term) {
+      return;
+    }
+
+    if (!force && !this.hasUnreportedRuntimeMetrics) {
+      return;
+    }
+
+    const now = clock.now();
+    if (!force && now - this.lastRuntimeMetricsReportAt < RUNTIME_METRICS_REPORT_INTERVAL_MS) {
+      return;
+    }
+
+    this.lastRuntimeMetricsReportAt = now;
+    this.hasUnreportedRuntimeMetrics = false;
+    Term.reportRenderer(this.props.uid, this.getCurrentRendererType(), undefined, this.createRuntimeMetricsSnapshot());
+  }
+
+  private startFrameTimingLoop() {
+    if (this.frameTimingRaf !== null) {
+      return;
+    }
+
+    const onFrame = (timestamp: number) => {
+      this.frameTimingRaf = window.requestAnimationFrame(onFrame);
+
+      if (this.lastFrameTimestamp === null) {
+        this.lastFrameTimestamp = timestamp;
+        return;
+      }
+
+      const frameDurationMs = timestamp - this.lastFrameTimestamp;
+      this.lastFrameTimestamp = timestamp;
+
+      const shouldTrackFrame = document.visibilityState === 'visible';
+      if (!shouldTrackFrame) {
+        return;
+      }
+
+      this.recordFrameTimingSample(frameDurationMs);
+      this.maybeReportRuntimeMetrics();
+    };
+
+    this.frameTimingRaf = window.requestAnimationFrame(onFrame);
+  }
+
+  private stopFrameTimingLoop() {
+    if (this.frameTimingRaf !== null) {
+      window.cancelAnimationFrame(this.frameTimingRaf);
+      this.frameTimingRaf = null;
+    }
+    this.lastFrameTimestamp = null;
   }
 
   setBellSound(bell: 'SOUND' | false, sound: string | null) {
@@ -659,7 +843,7 @@ export default class Term extends React.PureComponent<
       this.term.loadAddon(this.ligaturesAddon);
     }
 
-    Term.reportRenderer(this.props.uid, 'Canvas', reason);
+    Term.reportRenderer(this.props.uid, 'Canvas', reason, this.createRuntimeMetricsSnapshot());
   }
 
   detachWebGLRenderer() {
@@ -704,7 +888,7 @@ export default class Term extends React.PureComponent<
 
       this.markWebGLInitSuccess();
       this.clearRendererRetryTimer();
-      Term.reportRenderer(this.props.uid, 'WebGL');
+      Term.reportRenderer(this.props.uid, 'WebGL', undefined, this.createRuntimeMetricsSnapshot());
     } catch (error) {
       console.warn('WebGL renderer initialization failed. Falling back to canvas-based rendering.', error);
       this.recordWebGLFailure();
@@ -792,6 +976,13 @@ export default class Term extends React.PureComponent<
     if (this.hasRendererPropsChanged(prevProps)) {
       this.scheduleRendererVisibilitySync();
     }
+
+    if (!prevProps.isActiveRootGroup && this.props.isActiveRootGroup) {
+      this.startFrameTimingLoop();
+    } else if (prevProps.isActiveRootGroup && !this.props.isActiveRootGroup) {
+      this.maybeReportRuntimeMetrics(true);
+      this.stopFrameTimingLoop();
+    }
   }
 
   onTermWrapperRef = (component: HTMLElement | null) => {
@@ -827,6 +1018,7 @@ export default class Term extends React.PureComponent<
     this.disposableListeners.forEach((handler) => handler.dispose());
     this.disposableListeners = [];
 
+    this.maybeReportRuntimeMetrics(true);
     this.detachWebGLRenderer();
     this.canvasAddon?.dispose();
     this.canvasAddon = null;
@@ -837,6 +1029,9 @@ export default class Term extends React.PureComponent<
       this.visibilityFrame = null;
     }
     this.clearRendererRetryTimer();
+    this.stopFrameTimingLoop();
+    clearInputSendTimestamps(this.props.uid);
+    this.keydownTimestamps.length = 0;
     this.resizeObserver?.disconnect();
     clearTimeout(this.resizeTimeout);
     window.removeEventListener('resize', this.scheduleRendererVisibilitySync);

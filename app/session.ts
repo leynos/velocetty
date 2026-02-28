@@ -6,6 +6,7 @@ import defaultShell from 'default-shell';
 import type {IPty, IWindowsPtyForkOptions, spawn as npSpawn} from 'node-pty';
 import osLocale from 'os-locale';
 import shellEnv from 'shell-env';
+import {PTY_BATCH_DURATION_MS, PTY_BATCH_MAX_BYTES} from '@shared/constants/runtime-telemetry';
 
 import * as config from './config';
 import {cliScriptPath} from './config/paths';
@@ -27,13 +28,6 @@ try {
 }
 
 const useConpty = config.getConfig().useConpty;
-
-// Max duration to batch session data before sending it to the renderer process.
-const BATCH_DURATION_MS = 16;
-
-// Max size of a session data batch. Note that this value can be exceeded by ~4k
-// (chunk sizes seem to be 4k at the most)
-const BATCH_MAX_SIZE = 200 * 1024;
 
 // Data coming from the pty is sent to the renderer process for further
 // vt parsing and rendering. This class batches data to minimize the number of
@@ -59,7 +53,7 @@ class DataBatcher extends EventEmitter {
   }
 
   write(chunk: Buffer | string) {
-    if (this.data.length + chunk.length >= BATCH_MAX_SIZE) {
+    if (this.data.length + chunk.length >= PTY_BATCH_MAX_BYTES) {
       // We've reached the max batch size. Flush it and start another one
       if (this.timeout) {
         clearTimeout(this.timeout);
@@ -71,7 +65,7 @@ class DataBatcher extends EventEmitter {
     this.data += typeof chunk === 'string' ? chunk : this.decoder.write(chunk);
 
     if (!this.timeout) {
-      this.timeout = setTimeout(() => this.flush(), BATCH_DURATION_MS);
+      this.timeout = setTimeout(() => this.flush(), PTY_BATCH_DURATION_MS);
     }
   }
 

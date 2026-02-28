@@ -50,13 +50,44 @@ export type sessionExtraOptions = {
 /** Structured fallback reasons emitted alongside renderer-type transitions. */
 export type RendererFallbackReason = 'context-loss' | 'pool-evicted' | 'webgl-init-failed';
 
+/** Rolling latency summary used by runtime diagnostics ingestion. */
+export type RuntimeLatencyMetrics = {
+  sampleCount: number;
+  totalMs: number;
+  maxMs: number;
+  lastMs: number;
+};
+
+/** Rolling frame-timing summary used by runtime diagnostics ingestion. */
+export type RuntimeFrameTimingMetrics = {
+  sampleCount: number;
+  totalMs: number;
+  maxMs: number;
+  lastMs: number;
+  longFrameCount: number;
+  longFrameThresholdMs: number;
+};
+
+/** Runtime metrics emitted from renderer and aggregated in the main process. */
+export type RendererRuntimeMetrics = {
+  inputKeydownToSend: RuntimeLatencyMetrics;
+  frameTiming: RuntimeFrameTimingMetrics;
+  reportIntervalMs: number;
+  updatedAtMs: number;
+};
+
 /** Events emitted from the renderer and consumed by the privileged process. */
 export type MainEvents = {
   close: never;
   command: CommandId;
-  data: {uid: SessionId | null; data: string; escaped?: boolean};
+  data: {uid: SessionId | null; data: string; escaped?: boolean; inputSentAtMs?: number};
   exit: {uid: SessionId};
-  'info renderer': {uid: SessionId; type: string; reason?: RendererFallbackReason};
+  'info renderer': {
+    uid: SessionId;
+    type: string;
+    reason?: RendererFallbackReason;
+    runtimeMetrics?: RendererRuntimeMetrics;
+  };
   init: null;
   maximize: never;
   minimize: never;

@@ -185,6 +185,31 @@ rules when changing context-loss handling and renderer instrumentation:
 - When adding or renaming fallback reasons or allocation metric fields, update
   this guide, `docs/roadmap.md`, and diagnostics tests in the same change.
 
+## PTY batching and frame-timing benchmark practice
+
+Roadmap item `2.2.2` adds a synthetic-load benchmark command for validation and
+evidence capture.
+
+- Run `bun run benchmark:pty-frame-timing` to generate deterministic benchmark
+  evidence.
+- The default evidence path is
+  `/tmp/benchmark-<project>-<branch>-pty-frame-timing-synthetic-load.json`.
+- Override the output location with
+  `bun run benchmark:pty-frame-timing -- --evidence-path /tmp/<name>.json`.
+- The benchmark verifies the current runtime batching contract from
+  `shared/src/constants/runtime-telemetry.ts`
+  (`PTY_BATCH_DURATION_MS = 16` and `PTY_BATCH_MAX_BYTES = 200 * 1024`) as used
+  by `app/session.ts`.
+- Treat benchmark output as valid only when all checks are `true` and `passed`
+  is `true`.
+- Runtime telemetry for this milestone is emitted through
+  `Term.reportRenderer(...)` (`info renderer.runtimeMetrics`) and consumed in
+  `app/utils/renderer-utils.ts`; keep renderer-side and main-process contracts
+  in sync when adding or renaming metric fields.
+- Verify diagnostics after instrumentation changes via the About dialog output:
+  keydown-to-send latency, send-to-write latency, frame timing, long-frame
+  counts, and PTY batching-parity status.
+
 ## Tab decoration provider practice
 
 Roadmap item `1.3.1` introduces the golden-path tab-decoration provider seam.

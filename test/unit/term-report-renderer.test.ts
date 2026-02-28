@@ -1,5 +1,6 @@
 /** @file Verifies Term.reportRenderer emits via transport with deduplication. */
 import {afterAll, beforeAll, beforeEach, describe, expect, mock, test} from 'bun:test';
+import {LONG_FRAME_THRESHOLD_MS, RUNTIME_METRICS_REPORT_INTERVAL_MS} from '@shared/constants/runtime-telemetry';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
@@ -164,7 +165,25 @@ describe('Term.ensureWebGLRenderer fallback handling', () => {
     expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {
       uid: 'uid-webgl-failure',
       type: 'Canvas',
-      reason: 'webgl-init-failed'
+      reason: 'webgl-init-failed',
+      runtimeMetrics: {
+        inputKeydownToSend: {
+          sampleCount: 0,
+          totalMs: 0,
+          maxMs: 0,
+          lastMs: 0
+        },
+        frameTiming: {
+          sampleCount: 0,
+          totalMs: 0,
+          maxMs: 0,
+          lastMs: 0,
+          longFrameCount: 0,
+          longFrameThresholdMs: LONG_FRAME_THRESHOLD_MS
+        },
+        reportIntervalMs: RUNTIME_METRICS_REPORT_INTERVAL_MS,
+        updatedAtMs: expect.any(Number)
+      }
     });
   });
 });
