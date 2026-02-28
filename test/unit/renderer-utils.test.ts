@@ -181,7 +181,7 @@ describe('renderer-utils', () => {
     });
   });
 
-  const setupUnsetRendererTypeScenario = () => {
+  const setupTwoRendererScenario = () => {
     const removedUid = asRendererUid('uid-1');
     const survivingUid = asRendererUid('uid-2');
 
@@ -225,14 +225,14 @@ describe('renderer-utils', () => {
     return {removedUid, survivingUid};
   };
 
-  const verifyFallbackCountersPreservedAfterUnset = (survivingUid: ReturnType<typeof asRendererUid>) => {
+  const verifyRendererTypesAndFallbacks = (survivingUid: ReturnType<typeof asRendererUid>) => {
     expect(getRendererTypes()).toEqual({[survivingUid]: 'Canvas'});
     expect(getRendererFallbackReasonCounts()).toEqual({
       'webgl-init-failed': 1
     });
   };
 
-  const verifyRuntimeMetricsCleanedUpAfterUnset = (survivingUid: ReturnType<typeof asRendererUid>) => {
+  const verifyPerUidMetrics = (survivingUid: ReturnType<typeof asRendererUid>) => {
     expect(getRendererRuntimeMetricsByUid()).toEqual({
       [survivingUid]: createRuntimeMetrics({
         inputSampleCount: 1,
@@ -248,9 +248,6 @@ describe('renderer-utils', () => {
         updatedAtMs: 50
       })
     });
-  };
-
-  const verifyInputLatencyCleanedUpAfterUnset = (survivingUid: ReturnType<typeof asRendererUid>) => {
     expect(getInputSendToWriteLatencyByUid()).toEqual({
       [survivingUid]: {
         sampleCount: 1,
@@ -261,7 +258,7 @@ describe('renderer-utils', () => {
     });
   };
 
-  const verifyAggregatedMetricsReflectOnlySurvivingRenderer = (survivingUid: ReturnType<typeof asRendererUid>) => {
+  const verifyAggregatedMetrics = (survivingUid: ReturnType<typeof asRendererUid>) => {
     void survivingUid;
 
     expect(getAggregatedRendererRuntimeMetrics()).toEqual({
@@ -286,14 +283,13 @@ describe('renderer-utils', () => {
   };
 
   test('does not decrement fallback counters when sessions are unset', () => {
-    const {removedUid, survivingUid} = setupUnsetRendererTypeScenario();
+    const {removedUid, survivingUid} = setupTwoRendererScenario();
 
     unsetRendererType(removedUid);
 
-    verifyFallbackCountersPreservedAfterUnset(survivingUid);
-    verifyRuntimeMetricsCleanedUpAfterUnset(survivingUid);
-    verifyInputLatencyCleanedUpAfterUnset(survivingUid);
-    verifyAggregatedMetricsReflectOnlySurvivingRenderer(survivingUid);
+    verifyRendererTypesAndFallbacks(survivingUid);
+    verifyPerUidMetrics(survivingUid);
+    verifyAggregatedMetrics(survivingUid);
   });
 
   test('only updates WebGL counts when WebGL classification changes', () => {
