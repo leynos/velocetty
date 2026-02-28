@@ -293,8 +293,9 @@ export default class Term extends React.PureComponent<
     const hasTypeChanged = rendererTypes[uid] !== type;
     rendererTypes[uid] = type;
     Term.rendererTypes = rendererTypes;
+    const hasNoUpdateToReport = !hasTypeChanged && !reason && !runtimeMetrics;
 
-    if (!hasTypeChanged && !reason && !runtimeMetrics) {
+    if (hasNoUpdateToReport) {
       return;
     }
 
