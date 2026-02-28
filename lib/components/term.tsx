@@ -214,7 +214,7 @@ export default class Term extends React.PureComponent<
   canvasAddon: CanvasAddon | null;
   webglAddon: WebglAddon | null;
   ligaturesAddon: LigaturesAddon | null;
-  static rendererTypes: Record<string, RendererType>;
+  static rendererTypes: Record<string, RendererType> = {};
   term!: Terminal;
   resizeObserver?: ResizeObserver;
   resizeTimeout?: NodeJS.Timeout;
@@ -286,10 +286,8 @@ export default class Term extends React.PureComponent<
   // The main process shows this in the About dialog
   static reportRenderer(payload: RendererReportPayload) {
     const {uid, type, reason, runtimeMetrics} = payload;
-    const rendererTypes = Term.rendererTypes || {};
-    const hasTypeChanged = rendererTypes[uid] !== type;
-    rendererTypes[uid] = type;
-    Term.rendererTypes = rendererTypes;
+    const hasTypeChanged = Term.rendererTypes[uid] !== type;
+    Term.rendererTypes[uid] = type;
     const hasNoUpdateToReport = !hasTypeChanged && !reason && !runtimeMetrics;
 
     if (hasNoUpdateToReport) {
@@ -567,7 +565,7 @@ export default class Term extends React.PureComponent<
     if (shouldProcess && this.shouldTrackKeydownForLatency(e)) {
       this.keydownTimestamps.push(clock.now());
       if (this.keydownTimestamps.length > KEYDOWN_TIMESTAMP_QUEUE_LIMIT) {
-        this.keydownTimestamps.splice(0, this.keydownTimestamps.length - KEYDOWN_TIMESTAMP_QUEUE_LIMIT);
+        this.keydownTimestamps = this.keydownTimestamps.slice(-KEYDOWN_TIMESTAMP_QUEUE_LIMIT);
       }
     }
 
@@ -629,7 +627,7 @@ export default class Term extends React.PureComponent<
   }
 
   private getCurrentRendererType(): RendererType {
-    return Term.rendererTypes?.[this.props.uid] || 'Canvas';
+    return Term.rendererTypes[this.props.uid] || 'Canvas';
   }
 
   private createRuntimeMetricsSnapshot(): RendererRuntimeMetrics {
