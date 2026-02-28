@@ -91,30 +91,30 @@ beforeEach(() => {
 
 describe('Term.reportRenderer transport emit', () => {
   test('emits info renderer via transport on first call', () => {
-    Term.reportRenderer('uid-1', 'WebGL');
+    Term.reportRenderer({uid: 'uid-1', type: 'WebGL'});
 
     expect(transportMock.emit).toHaveBeenCalledTimes(1);
     expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {uid: 'uid-1', type: 'WebGL'});
   });
 
   test('does not emit when renderer type is unchanged and no reason or runtimeMetrics are provided', () => {
-    Term.reportRenderer('uid-2', 'WebGL');
-    Term.reportRenderer('uid-2', 'WebGL');
+    Term.reportRenderer({uid: 'uid-2', type: 'WebGL'});
+    Term.reportRenderer({uid: 'uid-2', type: 'WebGL'});
 
     expect(transportMock.emit).toHaveBeenCalledTimes(1);
   });
 
   test('emits again when the renderer type changes for the same uid', () => {
-    Term.reportRenderer('uid-3', 'WebGL');
-    Term.reportRenderer('uid-3', 'Canvas');
+    Term.reportRenderer({uid: 'uid-3', type: 'WebGL'});
+    Term.reportRenderer({uid: 'uid-3', type: 'Canvas'});
 
     expect(transportMock.emit).toHaveBeenCalledTimes(2);
     expect(transportMock.emit).toHaveBeenLastCalledWith('info renderer', {uid: 'uid-3', type: 'Canvas'});
   });
 
   test('deduplication is per-uid, not global by type', () => {
-    Term.reportRenderer('uid-4', 'WebGL');
-    Term.reportRenderer('uid-5', 'WebGL');
+    Term.reportRenderer({uid: 'uid-4', type: 'WebGL'});
+    Term.reportRenderer({uid: 'uid-5', type: 'WebGL'});
 
     expect(transportMock.emit).toHaveBeenCalledTimes(2);
     expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {uid: 'uid-4', type: 'WebGL'});
@@ -122,8 +122,8 @@ describe('Term.reportRenderer transport emit', () => {
   });
 
   test('emits fallback reason even when renderer type is unchanged', () => {
-    Term.reportRenderer('uid-6', 'Canvas');
-    Term.reportRenderer('uid-6', 'Canvas', 'context-loss');
+    Term.reportRenderer({uid: 'uid-6', type: 'Canvas'});
+    Term.reportRenderer({uid: 'uid-6', type: 'Canvas', reason: 'context-loss'});
 
     expect(transportMock.emit).toHaveBeenCalledTimes(2);
     expect(transportMock.emit).toHaveBeenLastCalledWith('info renderer', {
@@ -134,8 +134,8 @@ describe('Term.reportRenderer transport emit', () => {
   });
 
   test('keeps plain renderer deduplication after a reasoned fallback event', () => {
-    Term.reportRenderer('uid-7', 'Canvas', 'pool-evicted');
-    Term.reportRenderer('uid-7', 'Canvas');
+    Term.reportRenderer({uid: 'uid-7', type: 'Canvas', reason: 'pool-evicted'});
+    Term.reportRenderer({uid: 'uid-7', type: 'Canvas'});
 
     expect(transportMock.emit).toHaveBeenCalledTimes(1);
     expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {
@@ -165,8 +165,8 @@ describe('Term.reportRenderer transport emit', () => {
       updatedAtMs: Date.now()
     } as const;
 
-    Term.reportRenderer('uid-8', 'Canvas');
-    Term.reportRenderer('uid-8', 'Canvas', undefined, runtimeMetrics);
+    Term.reportRenderer({uid: 'uid-8', type: 'Canvas'});
+    Term.reportRenderer({uid: 'uid-8', type: 'Canvas', runtimeMetrics});
 
     expect(transportMock.emit).toHaveBeenCalledTimes(2);
     expect(transportMock.emit).toHaveBeenLastCalledWith('info renderer', {

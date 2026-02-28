@@ -42,6 +42,12 @@ import 'xterm/css/xterm.css';
 type ViewportDimensions = Readonly<{width: number; height: number}>;
 type TerminalSize = Readonly<{cols: number; rows: number}>;
 type TimeMs = number & {readonly brand: 'TimeMs'};
+type RendererReportPayload = Readonly<{
+  uid: string;
+  type: RendererType;
+  reason?: RendererFallbackReason;
+  runtimeMetrics?: RendererRuntimeMetrics;
+}>;
 
 const asTimeMs = (value: number): TimeMs => value as TimeMs;
 
@@ -278,12 +284,8 @@ export default class Term extends React.PureComponent<
   }
 
   // The main process shows this in the About dialog
-  static reportRenderer(
-    uid: string,
-    type: RendererType,
-    reason?: RendererFallbackReason,
-    runtimeMetrics?: RendererRuntimeMetrics
-  ) {
+  static reportRenderer(payload: RendererReportPayload) {
+    const {uid, type, reason, runtimeMetrics} = payload;
     const rendererTypes = Term.rendererTypes || {};
     const hasTypeChanged = rendererTypes[uid] !== type;
     rendererTypes[uid] = type;
@@ -577,6 +579,15 @@ export default class Term extends React.PureComponent<
       return false;
     }
 
+    if (event.isComposing) {
+      return false;
+    }
+
+    const isAltGraph = event.getModifierState('AltGraph');
+    if (event.metaKey || (!isAltGraph && (event.ctrlKey || event.altKey))) {
+      return false;
+    }
+
     return !NON_WRITING_KEYS.has(event.key);
   }
 
@@ -645,7 +656,11 @@ export default class Term extends React.PureComponent<
 
     this.lastRuntimeMetricsReportAt = now;
     this.hasUnreportedRuntimeMetrics = false;
-    Term.reportRenderer(this.props.uid, this.getCurrentRendererType(), undefined, this.createRuntimeMetricsSnapshot());
+    Term.reportRenderer({
+      uid: this.props.uid,
+      type: this.getCurrentRendererType(),
+      runtimeMetrics: this.createRuntimeMetricsSnapshot()
+    });
   }
 
   private startFrameTimingLoop() {
@@ -872,7 +887,7 @@ export default class Term extends React.PureComponent<
       this.term.loadAddon(this.ligaturesAddon);
     }
 
-    Term.reportRenderer(this.props.uid, 'Canvas', reason);
+    Term.reportRenderer({uid: this.props.uid, type: 'Canvas', reason});
   }
 
   detachWebGLRenderer() {
@@ -917,7 +932,7 @@ export default class Term extends React.PureComponent<
 
       this.markWebGLInitSuccess();
       this.clearRendererRetryTimer();
-      Term.reportRenderer(this.props.uid, 'WebGL');
+      Term.reportRenderer({uid: this.props.uid, type: 'WebGL'});
     } catch (error) {
       console.warn('WebGL renderer initialization failed. Falling back to canvas-based rendering.', error);
       this.recordWebGLFailure();
