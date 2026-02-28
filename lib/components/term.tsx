@@ -1024,7 +1024,9 @@ export default class Term extends React.PureComponent<
     }
 
     const hasTerminalSize = typeof this.props.cols === 'number' && typeof this.props.rows === 'number';
-    if (hasTerminalSize && (prevProps.rows !== this.props.rows || prevProps.cols !== this.props.cols)) {
+    const hasTerminalSizeChanged =
+      hasTerminalSize && (prevProps.rows !== this.props.rows || prevProps.cols !== this.props.cols);
+    if (hasTerminalSizeChanged) {
       this.resize({cols: this.props.cols, rows: this.props.rows});
     }
   }
