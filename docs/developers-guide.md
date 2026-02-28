@@ -53,10 +53,10 @@ Use shared imports via TypeScript path aliases:
 - `@backend/*`
 - `@shared/*`
 
-For `app/` main-process runtime modules compiled into `target/` via `tsgo`,
+For `app/` main-process runtime modules compiled into `dist/app/` via `tsgo`,
 TypeScript path aliases are type-checking conveniences only. Do not add bare
 runtime `@shared/*` value imports in `app/` modules unless the build pipeline
-also materializes runtime-resolvable modules under `target/`. Use `import type`
+also materializes runtime-resolvable modules under `dist/app/`. Use `import type`
 for shared contracts and prefer app-local runtime adapters/constants for
 main-process runtime dependencies.
 
@@ -278,8 +278,8 @@ Required coverage categories before cut-over:
 
 - Translation outcomes: verify `styled-jsx` scoped/global behaviour, externals
   mapping, source maps, and production minification output.
-- Packaging outcomes: verify copied artefacts under `target/` and CLI artefact
-  shape (including shebang integrity).
+- Packaging outcomes: verify copied artefacts under `dist/app/` and CLI
+  artefact shape (including shebang integrity).
 - Bespoke plugin validation: add deterministic unit tests for each custom
   esbuild plugin path (resolve/load/copy/ignore behaviour and diagnostics).
 

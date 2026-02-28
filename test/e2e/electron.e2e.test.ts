@@ -41,17 +41,17 @@ const macCiFallbackStabilityTimeoutMs = 5_000;
 const e2eTimeoutHeadroomMs = 1_500;
 const developmentAppLaunchArgs =
   process.platform === 'linux' && (process.env.CI === 'true' || process.env.ELECTRON_DISABLE_SANDBOX === '1')
-    ? ['node_modules/electron/cli.js', '--no-sandbox', '--disable-setuid-sandbox', 'target']
-    : ['node_modules/electron/cli.js', 'target'];
+    ? ['node_modules/electron/cli.js', '--no-sandbox', '--disable-setuid-sandbox', 'dist/app']
+    : ['node_modules/electron/cli.js', 'dist/app'];
 const shouldCapture = process.env.E2E_CAPTURE === '1';
 const debugE2E = process.env.E2E_DEBUG === '1';
 const driverOverride = process.env.E2E_DRIVER;
 const validDrivers = new Set(['playwright', 'spawn']);
 const unresolvedSharedRuntimeImportPattern = /require\((['"])@shared\//;
 const targetFilesRequiringResolvableRuntimeImports = [
-  'target/session.js',
-  'target/ui/window.js',
-  'target/utils/renderer-utils.js'
+  'dist/app/session.js',
+  'dist/app/ui/window.js',
+  'dist/app/utils/renderer-utils.js'
 ] as const;
 if (shouldRunE2E && driverOverride && !validDrivers.has(driverOverride)) {
   throw new Error(`E2E_DRIVER must be "playwright" or "spawn", received "${driverOverride}".`);
@@ -63,7 +63,7 @@ const assertTargetHasNoUnresolvedSharedRuntimeImports = async () => {
 
   for (const relativePath of targetFilesRequiringResolvableRuntimeImports) {
     if (!(await fs.pathExists(relativePath))) {
-      throw new Error(`Expected compiled target file at ${relativePath}. Run bun run test:e2e:prepare first.`);
+      throw new Error(`Expected compiled app output file at ${relativePath}. Run bun run test:e2e:prepare first.`);
     }
 
     const contents = await fs.readFile(relativePath, 'utf8');
@@ -74,7 +74,7 @@ const assertTargetHasNoUnresolvedSharedRuntimeImports = async () => {
 
   if (unresolvedImports.length > 0) {
     throw new Error(
-      `Compiled target contains unresolved @shared runtime imports in: ${unresolvedImports.join(', ')}. ` +
+      `Compiled app output contains unresolved @shared runtime imports in: ${unresolvedImports.join(', ')}. ` +
         'Main-process modules must not emit bare @shared runtime requires.'
     );
   }
@@ -469,7 +469,7 @@ e2eTest(
 );
 
 e2eTest(
-  'launches the development target without critical renderer errors',
+  'launches the development app output without critical renderer errors',
   async () => {
     const context = await setupTestContext();
     try {

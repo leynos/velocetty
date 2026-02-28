@@ -95,10 +95,10 @@ const copyDirectory = async (sourceDirectory: string, targetDirectory: string, a
   }
 };
 
-/** Copies the former `hyper-app` webpack artefacts into `target/`. */
+/** Copies the former `hyper-app` webpack artefacts into `dist/app/`. */
 export const copyHyperAppArtifacts = async (options: HyperAppCopyOptions = {}) => {
   const rootDir = options.rootDir ?? process.cwd();
-  const targetDir = options.targetDir ?? path.join(rootDir, 'target');
+  const targetDir = options.targetDir ?? path.join(rootDir, 'dist', 'app');
   const appDirectory = path.join(rootDir, 'app');
   const allowMissingPatches = options.allowMissingPatches ?? true;
 
@@ -118,7 +118,7 @@ export const copyHyperAppArtifacts = async (options: HyperAppCopyOptions = {}) =
 /** Copies renderer static assets to the renderer output directory. */
 export const copyRendererArtifacts = async (options: RendererCopyOptions = {}) => {
   const rootDir = options.rootDir ?? process.cwd();
-  const targetDir = options.targetDir ?? path.join(rootDir, 'target', 'renderer');
+  const targetDir = options.targetDir ?? path.join(rootDir, 'dist', 'app', 'renderer');
   const allowMissingAssets = options.allowMissingAssets ?? false;
   await copyFilesByExtensions(
     path.join(rootDir, 'assets'),

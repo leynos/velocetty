@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "./dist/tmp/root/",
+    "outDir": "./dist/",
     "noImplicitAny": true
   },
   "include": ["./app/", "./lib/", "./cli/", "./typings/", "./shared/src/"],

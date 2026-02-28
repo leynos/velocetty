@@ -1,14 +1,17 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
+    "allowJs": false,
     "declarationDir": "../dist/tmp/appdts/",
-    "outDir": "../target/",
+    "outDir": "../dist/app",
+    "paths": {
+      "@shared/*": ["../dist/shared/*"]
+    },
     "noImplicitAny": false
   },
   "include": [
     "./**/*",
     "./package.json",
-    "../shared/src/**/*",
     "../typings/extend-electron.d.ts",
     "../typings/ext-modules.d.ts",
     "../typings/runtime-globals.d.ts"

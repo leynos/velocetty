@@ -28,14 +28,3 @@ plugins
 !.vscode/launch.json
 .idea
 .grepai/
-
-# TypeScript intermediate artefacts emitted into source trees
-app/**/*.js
-app/**/*.d.ts
-app/**/*.js.map
-lib/**/*.js
-lib/**/*.d.ts
-lib/**/*.js.map
-shared/src/**/*.js
-shared/src/**/*.d.ts
-shared/src/**/*.js.map

@@ -4,7 +4,7 @@
   "afterSign": "./bin/notarize.js",
   "afterPack": "./bin/cp-snapshot.js",
   "directories": {
-    "app": "target"
+    "app": "dist/app"
   },
   "extraResources": [
     "./bin/cli.js",
