@@ -5,6 +5,7 @@ import {LONG_FRAME_THRESHOLD_MS, RUNTIME_METRICS_REPORT_INTERVAL_MS} from '@shar
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
+import {clock} from '../../lib/utils/clock';
 
 /** Type guard to identify WebGL addons by their onContextLoss method. */
 function isWebGLAddon(addon: unknown): addon is {onContextLoss: () => void} {
@@ -162,7 +163,7 @@ describe('Term.reportRenderer transport emit', () => {
         longFrameThresholdMs: LONG_FRAME_THRESHOLD_MS
       },
       reportIntervalMs: RUNTIME_METRICS_REPORT_INTERVAL_MS,
-      updatedAtMs: Date.now()
+      updatedAtMs: clock.now()
     } as const;
 
     Term.reportRenderer({uid: 'uid-8', type: 'Canvas'});
