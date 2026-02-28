@@ -26,7 +26,7 @@ import {
   enqueueInputSendTimestamp
 } from '@shared/constants/runtime-telemetry';
 import {asRendererUid, asSessionId} from '@shared/types/common';
-import type {RendererFallbackReason, RendererRuntimeMetrics, RendererType} from '@shared/types/common';
+import type {RendererFallbackReason, RendererRuntimeMetrics, RendererType, RendererUid} from '@shared/types/common';
 import terms from '../terms';
 import {transport} from '../transport';
 import {clock} from '../utils/clock';
@@ -43,7 +43,7 @@ type ViewportDimensions = Readonly<{width: number; height: number}>;
 type TerminalSize = Readonly<{cols: number; rows: number}>;
 type TimeMs = number & {readonly brand: 'TimeMs'};
 type RendererReportPayload = Readonly<{
-  uid: string;
+  uid: RendererUid;
   type: RendererType;
   reason?: RendererFallbackReason;
   runtimeMetrics?: RendererRuntimeMetrics;
@@ -214,7 +214,7 @@ export default class Term extends React.PureComponent<
   canvasAddon: CanvasAddon | null;
   webglAddon: WebglAddon | null;
   ligaturesAddon: LigaturesAddon | null;
-  static rendererTypes: Record<string, RendererType> = {};
+  static rendererTypes: Record<RendererUid, RendererType> = {} as Record<RendererUid, RendererType>;
   term!: Terminal;
   resizeObserver?: ResizeObserver;
   resizeTimeout?: NodeJS.Timeout;
@@ -627,7 +627,7 @@ export default class Term extends React.PureComponent<
   }
 
   private getCurrentRendererType(): RendererType {
-    return Term.rendererTypes[this.props.uid] || 'Canvas';
+    return Term.rendererTypes[asRendererUid(this.props.uid)] || 'Canvas';
   }
 
   private createRuntimeMetricsSnapshot(): RendererRuntimeMetrics {
@@ -656,7 +656,7 @@ export default class Term extends React.PureComponent<
     this.lastRuntimeMetricsReportAt = now;
     this.hasUnreportedRuntimeMetrics = false;
     Term.reportRenderer({
-      uid: this.props.uid,
+      uid: asRendererUid(this.props.uid),
       type: this.getCurrentRendererType(),
       runtimeMetrics: this.createRuntimeMetricsSnapshot()
     });
@@ -886,7 +886,7 @@ export default class Term extends React.PureComponent<
       this.term.loadAddon(this.ligaturesAddon);
     }
 
-    Term.reportRenderer({uid: this.props.uid, type: 'Canvas', reason});
+    Term.reportRenderer({uid: asRendererUid(this.props.uid), type: 'Canvas', reason});
   }
 
   detachWebGLRenderer() {
@@ -931,7 +931,7 @@ export default class Term extends React.PureComponent<
 
       this.markWebGLInitSuccess();
       this.clearRendererRetryTimer();
-      Term.reportRenderer({uid: this.props.uid, type: 'WebGL'});
+      Term.reportRenderer({uid: asRendererUid(this.props.uid), type: 'WebGL'});
     } catch (error) {
       console.warn('WebGL renderer initialization failed. Falling back to canvas-based rendering.', error);
       this.recordWebGLFailure();
