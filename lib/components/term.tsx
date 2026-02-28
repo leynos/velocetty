@@ -584,7 +584,8 @@ export default class Term extends React.PureComponent<
     }
 
     const isAltGraph = event.getModifierState('AltGraph');
-    if (event.metaKey || (!isAltGraph && (event.ctrlKey || event.altKey))) {
+    const isKeyboardShortcut = event.metaKey || (!isAltGraph && (event.ctrlKey || event.altKey));
+    if (isKeyboardShortcut) {
       return false;
     }
 
