@@ -181,7 +181,7 @@ describe('renderer-utils', () => {
     });
   });
 
-  test('does not decrement fallback counters when sessions are unset', () => {
+  const setupUnsetRendererTypeScenario = () => {
     const removedUid = asRendererUid('uid-1');
     const survivingUid = asRendererUid('uid-2');
 
@@ -222,14 +222,19 @@ describe('renderer-utils', () => {
     recordInputSendToWriteLatency(removedUid, 9);
     recordInputSendToWriteLatency(survivingUid, 7);
 
-    unsetRendererType(removedUid);
+    return {removedUid, survivingUid};
+  };
 
-    expect(getRendererTypes()).toEqual({'uid-2': 'Canvas'});
+  const verifyFallbackCountersPreservedAfterUnset = (survivingUid: ReturnType<typeof asRendererUid>) => {
+    expect(getRendererTypes()).toEqual({[survivingUid]: 'Canvas'});
     expect(getRendererFallbackReasonCounts()).toEqual({
       'webgl-init-failed': 1
     });
+  };
+
+  const verifyRuntimeMetricsCleanedUpAfterUnset = (survivingUid: ReturnType<typeof asRendererUid>) => {
     expect(getRendererRuntimeMetricsByUid()).toEqual({
-      'uid-2': createRuntimeMetrics({
+      [survivingUid]: createRuntimeMetrics({
         inputSampleCount: 1,
         inputTotalMs: 4,
         inputMaxMs: 4,
@@ -243,14 +248,22 @@ describe('renderer-utils', () => {
         updatedAtMs: 50
       })
     });
+  };
+
+  const verifyInputLatencyCleanedUpAfterUnset = (survivingUid: ReturnType<typeof asRendererUid>) => {
     expect(getInputSendToWriteLatencyByUid()).toEqual({
-      'uid-2': {
+      [survivingUid]: {
         sampleCount: 1,
         totalMs: 7,
         maxMs: 7,
         lastMs: 7
       }
     });
+  };
+
+  const verifyAggregatedMetricsReflectOnlySurvivingRenderer = (survivingUid: ReturnType<typeof asRendererUid>) => {
+    void survivingUid;
+
     expect(getAggregatedRendererRuntimeMetrics()).toEqual({
       inputKeydownToSend: {sampleCount: 1, totalMs: 4, maxMs: 4, lastMs: 4},
       frameTiming: {
@@ -270,6 +283,17 @@ describe('renderer-utils', () => {
       maxMs: 7,
       lastMs: 7
     });
+  };
+
+  test('does not decrement fallback counters when sessions are unset', () => {
+    const {removedUid, survivingUid} = setupUnsetRendererTypeScenario();
+
+    unsetRendererType(removedUid);
+
+    verifyFallbackCountersPreservedAfterUnset(survivingUid);
+    verifyRuntimeMetricsCleanedUpAfterUnset(survivingUid);
+    verifyInputLatencyCleanedUpAfterUnset(survivingUid);
+    verifyAggregatedMetricsReflectOnlySurvivingRenderer(survivingUid);
   });
 
   test('only updates WebGL counts when WebGL classification changes', () => {
