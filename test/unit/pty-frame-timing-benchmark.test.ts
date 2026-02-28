@@ -4,6 +4,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 
 import {expect, test} from 'bun:test';
+import {LONG_FRAME_THRESHOLD_MS} from '@shared/constants/runtime-telemetry';
 
 import {
   readBatchingContractFromSessionSource,
@@ -81,6 +82,9 @@ test('runPtyFrameTimingSyntheticBenchmark writes deterministic evidence JSON', a
         p95InputLatencyWithinBudget: boolean;
         longFrameRatioWithinBudget: boolean;
       };
+      thresholds: {
+        longFrameThresholdMs: number;
+      };
       passed: boolean;
     };
 
@@ -101,6 +105,7 @@ test('runPtyFrameTimingSyntheticBenchmark writes deterministic evidence JSON', a
       p95InputLatencyWithinBudget: true,
       longFrameRatioWithinBudget: true
     });
+    expect(report.thresholds.longFrameThresholdMs).toBe(LONG_FRAME_THRESHOLD_MS);
     expect(report.passed).toBe(true);
   } finally {
     await rm(tempDir, {recursive: true, force: true});
