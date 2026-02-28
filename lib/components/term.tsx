@@ -24,7 +24,12 @@ import {
   clearInputSendTimestamps,
   enqueueInputSendTimestamp
 } from '@shared/constants/runtime-telemetry';
-import {asSessionId, type RendererFallbackReason, type RendererRuntimeMetrics} from '@shared/types/common';
+import {
+  asSessionId,
+  type RendererFallbackReason,
+  type RendererRuntimeMetrics,
+  type RendererType
+} from '@shared/types/common';
 import terms from '../terms';
 import {transport} from '../transport';
 import {clock} from '../utils/clock';
@@ -213,7 +218,7 @@ export default class Term extends React.PureComponent<
   canvasAddon: CanvasAddon | null;
   webglAddon: WebglAddon | null;
   ligaturesAddon: LigaturesAddon | null;
-  static rendererTypes: Record<string, string>;
+  static rendererTypes: Record<string, RendererType>;
   term!: Terminal;
   resizeObserver?: ResizeObserver;
   resizeTimeout?: NodeJS.Timeout;
@@ -285,7 +290,7 @@ export default class Term extends React.PureComponent<
   // The main process shows this in the About dialog
   static reportRenderer(
     uid: string,
-    type: string,
+    type: RendererType,
     reason?: RendererFallbackReason,
     runtimeMetrics?: RendererRuntimeMetrics
   ) {
@@ -621,7 +626,7 @@ export default class Term extends React.PureComponent<
     this.hasUnreportedRuntimeMetrics = true;
   }
 
-  private getCurrentRendererType() {
+  private getCurrentRendererType(): RendererType {
     return Term.rendererTypes?.[this.props.uid] || 'Canvas';
   }
 

@@ -1,5 +1,6 @@
 /** @file Verifies renderer tracking helpers and fallback reason counters. */
 import {beforeEach, describe, expect, test} from 'bun:test';
+import {createRendererUid} from '@shared/types/common';
 
 import {
   getRendererFallbackReasonCounts,
@@ -15,11 +16,13 @@ beforeEach(() => {
 });
 
 describe('renderer-utils', () => {
+  const asRendererUid = (uid: string) => createRendererUid(uid);
+
   describe('resetRendererTracking', () => {
     test('clears all tracked renderer metrics', () => {
-      setRendererType('uid-1', 'WebGL');
-      setRendererType('uid-2', 'Canvas', 'context-loss');
-      setRendererType('uid-3', 'WebGL');
+      setRendererType(asRendererUid('uid-1'), 'WebGL');
+      setRendererType(asRendererUid('uid-2'), 'Canvas', 'context-loss');
+      setRendererType(asRendererUid('uid-3'), 'WebGL');
 
       expect(getRendererTypes()).toEqual({
         'uid-1': 'WebGL',
@@ -58,11 +61,11 @@ describe('renderer-utils', () => {
   });
 
   test('tracks renderer type by uid and records WebGL current/peak context counts', () => {
-    setRendererType('uid-1', 'WebGL');
-    setRendererType('uid-2', 'Canvas');
-    setRendererType('uid-3', 'WebGL');
-    setRendererType('uid-1', 'Canvas');
-    unsetRendererType('uid-3');
+    setRendererType(asRendererUid('uid-1'), 'WebGL');
+    setRendererType(asRendererUid('uid-2'), 'Canvas');
+    setRendererType(asRendererUid('uid-3'), 'WebGL');
+    setRendererType(asRendererUid('uid-1'), 'Canvas');
+    unsetRendererType(asRendererUid('uid-3'));
 
     expect(getRendererTypes()).toEqual({
       'uid-1': 'Canvas',
@@ -76,9 +79,9 @@ describe('renderer-utils', () => {
   });
 
   test('counts fallback reasons whenever a reason is provided', () => {
-    setRendererType('uid-1', 'Canvas', 'context-loss');
-    setRendererType('uid-1', 'Canvas', 'context-loss');
-    setRendererType('uid-2', 'Canvas', 'pool-evicted');
+    setRendererType(asRendererUid('uid-1'), 'Canvas', 'context-loss');
+    setRendererType(asRendererUid('uid-1'), 'Canvas', 'context-loss');
+    setRendererType(asRendererUid('uid-2'), 'Canvas', 'pool-evicted');
 
     expect(getRendererFallbackReasonCounts()).toEqual({
       'context-loss': 2,
@@ -87,8 +90,8 @@ describe('renderer-utils', () => {
   });
 
   test('does not decrement fallback counters when sessions are unset', () => {
-    setRendererType('uid-1', 'Canvas', 'webgl-init-failed');
-    unsetRendererType('uid-1');
+    setRendererType(asRendererUid('uid-1'), 'Canvas', 'webgl-init-failed');
+    unsetRendererType(asRendererUid('uid-1'));
 
     expect(getRendererTypes()).toEqual({});
     expect(getRendererFallbackReasonCounts()).toEqual({
@@ -97,10 +100,10 @@ describe('renderer-utils', () => {
   });
 
   test('only updates WebGL counts when WebGL classification changes', () => {
-    setRendererType('uid-1', 'WebGL');
-    setRendererType('uid-1', 'WebGL');
-    setRendererType('uid-1', 'Canvas');
-    setRendererType('uid-1', 'Canvas');
+    setRendererType(asRendererUid('uid-1'), 'WebGL');
+    setRendererType(asRendererUid('uid-1'), 'WebGL');
+    setRendererType(asRendererUid('uid-1'), 'Canvas');
+    setRendererType(asRendererUid('uid-1'), 'Canvas');
 
     expect(getRendererWebGLContextCounts()).toEqual({
       current: 0,
@@ -110,8 +113,8 @@ describe('renderer-utils', () => {
 
   test('returns WebGL context counts as an immutable snapshot', () => {
     resetRendererTracking();
-    setRendererType('uid-1', 'WebGL');
-    setRendererType('uid-2', 'WebGL');
+    setRendererType(asRendererUid('uid-1'), 'WebGL');
+    setRendererType(asRendererUid('uid-2'), 'WebGL');
 
     const snapshot = getRendererWebGLContextCounts();
     snapshot.current = 0;

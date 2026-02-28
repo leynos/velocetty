@@ -4,14 +4,20 @@ import {
   PTY_BATCH_MAX_BYTES,
   hasPtyBatchThresholdParity
 } from '@shared/constants/runtime-telemetry';
-import type {RendererFallbackReason, RendererRuntimeMetrics, RuntimeLatencyMetrics} from '@shared/types/common';
+import type {
+  RendererFallbackReason,
+  RendererRuntimeMetrics,
+  RendererType,
+  RendererUid,
+  RuntimeLatencyMetrics
+} from '@shared/types/common';
 
-const rendererTypes: Record<string, string> = {};
+const rendererTypes: Record<string, RendererType> = {};
 const rendererFallbackReasonCounts: Partial<Record<RendererFallbackReason, number>> = {};
 const rendererWebGLContextCounts = {current: 0, peak: 0};
 const rendererRuntimeMetricsByUid: Record<string, RendererRuntimeMetrics> = {};
 const inputSendToWriteLatencyByUid: Record<string, RuntimeLatencyMetrics> = {};
-const isWebGLRenderer = (type: string | undefined) => type === 'WebGL';
+const isWebGLRenderer = (type: RendererType | undefined): type is 'WebGL' => type === 'WebGL';
 const toKilobytes = (bytes: number) => Math.round((bytes / 1024) * 100) / 100;
 
 const createLatencyMetrics = (): RuntimeLatencyMetrics => ({
@@ -106,11 +112,11 @@ function getAggregatedInputSendToWriteLatencyMetrics() {
   return aggregateLatencyMetrics(Object.values(inputSendToWriteLatencyByUid));
 }
 
-function setRendererRuntimeMetrics(uid: string, runtimeMetrics: RendererRuntimeMetrics) {
+function setRendererRuntimeMetrics(uid: RendererUid, runtimeMetrics: RendererRuntimeMetrics) {
   rendererRuntimeMetricsByUid[uid] = runtimeMetrics;
 }
 
-function recordInputSendToWriteLatency(uid: string, sampleMs: number) {
+function recordInputSendToWriteLatency(uid: RendererUid, sampleMs: number) {
   if (!Number.isFinite(sampleMs)) {
     return;
   }
@@ -130,8 +136,8 @@ function getPtyBatchingThresholdMetrics() {
 }
 
 function setRendererType(
-  uid: string,
-  type: string,
+  uid: RendererUid,
+  type: RendererType,
   reason?: RendererFallbackReason,
   runtimeMetrics?: RendererRuntimeMetrics
 ) {
@@ -157,7 +163,7 @@ function setRendererType(
   rendererFallbackReasonCounts[reason] = (rendererFallbackReasonCounts[reason] ?? 0) + 1;
 }
 
-function unsetRendererType(uid: string) {
+function unsetRendererType(uid: RendererUid) {
   if (isWebGLRenderer(rendererTypes[uid])) {
     rendererWebGLContextCounts.current = Math.max(0, rendererWebGLContextCounts.current - 1);
   }
