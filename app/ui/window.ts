@@ -11,9 +11,9 @@ import isDev from 'electron-is-dev';
 import {getWorkingDirectoryFromPID} from 'native-process-working-directory';
 import {v4 as uuidv4} from 'uuid';
 
-import type {sessionExtraOptions} from '@shared/types/common';
+import {asRendererUid, type sessionExtraOptions} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
-import {asCommandId, asProfileId, asRendererUid, asSessionId} from '../utils/shared-ids';
+import {asCommandId, asProfileId, asSessionId} from '../utils/shared-ids';
 import {execCommand} from '../commands';
 import {getDefaultProfile} from '../config';
 import {icon, homeDirectory} from '../config/paths';
@@ -23,6 +23,7 @@ import {decorateSessionOptions, decorateSessionClass} from '../plugins';
 import createRPC from '../rpc';
 import Session from '../session';
 import updater from '../updater';
+import {clock} from '../utils/clock';
 import {recordInputSendToWriteLatency, setRendererType, unsetRendererType} from '../utils/renderer-utils';
 import toElectronBackgroundColor from '../utils/to-electron-background-color';
 
@@ -370,14 +371,18 @@ export function newWindow(
     }
   });
   rpc.on('data', ({uid, data, escaped, inputSentAtMs}) => {
-    const session = uid && sessions.get(uid);
+    if (!uid) {
+      return;
+    }
+
+    const session = sessions.get(uid);
     if (session) {
       const payload = escaped
         ? session.shell?.endsWith('cmd.exe')
           ? `"${data}"` // This is how cmd.exe does it
           : `'${data.replace(/'/g, `'\\''`)}'` // Inside a single-quoted string nothing is interpreted
         : data;
-      const writeTimestampMs = Date.now();
+      const writeTimestampMs = clock.now();
 
       session.write(payload);
       if (typeof inputSentAtMs === 'number') {

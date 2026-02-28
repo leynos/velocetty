@@ -1,3 +1,4 @@
+/** @file Renderer tracking state and runtime telemetry aggregation helpers. */
 import {
   LONG_FRAME_THRESHOLD_MS,
   PTY_BATCH_DURATION_MS,
@@ -14,11 +15,11 @@ import type {
   RuntimeLatencyMetrics
 } from '@shared/types/common';
 
-const rendererTypes: Record<string, RendererType> = {};
+const rendererTypes: Record<string, RendererType> = Object.create(null);
 const rendererFallbackReasonCounts: Partial<Record<RendererFallbackReason, number>> = {};
 const rendererWebGLContextCounts = {current: 0, peak: 0};
-const rendererRuntimeMetricsByUid: Record<string, RendererRuntimeMetrics> = {};
-const inputSendToWriteLatencyByUid: Record<string, RuntimeLatencyMetrics> = {};
+const rendererRuntimeMetricsByUid: Record<string, RendererRuntimeMetrics> = Object.create(null);
+const inputSendToWriteLatencyByUid: Record<string, RuntimeLatencyMetrics> = Object.create(null);
 const isWebGLRenderer = (type: RendererType | undefined): type is 'WebGL' => type === 'WebGL';
 const toKilobytes = (bytes: number) => Math.round((bytes / 1024) * 100) / 100;
 

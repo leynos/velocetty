@@ -25,12 +25,8 @@ import {
   clearInputSendTimestamps,
   enqueueInputSendTimestamp
 } from '@shared/constants/runtime-telemetry';
-import {
-  asSessionId,
-  type RendererFallbackReason,
-  type RendererRuntimeMetrics,
-  type RendererType
-} from '@shared/types/common';
+import {asRendererUid, asSessionId} from '@shared/types/common';
+import type {RendererFallbackReason, RendererRuntimeMetrics, RendererType} from '@shared/types/common';
 import terms from '../terms';
 import {transport} from '../transport';
 import {clock} from '../utils/clock';
@@ -369,7 +365,7 @@ export default class Term extends React.PureComponent<
     this.disposableListeners.push(
       this.term.onData((data) => {
         const inputSentAtMs = clock.now();
-        enqueueInputSendTimestamp(this.props.uid, inputSentAtMs);
+        enqueueInputSendTimestamp(asRendererUid(this.props.uid), inputSentAtMs);
         this.recordInputLatencyIfAvailable(inputSentAtMs);
 
         onData(data);
@@ -1086,7 +1082,7 @@ export default class Term extends React.PureComponent<
     }
     this.clearRendererRetryTimer();
     this.stopFrameTimingLoop();
-    clearInputSendTimestamps(this.props.uid);
+    clearInputSendTimestamps(asRendererUid(this.props.uid));
     this.keydownTimestamps.length = 0;
     this.resizeObserver?.disconnect();
     clearTimeout(this.resizeTimeout);

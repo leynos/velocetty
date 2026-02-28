@@ -100,6 +100,7 @@ const mirrorRendererBundleToDistLib = async (rootDir: string) => {
   const rendererOutputDir = path.join(rootDir, 'dist', 'app', 'renderer');
   const distLibDir = path.join(rootDir, 'dist', 'lib');
   const rendererBundleFiles = ['bundle.js', 'bundle.js.map', 'bundle.css', 'bundle.css.map'];
+  const optionalRendererBundleFiles = new Set(['bundle.js.map', 'bundle.css', 'bundle.css.map']);
 
   await mkdir(distLibDir, {recursive: true});
   await Promise.all(
@@ -108,9 +109,11 @@ const mirrorRendererBundleToDistLib = async (rootDir: string) => {
         await copyFile(path.join(rendererOutputDir, fileName), path.join(distLibDir, fileName));
       } catch (error) {
         const errorCode = (error as NodeJS.ErrnoException).code;
-        if (errorCode !== 'ENOENT') {
-          throw error;
+        if (errorCode === 'ENOENT' && optionalRendererBundleFiles.has(fileName)) {
+          return;
         }
+
+        throw error;
       }
     })
   );

@@ -38,6 +38,7 @@ class DataBatcher extends EventEmitter {
   uid: string;
   decoder: StringDecoder;
   data!: string;
+  dataBytes!: number;
   timeout!: NodeJS.Timeout | null;
   constructor(uid: string) {
     super();
@@ -49,11 +50,13 @@ class DataBatcher extends EventEmitter {
 
   reset() {
     this.data = this.uid;
+    this.dataBytes = Buffer.byteLength(this.uid, 'utf8');
     this.timeout = null;
   }
 
   write(chunk: Buffer | string) {
-    if (this.data.length + chunk.length >= PTY_BATCH_MAX_BYTES) {
+    const chunkBytes = typeof chunk === 'string' ? Buffer.byteLength(chunk, 'utf8') : chunk.length;
+    if (this.dataBytes + chunkBytes >= PTY_BATCH_MAX_BYTES) {
       // We've reached the max batch size. Flush it and start another one
       if (this.timeout) {
         clearTimeout(this.timeout);
@@ -63,6 +66,7 @@ class DataBatcher extends EventEmitter {
     }
 
     this.data += typeof chunk === 'string' ? chunk : this.decoder.write(chunk);
+    this.dataBytes += chunkBytes;
 
     if (!this.timeout) {
       this.timeout = setTimeout(() => this.flush(), PTY_BATCH_DURATION_MS);

@@ -60,15 +60,27 @@ const shouldUsePlaywright = driverOverride === 'playwright';
 
 const assertTargetHasNoUnresolvedSharedRuntimeImports = async () => {
   const unresolvedImports: string[] = [];
+  const inspections = await Promise.allSettled(
+    targetFilesRequiringResolvableRuntimeImports.map(async (relativePath) => {
+      if (!(await fs.pathExists(relativePath))) {
+        throw new Error(`Expected compiled app output file at ${relativePath}. Run bun run test:e2e:prepare first.`);
+      }
 
-  for (const relativePath of targetFilesRequiringResolvableRuntimeImports) {
-    if (!(await fs.pathExists(relativePath))) {
-      throw new Error(`Expected compiled app output file at ${relativePath}. Run bun run test:e2e:prepare first.`);
+      const contents = await fs.readFile(relativePath, 'utf8');
+      return {
+        relativePath,
+        hasUnresolvedImport: unresolvedSharedRuntimeImportPattern.test(contents)
+      };
+    })
+  );
+
+  for (const inspection of inspections) {
+    if (inspection.status === 'rejected') {
+      throw inspection.reason;
     }
 
-    const contents = await fs.readFile(relativePath, 'utf8');
-    if (unresolvedSharedRuntimeImportPattern.test(contents)) {
-      unresolvedImports.push(relativePath);
+    if (inspection.value.hasUnresolvedImport) {
+      unresolvedImports.push(inspection.value.relativePath);
     }
   }
 

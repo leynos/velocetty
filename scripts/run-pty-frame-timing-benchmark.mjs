@@ -141,11 +141,12 @@ const getFrameTimingMetrics = (frameDurationsMs) => {
   const longFrameRatio = frameDurationsMs.length === 0 ? 0 : longFrameCount / frameDurationsMs.length;
   const totalDurationMs = frameDurationsMs.reduce((total, durationMs) => total + durationMs, 0);
   const averageFrameMs = frameDurationsMs.length === 0 ? 0 : totalDurationMs / frameDurationsMs.length;
+  const maxFrameMs = frameDurationsMs.length === 0 ? 0 : Math.max(...frameDurationsMs);
 
   return {
     count: frameDurationsMs.length,
     averageMs: asRoundedNumber(averageFrameMs),
-    maxMs: asRoundedNumber(Math.max(...frameDurationsMs)),
+    maxMs: asRoundedNumber(maxFrameMs),
     longFrameCount,
     longFrameRatio: asRoundedNumber(longFrameRatio, 6),
     longFrameThresholdMs: LONG_FRAME_THRESHOLD_MS
@@ -153,11 +154,13 @@ const getFrameTimingMetrics = (frameDurationsMs) => {
 };
 
 const getInputLatencyMetrics = (inputLatenciesMs) => {
+  const maxLatencyMs = inputLatenciesMs.length === 0 ? 0 : Math.max(...inputLatenciesMs);
+
   return {
     count: inputLatenciesMs.length,
     p50Ms: asRoundedNumber(toPercentile(inputLatenciesMs, 50)),
     p95Ms: asRoundedNumber(toPercentile(inputLatenciesMs, 95)),
-    maxMs: asRoundedNumber(Math.max(...inputLatenciesMs))
+    maxMs: asRoundedNumber(maxLatencyMs)
   };
 };
 

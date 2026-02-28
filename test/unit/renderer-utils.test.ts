@@ -258,9 +258,7 @@ describe('renderer-utils', () => {
     });
   };
 
-  const verifyAggregatedMetrics = (survivingUid: ReturnType<typeof asRendererUid>) => {
-    void survivingUid;
-
+  const verifyAggregatedMetrics = (_survivingUid: ReturnType<typeof asRendererUid>) => {
     expect(getAggregatedRendererRuntimeMetrics()).toEqual({
       inputKeydownToSend: {sampleCount: 1, totalMs: 4, maxMs: 4, lastMs: 4},
       frameTiming: {

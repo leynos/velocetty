@@ -1,5 +1,5 @@
 /** @file Session action creators for state transitions and IPC effects. */
-import {asProfileId, asSessionId, type Session} from '@shared/types/common';
+import {asProfileId, asRendererUid, asSessionId, type Session} from '@shared/types/common';
 import {clearInputSendTimestamps, dequeueInputSendTimestamp} from '@shared/constants/runtime-telemetry';
 import {
   SESSION_ADD,
@@ -83,7 +83,7 @@ function createExitAction(type: typeof SESSION_USER_EXIT | typeof SESSION_PTY_EX
         if (type === SESSION_USER_EXIT) {
           transport.emit('exit', {uid: sessionUid});
         }
-        clearInputSendTimestamps(uid);
+        clearInputSendTimestamps(asRendererUid(uid));
 
         const sessions = keys(getState().sessions.sessions);
         if (sessions.length === 0) {
@@ -188,7 +188,7 @@ export function sendSessionData(uid: string | null, data: string, escaped?: bool
       effect() {
         // If no uid is passed, data is sent to the active session.
         const targetUid = uid || getState().sessions.activeUid;
-        const inputSentAtMs = targetUid ? dequeueInputSendTimestamp(targetUid) : undefined;
+        const inputSentAtMs = targetUid ? dequeueInputSendTimestamp(asRendererUid(targetUid)) : undefined;
 
         transport.emit('data', {uid: targetUid ? asSessionId(targetUid) : null, data, escaped, inputSentAtMs});
       }
