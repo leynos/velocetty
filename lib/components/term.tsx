@@ -301,27 +301,8 @@ export default class Term extends React.PureComponent<
     transport.emit('info renderer', {uid: asSessionId(uid), type, reason, runtimeMetrics});
   }
 
-  componentDidMount() {
+  private initializeTerminal() {
     const {props} = this;
-
-    this.termOptions = getTermOptions(props);
-    this.term = props.term || new Terminal(this.termOptions);
-    this.defaultBellSound = new Audio(
-      // Source: https://freesound.org/people/altemark/sounds/45759/
-      // This sound is released under the Creative Commons Attribution 3.0 Unported
-      // (CC BY 3.0) license. It was created by 'altemark'. No modifications have been
-      // made, apart from the conversion to base64.
-      'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjMyLjEwNAAAAAAAAAAAAAAA//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTRUoAWgBgkOAGbZHBgG1OF6zM82DWbZaUmMBptgQhGjsyYqc9ae9XFz280948NMBWInljyzsNRFLPWdnZGWrddDsjK1unuSrVN9jJsK8KuQtQCtMBjCEtImISdNKJOopIpBFpNSMbIHCSRpRR5iakjTiyzLhchUUBwCgyKiweBv/7UsQbg8isVNoMPMjAAAA0gAAABEVFGmgqK////9bP/6XCykxBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq'
-    );
-    this.setBellSound(props.bell, props.bellSound);
-
-    // The parent element for the terminal is attached and removed manually so
-    // that we can preserve it across mounts and unmounts of the component
-    this.termRef = props.term?.element?.parentElement ?? document.createElement('div');
-    this.termRef.className = 'term_fit term_term';
-
-    this.termWrapperRef?.appendChild(this.termRef);
-
     if (!props.term) {
       const shallActivateWebLink = (event: MouseEvent): boolean => {
         if (!event) return false;
@@ -344,11 +325,62 @@ export default class Term extends React.PureComponent<
       if (props.imageSupport) {
         this.term.loadAddon(new ImageAddon());
       }
-    } else {
-      // get the cached plugins
-      this.fitAddon = props.fitAddon!;
-      this.searchAddon = props.searchAddon!;
+      return;
     }
+
+    // get the cached plugins
+    this.fitAddon = props.fitAddon!;
+    this.searchAddon = props.searchAddon!;
+  }
+
+  private recordInputLatencyIfAvailable(inputSentAtMs: number) {
+    const keydownAtMs = this.dequeueKeydownTimestamp(asTimeMs(inputSentAtMs));
+    if (keydownAtMs === undefined) {
+      return;
+    }
+
+    this.recordLatencySample(this.runtimeInputLatencyMetrics, inputSentAtMs - keydownAtMs);
+  }
+
+  private setupDataHandler() {
+    const {onData} = this.props;
+    if (!onData) {
+      return;
+    }
+
+    this.disposableListeners.push(
+      this.term.onData((data) => {
+        const inputSentAtMs = clock.now();
+        enqueueInputSendTimestamp(this.props.uid, inputSentAtMs);
+        this.recordInputLatencyIfAvailable(inputSentAtMs);
+
+        onData(data);
+        this.maybeReportRuntimeMetrics();
+      })
+    );
+  }
+
+  componentDidMount() {
+    const {props} = this;
+
+    this.termOptions = getTermOptions(props);
+    this.term = props.term || new Terminal(this.termOptions);
+    this.defaultBellSound = new Audio(
+      // Source: https://freesound.org/people/altemark/sounds/45759/
+      // This sound is released under the Creative Commons Attribution 3.0 Unported
+      // (CC BY 3.0) license. It was created by 'altemark'. No modifications have been
+      // made, apart from the conversion to base64.
+      'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjMyLjEwNAAAAAAAAAAAAAAA//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTRUoAWgBgkOAGbZHBgG1OF6zM82DWbZaUmMBptgQhGjsyYqc9ae9XFz280948NMBWInljyzsNRFLPWdnZGWrddDsjK1unuSrVN9jJsK8KuQtQCtMBjCEtImISdNKJOopIpBFpNSMbIHCSRpRR5iakjTiyzLhchUUBwCgyKiweBv/7UsQbg8isVNoMPMjAAAA0gAAABEVFGmgqK////9bP/6XCykxBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq'
+    );
+    this.setBellSound(props.bell, props.bellSound);
+
+    // The parent element for the terminal is attached and removed manually so
+    // that we can preserve it across mounts and unmounts of the component
+    this.termRef = props.term?.element?.parentElement ?? document.createElement('div');
+    this.termRef.className = 'term_fit term_term';
+
+    this.termWrapperRef?.appendChild(this.termRef);
+    this.initializeTerminal();
 
     if (this.term.element) {
       this.term.element.style.padding = props.padding;
@@ -372,22 +404,7 @@ export default class Term extends React.PureComponent<
       });
     }
 
-    if (props.onData) {
-      this.disposableListeners.push(
-        this.term.onData((data) => {
-          const inputSentAtMs = clock.now();
-          enqueueInputSendTimestamp(this.props.uid, inputSentAtMs);
-
-          const keydownAtMs = this.dequeueKeydownTimestamp(asTimeMs(inputSentAtMs));
-          if (keydownAtMs !== undefined) {
-            this.recordLatencySample(this.runtimeInputLatencyMetrics, inputSentAtMs - keydownAtMs);
-          }
-
-          props.onData(data);
-          this.maybeReportRuntimeMetrics();
-        })
-      );
-    }
+    this.setupDataHandler();
 
     this.term.onBell(() => {
       this.ringBell();
