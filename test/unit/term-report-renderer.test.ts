@@ -97,7 +97,7 @@ describe('Term.reportRenderer transport emit', () => {
     expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {uid: 'uid-1', type: 'WebGL'});
   });
 
-  test('deduplicates when called with the same uid and type', () => {
+  test('does not emit when renderer type is unchanged and no reason or runtimeMetrics are provided', () => {
     Term.reportRenderer('uid-2', 'WebGL');
     Term.reportRenderer('uid-2', 'WebGL');
 
@@ -142,6 +142,37 @@ describe('Term.reportRenderer transport emit', () => {
       uid: 'uid-7',
       type: 'Canvas',
       reason: 'pool-evicted'
+    });
+  });
+
+  test('emits when only runtimeMetrics change for the same renderer type', () => {
+    const runtimeMetrics = {
+      inputKeydownToSend: {
+        sampleCount: 2,
+        totalMs: 30,
+        maxMs: 20,
+        lastMs: 10
+      },
+      frameTiming: {
+        sampleCount: 3,
+        totalMs: 48,
+        maxMs: 18,
+        lastMs: 16,
+        longFrameCount: 1,
+        longFrameThresholdMs: LONG_FRAME_THRESHOLD_MS
+      },
+      reportIntervalMs: RUNTIME_METRICS_REPORT_INTERVAL_MS,
+      updatedAtMs: Date.now()
+    } as const;
+
+    Term.reportRenderer('uid-8', 'Canvas');
+    Term.reportRenderer('uid-8', 'Canvas', undefined, runtimeMetrics);
+
+    expect(transportMock.emit).toHaveBeenCalledTimes(2);
+    expect(transportMock.emit).toHaveBeenLastCalledWith('info renderer', {
+      uid: 'uid-8',
+      type: 'Canvas',
+      runtimeMetrics
     });
   });
 });
@@ -219,5 +250,54 @@ describe('Term WebGL context-loss and eviction handlers', () => {
     expect(termInstance.ensureCanvasRenderer).toHaveBeenCalledWith('pool-evicted');
     expect(termInstance.scheduleRendererVisibilitySync).not.toHaveBeenCalled();
     expect(termInstance.scheduleDeterministicRendererRetry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Term runtime metrics flush behaviour', () => {
+  test('forces runtimeMetrics emission during teardown so pending metrics are not lost', () => {
+    const uid = 'uid-force-flush';
+    const termInstance = createTermInstanceForWebGLFallbackTest(uid);
+    // @ts-expect-error The teardown path only checks for a truthy terminal reference.
+    termInstance.term = {};
+    termInstance.runtimeInputLatencyMetrics = {
+      sampleCount: 3,
+      totalMs: 45,
+      maxMs: 20,
+      lastMs: 15
+    };
+    termInstance.runtimeFrameTimingMetrics = {
+      sampleCount: 3,
+      totalMs: 52,
+      maxMs: 21,
+      lastMs: 17,
+      longFrameCount: 1,
+      longFrameThresholdMs: LONG_FRAME_THRESHOLD_MS
+    };
+    termInstance.hasUnreportedRuntimeMetrics = true;
+    termInstance.componentWillUnmount();
+
+    expect(transportMock.emit).toHaveBeenCalledTimes(1);
+    expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {
+      uid,
+      type: 'Canvas',
+      runtimeMetrics: {
+        inputKeydownToSend: {
+          sampleCount: 3,
+          totalMs: 45,
+          maxMs: 20,
+          lastMs: 15
+        },
+        frameTiming: {
+          sampleCount: 3,
+          totalMs: 52,
+          maxMs: 21,
+          lastMs: 17,
+          longFrameCount: 1,
+          longFrameThresholdMs: LONG_FRAME_THRESHOLD_MS
+        },
+        reportIntervalMs: RUNTIME_METRICS_REPORT_INTERVAL_MS,
+        updatedAtMs: expect.any(Number)
+      }
+    });
   });
 });

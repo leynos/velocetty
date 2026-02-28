@@ -1,4 +1,4 @@
-# Add PTY output batching and frame timing metrics (Roadmap 2.2.2)
+# Add pseudo-terminal (PTY) output batching and frame timing metrics (Roadmap 2.2.2)
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -39,7 +39,8 @@ This roadmap item primarily touches existing PTY and renderer telemetry seams:
   frame loop hooks.
 - `lib/actions/sessions.ts` and `lib/store/write-middleware.ts`: PTY action
   timing and terminal write path.
-- `shared/src/types/common.ts`: IPC telemetry contract definitions.
+- `shared/src/types/common.ts`: inter-process communication (IPC) telemetry
+  contract definitions.
 - `app/ui/window.ts`, `app/utils/renderer-utils.ts`, `app/menus/menu.ts`:
   main-process aggregation and diagnostics presentation.
 - `test/unit/bootstrap-transport-integration.test.ts` and
@@ -50,8 +51,10 @@ Source documents that define scope and acceptance:
 
 - `docs/roadmap.md` section `2.2.2`.
 - `docs/velocetty-design.md` sections `Render scheduling` and `Observability`.
-- `docs/velocetty-product-requirements-document.md` instrumentation baseline.
-- `docs/velocetty-hyper-codebase.md` batching and performance SLA references.
+- `docs/velocetty-product-requirements-document.md` (PRD) instrumentation
+  baseline.
+- `docs/velocetty-hyper-codebase.md` batching and performance service level
+  agreement (SLA) references.
 - `docs/developers-guide.md` gate order and docs synchronization expectations.
 
 ## Constraints
@@ -104,7 +107,8 @@ Source documents that define scope and acceptance:
   Mitigation: keep measurement cheap (`requestAnimationFrame` delta tracking)
   and validate overhead with synthetic-load comparisons.
 
-- Risk: benchmark harness is flaky in CI or machine-dependent enough to be
+- Risk: benchmark harness is flaky in continuous integration (CI) or
+  machine-dependent enough to be
   misleading.
   Severity: high
   Likelihood: medium

@@ -7,12 +7,14 @@ import {execFileSync} from 'node:child_process';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {
+  LONG_FRAME_THRESHOLD_MS,
+  PTY_BATCH_DURATION_MS as EXPECTED_BATCH_DURATION_MS,
+  PTY_BATCH_MAX_BYTES as EXPECTED_BATCH_MAX_SIZE_BYTES
+} from '../shared/src/constants/runtime-telemetry.ts';
 
 const SESSION_SOURCE_RELATIVE_PATH = path.join('app', 'session.ts');
 const RUNTIME_TELEMETRY_SOURCE_RELATIVE_PATH = path.join('shared', 'src', 'constants', 'runtime-telemetry.ts');
-const EXPECTED_BATCH_DURATION_MS = 16;
-const EXPECTED_BATCH_MAX_SIZE_BYTES = 200 * 1024;
-const LONG_FRAME_THRESHOLD_MS = 16.7;
 const MAX_LONG_FRAME_RATIO = 0.05;
 const MAX_P95_INPUT_LATENCY_MS = 24;
 const DEFAULT_FRAME_COUNT = 1200;

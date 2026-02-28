@@ -1,6 +1,8 @@
 import {
   LONG_FRAME_THRESHOLD_MS,
   PTY_BATCH_DURATION_MS,
+  PTY_BATCH_EXPECTED_DURATION_MS,
+  PTY_BATCH_EXPECTED_MAX_BYTES,
   PTY_BATCH_MAX_BYTES,
   hasPtyBatchThresholdParity
 } from '../constants/runtime-telemetry';
@@ -20,32 +22,12 @@ const inputSendToWriteLatencyByUid: Record<string, RuntimeLatencyMetrics> = {};
 const isWebGLRenderer = (type: RendererType | undefined): type is 'WebGL' => type === 'WebGL';
 const toKilobytes = (bytes: number) => Math.round((bytes / 1024) * 100) / 100;
 
-const createLatencyMetrics = (): RuntimeLatencyMetrics => ({
+const createEmptyLatencyMetrics = (): RuntimeLatencyMetrics => ({
   sampleCount: 0,
   totalMs: 0,
   maxMs: 0,
   lastMs: 0
 });
-
-const updateLatencyMetrics = (metrics: RuntimeLatencyMetrics, sampleMs: number) => {
-  const sanitizedSampleMs = Math.max(0, sampleMs);
-  metrics.sampleCount += 1;
-  metrics.totalMs += sanitizedSampleMs;
-  metrics.maxMs = Math.max(metrics.maxMs, sanitizedSampleMs);
-  metrics.lastMs = sanitizedSampleMs;
-};
-
-const aggregateLatencyMetrics = (metricsCollection: RuntimeLatencyMetrics[]): RuntimeLatencyMetrics => {
-  return metricsCollection.reduce<RuntimeLatencyMetrics>(
-    (aggregate, metrics) => ({
-      sampleCount: aggregate.sampleCount + metrics.sampleCount,
-      totalMs: aggregate.totalMs + metrics.totalMs,
-      maxMs: Math.max(aggregate.maxMs, metrics.maxMs),
-      lastMs: metrics.lastMs || aggregate.lastMs
-    }),
-    createLatencyMetrics()
-  );
-};
 
 function getRendererTypes() {
   return rendererTypes;
@@ -66,10 +48,20 @@ function getRendererRuntimeMetricsByUid() {
   return rendererRuntimeMetricsByUid;
 }
 
+function getInputSendToWriteLatencyByUid() {
+  return inputSendToWriteLatencyByUid;
+}
+
 function getAggregatedRendererRuntimeMetrics() {
   const metricsByUid = Object.values(rendererRuntimeMetricsByUid);
-  const aggregatedInputKeydownToSend = aggregateLatencyMetrics(
-    metricsByUid.map((metrics) => metrics.inputKeydownToSend)
+  const aggregatedInputKeydownToSend = metricsByUid.reduce<RuntimeLatencyMetrics>(
+    (aggregate, metrics) => ({
+      sampleCount: aggregate.sampleCount + metrics.inputKeydownToSend.sampleCount,
+      totalMs: aggregate.totalMs + metrics.inputKeydownToSend.totalMs,
+      maxMs: Math.max(aggregate.maxMs, metrics.inputKeydownToSend.maxMs),
+      lastMs: metrics.inputKeydownToSend.lastMs ?? aggregate.lastMs
+    }),
+    createEmptyLatencyMetrics()
   );
 
   const aggregatedFrameTiming = metricsByUid.reduce(
@@ -77,7 +69,7 @@ function getAggregatedRendererRuntimeMetrics() {
       sampleCount: aggregate.sampleCount + metrics.frameTiming.sampleCount,
       totalMs: aggregate.totalMs + metrics.frameTiming.totalMs,
       maxMs: Math.max(aggregate.maxMs, metrics.frameTiming.maxMs),
-      lastMs: metrics.frameTiming.lastMs || aggregate.lastMs,
+      lastMs: metrics.frameTiming.lastMs ?? aggregate.lastMs,
       longFrameCount: aggregate.longFrameCount + metrics.frameTiming.longFrameCount,
       longFrameThresholdMs: Math.max(aggregate.longFrameThresholdMs, metrics.frameTiming.longFrameThresholdMs)
     }),
@@ -109,7 +101,15 @@ function getAggregatedRendererRuntimeMetrics() {
 }
 
 function getAggregatedInputSendToWriteLatencyMetrics() {
-  return aggregateLatencyMetrics(Object.values(inputSendToWriteLatencyByUid));
+  return Object.values(inputSendToWriteLatencyByUid).reduce<RuntimeLatencyMetrics>(
+    (aggregate, metrics) => ({
+      sampleCount: aggregate.sampleCount + metrics.sampleCount,
+      totalMs: aggregate.totalMs + metrics.totalMs,
+      maxMs: Math.max(aggregate.maxMs, metrics.maxMs),
+      lastMs: metrics.lastMs ?? aggregate.lastMs
+    }),
+    createEmptyLatencyMetrics()
+  );
 }
 
 function setRendererRuntimeMetrics(uid: RendererUid, runtimeMetrics: RendererRuntimeMetrics) {
@@ -121,17 +121,28 @@ function recordInputSendToWriteLatency(uid: RendererUid, sampleMs: number) {
     return;
   }
 
-  const metrics = inputSendToWriteLatencyByUid[uid] || createLatencyMetrics();
-  updateLatencyMetrics(metrics, sampleMs);
+  const metrics = inputSendToWriteLatencyByUid[uid] || createEmptyLatencyMetrics();
+  const sanitizedSampleMs = Math.max(0, sampleMs);
+  metrics.sampleCount += 1;
+  metrics.totalMs += sanitizedSampleMs;
+  metrics.maxMs = Math.max(metrics.maxMs, sanitizedSampleMs);
+  metrics.lastMs = sanitizedSampleMs;
   inputSendToWriteLatencyByUid[uid] = metrics;
 }
 
-function getPtyBatchingThresholdMetrics() {
+function getPtyBatchingThresholdMetrics(runtimeThresholds?: {durationMs: number; maxBytes: number}) {
+  const durationMs = runtimeThresholds?.durationMs ?? PTY_BATCH_DURATION_MS;
+  const maxBytes = runtimeThresholds?.maxBytes ?? PTY_BATCH_MAX_BYTES;
+  const parity =
+    runtimeThresholds === undefined
+      ? hasPtyBatchThresholdParity()
+      : durationMs === PTY_BATCH_EXPECTED_DURATION_MS && maxBytes === PTY_BATCH_EXPECTED_MAX_BYTES;
+
   return {
-    durationMs: PTY_BATCH_DURATION_MS,
-    maxBytes: PTY_BATCH_MAX_BYTES,
-    maxKilobytes: toKilobytes(PTY_BATCH_MAX_BYTES),
-    parity: hasPtyBatchThresholdParity()
+    durationMs,
+    maxBytes,
+    maxKilobytes: toKilobytes(maxBytes),
+    parity
   };
 }
 
@@ -200,6 +211,7 @@ export {
   getPtyBatchingThresholdMetrics,
   getRendererTypes,
   getRendererFallbackReasonCounts,
+  getInputSendToWriteLatencyByUid,
   getRendererRuntimeMetricsByUid,
   getRendererWebGLContextCounts,
   recordInputSendToWriteLatency,
