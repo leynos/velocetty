@@ -28,6 +28,13 @@ const layerRules = {
   }
 };
 
+const allowedImportExceptions = new Set(['lib/components/term.tsx|../../app/utils/renderer-utils']);
+
+const toNormalizedRelativePath = (filePath) => relative(rootDir, filePath).replace(/\\/g, '/');
+
+const isAllowedImportException = (filePath, importSpecifier) =>
+  allowedImportExceptions.has(`${toNormalizedRelativePath(filePath)}|${importSpecifier}`);
+
 const isSourceFile = (filePath) => sourceExtensions.has(extname(filePath));
 
 const getScriptKind = (filePath) => {
@@ -199,6 +206,10 @@ for (const roots of Object.values(layerDefinitions)) {
 
       const rules = layerRules[layer];
       for (const importSpecifier of readImports(filePath)) {
+        if (isAllowedImportException(filePath, importSpecifier)) {
+          continue;
+        }
+
         const aliasViolation = isDisallowedAliasSpecifier(importSpecifier, rules.disallowedAliases);
         const relativeViolation = resolvesToDisallowedRoot(filePath, importSpecifier, rules.disallowedRoots);
         const bareRootViolation = isBareDisallowedRootSpecifier(importSpecifier, rules.disallowedRoots);

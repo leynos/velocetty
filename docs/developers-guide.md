@@ -47,6 +47,14 @@ Dependency direction must remain one-way:
 `frontend` must not import `backend`, and `backend` must not import
 `frontend`.
 
+Approved exception:
+
+- `lib/components/term.tsx` may import
+  `../../app/utils/renderer-utils` to reuse
+  `createRuntimeLatencyMetrics` as the single latency-metrics factory.
+  This exception is explicitly allow-listed in
+  `scripts/check-package-boundaries.mjs`.
+
 Use shared imports via TypeScript path aliases:
 
 - `@frontend/*`

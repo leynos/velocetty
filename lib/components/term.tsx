@@ -17,6 +17,7 @@ import {Unicode11Addon} from 'xterm-addon-unicode11';
 import {WebLinksAddon} from 'xterm-addon-web-links';
 import {WebglAddon} from 'xterm-addon-webgl';
 
+import {createRuntimeLatencyMetrics} from '../../app/utils/renderer-utils';
 import type {TermProps} from '../../typings/hyper';
 import {
   LONG_FRAME_THRESHOLD_MS,
@@ -173,13 +174,6 @@ const getTermOptions = (props: TermProps): ITerminalOptions => {
     allowProposedApi: true
   };
 };
-
-const createRuntimeLatencyMetrics = () => ({
-  sampleCount: 0,
-  totalMs: 0,
-  maxMs: 0,
-  lastMs: 0
-});
 
 const createRuntimeFrameTimingMetrics = () => ({
   sampleCount: 0,

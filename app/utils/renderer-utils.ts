@@ -22,7 +22,7 @@ const inputSendToWriteLatencyByUid: Record<string, RuntimeLatencyMetrics> = {};
 const isWebGLRenderer = (type: RendererType | undefined): type is 'WebGL' => type === 'WebGL';
 const toKilobytes = (bytes: number) => Math.round((bytes / 1024) * 100) / 100;
 
-const createEmptyLatencyMetrics = (): RuntimeLatencyMetrics => ({
+const createRuntimeLatencyMetrics = (): RuntimeLatencyMetrics => ({
   sampleCount: 0,
   totalMs: 0,
   maxMs: 0,
@@ -61,7 +61,7 @@ function getAggregatedRendererRuntimeMetrics() {
       maxMs: Math.max(aggregate.maxMs, metrics.inputKeydownToSend.maxMs),
       lastMs: metrics.inputKeydownToSend.lastMs ?? aggregate.lastMs
     }),
-    createEmptyLatencyMetrics()
+    createRuntimeLatencyMetrics()
   );
 
   const aggregatedFrameTiming = metricsByUid.reduce(
@@ -108,7 +108,7 @@ function getAggregatedInputSendToWriteLatencyMetrics() {
       maxMs: Math.max(aggregate.maxMs, metrics.maxMs),
       lastMs: metrics.lastMs ?? aggregate.lastMs
     }),
-    createEmptyLatencyMetrics()
+    createRuntimeLatencyMetrics()
   );
 }
 
@@ -121,7 +121,7 @@ function recordInputSendToWriteLatency(uid: RendererUid, sampleMs: number) {
     return;
   }
 
-  const metrics = inputSendToWriteLatencyByUid[uid] || createEmptyLatencyMetrics();
+  const metrics = inputSendToWriteLatencyByUid[uid] || createRuntimeLatencyMetrics();
   const sanitizedSampleMs = Math.max(0, sampleMs);
   metrics.sampleCount += 1;
   metrics.totalMs += sanitizedSampleMs;
@@ -206,6 +206,7 @@ function resetRendererTracking() {
 }
 
 export {
+  createRuntimeLatencyMetrics,
   getAggregatedInputSendToWriteLatencyMetrics,
   getAggregatedRendererRuntimeMetrics,
   getPtyBatchingThresholdMetrics,
