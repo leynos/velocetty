@@ -58,21 +58,22 @@ if (shouldRunE2E && driverOverride && !validDrivers.has(driverOverride)) {
 }
 const shouldUsePlaywright = driverOverride === 'playwright';
 
-const assertTargetHasNoUnresolvedSharedRuntimeImports = async () => {
-  const unresolvedImports: string[] = [];
-  const inspections = await Promise.allSettled(
-    targetFilesRequiringResolvableRuntimeImports.map(async (relativePath) => {
-      if (!(await fs.pathExists(relativePath))) {
-        throw new Error(`Expected compiled app output file at ${relativePath}. Run bun run test:e2e:prepare first.`);
-      }
+const validateFileAndCheckImport = async (relativePath: string) => {
+  if (!(await fs.pathExists(relativePath))) {
+    throw new Error(`Expected compiled app output file at ${relativePath}. Run bun run test:e2e:prepare first.`);
+  }
 
-      const contents = await fs.readFile(relativePath, 'utf8');
-      return {
-        relativePath,
-        hasUnresolvedImport: unresolvedSharedRuntimeImportPattern.test(contents)
-      };
-    })
-  );
+  const contents = await fs.readFile(relativePath, 'utf8');
+  return {
+    relativePath,
+    hasUnresolvedImport: unresolvedSharedRuntimeImportPattern.test(contents)
+  };
+};
+
+const extractUnresolvedImportsFromInspections = (
+  inspections: PromiseSettledResult<{relativePath: string; hasUnresolvedImport: boolean}>[]
+) => {
+  const unresolvedImports: string[] = [];
 
   for (const inspection of inspections) {
     if (inspection.status === 'rejected') {
@@ -84,12 +85,24 @@ const assertTargetHasNoUnresolvedSharedRuntimeImports = async () => {
     }
   }
 
+  return unresolvedImports;
+};
+
+const throwIfUnresolvedImportsFound = (unresolvedImports: string[]) => {
   if (unresolvedImports.length > 0) {
     throw new Error(
       `Compiled app output contains unresolved @shared runtime imports in: ${unresolvedImports.join(', ')}. ` +
         'Main-process modules must not emit bare @shared runtime requires.'
     );
   }
+};
+
+const assertTargetHasNoUnresolvedSharedRuntimeImports = async () => {
+  const inspections = await Promise.allSettled(
+    targetFilesRequiringResolvableRuntimeImports.map(validateFileAndCheckImport)
+  );
+  const unresolvedImports = extractUnresolvedImportsFromInspections(inspections);
+  throwIfUnresolvedImportsFound(unresolvedImports);
 };
 
 const createSpawnOutputTracker = () => {
