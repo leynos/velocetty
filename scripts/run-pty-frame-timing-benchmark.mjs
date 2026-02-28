@@ -23,6 +23,7 @@ const DEFAULT_INPUT_SAMPLE_COUNT = 1200;
 const BENCHMARK_NAME = 'pty-output-batching-and-frame-timing-synthetic-load';
 
 const asRoundedNumber = (value, digits = 3) => Number(value.toFixed(digits));
+const toPosixPath = (filePath) => filePath.replace(/\\/g, '/');
 
 /**
  * Converts arbitrary identifiers into filesystem-safe tokens.
@@ -277,9 +278,9 @@ export const runPtyFrameTimingSyntheticBenchmark = async ({
     generatedAtUtc: new Date().toISOString(),
     evidencePath: resolvedEvidencePath,
     runtimeContract: {
-      sessionSourcePath: SESSION_SOURCE_RELATIVE_PATH,
+      sessionSourcePath: toPosixPath(SESSION_SOURCE_RELATIVE_PATH),
       runtimeTelemetrySourcePath:
-        typeof runtimeTelemetrySource === 'string' ? RUNTIME_TELEMETRY_SOURCE_RELATIVE_PATH : undefined,
+        typeof runtimeTelemetrySource === 'string' ? toPosixPath(RUNTIME_TELEMETRY_SOURCE_RELATIVE_PATH) : undefined,
       batchDurationMs: batchingContract.batchDurationMs,
       batchMaxSizeBytes: batchingContract.batchMaxSizeBytes
     },
