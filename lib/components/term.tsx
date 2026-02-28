@@ -37,6 +37,12 @@ import _SearchBox from './searchBox';
 
 import 'xterm/css/xterm.css';
 
+type ViewportDimensions = Readonly<{width: number; height: number}>;
+type TerminalSize = Readonly<{cols: number; rows: number}>;
+type TimeMs = number & {readonly brand: 'TimeMs'};
+
+const asTimeMs = (value: number): TimeMs => value as TimeMs;
+
 const SearchBox = decorate(_SearchBox, 'SearchBox');
 
 const isWindows = ['Windows', 'Win16', 'Win32', 'WinCE'].includes(navigator.platform) || process.platform === 'win32';
@@ -372,7 +378,7 @@ export default class Term extends React.PureComponent<
           const inputSentAtMs = clock.now();
           enqueueInputSendTimestamp(this.props.uid, inputSentAtMs);
 
-          const keydownAtMs = this.dequeueKeydownTimestamp(inputSentAtMs);
+          const keydownAtMs = this.dequeueKeydownTimestamp(asTimeMs(inputSentAtMs));
           if (keydownAtMs !== undefined) {
             this.recordLatencySample(this.runtimeInputLatencyMetrics, inputSentAtMs - keydownAtMs);
           }
@@ -514,7 +520,8 @@ export default class Term extends React.PureComponent<
     this.term.focus();
   };
 
-  resize(cols: number, rows: number) {
+  resize(size: TerminalSize) {
+    const {cols, rows} = size;
     this.term.resize(cols, rows);
   }
 
@@ -550,7 +557,7 @@ export default class Term extends React.PureComponent<
     return !NON_WRITING_KEYS.has(event.key);
   }
 
-  private dequeueKeydownTimestamp(nowMs = clock.now()) {
+  private dequeueKeydownTimestamp(nowMs: TimeMs = asTimeMs(clock.now())) {
     while (this.keydownTimestamps.length > 0) {
       const timestamp = this.keydownTimestamps.shift();
       if (timestamp === undefined) {
@@ -666,7 +673,7 @@ export default class Term extends React.PureComponent<
     void this.bellSound?.play();
   }
 
-  private recordWebGLFailure(timestamp = clock.now()) {
+  private recordWebGLFailure(timestamp: TimeMs = asTimeMs(clock.now())) {
     this.webglFailureCount += 1;
     this.webglLastFailureAt = timestamp;
   }
@@ -680,7 +687,7 @@ export default class Term extends React.PureComponent<
     this.webglRetryTimer = null;
   }
 
-  private getWebGLRetryDelayMs(currentTime = clock.now()) {
+  private getWebGLRetryDelayMs(currentTime: TimeMs = asTimeMs(clock.now())) {
     if (this.webglFailureCount === 0 || this.webglLastFailureAt === 0) {
       return this.webglCooldownMs;
     }
@@ -747,7 +754,7 @@ export default class Term extends React.PureComponent<
     }
   }
 
-  private hasWebGLFailureCooldown(currentTime = clock.now()) {
+  private hasWebGLFailureCooldown(currentTime: TimeMs = asTimeMs(clock.now())) {
     if (this.webglFailureCount === 0) {
       return false;
     }
@@ -793,20 +800,19 @@ export default class Term extends React.PureComponent<
     return true;
   }
 
-  private isCompletelyOutsideViewport(bounds: DOMRect, viewportWidth: number, viewportHeight: number) {
-    return bounds.right <= 0 || bounds.bottom <= 0 || bounds.left >= viewportWidth || bounds.top >= viewportHeight;
+  private isCompletelyOutsideViewport(bounds: DOMRect, viewport: ViewportDimensions) {
+    return bounds.right <= 0 || bounds.bottom <= 0 || bounds.left >= viewport.width || bounds.top >= viewport.height;
   }
 
   isPaneOccluded(bounds: DOMRect) {
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    const viewport: ViewportDimensions = {width: window.innerWidth, height: window.innerHeight};
 
-    if (this.isCompletelyOutsideViewport(bounds, viewportWidth, viewportHeight)) {
+    if (this.isCompletelyOutsideViewport(bounds, viewport)) {
       return true;
     }
 
-    const sampleX = Math.max(0, Math.min(viewportWidth - 1, bounds.left + bounds.width / 2));
-    const sampleY = Math.max(0, Math.min(viewportHeight - 1, bounds.top + bounds.height / 2));
+    const sampleX = Math.max(0, Math.min(viewport.width - 1, bounds.left + bounds.width / 2));
+    const sampleY = Math.max(0, Math.min(viewport.height - 1, bounds.top + bounds.height / 2));
     const topElement = document.elementFromPoint(sampleX, sampleY);
 
     if (!topElement) {
@@ -970,7 +976,7 @@ export default class Term extends React.PureComponent<
     }
 
     if (prevProps.rows !== this.props.rows || prevProps.cols !== this.props.cols) {
-      this.resize(this.props.cols!, this.props.rows!);
+      this.resize({cols: this.props.cols!, rows: this.props.rows!});
     }
 
     if (this.hasRendererPropsChanged(prevProps)) {
