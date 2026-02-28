@@ -961,20 +961,26 @@ export default class Term extends React.PureComponent<
     );
   }
 
-  componentDidUpdate(prevProps: TermProps) {
+  private handleClearedStateChange(prevProps: TermProps): void {
     if (!prevProps.cleared && this.props.cleared) {
       this.clear();
     }
+  }
 
-    const nextTermOptions = getTermOptions(this.props);
-
+  private handleBellSoundUpdate(prevProps: TermProps): void {
     if (prevProps.bell !== this.props.bell || prevProps.bellSound !== this.props.bellSound) {
       this.setBellSound(this.props.bell, this.props.bellSound);
     }
+  }
 
+  private handleSearchBoxUpdate(prevProps: TermProps): void {
     if (prevProps.search && !this.props.search) {
       this.closeSearchBox();
     }
+  }
+
+  private handleTerminalOptionsUpdate(): void {
+    const nextTermOptions = getTermOptions(this.props);
 
     // Update only options that have changed.
     this.term.options = pickBy(
@@ -983,11 +989,15 @@ export default class Term extends React.PureComponent<
     );
 
     this.termOptions = nextTermOptions;
+  }
 
+  private handlePaddingUpdate(): void {
     if (this.term.element) {
       this.term.element.style.padding = this.props.padding;
     }
+  }
 
+  private handleResizeUpdate(prevProps: TermProps): void {
     if (this.hasFontPropsChanged(prevProps)) {
       // resize to fit the container
       this.fitResize();
@@ -996,17 +1006,30 @@ export default class Term extends React.PureComponent<
     if (prevProps.rows !== this.props.rows || prevProps.cols !== this.props.cols) {
       this.resize({cols: this.props.cols!, rows: this.props.rows!});
     }
+  }
 
-    if (this.hasRendererPropsChanged(prevProps)) {
-      this.scheduleRendererVisibilitySync();
-    }
-
+  private handleActiveRootGroupChange(prevProps: TermProps): void {
     if (!prevProps.isActiveRootGroup && this.props.isActiveRootGroup) {
       this.startFrameTimingLoop();
     } else if (prevProps.isActiveRootGroup && !this.props.isActiveRootGroup) {
       this.maybeReportRuntimeMetrics(true);
       this.stopFrameTimingLoop();
     }
+  }
+
+  componentDidUpdate(prevProps: TermProps) {
+    this.handleClearedStateChange(prevProps);
+    this.handleBellSoundUpdate(prevProps);
+    this.handleSearchBoxUpdate(prevProps);
+    this.handleTerminalOptionsUpdate();
+    this.handlePaddingUpdate();
+    this.handleResizeUpdate(prevProps);
+
+    if (this.hasRendererPropsChanged(prevProps)) {
+      this.scheduleRendererVisibilitySync();
+    }
+
+    this.handleActiveRootGroupChange(prevProps);
   }
 
   onTermWrapperRef = (component: HTMLElement | null) => {
