@@ -872,7 +872,7 @@ export default class Term extends React.PureComponent<
       this.term.loadAddon(this.ligaturesAddon);
     }
 
-    Term.reportRenderer(this.props.uid, 'Canvas', reason, this.createRuntimeMetricsSnapshot());
+    Term.reportRenderer(this.props.uid, 'Canvas', reason);
   }
 
   detachWebGLRenderer() {
@@ -917,7 +917,7 @@ export default class Term extends React.PureComponent<
 
       this.markWebGLInitSuccess();
       this.clearRendererRetryTimer();
-      Term.reportRenderer(this.props.uid, 'WebGL', undefined, this.createRuntimeMetricsSnapshot());
+      Term.reportRenderer(this.props.uid, 'WebGL');
     } catch (error) {
       console.warn('WebGL renderer initialization failed. Falling back to canvas-based rendering.', error);
       this.recordWebGLFailure();
@@ -1008,8 +1008,9 @@ export default class Term extends React.PureComponent<
       this.fitResize();
     }
 
-    if (prevProps.rows !== this.props.rows || prevProps.cols !== this.props.cols) {
-      this.resize({cols: this.props.cols!, rows: this.props.rows!});
+    const hasTerminalSize = typeof this.props.cols === 'number' && typeof this.props.rows === 'number';
+    if (hasTerminalSize && (prevProps.rows !== this.props.rows || prevProps.cols !== this.props.cols)) {
+      this.resize({cols: this.props.cols, rows: this.props.rows});
     }
   }
 

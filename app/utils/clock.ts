@@ -1,4 +1,8 @@
 /** @file Provides a testable wall-clock adapter for app-side timing reads. */
-export const clock = {
-  now: () => Date.now()
+export interface Clock {
+  now(): number;
+}
+
+export const clock: Clock = {
+  now: (): number => Date.now()
 };

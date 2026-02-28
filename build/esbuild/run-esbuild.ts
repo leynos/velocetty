@@ -81,6 +81,8 @@ export const createCliBuildOptions = (mode: BuildMode, rootDir: string): BuildOp
     entryPoints: [path.join(rootDir, 'cli', 'index.ts')],
     outfile: path.join(rootDir, 'bin', 'cli.js'),
     platform: 'node',
+    // CLI output must stay CommonJS because it is invoked in Node/Electron
+    // contexts that load it via require semantics without ESM package mode.
     format: 'cjs',
     target: ['node24'],
     sourcemap: isProductionMode(mode) ? false : 'linked',

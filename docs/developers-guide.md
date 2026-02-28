@@ -200,7 +200,7 @@ rules when changing context-loss handling and renderer instrumentation:
 - When adding or renaming fallback reasons or allocation metric fields, update
   this guide, `docs/roadmap.md`, and diagnostics tests in the same change.
 
-## pseudo-terminal (PTY) batching and frame-timing benchmark practice
+## Pseudo-terminal (PTY) batching and frame-timing benchmark practice
 
 Roadmap item `2.2.2` adds a synthetic-load benchmark command for validation and
 evidence capture.
