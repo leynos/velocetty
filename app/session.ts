@@ -6,7 +6,7 @@ import defaultShell from 'default-shell';
 import type {IPty, IWindowsPtyForkOptions, spawn as npSpawn} from 'node-pty';
 import osLocale from 'os-locale';
 import shellEnv from 'shell-env';
-import {PTY_BATCH_DURATION_MS, PTY_BATCH_MAX_BYTES} from '@shared/constants/runtime-telemetry';
+import {PTY_BATCH_DURATION_MS, PTY_BATCH_MAX_BYTES} from './constants/runtime-telemetry';
 
 import * as config from './config';
 import {cliScriptPath} from './config/paths';

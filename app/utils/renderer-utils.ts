@@ -3,7 +3,7 @@ import {
   PTY_BATCH_DURATION_MS,
   PTY_BATCH_MAX_BYTES,
   hasPtyBatchThresholdParity
-} from '@shared/constants/runtime-telemetry';
+} from '../constants/runtime-telemetry';
 import type {
   RendererFallbackReason,
   RendererRuntimeMetrics,

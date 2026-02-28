@@ -11,9 +11,9 @@ import isDev from 'electron-is-dev';
 import {getWorkingDirectoryFromPID} from 'native-process-working-directory';
 import {v4 as uuidv4} from 'uuid';
 
-import {createRendererUid, type sessionExtraOptions} from '@shared/types/common';
+import type {sessionExtraOptions} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
-import {asCommandId, asProfileId, asSessionId} from '../utils/shared-ids';
+import {asCommandId, asProfileId, asRendererUid, asSessionId} from '../utils/shared-ids';
 import {execCommand} from '../commands';
 import {getDefaultProfile} from '../config';
 import {icon, homeDirectory} from '../config/paths';
@@ -331,7 +331,7 @@ export function newWindow(
 
       session.on('exit', () => {
         rpc.emit('session exit', {uid: asSessionId(options.uid)});
-        unsetRendererType(createRendererUid(options.uid));
+        unsetRendererType(asRendererUid(options.uid));
         sessions.delete(options.uid);
       });
     } catch (error) {
@@ -381,13 +381,13 @@ export function newWindow(
 
       session.write(payload);
       if (typeof inputSentAtMs === 'number') {
-        recordInputSendToWriteLatency(createRendererUid(uid), writeTimestampMs - inputSentAtMs);
+        recordInputSendToWriteLatency(asRendererUid(uid), writeTimestampMs - inputSentAtMs);
       }
     }
   });
   rpc.on('info renderer', ({uid, type, reason, runtimeMetrics}) => {
     // Used in the "About" dialog
-    setRendererType(createRendererUid(uid), type, reason, runtimeMetrics);
+    setRendererType(asRendererUid(uid), type, reason, runtimeMetrics);
   });
   rpc.on('open external', ({url}) => {
     void shell.openExternal(url);

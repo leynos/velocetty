@@ -53,6 +53,13 @@ Use shared imports via TypeScript path aliases:
 - `@backend/*`
 - `@shared/*`
 
+For `app/` main-process runtime modules compiled into `target/` via `tsgo`,
+TypeScript path aliases are type-checking conveniences only. Do not add bare
+runtime `@shared/*` value imports in `app/` modules unless the build pipeline
+also materializes runtime-resolvable modules under `target/`. Use `import type`
+for shared contracts and prefer app-local runtime adapters/constants for
+main-process runtime dependencies.
+
 Boundary validation is enforced by `bun run check:boundaries`, which runs as
 part of `bun run lint` and therefore `make lint`.
 
@@ -197,7 +204,8 @@ evidence capture.
 - Override the output location with
   `bun run benchmark:pty-frame-timing -- --evidence-path /tmp/<name>.json`.
 - The benchmark verifies the current runtime batching contract from
-  `shared/src/constants/runtime-telemetry.ts`
+  `shared/src/constants/runtime-telemetry.ts` mirrored in
+  `app/constants/runtime-telemetry.ts`
   (`PTY_BATCH_DURATION_MS = 16` and `PTY_BATCH_MAX_BYTES = 200 * 1024`) as used
   by `app/session.ts`.
 - Treat benchmark output as valid only when all checks are `true` and `passed`

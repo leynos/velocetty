@@ -47,10 +47,38 @@ const shouldCapture = process.env.E2E_CAPTURE === '1';
 const debugE2E = process.env.E2E_DEBUG === '1';
 const driverOverride = process.env.E2E_DRIVER;
 const validDrivers = new Set(['playwright', 'spawn']);
+const unresolvedSharedRuntimeImportPattern = /require\((['"])@shared\//;
+const targetFilesRequiringResolvableRuntimeImports = [
+  'target/session.js',
+  'target/ui/window.js',
+  'target/utils/renderer-utils.js'
+] as const;
 if (shouldRunE2E && driverOverride && !validDrivers.has(driverOverride)) {
   throw new Error(`E2E_DRIVER must be "playwright" or "spawn", received "${driverOverride}".`);
 }
 const shouldUsePlaywright = driverOverride === 'playwright';
+
+const assertTargetHasNoUnresolvedSharedRuntimeImports = async () => {
+  const unresolvedImports: string[] = [];
+
+  for (const relativePath of targetFilesRequiringResolvableRuntimeImports) {
+    if (!(await fs.pathExists(relativePath))) {
+      throw new Error(`Expected compiled target file at ${relativePath}. Run bun run test:e2e:prepare first.`);
+    }
+
+    const contents = await fs.readFile(relativePath, 'utf8');
+    if (unresolvedSharedRuntimeImportPattern.test(contents)) {
+      unresolvedImports.push(relativePath);
+    }
+  }
+
+  if (unresolvedImports.length > 0) {
+    throw new Error(
+      `Compiled target contains unresolved @shared runtime imports in: ${unresolvedImports.join(', ')}. ` +
+        'Main-process modules must not emit bare @shared runtime requires.'
+    );
+  }
+};
 
 const createSpawnOutputTracker = () => {
   let spawnOutput = '';
@@ -406,6 +434,7 @@ e2eTest(
     const testStartedAtMs = nowMs();
     const context = await setupTestContext();
     try {
+      await assertTargetHasNoUnresolvedSharedRuntimeImports();
       const {pathToBinary, launchArgs} = resolveLaunchConfig();
       if (!(await fs.pathExists(pathToBinary))) {
         throw new Error(`Expected packaged app binary at ${pathToBinary}. Run bun run dist first.`);
@@ -444,6 +473,7 @@ e2eTest(
   async () => {
     const context = await setupTestContext();
     try {
+      await assertTargetHasNoUnresolvedSharedRuntimeImports();
       context.spawned = spawn(process.execPath, developmentAppLaunchArgs, {
         cwd: process.cwd(),
         env: {
