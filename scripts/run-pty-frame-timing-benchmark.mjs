@@ -14,8 +14,8 @@ import {
   PTY_BATCH_MAX_BYTES as EXPECTED_BATCH_MAX_SIZE_BYTES
 } from '../shared/src/constants/runtime-telemetry.ts';
 
-const SESSION_SOURCE_RELATIVE_PATH = path.join('app', 'session.ts');
-const RUNTIME_TELEMETRY_SOURCE_RELATIVE_PATH = path.join('shared', 'src', 'constants', 'runtime-telemetry.ts');
+const SESSION_SOURCE_RELATIVE_PATH = 'app/session.ts';
+const RUNTIME_TELEMETRY_SOURCE_RELATIVE_PATH = 'shared/src/constants/runtime-telemetry.ts';
 const MAX_LONG_FRAME_RATIO = 0.05;
 const MAX_P95_INPUT_LATENCY_MS = 24;
 const DEFAULT_FRAME_COUNT = 1200;
