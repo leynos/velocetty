@@ -47,7 +47,9 @@ test('resolveBenchmarkEvidencePath builds branch-safe default path', () => {
     branchName: 'feature/2-2-2'
   });
 
-  expect(evidencePath).toBe('/tmp/benchmark-velocetty-feature-2-2-2-pty-frame-timing-synthetic-load.json');
+  expect(evidencePath).toBe(
+    path.join(tmpdir(), 'benchmark-velocetty-feature-2-2-2-pty-frame-timing-synthetic-load.json')
+  );
 });
 
 test('runPtyFrameTimingSyntheticBenchmark writes deterministic evidence JSON', async () => {

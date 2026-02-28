@@ -186,8 +186,8 @@ Add a reproducible benchmark path that validates frame-time stability.
 3. Define pass criteria aligned with design targets (for example, stable frame
    timing around the 60fps budget and bounded long-frame growth).
 4. Add benchmark invocation to documented developer workflow with an explicit
-   evidence path contract:
-   `/tmp/benchmark-<project>-<branch>-pty-frame-timing-synthetic-load.json`.
+   evidence path contract in the system temporary directory (`os.tmpdir()`):
+   `<tmpdir>/benchmark-<project>-<branch>-pty-frame-timing-synthetic-load.json`.
 
 Expected result: synthetic-load benchmark can be rerun locally and demonstrates
 stable, explainable frame-timing behaviour.
@@ -229,13 +229,14 @@ fi
 if [ -z "$safe_branch_name" ]; then
   safe_branch_name="branch"
 fi
+system_tmp_dir="$(node -p \"require('node:os').tmpdir()\")"
 bun install 2>&1 | tee "/tmp/install-${safe_project_name}-${safe_branch_name}.out"
 make build 2>&1 | tee "/tmp/build-${safe_project_name}-${safe_branch_name}.out"
 make check-fmt 2>&1 | tee "/tmp/check-fmt-${safe_project_name}-${safe_branch_name}.out"
 make lint 2>&1 | tee "/tmp/lint-${safe_project_name}-${safe_branch_name}.out"
 make test 2>&1 | tee "/tmp/test-${safe_project_name}-${safe_branch_name}.out"
 bun run benchmark:pty-frame-timing -- \
-  --evidence-path "/tmp/benchmark-${safe_project_name}-${safe_branch_name}-pty-frame-timing-synthetic-load.json" \
+  --evidence-path "${system_tmp_dir}/benchmark-${safe_project_name}-${safe_branch_name}-pty-frame-timing-synthetic-load.json" \
   2>&1 | tee "/tmp/benchmark-${safe_project_name}-${safe_branch_name}.out"
 ```
 
@@ -336,8 +337,9 @@ Do not infer success from truncated output.
   Rationale: Current user assignment explicitly limits ownership to tests,
   benchmark helper/script wiring, and documentation files.
 
-- Decision: Standardize synthetic-load evidence output under `/tmp/benchmark-`
-  `<project>-<branch>-pty-frame-timing-synthetic-load.json`.
+- Decision: Standardize synthetic-load evidence output under
+  `<tmpdir>/benchmark-<project>-<branch>-pty-frame-timing-synthetic-load.json`
+  (`tmpdir` resolved from `os.tmpdir()`).
   Rationale: Branch-safe deterministic paths align with gate evidence workflows
   and make multi-agent handoff predictable.
 

@@ -15,7 +15,7 @@ export type ProfileId = string & {readonly brand: 'ProfileId'};
 /** Branded identifier for terminal group entities. */
 export type TermGroupId = string & {readonly brand: 'TermGroupId'};
 /** Branded identifier for renderer telemetry subjects. */
-export type RendererUid = string & {readonly __brand: 'RendererUid'};
+export type RendererUid = string & {readonly brand: 'RendererUid'};
 /** Renderer backends supported by runtime telemetry reporting. */
 export type RendererType = 'WebGL' | 'Canvas' | 'DOM';
 
@@ -26,7 +26,7 @@ export const asProfileId = (value: string): ProfileId => value as ProfileId;
 /** Casts a raw terminal-group identifier into the shared branded type. */
 export const asTermGroupId = (value: string): TermGroupId => value as TermGroupId;
 /** Casts a raw renderer identifier into the shared branded type. */
-export const createRendererUid = (uid: string): RendererUid => uid as RendererUid;
+export const asRendererUid = (uid: string): RendererUid => uid as RendererUid;
 
 /** Session state synchronized between backend and renderer layers. */
 export type Session = {

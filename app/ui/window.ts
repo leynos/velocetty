@@ -371,7 +371,7 @@ export function newWindow(
   });
   rpc.on('data', ({uid, data, escaped, inputSentAtMs}) => {
     const session = uid && sessions.get(uid);
-    if (session && uid) {
+    if (session) {
       const payload = escaped
         ? session.shell?.endsWith('cmd.exe')
           ? `"${data}"` // This is how cmd.exe does it

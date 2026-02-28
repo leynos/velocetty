@@ -1,6 +1,6 @@
 /** @file Verifies renderer tracking helpers and fallback reason counters. */
 import {beforeEach, describe, expect, test} from 'bun:test';
-import {createRendererUid} from '@shared/types/common';
+import {asRendererUid} from '@shared/types/common';
 import type {RendererRuntimeMetrics} from '@shared/types/common';
 
 import {
@@ -25,7 +25,6 @@ beforeEach(() => {
 });
 
 describe('renderer-utils', () => {
-  const asRendererUid = (uid: string) => createRendererUid(uid);
   const createRuntimeMetrics = ({
     inputSampleCount = 0,
     inputTotalMs = 0,

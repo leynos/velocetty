@@ -199,8 +199,9 @@ evidence capture.
 
 - Run `bun run benchmark:pty-frame-timing` to generate deterministic benchmark
   evidence.
-- The default evidence path is
-  `/tmp/benchmark-<project>-<branch>-pty-frame-timing-synthetic-load.json`.
+- The default evidence path is in the system temporary directory
+  (`os.tmpdir()`):
+  `<tmpdir>/benchmark-<project>-<branch>-pty-frame-timing-synthetic-load.json`.
 - Override the output location with
   `bun run benchmark:pty-frame-timing -- --evidence-path /tmp/<name>.json`.
 - The benchmark verifies the current runtime batching contract from

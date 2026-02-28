@@ -5,6 +5,7 @@
  */
 import {execFileSync} from 'node:child_process';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {
@@ -172,7 +173,7 @@ export const resolveBenchmarkEvidencePath = ({evidencePath, projectName, branchN
 
   const safeProjectName = sanitiseToken(projectName);
   const safeBranchName = sanitiseToken(branchName);
-  return path.join('/tmp', `benchmark-${safeProjectName}-${safeBranchName}-pty-frame-timing-synthetic-load.json`);
+  return path.join(os.tmpdir(), `benchmark-${safeProjectName}-${safeBranchName}-pty-frame-timing-synthetic-load.json`);
 };
 
 const getGitBranchName = (repoRoot) => {
