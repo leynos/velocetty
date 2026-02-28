@@ -214,7 +214,7 @@ export default class Term extends React.PureComponent<
   canvasAddon: CanvasAddon | null;
   webglAddon: WebglAddon | null;
   ligaturesAddon: LigaturesAddon | null;
-  static rendererTypes: Record<RendererUid, RendererType> = {} as Record<RendererUid, RendererType>;
+  static rendererTypes: Record<RendererUid, RendererType> = {};
   term!: Terminal;
   resizeObserver?: ResizeObserver;
   resizeTimeout?: NodeJS.Timeout;
@@ -606,6 +606,10 @@ export default class Term extends React.PureComponent<
   }
 
   private recordLatencySample(metrics: ReturnType<typeof createRuntimeLatencyMetrics>, sampleMs: number) {
+    if (!Number.isFinite(sampleMs)) {
+      return;
+    }
+
     const sanitizedSampleMs = Math.max(0, sampleMs);
     metrics.sampleCount += 1;
     metrics.totalMs += sanitizedSampleMs;
@@ -615,6 +619,10 @@ export default class Term extends React.PureComponent<
   }
 
   private recordFrameTimingSample(frameDurationMs: number) {
+    if (!Number.isFinite(frameDurationMs)) {
+      return;
+    }
+
     const sanitizedFrameDurationMs = Math.max(0, frameDurationMs);
     this.runtimeFrameTimingMetrics.sampleCount += 1;
     this.runtimeFrameTimingMetrics.totalMs += sanitizedFrameDurationMs;
