@@ -11,9 +11,9 @@ import isDev from 'electron-is-dev';
 import {getWorkingDirectoryFromPID} from 'native-process-working-directory';
 import {v4 as uuidv4} from 'uuid';
 
-import {asRendererUid, type sessionExtraOptions} from '@shared/types/common';
+import type {sessionExtraOptions} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
-import {asCommandId, asProfileId, asSessionId} from '../utils/shared-ids';
+import {asCommandId, asProfileId, asRendererUid, asSessionId} from '../utils/shared-ids';
 import {execCommand} from '../commands';
 import {getDefaultProfile} from '../config';
 import {icon, homeDirectory} from '../config/paths';
