@@ -217,7 +217,8 @@ Current branch is the task branch; workflow shows windows-latest in matrix and
 no Windows aarch64 lane.
 ```
 
-- Recommended CI evidence collection (if `gh` is available):
+<!-- markdownlint-disable-next-line MD029 -->
+2. Recommended CI evidence collection (if `gh` is available):
 
 ```bash
 gh run list --workflow nodejs.yml --limit 20
@@ -226,7 +227,8 @@ gh run view <run-id> --log-failed
 
 Fallback: gather the same evidence from the GitHub Actions web UI.
 
-- Required local gates with repository log naming convention:
+<!-- markdownlint-disable-next-line MD029 -->
+3. Required local gates with repository log naming convention:
 
 ```bash
 set -o pipefail
