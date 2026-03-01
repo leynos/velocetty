@@ -397,7 +397,7 @@ And accompanying comment:
 ```tsx
 {/*
   Add custom CSS to Hyper.
-  We add a scope to the customCSS so that it can get around the weighting
+  A scope is added to the customCSS so that it can get around the weighting
   applied by styled-jsx
 */}
 <style dangerouslySetInnerHTML={{__html: stylis('#hyper', customCSS)}} />
