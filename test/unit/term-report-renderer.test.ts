@@ -204,13 +204,18 @@ describe('Term.ensureWebGLRenderer fallback handling', () => {
 });
 
 describe('Term WebGL context-loss and eviction handlers', () => {
-  test('onWebGLContextLoss emits context-loss fallback and schedules retry', () => {
-    const termInstance = createTermInstanceForWebGLFallbackTest('uid-context-loss');
+  const setupWebGLFallbackTest = (uid: string) => {
+    const termInstance = createTermInstanceForWebGLFallbackTest(uid);
     termInstance.detachWebGLRenderer = mock(() => {});
     termInstance.ensureCanvasRenderer = mock(() => {});
     termInstance.scheduleRendererVisibilitySync = mock(() => {});
     termInstance.scheduleDeterministicRendererRetry = mock(() => {});
     termInstance.webglFailureCount = 0;
+    return termInstance;
+  };
+
+  test('onWebGLContextLoss emits context-loss fallback and schedules retry', () => {
+    const termInstance = setupWebGLFallbackTest('uid-context-loss');
 
     termInstance.onWebGLContextLoss();
 
@@ -221,12 +226,7 @@ describe('Term WebGL context-loss and eviction handlers', () => {
   });
 
   test('onWebGLEvicted emits pool-evicted fallback and uses delayed retry path only', () => {
-    const termInstance = createTermInstanceForWebGLFallbackTest('uid-evicted');
-    termInstance.detachWebGLRenderer = mock(() => {});
-    termInstance.ensureCanvasRenderer = mock(() => {});
-    termInstance.scheduleRendererVisibilitySync = mock(() => {});
-    termInstance.scheduleDeterministicRendererRetry = mock(() => {});
-    termInstance.webglFailureCount = 0;
+    const termInstance = setupWebGLFallbackTest('uid-evicted');
 
     termInstance.onWebGLEvicted();
 
