@@ -227,11 +227,11 @@ export default class Term extends React.PureComponent<
   webglFailureThreshold: number;
   webglFailureDecayMs: number;
   webglRetryTimer: number | NodeJS.Timeout | null;
-  frameTimingRaf: number | null;
-  lastFrameTimestamp: number | null;
-  keydownTimestamps: number[];
+  frameTimingRaf: TimeMs | null;
+  lastFrameTimestamp: TimeMs | null;
+  keydownTimestamps: TimeMs[];
   hasUnreportedRuntimeMetrics: boolean;
-  lastRuntimeMetricsReportAt: number;
+  lastRuntimeMetricsReportAt: TimeMs;
   runtimeInputLatencyMetrics: ReturnType<typeof createRuntimeLatencyMetrics>;
   runtimeFrameTimingMetrics: ReturnType<typeof createRuntimeFrameTimingMetrics>;
   searchDecorations: ISearchDecorationOptions;
@@ -271,7 +271,7 @@ export default class Term extends React.PureComponent<
     this.lastFrameTimestamp = null;
     this.keydownTimestamps = [];
     this.hasUnreportedRuntimeMetrics = false;
-    this.lastRuntimeMetricsReportAt = 0;
+    this.lastRuntimeMetricsReportAt = asTimeMs(0);
     this.runtimeInputLatencyMetrics = createRuntimeLatencyMetrics();
     this.runtimeFrameTimingMetrics = createRuntimeFrameTimingMetrics();
     this.searchDecorations = {
@@ -563,7 +563,7 @@ export default class Term extends React.PureComponent<
     // Has Mousetrap flagged this event as a command?
     const shouldProcess = !e.catched;
     if (shouldProcess && this.shouldTrackKeydownForLatency(e)) {
-      this.keydownTimestamps.push(clock.now());
+      this.keydownTimestamps.push(asTimeMs(clock.now()));
       if (this.keydownTimestamps.length > KEYDOWN_TIMESTAMP_QUEUE_LIMIT) {
         this.keydownTimestamps = this.keydownTimestamps.slice(-KEYDOWN_TIMESTAMP_QUEUE_LIMIT);
       }
@@ -656,7 +656,7 @@ export default class Term extends React.PureComponent<
       return;
     }
 
-    const now = clock.now();
+    const now = asTimeMs(clock.now());
     if (!force && now - this.lastRuntimeMetricsReportAt < RUNTIME_METRICS_REPORT_INTERVAL_MS) {
       return;
     }
@@ -676,26 +676,27 @@ export default class Term extends React.PureComponent<
     }
 
     const onFrame = (timestamp: number) => {
-      this.frameTimingRaf = window.requestAnimationFrame(onFrame);
-
-      if (this.lastFrameTimestamp === null) {
-        this.lastFrameTimestamp = timestamp;
-        return;
-      }
-
-      const frameDurationMs = timestamp - this.lastFrameTimestamp;
-      this.lastFrameTimestamp = timestamp;
-
+      this.frameTimingRaf = asTimeMs(window.requestAnimationFrame(onFrame));
+      const currentTimestamp = asTimeMs(timestamp);
       const shouldTrackFrame = document.visibilityState === 'visible';
       if (!shouldTrackFrame) {
+        this.lastFrameTimestamp = currentTimestamp;
         return;
       }
+
+      if (this.lastFrameTimestamp === null) {
+        this.lastFrameTimestamp = currentTimestamp;
+        return;
+      }
+
+      const frameDurationMs = currentTimestamp - this.lastFrameTimestamp;
+      this.lastFrameTimestamp = currentTimestamp;
 
       this.recordFrameTimingSample(frameDurationMs);
       this.maybeReportRuntimeMetrics();
     };
 
-    this.frameTimingRaf = window.requestAnimationFrame(onFrame);
+    this.frameTimingRaf = asTimeMs(window.requestAnimationFrame(onFrame));
   }
 
   private stopFrameTimingLoop() {
