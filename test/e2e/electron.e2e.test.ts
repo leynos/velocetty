@@ -41,16 +41,69 @@ const macCiFallbackStabilityTimeoutMs = 5_000;
 const e2eTimeoutHeadroomMs = 1_500;
 const developmentAppLaunchArgs =
   process.platform === 'linux' && (process.env.CI === 'true' || process.env.ELECTRON_DISABLE_SANDBOX === '1')
-    ? ['node_modules/electron/cli.js', '--no-sandbox', '--disable-setuid-sandbox', 'target']
-    : ['node_modules/electron/cli.js', 'target'];
+    ? ['node_modules/electron/cli.js', '--no-sandbox', '--disable-setuid-sandbox', 'dist/app']
+    : ['node_modules/electron/cli.js', 'dist/app'];
 const shouldCapture = process.env.E2E_CAPTURE === '1';
 const debugE2E = process.env.E2E_DEBUG === '1';
 const driverOverride = process.env.E2E_DRIVER;
 const validDrivers = new Set(['playwright', 'spawn']);
+const unresolvedSharedRuntimeImportPattern = /require\((['"])@shared\//;
+const targetFilesRequiringResolvableRuntimeImports = [
+  'dist/app/session.js',
+  'dist/app/ui/window.js',
+  'dist/app/utils/renderer-utils.js'
+] as const;
 if (shouldRunE2E && driverOverride && !validDrivers.has(driverOverride)) {
   throw new Error(`E2E_DRIVER must be "playwright" or "spawn", received "${driverOverride}".`);
 }
 const shouldUsePlaywright = driverOverride === 'playwright';
+
+const validateFileAndCheckImport = async (relativePath: string) => {
+  if (!(await fs.pathExists(relativePath))) {
+    throw new Error(`Expected compiled app output file at ${relativePath}. Run bun run test:e2e:prepare first.`);
+  }
+
+  const contents = await fs.readFile(relativePath, 'utf8');
+  return {
+    relativePath,
+    hasUnresolvedImport: unresolvedSharedRuntimeImportPattern.test(contents)
+  };
+};
+
+const extractUnresolvedImportsFromInspections = (
+  inspections: PromiseSettledResult<{relativePath: string; hasUnresolvedImport: boolean}>[]
+) => {
+  const unresolvedImports: string[] = [];
+
+  for (const inspection of inspections) {
+    if (inspection.status === 'rejected') {
+      throw inspection.reason;
+    }
+
+    if (inspection.value.hasUnresolvedImport) {
+      unresolvedImports.push(inspection.value.relativePath);
+    }
+  }
+
+  return unresolvedImports;
+};
+
+const throwIfUnresolvedImportsFound = (unresolvedImports: string[]) => {
+  if (unresolvedImports.length > 0) {
+    throw new Error(
+      `Compiled app output contains unresolved @shared runtime imports in: ${unresolvedImports.join(', ')}. ` +
+        'Main-process modules must not emit bare @shared runtime requires.'
+    );
+  }
+};
+
+const assertTargetHasNoUnresolvedSharedRuntimeImports = async () => {
+  const inspections = await Promise.allSettled(
+    targetFilesRequiringResolvableRuntimeImports.map(validateFileAndCheckImport)
+  );
+  const unresolvedImports = extractUnresolvedImportsFromInspections(inspections);
+  throwIfUnresolvedImportsFound(unresolvedImports);
+};
 
 const createSpawnOutputTracker = () => {
   let spawnOutput = '';
@@ -406,6 +459,7 @@ e2eTest(
     const testStartedAtMs = nowMs();
     const context = await setupTestContext();
     try {
+      await assertTargetHasNoUnresolvedSharedRuntimeImports();
       const {pathToBinary, launchArgs} = resolveLaunchConfig();
       if (!(await fs.pathExists(pathToBinary))) {
         throw new Error(`Expected packaged app binary at ${pathToBinary}. Run bun run dist first.`);
@@ -440,10 +494,11 @@ e2eTest(
 );
 
 e2eTest(
-  'launches the development target without critical renderer errors',
+  'launches the development app output without critical renderer errors',
   async () => {
     const context = await setupTestContext();
     try {
+      await assertTargetHasNoUnresolvedSharedRuntimeImports();
       context.spawned = spawn(process.execPath, developmentAppLaunchArgs, {
         cwd: process.cwd(),
         env: {

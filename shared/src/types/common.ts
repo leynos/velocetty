@@ -14,6 +14,10 @@ export type SessionId = string & {readonly brand: 'SessionId'};
 export type ProfileId = string & {readonly brand: 'ProfileId'};
 /** Branded identifier for terminal group entities. */
 export type TermGroupId = string & {readonly brand: 'TermGroupId'};
+/** Branded identifier for renderer telemetry subjects. */
+export type RendererUid = string & {readonly brand: 'RendererUid'};
+/** Renderer backends supported by runtime telemetry reporting. */
+export type RendererType = 'WebGL' | 'Canvas' | 'DOM';
 
 /** Casts a raw session identifier into the shared branded type. */
 export const asSessionId = (value: string): SessionId => value as SessionId;
@@ -21,6 +25,8 @@ export const asSessionId = (value: string): SessionId => value as SessionId;
 export const asProfileId = (value: string): ProfileId => value as ProfileId;
 /** Casts a raw terminal-group identifier into the shared branded type. */
 export const asTermGroupId = (value: string): TermGroupId => value as TermGroupId;
+/** Casts a raw renderer identifier into the shared branded type. */
+export const asRendererUid = (uid: string): RendererUid => uid as RendererUid;
 
 /** Session state synchronized between backend and renderer layers. */
 export type Session = {
@@ -50,13 +56,44 @@ export type sessionExtraOptions = {
 /** Structured fallback reasons emitted alongside renderer-type transitions. */
 export type RendererFallbackReason = 'context-loss' | 'pool-evicted' | 'webgl-init-failed';
 
+/** Rolling latency summary used by runtime diagnostics ingestion. */
+export type RuntimeLatencyMetrics = {
+  sampleCount: number;
+  totalMs: number;
+  maxMs: number;
+  lastMs: number;
+};
+
+/** Rolling frame-timing summary used by runtime diagnostics ingestion. */
+export type RuntimeFrameTimingMetrics = {
+  sampleCount: number;
+  totalMs: number;
+  maxMs: number;
+  lastMs: number;
+  longFrameCount: number;
+  longFrameThresholdMs: number;
+};
+
+/** Runtime metrics emitted from renderer and aggregated in the main process. */
+export type RendererRuntimeMetrics = {
+  inputKeydownToSend: RuntimeLatencyMetrics;
+  frameTiming: RuntimeFrameTimingMetrics;
+  reportIntervalMs: number;
+  updatedAtMs: number;
+};
+
 /** Events emitted from the renderer and consumed by the privileged process. */
 export type MainEvents = {
   close: never;
   command: CommandId;
-  data: {uid: SessionId | null; data: string; escaped?: boolean};
+  data: {uid: SessionId | null; data: string; escaped?: boolean; inputSentAtMs?: number};
   exit: {uid: SessionId};
-  'info renderer': {uid: SessionId; type: string; reason?: RendererFallbackReason};
+  'info renderer': {
+    uid: SessionId;
+    type: RendererType;
+    reason?: RendererFallbackReason;
+    runtimeMetrics?: RendererRuntimeMetrics;
+  };
   init: null;
   maximize: never;
   minimize: never;

@@ -3,7 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 
 const repoRoot = path.resolve(__dirname, '..');
-const moduleRoot = path.join(repoRoot, 'target', 'node_modules', 'node-pty');
+const moduleRoot = path.join(repoRoot, 'dist', 'app', 'node_modules', 'node-pty');
 const nodeGypPath = path.join(repoRoot, 'node_modules', 'node-gyp', 'bin', 'node-gyp.js');
 const packageJsonPath = path.join(repoRoot, 'package.json');
 const nodeExecutable = process.env.NODE || 'node';

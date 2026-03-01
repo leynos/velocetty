@@ -111,24 +111,27 @@ test('packaging: hyper-app and renderer copy flows preserve required files', asy
 
     await copyHyperAppArtifacts({
       rootDir,
-      targetDir: path.join(rootDir, 'target'),
+      targetDir: path.join(rootDir, 'dist', 'app'),
       allowMissingPatches: true
     });
     await copyRendererArtifacts({
       rootDir,
-      targetDir: path.join(rootDir, 'target', 'renderer'),
+      targetDir: path.join(rootDir, 'dist', 'app', 'renderer'),
       allowMissingAssets: false
     });
 
-    const copiedHtml = await readFile(path.join(rootDir, 'target', 'index.html'), 'utf8');
-    const copiedPackageJson = await readFile(path.join(rootDir, 'target', 'package.json'), 'utf8');
-    const copiedTsconfig = await readFile(path.join(rootDir, 'target', 'tsconfig.json'), 'utf8');
-    const copiedConfig = await readFile(path.join(rootDir, 'target', 'config', 'schema.json'), 'utf8');
-    const copiedKeymap = await readFile(path.join(rootDir, 'target', 'keymaps', 'linux.json'), 'utf8');
-    const copiedStaticIcon = await readFile(path.join(rootDir, 'target', 'static', 'icon.png'), 'utf8');
-    const copiedStaticSvg = await readFile(path.join(rootDir, 'target', 'static', 'logo.svg'), 'utf8');
-    const copiedAsset = await readFile(path.join(rootDir, 'target', 'renderer', 'assets', 'icons.svg'), 'utf8');
-    const copiedAssetPng = await readFile(path.join(rootDir, 'target', 'renderer', 'assets', 'preview.png'), 'utf8');
+    const copiedHtml = await readFile(path.join(rootDir, 'dist', 'app', 'index.html'), 'utf8');
+    const copiedPackageJson = await readFile(path.join(rootDir, 'dist', 'app', 'package.json'), 'utf8');
+    const copiedTsconfig = await readFile(path.join(rootDir, 'dist', 'app', 'tsconfig.json'), 'utf8');
+    const copiedConfig = await readFile(path.join(rootDir, 'dist', 'app', 'config', 'schema.json'), 'utf8');
+    const copiedKeymap = await readFile(path.join(rootDir, 'dist', 'app', 'keymaps', 'linux.json'), 'utf8');
+    const copiedStaticIcon = await readFile(path.join(rootDir, 'dist', 'app', 'static', 'icon.png'), 'utf8');
+    const copiedStaticSvg = await readFile(path.join(rootDir, 'dist', 'app', 'static', 'logo.svg'), 'utf8');
+    const copiedAsset = await readFile(path.join(rootDir, 'dist', 'app', 'renderer', 'assets', 'icons.svg'), 'utf8');
+    const copiedAssetPng = await readFile(
+      path.join(rootDir, 'dist', 'app', 'renderer', 'assets', 'preview.png'),
+      'utf8'
+    );
 
     expect(copiedHtml).toBe('<html></html>');
     expect(copiedPackageJson).toBe('{"name":"fixture"}');
@@ -139,9 +142,11 @@ test('packaging: hyper-app and renderer copy flows preserve required files', asy
     expect(copiedStaticSvg).toBe('<svg>app</svg>');
     expect(copiedAsset).toBe('<svg></svg>');
     expect(copiedAssetPng).toBe('preview-png');
-    await expect(readFile(path.join(rootDir, 'target', 'ignore.tmp'), 'utf8')).rejects.toThrow();
-    await expect(readFile(path.join(rootDir, 'target', 'static', 'ignore.bak'), 'utf8')).rejects.toThrow();
-    await expect(readFile(path.join(rootDir, 'target', 'renderer', 'assets', 'ignore.tmp'), 'utf8')).rejects.toThrow();
+    await expect(readFile(path.join(rootDir, 'dist', 'app', 'ignore.tmp'), 'utf8')).rejects.toThrow();
+    await expect(readFile(path.join(rootDir, 'dist', 'app', 'static', 'ignore.bak'), 'utf8')).rejects.toThrow();
+    await expect(
+      readFile(path.join(rootDir, 'dist', 'app', 'renderer', 'assets', 'ignore.tmp'), 'utf8')
+    ).rejects.toThrow();
   } finally {
     await rm(rootDir, {recursive: true, force: true});
   }
@@ -160,14 +165,14 @@ test('packaging: allowMissing options control optional copy failures', async () 
     await expect(
       copyHyperAppArtifacts({
         rootDir,
-        targetDir: path.join(rootDir, 'target'),
+        targetDir: path.join(rootDir, 'dist', 'app'),
         allowMissingPatches: true
       })
     ).resolves.toBeUndefined();
     await expect(
       copyHyperAppArtifacts({
         rootDir,
-        targetDir: path.join(rootDir, 'target'),
+        targetDir: path.join(rootDir, 'dist', 'app'),
         allowMissingPatches: false
       })
     ).rejects.toThrow();
@@ -175,14 +180,14 @@ test('packaging: allowMissing options control optional copy failures', async () 
     await expect(
       copyRendererArtifacts({
         rootDir,
-        targetDir: path.join(rootDir, 'target', 'renderer-allow-missing'),
+        targetDir: path.join(rootDir, 'dist', 'app', 'renderer-allow-missing'),
         allowMissingAssets: true
       })
     ).resolves.toBeUndefined();
     await expect(
       copyRendererArtifacts({
         rootDir,
-        targetDir: path.join(rootDir, 'target', 'renderer-strict'),
+        targetDir: path.join(rootDir, 'dist', 'app', 'renderer-strict'),
         allowMissingAssets: false
       })
     ).rejects.toThrow();
@@ -196,9 +201,9 @@ test('packaging: app index loads renderer stylesheet output', async () => {
   expect(appIndexHtml.includes('renderer/bundle.css')).toBe(true);
 });
 
-test('packaging: hyper-app copy handles missing patches and replaces stale target patches', async () => {
+test('packaging: hyper-app copy handles missing patches and replaces stale app-output patches', async () => {
   const rootDir = await createTempDir();
-  const targetDir = path.join(rootDir, 'target');
+  const targetDir = path.join(rootDir, 'dist', 'app');
 
   try {
     await writeFixtureFile(path.join(rootDir, 'app', 'index.html'), '<html></html>');

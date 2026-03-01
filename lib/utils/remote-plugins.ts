@@ -21,7 +21,7 @@ const getCandidatePluginModulePaths = (): string[] => {
   const appRootPath = getGlobal('__velocettyAppRoot') as VelocettyRuntimeGlobals['__velocettyAppRoot'];
   const candidates = [
     appRootPath ? path.resolve(appRootPath, 'plugins') : undefined,
-    path.resolve(process.cwd(), 'target', 'plugins'),
+    path.resolve(process.cwd(), 'dist', 'app', 'plugins'),
     path.resolve(__dirname, 'plugins')
   ].filter((candidate): candidate is string => Boolean(candidate));
   return Array.from(new Set(candidates));

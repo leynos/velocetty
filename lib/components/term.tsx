@@ -17,8 +17,16 @@ import {Unicode11Addon} from 'xterm-addon-unicode11';
 import {WebLinksAddon} from 'xterm-addon-web-links';
 import {WebglAddon} from 'xterm-addon-webgl';
 
+import {createRuntimeLatencyMetrics} from '../../app/utils/renderer-utils';
 import type {TermProps} from '../../typings/hyper';
-import {asSessionId, type RendererFallbackReason} from '@shared/types/common';
+import {
+  LONG_FRAME_THRESHOLD_MS,
+  RUNTIME_METRICS_REPORT_INTERVAL_MS,
+  clearInputSendTimestamps,
+  enqueueInputSendTimestamp
+} from '@shared/constants/runtime-telemetry';
+import {asRendererUid, asSessionId} from '@shared/types/common';
+import type {RendererFallbackReason, RendererRuntimeMetrics, RendererType, RendererUid} from '@shared/types/common';
 import terms from '../terms';
 import {transport} from '../transport';
 import {clock} from '../utils/clock';
@@ -30,6 +38,18 @@ import {WebGLContextPool} from '../utils/webgl-context-pool';
 import _SearchBox from './searchBox';
 
 import 'xterm/css/xterm.css';
+
+type ViewportDimensions = Readonly<{width: number; height: number}>;
+type TerminalSize = Readonly<{cols: number; rows: number}>;
+type TimeMs = number & {readonly brand: 'TimeMs'};
+type RendererReportPayload = Readonly<{
+  uid: RendererUid;
+  type: RendererType;
+  reason?: RendererFallbackReason;
+  runtimeMetrics?: RendererRuntimeMetrics;
+}>;
+
+const asTimeMs = (value: number): TimeMs => value as TimeMs;
 
 const SearchBox = decorate(_SearchBox, 'SearchBox');
 
@@ -55,6 +75,19 @@ const isWebgl2Supported = (() => {
 })();
 
 const DEFAULT_WEBGL_MAX_CONTEXTS = 16;
+const KEYDOWN_TIMESTAMP_QUEUE_LIMIT = 64;
+const KEYDOWN_TIMESTAMP_MAX_AGE_MS = 5000;
+const NON_WRITING_KEYS = new Set([
+  'Alt',
+  'CapsLock',
+  'Control',
+  'Fn',
+  'FnLock',
+  'Meta',
+  'NumLock',
+  'ScrollLock',
+  'Shift'
+]);
 
 // Pool entries are logical slot tokens, not reusable WebGL context objects.
 type WebGLPoolSlot = Readonly<{paneId: string}>;
@@ -144,6 +177,15 @@ const getTermOptions = (props: TermProps): ITerminalOptions => {
   };
 };
 
+const createRuntimeFrameTimingMetrics = () => ({
+  sampleCount: 0,
+  totalMs: 0,
+  maxMs: 0,
+  lastMs: 0,
+  longFrameCount: 0,
+  longFrameThresholdMs: LONG_FRAME_THRESHOLD_MS
+});
+
 /** Terminal view component that wraps xterm and renderer-specific behaviour. */
 export default class Term extends React.PureComponent<
   TermProps,
@@ -172,7 +214,7 @@ export default class Term extends React.PureComponent<
   canvasAddon: CanvasAddon | null;
   webglAddon: WebglAddon | null;
   ligaturesAddon: LigaturesAddon | null;
-  static rendererTypes: Record<string, string>;
+  static rendererTypes: Record<RendererUid, RendererType> = {};
   term!: Terminal;
   resizeObserver?: ResizeObserver;
   resizeTimeout?: NodeJS.Timeout;
@@ -184,7 +226,14 @@ export default class Term extends React.PureComponent<
   webglCooldownMs: number;
   webglFailureThreshold: number;
   webglFailureDecayMs: number;
-  webglRetryTimer: ReturnType<typeof window.setTimeout> | null;
+  webglRetryTimer: number | NodeJS.Timeout | null;
+  frameTimingRaf: TimeMs | null;
+  lastFrameTimestamp: TimeMs | null;
+  keydownTimestamps: TimeMs[];
+  hasUnreportedRuntimeMetrics: boolean;
+  lastRuntimeMetricsReportAt: TimeMs;
+  runtimeInputLatencyMetrics: ReturnType<typeof createRuntimeLatencyMetrics>;
+  runtimeFrameTimingMetrics: ReturnType<typeof createRuntimeFrameTimingMetrics>;
   searchDecorations: ISearchDecorationOptions;
   state = {
     searchOptions: {
@@ -218,6 +267,13 @@ export default class Term extends React.PureComponent<
     this.webglFailureThreshold = 3;
     this.webglFailureDecayMs = 15_000;
     this.webglRetryTimer = null;
+    this.frameTimingRaf = null;
+    this.lastFrameTimestamp = null;
+    this.keydownTimestamps = [];
+    this.hasUnreportedRuntimeMetrics = false;
+    this.lastRuntimeMetricsReportAt = asTimeMs(0);
+    this.runtimeInputLatencyMetrics = createRuntimeLatencyMetrics();
+    this.runtimeFrameTimingMetrics = createRuntimeFrameTimingMetrics();
     this.searchDecorations = {
       activeMatchColorOverviewRuler: Color(this.props.cursorColor).hex(),
       matchOverviewRuler: Color(this.props.borderColor).hex(),
@@ -228,37 +284,21 @@ export default class Term extends React.PureComponent<
   }
 
   // The main process shows this in the About dialog
-  static reportRenderer(uid: string, type: string, reason?: RendererFallbackReason) {
-    const rendererTypes = Term.rendererTypes || {};
-    const hasTypeChanged = rendererTypes[uid] !== type;
-    rendererTypes[uid] = type;
-    Term.rendererTypes = rendererTypes;
+  static reportRenderer(payload: RendererReportPayload) {
+    const {uid, type, reason, runtimeMetrics} = payload;
+    const hasTypeChanged = Term.rendererTypes[uid] !== type;
+    Term.rendererTypes[uid] = type;
+    const hasNoUpdateToReport = !hasTypeChanged && !reason && !runtimeMetrics;
 
-    if (!hasTypeChanged && !reason) {
+    if (hasNoUpdateToReport) {
       return;
     }
 
-    if (reason) {
-      transport.emit('info renderer', {uid: asSessionId(uid), type, reason});
-      return;
-    }
-
-    transport.emit('info renderer', {uid: asSessionId(uid), type});
+    transport.emit('info renderer', {uid: asSessionId(uid), type, reason, runtimeMetrics});
   }
 
-  componentDidMount() {
+  private initializeTerminal() {
     const {props} = this;
-
-    this.termOptions = getTermOptions(props);
-    this.term = props.term || new Terminal(this.termOptions);
-    this.defaultBellSound = new Audio(
-      // Source: https://freesound.org/people/altemark/sounds/45759/
-      // This sound is released under the Creative Commons Attribution 3.0 Unported
-      // (CC BY 3.0) license. It was created by 'altemark'. No modifications have been
-      // made, apart from the conversion to base64.
-      'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjMyLjEwNAAAAAAAAAAAAAAA//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTRUoAWgBgkOAGbZHBgG1OF6zM82DWbZaUmMBptgQhGjsyYqc9ae9XFz280948NMBWInljyzsNRFLPWdnZGWrddDsjK1unuSrVN9jJsK8KuQtQCtMBjCEtImISdNKJOopIpBFpNSMbIHCSRpRR5iakjTiyzLhchUUBwCgyKiweBv/7UsQbg8isVNoMPMjAAAA0gAAABEVFGmgqK////9bP/6XCykxBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq'
-    );
-    this.setBellSound(props.bell, props.bellSound);
 
     // The parent element for the terminal is attached and removed manually so
     // that we can preserve it across mounts and unmounts of the component
@@ -273,7 +313,6 @@ export default class Term extends React.PureComponent<
         return props.webLinksActivationKey ? event[`${props.webLinksActivationKey}Key`] : true;
       };
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       this.term.attachCustomKeyEventHandler(this.keyboardHandler);
       this.term.loadAddon(this.fitAddon);
       this.term.loadAddon(this.searchAddon);
@@ -306,6 +345,37 @@ export default class Term extends React.PureComponent<
     if (this.props.isTermActive) {
       this.term.focus();
     }
+  }
+
+  private recordInputLatencyIfAvailable(inputSentAtMs: number) {
+    const keydownAtMs = this.dequeueKeydownTimestamp(asTimeMs(inputSentAtMs));
+    if (keydownAtMs === undefined) {
+      return;
+    }
+
+    this.recordLatencySample(this.runtimeInputLatencyMetrics, inputSentAtMs - keydownAtMs);
+  }
+
+  private setupDataHandler() {
+    const {onData} = this.props;
+    if (!onData) {
+      return;
+    }
+
+    this.disposableListeners.push(
+      this.term.onData((data) => {
+        const inputSentAtMs = clock.now();
+        enqueueInputSendTimestamp(asRendererUid(this.props.uid), inputSentAtMs);
+        this.recordInputLatencyIfAvailable(inputSentAtMs);
+
+        onData(data);
+        this.maybeReportRuntimeMetrics();
+      })
+    );
+  }
+
+  private setupTerminalEventListeners() {
+    const {props} = this;
 
     if (props.onTitle) {
       this.disposableListeners.push(this.term.onTitleChange(props.onTitle));
@@ -318,9 +388,7 @@ export default class Term extends React.PureComponent<
       });
     }
 
-    if (props.onData) {
-      this.disposableListeners.push(this.term.onData(props.onData));
-    }
+    this.setupDataHandler();
 
     this.term.onBell(() => {
       this.ringBell();
@@ -361,13 +429,38 @@ export default class Term extends React.PureComponent<
         }));
       })
     );
+  }
 
+  private setupWindowEventListeners() {
     window.addEventListener('paste', this.onWindowPaste, {
       capture: true
     });
     window.addEventListener('resize', this.scheduleRendererVisibilitySync, {passive: true});
     window.addEventListener('scroll', this.scheduleRendererVisibilitySync, true);
+  }
+
+  private finalizeTerminalMount() {
     this.scheduleRendererVisibilitySync();
+    if (this.props.isActiveRootGroup) {
+      this.startFrameTimingLoop();
+    }
+  }
+
+  componentDidMount() {
+    this.termOptions = getTermOptions(this.props);
+    this.term = this.props.term || new Terminal(this.termOptions);
+    this.defaultBellSound = new Audio(
+      // Source: https://freesound.org/people/altemark/sounds/45759/
+      // This sound is released under the Creative Commons Attribution 3.0 Unported
+      // (CC BY 3.0) license. It was created by 'altemark'. No modifications have been
+      // made, apart from the conversion to base64.
+      'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjMyLjEwNAAAAAAAAAAAAAAA//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTRUoAWgBgkOAGbZHBgG1OF6zM82DWbZaUmMBptgQhGjsyYqc9ae9XFz280948NMBWInljyzsNRFLPWdnZGWrddDsjK1unuSrVN9jJsK8KuQtQCtMBjCEtImISdNKJOopIpBFpNSMbIHCSRpRR5iakjTiyzLhchUUBwCgyKiweBv/7UsQbg8isVNoMPMjAAAA0gAAABEVFGmgqK////9bP/6XCykxBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq'
+    );
+    this.setBellSound(this.props.bell, this.props.bellSound);
+    this.initializeTerminal();
+    this.setupTerminalEventListeners();
+    this.setupWindowEventListeners();
+    this.finalizeTerminalMount();
 
     terms[this.props.uid] = this;
   }
@@ -450,7 +543,8 @@ export default class Term extends React.PureComponent<
     this.term.focus();
   };
 
-  resize(cols: number, rows: number) {
+  resize(size: TerminalSize) {
+    const {cols, rows} = size;
     this.term.resize(cols, rows);
   }
 
@@ -465,9 +559,152 @@ export default class Term extends React.PureComponent<
     this.fitAddon.fit();
   }
 
-  keyboardHandler(e: any) {
+  keyboardHandler = (e: KeyboardEvent & {catched?: boolean}) => {
     // Has Mousetrap flagged this event as a command?
-    return !e.catched;
+    const shouldProcess = !e.catched;
+    if (shouldProcess && this.shouldTrackKeydownForLatency(e)) {
+      this.keydownTimestamps.push(asTimeMs(clock.now()));
+      if (this.keydownTimestamps.length > KEYDOWN_TIMESTAMP_QUEUE_LIMIT) {
+        this.keydownTimestamps = this.keydownTimestamps.slice(-KEYDOWN_TIMESTAMP_QUEUE_LIMIT);
+      }
+    }
+
+    return shouldProcess;
+  };
+
+  private shouldTrackKeydownForLatency(event: KeyboardEvent) {
+    if (event.type !== 'keydown') {
+      return false;
+    }
+
+    if (event.isComposing) {
+      return false;
+    }
+
+    const isAltGraph = event.getModifierState('AltGraph');
+    const isKeyboardShortcut = event.metaKey || (!isAltGraph && (event.ctrlKey || event.altKey));
+    if (isKeyboardShortcut) {
+      return false;
+    }
+
+    return !NON_WRITING_KEYS.has(event.key);
+  }
+
+  private dequeueKeydownTimestamp(nowMs: TimeMs = asTimeMs(clock.now())) {
+    while (this.keydownTimestamps.length > 0) {
+      const timestamp = this.keydownTimestamps.shift();
+      if (timestamp === undefined) {
+        return undefined;
+      }
+
+      if (nowMs - timestamp <= KEYDOWN_TIMESTAMP_MAX_AGE_MS) {
+        return timestamp;
+      }
+    }
+
+    return undefined;
+  }
+
+  private recordLatencySample(metrics: ReturnType<typeof createRuntimeLatencyMetrics>, sampleMs: number) {
+    if (!Number.isFinite(sampleMs)) {
+      return;
+    }
+
+    const sanitizedSampleMs = Math.max(0, sampleMs);
+    metrics.sampleCount += 1;
+    metrics.totalMs += sanitizedSampleMs;
+    metrics.maxMs = Math.max(metrics.maxMs, sanitizedSampleMs);
+    metrics.lastMs = sanitizedSampleMs;
+    this.hasUnreportedRuntimeMetrics = true;
+  }
+
+  private recordFrameTimingSample(frameDurationMs: number) {
+    if (!Number.isFinite(frameDurationMs)) {
+      return;
+    }
+
+    const sanitizedFrameDurationMs = Math.max(0, frameDurationMs);
+    this.runtimeFrameTimingMetrics.sampleCount += 1;
+    this.runtimeFrameTimingMetrics.totalMs += sanitizedFrameDurationMs;
+    this.runtimeFrameTimingMetrics.maxMs = Math.max(this.runtimeFrameTimingMetrics.maxMs, sanitizedFrameDurationMs);
+    this.runtimeFrameTimingMetrics.lastMs = sanitizedFrameDurationMs;
+    if (sanitizedFrameDurationMs > this.runtimeFrameTimingMetrics.longFrameThresholdMs) {
+      this.runtimeFrameTimingMetrics.longFrameCount += 1;
+    }
+    this.hasUnreportedRuntimeMetrics = true;
+  }
+
+  private getCurrentRendererType(): RendererType {
+    return Term.rendererTypes[asRendererUid(this.props.uid)] || 'Canvas';
+  }
+
+  private createRuntimeMetricsSnapshot(): RendererRuntimeMetrics {
+    return {
+      inputKeydownToSend: {...this.runtimeInputLatencyMetrics},
+      frameTiming: {...this.runtimeFrameTimingMetrics},
+      reportIntervalMs: RUNTIME_METRICS_REPORT_INTERVAL_MS,
+      updatedAtMs: clock.now()
+    };
+  }
+
+  private maybeReportRuntimeMetrics(force = false) {
+    if (!this.term) {
+      return;
+    }
+
+    if (!force && !this.hasUnreportedRuntimeMetrics) {
+      return;
+    }
+
+    const now = asTimeMs(clock.now());
+    if (!force && now - this.lastRuntimeMetricsReportAt < RUNTIME_METRICS_REPORT_INTERVAL_MS) {
+      return;
+    }
+
+    this.lastRuntimeMetricsReportAt = now;
+    this.hasUnreportedRuntimeMetrics = false;
+    Term.reportRenderer({
+      uid: asRendererUid(this.props.uid),
+      type: this.getCurrentRendererType(),
+      runtimeMetrics: this.createRuntimeMetricsSnapshot()
+    });
+  }
+
+  private startFrameTimingLoop() {
+    if (this.frameTimingRaf !== null) {
+      return;
+    }
+
+    const onFrame = (timestamp: number) => {
+      this.frameTimingRaf = asTimeMs(window.requestAnimationFrame(onFrame));
+      const currentTimestamp = asTimeMs(timestamp);
+      const shouldTrackFrame = document.visibilityState === 'visible';
+      if (!shouldTrackFrame) {
+        this.lastFrameTimestamp = currentTimestamp;
+        return;
+      }
+
+      if (this.lastFrameTimestamp === null) {
+        this.lastFrameTimestamp = currentTimestamp;
+        return;
+      }
+
+      const frameDurationMs = currentTimestamp - this.lastFrameTimestamp;
+      this.lastFrameTimestamp = currentTimestamp;
+
+      this.recordFrameTimingSample(frameDurationMs);
+      this.maybeReportRuntimeMetrics();
+    };
+
+    this.frameTimingRaf = asTimeMs(window.requestAnimationFrame(onFrame));
+  }
+
+  private stopFrameTimingLoop() {
+    if (this.frameTimingRaf !== null) {
+      window.cancelAnimationFrame(this.frameTimingRaf);
+      this.frameTimingRaf = null;
+    }
+    this.lastFrameTimestamp = null;
   }
 
   setBellSound(bell: 'SOUND' | false, sound: string | null) {
@@ -482,7 +719,7 @@ export default class Term extends React.PureComponent<
     void this.bellSound?.play();
   }
 
-  private recordWebGLFailure(timestamp = clock.now()) {
+  private recordWebGLFailure(timestamp: TimeMs = asTimeMs(clock.now())) {
     this.webglFailureCount += 1;
     this.webglLastFailureAt = timestamp;
   }
@@ -496,7 +733,7 @@ export default class Term extends React.PureComponent<
     this.webglRetryTimer = null;
   }
 
-  private getWebGLRetryDelayMs(currentTime = clock.now()) {
+  private getWebGLRetryDelayMs(currentTime: TimeMs = asTimeMs(clock.now())) {
     if (this.webglFailureCount === 0 || this.webglLastFailureAt === 0) {
       return this.webglCooldownMs;
     }
@@ -563,7 +800,7 @@ export default class Term extends React.PureComponent<
     }
   }
 
-  private hasWebGLFailureCooldown(currentTime = clock.now()) {
+  private hasWebGLFailureCooldown(currentTime: TimeMs = asTimeMs(clock.now())) {
     if (this.webglFailureCount === 0) {
       return false;
     }
@@ -609,20 +846,19 @@ export default class Term extends React.PureComponent<
     return true;
   }
 
-  private isCompletelyOutsideViewport(bounds: DOMRect, viewportWidth: number, viewportHeight: number) {
-    return bounds.right <= 0 || bounds.bottom <= 0 || bounds.left >= viewportWidth || bounds.top >= viewportHeight;
+  private isCompletelyOutsideViewport(bounds: DOMRect, viewport: ViewportDimensions) {
+    return bounds.right <= 0 || bounds.bottom <= 0 || bounds.left >= viewport.width || bounds.top >= viewport.height;
   }
 
   isPaneOccluded(bounds: DOMRect) {
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    const viewport: ViewportDimensions = {width: window.innerWidth, height: window.innerHeight};
 
-    if (this.isCompletelyOutsideViewport(bounds, viewportWidth, viewportHeight)) {
+    if (this.isCompletelyOutsideViewport(bounds, viewport)) {
       return true;
     }
 
-    const sampleX = Math.max(0, Math.min(viewportWidth - 1, bounds.left + bounds.width / 2));
-    const sampleY = Math.max(0, Math.min(viewportHeight - 1, bounds.top + bounds.height / 2));
+    const sampleX = Math.max(0, Math.min(viewport.width - 1, bounds.left + bounds.width / 2));
+    const sampleY = Math.max(0, Math.min(viewport.height - 1, bounds.top + bounds.height / 2));
     const topElement = document.elementFromPoint(sampleX, sampleY);
 
     if (!topElement) {
@@ -659,7 +895,7 @@ export default class Term extends React.PureComponent<
       this.term.loadAddon(this.ligaturesAddon);
     }
 
-    Term.reportRenderer(this.props.uid, 'Canvas', reason);
+    Term.reportRenderer({uid: asRendererUid(this.props.uid), type: 'Canvas', reason});
   }
 
   detachWebGLRenderer() {
@@ -704,7 +940,7 @@ export default class Term extends React.PureComponent<
 
       this.markWebGLInitSuccess();
       this.clearRendererRetryTimer();
-      Term.reportRenderer(this.props.uid, 'WebGL');
+      Term.reportRenderer({uid: asRendererUid(this.props.uid), type: 'WebGL'});
     } catch (error) {
       console.warn('WebGL renderer initialization failed. Falling back to canvas-based rendering.', error);
       this.recordWebGLFailure();
@@ -753,20 +989,26 @@ export default class Term extends React.PureComponent<
     );
   }
 
-  componentDidUpdate(prevProps: TermProps) {
+  private handleClearedStateChange(prevProps: TermProps): void {
     if (!prevProps.cleared && this.props.cleared) {
       this.clear();
     }
+  }
 
-    const nextTermOptions = getTermOptions(this.props);
-
+  private handleBellSoundUpdate(prevProps: TermProps): void {
     if (prevProps.bell !== this.props.bell || prevProps.bellSound !== this.props.bellSound) {
       this.setBellSound(this.props.bell, this.props.bellSound);
     }
+  }
 
+  private handleSearchBoxUpdate(prevProps: TermProps): void {
     if (prevProps.search && !this.props.search) {
       this.closeSearchBox();
     }
+  }
+
+  private handleTerminalOptionsUpdate(): void {
+    const nextTermOptions = getTermOptions(this.props);
 
     // Update only options that have changed.
     this.term.options = pickBy(
@@ -775,23 +1017,50 @@ export default class Term extends React.PureComponent<
     );
 
     this.termOptions = nextTermOptions;
+  }
 
+  private handlePaddingUpdate(): void {
     if (this.term.element) {
       this.term.element.style.padding = this.props.padding;
     }
+  }
 
+  private handleResizeUpdate(prevProps: TermProps): void {
     if (this.hasFontPropsChanged(prevProps)) {
       // resize to fit the container
       this.fitResize();
     }
 
-    if (prevProps.rows !== this.props.rows || prevProps.cols !== this.props.cols) {
-      this.resize(this.props.cols!, this.props.rows!);
+    const hasTerminalSize = typeof this.props.cols === 'number' && typeof this.props.rows === 'number';
+    const hasTerminalSizeChanged =
+      hasTerminalSize && (prevProps.rows !== this.props.rows || prevProps.cols !== this.props.cols);
+    if (hasTerminalSizeChanged) {
+      this.resize({cols: this.props.cols, rows: this.props.rows});
     }
+  }
+
+  private handleActiveRootGroupChange(prevProps: TermProps): void {
+    if (!prevProps.isActiveRootGroup && this.props.isActiveRootGroup) {
+      this.startFrameTimingLoop();
+    } else if (prevProps.isActiveRootGroup && !this.props.isActiveRootGroup) {
+      this.maybeReportRuntimeMetrics(true);
+      this.stopFrameTimingLoop();
+    }
+  }
+
+  componentDidUpdate(prevProps: TermProps) {
+    this.handleClearedStateChange(prevProps);
+    this.handleBellSoundUpdate(prevProps);
+    this.handleSearchBoxUpdate(prevProps);
+    this.handleTerminalOptionsUpdate();
+    this.handlePaddingUpdate();
+    this.handleResizeUpdate(prevProps);
 
     if (this.hasRendererPropsChanged(prevProps)) {
       this.scheduleRendererVisibilitySync();
     }
+
+    this.handleActiveRootGroupChange(prevProps);
   }
 
   onTermWrapperRef = (component: HTMLElement | null) => {
@@ -827,6 +1096,7 @@ export default class Term extends React.PureComponent<
     this.disposableListeners.forEach((handler) => handler.dispose());
     this.disposableListeners = [];
 
+    this.maybeReportRuntimeMetrics(true);
     this.detachWebGLRenderer();
     this.canvasAddon?.dispose();
     this.canvasAddon = null;
@@ -837,6 +1107,9 @@ export default class Term extends React.PureComponent<
       this.visibilityFrame = null;
     }
     this.clearRendererRetryTimer();
+    this.stopFrameTimingLoop();
+    clearInputSendTimestamps(asRendererUid(this.props.uid));
+    this.keydownTimestamps.length = 0;
     this.resizeObserver?.disconnect();
     clearTimeout(this.resizeTimeout);
     window.removeEventListener('resize', this.scheduleRendererVisibilitySync);

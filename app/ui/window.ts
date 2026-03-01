@@ -13,7 +13,7 @@ import {v4 as uuidv4} from 'uuid';
 
 import type {sessionExtraOptions} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
-import {asCommandId, asProfileId, asSessionId} from '../utils/shared-ids';
+import {asCommandId, asProfileId, asRendererUid, asSessionId} from '../utils/shared-ids';
 import {execCommand} from '../commands';
 import {getDefaultProfile} from '../config';
 import {icon, homeDirectory} from '../config/paths';
@@ -23,7 +23,8 @@ import {decorateSessionOptions, decorateSessionClass} from '../plugins';
 import createRPC from '../rpc';
 import Session from '../session';
 import updater from '../updater';
-import {setRendererType, unsetRendererType} from '../utils/renderer-utils';
+import {clock} from '../utils/clock';
+import {recordInputSendToWriteLatency, setRendererType, unsetRendererType} from '../utils/renderer-utils';
 import toElectronBackgroundColor from '../utils/to-electron-background-color';
 
 import contextMenuTemplate from './contextmenu';
@@ -331,7 +332,7 @@ export function newWindow(
 
       session.on('exit', () => {
         rpc.emit('session exit', {uid: asSessionId(options.uid)});
-        unsetRendererType(options.uid);
+        unsetRendererType(asRendererUid(options.uid));
         sessions.delete(options.uid);
       });
     } catch (error) {
@@ -369,23 +370,29 @@ export function newWindow(
       session.resize({cols, rows});
     }
   });
-  rpc.on('data', ({uid, data, escaped}) => {
-    const session = uid && sessions.get(uid);
-    if (session) {
-      if (escaped) {
-        const escapedData = session.shell?.endsWith('cmd.exe')
-          ? `"${data}"` // This is how cmd.exe does it
-          : `'${data.replace(/'/g, `'\\''`)}'`; // Inside a single-quoted string nothing is interpreted
+  rpc.on('data', ({uid, data, escaped, inputSentAtMs}) => {
+    if (!uid) {
+      return;
+    }
 
-        session.write(escapedData);
-      } else {
-        session.write(data);
+    const session = sessions.get(uid);
+    if (session) {
+      const payload = escaped
+        ? session.shell?.endsWith('cmd.exe')
+          ? `"${data}"` // This is how cmd.exe does it
+          : `'${data.replace(/'/g, `'\\''`)}'` // Inside a single-quoted string nothing is interpreted
+        : data;
+      const writeTimestampMs = clock.now();
+
+      session.write(payload);
+      if (typeof inputSentAtMs === 'number') {
+        recordInputSendToWriteLatency(asRendererUid(uid), writeTimestampMs - inputSentAtMs);
       }
     }
   });
-  rpc.on('info renderer', ({uid, type, reason}) => {
+  rpc.on('info renderer', ({uid, type, reason, runtimeMetrics}) => {
     // Used in the "About" dialog
-    setRendererType(uid, type, reason);
+    setRendererType(asRendererUid(uid), type, reason, runtimeMetrics);
   });
   rpc.on('open external', ({url}) => {
     void shell.openExternal(url);

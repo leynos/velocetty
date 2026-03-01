@@ -3,7 +3,7 @@ const fs = require('fs-extra');
 
 function copyNodeModules() {
   const baseDir = path.resolve(__dirname, '..');
-  const sourceDir = path.join(baseDir, 'target', 'node_modules');
+  const sourceDir = path.join(baseDir, 'dist', 'app', 'node_modules');
   const destinationDir = path.join(baseDir, 'app', 'node_modules');
   const excludedSegments = [
     path.join('node-pty', 'build', 'node_gyp_bins'),

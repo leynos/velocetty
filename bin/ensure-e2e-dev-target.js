@@ -2,8 +2,8 @@
 
 /**
  * @file Ensures development Electron target artefacts exist before fast E2E runs.
- * Invariant: `target/` must contain runnable app entrypoints for direct Electron
- * CLI launches used by development-lane E2E tests.
+ * Invariant: `dist/app/` must contain runnable app entrypoints for direct
+ * Electron CLI launches used by development-lane E2E tests.
  */
 
 const {cpSync, existsSync, rmSync, symlinkSync} = require('node:fs');
@@ -12,15 +12,15 @@ const {spawnSync} = require('node:child_process');
 
 const repositoryRoot = path.resolve(__dirname, '..');
 const requiredTargetFiles = [
-  'target/index.js',
-  'target/index.html',
-  'target/package.json',
-  'target/renderer/bundle.js'
+  'dist/app/index.js',
+  'dist/app/index.html',
+  'dist/app/package.json',
+  'dist/app/renderer/bundle.js'
 ];
 
-const tsBuildInfoPath = path.join(repositoryRoot, 'target/tsconfig.tsbuildinfo');
+const tsBuildInfoPath = path.join(repositoryRoot, 'dist/app/tsconfig.tsbuildinfo');
 
-const targetNodeModulesPath = path.join(repositoryRoot, 'target/node_modules');
+const targetNodeModulesPath = path.join(repositoryRoot, 'dist/app/node_modules');
 const appNodeModulesPath = path.join(repositoryRoot, 'app/node_modules');
 
 const clearStaleTsBuildInfo = () => {
@@ -42,14 +42,14 @@ const ensureTargetNodeModules = () => {
 
   try {
     symlinkSync(symlinkTarget, targetNodeModulesPath, process.platform === 'win32' ? 'junction' : 'dir');
-    console.log('[e2e:prepare] Linked target/node_modules to app/node_modules.');
+    console.log('[e2e:prepare] Linked dist/app/node_modules to app/node_modules.');
     return;
   } catch (error) {
     console.warn('[e2e:prepare] Could not create node_modules symlink, falling back to copy.', error);
   }
 
   cpSync(appNodeModulesPath, targetNodeModulesPath, {recursive: true, dereference: false});
-  console.log('[e2e:prepare] Copied app/node_modules into target/node_modules.');
+  console.log('[e2e:prepare] Copied app/node_modules into dist/app/node_modules.');
 };
 
 const getMissingTargetFiles = () => {
@@ -77,12 +77,12 @@ const ensureDevelopmentTarget = () => {
   const missingBeforeBuild = getMissingTargetFiles();
   if (missingBeforeBuild.length === 0) {
     ensureTargetNodeModules();
-    console.log('[e2e:prepare] Development target already present.');
+    console.log('[e2e:prepare] Development app output already present.');
     return;
   }
 
   console.log(
-    `[e2e:prepare] Missing development target artefacts (${missingBeforeBuild.join(', ')}). Rebuilding target for E2E.`
+    `[e2e:prepare] Missing development app output artefacts (${missingBeforeBuild.join(', ')}). Rebuilding dist/app for E2E.`
   );
 
   runBunCommand('Build Hyper app and renderer artefacts', [
@@ -93,18 +93,18 @@ const ensureDevelopmentTarget = () => {
 
   clearStaleTsBuildInfo();
 
-  runBunCommand('Compile Electron main-process target', ['x', 'tsgo', '--project', 'app/tsconfig.json']);
+  runBunCommand('Compile Electron main-process output', ['x', 'tsgo', '--project', 'app/tsconfig.json']);
 
   ensureTargetNodeModules();
 
   const missingAfterBuild = getMissingTargetFiles();
   if (missingAfterBuild.length > 0) {
     throw new Error(
-      `[e2e:prepare] Development target is still incomplete after rebuild. Missing: ${missingAfterBuild.join(', ')}`
+      `[e2e:prepare] Development app output is still incomplete after rebuild. Missing: ${missingAfterBuild.join(', ')}`
     );
   }
 
-  console.log('[e2e:prepare] Development target rebuild complete.');
+  console.log('[e2e:prepare] Development app output rebuild complete.');
 };
 
 ensureDevelopmentTarget();

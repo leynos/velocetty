@@ -2,10 +2,10 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "composite": false,
-    "noEmit": true,
-    "outDir": "../dist/tmp/shared",
+    "declaration": true,
+    "outDir": "../dist/shared",
     "rootDir": "./src",
-    "tsBuildInfoFile": "../dist/tmp/shared/tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "../dist/shared/tsconfig.tsbuildinfo"
   },
   "include": ["./src/**/*"],
   "exclude": ["../dist/", "../node_modules/", "../target/"]

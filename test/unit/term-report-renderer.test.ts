@@ -1,9 +1,12 @@
 /** @file Verifies Term.reportRenderer emits via transport with deduplication. */
 import {afterAll, beforeAll, beforeEach, describe, expect, mock, test} from 'bun:test';
+import {asRendererUid} from '@shared/types/common';
+import {LONG_FRAME_THRESHOLD_MS, RUNTIME_METRICS_REPORT_INTERVAL_MS} from '@shared/constants/runtime-telemetry';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
+import {clock} from '../../lib/utils/clock';
 
 /** Type guard to identify WebGL addons by their onContextLoss method. */
 function isWebGLAddon(addon: unknown): addon is {onContextLoss: () => void} {
@@ -85,35 +88,35 @@ afterAll(() => {
 beforeEach(() => {
   resetTransportMock();
   // Reset the static renderer type cache between tests.
-  Term.rendererTypes = {};
+  Term.rendererTypes = {} as typeof Term.rendererTypes;
 });
 
 describe('Term.reportRenderer transport emit', () => {
   test('emits info renderer via transport on first call', () => {
-    Term.reportRenderer('uid-1', 'WebGL');
+    Term.reportRenderer({uid: asRendererUid('uid-1'), type: 'WebGL'});
 
     expect(transportMock.emit).toHaveBeenCalledTimes(1);
     expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {uid: 'uid-1', type: 'WebGL'});
   });
 
-  test('deduplicates when called with the same uid and type', () => {
-    Term.reportRenderer('uid-2', 'WebGL');
-    Term.reportRenderer('uid-2', 'WebGL');
+  test('does not emit when renderer type is unchanged and no reason or runtimeMetrics are provided', () => {
+    Term.reportRenderer({uid: asRendererUid('uid-2'), type: 'WebGL'});
+    Term.reportRenderer({uid: asRendererUid('uid-2'), type: 'WebGL'});
 
     expect(transportMock.emit).toHaveBeenCalledTimes(1);
   });
 
   test('emits again when the renderer type changes for the same uid', () => {
-    Term.reportRenderer('uid-3', 'WebGL');
-    Term.reportRenderer('uid-3', 'Canvas');
+    Term.reportRenderer({uid: asRendererUid('uid-3'), type: 'WebGL'});
+    Term.reportRenderer({uid: asRendererUid('uid-3'), type: 'Canvas'});
 
     expect(transportMock.emit).toHaveBeenCalledTimes(2);
     expect(transportMock.emit).toHaveBeenLastCalledWith('info renderer', {uid: 'uid-3', type: 'Canvas'});
   });
 
   test('deduplication is per-uid, not global by type', () => {
-    Term.reportRenderer('uid-4', 'WebGL');
-    Term.reportRenderer('uid-5', 'WebGL');
+    Term.reportRenderer({uid: asRendererUid('uid-4'), type: 'WebGL'});
+    Term.reportRenderer({uid: asRendererUid('uid-5'), type: 'WebGL'});
 
     expect(transportMock.emit).toHaveBeenCalledTimes(2);
     expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {uid: 'uid-4', type: 'WebGL'});
@@ -121,8 +124,8 @@ describe('Term.reportRenderer transport emit', () => {
   });
 
   test('emits fallback reason even when renderer type is unchanged', () => {
-    Term.reportRenderer('uid-6', 'Canvas');
-    Term.reportRenderer('uid-6', 'Canvas', 'context-loss');
+    Term.reportRenderer({uid: asRendererUid('uid-6'), type: 'Canvas'});
+    Term.reportRenderer({uid: asRendererUid('uid-6'), type: 'Canvas', reason: 'context-loss'});
 
     expect(transportMock.emit).toHaveBeenCalledTimes(2);
     expect(transportMock.emit).toHaveBeenLastCalledWith('info renderer', {
@@ -133,14 +136,45 @@ describe('Term.reportRenderer transport emit', () => {
   });
 
   test('keeps plain renderer deduplication after a reasoned fallback event', () => {
-    Term.reportRenderer('uid-7', 'Canvas', 'pool-evicted');
-    Term.reportRenderer('uid-7', 'Canvas');
+    Term.reportRenderer({uid: asRendererUid('uid-7'), type: 'Canvas', reason: 'pool-evicted'});
+    Term.reportRenderer({uid: asRendererUid('uid-7'), type: 'Canvas'});
 
     expect(transportMock.emit).toHaveBeenCalledTimes(1);
     expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {
       uid: 'uid-7',
       type: 'Canvas',
       reason: 'pool-evicted'
+    });
+  });
+
+  test('emits when only runtimeMetrics change for the same renderer type', () => {
+    const runtimeMetrics = {
+      inputKeydownToSend: {
+        sampleCount: 2,
+        totalMs: 30,
+        maxMs: 20,
+        lastMs: 10
+      },
+      frameTiming: {
+        sampleCount: 3,
+        totalMs: 48,
+        maxMs: 18,
+        lastMs: 16,
+        longFrameCount: 1,
+        longFrameThresholdMs: LONG_FRAME_THRESHOLD_MS
+      },
+      reportIntervalMs: RUNTIME_METRICS_REPORT_INTERVAL_MS,
+      updatedAtMs: clock.now()
+    } as const;
+
+    Term.reportRenderer({uid: asRendererUid('uid-8'), type: 'Canvas'});
+    Term.reportRenderer({uid: asRendererUid('uid-8'), type: 'Canvas', runtimeMetrics});
+
+    expect(transportMock.emit).toHaveBeenCalledTimes(2);
+    expect(transportMock.emit).toHaveBeenLastCalledWith('info renderer', {
+      uid: 'uid-8',
+      type: 'Canvas',
+      runtimeMetrics
     });
   });
 });
@@ -170,13 +204,18 @@ describe('Term.ensureWebGLRenderer fallback handling', () => {
 });
 
 describe('Term WebGL context-loss and eviction handlers', () => {
-  test('onWebGLContextLoss emits context-loss fallback and schedules retry', () => {
-    const termInstance = createTermInstanceForWebGLFallbackTest('uid-context-loss');
+  const setupWebGLFallbackTest = (uid: string) => {
+    const termInstance = createTermInstanceForWebGLFallbackTest(uid);
     termInstance.detachWebGLRenderer = mock(() => {});
     termInstance.ensureCanvasRenderer = mock(() => {});
     termInstance.scheduleRendererVisibilitySync = mock(() => {});
     termInstance.scheduleDeterministicRendererRetry = mock(() => {});
     termInstance.webglFailureCount = 0;
+    return termInstance;
+  };
+
+  test('onWebGLContextLoss emits context-loss fallback and schedules retry', () => {
+    const termInstance = setupWebGLFallbackTest('uid-context-loss');
 
     termInstance.onWebGLContextLoss();
 
@@ -187,12 +226,7 @@ describe('Term WebGL context-loss and eviction handlers', () => {
   });
 
   test('onWebGLEvicted emits pool-evicted fallback and uses delayed retry path only', () => {
-    const termInstance = createTermInstanceForWebGLFallbackTest('uid-evicted');
-    termInstance.detachWebGLRenderer = mock(() => {});
-    termInstance.ensureCanvasRenderer = mock(() => {});
-    termInstance.scheduleRendererVisibilitySync = mock(() => {});
-    termInstance.scheduleDeterministicRendererRetry = mock(() => {});
-    termInstance.webglFailureCount = 0;
+    const termInstance = setupWebGLFallbackTest('uid-evicted');
 
     termInstance.onWebGLEvicted();
 
@@ -200,5 +234,54 @@ describe('Term WebGL context-loss and eviction handlers', () => {
     expect(termInstance.ensureCanvasRenderer).toHaveBeenCalledWith('pool-evicted');
     expect(termInstance.scheduleRendererVisibilitySync).not.toHaveBeenCalled();
     expect(termInstance.scheduleDeterministicRendererRetry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Term runtime metrics flush behaviour', () => {
+  test('forces runtimeMetrics emission during teardown so pending metrics are not lost', () => {
+    const uid = 'uid-force-flush';
+    const termInstance = createTermInstanceForWebGLFallbackTest(uid);
+    // @ts-expect-error The teardown path only checks for a truthy terminal reference.
+    termInstance.term = {};
+    termInstance.runtimeInputLatencyMetrics = {
+      sampleCount: 3,
+      totalMs: 45,
+      maxMs: 20,
+      lastMs: 15
+    };
+    termInstance.runtimeFrameTimingMetrics = {
+      sampleCount: 3,
+      totalMs: 52,
+      maxMs: 21,
+      lastMs: 17,
+      longFrameCount: 1,
+      longFrameThresholdMs: LONG_FRAME_THRESHOLD_MS
+    };
+    termInstance.hasUnreportedRuntimeMetrics = true;
+    termInstance.componentWillUnmount();
+
+    expect(transportMock.emit).toHaveBeenCalledTimes(1);
+    expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {
+      uid,
+      type: 'Canvas',
+      runtimeMetrics: {
+        inputKeydownToSend: {
+          sampleCount: 3,
+          totalMs: 45,
+          maxMs: 20,
+          lastMs: 15
+        },
+        frameTiming: {
+          sampleCount: 3,
+          totalMs: 52,
+          maxMs: 21,
+          lastMs: 17,
+          longFrameCount: 1,
+          longFrameThresholdMs: LONG_FRAME_THRESHOLD_MS
+        },
+        reportIntervalMs: RUNTIME_METRICS_REPORT_INTERVAL_MS,
+        updatedAtMs: expect.any(Number)
+      }
+    });
   });
 });

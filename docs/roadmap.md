@@ -166,12 +166,16 @@ Scope notes:
   - [x] Record fallback events and reasons.
   - [x] Success criteria: metrics are visible in a developer diagnostics view or
     log output.
-- [ ] 2.2.2. Add PTY output batching and frame timing metrics. See
+- [x] 2.2.2. Add PTY output batching and frame timing metrics. See
   [velocetty-design.md](velocetty-design.md) §Render scheduling and
   §Observability.
-  - [ ] Track input latency and long-frame counts.
-  - [ ] Confirm batching thresholds mirror existing semantics.
-  - [ ] Success criteria: benchmarks demonstrate stable frame times under
+  - [x] Add a synthetic-load benchmark command and evidence-path contract:
+    `bun run benchmark:pty-frame-timing` writes
+    `/tmp/benchmark-<project>-<branch>-pty-frame-timing-synthetic-load.json`
+    by default.
+  - [x] Track input latency and long-frame counts.
+  - [x] Confirm batching thresholds mirror existing semantics.
+  - [x] Success criteria: benchmarks demonstrate stable frame times under
     synthetic load.
 
 ## 3. Configuration system: JSON5 and layering

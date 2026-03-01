@@ -7,10 +7,14 @@ import {getConfig} from '../config';
 import {icon} from '../config/paths';
 import {getDecoratedKeymaps} from '../plugins';
 import {
+  getAggregatedInputSendToWriteLatencyMetrics,
+  getAggregatedRendererRuntimeMetrics,
+  getPtyBatchingThresholdMetrics,
   getRendererTypes,
   getRendererFallbackReasonCounts,
   getRendererWebGLContextCounts
 } from '../utils/renderer-utils';
+import type {RuntimeLatencyMetrics} from '@shared/types/common';
 
 import darwinMenu from './menus/darwin';
 import editMenu from './menus/edit';
@@ -24,6 +28,17 @@ const appName = app.name;
 const appVersion = app.getVersion();
 
 let menu_: Menu;
+const formatAverageMs = (totalMs: number, sampleCount: number) =>
+  sampleCount > 0 ? (totalMs / sampleCount).toFixed(2) : 'n/a';
+const formatLatencySummary = (metrics: RuntimeLatencyMetrics) => {
+  if (metrics.sampleCount === 0) {
+    return 'no samples';
+  }
+
+  return `avg ${formatAverageMs(metrics.totalMs, metrics.sampleCount)}ms, max ${metrics.maxMs.toFixed(
+    2
+  )}ms, last ${metrics.lastMs.toFixed(2)}ms (n=${metrics.sampleCount})`;
+};
 
 export const createMenu = (getLoadedPluginVersions: () => {name: string; version: string}[]) => {
   const config = getConfig();
@@ -58,6 +73,9 @@ export const createMenu = (getLoadedPluginVersions: () => {name: string; version
       .map(([reason, count]) => reason + (count > 1 ? ` (${count})` : ''))
       .join(', ');
     const webGLContextCounts = getRendererWebGLContextCounts();
+    const rendererRuntimeMetrics = getAggregatedRendererRuntimeMetrics();
+    const inputSendToWriteLatency = getAggregatedInputSendToWriteLatencyMetrics();
+    const batchingThresholdMetrics = getPtyBatchingThresholdMetrics();
 
     void dialog.showMessageBox({
       title: `About ${appName}`,
@@ -66,6 +84,22 @@ export const createMenu = (getLoadedPluginVersions: () => {name: string; version
         `Renderers: ${renderers}\n` +
         `WebGL contexts: current ${webGLContextCounts.current}, peak ${webGLContextCounts.peak}\n` +
         `Renderer fallbacks: total ${fallbackTotal}; reasons: ${fallbackReasons || 'none'}\n` +
+        `Input latency: keydown->send ${formatLatencySummary(
+          rendererRuntimeMetrics.inputKeydownToSend
+        )}; send->write ${formatLatencySummary(inputSendToWriteLatency)}\n` +
+        `Frame timing: avg ${formatAverageMs(
+          rendererRuntimeMetrics.frameTiming.totalMs,
+          rendererRuntimeMetrics.frameTiming.sampleCount
+        )}ms, max ${rendererRuntimeMetrics.frameTiming.maxMs.toFixed(2)}ms, long frames ${
+          rendererRuntimeMetrics.frameTiming.longFrameCount
+        } (> ${rendererRuntimeMetrics.frameTiming.longFrameThresholdMs}ms, n=${
+          rendererRuntimeMetrics.frameTiming.sampleCount
+        })\n` +
+        `PTY batching thresholds: ${batchingThresholdMetrics.durationMs}ms / ${
+          batchingThresholdMetrics.maxKilobytes
+        }KB (${batchingThresholdMetrics.maxBytes} bytes); parity ${
+          batchingThresholdMetrics.parity ? 'ok' : 'mismatch'
+        }\n` +
         `Plugins: ${pluginList}\n\n` +
         'Created by Guillermo Rauch\nCopyright © 2022 Vercel, Inc.',
       buttons: [],
