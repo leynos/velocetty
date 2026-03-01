@@ -1778,6 +1778,80 @@ Context loss recovery:
 
 
 
+### Renderer styling migration model
+
+
+
+The renderer styling migration away from `styled-jsx` follows a model where
+
+components import local CSS Modules, use CSS custom properties for dynamic
+
+theme values, and reference explicit global styles only where required.
+
+
+
+For screen readers: The following class diagram shows how renderer components,
+
+CSS Modules, global stylesheets, theme custom properties, and the esbuild
+
+pipeline loaders interact during the migration path.
+
+
+
+```mermaid
+classDiagram
+  class RendererComponent {
+    +render(props) JSXElement
+    +applyLocalStyles()
+    +applyDynamicTheme(themeVars)
+  }
+
+  class CssModuleFile {
+    <<module>>
+    +classes : Record~string, string~
+  }
+
+  class GlobalStylesheet {
+    <<stylesheet>>
+    +selectors : string[]
+    +applyGlobalSelectors()
+  }
+
+  class CustomPropertiesTheme {
+    +vars : Record~string, string~
+    +fromProps(foregroundColor, backgroundColor, borderColor, selectionColor, font) CustomPropertiesTheme
+  }
+
+  class EsbuildPipeline {
+    +configureCssLoaders()
+    +bundleRendererSources()
+  }
+
+  class CssModulesLoader {
+    +pattern : string~"*.module.css"~
+    +mode : string~"local-css"~
+    +transform(cssPath, tsxImporter) CssModuleFile
+  }
+
+  class GlobalCssLoader {
+    +pattern : string~"*.css"~
+    +mode : string~"css"~
+    +transform(cssPath) GlobalStylesheet
+  }
+
+  RendererComponent --> CssModuleFile : imports
+  RendererComponent --> CustomPropertiesTheme : uses
+  RendererComponent --> GlobalStylesheet : may_reference
+
+  EsbuildPipeline --> CssModulesLoader : configures
+  EsbuildPipeline --> GlobalCssLoader : configures
+
+  CssModulesLoader --> CssModuleFile : produces
+  GlobalCssLoader --> GlobalStylesheet : produces
+```
+
+
+
 ## Host migration: Electron to Tauri
 
 
