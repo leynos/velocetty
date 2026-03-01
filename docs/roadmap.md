@@ -138,6 +138,48 @@ Scope notes:
   - [x] Success criteria: CI lanes are green for macOS aarch64, Linux aarch64,
     and Windows x64; armv7 lanes are removed; Windows aarch64 is either running
     in CI or explicitly tracked as blocked with a documented mitigation path.
+- [ ] 1.4.16. Publish the styled-jsx-to-CSS-Modules migration approach and
+  inventory for Babel removal. Requires 1.4.14.
+  See [adr-002-replace-webpack-babel-with-esbuild.md](adr-002-replace-webpack-babel-with-esbuild.md)
+  §Required plugin and bespoke-transform analysis, and
+  [1-4-16-migrate-styled-jsx-to-css-modules-and-remove-babel.md](execplans/1-4-16-migrate-styled-jsx-to-css-modules-and-remove-babel.md).
+  - [ ] Document all `styled-jsx` callsites and classify by migration pattern
+    (local static, local dynamic, and global selectors).
+  - [ ] Define the target renderer styling model (CSS Modules for local scope,
+    explicit global path for app-wide selectors, and custom-property policy for
+    dynamic values).
+  - [ ] Success criteria: migration approach document is published with worked
+    examples tied to repository files and an explicit decommission checklist.
+- [ ] 1.4.17. Migrate renderer style blocks from styled-jsx to CSS Modules.
+  Requires 1.4.16.
+  See [velocetty-design.md](velocetty-design.md) §Renderer process and
+  [1-4-16-migrate-styled-jsx-to-css-modules-and-remove-babel.md](execplans/1-4-16-migrate-styled-jsx-to-css-modules-and-remove-babel.md).
+  - [ ] Add esbuild CSS Modules support (`.module.css` using `local-css`) and
+    TypeScript module declarations for CSS imports.
+  - [ ] Migrate `lib/components/**` and `lib/containers/hyper.tsx` away from
+    `<style jsx>` and `<style jsx global>` with parity-focused tests.
+  - [ ] Success criteria: no renderer source files contain `<style jsx` and
+    style behaviour remains stable in unit and end-to-end checks.
+- [ ] 1.4.18. Remove styled-jsx bridge tooling and bridge-only Babel
+  dependencies after migration parity is complete. Requires 1.4.17.
+  See [adr-002-replace-webpack-babel-with-esbuild.md](adr-002-replace-webpack-babel-with-esbuild.md)
+  §Validation gaps and required testing coverage.
+  - [ ] Remove bridge integration from `build/esbuild/run-esbuild.ts` and
+    remove bridge implementation files/constants.
+  - [ ] Remove `typings/styled-jsx.d.ts` and update migration contract tests to
+    validate CSS Modules outputs instead of `styled-jsx/style` transforms.
+  - [ ] Remove bridge-only Babel and styled-jsx dependencies from manifests and
+    lockfile once build/test gates are green.
+  - [ ] Success criteria: `bun install`, `make build`, `make check-fmt`,
+    `make lint`, and `make test` pass with no direct styled-jsx bridge path.
+- [ ] 1.4.19. Close post-removal hardening tasks for security and compatibility.
+  Requires 1.4.18 and 9.2.4.
+  - [ ] Reassess Content Security Policy (CSP) constraints that were tied to
+    inline style transform behaviour and document any remaining blocker.
+  - [ ] Confirm plugin/custom CSS compatibility expectations and open tracking
+    issues for any intentional breakage with ownership and mitigation.
+  - [ ] Success criteria: follow-up constraints are either resolved or tracked
+    with explicit owners and review dates.
 
 ## 2. Rendering overhaul
 
@@ -426,6 +468,14 @@ Scope notes:
     pushes to `master` and `canary`.
   - [x] Retain deep-lane failure artefacts (stdout/stderr, renderer console,
     screenshots, and traces).
+- [ ] 9.2.4. Add integration and end-to-end regression coverage for styled-jsx
+  removal and CSS Modules parity. Requires 1.4.17 and 9.2.3.
+  - [ ] Add assertions that renderer startup and bundled output contain no
+    unresolved styled-jsx runtime imports.
+  - [ ] Add migration-focused parity checks for local styles, global selectors,
+    and dynamic theme values.
+  - [ ] Success criteria: fast and deep end-to-end lanes pass without style
+    regressions after the bridge is removed.
 
 ### 9.3. Unit-test isolation and concurrency safety
 

@@ -230,13 +230,14 @@ if [ -z "$safe_branch_name" ]; then
   safe_branch_name="branch"
 fi
 system_tmp_dir="$(node -p \"require('node:os').tmpdir()\")"
+benchmark_evidence_path="${system_tmp_dir}/benchmark-${safe_project_name}-${safe_branch_name}-pty-frame-timing-synthetic-load.json"
 bun install 2>&1 | tee "/tmp/install-${safe_project_name}-${safe_branch_name}.out"
 make build 2>&1 | tee "/tmp/build-${safe_project_name}-${safe_branch_name}.out"
 make check-fmt 2>&1 | tee "/tmp/check-fmt-${safe_project_name}-${safe_branch_name}.out"
 make lint 2>&1 | tee "/tmp/lint-${safe_project_name}-${safe_branch_name}.out"
 make test 2>&1 | tee "/tmp/test-${safe_project_name}-${safe_branch_name}.out"
 bun run benchmark:pty-frame-timing -- \
-  --evidence-path "${system_tmp_dir}/benchmark-${safe_project_name}-${safe_branch_name}-pty-frame-timing-synthetic-load.json" \
+  --evidence-path "${benchmark_evidence_path}" \
   2>&1 | tee "/tmp/benchmark-${safe_project_name}-${safe_branch_name}.out"
 ```
 
