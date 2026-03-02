@@ -69,15 +69,6 @@ const skipBlockComment = (raw: string, startIndex: number, limitIndex: number): 
   return hasRoomForCommentEnd(index, limitIndex) ? index + 2 : limitIndex;
 };
 
-const isAtTopLevel = (state: ParsingState, bracketDepth: number): boolean => state.depth === 0 && bracketDepth === 0;
-
-const isValueTerminator = (current: string, state: ParsingState, bracketDepth: number): boolean => {
-  if (!isAtTopLevel(state, bracketDepth)) {
-    return false;
-  }
-  return current === '}' || current === ',';
-};
-
 const updateBracketDepth = (current: string, bracketDepth: number): number => {
   if (current === '[') {
     return bracketDepth + 1;
@@ -256,6 +247,17 @@ export class Json5Parser {
     return -1;
   }
 
+  private isAtTopLevel(state: ParsingState, bracketDepth: number): boolean {
+    return state.depth === 0 && bracketDepth === 0;
+  }
+
+  private isValueTerminator(current: string, state: ParsingState, bracketDepth: number): boolean {
+    const atTopLevel = this.isAtTopLevel(state, bracketDepth);
+    const isClosingBrace = current === '}';
+    const isComma = current === ',';
+    return atTopLevel && (isClosingBrace || isComma);
+  }
+
   private findPropertyValueEnd(range: ParseRange): number {
     let state: ParsingState = {
       depth: 0,
@@ -287,7 +289,7 @@ export class Json5Parser {
         continue;
       }
 
-      if (isValueTerminator(current, state, bracketDepth)) {
+      if (this.isValueTerminator(current, state, bracketDepth)) {
         return index;
       }
 
