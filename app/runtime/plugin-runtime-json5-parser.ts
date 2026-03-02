@@ -37,6 +37,8 @@ const isWhitespaceCharacter = (character: string): boolean =>
   character === '\u2028' ||
   character === '\u2029';
 
+const isIndentationWhitespace = (character: string): boolean => character === ' ' || character === '\t';
+
 const identifierStartPattern = /[$_\p{ID_Start}]/u;
 const identifierContinuePattern = /(?:[$_\p{ID_Continue}]|\u200C|\u200D)/u;
 
@@ -119,7 +121,7 @@ export class Json5Parser {
   public getLineIndent(cursor: IndexCursor): string {
     const lineStartIndex = this.getLineStartIndex(cursor);
     let index = lineStartIndex;
-    while (index < this.raw.length && (this.raw[index] === ' ' || this.raw[index] === '\t')) {
+    while (index < this.raw.length && isIndentationWhitespace(this.raw[index])) {
       index += 1;
     }
     return this.raw.slice(lineStartIndex, index);
