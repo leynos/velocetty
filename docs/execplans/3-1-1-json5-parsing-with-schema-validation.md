@@ -188,6 +188,8 @@ Only after all gates pass, mark roadmap item `3.1.1` and sub-bullets done.
 
 ## Concrete steps
 
+<!-- markdownlint-disable MD029 -->
+
 1. Baseline and scope verification:
 
 ```bash
@@ -196,7 +198,7 @@ nl -ba docs/roadmap.md | sed -n '223,236p'
 nl -ba docs/velocetty-design.md | sed -n '912,1025p'
 ```
 
-1. Add/extend diagnostics-focused tests before implementation:
+2. Add/extend diagnostics-focused tests before implementation:
 
 ```bash
 set -o pipefail
@@ -204,14 +206,14 @@ TEST_LOG="/tmp/test-config-import-json5-$(get-project)-$(git branch --show).out"
 bun test --max-concurrency=1 test/unit/config-import-json5.test.ts 2>&1 | tee "$TEST_LOG"
 ```
 
-1. Add roundtrip-retention tests that verify unchanged comments/formatting are
+3. Add roundtrip-retention tests that verify unchanged comments/formatting are
    preserved during write operations:
 
 - `test/unit/config-import-json5.test.ts` (extend with retention assertions)
 - `test/unit/runtime-plugin-settings.test.ts` (extend with retention assertions
   for plugin settings writes)
 
-1. Implement parser/schema/import changes guided by failing tests in:
+4. Implement parser/schema/import changes guided by failing tests in:
 
 - `app/config/json5-config.ts`
 - `app/config/import.ts`
@@ -220,11 +222,11 @@ bun test --max-concurrency=1 test/unit/config-import-json5.test.ts 2>&1 | tee "$
 - `test/unit/runtime-plugin-settings.test.ts` (if config filename or
   persistence contract changes)
 
-1. Update developer guidance:
+5. Update developer guidance:
 
 - `docs/developers-guide.md` (configuration format and diagnostics practice)
 
-1. Run required full gates with durable logs:
+6. Run required full gates with durable logs:
 
 ```bash
 set -o pipefail
@@ -235,7 +237,7 @@ make lint 2>&1 | tee "/tmp/lint-$(get-project)-$(git branch --show).out"
 make test 2>&1 | tee "/tmp/test-$(get-project)-$(git branch --show).out"
 ```
 
-1. If docs changed, run docs gates too:
+7. If docs changed, run docs gates too:
 
 ```bash
 set -o pipefail
@@ -243,10 +245,12 @@ bunx markdownlint-cli2 "docs/**/*.md" 2>&1 | tee "/tmp/markdownlint-$(get-projec
 nixie --no-sandbox 2>&1 | tee "/tmp/nixie-$(get-project)-$(git branch --show).out"
 ```
 
-1. Roadmap closure (only after successful gates):
+8. Roadmap closure (only after successful gates):
 
 - Mark `docs/roadmap.md` item `3.1.1` and all child bullets complete.
 - Record gate evidence paths in this ExecPlan.
+
+<!-- markdownlint-enable MD029 -->
 
 ## Validation and acceptance
 

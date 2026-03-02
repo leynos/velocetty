@@ -189,6 +189,9 @@ type profileConfigOptions = {
   /**
    * Maximum number of terminal panes allowed to use WebGL concurrently before
    * falling back to canvas rendering.
+   *
+   * @minimum 1
+   * @TJS-type integer
    */
   webGLRendererMaxContexts: number;
   /**

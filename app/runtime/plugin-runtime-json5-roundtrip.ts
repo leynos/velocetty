@@ -56,7 +56,8 @@ const upsertObjectProperty = (
   }
 
   const parentIndent = getLineIndent(raw, objectRange.openBraceIndex);
-  const memberIndent = properties[0] ? getLineIndent(raw, properties[0].keyStartIndex) : `${parentIndent}  `;
+  const firstProperty = properties[0];
+  const memberIndent = firstProperty ? getLineIndent(raw, firstProperty.keyStartIndex) : `${parentIndent}  `;
   const formattedProperty = `${memberIndent}${formatObjectKey(key)}: ${formatJson5ValueForProperty(value, memberIndent)}`;
 
   if (properties.length === 0) {
@@ -69,6 +70,9 @@ const upsertObjectProperty = (
   }
 
   const lastProperty = properties[properties.length - 1];
+  if (!lastProperty) {
+    return null;
+  }
   const closeLineStartIndex = getLineStartIndex(raw, objectRange.closeBraceIndex);
   const closeLinePrefix = raw.slice(closeLineStartIndex, objectRange.closeBraceIndex);
   const closeLineIsIndentOnly = /^[ \t]*$/.test(closeLinePrefix);
@@ -115,6 +119,9 @@ const ensureObjectPath = (raw: string, path: readonly string[]): string | null =
       return null;
     }
     const key = path[depth - 1];
+    if (key === undefined) {
+      return null;
+    }
     const updated = upsertObjectProperty(nextRaw, parentRange, key, {});
     if (!updated) {
       return null;

@@ -77,6 +77,21 @@ const parseQuotedStringEnd = (raw: string, startIndex: number, limitIndex: numbe
   return -1;
 };
 
+const identifierStartPattern = /[$_\p{ID_Start}]/u;
+const identifierContinuePattern = /(?:[$_\p{ID_Continue}]|\u200C|\u200D)/u;
+
+const readCodePoint = (raw: string, index: number): {character: string; nextIndex: number} | null => {
+  const codePoint = raw.codePointAt(index);
+  if (codePoint === undefined) {
+    return null;
+  }
+  const character = String.fromCodePoint(codePoint);
+  return {
+    character,
+    nextIndex: index + character.length
+  };
+};
+
 const parseObjectKey = (
   raw: string,
   startIndex: number,
@@ -98,12 +113,17 @@ const parseObjectKey = (
       return null;
     }
   }
-  if (!/[A-Za-z_$]/.test(first)) {
+  const firstCodePoint = readCodePoint(raw, startIndex);
+  if (!firstCodePoint || !identifierStartPattern.test(firstCodePoint.character)) {
     return null;
   }
-  let cursor = startIndex + 1;
-  while (cursor < limitIndex && /[A-Za-z0-9_$]/.test(raw[cursor])) {
-    cursor += 1;
+  let cursor = firstCodePoint.nextIndex;
+  while (cursor < limitIndex) {
+    const nextCodePoint = readCodePoint(raw, cursor);
+    if (!nextCodePoint || !identifierContinuePattern.test(nextCodePoint.character)) {
+      break;
+    }
+    cursor = nextCodePoint.nextIndex;
   }
   return {key: raw.slice(startIndex, cursor), startIndex, endIndex: cursor};
 };

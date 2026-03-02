@@ -34,15 +34,19 @@ const hasDefaultSet = () => {
   if (!userChoice) return false;
 
   try {
-    // Load key values
-    const userChoiceKey = Registry.openKey(Registry.HKCU, userChoice, Registry.Access.READ)!;
-    const values: string[] = Registry.enumValueNames(userChoiceKey).map(
-      (x) => (Registry.queryValue(userChoiceKey, x) as string) || ''
-    );
-    Registry.closeKey(userChoiceKey);
+    const userChoiceKey = Registry.openKey(Registry.HKCU, userChoice, Registry.Access.READ);
+    if (!userChoiceKey) {
+      return false;
+    }
 
-    // Look for default program
-    const hasDefaultProgramConfigured = values.every((value) => value && typeof value === 'string');
+    let progId = '';
+    try {
+      progId = (Registry.queryValue(userChoiceKey, 'ProgId') as string) || '';
+    } finally {
+      Registry.closeKey(userChoiceKey);
+    }
+
+    const hasDefaultProgramConfigured = progId.length > 0;
 
     return hasDefaultProgramConfigured;
   } catch (error) {
@@ -66,7 +70,7 @@ const openConfig = () => {
       if (hasDefaultSet()) {
         return shell.openPath(cfgPath).then((error) => error === '');
       }
-      console.warn('No default app set for .js files, using notepad.exe fallback');
+      console.warn('No default app set for .json5 files, using notepad.exe fallback');
     } catch (err) {
       console.error('Open config with default app error:', err);
     }

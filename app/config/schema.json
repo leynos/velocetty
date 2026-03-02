@@ -283,7 +283,8 @@
                 },
                 "webGLRendererMaxContexts": {
                     "description": "Maximum number of terminal panes allowed to use WebGL concurrently before\nfalling back to canvas rendering.",
-                    "type": "number"
+                    "minimum": 1,
+                    "type": "integer"
                 },
                 "webLinksActivationKey": {
                     "description": "keypress required for weblink activation: [ctrl | alt | meta | shift]",
@@ -614,7 +615,8 @@
                         },
                         "webGLRendererMaxContexts": {
                             "description": "Maximum number of terminal panes allowed to use WebGL concurrently before\nfalling back to canvas rendering.",
-                            "type": "number"
+                            "minimum": 1,
+                            "type": "integer"
                         },
                         "webLinksActivationKey": {
                             "description": "keypress required for weblink activation: [ctrl | alt | meta | shift]",
