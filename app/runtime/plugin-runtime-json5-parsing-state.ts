@@ -8,6 +8,8 @@ export type ParsingState = {
   depth: number;
 };
 
+type StateTransition = {state: ParsingState; skipNext: boolean; foundClose: boolean};
+
 export const processLineComment = (state: ParsingState, current: string): ParsingState => ({
   ...state,
   inLineComment: current !== '\n'
@@ -29,26 +31,29 @@ export const processStringContext = (state: ParsingState, current: string): Pars
   return state;
 };
 
-export const processDelimitersAndComments = (
-  state: ParsingState,
-  current: string,
-  next: string
-): {state: ParsingState; skipNext: boolean; foundClose: boolean} => {
-  if (current === '/' && next === '/') {
-    return {state: {...state, inLineComment: true}, skipNext: true, foundClose: false};
-  }
-  if (current === '/' && next === '*') {
-    return {state: {...state, inBlockComment: true}, skipNext: true, foundClose: false};
-  }
-  if (current === '"' || current === "'") {
-    return {state: {...state, inString: current}, skipNext: false, foundClose: false};
-  }
-  if (current === '{') {
-    return {state: {...state, depth: state.depth + 1}, skipNext: false, foundClose: false};
-  }
-  if (current === '}') {
-    const depth = state.depth - 1;
-    return {state: {...state, depth}, skipNext: false, foundClose: depth === 0};
-  }
-  return {state, skipNext: false, foundClose: false};
+const handleLineCommentStart = (state: ParsingState, current: string, next: string): StateTransition | null =>
+  current === '/' && next === '/' ? {state: {...state, inLineComment: true}, skipNext: true, foundClose: false} : null;
+
+const handleBlockCommentStart = (state: ParsingState, current: string, next: string): StateTransition | null =>
+  current === '/' && next === '*' ? {state: {...state, inBlockComment: true}, skipNext: true, foundClose: false} : null;
+
+const handleStringDelimiter = (state: ParsingState, current: string): StateTransition | null =>
+  current === '"' || current === "'"
+    ? {state: {...state, inString: current}, skipNext: false, foundClose: false}
+    : null;
+
+const handleOpeningBrace = (state: ParsingState, current: string): StateTransition | null =>
+  current === '{' ? {state: {...state, depth: state.depth + 1}, skipNext: false, foundClose: false} : null;
+
+const handleClosingBrace = (state: ParsingState, current: string): StateTransition | null => {
+  if (current !== '}') return null;
+  const depth = state.depth - 1;
+  return {state: {...state, depth}, skipNext: false, foundClose: depth === 0};
 };
+
+export const processDelimitersAndComments = (state: ParsingState, current: string, next: string): StateTransition =>
+  handleLineCommentStart(state, current, next) ??
+  handleBlockCommentStart(state, current, next) ??
+  handleStringDelimiter(state, current) ??
+  handleOpeningBrace(state, current) ??
+  handleClosingBrace(state, current) ?? {state, skipNext: false, foundClose: false};
