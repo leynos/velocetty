@@ -198,80 +198,146 @@ const findMatchingClosingBrace = (raw: string, openBraceIndex: number): number =
   return -1;
 };
 
+type ParserState = {
+  inString: '"' | "'" | null;
+  isEscaped: boolean;
+  inLineComment: boolean;
+  inBlockComment: boolean;
+  braceDepth: number;
+  bracketDepth: number;
+};
+
+const advanceIfInLineComment = (
+  raw: string,
+  index: number,
+  state: ParserState
+): {shouldContinue: boolean; newIndex: number} => {
+  if (!state.inLineComment) {
+    return {shouldContinue: false, newIndex: index};
+  }
+  state.inLineComment = raw[index] !== '\n';
+  return {shouldContinue: true, newIndex: index};
+};
+
+const advanceIfInBlockComment = (
+  raw: string,
+  index: number,
+  state: ParserState
+): {shouldContinue: boolean; newIndex: number} => {
+  if (!state.inBlockComment) {
+    return {shouldContinue: false, newIndex: index};
+  }
+  const current = raw[index];
+  const next = raw[index + 1];
+  if (current === '*' && next === '/') {
+    state.inBlockComment = false;
+    return {shouldContinue: true, newIndex: index + 1};
+  }
+  return {shouldContinue: true, newIndex: index};
+};
+
+const advanceIfInString = (
+  raw: string,
+  index: number,
+  state: ParserState
+): {shouldContinue: boolean; newIndex: number} => {
+  if (!state.inString) {
+    return {shouldContinue: false, newIndex: index};
+  }
+  const current = raw[index];
+
+  if (state.isEscaped) {
+    state.isEscaped = false;
+    return {shouldContinue: true, newIndex: index};
+  }
+  if (current === '\\') {
+    state.isEscaped = true;
+    return {shouldContinue: true, newIndex: index};
+  }
+  if (current === state.inString) {
+    state.inString = null;
+  }
+  return {shouldContinue: true, newIndex: index};
+};
+
+const processCharacterOutsideContext = (
+  raw: string,
+  index: number,
+  state: ParserState
+): {foundEnd: boolean; endIndex: number; newIndex: number} => {
+  const current = raw[index];
+  const next = raw[index + 1];
+
+  if (current === '/' && next === '/') {
+    state.inLineComment = true;
+    return {foundEnd: false, endIndex: -1, newIndex: index + 1};
+  }
+  if (current === '/' && next === '*') {
+    state.inBlockComment = true;
+    return {foundEnd: false, endIndex: -1, newIndex: index + 1};
+  }
+  if (current === '"' || current === "'") {
+    state.inString = current;
+    return {foundEnd: false, endIndex: -1, newIndex: index};
+  }
+  if (current === '{') {
+    state.braceDepth += 1;
+    return {foundEnd: false, endIndex: -1, newIndex: index};
+  }
+  if (current === '}') {
+    if (state.braceDepth === 0 && state.bracketDepth === 0) {
+      return {foundEnd: true, endIndex: index, newIndex: index};
+    }
+    state.braceDepth -= 1;
+    return {foundEnd: false, endIndex: -1, newIndex: index};
+  }
+  if (current === '[') {
+    state.bracketDepth += 1;
+    return {foundEnd: false, endIndex: -1, newIndex: index};
+  }
+  if (current === ']') {
+    state.bracketDepth -= 1;
+    return {foundEnd: false, endIndex: -1, newIndex: index};
+  }
+  if (current === ',' && state.braceDepth === 0 && state.bracketDepth === 0) {
+    return {foundEnd: true, endIndex: index, newIndex: index};
+  }
+
+  return {foundEnd: false, endIndex: -1, newIndex: index};
+};
+
 const findPropertyValueEnd = (raw: string, valueStartIndex: number, objectCloseIndex: number): number => {
-  let braceDepth = 0;
-  let bracketDepth = 0;
-  let inString: '"' | "'" | null = null;
-  let isEscaped = false;
-  let inLineComment = false;
-  let inBlockComment = false;
+  const state: ParserState = {
+    braceDepth: 0,
+    bracketDepth: 0,
+    inString: null,
+    isEscaped: false,
+    inLineComment: false,
+    inBlockComment: false
+  };
 
   for (let index = valueStartIndex; index < objectCloseIndex; index += 1) {
-    const current = raw[index];
-    const next = raw[index + 1];
-
-    if (inLineComment) {
-      inLineComment = current !== '\n';
-      continue;
-    }
-    if (inBlockComment) {
-      if (current === '*' && next === '/') {
-        inBlockComment = false;
-        index += 1;
-      }
-      continue;
-    }
-    if (inString) {
-      if (isEscaped) {
-        isEscaped = false;
-        continue;
-      }
-      if (current === '\\') {
-        isEscaped = true;
-        continue;
-      }
-      if (current === inString) {
-        inString = null;
-      }
+    const lineComment = advanceIfInLineComment(raw, index, state);
+    if (lineComment.shouldContinue) {
       continue;
     }
 
-    if (current === '/' && next === '/') {
-      inLineComment = true;
-      index += 1;
+    const blockComment = advanceIfInBlockComment(raw, index, state);
+    if (blockComment.shouldContinue) {
+      index = blockComment.newIndex;
       continue;
     }
-    if (current === '/' && next === '*') {
-      inBlockComment = true;
-      index += 1;
+
+    const string = advanceIfInString(raw, index, state);
+    if (string.shouldContinue) {
       continue;
     }
-    if (current === '"' || current === "'") {
-      inString = current;
-      continue;
+
+    const result = processCharacterOutsideContext(raw, index, state);
+    if (result.foundEnd) {
+      return result.endIndex;
     }
-    if (current === '{') {
-      braceDepth += 1;
-      continue;
-    }
-    if (current === '}') {
-      if (braceDepth === 0 && bracketDepth === 0) {
-        return index;
-      }
-      braceDepth -= 1;
-      continue;
-    }
-    if (current === '[') {
-      bracketDepth += 1;
-      continue;
-    }
-    if (current === ']') {
-      bracketDepth -= 1;
-      continue;
-    }
-    if (current === ',' && braceDepth === 0 && bracketDepth === 0) {
-      return index;
-    }
+    index = result.newIndex;
   }
 
   return objectCloseIndex;
