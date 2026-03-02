@@ -54,10 +54,17 @@ const skipLineComment = (raw: string, startIndex: number, limitIndex: number): n
   return index;
 };
 
+const isBlockCommentEnd = (raw: string, index: number): boolean => raw[index] === '*' && raw[index + 1] === '/';
+
+const hasRoomForCommentEnd = (index: number, limitIndex: number): boolean => index + 1 < limitIndex;
+
 const skipBlockComment = (raw: string, startIndex: number, limitIndex: number): number => {
+  // Skip the opening '/*'
   let index = startIndex + 2;
-  while (index + 1 < limitIndex && !(raw[index] === '*' && raw[index + 1] === '/')) index += 1;
-  return index + 1 < limitIndex ? index + 2 : limitIndex;
+  while (hasRoomForCommentEnd(index, limitIndex) && !isBlockCommentEnd(raw, index)) {
+    index += 1;
+  }
+  return hasRoomForCommentEnd(index, limitIndex) ? index + 2 : limitIndex;
 };
 
 const isAtTopLevel = (state: ParsingState, bracketDepth: number): boolean => state.depth === 0 && bracketDepth === 0;
