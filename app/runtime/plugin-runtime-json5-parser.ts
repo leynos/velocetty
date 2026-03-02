@@ -18,6 +18,8 @@ export type Json5ObjectProperty = {
   hasTrailingComma: boolean;
 };
 
+type ParsedObjectKey = {key: string; startIndex: number; endIndex: number};
+
 const isWhitespaceCharacter = (character: string): boolean =>
   character === ' ' || character === '\n' || character === '\r' || character === '\t';
 
@@ -116,42 +118,35 @@ export class Json5Parser {
     };
   }
 
-  private parseObjectKey(
-    startIndex: number,
-    limitIndex: number
-  ): {key: string; startIndex: number; endIndex: number} | null {
-    const first = this.raw[startIndex];
-    if (first === '"' || first === "'") {
-      const endIndex = this.parseQuotedStringEnd(startIndex, limitIndex);
-      if (endIndex === -1) {
-        return null;
-      }
-      try {
-        return {
-          key: JSON5.parse(this.raw.slice(startIndex, endIndex)) as string,
-          startIndex,
-          endIndex
-        };
-      } catch {
-        return null;
-      }
-    }
-
-    const firstCodePoint = this.readCodePoint(startIndex);
-    if (!firstCodePoint || !identifierStartPattern.test(firstCodePoint.character)) {
+  private parseQuotedKey(startIndex: number, limitIndex: number): ParsedObjectKey | null {
+    const endIndex = this.parseQuotedStringEnd(startIndex, limitIndex);
+    if (endIndex === -1) return null;
+    try {
+      return {key: JSON5.parse(this.raw.slice(startIndex, endIndex)) as string, startIndex, endIndex};
+    } catch {
       return null;
     }
+  }
+
+  private parseUnquotedKey(startIndex: number, limitIndex: number): ParsedObjectKey | null {
+    const firstCodePoint = this.readCodePoint(startIndex);
+    if (!firstCodePoint || !identifierStartPattern.test(firstCodePoint.character)) return null;
 
     let cursor = firstCodePoint.nextIndex;
     while (cursor < limitIndex) {
       const nextCodePoint = this.readCodePoint(cursor);
-      if (!nextCodePoint || !identifierContinuePattern.test(nextCodePoint.character)) {
-        break;
-      }
+      if (!nextCodePoint || !identifierContinuePattern.test(nextCodePoint.character)) break;
       cursor = nextCodePoint.nextIndex;
     }
 
     return {key: this.raw.slice(startIndex, cursor), startIndex, endIndex: cursor};
+  }
+
+  private parseObjectKey(startIndex: number, limitIndex: number): ParsedObjectKey | null {
+    const first = this.raw[startIndex];
+    return first === '"' || first === "'"
+      ? this.parseQuotedKey(startIndex, limitIndex)
+      : this.parseUnquotedKey(startIndex, limitIndex);
   }
 
   private findMatchingClosingBrace(openBraceIndex: number): number {
@@ -178,9 +173,7 @@ export class Json5Parser {
       if (state.inBlockComment) {
         const blockCommentResult = processBlockComment(state, current, next);
         state = blockCommentResult.state;
-        if (blockCommentResult.skipNext) {
-          index += 1;
-        }
+        index += blockCommentResult.skipNext ? 1 : 0;
         continue;
       }
       if (state.inString) {
@@ -202,67 +195,39 @@ export class Json5Parser {
   }
 
   private findPropertyValueEnd(valueStartIndex: number, objectCloseIndex: number): number {
-    let braceDepth = 0;
+    let state: ParsingState = {
+      depth: 0,
+      inString: null,
+      isEscaped: false,
+      inLineComment: false,
+      inBlockComment: false
+    };
     let bracketDepth = 0;
-    let inString: '"' | "'" | null = null;
-    let isEscaped = false;
-    let inLineComment = false;
-    let inBlockComment = false;
 
     for (let index = valueStartIndex; index < objectCloseIndex; index += 1) {
       const current = this.raw[index];
       const next = this.raw[index + 1];
 
-      if (inLineComment) {
-        inLineComment = current !== '\n';
+      if (state.inLineComment) {
+        state = processLineComment(state, current);
         continue;
       }
-      if (inBlockComment) {
-        if (current === '*' && next === '/') {
-          inBlockComment = false;
-          index += 1;
-        }
+      if (state.inBlockComment) {
+        const blockCommentResult = processBlockComment(state, current, next);
+        state = blockCommentResult.state;
+        index += blockCommentResult.skipNext ? 1 : 0;
         continue;
       }
-      if (inString) {
-        if (isEscaped) {
-          isEscaped = false;
-          continue;
-        }
-        if (current === '\\') {
-          isEscaped = true;
-          continue;
-        }
-        if (current === inString) {
-          inString = null;
-        }
+      if (state.inString) {
+        state = processStringContext(state, current);
         continue;
       }
 
-      if (current === '/' && next === '/') {
-        inLineComment = true;
-        index += 1;
-        continue;
+      if (current === '}' && state.depth === 0 && bracketDepth === 0) {
+        return index;
       }
-      if (current === '/' && next === '*') {
-        inBlockComment = true;
-        index += 1;
-        continue;
-      }
-      if (current === '"' || current === "'") {
-        inString = current;
-        continue;
-      }
-      if (current === '{') {
-        braceDepth += 1;
-        continue;
-      }
-      if (current === '}') {
-        if (braceDepth === 0 && bracketDepth === 0) {
-          return index;
-        }
-        braceDepth -= 1;
-        continue;
+      if (current === ',' && state.depth === 0 && bracketDepth === 0) {
+        return index;
       }
       if (current === '[') {
         bracketDepth += 1;
@@ -272,12 +237,42 @@ export class Json5Parser {
         bracketDepth -= 1;
         continue;
       }
-      if (current === ',' && braceDepth === 0 && bracketDepth === 0) {
-        return index;
-      }
+
+      const delimiterResult = processDelimitersAndComments(state, current, next);
+      state = delimiterResult.state;
+      if (delimiterResult.skipNext) index += 1;
     }
 
     return objectCloseIndex;
+  }
+
+  private parseSingleProperty(
+    startCursor: number,
+    objectCloseIndex: number
+  ): {property: Json5ObjectProperty; nextCursor: number} | null {
+    const parsedKey = this.parseObjectKey(startCursor, objectCloseIndex);
+    if (!parsedKey) return null;
+
+    const colonIndex = this.skipWhitespaceAndComments(parsedKey.endIndex, objectCloseIndex);
+    if (this.raw[colonIndex] !== ':') return null;
+
+    const valueStartIndex = this.skipWhitespaceAndComments(colonIndex + 1, objectCloseIndex);
+    if (valueStartIndex >= objectCloseIndex) return null;
+
+    const valueEndIndex = this.findPropertyValueEnd(valueStartIndex, objectCloseIndex);
+    const afterValueIndex = this.skipWhitespaceAndComments(valueEndIndex, objectCloseIndex);
+    const hasTrailingComma = this.raw[afterValueIndex] === ',';
+
+    return {
+      property: {
+        key: parsedKey.key,
+        keyStartIndex: parsedKey.startIndex,
+        valueStartIndex,
+        valueEndIndex,
+        hasTrailingComma
+      },
+      nextCursor: hasTrailingComma ? afterValueIndex + 1 : afterValueIndex
+    };
   }
 
   public parseObjectProperties(objectRange: Json5ObjectRange): Json5ObjectProperty[] | null {
@@ -290,35 +285,10 @@ export class Json5Parser {
         continue;
       }
 
-      const parsedKey = this.parseObjectKey(cursor, objectRange.closeBraceIndex);
-      if (!parsedKey) {
-        return null;
-      }
-
-      const colonIndex = this.skipWhitespaceAndComments(parsedKey.endIndex, objectRange.closeBraceIndex);
-      if (this.raw[colonIndex] !== ':') {
-        return null;
-      }
-
-      const valueStartIndex = this.skipWhitespaceAndComments(colonIndex + 1, objectRange.closeBraceIndex);
-      if (valueStartIndex >= objectRange.closeBraceIndex) {
-        return null;
-      }
-
-      const valueEndIndex = this.findPropertyValueEnd(valueStartIndex, objectRange.closeBraceIndex);
-      const afterValueIndex = this.skipWhitespaceAndComments(valueEndIndex, objectRange.closeBraceIndex);
-      const hasTrailingComma = this.raw[afterValueIndex] === ',';
-
-      properties.push({
-        key: parsedKey.key,
-        keyStartIndex: parsedKey.startIndex,
-        valueStartIndex,
-        valueEndIndex,
-        hasTrailingComma
-      });
-
-      const nextCursor = hasTrailingComma ? afterValueIndex + 1 : afterValueIndex;
-      cursor = this.skipWhitespaceAndComments(nextCursor, objectRange.closeBraceIndex);
+      const parsedProperty = this.parseSingleProperty(cursor, objectRange.closeBraceIndex);
+      if (!parsedProperty) return null;
+      properties.push(parsedProperty.property);
+      cursor = this.skipWhitespaceAndComments(parsedProperty.nextCursor, objectRange.closeBraceIndex);
     }
 
     return properties;
