@@ -1,5 +1,12 @@
 /** @file JSON5 object parsing helpers for runtime plugin settings persistence. */
 import JSON5 from 'json5';
+import {
+  type ParsingState,
+  processBlockComment,
+  processDelimitersAndComments,
+  processLineComment,
+  processStringContext
+} from './plugin-runtime-json5-parsing-state';
 
 export type Json5ObjectRange = {openBraceIndex: number; closeBraceIndex: number};
 
@@ -152,65 +159,42 @@ export class Json5Parser {
       return -1;
     }
 
-    let depth = 0;
-    let inString: '"' | "'" | null = null;
-    let isEscaped = false;
-    let inLineComment = false;
-    let inBlockComment = false;
+    let state: ParsingState = {
+      depth: 0,
+      inString: null,
+      isEscaped: false,
+      inLineComment: false,
+      inBlockComment: false
+    };
 
     for (let index = openBraceIndex; index < this.raw.length; index += 1) {
       const current = this.raw[index];
       const next = this.raw[index + 1];
 
-      if (inLineComment) {
-        inLineComment = current !== '\n';
+      if (state.inLineComment) {
+        state = processLineComment(state, current);
         continue;
       }
-      if (inBlockComment) {
-        if (current === '*' && next === '/') {
-          inBlockComment = false;
+      if (state.inBlockComment) {
+        const blockCommentResult = processBlockComment(state, current, next);
+        state = blockCommentResult.state;
+        if (blockCommentResult.skipNext) {
           index += 1;
         }
         continue;
       }
-      if (inString) {
-        if (isEscaped) {
-          isEscaped = false;
-          continue;
-        }
-        if (current === '\\') {
-          isEscaped = true;
-          continue;
-        }
-        if (current === inString) {
-          inString = null;
-        }
+      if (state.inString) {
+        state = processStringContext(state, current);
         continue;
       }
 
-      if (current === '/' && next === '/') {
-        inLineComment = true;
+      const delimiterResult = processDelimitersAndComments(state, current, next);
+      state = delimiterResult.state;
+      if (delimiterResult.foundClose) {
+        return index;
+      }
+      if (delimiterResult.skipNext) {
         index += 1;
-        continue;
-      }
-      if (current === '/' && next === '*') {
-        inBlockComment = true;
-        index += 1;
-        continue;
-      }
-      if (current === '"' || current === "'") {
-        inString = current;
-        continue;
-      }
-      if (current === '{') {
-        depth += 1;
-        continue;
-      }
-      if (current === '}') {
-        depth -= 1;
-        if (depth === 0) {
-          return index;
-        }
       }
     }
 
