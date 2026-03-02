@@ -17,11 +17,7 @@ export type Json5ObjectProperty = {
 const isWhitespaceCharacter = (character: string): boolean =>
   character === ' ' || character === '\n' || character === '\r' || character === '\t';
 
-export const skipWhitespaceAndComments = (
-  raw: string,
-  fromIndex: number,
-  limitIndex: number
-): number => {
+export const skipWhitespaceAndComments = (raw: string, fromIndex: number, limitIndex: number): number => {
   let index = fromIndex;
   while (index < limitIndex) {
     const current = raw[index];
@@ -39,10 +35,7 @@ export const skipWhitespaceAndComments = (
     }
     if (current === '/' && next === '*') {
       index += 2;
-      while (
-        index + 1 < limitIndex &&
-        !(raw[index] === '*' && raw[index + 1] === '/')
-      ) {
+      while (index + 1 < limitIndex && !(raw[index] === '*' && raw[index + 1] === '/')) {
         index += 1;
       }
       index = index + 1 < limitIndex ? index + 2 : limitIndex;
@@ -67,11 +60,7 @@ export const getLineIndent = (raw: string, index: number): string => {
   return raw.slice(lineStartIndex, cursor);
 };
 
-const parseQuotedStringEnd = (
-  raw: string,
-  startIndex: number,
-  limitIndex: number
-): number => {
+const parseQuotedStringEnd = (raw: string, startIndex: number, limitIndex: number): number => {
   const quote = raw[startIndex];
   let index = startIndex + 1;
   while (index < limitIndex) {
@@ -189,11 +178,7 @@ const findMatchingClosingBrace = (raw: string, openBraceIndex: number): number =
   return -1;
 };
 
-const findPropertyValueEnd = (
-  raw: string,
-  valueStartIndex: number,
-  objectCloseIndex: number
-): number => {
+const findPropertyValueEnd = (raw: string, valueStartIndex: number, objectCloseIndex: number): number => {
   let braceDepth = 0;
   let bracketDepth = 0;
   let inString: '"' | "'" | null = null;
@@ -272,16 +257,9 @@ const findPropertyValueEnd = (
   return objectCloseIndex;
 };
 
-export const parseObjectProperties = (
-  raw: string,
-  objectRange: Json5ObjectRange
-): Json5ObjectProperty[] | null => {
+export const parseObjectProperties = (raw: string, objectRange: Json5ObjectRange): Json5ObjectProperty[] | null => {
   const properties: Json5ObjectProperty[] = [];
-  let cursor = skipWhitespaceAndComments(
-    raw,
-    objectRange.openBraceIndex + 1,
-    objectRange.closeBraceIndex
-  );
+  let cursor = skipWhitespaceAndComments(raw, objectRange.openBraceIndex + 1, objectRange.closeBraceIndex);
 
   while (cursor < objectRange.closeBraceIndex) {
     if (raw[cursor] === ',') {
@@ -298,11 +276,7 @@ export const parseObjectProperties = (
       return null;
     }
 
-    const valueStartIndex = skipWhitespaceAndComments(
-      raw,
-      colonIndex + 1,
-      objectRange.closeBraceIndex
-    );
+    const valueStartIndex = skipWhitespaceAndComments(raw, colonIndex + 1, objectRange.closeBraceIndex);
     if (valueStartIndex >= objectRange.closeBraceIndex) {
       return null;
     }
@@ -349,10 +323,7 @@ export const getObjectProperty = (
   return properties.find((property) => property.key === key) ?? null;
 };
 
-export const getObjectRangeForProperty = (
-  raw: string,
-  property: Json5ObjectProperty
-): Json5ObjectRange | null => {
+export const getObjectRangeForProperty = (raw: string, property: Json5ObjectProperty): Json5ObjectRange | null => {
   const valueStart = skipWhitespaceAndComments(raw, property.valueStartIndex, raw.length);
   if (raw[valueStart] !== '{') {
     return null;

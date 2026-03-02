@@ -4,9 +4,9 @@ import {resolve} from 'node:path';
 import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
 import {z} from 'zod';
 
-import type {rawConfig} from '@shared/types/config';
+import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
 import notify from '../notify';
-import {parseJson5WithSchema, safeParseRawConfig, stringifyJson5, type ParseSchema} from './json5-config';
+import {parseJson5WithSchemaDiagnostics, safeParseRawConfig, stringifyJson5, type ParseSchema} from './json5-config';
 
 import {_init} from './init';
 import {cfgDir, cfgPath, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath} from './paths';
@@ -42,22 +42,87 @@ const rawConfigSchema: ParseSchema<rawConfig> = {
   safeParse: (value) => safeParseRawConfig(value)
 };
 
+const rawConfigDiagnosticHints = {
+  '/': {
+    docHint: 'Top-level config payload object.',
+    defaultHint: '{}'
+  },
+  '/config': {
+    docHint: 'Root terminal configuration object.',
+    defaultHint: '{}'
+  },
+  '/plugins': {
+    docHint: 'List of plugins to fetch and install from npm.',
+    defaultHint: '[]'
+  },
+  '/localPlugins': {
+    docHint: 'List of local plugin directories to load in development.',
+    defaultHint: '[]'
+  },
+  '/keymaps': {
+    docHint: 'Command keymap overrides as strings or string arrays.',
+    defaultHint: '{}'
+  }
+} as const;
+
+const keymapDiagnosticHints = {
+  '/': {
+    docHint: 'Keymap entries map command ids to keybinding strings or arrays.',
+    defaultHint: '{}'
+  }
+} as const;
+
+const reportDiagnostics = (context: string, source: string, diagnostics: configValidationDiagnostic[]) => {
+  if (diagnostics.length === 0) {
+    return;
+  }
+  console.warn(`[config-import] ${context}`, {source, diagnostics});
+};
+
+const notifyWithPrimaryDiagnostic = (baseMessage: string, diagnostics: configValidationDiagnostic[]) => {
+  const primaryDiagnostic = diagnostics[0];
+  if (!primaryDiagnostic) {
+    notify(baseMessage);
+    return;
+  }
+
+  const docHint = primaryDiagnostic.docHint ? ` Hint: ${primaryDiagnostic.docHint}.` : '';
+  const defaultHint = primaryDiagnostic.defaultHint ? ` Default: ${primaryDiagnostic.defaultHint}.` : '';
+  notify(
+    `${baseMessage} ${primaryDiagnostic.path}: ${primaryDiagnostic.message} Suggested fix: ${primaryDiagnostic.suggestedFix}.${docHint}${defaultHint}`
+  );
+};
+
 /**
  * Parses JSON5 config text into a validated raw config payload.
  *
- * Returns `null` when parsing or validation fails.
+ * Returns parsed payload plus structured diagnostics when fallback is used.
  */
-const parseRawConfig = (raw: string, source: string): rawConfig | null => {
-  return parseJson5WithSchema({raw, source, schema: rawConfigSchema, fallback: null, itemType: 'config'});
+const parseRawConfig = (raw: string, source: string) => {
+  return parseJson5WithSchemaDiagnostics({
+    raw,
+    source,
+    schema: rawConfigSchema,
+    fallback: null,
+    itemType: 'config',
+    diagnosticHints: rawConfigDiagnosticHints
+  });
 };
 
 /**
  * Parses JSON5 keymap text and validates that each entry is a string or string array.
  *
- * Returns an empty object when parsing or validation fails.
+ * Returns parsed keymaps plus diagnostics when fallback is used.
  */
-const parseKeymapConfig = (raw: string, source: string): Record<string, string | string[]> => {
-  return parseJson5WithSchema({raw, source, schema: keymapSchema, fallback: {}, itemType: 'keymap'});
+const parseKeymapConfig = (raw: string, source: string) => {
+  return parseJson5WithSchemaDiagnostics({
+    raw,
+    source,
+    schema: keymapSchema,
+    fallback: {},
+    itemType: 'keymap',
+    diagnosticHints: keymapDiagnosticHints
+  });
 };
 
 /** Serializes config using deterministic JSON5 formatting for stable snapshots. */
@@ -115,14 +180,21 @@ const _importConf = () => {
   } catch (err) {
     console.error(`[config-import] Failed to read bundled default config at "${defaultCfg}".`, err);
   }
-  const parsedDefaultConfig = parseRawConfig(defaultCfgRaw, defaultCfg);
+  const parsedDefaultConfigResult = parseRawConfig(defaultCfgRaw, defaultCfg);
+  if (parsedDefaultConfigResult.usedFallback) {
+    reportDiagnostics('Bundled default config diagnostics.', defaultCfg, parsedDefaultConfigResult.diagnostics);
+  }
+  const parsedDefaultConfig = parsedDefaultConfigResult.value;
   const _defaultCfg =
     parsedDefaultConfig ??
     (() => {
       console.error(
         `[config-import] Failed to parse bundled default config at "${defaultCfg}". Using safe fallback defaults.`
       );
-      notify("Couldn't parse the bundled default config. Falling back to safe defaults.");
+      notifyWithPrimaryDiagnostic(
+        "Couldn't parse the bundled default config. Falling back to safe defaults.",
+        parsedDefaultConfigResult.diagnostics
+      );
       return cloneRawConfig(defaultRawConfigFallback);
     })();
 
@@ -136,13 +208,22 @@ const _importConf = () => {
   } catch (err) {
     console.error(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`, err);
   }
-  const mapping = parseKeymapConfig(content, platformKeyPath);
-  _defaultCfg.keymaps = mapping;
+  const keymapResult = parseKeymapConfig(content, platformKeyPath);
+  if (keymapResult.usedFallback) {
+    reportDiagnostics('Platform keymap diagnostics.', platformKeyPath, keymapResult.diagnostics);
+  }
+  _defaultCfg.keymaps = keymapResult.value;
 
   // Import user config
   let userCfg: rawConfig | null;
+  let userConfigDiagnostics: configValidationDiagnostic[] = [];
   try {
-    userCfg = parseRawConfig(readFileSync(cfgPath, 'utf8'), cfgPath);
+    const userCfgResult = parseRawConfig(readFileSync(cfgPath, 'utf8'), cfgPath);
+    userCfg = userCfgResult.value;
+    userConfigDiagnostics = userCfgResult.diagnostics;
+    if (userCfgResult.usedFallback) {
+      reportDiagnostics('User config diagnostics.', cfgPath, userCfgResult.diagnostics);
+    }
   } catch (err) {
     console.error(`[config-import] Failed to read or parse user config at "${cfgPath}".`, err);
     userCfg = null;
@@ -152,7 +233,7 @@ const _importConf = () => {
     console.warn(
       `[config-import] Using default config fallback after user config parse failure. userPath="${cfgPath}" defaultPath="${defaultCfg}"`
     );
-    notify("Couldn't parse config file. Using default config instead.");
+    notifyWithPrimaryDiagnostic("Couldn't parse config file. Using default config instead.", userConfigDiagnostics);
     userCfg = cloneRawConfig(_defaultCfg);
   }
 

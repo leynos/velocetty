@@ -20,8 +20,7 @@ export type PluginPersistencePatch = {
   settings: RuntimePluginSettings;
 };
 
-const formatObjectKey = (key: string): string =>
-  /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : JSON.stringify(key);
+const formatObjectKey = (key: string): string => (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : JSON.stringify(key));
 
 const formatJson5ValueForProperty = (value: unknown, propertyIndent: string): string => {
   const serialized = stringifyJson5(value).trimEnd();
@@ -29,15 +28,14 @@ const formatJson5ValueForProperty = (value: unknown, propertyIndent: string): st
   if (lines.length <= 1) {
     return serialized;
   }
-  return `${lines[0]}\n${lines.slice(1).map((line) => `${propertyIndent}${line}`).join('\n')}`;
+  return `${lines[0]}\n${lines
+    .slice(1)
+    .map((line) => `${propertyIndent}${line}`)
+    .join('\n')}`;
 };
 
-const replaceSlice = (
-  raw: string,
-  startIndex: number,
-  endIndex: number,
-  replacement: string
-): string => `${raw.slice(0, startIndex)}${replacement}${raw.slice(endIndex)}`;
+const replaceSlice = (raw: string, startIndex: number, endIndex: number, replacement: string): string =>
+  `${raw.slice(0, startIndex)}${replacement}${raw.slice(endIndex)}`;
 
 const upsertObjectProperty = (
   raw: string,
@@ -144,10 +142,7 @@ const applyPluginSettingsPatch = (raw: string, patch: PluginPersistencePatch): s
   return upsertObjectProperty(nextRaw, pluginsRange, patch.pluginId, patch.settings);
 };
 
-export const applyPluginSettingsPatches = (
-  raw: string,
-  patches: readonly PluginPersistencePatch[]
-): string | null => {
+export const applyPluginSettingsPatches = (raw: string, patches: readonly PluginPersistencePatch[]): string | null => {
   let nextRaw = raw;
   for (const patch of patches) {
     const updated = applyPluginSettingsPatch(nextRaw, patch);

@@ -70,7 +70,7 @@ test('ensureRuntimePluginSettingsPersisted writes missing defaults to config.plu
     keymaps: {},
   }`);
 
-  const namespace = ensureRuntimePluginSettingsPersisted({configFilePath: '/tmp/hyper.json', readFile, writeFile});
+  const namespace = ensureRuntimePluginSettingsPersisted({configFilePath: '/tmp/config.json5', readFile, writeFile});
 
   expect(getWrites()).toHaveLength(1);
   expect(namespace[GOLDEN_PATH_PLUGIN_ID]).toEqual(goldenPathSettingsDefaults);
@@ -90,11 +90,15 @@ test('ensureRuntimePluginSettingsPersisted is idempotent after defaults are writ
     keymaps: {},
   }`);
 
-  const firstNamespace = ensureRuntimePluginSettingsPersisted({configFilePath: '/tmp/hyper.json', readFile, writeFile});
+  const firstNamespace = ensureRuntimePluginSettingsPersisted({
+    configFilePath: '/tmp/config.json5',
+    readFile,
+    writeFile
+  });
   const firstContent = getContent();
 
   const secondNamespace = ensureRuntimePluginSettingsPersisted({
-    configFilePath: '/tmp/hyper.json',
+    configFilePath: '/tmp/config.json5',
     readFile,
     writeFile
   });
@@ -115,7 +119,7 @@ test('setRuntimePluginEnabledPersisted updates enabled flag in JSON5 namespace',
   }`);
 
   const updated = setRuntimePluginEnabledPersisted(GOLDEN_PATH_PLUGIN_ID, false, {
-    configFilePath: '/tmp/hyper.json',
+    configFilePath: '/tmp/config.json5',
     readFile,
     writeFile
   });
@@ -142,7 +146,7 @@ test('ensureRuntimePluginSettingsPersisted preserves unchanged comments and form
 }`;
   const {readFile, writeFile, getContent, getWrites} = createReadWritePair(initialContent);
 
-  ensureRuntimePluginSettingsPersisted({configFilePath: '/tmp/hyper.json', readFile, writeFile});
+  ensureRuntimePluginSettingsPersisted({configFilePath: '/tmp/config.json5', readFile, writeFile});
 
   expect(getWrites()).toHaveLength(1);
   expect(getContent()).toBe(`{
@@ -183,7 +187,7 @@ test('setRuntimePluginEnabledPersisted preserves unrelated plugin formatting', (
   const {readFile, writeFile, getContent, getWrites} = createReadWritePair(initialContent);
 
   setRuntimePluginEnabledPersisted(GOLDEN_PATH_PLUGIN_ID, false, {
-    configFilePath: '/tmp/hyper.json',
+    configFilePath: '/tmp/config.json5',
     readFile,
     writeFile
   });
@@ -207,7 +211,7 @@ test('setRuntimePluginEnabledPersisted preserves unrelated plugin formatting', (
 test('ensureRuntimePluginSettingsPersisted does not write on parse errors', () => {
   const {readFile, writeFile, getWrites} = createReadWritePair('{config:');
   const persisted = ensureRuntimePluginSettingsPersisted({
-    configFilePath: '/tmp/hyper.json',
+    configFilePath: '/tmp/config.json5',
     readFile,
     writeFile
   });
@@ -219,7 +223,7 @@ test('ensureRuntimePluginSettingsPersisted does not write on parse errors', () =
 test('setRuntimePluginEnabledPersisted returns fallback settings on parse errors', () => {
   const {readFile, writeFile, getWrites} = createReadWritePair('{config:');
   const persisted = setRuntimePluginEnabledPersisted(GOLDEN_PATH_PLUGIN_ID, false, {
-    configFilePath: '/tmp/hyper.json',
+    configFilePath: '/tmp/config.json5',
     readFile,
     writeFile
   });

@@ -262,3 +262,17 @@ export type parsedConfig = {
   localPlugins: string[];
   keymaps: Record<string, string[]>;
 };
+
+/** Structured config validation diagnostic payload for JSON5 parse/schema failures. */
+export type configValidationDiagnostic = {
+  /** JSON Pointer-like path for schema issues or source:line:column for parse issues. */
+  path: string;
+  /** Human-readable explanation of what failed. */
+  message: string;
+  /** Concrete remediation guidance for the user. */
+  suggestedFix: string;
+  /** Optional schema-derived description for the affected field. */
+  docHint?: string;
+  /** Optional default value hint when a safe fallback exists. */
+  defaultHint?: string;
+};

@@ -137,11 +137,17 @@ registry APIs. Follow these rules for command-system changes:
 Roadmap item `1.3.1` moves repository config handling to JSON5-only semantics
 for active configuration files:
 
-- Parse and write `hyper.json` as JSON5 (including comments and trailing
+- Parse and write `config.json5` as JSON5 (including comments and trailing
   commas).
 - Do not rely on `.hyper.js` migration; legacy migration paths were removed.
 - Persist runtime plugin settings under `config.plugins.<plugin-id>` in
-  `hyper.json`.
+  `config.json5`.
+- Keep config-validation diagnostics structured with required fields:
+  `path`, `message`, and `suggestedFix` (optional `docHint` and `defaultHint`
+  may be included when available).
+- Preserve user-authored comments and formatting when roundtripping
+  `config.json5`; avoid full-file canonical rewrites for targeted runtime
+  settings updates.
 
 ## Visible-only WebGL rendering practice
 

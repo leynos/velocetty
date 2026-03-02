@@ -27,9 +27,7 @@ type PersistenceOptions = {
 
 const cloneValue = <T>(value: T): T => structuredClone(value);
 
-const findRuntimePluginManifest = (
-  pluginId: string
-): RuntimePluginManifest | undefined =>
+const findRuntimePluginManifest = (pluginId: string): RuntimePluginManifest | undefined =>
   runtimePluginManifests.find((manifest) => manifest.id === pluginId);
 
 const getDefaultConfigPath = (): string => cfgPath;
@@ -58,18 +56,11 @@ const getOrInitPluginsNamespace = (cfg: rawConfig): RuntimePluginSettingsNamespa
 };
 
 const resolvePersistenceOptions = (options: PersistenceOptions = {}) => {
-  const {
-    configFilePath = getDefaultConfigPath(),
-    readFile = readFileSync,
-    writeFile = writeFileSync
-  } = options;
+  const {configFilePath = getDefaultConfigPath(), readFile = readFileSync, writeFile = writeFileSync} = options;
   return {configFilePath, readFile, writeFile};
 };
 
-const isRuntimePluginManifestEnabled = (
-  cfg: configOptions,
-  manifest: RuntimePluginManifest
-): boolean => {
+const isRuntimePluginManifestEnabled = (cfg: configOptions, manifest: RuntimePluginManifest): boolean => {
   const namespace = getPluginsNamespace(cfg);
   const existing = namespace[manifest.id];
   const resolvedSettings = merge(
@@ -82,10 +73,7 @@ const isRuntimePluginManifestEnabled = (
 };
 
 /** Returns resolved settings for a runtime plugin from in-memory config state. */
-export const getRuntimePluginSettings = (
-  cfg: configOptions,
-  pluginId: string
-): RuntimePluginSettings => {
+export const getRuntimePluginSettings = (cfg: configOptions, pluginId: string): RuntimePluginSettings => {
   const namespace = getPluginsNamespace(cfg);
   const existing = namespace[pluginId];
   const manifest = findRuntimePluginManifest(pluginId);
@@ -96,9 +84,7 @@ export const getRuntimePluginSettings = (
 };
 
 /** Returns command definitions contributed by currently enabled runtime plugins. */
-export const getRuntimePluginCommandDefinitions = (
-  cfg: configOptions
-): CommandDefinition[] => {
+export const getRuntimePluginCommandDefinitions = (cfg: configOptions): CommandDefinition[] => {
   return runtimePluginManifests.flatMap((manifest) => {
     if (!isRuntimePluginManifestEnabled(cfg, manifest)) {
       return [];
@@ -108,23 +94,18 @@ export const getRuntimePluginCommandDefinitions = (
 };
 
 /** Returns keybinding contributions from currently enabled runtime plugins. */
-export const getRuntimePluginKeybindings = (
-  cfg: configOptions
-): Record<string, string[]> => {
-  return runtimePluginManifests.reduce<Record<string, string[]>>(
-    (accumulator, manifest) => {
-      if (!isRuntimePluginManifestEnabled(cfg, manifest)) {
-        return accumulator;
-      }
-
-      Object.keys(manifest.keybindings).forEach((commandId) => {
-        accumulator[commandId] = [...manifest.keybindings[commandId]];
-      });
-
+export const getRuntimePluginKeybindings = (cfg: configOptions): Record<string, string[]> => {
+  return runtimePluginManifests.reduce<Record<string, string[]>>((accumulator, manifest) => {
+    if (!isRuntimePluginManifestEnabled(cfg, manifest)) {
       return accumulator;
-    },
-    {}
-  );
+    }
+
+    Object.keys(manifest.keybindings).forEach((commandId) => {
+      accumulator[commandId] = [...manifest.keybindings[commandId]];
+    });
+
+    return accumulator;
+  }, {});
 };
 
 /**
@@ -155,9 +136,7 @@ export const ensureRuntimePluginSettingsPersisted = (
     const rawConfigText = readFile(configFilePath, 'utf8');
     const rawConfig = parseConfigJson5Strict(rawConfigText);
     if (!rawConfig) {
-      console.error(
-        `Failed to parse runtime plugin config at "${configFilePath}". Returning empty namespace.`
-      );
+      console.error(`Failed to parse runtime plugin config at "${configFilePath}". Returning empty namespace.`);
       return {};
     }
     const namespace = getOrInitPluginsNamespace(rawConfig);
@@ -211,9 +190,7 @@ export const setRuntimePluginEnabledPersisted = (
     const rawConfigText = readFile(configFilePath, 'utf8');
     const rawConfig = parseConfigJson5Strict(rawConfigText);
     if (!rawConfig) {
-      console.error(
-        `Failed to parse runtime plugin config at "${configFilePath}". Returning fallback settings.`
-      );
+      console.error(`Failed to parse runtime plugin config at "${configFilePath}". Returning fallback settings.`);
       return fallbackSettings;
     }
 
@@ -223,9 +200,7 @@ export const setRuntimePluginEnabledPersisted = (
 
     if (!isEqual(existing, merged)) {
       namespace[pluginId] = merged;
-      const patchedContent = applyPluginSettingsPatches(rawConfigText, [
-        {pluginId, settings: merged}
-      ]);
+      const patchedContent = applyPluginSettingsPatches(rawConfigText, [{pluginId, settings: merged}]);
       if (!patchedContent) {
         console.error(
           `Failed to apply runtime plugin enabled patch for "${configFilePath}". Skipping write to preserve user formatting.`
