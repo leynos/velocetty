@@ -149,6 +149,28 @@ export class Json5Parser {
       : this.parseUnquotedKey(startIndex, limitIndex);
   }
 
+  private applyBlockCommentResult(
+    result: {state: ParsingState; skipNext: boolean},
+    currentIndex: number
+  ): {state: ParsingState; nextIndex: number} {
+    return {
+      state: result.state,
+      nextIndex: currentIndex + (result.skipNext ? 1 : 0)
+    };
+  }
+
+  private applyDelimiterResult(
+    result: {state: ParsingState; skipNext: boolean; foundClose: boolean},
+    currentIndex: number
+  ): {state: ParsingState; nextIndex: number; shouldReturn: boolean; returnValue: number} {
+    return {
+      state: result.state,
+      nextIndex: currentIndex + (result.skipNext ? 1 : 0),
+      shouldReturn: result.foundClose,
+      returnValue: currentIndex
+    };
+  }
+
   private findMatchingClosingBrace(openBraceIndex: number): number {
     if (this.raw[openBraceIndex] !== '{') {
       return -1;
@@ -171,9 +193,12 @@ export class Json5Parser {
         continue;
       }
       if (state.inBlockComment) {
-        const blockCommentResult = processBlockComment(state, current, next);
-        state = blockCommentResult.state;
-        index += blockCommentResult.skipNext ? 1 : 0;
+        const appliedBlockCommentResult = this.applyBlockCommentResult(
+          processBlockComment(state, current, next),
+          index
+        );
+        state = appliedBlockCommentResult.state;
+        index = appliedBlockCommentResult.nextIndex;
         continue;
       }
       if (state.inString) {
@@ -181,14 +206,13 @@ export class Json5Parser {
         continue;
       }
 
-      const delimiterResult = processDelimitersAndComments(state, current, next);
-      state = delimiterResult.state;
-      if (delimiterResult.foundClose) {
-        return index;
-      }
-      if (delimiterResult.skipNext) {
-        index += 1;
-      }
+      const appliedDelimiterResult = this.applyDelimiterResult(
+        processDelimitersAndComments(state, current, next),
+        index
+      );
+      state = appliedDelimiterResult.state;
+      index = appliedDelimiterResult.nextIndex;
+      if (appliedDelimiterResult.shouldReturn) return appliedDelimiterResult.returnValue;
     }
 
     return -1;
