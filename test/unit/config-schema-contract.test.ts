@@ -11,6 +11,21 @@ const readJsonFile = async (workspaceRelativePath: string): Promise<unknown> => 
   return JSON.parse(raw) as unknown;
 };
 
+const processArrayNode = (current: unknown[], stack: unknown[]): void => {
+  for (const entry of current) {
+    stack.push(entry);
+  }
+};
+
+const processObjectNode = (current: JsonObject, stack: unknown[], matches: JsonObject[]): void => {
+  for (const [key, value] of Object.entries(current)) {
+    if (key === 'webGLRendererMaxContexts' && value && typeof value === 'object') {
+      matches.push(value as JsonObject);
+    }
+    stack.push(value);
+  }
+};
+
 const collectContextCapSchemas = (node: unknown): JsonObject[] => {
   const matches: JsonObject[] = [];
   const stack: unknown[] = [node];
@@ -18,9 +33,7 @@ const collectContextCapSchemas = (node: unknown): JsonObject[] => {
   while (stack.length > 0) {
     const current = stack.pop();
     if (Array.isArray(current)) {
-      for (const entry of current) {
-        stack.push(entry);
-      }
+      processArrayNode(current, stack);
       continue;
     }
 
@@ -28,12 +41,7 @@ const collectContextCapSchemas = (node: unknown): JsonObject[] => {
       continue;
     }
 
-    for (const [key, value] of Object.entries(current as JsonObject)) {
-      if (key === 'webGLRendererMaxContexts' && value && typeof value === 'object') {
-        matches.push(value as JsonObject);
-      }
-      stack.push(value);
-    }
+    processObjectNode(current as JsonObject, stack, matches);
   }
 
   return matches;
