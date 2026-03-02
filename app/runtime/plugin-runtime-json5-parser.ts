@@ -30,14 +30,27 @@ export type IndexCursor = {
 type ParsedObjectKey = {key: string; startIndex: number; endIndex: number};
 
 const isWhitespaceCharacter = (character: string): boolean =>
-  character === ' ' || character === '\n' || character === '\r' || character === '\t';
+  character === ' ' ||
+  character === '\n' ||
+  character === '\r' ||
+  character === '\t' ||
+  character === '\u2028' ||
+  character === '\u2029';
 
 const identifierStartPattern = /[$_\p{ID_Start}]/u;
 const identifierContinuePattern = /(?:[$_\p{ID_Continue}]|\u200C|\u200D)/u;
 
 const skipLineComment = (raw: string, startIndex: number, limitIndex: number): number => {
   let index = startIndex + 2;
-  while (index < limitIndex && raw[index] !== '\n') index += 1;
+  while (
+    index < limitIndex &&
+    raw[index] !== '\n' &&
+    raw[index] !== '\r' &&
+    raw[index] !== '\u2028' &&
+    raw[index] !== '\u2029'
+  ) {
+    index += 1;
+  }
   return index;
 };
 
@@ -255,6 +268,9 @@ export class Json5Parser {
         continue;
       }
       if (current === ']') {
+        if (bracketDepth === 0) {
+          return -1;
+        }
         bracketDepth -= 1;
         continue;
       }

@@ -12,7 +12,8 @@ export type PluginPersistencePatch = {
   settings: RuntimePluginSettings;
 };
 
-const formatObjectKey = (key: string): string => (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : JSON.stringify(key));
+const formatObjectKey = (key: string): string =>
+  /^[\p{ID_Start}_$][\p{ID_Continue}_$]*$/u.test(key) ? key : JSON.stringify(key);
 
 const formatJson5ValueForProperty = (value: unknown, propertyIndent: string): string => {
   const serialized = stringifyJson5(value).trimEnd();
