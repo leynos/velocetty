@@ -40,20 +40,25 @@ type ParsedDiagnosticsPayload = {
   diagnostics: Array<Record<string, unknown>>;
 };
 
+const isValidObject = (entry: unknown): entry is Record<string, unknown> => typeof entry === 'object' && entry !== null;
+
+const extractDiagnostics = (entry: Record<string, unknown>): unknown =>
+  'diagnostics' in entry ? entry.diagnostics : null;
+
+const isValidDiagnosticsArray = (diagnostics: unknown): diagnostics is Array<Record<string, unknown>> =>
+  Array.isArray(diagnostics) && diagnostics.length > 0;
+
 const findDiagnosticsPayload = (): ParsedDiagnosticsPayload => {
   for (const call of warnMock.mock.calls) {
     for (const entry of call) {
-      if (typeof entry !== 'object' || entry === null) {
+      if (!isValidObject(entry)) {
         continue;
       }
-      if (!('diagnostics' in entry)) {
+      const diagnostics = extractDiagnostics(entry);
+      if (!isValidDiagnosticsArray(diagnostics)) {
         continue;
       }
-      const diagnostics = (entry as {diagnostics?: unknown}).diagnostics;
-      if (!Array.isArray(diagnostics) || diagnostics.length === 0) {
-        continue;
-      }
-      return {diagnostics: diagnostics as Array<Record<string, unknown>>};
+      return {diagnostics};
     }
   }
 
