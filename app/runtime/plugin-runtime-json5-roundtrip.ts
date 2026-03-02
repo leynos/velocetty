@@ -2,7 +2,7 @@
 import JSON5 from 'json5';
 
 import {safeParseRawConfig, stringifyJson5} from '../config/json5-config';
-import {Json5Parser, type Json5ObjectRange} from './plugin-runtime-json5-parser';
+import {Json5Parser, type Json5ObjectProperty, type Json5ObjectRange} from './plugin-runtime-json5-parser';
 
 import type {rawConfig} from '@shared/types/config';
 
@@ -30,6 +30,63 @@ const formatJson5ValueForProperty = (value: unknown, propertyIndent: string): st
 const replaceSlice = (raw: string, startIndex: number, endIndex: number, replacement: string): string =>
   `${raw.slice(0, startIndex)}${replacement}${raw.slice(endIndex)}`;
 
+const updateExistingProperty = (
+  raw: string,
+  parser: Json5Parser,
+  existingProperty: Json5ObjectProperty,
+  value: unknown
+): string => {
+  const propertyIndent = parser.getLineIndent({index: existingProperty.keyStartIndex});
+  const formattedValue = formatJson5ValueForProperty(value, propertyIndent);
+  return replaceSlice(raw, existingProperty.valueStartIndex, existingProperty.valueEndIndex, formattedValue);
+};
+
+const insertIntoEmptyObject = (
+  raw: string,
+  parser: Json5Parser,
+  objectRange: Json5ObjectRange,
+  key: string,
+  value: unknown
+): string => {
+  const parentIndent = parser.getLineIndent({index: objectRange.openBraceIndex});
+  const memberIndent = `${parentIndent}  `;
+  const formattedProperty = `${memberIndent}${formatObjectKey(key)}: ${formatJson5ValueForProperty(value, memberIndent)}`;
+  return replaceSlice(
+    raw,
+    objectRange.openBraceIndex + 1,
+    objectRange.closeBraceIndex,
+    `\n${formattedProperty}\n${parentIndent}`
+  );
+};
+
+const appendToExistingObject = (
+  raw: string,
+  parser: Json5Parser,
+  objectRange: Json5ObjectRange,
+  properties: readonly Json5ObjectProperty[],
+  key: string,
+  value: unknown
+): string | null => {
+  const parentIndent = parser.getLineIndent({index: objectRange.openBraceIndex});
+  const firstProperty = properties[0];
+  const memberIndent = firstProperty ? parser.getLineIndent({index: firstProperty.keyStartIndex}) : `${parentIndent}  `;
+  const formattedProperty = `${memberIndent}${formatObjectKey(key)}: ${formatJson5ValueForProperty(value, memberIndent)}`;
+  const lastProperty = properties[properties.length - 1];
+  if (!lastProperty) {
+    return null;
+  }
+
+  const closeLineStartIndex = parser.getLineStartIndex({index: objectRange.closeBraceIndex});
+  const closeLinePrefix = raw.slice(closeLineStartIndex, objectRange.closeBraceIndex);
+  const closeLineIsIndentOnly = /^[ \t]*$/.test(closeLinePrefix);
+  const insertionIndex = closeLineIsIndentOnly ? closeLineStartIndex : objectRange.closeBraceIndex;
+  const separator = lastProperty.hasTrailingComma ? '' : ',';
+  const prefix = raw.slice(0, insertionIndex);
+  const leadingNewline = prefix.endsWith('\n') ? '' : '\n';
+
+  return `${prefix}${separator}${leadingNewline}${formattedProperty}\n${raw.slice(insertionIndex)}`;
+};
+
 const upsertObjectProperty = (
   raw: string,
   objectRange: Json5ObjectRange,
@@ -44,38 +101,14 @@ const upsertObjectProperty = (
 
   const existingProperty = properties.find((property) => property.key === key);
   if (existingProperty) {
-    const propertyIndent = parser.getLineIndent({index: existingProperty.keyStartIndex});
-    const formattedValue = formatJson5ValueForProperty(value, propertyIndent);
-    return replaceSlice(raw, existingProperty.valueStartIndex, existingProperty.valueEndIndex, formattedValue);
+    return updateExistingProperty(raw, parser, existingProperty, value);
   }
-
-  const parentIndent = parser.getLineIndent({index: objectRange.openBraceIndex});
-  const firstProperty = properties[0];
-  const memberIndent = firstProperty ? parser.getLineIndent({index: firstProperty.keyStartIndex}) : `${parentIndent}  `;
-  const formattedProperty = `${memberIndent}${formatObjectKey(key)}: ${formatJson5ValueForProperty(value, memberIndent)}`;
 
   if (properties.length === 0) {
-    return replaceSlice(
-      raw,
-      objectRange.openBraceIndex + 1,
-      objectRange.closeBraceIndex,
-      `\n${formattedProperty}\n${parentIndent}`
-    );
+    return insertIntoEmptyObject(raw, parser, objectRange, key, value);
   }
 
-  const lastProperty = properties[properties.length - 1];
-  if (!lastProperty) {
-    return null;
-  }
-  const closeLineStartIndex = parser.getLineStartIndex({index: objectRange.closeBraceIndex});
-  const closeLinePrefix = raw.slice(closeLineStartIndex, objectRange.closeBraceIndex);
-  const closeLineIsIndentOnly = /^[ \t]*$/.test(closeLinePrefix);
-  const insertionIndex = closeLineIsIndentOnly ? closeLineStartIndex : objectRange.closeBraceIndex;
-  const separator = lastProperty.hasTrailingComma ? '' : ',';
-  const prefix = raw.slice(0, insertionIndex);
-  const leadingNewline = prefix.endsWith('\n') ? '' : '\n';
-
-  return `${prefix}${separator}${leadingNewline}${formattedProperty}\n${raw.slice(insertionIndex)}`;
+  return appendToExistingObject(raw, parser, objectRange, properties, key, value);
 };
 
 const getObjectRangeByPath = (raw: string, path: readonly string[]): Json5ObjectRange | null => {
