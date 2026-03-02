@@ -77,8 +77,8 @@ const handleOpeningBrace = (state: ParsingState, current: string): StateTransiti
 
 const handleClosingBrace = (state: ParsingState, current: string): StateTransition | null => {
   if (current !== '}') return null;
-  const depth = state.depth - 1;
-  return {state: {...state, depth}, skipNext: false, foundClose: depth === 0};
+  const depth = Math.max(0, state.depth - 1);
+  return {state: {...state, depth}, skipNext: false, foundClose: state.depth > 0 && depth === 0};
 };
 
 /**
