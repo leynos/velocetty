@@ -18,6 +18,15 @@ export type Json5ObjectProperty = {
   hasTrailingComma: boolean;
 };
 
+export type ParseRange = {
+  readonly startIndex: number;
+  readonly limitIndex: number;
+};
+
+export type IndexCursor = {
+  readonly index: number;
+};
+
 type ParsedObjectKey = {key: string; startIndex: number; endIndex: number};
 
 const isWhitespaceCharacter = (character: string): boolean =>
@@ -41,9 +50,9 @@ const skipBlockComment = (raw: string, startIndex: number, limitIndex: number): 
 export class Json5Parser {
   public constructor(private readonly raw: string) {}
 
-  public skipWhitespaceAndComments(fromIndex: number, limitIndex: number): number {
-    let index = fromIndex;
-    while (index < limitIndex) {
+  public skipWhitespaceAndComments(range: ParseRange): number {
+    let index = range.startIndex;
+    while (index < range.limitIndex) {
       const current = this.raw[index];
       const next = this.raw[index + 1];
       if (isWhitespaceCharacter(current)) {
@@ -51,11 +60,11 @@ export class Json5Parser {
         continue;
       }
       if (current === '/' && next === '/') {
-        index = skipLineComment(this.raw, index, limitIndex);
+        index = skipLineComment(this.raw, index, range.limitIndex);
         continue;
       }
       if (current === '/' && next === '*') {
-        index = skipBlockComment(this.raw, index, limitIndex);
+        index = skipBlockComment(this.raw, index, range.limitIndex);
         continue;
       }
       break;
@@ -63,36 +72,24 @@ export class Json5Parser {
     return index;
   }
 
-  public static skipWhitespaceAndComments(raw: string, fromIndex: number, limitIndex: number): number {
-    return new Json5Parser(raw).skipWhitespaceAndComments(fromIndex, limitIndex);
-  }
-
-  public getLineStartIndex(index: number): number {
-    const lineBreakIndex = this.raw.lastIndexOf('\n', Math.max(0, index - 1));
+  public getLineStartIndex(cursor: IndexCursor): number {
+    const lineBreakIndex = this.raw.lastIndexOf('\n', Math.max(0, cursor.index - 1));
     return lineBreakIndex === -1 ? 0 : lineBreakIndex + 1;
   }
 
-  public static getLineStartIndex(raw: string, index: number): number {
-    return new Json5Parser(raw).getLineStartIndex(index);
-  }
-
-  public getLineIndent(index: number): string {
-    const lineStartIndex = this.getLineStartIndex(index);
-    let cursor = lineStartIndex;
-    while (cursor < this.raw.length && (this.raw[cursor] === ' ' || this.raw[cursor] === '\t')) {
-      cursor += 1;
+  public getLineIndent(cursor: IndexCursor): string {
+    const lineStartIndex = this.getLineStartIndex(cursor);
+    let index = lineStartIndex;
+    while (index < this.raw.length && (this.raw[index] === ' ' || this.raw[index] === '\t')) {
+      index += 1;
     }
-    return this.raw.slice(lineStartIndex, cursor);
+    return this.raw.slice(lineStartIndex, index);
   }
 
-  public static getLineIndent(raw: string, index: number): string {
-    return new Json5Parser(raw).getLineIndent(index);
-  }
-
-  private parseQuotedStringEnd(startIndex: number, limitIndex: number): number {
-    const quote = this.raw[startIndex];
-    let index = startIndex + 1;
-    while (index < limitIndex) {
+  private parseQuotedStringEnd(range: ParseRange): number {
+    const quote = this.raw[range.startIndex];
+    let index = range.startIndex + 1;
+    while (index < range.limitIndex) {
       const current = this.raw[index];
       if (current === '\\') {
         index += 2;
@@ -106,73 +103,75 @@ export class Json5Parser {
     return -1;
   }
 
-  private readCodePoint(index: number): {character: string; nextIndex: number} | null {
-    const codePoint = this.raw.codePointAt(index);
+  private readCodePoint(cursor: IndexCursor): {character: string; nextIndex: number} | null {
+    const codePoint = this.raw.codePointAt(cursor.index);
     if (codePoint === undefined) {
       return null;
     }
     const character = String.fromCodePoint(codePoint);
     return {
       character,
-      nextIndex: index + character.length
+      nextIndex: cursor.index + character.length
     };
   }
 
-  private parseQuotedKey(startIndex: number, limitIndex: number): ParsedObjectKey | null {
-    const endIndex = this.parseQuotedStringEnd(startIndex, limitIndex);
+  private parseQuotedKey(range: ParseRange): ParsedObjectKey | null {
+    const endIndex = this.parseQuotedStringEnd(range);
     if (endIndex === -1) return null;
     try {
-      return {key: JSON5.parse(this.raw.slice(startIndex, endIndex)) as string, startIndex, endIndex};
+      return {
+        key: JSON5.parse(this.raw.slice(range.startIndex, endIndex)) as string,
+        startIndex: range.startIndex,
+        endIndex
+      };
     } catch {
       return null;
     }
   }
 
-  private parseUnquotedKey(startIndex: number, limitIndex: number): ParsedObjectKey | null {
-    const firstCodePoint = this.readCodePoint(startIndex);
+  private parseUnquotedKey(range: ParseRange): ParsedObjectKey | null {
+    const firstCodePoint = this.readCodePoint({index: range.startIndex});
     if (!firstCodePoint || !identifierStartPattern.test(firstCodePoint.character)) return null;
 
     let cursor = firstCodePoint.nextIndex;
-    while (cursor < limitIndex) {
-      const nextCodePoint = this.readCodePoint(cursor);
+    while (cursor < range.limitIndex) {
+      const nextCodePoint = this.readCodePoint({index: cursor});
       if (!nextCodePoint || !identifierContinuePattern.test(nextCodePoint.character)) break;
       cursor = nextCodePoint.nextIndex;
     }
 
-    return {key: this.raw.slice(startIndex, cursor), startIndex, endIndex: cursor};
+    return {key: this.raw.slice(range.startIndex, cursor), startIndex: range.startIndex, endIndex: cursor};
   }
 
-  private parseObjectKey(startIndex: number, limitIndex: number): ParsedObjectKey | null {
-    const first = this.raw[startIndex];
-    return first === '"' || first === "'"
-      ? this.parseQuotedKey(startIndex, limitIndex)
-      : this.parseUnquotedKey(startIndex, limitIndex);
+  private parseObjectKey(range: ParseRange): ParsedObjectKey | null {
+    const first = this.raw[range.startIndex];
+    return first === '"' || first === "'" ? this.parseQuotedKey(range) : this.parseUnquotedKey(range);
   }
 
   private applyBlockCommentResult(
     result: {state: ParsingState; skipNext: boolean},
-    currentIndex: number
+    cursor: IndexCursor
   ): {state: ParsingState; nextIndex: number} {
     return {
       state: result.state,
-      nextIndex: currentIndex + (result.skipNext ? 1 : 0)
+      nextIndex: cursor.index + (result.skipNext ? 1 : 0)
     };
   }
 
   private applyDelimiterResult(
     result: {state: ParsingState; skipNext: boolean; foundClose: boolean},
-    currentIndex: number
+    cursor: IndexCursor
   ): {state: ParsingState; nextIndex: number; shouldReturn: boolean; returnValue: number} {
     return {
       state: result.state,
-      nextIndex: currentIndex + (result.skipNext ? 1 : 0),
+      nextIndex: cursor.index + (result.skipNext ? 1 : 0),
       shouldReturn: result.foundClose,
-      returnValue: currentIndex
+      returnValue: cursor.index
     };
   }
 
-  private findMatchingClosingBrace(openBraceIndex: number): number {
-    if (this.raw[openBraceIndex] !== '{') {
+  private findMatchingClosingBrace(cursor: IndexCursor): number {
+    if (this.raw[cursor.index] !== '{') {
       return -1;
     }
 
@@ -184,7 +183,7 @@ export class Json5Parser {
       inBlockComment: false
     };
 
-    for (let index = openBraceIndex; index < this.raw.length; index += 1) {
+    for (let index = cursor.index; index < this.raw.length; index += 1) {
       const current = this.raw[index];
       const next = this.raw[index + 1];
 
@@ -193,10 +192,9 @@ export class Json5Parser {
         continue;
       }
       if (state.inBlockComment) {
-        const appliedBlockCommentResult = this.applyBlockCommentResult(
-          processBlockComment(state, current, next),
+        const appliedBlockCommentResult = this.applyBlockCommentResult(processBlockComment(state, current, next), {
           index
-        );
+        });
         state = appliedBlockCommentResult.state;
         index = appliedBlockCommentResult.nextIndex;
         continue;
@@ -206,10 +204,9 @@ export class Json5Parser {
         continue;
       }
 
-      const appliedDelimiterResult = this.applyDelimiterResult(
-        processDelimitersAndComments(state, current, next),
+      const appliedDelimiterResult = this.applyDelimiterResult(processDelimitersAndComments(state, current, next), {
         index
-      );
+      });
       state = appliedDelimiterResult.state;
       index = appliedDelimiterResult.nextIndex;
       if (appliedDelimiterResult.shouldReturn) return appliedDelimiterResult.returnValue;
@@ -218,7 +215,7 @@ export class Json5Parser {
     return -1;
   }
 
-  private findPropertyValueEnd(valueStartIndex: number, objectCloseIndex: number): number {
+  private findPropertyValueEnd(range: ParseRange): number {
     let state: ParsingState = {
       depth: 0,
       inString: null,
@@ -228,7 +225,7 @@ export class Json5Parser {
     };
     let bracketDepth = 0;
 
-    for (let index = valueStartIndex; index < objectCloseIndex; index += 1) {
+    for (let index = range.startIndex; index < range.limitIndex; index += 1) {
       const current = this.raw[index];
       const next = this.raw[index + 1];
 
@@ -267,24 +264,21 @@ export class Json5Parser {
       if (delimiterResult.skipNext) index += 1;
     }
 
-    return objectCloseIndex;
+    return range.limitIndex;
   }
 
-  private parseSingleProperty(
-    startCursor: number,
-    objectCloseIndex: number
-  ): {property: Json5ObjectProperty; nextCursor: number} | null {
-    const parsedKey = this.parseObjectKey(startCursor, objectCloseIndex);
+  private parseSingleProperty(range: ParseRange): {property: Json5ObjectProperty; nextCursor: number} | null {
+    const parsedKey = this.parseObjectKey(range);
     if (!parsedKey) return null;
 
-    const colonIndex = this.skipWhitespaceAndComments(parsedKey.endIndex, objectCloseIndex);
+    const colonIndex = this.skipWhitespaceAndComments({startIndex: parsedKey.endIndex, limitIndex: range.limitIndex});
     if (this.raw[colonIndex] !== ':') return null;
 
-    const valueStartIndex = this.skipWhitespaceAndComments(colonIndex + 1, objectCloseIndex);
-    if (valueStartIndex >= objectCloseIndex) return null;
+    const valueStartIndex = this.skipWhitespaceAndComments({startIndex: colonIndex + 1, limitIndex: range.limitIndex});
+    if (valueStartIndex >= range.limitIndex) return null;
 
-    const valueEndIndex = this.findPropertyValueEnd(valueStartIndex, objectCloseIndex);
-    const afterValueIndex = this.skipWhitespaceAndComments(valueEndIndex, objectCloseIndex);
+    const valueEndIndex = this.findPropertyValueEnd({startIndex: valueStartIndex, limitIndex: range.limitIndex});
+    const afterValueIndex = this.skipWhitespaceAndComments({startIndex: valueEndIndex, limitIndex: range.limitIndex});
     const hasTrailingComma = this.raw[afterValueIndex] === ',';
 
     return {
@@ -301,41 +295,39 @@ export class Json5Parser {
 
   public parseObjectProperties(objectRange: Json5ObjectRange): Json5ObjectProperty[] | null {
     const properties: Json5ObjectProperty[] = [];
-    let cursor = this.skipWhitespaceAndComments(objectRange.openBraceIndex + 1, objectRange.closeBraceIndex);
+    let cursor = this.skipWhitespaceAndComments({
+      startIndex: objectRange.openBraceIndex + 1,
+      limitIndex: objectRange.closeBraceIndex
+    });
 
     while (cursor < objectRange.closeBraceIndex) {
       if (this.raw[cursor] === ',') {
-        cursor = this.skipWhitespaceAndComments(cursor + 1, objectRange.closeBraceIndex);
+        cursor = this.skipWhitespaceAndComments({startIndex: cursor + 1, limitIndex: objectRange.closeBraceIndex});
         continue;
       }
 
-      const parsedProperty = this.parseSingleProperty(cursor, objectRange.closeBraceIndex);
+      const parsedProperty = this.parseSingleProperty({startIndex: cursor, limitIndex: objectRange.closeBraceIndex});
       if (!parsedProperty) return null;
       properties.push(parsedProperty.property);
-      cursor = this.skipWhitespaceAndComments(parsedProperty.nextCursor, objectRange.closeBraceIndex);
+      cursor = this.skipWhitespaceAndComments({
+        startIndex: parsedProperty.nextCursor,
+        limitIndex: objectRange.closeBraceIndex
+      });
     }
 
     return properties;
   }
 
-  public static parseObjectProperties(raw: string, objectRange: Json5ObjectRange): Json5ObjectProperty[] | null {
-    return new Json5Parser(raw).parseObjectProperties(objectRange);
-  }
-
   public findRootObjectRange(): Json5ObjectRange | null {
-    const rootStartIndex = this.skipWhitespaceAndComments(0, this.raw.length);
+    const rootStartIndex = this.skipWhitespaceAndComments({startIndex: 0, limitIndex: this.raw.length});
     if (this.raw[rootStartIndex] !== '{') {
       return null;
     }
-    const closeBraceIndex = this.findMatchingClosingBrace(rootStartIndex);
+    const closeBraceIndex = this.findMatchingClosingBrace({index: rootStartIndex});
     if (closeBraceIndex === -1) {
       return null;
     }
     return {openBraceIndex: rootStartIndex, closeBraceIndex};
-  }
-
-  public static findRootObjectRange(raw: string): Json5ObjectRange | null {
-    return new Json5Parser(raw).findRootObjectRange();
   }
 
   public getObjectProperty(objectRange: Json5ObjectRange, key: string): Json5ObjectProperty | null {
@@ -346,31 +338,18 @@ export class Json5Parser {
     return properties.find((property) => property.key === key) ?? null;
   }
 
-  public static getObjectProperty(raw: string, objectRange: Json5ObjectRange, key: string): Json5ObjectProperty | null {
-    return new Json5Parser(raw).getObjectProperty(objectRange, key);
-  }
-
   public getObjectRangeForProperty(property: Json5ObjectProperty): Json5ObjectRange | null {
-    const valueStart = this.skipWhitespaceAndComments(property.valueStartIndex, this.raw.length);
+    const valueStart = this.skipWhitespaceAndComments({
+      startIndex: property.valueStartIndex,
+      limitIndex: this.raw.length
+    });
     if (this.raw[valueStart] !== '{') {
       return null;
     }
-    const closeBraceIndex = this.findMatchingClosingBrace(valueStart);
+    const closeBraceIndex = this.findMatchingClosingBrace({index: valueStart});
     if (closeBraceIndex === -1) {
       return null;
     }
     return {openBraceIndex: valueStart, closeBraceIndex};
   }
-
-  public static getObjectRangeForProperty(raw: string, property: Json5ObjectProperty): Json5ObjectRange | null {
-    return new Json5Parser(raw).getObjectRangeForProperty(property);
-  }
 }
-
-export const skipWhitespaceAndComments = Json5Parser.skipWhitespaceAndComments;
-export const getLineStartIndex = Json5Parser.getLineStartIndex;
-export const getLineIndent = Json5Parser.getLineIndent;
-export const parseObjectProperties = Json5Parser.parseObjectProperties;
-export const findRootObjectRange = Json5Parser.findRootObjectRange;
-export const getObjectProperty = Json5Parser.getObjectProperty;
-export const getObjectRangeForProperty = Json5Parser.getObjectRangeForProperty;

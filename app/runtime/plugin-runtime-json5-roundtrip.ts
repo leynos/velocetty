@@ -43,14 +43,14 @@ const upsertObjectProperty = (
 
   const existingProperty = properties.find((property) => property.key === key);
   if (existingProperty) {
-    const propertyIndent = parser.getLineIndent(existingProperty.keyStartIndex);
+    const propertyIndent = parser.getLineIndent({index: existingProperty.keyStartIndex});
     const formattedValue = formatJson5ValueForProperty(value, propertyIndent);
     return replaceSlice(raw, existingProperty.valueStartIndex, existingProperty.valueEndIndex, formattedValue);
   }
 
-  const parentIndent = parser.getLineIndent(objectRange.openBraceIndex);
+  const parentIndent = parser.getLineIndent({index: objectRange.openBraceIndex});
   const firstProperty = properties[0];
-  const memberIndent = firstProperty ? parser.getLineIndent(firstProperty.keyStartIndex) : `${parentIndent}  `;
+  const memberIndent = firstProperty ? parser.getLineIndent({index: firstProperty.keyStartIndex}) : `${parentIndent}  `;
   const formattedProperty = `${memberIndent}${formatObjectKey(key)}: ${formatJson5ValueForProperty(value, memberIndent)}`;
 
   if (properties.length === 0) {
@@ -66,7 +66,7 @@ const upsertObjectProperty = (
   if (!lastProperty) {
     return null;
   }
-  const closeLineStartIndex = parser.getLineStartIndex(objectRange.closeBraceIndex);
+  const closeLineStartIndex = parser.getLineStartIndex({index: objectRange.closeBraceIndex});
   const closeLinePrefix = raw.slice(closeLineStartIndex, objectRange.closeBraceIndex);
   const closeLineIsIndentOnly = /^[ \t]*$/.test(closeLinePrefix);
   const insertionIndex = closeLineIsIndentOnly ? closeLineStartIndex : objectRange.closeBraceIndex;
