@@ -60,6 +60,25 @@ const skipBlockComment = (raw: string, startIndex: number, limitIndex: number): 
   return index + 1 < limitIndex ? index + 2 : limitIndex;
 };
 
+const isAtTopLevel = (state: ParsingState, bracketDepth: number): boolean => state.depth === 0 && bracketDepth === 0;
+
+const isValueTerminator = (current: string, state: ParsingState, bracketDepth: number): boolean => {
+  if (!isAtTopLevel(state, bracketDepth)) {
+    return false;
+  }
+  return current === '}' || current === ',';
+};
+
+const updateBracketDepth = (current: string, bracketDepth: number): number => {
+  if (current === '[') {
+    return bracketDepth + 1;
+  }
+  if (current === ']') {
+    return bracketDepth - 1;
+  }
+  return bracketDepth;
+};
+
 export class Json5Parser {
   public constructor(private readonly raw: string) {}
 
@@ -249,7 +268,9 @@ export class Json5Parser {
       if (state.inBlockComment) {
         const blockCommentResult = processBlockComment(state, current, next);
         state = blockCommentResult.state;
-        index += blockCommentResult.skipNext ? 1 : 0;
+        if (blockCommentResult.skipNext) {
+          index += 1;
+        }
         continue;
       }
       if (state.inString) {
@@ -257,27 +278,24 @@ export class Json5Parser {
         continue;
       }
 
-      if (current === '}' && state.depth === 0 && bracketDepth === 0) {
+      if (isValueTerminator(current, state, bracketDepth)) {
         return index;
       }
-      if (current === ',' && state.depth === 0 && bracketDepth === 0) {
-        return index;
-      }
-      if (current === '[') {
-        bracketDepth += 1;
-        continue;
-      }
-      if (current === ']') {
-        if (bracketDepth === 0) {
+
+      const nextBracketDepth = updateBracketDepth(current, bracketDepth);
+      if (nextBracketDepth !== bracketDepth) {
+        if (current === ']' && nextBracketDepth < 0) {
           return -1;
         }
-        bracketDepth -= 1;
+        bracketDepth = nextBracketDepth;
         continue;
       }
 
       const delimiterResult = processDelimitersAndComments(state, current, next);
       state = delimiterResult.state;
-      if (delimiterResult.skipNext) index += 1;
+      if (delimiterResult.skipNext) {
+        index += 1;
+      }
     }
 
     return range.limitIndex;
