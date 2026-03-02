@@ -1,10 +1,7 @@
 /** @file JSON5 object parsing helpers for runtime plugin settings persistence. */
 import JSON5 from 'json5';
 
-export type Json5ObjectRange = {
-  openBraceIndex: number;
-  closeBraceIndex: number;
-};
+export type Json5ObjectRange = {openBraceIndex: number; closeBraceIndex: number};
 
 export type Json5ObjectProperty = {
   key: string;
@@ -20,6 +17,18 @@ const isWhitespaceCharacter = (character: string): boolean =>
 const identifierStartPattern = /[$_\p{ID_Start}]/u;
 const identifierContinuePattern = /(?:[$_\p{ID_Continue}]|\u200C|\u200D)/u;
 
+const skipLineComment = (raw: string, startIndex: number, limitIndex: number): number => {
+  let index = startIndex + 2;
+  while (index < limitIndex && raw[index] !== '\n') index += 1;
+  return index;
+};
+
+const skipBlockComment = (raw: string, startIndex: number, limitIndex: number): number => {
+  let index = startIndex + 2;
+  while (index + 1 < limitIndex && !(raw[index] === '*' && raw[index + 1] === '/')) index += 1;
+  return index + 1 < limitIndex ? index + 2 : limitIndex;
+};
+
 export class Json5Parser {
   public constructor(private readonly raw: string) {}
 
@@ -33,18 +42,11 @@ export class Json5Parser {
         continue;
       }
       if (current === '/' && next === '/') {
-        index += 2;
-        while (index < limitIndex && this.raw[index] !== '\n') {
-          index += 1;
-        }
+        index = skipLineComment(this.raw, index, limitIndex);
         continue;
       }
       if (current === '/' && next === '*') {
-        index += 2;
-        while (index + 1 < limitIndex && !(this.raw[index] === '*' && this.raw[index + 1] === '/')) {
-          index += 1;
-        }
-        index = index + 1 < limitIndex ? index + 2 : limitIndex;
+        index = skipBlockComment(this.raw, index, limitIndex);
         continue;
       }
       break;
