@@ -127,6 +127,107 @@ test('setRuntimePluginEnabledPersisted updates enabled flag in JSON5 namespace',
   expect(persisted.config.plugins[GOLDEN_PATH_PLUGIN_ID]?.enabled).toBe(false);
 });
 
+test('ensureRuntimePluginSettingsPersisted preserves unchanged comments and formatting', () => {
+  const initialContent = `{
+  // keep root comment and spacing
+  config: {
+    defaultProfile: 'default',
+    profiles: [{name: 'default', config: {}}],
+    // keep this config comment
+    shell: '/bin/zsh',
+  },
+  plugins: [],
+  localPlugins: [],
+  keymaps: {},
+}`;
+  const {readFile, writeFile, getContent, getWrites} = createReadWritePair(initialContent);
+
+  ensureRuntimePluginSettingsPersisted({configFilePath: '/tmp/hyper.json', readFile, writeFile});
+
+  expect(getWrites()).toHaveLength(1);
+  expect(getContent()).toBe(`{
+  // keep root comment and spacing
+  config: {
+    defaultProfile: 'default',
+    profiles: [{name: 'default', config: {}}],
+    // keep this config comment
+    shell: '/bin/zsh',
+    plugins: {
+      "${GOLDEN_PATH_PLUGIN_ID}": {
+        enabled: true,
+        message: 'Golden path plugin command invoked.',
+        tabPrefix: 'GP',
+      }
+    }
+  },
+  plugins: [],
+  localPlugins: [],
+  keymaps: {},
+}`);
+});
+
+test('setRuntimePluginEnabledPersisted preserves unrelated plugin formatting', () => {
+  const initialContent = `{
+  config: {
+    // keep plugin ordering and comments
+    plugins: {
+      otherPlugin: {enabled: true},
+      "${GOLDEN_PATH_PLUGIN_ID}": {
+        enabled: true,
+        message: "custom message",
+        tabPrefix: "Custom"
+      },
+    },
+  },
+}`;
+  const {readFile, writeFile, getContent, getWrites} = createReadWritePair(initialContent);
+
+  setRuntimePluginEnabledPersisted(GOLDEN_PATH_PLUGIN_ID, false, {
+    configFilePath: '/tmp/hyper.json',
+    readFile,
+    writeFile
+  });
+
+  expect(getWrites()).toHaveLength(1);
+  expect(getContent()).toBe(`{
+  config: {
+    // keep plugin ordering and comments
+    plugins: {
+      otherPlugin: {enabled: true},
+      "${GOLDEN_PATH_PLUGIN_ID}": {
+        enabled: false,
+        message: 'custom message',
+        tabPrefix: 'Custom',
+      },
+    },
+  },
+}`);
+});
+
+test('ensureRuntimePluginSettingsPersisted does not write on parse errors', () => {
+  const {readFile, writeFile, getWrites} = createReadWritePair('{config:');
+  const persisted = ensureRuntimePluginSettingsPersisted({
+    configFilePath: '/tmp/hyper.json',
+    readFile,
+    writeFile
+  });
+
+  expect(persisted).toEqual({});
+  expect(getWrites()).toHaveLength(0);
+});
+
+test('setRuntimePluginEnabledPersisted returns fallback settings on parse errors', () => {
+  const {readFile, writeFile, getWrites} = createReadWritePair('{config:');
+  const persisted = setRuntimePluginEnabledPersisted(GOLDEN_PATH_PLUGIN_ID, false, {
+    configFilePath: '/tmp/hyper.json',
+    readFile,
+    writeFile
+  });
+
+  expect(persisted).toEqual({...goldenPathSettingsDefaults, enabled: false});
+  expect(getWrites()).toHaveLength(0);
+});
+
 test('runtime command and keybinding contributions follow enabled setting', () => {
   const enabledConfig = {
     plugins: {
