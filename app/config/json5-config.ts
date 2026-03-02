@@ -184,26 +184,44 @@ const toSchemaDiagnostic = (
   );
 };
 
+const extractErrorMessage = (error: unknown, source: string, itemType: string): string => {
+  if (error instanceof Error && error.message.length > 0) {
+    return error.message;
+  }
+  return `Failed to parse JSON5 ${itemType} from ${source}.`;
+};
+
+const extractLineNumber = (error: unknown): number | null => {
+  if (isRecord(error) && typeof error.lineNumber === 'number' && Number.isFinite(error.lineNumber)) {
+    return error.lineNumber;
+  }
+  return null;
+};
+
+const extractColumnNumber = (error: unknown): number | null => {
+  if (isRecord(error) && typeof error.columnNumber === 'number' && Number.isFinite(error.columnNumber)) {
+    return error.columnNumber;
+  }
+  return null;
+};
+
+const buildDiagnosticPath = (source: string, lineNumber: number | null, columnNumber: number | null): string => {
+  if (lineNumber !== null && columnNumber !== null) {
+    return `${source}:${lineNumber}:${columnNumber}`;
+  }
+  return source;
+};
+
 const toParseDiagnostic = (
   error: unknown,
   source: string,
   itemType: string,
   diagnosticHints: DiagnosticHints | undefined
 ): configValidationDiagnostic => {
-  const message =
-    error instanceof Error && error.message.length > 0
-      ? error.message
-      : `Failed to parse JSON5 ${itemType} from ${source}.`;
-
-  const lineNumber =
-    isRecord(error) && typeof error.lineNumber === 'number' && Number.isFinite(error.lineNumber)
-      ? error.lineNumber
-      : null;
-  const columnNumber =
-    isRecord(error) && typeof error.columnNumber === 'number' && Number.isFinite(error.columnNumber)
-      ? error.columnNumber
-      : null;
-  const path = lineNumber !== null && columnNumber !== null ? `${source}:${lineNumber}:${columnNumber}` : source;
+  const message = extractErrorMessage(error, source, itemType);
+  const lineNumber = extractLineNumber(error);
+  const columnNumber = extractColumnNumber(error);
+  const path = buildDiagnosticPath(source, lineNumber, columnNumber);
 
   return withHints(
     {
