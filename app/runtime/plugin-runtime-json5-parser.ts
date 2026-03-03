@@ -262,6 +262,37 @@ export class Json5Parser {
     return bracketDepth;
   }
 
+  private applyBlockCommentResultForValueEnd(
+    result: {state: ParsingState; skipNext: boolean},
+    currentIndex: number
+  ): {state: ParsingState; nextIndex: number} {
+    return {
+      state: result.state,
+      nextIndex: currentIndex + (result.skipNext ? 1 : 0)
+    };
+  }
+
+  private updateBracketDepthWithValidation(
+    current: string,
+    currentDepth: number
+  ): {newDepth: number; isInvalid: boolean} {
+    const newDepth = this.updateBracketDepth(current, currentDepth);
+    return {
+      newDepth,
+      isInvalid: current === ']' && newDepth < 0
+    };
+  }
+
+  private applyDelimiterResultForValueEnd(
+    result: {state: ParsingState; skipNext: boolean},
+    currentIndex: number
+  ): {state: ParsingState; nextIndex: number} {
+    return {
+      state: result.state,
+      nextIndex: currentIndex + (result.skipNext ? 1 : 0)
+    };
+  }
+
   private findPropertyValueEnd(range: ParseRange): number {
     let state: ParsingState = {
       depth: 0,
@@ -281,11 +312,12 @@ export class Json5Parser {
         continue;
       }
       if (state.inBlockComment) {
-        const blockCommentResult = processBlockComment(state, current, next);
-        state = blockCommentResult.state;
-        if (blockCommentResult.skipNext) {
-          index += 1;
-        }
+        const appliedBlockCommentResult = this.applyBlockCommentResultForValueEnd(
+          processBlockComment(state, current, next),
+          index
+        );
+        state = appliedBlockCommentResult.state;
+        index = appliedBlockCommentResult.nextIndex;
         continue;
       }
       if (state.inString) {
@@ -297,20 +329,21 @@ export class Json5Parser {
         return index;
       }
 
-      const nextBracketDepth = this.updateBracketDepth(current, bracketDepth);
-      if (nextBracketDepth !== bracketDepth) {
-        if (current === ']' && nextBracketDepth < 0) {
-          return -1;
-        }
-        bracketDepth = nextBracketDepth;
+      const bracketDepthResult = this.updateBracketDepthWithValidation(current, bracketDepth);
+      if (bracketDepthResult.isInvalid) {
+        return -1;
+      }
+      if (bracketDepthResult.newDepth !== bracketDepth) {
+        bracketDepth = bracketDepthResult.newDepth;
         continue;
       }
 
-      const delimiterResult = processDelimitersAndComments(state, current, next);
-      state = delimiterResult.state;
-      if (delimiterResult.skipNext) {
-        index += 1;
-      }
+      const appliedDelimiterResult = this.applyDelimiterResultForValueEnd(
+        processDelimitersAndComments(state, current, next),
+        index
+      );
+      state = appliedDelimiterResult.state;
+      index = appliedDelimiterResult.nextIndex;
     }
 
     return range.limitIndex;
