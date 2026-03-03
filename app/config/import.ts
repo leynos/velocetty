@@ -183,7 +183,7 @@ const loadDefaultConfig = (): LoadedConfig => {
     reportDiagnostics('Bundled default config diagnostics.', defaultCfg, parsedDefaultConfigResult.diagnostics);
   }
 
-  if (parsedDefaultConfigResult.value) {
+  if (!parsedDefaultConfigResult.usedFallback && parsedDefaultConfigResult.value !== null) {
     return {
       config: parsedDefaultConfigResult.value,
       diagnostics: parsedDefaultConfigResult.diagnostics
@@ -225,7 +225,7 @@ const loadUserConfig = (defaultConfigFallback: rawConfig): LoadedConfig => {
     if (userCfgResult.usedFallback) {
       reportDiagnostics('User config diagnostics.', cfgPath, userCfgResult.diagnostics);
     }
-    if (userCfgResult.value) {
+    if (!userCfgResult.usedFallback && userCfgResult.value !== null) {
       return {
         config: userCfgResult.value,
         diagnostics: userCfgResult.diagnostics

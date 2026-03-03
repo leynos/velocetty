@@ -56,19 +56,25 @@ const updateExistingProperty = (
   return replaceSlice(raw, existingProperty.valueStartIndex, existingProperty.valueEndIndex, formattedValue);
 };
 
-const insertIntoEmptyObject = (
-  raw: string,
-  parser: Json5Parser,
-  objectRange: Json5ObjectRange,
-  key: PropertyKey,
-  value: unknown
-): string => {
+const insertIntoEmptyObject = ({
+  raw,
+  parser,
+  objectRange,
+  key,
+  value
+}: {
+  raw: string;
+  parser: Json5Parser;
+  objectRange: Json5ObjectRange;
+  key: PropertyKey;
+  value: unknown;
+}): string => {
   const parentIndent = parser.getLineIndent({index: objectRange.openBraceIndex});
   const memberIndent = `${parentIndent}  `;
   const formattedProperty = `${memberIndent}${formatObjectKey(key)}: ${formatJson5ValueForProperty(value, memberIndent)}`;
   return replaceSlice(
     raw,
-    objectRange.openBraceIndex + 1,
+    objectRange.closeBraceIndex,
     objectRange.closeBraceIndex,
     `\n${formattedProperty}\n${parentIndent}`
   );
@@ -120,7 +126,7 @@ const upsertObjectProperty = (
   }
 
   if (properties.length === 0) {
-    return insertIntoEmptyObject(raw, parser, objectRange, key, value);
+    return insertIntoEmptyObject({raw, parser, objectRange, key, value});
   }
 
   return appendToExistingObject(raw, parser, objectRange, properties, key, value);

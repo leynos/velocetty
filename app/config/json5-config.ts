@@ -12,6 +12,13 @@ export type ParseSchema<T> = {
 
 type DiagnosticHint = Pick<configValidationDiagnostic, 'docHint' | 'defaultHint'>;
 type DiagnosticHints = Record<string, DiagnosticHint>;
+type ParseDiagnosticContext = {
+  source: string;
+  itemType: string;
+  diagnosticHints?: DiagnosticHints;
+};
+type SchemaDiagnosticContext = Pick<ParseDiagnosticContext, 'itemType' | 'diagnosticHints'>;
+type ErrorMessageContext = Pick<ParseDiagnosticContext, 'source' | 'itemType'>;
 
 export interface ParseOptions<T> {
   readonly raw: string;
@@ -152,13 +159,9 @@ const withHints = (
   };
 };
 
-const toSchemaDiagnostic = (
-  error: Error,
-  itemType: string,
-  diagnosticHints: DiagnosticHints | undefined
-): configValidationDiagnostic => {
+const toSchemaDiagnostic = (error: Error, context: SchemaDiagnosticContext): configValidationDiagnostic => {
   if (hasDiagnostic(error)) {
-    return withHints(error.diagnostic, diagnosticHints);
+    return withHints(error.diagnostic, context.diagnosticHints);
   }
 
   const issues = (error as {issues?: unknown}).issues;
@@ -167,28 +170,29 @@ const toSchemaDiagnostic = (
     return withHints(
       {
         path: getIssuePath(firstIssue.path),
-        message: typeof firstIssue.message === 'string' ? firstIssue.message : `Invalid ${itemType} schema shape.`,
+        message:
+          typeof firstIssue.message === 'string' ? firstIssue.message : `Invalid ${context.itemType} schema shape.`,
         suggestedFix: schemaFallbackFix
       },
-      diagnosticHints
+      context.diagnosticHints
     );
   }
 
   return withHints(
     {
       path: rootPath,
-      message: error.message || `Invalid JSON5 ${itemType} shape.`,
+      message: error.message || `Invalid JSON5 ${context.itemType} shape.`,
       suggestedFix: schemaFallbackFix
     },
-    diagnosticHints
+    context.diagnosticHints
   );
 };
 
-const extractErrorMessage = (error: unknown, source: string, itemType: string): string => {
+const extractErrorMessage = (error: unknown, context: ErrorMessageContext): string => {
   if (error instanceof Error && error.message.length > 0) {
     return error.message;
   }
-  return `Failed to parse JSON5 ${itemType} from ${source}.`;
+  return `Failed to parse JSON5 ${context.itemType} from ${context.source}.`;
 };
 
 const extractLineNumber = (error: unknown): number | null => {
@@ -212,16 +216,11 @@ const buildDiagnosticPath = (source: string, lineNumber: number | null, columnNu
   return source;
 };
 
-const toParseDiagnostic = (
-  error: unknown,
-  source: string,
-  itemType: string,
-  diagnosticHints: DiagnosticHints | undefined
-): configValidationDiagnostic => {
-  const message = extractErrorMessage(error, source, itemType);
+const toParseDiagnostic = (error: unknown, context: ParseDiagnosticContext): configValidationDiagnostic => {
+  const message = extractErrorMessage(error, context);
   const lineNumber = extractLineNumber(error);
   const columnNumber = extractColumnNumber(error);
-  const path = buildDiagnosticPath(source, lineNumber, columnNumber);
+  const path = buildDiagnosticPath(context.source, lineNumber, columnNumber);
 
   return withHints(
     {
@@ -229,7 +228,7 @@ const toParseDiagnostic = (
       message,
       suggestedFix: parseFallbackFix
     },
-    diagnosticHints
+    context.diagnosticHints
   );
 };
 
@@ -241,7 +240,7 @@ export const parseJson5WithSchemaDiagnostics = <T>(options: ParseOptions<T>): Pa
     if (validated.success === false) {
       return {
         value: fallback,
-        diagnostics: [toSchemaDiagnostic(validated.error, itemType, diagnosticHints)],
+        diagnostics: [toSchemaDiagnostic(validated.error, {itemType, diagnosticHints})],
         usedFallback: true
       };
     }
@@ -249,7 +248,7 @@ export const parseJson5WithSchemaDiagnostics = <T>(options: ParseOptions<T>): Pa
   } catch (error) {
     return {
       value: fallback,
-      diagnostics: [toParseDiagnostic(error, source, itemType, diagnosticHints)],
+      diagnostics: [toParseDiagnostic(error, {source, itemType, diagnosticHints})],
       usedFallback: true
     };
   }
