@@ -7,13 +7,28 @@ import {Json5Parser, type Json5ObjectProperty, type Json5ObjectRange} from './pl
 import type {rawConfig} from '@shared/types/config';
 
 type RuntimePluginSettings = Record<string, unknown>;
+/** Represents a JSON5 object property key with validation semantics. */
+export type PropertyKey = {
+  readonly value: string;
+};
+
+/** Represents a plugin identifier. */
+export type PluginId = {
+  readonly value: string;
+};
+
+/** Represents a path through nested JSON5 objects. */
+export type PropertyPath = {
+  readonly segments: readonly PropertyKey[];
+};
+
 export type PluginPersistencePatch = {
-  pluginId: string;
+  pluginId: PluginId;
   settings: RuntimePluginSettings;
 };
 
-const formatObjectKey = (key: string): string =>
-  /^[\p{ID_Start}_$][\p{ID_Continue}_$]*$/u.test(key) ? key : JSON.stringify(key);
+const formatObjectKey = (key: PropertyKey): string =>
+  /^[\p{ID_Start}_$][\p{ID_Continue}_$]*$/u.test(key.value) ? key.value : JSON.stringify(key.value);
 
 const formatJson5ValueForProperty = (value: unknown, propertyIndent: string): string => {
   const serialized = stringifyJson5(value).trimEnd();
@@ -45,7 +60,7 @@ const insertIntoEmptyObject = (
   raw: string,
   parser: Json5Parser,
   objectRange: Json5ObjectRange,
-  key: string,
+  key: PropertyKey,
   value: unknown
 ): string => {
   const parentIndent = parser.getLineIndent({index: objectRange.openBraceIndex});
@@ -64,7 +79,7 @@ const appendToExistingObject = (
   parser: Json5Parser,
   objectRange: Json5ObjectRange,
   properties: readonly Json5ObjectProperty[],
-  key: string,
+  key: PropertyKey,
   value: unknown
 ): string | null => {
   const parentIndent = parser.getLineIndent({index: objectRange.openBraceIndex});
@@ -90,7 +105,7 @@ const appendToExistingObject = (
 const upsertObjectProperty = (
   raw: string,
   objectRange: Json5ObjectRange,
-  key: string,
+  key: PropertyKey,
   value: unknown
 ): string | null => {
   const parser = new Json5Parser(raw);
@@ -99,7 +114,7 @@ const upsertObjectProperty = (
     return null;
   }
 
-  const existingProperty = properties.find((property) => property.key === key);
+  const existingProperty = properties.find((property) => property.key === key.value);
   if (existingProperty) {
     return updateExistingProperty(raw, parser, existingProperty, value);
   }
@@ -111,14 +126,14 @@ const upsertObjectProperty = (
   return appendToExistingObject(raw, parser, objectRange, properties, key, value);
 };
 
-const getObjectRangeByPath = (raw: string, path: readonly string[]): Json5ObjectRange | null => {
+const getObjectRangeByPath = (raw: string, path: PropertyPath): Json5ObjectRange | null => {
   const parser = new Json5Parser(raw);
   let currentRange = parser.findRootObjectRange();
   if (!currentRange) {
     return null;
   }
-  for (const key of path) {
-    const property = parser.getObjectProperty(currentRange, key);
+  for (const key of path.segments) {
+    const property = parser.getObjectProperty(currentRange, key.value);
     if (!property) {
       return null;
     }
@@ -131,22 +146,23 @@ const getObjectRangeByPath = (raw: string, path: readonly string[]): Json5Object
   return currentRange;
 };
 
-const ensureObjectPath = (raw: string, path: readonly string[]): string | null => {
-  if (path.length === 0) {
+const ensureObjectPath = (raw: string, path: PropertyPath): string | null => {
+  if (path.segments.length === 0) {
     return raw;
   }
 
   let nextRaw = raw;
-  for (let depth = 1; depth <= path.length; depth += 1) {
-    const currentPath = path.slice(0, depth);
+  for (let depth = 1; depth <= path.segments.length; depth += 1) {
+    const currentPath: PropertyPath = {segments: path.segments.slice(0, depth)};
     if (getObjectRangeByPath(nextRaw, currentPath)) {
       continue;
     }
-    const parentRange = getObjectRangeByPath(nextRaw, path.slice(0, depth - 1));
+    const parentPath: PropertyPath = {segments: path.segments.slice(0, depth - 1)};
+    const parentRange = getObjectRangeByPath(nextRaw, parentPath);
     if (!parentRange) {
       return null;
     }
-    const key = path[depth - 1];
+    const key = path.segments[depth - 1];
     if (key === undefined) {
       return null;
     }
@@ -161,16 +177,16 @@ const ensureObjectPath = (raw: string, path: readonly string[]): string | null =
 };
 
 const applyPluginSettingsPatch = (raw: string, patch: PluginPersistencePatch): string | null => {
-  let nextRaw = ensureObjectPath(raw, ['config']);
+  let nextRaw = ensureObjectPath(raw, {segments: [{value: 'config'}]});
   if (!nextRaw) {
     return null;
   }
-  nextRaw = ensureObjectPath(nextRaw, ['config', 'plugins']);
+  nextRaw = ensureObjectPath(nextRaw, {segments: [{value: 'config'}, {value: 'plugins'}]});
   if (!nextRaw) {
     return null;
   }
 
-  const pluginsRange = getObjectRangeByPath(nextRaw, ['config', 'plugins']);
+  const pluginsRange = getObjectRangeByPath(nextRaw, {segments: [{value: 'config'}, {value: 'plugins'}]});
   if (!pluginsRange) {
     return null;
   }

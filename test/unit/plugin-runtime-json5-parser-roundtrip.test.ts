@@ -44,7 +44,7 @@ test('applyPluginSettingsPatches writes Unicode identifier keys without forcing 
   },
 }`;
 
-  const patched = applyPluginSettingsPatches(raw, [{pluginId: 'πPlugin', settings: {enabled: true}}]);
+  const patched = applyPluginSettingsPatches(raw, [{pluginId: {value: 'πPlugin'}, settings: {enabled: true}}]);
   expect(patched).not.toBeNull();
   if (!patched) {
     return;

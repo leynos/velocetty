@@ -148,7 +148,7 @@ export const ensureRuntimePluginSettingsPersisted = (
       const merged = merge({}, manifest.settingsDefaults, existing) as RuntimePluginSettings;
       if (!isEqual(existing, merged)) {
         namespace[manifest.id] = merged;
-        patches.push({pluginId: manifest.id, settings: merged});
+        patches.push({pluginId: {value: manifest.id}, settings: merged});
       }
     });
 
@@ -200,7 +200,9 @@ export const setRuntimePluginEnabledPersisted = (
 
     if (!isEqual(existing, merged)) {
       namespace[pluginId] = merged;
-      const patchedContent = applyPluginSettingsPatches(rawConfigText, [{pluginId, settings: merged}]);
+      const patchedContent = applyPluginSettingsPatches(rawConfigText, [
+        {pluginId: {value: pluginId}, settings: merged}
+      ]);
       if (!patchedContent) {
         console.error(
           `Failed to apply runtime plugin enabled patch for "${configFilePath}". Skipping write to preserve user formatting.`
