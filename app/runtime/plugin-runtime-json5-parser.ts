@@ -42,43 +42,6 @@ const isIndentationWhitespace = (character: string): boolean => character === ' 
 const identifierStartPattern = /[$_\p{ID_Start}]/u;
 const identifierContinuePattern = /(?:[$_\p{ID_Continue}]|\u200C|\u200D)/u;
 
-const skipLineComment = (raw: string, startIndex: number, limitIndex: number): number => {
-  let index = startIndex + 2;
-  while (
-    index < limitIndex &&
-    raw[index] !== '\n' &&
-    raw[index] !== '\r' &&
-    raw[index] !== '\u2028' &&
-    raw[index] !== '\u2029'
-  ) {
-    index += 1;
-  }
-  return index;
-};
-
-const isBlockCommentEnd = (raw: string, index: number): boolean => raw[index] === '*' && raw[index + 1] === '/';
-
-const hasRoomForCommentEnd = (index: number, limitIndex: number): boolean => index + 1 < limitIndex;
-
-const skipBlockComment = (raw: string, startIndex: number, limitIndex: number): number => {
-  // Skip the opening '/*'
-  let index = startIndex + 2;
-  while (hasRoomForCommentEnd(index, limitIndex) && !isBlockCommentEnd(raw, index)) {
-    index += 1;
-  }
-  return hasRoomForCommentEnd(index, limitIndex) ? index + 2 : limitIndex;
-};
-
-const updateBracketDepth = (current: string, bracketDepth: number): number => {
-  if (current === '[') {
-    return bracketDepth + 1;
-  }
-  if (current === ']') {
-    return bracketDepth - 1;
-  }
-  return bracketDepth;
-};
-
 export class Json5Parser {
   public constructor(private readonly raw: string) {}
 
@@ -92,11 +55,11 @@ export class Json5Parser {
         continue;
       }
       if (current === '/' && next === '/') {
-        index = skipLineComment(this.raw, index, range.limitIndex);
+        index = this.skipLineComment({startIndex: index, limitIndex: range.limitIndex});
         continue;
       }
       if (current === '/' && next === '*') {
-        index = skipBlockComment(this.raw, index, range.limitIndex);
+        index = this.skipBlockComment({startIndex: index, limitIndex: range.limitIndex});
         continue;
       }
       break;
@@ -116,6 +79,37 @@ export class Json5Parser {
       index += 1;
     }
     return this.raw.slice(lineStartIndex, index);
+  }
+
+  private skipLineComment(range: ParseRange): number {
+    let index = range.startIndex + 2;
+    while (
+      index < range.limitIndex &&
+      this.raw[index] !== '\n' &&
+      this.raw[index] !== '\r' &&
+      this.raw[index] !== '\u2028' &&
+      this.raw[index] !== '\u2029'
+    ) {
+      index += 1;
+    }
+    return index;
+  }
+
+  private hasRoomForCommentEnd(cursor: IndexCursor, limitIndex: number): boolean {
+    return cursor.index + 1 < limitIndex;
+  }
+
+  private isBlockCommentEnd(cursor: IndexCursor): boolean {
+    return this.raw[cursor.index] === '*' && this.raw[cursor.index + 1] === '/';
+  }
+
+  private skipBlockComment(range: ParseRange): number {
+    // Skip the opening '/*'
+    let index = range.startIndex + 2;
+    while (this.hasRoomForCommentEnd({index}, range.limitIndex) && !this.isBlockCommentEnd({index})) {
+      index += 1;
+    }
+    return this.hasRoomForCommentEnd({index}, range.limitIndex) ? index + 2 : range.limitIndex;
   }
 
   private parseQuotedStringEnd(range: ParseRange): number {
@@ -258,6 +252,16 @@ export class Json5Parser {
     return atTopLevel && (isClosingBrace || isComma);
   }
 
+  private updateBracketDepth(current: string, bracketDepth: number): number {
+    if (current === '[') {
+      return bracketDepth + 1;
+    }
+    if (current === ']') {
+      return bracketDepth - 1;
+    }
+    return bracketDepth;
+  }
+
   private findPropertyValueEnd(range: ParseRange): number {
     let state: ParsingState = {
       depth: 0,
@@ -293,7 +297,7 @@ export class Json5Parser {
         return index;
       }
 
-      const nextBracketDepth = updateBracketDepth(current, bracketDepth);
+      const nextBracketDepth = this.updateBracketDepth(current, bracketDepth);
       if (nextBracketDepth !== bracketDepth) {
         if (current === ']' && nextBracketDepth < 0) {
           return -1;
