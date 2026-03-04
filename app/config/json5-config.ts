@@ -155,34 +155,45 @@ const withHints = (
   };
 };
 
+const extractFirstIssue = (error: Error): Record<string, unknown> | undefined => {
+  const issues = (error as {issues?: unknown}).issues;
+  if (!Array.isArray(issues) || issues.length === 0) {
+    return undefined;
+  }
+  const firstIssue = issues[0];
+  return isRecord(firstIssue) ? firstIssue : undefined;
+};
+
+const buildIssueDiagnostic = (
+  issue: Record<string, unknown>,
+  context: SchemaDiagnosticContext
+): configValidationDiagnostic => {
+  const issuePath = 'path' in issue ? issue.path : undefined;
+  const issueMessage = 'message' in issue ? issue.message : undefined;
+  return {
+    path: getIssuePath(issuePath),
+    message: typeof issueMessage === 'string' ? issueMessage : `Invalid ${context.itemType} schema shape.`,
+    suggestedFix: schemaFallbackFix
+  };
+};
+
+const buildFallbackDiagnostic = (error: Error, context: SchemaDiagnosticContext): configValidationDiagnostic => ({
+  path: rootPath,
+  message: error.message || `Invalid JSON5 ${context.itemType} shape.`,
+  suggestedFix: schemaFallbackFix
+});
+
 const toSchemaDiagnostic = (error: Error, context: SchemaDiagnosticContext): configValidationDiagnostic => {
   if (hasDiagnostic(error)) {
     return withHints(error.diagnostic, context.diagnosticHints);
   }
 
-  const issues = (error as {issues?: unknown}).issues;
-  const firstIssue = Array.isArray(issues) && issues.length > 0 ? issues[0] : undefined;
-  if (firstIssue && isRecord(firstIssue)) {
-    const issuePath = 'path' in firstIssue ? firstIssue.path : undefined;
-    const issueMessage = 'message' in firstIssue ? firstIssue.message : undefined;
-    return withHints(
-      {
-        path: getIssuePath(issuePath),
-        message: typeof issueMessage === 'string' ? issueMessage : `Invalid ${context.itemType} schema shape.`,
-        suggestedFix: schemaFallbackFix
-      },
-      context.diagnosticHints
-    );
+  const firstIssue = extractFirstIssue(error);
+  if (firstIssue) {
+    return withHints(buildIssueDiagnostic(firstIssue, context), context.diagnosticHints);
   }
 
-  return withHints(
-    {
-      path: rootPath,
-      message: error.message || `Invalid JSON5 ${context.itemType} shape.`,
-      suggestedFix: schemaFallbackFix
-    },
-    context.diagnosticHints
-  );
+  return withHints(buildFallbackDiagnostic(error, context), context.diagnosticHints);
 };
 
 const extractErrorMessage = (error: unknown, context: ErrorMessageContext): string => {
