@@ -1,4 +1,22 @@
-/** @file JSON5 object parsing helpers for runtime plugin settings persistence. */
+/**
+ * @file JSON5 object parsing helpers for runtime plugin settings persistence.
+ *
+ * Responsibilities:
+ * - parse root-object and property ranges from raw JSON5 documents.
+ * - preserve index metadata so roundtrip edits keep comments and formatting.
+ *
+ * Invariants:
+ * - returned indices always stay within the original source bounds.
+ * - parsing helpers never mutate the source document.
+ *
+ * Cross-links:
+ * - `plugin-runtime-json5-parsing-state.ts` for lexical state transitions.
+ * - `plugin-runtime-json5-roundtrip.ts` for persistence edits that consume
+ *   these ranges.
+ *
+ * Example:
+ * - `const parser = new Json5Parser(raw); parser.findRootObjectRange();`
+ */
 import JSON5 from 'json5';
 import {
   type ParsingState,
@@ -46,9 +64,9 @@ export type IndexCursor = {
 /** Read-only key wrapper used for object-property lookups. */
 export type PropertyKey = {
   readonly value: string;
-};
+} & {readonly __brand: 'PropertyKey'};
 
-export const propertyKey = (value: string): PropertyKey => ({value});
+export const propertyKey = (value: string): PropertyKey => ({value}) as PropertyKey;
 const toKeyString = (key: PropertyKey | string): string => (typeof key === 'string' ? key : key.value);
 
 type ParsedObjectKey = {key: string; startIndex: number; endIndex: number};
@@ -157,8 +175,12 @@ export class Json5Parser {
 
   /** Returns the index of the start of the line that contains `cursor.index`. */
   public getLineStartIndex(cursor: IndexCursor): number {
-    const lineBreakIndex = this.raw.lastIndexOf('\n', Math.max(0, cursor.index - 1));
-    return lineBreakIndex === -1 ? 0 : lineBreakIndex + 1;
+    for (let index = Math.max(0, cursor.index - 1); index >= 0; index -= 1) {
+      if (isLineTerminator(this.raw[index])) {
+        return index + 1;
+      }
+    }
+    return 0;
   }
 
   /** Returns the leading indentation (spaces/tabs) for the line at `cursor.index`. */
@@ -242,18 +264,48 @@ export class Json5Parser {
     }
   }
 
-  private parseUnquotedKey(range: ParseRange): ParsedObjectKey | null {
-    const firstCodePoint = this.readCodePoint({index: range.startIndex});
-    if (!firstCodePoint || !identifierStartPattern.test(firstCodePoint.character)) return null;
+  private parseUnicodeEscapeCharacter(cursor: IndexCursor): {character: string; nextIndex: number} | null {
+    if (this.raw[cursor.index] !== '\\' || this.raw[cursor.index + 1] !== 'u') {
+      return null;
+    }
+    const hexStartIndex = cursor.index + 2;
+    const hexEndIndex = hexStartIndex + 4;
+    const codeUnit = this.raw.slice(hexStartIndex, hexEndIndex);
+    if (!/^[0-9A-Fa-f]{4}$/.test(codeUnit)) {
+      return null;
+    }
+    return {
+      character: String.fromCodePoint(Number.parseInt(codeUnit, 16)),
+      nextIndex: hexEndIndex
+    };
+  }
 
-    let cursor = firstCodePoint.nextIndex;
+  private parseIdentifierCharacter(
+    cursor: IndexCursor,
+    isStart: boolean
+  ): {character: string; nextIndex: number} | null {
+    const parsed = this.parseUnicodeEscapeCharacter(cursor) ?? this.readCodePoint(cursor);
+    if (!parsed) {
+      return null;
+    }
+    const pattern = isStart ? identifierStartPattern : identifierContinuePattern;
+    return pattern.test(parsed.character) ? parsed : null;
+  }
+
+  private parseUnquotedKey(range: ParseRange): ParsedObjectKey | null {
+    const firstCharacter = this.parseIdentifierCharacter({index: range.startIndex}, true);
+    if (!firstCharacter) return null;
+
+    let cursor = firstCharacter.nextIndex;
+    let key = firstCharacter.character;
     while (cursor < range.limitIndex) {
-      const nextCodePoint = this.readCodePoint({index: cursor});
-      if (!nextCodePoint || !identifierContinuePattern.test(nextCodePoint.character)) break;
-      cursor = nextCodePoint.nextIndex;
+      const nextCharacter = this.parseIdentifierCharacter({index: cursor}, false);
+      if (!nextCharacter) break;
+      key += nextCharacter.character;
+      cursor = nextCharacter.nextIndex;
     }
 
-    return {key: this.raw.slice(range.startIndex, cursor), startIndex: range.startIndex, endIndex: cursor};
+    return {key, startIndex: range.startIndex, endIndex: cursor};
   }
 
   private parseObjectKey(range: ParseRange): ParsedObjectKey | null {

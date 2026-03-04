@@ -24,6 +24,18 @@ for (const terminator of json5LineTerminators) {
   });
 }
 
+test('getLineStartIndex handles JSON5 line terminators and CRLF', () => {
+  const terminators = [...json5LineTerminators, '\r\n'] as const;
+
+  for (const terminator of terminators) {
+    const raw = `first${terminator}  second`;
+    const parser = new Json5Parser(raw);
+    const expectedStartIndex = `first${terminator}`.length;
+
+    expect(parser.getLineStartIndex({index: raw.length - 1})).toBe(expectedStartIndex);
+  }
+});
+
 test('parseObjectProperties fails on unmatched closing bracket in a property value', () => {
   const raw = `{a: ]}`;
   const parser = new Json5Parser(raw);
@@ -35,6 +47,20 @@ test('parseObjectProperties fails on unmatched closing bracket in a property val
   }
 
   expect(parser.parseObjectProperties(rootRange)).toBeNull();
+});
+
+test('parseObjectProperties decodes unicode escapes in unquoted keys', () => {
+  const raw = String.raw`{\u0061: 1, \u03c0Plugin: 2}`;
+  const parser = new Json5Parser(raw);
+  const rootRange = parser.findRootObjectRange();
+
+  expect(rootRange).not.toBeNull();
+  if (!rootRange) {
+    return;
+  }
+
+  const properties = parser.parseObjectProperties(rootRange);
+  expect(properties?.map((property) => property.key)).toEqual(['a', 'πPlugin']);
 });
 
 test('applyPluginSettingsPatches writes Unicode identifier keys without forcing quotes', () => {

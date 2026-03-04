@@ -36,9 +36,9 @@ const ensureObject = (value: unknown): Record<string, unknown> => {
   return value as Record<string, unknown>;
 };
 
-type ParsedDiagnosticsPayload = {
-  diagnostics: Array<Record<string, unknown>>;
-};
+type ParsedDiagnosticsPayload = Readonly<{
+  diagnostics: ReadonlyArray<Record<string, unknown>>;
+}>;
 
 const isValidObject = (entry: unknown): entry is Record<string, unknown> => typeof entry === 'object' && entry !== null;
 
