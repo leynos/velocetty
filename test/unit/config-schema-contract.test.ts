@@ -17,10 +17,13 @@ const processArrayNode = (current: unknown[], stack: unknown[]): void => {
   }
 };
 
+const isContextCapSchema = (key: string, value: unknown): value is JsonObject =>
+  key === 'webGLRendererMaxContexts' && value != null && typeof value === 'object';
+
 const processObjectNode = (current: JsonObject, stack: unknown[], matches: JsonObject[]): void => {
   for (const [key, value] of Object.entries(current)) {
-    if (key === 'webGLRendererMaxContexts' && value && typeof value === 'object') {
-      matches.push(value as JsonObject);
+    if (isContextCapSchema(key, value)) {
+      matches.push(value);
     }
     stack.push(value);
   }
