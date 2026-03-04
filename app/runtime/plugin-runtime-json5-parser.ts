@@ -32,6 +32,11 @@ type ValueEndContext = {
   readonly state: ParsingState;
   readonly bracketDepth: number;
 };
+type CharacterContext = {
+  readonly current: string;
+  readonly next: string | undefined;
+  readonly index: number;
+};
 type ValueEndCharacterResult = {
   readonly state: ParsingState;
   readonly nextIndex: number;
@@ -304,36 +309,35 @@ export class Json5Parser {
   }
 
   private processValueEndCharacter(
-    current: string,
-    next: string | undefined,
-    context: ValueEndContext,
-    cursor: IndexCursor
+    ctx: CharacterContext,
+    state: ParsingState,
+    bracketDepth: number
   ): ValueEndCharacterResult {
-    if (this.isValueTerminator(current, context.state, context.bracketDepth)) {
+    if (this.isValueTerminator(ctx.current, state, bracketDepth)) {
       return {
-        state: context.state,
-        nextIndex: cursor.index,
-        bracketDepth: context.bracketDepth,
+        state,
+        nextIndex: ctx.index,
+        bracketDepth,
         shouldTerminate: true,
         isInvalid: false
       };
     }
 
-    const bracketUpdate = this.updateBracketDepthWithValidation(current, context.bracketDepth);
+    const bracketUpdate = this.updateBracketDepthWithValidation(ctx.current, bracketDepth);
     if (bracketUpdate.isInvalid) {
       return {
-        state: context.state,
-        nextIndex: cursor.index,
-        bracketDepth: context.bracketDepth,
+        state,
+        nextIndex: ctx.index,
+        bracketDepth,
         shouldTerminate: false,
         isInvalid: true
       };
     }
 
-    if (bracketUpdate.newDepth !== context.bracketDepth) {
+    if (bracketUpdate.newDepth !== bracketDepth) {
       return {
-        state: context.state,
-        nextIndex: cursor.index,
+        state,
+        nextIndex: ctx.index,
         bracketDepth: bracketUpdate.newDepth,
         shouldTerminate: false,
         isInvalid: false
@@ -341,13 +345,13 @@ export class Json5Parser {
     }
 
     const applied = this.applyDelimiterResultForValueEnd(
-      processDelimitersAndComments(context.state, current, next ?? ''),
-      cursor
+      processDelimitersAndComments(state, ctx.current, ctx.next ?? ''),
+      {index: ctx.index}
     );
     return {
       state: applied.state,
       nextIndex: applied.nextIndex,
-      bracketDepth: context.bracketDepth,
+      bracketDepth,
       shouldTerminate: false,
       isInvalid: false
     };
@@ -387,7 +391,7 @@ export class Json5Parser {
         continue;
       }
 
-      const result = this.processValueEndCharacter(current, next, context, {index});
+      const result = this.processValueEndCharacter({current, next, index}, context.state, context.bracketDepth);
       if (result.shouldTerminate) return index;
       if (result.isInvalid) return -1;
       context = {state: result.state, bracketDepth: result.bracketDepth};
