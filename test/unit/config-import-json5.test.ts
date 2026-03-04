@@ -1,5 +1,5 @@
 /** @file Verifies JSON5 config import and startup bootstrap without legacy migration. */
-import {afterAll, beforeEach, expect, mock, test} from 'bun:test';
+import {afterAll, afterEach, beforeEach, expect, mock, test} from 'bun:test';
 
 import {mkdtempSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -87,6 +87,10 @@ beforeEach(() => {
   console.warn = warnMock as typeof console.warn;
 });
 
+afterEach(() => {
+  console.warn = originalConsoleWarn;
+});
+
 afterAll(() => {
   console.warn = originalConsoleWarn;
   mock.restore();
@@ -121,7 +125,15 @@ test.serial('notifies and falls back to default config on invalid JSON5 user con
   expect(notifyMock.mock.calls[0]?.[0]).toContain('Suggested fix:');
 
   const diagnosticsPayload = findDiagnosticsPayload();
-  const primaryDiagnostic = ensureObject(diagnosticsPayload.diagnostics[0]);
+  const diagnostics = diagnosticsPayload.diagnostics.map((diagnostic) => ensureObject(diagnostic));
+  const primaryDiagnostic = diagnostics.find((diagnostic) => {
+    const path = typeof diagnostic.path === 'string' ? diagnostic.path : '';
+    const message = typeof diagnostic.message === 'string' ? diagnostic.message : '';
+    return path.includes(mockPaths.cfgPath) && message.includes('JSON5');
+  });
+  if (!primaryDiagnostic) {
+    throw new Error('Expected parse diagnostic for config file path.');
+  }
   expect(primaryDiagnostic.path).toContain(mockPaths.cfgPath);
   expect(primaryDiagnostic.message).toContain('JSON5');
   expect(primaryDiagnostic.suggestedFix).toContain('Fix');
@@ -161,7 +173,11 @@ test.serial('reports schema validation diagnostics with doc and default hints', 
   expect(notifyMock.mock.calls[0]?.[0]).toContain('Suggested fix:');
 
   const diagnosticsPayload = findDiagnosticsPayload();
-  const primaryDiagnostic = ensureObject(diagnosticsPayload.diagnostics[0]);
+  const diagnostics = diagnosticsPayload.diagnostics.map((diagnostic) => ensureObject(diagnostic));
+  const primaryDiagnostic = diagnostics.find((diagnostic) => diagnostic.path === '/plugins');
+  if (!primaryDiagnostic) {
+    throw new Error('Expected schema diagnostic for /plugins.');
+  }
   expect(primaryDiagnostic.path).toBe('/plugins');
   expect(primaryDiagnostic.message).toContain('array of strings');
   expect(primaryDiagnostic.suggestedFix).toContain('array of plugin');
