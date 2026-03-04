@@ -68,6 +68,7 @@ type SkipResult = {kind: 'advanced'; nextIndex: number} | {kind: 'invalid'} | {k
 type Step<T> = {success: true; value: T} | {success: false};
 
 const parserFailureSentinel = -1;
+const unicodeSpaceSeparatorPattern = /^\p{Zs}$/u;
 
 const isWhitespaceCharacter = (character: string): boolean =>
   character === ' ' ||
@@ -76,10 +77,10 @@ const isWhitespaceCharacter = (character: string): boolean =>
   character === '\t' ||
   character === '\u000B' ||
   character === '\u000C' ||
-  character === '\u00A0' ||
   character === '\uFEFF' ||
   character === '\u2028' ||
-  character === '\u2029';
+  character === '\u2029' ||
+  unicodeSpaceSeparatorPattern.test(character);
 
 const isIndentationWhitespace = (character: string): boolean => character === ' ' || character === '\t';
 const isLineTerminator = (character: string): boolean =>
@@ -333,16 +334,6 @@ export class Json5Parser {
     return bracketDepth;
   }
 
-  private applyBlockCommentResultForValueEnd(
-    result: {state: ParsingState; skipNext: boolean},
-    cursor: IndexCursor
-  ): {state: ParsingState; nextIndex: number} {
-    return {
-      state: result.state,
-      nextIndex: cursor.index + (result.skipNext ? 1 : 0)
-    };
-  }
-
   private updateBracketDepthWithValidation(
     current: string,
     currentDepth: number
@@ -439,9 +430,11 @@ export class Json5Parser {
       };
     }
     if (context.state.inBlockComment) {
-      const appliedBlockCommentResult = this.applyBlockCommentResultForValueEnd(
+      const appliedBlockCommentResult = this.applyBlockCommentResult(
         processBlockComment(context.state, current, next ?? ''),
-        {index}
+        {
+          index
+        }
       );
       return {
         advanced: true,
