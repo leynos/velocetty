@@ -7,6 +7,7 @@ import {cfgPath} from '../config/paths';
 import {isRecord} from '../config/json5-config';
 import {
   applyPluginSettingsPatches,
+  json5Document,
   pluginId as toPluginId,
   parseConfigJson5Strict,
   type PluginPersistencePatch
@@ -135,7 +136,7 @@ export const ensureRuntimePluginSettingsPersisted = (
   const {configFilePath, readFile, writeFile} = resolvePersistenceOptions(options);
   try {
     const rawConfigText = readFile(configFilePath, 'utf8');
-    const rawConfig = parseConfigJson5Strict(rawConfigText);
+    const rawConfig = parseConfigJson5Strict(json5Document(rawConfigText));
     if (!rawConfig) {
       console.error(`Failed to parse runtime plugin config at "${configFilePath}". Returning empty namespace.`);
       return {};
@@ -154,7 +155,7 @@ export const ensureRuntimePluginSettingsPersisted = (
     });
 
     if (patches.length > 0) {
-      const patchedContent = applyPluginSettingsPatches(rawConfigText, patches);
+      const patchedContent = applyPluginSettingsPatches(json5Document(rawConfigText), patches);
       if (!patchedContent) {
         console.error(
           `Failed to apply runtime plugin settings patch for "${configFilePath}". Skipping write to preserve user formatting.`
@@ -189,7 +190,7 @@ export const setRuntimePluginEnabledPersisted = (
 
   try {
     const rawConfigText = readFile(configFilePath, 'utf8');
-    const rawConfig = parseConfigJson5Strict(rawConfigText);
+    const rawConfig = parseConfigJson5Strict(json5Document(rawConfigText));
     if (!rawConfig) {
       console.error(`Failed to parse runtime plugin config at "${configFilePath}". Returning fallback settings.`);
       return fallbackSettings;
@@ -201,7 +202,7 @@ export const setRuntimePluginEnabledPersisted = (
 
     if (!isEqual(existing, merged)) {
       namespace[pluginId] = merged;
-      const patchedContent = applyPluginSettingsPatches(rawConfigText, [
+      const patchedContent = applyPluginSettingsPatches(json5Document(rawConfigText), [
         {pluginId: toPluginId(pluginId), settings: merged}
       ]);
       if (!patchedContent) {

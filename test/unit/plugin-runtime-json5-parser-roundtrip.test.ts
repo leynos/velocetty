@@ -3,7 +3,7 @@ import {expect, test} from 'bun:test';
 import JSON5 from 'json5';
 
 import {Json5Parser} from '../../app/runtime/plugin-runtime-json5-parser';
-import {applyPluginSettingsPatches, pluginId} from '../../app/runtime/plugin-runtime-json5-roundtrip';
+import {applyPluginSettingsPatches, json5Document, pluginId} from '../../app/runtime/plugin-runtime-json5-roundtrip';
 
 const json5LineTerminators = ['\n', '\r', '\u2028', '\u2029'] as const;
 
@@ -44,7 +44,9 @@ test('applyPluginSettingsPatches writes Unicode identifier keys without forcing 
   },
 }`;
 
-  const patched = applyPluginSettingsPatches(raw, [{pluginId: pluginId('πPlugin'), settings: {enabled: true}}]);
+  const patched = applyPluginSettingsPatches(json5Document(raw), [
+    {pluginId: pluginId('πPlugin'), settings: {enabled: true}}
+  ]);
   expect(patched).not.toBeNull();
   if (!patched) {
     return;
