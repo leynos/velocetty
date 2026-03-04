@@ -60,6 +60,7 @@ type ValueEndCharacterResult = {
   readonly shouldTerminate: boolean;
   readonly isInvalid: boolean;
 };
+type SkipResult = {kind: 'advanced'; nextIndex: number} | {kind: 'invalid'} | {kind: 'none'};
 
 const parserFailureSentinel = -1;
 
@@ -97,26 +98,36 @@ export class Json5Parser {
    * Returns the first non-whitespace/comment index or `-1` when an unterminated
    * block comment is encountered.
    */
+  private tryAdvanceWhitespaceOrComment(index: number, limitIndex: number): SkipResult {
+    const current = this.raw[index];
+    const next = this.raw[index + 1];
+    if (isWhitespaceCharacter(current)) {
+      return {kind: 'advanced', nextIndex: index + 1};
+    }
+    if (current === '/' && next === '/') {
+      const nextIndex = this.skipLineComment({startIndex: index, limitIndex});
+      return {kind: 'advanced', nextIndex};
+    }
+    if (current === '/' && next === '*') {
+      const nextIndex = this.skipBlockComment({startIndex: index, limitIndex});
+      if (nextIndex === parserFailureSentinel) {
+        return {kind: 'invalid'};
+      }
+      return {kind: 'advanced', nextIndex};
+    }
+    return {kind: 'none'};
+  }
+
   public skipWhitespaceAndComments(range: ParseRange): number {
     let index = range.startIndex;
     while (index < range.limitIndex) {
-      const current = this.raw[index];
-      const next = this.raw[index + 1];
-      if (isWhitespaceCharacter(current)) {
-        index += 1;
+      const skipResult = this.tryAdvanceWhitespaceOrComment(index, range.limitIndex);
+      if (skipResult.kind === 'advanced') {
+        index = skipResult.nextIndex;
         continue;
       }
-      if (current === '/' && next === '/') {
-        index = this.skipLineComment({startIndex: index, limitIndex: range.limitIndex});
-        continue;
-      }
-      if (current === '/' && next === '*') {
-        const blockCommentEndIndex = this.skipBlockComment({startIndex: index, limitIndex: range.limitIndex});
-        if (blockCommentEndIndex === parserFailureSentinel) {
-          return parserFailureSentinel;
-        }
-        index = blockCommentEndIndex;
-        continue;
+      if (skipResult.kind === 'invalid') {
+        return parserFailureSentinel;
       }
       break;
     }
