@@ -61,6 +61,7 @@ type ValueEndCharacterResult = {
   readonly isInvalid: boolean;
 };
 type SkipResult = {kind: 'advanced'; nextIndex: number} | {kind: 'invalid'} | {kind: 'none'};
+type Step<T> = {success: true; value: T} | {success: false};
 
 const parserFailureSentinel = -1;
 
@@ -458,33 +459,77 @@ export class Json5Parser {
     return hasBalancedDepth && isRootLexicalState ? range.limitIndex : parserFailureSentinel;
   }
 
+  private readColonIndexAfterKey(range: ParseRange, keyEndIndex: number): Step<number> {
+    const colonIndex = this.skipWhitespaceAndComments({startIndex: keyEndIndex, limitIndex: range.limitIndex});
+    if (colonIndex === parserFailureSentinel || this.raw[colonIndex] !== ':') {
+      return {success: false};
+    }
+    return {success: true, value: colonIndex};
+  }
+
+  private readValueStartIndexAfterColon(range: ParseRange, colonIndex: number): Step<number> {
+    const valueStartIndex = this.skipWhitespaceAndComments({startIndex: colonIndex + 1, limitIndex: range.limitIndex});
+    if (valueStartIndex === parserFailureSentinel || valueStartIndex >= range.limitIndex) {
+      return {success: false};
+    }
+    return {success: true, value: valueStartIndex};
+  }
+
+  private computeValueEndIndex(valueRange: ParseRange): Step<number> {
+    const valueEndIndex = this.findPropertyValueEnd(valueRange);
+    if (valueEndIndex === parserFailureSentinel) {
+      return {success: false};
+    }
+    return {success: true, value: valueEndIndex};
+  }
+
+  private readAfterValue(
+    range: ParseRange,
+    valueEndIndex: number
+  ): Step<{afterValueIndex: number; hasTrailingComma: boolean; nextCursor: number}> {
+    const afterValueIndex = this.skipWhitespaceAndComments({startIndex: valueEndIndex, limitIndex: range.limitIndex});
+    if (afterValueIndex === parserFailureSentinel) {
+      return {success: false};
+    }
+    const hasTrailingComma = this.raw[afterValueIndex] === ',';
+    return {
+      success: true,
+      value: {
+        afterValueIndex,
+        hasTrailingComma,
+        nextCursor: hasTrailingComma ? afterValueIndex + 1 : afterValueIndex
+      }
+    };
+  }
+
   private parseSingleProperty(range: ParseRange): {property: Json5ObjectProperty; nextCursor: number} | null {
     const parsedKey = this.parseObjectKey(range);
     if (!parsedKey) return null;
 
-    const colonIndex = this.skipWhitespaceAndComments({startIndex: parsedKey.endIndex, limitIndex: range.limitIndex});
-    if (colonIndex === parserFailureSentinel) return null;
-    if (this.raw[colonIndex] !== ':') return null;
+    const colonIndexStep = this.readColonIndexAfterKey(range, parsedKey.endIndex);
+    if (!colonIndexStep.success) return null;
 
-    const valueStartIndex = this.skipWhitespaceAndComments({startIndex: colonIndex + 1, limitIndex: range.limitIndex});
-    if (valueStartIndex === parserFailureSentinel) return null;
-    if (valueStartIndex >= range.limitIndex) return null;
+    const valueStartIndexStep = this.readValueStartIndexAfterColon(range, colonIndexStep.value);
+    if (!valueStartIndexStep.success) return null;
 
-    const valueEndIndex = this.findPropertyValueEnd({startIndex: valueStartIndex, limitIndex: range.limitIndex});
-    if (valueEndIndex === parserFailureSentinel) return null;
-    const afterValueIndex = this.skipWhitespaceAndComments({startIndex: valueEndIndex, limitIndex: range.limitIndex});
-    if (afterValueIndex === parserFailureSentinel) return null;
-    const hasTrailingComma = this.raw[afterValueIndex] === ',';
+    const valueEndIndexStep = this.computeValueEndIndex({
+      startIndex: valueStartIndexStep.value,
+      limitIndex: range.limitIndex
+    });
+    if (!valueEndIndexStep.success) return null;
+
+    const afterValueStep = this.readAfterValue(range, valueEndIndexStep.value);
+    if (!afterValueStep.success) return null;
 
     return {
       property: {
         key: parsedKey.key,
         keyStartIndex: parsedKey.startIndex,
-        valueStartIndex,
-        valueEndIndex,
-        hasTrailingComma
+        valueStartIndex: valueStartIndexStep.value,
+        valueEndIndex: valueEndIndexStep.value,
+        hasTrailingComma: afterValueStep.value.hasTrailingComma
       },
-      nextCursor: hasTrailingComma ? afterValueIndex + 1 : afterValueIndex
+      nextCursor: afterValueStep.value.nextCursor
     };
   }
 
