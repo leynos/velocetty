@@ -52,9 +52,19 @@ const collectContextCapSchemas = (node: unknown): JsonObject[] => {
 
 test('generated config schemas enforce webGLRendererMaxContexts as integer >= 1', async () => {
   const schemaFiles = ['app/config/schema.json', 'shared/schemas/schema.json'];
+  const schemaResults = await Promise.allSettled(
+    schemaFiles.map(async (schemaFile) => ({
+      schemaFile,
+      schemaRoot: await readJsonFile(schemaFile)
+    }))
+  );
 
-  for (const schemaFile of schemaFiles) {
-    const schemaRoot = await readJsonFile(schemaFile);
+  for (const [index, result] of schemaResults.entries()) {
+    const schemaFile = schemaFiles[index];
+    if (result.status !== 'fulfilled') {
+      throw new Error(`Failed to read schema file "${schemaFile}": ${String(result.reason)}`);
+    }
+    const schemaRoot = result.value.schemaRoot;
     const contextCaps = collectContextCapSchemas(schemaRoot);
 
     expect(contextCaps.length).toBe(2);
