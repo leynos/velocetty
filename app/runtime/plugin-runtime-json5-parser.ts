@@ -28,6 +28,10 @@ export type IndexCursor = {
 };
 
 type ParsedObjectKey = {key: string; startIndex: number; endIndex: number};
+type ValueEndContext = {
+  readonly state: ParsingState;
+  readonly bracketDepth: number;
+};
 type ValueEndCharacterResult = {
   readonly state: ParsingState;
   readonly nextIndex: number;
@@ -270,11 +274,11 @@ export class Json5Parser {
 
   private applyBlockCommentResultForValueEnd(
     result: {state: ParsingState; skipNext: boolean},
-    currentIndex: number
+    cursor: IndexCursor
   ): {state: ParsingState; nextIndex: number} {
     return {
       state: result.state,
-      nextIndex: currentIndex + (result.skipNext ? 1 : 0)
+      nextIndex: cursor.index + (result.skipNext ? 1 : 0)
     };
   }
 
@@ -291,34 +295,45 @@ export class Json5Parser {
 
   private applyDelimiterResultForValueEnd(
     result: {state: ParsingState; skipNext: boolean},
-    currentIndex: number
+    cursor: IndexCursor
   ): {state: ParsingState; nextIndex: number} {
     return {
       state: result.state,
-      nextIndex: currentIndex + (result.skipNext ? 1 : 0)
+      nextIndex: cursor.index + (result.skipNext ? 1 : 0)
     };
   }
 
   private processValueEndCharacter(
     current: string,
     next: string | undefined,
-    state: ParsingState,
-    bracketDepth: number,
-    index: number
+    context: ValueEndContext,
+    cursor: IndexCursor
   ): ValueEndCharacterResult {
-    if (this.isValueTerminator(current, state, bracketDepth)) {
-      return {state, nextIndex: index, bracketDepth, shouldTerminate: true, isInvalid: false};
-    }
-
-    const bracketUpdate = this.updateBracketDepthWithValidation(current, bracketDepth);
-    if (bracketUpdate.isInvalid) {
-      return {state, nextIndex: index, bracketDepth, shouldTerminate: false, isInvalid: true};
-    }
-
-    if (bracketUpdate.newDepth !== bracketDepth) {
+    if (this.isValueTerminator(current, context.state, context.bracketDepth)) {
       return {
-        state,
-        nextIndex: index,
+        state: context.state,
+        nextIndex: cursor.index,
+        bracketDepth: context.bracketDepth,
+        shouldTerminate: true,
+        isInvalid: false
+      };
+    }
+
+    const bracketUpdate = this.updateBracketDepthWithValidation(current, context.bracketDepth);
+    if (bracketUpdate.isInvalid) {
+      return {
+        state: context.state,
+        nextIndex: cursor.index,
+        bracketDepth: context.bracketDepth,
+        shouldTerminate: false,
+        isInvalid: true
+      };
+    }
+
+    if (bracketUpdate.newDepth !== context.bracketDepth) {
+      return {
+        state: context.state,
+        nextIndex: cursor.index,
         bracketDepth: bracketUpdate.newDepth,
         shouldTerminate: false,
         isInvalid: false
@@ -326,53 +341,60 @@ export class Json5Parser {
     }
 
     const applied = this.applyDelimiterResultForValueEnd(
-      processDelimitersAndComments(state, current, next ?? ''),
-      index
+      processDelimitersAndComments(context.state, current, next ?? ''),
+      cursor
     );
-    return {state: applied.state, nextIndex: applied.nextIndex, bracketDepth, shouldTerminate: false, isInvalid: false};
+    return {
+      state: applied.state,
+      nextIndex: applied.nextIndex,
+      bracketDepth: context.bracketDepth,
+      shouldTerminate: false,
+      isInvalid: false
+    };
   }
 
   private findPropertyValueEnd(range: ParseRange): number {
-    let state: ParsingState = {
-      depth: 0,
-      inString: null,
-      isEscaped: false,
-      inLineComment: false,
-      inBlockComment: false
+    let context: ValueEndContext = {
+      state: {
+        depth: 0,
+        inString: null,
+        isEscaped: false,
+        inLineComment: false,
+        inBlockComment: false
+      },
+      bracketDepth: 0
     };
-    let bracketDepth = 0;
 
     for (let index = range.startIndex; index < range.limitIndex; index += 1) {
       const current = this.raw[index];
       const next = this.raw[index + 1];
 
-      if (state.inLineComment) {
-        state = processLineComment(state, current);
+      if (context.state.inLineComment) {
+        context = {...context, state: processLineComment(context.state, current)};
         continue;
       }
-      if (state.inBlockComment) {
+      if (context.state.inBlockComment) {
         const appliedBlockCommentResult = this.applyBlockCommentResultForValueEnd(
-          processBlockComment(state, current, next),
-          index
+          processBlockComment(context.state, current, next),
+          {index}
         );
-        state = appliedBlockCommentResult.state;
+        context = {...context, state: appliedBlockCommentResult.state};
         index = appliedBlockCommentResult.nextIndex;
         continue;
       }
-      if (state.inString) {
-        state = processStringContext(state, current);
+      if (context.state.inString) {
+        context = {...context, state: processStringContext(context.state, current)};
         continue;
       }
 
-      const result = this.processValueEndCharacter(current, next, state, bracketDepth, index);
+      const result = this.processValueEndCharacter(current, next, context, {index});
       if (result.shouldTerminate) return index;
       if (result.isInvalid) return -1;
-      state = result.state;
-      bracketDepth = result.bracketDepth;
+      context = {state: result.state, bracketDepth: result.bracketDepth};
       index = result.nextIndex;
     }
 
-    return state.depth === 0 ? range.limitIndex : -1;
+    return context.state.depth === 0 ? range.limitIndex : -1;
   }
 
   private parseSingleProperty(range: ParseRange): {property: Json5ObjectProperty; nextCursor: number} | null {
