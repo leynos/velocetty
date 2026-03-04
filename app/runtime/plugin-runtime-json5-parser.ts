@@ -409,6 +409,52 @@ export class Json5Parser {
     };
   }
 
+  private hasBalancedDepth(context: ValueEndContext): boolean {
+    return context.state.depth === 0 && context.bracketDepth === 0;
+  }
+
+  private isRootLexicalState(state: ParsingState): boolean {
+    return state.inString === null && !state.isEscaped && !state.inLineComment && !state.inBlockComment;
+  }
+
+  private isCleanParseEnd(context: ValueEndContext): boolean {
+    return this.hasBalancedDepth(context) && this.isRootLexicalState(context.state);
+  }
+
+  private advanceActiveLexicalState(
+    context: ValueEndContext,
+    current: string,
+    next: string | undefined,
+    index: number
+  ): {advanced: true; context: ValueEndContext; nextIndex: number} | {advanced: false} {
+    if (context.state.inLineComment) {
+      return {
+        advanced: true,
+        context: {...context, state: processLineComment(context.state, current)},
+        nextIndex: index
+      };
+    }
+    if (context.state.inBlockComment) {
+      const appliedBlockCommentResult = this.applyBlockCommentResultForValueEnd(
+        processBlockComment(context.state, current, next ?? ''),
+        {index}
+      );
+      return {
+        advanced: true,
+        context: {...context, state: appliedBlockCommentResult.state},
+        nextIndex: appliedBlockCommentResult.nextIndex
+      };
+    }
+    if (context.state.inString) {
+      return {
+        advanced: true,
+        context: {...context, state: processStringContext(context.state, current)},
+        nextIndex: index
+      };
+    }
+    return {advanced: false};
+  }
+
   private findPropertyValueEnd(range: ParseRange): number {
     let context: ValueEndContext = {
       state: {
@@ -425,21 +471,10 @@ export class Json5Parser {
       const current = this.raw[index];
       const next = this.raw[index + 1];
 
-      if (context.state.inLineComment) {
-        context = {...context, state: processLineComment(context.state, current)};
-        continue;
-      }
-      if (context.state.inBlockComment) {
-        const appliedBlockCommentResult = this.applyBlockCommentResultForValueEnd(
-          processBlockComment(context.state, current, next),
-          {index}
-        );
-        context = {...context, state: appliedBlockCommentResult.state};
-        index = appliedBlockCommentResult.nextIndex;
-        continue;
-      }
-      if (context.state.inString) {
-        context = {...context, state: processStringContext(context.state, current)};
+      const step = this.advanceActiveLexicalState(context, current, next, index);
+      if (step.advanced) {
+        context = step.context;
+        index = step.nextIndex;
         continue;
       }
 
@@ -450,13 +485,7 @@ export class Json5Parser {
       index = result.nextIndex;
     }
 
-    const hasBalancedDepth = context.state.depth === 0 && context.bracketDepth === 0;
-    const isRootLexicalState =
-      context.state.inString === null &&
-      !context.state.isEscaped &&
-      !context.state.inLineComment &&
-      !context.state.inBlockComment;
-    return hasBalancedDepth && isRootLexicalState ? range.limitIndex : parserFailureSentinel;
+    return this.isCleanParseEnd(context) ? range.limitIndex : parserFailureSentinel;
   }
 
   private readColonIndexAfterKey(range: ParseRange, keyEndIndex: number): Step<number> {
