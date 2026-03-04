@@ -56,38 +56,40 @@ export const isStringArray = (value: unknown): value is string[] =>
 export const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
   isRecord(value) && Object.values(value).every((entry) => typeof entry === 'string' || isStringArray(entry));
 
-const validateRecordField: FieldValidator = (value, field) => {
-  if (value[field] !== undefined && !isRecord(value[field])) {
-    return createDiagnosticError({
-      path: getPathForField(field),
-      message: `Expected \`${field}\` to be an object when present.`,
-      suggestedFix: `Set \`${field}\` to an object value.`
-    });
-  }
-  return null;
-};
+const makeFieldValidator =
+  (
+    guard: (value: unknown) => boolean,
+    message: (field: string) => string,
+    suggestedFix: (field: string) => string
+  ): FieldValidator =>
+  (value, field) => {
+    if (value[field] !== undefined && !guard(value[field])) {
+      return createDiagnosticError({
+        path: getPathForField(field),
+        message: message(field),
+        suggestedFix: suggestedFix(field)
+      });
+    }
+    return null;
+  };
 
-const validateStringArrayField: FieldValidator = (value, field) => {
-  if (value[field] !== undefined && !isStringArray(value[field])) {
-    return createDiagnosticError({
-      path: getPathForField(field),
-      message: `Expected \`${field}\` to be an array of strings when present.`,
-      suggestedFix: `Set \`${field}\` to an array of plugin names, for example ['plugin-name'].`
-    });
-  }
-  return null;
-};
+const validateRecordField: FieldValidator = makeFieldValidator(
+  isRecord,
+  (field) => `Expected \`${field}\` to be an object when present.`,
+  (field) => `Set \`${field}\` to an object value.`
+);
 
-const validateKeymapField: FieldValidator = (value, field) => {
-  if (value[field] !== undefined && !isKeymapConfig(value[field])) {
-    return createDiagnosticError({
-      path: getPathForField(field),
-      message: `Expected \`${field}\` values to be strings or string arrays when present.`,
-      suggestedFix: `Set \`${field}\` entries to keybinding strings or string arrays.`
-    });
-  }
-  return null;
-};
+const validateStringArrayField: FieldValidator = makeFieldValidator(
+  isStringArray,
+  (field) => `Expected \`${field}\` to be an array of strings when present.`,
+  (field) => `Set \`${field}\` to an array of plugin names, for example ['plugin-name'].`
+);
+
+const validateKeymapField: FieldValidator = makeFieldValidator(
+  isKeymapConfig,
+  (field) => `Expected \`${field}\` values to be strings or string arrays when present.`,
+  (field) => `Set \`${field}\` entries to keybinding strings or string arrays.`
+);
 
 export const validateRawConfig = (value: unknown): ParseResult<Record<string, unknown>> => {
   if (!isRecord(value)) {
