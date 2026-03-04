@@ -16,6 +16,17 @@ type LoadedConfig = {
   diagnostics: configValidationDiagnostic[];
 };
 
+/** A file path used to identify a config artefact in diagnostics. */
+type ConfigFilePath = {
+  readonly path: string;
+};
+
+/** Bundles the raw text and originating file path of a config source. */
+type ConfigSource = {
+  readonly filePath: ConfigFilePath;
+  readonly rawContent: string;
+};
+
 let defaultConfig: rawConfig;
 const defaultRawConfigFallback: rawConfig = {
   plugins: [],
@@ -77,11 +88,11 @@ const keymapDiagnosticHints = {
   }
 } as const;
 
-const reportDiagnostics = (context: string, source: string, diagnostics: configValidationDiagnostic[]) => {
+const reportDiagnostics = (context: string, source: ConfigFilePath, diagnostics: configValidationDiagnostic[]) => {
   if (diagnostics.length === 0) {
     return;
   }
-  console.warn(`[config-import] ${context}`, {source, diagnostics});
+  console.warn(`[config-import] ${context}`, {source: source.path, diagnostics});
 };
 
 const notifyWithPrimaryDiagnostic = (baseMessage: string, diagnostics: configValidationDiagnostic[]) => {
@@ -103,10 +114,10 @@ const notifyWithPrimaryDiagnostic = (baseMessage: string, diagnostics: configVal
  *
  * Returns parsed payload plus structured diagnostics when fallback is used.
  */
-const parseRawConfig = (raw: string, source: string) => {
+const parseRawConfig = (source: ConfigSource) => {
   return parseJson5WithSchemaDiagnostics({
-    raw,
-    source,
+    raw: source.rawContent,
+    source: source.filePath.path,
     schema: rawConfigSchema,
     fallback: null,
     itemType: 'config',
@@ -119,10 +130,10 @@ const parseRawConfig = (raw: string, source: string) => {
  *
  * Returns parsed keymaps plus diagnostics when fallback is used.
  */
-const parseKeymapConfig = (raw: string, source: string) => {
+const parseKeymapConfig = (source: ConfigSource) => {
   return parseJson5WithSchemaDiagnostics({
-    raw,
-    source,
+    raw: source.rawContent,
+    source: source.filePath.path,
     schema: keymapSchema,
     fallback: {},
     itemType: 'keymap',
@@ -178,9 +189,10 @@ const loadDefaultConfig = (): LoadedConfig => {
     console.error(`[config-import] Failed to read bundled default config at "${defaultCfg}".`, err);
   }
 
-  const parsedDefaultConfigResult = parseRawConfig(defaultCfgRaw, defaultCfg);
+  const filePath: ConfigFilePath = {path: defaultCfg};
+  const parsedDefaultConfigResult = parseRawConfig({filePath, rawContent: defaultCfgRaw});
   if (parsedDefaultConfigResult.usedFallback) {
-    reportDiagnostics('Bundled default config diagnostics.', defaultCfg, parsedDefaultConfigResult.diagnostics);
+    reportDiagnostics('Bundled default config diagnostics.', filePath, parsedDefaultConfigResult.diagnostics);
   }
 
   if (!parsedDefaultConfigResult.usedFallback && parsedDefaultConfigResult.value !== null) {
@@ -205,6 +217,7 @@ const loadDefaultConfig = (): LoadedConfig => {
 
 const loadPlatformKeymap = (): Record<string, string | string[]> => {
   const platformKeyPath = defaultPlatformKeyPath();
+  const filePath: ConfigFilePath = {path: platformKeyPath};
   let content = '{}';
   try {
     content = readFileSync(platformKeyPath, 'utf8');
@@ -212,18 +225,19 @@ const loadPlatformKeymap = (): Record<string, string | string[]> => {
     console.error(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`, err);
   }
 
-  const keymapResult = parseKeymapConfig(content, platformKeyPath);
+  const keymapResult = parseKeymapConfig({filePath, rawContent: content});
   if (keymapResult.usedFallback) {
-    reportDiagnostics('Platform keymap diagnostics.', platformKeyPath, keymapResult.diagnostics);
+    reportDiagnostics('Platform keymap diagnostics.', filePath, keymapResult.diagnostics);
   }
   return keymapResult.value;
 };
 
 const loadUserConfig = (defaultConfigFallback: rawConfig): LoadedConfig => {
+  const filePath: ConfigFilePath = {path: cfgPath};
   try {
-    const userCfgResult = parseRawConfig(readFileSync(cfgPath, 'utf8'), cfgPath);
+    const userCfgResult = parseRawConfig({filePath, rawContent: readFileSync(cfgPath, 'utf8')});
     if (userCfgResult.usedFallback) {
-      reportDiagnostics('User config diagnostics.', cfgPath, userCfgResult.diagnostics);
+      reportDiagnostics('User config diagnostics.', filePath, userCfgResult.diagnostics);
     }
     if (!userCfgResult.usedFallback && userCfgResult.value !== null) {
       return {
