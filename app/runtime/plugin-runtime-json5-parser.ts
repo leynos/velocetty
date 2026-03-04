@@ -8,8 +8,22 @@ import {
   processStringContext
 } from './plugin-runtime-json5-parsing-state';
 
+/**
+ * Delimits an object literal in raw JSON5 source.
+ *
+ * `openBraceIndex` points at the opening `{` character and `closeBraceIndex`
+ * points at the matching closing `}` character.
+ */
 export type Json5ObjectRange = {openBraceIndex: number; closeBraceIndex: number};
 
+/**
+ * Captures a parsed key/value entry inside a JSON5 object.
+ *
+ * `keyStartIndex` points at the first character of the key token.
+ * `valueStartIndex` is the first non-whitespace/comment character of the value.
+ * `valueEndIndex` is the terminating delimiter index (`,` or `}` boundary).
+ * `hasTrailingComma` is true when a comma follows the value before the next key.
+ */
 export type Json5ObjectProperty = {
   key: string;
   keyStartIndex: number;
@@ -18,11 +32,13 @@ export type Json5ObjectProperty = {
   hasTrailingComma: boolean;
 };
 
+/** Read-only start/limit cursor window used for parser scans. */
 export type ParseRange = {
   readonly startIndex: number;
   readonly limitIndex: number;
 };
 
+/** Read-only single cursor index wrapper used for parser helper calls. */
 export type IndexCursor = {
   readonly index: number;
 };
@@ -45,11 +61,17 @@ type ValueEndCharacterResult = {
   readonly isInvalid: boolean;
 };
 
+const parserFailureSentinel = -1;
+
 const isWhitespaceCharacter = (character: string): boolean =>
   character === ' ' ||
   character === '\n' ||
   character === '\r' ||
   character === '\t' ||
+  character === '\u000B' ||
+  character === '\u000C' ||
+  character === '\u00A0' ||
+  character === '\uFEFF' ||
   character === '\u2028' ||
   character === '\u2029';
 
@@ -60,9 +82,21 @@ const isLineTerminator = (character: string): boolean =>
 const identifierStartPattern = /[$_\p{ID_Start}]/u;
 const identifierContinuePattern = /(?:[$_\p{ID_Continue}]|\u200C|\u200D)/u;
 
+/**
+ * Parses and locates JSON5 object structures for round-trip-safe mutations.
+ *
+ * The parser operates on the original document string and returns index ranges
+ * so callers can preserve formatting and comments while editing targeted values.
+ */
 export class Json5Parser {
   public constructor(private readonly raw: string) {}
 
+  /**
+   * Advances through whitespace and comments within a bounded scan range.
+   *
+   * Returns the first non-whitespace/comment index or `-1` when an unterminated
+   * block comment is encountered.
+   */
   public skipWhitespaceAndComments(range: ParseRange): number {
     let index = range.startIndex;
     while (index < range.limitIndex) {
@@ -77,7 +111,11 @@ export class Json5Parser {
         continue;
       }
       if (current === '/' && next === '*') {
-        index = this.skipBlockComment({startIndex: index, limitIndex: range.limitIndex});
+        const blockCommentEndIndex = this.skipBlockComment({startIndex: index, limitIndex: range.limitIndex});
+        if (blockCommentEndIndex === parserFailureSentinel) {
+          return parserFailureSentinel;
+        }
+        index = blockCommentEndIndex;
         continue;
       }
       break;
@@ -85,11 +123,13 @@ export class Json5Parser {
     return index;
   }
 
+  /** Returns the index of the start of the line that contains `cursor.index`. */
   public getLineStartIndex(cursor: IndexCursor): number {
     const lineBreakIndex = this.raw.lastIndexOf('\n', Math.max(0, cursor.index - 1));
     return lineBreakIndex === -1 ? 0 : lineBreakIndex + 1;
   }
 
+  /** Returns the leading indentation (spaces/tabs) for the line at `cursor.index`. */
   public getLineIndent(cursor: IndexCursor): string {
     const lineStartIndex = this.getLineStartIndex(cursor);
     let index = lineStartIndex;
@@ -121,7 +161,7 @@ export class Json5Parser {
     while (this.hasRoomForCommentEnd({index}, range.limitIndex) && !this.isBlockCommentEnd({index})) {
       index += 1;
     }
-    return this.hasRoomForCommentEnd({index}, range.limitIndex) ? index + 2 : range.limitIndex;
+    return this.hasRoomForCommentEnd({index}, range.limitIndex) ? index + 2 : parserFailureSentinel;
   }
 
   private parseQuotedStringEnd(range: ParseRange): number {
@@ -393,12 +433,18 @@ export class Json5Parser {
 
       const result = this.processValueEndCharacter({current, next, index}, context.state, context.bracketDepth);
       if (result.shouldTerminate) return index;
-      if (result.isInvalid) return -1;
+      if (result.isInvalid) return parserFailureSentinel;
       context = {state: result.state, bracketDepth: result.bracketDepth};
       index = result.nextIndex;
     }
 
-    return context.state.depth === 0 ? range.limitIndex : -1;
+    const hasBalancedDepth = context.state.depth === 0 && context.bracketDepth === 0;
+    const isRootLexicalState =
+      context.state.inString === null &&
+      !context.state.isEscaped &&
+      !context.state.inLineComment &&
+      !context.state.inBlockComment;
+    return hasBalancedDepth && isRootLexicalState ? range.limitIndex : parserFailureSentinel;
   }
 
   private parseSingleProperty(range: ParseRange): {property: Json5ObjectProperty; nextCursor: number} | null {
@@ -406,14 +452,17 @@ export class Json5Parser {
     if (!parsedKey) return null;
 
     const colonIndex = this.skipWhitespaceAndComments({startIndex: parsedKey.endIndex, limitIndex: range.limitIndex});
+    if (colonIndex === parserFailureSentinel) return null;
     if (this.raw[colonIndex] !== ':') return null;
 
     const valueStartIndex = this.skipWhitespaceAndComments({startIndex: colonIndex + 1, limitIndex: range.limitIndex});
+    if (valueStartIndex === parserFailureSentinel) return null;
     if (valueStartIndex >= range.limitIndex) return null;
 
     const valueEndIndex = this.findPropertyValueEnd({startIndex: valueStartIndex, limitIndex: range.limitIndex});
-    if (valueEndIndex === -1) return null;
+    if (valueEndIndex === parserFailureSentinel) return null;
     const afterValueIndex = this.skipWhitespaceAndComments({startIndex: valueEndIndex, limitIndex: range.limitIndex});
+    if (afterValueIndex === parserFailureSentinel) return null;
     const hasTrailingComma = this.raw[afterValueIndex] === ',';
 
     return {
@@ -428,12 +477,20 @@ export class Json5Parser {
     };
   }
 
+  /**
+   * Parses properties within an object range while preserving source indices.
+   *
+   * Returns `null` when token order is invalid or parsing fails.
+   */
   public parseObjectProperties(objectRange: Json5ObjectRange): Json5ObjectProperty[] | null {
     const properties: Json5ObjectProperty[] = [];
     let cursor = this.skipWhitespaceAndComments({
       startIndex: objectRange.openBraceIndex + 1,
       limitIndex: objectRange.closeBraceIndex
     });
+    if (cursor === parserFailureSentinel) {
+      return null;
+    }
     let hasParsedProperty = false;
     let lastTokenWasComma = false;
 
@@ -443,6 +500,9 @@ export class Json5Parser {
           return null;
         }
         cursor = this.skipWhitespaceAndComments({startIndex: cursor + 1, limitIndex: objectRange.closeBraceIndex});
+        if (cursor === parserFailureSentinel) {
+          return null;
+        }
         lastTokenWasComma = true;
         continue;
       }
@@ -459,13 +519,24 @@ export class Json5Parser {
         startIndex: parsedProperty.nextCursor,
         limitIndex: objectRange.closeBraceIndex
       });
+      if (cursor === parserFailureSentinel) {
+        return null;
+      }
     }
 
     return properties;
   }
 
+  /**
+   * Locates the top-level object in the parser source.
+   *
+   * Returns `null` when no valid root object exists or trailing content remains.
+   */
   public findRootObjectRange(): Json5ObjectRange | null {
     const rootStartIndex = this.skipWhitespaceAndComments({startIndex: 0, limitIndex: this.raw.length});
+    if (rootStartIndex === parserFailureSentinel) {
+      return null;
+    }
     if (this.raw[rootStartIndex] !== '{') {
       return null;
     }
@@ -477,12 +548,16 @@ export class Json5Parser {
       startIndex: closeBraceIndex + 1,
       limitIndex: this.raw.length
     });
+    if (trailingIndex === parserFailureSentinel) {
+      return null;
+    }
     if (trailingIndex !== this.raw.length) {
       return null;
     }
     return {openBraceIndex: rootStartIndex, closeBraceIndex};
   }
 
+  /** Returns a parsed property by key from an object range, or `null` if missing. */
   public getObjectProperty(objectRange: Json5ObjectRange, key: string): Json5ObjectProperty | null {
     const properties = this.parseObjectProperties(objectRange);
     if (!properties) {
@@ -491,11 +566,15 @@ export class Json5Parser {
     return properties.find((property) => property.key === key) ?? null;
   }
 
+  /** Resolves an object value range for a previously parsed property value. */
   public getObjectRangeForProperty(property: Json5ObjectProperty): Json5ObjectRange | null {
     const valueStart = this.skipWhitespaceAndComments({
       startIndex: property.valueStartIndex,
       limitIndex: this.raw.length
     });
+    if (valueStart === parserFailureSentinel) {
+      return null;
+    }
     if (this.raw[valueStart] !== '{') {
       return null;
     }
