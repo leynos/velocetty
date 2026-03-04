@@ -44,6 +44,10 @@ export type IndexCursor = {
 };
 
 type ParsedObjectKey = {key: string; startIndex: number; endIndex: number};
+type PropertyListState = {
+  readonly hasParsedProperty: boolean;
+  readonly lastTokenWasComma: boolean;
+};
 type ValueEndContext = {
   readonly state: ParsingState;
   readonly bracketDepth: number;
@@ -562,6 +566,50 @@ export class Json5Parser {
     };
   }
 
+  private processObjectComma(
+    cursor: number,
+    limitIndex: number,
+    listState: PropertyListState
+  ): {success: false} | {success: true; nextCursor: number; newState: PropertyListState} {
+    if (!listState.hasParsedProperty || listState.lastTokenWasComma) {
+      return {success: false};
+    }
+    const nextCursor = this.skipWhitespaceAndComments({startIndex: cursor + 1, limitIndex});
+    if (nextCursor === parserFailureSentinel) {
+      return {success: false};
+    }
+    return {success: true, nextCursor, newState: {...listState, lastTokenWasComma: true}};
+  }
+
+  private processObjectProperty(
+    cursor: number,
+    limitIndex: number,
+    listState: PropertyListState
+  ):
+    | {success: false}
+    | {success: true; nextCursor: number; property: Json5ObjectProperty; newState: PropertyListState} {
+    if (listState.hasParsedProperty && !listState.lastTokenWasComma) {
+      return {success: false};
+    }
+    const parsedProperty = this.parseSingleProperty({startIndex: cursor, limitIndex});
+    if (!parsedProperty) {
+      return {success: false};
+    }
+    const nextCursor = this.skipWhitespaceAndComments({
+      startIndex: parsedProperty.nextCursor,
+      limitIndex
+    });
+    if (nextCursor === parserFailureSentinel) {
+      return {success: false};
+    }
+    return {
+      success: true,
+      nextCursor,
+      property: parsedProperty.property,
+      newState: {hasParsedProperty: true, lastTokenWasComma: parsedProperty.property.hasTrailingComma}
+    };
+  }
+
   /**
    * Parses properties within an object range while preserving source indices.
    *
@@ -576,37 +624,22 @@ export class Json5Parser {
     if (cursor === parserFailureSentinel) {
       return null;
     }
-    let hasParsedProperty = false;
-    let lastTokenWasComma = false;
+    let listState: PropertyListState = {hasParsedProperty: false, lastTokenWasComma: false};
 
     while (cursor < objectRange.closeBraceIndex) {
       if (this.raw[cursor] === ',') {
-        if (!hasParsedProperty || lastTokenWasComma) {
-          return null;
-        }
-        cursor = this.skipWhitespaceAndComments({startIndex: cursor + 1, limitIndex: objectRange.closeBraceIndex});
-        if (cursor === parserFailureSentinel) {
-          return null;
-        }
-        lastTokenWasComma = true;
+        const result = this.processObjectComma(cursor, objectRange.closeBraceIndex, listState);
+        if (!result.success) return null;
+        cursor = result.nextCursor;
+        listState = result.newState;
         continue;
       }
-      if (hasParsedProperty && !lastTokenWasComma) {
-        return null;
-      }
 
-      const parsedProperty = this.parseSingleProperty({startIndex: cursor, limitIndex: objectRange.closeBraceIndex});
-      if (!parsedProperty) return null;
-      properties.push(parsedProperty.property);
-      hasParsedProperty = true;
-      lastTokenWasComma = parsedProperty.property.hasTrailingComma;
-      cursor = this.skipWhitespaceAndComments({
-        startIndex: parsedProperty.nextCursor,
-        limitIndex: objectRange.closeBraceIndex
-      });
-      if (cursor === parserFailureSentinel) {
-        return null;
-      }
+      const result = this.processObjectProperty(cursor, objectRange.closeBraceIndex, listState);
+      if (!result.success) return null;
+      properties.push(result.property);
+      listState = result.newState;
+      cursor = result.nextCursor;
     }
 
     return properties;
