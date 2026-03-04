@@ -43,6 +43,14 @@ export type IndexCursor = {
   readonly index: number;
 };
 
+/** Read-only key wrapper used for object-property lookups. */
+export type PropertyKey = {
+  readonly value: string;
+};
+
+export const propertyKey = (value: string): PropertyKey => ({value});
+const toKeyString = (key: PropertyKey | string): string => (typeof key === 'string' ? key : key.value);
+
 type ParsedObjectKey = {key: string; startIndex: number; endIndex: number};
 type PropertyListState = {
   readonly hasParsedProperty: boolean;
@@ -63,6 +71,10 @@ type ValueEndCharacterResult = {
   readonly bracketDepth: number;
   readonly shouldTerminate: boolean;
   readonly isInvalid: boolean;
+};
+type AdvanceContext = {
+  readonly cursor: IndexCursor;
+  readonly limitIndex: number;
 };
 type SkipResult = {kind: 'advanced'; nextIndex: number} | {kind: 'invalid'} | {kind: 'none'};
 type Step<T> = {success: true; value: T} | {success: false};
@@ -104,18 +116,18 @@ export class Json5Parser {
    * Returns the first non-whitespace/comment index or `-1` when an unterminated
    * block comment is encountered.
    */
-  private tryAdvanceWhitespaceOrComment(index: number, limitIndex: number): SkipResult {
-    const current = this.raw[index];
-    const next = this.raw[index + 1];
+  private tryAdvanceWhitespaceOrComment(ctx: AdvanceContext): SkipResult {
+    const current = this.raw[ctx.cursor.index];
+    const next = this.raw[ctx.cursor.index + 1];
     if (isWhitespaceCharacter(current)) {
-      return {kind: 'advanced', nextIndex: index + 1};
+      return {kind: 'advanced', nextIndex: ctx.cursor.index + 1};
     }
     if (current === '/' && next === '/') {
-      const nextIndex = this.skipLineComment({startIndex: index, limitIndex});
+      const nextIndex = this.skipLineComment({startIndex: ctx.cursor.index, limitIndex: ctx.limitIndex});
       return {kind: 'advanced', nextIndex};
     }
     if (current === '/' && next === '*') {
-      const nextIndex = this.skipBlockComment({startIndex: index, limitIndex});
+      const nextIndex = this.skipBlockComment({startIndex: ctx.cursor.index, limitIndex: ctx.limitIndex});
       if (nextIndex === parserFailureSentinel) {
         return {kind: 'invalid'};
       }
@@ -127,7 +139,10 @@ export class Json5Parser {
   public skipWhitespaceAndComments(range: ParseRange): number {
     let index = range.startIndex;
     while (index < range.limitIndex) {
-      const skipResult = this.tryAdvanceWhitespaceOrComment(index, range.limitIndex);
+      const skipResult = this.tryAdvanceWhitespaceOrComment({
+        cursor: {index},
+        limitIndex: range.limitIndex
+      });
       if (skipResult.kind === 'advanced') {
         index = skipResult.nextIndex;
         continue;
@@ -560,14 +575,14 @@ export class Json5Parser {
   }
 
   private processObjectComma(
-    cursor: number,
+    cursor: IndexCursor,
     limitIndex: number,
     listState: PropertyListState
   ): {success: false} | {success: true; nextCursor: number; newState: PropertyListState} {
     if (!listState.hasParsedProperty || listState.lastTokenWasComma) {
       return {success: false};
     }
-    const nextCursor = this.skipWhitespaceAndComments({startIndex: cursor + 1, limitIndex});
+    const nextCursor = this.skipWhitespaceAndComments({startIndex: cursor.index + 1, limitIndex});
     if (nextCursor === parserFailureSentinel) {
       return {success: false};
     }
@@ -575,7 +590,7 @@ export class Json5Parser {
   }
 
   private processObjectProperty(
-    cursor: number,
+    cursor: IndexCursor,
     limitIndex: number,
     listState: PropertyListState
   ):
@@ -584,7 +599,7 @@ export class Json5Parser {
     if (listState.hasParsedProperty && !listState.lastTokenWasComma) {
       return {success: false};
     }
-    const parsedProperty = this.parseSingleProperty({startIndex: cursor, limitIndex});
+    const parsedProperty = this.parseSingleProperty({startIndex: cursor.index, limitIndex});
     if (!parsedProperty) {
       return {success: false};
     }
@@ -621,14 +636,14 @@ export class Json5Parser {
 
     while (cursor < objectRange.closeBraceIndex) {
       if (this.raw[cursor] === ',') {
-        const result = this.processObjectComma(cursor, objectRange.closeBraceIndex, listState);
+        const result = this.processObjectComma({index: cursor}, objectRange.closeBraceIndex, listState);
         if (!result.success) return null;
         cursor = result.nextCursor;
         listState = result.newState;
         continue;
       }
 
-      const result = this.processObjectProperty(cursor, objectRange.closeBraceIndex, listState);
+      const result = this.processObjectProperty({index: cursor}, objectRange.closeBraceIndex, listState);
       if (!result.success) return null;
       properties.push(result.property);
       listState = result.newState;
@@ -669,12 +684,13 @@ export class Json5Parser {
   }
 
   /** Returns a parsed property by key from an object range, or `null` if missing. */
-  public getObjectProperty(objectRange: Json5ObjectRange, key: string): Json5ObjectProperty | null {
+  public getObjectProperty(objectRange: Json5ObjectRange, key: PropertyKey | string): Json5ObjectProperty | null {
+    const keyStr = toKeyString(key);
     const properties = this.parseObjectProperties(objectRange);
     if (!properties) {
       return null;
     }
-    return properties.find((property) => property.key === key) ?? null;
+    return properties.find((property) => property.key === keyStr) ?? null;
   }
 
   /** Resolves an object value range for a previously parsed property value. */
