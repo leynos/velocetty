@@ -37,10 +37,6 @@ export type ParseWithDiagnosticsResult<T> = {
 
 type DiagnosticError = Error & {diagnostic: configValidationDiagnostic};
 type FieldValidator = (value: Record<string, unknown>, field: string) => DiagnosticError | null;
-type SchemaIssue = {
-  path?: unknown;
-  message?: unknown;
-};
 
 const rootPath = '/';
 const schemaFallbackFix = 'Update the JSON structure to match the expected config schema.';
@@ -165,13 +161,14 @@ const toSchemaDiagnostic = (error: Error, context: SchemaDiagnosticContext): con
   }
 
   const issues = (error as {issues?: unknown}).issues;
-  if (Array.isArray(issues) && issues.length > 0) {
-    const firstIssue = issues[0] as SchemaIssue;
+  const firstIssue = Array.isArray(issues) && issues.length > 0 ? issues[0] : undefined;
+  if (firstIssue && isRecord(firstIssue)) {
+    const issuePath = 'path' in firstIssue ? firstIssue.path : undefined;
+    const issueMessage = 'message' in firstIssue ? firstIssue.message : undefined;
     return withHints(
       {
-        path: getIssuePath(firstIssue.path),
-        message:
-          typeof firstIssue.message === 'string' ? firstIssue.message : `Invalid ${context.itemType} schema shape.`,
+        path: getIssuePath(issuePath),
+        message: typeof issueMessage === 'string' ? issueMessage : `Invalid ${context.itemType} schema shape.`,
         suggestedFix: schemaFallbackFix
       },
       context.diagnosticHints

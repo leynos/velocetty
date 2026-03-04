@@ -7,6 +7,7 @@ import {cfgPath} from '../config/paths';
 import {isRecord} from '../config/json5-config';
 import {
   applyPluginSettingsPatches,
+  pluginId as toPluginId,
   parseConfigJson5Strict,
   type PluginPersistencePatch
 } from './plugin-runtime-json5-roundtrip';
@@ -148,7 +149,7 @@ export const ensureRuntimePluginSettingsPersisted = (
       const merged = merge({}, manifest.settingsDefaults, existing) as RuntimePluginSettings;
       if (!isEqual(existing, merged)) {
         namespace[manifest.id] = merged;
-        patches.push({pluginId: {value: manifest.id}, settings: merged});
+        patches.push({pluginId: toPluginId(manifest.id), settings: merged});
       }
     });
 
@@ -201,7 +202,7 @@ export const setRuntimePluginEnabledPersisted = (
     if (!isEqual(existing, merged)) {
       namespace[pluginId] = merged;
       const patchedContent = applyPluginSettingsPatches(rawConfigText, [
-        {pluginId: {value: pluginId}, settings: merged}
+        {pluginId: toPluginId(pluginId), settings: merged}
       ]);
       if (!patchedContent) {
         console.error(

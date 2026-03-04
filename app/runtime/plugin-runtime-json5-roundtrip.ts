@@ -10,17 +10,21 @@ type RuntimePluginSettings = Record<string, unknown>;
 /** Represents a JSON5 object property key with validation semantics. */
 export type PropertyKey = {
   readonly value: string;
-};
+} & {readonly __brand: 'PropertyKey'};
 
 /** Represents a plugin identifier. */
 export type PluginId = {
   readonly value: string;
-};
+} & {readonly __brand: 'PluginId'};
 
 /** Represents a path through nested JSON5 objects. */
 export type PropertyPath = {
   readonly segments: readonly PropertyKey[];
-};
+} & {readonly __brand: 'PropertyPath'};
+
+export const propertyKey = (value: string): PropertyKey => ({value}) as PropertyKey;
+export const pluginId = (value: string): PluginId => ({value}) as PluginId;
+export const propertyPath = (segments: readonly PropertyKey[]): PropertyPath => ({segments}) as PropertyPath;
 
 export type PluginPersistencePatch = {
   pluginId: PluginId;
@@ -159,11 +163,11 @@ const ensureObjectPath = (raw: string, path: PropertyPath): string | null => {
 
   let nextRaw = raw;
   for (let depth = 1; depth <= path.segments.length; depth += 1) {
-    const currentPath: PropertyPath = {segments: path.segments.slice(0, depth)};
+    const currentPath = propertyPath(path.segments.slice(0, depth));
     if (getObjectRangeByPath(nextRaw, currentPath)) {
       continue;
     }
-    const parentPath: PropertyPath = {segments: path.segments.slice(0, depth - 1)};
+    const parentPath = propertyPath(path.segments.slice(0, depth - 1));
     const parentRange = getObjectRangeByPath(nextRaw, parentPath);
     if (!parentRange) {
       return null;
@@ -183,20 +187,20 @@ const ensureObjectPath = (raw: string, path: PropertyPath): string | null => {
 };
 
 const applyPluginSettingsPatch = (raw: string, patch: PluginPersistencePatch): string | null => {
-  let nextRaw = ensureObjectPath(raw, {segments: [{value: 'config'}]});
+  let nextRaw = ensureObjectPath(raw, propertyPath([propertyKey('config')]));
   if (!nextRaw) {
     return null;
   }
-  nextRaw = ensureObjectPath(nextRaw, {segments: [{value: 'config'}, {value: 'plugins'}]});
+  nextRaw = ensureObjectPath(nextRaw, propertyPath([propertyKey('config'), propertyKey('plugins')]));
   if (!nextRaw) {
     return null;
   }
 
-  const pluginsRange = getObjectRangeByPath(nextRaw, {segments: [{value: 'config'}, {value: 'plugins'}]});
+  const pluginsRange = getObjectRangeByPath(nextRaw, propertyPath([propertyKey('config'), propertyKey('plugins')]));
   if (!pluginsRange) {
     return null;
   }
-  return upsertObjectProperty(nextRaw, pluginsRange, patch.pluginId, patch.settings);
+  return upsertObjectProperty(nextRaw, pluginsRange, propertyKey(patch.pluginId.value), patch.settings);
 };
 
 export const applyPluginSettingsPatches = (raw: string, patches: readonly PluginPersistencePatch[]): string | null => {
