@@ -114,32 +114,43 @@ const notifyWithPrimaryDiagnostic = (baseMessage: string, diagnostics: configVal
  *
  * Returns parsed payload plus structured diagnostics when fallback is used.
  */
-const parseRawConfig = (source: ConfigSource) => {
-  return parseJson5WithSchemaDiagnostics({
+type ConfigParseOptions<T> = {
+  readonly schema: ParseSchema<T>;
+  readonly fallback: T;
+  readonly itemType: string;
+  readonly diagnosticHints: Record<string, {docHint?: string; defaultHint?: string}>;
+};
+
+const parseConfigSource = <T>(source: ConfigSource, options: ConfigParseOptions<T>) =>
+  parseJson5WithSchemaDiagnostics({
     raw: source.rawContent,
     source: source.filePath.path,
+    schema: options.schema,
+    fallback: options.fallback,
+    itemType: options.itemType,
+    diagnosticHints: options.diagnosticHints
+  });
+
+const parseRawConfig = (source: ConfigSource) =>
+  parseConfigSource(source, {
     schema: rawConfigSchema,
     fallback: null,
     itemType: 'config',
     diagnosticHints: rawConfigDiagnosticHints
   });
-};
 
 /**
  * Parses JSON5 keymap text and validates that each entry is a string or string array.
  *
  * Returns parsed keymaps plus diagnostics when fallback is used.
  */
-const parseKeymapConfig = (source: ConfigSource) => {
-  return parseJson5WithSchemaDiagnostics({
-    raw: source.rawContent,
-    source: source.filePath.path,
+const parseKeymapConfig = (source: ConfigSource) =>
+  parseConfigSource(source, {
     schema: keymapSchema,
     fallback: {},
     itemType: 'keymap',
     diagnosticHints: keymapDiagnosticHints
   });
-};
 
 /** Serializes config using deterministic JSON5 formatting for stable snapshots. */
 const stringifyConfig = (config: rawConfig): string => stringifyJson5(config);
