@@ -203,18 +203,25 @@ const extractErrorMessage = (error: unknown, context: ErrorMessageContext): stri
   return `Failed to parse JSON5 ${context.itemType} from ${context.source}.`;
 };
 
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+const getFiniteNumberProperty = (record: Record<string, unknown>, property: string): number | null => {
+  const value = record[property];
+  return isFiniteNumber(value) ? value : null;
+};
+
 const extractLineNumber = (error: unknown): number | null => {
-  if (isRecord(error) && typeof error.lineNumber === 'number' && Number.isFinite(error.lineNumber)) {
-    return error.lineNumber;
+  if (!isRecord(error)) {
+    return null;
   }
-  return null;
+  return getFiniteNumberProperty(error, 'lineNumber');
 };
 
 const extractColumnNumber = (error: unknown): number | null => {
-  if (isRecord(error) && typeof error.columnNumber === 'number' && Number.isFinite(error.columnNumber)) {
-    return error.columnNumber;
+  if (!isRecord(error)) {
+    return null;
   }
-  return null;
+  return getFiniteNumberProperty(error, 'columnNumber');
 };
 
 const buildDiagnosticPath = (source: string, lineNumber: number | null, columnNumber: number | null): string => {
