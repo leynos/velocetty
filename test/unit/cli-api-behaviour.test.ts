@@ -77,6 +77,13 @@ const loadCliApi = async () => {
 
 const originalNodeEnv = process.env.NODE_ENV;
 const originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
+const restoreEnvVar = (key: 'NODE_ENV' | 'XDG_CONFIG_HOME', value: string | undefined): void => {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+  process.env[key] = value;
+};
 
 beforeEach(() => {
   configData = {plugins: [], localPlugins: []};
@@ -89,13 +96,13 @@ beforeEach(() => {
   fsReadFileSyncValue = undefined;
   fsReadFileSyncCallCount = 0;
   existingPaths = null;
-  process.env.NODE_ENV = originalNodeEnv;
-  process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
+  restoreEnvVar('NODE_ENV', originalNodeEnv);
+  restoreEnvVar('XDG_CONFIG_HOME', originalXdgConfigHome);
 });
 
 afterAll(() => {
-  process.env.NODE_ENV = originalNodeEnv;
-  process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
+  restoreEnvVar('NODE_ENV', originalNodeEnv);
+  restoreEnvVar('XDG_CONFIG_HOME', originalXdgConfigHome);
 });
 
 test('list() and isInstalled() read configured plugin state', async () => {
