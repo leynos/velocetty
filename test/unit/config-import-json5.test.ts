@@ -79,6 +79,42 @@ const loadConfigImport = async () => {
   return await import(`../../app/config/import.ts?json5_config_case=${importCounter}`);
 };
 
+const sharedDefaultConfigFixture = `{
+  config: { defaultProfile: 'default', profiles: [{ name: 'default', config: {} }] },
+  plugins: [],
+  localPlugins: [],
+  keymaps: {}
+}`;
+
+type DiagnosticFallbackTestOptions = {
+  userConfigContent: string;
+  assertNotification: (message: string) => void;
+  assertPrimaryDiagnostic: (diagnostics: Array<Record<string, unknown>>) => void;
+};
+
+const runDiagnosticFallbackTest = async (options: DiagnosticFallbackTestOptions): Promise<void> => {
+  mkdirpSync(mockPaths.cfgDir);
+  writeFileSync(mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
+  writeFileSync(mockPaths.defaultPlatformKeyPath(), `{"window:new": ["ctrl+n"]}`, 'utf8');
+  writeFileSync(mockPaths.cfgPath, options.userConfigContent, 'utf8');
+  writeFileSync(mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+
+  const configModule = await loadConfigImport();
+  const importedConfig = configModule._import();
+
+  expect(notifyMock).toHaveBeenCalledTimes(1);
+  options.assertNotification(notifyMock.mock.calls[0]?.[0] as string);
+  expect(notifyMock.mock.calls[0]?.[0]).toContain('Suggested fix:');
+
+  const diagnosticsPayload = findDiagnosticsPayload();
+  const diagnostics = diagnosticsPayload.diagnostics.map((d) => ensureObject(d));
+  options.assertPrimaryDiagnostic(diagnostics);
+
+  const expectedFallbackConfig = JSON5.parse(sharedDefaultConfigFixture) as Record<string, unknown>;
+  expectedFallbackConfig.keymaps = {'window:new': ['ctrl+n']};
+  expect(importedConfig.userCfg).toEqual(expectedFallbackConfig);
+};
+
 beforeEach(() => {
   resetWorkspace();
   notifyMock.mockClear();
@@ -98,95 +134,53 @@ afterAll(() => {
 });
 
 test.serial('notifies and falls back to default config on invalid JSON5 user config', async () => {
-  mkdirpSync(mockPaths.cfgDir);
-  const defaultConfigFixture = `{
-    config: { defaultProfile: 'default', profiles: [{ name: 'default', config: {} }] },
-    plugins: [],
-    localPlugins: [],
-    keymaps: {}
-  }`;
-  writeFileSync(mockPaths.defaultCfg, defaultConfigFixture, 'utf8');
-  writeFileSync(mockPaths.defaultPlatformKeyPath(), `{"window:new": ["ctrl+n"]}`, 'utf8');
-  writeFileSync(
-    mockPaths.cfgPath,
-    `{
+  await runDiagnosticFallbackTest({
+    userConfigContent: `{
       config: { defaultProfile: 'broken' profiles: [{ name: 'broken', config: {} }] },
       plugins: [],
     }`,
-    'utf8'
-  );
-  writeFileSync(mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
-
-  const configModule = await loadConfigImport();
-  const importedConfig = configModule._import();
-
-  expect(notifyMock).toHaveBeenCalledTimes(1);
-  expect(notifyMock.mock.calls[0]?.[0]).toContain(mockPaths.cfgPath);
-  expect(notifyMock.mock.calls[0]?.[0]).toContain('Suggested fix:');
-
-  const diagnosticsPayload = findDiagnosticsPayload();
-  const diagnostics = diagnosticsPayload.diagnostics.map((diagnostic) => ensureObject(diagnostic));
-  const primaryDiagnostic = diagnostics.find((diagnostic) => {
-    const path = typeof diagnostic.path === 'string' ? diagnostic.path : '';
-    const message = typeof diagnostic.message === 'string' ? diagnostic.message : '';
-    return path.includes(mockPaths.cfgPath) && message.includes('JSON5');
+    assertNotification: (message) => {
+      expect(message).toContain(mockPaths.cfgPath);
+    },
+    assertPrimaryDiagnostic: (diagnostics) => {
+      const primaryDiagnostic = diagnostics.find((d) => {
+        const path = typeof d.path === 'string' ? d.path : '';
+        const message = typeof d.message === 'string' ? d.message : '';
+        return path.includes(mockPaths.cfgPath) && message.includes('JSON5');
+      });
+      if (!primaryDiagnostic) {
+        throw new Error('Expected parse diagnostic for config file path.');
+      }
+      expect(primaryDiagnostic.path).toContain(mockPaths.cfgPath);
+      expect(primaryDiagnostic.message).toContain('JSON5');
+      expect(primaryDiagnostic.suggestedFix).toContain('Fix');
+    }
   });
-  if (!primaryDiagnostic) {
-    throw new Error('Expected parse diagnostic for config file path.');
-  }
-  expect(primaryDiagnostic.path).toContain(mockPaths.cfgPath);
-  expect(primaryDiagnostic.message).toContain('JSON5');
-  expect(primaryDiagnostic.suggestedFix).toContain('Fix');
-
-  const expectedFallbackConfig = JSON5.parse(defaultConfigFixture) as Record<string, unknown>;
-  expectedFallbackConfig.keymaps = {'window:new': ['ctrl+n']};
-  expect(importedConfig.userCfg).toEqual(expectedFallbackConfig);
 });
 
 test.serial('reports schema validation diagnostics with doc and default hints', async () => {
-  mkdirpSync(mockPaths.cfgDir);
-  const defaultConfigFixture = `{
-    config: { defaultProfile: 'default', profiles: [{ name: 'default', config: {} }] },
-    plugins: [],
-    localPlugins: [],
-    keymaps: {}
-  }`;
-  writeFileSync(mockPaths.defaultCfg, defaultConfigFixture, 'utf8');
-  writeFileSync(mockPaths.defaultPlatformKeyPath(), `{"window:new": ["ctrl+n"]}`, 'utf8');
-  writeFileSync(
-    mockPaths.cfgPath,
-    `{
+  await runDiagnosticFallbackTest({
+    userConfigContent: `{
       config: { defaultProfile: 'broken', profiles: [{ name: 'broken', config: {} }] },
       plugins: { not: 'an-array' },
       localPlugins: [],
       keymaps: {}
     }`,
-    'utf8'
-  );
-  writeFileSync(mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
-
-  const configModule = await loadConfigImport();
-  const importedConfig = configModule._import();
-
-  expect(notifyMock).toHaveBeenCalledTimes(1);
-  expect(notifyMock.mock.calls[0]?.[0]).toContain('/plugins');
-  expect(notifyMock.mock.calls[0]?.[0]).toContain('Suggested fix:');
-
-  const diagnosticsPayload = findDiagnosticsPayload();
-  const diagnostics = diagnosticsPayload.diagnostics.map((diagnostic) => ensureObject(diagnostic));
-  const primaryDiagnostic = diagnostics.find((diagnostic) => diagnostic.path === '/plugins');
-  if (!primaryDiagnostic) {
-    throw new Error('Expected schema diagnostic for /plugins.');
-  }
-  expect(primaryDiagnostic.path).toBe('/plugins');
-  expect(primaryDiagnostic.message).toContain('array of strings');
-  expect(primaryDiagnostic.suggestedFix).toContain('array of plugin');
-  expect(primaryDiagnostic.defaultHint).toBe('[]');
-  expect(primaryDiagnostic.docHint).toContain('plugins');
-
-  const expectedFallbackConfig = JSON5.parse(defaultConfigFixture) as Record<string, unknown>;
-  expectedFallbackConfig.keymaps = {'window:new': ['ctrl+n']};
-  expect(importedConfig.userCfg).toEqual(expectedFallbackConfig);
+    assertNotification: (message) => {
+      expect(message).toContain('/plugins');
+    },
+    assertPrimaryDiagnostic: (diagnostics) => {
+      const primaryDiagnostic = diagnostics.find((d) => d.path === '/plugins');
+      if (!primaryDiagnostic) {
+        throw new Error('Expected schema diagnostic for /plugins.');
+      }
+      expect(primaryDiagnostic.path).toBe('/plugins');
+      expect(primaryDiagnostic.message).toContain('array of strings');
+      expect(primaryDiagnostic.suggestedFix).toContain('array of plugin');
+      expect(primaryDiagnostic.defaultHint).toBe('[]');
+      expect(primaryDiagnostic.docHint).toContain('plugins');
+    }
+  });
 });
 
 test.serial('imports user config with JSON5 comments and trailing commas', async () => {
