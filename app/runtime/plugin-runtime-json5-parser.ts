@@ -66,7 +66,12 @@ export type PropertyKey = {
   readonly value: string;
 } & {readonly __brand: 'PropertyKey'};
 
-/** `propertyKey` constructs a branded `PropertyKey` from a raw key string. */
+/**
+ * `propertyKey` constructs a `PropertyKey` from a raw key string.
+ *
+ * @param value String key value to wrap.
+ * @returns A `PropertyKey` wrapper object containing the provided `value`.
+ */
 export const propertyKey = (value: string): PropertyKey => ({value}) as PropertyKey;
 const toKeyString = (key: PropertyKey | string): string => (typeof key === 'string' ? key : key.value);
 
