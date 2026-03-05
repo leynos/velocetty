@@ -90,6 +90,11 @@ type LexicalCharContext = {
   readonly next: string | undefined;
   readonly index: number;
 };
+type ValueEndPredicateContext = {
+  readonly char: CharacterContext;
+  readonly end: ValueEndContext;
+  readonly delimiter: {readonly foundClose: boolean};
+};
 type CharacterContext = {
   readonly current: string;
   readonly next: string | undefined;
@@ -462,16 +467,11 @@ export class Json5Parser {
     };
   }
 
-  private isUnmatchedBraceInArray(
-    ctx: CharacterContext,
-    state: ParsingState,
-    bracketDepth: number,
-    foundClose: boolean
-  ): boolean {
-    const isClosingBrace = ctx.current === '}';
-    const inArray = bracketDepth > 0;
-    const atObjectTopLevel = state.depth === 0;
-    return isClosingBrace && inArray && atObjectTopLevel && !foundClose;
+  private isUnmatchedBraceInArrayCtx(c: ValueEndPredicateContext): boolean {
+    const isClosingBrace = c.char.current === '}';
+    const inArray = c.end.bracketDepth > 0;
+    const atObjectTopLevel = c.end.state.depth === 0;
+    return isClosingBrace && inArray && atObjectTopLevel && !c.delimiter.foundClose;
   }
 
   private processValueEndCharacter(
@@ -511,7 +511,12 @@ export class Json5Parser {
     }
 
     const delimiterResult = processDelimitersAndComments(state, ctx.current, ctx.next ?? '');
-    if (this.isUnmatchedBraceInArray(ctx, state, bracketDepth, delimiterResult.foundClose)) {
+    const checkCtx: ValueEndPredicateContext = {
+      char: ctx,
+      end: {state, bracketDepth},
+      delimiter: {foundClose: delimiterResult.foundClose}
+    };
+    if (this.isUnmatchedBraceInArrayCtx(checkCtx)) {
       return {
         state,
         nextIndex: ctx.index,
