@@ -84,6 +84,12 @@ type ValueEndContext = {
   readonly state: ParsingState;
   readonly bracketDepth: number;
 };
+type LexicalCharContext = {
+  readonly context: ValueEndContext;
+  readonly current: string;
+  readonly next: string | undefined;
+  readonly index: number;
+};
 type CharacterContext = {
   readonly current: string;
   readonly next: string | undefined;
@@ -537,12 +543,12 @@ export class Json5Parser {
     return this.hasBalancedDepth(context) && this.isRootLexicalState(context.state);
   }
 
-  private advanceActiveLexicalState(
-    context: ValueEndContext,
-    current: string,
-    next: string | undefined,
-    index: number
-  ): {advanced: true; context: ValueEndContext; nextIndex: number} | {advanced: false} {
+  private advanceActiveLexicalState({
+    context,
+    current,
+    next,
+    index
+  }: LexicalCharContext): {advanced: true; context: ValueEndContext; nextIndex: number} | {advanced: false} {
     if (context.state.inLineComment) {
       return {
         advanced: true,
@@ -589,7 +595,7 @@ export class Json5Parser {
       const current = this.raw[index];
       const next = this.raw[index + 1];
 
-      const step = this.advanceActiveLexicalState(context, current, next, index);
+      const step = this.advanceActiveLexicalState({context, current, next, index});
       if (step.advanced) {
         context = step.context;
         index = step.nextIndex;
@@ -823,7 +829,7 @@ export class Json5Parser {
       return null;
     }
     const closeBraceIndex = this.findMatchingClosingBrace({index: valueStart});
-    if (closeBraceIndex === -1) {
+    if (closeBraceIndex === -1 || closeBraceIndex > property.valueEndIndex) {
       return null;
     }
     return {openBraceIndex: valueStart, closeBraceIndex};
