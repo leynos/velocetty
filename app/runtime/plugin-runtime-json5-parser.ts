@@ -99,6 +99,7 @@ type Step<T> = {success: true; value: T} | {success: false};
 
 const parserFailureSentinel = -1;
 const unicodeSpaceSeparatorPattern = /^\p{Zs}$/u;
+const NON_VALUE_START_CHARS = new Set([',', '}', ']']);
 
 const isWhitespaceCharacter = (character: string): boolean =>
   character === ' ' ||
@@ -579,11 +580,13 @@ export class Json5Parser {
     if (valueStartIndex === parserFailureSentinel || valueStartIndex >= range.limitIndex) {
       return {success: false};
     }
-    const valueStartCharacter = this.raw[valueStartIndex];
-    if (valueStartCharacter === ',' || valueStartCharacter === '}' || valueStartCharacter === ']') {
-      return {success: false};
-    }
+    const ch = this.raw[valueStartIndex];
+    if (this.isInvalidValueStart(ch)) return {success: false};
     return {success: true, value: valueStartIndex};
+  }
+
+  private isInvalidValueStart(ch: string): boolean {
+    return NON_VALUE_START_CHARS.has(ch);
   }
 
   private computeValueEndIndex(valueRange: ParseRange): Step<number> {
