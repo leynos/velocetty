@@ -117,6 +117,13 @@ type Step<T> = {success: true; value: T} | {success: false};
 const parserFailureSentinel = -1;
 const unicodeSpaceSeparatorPattern = /^\p{Zs}$/u;
 const NON_VALUE_START_CHARS = new Set([',', '}', ']']);
+const createInitialParsingState = (): ParsingState => ({
+  depth: 0,
+  inString: null,
+  isEscaped: false,
+  inLineComment: false,
+  inBlockComment: false
+});
 
 const isWhitespaceCharacter = (character: string): boolean =>
   character === ' ' ||
@@ -395,13 +402,7 @@ export class Json5Parser {
       return -1;
     }
 
-    let state: ParsingState = {
-      depth: 0,
-      inString: null,
-      isEscaped: false,
-      inLineComment: false,
-      inBlockComment: false
-    };
+    let state = createInitialParsingState();
 
     for (let index = cursor.index; index < this.raw.length; index += 1) {
       const current = this.raw[index];
@@ -586,13 +587,7 @@ export class Json5Parser {
 
   private findPropertyValueEnd(range: ParseRange): number {
     let context: ValueEndContext = {
-      state: {
-        depth: 0,
-        inString: null,
-        isEscaped: false,
-        inLineComment: false,
-        inBlockComment: false
-      },
+      state: createInitialParsingState(),
       bracketDepth: 0
     };
 
