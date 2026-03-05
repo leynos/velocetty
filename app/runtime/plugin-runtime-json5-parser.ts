@@ -444,6 +444,18 @@ export class Json5Parser {
     };
   }
 
+  private isUnmatchedBraceInArray(
+    ctx: CharacterContext,
+    state: ParsingState,
+    bracketDepth: number,
+    foundClose: boolean
+  ): boolean {
+    const isClosingBrace = ctx.current === '}';
+    const inArray = bracketDepth > 0;
+    const atObjectTopLevel = state.depth === 0;
+    return isClosingBrace && inArray && atObjectTopLevel && !foundClose;
+  }
+
   private processValueEndCharacter(
     ctx: CharacterContext,
     state: ParsingState,
@@ -481,7 +493,7 @@ export class Json5Parser {
     }
 
     const delimiterResult = processDelimitersAndComments(state, ctx.current, ctx.next ?? '');
-    if (ctx.current === '}' && bracketDepth > 0 && state.depth === 0 && !delimiterResult.foundClose) {
+    if (this.isUnmatchedBraceInArray(ctx, state, bracketDepth, delimiterResult.foundClose)) {
       return {
         state,
         nextIndex: ctx.index,
