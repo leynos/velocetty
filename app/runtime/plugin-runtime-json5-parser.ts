@@ -175,6 +175,9 @@ export class Json5Parser {
 
   /** Returns the index of the start of the line that contains `cursor.index`. */
   public getLineStartIndex(cursor: IndexCursor): number {
+    if (cursor.index === 0) {
+      return 0;
+    }
     for (let index = Math.max(0, cursor.index - 1); index >= 0; index -= 1) {
       if (isLineTerminator(this.raw[index])) {
         return index + 1;
@@ -574,6 +577,10 @@ export class Json5Parser {
   private readValueStartIndexAfterColon(range: ParseRange, colonIndex: number): Step<number> {
     const valueStartIndex = this.skipWhitespaceAndComments({startIndex: colonIndex + 1, limitIndex: range.limitIndex});
     if (valueStartIndex === parserFailureSentinel || valueStartIndex >= range.limitIndex) {
+      return {success: false};
+    }
+    const valueStartCharacter = this.raw[valueStartIndex];
+    if (valueStartCharacter === ',' || valueStartCharacter === '}' || valueStartCharacter === ']') {
       return {success: false};
     }
     return {success: true, value: valueStartIndex};

@@ -49,6 +49,32 @@ test('parseObjectProperties fails on unmatched closing bracket in a property val
   expect(parser.parseObjectProperties(rootRange)).toBeNull();
 });
 
+test('parseObjectProperties fails when a property value is missing before the next key', () => {
+  const raw = `{a:, b:1}`;
+  const parser = new Json5Parser(raw);
+  const rootRange = parser.findRootObjectRange();
+
+  expect(rootRange).not.toBeNull();
+  if (!rootRange) {
+    return;
+  }
+
+  expect(parser.parseObjectProperties(rootRange)).toBeNull();
+});
+
+test('parseObjectProperties fails when a property value is missing before a trailing comma', () => {
+  const raw = `{a:,}`;
+  const parser = new Json5Parser(raw);
+  const rootRange = parser.findRootObjectRange();
+
+  expect(rootRange).not.toBeNull();
+  if (!rootRange) {
+    return;
+  }
+
+  expect(parser.parseObjectProperties(rootRange)).toBeNull();
+});
+
 test('parseObjectProperties decodes unicode escapes in unquoted keys', () => {
   const raw = String.raw`{\u0061: 1, \u03c0Plugin: 2}`;
   const parser = new Json5Parser(raw);
