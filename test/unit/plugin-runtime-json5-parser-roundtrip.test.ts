@@ -2,8 +2,37 @@
 import {expect, test} from 'bun:test';
 import JSON5 from 'json5';
 
-import {Json5Parser} from '../../app/runtime/plugin-runtime-json5-parser';
+import {type Json5ObjectRange, Json5Parser} from '../../app/runtime/plugin-runtime-json5-parser';
 import {applyPluginSettingsPatches, json5Document, pluginId} from '../../app/runtime/plugin-runtime-json5-roundtrip';
+
+const rootOf = (raw: string): {parser: Json5Parser; root: Json5ObjectRange} => {
+  const parser = new Json5Parser(raw);
+  const root = parser.findRootObjectRange();
+
+  expect(root).not.toBeNull();
+  if (!root) {
+    throw new Error('Expected root object range to be present.');
+  }
+
+  return {parser, root};
+};
+
+const expectPropsToFail = (raw: string): void => {
+  const {parser, root} = rootOf(raw);
+  expect(parser.parseObjectProperties(root)).toBeNull();
+};
+
+const expectParsedKeys = (raw: string, expectedKeys: string[]): void => {
+  const {parser, root} = rootOf(raw);
+  const properties = parser.parseObjectProperties(root);
+
+  expect(properties).not.toBeNull();
+  if (!properties) {
+    throw new Error('Expected properties to parse successfully.');
+  }
+
+  expect(properties.map((property) => property.key)).toEqual(expectedKeys);
+};
 
 const json5LineTerminators = ['\n', '\r', '\u2028', '\u2029'] as const;
 
@@ -36,71 +65,35 @@ test('getLineStartIndex handles JSON5 line terminators and CRLF', () => {
   }
 });
 
-test('parseObjectProperties fails on unmatched closing bracket in a property value', () => {
-  const raw = `{a: ]}`;
-  const parser = new Json5Parser(raw);
-  const rootRange = parser.findRootObjectRange();
+const failureCases = [
+  {name: 'fails on unmatched closing bracket in a property value', raw: `{a: ]}`},
+  {name: 'fails when a property value is missing before the next key', raw: `{a: , b: 1}`},
+  {name: 'fails when a property value is missing before a trailing comma', raw: `{a: ,}`}
+] as const;
 
-  expect(rootRange).not.toBeNull();
-  if (!rootRange) {
-    return;
-  }
-
-  expect(parser.parseObjectProperties(rootRange)).toBeNull();
+failureCases.forEach(({name, raw}) => {
+  test(`parseObjectProperties ${name}`, () => {
+    expectPropsToFail(raw);
+  });
 });
 
-test('parseObjectProperties fails when a property value is missing before the next key', () => {
-  const raw = `{a:, b:1}`;
-  const parser = new Json5Parser(raw);
-  const rootRange = parser.findRootObjectRange();
-
-  expect(rootRange).not.toBeNull();
-  if (!rootRange) {
-    return;
+const successCases = [
+  {
+    name: 'decodes unicode escapes in unquoted keys',
+    raw: `{\\u0061: 1, \\u03c0Plugin: 2}`,
+    expectedKeys: ['a', 'πPlugin']
+  },
+  {
+    name: 'decodes bracketed unicode escapes in unquoted keys',
+    raw: `{\\u{0061}: 1, \\u{03c0}Plugin: 2}`,
+    expectedKeys: ['a', 'πPlugin']
   }
+] as const;
 
-  expect(parser.parseObjectProperties(rootRange)).toBeNull();
-});
-
-test('parseObjectProperties fails when a property value is missing before a trailing comma', () => {
-  const raw = `{a:,}`;
-  const parser = new Json5Parser(raw);
-  const rootRange = parser.findRootObjectRange();
-
-  expect(rootRange).not.toBeNull();
-  if (!rootRange) {
-    return;
-  }
-
-  expect(parser.parseObjectProperties(rootRange)).toBeNull();
-});
-
-test('parseObjectProperties decodes unicode escapes in unquoted keys', () => {
-  const raw = String.raw`{\u0061: 1, \u03c0Plugin: 2}`;
-  const parser = new Json5Parser(raw);
-  const rootRange = parser.findRootObjectRange();
-
-  expect(rootRange).not.toBeNull();
-  if (!rootRange) {
-    return;
-  }
-
-  const properties = parser.parseObjectProperties(rootRange);
-  expect(properties?.map((property) => property.key)).toEqual(['a', 'πPlugin']);
-});
-
-test('parseObjectProperties decodes bracketed unicode escapes in unquoted keys', () => {
-  const raw = String.raw`{\u{0061}: 1, \u{03c0}Plugin: 2}`;
-  const parser = new Json5Parser(raw);
-  const rootRange = parser.findRootObjectRange();
-
-  expect(rootRange).not.toBeNull();
-  if (!rootRange) {
-    return;
-  }
-
-  const properties = parser.parseObjectProperties(rootRange);
-  expect(properties?.map((property) => property.key)).toEqual(['a', 'πPlugin']);
+successCases.forEach(({name, raw, expectedKeys}) => {
+  test(`parseObjectProperties ${name}`, () => {
+    expectParsedKeys(raw, [...expectedKeys]);
+  });
 });
 
 test('applyPluginSettingsPatches writes Unicode identifier keys without forcing quotes', () => {
