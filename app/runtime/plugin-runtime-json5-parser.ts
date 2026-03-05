@@ -474,9 +474,18 @@ export class Json5Parser {
       };
     }
 
-    const applied = this.applyBlockCommentResult(processDelimitersAndComments(state, ctx.current, ctx.next ?? ''), {
-      index: ctx.index
-    });
+    const delimiterResult = processDelimitersAndComments(state, ctx.current, ctx.next ?? '');
+    if (ctx.current === '}' && bracketDepth > 0 && state.depth === 0 && !delimiterResult.foundClose) {
+      return {
+        state,
+        nextIndex: ctx.index,
+        bracketDepth,
+        shouldTerminate: false,
+        isInvalid: true
+      };
+    }
+
+    const applied = this.applyBlockCommentResult(delimiterResult, {index: ctx.index});
     return {
       state: applied.state,
       nextIndex: applied.nextIndex,
