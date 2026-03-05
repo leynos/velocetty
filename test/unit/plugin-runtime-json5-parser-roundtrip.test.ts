@@ -63,6 +63,20 @@ test('parseObjectProperties decodes unicode escapes in unquoted keys', () => {
   expect(properties?.map((property) => property.key)).toEqual(['a', 'πPlugin']);
 });
 
+test('parseObjectProperties decodes bracketed unicode escapes in unquoted keys', () => {
+  const raw = String.raw`{\u{0061}: 1, \u{03c0}Plugin: 2}`;
+  const parser = new Json5Parser(raw);
+  const rootRange = parser.findRootObjectRange();
+
+  expect(rootRange).not.toBeNull();
+  if (!rootRange) {
+    return;
+  }
+
+  const properties = parser.parseObjectProperties(rootRange);
+  expect(properties?.map((property) => property.key)).toEqual(['a', 'πPlugin']);
+});
+
 test('applyPluginSettingsPatches writes Unicode identifier keys without forcing quotes', () => {
   const raw = `{
   config: {

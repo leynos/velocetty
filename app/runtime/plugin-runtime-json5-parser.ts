@@ -268,12 +268,34 @@ export class Json5Parser {
     if (this.raw[cursor.index] !== '\\' || this.raw[cursor.index + 1] !== 'u') {
       return null;
     }
+
+    if (this.raw[cursor.index + 2] === '{') {
+      const hexStartIndex = cursor.index + 3;
+      const closeBraceIndex = this.raw.indexOf('}', hexStartIndex);
+      if (closeBraceIndex === -1) {
+        return null;
+      }
+      const codePointHex = this.raw.slice(hexStartIndex, closeBraceIndex);
+      if (!/^[0-9A-Fa-f]{1,6}$/.test(codePointHex)) {
+        return null;
+      }
+      const codePoint = Number.parseInt(codePointHex, 16);
+      if (codePoint > 0x10ffff) {
+        return null;
+      }
+      return {
+        character: String.fromCodePoint(codePoint),
+        nextIndex: closeBraceIndex + 1
+      };
+    }
+
     const hexStartIndex = cursor.index + 2;
     const hexEndIndex = hexStartIndex + 4;
     const codeUnit = this.raw.slice(hexStartIndex, hexEndIndex);
     if (!/^[0-9A-Fa-f]{4}$/.test(codeUnit)) {
       return null;
     }
+
     return {
       character: String.fromCodePoint(Number.parseInt(codeUnit, 16)),
       nextIndex: hexEndIndex
