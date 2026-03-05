@@ -128,9 +128,17 @@ registry APIs. Follow these rules for command-system changes:
 - Preserve compatibility surfaces used by current runtime/plugin paths
   (`registerCommandHandlers`, `getCommandHandler`, and `getRegisteredKeys`)
   until dispatcher migration milestones replace those entry points.
-- Add or update unit coverage in `test/unit/command-registry.test.ts` for
-  create, read, update, and delete (CRUD) semantics, deterministic ordering,
-  and validation error behaviour.
+- Use `detectKeybindingConflicts(...)` in `app/runtime/plugin-runtime.ts` when
+  testing exact shortcut collisions after precedence merges; the helper reports
+  deterministic conflicts for remaining duplicate shortcuts.
+- Add or update unit coverage in `test/unit/command-registry.test.ts` and
+  `test/unit/command-registry-validation.test.ts` for create, read, update, and
+  delete (CRUD) semantics, deterministic ordering, compatibility aliases,
+  invalid-schema handling, validator-cache invalidation, and validation error
+  behaviour.
+- Add or update precedence/conflict coverage in
+  `test/unit/runtime-plugin-settings.test.ts` when changing runtime keybinding
+  merge or conflict-detection behaviour.
 
 ## Configuration format practice
 
@@ -271,8 +279,9 @@ command or keybinding behaviour:
   or `null`) and avoid ad-hoc component booleans outside the context-key
   service.
 - Add or update unit coverage in `test/unit/context-key-service.test.ts` for
-  all operators, precedence/grouping, parse failure indices, and deterministic
-  repeated evaluation.
+  all operators, precedence/grouping, parse failure indices, deterministic
+  repeated evaluation, and parser edge cases such as empty expressions, stray
+  operators, identifier variants, and string-escape handling.
 
 ## esbuild build pipeline and safeguards
 
@@ -548,6 +557,21 @@ Unit tests run under Bun's built-in test runner. Use one of the following:
   report under
   `coverage/`)
 - `make coverage`
+- For roadmap item `9.1.1`, run focused coverage with:
+
+  ```bash
+  bun test --coverage \
+    test/unit/command-registry.test.ts \
+    test/unit/command-registry-validation.test.ts \
+    test/unit/context-key-service.test.ts \
+    test/unit/runtime-plugin-settings.test.ts
+  ```
+
+  Until Bun branch-threshold enforcement is wired for this repository, use the
+  current codebase target from `docs/velocetty-hyper-codebase.md` §6.6.7.2 as
+  the local pass/fail basis for touched core modules: at least 60% line
+  coverage and 50% function coverage as the Bun-reported proxy for the
+  documented 50% branch target.
 
 `make test` now executes two stages:
 

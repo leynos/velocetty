@@ -436,13 +436,13 @@ Scope notes:
 
 ### 9.1. Shared test coverage for core primitives
 
-- [ ] 9.1.1. Add unit tests for the command system and `when` evaluator.
+- [x] 9.1.1. Add unit tests for the command system and `when` evaluator.
   Requires 1.2.1 and 1.2.2. See
   [velocetty-design.md](velocetty-design.md) §Testing.
-  - [ ] Include parser edge cases and error handling.
-  - [ ] Include precedence and conflict detection tests.
-  - [ ] Success criteria: coverage for new shared modules meets the project
-    threshold, and failures are actionable.
+  - [x] Include parser edge cases and error handling.
+  - [x] Include precedence and conflict detection tests.
+  - [x] Success criteria: coverage for new shared modules meets the current
+    project threshold basis, and failures are actionable.
 
 ### 9.2. Integration and performance tests
 
