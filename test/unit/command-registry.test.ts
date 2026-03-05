@@ -33,6 +33,20 @@ let list: typeof import('../../lib/command-registry').list;
 let has: typeof import('../../lib/command-registry').has;
 let validateArgs: typeof import('../../lib/command-registry').validateArgs;
 let commandRegistry: typeof import('../../lib/command-registry').commandRegistry;
+let registerCommand: typeof import('../../lib/command-registry').registerCommand;
+let createCommand: typeof import('../../lib/command-registry').createCommand;
+let updateCommand: typeof import('../../lib/command-registry').updateCommand;
+let replaceCommand: typeof import('../../lib/command-registry').replaceCommand;
+let removeCommand: typeof import('../../lib/command-registry').removeCommand;
+let deleteCommand: typeof import('../../lib/command-registry').deleteCommand;
+let getCommand: typeof import('../../lib/command-registry').getCommand;
+let getCommandDefinition: typeof import('../../lib/command-registry').getCommandDefinition;
+let listCommands: typeof import('../../lib/command-registry').listCommands;
+let enumerateCommands: typeof import('../../lib/command-registry').enumerateCommands;
+let hasCommand: typeof import('../../lib/command-registry').hasCommand;
+let hasCommandDefinition: typeof import('../../lib/command-registry').hasCommandDefinition;
+let validateCommandArgs: typeof import('../../lib/command-registry').validateCommandArgs;
+let validateCommandArgsFor: typeof import('../../lib/command-registry').validateCommandArgsFor;
 
 const TEST_COMMAND_PREFIX = 'test:command-registry';
 const asCommandId = (value: string): CommandId => value as CommandId;
@@ -45,8 +59,10 @@ const createCommandDefinition = (commandId: string, title = commandId): CommandD
   }
 });
 
+const focusActiveTermMock = mock(() => {});
+
 beforeAll(async () => {
-  (globalThis as {window?: Record<string, unknown>}).window = {};
+  (globalThis as {window?: Record<string, unknown>}).window = {focusActiveTerm: focusActiveTermMock};
 
   ({
     getRegisteredKeys,
@@ -60,12 +76,27 @@ beforeAll(async () => {
     list,
     has,
     validateArgs,
-    commandRegistry
+    commandRegistry,
+    registerCommand,
+    createCommand,
+    updateCommand,
+    replaceCommand,
+    removeCommand,
+    deleteCommand,
+    getCommand,
+    getCommandDefinition,
+    listCommands,
+    enumerateCommands,
+    hasCommand,
+    hasCommandDefinition,
+    validateCommandArgs,
+    validateCommandArgsFor
   } = await import('../../lib/command-registry.ts?command_registry_unit'));
 });
 
 beforeEach(() => {
   invokeMock.mockClear();
+  focusActiveTermMock.mockClear();
   decoratedKeymaps = {};
   runtimeCommands = [];
 
@@ -115,6 +146,8 @@ test('getRegisteredKeys synchronizes runtime plugin command registrations', asyn
 });
 
 test('registerCommandHandlers merges new handlers into registry', () => {
+  registerCommandHandlers(undefined);
+
   const commandName = `test:command:${Date.now()}`;
   const handler = () => {};
 
@@ -124,6 +157,32 @@ test('registerCommandHandlers merges new handlers into registry', () => {
 
   expect(getCommandHandler(commandName)).toBe(handler);
   expect(getCommandHandler('editor:search-close')).toBeFunction();
+});
+
+test('compatibility aliases mirror the primary command-registry APIs', () => {
+  expect(registerCommand).toBe(register);
+  expect(createCommand).toBe(register);
+  expect(updateCommand).toBe(update);
+  expect(replaceCommand).toBe(update);
+  expect(removeCommand).toBe(remove);
+  expect(deleteCommand).toBe(remove);
+  expect(getCommand).toBe(get);
+  expect(getCommandDefinition).toBe(get);
+  expect(listCommands).toBe(list);
+  expect(enumerateCommands).toBe(list);
+  expect(hasCommand).toBe(has);
+  expect(hasCommandDefinition).toBe(has);
+  expect(validateCommandArgs).toBe(validateArgs);
+  expect(validateCommandArgsFor).toBe(validateArgs);
+});
+
+test('legacy search-close handler dispatches closeSearch and focuses the active terminal', () => {
+  const dispatch = mock(() => {});
+
+  getCommandHandler('editor:search-close')?.('event-payload', dispatch as unknown as never);
+
+  expect(dispatch).toHaveBeenCalledTimes(1);
+  expect(focusActiveTermMock).toHaveBeenCalledTimes(1);
 });
 
 test('registry CRUD supports deterministic command enumeration', () => {

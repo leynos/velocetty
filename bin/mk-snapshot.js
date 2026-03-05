@@ -17,14 +17,42 @@ const excludedModuleMatchers = [/\/node_modules\/react-redux(?:\/|$)/];
 
 const crossArchDirs = ['clang_x86_v8_arm', 'clang_x64_v8_arm64', 'win_clang_x64'];
 
+async function ensureDirectoryPath(dirPath) {
+  try {
+    const stat = await fs.promises.lstat(dirPath);
+    if (stat.isDirectory()) {
+      return dirPath;
+    }
+
+    if (stat.isSymbolicLink()) {
+      const linkTarget = await fs.promises.readlink(dirPath);
+      const resolvedTarget = path.resolve(path.dirname(dirPath), linkTarget);
+      await fs.promises.mkdir(resolvedTarget, {recursive: true});
+      return dirPath;
+    }
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+      await fs.promises.mkdir(dirPath, {recursive: true});
+      return dirPath;
+    }
+
+    throw error;
+  }
+
+  throw new Error(`Expected "${dirPath}" to be a directory path.`);
+}
+
 async function main() {
   const baseDirPath = path.resolve(__dirname, '..');
+  const cachePath = `${baseDirPath}/cache`;
+
+  await ensureDirectoryPath(cachePath);
 
   console.log('Creating a linked script..');
   const result = await electronLink({
     baseDirPath: baseDirPath,
     mainPath: `${__dirname}/snapshot-libs.js`,
-    cachePath: `${baseDirPath}/cache`,
+    cachePath,
     shouldExcludeModule: ({requiredModulePath}) => {
       if (typeof requiredModulePath !== 'string') {
         return false;
@@ -34,14 +62,14 @@ async function main() {
     }
   });
 
-  const snapshotScriptPath = `${baseDirPath}/cache/snapshot-libs.js`;
+  const snapshotScriptPath = `${cachePath}/snapshot-libs.js`;
   fs.writeFileSync(snapshotScriptPath, result.snapshotScript);
 
   // Verify if we will be able to use this in `mksnapshot`
   vm.runInNewContext(result.snapshotScript, undefined, {filename: snapshotScriptPath, displayErrors: true});
 
   const targetArch = normaliseArch(process.env.npm_config_arch || process.arch);
-  const outputBlobPath = `${baseDirPath}/cache/${targetArch}`;
+  const outputBlobPath = `${cachePath}/${targetArch}`;
   await fs.promises.mkdir(outputBlobPath, {recursive: true});
 
   if (process.platform !== 'darwin') {
