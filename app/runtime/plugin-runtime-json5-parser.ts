@@ -161,6 +161,15 @@ export class Json5Parser {
     return {kind: 'none'};
   }
 
+  /**
+   * Advances the cursor past whitespace and comment tokens.
+   *
+   * @param range Scan bounds where `startIndex` is the initial cursor and
+   * `limitIndex` is the exclusive end boundary.
+   * @returns The next non-whitespace/comment index, or
+   * `parserFailureSentinel` when an invalid token (such as an unterminated
+   * block comment) is encountered.
+   */
   public skipWhitespaceAndComments(range: ParseRange): number {
     let index = range.startIndex;
     while (index < range.limitIndex) {
@@ -279,6 +288,9 @@ export class Json5Parser {
       return null;
     }
 
+    // Intentional leniency: JSON5 (ES5.1) only requires `\uHHHH`, but this
+    // parser also accepts ES6+ `\u{XXXXX}` escapes for unquoted identifier
+    // keys. Roundtrip parser tests cover this behaviour.
     if (this.raw[cursor.index + 2] === '{') {
       const hexStartIndex = cursor.index + 3;
       const closeBraceIndex = this.raw.indexOf('}', hexStartIndex);
@@ -802,7 +814,7 @@ export class Json5Parser {
   public getObjectRangeForProperty(property: Json5ObjectProperty): Json5ObjectRange | null {
     const valueStart = this.skipWhitespaceAndComments({
       startIndex: property.valueStartIndex,
-      limitIndex: this.raw.length
+      limitIndex: property.valueEndIndex
     });
     if (valueStart === parserFailureSentinel) {
       return null;
