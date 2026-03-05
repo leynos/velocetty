@@ -66,6 +66,7 @@ export type PropertyKey = {
   readonly value: string;
 } & {readonly __brand: 'PropertyKey'};
 
+/** `propertyKey` constructs a branded `PropertyKey` from a raw key string. */
 export const propertyKey = (value: string): PropertyKey => ({value}) as PropertyKey;
 const toKeyString = (key: PropertyKey | string): string => (typeof key === 'string' ? key : key.value);
 
@@ -601,6 +602,11 @@ export class Json5Parser {
   private computeValueEndIndex(valueRange: ParseRange): Step<number> {
     const valueEndIndex = this.findPropertyValueEnd(valueRange);
     if (valueEndIndex === parserFailureSentinel) {
+      return {success: false};
+    }
+    try {
+      JSON5.parse(this.raw.slice(valueRange.startIndex, valueEndIndex));
+    } catch {
       return {success: false};
     }
     return {success: true, value: valueEndIndex};
