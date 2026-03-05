@@ -224,12 +224,12 @@ Scope notes:
 
 ### 3.1. JSON5 config loader and schema diagnostics
 
-- [ ] 3.1.1. Implement JSON5 parsing with schema validation. See
+- [x] 3.1.1. Implement JSON5 parsing with schema validation. See
   [velocetty-design.md](velocetty-design.md) §Configuration system: JSON5 and
   layering.
-  - [ ] Parse `config.json5` and surface structured validation errors.
-  - [ ] Provide defaults and schema-derived documentation strings.
-  - [ ] Success criteria: invalid config reports path, message, and suggested
+  - [x] Parse `config.json5` and surface structured validation errors.
+  - [x] Provide defaults and schema-derived documentation strings.
+  - [x] Success criteria: invalid config reports path, message, and suggested
     fix.
 - [ ] 3.1.2. Define layering rules and hot-reload semantics. See
   [velocetty-design.md](velocetty-design.md) §Layering rules.

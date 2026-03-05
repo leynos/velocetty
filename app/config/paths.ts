@@ -13,7 +13,8 @@ import {app} from 'electron';
 
 import isDev from 'electron-is-dev';
 
-const cfgFile = 'hyper.json';
+const cfgFile = 'config.json5';
+const legacyCfgFile = 'hyper.json';
 const defaultCfgFile = 'config-default.json';
 const schemaFile = 'schema.json';
 const homeDirectory = homedir();
@@ -27,21 +28,39 @@ let cfgDir = process.env.XDG_CONFIG_HOME
     : join(homeDirectory, '.config', 'Hyper');
 
 let cfgPath = join(cfgDir, cfgFile);
+const legacyCfgPath = join(cfgDir, legacyCfgFile);
 const schemaPath = resolve(__dirname, schemaFile);
 
 const devDir = resolve(__dirname, '../..');
 const devCfg = join(devDir, cfgFile);
+const devLegacyCfg = join(devDir, legacyCfgFile);
 const defaultCfg = resolve(__dirname, defaultCfgFile);
+
+const fileExists = (path: string): boolean => {
+  try {
+    statSync(path);
+    return true;
+  } catch (_err) {
+    return false;
+  }
+};
+
+if (!fileExists(cfgPath) && fileExists(legacyCfgPath)) {
+  cfgPath = legacyCfgPath;
+}
 
 if (isDev) {
   // if a local config file exists, use it
-  try {
-    statSync(devCfg);
+  if (fileExists(devCfg)) {
     cfgPath = devCfg;
     cfgDir = devDir;
     console.log('using config file:', cfgPath);
-  } catch (_err) {
-    // ignore
+  } else if (fileExists(devLegacyCfg)) {
+    cfgPath = devLegacyCfg;
+    cfgDir = devDir;
+    console.warn(
+      `using legacy config file: ${cfgPath}. Rename to "${cfgFile}" to align with JSON5 config conventions.`
+    );
   }
 }
 

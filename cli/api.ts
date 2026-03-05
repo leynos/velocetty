@@ -51,12 +51,35 @@ const applicationDirectory = process.env.XDG_CONFIG_HOME
     ? path.join(process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming'), 'Hyper')
     : path.join(os.homedir(), '.config', 'Hyper');
 
-const devConfigFileName = path.join(__dirname, `../hyper.json`);
+const configFileName = 'config.json5';
+const legacyConfigFileName = 'hyper.json';
 
-const fileName =
-  process.env.NODE_ENV !== 'production' && fs.existsSync(devConfigFileName)
-    ? devConfigFileName
-    : path.join(applicationDirectory, 'hyper.json');
+const resolveConfigPath = (): string => {
+  const devConfigFileName = path.join(__dirname, `../${configFileName}`);
+  const devLegacyConfigFileName = path.join(__dirname, `../${legacyConfigFileName}`);
+  if (process.env.NODE_ENV !== 'production') {
+    if (fs.existsSync(devConfigFileName)) {
+      return devConfigFileName;
+    }
+    if (fs.existsSync(devLegacyConfigFileName)) {
+      return devLegacyConfigFileName;
+    }
+  }
+
+  const configPath = path.join(applicationDirectory, configFileName);
+  if (fs.existsSync(configPath)) {
+    return configPath;
+  }
+
+  const legacyConfigPath = path.join(applicationDirectory, legacyConfigFileName);
+  if (fs.existsSync(legacyConfigPath)) {
+    return legacyConfigPath;
+  }
+
+  return configPath;
+};
+
+const fileName = resolveConfigPath();
 
 /**
  * We need to make sure the file reading and parsing is lazy so that failure to
@@ -104,7 +127,7 @@ const getLocalPlugins = memoize(() => {
 });
 
 function exists() {
-  return getFileContents() !== undefined;
+  return fs.existsSync(fileName);
 }
 
 function isInstalled(plugin: PluginSpecifier, locally?: boolean) {

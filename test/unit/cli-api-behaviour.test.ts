@@ -1,7 +1,9 @@
 /** @file Covers install, uninstall, and listing branches in CLI plugin APIs. */
-import {beforeEach, expect, mock, test} from 'bun:test';
+import {afterAll, beforeEach, expect, mock, test} from 'bun:test';
 
 import JSON5 from 'json5';
+import type {PathLike} from 'node:fs';
+import path from 'node:path';
 
 import {buildNodeFsModuleMock} from '../testUtils/mock-node-fs';
 
@@ -24,11 +26,21 @@ let gotVersions: unknown = ['1.0.0'];
 let fsExistsSyncResult = true;
 let fsReadFileSyncValue: unknown;
 let hasReadFileSyncOverride = false;
+let fsReadFileSyncCallCount = 0;
+let existingPaths: Set<string> | null = null;
 
 const fsMock = {
-  existsSync: () => fsExistsSyncResult,
+  existsSync: (candidatePath: PathLike) => {
+    if (existingPaths) {
+      return typeof candidatePath === 'string' && existingPaths.has(candidatePath);
+    }
+    return fsExistsSyncResult;
+  },
   // Assumes cli/api only reads the single config file under test.
-  readFileSync: () => (hasReadFileSyncOverride ? fsReadFileSyncValue : JSON.stringify(configData)),
+  readFileSync: () => {
+    fsReadFileSyncCallCount += 1;
+    return hasReadFileSyncOverride ? fsReadFileSyncValue : JSON.stringify(configData);
+  },
   writeFileSync: (_path: string, contents: string) => {
     const parsed = JSON5.parse(contents) as ConfigData;
     savedConfigs.push(parsed);
@@ -63,6 +75,16 @@ const loadCliApi = async () => {
   return await import(`../../cli/api.ts?coverage_case=${importIndex}`);
 };
 
+const originalNodeEnv = process.env.NODE_ENV;
+const originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
+const restoreEnvVar = (key: 'NODE_ENV' | 'XDG_CONFIG_HOME', value: string | undefined): void => {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+  process.env[key] = value;
+};
+
 beforeEach(() => {
   configData = {plugins: [], localPlugins: []};
   savedConfigs = [];
@@ -72,6 +94,15 @@ beforeEach(() => {
   fsExistsSyncResult = true;
   hasReadFileSyncOverride = false;
   fsReadFileSyncValue = undefined;
+  fsReadFileSyncCallCount = 0;
+  existingPaths = null;
+  restoreEnvVar('NODE_ENV', originalNodeEnv);
+  restoreEnvVar('XDG_CONFIG_HOME', originalXdgConfigHome);
+});
+
+afterAll(() => {
+  restoreEnvVar('NODE_ENV', originalNodeEnv);
+  restoreEnvVar('XDG_CONFIG_HOME', originalXdgConfigHome);
 });
 
 test('list() and isInstalled() read configured plugin state', async () => {
@@ -177,11 +208,36 @@ test('exists(), list(), and isInstalled() handle empty or malformed plugin array
   expect(malformedApi.isInstalled('plugin-x')).toBe(false);
 });
 
-test('exists() returns false when config reading yields undefined', async () => {
-  hasReadFileSyncOverride = true;
-  fsReadFileSyncValue = undefined;
+test('exists() returns false when config file is missing without reading config contents', async () => {
+  fsExistsSyncResult = false;
   const {exists} = await loadCliApi();
+
   expect(exists()).toBe(false);
+  expect(fsReadFileSyncCallCount).toBe(0);
+});
+
+test('configPath prefers config.json5 in production', async () => {
+  process.env.NODE_ENV = 'production';
+  process.env.XDG_CONFIG_HOME = '/tmp/velocetty-xdg';
+  const expectedConfigPath = path.join('/tmp/velocetty-xdg', 'Hyper', 'config.json5');
+  existingPaths = new Set([expectedConfigPath]);
+
+  const {configPath, exists} = await loadCliApi();
+
+  expect(configPath).toBe(expectedConfigPath);
+  expect(exists()).toBe(true);
+});
+
+test('configPath falls back to legacy hyper.json when config.json5 is absent', async () => {
+  process.env.NODE_ENV = 'production';
+  process.env.XDG_CONFIG_HOME = '/tmp/velocetty-xdg';
+  const legacyPath = path.join('/tmp/velocetty-xdg', 'Hyper', 'hyper.json');
+  existingPaths = new Set([legacyPath]);
+
+  const {configPath, exists} = await loadCliApi();
+
+  expect(configPath).toBe(legacyPath);
+  expect(exists()).toBe(true);
 });
 
 test('node:fs mock preserves passthrough exports required by other suites', async () => {

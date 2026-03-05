@@ -4,13 +4,14 @@ import {readFileSync, writeFileSync} from 'node:fs';
 import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
 import {cfgPath} from '../config/paths';
+import {isRecord} from '../config/json5-config';
 import {
-  isRecord,
-  parseJson5WithSchema,
-  safeParseRawConfig,
-  stringifyJson5,
-  type ParseSchema
-} from '../config/json5-config';
+  applyPluginSettingsPatches,
+  json5Document,
+  pluginId as toPluginId,
+  parseConfigJson5Strict,
+  type PluginPersistencePatch
+} from './plugin-runtime-json5-roundtrip';
 
 import type {CommandDefinition} from '@shared/types/commands';
 import type {configOptions, rawConfig} from '@shared/types/config';
@@ -55,22 +56,6 @@ const getOrInitPluginsNamespace = (cfg: rawConfig): RuntimePluginSettingsNamespa
   }
   return configSection.plugins as RuntimePluginSettingsNamespace;
 };
-
-const rawConfigSchema: ParseSchema<rawConfig> = {
-  safeParse: safeParseRawConfig
-};
-
-const parseConfigJson5 = (raw: string): rawConfig => {
-  return parseJson5WithSchema({
-    raw,
-    source: 'runtime plugin config',
-    schema: rawConfigSchema,
-    fallback: {},
-    itemType: 'config'
-  });
-};
-
-const stringifyConfigJson5 = (cfg: rawConfig): string => stringifyJson5(cfg);
 
 const resolvePersistenceOptions = (options: PersistenceOptions = {}) => {
   const {configFilePath = getDefaultConfigPath(), readFile = readFileSync, writeFile = writeFileSync} = options;
@@ -150,22 +135,34 @@ export const ensureRuntimePluginSettingsPersisted = (
 ): RuntimePluginSettingsNamespace => {
   const {configFilePath, readFile, writeFile} = resolvePersistenceOptions(options);
   try {
-    const rawConfig = parseConfigJson5(readFile(configFilePath, 'utf8'));
+    const rawConfigText = readFile(configFilePath, 'utf8');
+    const rawConfig = parseConfigJson5Strict(json5Document(rawConfigText));
+    if (!rawConfig) {
+      console.error(`Failed to parse runtime plugin config at "${configFilePath}". Returning empty namespace.`);
+      return {};
+    }
     const namespace = getOrInitPluginsNamespace(rawConfig);
 
-    let didChange = false;
+    const patches: PluginPersistencePatch[] = [];
 
     runtimePluginManifests.forEach((manifest) => {
       const existing = isRecord(namespace[manifest.id]) ? namespace[manifest.id] : {};
       const merged = merge({}, manifest.settingsDefaults, existing) as RuntimePluginSettings;
       if (!isEqual(existing, merged)) {
         namespace[manifest.id] = merged;
-        didChange = true;
+        patches.push({pluginId: toPluginId(manifest.id), settings: merged});
       }
     });
 
-    if (didChange) {
-      writeFile(configFilePath, stringifyConfigJson5(rawConfig), 'utf8');
+    if (patches.length > 0) {
+      const patchedContent = applyPluginSettingsPatches(json5Document(rawConfigText), patches);
+      if (!patchedContent) {
+        console.error(
+          `Failed to apply runtime plugin settings patch for "${configFilePath}". Skipping write to preserve user formatting.`
+        );
+      } else {
+        writeFile(configFilePath, patchedContent, 'utf8');
+      }
     }
 
     return namespace;
@@ -192,14 +189,29 @@ export const setRuntimePluginEnabledPersisted = (
   const fallbackSettings = merge({}, manifestDefaults, {enabled}) as RuntimePluginSettings;
 
   try {
-    const rawConfig = parseConfigJson5(readFile(configFilePath, 'utf8'));
+    const rawConfigText = readFile(configFilePath, 'utf8');
+    const rawConfig = parseConfigJson5Strict(json5Document(rawConfigText));
+    if (!rawConfig) {
+      console.error(`Failed to parse runtime plugin config at "${configFilePath}". Returning fallback settings.`);
+      return fallbackSettings;
+    }
+
     const namespace = getOrInitPluginsNamespace(rawConfig);
     const existing = isRecord(namespace[pluginId]) ? namespace[pluginId] : {};
     const merged = merge({}, manifestDefaults, existing, {enabled}) as RuntimePluginSettings;
 
     if (!isEqual(existing, merged)) {
       namespace[pluginId] = merged;
-      writeFile(configFilePath, stringifyConfigJson5(rawConfig), 'utf8');
+      const patchedContent = applyPluginSettingsPatches(json5Document(rawConfigText), [
+        {pluginId: toPluginId(pluginId), settings: merged}
+      ]);
+      if (!patchedContent) {
+        console.error(
+          `Failed to apply runtime plugin enabled patch for "${configFilePath}". Skipping write to preserve user formatting.`
+        );
+      } else {
+        writeFile(configFilePath, patchedContent, 'utf8');
+      }
     }
 
     return merged;

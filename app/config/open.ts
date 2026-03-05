@@ -9,10 +9,10 @@ import {cfgPath} from './paths';
 
 const getUserChoiceKey = () => {
   try {
-    // Load FileExts keys for .js files
+    // Load FileExts keys for .json5 files
     const fileExtsKeys = Registry.openKey(
       Registry.HKCU,
-      'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\.js',
+      'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\.json5',
       Registry.Access.READ
     );
     const keys = fileExtsKeys ? Registry.enumKeyNames(fileExtsKeys) : [];
@@ -21,7 +21,7 @@ const getUserChoiceKey = () => {
     // Find UserChoice key
     const userChoice = keys.find((k) => k.endsWith('UserChoice'));
     return userChoice
-      ? `Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\.js\\${userChoice}`
+      ? `Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\.json5\\${userChoice}`
       : userChoice;
   } catch (error) {
     console.error(error);
@@ -34,17 +34,19 @@ const hasDefaultSet = () => {
   if (!userChoice) return false;
 
   try {
-    // Load key values
-    const userChoiceKey = Registry.openKey(Registry.HKCU, userChoice, Registry.Access.READ)!;
-    const values: string[] = Registry.enumValueNames(userChoiceKey).map(
-      (x) => (Registry.queryValue(userChoiceKey, x) as string) || ''
-    );
-    Registry.closeKey(userChoiceKey);
+    const userChoiceKey = Registry.openKey(Registry.HKCU, userChoice, Registry.Access.READ);
+    if (!userChoiceKey) {
+      return false;
+    }
 
-    // Look for default program
-    const hasDefaultProgramConfigured = values.every(
-      (value) => value && typeof value === 'string' && !value.includes('WScript.exe') && !value.includes('JSFile')
-    );
+    let progId = '';
+    try {
+      progId = (Registry.queryValue(userChoiceKey, 'ProgId') as string) || '';
+    } finally {
+      Registry.closeKey(userChoiceKey);
+    }
+
+    const hasDefaultProgramConfigured = progId.length > 0;
 
     return hasDefaultProgramConfigured;
   } catch (error) {
@@ -62,14 +64,13 @@ const openNotepad = (file: string) =>
   });
 
 const openConfig = () => {
-  // Windows opens .js files with  WScript.exe by default
-  // If the user hasn't set up an editor for .js files, we fallback to notepad.
+  // If the user has no default editor for .json5 files, fallback to notepad.
   if (process.platform === 'win32') {
     try {
       if (hasDefaultSet()) {
         return shell.openPath(cfgPath).then((error) => error === '');
       }
-      console.warn('No default app set for .js files, using notepad.exe fallback');
+      console.warn('No default app set for .json5 files, using notepad.exe fallback');
     } catch (err) {
       console.error('Open config with default app error:', err);
     }

@@ -44,12 +44,12 @@ const helpMenu = (_commands: Record<string, string>, showAbout: () => void): Men
 
 
 ---
-<!-- hyper.json config -->
+<!-- config.json5 config -->
 - **${app.name} version**: ${env.TERM_PROGRAM_VERSION} "${app.getVersion()}"
 - **OS ARCH VERSION:** ${platform} ${arch} ${release()}
 - **Electron:** ${versions.electron}  **LANG:** ${env.LANG}
 - **SHELL:** ${env.SHELL}   **TERM:** ${env.TERM}
-<details><summary><strong>hyper.json contents</strong></summary>
+<details><summary><strong>config.json5 contents</strong></summary>
 
 \`\`\`json
 ${JSON.stringify(getConfig(), null, 2)}
