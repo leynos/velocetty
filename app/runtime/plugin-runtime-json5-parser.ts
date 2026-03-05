@@ -434,16 +434,6 @@ export class Json5Parser {
     };
   }
 
-  private applyDelimiterResultForValueEnd(
-    result: {state: ParsingState; skipNext: boolean},
-    cursor: IndexCursor
-  ): {state: ParsingState; nextIndex: number} {
-    return {
-      state: result.state,
-      nextIndex: cursor.index + (result.skipNext ? 1 : 0)
-    };
-  }
-
   private processValueEndCharacter(
     ctx: CharacterContext,
     state: ParsingState,
@@ -480,10 +470,9 @@ export class Json5Parser {
       };
     }
 
-    const applied = this.applyDelimiterResultForValueEnd(
-      processDelimitersAndComments(state, ctx.current, ctx.next ?? ''),
-      {index: ctx.index}
-    );
+    const applied = this.applyBlockCommentResult(processDelimitersAndComments(state, ctx.current, ctx.next ?? ''), {
+      index: ctx.index
+    });
     return {
       state: applied.state,
       nextIndex: applied.nextIndex,
