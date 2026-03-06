@@ -185,10 +185,51 @@ test('reports parse errors with stable source indices', () => {
   assertSyntaxError('paneCount >>> 1', 11, 'Unexpected token');
 });
 
+test('reports empty, whitespace-only, and stray-token parse failures consistently', () => {
+  assertSyntaxError('', 0, 'Unexpected token');
+  assertSyntaxError('   ', 3, 'Unexpected token');
+  assertSyntaxError(')', 0, 'Unexpected token');
+  assertSyntaxError('&& terminalFocus', 0, 'Unexpected token');
+  assertSyntaxError('count < other < third', 14, 'Expected eof');
+});
+
 test('reports literal parse errors with stable syntax diagnostics', () => {
   assertSyntaxError("'unterminated", 0, 'Unterminated string literal');
   assertSyntaxError('1.', 0, 'Invalid numeric literal');
   assertSyntaxError('1e', 0, 'Invalid numeric literal exponent');
+});
+
+test('parses identifier and escape-sequence edge cases into stable literal values', () => {
+  expect(parseWhenExpression('foo.bar && $shell && _pane')).toEqual({
+    kind: 'logical',
+    operator: '&&',
+    left: {
+      kind: 'logical',
+      operator: '&&',
+      left: {
+        kind: 'identifier',
+        key: 'foo.bar'
+      },
+      right: {
+        kind: 'identifier',
+        key: '$shell'
+      }
+    },
+    right: {
+      kind: 'identifier',
+      key: '_pane'
+    }
+  } satisfies WhenExpressionNode);
+
+  expect(parseWhenExpression(String.raw`"line\rbreak\\done"`)).toEqual({
+    kind: 'literal',
+    value: 'line\rbreak\\done'
+  } satisfies WhenExpressionNode);
+
+  expect(parseWhenExpression(String.raw`"\q"`)).toEqual({
+    kind: 'literal',
+    value: 'q'
+  } satisfies WhenExpressionNode);
 });
 
 test('service snapshots are deterministic and independent of insertion order', () => {

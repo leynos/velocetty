@@ -19,6 +19,10 @@ import {runtimePluginManifests, type RuntimePluginManifest} from './golden-path-
 
 type RuntimePluginSettings = Record<string, unknown>;
 type RuntimePluginSettingsNamespace = Record<string, RuntimePluginSettings>;
+export type KeybindingConflict = {
+  readonly keys: string;
+  readonly commands: readonly string[];
+};
 type ReadTextFile = (path: string, encoding: BufferEncoding) => string;
 type WriteTextFile = (path: string, content: string, encoding: BufferEncoding) => void;
 type PersistenceOptions = {
@@ -28,6 +32,7 @@ type PersistenceOptions = {
 };
 
 const cloneValue = <T>(value: T): T => structuredClone(value);
+const compareLexical = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
 
 const findRuntimePluginManifest = (pluginId: string): RuntimePluginManifest | undefined =>
   runtimePluginManifests.find((manifest) => manifest.id === pluginId);
@@ -123,6 +128,40 @@ export const mergeRuntimePluginKeybindings = (
   ...runtimeKeybindings,
   ...resolvedKeymaps
 });
+
+/**
+ * Computes deterministic keybinding conflicts for exact shortcut collisions.
+ *
+ * The input is expected to already reflect precedence rules, so the helper only
+ * reports shortcuts that are still assigned to multiple distinct commands.
+ */
+export const detectKeybindingConflicts = (keymaps: Record<string, string[]>): readonly KeybindingConflict[] => {
+  const commandsByKey = new Map<string, Set<string>>();
+
+  Object.keys(keymaps)
+    .sort(compareLexical)
+    .forEach((commandId) => {
+      Array.from(new Set(keymaps[commandId]))
+        .sort(compareLexical)
+        .forEach((keys) => {
+          const commands = commandsByKey.get(keys) ?? new Set<string>();
+          commands.add(commandId);
+          commandsByKey.set(keys, commands);
+        });
+    });
+
+  return Object.freeze(
+    Array.from(commandsByKey.entries())
+      .filter(([, commands]) => commands.size > 1)
+      .sort(([left], [right]) => compareLexical(left, right))
+      .map(([keys, commands]) =>
+        Object.freeze({
+          keys,
+          commands: Object.freeze(Array.from(commands).sort(compareLexical))
+        })
+      )
+  );
+};
 
 /**
  * Ensures runtime plugin settings defaults are present in the JSON5 config file.

@@ -10,6 +10,7 @@ import {
 } from '@shared/runtime/golden-path-demo';
 import type {configOptions} from '@shared/types/config';
 import type {
+  detectKeybindingConflicts as detectKeybindingConflictsType,
   ensureRuntimePluginSettingsPersisted as ensureRuntimePluginSettingsPersistedType,
   getRuntimePluginCommandDefinitions as getRuntimePluginCommandDefinitionsType,
   getRuntimePluginKeybindings as getRuntimePluginKeybindingsType,
@@ -22,6 +23,7 @@ type ReadTextFile = (path: string, encoding: BufferEncoding) => string;
 type WriteTextFile = (path: string, content: string, encoding: BufferEncoding) => void;
 
 let ensureRuntimePluginSettingsPersisted: typeof ensureRuntimePluginSettingsPersistedType;
+let detectKeybindingConflicts: typeof detectKeybindingConflictsType;
 let getRuntimePluginCommandDefinitions: typeof getRuntimePluginCommandDefinitionsType;
 let getRuntimePluginKeybindings: typeof getRuntimePluginKeybindingsType;
 let mergeRuntimePluginKeybindings: typeof mergeRuntimePluginKeybindingsType;
@@ -35,6 +37,7 @@ beforeAll(async () => {
   registerElectronMock();
   ({
     ensureRuntimePluginSettingsPersisted,
+    detectKeybindingConflicts,
     getRuntimePluginCommandDefinitions,
     getRuntimePluginKeybindings,
     mergeRuntimePluginKeybindings,
@@ -268,6 +271,41 @@ test('mergeRuntimePluginKeybindings preserves resolved user keymap overrides', (
   expect(mergeRuntimePluginKeybindings(resolvedKeymaps, runtimeKeybindings)[GOLDEN_PATH_COMMAND_ID]).toEqual([
     'ctrl+shift+g'
   ]);
+});
+
+test('detectKeybindingConflicts reports exact shortcut collisions deterministically', () => {
+  const conflicts = detectKeybindingConflicts({
+    'window:new': ['ctrl+n', 'ctrl+shift+n', 'ctrl+n'],
+    'tab:new': ['ctrl+t'],
+    'plugins:demo:announce': ['ctrl+n'],
+    'workspace:reload': ['ctrl+shift+n']
+  });
+
+  expect(conflicts).toEqual([
+    {
+      keys: 'ctrl+n',
+      commands: ['plugins:demo:announce', 'window:new']
+    },
+    {
+      keys: 'ctrl+shift+n',
+      commands: ['window:new', 'workspace:reload']
+    }
+  ]);
+});
+
+test('detectKeybindingConflicts ignores user overrides that replace runtime defaults for the same command', () => {
+  const mergedKeymaps = mergeRuntimePluginKeybindings(
+    {
+      [GOLDEN_PATH_COMMAND_ID]: ['ctrl+shift+g'],
+      'workspace:reload': ['ctrl+r']
+    },
+    {
+      [GOLDEN_PATH_COMMAND_ID]: ['ctrl+alt+shift+g']
+    }
+  );
+
+  expect(mergedKeymaps[GOLDEN_PATH_COMMAND_ID]).toEqual(['ctrl+shift+g']);
+  expect(detectKeybindingConflicts(mergedKeymaps)).toEqual([]);
 });
 
 test('golden path runtime tab provider output is deterministic for identical context', () => {

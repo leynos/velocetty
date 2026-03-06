@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import {build, context, type BuildContext, type BuildOptions} from 'esbuild';
 
+import {ensureDirectoryPath} from '../../bin/shared/ensure-directory-path.js';
 import {copyHyperAppArtifacts, copyRendererArtifacts} from './copy-artifacts';
 import {createIgnoreImportsPlugin} from './esbuild-plugins/ignore-imports-plugin';
 import {createNodeBuiltinsPlugin} from './esbuild-plugins/node-builtins-plugin';
@@ -156,6 +157,7 @@ const createTargetDescriptors = (): Record<BuildTarget, TargetDescriptor> => {
 
 const runTargets = async (options: RunEsbuildOptions) => {
   const rootDir = options.rootDir ?? process.cwd();
+  await ensureDirectoryPath(path.join(rootDir, 'dist'));
   const targetSet = new Set(options.targets);
   const descriptors = createTargetDescriptors();
 

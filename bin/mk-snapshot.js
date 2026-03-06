@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import electronLink from 'electron-link';
 
 import {normaliseArch} from './shared/arch.js';
+import {ensureDirectoryPath} from './shared/ensure-directory-path.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,12 +20,15 @@ const crossArchDirs = ['clang_x86_v8_arm', 'clang_x64_v8_arm64', 'win_clang_x64'
 
 async function main() {
   const baseDirPath = path.resolve(__dirname, '..');
+  const cachePath = `${baseDirPath}/cache`;
+
+  await ensureDirectoryPath(cachePath);
 
   console.log('Creating a linked script..');
   const result = await electronLink({
     baseDirPath: baseDirPath,
     mainPath: `${__dirname}/snapshot-libs.js`,
-    cachePath: `${baseDirPath}/cache`,
+    cachePath,
     shouldExcludeModule: ({requiredModulePath}) => {
       if (typeof requiredModulePath !== 'string') {
         return false;
@@ -34,14 +38,14 @@ async function main() {
     }
   });
 
-  const snapshotScriptPath = `${baseDirPath}/cache/snapshot-libs.js`;
+  const snapshotScriptPath = `${cachePath}/snapshot-libs.js`;
   fs.writeFileSync(snapshotScriptPath, result.snapshotScript);
 
   // Verify if we will be able to use this in `mksnapshot`
   vm.runInNewContext(result.snapshotScript, undefined, {filename: snapshotScriptPath, displayErrors: true});
 
   const targetArch = normaliseArch(process.env.npm_config_arch || process.arch);
-  const outputBlobPath = `${baseDirPath}/cache/${targetArch}`;
+  const outputBlobPath = `${cachePath}/${targetArch}`;
   await fs.promises.mkdir(outputBlobPath, {recursive: true});
 
   if (process.platform !== 'darwin') {
