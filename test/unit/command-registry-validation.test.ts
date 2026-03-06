@@ -106,66 +106,74 @@ test('validateArgs returns all actionable issues for invalid payloads', () => {
   expect(issueKeywords).toEqual(['additionalProperties', 'minimum', 'required']);
 });
 
+const assertCacheIsInvalidatedAfterSchemaChange = (
+  commandId: string,
+  initialSchema: Record<string, unknown>,
+  initialValidPayload: Record<string, unknown>,
+  mutate: () => void,
+  updatedValidPayload: Record<string, unknown>
+): void => {
+  register(createCommandDefinition(commandId, initialSchema));
+  expect(validateArgs(commandId, initialValidPayload)).toMatchObject({ok: true});
+  mutate();
+  const stalePayloadResult = validateArgs(commandId, initialValidPayload);
+  expect(stalePayloadResult.ok).toBe(false);
+  expect(validateArgs(commandId, updatedValidPayload)).toMatchObject({ok: true});
+};
+
 test('update invalidates cached validators when schemas change', () => {
   const commandId = `${TEST_COMMAND_PREFIX}:update-cache`;
-  register(
-    createCommandDefinition(commandId, {
+  const updatedSchema = {
+    type: 'object',
+    properties: {
+      enabled: {type: 'integer'}
+    },
+    required: ['enabled'],
+    additionalProperties: false
+  };
+
+  assertCacheIsInvalidatedAfterSchemaChange(
+    commandId,
+    {
       type: 'object',
       properties: {
         enabled: {type: 'boolean'}
       },
       required: ['enabled'],
       additionalProperties: false
-    })
+    },
+    {enabled: true},
+    () => update(createCommandDefinition(commandId, updatedSchema)),
+    {enabled: 1}
   );
-
-  expect(validateArgs(commandId, {enabled: true})).toMatchObject({ok: true});
-
-  update(
-    createCommandDefinition(commandId, {
-      type: 'object',
-      properties: {
-        enabled: {type: 'integer'}
-      },
-      required: ['enabled'],
-      additionalProperties: false
-    })
-  );
-
-  const stalePayloadResult = validateArgs(commandId, {enabled: true});
-  expect(stalePayloadResult.ok).toBe(false);
-  expect(validateArgs(commandId, {enabled: 1})).toMatchObject({ok: true});
 });
 
 test('remove clears cached validators before re-registering a command id', () => {
   const commandId = `${TEST_COMMAND_PREFIX}:remove-cache`;
-  register(
-    createCommandDefinition(commandId, {
+  const updatedSchema = {
+    type: 'object',
+    properties: {
+      enabled: {type: 'integer'}
+    },
+    required: ['enabled'],
+    additionalProperties: false
+  };
+
+  assertCacheIsInvalidatedAfterSchemaChange(
+    commandId,
+    {
       type: 'object',
       properties: {
         enabled: {type: 'string'}
       },
       required: ['enabled'],
       additionalProperties: false
-    })
+    },
+    {enabled: 'yes'},
+    () => {
+      expect(remove(commandId)).toBe(true);
+      register(createCommandDefinition(commandId, updatedSchema));
+    },
+    {enabled: 7}
   );
-
-  expect(validateArgs(commandId, {enabled: 'yes'})).toMatchObject({ok: true});
-
-  expect(remove(commandId)).toBe(true);
-
-  register(
-    createCommandDefinition(commandId, {
-      type: 'object',
-      properties: {
-        enabled: {type: 'integer'}
-      },
-      required: ['enabled'],
-      additionalProperties: false
-    })
-  );
-
-  const stalePayloadResult = validateArgs(commandId, {enabled: 'yes'});
-  expect(stalePayloadResult.ok).toBe(false);
-  expect(validateArgs(commandId, {enabled: 7})).toMatchObject({ok: true});
 });
