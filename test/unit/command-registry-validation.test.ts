@@ -112,8 +112,8 @@ test('validateArgs returns all actionable issues for invalid payloads', () => {
     throw new Error('Expected invalid payload to fail validation');
   }
 
-const issueKeywords = (result.error.issues ?? []).map((issue) => issue.keyword).sort();
-expect(issueKeywords).toEqual(['additionalProperties', 'minimum', 'required']);
+  const issueKeywords = (result.error.issues ?? []).map((issue) => issue.keyword).sort();
+  expect(issueKeywords).toEqual(['additionalProperties', 'minimum', 'required']);
 });
 
 interface SchemaChangeScenario {
