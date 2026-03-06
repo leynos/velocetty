@@ -22,7 +22,7 @@
  *   `bun test --max-concurrency=1 test/unit/command-registry-compat.test.ts`
  * - the suite installs its own IPC transport mock and temporary
  *   `window.focusActiveTerm` shim during `beforeAll`, then restores the prior
- *   global window state in `afterAll`
+ *   property state in `afterAll`
  *
  * Related modules:
  * - `../../lib/command-registry.ts` implements the compatibility aliases and
@@ -45,7 +45,7 @@ const invokeMock = mock(async (channel: string) => {
   if (channel === 'getDecoratedKeymaps') {
     return decoratedKeymaps;
   }
-  return {};
+  throw new Error(`Unexpected IPC channel: ${channel}`);
 });
 
 mock.module('../../lib/transport/electron-ipc-transport', () => ({
@@ -80,20 +80,36 @@ let validateCommandArgsFor: typeof import('../../lib/command-registry').validate
 
 const TEST_COMMAND_PREFIX = 'test:command-registry:compat';
 const focusActiveTermMock = mock(() => {});
-const previousWindow = (globalThis as {window?: Record<string, unknown>}).window;
+const windowHost = globalThis as {window?: Record<string, unknown>};
+const previousWindow = windowHost.window;
+const previousFocusActiveTerm = previousWindow?.focusActiveTerm;
+let createdWindowForTest = false;
 let moduleInstanceCounter = 0;
 
 beforeAll(() => {
-  (globalThis as {window?: Record<string, unknown>}).window = {focusActiveTerm: focusActiveTermMock};
+  if (windowHost.window === undefined) {
+    windowHost.window = {};
+    createdWindowForTest = true;
+  }
+
+  windowHost.window.focusActiveTerm = focusActiveTermMock;
 });
 
 afterAll(() => {
-  if (previousWindow === undefined) {
-    delete (globalThis as {window?: Record<string, unknown>}).window;
+  if (windowHost.window === undefined) {
     return;
   }
 
-  (globalThis as {window?: Record<string, unknown>}).window = previousWindow;
+  if (previousFocusActiveTerm === undefined) {
+    delete windowHost.window.focusActiveTerm;
+  } else {
+    windowHost.window.focusActiveTerm = previousFocusActiveTerm;
+  }
+
+  if (createdWindowForTest) {
+    delete windowHost.window;
+    return;
+  }
 });
 
 beforeEach(async () => {
