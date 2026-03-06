@@ -1,4 +1,37 @@
-/** @file Covers command-registry compatibility aliases and legacy handlers. */
+/**
+ * @file Verifies the compatibility-alias and legacy-handler behaviour exposed
+ * by the shared command-registry module.
+ *
+ * Responsibilities:
+ * - assert that legacy alias exports remain wired to the primary
+ *   command-registry APIs
+ * - verify `registerCommandHandlers(...)` ignores undefined input without
+ *   mutating the existing registry
+ * - confirm the legacy `editor:search-close` handler still dispatches the
+ *   expected close-search action and restores terminal focus
+ *
+ * Invariants:
+ * - compatibility aliases continue to reference the same callable
+ *   implementations as the primary exports
+ * - the built-in legacy handler remains registered throughout the suite
+ * - each test runs against an isolated command-registry module instance and a
+ *   reset transport mock state
+ *
+ * Usage:
+ * - run this module directly with
+ *   `bun test --max-concurrency=1 test/unit/command-registry-compat.test.ts`
+ * - the suite installs its own IPC transport mock and temporary
+ *   `window.focusActiveTerm` shim during `beforeAll`, then restores the prior
+ *   global window state in `afterAll`
+ *
+ * Related modules:
+ * - `../../lib/command-registry.ts` implements the compatibility aliases and
+ *   legacy handlers under test
+ * - `./command-registry.test.ts` covers the core keymap and CRUD behaviour for
+ *   the same module
+ * - `./ensure-directory-path.test.ts` is the companion example for this
+ *   richer test-module header format
+ */
 import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 import {SESSION_SEARCH} from '@shared/constants/sessions';
 import type {CommandDefinition} from '@shared/types/commands';
