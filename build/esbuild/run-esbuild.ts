@@ -1,9 +1,10 @@
 /** @file Builds renderer/CLI bundles with esbuild and handles watch mode. */
-import {copyFile, lstat, mkdir, readlink} from 'node:fs/promises';
+import {copyFile, mkdir} from 'node:fs/promises';
 import path from 'node:path';
 
 import {build, context, type BuildContext, type BuildOptions} from 'esbuild';
 
+import {ensureDirectoryPath} from '../../bin/shared/ensure-directory-path.js';
 import {copyHyperAppArtifacts, copyRendererArtifacts} from './copy-artifacts';
 import {createIgnoreImportsPlugin} from './esbuild-plugins/ignore-imports-plugin';
 import {createNodeBuiltinsPlugin} from './esbuild-plugins/node-builtins-plugin';
@@ -91,31 +92,6 @@ export const createCliBuildOptions = (mode: BuildMode, rootDir: string): BuildOp
 };
 
 const targetExecutionOrder: BuildTarget[] = ['hyper-app', 'renderer', 'cli'];
-
-const ensureDirectoryPath = async (dirPath: string) => {
-  try {
-    const stat = await lstat(dirPath);
-    if (stat.isDirectory()) {
-      return;
-    }
-
-    if (stat.isSymbolicLink()) {
-      const linkTarget = await readlink(dirPath);
-      await mkdir(path.resolve(path.dirname(dirPath), linkTarget), {recursive: true});
-      return;
-    }
-  } catch (error) {
-    const errorCode = (error as NodeJS.ErrnoException).code;
-    if (errorCode === 'ENOENT') {
-      await mkdir(dirPath, {recursive: true});
-      return;
-    }
-
-    throw error;
-  }
-
-  throw new Error(`Expected "${dirPath}" to be a directory path.`);
-};
 
 const watchBuild = async (options: BuildOptions): Promise<BuildContext> => {
   const buildContext = await context(options);

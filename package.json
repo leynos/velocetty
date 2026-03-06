@@ -9,7 +9,7 @@
     "start": "echo 'please run `bun run dev` in one tab and then `bun run app` in another one'",
     "app": "bunx cross-env ELECTRONMON_LOGLEVEL=error bun node_modules/electronmon/bin/cli.js dist/app",
     "dev": "bun node_modules/concurrently/dist/bin/concurrently.js -n \"esbuild,TypeScript\" -c \"cyan.bold,blue.bold\" \"bun ./build/esbuild/build.ts --watch --mode=development\" \"bunx tsgo --build -v --pretty --watch --preserveWatchOutput\" -k",
-    "build:shared": "bunx tsgo --project shared/tsconfig.json",
+    "build:shared": "bun bin/ensure-dist-dir.js && bunx tsgo --project shared/tsconfig.json",
     "build:frontend": "bunx tsgo --project frontend/tsconfig.json --noEmit",
     "build:backend": "bunx tsgo --project backend/tsconfig.json --noEmit",
     "build:packages": "bun run build:shared && bun run build:frontend && bun run build:backend",

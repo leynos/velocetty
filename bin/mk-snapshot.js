@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import electronLink from 'electron-link';
 
 import {normaliseArch} from './shared/arch.js';
+import {ensureDirectoryPath} from './shared/ensure-directory-path.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,31 +17,6 @@ const __dirname = path.dirname(__filename);
 const excludedModuleMatchers = [/\/node_modules\/react-redux(?:\/|$)/];
 
 const crossArchDirs = ['clang_x86_v8_arm', 'clang_x64_v8_arm64', 'win_clang_x64'];
-
-async function ensureDirectoryPath(dirPath) {
-  try {
-    const stat = await fs.promises.lstat(dirPath);
-    if (stat.isDirectory()) {
-      return dirPath;
-    }
-
-    if (stat.isSymbolicLink()) {
-      const linkTarget = await fs.promises.readlink(dirPath);
-      const resolvedTarget = path.resolve(path.dirname(dirPath), linkTarget);
-      await fs.promises.mkdir(resolvedTarget, {recursive: true});
-      return dirPath;
-    }
-  } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
-      await fs.promises.mkdir(dirPath, {recursive: true});
-      return dirPath;
-    }
-
-    throw error;
-  }
-
-  throw new Error(`Expected "${dirPath}" to be a directory path.`);
-}
 
 async function main() {
   const baseDirPath = path.resolve(__dirname, '..');

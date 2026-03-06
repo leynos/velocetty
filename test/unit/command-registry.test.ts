@@ -1,5 +1,6 @@
 /** @file Verifies command-registry keymap and handler behaviour. */
 import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import {SESSION_SEARCH} from '@shared/constants/sessions';
 import type {CommandDefinition, CommandId} from '@shared/types/commands';
 import {goldenPathCommandDefinition, GOLDEN_PATH_COMMAND_ID} from '@shared/runtime/golden-path-demo';
 
@@ -182,10 +183,35 @@ test('compatibility aliases mirror the primary command-registry APIs', () => {
 
 test('legacy search-close handler dispatches closeSearch and focuses the active terminal', () => {
   const dispatch = mock(() => {});
+  const innerDispatch = mock(() => {});
 
   getCommandHandler('editor:search-close')?.('event-payload', dispatch as unknown as never);
 
   expect(dispatch).toHaveBeenCalledTimes(1);
+  const dispatchedThunk = dispatch.mock.calls[0]?.[0];
+  expect(dispatchedThunk).toBeFunction();
+  if (typeof dispatchedThunk !== 'function') {
+    throw new Error('Expected the legacy search-close handler to dispatch a thunk');
+  }
+
+  dispatchedThunk(innerDispatch as never, () => ({
+    sessions: {
+      activeUid: 'active-session',
+      sessions: {
+        'active-session': {
+          search: true
+        }
+      }
+    }
+  }));
+
+  expect(innerDispatch).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: SESSION_SEARCH,
+      uid: 'active-session',
+      value: false
+    })
+  );
   expect(focusActiveTermMock).toHaveBeenCalledTimes(1);
 });
 
