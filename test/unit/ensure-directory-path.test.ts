@@ -1,4 +1,34 @@
-/** @file Verifies symlink-aware directory bootstrap behaviour for build scripts. */
+/**
+ * @file Verifies the symlink-aware directory bootstrap behaviour shared by the
+ * build and packaging scripts.
+ *
+ * Responsibilities:
+ * - assert that `ensureDirectoryPath(...)` preserves existing directories and
+ *   their contents
+ * - verify recursive directory creation for missing paths
+ * - confirm symlink resolution creates the backing directory target rather than
+ *   replacing the symlink
+ * - prove non-directory paths fail with a stable error contract
+ *
+ * Invariants:
+ * - directory creation is idempotent for existing paths
+ * - symlink paths remain symlinks after bootstrap
+ * - resolved symlink targets are materialized as directories
+ * - each test runs in an isolated temporary root that is removed during
+ *   teardown
+ *
+ * Usage:
+ * - run this module directly with
+ *   `bun test --max-concurrency=1 test/unit/ensure-directory-path.test.ts`
+ * - the suite manages its own temporary directories via `afterEach`, so no
+ *   manual fixture cleanup is required
+ *
+ * Related modules:
+ * - `../../bin/shared/ensure-directory-path.js` implements the helper under
+ *   test
+ * - `../../bin/ensure-dist-dir.js` and `../../bin/mk-snapshot.js` consume the
+ *   same bootstrap semantics in build-script entrypoints
+ */
 import {afterEach, expect, test} from 'bun:test';
 import {lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile} from 'node:fs/promises';
 import os from 'node:os';
