@@ -116,21 +116,16 @@ const issueKeywords = (result.error.issues ?? []).map((issue) => issue.keyword).
 expect(issueKeywords).toEqual(['additionalProperties', 'minimum', 'required']);
 });
 
-type CacheInvalidationScenario = {
+interface SchemaChangeScenario {
   commandId: string;
   initialSchema: Record<string, unknown>;
   initialValidPayload: Record<string, unknown>;
   mutate: () => void;
   updatedValidPayload: Record<string, unknown>;
-};
+}
 
-const assertCacheIsInvalidatedAfterSchemaChange = ({
-  commandId,
-  initialSchema,
-  initialValidPayload,
-  mutate,
-  updatedValidPayload
-}: CacheInvalidationScenario): void => {
+const assertCacheIsInvalidatedAfterSchemaChange = (scenario: SchemaChangeScenario): void => {
+  const {commandId, initialSchema, initialValidPayload, mutate, updatedValidPayload} = scenario;
   register(createCommandDefinition(commandId, initialSchema));
   expect(validateArgs(commandId, initialValidPayload)).toMatchObject({ok: true});
   mutate();
