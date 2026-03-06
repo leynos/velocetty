@@ -441,8 +441,9 @@ Scope notes:
   [velocetty-design.md](velocetty-design.md) §Testing.
   - [x] Include parser edge cases and error handling.
   - [x] Include precedence and conflict detection tests.
-  - [x] Success criteria: coverage for new shared modules meets the current
-    project threshold basis, and failures are actionable.
+  - [x] Success criteria: coverage for new shared modules meets the code
+    coverage targets in [velocetty-hyper-codebase.md](velocetty-hyper-codebase.md)
+    §6.6.7.2, and failures are actionable.
 
 ### 9.2. Integration and performance tests
 

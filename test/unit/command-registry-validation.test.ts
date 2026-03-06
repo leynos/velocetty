@@ -1,5 +1,5 @@
 /** @file Covers command-registry validation edge cases and cache invalidation. */
-import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 import type {CommandDefinition, CommandId} from '@shared/types/commands';
 
 let decoratedKeymaps: Record<string, string[]> = {};
@@ -28,6 +28,7 @@ let validateArgs: typeof import('../../lib/command-registry').validateArgs;
 
 const TEST_COMMAND_PREFIX = 'test:command-registry:validation';
 const asCommandId = (value: string): CommandId => value as CommandId;
+const previousWindow = (globalThis as {window?: Record<string, unknown>}).window;
 
 const createCommandDefinition = (commandId: string, argsSchema?: Record<string, unknown>): CommandDefinition => ({
   id: asCommandId(commandId),
@@ -44,6 +45,15 @@ beforeAll(async () => {
   ({register, update, remove, list, validateArgs} = await import(
     '../../lib/command-registry.ts?command_registry_validation_unit'
   ));
+});
+
+afterAll(() => {
+  if (previousWindow === undefined) {
+    delete (globalThis as {window?: Record<string, unknown>}).window;
+    return;
+  }
+
+  (globalThis as {window?: Record<string, unknown>}).window = previousWindow;
 });
 
 beforeEach(() => {

@@ -146,7 +146,11 @@ test('getRegisteredKeys synchronizes runtime plugin command registrations', asyn
 });
 
 test('registerCommandHandlers merges new handlers into registry', () => {
+  const searchCloseHandlerBeforeUndefinedCall = getCommandHandler('editor:search-close');
+
   registerCommandHandlers(undefined);
+
+  expect(getCommandHandler('editor:search-close')).toBe(searchCloseHandlerBeforeUndefinedCall);
 
   const commandName = `test:command:${Date.now()}`;
   const handler = () => {};
