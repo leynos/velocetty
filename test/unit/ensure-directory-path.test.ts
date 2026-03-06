@@ -48,7 +48,7 @@ test('creates the resolved target when the directory path is a symlink', async (
   const targetDirectory = path.join(temporaryRoot, 'backing', 'dist');
   const relativeTarget = path.relative(path.dirname(symlinkPath), targetDirectory);
 
-  await symlink(relativeTarget, symlinkPath);
+  await symlink(relativeTarget, symlinkPath, 'dir');
 
   await expect(ensureDirectoryPath(symlinkPath)).resolves.toBeUndefined();
 
