@@ -1,8 +1,24 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** @param {unknown} error */
-const isEnoent = (error) => error?.code === 'ENOENT';
+function isEnoentError(error) {
+  return error != null && typeof error === 'object' && 'code' in error && error.code === 'ENOENT';
+}
+
+async function ensureExistingPath(dirPath, stat) {
+  if (stat.isDirectory()) {
+    return;
+  }
+
+  if (stat.isSymbolicLink()) {
+    const linkTarget = await fs.promises.readlink(dirPath);
+    const resolvedTarget = path.resolve(path.dirname(dirPath), linkTarget);
+    await fs.promises.mkdir(resolvedTarget, {recursive: true});
+    return;
+  }
+
+  throw new Error(`Expected "${dirPath}" to be a directory path.`);
+}
 
 /**
  * Ensures a directory path exists, including when the path is a symlink to a
@@ -16,24 +32,12 @@ export async function ensureDirectoryPath(dirPath) {
   try {
     stat = await fs.promises.lstat(dirPath);
   } catch (error) {
-    if (isEnoent(error)) {
+    if (isEnoentError(error)) {
       await fs.promises.mkdir(dirPath, {recursive: true});
       return;
     }
 
     throw error;
   }
-
-  if (stat.isDirectory()) {
-    return;
-  }
-
-  if (stat.isSymbolicLink()) {
-    const linkTarget = await fs.promises.readlink(dirPath);
-    const resolvedTarget = path.resolve(path.dirname(dirPath), linkTarget);
-    await fs.promises.mkdir(resolvedTarget, {recursive: true});
-    return;
-  }
-
-  throw new Error(`Expected "${dirPath}" to be a directory path.`);
+  await ensureExistingPath(dirPath, stat);
 }
