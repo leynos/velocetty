@@ -29,7 +29,8 @@ test('returns without changing an existing directory', async () => {
   await expect(ensureDirectoryPath(existingDirectory)).resolves.toBeUndefined();
 
   await expect(readFile(sentinelFile, 'utf8')).resolves.toBe('kept');
-  await expect(lstat(existingDirectory)).resolves.toMatchObject({isDirectory: expect.any(Function)});
+  const existingDirectoryStats = await lstat(existingDirectory);
+  expect(existingDirectoryStats.isDirectory()).toBe(true);
 });
 
 test('creates a missing directory path recursively', async () => {
@@ -37,7 +38,8 @@ test('creates a missing directory path recursively', async () => {
   const missingDirectory = path.join(temporaryRoot, 'nested', 'output');
 
   await expect(ensureDirectoryPath(missingDirectory)).resolves.toBeUndefined();
-  await expect(lstat(missingDirectory)).resolves.toMatchObject({isDirectory: expect.any(Function)});
+  const missingDirectoryStats = await lstat(missingDirectory);
+  expect(missingDirectoryStats.isDirectory()).toBe(true);
 });
 
 test('creates the resolved target when the directory path is a symlink', async () => {

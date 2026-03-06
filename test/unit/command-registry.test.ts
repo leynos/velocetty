@@ -1,5 +1,5 @@
 /** @file Verifies command-registry keymap and handler behaviour. */
-import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 import {SESSION_SEARCH} from '@shared/constants/sessions';
 import type {CommandDefinition, CommandId} from '@shared/types/commands';
 import {goldenPathCommandDefinition, GOLDEN_PATH_COMMAND_ID} from '@shared/runtime/golden-path-demo';
@@ -51,6 +51,7 @@ let validateCommandArgsFor: typeof import('../../lib/command-registry').validate
 
 const TEST_COMMAND_PREFIX = 'test:command-registry';
 const asCommandId = (value: string): CommandId => value as CommandId;
+const originalWindow = (globalThis as {window?: Record<string, unknown>}).window;
 
 const createCommandDefinition = (commandId: string, title = commandId): CommandDefinition => ({
   id: asCommandId(commandId),
@@ -93,6 +94,15 @@ beforeAll(async () => {
     validateCommandArgs,
     validateCommandArgsFor
   } = await import('../../lib/command-registry.ts?command_registry_unit'));
+});
+
+afterAll(() => {
+  if (originalWindow === undefined) {
+    delete (globalThis as {window?: Record<string, unknown>}).window;
+    return;
+  }
+
+  (globalThis as {window?: Record<string, unknown>}).window = originalWindow;
 });
 
 beforeEach(() => {
