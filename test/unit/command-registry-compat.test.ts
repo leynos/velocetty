@@ -81,10 +81,28 @@ let validateCommandArgsFor: typeof import('../../lib/command-registry').validate
 const TEST_COMMAND_PREFIX = 'test:command-registry:compat';
 const focusActiveTermMock = mock(() => {});
 const previousWindow = (globalThis as {window?: Record<string, unknown>}).window;
+let moduleInstanceCounter = 0;
 
-beforeAll(async () => {
+beforeAll(() => {
   (globalThis as {window?: Record<string, unknown>}).window = {focusActiveTerm: focusActiveTermMock};
+});
 
+afterAll(() => {
+  if (previousWindow === undefined) {
+    delete (globalThis as {window?: Record<string, unknown>}).window;
+    return;
+  }
+
+  (globalThis as {window?: Record<string, unknown>}).window = previousWindow;
+});
+
+beforeEach(async () => {
+  invokeMock.mockClear();
+  focusActiveTermMock.mockClear();
+  decoratedKeymaps = {};
+  runtimeCommands = [];
+
+  moduleInstanceCounter += 1;
   ({
     registerCommandHandlers,
     getCommandHandler,
@@ -109,23 +127,7 @@ beforeAll(async () => {
     hasCommandDefinition,
     validateCommandArgs,
     validateCommandArgsFor
-  } = await import('../../lib/command-registry.ts?command_registry_compat_unit'));
-});
-
-afterAll(() => {
-  if (previousWindow === undefined) {
-    delete (globalThis as {window?: Record<string, unknown>}).window;
-    return;
-  }
-
-  (globalThis as {window?: Record<string, unknown>}).window = previousWindow;
-});
-
-beforeEach(() => {
-  invokeMock.mockClear();
-  focusActiveTermMock.mockClear();
-  decoratedKeymaps = {};
-  runtimeCommands = [];
+  } = await import(`../../lib/command-registry.ts?command_registry_compat_unit=${moduleInstanceCounter}`));
 
   list()
     .filter((command) => command.id.startsWith(TEST_COMMAND_PREFIX))
@@ -135,11 +137,19 @@ beforeEach(() => {
 });
 
 test('registerCommandHandlers ignores undefined input without mutating the registry', () => {
-  const searchCloseHandlerBeforeUndefinedCall = getCommandHandler('editor:search-close');
+  const registryBeforeUndefinedCall = list().map((command) => ({
+    id: command.id,
+    handler: getCommandHandler(command.id)
+  }));
 
   registerCommandHandlers(undefined);
 
-  expect(getCommandHandler('editor:search-close')).toBe(searchCloseHandlerBeforeUndefinedCall);
+  const registryAfterUndefinedCall = list().map((command) => ({
+    id: command.id,
+    handler: getCommandHandler(command.id)
+  }));
+
+  expect(registryAfterUndefinedCall).toStrictEqual(registryBeforeUndefinedCall);
 });
 
 test('compatibility aliases mirror the primary command-registry APIs', () => {
