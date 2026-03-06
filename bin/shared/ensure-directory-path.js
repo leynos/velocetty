@@ -1,9 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-function isENOENT(error) {
-  return error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT';
-}
+/** @param {unknown} error */
+const isEnoent = (error) => error?.code === 'ENOENT';
 
 /**
  * Ensures a directory path exists, including when the path is a symlink to a
@@ -17,7 +16,7 @@ export async function ensureDirectoryPath(dirPath) {
   try {
     stat = await fs.promises.lstat(dirPath);
   } catch (error) {
-    if (isENOENT(error)) {
+    if (isEnoent(error)) {
       await fs.promises.mkdir(dirPath, {recursive: true});
       return;
     }
