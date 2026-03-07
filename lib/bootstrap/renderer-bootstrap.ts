@@ -6,7 +6,7 @@ import type {RendererCommandTransport} from '@shared/types/transport';
 export type AddSessionDataParams = {uid: string; data: string};
 export type SendSessionDataParams = {uid: string | null; data: string; escaped?: boolean};
 export type SplitRequestParams = {activeUid?: string; profile?: string};
-export type AddNotificationParams = {text: string; url: string | null; dismissable: boolean};
+export type AddNotificationParams = {text: string; url?: string | null; dismissable?: boolean};
 export type UpdateAvailableParams = {
   releaseName: string;
   notes: string;
