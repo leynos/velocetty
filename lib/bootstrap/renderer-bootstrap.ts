@@ -153,11 +153,32 @@ export const exposeRendererGlobals = ({
   rpc: unknown;
   store: StoreLike;
   windowObject: WindowGlobalsLike;
-}): void => {
-  Object.defineProperty(windowObject, 'store', {configurable: true, get: () => store});
-  Object.defineProperty(windowObject, 'rpc', {configurable: true, get: () => rpc});
-  Object.defineProperty(windowObject, 'config', {configurable: true, get: () => config});
-  Object.defineProperty(windowObject, 'plugins', {configurable: true, get: () => plugins});
+}): (() => void) => {
+  const values = {store, rpc, config, plugins};
+  const keys = ['store', 'rpc', 'config', 'plugins'] as const;
+  const previousDescriptors = Object.fromEntries(
+    keys.map((key) => [key, Object.getOwnPropertyDescriptor(windowObject, key)])
+  ) as {
+    [Key in (typeof keys)[number]]: PropertyDescriptor | undefined;
+  };
+
+  for (const key of keys) {
+    Object.defineProperty(windowObject, key, {
+      configurable: true,
+      get: () => values[key]
+    });
+  }
+
+  return () => {
+    for (const key of keys) {
+      const previousDescriptor = previousDescriptors[key];
+      if (previousDescriptor) {
+        Object.defineProperty(windowObject, key, previousDescriptor);
+      } else {
+        delete (windowObject as Record<string, unknown>)[key];
+      }
+    }
+  };
 };
 
 /**
@@ -390,7 +411,7 @@ export const startRendererApplication = (dependencies: RendererBootstrapDependen
   configureRendererZoom(dependencies);
 
   const store = dependencies.configureStore();
-  exposeRendererGlobals({
+  const restoreWindowGlobals = exposeRendererGlobals({
     config: dependencies.config,
     plugins: dependencies.plugins,
     rpc: dependencies.rpc,
@@ -426,6 +447,7 @@ export const startRendererApplication = (dependencies: RendererBootstrapDependen
     store,
     dispose: () => {
       mountedApp?.unmount?.();
+      restoreWindowGlobals();
       unsubscribeConfig();
       removeTransportListeners();
     }
