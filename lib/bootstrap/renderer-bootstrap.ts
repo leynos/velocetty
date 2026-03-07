@@ -411,19 +411,19 @@ export const startRendererApplication = (dependencies: RendererBootstrapDependen
   configureRendererZoom(dependencies);
 
   const store = dependencies.configureStore();
-  const restoreWindowGlobals = exposeRendererGlobals({
-    config: dependencies.config,
-    plugins: dependencies.plugins,
-    rpc: dependencies.rpc,
-    store,
-    windowObject: dependencies.windowObject
-  });
-
+  let restoreWindowGlobals = () => {};
   let unsubscribeConfig = () => {};
   let removeTransportListeners = () => {};
   let mountedApp: MountResult;
 
   try {
+    restoreWindowGlobals = exposeRendererGlobals({
+      config: dependencies.config,
+      plugins: dependencies.plugins,
+      rpc: dependencies.rpc,
+      store,
+      windowObject: dependencies.windowObject
+    });
     unsubscribeConfig = initializeRendererConfig({
       actions: dependencies.actions,
       config: dependencies.config,
@@ -438,6 +438,7 @@ export const startRendererApplication = (dependencies: RendererBootstrapDependen
     });
     mountedApp = dependencies.mountApp(store);
   } catch (error) {
+    restoreWindowGlobals();
     removeTransportListeners();
     unsubscribeConfig();
     throw error;

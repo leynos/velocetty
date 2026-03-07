@@ -24,7 +24,8 @@ function resolveSplitContext(
 ): ResolvedSplitContext {
   const {sessions} = getState();
   const activeUid = requestedActiveUid ?? sessions.activeUid;
-  const profile = requestedProfile ?? (activeUid ? sessions.sessions[activeUid].profile : window.profileName);
+  const activeSession = activeUid ? sessions.sessions[activeUid] : undefined;
+  const profile = requestedProfile ?? activeSession?.profile ?? window.profileName;
   return {activeUid, profile};
 }
 

@@ -13,7 +13,6 @@ type WindowValue = Record<string, unknown> | (Window & typeof globalThis.window)
 export const installTestWindow = (value: WindowValue = {}): (() => void) => {
   const windowHost = globalThis as WindowHost;
   const previousDescriptor = Object.getOwnPropertyDescriptor(windowHost, 'window');
-  const hadWindow = previousDescriptor !== undefined;
 
   Object.defineProperty(windowHost, 'window', {
     configurable: true,
@@ -22,11 +21,11 @@ export const installTestWindow = (value: WindowValue = {}): (() => void) => {
   });
 
   return () => {
-    if (!hadWindow) {
+    if (!previousDescriptor) {
       delete windowHost.window;
       return;
     }
 
-    Object.defineProperty(windowHost, 'window', previousDescriptor!);
+    Object.defineProperty(windowHost, 'window', previousDescriptor);
   };
 };

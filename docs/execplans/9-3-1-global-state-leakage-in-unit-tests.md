@@ -1,8 +1,8 @@
 # Eliminate cross-suite global state leakage in unit tests (roadmap 9.3.1)
 
 This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
+`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
 proceeds.
 
 Status: COMPLETE
@@ -109,7 +109,7 @@ inline mocks:
   under `shared/src/types/` or transport event payload shapes, stop and
   escalate.
 - Semantics: if randomized runs reveal failures outside the renderer/bootstrap
-  isolation surfaces listed in this plan, document them in `Decision Log` and
+  isolation surfaces listed in this plan, document them in `Decision log` and
   stop before expanding scope silently.
 - Validation: if `bun install`, `make build`, `make check-fmt`, `make lint`, or
   `make test` still fails after two focused remediation passes, stop and report
@@ -169,22 +169,22 @@ inline mocks:
 - [x] (2026-03-07 00:18Z) Stage B complete: extracted renderer bootstrap into
   injected helpers under `lib/bootstrap/renderer-bootstrap.ts`, rewrote
   `test/unit/bootstrap-transport-integration.test.ts` to use dependency
-  injection instead of module-scope mocks, and removed the dedicated bootstrap
-  quarantine from `package.json` and `Makefile`.
-- [x] (2026-03-07 00:20Z) Stage C complete: the original failing randomized seed
-  (`2444615283`) now passes across `test/unit` in one Bun process.
-- [x] (2026-03-07 00:33Z) Stage D complete: remaining DOM-heavy hotspot suites
+  injection instead of module-scope mocks.
+- [x] (2026-03-07 00:33Z) Stage C complete: remaining DOM-heavy hotspot suites
   now register module mocks from suite-local loaders, restore mocks in the same
-  file, and use explicit window replacement helpers where readonly globals were
-  previously reassigned directly.
-- [x] (2026-03-07 00:35Z) Stage E complete: `docs/developers-guide.md`,
-  `docs/velocetty-design.md`, and `docs/roadmap.md` now describe the shared
-  unit-suite workflow and retire the bootstrap quarantine note.
-- [x] (2026-03-07 00:42Z) Stage F complete: `bun install`, `make build`,
+  file, use explicit window replacement helpers where readonly globals were
+  previously reassigned directly, and the original failing randomized seed
+  (`2444615283`) now passes across `test/unit` in one Bun process.
+- [x] (2026-03-07 00:35Z) Stage D complete: removed the dedicated bootstrap
+  quarantine from `package.json` and `Makefile`, and
+  `docs/developers-guide.md`, `docs/velocetty-design.md`, and
+  `docs/roadmap.md` now describe the shared unit-suite workflow and retire the
+  bootstrap quarantine note.
+- [x] (2026-03-07 00:42Z) Stage E complete: `bun install`, `make build`,
   `make check-fmt`, `make lint`, `make test`, and randomized seeded runs for
   `1337`, `20260306`, and `2444615283` all passed on the final tree.
 
-## Surprises & Discoveries
+## Surprises & discoveries
 
 - Observation: part of roadmap item `9.3.1` is already complete.
   Evidence: `package.json` defines `test:unit:bootstrap-transport`, `Makefile`
@@ -250,7 +250,7 @@ inline mocks:
   the helper API and entrypoint must be updated together or the refactor fails
   at build time before tests can protect it.
 
-## Decision Log
+## Decision log
 
 - Decision: keep this plan focused on a narrow bootstrap-extraction and
   test-isolation refactor, not a full renderer bootstrap redesign.
@@ -403,7 +403,7 @@ The implementation is acceptable only when all of the following are true:
 5. The gate logs and three seed logs exist under `/tmp/` with the exact command
    evidence used to close the roadmap item.
 
-## Outcomes & Retrospective
+## Outcomes & retrospective
 
 Roadmap item `9.3.1` is complete. The shipped production change is a new
 bootstrap seam in `lib/bootstrap/renderer-bootstrap.ts`, with `lib/index.tsx`
