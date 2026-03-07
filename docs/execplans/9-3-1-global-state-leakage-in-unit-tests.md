@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -160,17 +160,29 @@ inline mocks:
 - [x] (2026-03-06 23:53Z) Used an agent team to inspect the bootstrap
   quarantine and the DOM/mock-leak hotspots.
 - [x] (2026-03-06 23:53Z) Drafted this ExecPlan.
-- [ ] Await explicit approval before implementation.
-- [ ] Stage A: reproduce or at least probe current same-process order
-  sensitivity and record the baseline.
-- [ ] Stage B: extract explicit bootstrap dependency-injection seams from
-  `lib/index.tsx` while preserving runtime order.
-- [ ] Stage C: rewrite bootstrap and renderer isolation tests to use those
-  seams and deterministic mock teardown.
-- [ ] Stage D: remove the quarantine from `package.json`, `Makefile`, and
-  developer/design docs once the same-process suite is stable.
-- [ ] Stage E: run the full validation sequence and mark roadmap item `9.3.1`
-  done.
+- [x] (2026-03-07 00:00Z) Received explicit approval to begin implementation.
+- [x] (2026-03-07 00:05Z) Stage A baseline complete: same-process randomized
+  execution with `VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1` failed with
+  22 failures spanning bootstrap import wiring, `Hyper` DOM suites,
+  `setupHappyDom`, `rpc-client`, `command-registry-validation`, notification
+  tests, and `tabs-decoration-updates`.
+- [x] (2026-03-07 00:18Z) Stage B complete: extracted renderer bootstrap into
+  injected helpers under `lib/bootstrap/renderer-bootstrap.ts`, rewrote
+  `test/unit/bootstrap-transport-integration.test.ts` to use dependency
+  injection instead of module-scope mocks, and removed the dedicated bootstrap
+  quarantine from `package.json` and `Makefile`.
+- [x] (2026-03-07 00:20Z) Stage C complete: the original failing randomized seed
+  (`2444615283`) now passes across `test/unit` in one Bun process.
+- [x] (2026-03-07 00:33Z) Stage D complete: remaining DOM-heavy hotspot suites
+  now register module mocks from suite-local loaders, restore mocks in the same
+  file, and use explicit window replacement helpers where readonly globals were
+  previously reassigned directly.
+- [x] (2026-03-07 00:35Z) Stage E complete: `docs/developers-guide.md`,
+  `docs/velocetty-design.md`, and `docs/roadmap.md` now describe the shared
+  unit-suite workflow and retire the bootstrap quarantine note.
+- [x] (2026-03-07 00:42Z) Stage F complete: `bun install`, `make build`,
+  `make check-fmt`, `make lint`, `make test`, and randomized seeded runs for
+  `1337`, `20260306`, and `2444615283` all passed on the final tree.
 
 ## Surprises & Discoveries
 
@@ -202,6 +214,42 @@ inline mocks:
   Impact: Stage C must normalize same-file lifecycle ownership before claiming
   the randomized-order success criteria.
 
+- Observation: the shared-process baseline reveals that leakage currently
+  extends beyond the originally targeted hotspot list.
+  Evidence: the first seeded same-process run failed in
+  `test/unit/bootstrap-transport-integration.test.ts`,
+  `test/unit/hyper-effects.test.ts`,
+  `test/unit/command-registry-validation.test.ts`,
+  `test/unit/rpc-client.test.ts`,
+  `test/unit/electron-ipc-transport.test.ts`,
+  `test/unit/notification.test.ts`,
+  `test/unit/tabs-decoration-updates.test.ts`,
+  `test/unit/happy-dom.test.ts`, and
+  `test/unit/electron-e2e-helpers.test.ts`.
+  Impact: the implementation should remove the bootstrap blast radius first,
+  then rerun focused randomized checks before deciding whether additional
+  teardown normalization is still required outside the renderer-heavy suites.
+
+- Observation: once the bootstrap import-time side effects were replaced with
+  injected helpers, the original failing seed passed across the full unit suite
+  without the dedicated bootstrap process.
+  Evidence: `bun test --max-concurrency=1 --randomize --seed 2444615283
+  test/unit` completed successfully after the `lib/bootstrap/renderer-bootstrap.ts`
+  extraction and test rewrites.
+  Impact: the remaining work is hardening and documentation, not a second large
+  production refactor.
+
+- Observation: the extracted bootstrap helper and the thin entrypoint drifted
+  briefly during implementation.
+  Evidence: `make build` failed when `lib/index.tsx` still called
+  `startRendererBootstrap(...)` with the old flat dependency shape while
+  `lib/bootstrap/renderer-bootstrap.ts` exported
+  `startRendererApplication(...)` with nested `actions`, `configureStore`, and
+  `mountApp` seams.
+  Impact: keeping `lib/index.tsx` as a thin composition layer is correct, but
+  the helper API and entrypoint must be updated together or the refactor fails
+  at build time before tests can protect it.
+
 ## Decision Log
 
 - Decision: keep this plan focused on a narrow bootstrap-extraction and
@@ -223,6 +271,23 @@ inline mocks:
   `lib/index.tsx` and map directly to the test blast radius observed in the
   bootstrap integration suite.
   Date/Author: 2026-03-06 / Codex
+
+- Decision: after the first same-process seed passed, keep additional cleanup
+  focused on deterministic teardown and docs rather than widening production
+  scope again.
+  Rationale: roadmap `9.3.1` closes on shared-process stability and teardown
+  hygiene; once the injected bootstrap seam removed the dominant leak vector,
+  the remaining work became bounded and test-facing.
+  Date/Author: 2026-03-07 / Codex
+
+- Decision: use a dedicated test helper to replace `globalThis.window` in
+  readonly-hosted suites instead of continuing direct assignment or broad
+  module-level globals.
+  Rationale: several remaining failures were not transport-specific; they came
+  from suites mutating `window` in ways that were difficult to restore
+  deterministically once Bun randomized file order. A small helper in
+  `test/testUtils/global-window.ts` made the ownership boundary explicit.
+  Date/Author: 2026-03-07 / Codex
 
 ## Implementation plan
 
@@ -340,5 +405,47 @@ The implementation is acceptable only when all of the following are true:
 
 ## Outcomes & Retrospective
 
-Not started. This section must be rewritten during implementation with the
-actual extracted seams, files changed, gate evidence, and lessons learned.
+Roadmap item `9.3.1` is complete. The shipped production change is a new
+bootstrap seam in `lib/bootstrap/renderer-bootstrap.ts`, with `lib/index.tsx`
+reduced to the real dependency composition layer that injects actions, store
+creation, config wiring, transport wiring, and React mounting into the helper.
+That let `test/unit/bootstrap-transport-integration.test.ts` target transport
+listener registration directly instead of importing a side-effect-only renderer
+entrypoint behind file-scope `mock.module(...)`.
+
+The accompanying test-isolation work removed file-scope mock blast radius from
+the identified DOM-heavy suites. `test/unit/hyper-effects.test.ts`,
+`test/unit/hyper-transport.test.ts`,
+`test/unit/tabs-decoration-updates.test.ts`, and
+`test/unit/term-report-renderer.test.ts` now install module mocks from
+suite-local helpers and restore them in the same file. Window-owning tests use
+`test/testUtils/global-window.ts` so readonly globals are installed and
+restored deterministically rather than leaking between files. The command
+registry, RPC client, and runtime tab-provider tests were updated to use the
+same deterministic window ownership model.
+
+Repository workflow is now aligned with the implementation. `package.json` and
+`Makefile` no longer special-case a bootstrap-only Bun lane, the developers
+guide documents the shared `make test` path plus seeded replay commands, the
+design note now describes injected seams instead of process isolation, and the
+roadmap marks `9.3.1` done.
+
+Final validation evidence:
+
+```plaintext
+/tmp/bun-install-velocetty-9-3-1-global-state-leakage-in-unit-tests.out
+/tmp/build-velocetty-9-3-1-global-state-leakage-in-unit-tests.out
+/tmp/check-fmt-velocetty-9-3-1-global-state-leakage-in-unit-tests.out
+/tmp/lint-velocetty-9-3-1-global-state-leakage-in-unit-tests.out
+/tmp/test-velocetty-9-3-1-global-state-leakage-in-unit-tests.out
+/tmp/test-seed-1337-velocetty-9-3-1-global-state-leakage-in-unit-tests.out
+/tmp/test-seed-20260306-velocetty-9-3-1-global-state-leakage-in-unit-tests.out
+/tmp/test-seed-2444615283-velocetty-9-3-1-global-state-leakage-in-unit-tests.out
+```
+
+The main lesson is that randomized-order failures were driven more by import
+side effects and shared global ownership than by any single flaky assertion.
+Once the bootstrap logic became injectable and each DOM-heavy suite owned its
+mock and `window` lifecycle locally, the original failing seed and two
+additional seeds became stable without widening scope into parallel execution
+work reserved for roadmap item `9.3.2`.

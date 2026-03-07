@@ -1912,10 +1912,9 @@ façade, but the architecture is not yet fully host-agnostic:
 - Continue to harden bootstrap event-path assertions (for
   example: `ready`, `session add`, and `update available`) to
   defend transport-swap regressions.
-- Keep bootstrap transport integration assertions in a
-  process-isolated Bun lane while file-scope module mocks are
-  still required; remove this quarantine after bootstrap wiring
-  is refactored to dependency injection.
+- Keep bootstrap transport integration assertions focused on
+  injected bootstrap seams so transport event wiring can be
+  exercised without process-isolated module-mock quarantine.
 
 
 
@@ -2146,8 +2145,8 @@ Design:
 &nbsp; \-Keybinding capture integration with xterm focus.
 
 &nbsp; \-Plugin contribution loading and enable/disable flows.
-&nbsp; - Process-isolated transport bootstrap event-path assertion until
-&nbsp;   module-mock blast-radius removal in roadmap item 9.3.1 is complete.
+&nbsp; - Transport bootstrap event-path assertions should run in the shared unit
+&nbsp;   suite through dependency-injected bootstrap seams.
 
 - Performance tests:
 

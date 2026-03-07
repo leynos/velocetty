@@ -1,5 +1,5 @@
 /** @file Ensures runtime tab providers are registered even when initially disabled. */
-import {beforeEach, expect, mock, test} from 'bun:test';
+import {afterAll, beforeEach, expect, mock, test} from 'bun:test';
 
 import {GOLDEN_PATH_PLUGIN_ID} from '@shared/runtime/golden-path-demo';
 
@@ -47,6 +47,10 @@ beforeEach(() => {
   rendererConfig = {};
   rendererConfigSubscriptions.length = 0;
   subscribeRendererConfigMock.mockClear();
+});
+
+afterAll(() => {
+  mock.restore();
 });
 
 test('registers runtime tab providers for live enablement toggles', async () => {

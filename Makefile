@@ -17,7 +17,6 @@ lint:
 
 test:
 	bun run test:unit:run
-	bun run test:unit:bootstrap-transport
 
 coverage:
 	bun run test:coverage

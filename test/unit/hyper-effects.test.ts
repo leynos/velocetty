@@ -2,7 +2,7 @@
 import React, {act} from 'react';
 import {createRoot} from 'react-dom/client';
 
-import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import {afterEach, beforeEach, expect, mock, test} from 'bun:test';
 
 import type {HyperProps} from '../../typings/hyper';
 import {setupHappyDom} from '../testUtils/happy-dom';
@@ -27,9 +27,6 @@ type RpcWindow = Window & {
   focusActiveTerm?: (uid?: string) => void;
 };
 
-type HyperComponent = React.ComponentType<HyperProps>;
-
-let Hyper: HyperComponent;
 let registerCalls = 0;
 let bindCalls = 0;
 let resetCalls = 0;
@@ -41,6 +38,9 @@ let termsRef: TermsRef = {
   getTermByUid: () => null,
   getActiveTerm: () => null
 };
+let Hyper: React.ComponentType<HyperProps>;
+let cleanupHappyDom: (() => void) | null = null;
+let moduleInstanceCounter = 0;
 
 /**
  * Mousetrap test double that captures bind and reset activity.
@@ -70,7 +70,11 @@ const buildHyperProps = (overrides: Partial<HyperProps> = {}): HyperProps => ({
   ...overrides
 });
 
-const renderHyper = (root: ReturnType<typeof createRoot>, overrides: Partial<HyperProps> = {}) => {
+const renderHyper = (
+  Hyper: React.ComponentType<HyperProps>,
+  root: ReturnType<typeof createRoot>,
+  overrides: Partial<HyperProps> = {}
+) => {
   root.render(React.createElement(Hyper, buildHyperProps(overrides)));
 };
 
@@ -119,14 +123,13 @@ const registerHyperModuleMocks = () => {
   }));
 };
 
-registerHyperModuleMocks();
-
-beforeAll(async () => {
+const loadHyperComponent = async () => {
   registerHyperModuleMocks();
-  ({default: Hyper} = await import('../../lib/containers/hyper'));
-}, 15000);
+  moduleInstanceCounter += 1;
+  ({default: Hyper} = await import(`../../lib/containers/hyper.tsx?hyper_effects=${moduleInstanceCounter}`));
+};
 
-beforeEach(() => {
+beforeEach(async () => {
   registerCalls = 0;
   bindCalls = 0;
   resetCalls = 0;
@@ -139,10 +142,17 @@ beforeEach(() => {
     getActiveTerm: () => null
   };
   resetTransportMock();
+  cleanupHappyDom = await setupHappyDom();
+  await loadHyperComponent();
+});
+
+afterEach(() => {
+  cleanupHappyDom?.();
+  cleanupHappyDom = null;
+  mock.restore();
 });
 
 test.serial('Hyper attaches key listeners on mount and config updates', async () => {
-  const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -152,7 +162,7 @@ test.serial('Hyper attaches key listeners on mount and config updates', async ()
   const execCommand = () => {};
 
   await act(async () => {
-    renderHyper(root, {execCommand});
+    renderHyper(Hyper, root, {execCommand});
     await waitFor(0);
   });
 
@@ -161,14 +171,14 @@ test.serial('Hyper attaches key listeners on mount and config updates', async ()
   expect(resetCalls).toBe(0);
 
   await act(async () => {
-    renderHyper(root, {backgroundColor: '#111', execCommand});
+    renderHyper(Hyper, root, {backgroundColor: '#111', execCommand});
     await waitFor(0);
   });
 
   expect(registerCalls).toBe(1);
 
   await act(async () => {
-    renderHyper(root, {backgroundColor: '#111', lastConfigUpdate: 2, execCommand});
+    renderHyper(Hyper, root, {backgroundColor: '#111', lastConfigUpdate: 2, execCommand});
     await waitFor(0);
   });
 
@@ -177,11 +187,9 @@ test.serial('Hyper attaches key listeners on mount and config updates', async ()
   await act(async () => {
     root.unmount();
   });
-  cleanup();
 });
 
 test.serial('Hyper focuses the active session when it changes', async () => {
-  const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -199,14 +207,14 @@ test.serial('Hyper focuses the active session when it changes', async () => {
   };
 
   await act(async () => {
-    renderHyper(root);
+    renderHyper(Hyper, root);
     await waitFor(0);
   });
 
   expect(focusCalls).toBe(0);
 
   await act(async () => {
-    renderHyper(root, {activeSession: 'session-1'});
+    renderHyper(Hyper, root, {activeSession: 'session-1'});
     await waitFor(0);
   });
 
@@ -215,11 +223,9 @@ test.serial('Hyper focuses the active session when it changes', async () => {
   await act(async () => {
     root.unmount();
   });
-  cleanup();
 });
 
 test.serial('Hyper routes key handlers and select-all callbacks through terms', async () => {
-  const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -246,7 +252,7 @@ test.serial('Hyper routes key handlers and select-all callbacks through terms', 
   };
 
   await act(async () => {
-    renderHyper(root, {
+    renderHyper(Hyper, root, {
       execCommand: () => {
         commandCalls += 1;
       }
@@ -282,11 +288,9 @@ test.serial('Hyper routes key handlers and select-all callbacks through terms', 
     await waitFor(0);
   });
   expect(transportRemovedListeners).toContain('term selectAll');
-  cleanup();
 });
 
 test.serial('Hyper does not call preventDefault when key handlers allow default behaviour', async () => {
-  const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -299,7 +303,7 @@ test.serial('Hyper does not call preventDefault when key handlers allow default 
   registeredKeys = {demo: 'demo:command'};
 
   await act(async () => {
-    renderHyper(root, {
+    renderHyper(Hyper, root, {
       execCommand: () => {
         commandCalls += 1;
       }
@@ -320,11 +324,9 @@ test.serial('Hyper does not call preventDefault when key handlers allow default 
   await act(async () => {
     root.unmount();
   });
-  cleanup();
 });
 
 test.serial('Hyper forwards local handlers and fallback commands to execCommand', async () => {
-  const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -343,7 +345,7 @@ test.serial('Hyper forwards local handlers and fallback commands to execCommand'
   const execCommandCalls: Array<{command: string; handler: unknown; event: unknown}> = [];
 
   await act(async () => {
-    renderHyper(root, {
+    renderHyper(Hyper, root, {
       execCommand: (command: string, handler: unknown, event: unknown) => {
         execCommandCalls.push({command, handler, event});
       }
@@ -373,5 +375,4 @@ test.serial('Hyper forwards local handlers and fallback commands to execCommand'
   await act(async () => {
     root.unmount();
   });
-  cleanup();
 });

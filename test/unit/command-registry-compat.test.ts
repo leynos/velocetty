@@ -36,6 +36,8 @@ import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 import {SESSION_SEARCH} from '@shared/constants/sessions';
 import type {CommandDefinition} from '@shared/types/commands';
 
+import {installTestWindow} from '../testUtils/global-window';
+
 let decoratedKeymaps: Record<string, string[]> = {};
 let runtimeCommands: CommandDefinition[] = [];
 const invokeMock = mock(async (channel: string) => {
@@ -81,35 +83,24 @@ let validateCommandArgsFor: typeof import('../../lib/command-registry').validate
 const TEST_COMMAND_PREFIX = 'test:command-registry:compat';
 const focusActiveTermMock = mock(() => {});
 const windowHost = globalThis as {window?: Record<string, unknown>};
-const previousWindow = windowHost.window;
-const previousFocusActiveTerm = previousWindow?.focusActiveTerm;
-let createdWindowForTest = false;
+const previousFocusActiveTerm = windowHost.window?.focusActiveTerm;
+let restoreWindow = () => {};
 let moduleInstanceCounter = 0;
 
 beforeAll(() => {
-  if (windowHost.window === undefined) {
-    windowHost.window = {};
-    createdWindowForTest = true;
-  }
-
+  restoreWindow = installTestWindow(windowHost.window ?? {});
   windowHost.window.focusActiveTerm = focusActiveTermMock;
 });
 
 afterAll(() => {
-  if (windowHost.window === undefined) {
-    return;
+  if (windowHost.window !== undefined) {
+    if (previousFocusActiveTerm === undefined) {
+      delete windowHost.window.focusActiveTerm;
+    } else {
+      windowHost.window.focusActiveTerm = previousFocusActiveTerm;
+    }
   }
-
-  if (previousFocusActiveTerm === undefined) {
-    delete windowHost.window.focusActiveTerm;
-  } else {
-    windowHost.window.focusActiveTerm = previousFocusActiveTerm;
-  }
-
-  if (createdWindowForTest) {
-    delete windowHost.window;
-    return;
-  }
+  restoreWindow();
 });
 
 beforeEach(async () => {

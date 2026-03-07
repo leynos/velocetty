@@ -3,6 +3,8 @@ import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 import type {CommandDefinition, CommandId} from '@shared/types/commands';
 import {goldenPathCommandDefinition, GOLDEN_PATH_COMMAND_ID} from '@shared/runtime/golden-path-demo';
 
+import {installTestWindow} from '../testUtils/global-window';
+
 let decoratedKeymaps: Record<string, string[]> = {};
 let runtimeCommands: CommandDefinition[] = [];
 const invokeMock = mock(async (channel: string) => {
@@ -35,7 +37,7 @@ let validateArgs: typeof import('../../lib/command-registry').validateArgs;
 let commandRegistry: typeof import('../../lib/command-registry').commandRegistry;
 const TEST_COMMAND_PREFIX = 'test:command-registry';
 const asCommandId = (value: string): CommandId => value as CommandId;
-const originalWindow = (globalThis as {window?: Record<string, unknown>}).window;
+let restoreWindow = () => {};
 
 const createCommandDefinition = (commandId: string, title = commandId): CommandDefinition => ({
   id: asCommandId(commandId),
@@ -46,7 +48,7 @@ const createCommandDefinition = (commandId: string, title = commandId): CommandD
 });
 
 beforeAll(async () => {
-  (globalThis as {window?: Record<string, unknown>}).window = {};
+  restoreWindow = installTestWindow();
 
   ({
     getRegisteredKeys,
@@ -65,12 +67,7 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  if (originalWindow === undefined) {
-    delete (globalThis as {window?: Record<string, unknown>}).window;
-    return;
-  }
-
-  (globalThis as {window?: Record<string, unknown>}).window = originalWindow;
+  restoreWindow();
 });
 
 beforeEach(() => {

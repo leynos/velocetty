@@ -3,6 +3,8 @@ import {afterEach, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
 import type {IpcRendererEvent} from 'electron';
 
+import {installTestWindow} from '../testUtils/global-window';
+
 type IpcListener = (event: IpcRendererEvent, ...args: any[]) => void;
 
 const channelListeners = new Map<string, IpcListener[]>();
@@ -32,6 +34,7 @@ mock.module('../../lib/utils/ipc', () => ({
 }));
 
 let Client: typeof import('../../lib/utils/rpc').default;
+let restoreWindow = () => {};
 
 beforeAll(async () => {
   ({default: Client} = await import('../../lib/utils/rpc'));
@@ -42,11 +45,11 @@ beforeEach(() => {
   onMock.mockClear();
   sendMock.mockClear();
   removeAllListenersMock.mockClear();
-  (globalThis as {window?: Record<string, unknown>}).window = {};
+  restoreWindow = installTestWindow();
 });
 
 afterEach(() => {
-  delete (globalThis as {window?: Record<string, unknown>}).window;
+  restoreWindow();
 });
 
 test('subscribes to init channel and becomes ready when init event arrives', () => {

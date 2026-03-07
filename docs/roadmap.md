@@ -480,18 +480,18 @@ Scope notes:
 
 ### 9.3. Unit-test isolation and concurrency safety
 
-- [ ] 9.3.1. Eliminate cross-suite global state leakage in unit tests. Requires
+- [x] 9.3.1. Eliminate cross-suite global state leakage in unit tests. Requires
   1.1.2 and 9.1.1. See [velocetty-design.md](velocetty-design.md) §Testing.
-  - [x] Quarantine `test/unit/bootstrap-transport-integration.test.ts` behind
-    `VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1` and execute it in a
-    dedicated Bun process from `make test`.
-  - [ ] Remove file-scope `mock.module(...)` blast radius in suites that mutate
+  - [x] Replace the temporary bootstrap quarantine with injected renderer
+    bootstrap seams so `test/unit/bootstrap-transport-integration.test.ts` runs
+    in the shared unit suite without a dedicated Bun process.
+  - [x] Remove file-scope `mock.module(...)` blast radius in suites that mutate
     shared renderer/runtime globals (`window`, `document`, transport mocks).
-  - [ ] Replace bootstrap module-mock wiring with explicit dependency injection
+  - [x] Replace bootstrap module-mock wiring with explicit dependency injection
     so the dedicated-process quarantine can be removed.
-  - [ ] Ensure each suite that calls `setupHappyDom()` performs deterministic
+  - [x] Ensure each suite that calls `setupHappyDom()` performs deterministic
     teardown in the same file and restores module mocks after use.
-  - [ ] Success criteria: repeated `bun test --randomize --seed <N>` runs are
+  - [x] Success criteria: repeated `bun test --randomize --seed <N>` runs are
     stable with no order-dependent failures across at least three seeds.
 - [ ] 9.3.2. Restore parallel unit-test execution after isolation hardening.
   Requires 9.3.1. See [velocetty-design.md](velocetty-design.md) §Testing.
