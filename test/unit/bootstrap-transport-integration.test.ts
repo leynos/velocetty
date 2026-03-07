@@ -1,4 +1,17 @@
-/** @file Asserts bootstrap stream handlers use transport-on callbacks. */
+/**
+ * @file Asserts bootstrap stream handlers wire transport-on callbacks.
+ *
+ * Exercises `registerTransportListeners` from
+ * `lib/bootstrap/renderer-bootstrap.ts` with in-test transport, store,
+ * plugins, and action-creator stubs.
+ *
+ * Invariants: listener registration order is deterministic; transport mocks
+ * and dispatch spies are reset before each test via
+ * `resetTransportListenersFixture`; and the returned cleanup removes every
+ * registered listener with one-to-one `on`/`off` correspondence.
+ *
+ * @see lib/bootstrap/renderer-bootstrap.ts
+ */
 import {beforeEach, describe, expect, mock, test} from 'bun:test';
 
 import type {Session} from '@shared/types/common';
