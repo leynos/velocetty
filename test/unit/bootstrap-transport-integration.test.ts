@@ -16,6 +16,14 @@ import {beforeEach, describe, expect, mock, test} from 'bun:test';
 
 import type {Session} from '@shared/types/common';
 
+const createMockSession = (overrides: Partial<Session> & {uid: string}): Session =>
+  ({
+    shell: '/bin/bash',
+    pid: 0,
+    profile: 'default',
+    ...overrides
+  }) as Session;
+
 import {
   registerTransportListeners,
   type AddNotificationParams,
@@ -372,18 +380,8 @@ describe('bootstrap transport event wiring', () => {
   test('session add event dispatches SESSION_ADD actions', () => {
     clearDispatch();
 
-    getListener(TransportEvent.SessionAdd)({
-      uid: 's-1',
-      shell: '/bin/bash',
-      pid: 100,
-      profile: 'default'
-    } as unknown as Session);
-    getListener(TransportEvent.SessionAdd)({
-      uid: 's-2',
-      shell: '/bin/bash',
-      pid: 101,
-      profile: 'default'
-    } as unknown as Session);
+    getListener(TransportEvent.SessionAdd)(createMockSession({uid: 's-1', pid: 100}));
+    getListener(TransportEvent.SessionAdd)(createMockSession({uid: 's-2', pid: 101}));
     expect(dispatchMock.mock.calls).toContainEqual([
       {type: ActionType.SessionAdd, session: {uid: 's-1', shell: '/bin/bash', pid: 100, profile: 'default'}}
     ]);
@@ -533,12 +531,7 @@ describe('bootstrap transport event wiring', () => {
     clearDispatch();
 
     getListener(TransportEvent.Ready)(null);
-    getListener(TransportEvent.SessionAdd)({
-      uid: 'seq-1',
-      shell: '/bin/bash',
-      pid: 200,
-      profile: 'default'
-    } as unknown as Session);
+    getListener(TransportEvent.SessionAdd)(createMockSession({uid: 'seq-1', pid: 200}));
     const uid = '01234567-89ab-cdef-0123-456789abcdef';
     getListener(TransportEvent.SessionData)(`${uid}initial output`);
     getListener(TransportEvent.UpdateAvailable)({
@@ -589,12 +582,7 @@ describe('bootstrap transport event wiring', () => {
     clearDispatch();
 
     getListener(TransportEvent.Ready)(null);
-    getListener(TransportEvent.SessionAdd)({
-      uid: 'prereq-1',
-      shell: '/bin/zsh',
-      pid: 300,
-      profile: 'default'
-    } as unknown as Session);
+    getListener(TransportEvent.SessionAdd)(createMockSession({uid: 'prereq-1', shell: '/bin/zsh', pid: 300}));
     const uid = '01234567-89ab-cdef-0123-456789abcdef';
     getListener(TransportEvent.SessionData)(`${uid}post-ready output`);
 
