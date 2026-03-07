@@ -12,11 +12,12 @@ type WindowValue = Record<string, unknown> | (Window & typeof globalThis.window)
  */
 export const installTestWindow = (value: WindowValue = {}): (() => void) => {
   const windowHost = globalThis as WindowHost;
-  const hadWindow = Object.hasOwn(windowHost, 'window');
-  const previousWindow = windowHost.window;
+  const previousDescriptor = Object.getOwnPropertyDescriptor(windowHost, 'window');
+  const hadWindow = previousDescriptor !== undefined;
 
   Object.defineProperty(windowHost, 'window', {
     configurable: true,
+    enumerable: previousDescriptor?.enumerable ?? true,
     value
   });
 
@@ -26,9 +27,6 @@ export const installTestWindow = (value: WindowValue = {}): (() => void) => {
       return;
     }
 
-    Object.defineProperty(windowHost, 'window', {
-      configurable: true,
-      value: previousWindow
-    });
+    Object.defineProperty(windowHost, 'window', previousDescriptor!);
   };
 };
