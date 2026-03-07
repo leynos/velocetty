@@ -48,6 +48,7 @@ test('installTestWindow restores the prior window value when one existed', () =>
     configurable: true,
     value: originalWindow
   });
+  const expectedWindowDescriptor = Object.getOwnPropertyDescriptor(windowHost, 'window');
 
   const replacementWindow = {replacementWindow: true};
   const restoreWindow = installTestWindow(replacementWindow);
@@ -57,10 +58,11 @@ test('installTestWindow restores the prior window value when one existed', () =>
   restoreWindow();
 
   expect(windowHost.window).toBe(originalWindow);
-  expect(Object.getOwnPropertyDescriptor(windowHost, 'window')?.configurable).toBe(true);
+  expect(Object.getOwnPropertyDescriptor(windowHost, 'window')).toStrictEqual(expectedWindowDescriptor);
 });
 
 test('installTestWindow keeps the descriptor configurable for later overwrites', () => {
+  const expectedWindowDescriptor = Object.getOwnPropertyDescriptor(windowHost, 'window');
   const restoreWindow = installTestWindow({firstWindow: true});
   const laterWindow = {laterWindow: true};
 
@@ -72,4 +74,6 @@ test('installTestWindow keeps the descriptor configurable for later overwrites',
   expect(windowHost.window).toBe(laterWindow);
 
   restoreWindow();
+
+  expect(Object.getOwnPropertyDescriptor(windowHost, 'window')).toStrictEqual(expectedWindowDescriptor);
 });

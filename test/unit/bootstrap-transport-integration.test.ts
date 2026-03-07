@@ -100,9 +100,34 @@ type Listener = (payload: unknown) => void;
 const transport = {
   invoke: mock(async () => ({})),
   emit: mock(() => true),
-  off: mock((_event: string, _listener: Listener) => transport),
+  off: mock((event: string, listener: Listener) => {
+    const handlers = transportOnCalls[event];
+    if (!handlers) {
+      return transport;
+    }
+
+    const remainingHandlers = handlers.filter((registeredListener) => registeredListener !== listener);
+    if (remainingHandlers.length === 0) {
+      delete transportOnCalls[event];
+    } else {
+      transportOnCalls[event] = remainingHandlers;
+    }
+
+    return transport;
+  }),
   once: mock((_event: string, _listener: Listener) => transport),
-  removeAllListeners: mock((_event?: string) => transport),
+  removeAllListeners: mock((event?: string) => {
+    if (event) {
+      delete transportOnCalls[event];
+      return transport;
+    }
+
+    Object.keys(transportOnCalls).forEach((key) => {
+      delete transportOnCalls[key];
+    });
+
+    return transport;
+  }),
   destroy: mock(() => {}),
   on: mock((event: string, listener: Listener) => {
     transportOnCalls[event] = transportOnCalls[event] ? [...transportOnCalls[event], listener] : [listener];
@@ -289,7 +314,7 @@ describe('bootstrap transport event wiring', () => {
       TransportEvent.Reload
     ];
 
-    const registeredEvents = transport.on.mock.calls.map(([name]: [string]) => name);
+    const registeredEvents = transport.on.mock.calls.map(([name]: [string, ...unknown[]]) => name);
 
     expect(registeredEvents).toHaveLength(expectedEvents.length);
     expect([...registeredEvents].sort()).toEqual([...expectedEvents].sort());
@@ -320,6 +345,7 @@ describe('bootstrap transport event wiring', () => {
     for (const [event, listener] of registeredPairs) {
       expect(transport.off.mock.calls).toContainEqual([event, listener]);
     }
+    expect(Object.values(transportOnCalls).flat()).toHaveLength(0);
   });
 
   test('ready dispatches init and font smoothing', () => {
