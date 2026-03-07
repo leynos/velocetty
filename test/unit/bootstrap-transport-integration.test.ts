@@ -166,7 +166,7 @@ const store = {
 };
 
 const init = () => ({type: ActionType.InitAction});
-const addNotificationMessage = ({text, url, dismissable}: AddNotificationParams) => ({
+const addNotificationMessage = ({text, url = null, dismissable = true}: AddNotificationParams) => ({
   type: ActionType.AddNotification,
   text,
   url,
