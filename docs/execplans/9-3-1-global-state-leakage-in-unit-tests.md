@@ -300,7 +300,7 @@ bootstrap integration file back into the same Bun process as the rest of
 ```bash
 set -o pipefail && VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1 \
   bun test --max-concurrency=1 --randomize --seed 2444615283 test/unit \
-  | tee /tmp/test-baseline-$(get-project)-$(git branch --show).out
+  | tee /tmp/test-baseline-$(get-project)-$(git branch --show-current).out
 ```
 
 Repeat with two more fixed seeds. If none fail, still keep the code-inspection
@@ -361,15 +361,15 @@ order and log naming convention:
 
 ```bash
 set -o pipefail && bun install \
-  | tee /tmp/bun-install-$(get-project)-$(git branch --show).out
+  | tee /tmp/bun-install-$(get-project)-$(git branch --show-current).out
 set -o pipefail && make build \
-  | tee /tmp/build-$(get-project)-$(git branch --show).out
+  | tee /tmp/build-$(get-project)-$(git branch --show-current).out
 set -o pipefail && make check-fmt \
-  | tee /tmp/check-fmt-$(get-project)-$(git branch --show).out
+  | tee /tmp/check-fmt-$(get-project)-$(git branch --show-current).out
 set -o pipefail && make lint \
-  | tee /tmp/lint-$(get-project)-$(git branch --show).out
+  | tee /tmp/lint-$(get-project)-$(git branch --show-current).out
 set -o pipefail && make test \
-  | tee /tmp/test-$(get-project)-$(git branch --show).out
+  | tee /tmp/test-$(get-project)-$(git branch --show-current).out
 ```
 
 After the gate sequence passes, prove the roadmap success criterion explicitly
@@ -377,11 +377,11 @@ with at least three seeded randomized runs, for example:
 
 ```bash
 set -o pipefail && bun test --max-concurrency=1 --randomize --seed 2444615283 test/unit \
-  | tee /tmp/test-seed-2444615283-$(get-project)-$(git branch --show).out
+  | tee /tmp/test-seed-2444615283-$(get-project)-$(git branch --show-current).out
 set -o pipefail && bun test --max-concurrency=1 --randomize --seed 1337 test/unit \
-  | tee /tmp/test-seed-1337-$(get-project)-$(git branch --show).out
+  | tee /tmp/test-seed-1337-$(get-project)-$(git branch --show-current).out
 set -o pipefail && bun test --max-concurrency=1 --randomize --seed 20260306 test/unit \
-  | tee /tmp/test-seed-20260306-$(get-project)-$(git branch --show).out
+  | tee /tmp/test-seed-20260306-$(get-project)-$(git branch --show-current).out
 ```
 
 If all three pass, update the roadmap checkbox, keep the developers guide and
