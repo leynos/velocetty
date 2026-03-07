@@ -165,7 +165,7 @@ export const exposeRendererGlobals = ({
  * config change events.
  */
 const isBellSoundEnabled = (config: configOptions): config is configOptions & {bellSoundURL: string} =>
-  config.bell?.toUpperCase() === 'SOUND' && Boolean(config.bellSoundURL);
+  typeof config.bell === 'string' && config.bell.toUpperCase() === 'SOUND' && Boolean(config.bellSoundURL);
 
 export const initializeRendererConfig = ({
   actions,
@@ -398,19 +398,29 @@ export const startRendererApplication = (dependencies: RendererBootstrapDependen
     windowObject: dependencies.windowObject
   });
 
-  const unsubscribeConfig = initializeRendererConfig({
-    actions: dependencies.actions,
-    config: dependencies.config,
-    getBase64FileData: dependencies.getBase64FileData,
-    store
-  });
-  const removeTransportListeners = registerRendererTransportListeners({
-    actions: dependencies.actions,
-    plugins: dependencies.plugins,
-    store,
-    transport: dependencies.transport
-  });
-  const mountedApp = dependencies.mountApp(store);
+  let unsubscribeConfig = () => {};
+  let removeTransportListeners = () => {};
+  let mountedApp: MountResult;
+
+  try {
+    unsubscribeConfig = initializeRendererConfig({
+      actions: dependencies.actions,
+      config: dependencies.config,
+      getBase64FileData: dependencies.getBase64FileData,
+      store
+    });
+    removeTransportListeners = registerRendererTransportListeners({
+      actions: dependencies.actions,
+      plugins: dependencies.plugins,
+      store,
+      transport: dependencies.transport
+    });
+    mountedApp = dependencies.mountApp(store);
+  } catch (error) {
+    removeTransportListeners();
+    unsubscribeConfig();
+    throw error;
+  }
 
   return {
     store,

@@ -42,7 +42,7 @@ startRendererApplication({
   mountApp: (store) => {
     const root = createRoot(mountElement);
     root.render(
-      <Provider store={store}>
+      <Provider store={store as ReturnType<typeof configureStore>}>
         <HyperContainer />
       </Provider>
     );
