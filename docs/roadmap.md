@@ -491,7 +491,7 @@ Scope notes:
     so the dedicated-process quarantine can be removed.
   - [x] Ensure each suite that calls `setupHappyDom()` performs deterministic
     teardown in the same file and restores module mocks after use.
-  - [x] Success criteria: repeated `bun test --randomize --seed <N>` runs are
+  - [x] Success criteria: repeated `bun test --randomize --seed <N> --max-concurrency=1` runs are
     stable with no order-dependent failures across at least three seeds.
 - [ ] 9.3.2. Restore parallel unit-test execution after isolation hardening.
   Requires 9.3.1. See [velocetty-design.md](velocetty-design.md) §Testing.
