@@ -54,9 +54,12 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-  cleanupHappyDom?.();
-  cleanupHappyDom = null;
-  mock.restore();
+  try {
+    cleanupHappyDom?.();
+  } finally {
+    cleanupHappyDom = null;
+    mock.restore();
+  }
 });
 
 const mountTabs = async (root: ReturnType<typeof createRoot>) => {
