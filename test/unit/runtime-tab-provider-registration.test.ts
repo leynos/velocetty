@@ -16,34 +16,37 @@ const subscribeRendererConfigMock = mock((listener: () => void) => {
   return () => {};
 });
 
-mock.module('../../lib/utils/config', () => ({
-  getConfig: () => rendererConfig,
-  subscribe: subscribeRendererConfigMock
-}));
+const registerPluginsModuleMocks = () => {
+  mock.module('../../lib/utils/config', () => ({
+    getConfig: () => rendererConfig,
+    subscribe: subscribeRendererConfigMock
+  }));
 
-mock.module('../../lib/utils/notify', () => ({
-  default: () => {}
-}));
+  mock.module('../../lib/utils/notify', () => ({
+    default: () => {}
+  }));
 
-mock.module('../../lib/utils/remote-plugins', () => ({
-  loadRemotePluginsModule: () => ({
-    getPaths: () => ({
-      plugins: [],
-      localPlugins: []
-    }),
-    getLoadedPluginVersions: () => [],
-    getDeprecatedConfig: () => ({})
-  })
-}));
+  mock.module('../../lib/utils/remote-plugins', () => ({
+    loadRemotePluginsModule: () => ({
+      getPaths: () => ({
+        plugins: [],
+        localPlugins: []
+      }),
+      getLoadedPluginVersions: () => [],
+      getDeprecatedConfig: () => ({})
+    })
+  }));
 
-mock.module('../../lib/utils/ipc-child-process', () => ({
-  default: {
-    exec: () => {},
-    execFile: () => {}
-  }
-}));
+  mock.module('../../lib/utils/ipc-child-process', () => ({
+    default: {
+      exec: () => {},
+      execFile: () => {}
+    }
+  }));
+};
 
 beforeEach(() => {
+  registerPluginsModuleMocks();
   rendererConfig = {};
   rendererConfigSubscriptions.length = 0;
   subscribeRendererConfigMock.mockClear();
