@@ -164,6 +164,9 @@ export const exposeRendererGlobals = ({
  * Initializes config state and keeps bell-sound hydration aligned with later
  * config change events.
  */
+const isBellSoundEnabled = (config: configOptions): config is configOptions & {bellSoundURL: string} =>
+  config.bell?.toUpperCase() === 'SOUND' && Boolean(config.bellSoundURL);
+
 export const initializeRendererConfig = ({
   actions,
   config,
@@ -174,14 +177,14 @@ export const initializeRendererConfig = ({
 }): (() => void) => {
   const fetchFileData = (configData: configOptions) => {
     const configInfo: configOptions = {...configData, bellSound: null};
-    if (!configInfo.bell || configInfo.bell.toUpperCase() !== 'SOUND' || !configInfo.bellSoundURL) {
+    if (!isBellSoundEnabled(configInfo)) {
       store.dispatch(actions.reloadConfig(configInfo));
       return;
     }
 
     void getBase64FileData(configInfo.bellSoundURL).then((base64FileData) => {
       // Prepend "base64," so xterm.js can decode the in-memory bell sound.
-      const bellSound = !base64FileData ? null : `base64,${base64FileData}`;
+      const bellSound = base64FileData == null ? null : `base64,${base64FileData}`;
       configInfo.bellSound = bellSound;
       store.dispatch(actions.reloadConfig(configInfo));
     });
