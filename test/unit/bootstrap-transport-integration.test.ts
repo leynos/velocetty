@@ -192,6 +192,17 @@ const plugins = {
   reload: pluginsReloadMock
 };
 
+const createBootstrapActions = () => ({
+  addNotificationMessage,
+  init,
+  loadConfig: mock((_config: unknown) => ({type: ActionType.LoadConfig})),
+  reloadConfig: mock((_config: unknown) => ({type: ActionType.ReloadConfig})),
+  sessionActions,
+  termGroupActions,
+  uiActions,
+  updaterActions
+});
+
 const getListener = (event: string): Listener => {
   const handlers = transportOnCalls[event];
   if (!handlers || handlers.length === 0) {
@@ -200,7 +211,7 @@ const getListener = (event: string): Listener => {
   return handlers[handlers.length - 1];
 };
 
-const registerBootstrapTransportListeners = () => {
+const resetTransportListenersFixture = () => {
   dispatchMock.mockClear();
   pluginsReloadMock.mockClear();
   transport.invoke.mockClear();
@@ -213,18 +224,13 @@ const registerBootstrapTransportListeners = () => {
   Object.keys(transportOnCalls).forEach((key) => {
     transportOnCalls[key] = [];
   });
+};
 
-  registerTransportListeners({
-    actions: {
-      addNotificationMessage,
-      init,
-      loadConfig: mock((_config: unknown) => ({type: ActionType.LoadConfig})),
-      reloadConfig: mock((_config: unknown) => ({type: ActionType.ReloadConfig})),
-      sessionActions,
-      termGroupActions,
-      uiActions,
-      updaterActions
-    },
+const registerBootstrapTransportListeners = () => {
+  resetTransportListenersFixture();
+
+  return registerTransportListeners({
+    actions: createBootstrapActions(),
     plugins,
     store,
     transport
@@ -290,6 +296,29 @@ describe('bootstrap transport event wiring', () => {
 
     for (const event of expectedEvents) {
       expect(transport.on.mock.calls).toContainEqual([event, expect.any(Function)]);
+    }
+  });
+
+  test('cleanup removes every registered transport listener', () => {
+    resetTransportListenersFixture();
+
+    const cleanup = registerTransportListeners({
+      actions: createBootstrapActions(),
+      plugins,
+      store,
+      transport
+    });
+    const registeredPairs = transport.on.mock.calls.map(
+      ([event, listener]: [string, Listener]) => [event, listener] as const
+    );
+
+    expect(registeredPairs.length).toBeGreaterThan(0);
+
+    cleanup();
+
+    expect(transport.off.mock.calls).toHaveLength(registeredPairs.length);
+    for (const [event, listener] of registeredPairs) {
+      expect(transport.off.mock.calls).toContainEqual([event, listener]);
     }
   });
 
