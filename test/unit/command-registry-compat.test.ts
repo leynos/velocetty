@@ -32,7 +32,7 @@
  * - `./ensure-directory-path.test.ts` is the companion example for this
  *   richer test-module header format
  */
-import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import {afterAll, afterEach, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 import {SESSION_SEARCH} from '@shared/constants/sessions';
 import type {CommandDefinition} from '@shared/types/commands';
 
@@ -101,6 +101,10 @@ afterAll(() => {
     }
   }
   restoreWindow();
+});
+
+afterEach(() => {
+  mock.restore();
 });
 
 beforeEach(async () => {
