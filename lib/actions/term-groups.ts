@@ -16,19 +16,29 @@ import findBySession from '../utils/term-groups';
 
 import {ptyExitSession, setActiveSession, userExitSession} from './sessions';
 
+type ResolvedSplitContext = {activeUid: string | undefined; profile: string | undefined};
+
+function resolveSplitContext(
+  {activeUid: requestedActiveUid, profile: requestedProfile}: SplitRequestParams,
+  getState: () => HyperState
+): ResolvedSplitContext {
+  const {sessions} = getState();
+  const activeUid = requestedActiveUid ?? sessions.activeUid;
+  const profile = requestedProfile ?? (activeUid ? sessions.sessions[activeUid].profile : window.profileName);
+  return {activeUid, profile};
+}
+
 function requestSplit(direction: 'VERTICAL' | 'HORIZONTAL') {
   return ({activeUid: requestedActiveUid, profile: requestedProfile}: SplitRequestParams = {}) =>
     (dispatch: HyperDispatch, getState: () => HyperState): void => {
       dispatch({
         type: SESSION_REQUEST,
         effect: () => {
-          const {ui, sessions} = getState();
-          const activeUid = requestedActiveUid ? requestedActiveUid : sessions.activeUid;
-          const profile = requestedProfile
-            ? requestedProfile
-            : activeUid
-              ? sessions.sessions[activeUid].profile
-              : window.profileName;
+          const {ui} = getState();
+          const {activeUid, profile} = resolveSplitContext(
+            {activeUid: requestedActiveUid, profile: requestedProfile},
+            getState
+          );
           transport.emit('new', {
             splitDirection: direction,
             cwd: ui.cwd,
@@ -56,14 +66,12 @@ export function requestTermGroup({activeUid: requestedActiveUid, profile: reques
     dispatch({
       type: TERM_GROUP_REQUEST,
       effect: () => {
-        const {ui, sessions} = getState();
+        const {ui} = getState();
         const {cwd} = ui;
-        const activeUid = requestedActiveUid ? requestedActiveUid : sessions.activeUid;
-        const profile = requestedProfile
-          ? requestedProfile
-          : activeUid
-            ? sessions.sessions[activeUid].profile
-            : window.profileName;
+        const {activeUid, profile} = resolveSplitContext(
+          {activeUid: requestedActiveUid, profile: requestedProfile},
+          getState
+        );
         transport.emit('new', {
           isNewGroup: true,
           cwd,
