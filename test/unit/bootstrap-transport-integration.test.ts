@@ -3,7 +3,14 @@ import {beforeEach, describe, expect, mock, test} from 'bun:test';
 
 import type {Session} from '@shared/types/common';
 
-import {registerTransportListeners} from '../../lib/bootstrap/renderer-bootstrap';
+import {
+  registerTransportListeners,
+  type AddNotificationParams,
+  type AddSessionDataParams,
+  type SendSessionDataParams,
+  type SplitRequestParams,
+  type UpdateAvailableParams
+} from '../../lib/bootstrap/renderer-bootstrap';
 
 const dispatchMock = mock((_action: unknown) => {});
 const transportOnCalls: Record<string, Array<(...args: unknown[]) => void>> = {};
@@ -33,7 +40,7 @@ const store = {
 };
 
 const init = () => ({type: 'INIT_ACTION'});
-const addNotificationMessage = (text: string, url: string | null, dismissable: boolean) => ({
+const addNotificationMessage = ({text, url, dismissable}: AddNotificationParams) => ({
   type: 'ADD_NOTIFICATION',
   text,
   url,
@@ -41,8 +48,8 @@ const addNotificationMessage = (text: string, url: string | null, dismissable: b
 });
 const sessionActions = {
   addSession: (session: unknown) => ({type: 'SESSION_ADD', session}),
-  addSessionData: (uid: string, data: string) => ({type: 'SESSION_DATA', uid, data}),
-  sendSessionData: (uid: string | null, data: string, escaped?: boolean) => ({
+  addSessionData: ({uid, data}: AddSessionDataParams) => ({type: 'SESSION_DATA', uid, data}),
+  sendSessionData: ({uid, data, escaped}: SendSessionDataParams) => ({
     type: 'SESSION_DATA_SEND',
     uid,
     data,
@@ -56,17 +63,17 @@ const sessionActions = {
   createExitAction: () => () => ({type: 'CREATE_EXIT_ACTION'})
 };
 const termGroupActions = {
-  requestTermGroup: (activeUid?: string, profile?: string) => ({
+  requestTermGroup: ({activeUid, profile}: SplitRequestParams = {}) => ({
     type: 'TERM_GROUP_REQUEST',
     activeUid,
     profile
   }),
-  requestHorizontalSplit: (activeUid?: string, profile?: string) => ({
+  requestHorizontalSplit: ({activeUid, profile}: SplitRequestParams = {}) => ({
     type: 'TERM_GROUP_SPLIT_HORIZONTAL',
     activeUid,
     profile
   }),
-  requestVerticalSplit: (activeUid?: string, profile?: string) => ({
+  requestVerticalSplit: ({activeUid, profile}: SplitRequestParams = {}) => ({
     type: 'TERM_GROUP_SPLIT_VERTICAL',
     activeUid,
     profile
@@ -92,7 +99,7 @@ const uiActions = {
   leaveFullScreen: () => ({type: 'UI_LEAVE_FULL_SCREEN'})
 };
 const updaterActions = {
-  updateAvailable: (releaseName: string, notes: string, releaseUrl: string, canInstall: boolean) => ({
+  updateAvailable: ({releaseName, notes, releaseUrl, canInstall}: UpdateAvailableParams) => ({
     type: 'UPDATE_AVAILABLE',
     releaseName,
     notes,

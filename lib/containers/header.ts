@@ -76,7 +76,7 @@ const mapDispatchToProps = (dispatch: HyperDispatch) => {
     },
 
     openNewTab: (profile: string) => {
-      dispatch(requestTermGroup(undefined, profile));
+      dispatch(requestTermGroup({profile}));
     }
   };
 };

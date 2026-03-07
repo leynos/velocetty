@@ -3,6 +3,17 @@ import type {configOptions} from '@shared/types/config';
 import type {RendererEvents} from '@shared/types/common';
 import type {RendererCommandTransport} from '@shared/types/transport';
 
+export type AddSessionDataParams = {uid: string; data: string};
+export type SendSessionDataParams = {uid: string | null; data: string; escaped?: boolean};
+export type SplitRequestParams = {activeUid?: string; profile?: string};
+export type AddNotificationParams = {text: string; url: string | null; dismissable: boolean};
+export type UpdateAvailableParams = {
+  releaseName: string;
+  notes: string;
+  releaseUrl: string;
+  canInstall: boolean;
+};
+
 type StoreState = {
   ui: {
     bellSound: string | null;
@@ -39,17 +50,17 @@ type MountResult =
 
 type SessionActionModule = {
   addSession: (session: unknown) => unknown;
-  addSessionData: (uid: string, data: string) => unknown;
-  sendSessionData: (uid: string | null, data: string, escaped?: boolean) => unknown;
+  addSessionData: (params: AddSessionDataParams) => unknown;
+  sendSessionData: (params: SendSessionDataParams) => unknown;
   openSearch: () => unknown;
   closeSearch: () => unknown;
   clearActiveSession: () => unknown;
 };
 
 type TermGroupActionModule = {
-  requestTermGroup: (activeUid?: string, profile?: string) => unknown;
-  requestHorizontalSplit: (activeUid?: string, profile?: string) => unknown;
-  requestVerticalSplit: (activeUid?: string, profile?: string) => unknown;
+  requestTermGroup: (params?: SplitRequestParams) => unknown;
+  requestHorizontalSplit: (params?: SplitRequestParams) => unknown;
+  requestVerticalSplit: (params?: SplitRequestParams) => unknown;
   exitActiveTermGroup: () => unknown;
   ptyExitTermGroup: (uid: string) => unknown;
 };
@@ -73,11 +84,11 @@ type UiActionModule = {
 };
 
 type UpdaterActionModule = {
-  updateAvailable: (releaseName: string, notes: string, releaseUrl: string, canInstall: boolean) => unknown;
+  updateAvailable: (params: UpdateAvailableParams) => unknown;
 };
 
 type BootstrapActionModules = {
-  addNotificationMessage: (text: string, url: string | null, dismissable: boolean) => unknown;
+  addNotificationMessage: (params: AddNotificationParams) => unknown;
   init: () => unknown;
   loadConfig: (config: configOptions) => unknown;
   reloadConfig: (config: configOptions) => unknown;
@@ -226,10 +237,10 @@ export const registerRendererTransportListeners = ({
   });
   register('session data', (data) => {
     const uid = data.slice(0, 36);
-    store.dispatch(actions.sessionActions.addSessionData(uid, data.slice(36)));
+    store.dispatch(actions.sessionActions.addSessionData({uid, data: data.slice(36)}));
   });
   register('session data send', ({uid, data, escaped}) => {
-    store.dispatch(actions.sessionActions.sendSessionData(uid, data, escaped));
+    store.dispatch(actions.sessionActions.sendSessionData({uid, data, escaped}));
   });
   register('session exit', ({uid}) => {
     store.dispatch(actions.termGroupActions.ptyExitTermGroup(uid));
@@ -241,40 +252,40 @@ export const registerRendererTransportListeners = ({
     store.dispatch(actions.sessionActions.clearActiveSession());
   });
   register('session move word left req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData(null, '\x1bb'));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bb'}));
   });
   register('session move word right req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData(null, '\x1bf'));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bf'}));
   });
   register('session move line beginning req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData(null, '\x1bOH'));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bOH'}));
   });
   register('session move line end req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData(null, '\x1bOF'));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bOF'}));
   });
   register('session del word left req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData(null, '\x1b\x7f'));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1b\x7f'}));
   });
   register('session del word right req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData(null, '\x1bd'));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bd'}));
   });
   register('session del line beginning req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData(null, '\x1bw'));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bw'}));
   });
   register('session del line end req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData(null, '\x10B'));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x10B'}));
   });
   register('session break req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData(null, '\x03'));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x03'}));
   });
   register('session stop req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData(null, '\x1a'));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1a'}));
   });
   register('session quit req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData(null, '\x1c'));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1c'}));
   });
   register('session tmux req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData(null, '\x02'));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x02'}));
   });
   register('session search', () => {
     store.dispatch(actions.sessionActions.openSearch());
@@ -283,13 +294,13 @@ export const registerRendererTransportListeners = ({
     store.dispatch(actions.sessionActions.closeSearch());
   });
   register('termgroup add req', ({activeUid, profile}) => {
-    store.dispatch(actions.termGroupActions.requestTermGroup(activeUid, profile));
+    store.dispatch(actions.termGroupActions.requestTermGroup({activeUid, profile}));
   });
   register('split request horizontal', ({activeUid, profile}) => {
-    store.dispatch(actions.termGroupActions.requestHorizontalSplit(activeUid, profile));
+    store.dispatch(actions.termGroupActions.requestHorizontalSplit({activeUid, profile}));
   });
   register('split request vertical', ({activeUid, profile}) => {
-    store.dispatch(actions.termGroupActions.requestVerticalSplit(activeUid, profile));
+    store.dispatch(actions.termGroupActions.requestVerticalSplit({activeUid, profile}));
   });
   register('reset fontSize req', () => {
     store.dispatch(actions.uiActions.resetFontSize());
@@ -322,7 +333,7 @@ export const registerRendererTransportListeners = ({
     store.dispatch(actions.uiActions.openSSH(parsedUrl));
   });
   register('update available', ({releaseName, releaseNotes, releaseUrl, canInstall}) => {
-    store.dispatch(actions.updaterActions.updateAvailable(releaseName, releaseNotes, releaseUrl, canInstall));
+    store.dispatch(actions.updaterActions.updateAvailable({releaseName, notes: releaseNotes, releaseUrl, canInstall}));
   });
   register('move', (window) => {
     store.dispatch(actions.uiActions.windowMove(window));
@@ -331,7 +342,7 @@ export const registerRendererTransportListeners = ({
     store.dispatch(actions.uiActions.windowGeometryUpdated(data));
   });
   register('add notification', ({text, url, dismissable}) => {
-    store.dispatch(actions.addNotificationMessage(text, url, dismissable));
+    store.dispatch(actions.addNotificationMessage({text, url, dismissable}));
   });
   register('enter full screen', () => {
     store.dispatch(actions.uiActions.enterFullScreen());

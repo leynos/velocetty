@@ -1,5 +1,6 @@
 import {NOTIFICATION_MESSAGE, NOTIFICATION_DISMISS} from '@shared/constants/notifications';
 import type {HyperActions} from '../../typings/hyper';
+import type {AddNotificationParams} from '../bootstrap/renderer-bootstrap';
 
 export function dismissNotification(id: string): HyperActions {
   return {
@@ -8,7 +9,7 @@ export function dismissNotification(id: string): HyperActions {
   };
 }
 
-export function addNotificationMessage(text: string, url: string | null = null, dismissable = true): HyperActions {
+export function addNotificationMessage({text, url = null, dismissable = true}: AddNotificationParams): HyperActions {
   return {
     type: NOTIFICATION_MESSAGE,
     text,
