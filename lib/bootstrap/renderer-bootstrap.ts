@@ -175,7 +175,11 @@ export const initializeRendererConfig = ({
 }: Pick<RendererBootstrapDependencies, 'actions' | 'config' | 'getBase64FileData'> & {
   store: StoreLike;
 }): (() => void) => {
+  let activeBellSoundRequest = 0;
+  let disposed = false;
+
   const fetchFileData = (configData: configOptions) => {
+    const requestId = ++activeBellSoundRequest;
     const configInfo: configOptions = {...configData, bellSound: null};
     if (!isBellSoundEnabled(configInfo)) {
       store.dispatch(actions.reloadConfig(configInfo));
@@ -183,6 +187,13 @@ export const initializeRendererConfig = ({
     }
 
     void getBase64FileData(configInfo.bellSoundURL).then((base64FileData) => {
+      if (disposed || requestId !== activeBellSoundRequest) {
+        return;
+      }
+      if (config.getConfig().bellSoundURL !== configInfo.bellSoundURL) {
+        return;
+      }
+
       // Prepend "base64," so xterm.js can decode the in-memory bell sound.
       const bellSound = base64FileData == null ? null : `base64,${base64FileData}`;
       configInfo.bellSound = bellSound;
@@ -204,7 +215,11 @@ export const initializeRendererConfig = ({
       }
     }) ?? (() => {});
 
-  return unsubscribe;
+  return () => {
+    disposed = true;
+    activeBellSoundRequest += 1;
+    unsubscribe();
+  };
 };
 
 /**
