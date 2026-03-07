@@ -28,6 +28,19 @@ function resolveSplitContext(
   return {activeUid, profile};
 }
 
+function emitNewSession(
+  extra: {splitDirection?: 'VERTICAL' | 'HORIZONTAL'; isNewGroup?: true},
+  cwd: string | undefined,
+  {activeUid, profile}: ResolvedSplitContext
+): void {
+  transport.emit('new', {
+    ...extra,
+    cwd,
+    activeUid: activeUid ? asSessionId(activeUid) : undefined,
+    profile: profile ? asProfileId(profile) : undefined
+  });
+}
+
 function requestSplit(direction: 'VERTICAL' | 'HORIZONTAL') {
   return ({activeUid: requestedActiveUid, profile: requestedProfile}: SplitRequestParams = {}) =>
     (dispatch: HyperDispatch, getState: () => HyperState): void => {
@@ -35,16 +48,11 @@ function requestSplit(direction: 'VERTICAL' | 'HORIZONTAL') {
         type: SESSION_REQUEST,
         effect: () => {
           const {ui} = getState();
-          const {activeUid, profile} = resolveSplitContext(
-            {activeUid: requestedActiveUid, profile: requestedProfile},
-            getState
+          emitNewSession(
+            {splitDirection: direction},
+            ui.cwd,
+            resolveSplitContext({activeUid: requestedActiveUid, profile: requestedProfile}, getState)
           );
-          transport.emit('new', {
-            splitDirection: direction,
-            cwd: ui.cwd,
-            activeUid: activeUid ? asSessionId(activeUid) : undefined,
-            profile: profile ? asProfileId(profile) : undefined
-          });
         }
       });
     };
@@ -67,17 +75,11 @@ export function requestTermGroup({activeUid: requestedActiveUid, profile: reques
       type: TERM_GROUP_REQUEST,
       effect: () => {
         const {ui} = getState();
-        const {cwd} = ui;
-        const {activeUid, profile} = resolveSplitContext(
-          {activeUid: requestedActiveUid, profile: requestedProfile},
-          getState
+        emitNewSession(
+          {isNewGroup: true},
+          ui.cwd,
+          resolveSplitContext({activeUid: requestedActiveUid, profile: requestedProfile}, getState)
         );
-        transport.emit('new', {
-          isNewGroup: true,
-          cwd,
-          activeUid: activeUid ? asSessionId(activeUid) : undefined,
-          profile: profile ? asProfileId(profile) : undefined
-        });
       }
     });
   };
