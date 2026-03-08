@@ -2,6 +2,7 @@
 import type {configOptions} from '@shared/types/config';
 import type {RendererEvents} from '@shared/types/common';
 import type {RendererCommandTransport} from '@shared/types/transport';
+import {z} from 'zod';
 import type {SplitRequestParams} from '../types/request-shapes';
 
 export type AddSessionDataParams = {uid: string; data: string};
@@ -122,6 +123,69 @@ export type RendererBootstrapDependencies = {
 type RendererBootstrapHandle = {
   dispose: () => void;
   store: StoreLike;
+};
+
+type PayloadRendererEvent = {
+  [Event in keyof RendererEvents]: RendererEvents[Event] extends never ? never : Event;
+}[keyof RendererEvents];
+
+const sessionIdSchema = z.custom<NonNullable<RendererEvents['session exit']['uid']>>(
+  (value) => typeof value === 'string' && value.length > 0,
+  'Expected a non-empty session id string.'
+);
+const profileIdSchema = z.custom<RendererEvents['session add']['profile']>(
+  (value) => typeof value === 'string' && value.length > 0,
+  'Expected a non-empty profile id string.'
+);
+const splitRequestParamsSchema = z.object({
+  activeUid: sessionIdSchema.optional(),
+  profile: profileIdSchema.optional()
+});
+const rendererEventSchemas: Partial<Record<PayloadRendererEvent, z.ZodType<unknown>>> = {
+  'add notification': z.object({
+    text: z.string(),
+    url: z.string().nullable().default(null),
+    dismissable: z.boolean().default(true)
+  }),
+  'update available': z.object({
+    releaseNotes: z.string(),
+    releaseName: z.string(),
+    releaseUrl: z.string(),
+    canInstall: z.boolean()
+  }),
+  'open ssh': z.custom<RendererEvents['open ssh']>(
+    (value) => typeof value === 'object' && value !== null,
+    'Expected a parsed SSH URL payload object.'
+  ),
+  'open file': z.object({path: z.string()}),
+  'move jump req': z.union([z.number(), z.literal('last')]),
+  'split request horizontal': splitRequestParamsSchema,
+  'split request vertical': splitRequestParamsSchema,
+  'termgroup add req': splitRequestParamsSchema,
+  'session add': z.object({
+    uid: sessionIdSchema,
+    rows: z.number().nullable().optional(),
+    cols: z.number().nullable().optional(),
+    splitDirection: z.enum(['HORIZONTAL', 'VERTICAL']).optional(),
+    shell: z.string().nullable(),
+    pid: z.number().nullable(),
+    activeUid: sessionIdSchema.optional(),
+    profile: profileIdSchema
+  }),
+  'session data': z.string(),
+  'session exit': z.object({uid: sessionIdSchema}),
+  'windowGeometry change': z.object({isMaximized: z.boolean()}),
+  move: z.object({
+    bounds: z.object({
+      x: z.number(),
+      y: z.number()
+    })
+  }),
+  'session data send': z.object({
+    uid: sessionIdSchema.nullable(),
+    data: z.string(),
+    escaped: z.boolean().optional()
+  })
 };
 
 const safeInvoke = (label: string, cleanup: () => void, errors: unknown[]): void => {
@@ -245,13 +309,16 @@ export const initializeRendererConfig = ({
 
   const unsubscribe =
     config.subscribe(() => {
-      const configInfo = config.getConfig();
       const currentUi = store.getState().ui;
-      configInfo.bellSound = currentUi.bellSound;
-      const shouldHydrateBellSound =
-        currentUi.bellSoundURL !== configInfo.bellSoundURL ||
-        (currentUi.bellSound !== configInfo.bell && isBellSoundEnabled(configInfo));
-      if (shouldHydrateBellSound) {
+      const nextConfig = config.getConfig();
+      const configInfo: configOptions = {...nextConfig, bellSound: currentUi.bellSound};
+      if (!isBellSoundEnabled(nextConfig)) {
+        configInfo.bellSound = null;
+        store.dispatch(actions.reloadConfig(configInfo));
+        return;
+      }
+
+      if (currentUi.bellSoundURL !== configInfo.bellSoundURL || currentUi.bellSound == null) {
         fetchFileData(configInfo);
       } else {
         store.dispatch(actions.reloadConfig(configInfo));
@@ -283,9 +350,25 @@ export const registerRendererTransportListeners = ({
     event: Event,
     listener: (payload: RendererEvents[Event]) => void
   ) => {
-    transport.on(event, listener);
+    const schema = rendererEventSchemas[event as PayloadRendererEvent] as z.ZodType<RendererEvents[Event]> | undefined;
+    const wrappedListener = (payload: RendererEvents[Event]) => {
+      if (!schema) {
+        listener(payload);
+        return;
+      }
+
+      const parsedPayload = schema.safeParse(payload);
+      if (!parsedPayload.success) {
+        console.error(`Ignoring invalid renderer transport payload for "${event}".`, parsedPayload.error);
+        return;
+      }
+
+      listener(parsedPayload.data as RendererEvents[Event]);
+    };
+
+    transport.on(event, wrappedListener);
     removers.push(() => {
-      transport.off(event, listener);
+      transport.off(event, wrappedListener);
     });
   };
 
