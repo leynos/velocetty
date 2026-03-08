@@ -171,14 +171,7 @@ export const exposeRendererGlobals = ({
     [Key in (typeof keys)[number]]: PropertyDescriptor | undefined;
   };
 
-  for (const key of keys) {
-    Object.defineProperty(windowObject, key, {
-      configurable: true,
-      get: () => values[key]
-    });
-  }
-
-  return () => {
+  const restoreProperties = () => {
     for (const key of keys) {
       const previousDescriptor = previousDescriptors[key];
       if (previousDescriptor) {
@@ -188,6 +181,20 @@ export const exposeRendererGlobals = ({
       }
     }
   };
+
+  try {
+    for (const key of keys) {
+      Object.defineProperty(windowObject, key, {
+        configurable: true,
+        get: () => values[key]
+      });
+    }
+  } catch (error) {
+    restoreProperties();
+    throw error;
+  }
+
+  return restoreProperties;
 };
 
 /**
@@ -239,8 +246,12 @@ export const initializeRendererConfig = ({
   const unsubscribe =
     config.subscribe(() => {
       const configInfo = config.getConfig();
-      configInfo.bellSound = store.getState().ui.bellSound;
-      if (store.getState().ui.bellSoundURL !== config.getConfig().bellSoundURL) {
+      const currentUi = store.getState().ui;
+      configInfo.bellSound = currentUi.bellSound;
+      const shouldHydrateBellSound =
+        currentUi.bellSoundURL !== configInfo.bellSoundURL ||
+        (currentUi.bellSound !== configInfo.bell && isBellSoundEnabled(configInfo));
+      if (shouldHydrateBellSound) {
         fetchFileData(configInfo);
       } else {
         store.dispatch(actions.reloadConfig(configInfo));
@@ -405,8 +416,15 @@ export const registerRendererTransportListeners = ({
   });
 
   return () => {
-    for (const remove of removers.reverse()) {
-      remove();
+    const cleanupErrors: unknown[] = [];
+    for (const remove of [...removers].reverse()) {
+      safeInvoke('transport listener removal', remove, cleanupErrors);
+    }
+    if (cleanupErrors.length === 1) {
+      throw cleanupErrors[0];
+    }
+    if (cleanupErrors.length > 1) {
+      throw new AggregateError(cleanupErrors, 'Renderer transport cleanup failed.');
     }
   };
 };
