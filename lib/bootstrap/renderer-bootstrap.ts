@@ -172,7 +172,7 @@ const rendererEventSchemas: Partial<Record<PayloadRendererEvent, z.ZodType<unkno
     activeUid: sessionIdSchema.optional(),
     profile: profileIdSchema
   }),
-  'session data': z.string().min(36, {message: 'Expected session data to include a 36-character uid prefix.'}),
+  'session data': z.string().min(36, {error: 'Expected session data to include a 36-character uid prefix.'}),
   'session exit': z.object({uid: sessionIdSchema}),
   'windowGeometry change': z.object({isMaximized: z.boolean()}),
   move: z.object({

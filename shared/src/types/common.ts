@@ -109,7 +109,7 @@ export type MainEvents = {
 /** Events emitted from the privileged process and consumed by the renderer. */
 export type RendererEvents = {
   ready: never;
-  'add notification': {text: string; url: string; dismissable: boolean};
+  'add notification': {text: string; url: string | null; dismissable: boolean};
   'update available': {releaseNotes: string; releaseName: string; releaseUrl: string; canInstall: boolean};
   'open ssh': ReturnType<typeof parseUrl>;
   'open file': {path: string};
