@@ -15,6 +15,7 @@
 import {beforeEach, describe, expect, mock, test} from 'bun:test';
 
 import type {Session} from '@shared/types/common';
+import type {SplitRequestParams} from '../../lib/types/request-shapes';
 
 const createMockSession = (overrides: Partial<Session> & {uid: string}): Session =>
   ({
@@ -29,7 +30,6 @@ import {
   type AddNotificationParams,
   type AddSessionDataParams,
   type SendSessionDataParams,
-  type SplitRequestParams,
   type UpdateAvailableParams
 } from '../../lib/bootstrap/renderer-bootstrap';
 

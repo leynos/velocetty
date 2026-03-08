@@ -2,10 +2,10 @@
 import type {configOptions} from '@shared/types/config';
 import type {RendererEvents} from '@shared/types/common';
 import type {RendererCommandTransport} from '@shared/types/transport';
+import type {SplitRequestParams} from '../types/request-shapes';
 
 export type AddSessionDataParams = {uid: string; data: string};
 export type SendSessionDataParams = {uid: string | null; data: string; escaped?: boolean};
-export type SplitRequestParams = {activeUid?: string; profile?: string};
 export type AddNotificationParams = {text: string; url?: string | null; dismissable?: boolean};
 export type UpdateAvailableParams = {
   releaseName: string;
@@ -124,6 +124,15 @@ type RendererBootstrapHandle = {
   store: StoreLike;
 };
 
+const safeInvoke = (label: string, cleanup: () => void, errors: unknown[]): void => {
+  try {
+    cleanup();
+  } catch (error) {
+    console.error(`Renderer bootstrap cleanup failed during ${label}.`, error);
+    errors.push(error);
+  }
+};
+
 /**
  * Sets the historical Linux zoom factor so Electron 40 preserves renderer size
  * expectations.
@@ -207,19 +216,21 @@ export const initializeRendererConfig = ({
       return;
     }
 
-    void getBase64FileData(configInfo.bellSoundURL).then((base64FileData) => {
-      if (disposed || requestId !== activeBellSoundRequest) {
-        return;
-      }
-      if (config.getConfig().bellSoundURL !== configInfo.bellSoundURL) {
-        return;
-      }
+    void getBase64FileData(configInfo.bellSoundURL)
+      .catch(() => null)
+      .then((base64FileData) => {
+        if (disposed || requestId !== activeBellSoundRequest) {
+          return;
+        }
+        if (config.getConfig().bellSoundURL !== configInfo.bellSoundURL) {
+          return;
+        }
 
-      // Prepend "base64," so xterm.js can decode the in-memory bell sound.
-      const bellSound = base64FileData == null ? null : `base64,${base64FileData}`;
-      configInfo.bellSound = bellSound;
-      store.dispatch(actions.reloadConfig(configInfo));
-    });
+        // Prepend "base64," so xterm.js can decode the in-memory bell sound.
+        const bellSound = base64FileData == null ? null : `base64,${base64FileData}`;
+        configInfo.bellSound = bellSound;
+        store.dispatch(actions.reloadConfig(configInfo));
+      });
   };
 
   store.dispatch(actions.loadConfig(config.getConfig()));
@@ -438,19 +449,34 @@ export const startRendererApplication = (dependencies: RendererBootstrapDependen
     });
     mountedApp = dependencies.mountApp(store);
   } catch (error) {
-    restoreWindowGlobals();
-    removeTransportListeners();
-    unsubscribeConfig();
+    const rollbackErrors: unknown[] = [];
+    safeInvoke('restoreWindowGlobals', restoreWindowGlobals, rollbackErrors);
+    safeInvoke('removeTransportListeners', removeTransportListeners, rollbackErrors);
+    safeInvoke('unsubscribeConfig', unsubscribeConfig, rollbackErrors);
     throw error;
   }
 
   return {
     store,
     dispose: () => {
-      mountedApp?.unmount?.();
-      restoreWindowGlobals();
-      unsubscribeConfig();
-      removeTransportListeners();
+      const cleanupErrors: unknown[] = [];
+      safeInvoke(
+        'mountedApp.unmount',
+        () => {
+          mountedApp?.unmount?.();
+        },
+        cleanupErrors
+      );
+      safeInvoke('restoreWindowGlobals', restoreWindowGlobals, cleanupErrors);
+      safeInvoke('unsubscribeConfig', unsubscribeConfig, cleanupErrors);
+      safeInvoke('removeTransportListeners', removeTransportListeners, cleanupErrors);
+
+      if (cleanupErrors.length === 1) {
+        throw cleanupErrors[0];
+      }
+      if (cleanupErrors.length > 1) {
+        throw new AggregateError(cleanupErrors, 'Renderer bootstrap dispose failed.');
+      }
     }
   };
 };
