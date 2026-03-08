@@ -377,13 +377,15 @@ describe('bootstrap transport event wiring', () => {
 
     const registrationError = new Error('transport.on failed mid-registration');
     const failingCallNumber = 5;
+    const successfulRegistrations: Array<[string, Listener]> = [];
     let callCount = 0;
     transport.on.mockImplementation((event: string, listener: Listener) => {
       callCount += 1;
-      if (callCount === failingCallNumber) {
-        throw registrationError;
+      if (callCount !== failingCallNumber) {
+        successfulRegistrations.push([event, listener]);
+        return registerTransportListener(event, listener);
       }
-      return registerTransportListener(event, listener);
+      throw registrationError;
     });
 
     expect(() =>
@@ -395,12 +397,9 @@ describe('bootstrap transport event wiring', () => {
       })
     ).toThrow(registrationError);
 
-    const successfulRegistrations = transport.on.mock.calls.slice(0, failingCallNumber - 1) as Array<
-      [string, Listener]
-    >;
-
     expect(successfulRegistrations).toHaveLength(failingCallNumber - 1);
     expect(transport.off.mock.calls).toHaveLength(successfulRegistrations.length);
+    expect(transport.off.mock.calls).toEqual(successfulRegistrations.slice().reverse());
 
     for (const [event, listener] of successfulRegistrations) {
       expect(transport.off.mock.calls).toContainEqual([event, listener]);
