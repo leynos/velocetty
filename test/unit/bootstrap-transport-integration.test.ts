@@ -1,545 +1,605 @@
-/** @file Asserts bootstrap stream handlers use transport-on callbacks. */
-import {afterAll, beforeAll, describe, expect, mock, test} from 'bun:test';
+/**
+ * @file Asserts bootstrap stream handlers wire transport-on callbacks.
+ *
+ * Exercises `registerTransportListeners` from
+ * `lib/bootstrap/renderer-bootstrap.ts` with in-test transport, store,
+ * plugins, and action-creator stubs.
+ *
+ * Invariants: listener registration order is deterministic; transport mocks
+ * and dispatch spies are reset before each test via
+ * `resetTransportListenersFixture`; and the returned cleanup removes every
+ * registered listener with one-to-one `on`/`off` correspondence.
+ *
+ * @see lib/bootstrap/renderer-bootstrap.ts
+ */
+import {beforeEach, describe, expect, mock, test} from 'bun:test';
 
 import type {Session} from '@shared/types/common';
+import type {SplitRequestParams} from '../../lib/types/request-shapes';
 
-import {setupHappyDom} from '../testUtils/happy-dom';
+const createMockSession = (overrides: Partial<Session> & {uid: string}): Session =>
+  ({
+    shell: '/bin/bash',
+    pid: 0,
+    profile: 'default',
+    ...overrides
+  }) as Session;
 
-const shouldRunBootstrapTransportIntegration = process.env.VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION === '1';
-const BOOTSTRAP_TRANSPORT_HOOK_TIMEOUT_MS = 15_000;
+import {
+  registerTransportListeners,
+  type AddNotificationParams,
+  type AddSessionDataParams,
+  type SendSessionDataParams,
+  type UpdateAvailableParams
+} from '../../lib/bootstrap/renderer-bootstrap';
 
-if (!shouldRunBootstrapTransportIntegration) {
-  test.skip('bootstrap event wiring delegates to transport event bus', () => {});
-} else {
-  const dispatchMock = mock((_action: unknown) => {});
-  const transportOnCalls: Record<string, Array<(...args: unknown[]) => void>> = {};
+const TransportEvent = {
+  Ready: 'ready',
+  AddNotification: 'add notification',
+  UpdateAvailable: 'update available',
+  Reload: 'reload',
+  SessionAdd: 'session add',
+  SessionData: 'session data',
+  SessionDataSend: 'session data send',
+  SessionExit: 'session exit',
+  SessionClearReq: 'session clear req',
+  SessionMoveWordLeftReq: 'session move word left req',
+  SessionMoveWordRightReq: 'session move word right req',
+  SessionMoveLineBeginReq: 'session move line beginning req',
+  SessionMoveLineEndReq: 'session move line end req',
+  SessionDelWordLeftReq: 'session del word left req',
+  SessionDelWordRightReq: 'session del word right req',
+  SessionDelLineBeginReq: 'session del line beginning req',
+  SessionDelLineEndReq: 'session del line end req',
+  SessionBreakReq: 'session break req',
+  SessionStopReq: 'session stop req',
+  SessionQuitReq: 'session quit req',
+  SessionTmuxReq: 'session tmux req',
+  SessionSearch: 'session search',
+  SessionSearchClose: 'session search close',
+  TermGroupCloseReq: 'termgroup close req',
+  TermGroupAddReq: 'termgroup add req',
+  SplitHorizontal: 'split request horizontal',
+  SplitVertical: 'split request vertical',
+  ResetFontSizeReq: 'reset fontSize req',
+  IncreaseFontSizeReq: 'increase fontSize req',
+  DecreaseFontSizeReq: 'decrease fontSize req',
+  MoveLeftReq: 'move left req',
+  MoveRightReq: 'move right req',
+  MoveJumpReq: 'move jump req',
+  NextPaneReq: 'next pane req',
+  PrevPaneReq: 'prev pane req',
+  OpenFile: 'open file',
+  OpenSsh: 'open ssh',
+  Move: 'move',
+  EnterFullScreen: 'enter full screen',
+  LeaveFullScreen: 'leave full screen',
+  WindowGeometryChange: 'windowGeometry change'
+} as const;
 
-  type Listener = (payload: unknown) => void;
+const ActionType = {
+  InitAction: 'INIT_ACTION',
+  LoadConfig: 'LOAD_CONFIG',
+  ReloadConfig: 'RELOAD_CONFIG',
+  AddNotification: 'ADD_NOTIFICATION',
+  UpdateAvailable: 'UPDATE_AVAILABLE',
+  SessionAdd: 'SESSION_ADD',
+  SessionData: 'SESSION_DATA',
+  SessionDataSend: 'SESSION_DATA_SEND',
+  SessionSearch: 'SESSION_SEARCH',
+  SessionSearchClose: 'SESSION_SEARCH_CLOSE',
+  SessionClearActive: 'SESSION_CLEAR_ACTIVE',
+  UserExitSession: 'USER_EXIT_SESSION',
+  CreateExitAction: 'CREATE_EXIT_ACTION',
+  PtyExitTermGroup: 'PTY_EXIT_TERM_GROUP',
+  TermGroupRequest: 'TERM_GROUP_REQUEST',
+  TermGroupSplitHoriz: 'TERM_GROUP_SPLIT_HORIZONTAL',
+  TermGroupSplitVert: 'TERM_GROUP_SPLIT_VERTICAL',
+  TermGroupExitActive: 'TERM_GROUP_EXIT_ACTIVE',
+  UiSetFontSmoothing: 'UI_SET_FONT_SMOOTHING',
+  UiResetFontSize: 'UI_RESET_FONT_SIZE',
+  UiIncreaseFontSize: 'UI_INCREASE_FONT_SIZE',
+  UiDecreaseFontSize: 'UI_DECREASE_FONT_SIZE',
+  UiMoveLeft: 'UI_MOVE_LEFT',
+  UiMoveRight: 'UI_MOVE_RIGHT',
+  UiMoveTo: 'UI_MOVE_TO',
+  UiMoveNextPane: 'UI_MOVE_NEXT_PANE',
+  UiMovePreviousPane: 'UI_MOVE_PREVIOUS_PANE',
+  UiOpenFile: 'UI_OPEN_FILE',
+  UiOpenSsh: 'UI_OPEN_SSH',
+  UiWindowMove: 'UI_WINDOW_MOVE',
+  UiWindowGeometryUpdated: 'UI_WINDOW_GEOMETRY_UPDATED',
+  UiEnterFullScreen: 'UI_ENTER_FULL_SCREEN',
+  UiLeaveFullScreen: 'UI_LEAVE_FULL_SCREEN'
+} as const;
 
-  const transport = {
-    invoke: mock(async () => ({})),
-    emit: mock(() => true),
-    off: mock((_event: string, _listener: Listener) => transport),
-    once: mock((_event: string, _listener: Listener) => transport),
-    removeAllListeners: mock((_event?: string) => transport),
-    destroy: mock(() => {}),
-    on: mock((event: string, listener: Listener) => {
-      transportOnCalls[event] = transportOnCalls[event] ? [...transportOnCalls[event], listener] : [listener];
-      return transport;
-    })
-  };
+const dispatchMock = mock((_action: unknown) => {});
+const transportOnCalls: Record<string, Array<(...args: unknown[]) => void>> = {};
 
-  const getListener = (event: string): Listener => {
+type Listener = (payload: unknown) => void;
+
+const transport = {
+  invoke: mock(async () => ({})),
+  emit: mock(() => true),
+  off: mock((event: string, listener: Listener) => {
     const handlers = transportOnCalls[event];
-    if (!handlers || handlers.length === 0) {
-      throw new Error(`Expected transport listener for ${event}`);
+    if (!handlers) {
+      return transport;
     }
-    return handlers[handlers.length - 1];
-  };
 
-  mock.module('../../lib/transport/electron-ipc-transport', () => ({transport}));
-  mock.module('electron', () => ({
-    webFrame: {setZoomFactor: mock(() => {})},
-    ipcRenderer: {
-      invoke: mock(async () => ({})),
-      on: mock(() => {}),
-      send: mock(() => {}),
-      removeAllListeners: mock(() => {}),
-      removeListener: mock(() => {})
+    const remainingHandlers = handlers.filter((registeredListener) => registeredListener !== listener);
+    if (remainingHandlers.length === 0) {
+      delete transportOnCalls[event];
+    } else {
+      transportOnCalls[event] = remainingHandlers;
     }
-  }));
-  mock.module('react-dom/client', () => ({
-    createRoot: () => ({
-      render: mock(() => {}),
-      unmount: mock(() => {})
-    })
-  }));
-  mock.module('../../lib/store/configure-store', () => ({
-    default: () => ({
-      dispatch: dispatchMock,
-      getState: () => ({
-        ui: {bellSoundURL: 'sound.wav', bellSound: 'abc', bell: 'SOUND'},
-        sessions: {activeUid: 'session-0', sessions: {}},
-        termGroups: {termGroups: {}, activeSessions: {}, activeRootGroup: null}
-      })
-    })
-  }));
-  mock.module('../../lib/actions/config', () => ({
-    loadConfig: (config: unknown) => ({type: 'LOAD_CONFIG', config}),
-    reloadConfig: (config: unknown) => ({type: 'RELOAD_CONFIG', config})
-  }));
-  mock.module('../../lib/actions/index', () => ({default: () => ({type: 'INIT_ACTION'})}));
-  mock.module('../../lib/actions/notifications', () => ({
-    addNotificationMessage: (text: string, url: string | null, dismissable: boolean) => ({
-      type: 'ADD_NOTIFICATION',
-      text,
-      url,
-      dismissable
-    })
-  }));
-  mock.module('../../lib/actions/sessions', () => ({
-    addSession: (session: unknown) => ({type: 'SESSION_ADD', session}),
-    addSessionData: (uid: string, data: string) => ({type: 'SESSION_DATA', uid, data}),
-    sendSessionData: (uid: string | null, data: string, escaped?: boolean) => ({
-      type: 'SESSION_DATA_SEND',
-      uid,
-      data,
-      ...(escaped !== undefined && {escaped})
-    }),
-    openSearch: () => ({type: 'SESSION_SEARCH'}),
-    closeSearch: () => ({type: 'SESSION_SEARCH_CLOSE'}),
-    clearActiveSession: () => ({type: 'SESSION_CLEAR_ACTIVE'}),
-    ptyExitTermGroup: (uid: string) => ({type: 'PTY_EXIT_TERM_GROUP', uid}),
-    userExitSession: (uid: string) => ({type: 'USER_EXIT_SESSION', uid}),
-    createExitAction: () => () => ({type: 'CREATE_EXIT_ACTION'})
-  }));
-  mock.module('../../lib/actions/term-groups', () => ({
-    requestTermGroup: (_activeUid?: string, profile?: string) => ({
-      type: 'TERM_GROUP_REQUEST',
-      activeUid: _activeUid,
-      profile
-    }),
-    requestHorizontalSplit: (_activeUid?: string, profile?: string) => ({
-      type: 'TERM_GROUP_SPLIT_HORIZONTAL',
-      activeUid: _activeUid,
-      profile
-    }),
-    requestVerticalSplit: (_activeUid?: string, profile?: string) => ({
-      type: 'TERM_GROUP_SPLIT_VERTICAL',
-      activeUid: _activeUid,
-      profile
-    }),
-    exitActiveTermGroup: () => ({type: 'TERM_GROUP_EXIT_ACTIVE'}),
-    ptyExitTermGroup: (uid: string) => ({type: 'PTY_EXIT_TERM_GROUP', uid})
-  }));
-  mock.module('../../lib/actions/ui', () => {
-    const actions = {
-      setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'}),
-      resetFontSize: () => ({type: 'UI_RESET_FONT_SIZE'}),
-      increaseFontSize: () => ({type: 'UI_INCREASE_FONT_SIZE'}),
-      decreaseFontSize: () => ({type: 'UI_DECREASE_FONT_SIZE'}),
-      moveLeft: () => ({type: 'UI_MOVE_LEFT'}),
-      moveRight: () => ({type: 'UI_MOVE_RIGHT'}),
-      moveTo: (index: number | 'last') => ({type: 'UI_MOVE_TO', index}),
-      moveToNextPane: () => ({type: 'UI_MOVE_NEXT_PANE'}),
-      moveToPreviousPane: () => ({type: 'UI_MOVE_PREVIOUS_PANE'}),
-      openFile: (path: string) => ({type: 'UI_OPEN_FILE', path}),
-      openSSH: (parsedUrl: unknown) => ({type: 'UI_OPEN_SSH', parsedUrl}),
-      windowGeometryUpdated: (data: {isMaximized: boolean}) => ({type: 'UI_WINDOW_GEOMETRY_UPDATED', data}),
-      windowMove: (window: {bounds: {x: number; y: number}}) => ({type: 'UI_WINDOW_MOVE', window}),
-      enterFullScreen: () => ({type: 'UI_ENTER_FULL_SCREEN'}),
-      leaveFullScreen: () => ({type: 'UI_LEAVE_FULL_SCREEN'})
-    };
-    return {
-      __esModule: true,
-      default: actions,
-      ...actions
-    };
-  });
-  mock.module('../../lib/actions/updater', () => ({
-    updateAvailable: (releaseName: string, notes: string, releaseUrl: string, canInstall: boolean) => ({
-      type: 'UPDATE_AVAILABLE',
-      releaseName,
-      notes,
-      releaseUrl,
-      canInstall
-    })
-  }));
-  mock.module('../../lib/utils/file', () => ({
-    getBase64FileData: async () => 'ZGF0YQ=='
-  }));
-  mock.module('../../lib/utils/config', () => ({
-    getConfig: () => ({
-      bell: 'SOUND',
-      bellSound: 'sound',
-      bellSoundURL: 'sound.wav'
-    }),
-    subscribe: () => {}
-  }));
-  mock.module('../../lib/containers/hyper', () => ({default: () => null}));
-  const pluginsReloadMock = mock(() => {});
-  const createPluginsMock = () => ({
-    connect: () => (Component: unknown) => Component,
-    default: {},
-    getTabProps: (_tab: unknown, _parentProps: unknown, props: unknown) => props,
-    reload: pluginsReloadMock,
-    subscribeTabDecorationUpdates: () => () => {}
-  });
 
-  mock.module('../../lib/utils/plugins', createPluginsMock);
-  mock.module('../../lib/utils/plugins.ts', createPluginsMock);
+    return transport;
+  }),
+  once: mock((_event: string, _listener: Listener) => transport),
+  removeAllListeners: mock((event?: string) => {
+    if (event) {
+      delete transportOnCalls[event];
+      return transport;
+    }
 
-  let importCounter = 0;
-  let cleanupHappyDom: (() => void) | null = null;
-
-  beforeAll(async () => {
-    cleanupHappyDom = await setupHappyDom();
-  }, BOOTSTRAP_TRANSPORT_HOOK_TIMEOUT_MS);
-
-  afterAll(() => {
-    cleanupHappyDom?.();
-    cleanupHappyDom = null;
-    mock.restore();
-  }, BOOTSTRAP_TRANSPORT_HOOK_TIMEOUT_MS);
-
-  /**
-   * Import the bootstrap module and return a helper that invokes
-   * registered listeners by event name.
-   */
-  const importBootstrap = async () => {
-    importCounter += 1;
-    dispatchMock.mockClear();
-    transport.invoke.mockClear();
-    transport.emit.mockClear();
-    transport.off.mockClear();
-    transport.once.mockClear();
-    transport.removeAllListeners.mockClear();
-    transport.destroy.mockClear();
-    transport.on.mockClear();
-    pluginsReloadMock.mockClear();
     Object.keys(transportOnCalls).forEach((key) => {
-      transportOnCalls[key] = [];
-    });
-    await import(`../../lib/index.tsx?transport_integration=${importCounter}`);
-  };
-
-  describe('bootstrap transport event wiring', () => {
-    beforeAll(async () => {
-      await importBootstrap();
-    }, BOOTSTRAP_TRANSPORT_HOOK_TIMEOUT_MS);
-
-    const clearDispatch = () => dispatchMock.mockClear();
-
-    test('registers all expected transport listeners', () => {
-      const expectedEvents = [
-        // bootstrap lifecycle
-        'ready',
-
-        // session lifecycle and data
-        'session add',
-        'session data',
-        'session data send',
-        'session exit',
-        'session clear req',
-
-        // session navigation / word and line shortcuts
-        'session move word left req',
-        'session move word right req',
-        'session move line beginning req',
-        'session move line end req',
-
-        // session deletion shortcuts
-        'session del word left req',
-        'session del word right req',
-        'session del line beginning req',
-        'session del line end req',
-
-        // session control shortcuts
-        'session break req',
-        'session stop req',
-        'session quit req',
-        'session tmux req',
-
-        // session search
-        'session search',
-        'session search close',
-
-        // termgroup control
-        'termgroup close req',
-        'termgroup add req',
-        'split request horizontal',
-        'split request vertical',
-
-        // font size
-        'reset fontSize req',
-        'increase fontSize req',
-        'decrease fontSize req',
-
-        // tab and pane navigation
-        'move left req',
-        'move right req',
-        'move jump req',
-        'next pane req',
-        'prev pane req',
-
-        // file and SSH
-        'open file',
-        'open ssh',
-
-        // window
-        'move',
-        'enter full screen',
-        'leave full screen',
-        'windowGeometry change',
-
-        // notifications and updates
-        'add notification',
-        'update available',
-
-        // plugin reload
-        'reload'
-      ];
-
-      const registeredEvents = transport.on.mock.calls.map(([name]: [string]) => name);
-
-      // Exact count guards against missing or extra listeners
-      expect(registeredEvents).toHaveLength(expectedEvents.length);
-
-      // Sorted set equality catches renames, additions, and removals
-      expect([...registeredEvents].sort()).toEqual([...expectedEvents].sort());
-
-      // Each listener must be a function
-      for (const event of expectedEvents) {
-        expect(transport.on.mock.calls).toContainEqual([event, expect.any(Function)]);
-      }
+      delete transportOnCalls[key];
     });
 
-    test('ready dispatches init and font smoothing', () => {
-      clearDispatch();
-      getListener('ready')(null);
+    return transport;
+  }),
+  destroy: mock(() => {}),
+  on: mock((event: string, listener: Listener) => {
+    transportOnCalls[event] = transportOnCalls[event] ? [...transportOnCalls[event], listener] : [listener];
+    return transport;
+  })
+};
 
-      expect(dispatchMock.mock.calls).toContainEqual([{type: 'INIT_ACTION'}]);
-      expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_SET_FONT_SMOOTHING'}]);
+const store = {
+  dispatch: dispatchMock,
+  getState: () => ({
+    ui: {bellSoundURL: 'sound.wav', bellSound: 'abc', bell: 'SOUND'},
+    sessions: {activeUid: 'session-0', sessions: {}},
+    termGroups: {termGroups: {}, activeSessions: {}, activeRootGroup: null}
+  })
+};
+
+const init = () => ({type: ActionType.InitAction});
+const addNotificationMessage = ({text, url = null, dismissable = true}: AddNotificationParams) => ({
+  type: ActionType.AddNotification,
+  text,
+  url,
+  dismissable
+});
+const sessionActions = {
+  addSession: (session: unknown) => ({type: ActionType.SessionAdd, session}),
+  addSessionData: ({uid, data}: AddSessionDataParams) => ({type: ActionType.SessionData, uid, data}),
+  sendSessionData: ({uid, data, escaped}: SendSessionDataParams) => ({
+    type: ActionType.SessionDataSend,
+    uid,
+    data,
+    ...(escaped !== undefined && {escaped})
+  }),
+  openSearch: () => ({type: ActionType.SessionSearch}),
+  closeSearch: () => ({type: ActionType.SessionSearchClose}),
+  clearActiveSession: () => ({type: ActionType.SessionClearActive}),
+  ptyExitTermGroup: (uid: string) => ({type: ActionType.PtyExitTermGroup, uid}),
+  userExitSession: (uid: string) => ({type: ActionType.UserExitSession, uid}),
+  createExitAction: () => () => ({type: ActionType.CreateExitAction})
+};
+const termGroupActions = {
+  requestTermGroup: ({activeUid, profile}: SplitRequestParams = {}) => ({
+    type: ActionType.TermGroupRequest,
+    activeUid,
+    profile
+  }),
+  requestHorizontalSplit: ({activeUid, profile}: SplitRequestParams = {}) => ({
+    type: ActionType.TermGroupSplitHoriz,
+    activeUid,
+    profile
+  }),
+  requestVerticalSplit: ({activeUid, profile}: SplitRequestParams = {}) => ({
+    type: ActionType.TermGroupSplitVert,
+    activeUid,
+    profile
+  }),
+  exitActiveTermGroup: () => ({type: ActionType.TermGroupExitActive}),
+  ptyExitTermGroup: (uid: string) => ({type: ActionType.PtyExitTermGroup, uid})
+};
+const uiActions = {
+  setFontSmoothing: () => ({type: ActionType.UiSetFontSmoothing}),
+  resetFontSize: () => ({type: ActionType.UiResetFontSize}),
+  increaseFontSize: () => ({type: ActionType.UiIncreaseFontSize}),
+  decreaseFontSize: () => ({type: ActionType.UiDecreaseFontSize}),
+  moveLeft: () => ({type: ActionType.UiMoveLeft}),
+  moveRight: () => ({type: ActionType.UiMoveRight}),
+  moveTo: (index: number | 'last') => ({type: ActionType.UiMoveTo, index}),
+  moveToNextPane: () => ({type: ActionType.UiMoveNextPane}),
+  moveToPreviousPane: () => ({type: ActionType.UiMovePreviousPane}),
+  openFile: (path: string) => ({type: ActionType.UiOpenFile, path}),
+  openSSH: (parsedUrl: unknown) => ({type: ActionType.UiOpenSsh, parsedUrl}),
+  windowGeometryUpdated: (data: {isMaximized: boolean}) => ({type: ActionType.UiWindowGeometryUpdated, data}),
+  windowMove: (windowState: {bounds: {x: number; y: number}}) => ({type: ActionType.UiWindowMove, window: windowState}),
+  enterFullScreen: () => ({type: ActionType.UiEnterFullScreen}),
+  leaveFullScreen: () => ({type: ActionType.UiLeaveFullScreen})
+};
+const updaterActions = {
+  updateAvailable: ({releaseName, notes, releaseUrl, canInstall}: UpdateAvailableParams) => ({
+    type: ActionType.UpdateAvailable,
+    releaseName,
+    notes,
+    releaseUrl,
+    canInstall
+  })
+};
+const pluginsReloadMock = mock(() => {});
+const plugins = {
+  reload: pluginsReloadMock
+};
+
+const createBootstrapActions = () => ({
+  addNotificationMessage,
+  init,
+  loadConfig: mock((_config: unknown) => ({type: ActionType.LoadConfig})),
+  reloadConfig: mock((_config: unknown) => ({type: ActionType.ReloadConfig})),
+  sessionActions,
+  termGroupActions,
+  uiActions,
+  updaterActions
+});
+
+const getListener = (event: string): Listener => {
+  const handlers = transportOnCalls[event];
+  if (!handlers || handlers.length === 0) {
+    throw new Error(`Expected transport listener for ${event}`);
+  }
+  return handlers[handlers.length - 1];
+};
+
+const resetTransportListenersFixture = () => {
+  dispatchMock.mockClear();
+  pluginsReloadMock.mockClear();
+  transport.invoke.mockClear();
+  transport.emit.mockClear();
+  transport.off.mockClear();
+  transport.once.mockClear();
+  transport.removeAllListeners.mockClear();
+  transport.destroy.mockClear();
+  transport.on.mockClear();
+  Object.keys(transportOnCalls).forEach((key) => {
+    transportOnCalls[key] = [];
+  });
+};
+
+const registerBootstrapTransportListeners = () => {
+  resetTransportListenersFixture();
+
+  return registerTransportListeners({
+    actions: createBootstrapActions(),
+    plugins,
+    store,
+    transport
+  });
+};
+
+describe('bootstrap transport event wiring', () => {
+  beforeEach(() => {
+    registerBootstrapTransportListeners();
+  });
+
+  const clearDispatch = () => dispatchMock.mockClear();
+
+  test('registers all expected transport listeners', () => {
+    const expectedEvents = [
+      TransportEvent.Ready,
+      TransportEvent.SessionAdd,
+      TransportEvent.SessionData,
+      TransportEvent.SessionDataSend,
+      TransportEvent.SessionExit,
+      TransportEvent.SessionClearReq,
+      TransportEvent.SessionMoveWordLeftReq,
+      TransportEvent.SessionMoveWordRightReq,
+      TransportEvent.SessionMoveLineBeginReq,
+      TransportEvent.SessionMoveLineEndReq,
+      TransportEvent.SessionDelWordLeftReq,
+      TransportEvent.SessionDelWordRightReq,
+      TransportEvent.SessionDelLineBeginReq,
+      TransportEvent.SessionDelLineEndReq,
+      TransportEvent.SessionBreakReq,
+      TransportEvent.SessionStopReq,
+      TransportEvent.SessionQuitReq,
+      TransportEvent.SessionTmuxReq,
+      TransportEvent.SessionSearch,
+      TransportEvent.SessionSearchClose,
+      TransportEvent.TermGroupCloseReq,
+      TransportEvent.TermGroupAddReq,
+      TransportEvent.SplitHorizontal,
+      TransportEvent.SplitVertical,
+      TransportEvent.ResetFontSizeReq,
+      TransportEvent.IncreaseFontSizeReq,
+      TransportEvent.DecreaseFontSizeReq,
+      TransportEvent.MoveLeftReq,
+      TransportEvent.MoveRightReq,
+      TransportEvent.MoveJumpReq,
+      TransportEvent.NextPaneReq,
+      TransportEvent.PrevPaneReq,
+      TransportEvent.OpenFile,
+      TransportEvent.OpenSsh,
+      TransportEvent.Move,
+      TransportEvent.EnterFullScreen,
+      TransportEvent.LeaveFullScreen,
+      TransportEvent.WindowGeometryChange,
+      TransportEvent.AddNotification,
+      TransportEvent.UpdateAvailable,
+      TransportEvent.Reload
+    ];
+
+    const registeredEvents = transport.on.mock.calls.map(([name]: [string, ...unknown[]]) => name);
+
+    expect(registeredEvents).toHaveLength(expectedEvents.length);
+    expect([...registeredEvents].sort()).toEqual([...expectedEvents].sort());
+
+    for (const event of expectedEvents) {
+      expect(transport.on.mock.calls).toContainEqual([event, expect.any(Function)]);
+    }
+  });
+
+  test('cleanup removes every registered transport listener', () => {
+    resetTransportListenersFixture();
+
+    const cleanup = registerTransportListeners({
+      actions: createBootstrapActions(),
+      plugins,
+      store,
+      transport
     });
+    const registeredPairs = transport.on.mock.calls.map(
+      ([event, listener]: [string, Listener]) => [event, listener] as const
+    );
 
-    test('session add event dispatches SESSION_ADD actions', () => {
-      clearDispatch();
+    expect(registeredPairs.length).toBeGreaterThan(0);
 
-      getListener('session add')({uid: 's-1', shell: '/bin/bash', pid: 100, profile: 'default'} as unknown as Session);
-      getListener('session add')({uid: 's-2', shell: '/bin/bash', pid: 101, profile: 'default'} as unknown as Session);
-      expect(dispatchMock.mock.calls).toContainEqual([
-        {type: 'SESSION_ADD', session: {uid: 's-1', shell: '/bin/bash', pid: 100, profile: 'default'}}
-      ]);
-      expect(dispatchMock.mock.calls).toContainEqual([
-        {type: 'SESSION_ADD', session: {uid: 's-2', shell: '/bin/bash', pid: 101, profile: 'default'}}
-      ]);
-      expect(dispatchMock.mock.calls.filter((c) => c[0]?.type === 'SESSION_ADD')).toHaveLength(2);
+    cleanup();
+
+    expect(transport.off.mock.calls).toHaveLength(registeredPairs.length);
+    for (const [event, listener] of registeredPairs) {
+      expect(transport.off.mock.calls).toContainEqual([event, listener]);
+    }
+    expect(Object.values(transportOnCalls).flat()).toHaveLength(0);
+  });
+
+  test('ready dispatches init and font smoothing', () => {
+    clearDispatch();
+    getListener(TransportEvent.Ready)(null);
+
+    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.InitAction}]);
+    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.UiSetFontSmoothing}]);
+  });
+
+  test('session add event dispatches SESSION_ADD actions', () => {
+    clearDispatch();
+
+    getListener(TransportEvent.SessionAdd)(createMockSession({uid: 's-1', pid: 100}));
+    getListener(TransportEvent.SessionAdd)(createMockSession({uid: 's-2', pid: 101}));
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {type: ActionType.SessionAdd, session: {uid: 's-1', shell: '/bin/bash', pid: 100, profile: 'default'}}
+    ]);
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {type: ActionType.SessionAdd, session: {uid: 's-2', shell: '/bin/bash', pid: 101, profile: 'default'}}
+    ]);
+    expect(dispatchMock.mock.calls.filter((call) => call[0]?.type === ActionType.SessionAdd)).toHaveLength(2);
+  });
+
+  test('session data event dispatches SESSION_DATA action', () => {
+    clearDispatch();
+
+    const uid = '01234567-89ab-cdef-0123-456789abcdef';
+    getListener(TransportEvent.SessionData)(`${uid}hello world`);
+    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.SessionData, uid, data: 'hello world'}]);
+  });
+
+  test('session exit event dispatches PTY_EXIT_TERM_GROUP action', () => {
+    clearDispatch();
+
+    getListener(TransportEvent.SessionExit)({uid: 's-1'});
+    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.PtyExitTermGroup, uid: 's-1'}]);
+  });
+
+  test('reload invokes plugins.reload', () => {
+    pluginsReloadMock.mockClear();
+    getListener(TransportEvent.Reload)(null);
+    expect(pluginsReloadMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('update available dispatches UPDATE_AVAILABLE', () => {
+    clearDispatch();
+    getListener(TransportEvent.UpdateAvailable)({
+      releaseName: 'v0.0.1',
+      releaseNotes: 'notes',
+      releaseUrl: 'https://example.org',
+      canInstall: true
     });
-
-    test('session data event dispatches SESSION_DATA action', () => {
-      clearDispatch();
-
-      const uid = '01234567-89ab-cdef-0123-456789abcdef';
-      getListener('session data')(`${uid}hello world`);
-      expect(dispatchMock.mock.calls).toContainEqual([{type: 'SESSION_DATA', uid, data: 'hello world'}]);
-    });
-
-    test('session exit event dispatches PTY_EXIT_TERM_GROUP action', () => {
-      clearDispatch();
-
-      getListener('session exit')({uid: 's-1'});
-      expect(dispatchMock.mock.calls).toContainEqual([{type: 'PTY_EXIT_TERM_GROUP', uid: 's-1'}]);
-    });
-
-    test('reload invokes plugins.reload', () => {
-      pluginsReloadMock.mockClear();
-      getListener('reload')(null);
-      expect(pluginsReloadMock).toHaveBeenCalledTimes(1);
-    });
-
-    test('update available dispatches UPDATE_AVAILABLE', () => {
-      clearDispatch();
-      getListener('update available')({
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {
+        type: ActionType.UpdateAvailable,
         releaseName: 'v0.0.1',
-        releaseNotes: 'notes',
+        notes: 'notes',
         releaseUrl: 'https://example.org',
         canInstall: true
-      });
-      expect(dispatchMock.mock.calls).toContainEqual([
-        {
-          type: 'UPDATE_AVAILABLE',
-          releaseName: 'v0.0.1',
-          notes: 'notes',
-          releaseUrl: 'https://example.org',
-          canInstall: true
-        }
-      ]);
-    });
-
-    test('session data send dispatches SESSION_DATA_SEND with escaped flag', () => {
-      clearDispatch();
-      getListener('session data send')({uid: 's-1', data: 'input', escaped: true});
-      expect(dispatchMock.mock.calls).toContainEqual([
-        {type: 'SESSION_DATA_SEND', uid: 's-1', data: 'input', escaped: true}
-      ]);
-    });
-
-    test('session shortcut events dispatch sendSessionData with escape sequences', () => {
-      clearDispatch();
-      const cases: Array<{event: string; data: string}> = [
-        {event: 'session move word left req', data: '\x1bb'},
-        {event: 'session move word right req', data: '\x1bf'},
-        {event: 'session move line beginning req', data: '\x1bOH'},
-        {event: 'session move line end req', data: '\x1bOF'},
-        {event: 'session del word left req', data: '\x1b\x7f'},
-        {event: 'session del word right req', data: '\x1bd'},
-        {event: 'session del line beginning req', data: '\x1bw'},
-        {event: 'session del line end req', data: '\x10B'},
-        {event: 'session break req', data: '\x03'},
-        {event: 'session stop req', data: '\x1a'},
-        {event: 'session quit req', data: '\x1c'},
-        {event: 'session tmux req', data: '\x02'}
-      ];
-      for (const {event, data} of cases) {
-        getListener(event)(null);
-        expect(dispatchMock.mock.calls).toContainEqual([{type: 'SESSION_DATA_SEND', uid: null, data}]);
       }
-    });
-
-    test('parameterless events dispatch correct actions', () => {
-      clearDispatch();
-      const cases: Array<{event: string; actionType: string}> = [
-        {event: 'session clear req', actionType: 'SESSION_CLEAR_ACTIVE'},
-        {event: 'session search', actionType: 'SESSION_SEARCH'},
-        {event: 'session search close', actionType: 'SESSION_SEARCH_CLOSE'},
-        {event: 'termgroup close req', actionType: 'TERM_GROUP_EXIT_ACTIVE'},
-        {event: 'reset fontSize req', actionType: 'UI_RESET_FONT_SIZE'},
-        {event: 'increase fontSize req', actionType: 'UI_INCREASE_FONT_SIZE'},
-        {event: 'decrease fontSize req', actionType: 'UI_DECREASE_FONT_SIZE'},
-        {event: 'move left req', actionType: 'UI_MOVE_LEFT'},
-        {event: 'move right req', actionType: 'UI_MOVE_RIGHT'},
-        {event: 'next pane req', actionType: 'UI_MOVE_NEXT_PANE'},
-        {event: 'prev pane req', actionType: 'UI_MOVE_PREVIOUS_PANE'},
-        {event: 'enter full screen', actionType: 'UI_ENTER_FULL_SCREEN'},
-        {event: 'leave full screen', actionType: 'UI_LEAVE_FULL_SCREEN'}
-      ];
-      for (const {event, actionType} of cases) {
-        getListener(event)(null);
-        expect(dispatchMock.mock.calls).toContainEqual([{type: actionType}]);
-      }
-    });
-
-    test('payload-bearing events dispatch correct actions', () => {
-      clearDispatch();
-
-      getListener('termgroup add req')({activeUid: 's-1', profile: 'default'});
-      expect(dispatchMock.mock.calls).toContainEqual([
-        {type: 'TERM_GROUP_REQUEST', activeUid: 's-1', profile: 'default'}
-      ]);
-
-      getListener('split request horizontal')({activeUid: 's-1', profile: 'default'});
-      expect(dispatchMock.mock.calls).toContainEqual([
-        {type: 'TERM_GROUP_SPLIT_HORIZONTAL', activeUid: 's-1', profile: 'default'}
-      ]);
-
-      getListener('split request vertical')({activeUid: 's-1', profile: 'default'});
-      expect(dispatchMock.mock.calls).toContainEqual([
-        {type: 'TERM_GROUP_SPLIT_VERTICAL', activeUid: 's-1', profile: 'default'}
-      ]);
-
-      getListener('move jump req')(3);
-      expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_MOVE_TO', index: 3}]);
-
-      getListener('open file')({path: '/tmp/test.txt'});
-      expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_OPEN_FILE', path: '/tmp/test.txt'}]);
-
-      getListener('add notification')({text: 'hello', url: 'https://example.org', dismissable: true});
-      expect(dispatchMock.mock.calls).toContainEqual([
-        {type: 'ADD_NOTIFICATION', text: 'hello', url: 'https://example.org', dismissable: true}
-      ]);
-
-      getListener('move')({bounds: {x: 100, y: 200}});
-      expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_WINDOW_MOVE', window: {bounds: {x: 100, y: 200}}}]);
-
-      getListener('windowGeometry change')({isMaximized: false});
-      expect(dispatchMock.mock.calls).toContainEqual([
-        {type: 'UI_WINDOW_GEOMETRY_UPDATED', data: {isMaximized: false}}
-      ]);
-    });
-
-    test('ordered bootstrap sequence: ready → session add → session data', () => {
-      clearDispatch();
-
-      // Simulate ordered bootstrap pipeline.
-      getListener('ready')(null);
-      getListener('session add')({
-        uid: 'seq-1',
-        shell: '/bin/bash',
-        pid: 200,
-        profile: 'default'
-      } as unknown as Session);
-      const uid = '01234567-89ab-cdef-0123-456789abcdef';
-      getListener('session data')(`${uid}initial output`);
-      getListener('update available')({
-        releaseName: 'v1.0.0',
-        releaseNotes: 'release',
-        releaseUrl: 'https://example.org',
-        canInstall: false
-      });
-
-      const types = dispatchMock.mock.calls.map((c) => c[0]?.type as string);
-
-      // Verify the expected dispatch order across the full sequence.
-      const initIdx = types.indexOf('INIT_ACTION');
-      const fontIdx = types.indexOf('UI_SET_FONT_SMOOTHING');
-      const addIdx = types.indexOf('SESSION_ADD');
-      const dataIdx = types.indexOf('SESSION_DATA');
-      const updateIdx = types.indexOf('UPDATE_AVAILABLE');
-
-      expect(initIdx).toBeGreaterThanOrEqual(0);
-      expect(fontIdx).toBeGreaterThan(initIdx);
-      expect(addIdx).toBeGreaterThan(fontIdx);
-      expect(dataIdx).toBeGreaterThan(addIdx);
-      expect(updateIdx).toBeGreaterThan(dataIdx);
-    });
-
-    test('high-frequency session data: 100 events dispatch correctly', () => {
-      clearDispatch();
-
-      const uid = '01234567-89ab-cdef-0123-456789abcdef';
-      const count = 100;
-
-      for (let i = 0; i < count; i++) {
-        getListener('session data')(`${uid}chunk-${i}`);
-      }
-
-      const dataActions = dispatchMock.mock.calls.filter((c) => c[0]?.type === 'SESSION_DATA');
-
-      expect(dataActions).toHaveLength(count);
-
-      // Verify each dispatch received the correct uid and data slice.
-      for (let i = 0; i < count; i++) {
-        expect(dataActions[i][0]).toEqual({
-          type: 'SESSION_DATA',
-          uid,
-          data: `chunk-${i}`
-        });
-      }
-    });
-
-    test('ready prerequisite: session add and data dispatch after ready', () => {
-      clearDispatch();
-
-      // Fire ready first to initialize bootstrap state.
-      getListener('ready')(null);
-
-      // Then fire session lifecycle events.
-      getListener('session add')({
-        uid: 'prereq-1',
-        shell: '/bin/zsh',
-        pid: 300,
-        profile: 'default'
-      } as unknown as Session);
-      const uid = '01234567-89ab-cdef-0123-456789abcdef';
-      getListener('session data')(`${uid}post-ready output`);
-
-      // Verify all dispatched correctly after ready.
-      expect(dispatchMock.mock.calls).toContainEqual([{type: 'INIT_ACTION'}]);
-      expect(dispatchMock.mock.calls).toContainEqual([
-        {
-          type: 'SESSION_ADD',
-          session: {uid: 'prereq-1', shell: '/bin/zsh', pid: 300, profile: 'default'}
-        }
-      ]);
-      expect(dispatchMock.mock.calls).toContainEqual([{type: 'SESSION_DATA', uid, data: 'post-ready output'}]);
-
-      // Confirm ordering: init comes before session events.
-      const types = dispatchMock.mock.calls.map((c) => c[0]?.type as string);
-      const initIdx = types.indexOf('INIT_ACTION');
-      const addIdx = types.indexOf('SESSION_ADD');
-      const dataIdx = types.indexOf('SESSION_DATA');
-      expect(addIdx).toBeGreaterThan(initIdx);
-      expect(dataIdx).toBeGreaterThan(initIdx);
-    });
+    ]);
   });
-}
+
+  test('session data send dispatches SESSION_DATA_SEND with escaped flag', () => {
+    clearDispatch();
+    getListener(TransportEvent.SessionDataSend)({uid: 's-1', data: 'input', escaped: true});
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {type: ActionType.SessionDataSend, uid: 's-1', data: 'input', escaped: true}
+    ]);
+  });
+
+  test('session shortcut events dispatch sendSessionData with escape sequences', () => {
+    clearDispatch();
+    const cases: Array<{event: (typeof TransportEvent)[keyof typeof TransportEvent]; data: string}> = [
+      {event: TransportEvent.SessionMoveWordLeftReq, data: '\x1bb'},
+      {event: TransportEvent.SessionMoveWordRightReq, data: '\x1bf'},
+      {event: TransportEvent.SessionMoveLineBeginReq, data: '\x1bOH'},
+      {event: TransportEvent.SessionMoveLineEndReq, data: '\x1bOF'},
+      {event: TransportEvent.SessionDelWordLeftReq, data: '\x1b\x7f'},
+      {event: TransportEvent.SessionDelWordRightReq, data: '\x1bd'},
+      {event: TransportEvent.SessionDelLineBeginReq, data: '\x1bw'},
+      {event: TransportEvent.SessionDelLineEndReq, data: '\x10B'},
+      {event: TransportEvent.SessionBreakReq, data: '\x03'},
+      {event: TransportEvent.SessionStopReq, data: '\x1a'},
+      {event: TransportEvent.SessionQuitReq, data: '\x1c'},
+      {event: TransportEvent.SessionTmuxReq, data: '\x02'}
+    ];
+    for (const {event, data} of cases) {
+      getListener(event)(null);
+      expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.SessionDataSend, uid: null, data}]);
+    }
+  });
+
+  test('parameterless events dispatch correct actions', () => {
+    clearDispatch();
+    const cases: Array<{
+      event: (typeof TransportEvent)[keyof typeof TransportEvent];
+      actionType: (typeof ActionType)[keyof typeof ActionType];
+    }> = [
+      {event: TransportEvent.SessionClearReq, actionType: ActionType.SessionClearActive},
+      {event: TransportEvent.SessionSearch, actionType: ActionType.SessionSearch},
+      {event: TransportEvent.SessionSearchClose, actionType: ActionType.SessionSearchClose},
+      {event: TransportEvent.TermGroupCloseReq, actionType: ActionType.TermGroupExitActive},
+      {event: TransportEvent.ResetFontSizeReq, actionType: ActionType.UiResetFontSize},
+      {event: TransportEvent.IncreaseFontSizeReq, actionType: ActionType.UiIncreaseFontSize},
+      {event: TransportEvent.DecreaseFontSizeReq, actionType: ActionType.UiDecreaseFontSize},
+      {event: TransportEvent.MoveLeftReq, actionType: ActionType.UiMoveLeft},
+      {event: TransportEvent.MoveRightReq, actionType: ActionType.UiMoveRight},
+      {event: TransportEvent.NextPaneReq, actionType: ActionType.UiMoveNextPane},
+      {event: TransportEvent.PrevPaneReq, actionType: ActionType.UiMovePreviousPane},
+      {event: TransportEvent.EnterFullScreen, actionType: ActionType.UiEnterFullScreen},
+      {event: TransportEvent.LeaveFullScreen, actionType: ActionType.UiLeaveFullScreen}
+    ];
+    for (const {event, actionType} of cases) {
+      getListener(event)(null);
+      expect(dispatchMock.mock.calls).toContainEqual([{type: actionType}]);
+    }
+  });
+
+  test('payload-bearing events dispatch correct actions', () => {
+    clearDispatch();
+
+    getListener(TransportEvent.TermGroupAddReq)({activeUid: 's-1', profile: 'default'});
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {type: ActionType.TermGroupRequest, activeUid: 's-1', profile: 'default'}
+    ]);
+
+    getListener(TransportEvent.SplitHorizontal)({activeUid: 's-1', profile: 'default'});
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {type: ActionType.TermGroupSplitHoriz, activeUid: 's-1', profile: 'default'}
+    ]);
+
+    getListener(TransportEvent.SplitVertical)({activeUid: 's-1', profile: 'default'});
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {type: ActionType.TermGroupSplitVert, activeUid: 's-1', profile: 'default'}
+    ]);
+
+    getListener(TransportEvent.MoveJumpReq)(3);
+    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.UiMoveTo, index: 3}]);
+
+    getListener(TransportEvent.OpenFile)({path: '/tmp/test.txt'});
+    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.UiOpenFile, path: '/tmp/test.txt'}]);
+
+    getListener(TransportEvent.AddNotification)({text: 'hello', url: 'https://example.org', dismissable: true});
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {type: ActionType.AddNotification, text: 'hello', url: 'https://example.org', dismissable: true}
+    ]);
+
+    getListener(TransportEvent.Move)({bounds: {x: 100, y: 200}});
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {type: ActionType.UiWindowMove, window: {bounds: {x: 100, y: 200}}}
+    ]);
+
+    getListener(TransportEvent.WindowGeometryChange)({isMaximized: false});
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {type: ActionType.UiWindowGeometryUpdated, data: {isMaximized: false}}
+    ]);
+  });
+
+  test('ordered bootstrap sequence: ready → session add → session data', () => {
+    clearDispatch();
+
+    getListener(TransportEvent.Ready)(null);
+    getListener(TransportEvent.SessionAdd)(createMockSession({uid: 'seq-1', pid: 200}));
+    const uid = '01234567-89ab-cdef-0123-456789abcdef';
+    getListener(TransportEvent.SessionData)(`${uid}initial output`);
+    getListener(TransportEvent.UpdateAvailable)({
+      releaseName: 'v1.0.0',
+      releaseNotes: 'release',
+      releaseUrl: 'https://example.org',
+      canInstall: false
+    });
+
+    const types = dispatchMock.mock.calls.map((call) => call[0]?.type as string);
+    const initIdx = types.indexOf(ActionType.InitAction);
+    const fontIdx = types.indexOf(ActionType.UiSetFontSmoothing);
+    const addIdx = types.indexOf(ActionType.SessionAdd);
+    const dataIdx = types.indexOf(ActionType.SessionData);
+    const updateIdx = types.indexOf(ActionType.UpdateAvailable);
+
+    expect(initIdx).toBeGreaterThanOrEqual(0);
+    expect(fontIdx).toBeGreaterThan(initIdx);
+    expect(addIdx).toBeGreaterThan(fontIdx);
+    expect(dataIdx).toBeGreaterThan(addIdx);
+    expect(updateIdx).toBeGreaterThan(dataIdx);
+  });
+
+  test('high-frequency session data: 100 events dispatch correctly', () => {
+    clearDispatch();
+
+    const uid = '01234567-89ab-cdef-0123-456789abcdef';
+    const count = 100;
+
+    for (let index = 0; index < count; index += 1) {
+      getListener(TransportEvent.SessionData)(`${uid}chunk-${index}`);
+    }
+
+    const dataActions = dispatchMock.mock.calls.filter((call) => call[0]?.type === ActionType.SessionData);
+
+    expect(dataActions).toHaveLength(count);
+
+    for (let index = 0; index < count; index += 1) {
+      expect(dataActions[index][0]).toEqual({
+        type: ActionType.SessionData,
+        uid,
+        data: `chunk-${index}`
+      });
+    }
+  });
+
+  test('ready prerequisite: session add and data dispatch after ready', () => {
+    clearDispatch();
+
+    getListener(TransportEvent.Ready)(null);
+    getListener(TransportEvent.SessionAdd)(createMockSession({uid: 'prereq-1', shell: '/bin/zsh', pid: 300}));
+    const uid = '01234567-89ab-cdef-0123-456789abcdef';
+    getListener(TransportEvent.SessionData)(`${uid}post-ready output`);
+
+    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.InitAction}]);
+    expect(dispatchMock.mock.calls).toContainEqual([
+      {
+        type: ActionType.SessionAdd,
+        session: {uid: 'prereq-1', shell: '/bin/zsh', pid: 300, profile: 'default'}
+      }
+    ]);
+    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.SessionData, uid, data: 'post-ready output'}]);
+
+    const types = dispatchMock.mock.calls.map((call) => call[0]?.type as string);
+    const initIdx = types.indexOf(ActionType.InitAction);
+    const addIdx = types.indexOf(ActionType.SessionAdd);
+    const dataIdx = types.indexOf(ActionType.SessionData);
+    expect(addIdx).toBeGreaterThan(initIdx);
+    expect(dataIdx).toBeGreaterThan(initIdx);
+  });
+});

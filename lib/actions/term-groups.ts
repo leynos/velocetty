@@ -9,27 +9,51 @@ import {
   TERM_GROUP_EXIT_ACTIVE
 } from '@shared/constants/term-groups';
 import type {ITermState, ITermGroup, HyperState, HyperDispatch, HyperActions} from '../../typings/hyper';
+import type {SplitRequestParams} from '../types/request-shapes';
 import {transport} from '../transport';
 import {getRootGroups} from '../selectors';
 import findBySession from '../utils/term-groups';
 
 import {ptyExitSession, setActiveSession, userExitSession} from './sessions';
 
+type ResolvedSplitContext = {activeUid: string | undefined; profile: string | undefined};
+
+function resolveSplitContext(
+  {activeUid: requestedActiveUid, profile: requestedProfile}: SplitRequestParams,
+  getState: () => HyperState
+): ResolvedSplitContext {
+  const {sessions} = getState();
+  const activeUid = requestedActiveUid ?? sessions.activeUid;
+  const activeSession = activeUid ? sessions.sessions[activeUid] : undefined;
+  const profile = requestedProfile ?? activeSession?.profile ?? window.profileName;
+  return {activeUid, profile};
+}
+
+function emitNewSession(
+  extra: {splitDirection?: 'VERTICAL' | 'HORIZONTAL'; isNewGroup?: true},
+  cwd: string | undefined,
+  {activeUid, profile}: ResolvedSplitContext
+): void {
+  transport.emit('new', {
+    ...extra,
+    cwd,
+    activeUid: activeUid ? asSessionId(activeUid) : undefined,
+    profile: profile ? asProfileId(profile) : undefined
+  });
+}
+
 function requestSplit(direction: 'VERTICAL' | 'HORIZONTAL') {
-  return (_activeUid: string | undefined, _profile: string | undefined) =>
+  return ({activeUid: requestedActiveUid, profile: requestedProfile}: SplitRequestParams = {}) =>
     (dispatch: HyperDispatch, getState: () => HyperState): void => {
       dispatch({
         type: SESSION_REQUEST,
         effect: () => {
-          const {ui, sessions} = getState();
-          const activeUid = _activeUid ? _activeUid : sessions.activeUid;
-          const profile = _profile ? _profile : activeUid ? sessions.sessions[activeUid].profile : window.profileName;
-          transport.emit('new', {
-            splitDirection: direction,
-            cwd: ui.cwd,
-            activeUid: activeUid ? asSessionId(activeUid) : undefined,
-            profile: profile ? asProfileId(profile) : undefined
-          });
+          const {ui} = getState();
+          emitNewSession(
+            {splitDirection: direction},
+            ui.cwd,
+            resolveSplitContext({activeUid: requestedActiveUid, profile: requestedProfile}, getState)
+          );
         }
       });
     };
@@ -46,21 +70,17 @@ export function resizeTermGroup(uid: string, sizes: number[]): HyperActions {
   };
 }
 
-export function requestTermGroup(_activeUid: string | undefined, _profile: string | undefined) {
+export function requestTermGroup({activeUid: requestedActiveUid, profile: requestedProfile}: SplitRequestParams = {}) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     dispatch({
       type: TERM_GROUP_REQUEST,
       effect: () => {
-        const {ui, sessions} = getState();
-        const {cwd} = ui;
-        const activeUid = _activeUid ? _activeUid : sessions.activeUid;
-        const profile = _profile ? _profile : activeUid ? sessions.sessions[activeUid].profile : window.profileName;
-        transport.emit('new', {
-          isNewGroup: true,
-          cwd,
-          activeUid: activeUid ? asSessionId(activeUid) : undefined,
-          profile: profile ? asProfileId(profile) : undefined
-        });
+        const {ui} = getState();
+        emitNewSession(
+          {isNewGroup: true},
+          ui.cwd,
+          resolveSplitContext({activeUid: requestedActiveUid, profile: requestedProfile}, getState)
+        );
       }
     });
   };

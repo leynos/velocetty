@@ -2,7 +2,7 @@
 import React, {act} from 'react';
 import {createRoot} from 'react-dom/client';
 
-import {afterAll, beforeAll, beforeEach, describe, expect, mock, test} from 'bun:test';
+import {afterEach, beforeEach, describe, expect, mock, test} from 'bun:test';
 
 import type {HyperProps} from '../../typings/hyper';
 import {setupHappyDom} from '../testUtils/happy-dom';
@@ -51,12 +51,11 @@ const registerHyperModuleMocks = () => {
   }));
 };
 
-registerHyperModuleMocks();
-
 let Hyper: HyperComponent;
 let cleanupHappyDom: (() => void) | null = null;
+let moduleInstanceCounter = 0;
 
-beforeAll(async () => {
+const loadHyperComponent = async () => {
   registerHyperModuleMocks();
   cleanupHappyDom = await setupHappyDom();
   // Provide window.rpc stub for any residual plugin-API references.
@@ -65,16 +64,19 @@ beforeAll(async () => {
     off: () => {},
     removeListener: () => {}
   };
-  ({default: Hyper} = await import('../../lib/containers/hyper'));
+  moduleInstanceCounter += 1;
+  ({default: Hyper} = await import(`../../lib/containers/hyper.tsx?hyper_transport=${moduleInstanceCounter}`));
+};
+
+beforeEach(async () => {
+  resetTransportMock();
+  await loadHyperComponent();
 }, 15000);
 
-afterAll(() => {
+afterEach(() => {
   cleanupHappyDom?.();
   cleanupHappyDom = null;
-});
-
-beforeEach(() => {
-  resetTransportMock();
+  mock.restore();
 });
 
 const buildHyperProps = (overrides: Partial<HyperProps> = {}): HyperProps => ({

@@ -2,7 +2,7 @@
 import React, {act} from 'react';
 import {createRoot} from 'react-dom/client';
 
-import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import {afterEach, beforeEach, expect, mock, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
@@ -19,37 +19,47 @@ const unsubscribeDecorationUpdates = mock(() => {
 });
 let decorationListener: (() => void) | null = null;
 
-registerPluginsModuleMocks({
-  getTabProps: (tab: unknown, parentProps: unknown, props: unknown) => getTabPropsMock(tab, parentProps, props),
-  subscribeTabDecorationUpdates: (listener: () => void) => {
-    decorationListener = listener;
-    return unsubscribeDecorationUpdates;
-  }
-});
+const registerTabsModuleMocks = () => {
+  registerPluginsModuleMocks({
+    getTabProps: (tab: unknown, parentProps: unknown, props: unknown) => getTabPropsMock(tab, parentProps, props),
+    subscribeTabDecorationUpdates: (listener: () => void) => {
+      decorationListener = listener;
+      return unsubscribeDecorationUpdates;
+    }
+  });
 
-mock.module('../../lib/components/new-tab', () => ({
-  default: () => null
-}));
+  mock.module('../../lib/components/new-tab', () => ({
+    default: () => null
+  }));
+};
 
 type TabsComponent = typeof import('../../lib/components/tabs').default;
 
 let Tabs: TabsComponent;
 let cleanupHappyDom: (() => void) | null = null;
+let moduleInstanceCounter = 0;
 
-beforeAll(async () => {
+const loadTabsComponent = async () => {
   cleanupHappyDom = await setupHappyDom();
-  ({default: Tabs} = await import('../../lib/components/tabs'));
-});
+  registerTabsModuleMocks();
+  moduleInstanceCounter += 1;
+  ({default: Tabs} = await import(`../../lib/components/tabs.tsx?tabs_decoration_updates=${moduleInstanceCounter}`));
+};
 
-afterAll(() => {
-  cleanupHappyDom?.();
-  cleanupHappyDom = null;
-});
-
-beforeEach(() => {
+beforeEach(async () => {
   decorationListener = null;
   getTabPropsMock.mockClear();
   unsubscribeDecorationUpdates.mockClear();
+  await loadTabsComponent();
+});
+
+afterEach(() => {
+  try {
+    cleanupHappyDom?.();
+  } finally {
+    cleanupHappyDom = null;
+    mock.restore();
+  }
 });
 
 const mountTabs = async (root: ReturnType<typeof createRoot>) => {

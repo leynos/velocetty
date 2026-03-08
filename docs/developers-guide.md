@@ -551,8 +551,6 @@ Unit tests run under Bun's built-in test runner. Use one of the following:
 
 - `bun run test:unit`
 - `bun test test/unit`
-- `bun run test:unit:bootstrap-transport` (runs only the transport bootstrap
-  integration assertion in an isolated process)
 - `bun run test:coverage` (writes text output and an LCOV (line coverage)
   report under
   `coverage/`)
@@ -573,13 +571,19 @@ Unit tests run under Bun's built-in test runner. Use one of the following:
   coverage and 50% function coverage as the Bun-reported proxy for the
   documented 50% branch target.
 
-`make test` now executes two stages:
+`make test` now executes the shared unit suite through `bun run test:unit:run`.
+Roadmap item `9.3.1` removed the dedicated bootstrap-process quarantine by
+moving renderer bootstrap assertions behind injected seams instead of
+file-scope module mocks.
 
-- `bun run test:unit:run` for the general suite.
-- `bun run test:unit:bootstrap-transport` with
-  `VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1` so file-scope module mocks
-  in the bootstrap transport integration suite cannot leak into other test
-  files.
+When checking for order-dependent regressions, replay the unit suite with fixed
+seeds. For example:
+
+```bash
+bun test --max-concurrency=1 --randomize --seed 2444615283 test/unit
+bun test --max-concurrency=1 --randomize --seed 1337 test/unit
+bun test --max-concurrency=1 --randomize --seed 20260306 test/unit
+```
 
 ### End-to-end (E2E) tests (layered strategy)
 

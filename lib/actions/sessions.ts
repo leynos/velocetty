@@ -16,6 +16,7 @@ import {
   SESSION_SEARCH
 } from '@shared/constants/sessions';
 import type {HyperState, HyperDispatch, HyperActions} from '../../typings/hyper';
+import type {AddSessionDataParams, SendSessionDataParams} from '../bootstrap/renderer-bootstrap';
 import {transport} from '../transport';
 import {keys} from '../utils/object';
 import findBySession from '../utils/term-groups';
@@ -55,7 +56,7 @@ export function requestSession(profile: string | undefined) {
 }
 
 /** Queue incoming PTY data and stamp it with the current timestamp. */
-export function addSessionData(uid: string, data: string) {
+export function addSessionData({uid, data}: AddSessionDataParams) {
   return (dispatch: HyperDispatch) => {
     dispatch({
       type: SESSION_ADD_DATA,
@@ -180,7 +181,7 @@ export function closeSearch(uid?: string, keyEvent?: any) {
 }
 
 /** Send session input data to RPC with optional shell escaping. */
-export function sendSessionData(uid: string | null, data: string, escaped?: boolean) {
+export function sendSessionData({uid, data, escaped}: SendSessionDataParams) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     dispatch({
       type: SESSION_USER_DATA,

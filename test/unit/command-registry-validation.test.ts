@@ -2,6 +2,8 @@
 import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 import type {CommandDefinition, CommandId} from '@shared/types/commands';
 
+import {installTestWindow} from '../testUtils/global-window';
+
 let decoratedKeymaps: Record<string, string[]> = {};
 let runtimeCommands: CommandDefinition[] = [];
 const invokeMock = mock(async (channel: string) => {
@@ -28,7 +30,7 @@ let validateArgs: typeof import('../../lib/command-registry').validateArgs;
 
 const TEST_COMMAND_PREFIX = 'test:command-registry:validation';
 const asCommandId = (value: string): CommandId => value as CommandId;
-const previousWindow = (globalThis as {window?: Record<string, unknown>}).window;
+let restoreWindow = () => {};
 
 const createCommandDefinition = (commandId: string, argsSchema?: Record<string, unknown>): CommandDefinition => ({
   id: asCommandId(commandId),
@@ -40,7 +42,7 @@ const createCommandDefinition = (commandId: string, argsSchema?: Record<string, 
 });
 
 beforeAll(async () => {
-  (globalThis as {window?: Record<string, unknown>}).window = {};
+  restoreWindow = installTestWindow();
 
   ({register, update, remove, list, validateArgs} = await import(
     '../../lib/command-registry.ts?command_registry_validation_unit'
@@ -48,12 +50,7 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  if (previousWindow === undefined) {
-    delete (globalThis as {window?: Record<string, unknown>}).window;
-    return;
-  }
-
-  (globalThis as {window?: Record<string, unknown>}).window = previousWindow;
+  restoreWindow();
 });
 
 beforeEach(() => {

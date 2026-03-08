@@ -32,9 +32,11 @@
  * - `./ensure-directory-path.test.ts` is the companion example for this
  *   richer test-module header format
  */
-import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import {afterAll, afterEach, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 import {SESSION_SEARCH} from '@shared/constants/sessions';
 import type {CommandDefinition} from '@shared/types/commands';
+
+import {installTestWindow} from '../testUtils/global-window';
 
 let decoratedKeymaps: Record<string, string[]> = {};
 let runtimeCommands: CommandDefinition[] = [];
@@ -80,36 +82,21 @@ let validateCommandArgsFor: typeof import('../../lib/command-registry').validate
 
 const TEST_COMMAND_PREFIX = 'test:command-registry:compat';
 const focusActiveTermMock = mock(() => {});
-const windowHost = globalThis as {window?: Record<string, unknown>};
-const previousWindow = windowHost.window;
-const previousFocusActiveTerm = previousWindow?.focusActiveTerm;
-let createdWindowForTest = false;
+const commandRegistryWindowDouble: Record<string, unknown> = {};
+let restoreWindow = () => {};
 let moduleInstanceCounter = 0;
 
 beforeAll(() => {
-  if (windowHost.window === undefined) {
-    windowHost.window = {};
-    createdWindowForTest = true;
-  }
-
-  windowHost.window.focusActiveTerm = focusActiveTermMock;
+  commandRegistryWindowDouble.focusActiveTerm = focusActiveTermMock;
+  restoreWindow = installTestWindow(commandRegistryWindowDouble);
 });
 
 afterAll(() => {
-  if (windowHost.window === undefined) {
-    return;
-  }
+  restoreWindow();
+});
 
-  if (previousFocusActiveTerm === undefined) {
-    delete windowHost.window.focusActiveTerm;
-  } else {
-    windowHost.window.focusActiveTerm = previousFocusActiveTerm;
-  }
-
-  if (createdWindowForTest) {
-    delete windowHost.window;
-    return;
-  }
+afterEach(() => {
+  mock.restore();
 });
 
 beforeEach(async () => {

@@ -1,5 +1,5 @@
 /** @file Verifies Term.reportRenderer emits via transport with deduplication. */
-import {afterAll, beforeAll, beforeEach, describe, expect, mock, test} from 'bun:test';
+import {afterEach, beforeEach, describe, expect, mock, test} from 'bun:test';
 import {asRendererUid} from '@shared/types/common';
 import {LONG_FRAME_THRESHOLD_MS, RUNTIME_METRICS_REPORT_INTERVAL_MS} from '@shared/constants/runtime-telemetry';
 
@@ -17,52 +17,55 @@ function isWebGLAddon(addon: unknown): addon is {onContextLoss: () => void} {
 
 const {transportMock, resetTransportMock} = createTransportMock();
 
-mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
+const registerTermModuleMocks = () => {
+  mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
 
-// Stub heavy renderer dependencies that Term pulls in transitively.
-mock.module('electron', () => ({
-  clipboard: {writeText: mock(() => {}), readText: mock(() => '')},
-  shell: {openExternal: mock(async () => {})},
-  ipcRenderer: {
-    invoke: mock(async () => ({})),
-    on: mock(() => {}),
-    send: mock(() => {}),
-    removeAllListeners: mock(() => {}),
-    removeListener: mock(() => {})
-  }
-}));
-mock.module('color', () => ({
-  default: () => ({
-    alpha() {
-      return 1;
-    },
-    hex() {
-      return '#000000';
+  // Stub heavy renderer dependencies that Term pulls in transitively.
+  mock.module('electron', () => ({
+    clipboard: {writeText: mock(() => {}), readText: mock(() => '')},
+    shell: {openExternal: mock(async () => {})},
+    ipcRenderer: {
+      invoke: mock(async () => ({})),
+      on: mock(() => {}),
+      send: mock(() => {}),
+      removeAllListeners: mock(() => {}),
+      removeListener: mock(() => {})
     }
-  })
-}));
-mock.module('xterm', () => ({Terminal: class {}}));
-mock.module('xterm-addon-canvas', () => ({CanvasAddon: class {}}));
-mock.module('xterm-addon-fit', () => ({FitAddon: class {}}));
-mock.module('xterm-addon-image', () => ({ImageAddon: class {}}));
-mock.module('xterm-addon-ligatures', () => ({LigaturesAddon: class {}}));
-mock.module('xterm-addon-search', () => ({SearchAddon: class {}}));
-mock.module('xterm-addon-unicode11', () => ({Unicode11Addon: class {}}));
-mock.module('xterm-addon-web-links', () => ({WebLinksAddon: class {}}));
-mock.module('xterm-addon-webgl', () => ({
-  WebglAddon: class {
-    onContextLoss() {}
-    dispose() {}
-  }
-}));
-mock.module('xterm/css/xterm.css', () => ({}));
-mock.module('../../lib/terms', () => ({default: {}}));
-mock.module('../../lib/utils/paste', () => ({default: () => null}));
-registerPluginsModuleMocks();
-mock.module('../../lib/components/searchBox', () => ({default: () => null}));
+  }));
+  mock.module('color', () => ({
+    default: () => ({
+      alpha() {
+        return 1;
+      },
+      hex() {
+        return '#000000';
+      }
+    })
+  }));
+  mock.module('xterm', () => ({Terminal: class {}}));
+  mock.module('xterm-addon-canvas', () => ({CanvasAddon: class {}}));
+  mock.module('xterm-addon-fit', () => ({FitAddon: class {}}));
+  mock.module('xterm-addon-image', () => ({ImageAddon: class {}}));
+  mock.module('xterm-addon-ligatures', () => ({LigaturesAddon: class {}}));
+  mock.module('xterm-addon-search', () => ({SearchAddon: class {}}));
+  mock.module('xterm-addon-unicode11', () => ({Unicode11Addon: class {}}));
+  mock.module('xterm-addon-web-links', () => ({WebLinksAddon: class {}}));
+  mock.module('xterm-addon-webgl', () => ({
+    WebglAddon: class {
+      onContextLoss() {}
+      dispose() {}
+    }
+  }));
+  mock.module('xterm/css/xterm.css', () => ({}));
+  mock.module('../../lib/terms', () => ({default: {}}));
+  mock.module('../../lib/utils/paste', () => ({default: () => null}));
+  registerPluginsModuleMocks();
+  mock.module('../../lib/components/searchBox', () => ({default: () => null}));
+};
 
 let Term: typeof import('../../lib/components/term').default;
 let cleanupHappyDom: (() => void) | null = null;
+let moduleInstanceCounter = 0;
 
 const createTermInstanceForWebGLFallbackTest = (uid: string) => {
   // @ts-expect-error Test constructor setup intentionally uses a minimal prop subset.
@@ -74,21 +77,24 @@ const createTermInstanceForWebGLFallbackTest = (uid: string) => {
   });
 };
 
-beforeAll(async () => {
+const loadTermComponent = async () => {
   cleanupHappyDom = await setupHappyDom();
-  ({default: Term} = await import('../../lib/components/term'));
+  registerTermModuleMocks();
+  moduleInstanceCounter += 1;
+  ({default: Term} = await import(`../../lib/components/term.tsx?term_report_renderer=${moduleInstanceCounter}`));
+};
+
+beforeEach(async () => {
+  resetTransportMock();
+  await loadTermComponent();
+  // Reset the static renderer type cache between tests.
+  Term.rendererTypes = {} as typeof Term.rendererTypes;
 });
 
-afterAll(() => {
+afterEach(() => {
   mock.restore();
   cleanupHappyDom?.();
   cleanupHappyDom = null;
-});
-
-beforeEach(() => {
-  resetTransportMock();
-  // Reset the static renderer type cache between tests.
-  Term.rendererTypes = {} as typeof Term.rendererTypes;
 });
 
 describe('Term.reportRenderer transport emit', () => {

@@ -273,7 +273,7 @@ export function openFile(path: string) {
             }
             transport.once('session add', ({uid}) => {
               transport.once('session data', () => {
-                dispatch(sendSessionData(uid, command));
+                dispatch(sendSessionData({uid, data: command}));
               });
             });
           }
@@ -309,7 +309,7 @@ export function openSSH(parsedUrl: ReturnType<typeof parseUrl>) {
 
         transport.once('session add', ({uid}) => {
           transport.once('session data', () => {
-            dispatch(sendSessionData(uid, command));
+            dispatch(sendSessionData({uid, data: command}));
           });
         });
 
