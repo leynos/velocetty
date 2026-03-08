@@ -381,11 +381,12 @@ describe('bootstrap transport event wiring', () => {
     let callCount = 0;
     transport.on.mockImplementation((event: string, listener: Listener) => {
       callCount += 1;
-      if (callCount !== failingCallNumber) {
-        successfulRegistrations.push([event, listener]);
-        return registerTransportListener(event, listener);
+      successfulRegistrations.push([event, listener]);
+      registerTransportListener(event, listener);
+      if (callCount === failingCallNumber) {
+        throw registrationError;
       }
-      throw registrationError;
+      return transport;
     });
 
     expect(() =>
@@ -397,8 +398,8 @@ describe('bootstrap transport event wiring', () => {
       })
     ).toThrow(registrationError);
 
-    expect(successfulRegistrations).toHaveLength(failingCallNumber - 1);
-    expect(transport.off.mock.calls).toHaveLength(successfulRegistrations.length);
+    expect(successfulRegistrations).toHaveLength(failingCallNumber);
+    expect(transport.off.mock.calls).toHaveLength(failingCallNumber);
     expect(transport.off.mock.calls).toEqual(successfulRegistrations.slice().reverse());
 
     for (const [event, listener] of successfulRegistrations) {
@@ -417,10 +418,11 @@ describe('bootstrap transport event wiring', () => {
     let callCount = 0;
     transport.on.mockImplementation((event: string, listener: Listener) => {
       callCount += 1;
+      registerTransportListener(event, listener);
       if (callCount === failingCallNumber) {
         throw registrationError;
       }
-      return registerTransportListener(event, listener);
+      return transport;
     });
     transport.off.mockImplementationOnce((_event: string, _listener: Listener) => {
       throw rollbackError;
@@ -435,7 +437,7 @@ describe('bootstrap transport event wiring', () => {
       })
     ).toThrow(registrationError);
 
-    expect(transport.off.mock.calls).toHaveLength(failingCallNumber - 1);
+    expect(transport.off.mock.calls).toHaveLength(failingCallNumber);
   });
 
   test('ready dispatches init and font smoothing', () => {

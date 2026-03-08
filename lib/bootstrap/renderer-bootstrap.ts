@@ -517,10 +517,11 @@ export const registerRendererTransportListeners = ({
       listener(parsedPayload.data as RendererEvents[Event]);
     };
 
-    transport.on(event, wrappedListener);
-    removers.push(() => {
+    const remove = () => {
       transport.off(event, wrappedListener);
-    });
+    };
+    removers.push(remove);
+    transport.on(event, wrappedListener);
   };
 
   try {
