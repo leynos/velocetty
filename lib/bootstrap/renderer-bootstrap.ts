@@ -197,6 +197,157 @@ const safeInvoke = (label: string, cleanup: () => void, errors: unknown[]): void
   }
 };
 
+const cleanupTransportListenerRemovers = (
+  removers: Array<() => void>,
+  label: 'transport listener removal' | 'transport listener removal (rollback)'
+): unknown[] => {
+  const cleanupErrors: unknown[] = [];
+  for (const remove of [...removers].reverse()) {
+    safeInvoke(label, remove, cleanupErrors);
+  }
+  return cleanupErrors;
+};
+
+type RendererTransportRegistrationDependencies = Pick<RendererBootstrapDependencies, 'actions' | 'plugins'> & {
+  store: StoreLike;
+};
+
+type RendererTransportRegister = <Event extends keyof RendererEvents>(
+  event: Event,
+  listener: (payload: RendererEvents[Event]) => void
+) => void;
+
+const registerRendererTransportEventHandlers = (
+  register: RendererTransportRegister,
+  {actions, plugins, store}: RendererTransportRegistrationDependencies
+): void => {
+  register('ready', () => {
+    store.dispatch(actions.init());
+    store.dispatch(actions.uiActions.setFontSmoothing());
+  });
+  register('session add', (data) => {
+    store.dispatch(actions.sessionActions.addSession(data));
+  });
+  register('session data', (data) => {
+    const uid = data.slice(0, 36);
+    store.dispatch(actions.sessionActions.addSessionData({uid, data: data.slice(36)}));
+  });
+  register('session data send', ({uid, data, escaped}) => {
+    store.dispatch(actions.sessionActions.sendSessionData({uid, data, escaped}));
+  });
+  register('session exit', ({uid}) => {
+    store.dispatch(actions.termGroupActions.ptyExitTermGroup(uid));
+  });
+  register('termgroup close req', () => {
+    store.dispatch(actions.termGroupActions.exitActiveTermGroup());
+  });
+  register('session clear req', () => {
+    store.dispatch(actions.sessionActions.clearActiveSession());
+  });
+  register('session move word left req', () => {
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bb'}));
+  });
+  register('session move word right req', () => {
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bf'}));
+  });
+  register('session move line beginning req', () => {
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bOH'}));
+  });
+  register('session move line end req', () => {
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bOF'}));
+  });
+  register('session del word left req', () => {
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1b\x7f'}));
+  });
+  register('session del word right req', () => {
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bd'}));
+  });
+  register('session del line beginning req', () => {
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bw'}));
+  });
+  register('session del line end req', () => {
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x10B'}));
+  });
+  register('session break req', () => {
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x03'}));
+  });
+  register('session stop req', () => {
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1a'}));
+  });
+  register('session quit req', () => {
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1c'}));
+  });
+  register('session tmux req', () => {
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x02'}));
+  });
+  register('session search', () => {
+    store.dispatch(actions.sessionActions.openSearch());
+  });
+  register('session search close', () => {
+    store.dispatch(actions.sessionActions.closeSearch());
+  });
+  register('termgroup add req', ({activeUid, profile}) => {
+    store.dispatch(actions.termGroupActions.requestTermGroup({activeUid, profile}));
+  });
+  register('split request horizontal', ({activeUid, profile}) => {
+    store.dispatch(actions.termGroupActions.requestHorizontalSplit({activeUid, profile}));
+  });
+  register('split request vertical', ({activeUid, profile}) => {
+    store.dispatch(actions.termGroupActions.requestVerticalSplit({activeUid, profile}));
+  });
+  register('reset fontSize req', () => {
+    store.dispatch(actions.uiActions.resetFontSize());
+  });
+  register('increase fontSize req', () => {
+    store.dispatch(actions.uiActions.increaseFontSize());
+  });
+  register('decrease fontSize req', () => {
+    store.dispatch(actions.uiActions.decreaseFontSize());
+  });
+  register('move left req', () => {
+    store.dispatch(actions.uiActions.moveLeft());
+  });
+  register('move right req', () => {
+    store.dispatch(actions.uiActions.moveRight());
+  });
+  register('move jump req', (index) => {
+    store.dispatch(actions.uiActions.moveTo(index));
+  });
+  register('next pane req', () => {
+    store.dispatch(actions.uiActions.moveToNextPane());
+  });
+  register('prev pane req', () => {
+    store.dispatch(actions.uiActions.moveToPreviousPane());
+  });
+  register('open file', ({path}) => {
+    store.dispatch(actions.uiActions.openFile(path));
+  });
+  register('open ssh', (parsedUrl) => {
+    store.dispatch(actions.uiActions.openSSH(parsedUrl));
+  });
+  register('update available', ({releaseName, releaseNotes, releaseUrl, canInstall}) => {
+    store.dispatch(actions.updaterActions.updateAvailable({releaseName, notes: releaseNotes, releaseUrl, canInstall}));
+  });
+  register('move', (window) => {
+    store.dispatch(actions.uiActions.windowMove(window));
+  });
+  register('windowGeometry change', (data) => {
+    store.dispatch(actions.uiActions.windowGeometryUpdated(data));
+  });
+  register('add notification', ({text, url, dismissable}) => {
+    store.dispatch(actions.addNotificationMessage({text, url, dismissable}));
+  });
+  register('enter full screen', () => {
+    store.dispatch(actions.uiActions.enterFullScreen());
+  });
+  register('leave full screen', () => {
+    store.dispatch(actions.uiActions.leaveFullScreen());
+  });
+  register('reload', () => {
+    plugins.reload();
+  });
+};
+
 /**
  * Sets the historical Linux zoom factor so Electron 40 preserves renderer size
  * expectations.
@@ -366,143 +517,27 @@ export const registerRendererTransportListeners = ({
       listener(parsedPayload.data as RendererEvents[Event]);
     };
 
-    transport.on(event, wrappedListener);
-    removers.push(() => {
+    const remove = () => {
       transport.off(event, wrappedListener);
-    });
+    };
+    removers.push(remove);
+    transport.on(event, wrappedListener);
   };
 
-  register('ready', () => {
-    store.dispatch(actions.init());
-    store.dispatch(actions.uiActions.setFontSmoothing());
-  });
-  register('session add', (data) => {
-    store.dispatch(actions.sessionActions.addSession(data));
-  });
-  register('session data', (data) => {
-    const uid = data.slice(0, 36);
-    store.dispatch(actions.sessionActions.addSessionData({uid, data: data.slice(36)}));
-  });
-  register('session data send', ({uid, data, escaped}) => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid, data, escaped}));
-  });
-  register('session exit', ({uid}) => {
-    store.dispatch(actions.termGroupActions.ptyExitTermGroup(uid));
-  });
-  register('termgroup close req', () => {
-    store.dispatch(actions.termGroupActions.exitActiveTermGroup());
-  });
-  register('session clear req', () => {
-    store.dispatch(actions.sessionActions.clearActiveSession());
-  });
-  register('session move word left req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bb'}));
-  });
-  register('session move word right req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bf'}));
-  });
-  register('session move line beginning req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bOH'}));
-  });
-  register('session move line end req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bOF'}));
-  });
-  register('session del word left req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1b\x7f'}));
-  });
-  register('session del word right req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bd'}));
-  });
-  register('session del line beginning req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bw'}));
-  });
-  register('session del line end req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x10B'}));
-  });
-  register('session break req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x03'}));
-  });
-  register('session stop req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1a'}));
-  });
-  register('session quit req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1c'}));
-  });
-  register('session tmux req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x02'}));
-  });
-  register('session search', () => {
-    store.dispatch(actions.sessionActions.openSearch());
-  });
-  register('session search close', () => {
-    store.dispatch(actions.sessionActions.closeSearch());
-  });
-  register('termgroup add req', ({activeUid, profile}) => {
-    store.dispatch(actions.termGroupActions.requestTermGroup({activeUid, profile}));
-  });
-  register('split request horizontal', ({activeUid, profile}) => {
-    store.dispatch(actions.termGroupActions.requestHorizontalSplit({activeUid, profile}));
-  });
-  register('split request vertical', ({activeUid, profile}) => {
-    store.dispatch(actions.termGroupActions.requestVerticalSplit({activeUid, profile}));
-  });
-  register('reset fontSize req', () => {
-    store.dispatch(actions.uiActions.resetFontSize());
-  });
-  register('increase fontSize req', () => {
-    store.dispatch(actions.uiActions.increaseFontSize());
-  });
-  register('decrease fontSize req', () => {
-    store.dispatch(actions.uiActions.decreaseFontSize());
-  });
-  register('move left req', () => {
-    store.dispatch(actions.uiActions.moveLeft());
-  });
-  register('move right req', () => {
-    store.dispatch(actions.uiActions.moveRight());
-  });
-  register('move jump req', (index) => {
-    store.dispatch(actions.uiActions.moveTo(index));
-  });
-  register('next pane req', () => {
-    store.dispatch(actions.uiActions.moveToNextPane());
-  });
-  register('prev pane req', () => {
-    store.dispatch(actions.uiActions.moveToPreviousPane());
-  });
-  register('open file', ({path}) => {
-    store.dispatch(actions.uiActions.openFile(path));
-  });
-  register('open ssh', (parsedUrl) => {
-    store.dispatch(actions.uiActions.openSSH(parsedUrl));
-  });
-  register('update available', ({releaseName, releaseNotes, releaseUrl, canInstall}) => {
-    store.dispatch(actions.updaterActions.updateAvailable({releaseName, notes: releaseNotes, releaseUrl, canInstall}));
-  });
-  register('move', (window) => {
-    store.dispatch(actions.uiActions.windowMove(window));
-  });
-  register('windowGeometry change', (data) => {
-    store.dispatch(actions.uiActions.windowGeometryUpdated(data));
-  });
-  register('add notification', ({text, url, dismissable}) => {
-    store.dispatch(actions.addNotificationMessage({text, url, dismissable}));
-  });
-  register('enter full screen', () => {
-    store.dispatch(actions.uiActions.enterFullScreen());
-  });
-  register('leave full screen', () => {
-    store.dispatch(actions.uiActions.leaveFullScreen());
-  });
-  register('reload', () => {
-    plugins.reload();
-  });
+  try {
+    registerRendererTransportEventHandlers(register, {actions, plugins, store});
+  } catch (error) {
+    const rollbackErrors = cleanupTransportListenerRemovers(removers, 'transport listener removal (rollback)');
+    if (rollbackErrors.length > 0) {
+      console.error(
+        `Renderer transport listener registration rollback encountered ${rollbackErrors.length} cleanup error(s).`
+      );
+    }
+    throw error;
+  }
 
   return () => {
-    const cleanupErrors: unknown[] = [];
-    for (const remove of [...removers].reverse()) {
-      safeInvoke('transport listener removal', remove, cleanupErrors);
-    }
+    const cleanupErrors = cleanupTransportListenerRemovers(removers, 'transport listener removal');
     if (cleanupErrors.length === 1) {
       throw cleanupErrors[0];
     }

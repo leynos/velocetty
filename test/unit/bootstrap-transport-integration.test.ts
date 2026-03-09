@@ -118,6 +118,11 @@ const transportOnCalls: Record<string, Array<(...args: unknown[]) => void>> = {}
 
 type Listener = (payload: unknown) => void;
 
+const registerTransportListener = (event: string, listener: Listener) => {
+  transportOnCalls[event] = transportOnCalls[event] ? [...transportOnCalls[event], listener] : [listener];
+  return transport;
+};
+
 const transport = {
   invoke: mock(async () => ({})),
   emit: mock(() => true),
@@ -150,10 +155,7 @@ const transport = {
     return transport;
   }),
   destroy: mock(() => {}),
-  on: mock((event: string, listener: Listener) => {
-    transportOnCalls[event] = transportOnCalls[event] ? [...transportOnCalls[event], listener] : [listener];
-    return transport;
-  })
+  on: mock(registerTransportListener)
 };
 
 const store = {
@@ -267,6 +269,7 @@ const resetTransportListenersFixture = () => {
   transport.removeAllListeners.mockClear();
   transport.destroy.mockClear();
   transport.on.mockClear();
+  transport.on.mockImplementation(registerTransportListener);
   Object.keys(transportOnCalls).forEach((key) => {
     transportOnCalls[key] = [];
   });
@@ -367,6 +370,74 @@ describe('bootstrap transport event wiring', () => {
       expect(transport.off.mock.calls).toContainEqual([event, listener]);
     }
     expect(Object.values(transportOnCalls).flat()).toHaveLength(0);
+  });
+
+  test('registration failure removes listeners registered before the throw', () => {
+    resetTransportListenersFixture();
+
+    const registrationError = new Error('transport.on failed mid-registration');
+    const failingCallNumber = 5;
+    const successfulRegistrations: Array<[string, Listener]> = [];
+    let callCount = 0;
+    transport.on.mockImplementation((event: string, listener: Listener) => {
+      callCount += 1;
+      successfulRegistrations.push([event, listener]);
+      registerTransportListener(event, listener);
+      if (callCount === failingCallNumber) {
+        throw registrationError;
+      }
+      return transport;
+    });
+
+    expect(() =>
+      registerTransportListeners({
+        actions: createBootstrapActions(),
+        plugins,
+        store,
+        transport
+      })
+    ).toThrow(registrationError);
+
+    expect(successfulRegistrations).toHaveLength(failingCallNumber);
+    expect(transport.off.mock.calls).toHaveLength(failingCallNumber);
+    expect(transport.off.mock.calls).toEqual(successfulRegistrations.slice().reverse());
+
+    for (const [event, listener] of successfulRegistrations) {
+      expect(transport.off.mock.calls).toContainEqual([event, listener]);
+    }
+
+    expect(Object.values(transportOnCalls).flat()).toHaveLength(0);
+  });
+
+  test('registration failure preserves the original error when rollback cleanup also throws', () => {
+    resetTransportListenersFixture();
+
+    const registrationError = new Error('transport.on failed mid-registration');
+    const rollbackError = new Error('transport.off failed during rollback');
+    const failingCallNumber = 4;
+    let callCount = 0;
+    transport.on.mockImplementation((event: string, listener: Listener) => {
+      callCount += 1;
+      registerTransportListener(event, listener);
+      if (callCount === failingCallNumber) {
+        throw registrationError;
+      }
+      return transport;
+    });
+    transport.off.mockImplementationOnce((_event: string, _listener: Listener) => {
+      throw rollbackError;
+    });
+
+    expect(() =>
+      registerTransportListeners({
+        actions: createBootstrapActions(),
+        plugins,
+        store,
+        transport
+      })
+    ).toThrow(registrationError);
+
+    expect(transport.off.mock.calls).toHaveLength(failingCallNumber);
   });
 
   test('ready dispatches init and font smoothing', () => {
