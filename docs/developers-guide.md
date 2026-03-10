@@ -587,7 +587,7 @@ bun test --randomize --seed 1337 test/unit
 bun test --randomize --seed 20260306 test/unit
 ```
 
-If you need a serialized reproduction path while diagnosing a suspected
+To obtain a serialized reproduction path while diagnosing a suspected
 cross-file race, use one of the explicit diagnostic scripts instead of changing
 the default gate:
 
