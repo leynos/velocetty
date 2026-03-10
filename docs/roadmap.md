@@ -494,11 +494,12 @@ Scope notes:
   - [x] Success criteria: repeated
     `bun test --randomize --seed <N> --max-concurrency=1` runs are stable with
     no order-dependent failures across at least three seeds.
-- [ ] 9.3.2. Restore parallel unit-test execution after isolation hardening.
+- [x] 9.3.2. Restore parallel unit-test execution after isolation hardening.
   Requires 9.3.1. See [velocetty-design.md](velocetty-design.md) §Testing.
-  - [ ] Remove serialized Bun execution guardrails from default lint/test gates.
-  - [ ] Re-enable parallel execution in CI and local default test gates.
-  - [ ] Success criteria: CI and local runs pass with default Bun concurrency
+  - [x] Remove serialized Bun execution guardrails from default lint/test
+    gates.
+  - [x] Re-enable parallel execution in CI and local default test gates.
+  - [x] Success criteria: CI and local runs pass with default Bun concurrency
     and no test timeouts caused by cross-file interference.
 
 ## Out of scope for this roadmap
