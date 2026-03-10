@@ -571,18 +571,29 @@ Unit tests run under Bun's built-in test runner. Use one of the following:
   coverage and 50% function coverage as the Bun-reported proxy for the
   documented 50% branch target.
 
-`make test` now executes the shared unit suite through `bun run test:unit:run`.
-Roadmap item `9.3.1` removed the dedicated bootstrap-process quarantine by
-moving renderer bootstrap assertions behind injected seams instead of
-file-scope module mocks.
+`make test` now executes the shared unit suite through `bun run test:unit:run`
+without forcing `--max-concurrency=1`. Roadmap item `9.3.1` removed the
+dedicated bootstrap-process quarantine by moving renderer bootstrap assertions
+behind injected seams instead of file-scope module mocks, and roadmap item
+`9.3.2` removes the serialized guardrail from the default local and CI unit
+gate.
 
 When checking for order-dependent regressions, replay the unit suite with fixed
 seeds. For example:
 
 ```bash
-bun test --max-concurrency=1 --randomize --seed 2444615283 test/unit
-bun test --max-concurrency=1 --randomize --seed 1337 test/unit
-bun test --max-concurrency=1 --randomize --seed 20260306 test/unit
+bun test --randomize --seed 2444615283 test/unit
+bun test --randomize --seed 1337 test/unit
+bun test --randomize --seed 20260306 test/unit
+```
+
+To obtain a serialized reproduction path while diagnosing a suspected
+cross-file race, use one of the explicit diagnostic scripts instead of changing
+the default gate:
+
+```bash
+bun run test:unit:serialized
+bun run test:unit:serialized:shuffled
 ```
 
 ### End-to-end (E2E) tests (layered strategy)

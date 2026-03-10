@@ -382,6 +382,13 @@ Bun defaults max concurrency to 20.[^1]
 This provides a clean way to keep “stateful” integration tests serial while
 letting pure/isolated tests fly.
 
+Repository note: Velocetty's default unit-test gate intentionally runs
+`bun test test/unit` without `--max-concurrency=1`. The repository keeps
+explicit serialized scripts for debugging (`bun run test:unit:serialized` and
+`bun run test:unit:serialized:shuffled`), but `--concurrent` remains an
+additional stress mode rather than the default gate because it promotes every
+test to `test.concurrent()`.
+
 ### Gradual migration with `concurrentTestGlob`
 
 Concurrency can be enabled only for matching files via `bunfig.toml`:

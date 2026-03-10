@@ -19,7 +19,7 @@
  *
  * Usage:
  * - run this module directly with
- *   `bun test --max-concurrency=1 test/unit/command-registry-compat.test.ts`
+ *   `bun test test/unit/command-registry-compat.test.ts`
  * - the suite installs its own IPC transport mock and temporary
  *   `window.focusActiveTerm` shim during `beforeAll`, then restores the prior
  *   property state in `afterAll`

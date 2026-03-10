@@ -19,7 +19,7 @@
  *
  * Usage:
  * - run this module directly with
- *   `bun test --max-concurrency=1 test/unit/ensure-directory-path.test.ts`
+ *   `bun test test/unit/ensure-directory-path.test.ts`
  * - the suite manages its own temporary directories via `afterEach`, so no
  *   manual fixture cleanup is required
  *

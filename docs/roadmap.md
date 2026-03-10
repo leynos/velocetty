@@ -494,12 +494,77 @@ Scope notes:
   - [x] Success criteria: repeated
     `bun test --randomize --seed <N> --max-concurrency=1` runs are stable with
     no order-dependent failures across at least three seeds.
-- [ ] 9.3.2. Restore parallel unit-test execution after isolation hardening.
+- [x] 9.3.2. Restore parallel unit-test execution after isolation hardening.
   Requires 9.3.1. See [velocetty-design.md](velocetty-design.md) §Testing.
-  - [ ] Remove serialized Bun execution guardrails from default lint/test gates.
-  - [ ] Re-enable parallel execution in CI and local default test gates.
-  - [ ] Success criteria: CI and local runs pass with default Bun concurrency
+  - [x] Remove serialized Bun execution guardrails from default lint/test
+    gates.
+  - [x] Re-enable parallel execution in CI and local default test gates.
+  - [x] Success criteria: CI and local runs pass with default Bun concurrency
     and no test timeouts caused by cross-file interference.
+- [ ] 9.3.3. Isolate renderer event and renderer-metric tests for explicit
+  `--concurrent` runs. Requires 9.3.2. See
+  [velocetty-design.md](velocetty-design.md) §Testing.
+  - [ ] Remove cross-test channel/listener bleed in `test/unit/rpc-client.test.ts`.
+  - [ ] Remove shared `Term.reportRenderer` transport-emission and metric-state
+    bleed in `test/unit/term-report-renderer.test.ts`.
+  - [ ] Success criteria: targeted
+    `bun test --concurrent test/unit/rpc-client.test.ts test/unit/term-report-renderer.test.ts`
+    passes repeatedly with no call-count leakage between tests.
+- [ ] 9.3.4. Isolate filesystem bootstrap helper tests for explicit
+  `--concurrent` runs. Requires 9.3.2. See
+  [velocetty-design.md](velocetty-design.md) §Testing.
+  - [ ] Remove temporary-directory and symlink-target interference in
+    `test/unit/ensure-directory-path.test.ts`.
+  - [ ] Keep temporary-root creation and teardown deterministic even when other
+    files execute at the same time.
+  - [ ] Success criteria: targeted
+    `bun test --concurrent test/unit/ensure-directory-path.test.ts`
+    passes repeatedly with no `ENOENT` races.
+- [ ] 9.3.5. Isolate snapshot and CLI configuration tests from process-global
+  module state for explicit `--concurrent` runs. Requires 9.3.2. See
+  [velocetty-design.md](velocetty-design.md) §Testing.
+  - [ ] Remove snapshot bootstrap global/module-cache bleed in
+    `test/unit/v8-snapshot-util.test.ts`.
+  - [ ] Remove config-path, plugin-config, and mocked module bleed in
+    `test/unit/cli-api-behaviour.test.ts`.
+  - [ ] Success criteria: targeted
+    `bun test --concurrent test/unit/v8-snapshot-util.test.ts test/unit/cli-api-behaviour.test.ts`
+    passes repeatedly with stable config and snapshot expectations.
+- [ ] 9.3.6. Eliminate remaining long-lived file-scope module mocks in
+  concurrency hotspots. Requires 9.3.2. See
+  [velocetty-design.md](velocetty-design.md) §Testing.
+  - [ ] Move remaining `mock.module(...)` registrations and restores in
+    `test/unit/runtime-tab-provider-registration.test.ts`,
+    `test/unit/command-registry-compat.test.ts`, and
+    `test/unit/config-import-json5.test.ts` to per-test lifetimes where needed.
+  - [ ] Ensure temporary `window` installs and other global shims are restored
+    after each test rather than after the whole file.
+  - [ ] Success criteria: hotspot suites no longer rely on `afterAll`
+    restoration for process-wide mocks or globals.
+- [ ] 9.3.7. Replace process-global timer and logger overrides with injected
+  seams in DOM-heavy unit tests. Requires 9.3.2. See
+  [velocetty-design.md](velocetty-design.md) §Testing.
+  - [ ] Add a timer seam for `lib/components/notification.tsx` so
+    `test/unit/notification.test.ts` no longer replaces
+    `globalThis.setTimeout` or `globalThis.clearTimeout`.
+  - [ ] Add scheduler/logger seams for `app/updater.ts` so
+    `test/unit/updater.test.ts` no longer replaces process-global timers or
+    `console.error`.
+  - [ ] Success criteria: the notification and updater suites no longer mutate
+    process-global timer or logger functions during their assertions.
+- [ ] 9.3.8. Promote `--concurrent` to the default unit-test gate after the
+  explicit-concurrency fixes land. Requires 9.3.3, 9.3.4, 9.3.5, 9.3.6, and
+  9.3.7. See [velocetty-design.md](velocetty-design.md) §Testing.
+  - [ ] Update local and CI default unit-test scripts to add `--concurrent`
+    only after the targeted hardening tasks above are complete.
+  - [ ] Keep seeded stress commands and serialized diagnostics available for
+    triage after the default-gate flip.
+  - [ ] Success criteria:
+    `bun test --concurrent --randomize --seed 2444615283 test/unit`,
+    `bun test --concurrent --randomize --seed 1337 test/unit`, and
+    `bun test --concurrent --randomize --seed 20260306 test/unit` all pass,
+    and then `bun install`, `make build`, `make check-fmt`, `make lint`, and
+    `make test` pass with `--concurrent` in the default unit-test path.
 
 ## Out of scope for this roadmap
 
