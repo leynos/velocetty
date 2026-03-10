@@ -15,30 +15,67 @@ import type {
   TypedEmitter
 } from '@shared/types/common';
 
-import {ipcRenderer} from './ipc';
+export type RpcClientIpc = Pick<IpcRendererWithCommands, 'on' | 'removeListener' | 'send'>;
+
+type RpcWindowState = {
+  __rpcId?: string;
+  require?: (moduleId: string) => unknown;
+};
+
+type ClientOptions = {
+  deferReadyRegistration?: (callback: () => void) => void;
+  ipc?: RpcClientIpc;
+  windowHost?: RpcWindowState;
+};
+
+const resolveWindowHost = (): RpcWindowState => window as RpcWindowState;
+const defaultDeferReadyRegistration = (callback: () => void) => {
+  setTimeout(callback, 0);
+};
+const resolveIpcRenderer = (): RpcClientIpc => {
+  if (typeof window.require !== 'function') {
+    throw new Error('Electron ipcRenderer is unavailable');
+  }
+
+  const electronModule = window.require('electron') as {ipcRenderer: IpcRendererWithCommands};
+  return electronModule.ipcRenderer;
+};
 
 /** Renderer-side RPC client that forwards typed events over IPC. */
 export default class Client {
   emitter: TypedEmitter<RendererEvents>;
-  ipc: IpcRendererWithCommands;
+  ipc: RpcClientIpc;
   id!: string;
+  private readonly deferReadyRegistration: (callback: () => void) => void;
+  private readonly windowHost: RpcWindowState;
 
-  constructor() {
+  constructor(options: ClientOptions = {}) {
+    const {
+      ipc = resolveIpcRenderer(),
+      windowHost = resolveWindowHost(),
+      deferReadyRegistration = defaultDeferReadyRegistration
+    } = options;
     this.emitter = new EventEmitter();
-    this.ipc = ipcRenderer;
+    this.ipc = ipc;
+    this.windowHost = windowHost;
+    this.deferReadyRegistration = deferReadyRegistration;
     this.emit = this.emit.bind(this);
-    if (window.__rpcId) {
-      setTimeout(() => {
-        this.id = window.__rpcId;
+    if (this.windowHost.__rpcId) {
+      this.deferReadyRegistration(() => {
+        const cachedRpcId = this.windowHost.__rpcId;
+        if (!cachedRpcId) {
+          return;
+        }
+        this.id = cachedRpcId;
         this.ipc.on(this.id, this.ipcListener);
         this.emitter.emit('ready');
-      }, 0);
+      });
     } else {
       this.ipc.on('init', (_ev: IpcRendererEvent, uid: string, _profileName: string) => {
         // we cache so that if the object
         // gets re-instantiated we don't
         // wait for a `init` event
-        window.__rpcId = uid;
+        this.windowHost.__rpcId = uid;
         // window.profileName = profileName;
         this.id = uid;
         this.ipc.on(uid, this.ipcListener);
@@ -96,6 +133,10 @@ export default class Client {
 
   destroy = () => {
     this.removeAllListeners();
-    this.ipc.removeAllListeners(this.id);
+    if (!this.id) {
+      return;
+    }
+
+    this.ipc.removeListener(this.id, this.ipcListener);
   };
 }
