@@ -596,6 +596,20 @@ bun run test:unit:serialized
 bun run test:unit:serialized:shuffled
 ```
 
+For roadmap item `9.3.3` and similar renderer-isolation work, use a focused
+explicit-concurrency stress run against the renderer event and renderer-metric
+suites:
+
+```bash
+bun test --concurrent \
+  test/unit/rpc-client.test.ts \
+  test/unit/term-report-renderer.test.ts
+```
+
+This command supplements the default `make test` path and the seeded
+randomized reruns above. It does not replace the default gate restored by
+roadmap item `9.3.2`.
+
 ### End-to-end (E2E) tests (layered strategy)
 
 End-to-end tests are split into two lanes and require packaged binaries in

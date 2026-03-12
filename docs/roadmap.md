@@ -501,13 +501,13 @@ Scope notes:
   - [x] Re-enable parallel execution in CI and local default test gates.
   - [x] Success criteria: CI and local runs pass with default Bun concurrency
     and no test timeouts caused by cross-file interference.
-- [ ] 9.3.3. Isolate renderer event and renderer-metric tests for explicit
+- [x] 9.3.3. Isolate renderer event and renderer-metric tests for explicit
   `--concurrent` runs. Requires 9.3.2. See
   [velocetty-design.md](velocetty-design.md) §Testing.
-  - [ ] Remove cross-test channel/listener bleed in `test/unit/rpc-client.test.ts`.
-  - [ ] Remove shared `Term.reportRenderer` transport-emission and metric-state
+  - [x] Remove cross-test channel/listener bleed in `test/unit/rpc-client.test.ts`.
+  - [x] Remove shared `Term.reportRenderer` transport-emission and metric-state
     bleed in `test/unit/term-report-renderer.test.ts`.
-  - [ ] Success criteria: targeted
+  - [x] Success criteria: targeted
     `bun test --concurrent test/unit/rpc-client.test.ts test/unit/term-report-renderer.test.ts`
     passes repeatedly with no call-count leakage between tests.
 - [ ] 9.3.4. Isolate filesystem bootstrap helper tests for explicit
