@@ -28,7 +28,6 @@ type ClientOptions = {
   windowHost?: RpcWindowState;
 };
 
-const resolveWindowHost = (): RpcWindowState => window as RpcWindowState;
 const defaultDeferReadyRegistration = (callback: () => void) => {
   setTimeout(callback, 0);
 };
@@ -46,23 +45,19 @@ export default class Client {
   emitter: TypedEmitter<RendererEvents>;
   ipc: RpcClientIpc;
   id!: string;
-  private readonly deferReadyRegistration: (callback: () => void) => void;
-  private readonly windowHost: RpcWindowState;
 
   constructor(options: ClientOptions = {}) {
     const {
       ipc = resolveIpcRenderer(),
-      windowHost = resolveWindowHost(),
+      windowHost = window as RpcWindowState,
       deferReadyRegistration = defaultDeferReadyRegistration
     } = options;
     this.emitter = new EventEmitter();
     this.ipc = ipc;
-    this.windowHost = windowHost;
-    this.deferReadyRegistration = deferReadyRegistration;
     this.emit = this.emit.bind(this);
-    if (this.windowHost.__rpcId) {
-      this.deferReadyRegistration(() => {
-        const cachedRpcId = this.windowHost.__rpcId;
+    if (windowHost.__rpcId) {
+      deferReadyRegistration(() => {
+        const cachedRpcId = windowHost.__rpcId;
         if (!cachedRpcId) {
           return;
         }
@@ -75,7 +70,7 @@ export default class Client {
         // we cache so that if the object
         // gets re-instantiated we don't
         // wait for a `init` event
-        this.windowHost.__rpcId = uid;
+        windowHost.__rpcId = uid;
         // window.profileName = profileName;
         this.id = uid;
         this.ipc.on(uid, this.ipcListener);

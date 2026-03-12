@@ -118,11 +118,35 @@ test('reuses cached rpc id and emits ready on next tick', () => {
   expect(readyListener).toHaveBeenCalledTimes(1);
 });
 
+test('does not register ready handler if cached rpc id is cleared before deferred registration', () => {
+  const harness = createRpcClientHarness();
+  harness.windowHost.__rpcId = 'cached-rpc-id';
+
+  const client = harness.createClient();
+  const readyListener = mock(() => {});
+  client.on('ready', readyListener);
+
+  delete harness.windowHost.__rpcId;
+
+  harness.flushDeferredReadyRegistrations();
+
+  expect(harness.onMock).not.toHaveBeenCalled();
+  expect(readyListener).not.toHaveBeenCalled();
+});
+
 test('throws when emitting commands before the rpc channel is ready', () => {
   const harness = createRpcClientHarness();
   const client = harness.createClient();
 
   expect(() => client.emit('command', 'tab:new')).toThrow('Not ready');
+});
+
+test('destroy is a no-op if client is destroyed before ready', () => {
+  const harness = createRpcClientHarness();
+  const client = harness.createClient();
+
+  expect(() => client.destroy()).not.toThrow();
+  expect(harness.removeListenerMock).not.toHaveBeenCalled();
 });
 
 test('forwards renderer events and cleans up listeners on destroy', () => {

@@ -383,6 +383,18 @@ The final implementation report should cite all of the following:
 - [ ] Run `bun install`, `make build`, `make check-fmt`, `make lint`, and
   `make test`, then rerun the focused concurrent stress loop before updating
   `docs/roadmap.md` and closing the item.
+- [x] (2026-03-12 12:00Z) Addressed review follow-up on the RPC client seam:
+  simplified constructor-only test hooks in `lib/utils/rpc.ts` and added
+  explicit regression tests for destroying a client before readiness and for a
+  cached `__rpcId` disappearing before deferred ready registration runs.
+- [x] (2026-03-12 12:13Z) Revalidated the review follow-up with
+  `make check-fmt`, `make typecheck`, `make lint`, `make test`, and a 10-run
+  focused concurrent stress loop; all passed with logs under `/tmp/`.
+- [x] (2026-03-12 12:21Z) `make build` initially failed because the packaging
+  step could not find cached V8 snapshot artefacts in `cache/x64`. Running
+  `bun run v8-snapshot` regenerated the cache, and the subsequent
+  `/tmp/build-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-review-followup-retry.out`
+  rerun passed.
 
 ## Surprises & discoveries
 
@@ -429,6 +441,14 @@ The final implementation report should cite all of the following:
   Impact: this milestone's documentation update must be framed as a focused
   concurrent stress path, not as a change to the default gate.
 
+- Observation: the packaging gate depends on pre-generated V8 snapshot
+  artefacts in `cache/x64`.
+  Evidence: the first review-follow-up `make build` run failed in
+  `bin/cp-snapshot.js` with "Missing snapshot output" until
+  `bun run v8-snapshot` recreated the cache.
+  Impact: future build replays in a cleaned worktree should warm snapshots
+  before treating packaging failures as product regressions.
+
 ## Decision log
 
 - Decision: keep the plan tightly scoped to the two roadmap-named suites and
@@ -472,6 +492,12 @@ The final implementation report should cite all of the following:
   injection seam, and avoids bundling the `createRequire(import.meta.url)` path
   that produced an IIFE build warning.
 
+- Decision: keep injected `windowHost` and deferred-ready scheduling as
+  constructor-local closures rather than instance fields.
+  Rationale: the test seam still exists, but the ready path is easier to read
+  when constructor-only dependencies do not become extra instance state to
+  track later in the client lifecycle.
+
 ## Outcomes & retrospective
 
 Roadmap item `9.3.3` is complete.
@@ -481,6 +507,29 @@ listener registry, deferred-ready queue, and `windowHost` instead of shared
 file-scope mocks and global `window` mutation. `lib/utils/rpc.ts` now supports
 that isolation through constructor injection and removes only the instance's
 IPC listener during `destroy()`.
+
+Review follow-up tightened the RPC coverage further: the suite now proves that
+destroying a client before readiness is a no-op and that deferred cached-id
+registration aborts cleanly if `windowHost.__rpcId` disappears before the
+callback runs. The constructor-only test hooks in `lib/utils/rpc.ts` were also
+collapsed back to local variables so the injection seam stays narrow.
+
+Review follow-up validation evidence:
+
+- `make check-fmt`:
+  `/tmp/check-fmt-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-review-followup.out`
+- `make typecheck`:
+  `/tmp/typecheck-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-review-followup.out`
+- `make lint`:
+  `/tmp/lint-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-review-followup.out`
+- `make test`:
+  `/tmp/test-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-review-followup.out`
+- focused concurrent loop:
+  `/tmp/concurrent-focus-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-review-followup.out`
+- `bun run v8-snapshot`:
+  `/tmp/v8-snapshot-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-review-followup.out`
+- `make build` retry after snapshot generation:
+  `/tmp/build-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-review-followup-retry.out`
 
 `test/unit/term-report-renderer.test.ts` now uses an async per-test harness
 that holds the Happy DOM lease for the full test, creates a fresh transport
