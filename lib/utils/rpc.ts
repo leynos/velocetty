@@ -28,6 +28,8 @@ type ClientOptions = {
   windowHost?: RpcWindowState;
 };
 
+type InitListener = (event: IpcRendererEvent, uid: string, profileName: string) => void;
+
 const defaultDeferReadyRegistration = (callback: () => void) => {
   setTimeout(callback, 0);
 };
@@ -45,6 +47,7 @@ export default class Client {
   emitter: TypedEmitter<RendererEvents>;
   ipc: RpcClientIpc;
   id!: string;
+  private initListener?: InitListener;
 
   constructor(options: ClientOptions = {}) {
     const {
@@ -66,7 +69,8 @@ export default class Client {
         this.emitter.emit('ready');
       });
     } else {
-      this.ipc.on('init', (_ev: IpcRendererEvent, uid: string, _profileName: string) => {
+      this.initListener = (_ev: IpcRendererEvent, uid: string, _profileName: string) => {
+        this.detachInitListener();
         // we cache so that if the object
         // gets re-instantiated we don't
         // wait for a `init` event
@@ -75,8 +79,18 @@ export default class Client {
         this.id = uid;
         this.ipc.on(uid, this.ipcListener);
         this.emitter.emit('ready');
-      });
+      };
+      this.ipc.on('init', this.initListener);
     }
+  }
+
+  private detachInitListener() {
+    if (!this.initListener) {
+      return;
+    }
+
+    this.ipc.removeListener('init', this.initListener);
+    this.initListener = undefined;
   }
 
   private emitRendererEvent<U extends keyof RendererEvents>(ch: U, data: RendererEvents[U] | undefined) {
@@ -128,6 +142,7 @@ export default class Client {
 
   destroy = () => {
     this.removeAllListeners();
+    this.detachInitListener();
     if (!this.id) {
       return;
     }

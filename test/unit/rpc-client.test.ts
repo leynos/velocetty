@@ -94,6 +94,7 @@ test('subscribes to init channel and becomes ready when init event arrives', () 
   harness.emitChannel('init', 'rpc-uid', 'default-profile');
 
   expect(harness.windowHost.__rpcId).toBe('rpc-uid');
+  expect(harness.removeListenerMock).toHaveBeenCalledWith('init', expect.any(Function));
   expect(harness.onMock).toHaveBeenCalledWith('rpc-uid', expect.any(Function));
   expect(readyListener).toHaveBeenCalledTimes(1);
 
@@ -141,12 +142,21 @@ test('throws when emitting commands before the rpc channel is ready', () => {
   expect(() => client.emit('command', 'tab:new')).toThrow('Not ready');
 });
 
-test('destroy is a no-op if client is destroyed before ready', () => {
+test('destroy removes the pending init listener when client is destroyed before ready', () => {
   const harness = createRpcClientHarness();
   const client = harness.createClient();
+  const readyListener = mock(() => {});
+  client.on('ready', readyListener);
 
   expect(() => client.destroy()).not.toThrow();
-  expect(harness.removeListenerMock).not.toHaveBeenCalled();
+
+  expect(harness.removeListenerMock).toHaveBeenCalledWith('init', expect.any(Function));
+
+  harness.emitChannel('init', 'late-rpc-id', 'default-profile');
+
+  expect(harness.windowHost.__rpcId).toBeUndefined();
+  expect(harness.onMock).not.toHaveBeenCalledWith('late-rpc-id', expect.any(Function));
+  expect(readyListener).not.toHaveBeenCalled();
 });
 
 test('forwards renderer events and cleans up listeners on destroy', () => {

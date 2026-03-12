@@ -350,12 +350,17 @@ The final implementation report should cite all of the following:
   in `term-report-renderer.test.ts`.
 - [x] (2026-03-10 18:57Z) Reworked `test/unit/rpc-client.test.ts` into a
   per-test harness and narrowed `lib/utils/rpc.ts` onto injected IPC/window
-  dependencies plus precise `removeListener(...)` cleanup on destroy.
+  dependencies plus precise `removeListener(...)` cleanup on destroy, without
+  importing Electron IPC at module load.
 - [x] (2026-03-10 19:01Z) Reworked
   `test/unit/term-report-renderer.test.ts` into an async per-test harness that
   owns the Happy DOM lease, transport mock, dynamic `Term` import, and
-  renderer-metric cleanup, and confirmed one focused concurrent rerun passes at
+  renderer-metric cleanup, including explicit runtime telemetry resets, and
+  confirmed one focused concurrent rerun passes at
   `/tmp/focused-check-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests.out`.
+- [x] (2026-03-10 19:01Z) Updated `docs/developers-guide.md` with the focused
+  renderer `--concurrent` stress command while preserving the `9.3.2` default
+  gate description.
 - [x] (2026-03-10 19:10Z) Ran `bun install`, `make build`,
   `make check-fmt`, `make lint`, and `make test` with tee'd logs under
   `/tmp/`; all passed on the final tree.
@@ -365,24 +370,6 @@ The final implementation report should cite all of the following:
   all runs passed with stable call counts.
 - [x] (2026-03-10 19:17Z) Updated `docs/roadmap.md` to mark `9.3.3` complete
   after the required validation evidence was captured.
-- [x] (2026-03-10 19:01Z) Captured the focused concurrent baseline at
-  `/tmp/concurrent-focus-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests.out`;
-  the cached-RPC-id test observed `per-event-rpc-id`, and the renderer metric
-  suite showed shared `transportMock.emit` counts climbing across tests.
-- [x] (2026-03-10 19:01Z) Reworked `test/unit/rpc-client.test.ts` around a
-  per-test harness and updated `lib/utils/rpc.ts` so tests can inject IPC,
-  window state, and deferred-ready scheduling without importing Electron IPC at
-  module load.
-- [x] (2026-03-10 19:01Z) Reworked
-  `test/unit/term-report-renderer.test.ts` around a per-test renderer harness
-  with isolated transport mocks, isolated `Term` imports, and explicit runtime
-  telemetry resets.
-- [x] (2026-03-10 19:01Z) Updated `docs/developers-guide.md` with the focused
-  renderer `--concurrent` stress command while preserving the `9.3.2` default
-  gate description.
-- [ ] Run `bun install`, `make build`, `make check-fmt`, `make lint`, and
-  `make test`, then rerun the focused concurrent stress loop before updating
-  `docs/roadmap.md` and closing the item.
 - [x] (2026-03-12 12:00Z) Addressed review follow-up on the RPC client seam:
   simplified constructor-only test hooks in `lib/utils/rpc.ts` and added
   explicit regression tests for destroying a client before readiness and for a
@@ -395,6 +382,14 @@ The final implementation report should cite all of the following:
   `bun run v8-snapshot` regenerated the cache, and the subsequent
   `/tmp/build-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-review-followup-retry.out`
   rerun passed.
+- [x] (2026-03-12 12:40Z) Fixed a second RPC lifecycle follow-up: unready
+  clients now detach the pending `'init'` IPC listener during `destroy()`, and
+  the suite now proves that a later init handshake does not revive a destroyed
+  client.
+- [x] (2026-03-12 12:50Z) Revalidated the init-listener cleanup follow-up with
+  `make check-fmt`, `make typecheck`, `make lint`, `make test`, a 10-run
+  focused concurrent stress loop, Markdown lint, and a build replay after
+  regenerating the snapshot cache under `/tmp/velocetty-ci-work/cache`.
 
 ## Surprises & discoveries
 
@@ -425,6 +420,14 @@ The final implementation report should cite all of the following:
   `this.ipc.removeListener(this.id, this.ipcListener)` during `destroy()`.
   Impact: the suite can assert instance-specific teardown without sharing or
   deleting unrelated channel listeners.
+
+- Observation: an unready RPC client still owns an active `'init'` IPC
+  subscription until the handshake arrives.
+  Evidence: before the latest follow-up, `destroy()` returned early when
+  `this.id` was unset and never removed the constructor-time init listener.
+  Impact: the client must detach the pending init listener both when the
+  handshake succeeds and when the client is destroyed before readiness, or a
+  later init event can revive a stale instance and duplicate channel listeners.
 
 - Observation: `lib/utils/rpc.ts` was also hard to import safely in a unit test
   because it pulled in Electron IPC at module load.
@@ -514,6 +517,11 @@ registration aborts cleanly if `windowHost.__rpcId` disappears before the
 callback runs. The constructor-only test hooks in `lib/utils/rpc.ts` were also
 collapsed back to local variables so the injection seam stays narrow.
 
+The next RPC lifecycle follow-up hardened the init-handshake path as well:
+`Client` now detaches the pending `'init'` listener on handshake completion and
+on pre-ready destruction, and the suite proves that a destroyed unready client
+does not later become ready when an init event arrives.
+
 Review follow-up validation evidence:
 
 - `make check-fmt`:
@@ -530,6 +538,24 @@ Review follow-up validation evidence:
   `/tmp/v8-snapshot-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-review-followup.out`
 - `make build` retry after snapshot generation:
   `/tmp/build-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-review-followup-retry.out`
+- init-listener cleanup `make check-fmt`:
+  `/tmp/check-fmt-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-init-cleanup.out`
+- init-listener cleanup `make typecheck`:
+  `/tmp/typecheck-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-init-cleanup.out`
+- init-listener cleanup `make lint`:
+  `/tmp/lint-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-init-cleanup.out`
+- init-listener cleanup `make test`:
+  `/tmp/test-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-init-cleanup.out`
+- init-listener cleanup focused concurrent loop:
+  `/tmp/concurrent-focus-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-init-cleanup.out`
+- init-listener cleanup `bun fmt`:
+  `/tmp/fmt-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-init-cleanup.out`
+- init-listener cleanup Markdown lint:
+  `/tmp/markdownlint-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-init-cleanup.out`
+- init-listener cleanup `bun run v8-snapshot`:
+  `/tmp/v8-snapshot-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-init-cleanup.out`
+- init-listener cleanup `make build` retry:
+  `/tmp/build-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests-init-cleanup-retry.out`
 
 `test/unit/term-report-renderer.test.ts` now uses an async per-test harness
 that holds the Happy DOM lease for the full test, creates a fresh transport
