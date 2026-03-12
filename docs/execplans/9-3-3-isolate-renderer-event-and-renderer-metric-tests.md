@@ -512,10 +512,11 @@ that isolation through constructor injection and removes only the instance's
 IPC listener during `destroy()`.
 
 Review follow-up tightened the RPC coverage further: the suite now proves that
-destroying a client before readiness is a no-op and that deferred cached-id
-registration aborts cleanly if `windowHost.__rpcId` disappears before the
-callback runs. The constructor-only test hooks in `lib/utils/rpc.ts` were also
-collapsed back to local variables so the injection seam stays narrow.
+destroying a client before readiness performs observable cleanup by detaching
+the pending `'init'` listener, and that deferred cached-id registration aborts
+cleanly if `windowHost.__rpcId` disappears before the callback runs. The
+constructor-only test hooks in `lib/utils/rpc.ts` were also collapsed back to
+local variables so the injection seam stays narrow.
 
 The next RPC lifecycle follow-up hardened the init-handshake path as well:
 `Client` now detaches the pending `'init'` listener on handshake completion and
