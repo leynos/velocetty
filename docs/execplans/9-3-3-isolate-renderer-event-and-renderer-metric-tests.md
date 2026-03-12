@@ -72,7 +72,7 @@ loading `../../lib/components/term.tsx` with a query-string suffix in
 
 The production component in `lib/components/term.tsx` uses static
 `Term.rendererTypes` for renderer deduplication and routes renderer telemetry
-through `Term.reportRenderer(...)`. That contract must remain intact because
+through `Term.reportRenderer(…)`. That contract must remain intact because
 `docs/developers-guide.md` and `app/utils/renderer-utils.ts` treat it as the
 canonical source for renderer mode events and runtime-metric aggregation.
 
@@ -102,7 +102,7 @@ The implementation will likely touch these files:
 - Do not solve the problem by restoring serialized defaults, adding a new
   dedicated-process quarantine, or weakening the roadmap success criterion.
 - Preserve the renderer telemetry contract in `lib/components/term.tsx`.
-  `Term.reportRenderer(...)` must remain the path that emits renderer mode and
+  `Term.reportRenderer(…)` must remain the path that emits renderer mode and
   runtime-metric updates.
 - Preserve the renderer RPC client contract in `lib/utils/rpc.ts`. Any fix in
   production code must keep the current ready/init/event-forwarding behaviour
