@@ -37,7 +37,7 @@
     "test:e2e:deep:run": "node ./node_modules/playwright/cli.js test -c playwright.e2e.config.ts",
     "test:e2e:deep": "bun run test:e2e:prepare && bun run test:e2e:deep:prepare && bun run test:e2e:deep:run",
     "test:e2e": "bun run test:e2e:fast",
-    "postinstall": "bun run v8-snapshot && bun run build:hyper-app && bun bin/run-electron-builder.cjs install-app-deps && bun run rebuild-node-pty && bun bin/copy-node-modules.js && bun node_modules/husky/bin.mjs install && bun run generate-schema",
+    "postinstall": "bun run v8-snapshot && bun run build:hyper-app && bun bin/run-electron-builder.cjs install-app-deps && bun run rebuild-node-pty && node bin/copy-node-modules.js && bun node_modules/husky/bin.mjs install && bun run generate-schema",
     "rebuild-node-pty": "bun bin/rebuild-node-pty.cjs",
     "dist": "bun run build && bun bin/run-electron-builder.cjs",
     "clean": "bun ./bin/rimraf-standalone.js node_modules && bun ./bin/rimraf-standalone.js ./app/node_modules && bun ./bin/rimraf-standalone.js ./app/renderer",

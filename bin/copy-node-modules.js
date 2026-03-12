@@ -1,5 +1,21 @@
+/**
+ * Mirrors packaged production dependencies into `app/node_modules`.
+ *
+ * This script intentionally runs under Node.js during postinstall. Bun's
+ * runtime can intermittently raise `ENOENT` from `fs-extra` while copying
+ * large dependency trees on Linux/WSL, even though the same copy succeeds
+ * under Node.
+ */
 const path = require('node:path');
-const fs = require('fs-extra');
+const fs = require('node:fs');
+
+function hasEntries(dirPath) {
+  try {
+    return fs.readdirSync(dirPath).length > 0;
+  } catch (_error) {
+    return false;
+  }
+}
 
 function copyNodeModules() {
   const baseDir = path.resolve(__dirname, '..');
@@ -11,6 +27,13 @@ function copyNodeModules() {
   ];
 
   if (!fs.existsSync(sourceDir)) {
+    if (hasEntries(destinationDir)) {
+      console.log(
+        `Skipping node_modules copy because ${sourceDir} is unavailable and ${destinationDir} is already populated.`
+      );
+      return;
+    }
+
     throw new Error(`Source node_modules not found at ${sourceDir}`);
   }
 
@@ -25,11 +48,13 @@ function copyNodeModules() {
     throw new Error('Refusing to empty destination node_modules identical to source.');
   }
 
-  fs.emptyDirSync(destinationDir);
+  fs.rmSync(destinationDir, {recursive: true, force: true});
   console.log(`Copying node_modules from ${sourceDir} to ${destinationDir}`);
-  // fs-extra handles directories and symlinks without the cpy-cli EISDIR failure.
-  fs.copySync(sourceDir, destinationDir, {
-    overwrite: true,
+  // Native `cpSync` avoids the chmod race seen with `fs-extra` during large
+  // postinstall copies on this repository's app bundle tree.
+  fs.cpSync(sourceDir, destinationDir, {
+    recursive: true,
+    force: true,
     errorOnExist: false,
     dereference: false,
     filter: (sourcePath) => {

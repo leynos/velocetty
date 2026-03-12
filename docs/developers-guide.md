@@ -326,6 +326,10 @@ in the same change:
   same Node.js major family.
 - Run `bun install` to validate snapshot generation, `install-app-deps`, and
   `node-pty` rebuilding before running the remaining gates.
+- The install pipeline intentionally invokes `node bin/copy-node-modules.js`
+  during postinstall. Bun remains the default runner elsewhere, but Node's
+  native copy path is currently the stable option for mirroring large
+  `node_modules` trees on Linux/WSL after `install-app-deps`.
 
 Current repository runtime baseline after roadmap item `1.4.13`:
 
@@ -531,6 +535,10 @@ For the current Electron 40 toolchain (`electron-builder@24.x`), keep `ajv`
 aligned with `@develar/schema-utils` and `ajv-keywords@3` by pinning it to
 `6.14.0`; moving back to Ajv 8 without upgrading that stack will break
 `bun install` during postinstall.
+Keep the packaged `node_modules` mirror step on Node.js during postinstall.
+`node bin/copy-node-modules.js` is the supported path for that copy stage; Bun
+has shown intermittent `ENOENT` failures while copying the large packaged
+dependency tree on this Linux/WSL environment.
 
 ## Type checking
 
@@ -609,6 +617,19 @@ bun test --concurrent \
 This command supplements the default `make test` path and the seeded
 randomized reruns above. It does not replace the default gate restored by
 roadmap item `9.3.2`.
+
+For roadmap item `9.3.4` and similar filesystem-fixture isolation work, use a
+focused explicit-concurrency stress run against the directory-bootstrap helper
+suite:
+
+```bash
+bun test --concurrent test/unit/ensure-directory-path.test.ts
+```
+
+Keep temporary-directory ownership and teardown inside the individual test, or
+inside a helper that returns cleanup for just that test. Do not use a shared
+file-scope cleanup queue for temporary roots in suites that must survive
+explicit `--concurrent` runs.
 
 ### End-to-end (E2E) tests (layered strategy)
 
