@@ -329,7 +329,8 @@ in the same change:
 - The install pipeline intentionally invokes `node bin/copy-node-modules.js`
   during postinstall. Bun remains the default runner elsewhere, but Node's
   native copy path is currently the stable option for mirroring large
-  `node_modules` trees on Linux/WSL after `install-app-deps`.
+  `node_modules` trees on Linux/Windows Subsystem for Linux (WSL) after
+  `install-app-deps`.
 
 Current repository runtime baseline after roadmap item `1.4.13`:
 
