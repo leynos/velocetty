@@ -9,21 +9,6 @@
 const path = require('node:path');
 const fs = require('node:fs');
 
-const isMissingDirectoryError = (error) => {
-  return error?.code === 'ENOENT' || error?.code === 'ENOTDIR';
-};
-
-function hasEntries(dirPath, fsModule = fs) {
-  try {
-    return fsModule.readdirSync(dirPath).length > 0;
-  } catch (error) {
-    if (!isMissingDirectoryError(error)) {
-      throw error;
-    }
-    return false;
-  }
-}
-
 function copyNodeModules({
   baseDir = path.resolve(__dirname, '..'),
   fsModule = fs,
@@ -38,13 +23,6 @@ function copyNodeModules({
   ];
 
   if (!fsModule.existsSync(sourceDir)) {
-    if (hasEntries(destinationDir, fsModule)) {
-      logger(
-        `Skipping node_modules copy because ${sourceDir} is unavailable and ${destinationDir} is already populated.`
-      );
-      return;
-    }
-
     throw new Error(`Source node_modules not found at ${sourceDir}`);
   }
 
@@ -84,6 +62,5 @@ if (require.main === module) {
 }
 
 module.exports = {
-  copyNodeModules,
-  hasEntries
+  copyNodeModules
 };

@@ -3,13 +3,11 @@
  * `bin/copy-node-modules.js`.
  *
  * Responsibilities:
- * - confirm `hasEntries(...)` treats only missing-directory errors as empty
- * - prove unexpected filesystem failures still surface to the caller
+ * - verify the copy step fails fast when the packaged dependency tree is missing
  * - verify the native copy step uses Node-supported `fs.cpSync(...)` options
  *
  * Invariants:
- * - `ENOENT` and `ENOTDIR` mean the destination cannot contribute entries yet
- * - other `readdirSync(...)` failures remain actionable errors
+ * - missing packaged dependencies remain a hard failure even if stale app output exists
  * - the mirror step continues to copy recursively with `force: true`
  *
  * Usage:
@@ -21,43 +19,27 @@
 import {expect, test} from 'bun:test';
 import path from 'node:path';
 
-import {copyNodeModules, hasEntries} from '../../bin/copy-node-modules.js';
+import {copyNodeModules} from '../../bin/copy-node-modules.js';
 
-const createNodeError = (code: string, message: string) => {
-  const error = new Error(message) as Error & {code: string};
-  error.code = code;
-  return error;
-};
-
-test('treats a missing directory as empty', () => {
+test('fails when the packaged source tree is missing, even if stale app output exists', () => {
+  const baseDir = '/workspace';
+  const rmSyncCalls: string[] = [];
+  const cpSyncCalls: string[] = [];
   const fsModule = {
-    readdirSync: () => {
-      throw createNodeError('ENOENT', 'missing');
+    cpSync: (sourceDir: string) => {
+      cpSyncCalls.push(sourceDir);
+    },
+    existsSync: () => false,
+    rmSync: (targetPath: string) => {
+      rmSyncCalls.push(targetPath);
     }
   };
 
-  expect(hasEntries('/tmp/missing', fsModule)).toBe(false);
-});
-
-test('treats a non-directory path as empty', () => {
-  const fsModule = {
-    readdirSync: () => {
-      throw createNodeError('ENOTDIR', 'not a directory');
-    }
-  };
-
-  expect(hasEntries('/tmp/file', fsModule)).toBe(false);
-});
-
-test('rethrows unexpected directory read failures', () => {
-  const failure = createNodeError('EACCES', 'permission denied');
-  const fsModule = {
-    readdirSync: () => {
-      throw failure;
-    }
-  };
-
-  expect(() => hasEntries('/tmp/protected', fsModule)).toThrow(failure);
+  expect(() => copyNodeModules({baseDir, fsModule})).toThrow(
+    `Source node_modules not found at ${path.join(baseDir, 'dist', 'app', 'node_modules')}`
+  );
+  expect(rmSyncCalls).toEqual([]);
+  expect(cpSyncCalls).toEqual([]);
 });
 
 test('copies with Node-supported cpSync options', () => {
