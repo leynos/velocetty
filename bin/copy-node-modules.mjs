@@ -6,11 +6,16 @@
  * large dependency trees on Linux/WSL, even though the same copy succeeds
  * under Node.
  */
-const path = require('node:path');
-const fs = require('node:fs');
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 
-function copyNodeModules({
-  baseDir = path.resolve(__dirname, '..'),
+const moduleFilePath = fileURLToPath(import.meta.url);
+const moduleDir = path.dirname(moduleFilePath);
+const isMain = process.argv[1] ? path.resolve(process.argv[1]) === moduleFilePath : false;
+
+export function copyNodeModules({
+  baseDir = path.resolve(moduleDir, '..'),
   fsModule = fs,
   logger = console.log,
   pathModule = path
@@ -52,7 +57,7 @@ function copyNodeModules({
   });
 }
 
-if (require.main === module) {
+if (isMain) {
   try {
     copyNodeModules();
   } catch (error) {
@@ -60,7 +65,3 @@ if (require.main === module) {
     process.exit(1);
   }
 }
-
-module.exports = {
-  copyNodeModules
-};

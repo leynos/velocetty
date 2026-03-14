@@ -1,6 +1,6 @@
 /**
  * @file Verifies the guarded packaged dependency mirror in
- * `bin/copy-node-modules.js`.
+ * `bin/copy-node-modules.mjs`.
  *
  * Responsibilities:
  * - verify the copy step fails fast when the packaged dependency tree is missing
@@ -14,12 +14,12 @@
  * - run this module directly with
  *   `bun test test/unit/copy-node-modules.test.ts`
  *
- * Cross-link: `../../bin/copy-node-modules.js`.
+ * Cross-link: `../../bin/copy-node-modules.mjs`.
  */
 import {expect, test} from 'bun:test';
 import path from 'node:path';
 
-import {copyNodeModules} from '../../bin/copy-node-modules.js';
+import {copyNodeModules} from '../../bin/copy-node-modules.mjs';
 
 test('fails when the packaged source tree is missing, even if stale app output exists', () => {
   const baseDir = '/workspace';
@@ -50,12 +50,14 @@ test('copies with Node-supported cpSync options', () => {
   }> = [];
   const loggerMessages: string[] = [];
   const baseDir = '/workspace';
+  const sourceDir = path.join(baseDir, 'dist', 'app', 'node_modules');
+  const destinationDir = path.join(baseDir, 'app', 'node_modules');
   const fsModule = {
     cpSync: (sourceDir: string, destinationDir: string, options: Record<string, unknown>) => {
       cpSyncCalls.push({sourceDir, destinationDir, options});
     },
     existsSync: (targetPath: string) => {
-      return targetPath === path.join(baseDir, 'dist', 'app', 'node_modules');
+      return targetPath === sourceDir;
     },
     readdirSync: () => [],
     rmSync: () => {}
@@ -71,8 +73,8 @@ test('copies with Node-supported cpSync options', () => {
 
   expect(cpSyncCalls).toHaveLength(1);
   expect(cpSyncCalls[0]).toEqual({
-    sourceDir: '/workspace/dist/app/node_modules',
-    destinationDir: '/workspace/app/node_modules',
+    sourceDir,
+    destinationDir,
     options: {
       recursive: true,
       force: true,
@@ -81,7 +83,5 @@ test('copies with Node-supported cpSync options', () => {
     }
   });
   expect(cpSyncCalls[0]?.options).not.toHaveProperty('errorOnExist');
-  expect(loggerMessages).toEqual([
-    'Copying node_modules from /workspace/dist/app/node_modules to /workspace/app/node_modules'
-  ]);
+  expect(loggerMessages).toEqual([`Copying node_modules from ${sourceDir} to ${destinationDir}`]);
 });

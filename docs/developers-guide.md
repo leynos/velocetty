@@ -326,7 +326,7 @@ in the same change:
   same Node.js major family.
 - Run `bun install` to validate snapshot generation, `install-app-deps`, and
   `node-pty` rebuilding before running the remaining gates.
-- The install pipeline intentionally invokes `node bin/copy-node-modules.js`
+- The install pipeline intentionally invokes `node bin/copy-node-modules.mjs`
   during postinstall. Bun remains the default runner elsewhere, but Node's
   native copy path is currently the stable option for mirroring large
   `node_modules` trees on Linux/Windows Subsystem for Linux (WSL) after
@@ -536,10 +536,9 @@ For the current Electron 40 toolchain (`electron-builder@24.x`), keep `ajv`
 aligned with `@develar/schema-utils` and `ajv-keywords@3` by pinning it to
 `6.14.0`; moving back to Ajv 8 without upgrading that stack will break
 `bun install` during postinstall.
-Keep the packaged `node_modules` mirror step on Node.js during postinstall.
-`node bin/copy-node-modules.js` is the supported path for that copy stage; Bun
-has shown intermittent `ENOENT` failures while copying the large packaged
-dependency tree on this Linux/WSL environment.
+Follow the [Electron runtime alignment](#electron-runtime-alignment) section
+above for the canonical packaged dependency mirror command:
+`node bin/copy-node-modules.mjs`.
 
 ## Type checking
 
