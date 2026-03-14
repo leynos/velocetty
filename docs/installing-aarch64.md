@@ -110,7 +110,8 @@ SKIP_X64_V8_SNAPSHOT=1 bun install
 This project uses `bun ./build/esbuild/build.ts` inside scripts for bundling.
 Similarly, the rebuild step runs `bun bin/rebuild-node-pty.cjs`, which
 executes `node-gyp` from the module directory; avoid calling
-`electron-rebuild` directly. The copy step uses `bun bin/copy-node-modules.js`.
+`electron-rebuild` directly. The copy step uses
+`node bin/copy-node-modules.mjs`.
 Electron-builder is invoked via `bun bin/run-electron-builder.cjs` to avoid
 its package-manager detection spawning Bun through Node.
 Schema generation uses `bunx typescript-json-schema --ignoreErrors`.

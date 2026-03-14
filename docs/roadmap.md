@@ -510,14 +510,14 @@ Scope notes:
   - [x] Success criteria: targeted
     `bun test --concurrent test/unit/rpc-client.test.ts test/unit/term-report-renderer.test.ts`
     passes repeatedly with no call-count leakage between tests.
-- [ ] 9.3.4. Isolate filesystem bootstrap helper tests for explicit
+- [x] 9.3.4. Isolate filesystem bootstrap helper tests for explicit
   `--concurrent` runs. Requires 9.3.2. See
   [velocetty-design.md](velocetty-design.md) §Testing.
-  - [ ] Remove temporary-directory and symlink-target interference in
+  - [x] Remove temporary-directory and symlink-target interference in
     `test/unit/ensure-directory-path.test.ts`.
-  - [ ] Keep temporary-root creation and teardown deterministic even when other
+  - [x] Keep temporary-root creation and teardown deterministic even when other
     files execute at the same time.
-  - [ ] Success criteria: targeted
+  - [x] Success criteria: targeted
     `bun test --concurrent test/unit/ensure-directory-path.test.ts`
     passes repeatedly with no `ENOENT` races.
 - [ ] 9.3.5. Isolate snapshot and CLI configuration tests from process-global
