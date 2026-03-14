@@ -88,7 +88,6 @@ interface CopyFixture {
   fsModule: {
     cpSync: (sourceDir: string, destinationDir: string, options: Record<string, unknown>) => void;
     existsSync: (targetPath: string) => boolean;
-    readdirSync: () => unknown[];
     rmSync: () => void;
   };
   logger: (message: string) => void;
@@ -109,7 +108,6 @@ const makeCopyFixture = (): CopyFixture => {
     existsSync: (targetPath: string) => {
       return targetPath === sourceDir;
     },
-    readdirSync: () => [],
     rmSync: () => {}
   };
   const logger = (message: string) => {
