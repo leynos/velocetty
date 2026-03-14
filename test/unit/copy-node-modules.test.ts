@@ -3,11 +3,13 @@
  * `bin/copy-node-modules.mjs`.
  *
  * Responsibilities:
- * - verify the copy step fails fast when the packaged dependency tree is missing
+ * - verify the copy step skips when the packaged dependency tree is missing but stale app output remains
+ * - verify the copy step still fails when both dependency trees are missing
  * - verify the native copy step uses Node-supported `fs.cpSync(...)` options
  *
  * Invariants:
- * - missing packaged dependencies remain a hard failure even if stale app output exists
+ * - stale app output can satisfy the packaged dependency mirror when the source tree is missing
+ * - missing packaged dependencies remain a hard failure only when no destination tree exists
  * - the mirror step continues to copy recursively with `force: true`
  *
  * Usage:
@@ -21,7 +23,40 @@ import path from 'node:path';
 
 import {copyNodeModules} from '../../bin/copy-node-modules.mjs';
 
-test('fails when the packaged source tree is missing, even if stale app output exists', () => {
+test('skips when the packaged source tree is missing but stale app output already exists', () => {
+  const baseDir = '/workspace';
+  const rmSyncCalls: string[] = [];
+  const cpSyncCalls: string[] = [];
+  const loggerMessages: string[] = [];
+  const destinationDir = path.join(baseDir, 'app', 'node_modules');
+  const fsModule = {
+    cpSync: (sourceDir: string) => {
+      cpSyncCalls.push(sourceDir);
+    },
+    existsSync: (targetPath: string) => {
+      return targetPath === destinationDir;
+    },
+    rmSync: (targetPath: string) => {
+      rmSyncCalls.push(targetPath);
+    }
+  };
+
+  copyNodeModules({
+    baseDir,
+    fsModule,
+    logger: (message: string) => {
+      loggerMessages.push(message);
+    }
+  });
+
+  expect(rmSyncCalls).toEqual([]);
+  expect(cpSyncCalls).toEqual([]);
+  expect(loggerMessages).toEqual([
+    `Skipping node_modules mirror: source missing at ${path.join(baseDir, 'dist', 'app', 'node_modules')}, destination already exists at ${destinationDir}`
+  ]);
+});
+
+test('fails when both packaged and app dependency trees are missing', () => {
   const baseDir = '/workspace';
   const rmSyncCalls: string[] = [];
   const cpSyncCalls: string[] = [];

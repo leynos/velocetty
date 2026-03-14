@@ -27,7 +27,16 @@ export function copyNodeModules({
     pathModule.join('node-pty', 'build', 'node_gyp_bins', 'python3')
   ];
 
-  if (!fsModule.existsSync(sourceDir)) {
+  const sourceExists = fsModule.existsSync(sourceDir);
+  const destinationExists = fsModule.existsSync(destinationDir);
+
+  if (!sourceExists) {
+    if (destinationExists) {
+      logger(
+        `Skipping node_modules mirror: source missing at ${sourceDir}, destination already exists at ${destinationDir}`
+      );
+      return;
+    }
     throw new Error(`Source node_modules not found at ${sourceDir}`);
   }
 
