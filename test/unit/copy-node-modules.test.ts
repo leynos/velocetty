@@ -160,15 +160,17 @@ test('copies with Node-supported cpSync options', () => {
     }
   ]);
   expect(cpSyncCalls).toHaveLength(1);
-  expect(cpSyncCalls[0]?.sourceDir).toBe(sourceDir);
-  expect(cpSyncCalls[0]?.destinationDir).toBe(destinationDir);
-  expect(cpSyncCalls[0]?.options).toMatchObject({
+  const copyCall = cpSyncCalls[0];
+  expect(copyCall).toBeDefined();
+  expect(copyCall?.sourceDir).toBe(sourceDir);
+  expect(copyCall?.destinationDir).toBe(destinationDir);
+  expect(copyCall?.options).toMatchObject({
     recursive: true,
     force: true,
     dereference: false
   });
 
-  const filter = cpSyncCalls[0]?.options.filter;
+  const {filter} = copyCall.options;
   expect(filter(sourceDir)).toBe(true);
   expect(filter(path.join(sourceDir, 'left-pad', 'index.js'))).toBe(true);
   expect(filter(path.join(sourceDir, '.bin', 'bun'))).toBe(true);
@@ -177,7 +179,7 @@ test('copies with Node-supported cpSync options', () => {
   expect(filter(path.join(sourceDir, 'node-pty', 'build', 'node_gyp_bins', 'python3'))).toBe(false);
   expect(filter(path.join(sourceDir, 'node-pty', 'build', 'node_gyp_bins', 'python3', 'python3'))).toBe(false);
 
-  expect(cpSyncCalls[0]).toEqual({
+  expect(copyCall).toEqual({
     sourceDir,
     destinationDir,
     options: {
@@ -187,6 +189,6 @@ test('copies with Node-supported cpSync options', () => {
       filter
     }
   });
-  expect(cpSyncCalls[0]?.options).not.toHaveProperty('errorOnExist');
+  expect(copyCall?.options).not.toHaveProperty('errorOnExist');
   expect(loggerMessages).toEqual([`Copying node_modules from ${sourceDir} to ${destinationDir}`]);
 });
