@@ -326,7 +326,7 @@ in the same change:
   same Node.js major family.
 - Run `bun install` to validate snapshot generation, `install-app-deps`, and
   `node-pty` rebuilding before running the remaining gates.
-- The install pipeline intentionally invokes `node bin/copy-node-modules.mjs`
+- The installation pipeline intentionally invokes `node bin/copy-node-modules.mjs`
   during postinstall. Bun remains the default runner elsewhere, but Node's
   native copy path is currently the stable option for mirroring large
   `node_modules` trees on Linux/Windows Subsystem for Linux (WSL) after
