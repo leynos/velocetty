@@ -81,17 +81,23 @@ interface CopyFixture {
   baseDir: string;
   cpSyncCalls: Array<{
     destinationDir: string;
-    options: Record<string, unknown>;
+    options: {
+      dereference: boolean;
+      filter: (sourcePath: string) => boolean;
+      force: boolean;
+      recursive: boolean;
+    };
     sourceDir: string;
   }>;
   destinationDir: string;
   fsModule: {
-    cpSync: (sourceDir: string, destinationDir: string, options: Record<string, unknown>) => void;
+    cpSync: (sourceDir: string, destinationDir: string, options: CopyFixture['cpSyncCalls'][number]['options']) => void;
     existsSync: (targetPath: string) => boolean;
     rmSync: (targetPath: string, options?: Record<string, unknown>) => void;
   };
   logger: (message: string) => void;
   loggerMessages: string[];
+  operations: string[];
   rmSyncCalls: Array<{
     options: Record<string, unknown> | undefined;
     targetPath: string;
@@ -102,18 +108,21 @@ interface CopyFixture {
 const makeCopyFixture = (): CopyFixture => {
   const cpSyncCalls: CopyFixture['cpSyncCalls'] = [];
   const loggerMessages: string[] = [];
+  const operations: string[] = [];
   const rmSyncCalls: CopyFixture['rmSyncCalls'] = [];
   const baseDir = '/workspace';
   const sourceDir = path.join(baseDir, 'dist', 'app', 'node_modules');
   const destinationDir = path.join(baseDir, 'app', 'node_modules');
   const fsModule: CopyFixture['fsModule'] = {
-    cpSync: (sourceDir: string, destinationDir: string, options: Record<string, unknown>) => {
+    cpSync: (sourceDir: string, destinationDir: string, options: CopyFixture['cpSyncCalls'][number]['options']) => {
+      operations.push('cpSync');
       cpSyncCalls.push({sourceDir, destinationDir, options});
     },
     existsSync: (targetPath: string) => {
       return targetPath === sourceDir;
     },
     rmSync: (targetPath: string, options?: Record<string, unknown>) => {
+      operations.push('rmSync');
       rmSyncCalls.push({targetPath, options});
     }
   };
@@ -128,17 +137,19 @@ const makeCopyFixture = (): CopyFixture => {
     fsModule,
     logger,
     loggerMessages,
+    operations,
     rmSyncCalls,
     sourceDir
   };
 };
 
 test('copies with Node-supported cpSync options', () => {
-  const {baseDir, cpSyncCalls, destinationDir, fsModule, logger, loggerMessages, rmSyncCalls, sourceDir} =
+  const {baseDir, cpSyncCalls, destinationDir, fsModule, logger, loggerMessages, operations, rmSyncCalls, sourceDir} =
     makeCopyFixture();
 
   copyNodeModules({baseDir, fsModule, logger});
 
+  expect(operations).toEqual(['rmSync', 'cpSync']);
   expect(rmSyncCalls).toEqual([
     {
       targetPath: destinationDir,
@@ -149,6 +160,23 @@ test('copies with Node-supported cpSync options', () => {
     }
   ]);
   expect(cpSyncCalls).toHaveLength(1);
+  expect(cpSyncCalls[0]?.sourceDir).toBe(sourceDir);
+  expect(cpSyncCalls[0]?.destinationDir).toBe(destinationDir);
+  expect(cpSyncCalls[0]?.options).toMatchObject({
+    recursive: true,
+    force: true,
+    dereference: false
+  });
+
+  const filter = cpSyncCalls[0]?.options.filter;
+  expect(filter(sourceDir)).toBe(true);
+  expect(filter(path.join(sourceDir, 'left-pad', 'index.js'))).toBe(true);
+  expect(filter(path.join(sourceDir, '.bin', 'bun'))).toBe(true);
+  expect(filter(path.join(sourceDir, 'node-pty', 'build', 'Release', 'pty.node'))).toBe(true);
+  expect(filter(path.join(sourceDir, 'node-pty', 'build', 'node_gyp_bins'))).toBe(false);
+  expect(filter(path.join(sourceDir, 'node-pty', 'build', 'node_gyp_bins', 'python3'))).toBe(false);
+  expect(filter(path.join(sourceDir, 'node-pty', 'build', 'node_gyp_bins', 'python3', 'python3'))).toBe(false);
+
   expect(cpSyncCalls[0]).toEqual({
     sourceDir,
     destinationDir,
@@ -156,7 +184,7 @@ test('copies with Node-supported cpSync options', () => {
       recursive: true,
       force: true,
       dereference: false,
-      filter: expect.any(Function)
+      filter
     }
   });
   expect(cpSyncCalls[0]?.options).not.toHaveProperty('errorOnExist');
