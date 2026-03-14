@@ -88,16 +88,21 @@ interface CopyFixture {
   fsModule: {
     cpSync: (sourceDir: string, destinationDir: string, options: Record<string, unknown>) => void;
     existsSync: (targetPath: string) => boolean;
-    rmSync: () => void;
+    rmSync: (targetPath: string, options?: Record<string, unknown>) => void;
   };
   logger: (message: string) => void;
   loggerMessages: string[];
+  rmSyncCalls: Array<{
+    options: Record<string, unknown> | undefined;
+    targetPath: string;
+  }>;
   sourceDir: string;
 }
 
 const makeCopyFixture = (): CopyFixture => {
   const cpSyncCalls: CopyFixture['cpSyncCalls'] = [];
   const loggerMessages: string[] = [];
+  const rmSyncCalls: CopyFixture['rmSyncCalls'] = [];
   const baseDir = '/workspace';
   const sourceDir = path.join(baseDir, 'dist', 'app', 'node_modules');
   const destinationDir = path.join(baseDir, 'app', 'node_modules');
@@ -108,7 +113,9 @@ const makeCopyFixture = (): CopyFixture => {
     existsSync: (targetPath: string) => {
       return targetPath === sourceDir;
     },
-    rmSync: () => {}
+    rmSync: (targetPath: string, options?: Record<string, unknown>) => {
+      rmSyncCalls.push({targetPath, options});
+    }
   };
   const logger = (message: string) => {
     loggerMessages.push(message);
@@ -121,15 +128,26 @@ const makeCopyFixture = (): CopyFixture => {
     fsModule,
     logger,
     loggerMessages,
+    rmSyncCalls,
     sourceDir
   };
 };
 
 test('copies with Node-supported cpSync options', () => {
-  const {baseDir, cpSyncCalls, destinationDir, fsModule, logger, loggerMessages, sourceDir} = makeCopyFixture();
+  const {baseDir, cpSyncCalls, destinationDir, fsModule, logger, loggerMessages, rmSyncCalls, sourceDir} =
+    makeCopyFixture();
 
   copyNodeModules({baseDir, fsModule, logger});
 
+  expect(rmSyncCalls).toEqual([
+    {
+      targetPath: destinationDir,
+      options: {
+        recursive: true,
+        force: true
+      }
+    }
+  ]);
   expect(cpSyncCalls).toHaveLength(1);
   expect(cpSyncCalls[0]).toEqual({
     sourceDir,
