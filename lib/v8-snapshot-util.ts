@@ -1,39 +1,101 @@
 /** @file Initializes snapshot module loading hooks for renderer runtime execution. */
-if (typeof snapshotResult !== 'undefined') {
-  const runtimeWindow = typeof window !== 'undefined' ? window : undefined;
-  const runtimeDocument = typeof document !== 'undefined' ? document : undefined;
-  const rendererWindow = runtimeWindow as (Window & {require?: NodeRequire}) | undefined;
-  const runtimeRequire =
-    typeof global.require === 'function'
-      ? global.require
-      : typeof rendererWindow?.require === 'function'
-        ? rendererWindow.require
-        : null;
+type SnapshotCustomRequire = {
+  (moduleName: string): unknown;
+  cache: Record<string, {exports: unknown}>;
+  definitions: Record<string, unknown>;
+};
+
+type SnapshotResult = {
+  customRequire: SnapshotCustomRequire;
+  setGlobals: (...args: unknown[]) => void;
+};
+
+type SnapshotModuleLoader = {
+  _load: (moduleName: string, ...args: unknown[]) => unknown;
+};
+
+type SnapshotRuntimeWindow = Window & {require?: NodeRequire};
+
+type SnapshotRuntimeHost = typeof globalThis & {
+  document?: Document;
+  require?: NodeRequire;
+  snapshotResult?: SnapshotResult;
+  window?: SnapshotRuntimeWindow;
+};
+
+export type SnapshotBootstrapHandle = {
+  readonly module: SnapshotModuleLoader;
+  readonly runtimeRequire: NodeRequire;
+  restore(): void;
+};
+
+const resolveRuntimeRequire = (
+  runtimeHost: SnapshotRuntimeHost,
+  runtimeWindow: SnapshotRuntimeWindow | undefined
+): NodeRequire | null => {
+  if (typeof runtimeHost.require === 'function') {
+    return runtimeHost.require;
+  }
+
+  if (typeof runtimeWindow?.require === 'function') {
+    return runtimeWindow.require;
+  }
+
+  return null;
+};
+
+export const bootstrapSnapshotRuntime = (
+  runtimeHost: SnapshotRuntimeHost = globalThis as SnapshotRuntimeHost
+): SnapshotBootstrapHandle | null => {
+  const runtimeSnapshotResult = runtimeHost.snapshotResult;
+  if (runtimeSnapshotResult === undefined) {
+    return null;
+  }
+
+  const runtimeWindow = runtimeHost.window;
+  const runtimeDocument = runtimeHost.document;
+  const runtimeRequire = resolveRuntimeRequire(runtimeHost, runtimeWindow);
 
   if (!runtimeRequire) {
     throw new Error('Expected a Node-compatible require function for snapshot initialization.');
   }
+
   if (!runtimeWindow || !runtimeDocument) {
     throw new Error('Expected window and document globals for snapshot initialization.');
   }
 
-  const Module = runtimeRequire('module') as {_load: (module: string, ...args: unknown[]) => unknown};
-  const originalLoad = Module._load;
+  const moduleLoader = runtimeRequire('module') as SnapshotModuleLoader;
+  const originalLoad = moduleLoader._load;
 
-  Module._load = function _load(module: string, ...args: unknown[]): unknown {
-    let cachedModule = snapshotResult.customRequire.cache[module];
+  const snapshotAwareLoad = function _load(moduleName: string, ...args: unknown[]): unknown {
+    let cachedModule = runtimeSnapshotResult.customRequire.cache[moduleName];
 
-    if (cachedModule) return cachedModule.exports;
-
-    if (snapshotResult.customRequire.definitions[module]) {
-      cachedModule = {exports: snapshotResult.customRequire(module)};
-    } else {
-      cachedModule = {exports: originalLoad(module, ...args)};
+    if (cachedModule) {
+      return cachedModule.exports;
     }
 
-    snapshotResult.customRequire.cache[module] = cachedModule;
+    if (runtimeSnapshotResult.customRequire.definitions[moduleName]) {
+      cachedModule = {exports: runtimeSnapshotResult.customRequire(moduleName)};
+    } else {
+      cachedModule = {exports: originalLoad(moduleName, ...args)};
+    }
+
+    runtimeSnapshotResult.customRequire.cache[moduleName] = cachedModule;
     return cachedModule.exports;
   };
 
-  snapshotResult.setGlobals(global, process, runtimeWindow, runtimeDocument, console, runtimeRequire);
-}
+  moduleLoader._load = snapshotAwareLoad;
+  runtimeSnapshotResult.setGlobals(global, process, runtimeWindow, runtimeDocument, console, runtimeRequire);
+
+  return {
+    module: moduleLoader,
+    runtimeRequire,
+    restore() {
+      if (moduleLoader._load === snapshotAwareLoad) {
+        moduleLoader._load = originalLoad;
+      }
+    }
+  };
+};
+
+bootstrapSnapshotRuntime();

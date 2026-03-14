@@ -2,9 +2,10 @@
  * @file Verifies the snapshot bootstrap contract in `lib/v8-snapshot-util.ts`.
  *
  * Responsibilities:
- * - Exercise bundler-agnostic runtime `require` lookup through `global.require`
- *   and `window.require`.
- * - Validate snapshot cache/definition wiring performed during bootstrap.
+ * - Exercise bundler-agnostic runtime `require` lookup through explicit test
+ *   fixtures instead of process-global state.
+ * - Validate snapshot cache/definition wiring and loader restoration performed
+ *   during bootstrap.
  *
  * Invariants:
  * - Bootstrap resolves virtual modules via `customRequire` and falls back to
@@ -14,13 +15,11 @@
  * - Missing runtime `require` throws the expected initialization error, while
  *   an absent `snapshotResult` remains a no-op.
  *
- * Usage:
- * - Imports `lib/v8-snapshot-util.ts` with cache-busting query suffixes to
- *   execute bootstrap side effects and validate observable runtime behaviour.
- *
  * Cross-link: `lib/v8-snapshot-util.ts`.
  */
-import {afterEach, expect, test} from 'bun:test';
+import {expect, test} from 'bun:test';
+
+import {bootstrapSnapshotRuntime} from '../../lib/v8-snapshot-util';
 
 type SnapshotResultShape = {
   customRequire: {
@@ -35,22 +34,12 @@ type ModuleContainer = {
   _load: (moduleName: string) => unknown;
 };
 
-const globalHost = globalThis as typeof globalThis & {
-  snapshotResult?: SnapshotResultShape;
-  require?: (moduleName: string) => unknown;
-  document?: Document;
-  window?: Window & {
-    require?: (moduleName: string) => unknown;
-  };
-};
-
-let importSuffix = 0;
-
-const cleanupGlobals = () => {
-  delete globalHost.snapshotResult;
-  delete globalHost.require;
-  delete globalHost.document;
-  delete globalHost.window;
+type SnapshotHarness = {
+  moduleContainer: ModuleContainer;
+  restoreBootstrap: () => void;
+  runtimeRequire: NodeRequire;
+  setGlobalsCalls: unknown[][];
+  snapshotResult: SnapshotResultShape;
 };
 
 const createModuleContainer = (): ModuleContainer => {
@@ -59,13 +48,13 @@ const createModuleContainer = (): ModuleContainer => {
   };
 };
 
-const createRuntimeRequire = (moduleContainer: ModuleContainer) => {
-  return (moduleName: string) => {
+const createRuntimeRequire = (moduleContainer: ModuleContainer): NodeRequire => {
+  return ((moduleName: string) => {
     if (moduleName === 'module') {
       return moduleContainer;
     }
     throw new Error(`Unexpected module request: ${moduleName}`);
-  };
+  }) as NodeRequire;
 };
 
 const createSnapshotResult = (
@@ -88,71 +77,53 @@ const createSnapshotResult = (
   };
 };
 
-const setupSnapshotGlobals = ({
-  snapshotResult,
-  globalRequire,
-  windowRequire
-}: {
-  snapshotResult?: SnapshotResultShape;
-  globalRequire?: (moduleName: string) => unknown;
-  windowRequire?: (moduleName: string) => unknown;
-}) => {
-  if (globalRequire) {
-    globalHost.require = globalRequire;
-  }
-  globalHost.window = {
-    require: windowRequire
-  } as Window & {require?: (moduleName: string) => unknown};
-  globalHost.document = {} as Document;
-  if (snapshotResult) {
-    globalHost.snapshotResult = snapshotResult;
-  }
-};
-
-const importSnapshotUtil = async (testCase: string) => {
-  importSuffix += 1;
-  return import(`../../lib/v8-snapshot-util.ts?${testCase}_${importSuffix}`);
-};
-
-const testSnapshotBootstrap = async (
-  virtualModuleName: string,
-  testCaseName: string,
-  requireLocation: 'global' | 'window'
-) => {
+const createSnapshotHarness = (virtualModuleName: string, requireLocation: 'global' | 'window'): SnapshotHarness => {
   const moduleContainer = createModuleContainer();
+  const originalLoad = moduleContainer._load;
   const runtimeRequire = createRuntimeRequire(moduleContainer);
+  const runtimeWindow = {} as Window & {require?: NodeRequire};
+
+  if (requireLocation === 'window') {
+    runtimeWindow.require = runtimeRequire;
+  }
+
   const setGlobalsCalls: unknown[][] = [];
   const snapshotResult = createSnapshotResult({[virtualModuleName]: {}}, setGlobalsCalls);
+  const bootstrapHandle = bootstrapSnapshotRuntime({
+    document: {} as Document,
+    require: requireLocation === 'global' ? runtimeRequire : undefined,
+    snapshotResult,
+    window: runtimeWindow
+  });
 
-  if (requireLocation === 'global') {
-    setupSnapshotGlobals({
-      snapshotResult,
-      globalRequire: runtimeRequire
-    });
-  } else {
-    setupSnapshotGlobals({
-      snapshotResult,
-      windowRequire: runtimeRequire
-    });
+  if (!bootstrapHandle) {
+    throw new Error('Expected snapshot bootstrap to install a runtime handle.');
   }
 
-  await importSnapshotUtil(testCaseName);
-  return {moduleContainer, runtimeRequire, snapshotResult, setGlobalsCalls};
+  expect(moduleContainer._load).not.toBe(originalLoad);
+
+  return {
+    moduleContainer,
+    restoreBootstrap: () => {
+      bootstrapHandle.restore();
+    },
+    runtimeRequire,
+    setGlobalsCalls,
+    snapshotResult
+  };
 };
 
 const assertSnapshotBootstrapResult = ({
   moduleContainer,
+  restoreBootstrap,
   runtimeRequire,
   snapshotResult,
   setGlobalsCalls,
   virtualModuleName
-}: {
-  moduleContainer: ModuleContainer;
-  runtimeRequire: (moduleName: string) => unknown;
-  snapshotResult: SnapshotResultShape;
-  setGlobalsCalls: unknown[][];
+}: SnapshotHarness & {
   virtualModuleName: string;
 }) => {
+  const installedLoad = moduleContainer._load;
   const loadedVirtualModule = moduleContainer._load(virtualModuleName);
   const loadedNativeModule = moduleContainer._load('native:module');
 
@@ -163,32 +134,29 @@ const assertSnapshotBootstrapResult = ({
   });
   expect(setGlobalsCalls).toHaveLength(1);
   expect(setGlobalsCalls[0].at(-1)).toBe(runtimeRequire);
-};
 
-afterEach(() => {
-  cleanupGlobals();
-});
+  restoreBootstrap();
+  expect(moduleContainer._load).not.toBe(installedLoad);
+  expect(moduleContainer._load('native:module')).toEqual({native: 'native:module'});
+};
 
 const snapshotBootstrapCases = [
   {
     testName: 'uses runtime require and snapshot cache/definitions when available',
     virtualModuleName: 'virtual:plugin',
-    testCaseName: 'bootstrap_case',
     requireLocation: 'global' as const
   },
   {
     testName: 'falls back to window.require when global require is unavailable',
     virtualModuleName: 'virtual:renderer',
-    testCaseName: 'window_require_case',
     requireLocation: 'window' as const
   }
 ];
 
 for (const snapshotBootstrapCase of snapshotBootstrapCases) {
-  test(snapshotBootstrapCase.testName, async () => {
-    const snapshotBootstrapResult = await testSnapshotBootstrap(
+  test(snapshotBootstrapCase.testName, () => {
+    const snapshotBootstrapResult = createSnapshotHarness(
       snapshotBootstrapCase.virtualModuleName,
-      snapshotBootstrapCase.testCaseName,
       snapshotBootstrapCase.requireLocation
     );
 
@@ -199,31 +167,56 @@ for (const snapshotBootstrapCase of snapshotBootstrapCases) {
   });
 }
 
-test('throws when snapshot bootstrap cannot find runtime require', async () => {
-  setupSnapshotGlobals({
-    snapshotResult: {
-      customRequire: Object.assign(
-        (_moduleName: string) => {
-          return null;
-        },
-        {
-          cache: {},
-          definitions: {}
-        }
-      ),
-      setGlobals: () => {}
-    }
+test('restores the original module loader after bootstrap cleanup', () => {
+  const moduleContainer = createModuleContainer();
+  const originalLoad = moduleContainer._load;
+  const runtimeRequire = createRuntimeRequire(moduleContainer);
+  const bootstrapHandle = bootstrapSnapshotRuntime({
+    document: {} as Document,
+    require: runtimeRequire,
+    snapshotResult: createSnapshotResult({'virtual:plugin': {}}, []),
+    window: {} as Window & {require?: NodeRequire}
   });
 
-  await expect(importSnapshotUtil('missing_require_case')).rejects.toThrow(
-    'Expected a Node-compatible require function for snapshot initialization.'
-  );
+  if (!bootstrapHandle) {
+    throw new Error('Expected snapshot bootstrap to install a runtime handle.');
+  }
+
+  expect(moduleContainer._load).not.toBe(originalLoad);
+  bootstrapHandle.restore();
+  expect(moduleContainer._load).toBe(originalLoad);
 });
 
-test('no-ops when snapshotResult is unavailable', async () => {
-  globalHost.require = (_moduleName: string) => {
-    throw new Error('runtime require should not be called without snapshotResult');
-  };
+test('throws when snapshot bootstrap cannot find runtime require', () => {
+  expect(() =>
+    bootstrapSnapshotRuntime({
+      document: {} as Document,
+      snapshotResult: {
+        customRequire: Object.assign(
+          (_moduleName: string) => {
+            return null;
+          },
+          {
+            cache: {},
+            definitions: {}
+          }
+        ),
+        setGlobals: () => {}
+      },
+      window: {} as Window & {require?: NodeRequire}
+    })
+  ).toThrow('Expected a Node-compatible require function for snapshot initialization.');
+});
 
-  await expect(importSnapshotUtil('no_snapshot_result')).resolves.toBeDefined();
+test('no-ops when snapshotResult is unavailable', () => {
+  const runtimeRequire = ((moduleName: string) => {
+    throw new Error(`runtime require should not be called without snapshotResult: ${moduleName}`);
+  }) as NodeRequire;
+
+  expect(
+    bootstrapSnapshotRuntime({
+      require: runtimeRequire,
+      window: {} as Window & {require?: NodeRequire}
+    })
+  ).toBeNull();
 });
