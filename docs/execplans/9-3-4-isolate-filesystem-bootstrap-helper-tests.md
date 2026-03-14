@@ -167,11 +167,11 @@ set -o pipefail
 for run in $(seq 1 20); do
   echo "== ensure-directory-path concurrent run ${run} =="
   bun test --concurrent test/unit/ensure-directory-path.test.ts
-done | tee /tmp/concurrent-ensure-directory-path-velocetty-$(git branch --show).out
+done | tee /tmp/concurrent-ensure-directory-path-velocetty-$(git branch --show-current).out
 ```
 
 The current branch already reproduces the defect. A captured probe log at
-`/tmp/concurrent-ensure-directory-path-velocetty-$(git branch --show).out`
+`/tmp/concurrent-ensure-directory-path-velocetty-$(git branch --show-current).out`
 shows failures such as the following:
 
 ```plaintext
@@ -247,11 +247,11 @@ with durable tee'd logs.
 
 ```bash
 set -o pipefail
-bun install | tee /tmp/bun-install-velocetty-$(git branch --show).out
-make build | tee /tmp/build-velocetty-$(git branch --show).out
-make check-fmt | tee /tmp/check-fmt-velocetty-$(git branch --show).out
-make lint | tee /tmp/lint-velocetty-$(git branch --show).out
-make test | tee /tmp/test-velocetty-$(git branch --show).out
+bun install | tee /tmp/bun-install-velocetty-$(git branch --show-current).out
+make build | tee /tmp/build-velocetty-$(git branch --show-current).out
+make check-fmt | tee /tmp/check-fmt-velocetty-$(git branch --show-current).out
+make lint | tee /tmp/lint-velocetty-$(git branch --show-current).out
+make test | tee /tmp/test-velocetty-$(git branch --show-current).out
 ```
 
 Only after those commands pass should `docs/roadmap.md` mark `9.3.4` done.
@@ -269,18 +269,18 @@ Implementation is not complete until the following checks have passed:
    for run in $(seq 1 20); do
      echo "== ensure-directory-path concurrent run ${run} =="
      bun test --concurrent test/unit/ensure-directory-path.test.ts
-   done | tee /tmp/concurrent-ensure-directory-path-velocetty-$(git branch --show).out
+   done | tee /tmp/concurrent-ensure-directory-path-velocetty-$(git branch --show-current).out
    ```
 
 2. The required repository gates pass in this order:
 
    ```bash
    set -o pipefail
-   bun install | tee /tmp/bun-install-velocetty-$(git branch --show).out
-   make build | tee /tmp/build-velocetty-$(git branch --show).out
-   make check-fmt | tee /tmp/check-fmt-velocetty-$(git branch --show).out
-   make lint | tee /tmp/lint-velocetty-$(git branch --show).out
-   make test | tee /tmp/test-velocetty-$(git branch --show).out
+   bun install | tee /tmp/bun-install-velocetty-$(git branch --show-current).out
+   make build | tee /tmp/build-velocetty-$(git branch --show-current).out
+   make check-fmt | tee /tmp/check-fmt-velocetty-$(git branch --show-current).out
+   make lint | tee /tmp/lint-velocetty-$(git branch --show-current).out
+   make test | tee /tmp/test-velocetty-$(git branch --show-current).out
    ```
 
 3. `docs/developers-guide.md` accurately describes the new practice for
