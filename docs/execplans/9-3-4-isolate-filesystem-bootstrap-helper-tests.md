@@ -364,7 +364,7 @@ Implementation is not complete until the following checks have passed:
 - Observation: `bun install` was blocked by two independent generated-tree
   failures in this workspace: stale relink targets in `node_modules`, then
   `ENOENT` failures inside the packaged dependency mirror step.
-  Evidence: initial install attempts failed with `EEXIST` during dependency
+  Evidence: initial installation attempts failed with `EEXIST` during dependency
   relinking and then with `ENOENT` from `bin/copy-node-modules.js` while
   copying into `app/node_modules`.
   Impact: completing the requested gate suite required both a clean generated

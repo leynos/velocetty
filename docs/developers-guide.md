@@ -626,10 +626,10 @@ suite:
 bun test --concurrent test/unit/ensure-directory-path.test.ts
 ```
 
-Keep temporary-directory ownership and teardown inside the individual test, or
-inside a helper that returns cleanup for just that test. Do not use a shared
-file-scope cleanup queue for temporary roots in suites that must survive
-explicit `--concurrent` runs.
+Keep temporary-directory ownership and teardown scoped to each test, either
+directly in the test or via a helper that returns per-test cleanup, so
+ownership is not shared. Do not use a shared file-scope cleanup queue for
+temporary roots in suites that must survive explicit `--concurrent` runs.
 
 ### End-to-end (E2E) tests (layered strategy)
 
