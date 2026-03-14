@@ -42,17 +42,32 @@ test('fails when the packaged source tree is missing, even if stale app output e
   expect(cpSyncCalls).toEqual([]);
 });
 
-test('copies with Node-supported cpSync options', () => {
-  const cpSyncCalls: Array<{
+interface CopyFixture {
+  baseDir: string;
+  cpSyncCalls: Array<{
     destinationDir: string;
     options: Record<string, unknown>;
     sourceDir: string;
-  }> = [];
+  }>;
+  destinationDir: string;
+  fsModule: {
+    cpSync: (sourceDir: string, destinationDir: string, options: Record<string, unknown>) => void;
+    existsSync: (targetPath: string) => boolean;
+    readdirSync: () => unknown[];
+    rmSync: () => void;
+  };
+  logger: (message: string) => void;
+  loggerMessages: string[];
+  sourceDir: string;
+}
+
+const makeCopyFixture = (): CopyFixture => {
+  const cpSyncCalls: CopyFixture['cpSyncCalls'] = [];
   const loggerMessages: string[] = [];
   const baseDir = '/workspace';
   const sourceDir = path.join(baseDir, 'dist', 'app', 'node_modules');
   const destinationDir = path.join(baseDir, 'app', 'node_modules');
-  const fsModule = {
+  const fsModule: CopyFixture['fsModule'] = {
     cpSync: (sourceDir: string, destinationDir: string, options: Record<string, unknown>) => {
       cpSyncCalls.push({sourceDir, destinationDir, options});
     },
@@ -62,14 +77,25 @@ test('copies with Node-supported cpSync options', () => {
     readdirSync: () => [],
     rmSync: () => {}
   };
+  const logger = (message: string) => {
+    loggerMessages.push(message);
+  };
 
-  copyNodeModules({
+  return {
     baseDir,
+    cpSyncCalls,
+    destinationDir,
     fsModule,
-    logger: (message: string) => {
-      loggerMessages.push(message);
-    }
-  });
+    logger,
+    loggerMessages,
+    sourceDir
+  };
+};
+
+test('copies with Node-supported cpSync options', () => {
+  const {baseDir, cpSyncCalls, destinationDir, fsModule, logger, loggerMessages, sourceDir} = makeCopyFixture();
+
+  copyNodeModules({baseDir, fsModule, logger});
 
   expect(cpSyncCalls).toHaveLength(1);
   expect(cpSyncCalls[0]).toEqual({
