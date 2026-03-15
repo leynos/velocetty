@@ -221,31 +221,20 @@ test('exists() returns false when config file is missing without reading config 
   expect(state.fsReadFileSyncCallCount).toBe(0);
 });
 
-test('configPath prefers config.json5 in production', () => {
-  const expectedConfigPath = path.join('/tmp/velocetty-xdg', 'Hyper', 'config.json5');
+test.each([
+  {label: 'prefers config.json5 in production', filename: 'config.json5'},
+  {label: 'falls back to legacy hyper.json when config.json5 is absent', filename: 'hyper.json'}
+])('configPath $label', ({filename}) => {
+  const expectedPath = path.join('/tmp/velocetty-xdg', 'Hyper', filename);
   const {api} = createCliHarness({
     env: {
       NODE_ENV: 'production',
       XDG_CONFIG_HOME: '/tmp/velocetty-xdg'
     },
-    existingPaths: new Set([expectedConfigPath])
+    existingPaths: new Set([expectedPath])
   });
 
-  expect(api.configPath).toBe(expectedConfigPath);
-  expect(api.exists()).toBe(true);
-});
-
-test('configPath falls back to legacy hyper.json when config.json5 is absent', () => {
-  const legacyPath = path.join('/tmp/velocetty-xdg', 'Hyper', 'hyper.json');
-  const {api} = createCliHarness({
-    env: {
-      NODE_ENV: 'production',
-      XDG_CONFIG_HOME: '/tmp/velocetty-xdg'
-    },
-    existingPaths: new Set([legacyPath])
-  });
-
-  expect(api.configPath).toBe(legacyPath);
+  expect(api.configPath).toBe(expectedPath);
   expect(api.exists()).toBe(true);
 });
 
