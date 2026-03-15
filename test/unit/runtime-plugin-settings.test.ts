@@ -62,6 +62,22 @@ const createReadWritePair = (
   };
 };
 
+const assertParseErrorBehaviour = <T>(
+  invoke: (deps: {readFile: ReadTextFile; writeFile: WriteTextFile}) => T,
+  expectedResult: T,
+  expectedErrorMessage: string
+): void => {
+  const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+  const {readFile, writeFile, getWrites} = createReadWritePair('{config:');
+
+  const persisted = invoke({readFile, writeFile});
+
+  expect(persisted).toEqual(expectedResult);
+  expect(getWrites()).toHaveLength(0);
+  expect(errorSpy).toHaveBeenCalledWith(expectedErrorMessage);
+  errorSpy.mockRestore();
+};
+
 test('ensureRuntimePluginSettingsPersisted writes missing defaults to config.plugins namespace', () => {
   const {readFile, writeFile, getContent, getWrites} = createReadWritePair(`{
     config: {
@@ -212,37 +228,25 @@ test('setRuntimePluginEnabledPersisted preserves unrelated plugin formatting', (
 });
 
 test('ensureRuntimePluginSettingsPersisted does not write on parse errors', () => {
-  const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
-  const {readFile, writeFile, getWrites} = createReadWritePair('{config:');
-  const persisted = ensureRuntimePluginSettingsPersisted({
-    configFilePath: '/tmp/config.json5',
-    readFile,
-    writeFile
-  });
-
-  expect(persisted).toEqual({});
-  expect(getWrites()).toHaveLength(0);
-  expect(errorSpy).toHaveBeenCalledWith(
+  assertParseErrorBehaviour(
+    ({readFile, writeFile}) =>
+      ensureRuntimePluginSettingsPersisted({configFilePath: '/tmp/config.json5', readFile, writeFile}),
+    {},
     'Failed to parse runtime plugin config at "/tmp/config.json5". Returning empty namespace.'
   );
-  errorSpy.mockRestore();
 });
 
 test('setRuntimePluginEnabledPersisted returns fallback settings on parse errors', () => {
-  const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
-  const {readFile, writeFile, getWrites} = createReadWritePair('{config:');
-  const persisted = setRuntimePluginEnabledPersisted(GOLDEN_PATH_PLUGIN_ID, false, {
-    configFilePath: '/tmp/config.json5',
-    readFile,
-    writeFile
-  });
-
-  expect(persisted).toEqual({...goldenPathSettingsDefaults, enabled: false});
-  expect(getWrites()).toHaveLength(0);
-  expect(errorSpy).toHaveBeenCalledWith(
+  assertParseErrorBehaviour(
+    ({readFile, writeFile}) =>
+      setRuntimePluginEnabledPersisted(GOLDEN_PATH_PLUGIN_ID, false, {
+        configFilePath: '/tmp/config.json5',
+        readFile,
+        writeFile
+      }),
+    {...goldenPathSettingsDefaults, enabled: false},
     'Failed to parse runtime plugin config at "/tmp/config.json5". Returning fallback settings.'
   );
-  errorSpy.mockRestore();
 });
 
 test('runtime command and keybinding contributions follow enabled setting', () => {

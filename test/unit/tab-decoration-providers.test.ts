@@ -1,5 +1,5 @@
 /** @file Covers deterministic tab-decoration provider ordering and update events. */
-import {describe, expect, mock, test} from 'bun:test';
+import {beforeEach, describe, expect, mock, test} from 'bun:test';
 
 import type {CommandId} from '@shared/types/commands';
 import {
@@ -23,9 +23,13 @@ const buildContext = () => ({
 });
 
 describe('TabDecorationProviderRegistry', () => {
-  test('orders providers by priority then lexicographic id', () => {
-    const registry = new TabDecorationProviderRegistry();
+  let registry: TabDecorationProviderRegistry;
 
+  beforeEach(() => {
+    registry = new TabDecorationProviderRegistry();
+  });
+
+  test('orders providers by priority then lexicographic id', () => {
     registry.register({
       id: asTabDecorationProviderId('zeta'),
       priority: 10,
@@ -47,8 +51,6 @@ describe('TabDecorationProviderRegistry', () => {
   });
 
   test('uses deterministic singleton tie-breaks and bounded list merges', () => {
-    const registry = new TabDecorationProviderRegistry();
-
     registry.register({
       id: asTabDecorationProviderId('beta'),
       priority: 20,
@@ -86,8 +88,6 @@ describe('TabDecorationProviderRegistry', () => {
   });
 
   test('does not collide dedupe keys when values contain delimiters', () => {
-    const registry = new TabDecorationProviderRegistry();
-
     registry.register({
       id: asTabDecorationProviderId('delimiter-provider'),
       priority: 1,
@@ -115,7 +115,6 @@ describe('TabDecorationProviderRegistry', () => {
   });
 
   test('emits updates only from explicit provider-change events', async () => {
-    const registry = new TabDecorationProviderRegistry();
     const updateReasons: string[] = [];
     let emitProviderChange: (() => void) | null = null;
 
@@ -147,7 +146,6 @@ describe('TabDecorationProviderRegistry', () => {
   });
 
   test('clear disposes provider subscriptions and emits one change event', () => {
-    const registry = new TabDecorationProviderRegistry();
     const updateListener = mock(() => {});
     const disposeProvider = mock(() => {});
 
@@ -172,45 +170,47 @@ describe('TabDecorationProviderRegistry', () => {
     expect(updateListener.mock.calls.length).toBe(updatesBeforeClear + 1);
   });
 
-  test('resolve continues when one provider throws', () => {
-    const registry = new TabDecorationProviderRegistry(silentLogger);
+  describe('error-tolerant behaviour', () => {
+    beforeEach(() => {
+      registry = new TabDecorationProviderRegistry(silentLogger);
+    });
 
-    registry.register({
-      id: asTabDecorationProviderId('failing-provider'),
-      priority: 10,
-      provideDecoration: () => {
-        throw new Error('boom');
+    test('resolve continues when one provider throws', () => {
+      registry.register({
+        id: asTabDecorationProviderId('failing-provider'),
+        priority: 10,
+        provideDecoration: () => {
+          throw new Error('boom');
+        }
+      });
+      registry.register({
+        id: asTabDecorationProviderId('healthy-provider'),
+        priority: 5,
+        provideDecoration: () => ({title: 'healthy'})
+      });
+
+      const resolved = registry.resolve(buildContext());
+      expect(resolved.title).toBe('healthy');
+    });
+
+    test.each([
+      {
+        description: 'empty ids',
+        invalidId: '   ' as unknown as TabDecorationProviderId
+      },
+      {
+        description: 'non-string ids',
+        invalidId: 123 as unknown as TabDecorationProviderId
       }
+    ])('ignores provider registrations with $description', ({invalidId}) => {
+      const unregister = registry.register({
+        id: invalidId,
+        priority: 1,
+        provideDecoration: () => ({title: 'ignored'})
+      });
+
+      expect(typeof unregister).toBe('function');
+      expect(registry.listProviders()).toEqual([]);
     });
-    registry.register({
-      id: asTabDecorationProviderId('healthy-provider'),
-      priority: 5,
-      provideDecoration: () => ({title: 'healthy'})
-    });
-
-    const resolved = registry.resolve(buildContext());
-    expect(resolved.title).toBe('healthy');
-  });
-
-  test.each([
-    {
-      description: 'empty ids',
-      invalidId: '   ' as unknown as TabDecorationProviderId
-    },
-    {
-      description: 'non-string ids',
-      invalidId: 123 as unknown as TabDecorationProviderId
-    }
-  ])('ignores provider registrations with $description', ({invalidId}) => {
-    const registry = new TabDecorationProviderRegistry(silentLogger);
-
-    const unregister = registry.register({
-      id: invalidId,
-      priority: 1,
-      provideDecoration: () => ({title: 'ignored'})
-    });
-
-    expect(typeof unregister).toBe('function');
-    expect(registry.listProviders()).toEqual([]);
   });
 });
