@@ -11,6 +11,9 @@ import {
 
 const asCommandId = (value: string): CommandId => value as CommandId;
 
+/** Silent logger that prevents expected warning noise from polluting test output. */
+const silentLogger = {warn: () => {}, error: () => {}};
+
 const buildContext = () => ({
   tabId: asTabId('tab-1'),
   tabIndex: 0,
@@ -170,7 +173,7 @@ describe('TabDecorationProviderRegistry', () => {
   });
 
   test('resolve continues when one provider throws', () => {
-    const registry = new TabDecorationProviderRegistry();
+    const registry = new TabDecorationProviderRegistry(silentLogger);
 
     registry.register({
       id: asTabDecorationProviderId('failing-provider'),
@@ -199,7 +202,7 @@ describe('TabDecorationProviderRegistry', () => {
       invalidId: 123 as unknown as TabDecorationProviderId
     }
   ])('ignores provider registrations with $description', ({invalidId}) => {
-    const registry = new TabDecorationProviderRegistry();
+    const registry = new TabDecorationProviderRegistry(silentLogger);
 
     const unregister = registry.register({
       id: invalidId,

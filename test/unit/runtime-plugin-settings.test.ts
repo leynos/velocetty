@@ -1,5 +1,5 @@
 /** @file Covers runtime plugin settings persistence and enable/disable evaluation. */
-import {beforeAll, expect, test} from 'bun:test';
+import {beforeAll, expect, spyOn, test} from 'bun:test';
 import JSON5 from 'json5';
 
 import {
@@ -212,6 +212,7 @@ test('setRuntimePluginEnabledPersisted preserves unrelated plugin formatting', (
 });
 
 test('ensureRuntimePluginSettingsPersisted does not write on parse errors', () => {
+  const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
   const {readFile, writeFile, getWrites} = createReadWritePair('{config:');
   const persisted = ensureRuntimePluginSettingsPersisted({
     configFilePath: '/tmp/config.json5',
@@ -221,9 +222,14 @@ test('ensureRuntimePluginSettingsPersisted does not write on parse errors', () =
 
   expect(persisted).toEqual({});
   expect(getWrites()).toHaveLength(0);
+  expect(errorSpy).toHaveBeenCalledWith(
+    'Failed to parse runtime plugin config at "/tmp/config.json5". Returning empty namespace.'
+  );
+  errorSpy.mockRestore();
 });
 
 test('setRuntimePluginEnabledPersisted returns fallback settings on parse errors', () => {
+  const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
   const {readFile, writeFile, getWrites} = createReadWritePair('{config:');
   const persisted = setRuntimePluginEnabledPersisted(GOLDEN_PATH_PLUGIN_ID, false, {
     configFilePath: '/tmp/config.json5',
@@ -233,6 +239,10 @@ test('setRuntimePluginEnabledPersisted returns fallback settings on parse errors
 
   expect(persisted).toEqual({...goldenPathSettingsDefaults, enabled: false});
   expect(getWrites()).toHaveLength(0);
+  expect(errorSpy).toHaveBeenCalledWith(
+    'Failed to parse runtime plugin config at "/tmp/config.json5". Returning fallback settings.'
+  );
+  errorSpy.mockRestore();
 });
 
 test('runtime command and keybinding contributions follow enabled setting', () => {
