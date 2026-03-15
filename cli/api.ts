@@ -88,7 +88,11 @@ const legacyConfigFileName = 'hyper.json';
 
 const resolveCliApiContext = (options: CliApiOptions = {}): CliApiContext => ({
   appData: options.appData ?? options.env?.APPDATA ?? process.env.APPDATA,
-  env: options.env ?? process.env,
+  env: options.env ?? {
+    APPDATA: process.env.APPDATA,
+    NODE_ENV: process.env.NODE_ENV,
+    XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME
+  },
   fsModule: options.fsModule ?? fs,
   gotClient: options.gotClient ?? got,
   homeDirectory: options.homeDirectory ?? os.homedir(),
