@@ -64,6 +64,37 @@ type CliHarness = {
 
 const CLI_DIRECTORY = path.join(process.cwd(), 'cli');
 
+const buildFsModule = (state: CliHarnessState) => ({
+  existsSync: (candidatePath: unknown) => {
+    if (state.existingPaths) {
+      return typeof candidatePath === 'string' && state.existingPaths.has(candidatePath);
+    }
+    return state.fsExistsSyncResult;
+  },
+  readFileSync: () => {
+    state.fsReadFileSyncCallCount += 1;
+    return state.hasReadFileSyncOverride ? state.fsReadFileSyncValue : JSON.stringify(state.configData);
+  },
+  writeFileSync: (_path: unknown, contents: string) => {
+    const parsed = JSON5.parse(contents) as ConfigData;
+    state.savedConfigs.push(parsed);
+    state.configData = parsed;
+  }
+});
+
+const buildGotClient = (state: CliHarnessState) => ({
+  get: (url: string, requestOptions?: GotRequestOptions) => {
+    state.requestedUrls.push(url);
+    if (requestOptions) {
+      state.gotOptions.push(requestOptions);
+    }
+    if (state.gotError) {
+      return Promise.reject(state.gotError);
+    }
+    return Promise.resolve({body: {versions: state.gotVersions}});
+  }
+});
+
 const createCliHarness = (options: CliHarnessOptions = {}): CliHarness => {
   const state: CliHarnessState = {
     configData: options.configData ?? {plugins: [], localPlugins: []},
@@ -85,35 +116,8 @@ const createCliHarness = (options: CliHarnessOptions = {}): CliHarness => {
       XDG_CONFIG_HOME: options.env?.XDG_CONFIG_HOME,
       APPDATA: options.env?.APPDATA
     },
-    fsModule: {
-      existsSync: (candidatePath) => {
-        if (state.existingPaths) {
-          return typeof candidatePath === 'string' && state.existingPaths.has(candidatePath);
-        }
-        return state.fsExistsSyncResult;
-      },
-      readFileSync: () => {
-        state.fsReadFileSyncCallCount += 1;
-        return state.hasReadFileSyncOverride ? state.fsReadFileSyncValue : JSON.stringify(state.configData);
-      },
-      writeFileSync: (_path, contents) => {
-        const parsed = JSON5.parse(contents) as ConfigData;
-        state.savedConfigs.push(parsed);
-        state.configData = parsed;
-      }
-    },
-    gotClient: {
-      get: (url: string, requestOptions?: GotRequestOptions) => {
-        state.requestedUrls.push(url);
-        if (requestOptions) {
-          state.gotOptions.push(requestOptions);
-        }
-        if (state.gotError) {
-          return Promise.reject(state.gotError);
-        }
-        return Promise.resolve({body: {versions: state.gotVersions}});
-      }
-    },
+    fsModule: buildFsModule(state),
+    gotClient: buildGotClient(state),
     appData: options.appData,
     homeDirectory: options.homeDirectory,
     moduleDirectory: options.moduleDirectory ?? CLI_DIRECTORY,
