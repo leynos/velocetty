@@ -42,6 +42,12 @@ type SnapshotHarness = {
   snapshotResult: SnapshotResultShape;
 };
 
+type BootstrapFixture = {
+  moduleContainer: ModuleContainer;
+  originalLoad: (moduleName: string) => unknown;
+  bootstrapHandle: {restore: () => void};
+};
+
 const createModuleContainer = (): ModuleContainer => {
   return {
     _load: (moduleName: string) => ({native: moduleName})
@@ -140,6 +146,26 @@ const assertSnapshotBootstrapResult = ({
   expect(moduleContainer._load('native:module')).toEqual({native: 'native:module'});
 };
 
+const createBootstrapFixture = (): BootstrapFixture => {
+  const moduleContainer = createModuleContainer();
+  const originalLoad = moduleContainer._load;
+  const runtimeRequire = createRuntimeRequire(moduleContainer);
+  const bootstrapHandle = bootstrapSnapshotRuntime({
+    document: {} as Document,
+    require: runtimeRequire,
+    snapshotResult: createSnapshotResult({'virtual:plugin': {}}, []),
+    window: {} as Window & {require?: NodeRequire}
+  });
+
+  if (!bootstrapHandle) {
+    throw new Error('Expected snapshot bootstrap to install a runtime handle.');
+  }
+
+  expect(moduleContainer._load).not.toBe(originalLoad);
+
+  return {moduleContainer, originalLoad, bootstrapHandle};
+};
+
 const snapshotBootstrapCases = [
   {
     testName: 'uses runtime require and snapshot cache/definitions when available',
@@ -168,21 +194,7 @@ for (const snapshotBootstrapCase of snapshotBootstrapCases) {
 }
 
 test('restores the original module loader after bootstrap cleanup', () => {
-  const moduleContainer = createModuleContainer();
-  const originalLoad = moduleContainer._load;
-  const runtimeRequire = createRuntimeRequire(moduleContainer);
-  const bootstrapHandle = bootstrapSnapshotRuntime({
-    document: {} as Document,
-    require: runtimeRequire,
-    snapshotResult: createSnapshotResult({'virtual:plugin': {}}, []),
-    window: {} as Window & {require?: NodeRequire}
-  });
-
-  if (!bootstrapHandle) {
-    throw new Error('Expected snapshot bootstrap to install a runtime handle.');
-  }
-
-  expect(moduleContainer._load).not.toBe(originalLoad);
+  const {moduleContainer, originalLoad, bootstrapHandle} = createBootstrapFixture();
   bootstrapHandle.restore();
   expect(moduleContainer._load).toBe(originalLoad);
 });
@@ -246,19 +258,7 @@ test('throws when snapshot bootstrap cannot find window or document globals', ()
 });
 
 test('restore is idempotent when the module loader has changed', () => {
-  const moduleContainer = createModuleContainer();
-  const originalLoad = moduleContainer._load;
-  const runtimeRequire = createRuntimeRequire(moduleContainer);
-  const bootstrapHandle = bootstrapSnapshotRuntime({
-    document: {} as Document,
-    require: runtimeRequire,
-    snapshotResult: createSnapshotResult({'virtual:plugin': {}}, []),
-    window: {} as Window & {require?: NodeRequire}
-  });
-
-  if (!bootstrapHandle) {
-    throw new Error('Expected snapshot bootstrap to install a runtime handle.');
-  }
+  const {moduleContainer, originalLoad, bootstrapHandle} = createBootstrapFixture();
 
   const overriddenLoad = ((_moduleName: string) => {
     return 'overridden';
