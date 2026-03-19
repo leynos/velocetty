@@ -314,10 +314,10 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
 
   const install = (plugin: PluginSpecifier, options: InstallOptions = {}) => {
     const {locally = false, signal} = options;
-    const installedPlugins = locally ? getLocalPlugins() : getPlugins();
     return existsOnNpm(plugin, signal)
       .catch((err: unknown) => handleNpmCheckError(err, plugin))
       .then(() => {
+        const installedPlugins = locally ? getLocalPlugins() : getPlugins();
         if (isInstalled(plugin, locally)) {
           return Promise.reject(`${plugin} is already installed`);
         }
