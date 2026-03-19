@@ -16,6 +16,14 @@ type GotError = {
   message: string;
 };
 
+type GotRequestOptions = {
+  readonly responseType?: string;
+  readonly signal?: AbortSignal;
+  readonly timeout?: {
+    readonly request?: number;
+  };
+};
+
 type CliHarnessOptions = {
   readonly appData?: string;
   readonly configData?: ConfigData;
@@ -42,6 +50,7 @@ type CliHarnessState = {
   fsReadFileSyncCallCount: number;
   fsReadFileSyncValue: unknown;
   gotError: GotError | null;
+  gotOptions: GotRequestOptions[];
   gotVersions: unknown;
   hasReadFileSyncOverride: boolean;
   requestedUrls: string[];
@@ -63,6 +72,7 @@ const createCliHarness = (options: CliHarnessOptions = {}): CliHarness => {
     fsReadFileSyncCallCount: 0,
     fsReadFileSyncValue: options.fsReadFileSyncValue,
     gotError: options.gotError ?? null,
+    gotOptions: [],
     gotVersions: 'gotVersions' in options ? options.gotVersions : {'1.0.0': {}},
     hasReadFileSyncOverride: options.hasReadFileSyncOverride ?? false,
     requestedUrls: [],
@@ -93,8 +103,11 @@ const createCliHarness = (options: CliHarnessOptions = {}): CliHarness => {
       }
     },
     gotClient: {
-      get: (url: string) => {
+      get: (url: string, requestOptions?: GotRequestOptions) => {
         state.requestedUrls.push(url);
+        if (requestOptions) {
+          state.gotOptions.push(requestOptions);
+        }
         if (state.gotError) {
           return Promise.reject(state.gotError);
         }
@@ -138,10 +151,15 @@ test('list() accepts JSON5 plugin config with comments and trailing commas', () 
 
 test('install() persists plugin entries from npm checks', async () => {
   const {api, state} = createCliHarness();
+  const controller = new AbortController();
 
-  await api.install('plugin-alpha');
+  await api.install('plugin-alpha', {signal: controller.signal});
 
   expect(state.requestedUrls).toEqual(['https://registry.npmjs.org/plugin-alpha']);
+  expect(state.gotOptions[0]).toMatchObject({
+    signal: controller.signal,
+    timeout: {request: 10000}
+  });
   expect(state.savedConfigs.at(-1)).toEqual({
     plugins: ['plugin-alpha'],
     localPlugins: []

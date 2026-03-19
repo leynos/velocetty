@@ -288,10 +288,7 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
 
   const isInstalled = (plugin: PluginSpecifier, locally?: boolean) => {
     const installedPlugins = locally ? getLocalPlugins() : getPlugins();
-    if (Array.isArray(installedPlugins)) {
-      return installedPlugins.includes(plugin);
-    }
-    return false;
+    return installedPlugins.includes(plugin);
   };
 
   const save = (config: unknown) => {
@@ -342,8 +339,9 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   };
 
   const list = () => {
-    if (getPlugins().length > 0) {
-      return getPlugins().join('\n');
+    const plugins = getPlugins();
+    if (plugins.length > 0) {
+      return plugins.join('\n');
     }
     return false;
   };
