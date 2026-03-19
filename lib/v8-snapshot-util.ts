@@ -16,7 +16,7 @@ type SnapshotModuleLoader = {
 
 type SnapshotRuntimeWindow = Window & {require?: NodeRequire};
 
-type SnapshotRuntimeHost = typeof globalThis & {
+type SnapshotRuntimeEnvironment = {
   document?: Document;
   require?: NodeRequire;
   snapshotResult?: SnapshotResult;
@@ -24,37 +24,82 @@ type SnapshotRuntimeHost = typeof globalThis & {
 };
 
 export type SnapshotBootstrapHandle = {
-  readonly module: SnapshotModuleLoader;
-  readonly runtimeRequire: NodeRequire;
   restore(): void;
 };
 
-const resolveRuntimeRequire = (
-  runtimeHost: SnapshotRuntimeHost,
-  runtimeWindow: SnapshotRuntimeWindow | undefined
-): NodeRequire | null => {
-  if (typeof runtimeHost.require === 'function') {
-    return runtimeHost.require;
+type SnapshotLoaderEntry = {
+  isActive: boolean;
+  setFallbackLoad: (load: SnapshotModuleLoader['_load']) => void;
+  wrapper: SnapshotModuleLoader['_load'];
+};
+
+type SnapshotLoaderState = {
+  baseLoad: SnapshotModuleLoader['_load'];
+  entries: SnapshotLoaderEntry[];
+};
+
+declare const snapshotResult: SnapshotResult | undefined;
+
+const snapshotLoaderStates = new WeakMap<SnapshotModuleLoader, SnapshotLoaderState>();
+
+const resolveBoundSnapshotResult = (): SnapshotResult | undefined =>
+  typeof snapshotResult === 'undefined' ? undefined : snapshotResult;
+
+const isManagedSnapshotLoad = (loaderState: SnapshotLoaderState, load: SnapshotModuleLoader['_load']): boolean => {
+  return load === loaderState.baseLoad || loaderState.entries.some(({wrapper}) => wrapper === load);
+};
+
+const getOrCreateLoaderState = (moduleLoader: SnapshotModuleLoader): SnapshotLoaderState => {
+  const existingState = snapshotLoaderStates.get(moduleLoader);
+
+  if (existingState && isManagedSnapshotLoad(existingState, moduleLoader._load)) {
+    return existingState;
   }
 
-  if (typeof runtimeWindow?.require === 'function') {
-    return runtimeWindow.require;
+  const loaderState: SnapshotLoaderState = {
+    baseLoad: moduleLoader._load,
+    entries: []
+  };
+  snapshotLoaderStates.set(moduleLoader, loaderState);
+  return loaderState;
+};
+
+const rebuildSnapshotLoaderChain = (
+  moduleLoader: SnapshotModuleLoader,
+  loaderState: SnapshotLoaderState
+): SnapshotModuleLoader['_load'] => {
+  let nextLoad = loaderState.baseLoad;
+  const activeEntries = loaderState.entries.filter(({isActive}) => isActive);
+
+  if (activeEntries.length === 0) {
+    snapshotLoaderStates.delete(moduleLoader);
+    return nextLoad;
   }
 
-  return null;
+  for (const entry of activeEntries) {
+    entry.setFallbackLoad(nextLoad);
+    nextLoad = entry.wrapper;
+  }
+
+  return nextLoad;
 };
 
 export const bootstrapSnapshotRuntime = (
-  runtimeHost: SnapshotRuntimeHost = globalThis as SnapshotRuntimeHost
+  runtimeHost: SnapshotRuntimeEnvironment = globalThis as SnapshotRuntimeEnvironment
 ): SnapshotBootstrapHandle | null => {
-  const runtimeSnapshotResult = runtimeHost.snapshotResult;
+  const runtimeSnapshotResult = runtimeHost.snapshotResult ?? resolveBoundSnapshotResult();
   if (runtimeSnapshotResult === undefined) {
     return null;
   }
 
   const runtimeWindow = runtimeHost.window;
   const runtimeDocument = runtimeHost.document;
-  const runtimeRequire = resolveRuntimeRequire(runtimeHost, runtimeWindow);
+  const runtimeRequire =
+    typeof runtimeHost.require === 'function'
+      ? runtimeHost.require
+      : typeof runtimeWindow?.require === 'function'
+        ? runtimeWindow.require
+        : null;
 
   if (!runtimeRequire) {
     throw new Error('Expected a Node-compatible require function for snapshot initialization.');
@@ -65,7 +110,8 @@ export const bootstrapSnapshotRuntime = (
   }
 
   const moduleLoader = runtimeRequire('module') as SnapshotModuleLoader;
-  const originalLoad = moduleLoader._load;
+  const loaderState = getOrCreateLoaderState(moduleLoader);
+  let fallbackLoad = moduleLoader._load;
 
   const snapshotAwareLoad = function _load(moduleName: string, ...args: unknown[]): unknown {
     let cachedModule = runtimeSnapshotResult.customRequire.cache[moduleName];
@@ -77,22 +123,37 @@ export const bootstrapSnapshotRuntime = (
     if (runtimeSnapshotResult.customRequire.definitions[moduleName]) {
       cachedModule = {exports: runtimeSnapshotResult.customRequire(moduleName)};
     } else {
-      cachedModule = {exports: originalLoad(moduleName, ...args)};
+      cachedModule = {exports: fallbackLoad(moduleName, ...args)};
     }
 
     runtimeSnapshotResult.customRequire.cache[moduleName] = cachedModule;
     return cachedModule.exports;
   };
 
-  moduleLoader._load = snapshotAwareLoad;
+  const loaderEntry: SnapshotLoaderEntry = {
+    isActive: true,
+    setFallbackLoad(load) {
+      fallbackLoad = load;
+    },
+    wrapper: snapshotAwareLoad
+  };
+
+  loaderState.entries.push(loaderEntry);
+  moduleLoader._load = rebuildSnapshotLoaderChain(moduleLoader, loaderState);
   runtimeSnapshotResult.setGlobals(global, process, runtimeWindow, runtimeDocument, console, runtimeRequire);
 
   return {
-    module: moduleLoader,
-    runtimeRequire,
     restore() {
-      if (moduleLoader._load === snapshotAwareLoad) {
-        moduleLoader._load = originalLoad;
+      if (!loaderEntry.isActive) {
+        return;
+      }
+
+      loaderEntry.isActive = false;
+      const currentLoad = moduleLoader._load;
+      const restoredLoad = rebuildSnapshotLoaderChain(moduleLoader, loaderState);
+
+      if (isManagedSnapshotLoad(loaderState, currentLoad)) {
+        moduleLoader._load = restoredLoad;
       }
     }
   };

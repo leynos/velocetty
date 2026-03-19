@@ -208,6 +208,103 @@ test('throws when snapshot bootstrap cannot find runtime require', () => {
   ).toThrow('Expected a Node-compatible require function for snapshot initialization.');
 });
 
+test('throws when snapshot bootstrap cannot find window or document globals', () => {
+  const runtimeRequire = createRuntimeRequire(createModuleContainer());
+  const validRequire = Object.assign(
+    (_moduleName: string) => {
+      return null;
+    },
+    {
+      cache: {},
+      definitions: {}
+    }
+  );
+
+  expect(() =>
+    bootstrapSnapshotRuntime({
+      document: {} as Document,
+      require: runtimeRequire,
+      snapshotResult: {
+        customRequire: validRequire,
+        setGlobals: () => {}
+      },
+      window: undefined as unknown as Window & {require?: NodeRequire}
+    })
+  ).toThrow('Expected window and document globals for snapshot initialization.');
+
+  expect(() =>
+    bootstrapSnapshotRuntime({
+      document: undefined as unknown as Document,
+      snapshotResult: {
+        customRequire: validRequire,
+        setGlobals: () => {}
+      },
+      window: {} as Window & {require?: NodeRequire},
+      require: runtimeRequire
+    })
+  ).toThrow('Expected window and document globals for snapshot initialization.');
+});
+
+test('restore is idempotent when the module loader has changed', () => {
+  const moduleContainer = createModuleContainer();
+  const originalLoad = moduleContainer._load;
+  const runtimeRequire = createRuntimeRequire(moduleContainer);
+  const bootstrapHandle = bootstrapSnapshotRuntime({
+    document: {} as Document,
+    require: runtimeRequire,
+    snapshotResult: createSnapshotResult({'virtual:plugin': {}}, []),
+    window: {} as Window & {require?: NodeRequire}
+  });
+
+  if (!bootstrapHandle) {
+    throw new Error('Expected snapshot bootstrap to install a runtime handle.');
+  }
+
+  const overriddenLoad = ((_moduleName: string) => {
+    return 'overridden';
+  }) as typeof moduleContainer._load;
+  moduleContainer._load = overriddenLoad;
+
+  bootstrapHandle.restore();
+
+  expect(moduleContainer._load).toBe(overriddenLoad);
+  expect(moduleContainer._load).not.toBe(originalLoad);
+});
+
+test('restore removes stale wrappers when snapshot bootstraps overlap', () => {
+  const moduleContainer = createModuleContainer();
+  const originalLoad = moduleContainer._load;
+  const runtimeRequire = createRuntimeRequire(moduleContainer);
+  const firstHandle = bootstrapSnapshotRuntime({
+    document: {} as Document,
+    require: runtimeRequire,
+    snapshotResult: createSnapshotResult({'virtual:first': {}}, []),
+    window: {} as Window & {require?: NodeRequire}
+  });
+
+  if (!firstHandle) {
+    throw new Error('Expected the first snapshot bootstrap to install a runtime handle.');
+  }
+
+  const secondHandle = bootstrapSnapshotRuntime({
+    document: {} as Document,
+    require: runtimeRequire,
+    snapshotResult: createSnapshotResult({'virtual:second': {}}, []),
+    window: {} as Window & {require?: NodeRequire}
+  });
+
+  if (!secondHandle) {
+    throw new Error('Expected the second snapshot bootstrap to install a runtime handle.');
+  }
+
+  firstHandle.restore();
+  expect(moduleContainer._load('virtual:second')).toBe('custom:virtual:second');
+  expect(moduleContainer._load('native:module')).toEqual({native: 'native:module'});
+
+  secondHandle.restore();
+  expect(moduleContainer._load).toBe(originalLoad);
+});
+
 test('no-ops when snapshotResult is unavailable', () => {
   const runtimeRequire = ((moduleName: string) => {
     throw new Error(`runtime require should not be called without snapshotResult: ${moduleName}`);

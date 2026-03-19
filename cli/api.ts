@@ -50,15 +50,37 @@ type CliApiOptions = {
   readonly registryUrl?: string;
 };
 
-type CliApiContext = {
-  readonly appData?: string;
+type CliApiDependencies = {
   readonly env: CliApiEnvironment;
   readonly fsModule: CliApiFsModule;
   readonly gotClient: CliApiGotClient;
+  readonly platform: NodeJS.Platform;
+  readonly registryUrl: string;
+};
+
+type CliRuntimeConfig = {
+  readonly appData: string | undefined;
+  readonly homeDirectory: string;
+  readonly moduleDirectory: string;
+  readonly configPath: string;
+};
+
+type CliApiContext = CliApiDependencies & CliRuntimeConfig;
+
+type ApplicationDirectoryInput = {
+  readonly appData: string | undefined;
+  readonly env: Pick<CliApiEnvironment, 'XDG_CONFIG_HOME'>;
+  readonly homeDirectory: string;
+  readonly platform: NodeJS.Platform;
+};
+
+type ConfigPathInput = {
+  readonly appData: string | undefined;
+  readonly env: Pick<CliApiEnvironment, 'NODE_ENV' | 'XDG_CONFIG_HOME'>;
+  readonly fsModule: CliApiFsModule;
   readonly homeDirectory: string;
   readonly moduleDirectory: string;
   readonly platform: NodeJS.Platform;
-  readonly registryUrl: string;
 };
 
 export type CliApi = {
@@ -86,8 +108,7 @@ const packageName = (value: string): PackageName => value as PackageName;
 const configFileName = 'config.json5';
 const legacyConfigFileName = 'hyper.json';
 
-const resolveCliApiContext = (options: CliApiOptions = {}): CliApiContext => ({
-  appData: options.appData ?? options.env?.APPDATA ?? process.env.APPDATA,
+const resolveDependencies = (options: CliApiOptions = {}): CliApiDependencies => ({
   env: options.env ?? {
     APPDATA: process.env.APPDATA,
     NODE_ENV: process.env.NODE_ENV,
@@ -95,47 +116,89 @@ const resolveCliApiContext = (options: CliApiOptions = {}): CliApiContext => ({
   },
   fsModule: options.fsModule ?? fs,
   gotClient: options.gotClient ?? got,
-  homeDirectory: options.homeDirectory ?? os.homedir(),
-  moduleDirectory: options.moduleDirectory ?? __dirname,
   platform: options.platform ?? process.platform,
   registryUrl: options.registryUrl ?? registryUrlModule()
 });
 
+const resolveRuntimeConfig = (dependencies: CliApiDependencies, options: CliApiOptions = {}): CliRuntimeConfig => {
+  const homeDirectory = options.homeDirectory ?? os.homedir();
+  const appData = options.appData ?? dependencies.env.APPDATA;
+  const moduleDirectory = options.moduleDirectory ?? __dirname;
+
+  return {
+    appData,
+    configPath: resolveConfigPath({
+      appData,
+      env: dependencies.env,
+      fsModule: dependencies.fsModule,
+      homeDirectory,
+      moduleDirectory,
+      platform: dependencies.platform
+    }),
+    homeDirectory,
+    moduleDirectory
+  };
+};
+
+const resolveCliApiContext = (options: CliApiOptions = {}): CliApiContext => {
+  const dependencies = resolveDependencies(options);
+  const runtimeConfig = resolveRuntimeConfig(dependencies, options);
+
+  return {
+    ...dependencies,
+    ...runtimeConfig
+  };
+};
+
 // If the user defines XDG_CONFIG_HOME they definitely want their config there,
 // otherwise use the home directory in linux/mac and userdata in windows.
-const resolveApplicationDirectory = (context: CliApiContext): string => {
-  const configuredXdgConfigHome = context.env.XDG_CONFIG_HOME;
+const resolveApplicationDirectory = ({appData, env, homeDirectory, platform}: ApplicationDirectoryInput): string => {
+  const configuredXdgConfigHome = env.XDG_CONFIG_HOME;
   if (configuredXdgConfigHome) {
     return path.join(configuredXdgConfigHome, 'Hyper');
   }
 
-  if (context.platform === 'win32') {
-    return path.join(context.appData ?? path.join(context.homeDirectory, 'AppData', 'Roaming'), 'Hyper');
+  if (platform === 'win32') {
+    return path.join(appData ?? path.join(homeDirectory, 'AppData', 'Roaming'), 'Hyper');
   }
 
-  return path.join(context.homeDirectory, '.config', 'Hyper');
+  return path.join(homeDirectory, '.config', 'Hyper');
 };
 
-const resolveConfigPath = (context: CliApiContext): string => {
-  const applicationDirectory = resolveApplicationDirectory(context);
-  const devConfigFileName = path.join(context.moduleDirectory, `../${configFileName}`);
-  const devLegacyConfigFileName = path.join(context.moduleDirectory, `../${legacyConfigFileName}`);
-  if (context.env.NODE_ENV !== 'production') {
-    if (context.fsModule.existsSync(devConfigFileName)) {
+const resolveConfigPath = ({
+  appData,
+  env,
+  fsModule,
+  homeDirectory,
+  moduleDirectory,
+  platform
+}: ConfigPathInput): string => {
+  const applicationDirectory = resolveApplicationDirectory({
+    appData,
+    env,
+    homeDirectory,
+    platform
+  });
+  const devConfigFileName = path.join(moduleDirectory, `../${configFileName}`);
+  const devLegacyConfigFileName = path.join(moduleDirectory, `../${legacyConfigFileName}`);
+
+  if (env.NODE_ENV !== 'production') {
+    if (fsModule.existsSync(devConfigFileName)) {
       return devConfigFileName;
     }
-    if (context.fsModule.existsSync(devLegacyConfigFileName)) {
+
+    if (fsModule.existsSync(devLegacyConfigFileName)) {
       return devLegacyConfigFileName;
     }
   }
 
   const configPath = path.join(applicationDirectory, configFileName);
-  if (context.fsModule.existsSync(configPath)) {
+  if (fsModule.existsSync(configPath)) {
     return configPath;
   }
 
   const legacyConfigPath = path.join(applicationDirectory, legacyConfigFileName);
-  if (context.fsModule.existsSync(legacyConfigPath)) {
+  if (fsModule.existsSync(legacyConfigPath)) {
     return legacyConfigPath;
   }
 
@@ -219,7 +282,7 @@ type InstallOptions = {
 
 export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   const context = resolveCliApiContext(options);
-  const configPath = resolveConfigPath(context);
+  const {configPath} = context;
 
   const getFileContents = memoize(() => {
     return context.fsModule.readFileSync(configPath, 'utf8');

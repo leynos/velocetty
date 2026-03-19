@@ -17,6 +17,7 @@ type GotError = {
 };
 
 type CliHarnessOptions = {
+  readonly appData?: string;
   readonly configData?: ConfigData;
   readonly env?: {
     APPDATA?: string;
@@ -29,6 +30,9 @@ type CliHarnessOptions = {
   readonly gotError?: GotError | null;
   readonly gotVersions?: unknown;
   readonly hasReadFileSyncOverride?: boolean;
+  readonly homeDirectory?: string;
+  readonly moduleDirectory?: string;
+  readonly platform?: NodeJS.Platform;
 };
 
 type CliHarnessState = {
@@ -97,7 +101,10 @@ const createCliHarness = (options: CliHarnessOptions = {}): CliHarness => {
         return Promise.resolve({body: {versions: state.gotVersions}});
       }
     },
-    moduleDirectory: CLI_DIRECTORY,
+    appData: options.appData,
+    homeDirectory: options.homeDirectory,
+    moduleDirectory: options.moduleDirectory ?? CLI_DIRECTORY,
+    platform: options.platform,
     registryUrl: 'https://registry.npmjs.org/'
   });
 
@@ -232,6 +239,58 @@ test.each([
       XDG_CONFIG_HOME: '/tmp/velocetty-xdg'
     },
     existingPaths: new Set([expectedPath])
+  });
+
+  expect(api.configPath).toBe(expectedPath);
+  expect(api.exists()).toBe(true);
+});
+
+test.each([
+  {label: 'prefers dev config.json5 when present', filename: 'config.json5'},
+  {label: 'falls back to dev legacy hyper.json when config.json5 is absent', filename: 'hyper.json'}
+])('configPath $label outside production uses the module-relative development file', ({filename}) => {
+  const moduleDirectory = '/tmp/velocetty-module/cli';
+  const expectedPath = path.join(moduleDirectory, '..', filename);
+  const {api} = createCliHarness({
+    env: {
+      NODE_ENV: 'development'
+    },
+    existingPaths: new Set([expectedPath]),
+    moduleDirectory
+  });
+
+  expect(api.configPath).toBe(expectedPath);
+  expect(api.exists()).toBe(true);
+});
+
+test('configPath uses APPDATA for Windows production resolution when provided', () => {
+  const appData = 'C:\\Users\\alice\\AppData\\Roaming';
+  const expectedPath = path.join(appData, 'Hyper', 'config.json5');
+  const {api} = createCliHarness({
+    appData,
+    env: {
+      NODE_ENV: 'production'
+    },
+    existingPaths: new Set([expectedPath]),
+    homeDirectory: 'C:\\Users\\alice',
+    platform: 'win32'
+  });
+
+  expect(api.configPath).toBe(expectedPath);
+  expect(api.exists()).toBe(true);
+});
+
+test('configPath falls back to the home-directory APPDATA path on Windows', () => {
+  const homeDirectory = 'C:\\Users\\bob';
+  const inferredAppData = path.join(homeDirectory, 'AppData', 'Roaming');
+  const expectedPath = path.join(inferredAppData, 'Hyper', 'hyper.json');
+  const {api} = createCliHarness({
+    env: {
+      NODE_ENV: 'production'
+    },
+    existingPaths: new Set([expectedPath]),
+    homeDirectory,
+    platform: 'win32'
   });
 
   expect(api.configPath).toBe(expectedPath);

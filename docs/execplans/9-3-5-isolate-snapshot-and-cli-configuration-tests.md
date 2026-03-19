@@ -389,6 +389,15 @@ The implementation is complete only when all of the following are true:
   all passed.
 - [x] (2026-03-14 16:50Z) Updated `docs/roadmap.md` to mark `9.3.5` done
   after the validation evidence was in hand.
+- [x] (2026-03-19 23:05Z) Addressed follow-up review comments by extending the
+  CLI tests to cover development-path and Windows-path config resolution plus
+  `existsOnNpm(...)` request options, narrowing the CLI resolver inputs, and
+  hardening snapshot bootstrap restoration for overlapping handles and
+  externally replaced loaders.
+- [x] (2026-03-19 23:14Z) Re-ran the focused unit files, a ten-run
+  `bun test --concurrent` hotspot loop, and the full `bun install`,
+  `make build`, `make check-fmt`, `make typecheck`, `make lint`, and
+  `make test` gates with fresh tee'd logs; all passed.
 
 ## Surprises & discoveries
 
@@ -439,6 +448,14 @@ The implementation is complete only when all of the following are true:
   Impact: the suite is simpler, faster, and no longer depends on Bun's
   process-global mock lifetime rules.
 
+- Observation: the initial snapshot restore guard was still too weak for
+  review-driven overlapping-bootstrap scenarios.
+  Evidence: an earlier handle could restore out of order, then the later
+  handle would restore back to the stale intermediate wrapper instead of the
+  real base loader.
+  Impact: the loader patch now rebuilds the active wrapper chain from the true
+  base load and leaves externally replaced loaders untouched.
+
 ## Decision log
 
 - Decision: keep this document as a draft and stop after planning.
@@ -466,6 +483,14 @@ The implementation is complete only when all of the following are true:
   existing consumers.
   Date/Author: 2026-03-14 / Codex.
 
+- Decision: keep the review follow-up scoped to clearer dependency surfaces and
+  stronger behavioural coverage instead of widening production semantics.
+  Rationale: the remaining review comments were about missing branches,
+  overlapping restore correctness, and readability. Splitting CLI dependency
+  resolution from runtime config and rebuilding snapshot wrapper chains closes
+  those gaps without changing the external APIs.
+  Date/Author: 2026-03-19 / Codex.
+
 ## Outcomes & retrospective
 
 Roadmap item `9.3.5` is complete. The snapshot bootstrap path now exposes a
@@ -474,3 +499,10 @@ behaviour path now runs through isolated `createCliApi(...)` instances, the
 developers guide documents the new concurrency-safe testing rules, and the
 focused `--concurrent` hotspot command passed ten consecutive verification
 runs after the required top-level gates succeeded.
+
+The review follow-up kept that completion intact while strengthening the proof
+surface. The CLI behaviour suite now locks in development-path and Windows-path
+config resolution along with the `AbortSignal`/timeout contract for npm
+registry checks, and the snapshot suite now proves both missing-global failures
+and restoration correctness when handles overlap or another caller replaces the
+loader after bootstrap.
