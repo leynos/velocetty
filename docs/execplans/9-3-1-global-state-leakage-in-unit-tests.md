@@ -183,6 +183,11 @@ inline mocks:
 - [x] (2026-03-07 00:42Z) Stage E complete: `bun install`, `make build`,
   `make check-fmt`, `make lint`, `make test`, and randomized seeded runs for
   `1337`, `20260306`, and `2444615283` all passed on the final tree.
+- [x] (2026-03-19 15:05Z) Post-completion verification closed follow-up review
+  comments in `cli/api.ts`, `lib/v8-snapshot-util.ts`, and the affected unit
+  tests/docs by removing stale CLI config caching, fixing injected-platform
+  path joins, restoring snapshot loader state when `setGlobals(...)` throws,
+  and hardening console spy cleanup.
 
 ## Surprises & discoveries
 

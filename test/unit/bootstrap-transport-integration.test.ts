@@ -411,42 +411,45 @@ describe('bootstrap transport event wiring', () => {
 
   test('registration failure preserves the original error when rollback cleanup also throws', () => {
     const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
-    resetTransportListenersFixture();
+    try {
+      resetTransportListenersFixture();
 
-    const registrationError = new Error('transport.on failed mid-registration');
-    const rollbackError = new Error('transport.off failed during rollback');
-    const failingCallNumber = 4;
-    let callCount = 0;
-    transport.on.mockImplementation((event: string, listener: Listener) => {
-      callCount += 1;
-      registerTransportListener(event, listener);
-      if (callCount === failingCallNumber) {
-        throw registrationError;
-      }
-      return transport;
-    });
-    transport.off.mockImplementationOnce((_event: string, _listener: Listener) => {
-      throw rollbackError;
-    });
+      const registrationError = new Error('transport.on failed mid-registration');
+      const rollbackError = new Error('transport.off failed during rollback');
+      const failingCallNumber = 4;
+      let callCount = 0;
+      transport.on.mockImplementation((event: string, listener: Listener) => {
+        callCount += 1;
+        registerTransportListener(event, listener);
+        if (callCount === failingCallNumber) {
+          throw registrationError;
+        }
+        return transport;
+      });
+      transport.off.mockImplementationOnce((_event: string, _listener: Listener) => {
+        throw rollbackError;
+      });
 
-    expect(() =>
-      registerTransportListeners({
-        actions: createBootstrapActions(),
-        plugins,
-        store,
-        transport
-      })
-    ).toThrow(registrationError);
+      expect(() =>
+        registerTransportListeners({
+          actions: createBootstrapActions(),
+          plugins,
+          store,
+          transport
+        })
+      ).toThrow(registrationError);
 
-    expect(transport.off.mock.calls).toHaveLength(failingCallNumber);
-    expect(errorSpy).toHaveBeenCalledWith(
-      'Renderer bootstrap cleanup failed during transport listener removal (rollback).',
-      rollbackError
-    );
-    expect(errorSpy).toHaveBeenCalledWith(
-      'Renderer transport listener registration rollback encountered 1 cleanup error(s).'
-    );
-    errorSpy.mockRestore();
+      expect(transport.off.mock.calls).toHaveLength(failingCallNumber);
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Renderer bootstrap cleanup failed during transport listener removal (rollback).',
+        rollbackError
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Renderer transport listener registration rollback encountered 1 cleanup error(s).'
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   test('ready dispatches init and font smoothing', () => {

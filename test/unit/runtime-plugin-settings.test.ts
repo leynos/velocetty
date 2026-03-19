@@ -68,14 +68,17 @@ const assertParseErrorBehaviour = <T>(
   expectedErrorMessage: string
 ): void => {
   const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
-  const {readFile, writeFile, getWrites} = createReadWritePair('{config:');
+  try {
+    const {readFile, writeFile, getWrites} = createReadWritePair('{config:');
 
-  const persisted = invoke({readFile, writeFile});
+    const persisted = invoke({readFile, writeFile});
 
-  expect(persisted).toEqual(expectedResult);
-  expect(getWrites()).toHaveLength(0);
-  expect(errorSpy).toHaveBeenCalledWith(expectedErrorMessage);
-  errorSpy.mockRestore();
+    expect(persisted).toEqual(expectedResult);
+    expect(getWrites()).toHaveLength(0);
+    expect(errorSpy).toHaveBeenCalledWith(expectedErrorMessage);
+  } finally {
+    errorSpy.mockRestore();
+  }
 };
 
 test('ensureRuntimePluginSettingsPersisted writes missing defaults to config.plugins namespace', () => {

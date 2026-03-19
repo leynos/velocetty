@@ -51,7 +51,18 @@ beforeEach(async () => {
   // Suppress the known React warning about styled-jsx's non-boolean `jsx`
   // attribute. The styled-jsx build transform strips this at build time, but
   // the test environment renders the raw `<style jsx={true}>` into the DOM.
-  consoleErrorSpy = spyOn(console, 'error').mockImplementation(() => {});
+  const originalConsoleError = console.error.bind(console);
+  consoleErrorSpy = spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+    const message = args
+      .map((arg) => (arg instanceof Error ? arg.message : typeof arg === 'string' ? arg : String(arg)))
+      .join(' ');
+
+    if (message.includes('styled-jsx') || message.includes('jsx')) {
+      return;
+    }
+
+    originalConsoleError(...(args as Parameters<typeof console.error>));
+  });
   decorationListener = null;
   getTabPropsMock.mockClear();
   unsubscribeDecorationUpdates.mockClear();

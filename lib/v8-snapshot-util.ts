@@ -140,7 +140,19 @@ export const bootstrapSnapshotRuntime = (
 
   loaderState.entries.push(loaderEntry);
   moduleLoader._load = rebuildSnapshotLoaderChain(moduleLoader, loaderState);
-  runtimeSnapshotResult.setGlobals(global, process, runtimeWindow, runtimeDocument, console, runtimeRequire);
+  try {
+    runtimeSnapshotResult.setGlobals(global, process, runtimeWindow, runtimeDocument, console, runtimeRequire);
+  } catch (error) {
+    loaderEntry.isActive = false;
+    const currentLoad = moduleLoader._load;
+    const restoredLoad = rebuildSnapshotLoaderChain(moduleLoader, loaderState);
+
+    if (isManagedSnapshotLoad(loaderState, currentLoad)) {
+      moduleLoader._load = restoredLoad;
+    }
+
+    throw error;
+  }
 
   return {
     restore() {

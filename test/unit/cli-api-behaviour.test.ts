@@ -265,7 +265,7 @@ test.each([
 
 test('configPath uses APPDATA for Windows production resolution when provided', () => {
   const appData = 'C:\\Users\\alice\\AppData\\Roaming';
-  const expectedPath = path.join(appData, 'Hyper', 'config.json5');
+  const expectedPath = path.win32.join(appData, 'Hyper', 'config.json5');
   const {api} = createCliHarness({
     appData,
     env: {
@@ -282,8 +282,8 @@ test('configPath uses APPDATA for Windows production resolution when provided', 
 
 test('configPath falls back to the home-directory APPDATA path on Windows', () => {
   const homeDirectory = 'C:\\Users\\bob';
-  const inferredAppData = path.join(homeDirectory, 'AppData', 'Roaming');
-  const expectedPath = path.join(inferredAppData, 'Hyper', 'hyper.json');
+  const inferredAppData = path.win32.join(homeDirectory, 'AppData', 'Roaming');
+  const expectedPath = path.win32.join(inferredAppData, 'Hyper', 'hyper.json');
   const {api} = createCliHarness({
     env: {
       NODE_ENV: 'production'

@@ -196,7 +196,7 @@ for run in $(seq 1 10); do
     test/unit/v8-snapshot-util.test.ts \
     test/unit/cli-api-behaviour.test.ts
   echo
-done | tee /tmp/concurrent-9-3-5-velocetty-$(git branch --show).out
+done | tee /tmp/concurrent-9-3-5-velocetty-$(git branch --show-current).out
 ```
 
 Today that probe already shows the roadmap's failure classes:
@@ -311,11 +311,11 @@ durable logs:
 
 ```bash
 set -o pipefail
-bun install | tee /tmp/bun-install-velocetty-$(git branch --show).out
-make build | tee /tmp/build-velocetty-$(git branch --show).out
-make check-fmt | tee /tmp/check-fmt-velocetty-$(git branch --show).out
-make lint | tee /tmp/lint-velocetty-$(git branch --show).out
-make test | tee /tmp/test-velocetty-$(git branch --show).out
+bun install | tee /tmp/bun-install-velocetty-$(git branch --show-current).out
+make build | tee /tmp/build-velocetty-$(git branch --show-current).out
+make check-fmt | tee /tmp/check-fmt-velocetty-$(git branch --show-current).out
+make lint | tee /tmp/lint-velocetty-$(git branch --show-current).out
+make test | tee /tmp/test-velocetty-$(git branch --show-current).out
 ```
 
 Then rerun the focused concurrency stress loop until there is strong evidence
@@ -329,7 +329,7 @@ for run in $(seq 1 10); do
     test/unit/v8-snapshot-util.test.ts \
     test/unit/cli-api-behaviour.test.ts
   echo
-done | tee /tmp/concurrent-9-3-5-verify-velocetty-$(git branch --show).out
+done | tee /tmp/concurrent-9-3-5-verify-velocetty-$(git branch --show-current).out
 ```
 
 If `cli/api.ts` changes in a way that could affect adjacent tests, also run the
@@ -369,7 +369,7 @@ The implementation is complete only when all of the following are true:
   team to inspect snapshot and CLI concurrency bleed separately.
 - [x] (2026-03-14 15:36Z) Reproduced the roadmap failure with repeated focused
   `bun test --concurrent` runs and captured the baseline log at
-  `/tmp/concurrent-9-3-5-velocetty-$(git branch --show)-probe.out`.
+  `/tmp/concurrent-9-3-5-velocetty-$(git branch --show-current)-probe.out`.
 - [x] (2026-03-14 15:39Z) Drafted this ExecPlan with explicit implementation,
   validation, and documentation requirements.
 - [x] (2026-03-14 16:07Z) Received explicit approval to begin implementation.

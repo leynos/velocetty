@@ -527,9 +527,10 @@ Scope notes:
     `test/unit/v8-snapshot-util.test.ts`.
   - [x] Remove config-path, plugin-config, and mocked module bleed in
     `test/unit/cli-api-behaviour.test.ts`.
-  - [x] Success criteria: targeted
+- [x] Success criteria: targeted
     `bun test --concurrent test/unit/v8-snapshot-util.test.ts test/unit/cli-api-behaviour.test.ts`
-    passes repeatedly with stable config and snapshot expectations.
+    passes 100 consecutive local runs with stable config and snapshot
+    expectations.
 - [ ] 9.3.6. Eliminate remaining long-lived file-scope module mocks in
   concurrency hotspots. Requires 9.3.2. See
   [velocetty-design.md](velocetty-design.md) §Testing.

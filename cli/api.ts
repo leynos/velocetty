@@ -17,6 +17,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 import got from 'got';
 import registryUrlModule from 'registry-url';
@@ -107,6 +108,10 @@ const packageName = (value: string): PackageName => value as PackageName;
 
 const configFileName = 'config.json5';
 const legacyConfigFileName = 'hyper.json';
+// @ts-expect-error TS1343: the typecheck config still uses CommonJS module mode.
+const currentModuleDirectory = path.dirname(fileURLToPath(import.meta.url));
+
+const getPlatformPath = (platform: NodeJS.Platform) => (platform === 'win32' ? path.win32 : path.posix);
 
 const resolveDependencies = (options: CliApiOptions = {}): CliApiDependencies => ({
   env: options.env ?? {
@@ -123,7 +128,7 @@ const resolveDependencies = (options: CliApiOptions = {}): CliApiDependencies =>
 const resolveRuntimeConfig = (dependencies: CliApiDependencies, options: CliApiOptions = {}): CliRuntimeConfig => {
   const homeDirectory = options.homeDirectory ?? os.homedir();
   const appData = options.appData ?? dependencies.env.APPDATA;
-  const moduleDirectory = options.moduleDirectory ?? __dirname;
+  const moduleDirectory = options.moduleDirectory ?? currentModuleDirectory;
 
   return {
     appData,
@@ -153,16 +158,17 @@ const resolveCliApiContext = (options: CliApiOptions = {}): CliApiContext => {
 // If the user defines XDG_CONFIG_HOME they definitely want their config there,
 // otherwise use the home directory in linux/mac and userdata in windows.
 const resolveApplicationDirectory = ({appData, env, homeDirectory, platform}: ApplicationDirectoryInput): string => {
+  const platformPath = getPlatformPath(platform);
   const configuredXdgConfigHome = env.XDG_CONFIG_HOME;
   if (configuredXdgConfigHome) {
-    return path.join(configuredXdgConfigHome, 'Hyper');
+    return platformPath.join(configuredXdgConfigHome, 'Hyper');
   }
 
   if (platform === 'win32') {
-    return path.join(appData ?? path.join(homeDirectory, 'AppData', 'Roaming'), 'Hyper');
+    return platformPath.join(appData ?? platformPath.join(homeDirectory, 'AppData', 'Roaming'), 'Hyper');
   }
 
-  return path.join(homeDirectory, '.config', 'Hyper');
+  return platformPath.join(homeDirectory, '.config', 'Hyper');
 };
 
 const resolveConfigPath = ({
@@ -173,14 +179,15 @@ const resolveConfigPath = ({
   moduleDirectory,
   platform
 }: ConfigPathInput): string => {
+  const platformPath = getPlatformPath(platform);
   const applicationDirectory = resolveApplicationDirectory({
     appData,
     env,
     homeDirectory,
     platform
   });
-  const devConfigFileName = path.join(moduleDirectory, `../${configFileName}`);
-  const devLegacyConfigFileName = path.join(moduleDirectory, `../${legacyConfigFileName}`);
+  const devConfigFileName = platformPath.join(moduleDirectory, '..', configFileName);
+  const devLegacyConfigFileName = platformPath.join(moduleDirectory, '..', legacyConfigFileName);
 
   if (env.NODE_ENV !== 'production') {
     if (fsModule.existsSync(devConfigFileName)) {
@@ -192,35 +199,18 @@ const resolveConfigPath = ({
     }
   }
 
-  const configPath = path.join(applicationDirectory, configFileName);
+  const configPath = platformPath.join(applicationDirectory, configFileName);
   if (fsModule.existsSync(configPath)) {
     return configPath;
   }
 
-  const legacyConfigPath = path.join(applicationDirectory, legacyConfigFileName);
+  const legacyConfigPath = platformPath.join(applicationDirectory, legacyConfigFileName);
   if (fsModule.existsSync(legacyConfigPath)) {
     return legacyConfigPath;
   }
 
   return configPath;
 };
-
-/**
- * We need to make sure the file reading and parsing is lazy so that failure to
- * statically analyze the hyper configuration isn't fatal for all kinds of
- * subcommands. We can use memoization to make reading and parsing lazy.
- */
-function memoize<T extends (...args: unknown[]) => unknown>(fn: T): T {
-  let hasResult = false;
-  let result: ReturnType<T> | undefined;
-  return ((...args: Parameters<T>): ReturnType<T> => {
-    if (!hasResult) {
-      result = fn(...args) as ReturnType<T>;
-      hasResult = true;
-    }
-    return result as ReturnType<T>;
-  }) as T;
-}
 
 const pluginNameSchema = z.string().refine((value) => value.trim().length > 0, {
   message: 'Plugin identifiers must not be empty or whitespace-only.'
@@ -284,17 +274,15 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   const context = resolveCliApiContext(options);
   const {configPath} = context;
 
-  const getFileContents = memoize(() => {
-    return context.fsModule.readFileSync(configPath, 'utf8');
-  });
+  const getFileContents = () => context.fsModule.readFileSync(configPath, 'utf8');
 
-  const getParsedFile = memoize(() => parseJson5StrictWithSchema(getFileContents(), cliConfigSchema));
+  const getParsedFile = () => parseJson5StrictWithSchema(getFileContents(), cliConfigSchema);
 
   const getPluginsByKey = (key: 'plugins' | 'localPlugins'): PluginSpecifier[] =>
     getParsedFile()[key].map((entry) => pluginSpecifier(entry));
 
-  const getPlugins = memoize(() => getPluginsByKey('plugins'));
-  const getLocalPlugins = memoize(() => getPluginsByKey('localPlugins'));
+  const getPlugins = () => getPluginsByKey('plugins');
+  const getLocalPlugins = () => getPluginsByKey('localPlugins');
 
   const exists = () => context.fsModule.existsSync(configPath);
 

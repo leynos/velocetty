@@ -298,6 +298,7 @@ test('restore removes stale wrappers when snapshot bootstraps overlap', () => {
   }
 
   firstHandle.restore();
+  expect(moduleContainer._load('virtual:first')).toEqual({native: 'virtual:first'});
   expect(moduleContainer._load('virtual:second')).toBe('custom:virtual:second');
   expect(moduleContainer._load('native:module')).toEqual({native: 'native:module'});
 
