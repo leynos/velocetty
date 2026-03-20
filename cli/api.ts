@@ -285,6 +285,20 @@ type InstallOptions = {
   readonly signal?: AbortSignal;
 };
 
+const installOptionsSchema = z
+  .object({
+    locally: z.boolean().optional(),
+    signal: z.instanceof(AbortSignal).optional()
+  })
+  .strict();
+
+const validatePluginInput = (value: unknown): PluginSpecifier => pluginSpecifier(z.string().parse(value));
+
+const validateOptionalSignalInput = (value: unknown): AbortSignal | undefined =>
+  value === undefined ? undefined : z.instanceof(AbortSignal).parse(value);
+
+const validateOptionalBooleanInput = (value: unknown): boolean | undefined => z.boolean().optional().parse(value);
+
 export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   const context = resolveCliApiContext(options);
   const {configPath} = context;
@@ -308,8 +322,10 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   const exists = () => context.fsModule.existsSync(configPath);
 
   const isInstalled = (plugin: PluginSpecifier, locally?: boolean) => {
-    const installedPlugins = locally ? getLocalPlugins() : getPlugins();
-    return installedPlugins.includes(plugin);
+    const validatedPlugin = validatePluginInput(plugin);
+    const validatedLocally = validateOptionalBooleanInput(locally);
+    const installedPlugins = validatedLocally ? getLocalPlugins() : getPlugins();
+    return installedPlugins.includes(validatedPlugin);
   };
 
   const save = (config: unknown) => {
@@ -317,12 +333,14 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   };
 
   const existsOnNpm = (plugin: PluginSpecifier, signal?: AbortSignal) => {
-    const requestUrl = resolveRegistryPackageUrl(context.registryUrl, getPackageName(plugin));
+    const validatedPlugin = validatePluginInput(plugin);
+    const validatedSignal = validateOptionalSignalInput(signal);
+    const requestUrl = resolveRegistryPackageUrl(context.registryUrl, getPackageName(validatedPlugin));
     return context.gotClient
       .get<unknown>(requestUrl, {
         timeout: {request: 10000},
         responseType: 'json',
-        signal
+        signal: validatedSignal
       })
       .then((res) => {
         const validated = npmRegistryResponseSchema.safeParse(res.body);
@@ -334,32 +352,34 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   };
 
   const install = (plugin: PluginSpecifier, options: InstallOptions = {}) => {
-    const {locally = false, signal} = options;
-    return existsOnNpm(plugin, signal)
-      .catch((err: unknown) => handleNpmCheckError(err, plugin))
+    const validatedPlugin = validatePluginInput(plugin);
+    const {locally = false, signal} = installOptionsSchema.parse(options);
+    return existsOnNpm(validatedPlugin, signal)
+      .catch((err: unknown) => handleNpmCheckError(err, validatedPlugin))
       .then(() => {
         const installedPlugins = locally ? getLocalPlugins() : getPlugins();
-        if (installedPlugins.includes(plugin)) {
-          return Promise.reject(`${plugin} is already installed`);
+        if (installedPlugins.includes(validatedPlugin)) {
+          return Promise.reject(`${validatedPlugin} is already installed`);
         }
 
         const config = getParsedFile();
-        config[locally ? 'localPlugins' : 'plugins'] = [...installedPlugins, plugin];
+        config[locally ? 'localPlugins' : 'plugins'] = [...installedPlugins, validatedPlugin];
         save(config);
       });
   };
 
   const uninstall = async (plugin: PluginSpecifier) => {
+    const validatedPlugin = validatePluginInput(plugin);
     const config = getParsedFile();
-    const hasPlugin = config.plugins.some((installedPlugin) => installedPlugin === plugin);
-    const hasLocalPlugin = config.localPlugins.some((installedPlugin) => installedPlugin === plugin);
+    const hasPlugin = config.plugins.some((installedPlugin) => installedPlugin === validatedPlugin);
+    const hasLocalPlugin = config.localPlugins.some((installedPlugin) => installedPlugin === validatedPlugin);
 
     if (!hasPlugin && !hasLocalPlugin) {
-      throw new Error(`${plugin} is not installed`);
+      throw new Error(`${validatedPlugin} is not installed`);
     }
 
-    config.plugins = config.plugins.filter((installedPlugin) => installedPlugin !== plugin);
-    config.localPlugins = config.localPlugins.filter((installedPlugin) => installedPlugin !== plugin);
+    config.plugins = config.plugins.filter((installedPlugin) => installedPlugin !== validatedPlugin);
+    config.localPlugins = config.localPlugins.filter((installedPlugin) => installedPlugin !== validatedPlugin);
     save(config);
   };
 
