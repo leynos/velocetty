@@ -265,6 +265,15 @@ const handleNpmCheckError = (err: unknown, plugin: PluginSpecifier): Promise<nev
   return Promise.reject(`${errorMessage}\nPlugin check failed. Check your internet connection or retry later.`);
 };
 
+const resolveRegistryPackageUrl = (registryUrl: string, packageNameValue: PackageName): string => {
+  const normalizedBase = new URL(registryUrl);
+  if (!normalizedBase.pathname.endsWith('/')) {
+    normalizedBase.pathname = `${normalizedBase.pathname}/`;
+  }
+
+  return new URL(packageNameValue.toLowerCase(), normalizedBase).toString();
+};
+
 type InstallOptions = {
   readonly locally?: boolean;
   readonly signal?: AbortSignal;
@@ -296,9 +305,9 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   };
 
   const existsOnNpm = (plugin: PluginSpecifier, signal?: AbortSignal) => {
-    const name = getPackageName(plugin);
+    const requestUrl = resolveRegistryPackageUrl(context.registryUrl, getPackageName(plugin));
     return context.gotClient
-      .get<unknown>(context.registryUrl + name.toLowerCase(), {
+      .get<unknown>(requestUrl, {
         timeout: {request: 10000},
         responseType: 'json',
         signal
@@ -329,12 +338,16 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   };
 
   const uninstall = async (plugin: PluginSpecifier) => {
-    if (!isInstalled(plugin)) {
+    const config = getParsedFile();
+    const hasPlugin = config.plugins.some((installedPlugin) => installedPlugin === plugin);
+    const hasLocalPlugin = config.localPlugins.some((installedPlugin) => installedPlugin === plugin);
+
+    if (!hasPlugin && !hasLocalPlugin) {
       throw new Error(`${plugin} is not installed`);
     }
 
-    const config = getParsedFile();
     config.plugins = getPlugins().filter((installedPlugin) => installedPlugin !== plugin);
+    config.localPlugins = getLocalPlugins().filter((installedPlugin) => installedPlugin !== plugin);
     save(config);
   };
 

@@ -212,6 +212,23 @@ test('existsOnNpm() rejects malformed responses that do not include versions', a
   });
 });
 
+test('existsOnNpm() joins registry URLs with path segments safely', async () => {
+  const {state} = createCliHarness();
+  const api = createCliApi({
+    env: {
+      NODE_ENV: 'test'
+    },
+    fsModule: buildFsModule(state),
+    gotClient: buildGotClient(state),
+    moduleDirectory: CLI_DIRECTORY,
+    registryUrl: 'https://registry.npmjs.org/custom/segment'
+  });
+
+  await api.existsOnNpm('plugin-alpha');
+
+  expect(state.requestedUrls).toEqual(['https://registry.npmjs.org/custom/segment/plugin-alpha']);
+});
+
 test('uninstall() removes installed plugins and rejects unknown plugins', async () => {
   const installedPluginHarness = createCliHarness({
     configData: {plugins: ['plugin-a', 'plugin-b'], localPlugins: []}
@@ -227,6 +244,19 @@ test('uninstall() removes installed plugins and rejects unknown plugins', async 
     configData: {plugins: ['plugin-a', 'plugin-b'], localPlugins: []}
   });
   await expect(unknownPluginHarness.api.uninstall('plugin-z')).rejects.toThrow('plugin-z is not installed');
+});
+
+test('uninstall() removes locally installed plugins', async () => {
+  const installedPluginHarness = createCliHarness({
+    configData: {plugins: ['plugin-a'], localPlugins: ['plugin-local']}
+  });
+
+  await installedPluginHarness.api.uninstall('plugin-local');
+
+  expect(installedPluginHarness.state.savedConfigs.at(-1)).toEqual({
+    plugins: ['plugin-a'],
+    localPlugins: []
+  });
 });
 
 test('exists(), list(), and isInstalled() handle empty or malformed plugin arrays', () => {
