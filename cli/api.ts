@@ -186,6 +186,14 @@ const resolveCliApiContext = (options: CliApiOptions = {}): CliApiContext => {
   };
 };
 
+const normalizeConfiguredAppData = (appData: string | undefined): string | undefined => {
+  if (typeof appData !== 'string') {
+    return undefined;
+  }
+
+  return appData.trim() ? appData : undefined;
+};
+
 // If the user defines XDG_CONFIG_HOME they definitely want their config there,
 // otherwise use the home directory in linux/mac and userdata in windows.
 const resolveApplicationDirectory = ({appData, env, homeDirectory, platform}: ApplicationDirectoryInput): string => {
@@ -196,7 +204,10 @@ const resolveApplicationDirectory = ({appData, env, homeDirectory, platform}: Ap
   }
 
   if (platform === 'win32') {
-    return platformPath.join(appData ?? platformPath.join(homeDirectory, 'AppData', 'Roaming'), 'Hyper');
+    return platformPath.join(
+      normalizeConfiguredAppData(appData) ?? platformPath.join(homeDirectory, 'AppData', 'Roaming'),
+      'Hyper'
+    );
   }
 
   return platformPath.join(homeDirectory, '.config', 'Hyper');
@@ -247,14 +258,21 @@ const pluginNameSchema = z.string().refine((value) => value.trim().length > 0, {
   message: 'Plugin identifiers must not be empty or whitespace-only.'
 });
 
-const cliConfigSchema = z
+const cliConfigReadSchema = z
   .object({
     plugins: z.preprocess((value) => (Array.isArray(value) ? value : []), z.array(pluginNameSchema)).default([]),
     localPlugins: z.preprocess((value) => (Array.isArray(value) ? value : []), z.array(pluginNameSchema)).default([])
   })
   .passthrough();
 
-type ParsedCliConfig = z.infer<typeof cliConfigSchema>;
+const cliConfigSchema = z
+  .object({
+    plugins: z.array(pluginNameSchema).default([]),
+    localPlugins: z.array(pluginNameSchema).default([])
+  })
+  .passthrough();
+
+type ParsedCliConfig = z.infer<typeof cliConfigReadSchema>;
 
 type NormalizedCliConfig = Omit<ParsedCliConfig, 'plugins' | 'localPlugins'> & {
   plugins: PluginSpecifier[];
@@ -343,14 +361,19 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
 
   const getFileContents = () => context.fsModule.readFileSync(configPath, 'utf8');
 
-  const getParsedFile = (): NormalizedCliConfig => {
-    const config = parseJson5StrictWithSchema(getFileContents(), cliConfigSchema);
+  const normalizeParsedConfig = (config: ParsedCliConfig): NormalizedCliConfig => {
     return {
       ...config,
       plugins: config.plugins.map((entry) => pluginSpecifier(entry)),
       localPlugins: config.localPlugins.map((entry) => pluginSpecifier(entry))
     };
   };
+
+  const getParsedFile = (): NormalizedCliConfig =>
+    normalizeParsedConfig(parseJson5StrictWithSchema(getFileContents(), cliConfigReadSchema));
+
+  const getValidatedMutableFile = (): NormalizedCliConfig =>
+    normalizeParsedConfig(parseJson5StrictWithSchema(getFileContents(), cliConfigSchema));
 
   const getPluginsByKey = (key: 'plugins' | 'localPlugins'): PluginSpecifier[] => getParsedFile()[key];
 
@@ -402,7 +425,7 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
         existsOnNpm(validatedPlugin, signal)
           .catch((err: unknown) => handleNpmCheckError(err, validatedPlugin))
           .then(() => {
-            const config = getParsedFile();
+            const config = getValidatedMutableFile();
             const pluginKey = locally ? 'localPlugins' : 'plugins';
             const installedPlugins = config[pluginKey];
             if (installedPlugins.includes(validatedPlugin)) {
@@ -417,7 +440,7 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
 
   const uninstall = async (plugin: PluginSpecifier) => {
     const validatedPlugin = validatePluginInput(plugin);
-    const config = getParsedFile();
+    const config = getValidatedMutableFile();
     const hasPlugin = config.plugins.some((installedPlugin) => installedPlugin === validatedPlugin);
     const hasLocalPlugin = config.localPlugins.some((installedPlugin) => installedPlugin === validatedPlugin);
 

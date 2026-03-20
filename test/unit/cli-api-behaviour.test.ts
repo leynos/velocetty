@@ -221,6 +221,24 @@ test('install() validates runtime option inputs', async () => {
   await expect(api.install('plugin-alpha', {signal: 'not-a-signal' as never})).rejects.toThrow();
 });
 
+test('install() rejects malformed persisted plugin arrays before saving', async () => {
+  const {api, state} = createCliHarness({
+    configData: {plugins: {bad: true}, localPlugins: []}
+  });
+
+  await expect(api.install('plugin-alpha')).rejects.toThrow();
+  expect(state.savedConfigs).toEqual([]);
+});
+
+test('uninstall() rejects malformed persisted plugin arrays before saving', async () => {
+  const {api, state} = createCliHarness({
+    configData: {plugins: [], localPlugins: {bad: true}}
+  });
+
+  await expect(api.uninstall('plugin-alpha')).rejects.toThrow();
+  expect(state.savedConfigs).toEqual([]);
+});
+
 test('existsOnNpm() rejects malformed responses that do not include versions', async () => {
   const {api} = createCliHarness({gotVersions: undefined});
 
@@ -347,6 +365,24 @@ test('configPath falls back to the home-directory APPDATA path on Windows', () =
   const inferredAppData = path.win32.join(homeDirectory, 'AppData', 'Roaming');
   const expectedPath = path.win32.join(inferredAppData, 'Hyper', 'hyper.json');
   const {api} = createCliHarness({
+    env: {
+      NODE_ENV: 'production'
+    },
+    existingPaths: new Set([expectedPath]),
+    homeDirectory,
+    platform: 'win32'
+  });
+
+  expect(api.configPath).toBe(expectedPath);
+  expect(api.exists()).toBe(true);
+});
+
+test('configPath treats blank APPDATA as unset on Windows', () => {
+  const homeDirectory = 'C:\\Users\\carol';
+  const inferredAppData = path.win32.join(homeDirectory, 'AppData', 'Roaming');
+  const expectedPath = path.win32.join(inferredAppData, 'Hyper', 'config.json5');
+  const {api} = createCliHarness({
+    appData: '   ',
     env: {
       NODE_ENV: 'production'
     },
