@@ -327,7 +327,7 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
       .catch((err: unknown) => handleNpmCheckError(err, plugin))
       .then(() => {
         const installedPlugins = locally ? getLocalPlugins() : getPlugins();
-        if (isInstalled(plugin, locally)) {
+        if (installedPlugins.includes(plugin)) {
           return Promise.reject(`${plugin} is already installed`);
         }
 
@@ -346,8 +346,8 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
       throw new Error(`${plugin} is not installed`);
     }
 
-    config.plugins = getPlugins().filter((installedPlugin) => installedPlugin !== plugin);
-    config.localPlugins = getLocalPlugins().filter((installedPlugin) => installedPlugin !== plugin);
+    config.plugins = config.plugins.filter((installedPlugin) => installedPlugin !== plugin);
+    config.localPlugins = config.localPlugins.filter((installedPlugin) => installedPlugin !== plugin);
     save(config);
   };
 

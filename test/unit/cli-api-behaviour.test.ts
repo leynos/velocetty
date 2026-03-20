@@ -41,6 +41,7 @@ type CliHarnessOptions = {
   readonly homeDirectory?: string;
   readonly moduleDirectory?: string;
   readonly platform?: NodeJS.Platform;
+  readonly registryUrl?: string;
 };
 
 type CliHarnessState = {
@@ -122,7 +123,7 @@ const createCliHarness = (options: CliHarnessOptions = {}): CliHarness => {
     homeDirectory: options.homeDirectory,
     moduleDirectory: options.moduleDirectory ?? CLI_DIRECTORY,
     platform: options.platform,
-    registryUrl: 'https://registry.npmjs.org/'
+    registryUrl: options.registryUrl ?? 'https://registry.npmjs.org/'
   });
 
   return {api, state};
@@ -213,14 +214,7 @@ test('existsOnNpm() rejects malformed responses that do not include versions', a
 });
 
 test('existsOnNpm() joins registry URLs with path segments safely', async () => {
-  const {state} = createCliHarness();
-  const api = createCliApi({
-    env: {
-      NODE_ENV: 'test'
-    },
-    fsModule: buildFsModule(state),
-    gotClient: buildGotClient(state),
-    moduleDirectory: CLI_DIRECTORY,
+  const {api, state} = createCliHarness({
     registryUrl: 'https://registry.npmjs.org/custom/segment'
   });
 
