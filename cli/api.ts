@@ -108,7 +108,6 @@ const packageName = (value: string): PackageName => value as PackageName;
 
 const configFileName = 'config.json5';
 const legacyConfigFileName = 'hyper.json';
-// @ts-expect-error TS1343: the typecheck config still uses CommonJS module mode.
 const currentModuleDirectory = path.dirname(fileURLToPath(import.meta.url));
 
 const getPlatformPath = (platform: NodeJS.Platform) => (platform === 'win32' ? path.win32 : path.posix);

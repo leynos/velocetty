@@ -3,11 +3,19 @@
   "compilerOptions": {
     "allowJs": false,
     "declarationDir": "../dist/tmp/appdts/",
+    "exactOptionalPropertyTypes": false,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "noImplicitOverride": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": false,
     "outDir": "../dist/app",
     "paths": {
       "@shared/*": ["../dist/shared/*"]
     },
-    "noImplicitAny": false
+    "noImplicitAny": false,
+    "useUnknownInCatchVariables": false,
+    "verbatimModuleSyntax": false
   },
   "include": [
     "./**/*",

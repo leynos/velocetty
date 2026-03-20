@@ -3,6 +3,7 @@
   "compilerOptions": {
     "composite": false,
     "declaration": true,
+    "noPropertyAccessFromIndexSignature": false,
     "outDir": "../dist/shared",
     "rootDir": "./src",
     "tsBuildInfoFile": "../dist/shared/tsconfig.tsbuildinfo"

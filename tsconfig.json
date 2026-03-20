@@ -1,8 +1,15 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    "exactOptionalPropertyTypes": false,
+    "noImplicitOverride": false,
     "outDir": "./dist/",
-    "noImplicitAny": true
+    "noImplicitAny": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": false,
+    "strict": false,
+    "useUnknownInCatchVariables": false,
+    "verbatimModuleSyntax": false
   },
   "include": ["./app/", "./lib/", "./cli/", "./typings/", "./shared/src/"],
   "references": [

@@ -3,7 +3,13 @@
   "compilerOptions": {
     "composite": false,
     "noEmit": true,
-    "strict": false
+    "exactOptionalPropertyTypes": false,
+    "noImplicitOverride": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": false,
+    "strict": false,
+    "useUnknownInCatchVariables": false,
+    "verbatimModuleSyntax": false
   },
   "include": ["./app/", "./lib/", "./cli/", "./typings/", "./shared/src/"],
   "exclude": ["./dist/", "./node_modules/", "./target/"]
