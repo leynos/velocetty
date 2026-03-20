@@ -130,7 +130,7 @@ export const goldenPathPluginManifest: RuntimePluginManifest = {
         const prefix =
           typeof settings['tabPrefix'] === 'string' && settings['tabPrefix'].trim().length > 0
             ? settings['tabPrefix']
-            : 'GP';
+            : goldenPathSettingsDefaults.tabPrefix;
         const baseTitle = typeof context.title === 'string' && context.title.length > 0 ? context.title : 'Shell';
         const activitySuffix = context.hasActivity ? '!' : '';
         return {

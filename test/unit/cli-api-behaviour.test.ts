@@ -208,17 +208,17 @@ test('install() maps npm and transport errors to stable user-facing messages', a
 test('public plugin methods validate runtime plugin inputs', async () => {
   const {api} = createCliHarness();
 
-  expect(() => api.existsOnNpm('   ' as never)).toThrow('Plugin specifier cannot be empty');
-  expect(() => api.install('   ' as never)).toThrow('Plugin specifier cannot be empty');
+  await expect(api.existsOnNpm('   ' as never)).rejects.toThrow('Plugin specifier cannot be empty');
+  await expect(api.install('   ' as never)).rejects.toThrow('Plugin specifier cannot be empty');
   expect(() => api.isInstalled('   ' as never)).toThrow('Plugin specifier cannot be empty');
   await expect(api.uninstall('   ' as never)).rejects.toThrow('Plugin specifier cannot be empty');
 });
 
-test('install() validates runtime option inputs', () => {
+test('install() validates runtime option inputs', async () => {
   const {api} = createCliHarness();
 
-  expect(() => api.install('plugin-alpha', {locally: 'yes' as never})).toThrow();
-  expect(() => api.install('plugin-alpha', {signal: 'not-a-signal' as never})).toThrow();
+  await expect(api.install('plugin-alpha', {locally: 'yes' as never})).rejects.toThrow();
+  await expect(api.install('plugin-alpha', {signal: 'not-a-signal' as never})).rejects.toThrow();
 });
 
 test('existsOnNpm() rejects malformed responses that do not include versions', async () => {

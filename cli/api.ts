@@ -84,13 +84,45 @@ type ConfigPathInput = {
   readonly platform: NodeJS.Platform;
 };
 
+/**
+ * Public CLI helper surface for inspecting and mutating Hyper plugin config.
+ */
 export type CliApi = {
   readonly configPath: string;
+  /** Returns `true` when the resolved config file exists on disk. */
   exists: () => boolean;
+  /**
+   * Checks whether a plugin exists on npm.
+   *
+   * @param plugin Plugin specifier validated at runtime.
+   * @param signal Optional `AbortSignal` used to cancel the registry request.
+   * @returns A promise that resolves with the raw registry response body wrapper.
+   */
   existsOnNpm: (plugin: PluginSpecifier, signal?: AbortSignal) => Promise<unknown>;
+  /**
+   * Installs a plugin entry into the persisted config.
+   *
+   * @param plugin Plugin specifier validated at runtime.
+   * @param options Optional install controls such as local install mode or request cancellation.
+   * @returns A promise that resolves after persisting the updated config.
+   */
   install: (plugin: PluginSpecifier, options?: InstallOptions) => Promise<void>;
+  /**
+   * Reports whether a plugin is already configured.
+   *
+   * @param plugin Plugin specifier validated at runtime.
+   * @param locally When `true`, checks `localPlugins` instead of `plugins`.
+   * @returns `true` when the plugin is present in the selected config list.
+   */
   isInstalled: (plugin: PluginSpecifier, locally?: boolean) => boolean;
+  /** Returns newline-delimited configured plugins or `false` when the list is empty. */
   list: () => string | false;
+  /**
+   * Removes a plugin entry from the persisted config.
+   *
+   * @param plugin Plugin specifier validated at runtime.
+   * @returns A promise that resolves after persisting the updated config.
+   */
   uninstall: (plugin: PluginSpecifier) => Promise<void>;
 };
 
@@ -299,6 +331,12 @@ const validateOptionalSignalInput = (value: unknown): AbortSignal | undefined =>
 
 const validateOptionalBooleanInput = (value: unknown): boolean | undefined => z.boolean().optional().parse(value);
 
+/**
+ * Creates a CLI API instance bound to the provided filesystem, environment, and registry dependencies.
+ *
+ * @param options Optional dependency overrides for filesystem, environment, platform, and npm registry access.
+ * @returns A `CliApi` instance that reads and writes the resolved Hyper config path.
+ */
 export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   const context = resolveCliApiContext(options);
   const {configPath} = context;
@@ -333,39 +371,48 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   };
 
   const existsOnNpm = (plugin: PluginSpecifier, signal?: AbortSignal) => {
-    const validatedPlugin = validatePluginInput(plugin);
-    const validatedSignal = validateOptionalSignalInput(signal);
-    const requestUrl = resolveRegistryPackageUrl(context.registryUrl, getPackageName(validatedPlugin));
-    return context.gotClient
-      .get<unknown>(requestUrl, {
-        timeout: {request: 10000},
-        responseType: 'json',
-        signal: validatedSignal
-      })
-      .then((res) => {
-        const validated = npmRegistryResponseSchema.safeParse(res.body);
-        if (!validated.success) {
-          return Promise.reject(res);
-        }
-        return res;
-      });
+    return Promise.resolve().then(() => {
+      const validatedPlugin = validatePluginInput(plugin);
+      const validatedSignal = validateOptionalSignalInput(signal);
+      const requestUrl = resolveRegistryPackageUrl(context.registryUrl, getPackageName(validatedPlugin));
+      return context.gotClient
+        .get<unknown>(requestUrl, {
+          timeout: {request: 10000},
+          responseType: 'json',
+          signal: validatedSignal
+        })
+        .then((res) => {
+          const validated = npmRegistryResponseSchema.safeParse(res.body);
+          if (!validated.success) {
+            return Promise.reject(res);
+          }
+          return res;
+        });
+    });
   };
 
   const install = (plugin: PluginSpecifier, options: InstallOptions = {}) => {
-    const validatedPlugin = validatePluginInput(plugin);
-    const {locally = false, signal} = installOptionsSchema.parse(options);
-    return existsOnNpm(validatedPlugin, signal)
-      .catch((err: unknown) => handleNpmCheckError(err, validatedPlugin))
+    return Promise.resolve()
       .then(() => {
-        const installedPlugins = locally ? getLocalPlugins() : getPlugins();
-        if (installedPlugins.includes(validatedPlugin)) {
-          return Promise.reject(`${validatedPlugin} is already installed`);
-        }
+        const validatedPlugin = validatePluginInput(plugin);
+        const {locally = false, signal} = installOptionsSchema.parse(options);
+        return {locally, signal, validatedPlugin};
+      })
+      .then(({locally, signal, validatedPlugin}) =>
+        existsOnNpm(validatedPlugin, signal)
+          .catch((err: unknown) => handleNpmCheckError(err, validatedPlugin))
+          .then(() => {
+            const config = getParsedFile();
+            const pluginKey = locally ? 'localPlugins' : 'plugins';
+            const installedPlugins = config[pluginKey];
+            if (installedPlugins.includes(validatedPlugin)) {
+              return Promise.reject(`${validatedPlugin} is already installed`);
+            }
 
-        const config = getParsedFile();
-        config[locally ? 'localPlugins' : 'plugins'] = [...installedPlugins, validatedPlugin];
-        save(config);
-      });
+            config[pluginKey] = [...installedPlugins, validatedPlugin];
+            save(config);
+          })
+      );
   };
 
   const uninstall = async (plugin: PluginSpecifier) => {
@@ -396,6 +443,47 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
 
 const defaultCliApi = createCliApi();
 
+/** Resolved Hyper config path for the default CLI API instance. */
 export const configPath = defaultCliApi.configPath;
-export const {exists, existsOnNpm, install, isInstalled, list, uninstall} = defaultCliApi;
+
+/** Returns `true` when the default CLI config file exists on disk. */
+export const exists = defaultCliApi.exists;
+
+/**
+ * Checks whether a plugin exists on npm for the default CLI API instance.
+ *
+ * @param plugin Plugin specifier validated at runtime.
+ * @param signal Optional `AbortSignal` used to cancel the registry request.
+ * @returns A promise that resolves with the raw registry response body wrapper.
+ */
+export const existsOnNpm = defaultCliApi.existsOnNpm;
+
+/**
+ * Installs a plugin entry into the persisted config for the default CLI API instance.
+ *
+ * @param plugin Plugin specifier validated at runtime.
+ * @param options Optional install controls such as local install mode or request cancellation.
+ * @returns A promise that resolves after persisting the updated config.
+ */
+export const install = defaultCliApi.install;
+
+/**
+ * Reports whether a plugin is already configured for the default CLI API instance.
+ *
+ * @param plugin Plugin specifier validated at runtime.
+ * @param locally When `true`, checks `localPlugins` instead of `plugins`.
+ * @returns `true` when the plugin is present in the selected config list.
+ */
+export const isInstalled = defaultCliApi.isInstalled;
+
+/** Returns newline-delimited configured plugins or `false` when the list is empty. */
+export const list = defaultCliApi.list;
+
+/**
+ * Removes a plugin entry from the persisted config for the default CLI API instance.
+ *
+ * @param plugin Plugin specifier validated at runtime.
+ * @returns A promise that resolves after persisting the updated config.
+ */
+export const uninstall = defaultCliApi.uninstall;
 export {pluginSpecifier};
