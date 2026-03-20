@@ -222,6 +222,13 @@ const cliConfigSchema = z
   })
   .passthrough();
 
+type ParsedCliConfig = z.infer<typeof cliConfigSchema>;
+
+type NormalizedCliConfig = Omit<ParsedCliConfig, 'plugins' | 'localPlugins'> & {
+  plugins: PluginSpecifier[];
+  localPlugins: PluginSpecifier[];
+};
+
 function getPackageName(plugin: PluginSpecifier): PackageName {
   const isScoped = plugin[0] === '@';
   const nameWithoutVersion = plugin.split('#')[0];
@@ -284,10 +291,16 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
 
   const getFileContents = () => context.fsModule.readFileSync(configPath, 'utf8');
 
-  const getParsedFile = () => parseJson5StrictWithSchema(getFileContents(), cliConfigSchema);
+  const getParsedFile = (): NormalizedCliConfig => {
+    const config = parseJson5StrictWithSchema(getFileContents(), cliConfigSchema);
+    return {
+      ...config,
+      plugins: config.plugins.map((entry) => pluginSpecifier(entry)),
+      localPlugins: config.localPlugins.map((entry) => pluginSpecifier(entry))
+    };
+  };
 
-  const getPluginsByKey = (key: 'plugins' | 'localPlugins'): PluginSpecifier[] =>
-    getParsedFile()[key].map((entry) => pluginSpecifier(entry));
+  const getPluginsByKey = (key: 'plugins' | 'localPlugins'): PluginSpecifier[] => getParsedFile()[key];
 
   const getPlugins = () => getPluginsByKey('plugins');
   const getLocalPlugins = () => getPluginsByKey('localPlugins');
