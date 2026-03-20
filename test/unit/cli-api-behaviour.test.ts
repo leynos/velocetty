@@ -3,6 +3,7 @@ import {expect, test} from 'bun:test';
 
 import JSON5 from 'json5';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 import {createCliApi, type CliApi} from '../../cli/api';
 
@@ -63,7 +64,8 @@ type CliHarness = {
   state: CliHarnessState;
 };
 
-const CLI_DIRECTORY = path.join(process.cwd(), 'cli');
+const TEST_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+const CLI_DIRECTORY = path.join(TEST_DIRECTORY, '..', '..', 'cli');
 
 const buildFsModule = (state: CliHarnessState) => ({
   existsSync: (candidatePath: unknown) => {
@@ -131,27 +133,37 @@ const createCliHarness = (options: CliHarnessOptions = {}): CliHarness => {
 
 test('list() and isInstalled() read configured plugin state', () => {
   const {api} = createCliHarness({
-    configData: {plugins: ['plugin-alpha', 'plugin-beta'], localPlugins: ['local-alpha']}
+    configData: {
+      plugins: ['plugin-alpha', '@scope/plugin@1.0.0', 'plugin#tag'],
+      localPlugins: ['local-alpha', '@scope/local-plugin@2.0.0', 'local-plugin#tag']
+    }
   });
 
-  expect(api.list()).toBe('plugin-alpha\nplugin-beta');
-  expect(api.isInstalled('plugin-beta')).toBe(true);
+  expect(api.list()).toBe('plugin-alpha\n@scope/plugin\nplugin');
+  expect(api.isInstalled('@scope/plugin')).toBe(true);
+  expect(api.isInstalled('plugin')).toBe(true);
   expect(api.isInstalled('local-alpha', true)).toBe(true);
+  expect(api.isInstalled('@scope/local-plugin', true)).toBe(true);
+  expect(api.isInstalled('local-plugin', true)).toBe(true);
 });
 
 test('list() accepts JSON5 plugin config with comments and trailing commas', () => {
   const {api} = createCliHarness({
     fsReadFileSyncValue: `{
       // plugin sources
-      plugins: ['plugin-alpha',],
-      localPlugins: ['local-alpha',],
+      plugins: ['plugin-alpha', '@scope/plugin@1.0.0', 'plugin#tag',],
+      localPlugins: ['local-alpha', '@scope/local-plugin@2.0.0', 'local-plugin#tag',],
     }`,
     hasReadFileSyncOverride: true
   });
 
-  expect(api.list()).toBe('plugin-alpha');
+  expect(api.list()).toBe('plugin-alpha\n@scope/plugin\nplugin');
   expect(api.isInstalled('plugin-alpha')).toBe(true);
+  expect(api.isInstalled('@scope/plugin')).toBe(true);
+  expect(api.isInstalled('plugin')).toBe(true);
   expect(api.isInstalled('local-alpha', true)).toBe(true);
+  expect(api.isInstalled('@scope/local-plugin', true)).toBe(true);
+  expect(api.isInstalled('local-plugin', true)).toBe(true);
 });
 
 test('install() persists plugin entries from npm checks', async () => {

@@ -12,8 +12,6 @@
  *   `shared/src/config/json5-config.ts` (`parseJson5StrictWithSchema`,
  *   `stringifyJson5`).
  */
-// eslint-disable-next-line eslint-comments/disable-enable-pair
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -290,6 +288,25 @@ function getPackageName(plugin: PluginSpecifier): PackageName {
   return packageName(nameWithoutVersion.split('@')[0]);
 }
 
+const getBasePluginSpecifier = (plugin: PluginSpecifier): PluginSpecifier => {
+  const nameWithoutTag = plugin.split('#')[0];
+  if (!nameWithoutTag) {
+    throw new Error('Plugin specifier cannot be empty');
+  }
+
+  if (nameWithoutTag.startsWith('@')) {
+    const versionSeparatorIndex = nameWithoutTag.indexOf('@', nameWithoutTag.indexOf('/') + 1);
+    return pluginSpecifier(
+      versionSeparatorIndex === -1 ? nameWithoutTag : nameWithoutTag.slice(0, versionSeparatorIndex)
+    );
+  }
+
+  const versionSeparatorIndex = nameWithoutTag.indexOf('@');
+  return pluginSpecifier(
+    versionSeparatorIndex === -1 ? nameWithoutTag : nameWithoutTag.slice(0, versionSeparatorIndex)
+  );
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -375,7 +392,8 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   const getValidatedMutableFile = (): NormalizedCliConfig =>
     normalizeParsedConfig(parseJson5StrictWithSchema(getFileContents(), cliConfigSchema));
 
-  const getPluginsByKey = (key: 'plugins' | 'localPlugins'): PluginSpecifier[] => getParsedFile()[key];
+  const getPluginsByKey = (key: 'plugins' | 'localPlugins'): PluginSpecifier[] =>
+    getParsedFile()[key].map((plugin) => getBasePluginSpecifier(plugin));
 
   const getPlugins = () => getPluginsByKey('plugins');
   const getLocalPlugins = () => getPluginsByKey('localPlugins');
@@ -383,7 +401,7 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   const exists = () => context.fsModule.existsSync(configPath);
 
   const isInstalled = (plugin: PluginSpecifier, locally?: boolean) => {
-    const validatedPlugin = validatePluginInput(plugin);
+    const validatedPlugin = getBasePluginSpecifier(validatePluginInput(plugin));
     const validatedLocally = validateOptionalBooleanInput(locally);
     const installedPlugins = validatedLocally ? getLocalPlugins() : getPlugins();
     return installedPlugins.includes(validatedPlugin);
@@ -417,7 +435,7 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   const install = (plugin: PluginSpecifier, options: InstallOptions = {}) => {
     return Promise.resolve()
       .then(() => {
-        const validatedPlugin = validatePluginInput(plugin);
+        const validatedPlugin = getBasePluginSpecifier(validatePluginInput(plugin));
         const {locally = false, signal} = installOptionsSchema.parse(options);
         return {locally, signal, validatedPlugin};
       })
@@ -427,29 +445,39 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
           .then(() => {
             const config = getValidatedMutableFile();
             const pluginKey = locally ? 'localPlugins' : 'plugins';
-            const installedPlugins = config[pluginKey];
+            const installedPlugins = config[pluginKey].map((installedPlugin) =>
+              getBasePluginSpecifier(installedPlugin)
+            );
             if (installedPlugins.includes(validatedPlugin)) {
               return Promise.reject(`${validatedPlugin} is already installed`);
             }
 
-            config[pluginKey] = [...installedPlugins, validatedPlugin];
+            config[pluginKey] = [...config[pluginKey], validatedPlugin];
             save(config);
           })
       );
   };
 
   const uninstall = async (plugin: PluginSpecifier) => {
-    const validatedPlugin = validatePluginInput(plugin);
+    const validatedPlugin = getBasePluginSpecifier(validatePluginInput(plugin));
     const config = getValidatedMutableFile();
-    const hasPlugin = config.plugins.some((installedPlugin) => installedPlugin === validatedPlugin);
-    const hasLocalPlugin = config.localPlugins.some((installedPlugin) => installedPlugin === validatedPlugin);
+    const hasPlugin = config.plugins.some(
+      (installedPlugin) => getBasePluginSpecifier(installedPlugin) === validatedPlugin
+    );
+    const hasLocalPlugin = config.localPlugins.some(
+      (installedPlugin) => getBasePluginSpecifier(installedPlugin) === validatedPlugin
+    );
 
     if (!hasPlugin && !hasLocalPlugin) {
       throw new Error(`${validatedPlugin} is not installed`);
     }
 
-    config.plugins = config.plugins.filter((installedPlugin) => installedPlugin !== validatedPlugin);
-    config.localPlugins = config.localPlugins.filter((installedPlugin) => installedPlugin !== validatedPlugin);
+    config.plugins = config.plugins.filter(
+      (installedPlugin) => getBasePluginSpecifier(installedPlugin) !== validatedPlugin
+    );
+    config.localPlugins = config.localPlugins.filter(
+      (installedPlugin) => getBasePluginSpecifier(installedPlugin) !== validatedPlugin
+    );
     save(config);
   };
 
