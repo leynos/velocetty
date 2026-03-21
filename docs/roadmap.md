@@ -520,16 +520,17 @@ Scope notes:
   - [x] Success criteria: targeted
     `bun test --concurrent test/unit/ensure-directory-path.test.ts`
     passes repeatedly with no `ENOENT` races.
-- [ ] 9.3.5. Isolate snapshot and CLI configuration tests from process-global
+- [x] 9.3.5. Isolate snapshot and CLI configuration tests from process-global
   module state for explicit `--concurrent` runs. Requires 9.3.2. See
   [velocetty-design.md](velocetty-design.md) §Testing.
-  - [ ] Remove snapshot bootstrap global/module-cache bleed in
+  - [x] Remove snapshot bootstrap global/module-cache bleed in
     `test/unit/v8-snapshot-util.test.ts`.
-  - [ ] Remove config-path, plugin-config, and mocked module bleed in
+  - [x] Remove config-path, plugin-config, and mocked module bleed in
     `test/unit/cli-api-behaviour.test.ts`.
-  - [ ] Success criteria: targeted
+- [x] Success criteria: targeted
     `bun test --concurrent test/unit/v8-snapshot-util.test.ts test/unit/cli-api-behaviour.test.ts`
-    passes repeatedly with stable config and snapshot expectations.
+    passes 100 consecutive local runs with stable config and snapshot
+    expectations.
 - [ ] 9.3.6. Eliminate remaining long-lived file-scope module mocks in
   concurrency hotspots. Requires 9.3.2. See
   [velocetty-design.md](velocetty-design.md) §Testing.

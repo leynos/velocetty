@@ -2,7 +2,7 @@
 import React, {act} from 'react';
 import {createRoot} from 'react-dom/client';
 
-import {afterEach, beforeEach, expect, mock, test} from 'bun:test';
+import {afterEach, beforeEach, expect, mock, spyOn, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
@@ -38,6 +38,7 @@ type TabsComponent = typeof import('../../lib/components/tabs').default;
 let Tabs: TabsComponent;
 let cleanupHappyDom: (() => void) | null = null;
 let moduleInstanceCounter = 0;
+let consoleErrorSpy: ReturnType<typeof spyOn> | null = null;
 
 const loadTabsComponent = async () => {
   cleanupHappyDom = await setupHappyDom();
@@ -47,6 +48,21 @@ const loadTabsComponent = async () => {
 };
 
 beforeEach(async () => {
+  // Suppress the known React warning about styled-jsx's non-boolean `jsx`
+  // attribute. The styled-jsx build transform strips this at build time, but
+  // the test environment renders the raw `<style jsx={true}>` into the DOM.
+  const originalConsoleError = console.error.bind(console);
+  consoleErrorSpy = spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+    const message = args
+      .map((arg) => (arg instanceof Error ? arg.message : typeof arg === 'string' ? arg : String(arg)))
+      .join(' ');
+
+    if (message.includes('styled-jsx') || message.includes('jsx')) {
+      return;
+    }
+
+    originalConsoleError(...(args as Parameters<typeof console.error>));
+  });
   decorationListener = null;
   getTabPropsMock.mockClear();
   unsubscribeDecorationUpdates.mockClear();
@@ -55,6 +71,8 @@ beforeEach(async () => {
 
 afterEach(() => {
   try {
+    consoleErrorSpy?.mockRestore();
+    consoleErrorSpy = null;
     cleanupHappyDom?.();
   } finally {
     cleanupHappyDom = null;

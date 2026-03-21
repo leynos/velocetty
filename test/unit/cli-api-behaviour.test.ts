@@ -1,11 +1,11 @@
 /** @file Covers install, uninstall, and listing branches in CLI plugin APIs. */
-import {afterAll, beforeEach, expect, mock, test} from 'bun:test';
+import {expect, test} from 'bun:test';
 
 import JSON5 from 'json5';
-import type {PathLike} from 'node:fs';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 
-import {buildNodeFsModuleMock} from '../testUtils/mock-node-fs';
+import {createCliApi, type CliApi} from '../../cli/api';
 
 type ConfigData = {
   plugins: unknown;
@@ -17,230 +17,402 @@ type GotError = {
   message: string;
 };
 
-let importIndex = 0;
-let configData: ConfigData = {plugins: [], localPlugins: []};
-let savedConfigs: ConfigData[] = [];
-let requestedUrls: string[] = [];
-let gotError: GotError | null = null;
-let gotVersions: unknown = ['1.0.0'];
-let fsExistsSyncResult = true;
-let fsReadFileSyncValue: unknown;
-let hasReadFileSyncOverride = false;
-let fsReadFileSyncCallCount = 0;
-let existingPaths: Set<string> | null = null;
+type GotRequestOptions = {
+  readonly responseType?: string;
+  readonly signal?: AbortSignal;
+  readonly timeout?: {
+    readonly request?: number;
+  };
+};
 
-const fsMock = {
-  existsSync: (candidatePath: PathLike) => {
-    if (existingPaths) {
-      return typeof candidatePath === 'string' && existingPaths.has(candidatePath);
+type CliHarnessOptions = {
+  readonly appData?: string;
+  readonly configData?: ConfigData;
+  readonly env?: {
+    APPDATA?: string;
+    NODE_ENV?: string;
+    XDG_CONFIG_HOME?: string;
+  };
+  readonly existingPaths?: Set<string> | null;
+  readonly fsExistsSyncResult?: boolean;
+  readonly fsReadFileSyncValue?: unknown;
+  readonly gotError?: GotError | null;
+  readonly gotVersions?: unknown;
+  readonly hasReadFileSyncOverride?: boolean;
+  readonly homeDirectory?: string;
+  readonly moduleDirectory?: string;
+  readonly platform?: NodeJS.Platform;
+  readonly registryUrl?: string;
+};
+
+type CliHarnessState = {
+  configData: ConfigData;
+  existingPaths: Set<string> | null;
+  fsExistsSyncResult: boolean;
+  fsReadFileSyncCallCount: number;
+  fsReadFileSyncValue: unknown;
+  gotError: GotError | null;
+  gotOptions: GotRequestOptions[];
+  gotVersions: unknown;
+  hasReadFileSyncOverride: boolean;
+  requestedUrls: string[];
+  savedConfigs: ConfigData[];
+};
+
+type CliHarness = {
+  api: CliApi;
+  state: CliHarnessState;
+};
+
+const TEST_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+const CLI_DIRECTORY = path.join(TEST_DIRECTORY, '..', '..', 'cli');
+
+const buildFsModule = (state: CliHarnessState) => ({
+  existsSync: (candidatePath: unknown) => {
+    if (state.existingPaths) {
+      return typeof candidatePath === 'string' && state.existingPaths.has(candidatePath);
     }
-    return fsExistsSyncResult;
+    return state.fsExistsSyncResult;
   },
-  // Assumes cli/api only reads the single config file under test.
   readFileSync: () => {
-    fsReadFileSyncCallCount += 1;
-    return hasReadFileSyncOverride ? fsReadFileSyncValue : JSON.stringify(configData);
+    state.fsReadFileSyncCallCount += 1;
+    return state.hasReadFileSyncOverride ? state.fsReadFileSyncValue : JSON.stringify(state.configData);
   },
-  writeFileSync: (_path: string, contents: string) => {
+  writeFileSync: (_path: unknown, contents: string) => {
     const parsed = JSON5.parse(contents) as ConfigData;
-    savedConfigs.push(parsed);
-    configData = parsed;
+    state.savedConfigs.push(parsed);
+    state.configData = parsed;
   }
-};
+});
 
-const gotMock = {
-  get: (url: string) => {
-    requestedUrls.push(url);
-    if (gotError) {
-      return Promise.reject(gotError);
+const buildGotClient = (state: CliHarnessState) => ({
+  get: (url: string, requestOptions?: GotRequestOptions) => {
+    state.requestedUrls.push(url);
+    if (requestOptions) {
+      state.gotOptions.push(requestOptions);
     }
-    return Promise.resolve({body: {versions: gotVersions}});
+    if (state.gotError) {
+      return Promise.reject(state.gotError);
+    }
+    return Promise.resolve({body: {versions: state.gotVersions}});
   }
-};
-
-mock.module('node:fs', () =>
-  buildNodeFsModuleMock({
-    existsSync: fsMock.existsSync,
-    readFileSync: fsMock.readFileSync,
-    writeFileSync: fsMock.writeFileSync
-  })
-);
-
-mock.module('registry-url', () => ({default: () => 'https://registry.npmjs.org/'}));
-mock.module('got', () => ({default: gotMock}));
-
-const loadCliApi = async () => {
-  importIndex += 1;
-  // Query-string cache busting forces a fresh module instance per test in Bun.
-  return await import(`../../cli/api.ts?coverage_case=${importIndex}`);
-};
-
-const originalNodeEnv = process.env.NODE_ENV;
-const originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
-const restoreEnvVar = (key: 'NODE_ENV' | 'XDG_CONFIG_HOME', value: string | undefined): void => {
-  if (value === undefined) {
-    delete process.env[key];
-    return;
-  }
-  process.env[key] = value;
-};
-
-beforeEach(() => {
-  configData = {plugins: [], localPlugins: []};
-  savedConfigs = [];
-  requestedUrls = [];
-  gotError = null;
-  gotVersions = ['1.0.0'];
-  fsExistsSyncResult = true;
-  hasReadFileSyncOverride = false;
-  fsReadFileSyncValue = undefined;
-  fsReadFileSyncCallCount = 0;
-  existingPaths = null;
-  restoreEnvVar('NODE_ENV', originalNodeEnv);
-  restoreEnvVar('XDG_CONFIG_HOME', originalXdgConfigHome);
 });
 
-afterAll(() => {
-  restoreEnvVar('NODE_ENV', originalNodeEnv);
-  restoreEnvVar('XDG_CONFIG_HOME', originalXdgConfigHome);
+const createCliHarness = (options: CliHarnessOptions = {}): CliHarness => {
+  const state: CliHarnessState = {
+    configData: options.configData ?? {plugins: [], localPlugins: []},
+    existingPaths: options.existingPaths ?? null,
+    fsExistsSyncResult: options.fsExistsSyncResult ?? true,
+    fsReadFileSyncCallCount: 0,
+    fsReadFileSyncValue: options.fsReadFileSyncValue,
+    gotError: options.gotError ?? null,
+    gotOptions: [],
+    gotVersions: 'gotVersions' in options ? options.gotVersions : {'1.0.0': {}},
+    hasReadFileSyncOverride: options.hasReadFileSyncOverride ?? false,
+    requestedUrls: [],
+    savedConfigs: []
+  };
+
+  const api = createCliApi({
+    env: {
+      NODE_ENV: options.env?.NODE_ENV ?? 'test',
+      XDG_CONFIG_HOME: options.env?.XDG_CONFIG_HOME,
+      APPDATA: options.env?.APPDATA
+    },
+    fsModule: buildFsModule(state),
+    gotClient: buildGotClient(state),
+    appData: options.appData,
+    homeDirectory: options.homeDirectory,
+    moduleDirectory: options.moduleDirectory ?? CLI_DIRECTORY,
+    platform: options.platform,
+    registryUrl: options.registryUrl ?? 'https://registry.npmjs.org/'
+  });
+
+  return {api, state};
+};
+
+const assertPluginListAndInstalled = (api: CliApi): void => {
+  expect(api.list()).toBe('plugin-alpha\n@scope/plugin\nplugin');
+  expect(api.isInstalled('plugin-alpha')).toBe(true);
+  expect(api.isInstalled('@scope/plugin')).toBe(true);
+  expect(api.isInstalled('plugin')).toBe(true);
+  expect(api.isInstalled('local-alpha', true)).toBe(true);
+  expect(api.isInstalled('@scope/local-plugin', true)).toBe(true);
+  expect(api.isInstalled('local-plugin', true)).toBe(true);
+};
+
+test('list() and isInstalled() read configured plugin state', () => {
+  const {api} = createCliHarness({
+    configData: {
+      plugins: ['plugin-alpha', '@scope/plugin@1.0.0', 'plugin#tag'],
+      localPlugins: ['local-alpha', '@scope/local-plugin@2.0.0', 'local-plugin#tag']
+    }
+  });
+  assertPluginListAndInstalled(api);
 });
 
-test('list() and isInstalled() read configured plugin state', async () => {
-  configData = {plugins: ['plugin-alpha', 'plugin-beta'], localPlugins: ['local-alpha']};
-  const {list, isInstalled} = await loadCliApi();
-
-  expect(list()).toBe('plugin-alpha\nplugin-beta');
-  expect(isInstalled('plugin-beta')).toBe(true);
-  expect(isInstalled('local-alpha', true)).toBe(true);
-});
-
-test('list() accepts JSON5 plugin config with comments and trailing commas', async () => {
-  hasReadFileSyncOverride = true;
-  fsReadFileSyncValue = `{
-    // plugin sources
-    plugins: ['plugin-alpha',],
-    localPlugins: ['local-alpha',],
-  }`;
-  const {list, isInstalled} = await loadCliApi();
-
-  expect(list()).toBe('plugin-alpha');
-  expect(isInstalled('plugin-alpha')).toBe(true);
-  expect(isInstalled('local-alpha', true)).toBe(true);
+test('list() accepts JSON5 plugin config with comments and trailing commas', () => {
+  const {api} = createCliHarness({
+    fsReadFileSyncValue: `{
+      // plugin sources
+      plugins: ['plugin-alpha', '@scope/plugin@1.0.0', 'plugin#tag',],
+      localPlugins: ['local-alpha', '@scope/local-plugin@2.0.0', 'local-plugin#tag',],
+    }`,
+    hasReadFileSyncOverride: true
+  });
+  assertPluginListAndInstalled(api);
 });
 
 test('install() persists plugin entries from npm checks', async () => {
-  const {install} = await loadCliApi();
+  const {api, state} = createCliHarness();
+  const controller = new AbortController();
 
-  await install('plugin-alpha');
+  await api.install('plugin-alpha', {signal: controller.signal});
 
-  expect(requestedUrls).toEqual(['https://registry.npmjs.org/plugin-alpha']);
-  expect(savedConfigs.at(-1)).toEqual({
+  expect(state.requestedUrls).toEqual(['https://registry.npmjs.org/plugin-alpha']);
+  expect(state.gotOptions[0]).toMatchObject({
+    signal: controller.signal,
+    timeout: {request: 10000}
+  });
+  expect(state.savedConfigs.at(-1)).toEqual({
     plugins: ['plugin-alpha'],
     localPlugins: []
   });
 });
 
 test('install() persists local plugin entries when local install is requested', async () => {
-  const {install} = await loadCliApi();
+  const {api, state} = createCliHarness();
 
-  await install('local-plugin', {locally: true});
+  await api.install('local-plugin', {locally: true});
 
-  expect(requestedUrls).toEqual(['https://registry.npmjs.org/local-plugin']);
-  expect(savedConfigs.at(-1)).toEqual({
+  expect(state.requestedUrls).toEqual(['https://registry.npmjs.org/local-plugin']);
+  expect(state.savedConfigs.at(-1)).toEqual({
     plugins: [],
     localPlugins: ['local-plugin']
   });
 });
 
 test('install() rejects duplicate local plugins that already exist in config', async () => {
-  configData = {plugins: [], localPlugins: ['local-plugin']};
-  const {install} = await loadCliApi();
+  const {api} = createCliHarness({
+    configData: {plugins: [], localPlugins: ['local-plugin']}
+  });
 
-  await expect(install('local-plugin', {locally: true})).rejects.toBe('local-plugin is already installed');
+  await expect(api.install('local-plugin', {locally: true})).rejects.toBe('local-plugin is already installed');
 });
 
 test('install() maps npm and transport errors to stable user-facing messages', async () => {
-  const {install} = await loadCliApi();
+  const missingPluginHarness = createCliHarness({
+    gotError: {statusCode: 404, message: 'Not found'}
+  });
+  await expect(missingPluginHarness.api.install('missing-plugin')).rejects.toBe('missing-plugin not found on npm');
 
-  gotError = {statusCode: 404, message: 'Not found'};
-  await expect(install('missing-plugin')).rejects.toBe('missing-plugin not found on npm');
-
-  // gotMock reads this mutable binding at call time for the second install path.
-  gotError = {message: 'socket hang up'};
-  await expect(install('unstable-plugin')).rejects.toBe(
+  const unstablePluginHarness = createCliHarness({
+    gotError: {message: 'socket hang up'}
+  });
+  await expect(unstablePluginHarness.api.install('unstable-plugin')).rejects.toBe(
     'socket hang up\nPlugin check failed. Check your internet connection or retry later.'
   );
 });
 
-test('existsOnNpm() rejects malformed responses that do not include versions', async () => {
-  const {existsOnNpm} = await loadCliApi();
+test('public plugin methods validate runtime plugin inputs', async () => {
+  const {api} = createCliHarness();
 
-  gotVersions = undefined;
-  await expect(existsOnNpm('plugin-without-versions')).rejects.toMatchObject({
+  await expect(api.existsOnNpm('   ' as never)).rejects.toThrow('Plugin specifier cannot be empty');
+  await expect(api.install('   ' as never)).rejects.toThrow('Plugin specifier cannot be empty');
+  expect(() => api.isInstalled('   ' as never)).toThrow('Plugin specifier cannot be empty');
+  await expect(api.uninstall('   ' as never)).rejects.toThrow('Plugin specifier cannot be empty');
+});
+
+test('install() validates runtime option inputs', async () => {
+  const {api} = createCliHarness();
+
+  await expect(api.install('plugin-alpha', {locally: 'yes' as never})).rejects.toThrow();
+  await expect(api.install('plugin-alpha', {signal: 'not-a-signal' as never})).rejects.toThrow();
+});
+
+test('install() rejects malformed persisted plugin arrays before saving', async () => {
+  const {api, state} = createCliHarness({
+    configData: {plugins: {bad: true}, localPlugins: []}
+  });
+
+  await expect(api.install('plugin-alpha')).rejects.toThrow();
+  expect(state.savedConfigs).toEqual([]);
+});
+
+test('uninstall() rejects malformed persisted plugin arrays before saving', async () => {
+  const {api, state} = createCliHarness({
+    configData: {plugins: [], localPlugins: {bad: true}}
+  });
+
+  await expect(api.uninstall('plugin-alpha')).rejects.toThrow();
+  expect(state.savedConfigs).toEqual([]);
+});
+
+test('existsOnNpm() rejects malformed responses that do not include versions', async () => {
+  const {api} = createCliHarness({gotVersions: undefined});
+
+  await expect(api.existsOnNpm('plugin-without-versions')).rejects.toMatchObject({
     body: {versions: undefined}
   });
 });
 
-test('uninstall() removes installed plugins and rejects unknown plugins', async () => {
-  configData = {plugins: ['plugin-a', 'plugin-b'], localPlugins: []};
-  const {uninstall} = await loadCliApi();
+test('existsOnNpm() joins registry URLs with path segments safely', async () => {
+  const {api, state} = createCliHarness({
+    registryUrl: 'https://registry.npmjs.org/custom/segment'
+  });
 
-  await uninstall('plugin-a');
-  expect(savedConfigs.at(-1)).toEqual({
+  await api.existsOnNpm('plugin-alpha');
+
+  expect(state.requestedUrls).toEqual(['https://registry.npmjs.org/custom/segment/plugin-alpha']);
+});
+
+test('uninstall() removes installed plugins and rejects unknown plugins', async () => {
+  const installedPluginHarness = createCliHarness({
+    configData: {plugins: ['plugin-a', 'plugin-b'], localPlugins: []}
+  });
+
+  await installedPluginHarness.api.uninstall('plugin-a');
+  expect(installedPluginHarness.state.savedConfigs.at(-1)).toEqual({
     plugins: ['plugin-b'],
     localPlugins: []
   });
 
-  await expect(uninstall('plugin-z')).rejects.toThrow('plugin-z is not installed');
+  const unknownPluginHarness = createCliHarness({
+    configData: {plugins: ['plugin-a', 'plugin-b'], localPlugins: []}
+  });
+  await expect(unknownPluginHarness.api.uninstall('plugin-z')).rejects.toThrow('plugin-z is not installed');
 });
 
-test('exists(), list(), and isInstalled() handle empty or malformed plugin arrays', async () => {
-  const normalApi = await loadCliApi();
-  // exists() checks readable config presence; list() checks populated plugin entries.
-  expect(normalApi.exists()).toBe(true);
-  expect(normalApi.list()).toBe(false);
+test('uninstall() removes locally installed plugins', async () => {
+  const installedPluginHarness = createCliHarness({
+    configData: {plugins: ['plugin-a'], localPlugins: ['plugin-local']}
+  });
 
-  configData = {
-    plugins: {not: 'an-array'},
+  await installedPluginHarness.api.uninstall('plugin-local');
+
+  expect(installedPluginHarness.state.savedConfigs.at(-1)).toEqual({
+    plugins: ['plugin-a'],
     localPlugins: []
-  };
-  const malformedApi = await loadCliApi();
-  expect(malformedApi.isInstalled('plugin-x')).toBe(false);
+  });
 });
 
-test('exists() returns false when config file is missing without reading config contents', async () => {
-  fsExistsSyncResult = false;
-  const {exists} = await loadCliApi();
+test('exists(), list(), and isInstalled() handle empty or malformed plugin arrays', () => {
+  const normalHarness = createCliHarness();
+  expect(normalHarness.api.exists()).toBe(true);
+  expect(normalHarness.api.list()).toBe(false);
 
-  expect(exists()).toBe(false);
-  expect(fsReadFileSyncCallCount).toBe(0);
+  const malformedHarness = createCliHarness({
+    configData: {
+      plugins: {not: 'an-array'},
+      localPlugins: []
+    }
+  });
+  expect(malformedHarness.api.isInstalled('plugin-x')).toBe(false);
 });
 
-test('configPath prefers config.json5 in production', async () => {
-  process.env.NODE_ENV = 'production';
-  process.env.XDG_CONFIG_HOME = '/tmp/velocetty-xdg';
-  const expectedConfigPath = path.join('/tmp/velocetty-xdg', 'Hyper', 'config.json5');
-  existingPaths = new Set([expectedConfigPath]);
+test('exists() returns false when config file is missing without reading config contents', () => {
+  const {api, state} = createCliHarness({fsExistsSyncResult: false});
 
-  const {configPath, exists} = await loadCliApi();
-
-  expect(configPath).toBe(expectedConfigPath);
-  expect(exists()).toBe(true);
+  expect(api.exists()).toBe(false);
+  expect(state.fsReadFileSyncCallCount).toBe(0);
 });
 
-test('configPath falls back to legacy hyper.json when config.json5 is absent', async () => {
-  process.env.NODE_ENV = 'production';
-  process.env.XDG_CONFIG_HOME = '/tmp/velocetty-xdg';
-  const legacyPath = path.join('/tmp/velocetty-xdg', 'Hyper', 'hyper.json');
-  existingPaths = new Set([legacyPath]);
+test.each([
+  {label: 'prefers config.json5 in production', filename: 'config.json5'},
+  {label: 'falls back to legacy hyper.json when config.json5 is absent', filename: 'hyper.json'}
+])('configPath $label', ({filename}) => {
+  const expectedPath = path.join('/tmp/velocetty-xdg', 'Hyper', filename);
+  const {api} = createCliHarness({
+    env: {
+      NODE_ENV: 'production',
+      XDG_CONFIG_HOME: '/tmp/velocetty-xdg'
+    },
+    existingPaths: new Set([expectedPath])
+  });
 
-  const {configPath, exists} = await loadCliApi();
-
-  expect(configPath).toBe(legacyPath);
-  expect(exists()).toBe(true);
+  expect(api.configPath).toBe(expectedPath);
+  expect(api.exists()).toBe(true);
 });
 
-test('node:fs mock preserves passthrough exports required by other suites', async () => {
-  const fsModule = await import('node:fs');
-  expect(typeof fsModule.realpathSync).toBe('function');
+test.each([
+  {label: 'prefers dev config.json5 when present', filename: 'config.json5'},
+  {label: 'falls back to dev legacy hyper.json when config.json5 is absent', filename: 'hyper.json'}
+])('configPath $label outside production uses the module-relative development file', ({filename}) => {
+  const moduleDirectory = '/tmp/velocetty-module/cli';
+  const expectedPath = path.join(moduleDirectory, '..', filename);
+  const {api} = createCliHarness({
+    env: {
+      NODE_ENV: 'development'
+    },
+    existingPaths: new Set([expectedPath]),
+    moduleDirectory
+  });
+
+  expect(api.configPath).toBe(expectedPath);
+  expect(api.exists()).toBe(true);
+});
+
+test('configPath uses APPDATA for Windows production resolution when provided', () => {
+  const appData = 'C:\\Users\\alice\\AppData\\Roaming';
+  const expectedPath = path.win32.join(appData, 'Hyper', 'config.json5');
+  const {api} = createCliHarness({
+    appData,
+    env: {
+      NODE_ENV: 'production'
+    },
+    existingPaths: new Set([expectedPath]),
+    homeDirectory: 'C:\\Users\\alice',
+    platform: 'win32'
+  });
+
+  expect(api.configPath).toBe(expectedPath);
+  expect(api.exists()).toBe(true);
+});
+
+test.each([
+  {
+    label: 'falls back to the home-directory APPDATA path on Windows',
+    appData: undefined,
+    filename: 'hyper.json',
+    homeDirectory: 'C:\\Users\\bob'
+  },
+  {
+    label: 'treats blank APPDATA as unset on Windows',
+    appData: '   ' as string | undefined,
+    filename: 'config.json5',
+    homeDirectory: 'C:\\Users\\carol'
+  }
+])('configPath $label', ({appData, filename, homeDirectory}) => {
+  const inferredAppData = path.win32.join(homeDirectory, 'AppData', 'Roaming');
+  const expectedPath = path.win32.join(inferredAppData, 'Hyper', filename);
+  const {api} = createCliHarness({
+    appData,
+    env: {NODE_ENV: 'production'},
+    existingPaths: new Set([expectedPath]),
+    homeDirectory,
+    platform: 'win32'
+  });
+
+  expect(api.configPath).toBe(expectedPath);
+  expect(api.exists()).toBe(true);
+});
+
+test('createCliApi() keeps request and config state isolated per instance', async () => {
+  const leftHarness = createCliHarness();
+  const rightHarness = createCliHarness({
+    configData: {plugins: ['plugin-beta'], localPlugins: ['local-beta']}
+  });
+
+  await Promise.all([leftHarness.api.install('plugin-alpha'), rightHarness.api.install('plugin-gamma')]);
+
+  expect(leftHarness.state.requestedUrls).toEqual(['https://registry.npmjs.org/plugin-alpha']);
+  expect(rightHarness.state.requestedUrls).toEqual(['https://registry.npmjs.org/plugin-gamma']);
+  expect(leftHarness.state.savedConfigs.at(-1)).toEqual({
+    plugins: ['plugin-alpha'],
+    localPlugins: []
+  });
+  expect(rightHarness.state.savedConfigs.at(-1)).toEqual({
+    plugins: ['plugin-beta', 'plugin-gamma'],
+    localPlugins: ['local-beta']
+  });
 });

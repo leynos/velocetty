@@ -631,6 +631,27 @@ directly in the test or via a helper that returns per-test cleanup, so
 ownership is not shared. Do not use a shared file-scope cleanup queue for
 temporary roots in suites that must survive explicit `--concurrent` runs.
 
+For roadmap item `9.3.5` and similar snapshot/bootstrap or CLI-config
+isolation work, use a focused explicit-concurrency stress run against the
+snapshot and CLI behaviour suites:
+
+```bash
+bun test --concurrent \
+  test/unit/v8-snapshot-util.test.ts \
+  test/unit/cli-api-behaviour.test.ts
+```
+
+Keep snapshot/bootstrap state isolated from `globalThis` during unit tests.
+Prefer explicit bootstrap helpers that accept a test-owned runtime host and
+return a restoration handle for any patched module loader state, so each test
+can clean up the loader it installed without relying on file-scope teardown.
+
+For CLI-config tests, do not share file-scope mutable mock state, shared
+`process.env` mutation, or module-scope config-path capture across tests.
+Prefer a per-test API factory with injected filesystem, registry, and
+environment state so explicit `--concurrent` runs keep request history,
+config-path resolution, and parsed-plugin state isolated per test instance.
+
 ### End-to-end (E2E) tests (layered strategy)
 
 End-to-end tests are split into two lanes and require packaged binaries in

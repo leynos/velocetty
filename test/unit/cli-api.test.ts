@@ -1,38 +1,21 @@
 /** @file Verifies CLI API registry URL construction. */
-/* eslint-disable eslint-comments/disable-enable-pair */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import {beforeEach, expect, test} from 'bun:test';
 
-let existsOnNpm: typeof import('../../cli/api').existsOnNpm;
+import {createCliApi} from '../../cli/api';
+
 let getUrl = '';
+let getOptions: {
+  readonly responseType?: string;
+  readonly signal?: AbortSignal;
+  readonly timeout?: {
+    readonly request?: number;
+  };
+} | null = null;
 
-const buildRegistryResponse = (versions: string[] = []) => ({
+const buildRegistryResponse = (versions: Record<string, unknown> = {}) => ({
   body: {
     versions
   }
-});
-
-const gotMock = {
-  get(url: string) {
-    getUrl = url;
-    return Promise.resolve(buildRegistryResponse());
-  }
-};
-
-const registryUrl = () => 'https://registry.npmjs.org/';
-
-mock.module('got', () => ({default: gotMock}));
-mock.module('registry-url', () => ({default: registryUrl}));
-
-const CLI_API_IMPORT_TIMEOUT_MS = 15_000;
-
-beforeAll(async () => {
-  ({existsOnNpm} = await import('../../cli/api'));
-}, CLI_API_IMPORT_TIMEOUT_MS);
-
-beforeEach(() => {
-  getUrl = '';
 });
 
 const cases = [
@@ -48,9 +31,47 @@ const cases = [
   }
 ];
 
+beforeEach(() => {
+  getUrl = '';
+  getOptions = null;
+});
+
 cases.forEach(({name, packageName, expectedUrl}) => {
   test(`existsOnNpm() builds the url for ${name}`, async () => {
-    await existsOnNpm(packageName);
+    const api = createCliApi({
+      gotClient: {
+        get(url: string) {
+          getUrl = url;
+          return Promise.resolve(buildRegistryResponse());
+        }
+      },
+      registryUrl: 'https://registry.npmjs.org/'
+    });
+
+    await api.existsOnNpm(packageName);
     expect(getUrl).toBe(expectedUrl);
+  });
+});
+
+test('existsOnNpm() forwards AbortSignal and timeout options to the registry client', async () => {
+  const controller = new AbortController();
+  const api = createCliApi({
+    gotClient: {
+      get(url: string, options) {
+        getUrl = url;
+        getOptions = options;
+        return Promise.resolve(buildRegistryResponse());
+      }
+    },
+    registryUrl: 'https://registry.npmjs.org/'
+  });
+
+  await api.existsOnNpm('some-package', controller.signal);
+
+  expect(getUrl).toBe('https://registry.npmjs.org/some-package');
+  expect(getOptions).toMatchObject({
+    responseType: 'json',
+    signal: controller.signal,
+    timeout: {request: 10000}
   });
 });

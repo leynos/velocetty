@@ -1,7 +1,7 @@
 /** @file Verifies Term.reportRenderer emits via transport with deduplication. */
 import {randomUUID} from 'node:crypto';
 
-import {describe, expect, mock, test} from 'bun:test';
+import {describe, expect, mock, spyOn, test} from 'bun:test';
 import {
   LONG_FRAME_THRESHOLD_MS,
   resetInputSendTimestamps,
@@ -224,6 +224,7 @@ describe('Term.reportRenderer transport emit', () => {
 describe('Term.ensureWebGLRenderer fallback handling', () => {
   test('does not throw when WebGL addon attach fails', () =>
     withTermTestHarness(({createTermInstanceForWebGLFallbackTest, transportMock}) => {
+      const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
       const termInstance = createTermInstanceForWebGLFallbackTest('uid-webgl-failure');
       // @ts-expect-error Test double only needs loadAddon for this focused path.
       termInstance.term = {
@@ -243,12 +244,18 @@ describe('Term.ensureWebGLRenderer fallback handling', () => {
         type: 'Canvas',
         reason: 'webgl-init-failed'
       });
+      expect(warnSpy).toHaveBeenCalledWith(
+        'WebGL renderer initialization failed. Falling back to canvas-based rendering.',
+        expect.any(Error)
+      );
+      warnSpy.mockRestore();
     }));
 });
 
 describe('Term WebGL context-loss and eviction handlers', () => {
   test('onWebGLContextLoss emits context-loss fallback and schedules retry', () =>
     withTermTestHarness(({createTermInstanceForWebGLFallbackTest}) => {
+      const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
       const termInstance = createTermInstanceForWebGLFallbackTest('uid-context-loss');
       termInstance.detachWebGLRenderer = mock(() => {});
       termInstance.ensureCanvasRenderer = mock(() => {});
@@ -262,6 +269,8 @@ describe('Term WebGL context-loss and eviction handlers', () => {
       expect(termInstance.ensureCanvasRenderer).toHaveBeenCalledWith('context-loss');
       expect(termInstance.scheduleRendererVisibilitySync).toHaveBeenCalledTimes(1);
       expect(termInstance.scheduleDeterministicRendererRetry).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith('WebGL context lost. Falling back to canvas-based rendering.');
+      warnSpy.mockRestore();
     }));
 
   test('onWebGLEvicted emits pool-evicted fallback and uses delayed retry path only', () =>
