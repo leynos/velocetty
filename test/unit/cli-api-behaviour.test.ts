@@ -131,6 +131,16 @@ const createCliHarness = (options: CliHarnessOptions = {}): CliHarness => {
   return {api, state};
 };
 
+const assertPluginListAndInstalled = (api: CliApi): void => {
+  expect(api.list()).toBe('plugin-alpha\n@scope/plugin\nplugin');
+  expect(api.isInstalled('plugin-alpha')).toBe(true);
+  expect(api.isInstalled('@scope/plugin')).toBe(true);
+  expect(api.isInstalled('plugin')).toBe(true);
+  expect(api.isInstalled('local-alpha', true)).toBe(true);
+  expect(api.isInstalled('@scope/local-plugin', true)).toBe(true);
+  expect(api.isInstalled('local-plugin', true)).toBe(true);
+};
+
 test('list() and isInstalled() read configured plugin state', () => {
   const {api} = createCliHarness({
     configData: {
@@ -138,13 +148,7 @@ test('list() and isInstalled() read configured plugin state', () => {
       localPlugins: ['local-alpha', '@scope/local-plugin@2.0.0', 'local-plugin#tag']
     }
   });
-
-  expect(api.list()).toBe('plugin-alpha\n@scope/plugin\nplugin');
-  expect(api.isInstalled('@scope/plugin')).toBe(true);
-  expect(api.isInstalled('plugin')).toBe(true);
-  expect(api.isInstalled('local-alpha', true)).toBe(true);
-  expect(api.isInstalled('@scope/local-plugin', true)).toBe(true);
-  expect(api.isInstalled('local-plugin', true)).toBe(true);
+  assertPluginListAndInstalled(api);
 });
 
 test('list() accepts JSON5 plugin config with comments and trailing commas', () => {
@@ -156,14 +160,7 @@ test('list() accepts JSON5 plugin config with comments and trailing commas', () 
     }`,
     hasReadFileSyncOverride: true
   });
-
-  expect(api.list()).toBe('plugin-alpha\n@scope/plugin\nplugin');
-  expect(api.isInstalled('plugin-alpha')).toBe(true);
-  expect(api.isInstalled('@scope/plugin')).toBe(true);
-  expect(api.isInstalled('plugin')).toBe(true);
-  expect(api.isInstalled('local-alpha', true)).toBe(true);
-  expect(api.isInstalled('@scope/local-plugin', true)).toBe(true);
-  expect(api.isInstalled('local-plugin', true)).toBe(true);
+  assertPluginListAndInstalled(api);
 });
 
 test('install() persists plugin entries from npm checks', async () => {
@@ -372,32 +369,25 @@ test('configPath uses APPDATA for Windows production resolution when provided', 
   expect(api.exists()).toBe(true);
 });
 
-test('configPath falls back to the home-directory APPDATA path on Windows', () => {
-  const homeDirectory = 'C:\\Users\\bob';
+test.each([
+  {
+    label: 'falls back to the home-directory APPDATA path on Windows',
+    appData: undefined,
+    filename: 'hyper.json',
+    homeDirectory: 'C:\\Users\\bob'
+  },
+  {
+    label: 'treats blank APPDATA as unset on Windows',
+    appData: '   ' as string | undefined,
+    filename: 'config.json5',
+    homeDirectory: 'C:\\Users\\carol'
+  }
+])('configPath $label', ({appData, filename, homeDirectory}) => {
   const inferredAppData = path.win32.join(homeDirectory, 'AppData', 'Roaming');
-  const expectedPath = path.win32.join(inferredAppData, 'Hyper', 'hyper.json');
+  const expectedPath = path.win32.join(inferredAppData, 'Hyper', filename);
   const {api} = createCliHarness({
-    env: {
-      NODE_ENV: 'production'
-    },
-    existingPaths: new Set([expectedPath]),
-    homeDirectory,
-    platform: 'win32'
-  });
-
-  expect(api.configPath).toBe(expectedPath);
-  expect(api.exists()).toBe(true);
-});
-
-test('configPath treats blank APPDATA as unset on Windows', () => {
-  const homeDirectory = 'C:\\Users\\carol';
-  const inferredAppData = path.win32.join(homeDirectory, 'AppData', 'Roaming');
-  const expectedPath = path.win32.join(inferredAppData, 'Hyper', 'config.json5');
-  const {api} = createCliHarness({
-    appData: '   ',
-    env: {
-      NODE_ENV: 'production'
-    },
+    appData,
+    env: {NODE_ENV: 'production'},
     existingPaths: new Set([expectedPath]),
     homeDirectory,
     platform: 'win32'
