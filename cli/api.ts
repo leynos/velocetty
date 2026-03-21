@@ -92,36 +92,36 @@ export type CliApi = {
   /**
    * Checks whether a plugin exists on npm.
    *
-   * @param plugin Plugin specifier validated at runtime.
+   * @param plugin Plugin specifier string validated at runtime.
    * @param signal Optional `AbortSignal` used to cancel the registry request.
    * @returns A promise that resolves with the raw registry response body wrapper.
    */
-  existsOnNpm: (plugin: PluginSpecifier, signal?: AbortSignal) => Promise<unknown>;
+  existsOnNpm: (plugin: string, signal?: AbortSignal) => Promise<unknown>;
   /**
    * Installs a plugin entry into the persisted config.
    *
-   * @param plugin Plugin specifier validated at runtime.
+   * @param plugin Plugin specifier string validated at runtime.
    * @param options Optional install controls such as local install mode or request cancellation.
    * @returns A promise that resolves after persisting the updated config.
    */
-  install: (plugin: PluginSpecifier, options?: InstallOptions) => Promise<void>;
+  install: (plugin: string, options?: InstallOptions) => Promise<void>;
   /**
    * Reports whether a plugin is already configured.
    *
-   * @param plugin Plugin specifier validated at runtime.
+   * @param plugin Plugin specifier string validated at runtime.
    * @param locally When `true`, checks `localPlugins` instead of `plugins`.
    * @returns `true` when the plugin is present in the selected config list.
    */
-  isInstalled: (plugin: PluginSpecifier, locally?: boolean) => boolean;
+  isInstalled: (plugin: string, locally?: boolean) => boolean;
   /** Returns newline-delimited configured plugins or `false` when the list is empty. */
   list: () => string | false;
   /**
    * Removes a plugin entry from the persisted config.
    *
-   * @param plugin Plugin specifier validated at runtime.
+   * @param plugin Plugin specifier string validated at runtime.
    * @returns A promise that resolves after persisting the updated config.
    */
-  uninstall: (plugin: PluginSpecifier) => Promise<void>;
+  uninstall: (plugin: string) => Promise<void>;
 };
 
 /** Smart constructor for PluginSpecifier with runtime validation */
@@ -400,7 +400,7 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
 
   const exists = () => context.fsModule.existsSync(configPath);
 
-  const isInstalled = (plugin: PluginSpecifier, locally?: boolean) => {
+  const isInstalled = (plugin: string, locally?: boolean) => {
     const validatedPlugin = getBasePluginSpecifier(validatePluginInput(plugin));
     const validatedLocally = validateOptionalBooleanInput(locally);
     const installedPlugins = validatedLocally ? getLocalPlugins() : getPlugins();
@@ -411,7 +411,7 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
     return context.fsModule.writeFileSync(configPath, stringifyJson5(config), 'utf8');
   };
 
-  const existsOnNpm = (plugin: PluginSpecifier, signal?: AbortSignal) => {
+  const existsOnNpm = (plugin: string, signal?: AbortSignal) => {
     return Promise.resolve().then(() => {
       const validatedPlugin = validatePluginInput(plugin);
       const validatedSignal = validateOptionalSignalInput(signal);
@@ -432,7 +432,7 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
     });
   };
 
-  const install = (plugin: PluginSpecifier, options: InstallOptions = {}) => {
+  const install = (plugin: string, options: InstallOptions = {}) => {
     return Promise.resolve()
       .then(() => {
         const validatedPlugin = getBasePluginSpecifier(validatePluginInput(plugin));
@@ -458,7 +458,7 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
       );
   };
 
-  const uninstall = async (plugin: PluginSpecifier) => {
+  const uninstall = async (plugin: string) => {
     const validatedPlugin = getBasePluginSpecifier(validatePluginInput(plugin));
     const config = getValidatedMutableFile();
     const hasPlugin = config.plugins.some(
@@ -503,7 +503,7 @@ export const exists = defaultCliApi.exists;
 /**
  * Checks whether a plugin exists on npm for the default CLI API instance.
  *
- * @param plugin Plugin specifier validated at runtime.
+ * @param plugin Plugin specifier string validated at runtime.
  * @param signal Optional `AbortSignal` used to cancel the registry request.
  * @returns A promise that resolves with the raw registry response body wrapper.
  */
@@ -512,7 +512,7 @@ export const existsOnNpm = defaultCliApi.existsOnNpm;
 /**
  * Installs a plugin entry into the persisted config for the default CLI API instance.
  *
- * @param plugin Plugin specifier validated at runtime.
+ * @param plugin Plugin specifier string validated at runtime.
  * @param options Optional install controls such as local install mode or request cancellation.
  * @returns A promise that resolves after persisting the updated config.
  */
@@ -521,7 +521,7 @@ export const install = defaultCliApi.install;
 /**
  * Reports whether a plugin is already configured for the default CLI API instance.
  *
- * @param plugin Plugin specifier validated at runtime.
+ * @param plugin Plugin specifier string validated at runtime.
  * @param locally When `true`, checks `localPlugins` instead of `plugins`.
  * @returns `true` when the plugin is present in the selected config list.
  */
@@ -533,7 +533,7 @@ export const list = defaultCliApi.list;
 /**
  * Removes a plugin entry from the persisted config for the default CLI API instance.
  *
- * @param plugin Plugin specifier validated at runtime.
+ * @param plugin Plugin specifier string validated at runtime.
  * @returns A promise that resolves after persisting the updated config.
  */
 export const uninstall = defaultCliApi.uninstall;
