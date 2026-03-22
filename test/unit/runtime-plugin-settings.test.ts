@@ -81,6 +81,24 @@ const assertParseErrorBehaviour = <T>(
   }
 };
 
+const withProcessPlatform = async <T>(platform: NodeJS.Platform, action: () => Promise<T> | T): Promise<T> => {
+  const originalPlatform = process.platform;
+
+  Object.defineProperty(process, 'platform', {
+    configurable: true,
+    value: platform
+  });
+
+  try {
+    return await action();
+  } finally {
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: originalPlatform
+    });
+  }
+};
+
 test('ensureRuntimePluginSettingsPersisted writes missing defaults to config.plugins namespace', () => {
   const {readFile, writeFile, getContent, getWrites} = createReadWritePair(`{
     config: {
@@ -99,6 +117,31 @@ test('ensureRuntimePluginSettingsPersisted writes missing defaults to config.plu
 
   const persisted = JSON5.parse(getContent()) as {config: {plugins: Record<string, unknown>}};
   expect(persisted.config.plugins[GOLDEN_PATH_PLUGIN_ID]).toEqual(goldenPathSettingsDefaults);
+});
+
+test('runtime plugin settings import remains safe on Windows when config paths resolve via Electron userData', async () => {
+  await withProcessPlatform('win32', async () => {
+    resetElectronMock();
+    registerElectronMock();
+
+    const runtimePluginModule = await import(
+      '../../app/runtime/plugin-runtime.ts?runtime_plugin_settings_windows_user_data'
+    );
+    const {readFile, writeFile} = createReadWritePair(`{
+      config: {},
+      plugins: [],
+      localPlugins: [],
+      keymaps: {},
+    }`);
+
+    const namespace = runtimePluginModule.ensureRuntimePluginSettingsPersisted({
+      configFilePath: 'C:\\\\Users\\\\tester\\\\AppData\\\\Roaming\\\\Hyper\\\\config.json5',
+      readFile,
+      writeFile
+    });
+
+    expect(namespace[GOLDEN_PATH_PLUGIN_ID]).toEqual(goldenPathSettingsDefaults);
+  });
 });
 
 test('ensureRuntimePluginSettingsPersisted is idempotent after defaults are written', () => {
