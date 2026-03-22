@@ -1,5 +1,7 @@
 /** @file Ensures runtime tab providers are registered even when initially disabled. */
-import {afterAll, beforeEach, expect, mock, test} from 'bun:test';
+import {randomUUID} from 'node:crypto';
+
+import {expect, mock, test} from 'bun:test';
 
 import {GOLDEN_PATH_PLUGIN_ID} from '@shared/runtime/golden-path-demo';
 
@@ -7,18 +9,21 @@ type RendererConfig = {
   plugins?: Record<string, Record<string, unknown>>;
 };
 
-const rendererConfigSubscriptions: Array<() => void> = [];
-let rendererConfig: RendererConfig = {};
-let importNonce = 0;
+type RuntimeTabProviderHarness = {
+  cleanup: () => void;
+  notifyRendererConfigSubscribers: () => void;
+  plugins: typeof import('../../lib/utils/plugins');
+  setRendererConfig: (nextConfig: RendererConfig) => void;
+  subscribeRendererConfigMock: typeof mock<(_: () => void) => () => void>;
+};
 
-const subscribeRendererConfigMock = mock((listener: () => void) => {
-  rendererConfigSubscriptions.push(listener);
-  return () => {};
-});
-
-const registerPluginsModuleMocks = () => {
+const registerPluginsModuleMocks = (
+  _rendererConfigSubscriptions: Array<() => void>,
+  getRendererConfig: () => RendererConfig,
+  subscribeRendererConfigMock: RuntimeTabProviderHarness['subscribeRendererConfigMock']
+) => {
   mock.module('../../lib/utils/config', () => ({
-    getConfig: () => rendererConfig,
+    getConfig: () => getRendererConfig(),
     subscribe: subscribeRendererConfigMock
   }));
 
@@ -45,56 +50,86 @@ const registerPluginsModuleMocks = () => {
   }));
 };
 
-beforeEach(() => {
-  registerPluginsModuleMocks();
-  rendererConfig = {};
-  rendererConfigSubscriptions.length = 0;
-  subscribeRendererConfigMock.mockClear();
-});
+const createRuntimeTabProviderHarness = async (): Promise<RuntimeTabProviderHarness> => {
+  const rendererConfigSubscriptions: Array<() => void> = [];
+  let rendererConfig: RendererConfig = {};
+  const subscribeRendererConfigMock = mock((listener: () => void) => {
+    rendererConfigSubscriptions.push(listener);
+    return () => {};
+  });
+  let cleanupCalled = false;
 
-afterAll(() => {
-  mock.restore();
-});
+  const cleanup = () => {
+    if (cleanupCalled) {
+      return;
+    }
+    cleanupCalled = true;
+    mock.restore();
+  };
+
+  try {
+    registerPluginsModuleMocks(rendererConfigSubscriptions, () => rendererConfig, subscribeRendererConfigMock);
+    const plugins = await import(`../../lib/utils/plugins.ts?runtime_tab_provider_${randomUUID()}`);
+
+    return {
+      cleanup,
+      notifyRendererConfigSubscribers: () => {
+        rendererConfigSubscriptions.forEach((listener) => {
+          listener();
+        });
+      },
+      plugins,
+      setRendererConfig: (nextConfig) => {
+        rendererConfig = nextConfig;
+      },
+      subscribeRendererConfigMock
+    };
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
+};
 
 test('registers runtime tab providers for live enablement toggles', async () => {
-  rendererConfig = {
-    plugins: {
-      [GOLDEN_PATH_PLUGIN_ID]: {
-        enabled: false,
-        tabPrefix: 'GP'
+  const harness = await createRuntimeTabProviderHarness();
+  try {
+    harness.setRendererConfig({
+      plugins: {
+        [GOLDEN_PATH_PLUGIN_ID]: {
+          enabled: false,
+          tabPrefix: 'GP'
+        }
       }
-    }
-  };
+    });
 
-  const plugins = await import(`../../lib/utils/plugins.ts?runtime_tab_provider_${importNonce++}`);
+    expect(harness.subscribeRendererConfigMock.mock.calls.length).toBeGreaterThan(0);
 
-  expect(subscribeRendererConfigMock.mock.calls.length).toBeGreaterThan(0);
+    const tab = {
+      uid: 'tab-1',
+      tabIndex: 0,
+      isActive: true,
+      hasActivity: false,
+      title: 'Shell'
+    };
 
-  const tab = {
-    uid: 'tab-1',
-    tabIndex: 0,
-    isActive: true,
-    hasActivity: false,
-    title: 'Shell'
-  };
+    const disabledProps = harness.plugins.getTabProps(tab, {}, {text: 'Shell'});
+    expect(disabledProps.text).toBe('Shell');
+    expect(disabledProps.tabIndex).toBe(tab.tabIndex);
 
-  const disabledProps = plugins.getTabProps(tab, {}, {text: 'Shell'});
-  expect(disabledProps.text).toBe('Shell');
-  expect(disabledProps.tabIndex).toBe(tab.tabIndex);
-
-  rendererConfig = {
-    plugins: {
-      [GOLDEN_PATH_PLUGIN_ID]: {
-        enabled: true,
-        tabPrefix: 'GP'
+    harness.setRendererConfig({
+      plugins: {
+        [GOLDEN_PATH_PLUGIN_ID]: {
+          enabled: true,
+          tabPrefix: 'GP'
+        }
       }
-    }
-  };
+    });
 
-  rendererConfigSubscriptions.forEach((listener) => {
-    listener();
-  });
+    harness.notifyRendererConfigSubscribers();
 
-  const enabledProps = plugins.getTabProps(tab, {}, {text: 'Shell'});
-  expect(enabledProps.text).toBe('[GP] Shell');
+    const enabledProps = harness.plugins.getTabProps(tab, {}, {text: 'Shell'});
+    expect(enabledProps.text).toBe('[GP] Shell');
+  } finally {
+    harness.cleanup();
+  }
 });

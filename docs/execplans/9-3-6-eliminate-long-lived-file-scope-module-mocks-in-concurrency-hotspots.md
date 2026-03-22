@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision log`, and `Outcomes & retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -374,13 +374,30 @@ Do not mark `9.3.6` done until:
   debt rather than a reliably red probe.
 - [x] 2026-03-22 03:12Z: Collected agent-team findings on roadmap boundaries,
   existing developer guidance, and per-suite lifetime risks.
-- [ ] Await user approval before implementation.
-- [ ] Implement the per-suite lifetime fixes and any narrowly necessary helper
-  or production seams.
-- [ ] Run the focused concurrent loop and the required gate stack with durable
-  logs.
-- [ ] Update `docs/developers-guide.md` and mark `docs/roadmap.md` item
-  `9.3.6` done after validation.
+- [x] 2026-03-22 11:03Z: User explicitly requested implementation of this
+  approved execplan, so work moved from draft planning into execution.
+- [x] 2026-03-22 11:49Z: Refactored the three hotspot suites so cleanup is
+  test-owned. `runtime-tab-provider-registration` now uses a per-test module
+  harness, `command-registry-compat` now uses an injected command-registry
+  factory instead of transport/window module mocks, and
+  `config-import-json5` now uses an injected config-import factory instead of
+  file-scope mocked paths/init/notify modules.
+- [x] 2026-03-22 11:57Z: Updated `docs/developers-guide.md` with the `9.3.6`
+  concurrency rule and focused probe command. Roadmap sync remains pending
+  until validation is complete.
+- [x] 2026-03-22 12:06Z: Completed the 20-run focused concurrent stress loop
+  and captured green results in
+  `/tmp/concurrent-9-3-6-velocetty-9-3-6-eliminate-long-lived-file-scope-module-mocks-in-concurrency-hotspots.out`.
+- [x] 2026-03-22 12:15Z: Completed the required gate stack with durable logs:
+  `/tmp/install-velocetty-9-3-6-eliminate-long-lived-file-scope-module-mocks-in-concurrency-hotspots.out`,
+  `/tmp/build-velocetty-9-3-6-eliminate-long-lived-file-scope-module-mocks-in-concurrency-hotspots.out`,
+  `/tmp/check-fmt-velocetty-9-3-6-eliminate-long-lived-file-scope-module-mocks-in-concurrency-hotspots.out`,
+  `/tmp/lint-velocetty-9-3-6-eliminate-long-lived-file-scope-module-mocks-in-concurrency-hotspots.out`,
+  `/tmp/test-velocetty-9-3-6-eliminate-long-lived-file-scope-module-mocks-in-concurrency-hotspots.out`,
+  and
+  `/tmp/markdownlint-velocetty-9-3-6-eliminate-long-lived-file-scope-module-mocks-in-concurrency-hotspots.out`.
+- [x] 2026-03-22 12:17Z: Marked `docs/roadmap.md` item `9.3.6` complete after
+  the focused stress loop, required gates, and docs sync all succeeded.
 
 ## Surprises & discoveries
 
@@ -397,6 +414,11 @@ Do not mark `9.3.6` done until:
 - `lib/utils/plugins.ts` performs import-time runtime-provider registration, so
   the runtime-tab-provider suite may need a fuller per-test import harness than
   the other two files.
+- Bun's `mock.module(...)` lifetime is still process-global enough that naive
+  per-test `mock.restore()` cleanup can race inside the same hotspot file.
+  `command-registry-compat` and `config-import-json5` both needed narrow
+  production factories so tests could inject transport, focus, path, init, and
+  notify dependencies without sharing module mocks across tests.
 
 ## Decision log
 
@@ -415,14 +437,20 @@ Do not mark `9.3.6` done until:
 - 2026-03-22 03:13Z: Set the post-fix focused stress loop to 20 runs. The
   current baseline already passed 5 runs, so a stronger repeated check is
   needed to prove that the refactor did not merely preserve a lucky streak.
+- 2026-03-22 11:24Z: Escalate from harness-only changes to narrow
+  behaviour-preserving production seams after confirming that Bun's
+  process-global module-mock restoration still leaked across tests in the same
+  hotspot files during explicit `--concurrent` runs.
+- 2026-03-22 11:43Z: Keep the production seam narrow by injecting only the
+  dependencies that were previously being mocked globally:
+  `command-registry` now accepts transport invocation and focus callbacks for
+  test-created instances, and `config/import` now exposes a factory for
+  paths/init/notify dependencies while leaving the default exports unchanged.
 
 ## Outcomes & retrospective
 
-Draft phase only. This file now captures the current `9.3.6` scope, the known
-hotspot lifetimes, the likely implementation seams, and the validation
-contract. No production or test code has been changed, and no implementation
-has started.
-
-If the user approves this plan, the next pass should execute the stages above,
-keep this document updated as a living record, and stop immediately if a
-tolerance threshold is reached.
+Implementation completed. The hotspot suites now use test-owned cleanup, the
+required narrow production factories are in place where Bun's module-mock
+lifetime still leaked across tests, the 20-run focused concurrent probe is
+green, the required gate stack is green, and the roadmap/docs are synchronized
+in the same change set.

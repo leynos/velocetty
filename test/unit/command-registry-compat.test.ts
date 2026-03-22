@@ -20,9 +20,8 @@
  * Usage:
  * - run this module directly with
  *   `bun test test/unit/command-registry-compat.test.ts`
- * - the suite installs its own IPC transport mock and temporary
- *   `window.focusActiveTerm` shim during `beforeAll`, then restores the prior
- *   property state in `afterAll`
+ * - each test installs its own IPC transport mock and temporary
+ *   `window.focusActiveTerm` shim before importing the module under test
  *
  * Related modules:
  * - `../../lib/command-registry.ts` implements the compatibility aliases and
@@ -32,176 +31,137 @@
  * - `./ensure-directory-path.test.ts` is the companion example for this
  *   richer test-module header format
  */
-import {afterAll, afterEach, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import {expect, mock, test} from 'bun:test';
 import {SESSION_SEARCH} from '@shared/constants/sessions';
 import type {CommandDefinition} from '@shared/types/commands';
 
-import {installTestWindow} from '../testUtils/global-window';
+import {createCommandRegistryModule} from '../../lib/command-registry';
 
-let decoratedKeymaps: Record<string, string[]> = {};
-let runtimeCommands: CommandDefinition[] = [];
-const invokeMock = mock(async (channel: string) => {
-  if (channel === 'getRuntimePluginCommands') {
-    return runtimeCommands;
-  }
-  if (channel === 'getDecoratedKeymaps') {
-    return decoratedKeymaps;
-  }
-  throw new Error(`Unexpected IPC channel: ${channel}`);
-});
+type CommandRegistryCompatHarness = typeof import('../../lib/command-registry') & {
+  cleanup: () => void;
+  focusActiveTermMock: ReturnType<typeof mock<() => void>>;
+  invokeMock: ReturnType<typeof mock<(channel: string) => Promise<Record<string, string[]> | CommandDefinition[]>>>;
+  setDecoratedKeymaps: (nextKeymaps: Record<string, string[]>) => void;
+  setRuntimeCommands: (nextCommands: CommandDefinition[]) => void;
+};
 
-mock.module('../../lib/transport/electron-ipc-transport', () => ({
-  transport: {
-    invoke: invokeMock
-  }
-}));
+const createCommandRegistryCompatHarness = async (): Promise<CommandRegistryCompatHarness> => {
+  let decoratedKeymaps: Record<string, string[]> = {};
+  let runtimeCommands: CommandDefinition[] = [];
+  const invokeMock = mock(async (channel: string) => {
+    if (channel === 'getRuntimePluginCommands') {
+      return runtimeCommands;
+    }
+    if (channel === 'getDecoratedKeymaps') {
+      return decoratedKeymaps;
+    }
+    throw new Error(`Unexpected IPC channel: ${channel}`);
+  });
+  const focusActiveTermMock = mock(() => {});
 
-let registerCommandHandlers: typeof import('../../lib/command-registry').registerCommandHandlers;
-let getCommandHandler: typeof import('../../lib/command-registry').getCommandHandler;
-let register: typeof import('../../lib/command-registry').register;
-let update: typeof import('../../lib/command-registry').update;
-let remove: typeof import('../../lib/command-registry').remove;
-let get: typeof import('../../lib/command-registry').get;
-let list: typeof import('../../lib/command-registry').list;
-let has: typeof import('../../lib/command-registry').has;
-let validateArgs: typeof import('../../lib/command-registry').validateArgs;
-let registerCommand: typeof import('../../lib/command-registry').registerCommand;
-let createCommand: typeof import('../../lib/command-registry').createCommand;
-let updateCommand: typeof import('../../lib/command-registry').updateCommand;
-let replaceCommand: typeof import('../../lib/command-registry').replaceCommand;
-let removeCommand: typeof import('../../lib/command-registry').removeCommand;
-let deleteCommand: typeof import('../../lib/command-registry').deleteCommand;
-let getCommand: typeof import('../../lib/command-registry').getCommand;
-let getCommandDefinition: typeof import('../../lib/command-registry').getCommandDefinition;
-let listCommands: typeof import('../../lib/command-registry').listCommands;
-let enumerateCommands: typeof import('../../lib/command-registry').enumerateCommands;
-let hasCommand: typeof import('../../lib/command-registry').hasCommand;
-let hasCommandDefinition: typeof import('../../lib/command-registry').hasCommandDefinition;
-let validateCommandArgs: typeof import('../../lib/command-registry').validateCommandArgs;
-let validateCommandArgsFor: typeof import('../../lib/command-registry').validateCommandArgsFor;
-
-const TEST_COMMAND_PREFIX = 'test:command-registry:compat';
-const focusActiveTermMock = mock(() => {});
-const commandRegistryWindowDouble: Record<string, unknown> = {};
-let restoreWindow = () => {};
-let moduleInstanceCounter = 0;
-
-beforeAll(() => {
-  commandRegistryWindowDouble.focusActiveTerm = focusActiveTermMock;
-  restoreWindow = installTestWindow(commandRegistryWindowDouble);
-});
-
-afterAll(() => {
-  restoreWindow();
-});
-
-afterEach(() => {
-  mock.restore();
-});
-
-beforeEach(async () => {
-  invokeMock.mockClear();
-  focusActiveTermMock.mockClear();
-  decoratedKeymaps = {};
-  runtimeCommands = [];
-
-  moduleInstanceCounter += 1;
-  ({
-    registerCommandHandlers,
-    getCommandHandler,
-    register,
-    update,
-    remove,
-    get,
-    list,
-    has,
-    validateArgs,
-    registerCommand,
-    createCommand,
-    updateCommand,
-    replaceCommand,
-    removeCommand,
-    deleteCommand,
-    getCommand,
-    getCommandDefinition,
-    listCommands,
-    enumerateCommands,
-    hasCommand,
-    hasCommandDefinition,
-    validateCommandArgs,
-    validateCommandArgsFor
-  } = await import(`../../lib/command-registry.ts?command_registry_compat_unit=${moduleInstanceCounter}`));
-
-  list()
-    .filter((command) => command.id.startsWith(TEST_COMMAND_PREFIX))
-    .forEach((command) => {
-      remove(command.id);
-    });
-});
+  return {
+    ...createCommandRegistryModule({
+      focusActiveTerm: focusActiveTermMock,
+      transport: {
+        invoke: invokeMock
+      }
+    }),
+    cleanup: () => {},
+    focusActiveTermMock,
+    invokeMock,
+    setDecoratedKeymaps: (nextKeymaps) => {
+      decoratedKeymaps = nextKeymaps;
+    },
+    setRuntimeCommands: (nextCommands) => {
+      runtimeCommands = nextCommands;
+    }
+  };
+};
 
 test('registerCommandHandlers ignores undefined input without mutating the registry', () => {
-  const registryBeforeUndefinedCall = list().map((command) => ({
-    id: command.id,
-    handler: getCommandHandler(command.id)
-  }));
+  return (async () => {
+    const harness = await createCommandRegistryCompatHarness();
+    try {
+      const registryBeforeUndefinedCall = harness.list().map((command) => ({
+        id: command.id,
+        handler: harness.getCommandHandler(command.id)
+      }));
 
-  registerCommandHandlers(undefined);
+      harness.registerCommandHandlers(undefined);
 
-  const registryAfterUndefinedCall = list().map((command) => ({
-    id: command.id,
-    handler: getCommandHandler(command.id)
-  }));
+      const registryAfterUndefinedCall = harness.list().map((command) => ({
+        id: command.id,
+        handler: harness.getCommandHandler(command.id)
+      }));
 
-  expect(registryAfterUndefinedCall).toStrictEqual(registryBeforeUndefinedCall);
+      expect(registryAfterUndefinedCall).toStrictEqual(registryBeforeUndefinedCall);
+    } finally {
+      harness.cleanup();
+    }
+  })();
 });
 
 test('compatibility aliases mirror the primary command-registry APIs', () => {
-  expect(registerCommand).toBe(register);
-  expect(createCommand).toBe(register);
-  expect(updateCommand).toBe(update);
-  expect(replaceCommand).toBe(update);
-  expect(removeCommand).toBe(remove);
-  expect(deleteCommand).toBe(remove);
-  expect(getCommand).toBe(get);
-  expect(getCommandDefinition).toBe(get);
-  expect(listCommands).toBe(list);
-  expect(enumerateCommands).toBe(list);
-  expect(hasCommand).toBe(has);
-  expect(hasCommandDefinition).toBe(has);
-  expect(validateCommandArgs).toBe(validateArgs);
-  expect(validateCommandArgsFor).toBe(validateArgs);
+  return (async () => {
+    const harness = await createCommandRegistryCompatHarness();
+    try {
+      expect(harness.registerCommand).toBe(harness.register);
+      expect(harness.createCommand).toBe(harness.register);
+      expect(harness.updateCommand).toBe(harness.update);
+      expect(harness.replaceCommand).toBe(harness.update);
+      expect(harness.removeCommand).toBe(harness.remove);
+      expect(harness.deleteCommand).toBe(harness.remove);
+      expect(harness.getCommand).toBe(harness.get);
+      expect(harness.getCommandDefinition).toBe(harness.get);
+      expect(harness.listCommands).toBe(harness.list);
+      expect(harness.enumerateCommands).toBe(harness.list);
+      expect(harness.hasCommand).toBe(harness.has);
+      expect(harness.hasCommandDefinition).toBe(harness.has);
+      expect(harness.validateCommandArgs).toBe(harness.validateArgs);
+      expect(harness.validateCommandArgsFor).toBe(harness.validateArgs);
+    } finally {
+      harness.cleanup();
+    }
+  })();
 });
 
 test('legacy search-close handler dispatches closeSearch and focuses the active terminal', () => {
-  const dispatch = mock(() => {});
-  const innerDispatch = mock(() => {});
+  return (async () => {
+    const harness = await createCommandRegistryCompatHarness();
+    try {
+      const dispatch = mock(() => {});
+      const innerDispatch = mock(() => {});
 
-  getCommandHandler('editor:search-close')?.('event-payload', dispatch as unknown as never);
+      harness.getCommandHandler('editor:search-close')?.('event-payload', dispatch as unknown as never);
 
-  expect(dispatch).toHaveBeenCalledTimes(1);
-  const dispatchedThunk = dispatch.mock.calls[0]?.[0];
-  expect(dispatchedThunk).toBeFunction();
-  if (typeof dispatchedThunk !== 'function') {
-    throw new Error('Expected the legacy search-close handler to dispatch a thunk');
-  }
-
-  dispatchedThunk(innerDispatch as never, () => ({
-    sessions: {
-      activeUid: 'active-session',
-      sessions: {
-        'active-session': {
-          search: true
-        }
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      const dispatchedThunk = dispatch.mock.calls[0]?.[0];
+      expect(dispatchedThunk).toBeFunction();
+      if (typeof dispatchedThunk !== 'function') {
+        throw new Error('Expected the legacy search-close handler to dispatch a thunk');
       }
-    }
-  }));
 
-  expect(innerDispatch).toHaveBeenCalledWith(
-    expect.objectContaining({
-      type: SESSION_SEARCH,
-      uid: 'active-session',
-      value: false
-    })
-  );
-  expect(focusActiveTermMock).toHaveBeenCalledTimes(1);
+      dispatchedThunk(innerDispatch as never, () => ({
+        sessions: {
+          activeUid: 'active-session',
+          sessions: {
+            'active-session': {
+              search: true
+            }
+          }
+        }
+      }));
+
+      expect(innerDispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: SESSION_SEARCH,
+          uid: 'active-session',
+          value: false
+        })
+      );
+      expect(harness.focusActiveTermMock).toHaveBeenCalledTimes(1);
+    } finally {
+      harness.cleanup();
+    }
+  })();
 });

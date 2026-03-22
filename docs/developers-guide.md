@@ -652,6 +652,25 @@ Prefer a per-test API factory with injected filesystem, registry, and
 environment state so explicit `--concurrent` runs keep request history,
 config-path resolution, and parsed-plugin state isolated per test instance.
 
+For roadmap item `9.3.6` and similar concurrency-hotspot cleanup, use a
+focused explicit-concurrency stress run against the remaining long-lived mock
+and global hotspots:
+
+```bash
+bun test --concurrent \
+  test/unit/runtime-tab-provider-registration.test.ts \
+  test/unit/command-registry-compat.test.ts \
+  test/unit/config-import-json5.test.ts
+```
+
+Suites that must survive that probe must not rely on `afterAll(...)` to tear
+down `mock.module(...)` registrations, temporary `window` installs, or other
+process-global shims. Prefer per-test harness helpers that either return a
+cleanup callback or accept injected dependencies directly. When a module under
+test captures transport, config, or filesystem state at module scope, add the
+smallest behaviour-preserving factory seam needed so tests can provide
+test-owned dependencies without long-lived module mocks.
+
 ### End-to-end (E2E) tests (layered strategy)
 
 End-to-end tests are split into two lanes and require packaged binaries in

@@ -1,19 +1,37 @@
 /** @file Imports and normalizes user and default configuration files. */
+import {createRequire} from 'node:module';
 import {resolve} from 'node:path';
 
 import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
 import {z} from 'zod';
 
-import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
-import notify from '../notify';
+import type {configValidationDiagnostic, parsedConfig, rawConfig} from '@shared/types/config';
 import {parseJson5WithSchemaDiagnostics, safeParseRawConfig, stringifyJson5, type ParseSchema} from './json5-config';
-
-import {_init} from './init';
-import {cfgDir, cfgPath, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath} from './paths';
 
 type LoadedConfig = {
   config: rawConfig;
   diagnostics: configValidationDiagnostic[];
+};
+
+type ConfigInit = (userCfg: rawConfig, defaultCfg: rawConfig) => parsedConfig;
+
+export type ConfigImportPaths = {
+  cfgDir: string;
+  cfgPath: string;
+  defaultCfg: string;
+  defaultPlatformKeyPath: () => string;
+  plugs: {
+    base: string;
+    local: string;
+  };
+  schemaFile: string;
+  schemaPath: string;
+};
+
+type ConfigImportDependencies = {
+  _init: ConfigInit;
+  notify: (title: string, body?: string, details?: {error?: unknown}) => void;
+  paths: ConfigImportPaths;
 };
 
 /** A file path used to identify a config artefact in diagnostics. */
@@ -27,7 +45,6 @@ type ConfigSource = {
   readonly rawContent: string;
 };
 
-let defaultConfig: rawConfig;
 const defaultRawConfigFallback: rawConfig = {
   plugins: [],
   localPlugins: [],
@@ -81,6 +98,8 @@ const rawConfigDiagnosticHints = {
   }
 } as const;
 
+const requireFromHere = createRequire(__filename);
+
 const keymapDiagnosticHints = {
   '/': {
     docHint: 'Keymap entries map command ids to keybinding strings or arrays.',
@@ -95,16 +114,20 @@ const reportDiagnostics = (context: string, source: ConfigFilePath, diagnostics:
   console.warn(`[config-import] ${context}`, {source: source.path, diagnostics});
 };
 
-const notifyWithPrimaryDiagnostic = (baseMessage: string, diagnostics: configValidationDiagnostic[]) => {
+const notifyWithPrimaryDiagnostic = (
+  notifyFn: ConfigImportDependencies['notify'],
+  baseMessage: string,
+  diagnostics: configValidationDiagnostic[]
+) => {
   const primaryDiagnostic = diagnostics[0];
   if (!primaryDiagnostic) {
-    notify(baseMessage);
+    notifyFn(baseMessage);
     return;
   }
 
   const docHint = primaryDiagnostic.docHint ? ` Hint: ${primaryDiagnostic.docHint}.` : '';
   const defaultHint = primaryDiagnostic.defaultHint ? ` Default: ${primaryDiagnostic.defaultHint}.` : '';
-  notify(
+  notifyFn(
     `${baseMessage} ${primaryDiagnostic.path}: ${primaryDiagnostic.message} Suggested fix: ${primaryDiagnostic.suggestedFix}.${docHint}${defaultHint}`
   );
 };
@@ -161,163 +184,220 @@ const stringifyConfig = (config: rawConfig): string => stringifyJson5(config);
  * Logs and notifies when copying fails so schema-backed editor metadata issues
  * are visible to users.
  */
-const ensureSchemaFile = () => {
-  const destinationPath = resolve(cfgDir, schemaFile);
-  try {
-    copySync(schemaPath, destinationPath, {overwrite: true});
-  } catch (err) {
-    console.error(`[config-import] Failed to copy schema file from "${schemaPath}" to "${destinationPath}".`, err);
-    notify("Couldn't update config schema metadata. Config editor validation may be stale.");
-  }
-};
+export const createConfigImportModule = (dependencies: ConfigImportDependencies) => {
+  const {_init: initConfig, notify: notifyFn} = dependencies;
+  const pathDeps = dependencies.paths;
+  let defaultConfig: rawConfig;
 
-/**
- * Bootstraps the user config file from the provided default template.
- *
- * When writing fails, emits contextual error logs and notifies the user.
- */
-const ensureUserConfigFile = (defaultConfigTemplate: rawConfig) => {
-  if (existsSync(cfgPath)) {
-    return;
-  }
-
-  console.warn(`[config-import] User config file missing at "${cfgPath}". Bootstrapping from default config template.`);
-  try {
-    writeFileSync(cfgPath, stringifyConfig(defaultConfigTemplate), 'utf8');
-  } catch (error) {
-    console.error(`[config-import] Failed to write bootstrapped user config at "${cfgPath}".`, error);
-    notify("Couldn't create a user config file. Check permissions and available disk space.");
-  }
-};
-
-const isConfigImportDebugEnabled = () => process.env.DEBUG_CONFIG_IMPORT === '1';
-
-const loadDefaultConfig = (): LoadedConfig => {
-  let defaultCfgRaw = '{}';
-  try {
-    defaultCfgRaw = readFileSync(defaultCfg, 'utf8');
-  } catch (err) {
-    console.error(`[config-import] Failed to read bundled default config at "${defaultCfg}".`, err);
-  }
-
-  const filePath: ConfigFilePath = {path: defaultCfg};
-  const parsedDefaultConfigResult = parseRawConfig({filePath, rawContent: defaultCfgRaw});
-  if (parsedDefaultConfigResult.usedFallback) {
-    reportDiagnostics('Bundled default config diagnostics.', filePath, parsedDefaultConfigResult.diagnostics);
-  }
-
-  if (!parsedDefaultConfigResult.usedFallback && parsedDefaultConfigResult.value !== null) {
-    return {
-      config: parsedDefaultConfigResult.value,
-      diagnostics: parsedDefaultConfigResult.diagnostics
-    };
-  }
-
-  console.error(
-    `[config-import] Failed to parse bundled default config at "${defaultCfg}". Using safe fallback defaults.`
-  );
-  notifyWithPrimaryDiagnostic(
-    "Couldn't parse the bundled default config. Falling back to safe defaults.",
-    parsedDefaultConfigResult.diagnostics
-  );
-  return {
-    config: cloneRawConfig(defaultRawConfigFallback),
-    diagnostics: parsedDefaultConfigResult.diagnostics
-  };
-};
-
-const loadPlatformKeymap = (): Record<string, string | string[]> => {
-  const platformKeyPath = defaultPlatformKeyPath();
-  const filePath: ConfigFilePath = {path: platformKeyPath};
-  let content = '{}';
-  try {
-    content = readFileSync(platformKeyPath, 'utf8');
-  } catch (err) {
-    console.error(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`, err);
-  }
-
-  const keymapResult = parseKeymapConfig({filePath, rawContent: content});
-  if (keymapResult.usedFallback) {
-    reportDiagnostics('Platform keymap diagnostics.', filePath, keymapResult.diagnostics);
-  }
-  return keymapResult.value;
-};
-
-const loadUserConfig = (defaultConfigFallback: rawConfig): LoadedConfig => {
-  const filePath: ConfigFilePath = {path: cfgPath};
-  try {
-    const userCfgResult = parseRawConfig({filePath, rawContent: readFileSync(cfgPath, 'utf8')});
-    if (userCfgResult.usedFallback) {
-      reportDiagnostics('User config diagnostics.', filePath, userCfgResult.diagnostics);
+  const ensureSchemaFile = () => {
+    const destinationPath = resolve(pathDeps.cfgDir, pathDeps.schemaFile);
+    try {
+      copySync(pathDeps.schemaPath, destinationPath, {overwrite: true});
+    } catch (err) {
+      console.error(
+        `[config-import] Failed to copy schema file from "${pathDeps.schemaPath}" to "${destinationPath}".`,
+        err
+      );
+      notifyFn("Couldn't update config schema metadata. Config editor validation may be stale.");
     }
-    if (!userCfgResult.usedFallback && userCfgResult.value !== null) {
+  };
+
+  /**
+   * Bootstraps the user config file from the provided default template.
+   *
+   * When writing fails, emits contextual error logs and notifies the user.
+   */
+  const ensureUserConfigFile = (defaultConfigTemplate: rawConfig) => {
+    if (existsSync(pathDeps.cfgPath)) {
+      return;
+    }
+
+    console.warn(
+      `[config-import] User config file missing at "${pathDeps.cfgPath}". Bootstrapping from default config template.`
+    );
+    try {
+      writeFileSync(pathDeps.cfgPath, stringifyConfig(defaultConfigTemplate), 'utf8');
+    } catch (error) {
+      console.error(`[config-import] Failed to write bootstrapped user config at "${pathDeps.cfgPath}".`, error);
+      notifyFn("Couldn't create a user config file. Check permissions and available disk space.");
+    }
+  };
+
+  const isConfigImportDebugEnabled = () => process.env.DEBUG_CONFIG_IMPORT === '1';
+
+  const loadDefaultConfig = (): LoadedConfig => {
+    let defaultCfgRaw = '{}';
+    try {
+      defaultCfgRaw = readFileSync(pathDeps.defaultCfg, 'utf8');
+    } catch (err) {
+      console.error(`[config-import] Failed to read bundled default config at "${pathDeps.defaultCfg}".`, err);
+    }
+
+    const filePath: ConfigFilePath = {path: pathDeps.defaultCfg};
+    const parsedDefaultConfigResult = parseRawConfig({filePath, rawContent: defaultCfgRaw});
+    if (parsedDefaultConfigResult.usedFallback) {
+      reportDiagnostics('Bundled default config diagnostics.', filePath, parsedDefaultConfigResult.diagnostics);
+    }
+
+    if (!parsedDefaultConfigResult.usedFallback && parsedDefaultConfigResult.value !== null) {
       return {
-        config: userCfgResult.value,
-        diagnostics: userCfgResult.diagnostics
+        config: parsedDefaultConfigResult.value,
+        diagnostics: parsedDefaultConfigResult.diagnostics
       };
     }
 
-    console.warn(
-      `[config-import] Using default config fallback after user config parse failure. userPath="${cfgPath}" defaultPath="${defaultCfg}"`
+    console.error(
+      `[config-import] Failed to parse bundled default config at "${pathDeps.defaultCfg}". Using safe fallback defaults.`
     );
-    notifyWithPrimaryDiagnostic("Couldn't parse config file. Using default config instead.", userCfgResult.diagnostics);
-    return {
-      config: cloneRawConfig(defaultConfigFallback),
-      diagnostics: userCfgResult.diagnostics
-    };
-  } catch (err) {
-    console.error(`[config-import] Failed to read or parse user config at "${cfgPath}".`, err);
-    console.warn(
-      `[config-import] Using default config fallback after user config parse failure. userPath="${cfgPath}" defaultPath="${defaultCfg}"`
+    notifyWithPrimaryDiagnostic(
+      notifyFn,
+      "Couldn't parse the bundled default config. Falling back to safe defaults.",
+      parsedDefaultConfigResult.diagnostics
     );
-    notifyWithPrimaryDiagnostic("Couldn't parse config file. Using default config instead.", []);
     return {
-      config: cloneRawConfig(defaultConfigFallback),
-      diagnostics: []
+      config: cloneRawConfig(defaultRawConfigFallback),
+      diagnostics: parsedDefaultConfigResult.diagnostics
     };
+  };
+
+  const loadPlatformKeymap = (): Record<string, string | string[]> => {
+    const platformKeyPath = pathDeps.defaultPlatformKeyPath();
+    const filePath: ConfigFilePath = {path: platformKeyPath};
+    let content = '{}';
+    try {
+      content = readFileSync(platformKeyPath, 'utf8');
+    } catch (err) {
+      console.error(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`, err);
+    }
+
+    const keymapResult = parseKeymapConfig({filePath, rawContent: content});
+    if (keymapResult.usedFallback) {
+      reportDiagnostics('Platform keymap diagnostics.', filePath, keymapResult.diagnostics);
+    }
+    return keymapResult.value;
+  };
+
+  const loadUserConfig = (defaultConfigFallback: rawConfig): LoadedConfig => {
+    const filePath: ConfigFilePath = {path: pathDeps.cfgPath};
+    try {
+      const userCfgResult = parseRawConfig({filePath, rawContent: readFileSync(pathDeps.cfgPath, 'utf8')});
+      if (userCfgResult.usedFallback) {
+        reportDiagnostics('User config diagnostics.', filePath, userCfgResult.diagnostics);
+      }
+      if (!userCfgResult.usedFallback && userCfgResult.value !== null) {
+        return {
+          config: userCfgResult.value,
+          diagnostics: userCfgResult.diagnostics
+        };
+      }
+
+      console.warn(
+        `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
+      );
+      notifyWithPrimaryDiagnostic(
+        notifyFn,
+        "Couldn't parse config file. Using default config instead.",
+        userCfgResult.diagnostics
+      );
+      return {
+        config: cloneRawConfig(defaultConfigFallback),
+        diagnostics: userCfgResult.diagnostics
+      };
+    } catch (err) {
+      console.error(`[config-import] Failed to read or parse user config at "${pathDeps.cfgPath}".`, err);
+      console.warn(
+        `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
+      );
+      notifyWithPrimaryDiagnostic(notifyFn, "Couldn't parse config file. Using default config instead.", []);
+      return {
+        config: cloneRawConfig(defaultConfigFallback),
+        diagnostics: []
+      };
+    }
+  };
+
+  const _importConf = () => {
+    if (isConfigImportDebugEnabled()) {
+      console.warn('[config-import] Initializing config import using app-local JSON5 helpers.');
+    }
+    // init plugin directories if not present
+    mkdirpSync(pathDeps.plugs.base);
+    mkdirpSync(pathDeps.plugs.local);
+    ensureSchemaFile();
+
+    const {config: _defaultCfg} = loadDefaultConfig();
+
+    ensureUserConfigFile(_defaultCfg);
+
+    _defaultCfg.keymaps = loadPlatformKeymap();
+
+    const {config: userCfg} = loadUserConfig(_defaultCfg);
+
+    return {userCfg, defaultCfg: _defaultCfg};
+  };
+
+  const _import = () => {
+    const imported = _importConf();
+    defaultConfig = imported.defaultCfg;
+    const result = initConfig(imported.userCfg, imported.defaultCfg);
+    return result;
+  };
+
+  /**
+   * Returns the cached default config payload.
+   *
+   * When `_import` has not run yet, this method lazily calls `_importConf` to
+   * initialize `defaultConfig`. That initialization performs filesystem side
+   * effects:
+   * - plugin directory creation (`mkdirpSync`)
+   * - schema copy into the config directory (`ensureSchemaFile`)
+   * - user config bootstrapping when missing (`ensureUserConfigFile`)
+   */
+  const getDefaultConfig = () => {
+    if (!defaultConfig) {
+      defaultConfig = _importConf().defaultCfg;
+    }
+    return defaultConfig;
+  };
+
+  return {_import, getDefaultConfig};
+};
+
+const configImportModule = createConfigImportModule({
+  _init: (...args) => {
+    const initModule = requireFromHere('./init');
+    const defaultInit = initModule._init as ConfigInit;
+    return defaultInit(...args);
+  },
+  notify: (...args) => {
+    const notifyModule = requireFromHere('../notify');
+    const defaultNotify = notifyModule.default as ConfigImportDependencies['notify'];
+    return defaultNotify(...args);
+  },
+  paths: {
+    get cfgDir() {
+      return requireFromHere('./paths').cfgDir as string;
+    },
+    get cfgPath() {
+      return requireFromHere('./paths').cfgPath as string;
+    },
+    get defaultCfg() {
+      return requireFromHere('./paths').defaultCfg as string;
+    },
+    defaultPlatformKeyPath: () => {
+      return requireFromHere('./paths').defaultPlatformKeyPath() as string;
+    },
+    get plugs() {
+      return requireFromHere('./paths').plugs as ConfigImportPaths['plugs'];
+    },
+    get schemaFile() {
+      return requireFromHere('./paths').schemaFile as string;
+    },
+    get schemaPath() {
+      return requireFromHere('./paths').schemaPath as string;
+    }
   }
-};
+});
 
-const _importConf = () => {
-  if (isConfigImportDebugEnabled()) {
-    console.warn('[config-import] Initializing config import using app-local JSON5 helpers.');
-  }
-  // init plugin directories if not present
-  mkdirpSync(plugs.base);
-  mkdirpSync(plugs.local);
-  ensureSchemaFile();
-
-  const {config: _defaultCfg} = loadDefaultConfig();
-
-  ensureUserConfigFile(_defaultCfg);
-
-  _defaultCfg.keymaps = loadPlatformKeymap();
-
-  const {config: userCfg} = loadUserConfig(_defaultCfg);
-
-  return {userCfg, defaultCfg: _defaultCfg};
-};
-
-export const _import = () => {
-  const imported = _importConf();
-  defaultConfig = imported.defaultCfg;
-  const result = _init(imported.userCfg, imported.defaultCfg);
-  return result;
-};
-
-/**
- * Returns the cached default config payload.
- *
- * When `_import` has not run yet, this method lazily calls `_importConf` to
- * initialize `defaultConfig`. That initialization performs filesystem side
- * effects:
- * - plugin directory creation (`mkdirpSync`)
- * - schema copy into the config directory (`ensureSchemaFile`)
- * - user config bootstrapping when missing (`ensureUserConfigFile`)
- */
-export const getDefaultConfig = () => {
-  if (!defaultConfig) {
-    defaultConfig = _importConf().defaultCfg;
-  }
-  return defaultConfig;
-};
+export const _import = configImportModule._import;
+export const getDefaultConfig = configImportModule.getDefaultConfig;

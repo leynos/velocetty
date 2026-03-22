@@ -1,5 +1,5 @@
 /** @file Verifies JSON5 config import and startup bootstrap without legacy migration. */
-import {afterAll, afterEach, beforeEach, expect, mock, test} from 'bun:test';
+import {expect, mock, test} from 'bun:test';
 
 import {mkdtempSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -8,26 +8,21 @@ import {join} from 'node:path';
 import {existsSync, mkdirpSync, readFileSync, removeSync, writeFileSync} from 'fs-extra';
 import JSON5 from 'json5';
 
-const workspaceRoot = mkdtempSync(join(tmpdir(), 'velocetty-config-import-'));
-const mockPaths = {
-  cfgDir: join(workspaceRoot, 'user-config'),
-  cfgPath: join(workspaceRoot, 'user-config', 'config.json5'),
-  defaultCfg: join(workspaceRoot, 'defaults', 'config-default.json'),
-  defaultPlatformKeyPath: () => join(workspaceRoot, 'defaults', 'linux.json'),
-  plugs: {
-    base: join(workspaceRoot, 'user-config', 'plugins'),
-    local: join(workspaceRoot, 'user-config', 'plugins', 'local')
-  },
-  schemaFile: 'schema.json',
-  schemaPath: join(workspaceRoot, 'defaults', 'schema.json')
-};
+import {createConfigImportModule, type ConfigImportPaths} from '../../app/config/import';
 
-const notifyMock = mock((_message: string) => {});
-const initMock = mock((userCfg: unknown, defaultCfg: unknown) => ({userCfg, defaultCfg}));
-const warnMock = mock((_message?: unknown, ..._rest: unknown[]) => {});
 const originalConsoleWarn = console.warn;
 
-let importCounter = 0;
+type ConfigInit = Parameters<typeof createConfigImportModule>[0]['_init'];
+
+type ConfigImportHarness = {
+  _import: ReturnType<typeof createConfigImportModule>['_import'];
+  cleanup: () => void;
+  initMock: ReturnType<typeof mock<(userCfg: unknown, defaultCfg: unknown) => {userCfg: unknown; defaultCfg: unknown}>>;
+  mockPaths: ConfigImportPaths;
+  notifyMock: ReturnType<typeof mock<(_message: string) => void>>;
+  warnMock: ReturnType<typeof mock<(_message?: unknown, ..._rest: unknown[]) => void>>;
+  workspaceRoot: string;
+};
 
 const ensureObject = (value: unknown): Record<string, unknown> => {
   if (typeof value !== 'object' || value === null) {
@@ -48,7 +43,9 @@ const extractDiagnostics = (entry: Record<string, unknown>): unknown =>
 const isValidDiagnosticsArray = (diagnostics: unknown): diagnostics is Array<Record<string, unknown>> =>
   Array.isArray(diagnostics) && diagnostics.length > 0;
 
-const findDiagnosticsPayload = (): ParsedDiagnosticsPayload => {
+const findDiagnosticsPayloadFromWarnMock = (
+  warnMock: ReturnType<typeof mock<(_message?: unknown, ..._rest: unknown[]) => void>>
+): ParsedDiagnosticsPayload => {
   for (const call of warnMock.mock.calls) {
     for (const entry of call) {
       if (!isValidObject(entry)) {
@@ -65,18 +62,62 @@ const findDiagnosticsPayload = (): ParsedDiagnosticsPayload => {
   throw new Error('Expected a structured diagnostics payload in warning logs.');
 };
 
-const resetWorkspace = () => {
-  removeSync(workspaceRoot);
-  mkdirpSync(join(workspaceRoot, 'defaults'));
-};
+const createMockPaths = (workspaceRoot: string): ConfigImportPaths => ({
+  cfgDir: join(workspaceRoot, 'user-config'),
+  cfgPath: join(workspaceRoot, 'user-config', 'config.json5'),
+  defaultCfg: join(workspaceRoot, 'defaults', 'config-default.json'),
+  defaultPlatformKeyPath: () => join(workspaceRoot, 'defaults', 'linux.json'),
+  plugs: {
+    base: join(workspaceRoot, 'user-config', 'plugins'),
+    local: join(workspaceRoot, 'user-config', 'plugins', 'local')
+  },
+  schemaFile: 'schema.json',
+  schemaPath: join(workspaceRoot, 'defaults', 'schema.json')
+});
 
-mock.module('../../app/config/init', () => ({_init: initMock}));
-mock.module('../../app/config/paths', () => mockPaths);
-mock.module('../../app/notify', () => ({default: notifyMock}));
+const createConfigImportHarness = async (): Promise<ConfigImportHarness> => {
+  const workspaceRoot = mkdtempSync(join(tmpdir(), 'velocetty-config-import-'));
+  const mockPaths = createMockPaths(workspaceRoot);
+  const notifyMock = mock((_message: string) => {});
+  const initMock = mock((userCfg: unknown, defaultCfg: unknown) => ({userCfg, defaultCfg}));
+  const warnMock = mock((_message?: unknown, ..._rest: unknown[]) => {});
+  let cleanupCalled = false;
 
-const loadConfigImport = async () => {
-  importCounter += 1;
-  return await import(`../../app/config/import.ts?json5_config_case=${importCounter}`);
+  const cleanup = () => {
+    if (cleanupCalled) {
+      return;
+    }
+    cleanupCalled = true;
+    try {
+      console.warn = originalConsoleWarn;
+      mock.restore();
+    } finally {
+      removeSync(workspaceRoot);
+    }
+  };
+
+  try {
+    console.warn = warnMock as typeof console.warn;
+    mkdirpSync(join(workspaceRoot, 'defaults'));
+    const configModule = createConfigImportModule({
+      _init: initMock as ConfigInit,
+      notify: notifyMock as typeof import('../../app/notify').default,
+      paths: mockPaths
+    });
+
+    return {
+      _import: configModule._import,
+      cleanup,
+      initMock,
+      mockPaths,
+      notifyMock,
+      warnMock,
+      workspaceRoot
+    };
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
 };
 
 const sharedDefaultConfigFixture = `{
@@ -88,61 +129,47 @@ const sharedDefaultConfigFixture = `{
 
 type DiagnosticFallbackTestOptions = {
   userConfigContent: string;
-  assertNotification: (message: string) => void;
-  assertPrimaryDiagnostic: (diagnostics: Array<Record<string, unknown>>) => void;
+  assertNotification: (message: string, mockPaths: ConfigImportPaths) => void;
+  assertPrimaryDiagnostic: (diagnostics: Array<Record<string, unknown>>, mockPaths: ConfigImportPaths) => void;
 };
 
 const runDiagnosticFallbackTest = async (options: DiagnosticFallbackTestOptions): Promise<void> => {
-  mkdirpSync(mockPaths.cfgDir);
-  writeFileSync(mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
-  writeFileSync(mockPaths.defaultPlatformKeyPath(), `{"window:new": ["ctrl+n"]}`, 'utf8');
-  writeFileSync(mockPaths.cfgPath, options.userConfigContent, 'utf8');
-  writeFileSync(mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+  const harness = await createConfigImportHarness();
+  try {
+    mkdirpSync(harness.mockPaths.cfgDir);
+    writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
+    writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), `{"window:new": ["ctrl+n"]}`, 'utf8');
+    writeFileSync(harness.mockPaths.cfgPath, options.userConfigContent, 'utf8');
+    writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
 
-  const configModule = await loadConfigImport();
-  const importedConfig = configModule._import();
+    const importedConfig = harness._import();
 
-  expect(notifyMock).toHaveBeenCalledTimes(1);
-  options.assertNotification(notifyMock.mock.calls[0]?.[0] as string);
-  expect(notifyMock.mock.calls[0]?.[0]).toContain('Suggested fix:');
+    expect(harness.notifyMock).toHaveBeenCalledTimes(1);
+    options.assertNotification(harness.notifyMock.mock.calls[0]?.[0] as string, harness.mockPaths);
+    expect(harness.notifyMock.mock.calls[0]?.[0]).toContain('Suggested fix:');
 
-  const diagnosticsPayload = findDiagnosticsPayload();
-  const diagnostics = diagnosticsPayload.diagnostics.map((d) => ensureObject(d));
-  options.assertPrimaryDiagnostic(diagnostics);
+    const diagnosticsPayload = findDiagnosticsPayloadFromWarnMock(harness.warnMock);
+    const diagnostics = diagnosticsPayload.diagnostics.map((d) => ensureObject(d));
+    options.assertPrimaryDiagnostic(diagnostics, harness.mockPaths);
 
-  const expectedFallbackConfig = JSON5.parse(sharedDefaultConfigFixture) as Record<string, unknown>;
-  expectedFallbackConfig.keymaps = {'window:new': ['ctrl+n']};
-  expect(importedConfig.userCfg).toEqual(expectedFallbackConfig);
+    const expectedFallbackConfig = JSON5.parse(sharedDefaultConfigFixture) as Record<string, unknown>;
+    expectedFallbackConfig.keymaps = {'window:new': ['ctrl+n']};
+    expect(importedConfig.userCfg).toEqual(expectedFallbackConfig);
+  } finally {
+    harness.cleanup();
+  }
 };
 
-beforeEach(() => {
-  resetWorkspace();
-  notifyMock.mockClear();
-  initMock.mockClear();
-  warnMock.mockClear();
-  console.warn = warnMock as typeof console.warn;
-});
-
-afterEach(() => {
-  console.warn = originalConsoleWarn;
-});
-
-afterAll(() => {
-  console.warn = originalConsoleWarn;
-  mock.restore();
-  removeSync(workspaceRoot);
-});
-
-test.serial('notifies and falls back to default config on invalid JSON5 user config', async () => {
+test('notifies and falls back to default config on invalid JSON5 user config', async () => {
   await runDiagnosticFallbackTest({
     userConfigContent: `{
       config: { defaultProfile: 'broken' profiles: [{ name: 'broken', config: {} }] },
       plugins: [],
     }`,
-    assertNotification: (message) => {
+    assertNotification: (message, mockPaths) => {
       expect(message).toContain(mockPaths.cfgPath);
     },
-    assertPrimaryDiagnostic: (diagnostics) => {
+    assertPrimaryDiagnostic: (diagnostics, mockPaths) => {
       const primaryDiagnostic = diagnostics.find((d) => {
         const path = typeof d.path === 'string' ? d.path : '';
         const message = typeof d.message === 'string' ? d.message : '';
@@ -158,7 +185,7 @@ test.serial('notifies and falls back to default config on invalid JSON5 user con
   });
 });
 
-test.serial('reports schema validation diagnostics with doc and default hints', async () => {
+test('reports schema validation diagnostics with doc and default hints', async () => {
   await runDiagnosticFallbackTest({
     userConfigContent: `{
       config: { defaultProfile: 'broken', profiles: [{ name: 'broken', config: {} }] },
@@ -183,22 +210,24 @@ test.serial('reports schema validation diagnostics with doc and default hints', 
   });
 });
 
-test.serial('imports user config with JSON5 comments and trailing commas', async () => {
-  mkdirpSync(mockPaths.cfgDir);
-  writeFileSync(
-    mockPaths.defaultCfg,
-    `{
+test('imports user config with JSON5 comments and trailing commas', async () => {
+  const harness = await createConfigImportHarness();
+  try {
+    mkdirpSync(harness.mockPaths.cfgDir);
+    writeFileSync(
+      harness.mockPaths.defaultCfg,
+      `{
       config: { defaultProfile: 'default', profiles: [{ name: 'default', config: {} }] },
       plugins: [],
       localPlugins: [],
       keymaps: {}
     }`,
-    'utf8'
-  );
-  writeFileSync(mockPaths.defaultPlatformKeyPath(), `{"window:new": ["ctrl+n"]}`, 'utf8');
-  writeFileSync(
-    mockPaths.cfgPath,
-    `{
+      'utf8'
+    );
+    writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), `{"window:new": ["ctrl+n"]}`, 'utf8');
+    writeFileSync(
+      harness.mockPaths.cfgPath,
+      `{
       // user overrides in JSON5
       config: {
         defaultProfile: 'work',
@@ -208,58 +237,64 @@ test.serial('imports user config with JSON5 comments and trailing commas', async
       localPlugins: ['plugin-local',],
       keymaps: {'window:close': 'ctrl+w',},
     }`,
-    'utf8'
-  );
-  writeFileSync(mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+      'utf8'
+    );
+    writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
 
-  const configModule = await loadConfigImport();
-  const importedConfig = configModule._import();
+    const importedConfig = harness._import();
 
-  expect(initMock).toHaveBeenCalledTimes(1);
-  expect(importedConfig).toEqual({
-    userCfg: initMock.mock.calls[0]?.[0],
-    defaultCfg: initMock.mock.calls[0]?.[1]
-  });
+    expect(harness.initMock).toHaveBeenCalledTimes(1);
+    expect(importedConfig).toEqual({
+      userCfg: harness.initMock.mock.calls[0]?.[0],
+      defaultCfg: harness.initMock.mock.calls[0]?.[1]
+    });
 
-  const calledUserCfg = ensureObject(initMock.mock.calls[0]?.[0]);
-  const userConfigSection = ensureObject(calledUserCfg.config);
-  const userProfiles = userConfigSection.profiles as Array<Record<string, unknown>>;
-  const firstUserProfileConfig = ensureObject(userProfiles[0]?.config);
-  expect(firstUserProfileConfig.fontSize).toBe(17);
-  expect(calledUserCfg.plugins).toEqual(['plugin-alpha']);
-  expect(calledUserCfg.localPlugins).toEqual(['plugin-local']);
+    const calledUserCfg = ensureObject(harness.initMock.mock.calls[0]?.[0]);
+    const userConfigSection = ensureObject(calledUserCfg.config);
+    const userProfiles = userConfigSection.profiles as Array<Record<string, unknown>>;
+    const firstUserProfileConfig = ensureObject(userProfiles[0]?.config);
+    expect(firstUserProfileConfig.fontSize).toBe(17);
+    expect(calledUserCfg.plugins).toEqual(['plugin-alpha']);
+    expect(calledUserCfg.localPlugins).toEqual(['plugin-local']);
 
-  const calledDefaultCfg = ensureObject(initMock.mock.calls[0]?.[1]);
-  expect(calledDefaultCfg.keymaps).toEqual({'window:new': ['ctrl+n']});
-  expect(existsSync(join(mockPaths.cfgDir, mockPaths.schemaFile))).toBe(true);
-  expect(existsSync(mockPaths.plugs.base)).toBe(true);
-  expect(existsSync(mockPaths.plugs.local)).toBe(true);
-  expect(notifyMock).not.toHaveBeenCalled();
+    const calledDefaultCfg = ensureObject(harness.initMock.mock.calls[0]?.[1]);
+    expect(calledDefaultCfg.keymaps).toEqual({'window:new': ['ctrl+n']});
+    expect(existsSync(join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(true);
+    expect(existsSync(harness.mockPaths.plugs.base)).toBe(true);
+    expect(existsSync(harness.mockPaths.plugs.local)).toBe(true);
+    expect(harness.notifyMock).not.toHaveBeenCalled();
+  } finally {
+    harness.cleanup();
+  }
 });
 
-test.serial('bootstraps missing config with JSON5 output without legacy migration paths', async () => {
-  const defaultConfigFixture = `{
+test('bootstraps missing config with JSON5 output without legacy migration paths', async () => {
+  const harness = await createConfigImportHarness();
+  try {
+    const defaultConfigFixture = `{
     config: { defaultProfile: 'default', profiles: [{ name: 'default', config: {} }] },
     plugins: ['plugin-a'],
     localPlugins: ['plugin-local'],
     keymaps: {'window:new': 'ctrl+n'}
   }`;
-  writeFileSync(mockPaths.defaultCfg, defaultConfigFixture, 'utf8');
-  writeFileSync(mockPaths.defaultPlatformKeyPath(), `{"window:new": ["ctrl+n"]}`, 'utf8');
-  writeFileSync(mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
-  writeFileSync(join(workspaceRoot, '.hyper.js'), 'module.exports = {plugins: ["legacy-plugin"]};', 'utf8');
+    writeFileSync(harness.mockPaths.defaultCfg, defaultConfigFixture, 'utf8');
+    writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), `{"window:new": ["ctrl+n"]}`, 'utf8');
+    writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+    writeFileSync(join(harness.workspaceRoot, '.hyper.js'), 'module.exports = {plugins: ["legacy-plugin"]};', 'utf8');
 
-  const configModule = await loadConfigImport();
-  configModule._import();
+    harness._import();
 
-  expect(existsSync(mockPaths.cfgPath)).toBe(true);
-  expect(existsSync(join(mockPaths.cfgDir, mockPaths.schemaFile))).toBe(true);
-  expect(existsSync(mockPaths.plugs.base)).toBe(true);
-  expect(existsSync(mockPaths.plugs.local)).toBe(true);
-  expect(notifyMock).not.toHaveBeenCalled();
+    expect(existsSync(harness.mockPaths.cfgPath)).toBe(true);
+    expect(existsSync(join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(true);
+    expect(existsSync(harness.mockPaths.plugs.base)).toBe(true);
+    expect(existsSync(harness.mockPaths.plugs.local)).toBe(true);
+    expect(harness.notifyMock).not.toHaveBeenCalled();
 
-  const writtenConfig = JSON5.parse(readFileSync(mockPaths.cfgPath, 'utf8'));
-  const expectedConfig = JSON5.parse(defaultConfigFixture);
-  expect(writtenConfig.plugins).toEqual(['plugin-a']);
-  expect(writtenConfig).toEqual(expectedConfig);
+    const writtenConfig = JSON5.parse(readFileSync(harness.mockPaths.cfgPath, 'utf8'));
+    const expectedConfig = JSON5.parse(defaultConfigFixture);
+    expect(writtenConfig.plugins).toEqual(['plugin-a']);
+    expect(writtenConfig).toEqual(expectedConfig);
+  } finally {
+    harness.cleanup();
+  }
 });

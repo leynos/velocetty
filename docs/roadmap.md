@@ -531,16 +531,16 @@ Scope notes:
     `bun test --concurrent test/unit/v8-snapshot-util.test.ts test/unit/cli-api-behaviour.test.ts`
     passes 100 consecutive local runs with stable config and snapshot
     expectations.
-- [ ] 9.3.6. Eliminate remaining long-lived file-scope module mocks in
+- [x] 9.3.6. Eliminate remaining long-lived file-scope module mocks in
   concurrency hotspots. Requires 9.3.2. See
   [velocetty-design.md](velocetty-design.md) §Testing.
-  - [ ] Move remaining `mock.module(...)` registrations and restores in
+  - [x] Move remaining `mock.module(...)` registrations and restores in
     `test/unit/runtime-tab-provider-registration.test.ts`,
     `test/unit/command-registry-compat.test.ts`, and
     `test/unit/config-import-json5.test.ts` to per-test lifetimes where needed.
-  - [ ] Ensure temporary `window` installs and other global shims are restored
+  - [x] Ensure temporary `window` installs and other global shims are restored
     after each test rather than after the whole file.
-  - [ ] Success criteria: hotspot suites no longer rely on `afterAll`
+  - [x] Success criteria: hotspot suites no longer rely on `afterAll`
     restoration for process-wide mocks or globals.
 - [ ] 9.3.7. Replace process-global timer and logger overrides with injected
   seams in DOM-heavy unit tests. Requires 9.3.2. See
