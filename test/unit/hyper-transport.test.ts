@@ -45,6 +45,41 @@ const registerHyperModuleMocks = () => {
     }
   }));
   mock.module('../../lib/command-registry', () => ({
+    createCommandRegistryModule: () => ({
+      register: () => {},
+      update: () => {},
+      remove: () => false,
+      get: () => undefined,
+      list: () => [],
+      has: () => false,
+      validateArgs: () => ({ok: true, value: undefined}),
+      registerCommand: () => {},
+      createCommand: () => {},
+      updateCommand: () => {},
+      replaceCommand: () => {},
+      removeCommand: () => false,
+      deleteCommand: () => false,
+      getCommand: () => undefined,
+      getCommandDefinition: () => undefined,
+      listCommands: () => [],
+      enumerateCommands: () => [],
+      hasCommand: () => false,
+      hasCommandDefinition: () => false,
+      validateCommandArgs: () => ({ok: true, value: undefined}),
+      validateCommandArgsFor: () => ({ok: true, value: undefined}),
+      commandRegistry: {
+        register: () => {},
+        update: () => {},
+        remove: () => false,
+        get: () => undefined,
+        list: () => [],
+        has: () => false,
+        validateArgs: () => ({ok: true, value: undefined})
+      },
+      getRegisteredKeys: async () => ({}),
+      registerCommandHandlers: () => {},
+      getCommandHandler: () => undefined
+    }),
     getRegisteredKeys: async () => ({}),
     getCommandHandler: () => undefined,
     shouldPreventDefault: () => false
