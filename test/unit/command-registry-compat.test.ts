@@ -35,8 +35,6 @@ import {expect, mock, test} from 'bun:test';
 import {SESSION_SEARCH} from '@shared/constants/sessions';
 import type {CommandDefinition} from '@shared/types/commands';
 
-import {createCommandRegistryModule} from '../../lib/command-registry';
-
 type CommandRegistryCompatHarness = typeof import('../../lib/command-registry') & {
   cleanup: () => void;
   focusActiveTermMock: ReturnType<typeof mock<() => void>>;
@@ -44,6 +42,8 @@ type CommandRegistryCompatHarness = typeof import('../../lib/command-registry') 
   setDecoratedKeymaps: (nextKeymaps: Record<string, string[]>) => void;
   setRuntimeCommands: (nextCommands: CommandDefinition[]) => void;
 };
+
+let moduleInstanceCounter = 0;
 
 const createCommandRegistryCompatHarness = async (): Promise<CommandRegistryCompatHarness> => {
   let decoratedKeymaps: Record<string, string[]> = {};
@@ -58,6 +58,10 @@ const createCommandRegistryCompatHarness = async (): Promise<CommandRegistryComp
     throw new Error(`Unexpected IPC channel: ${channel}`);
   });
   const focusActiveTermMock = mock(() => {});
+  moduleInstanceCounter += 1;
+  const {createCommandRegistryModule} = await import(
+    `../../lib/command-registry.ts?command_registry_compat=${moduleInstanceCounter}`
+  );
 
   return {
     ...createCommandRegistryModule({
