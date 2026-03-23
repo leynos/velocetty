@@ -169,3 +169,81 @@ test('legacy search-close handler dispatches closeSearch and focuses the active 
     }
   })();
 });
+
+test('legacy search-close handler does not dispatch when session search is inactive', () => {
+  return (async () => {
+    const harness = await createCommandRegistryCompatHarness();
+    try {
+      const dispatch = mock(() => {});
+      const innerDispatch = mock(() => {});
+      const keyEvent: {catched: boolean} = {catched: true};
+
+      harness.getCommandHandler('editor:search-close')?.(keyEvent, dispatch as unknown as never);
+
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      const dispatchedThunk = dispatch.mock.calls[0]?.[0];
+      if (typeof dispatchedThunk !== 'function') {
+        throw new Error('Expected the legacy search-close handler to dispatch a thunk');
+      }
+
+      // Session for the active uid has no search flag — thunk should not
+      // dispatch SESSION_SEARCH and should set catched to false instead.
+      dispatchedThunk(innerDispatch as never, () => ({
+        sessions: {
+          activeUid: 'active-session',
+          sessions: {
+            'active-session': {}
+          }
+        }
+      }));
+
+      expect(innerDispatch).not.toHaveBeenCalled();
+      expect(keyEvent.catched).toBe(false);
+      expect(harness.focusActiveTermMock).toHaveBeenCalledTimes(1);
+    } finally {
+      harness.cleanup();
+    }
+  })();
+});
+
+test('legacy search-close handler targets the uid provided by state rather than a hardcoded value', () => {
+  return (async () => {
+    const harness = await createCommandRegistryCompatHarness();
+    try {
+      const dispatch = mock(() => {});
+      const innerDispatch = mock(() => {});
+
+      harness.getCommandHandler('editor:search-close')?.('event-payload', dispatch as unknown as never);
+
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      const dispatchedThunk = dispatch.mock.calls[0]?.[0];
+      if (typeof dispatchedThunk !== 'function') {
+        throw new Error('Expected the legacy search-close handler to dispatch a thunk');
+      }
+
+      // Use a different active uid with search: true to confirm the thunk
+      // reads activeUid from state rather than using any hardcoded value.
+      dispatchedThunk(innerDispatch as never, () => ({
+        sessions: {
+          activeUid: 'other-uid',
+          sessions: {
+            'other-uid': {
+              search: true
+            }
+          }
+        }
+      }));
+
+      expect(innerDispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: SESSION_SEARCH,
+          uid: 'other-uid',
+          value: false
+        })
+      );
+      expect(harness.focusActiveTermMock).toHaveBeenCalledTimes(1);
+    } finally {
+      harness.cleanup();
+    }
+  })();
+});
