@@ -5,6 +5,7 @@ import {createRoot} from 'react-dom/client';
 import {afterEach, beforeEach, describe, expect, mock, test} from 'bun:test';
 
 import type {HyperProps} from '../../typings/hyper';
+import {createCommandRegistryModuleStub} from '../testUtils/command-registry-mock';
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
@@ -45,6 +46,7 @@ const registerHyperModuleMocks = () => {
     }
   }));
   mock.module('../../lib/command-registry', () => ({
+    createCommandRegistryModule: () => createCommandRegistryModuleStub(),
     getRegisteredKeys: async () => ({}),
     getCommandHandler: () => undefined,
     shouldPreventDefault: () => false

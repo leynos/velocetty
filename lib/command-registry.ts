@@ -1,5 +1,6 @@
 /** @file Command registry and validation helpers for renderer command dispatch. */
-import type {HyperDispatch} from '../typings/hyper';
+import type {RendererCommandTransport} from '@shared/types/transport';
+import type {HyperDispatch, HyperState} from '../typings/hyper';
 import type {
   CommandDefinition,
   CommandId,
@@ -9,16 +10,23 @@ import type {
   CommandValidationIssue,
   CommandValidationResult
 } from '@shared/types/commands';
+import {SESSION_SEARCH} from '@shared/constants/sessions';
 import Ajv, {type ErrorObject, type ValidateFunction} from 'ajv';
-
-import {closeSearch} from './actions/sessions';
-import {transport} from './transport';
 
 export type CommandHandler = (event: unknown, dispatch: HyperDispatch) => void;
 
 interface RegisteredCommand extends CommandDefinition {
   handler?: CommandHandler;
 }
+
+type CommandRegistryDependencies = {
+  closeSearch: (
+    uid?: string,
+    keyEvent?: {catched?: boolean}
+  ) => (dispatch: HyperDispatch, getState: () => HyperState) => void;
+  focusActiveTerm: () => void;
+  transport: Pick<RendererCommandTransport, 'invoke'>;
+};
 
 const compareByCommandId: CommandOrderingComparator = (left, right) =>
   left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
@@ -38,6 +46,32 @@ const createLegacyDefinition = (id: CommandId): CommandDefinition => ({
     title: id
   }
 });
+
+export const closeSearchAction = (uid?: string, keyEvent?: {catched?: boolean}) => {
+  return (dispatch: HyperDispatch, getState: () => HyperState) => {
+    const targetUid = uid ?? getState().sessions.activeUid;
+    if (!targetUid) {
+      // No active session yet — propagate the key event and bail.
+      if (keyEvent) {
+        keyEvent.catched = false;
+      }
+      return;
+    }
+
+    if (getState().sessions.sessions[targetUid]?.search) {
+      dispatch({
+        type: SESSION_SEARCH,
+        uid: targetUid,
+        value: false
+      } as never);
+      return;
+    }
+
+    if (keyEvent) {
+      keyEvent.catched = false;
+    }
+  };
+};
 
 const cloneCommandDefinition = (command: RegisteredCommand): CommandDefinition => ({
   id: command.id,
@@ -77,242 +111,266 @@ const serializeAjvErrors = (errors: ErrorObject[] | null | undefined): CommandVa
     };
   });
 
-const ajv = new Ajv({allErrors: true});
-const validatorsByCommandId = new Map<CommandId, ValidateFunction>();
-const registry = new Map<CommandId, RegisteredCommand>();
-const runtimeManagedCommands = new Set<CommandId>();
+export const createCommandRegistryModule = (dependencies: CommandRegistryDependencies) => {
+  const ajv = new Ajv({allErrors: true});
+  const validatorsByCommandId = new Map<CommandId, ValidateFunction>();
+  const registry = new Map<CommandId, RegisteredCommand>();
+  const runtimeManagedCommands = new Set<CommandId>();
 
-const upsertCommand = (definition: CommandDefinition, handler?: CommandHandler) => {
-  const existingCommand = registry.get(definition.id);
+  const upsertCommand = (definition: CommandDefinition, handler?: CommandHandler) => {
+    const existingCommand = registry.get(definition.id);
 
-  registry.set(definition.id, {
-    ...existingCommand,
-    ...definition,
-    metadata: {
-      ...definition.metadata,
-      keywords: definition.metadata.keywords ? [...definition.metadata.keywords] : undefined
-    },
-    argsSchema: cloneSchema(definition.argsSchema),
-    resultSchema: cloneSchema(definition.resultSchema),
-    handler: handler ?? existingCommand?.handler
-  });
+    registry.set(definition.id, {
+      ...existingCommand,
+      ...definition,
+      metadata: {
+        ...definition.metadata,
+        keywords: definition.metadata.keywords ? [...definition.metadata.keywords] : undefined
+      },
+      argsSchema: cloneSchema(definition.argsSchema),
+      resultSchema: cloneSchema(definition.resultSchema),
+      handler: handler ?? existingCommand?.handler
+    });
 
-  validatorsByCommandId.delete(definition.id);
-};
+    validatorsByCommandId.delete(definition.id);
+  };
 
-const assignLegacyHandler = (commandId: CommandId, handler: CommandHandler) => {
-  const definition = registry.get(commandId) ?? createLegacyDefinition(commandId);
-  upsertCommand(definition, handler);
-};
+  const remove = (commandId: CommandId | string) => {
+    const commandKey = asCommandId(commandId);
+    validatorsByCommandId.delete(commandKey);
+    return registry.delete(commandKey);
+  };
 
-const syncRuntimePluginCommands = (runtimeCommands: CommandDefinition[]) => {
-  const activeRuntimeCommands = new Set<CommandId>();
+  const assignLegacyHandler = (commandId: CommandId, handler: CommandHandler) => {
+    const definition = registry.get(commandId) ?? createLegacyDefinition(commandId);
+    upsertCommand(definition, handler);
+  };
 
-  runtimeCommands.forEach((command) => {
-    const commandId = asCommandId(command.id);
-    upsertCommand({...command, id: commandId});
-    activeRuntimeCommands.add(commandId);
-  });
+  const syncRuntimePluginCommands = (runtimeCommands: CommandDefinition[]) => {
+    const activeRuntimeCommands = new Set<CommandId>();
 
-  runtimeManagedCommands.forEach((commandId) => {
-    if (!activeRuntimeCommands.has(commandId)) {
-      remove(commandId);
-    }
-  });
+    runtimeCommands.forEach((command) => {
+      const commandId = asCommandId(command.id);
+      upsertCommand({...command, id: commandId});
+      activeRuntimeCommands.add(commandId);
+    });
 
-  runtimeManagedCommands.clear();
-  activeRuntimeCommands.forEach((commandId) => {
-    runtimeManagedCommands.add(commandId);
-  });
-};
+    runtimeManagedCommands.forEach((commandId) => {
+      if (!activeRuntimeCommands.has(commandId)) {
+        remove(commandId);
+      }
+    });
 
-/**
- * Validates command arguments against a command's registered args schema.
- *
- * Returns `COMMAND_NOT_FOUND` when the command does not exist,
- * `INVALID_COMMAND_SCHEMA` when schema compilation fails, and
- * `INVALID_COMMAND_ARGS` with structured issues when validation fails.
- *
- * @param commandId Command identifier whose args contract should be checked.
- * @param args Candidate argument payload to validate.
- * @returns Validation result containing accepted args or a structured validation error.
- */
-export const validateArgs = (commandId: CommandId | string, args: unknown): CommandValidationResult => {
-  const commandKey = asCommandId(commandId);
-  const command = registry.get(commandKey);
-  if (!command) {
-    const error: CommandValidationError = {
-      code: 'COMMAND_NOT_FOUND',
-      commandId: commandKey,
-      target: 'args',
-      message: `Cannot validate args for unknown command: ${commandKey}`
-    };
-    return {
-      ok: false,
-      error
-    };
-  }
+    runtimeManagedCommands.clear();
+    activeRuntimeCommands.forEach((commandId) => {
+      runtimeManagedCommands.add(commandId);
+    });
+  };
 
-  if (!command.argsSchema) {
-    return {ok: true, value: args};
-  }
-
-  try {
-    let validator = validatorsByCommandId.get(commandKey);
-    if (!validator) {
-      validator = ajv.compile(command.argsSchema);
-      validatorsByCommandId.set(commandKey, validator);
+  const validateArgs = (commandId: CommandId | string, args: unknown): CommandValidationResult => {
+    const commandKey = asCommandId(commandId);
+    const command = registry.get(commandKey);
+    if (!command) {
+      const error: CommandValidationError = {
+        code: 'COMMAND_NOT_FOUND',
+        commandId: commandKey,
+        target: 'args',
+        message: `Cannot validate args for unknown command: ${commandKey}`
+      };
+      return {
+        ok: false,
+        error
+      };
     }
 
-    if (validator(args)) {
+    if (!command.argsSchema) {
       return {ok: true, value: args};
     }
 
-    const error: CommandValidationError = {
-      code: 'INVALID_COMMAND_ARGS',
-      commandId: commandKey,
-      target: 'args',
-      message: `Invalid args for command: ${commandKey}`,
-      issues: serializeAjvErrors(validator.errors)
-    };
-    return {
-      ok: false,
-      error
-    };
-  } catch (error) {
-    const validationError: CommandValidationError = {
-      code: 'INVALID_COMMAND_SCHEMA',
-      commandId: commandKey,
-      target: 'args',
-      message: error instanceof Error ? error.message : `Invalid schema for command: ${commandKey}`
-    };
-    return {
-      ok: false,
-      error: validationError
-    };
-  }
+    try {
+      let validator = validatorsByCommandId.get(commandKey);
+      if (!validator) {
+        validator = ajv.compile(command.argsSchema);
+        validatorsByCommandId.set(commandKey, validator);
+      }
+
+      if (validator(args)) {
+        return {ok: true, value: args};
+      }
+
+      const error: CommandValidationError = {
+        code: 'INVALID_COMMAND_ARGS',
+        commandId: commandKey,
+        target: 'args',
+        message: `Invalid args for command: ${commandKey}`,
+        issues: serializeAjvErrors(validator.errors)
+      };
+      return {
+        ok: false,
+        error
+      };
+    } catch (error) {
+      const validationError: CommandValidationError = {
+        code: 'INVALID_COMMAND_SCHEMA',
+        commandId: commandKey,
+        target: 'args',
+        message: error instanceof Error ? error.message : `Invalid schema for command: ${commandKey}`
+      };
+      return {
+        ok: false,
+        error: validationError
+      };
+    }
+  };
+
+  const get = (commandId: CommandId | string) => {
+    const command = registry.get(asCommandId(commandId));
+    return command ? cloneCommandDefinition(command) : undefined;
+  };
+
+  const list = () => {
+    return Array.from(registry.values()).map(cloneCommandDefinition).sort(compareByCommandId);
+  };
+
+  const has = (commandId: CommandId | string) => {
+    return registry.has(asCommandId(commandId));
+  };
+
+  const getCommandHandler = (command: CommandId | string) => {
+    return registry.get(asCommandId(command))?.handler;
+  };
+
+  const registerCommandHandlers = (cmds: Record<string, CommandHandler> | undefined) => {
+    if (!cmds) {
+      return;
+    }
+
+    Object.keys(cmds).forEach((commandId) => {
+      const handler = cmds[commandId];
+      if (!handler) {
+        return;
+      }
+      assignLegacyHandler(asCommandId(commandId), handler);
+    });
+  };
+
+  const getRegisteredKeys = async () => {
+    const runtimeCommands = await dependencies.transport.invoke('getRuntimePluginCommands');
+    syncRuntimePluginCommands(runtimeCommands);
+    const keymaps = await dependencies.transport.invoke('getDecoratedKeymaps');
+
+    return Object.keys(keymaps).reduce((result: Record<string, string>, actionName) => {
+      const commandKeys = keymaps[actionName];
+      commandKeys.forEach((shortcut) => {
+        result[shortcut] = actionName;
+      });
+      return result;
+    }, {});
+  };
+
+  assignLegacyHandler(asCommandId('editor:search-close'), (e, dispatch) => {
+    dispatch(dependencies.closeSearch(undefined, e as {catched?: boolean}) as never);
+    dependencies.focusActiveTerm();
+  });
+
+  const register = upsertCommand;
+  const update = upsertCommand;
+  const registerCommand = register;
+  const createCommand = register;
+  const updateCommand = update;
+  const replaceCommand = update;
+  const removeCommand = remove;
+  const deleteCommand = remove;
+  const getCommand = get;
+  const getCommandDefinition = get;
+  const listCommands = list;
+  const enumerateCommands = list;
+  const hasCommand = has;
+  const hasCommandDefinition = has;
+  const validateCommandArgs = validateArgs;
+  const validateCommandArgsFor = validateArgs;
+
+  const commandRegistry: CommandRegistry<CommandHandler> = {
+    register,
+    update,
+    remove,
+    get,
+    list,
+    has,
+    validateArgs
+  };
+
+  return {
+    commandRegistry,
+    createCommand,
+    deleteCommand,
+    enumerateCommands,
+    get,
+    getCommand,
+    getCommandDefinition,
+    getCommandHandler,
+    getRegisteredKeys,
+    has,
+    hasCommand,
+    hasCommandDefinition,
+    list,
+    listCommands,
+    register,
+    registerCommand,
+    registerCommandHandlers,
+    remove,
+    removeCommand,
+    replaceCommand,
+    update,
+    updateCommand,
+    validateArgs,
+    validateCommandArgs,
+    validateCommandArgsFor
+  };
 };
 
-assignLegacyHandler(asCommandId('editor:search-close'), (e, dispatch) => {
-  dispatch(closeSearch(undefined, e));
-  window.focusActiveTerm();
+const commandRegistryModule = createCommandRegistryModule({
+  closeSearch: closeSearchAction,
+  focusActiveTerm: () => {
+    if (typeof window !== 'undefined' && typeof window.focusActiveTerm === 'function') {
+      window.focusActiveTerm();
+    }
+  },
+  transport: {
+    invoke: (async (channel: string, ...args: unknown[]) => {
+      const {transport} = await import('./transport');
+      // Forward all args to avoid silently dropping IpcCommands payload args.
+      return (transport.invoke as (c: string, ...a: unknown[]) => Promise<unknown>)(channel, ...args);
+    }) as RendererCommandTransport['invoke']
+  }
 });
 
-/** Registers or updates a command definition with an optional handler. */
-export const register = upsertCommand;
-/** Updates a command definition with an optional handler (alias for `register`). */
-export const update = upsertCommand;
-
-/**
- * Removes a command from the registry.
- *
- * @param commandId Command identifier to remove.
- * @returns `true` when the command existed and was removed, otherwise `false`.
- */
-export const remove = (commandId: CommandId | string) => {
-  const commandKey = asCommandId(commandId);
-  validatorsByCommandId.delete(commandKey);
-  return registry.delete(commandKey);
-};
-
-/**
- * Retrieves a command definition by identifier.
- *
- * @param commandId Command identifier to retrieve.
- * @returns The registered command definition, or `undefined` when not found.
- */
-export const get = (commandId: CommandId | string) => {
-  const command = registry.get(asCommandId(commandId));
-  return command ? cloneCommandDefinition(command) : undefined;
-};
-
-/**
- * Lists all registered commands in deterministic order sorted by command ID.
- *
- * @returns All registered command definitions sorted lexically by ID.
- */
-export const list = () => {
-  return Array.from(registry.values()).map(cloneCommandDefinition).sort(compareByCommandId);
-};
-
-/**
- * Checks whether a command exists in the registry.
- *
- * @param commandId Command identifier to check.
- * @returns `true` when the command exists, otherwise `false`.
- */
-export const has = (commandId: CommandId | string) => {
-  return registry.has(asCommandId(commandId));
-};
-
-/** Public aliases for the primary registry APIs. */
-/** Alias of `register` for command creation workflows. */
-export const registerCommand = register;
-/** Alias of `register` retained for legacy compatibility. */
-export const createCommand = register;
-/** Alias of `update` for explicit update call sites. */
-export const updateCommand = update;
-/** Alias of `update` retained for replace semantics. */
-export const replaceCommand = update;
-/** Alias of `remove` for command deletion workflows. */
-export const removeCommand = remove;
-/** Alias of `remove` retained for legacy delete naming. */
-export const deleteCommand = remove;
-/** Alias of `get` for command lookup by identifier. */
-export const getCommand = get;
-/** Alias of `get` retained for definition-oriented call sites. */
-export const getCommandDefinition = get;
-/** Alias of `list` for command enumeration workflows. */
-export const listCommands = list;
-/** Alias of `list` retained for legacy enumerate naming. */
-export const enumerateCommands = list;
-/** Alias of `has` for command existence checks. */
-export const hasCommand = has;
-/** Alias of `has` retained for definition-oriented call sites. */
-export const hasCommandDefinition = has;
-/** Alias of `validateArgs` for command-args validation helpers. */
-export const validateCommandArgs = validateArgs;
-/** Alias of `validateArgs` retained for legacy helper naming. */
-export const validateCommandArgsFor = validateArgs;
+/** Core CRUD and validation API. */
+export const {validateArgs, register, update, remove, get, list, has} = commandRegistryModule;
 
 /** Public `CommandRegistry<CommandHandler>` entry point with CRUD and validation APIs. */
-export const commandRegistry: CommandRegistry<CommandHandler> = {
-  register,
-  update,
-  remove,
-  get,
-  list,
-  has,
-  validateArgs
-};
+export const commandRegistry: CommandRegistry<CommandHandler> = commandRegistryModule.commandRegistry;
 
-export const getRegisteredKeys = async () => {
-  const runtimeCommands = await transport.invoke('getRuntimePluginCommands');
-  syncRuntimePluginCommands(runtimeCommands);
-  const keymaps = await transport.invoke('getDecoratedKeymaps');
+/** Async key resolution, handler management, and bulk registration. */
+export const {getRegisteredKeys, registerCommandHandlers, getCommandHandler} = commandRegistryModule;
 
-  return Object.keys(keymaps).reduce((result: Record<string, string>, actionName) => {
-    const commandKeys = keymaps[actionName];
-    commandKeys.forEach((shortcut) => {
-      result[shortcut] = actionName;
-    });
-    return result;
-  }, {});
-};
-
-export const registerCommandHandlers = (cmds: Record<string, CommandHandler> | undefined) => {
-  if (!cmds) {
-    return;
-  }
-
-  Object.keys(cmds).forEach((commandId) => {
-    assignLegacyHandler(asCommandId(commandId), cmds[commandId]);
-  });
-};
-
-export const getCommandHandler = (command: CommandId | string) => {
-  return registry.get(asCommandId(command))?.handler;
-};
+/** Compat aliases — retained for call sites that use legacy command-verb naming. */
+export const {
+  registerCommand,
+  createCommand,
+  updateCommand,
+  replaceCommand,
+  removeCommand,
+  deleteCommand,
+  getCommand,
+  getCommandDefinition,
+  listCommands,
+  enumerateCommands,
+  hasCommand,
+  hasCommandDefinition,
+  validateCommandArgs,
+  validateCommandArgsFor
+} = commandRegistryModule;
 
 // Some commands are directly executed by Electron menuItem role.
 // They should not be prevented to reach Electron.
