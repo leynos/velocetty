@@ -47,7 +47,7 @@ Observable success for this milestone means:
    stress validation, documentation sync, and required gates all succeed.
 
 Implementation is complete. All gates passed, the 20-run focused concurrent
-stress loop is green, and documentation is synchronised.
+stress loop is green, and documentation is synchronized.
 
 ## Repository orientation
 

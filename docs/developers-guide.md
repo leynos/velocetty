@@ -668,7 +668,7 @@ down `mock.module(...)` registrations, temporary `window` installs, or other
 process-global shims. Prefer per-test harness helpers that either return a
 cleanup callback or accept injected dependencies directly. When a module under
 test captures transport, config, or filesystem state at module scope, add the
-smallest behaviour-preserving factory seam needed so tests can provide
+smallest behaviour-preserving factory seam needed, so tests can provide
 test-owned dependencies without long-lived module mocks.
 
 ### End-to-end (E2E) tests (layered strategy)
