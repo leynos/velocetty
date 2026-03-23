@@ -542,16 +542,16 @@ Scope notes:
     after each test rather than after the whole file.
   - [x] Success criteria: hotspot suites no longer rely on `afterAll`
     restoration for process-wide mocks or globals.
-- [ ] 9.3.7. Replace process-global timer and logger overrides with injected
+- [x] 9.3.7. Replace process-global timer and logger overrides with injected
   seams in DOM-heavy unit tests. Requires 9.3.2. See
   [velocetty-design.md](velocetty-design.md) §Testing.
-  - [ ] Add a timer seam for `lib/components/notification.tsx` so
+  - [x] Add a timer seam for `lib/components/notification.tsx` so
     `test/unit/notification.test.ts` no longer replaces
     `globalThis.setTimeout` or `globalThis.clearTimeout`.
-  - [ ] Add scheduler/logger seams for `app/updater.ts` so
+  - [x] Add scheduler/logger seams for `app/updater.ts` so
     `test/unit/updater.test.ts` no longer replaces process-global timers or
     `console.error`.
-  - [ ] Success criteria: the notification and updater suites no longer mutate
+  - [x] Success criteria: the notification and updater suites no longer mutate
     process-global timer or logger functions during their assertions.
 - [ ] 9.3.8. Promote `--concurrent` to the default unit-test gate after the
   explicit-concurrency fixes land. Requires 9.3.3, 9.3.4, 9.3.5, 9.3.6, and

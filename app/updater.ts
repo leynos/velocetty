@@ -57,9 +57,36 @@ const buildFeedUrl = (canary: boolean, currentVersion: string) => {
 
 const isCanary = (updateChannel: string) => updateChannel === 'canary';
 
-async function init() {
+/**
+ * Scheduler seam for timer operations.
+ * Allows injection of test doubles in unit tests.
+ */
+interface SchedulerSeam {
+  setTimeout: typeof globalThis.setTimeout;
+  clearTimeout: typeof globalThis.clearTimeout;
+  setInterval: typeof globalThis.setInterval;
+  clearInterval: typeof globalThis.clearInterval;
+}
+
+/**
+ * Logger seam for error logging.
+ * Allows injection of test doubles in unit tests.
+ */
+interface LoggerSeam {
+  error: (...args: unknown[]) => void;
+}
+
+/**
+ * Options for the updater function.
+ */
+export interface UpdaterOptions {
+  scheduler?: SchedulerSeam;
+  logger?: LoggerSeam;
+}
+
+async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
   autoUpdater.on('error', (err) => {
-    console.error('Error fetching updates', `${err.message} (${err.stack})`);
+    logger.error('Error fetching updates', `${err.message} (${err.stack})`);
   });
 
   const config = await getDecoratedConfigWithRetry();
@@ -74,11 +101,11 @@ async function init() {
   autoUpdater.setFeedURL({url: feedURL});
 
   if (process.env.NODE_ENV !== 'test') {
-    setTimeout(() => {
+    scheduler.setTimeout(() => {
       void checkForUpdates();
     }, ms('10s'));
 
-    setInterval(() => {
+    scheduler.setInterval(() => {
       void checkForUpdates();
     }, ms('30m'));
   }
@@ -86,9 +113,17 @@ async function init() {
   isInit = true;
 }
 
-const updater = (win: BrowserWindow) => {
+const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
+  const scheduler = options?.scheduler ?? {
+    setTimeout: globalThis.setTimeout,
+    clearTimeout: globalThis.clearTimeout,
+    setInterval: globalThis.setInterval,
+    clearInterval: globalThis.clearInterval
+  };
+  const logger = options?.logger ?? console;
+
   if (!isInit) {
-    void init();
+    void init(scheduler, logger);
   }
 
   const {rpc} = win;

@@ -671,6 +671,26 @@ test captures transport, config, or filesystem state at module scope, add the
 smallest behaviour-preserving factory seam needed, so tests can provide
 test-owned dependencies without long-lived module mocks.
 
+For roadmap item 9.3.7 and similar timer/logger-dependent module work, use
+injected seams instead of process-global mutations:
+
+- Pass timer implementations (`setTimeout`, `clearTimeout`, `setInterval`,
+  `clearInterval`) through component props or function options rather than
+  replacing `globalThis` methods.
+- Pass logger implementations (`console.error`, etc.) through function options
+  rather than replacing `console` methods.
+- Keep global fallbacks for production code when seams are not provided.
+- Test with explicit `--concurrent` stress runs to verify isolation:
+
+  ```bash
+  bun test --concurrent test/unit/notification.test.ts
+  bun test --concurrent test/unit/updater.test.ts
+  ```
+
+Suites that rely on timer or logger seams must not mutate global state during
+test execution; instead, provide test-doubles through the module's public
+interface.
+
 ### End-to-end (E2E) tests (layered strategy)
 
 End-to-end tests are split into two lanes and require packaged binaries in
