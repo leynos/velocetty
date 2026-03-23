@@ -59,12 +59,13 @@ const createCommandRegistryCompatHarness = async (): Promise<CommandRegistryComp
   });
   const focusActiveTermMock = mock(() => {});
   moduleInstanceCounter += 1;
-  const {createCommandRegistryModule} = await import(
+  const {createCommandRegistryModule, closeSearchAction} = await import(
     `../../lib/command-registry.ts?command_registry_compat=${moduleInstanceCounter}`
   );
 
   return {
     ...createCommandRegistryModule({
+      closeSearch: closeSearchAction,
       focusActiveTerm: focusActiveTermMock,
       transport: {
         invoke: invokeMock

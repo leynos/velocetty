@@ -20,6 +20,10 @@ interface RegisteredCommand extends CommandDefinition {
 }
 
 type CommandRegistryDependencies = {
+  closeSearch: (
+    uid?: string,
+    keyEvent?: {catched?: boolean}
+  ) => (dispatch: HyperDispatch, getState: () => HyperState) => void;
   focusActiveTerm: () => void;
   transport: Pick<RendererCommandTransport, 'invoke'>;
 };
@@ -43,7 +47,7 @@ const createLegacyDefinition = (id: CommandId): CommandDefinition => ({
   }
 });
 
-const closeSearchAction = (uid?: string, keyEvent?: {catched?: boolean}) => {
+export const closeSearchAction = (uid?: string, keyEvent?: {catched?: boolean}) => {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     const targetUid = uid || getState().sessions.activeUid!;
     if (getState().sessions.sessions[targetUid]?.search) {
@@ -253,7 +257,7 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
   };
 
   assignLegacyHandler(asCommandId('editor:search-close'), (e, dispatch) => {
-    dispatch(closeSearchAction(undefined, e as {catched?: boolean}) as never);
+    dispatch(dependencies.closeSearch(undefined, e as {catched?: boolean}) as never);
     dependencies.focusActiveTerm();
   });
 
@@ -314,6 +318,7 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
 };
 
 const commandRegistryModule = createCommandRegistryModule({
+  closeSearch: closeSearchAction,
   focusActiveTerm: () => {
     if (typeof window !== 'undefined' && typeof window.focusActiveTerm === 'function') {
       window.focusActiveTerm();
@@ -328,86 +333,32 @@ const commandRegistryModule = createCommandRegistryModule({
   }
 });
 
-/**
- * Validates command arguments against a command's registered args schema.
- *
- * Returns `COMMAND_NOT_FOUND` when the command does not exist,
- * `INVALID_COMMAND_SCHEMA` when schema compilation fails, and
- * `INVALID_COMMAND_ARGS` with structured issues when validation fails.
- *
- * @param commandId Command identifier whose args contract should be checked.
- * @param args Candidate argument payload to validate.
- * @returns Validation result containing accepted args or a structured validation error.
- */
-export const validateArgs = commandRegistryModule.validateArgs;
-/** Registers or updates a command definition with an optional handler. */
-export const register = commandRegistryModule.register;
-/** Updates a command definition with an optional handler (alias for `register`). */
-export const update = commandRegistryModule.update;
-/**
- * Removes a command from the registry.
- *
- * @param commandId Command identifier to remove.
- * @returns `true` when the command existed and was removed, otherwise `false`.
- */
-export const remove = commandRegistryModule.remove;
-/**
- * Retrieves a command definition by identifier.
- *
- * @param commandId Command identifier to retrieve.
- * @returns The registered command definition, or `undefined` when not found.
- */
-export const get = commandRegistryModule.get;
-/**
- * Lists all registered commands in deterministic order sorted by command ID.
- *
- * @returns All registered command definitions sorted lexically by ID.
- */
-export const list = commandRegistryModule.list;
-/**
- * Checks whether a command exists in the registry.
- *
- * @param commandId Command identifier to check.
- * @returns `true` when the command exists, otherwise `false`.
- */
-export const has = commandRegistryModule.has;
-
-/** Public aliases for the primary registry APIs. */
-/** Alias of `register` for command creation workflows. */
-export const registerCommand = commandRegistryModule.registerCommand;
-/** Alias of `register` retained for legacy compatibility. */
-export const createCommand = commandRegistryModule.createCommand;
-/** Alias of `update` for explicit update call sites. */
-export const updateCommand = commandRegistryModule.updateCommand;
-/** Alias of `update` retained for replace semantics. */
-export const replaceCommand = commandRegistryModule.replaceCommand;
-/** Alias of `remove` for command deletion workflows. */
-export const removeCommand = commandRegistryModule.removeCommand;
-/** Alias of `remove` retained for legacy delete naming. */
-export const deleteCommand = commandRegistryModule.deleteCommand;
-/** Alias of `get` for command lookup by identifier. */
-export const getCommand = commandRegistryModule.getCommand;
-/** Alias of `get` retained for definition-oriented call sites. */
-export const getCommandDefinition = commandRegistryModule.getCommandDefinition;
-/** Alias of `list` for command enumeration workflows. */
-export const listCommands = commandRegistryModule.listCommands;
-/** Alias of `list` retained for legacy enumerate naming. */
-export const enumerateCommands = commandRegistryModule.enumerateCommands;
-/** Alias of `has` for command existence checks. */
-export const hasCommand = commandRegistryModule.hasCommand;
-/** Alias of `has` retained for definition-oriented call sites. */
-export const hasCommandDefinition = commandRegistryModule.hasCommandDefinition;
-/** Alias of `validateArgs` for command-args validation helpers. */
-export const validateCommandArgs = commandRegistryModule.validateCommandArgs;
-/** Alias of `validateArgs` retained for legacy helper naming. */
-export const validateCommandArgsFor = commandRegistryModule.validateCommandArgsFor;
+/** Core CRUD and validation API. */
+export const {validateArgs, register, update, remove, get, list, has} = commandRegistryModule;
 
 /** Public `CommandRegistry<CommandHandler>` entry point with CRUD and validation APIs. */
 export const commandRegistry: CommandRegistry<CommandHandler> = commandRegistryModule.commandRegistry;
 
-export const getRegisteredKeys = commandRegistryModule.getRegisteredKeys;
-export const registerCommandHandlers = commandRegistryModule.registerCommandHandlers;
-export const getCommandHandler = commandRegistryModule.getCommandHandler;
+/** Async key resolution, handler management, and bulk registration. */
+export const {getRegisteredKeys, registerCommandHandlers, getCommandHandler} = commandRegistryModule;
+
+/** Compat aliases — retained for call sites that use legacy command-verb naming. */
+export const {
+  registerCommand,
+  createCommand,
+  updateCommand,
+  replaceCommand,
+  removeCommand,
+  deleteCommand,
+  getCommand,
+  getCommandDefinition,
+  listCommands,
+  enumerateCommands,
+  hasCommand,
+  hasCommandDefinition,
+  validateCommandArgs,
+  validateCommandArgsFor
+} = commandRegistryModule;
 
 // Some commands are directly executed by Electron menuItem role.
 // They should not be prevented to reach Electron.
