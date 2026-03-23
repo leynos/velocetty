@@ -49,10 +49,10 @@ let isInit = false;
 // Default to the "stable" update channel
 let canaryUpdates = false;
 
-const buildFeedUrl = (canary: boolean, currentVersion: string) => {
+const buildFeedUrl = (canary: boolean) => {
   const updatePrefix = canary ? 'releases-canary' : 'releases';
   const archSuffix = process.arch === 'arm64' || app.runningUnderARM64Translation ? '_arm64' : '';
-  return `https://${updatePrefix}.hyper.is/update/${isLinux ? 'deb' : platform}${archSuffix}/${currentVersion}`;
+  return `https://${updatePrefix}.hyper.is/update/${isLinux ? 'deb' : platform}${archSuffix}/${version}`;
 };
 
 /** Discriminated union for update channels; prevents arbitrary string drift. */
@@ -111,7 +111,7 @@ async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
     canaryUpdates = true;
   }
 
-  const feedURL = buildFeedUrl(canaryUpdates, version);
+  const feedURL = buildFeedUrl(canaryUpdates);
 
   autoUpdater.setFeedURL({url: feedURL});
 
@@ -186,7 +186,7 @@ const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
     const newUpdateIsCanary = isCanary(parseUpdateChannel(updateChannel));
 
     if (newUpdateIsCanary !== canaryUpdates) {
-      const feedURL = buildFeedUrl(newUpdateIsCanary, version);
+      const feedURL = buildFeedUrl(newUpdateIsCanary);
 
       autoUpdater.setFeedURL({url: feedURL});
       void checkForUpdates();
