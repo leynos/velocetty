@@ -46,8 +46,8 @@ Observable success for this milestone means:
 5. `docs/roadmap.md` is marked done only after the implementation, focused
    stress validation, documentation sync, and required gates all succeed.
 
-This plan is intentionally approval-gated. It is a draft only. No
-implementation should start until the user explicitly approves this document.
+Implementation is complete. All gates passed, the 20-run focused concurrent
+stress loop is green, and documentation is synchronised.
 
 ## Repository orientation
 
