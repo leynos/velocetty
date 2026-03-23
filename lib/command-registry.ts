@@ -1,6 +1,6 @@
 /** @file Command registry and validation helpers for renderer command dispatch. */
 import type {RendererCommandTransport} from '@shared/types/transport';
-import type {HyperDispatch} from '../typings/hyper';
+import type {HyperDispatch, HyperState} from '../typings/hyper';
 import type {
   CommandDefinition,
   CommandId,
@@ -44,8 +44,8 @@ const createLegacyDefinition = (id: CommandId): CommandDefinition => ({
 });
 
 const closeSearchAction = (uid?: string, keyEvent?: {catched?: boolean}) => {
-  return (dispatch: HyperDispatch, getState: () => any) => {
-    const targetUid = uid || getState().sessions.activeUid;
+  return (dispatch: HyperDispatch, getState: () => HyperState) => {
+    const targetUid = uid || getState().sessions.activeUid!;
     if (getState().sessions.sessions[targetUid]?.search) {
       dispatch({
         type: SESSION_SEARCH,
@@ -314,7 +314,11 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
 };
 
 const commandRegistryModule = createCommandRegistryModule({
-  focusActiveTerm: () => window.focusActiveTerm(),
+  focusActiveTerm: () => {
+    if (typeof window !== 'undefined' && typeof window.focusActiveTerm === 'function') {
+      window.focusActiveTerm();
+    }
+  },
   transport: {
     invoke: (async (channel: string, ...args: unknown[]) => {
       const {transport} = await import('./transport');
