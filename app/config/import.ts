@@ -114,24 +114,6 @@ const reportDiagnostics = (context: string, source: ConfigFilePath, diagnostics:
   console.warn(`[config-import] ${context}`, {source: source.path, diagnostics});
 };
 
-const notifyWithPrimaryDiagnostic = (
-  notifyFn: ConfigImportDependencies['notify'],
-  baseMessage: string,
-  diagnostics: configValidationDiagnostic[]
-) => {
-  const primaryDiagnostic = diagnostics[0];
-  if (!primaryDiagnostic) {
-    notifyFn(baseMessage);
-    return;
-  }
-
-  const docHint = primaryDiagnostic.docHint ? ` Hint: ${primaryDiagnostic.docHint}.` : '';
-  const defaultHint = primaryDiagnostic.defaultHint ? ` Default: ${primaryDiagnostic.defaultHint}.` : '';
-  notifyFn(
-    `${baseMessage} ${primaryDiagnostic.path}: ${primaryDiagnostic.message} Suggested fix: ${primaryDiagnostic.suggestedFix}.${docHint}${defaultHint}`
-  );
-};
-
 /**
  * Parses JSON5 config text into a validated raw config payload.
  *
@@ -188,6 +170,20 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
   const {_init: initConfig, notify: notifyFn} = dependencies;
   const pathDeps = dependencies.paths;
   let defaultConfig: rawConfig;
+
+  const notifyWithPrimaryDiagnostic = (baseMessage: string, diagnostics: configValidationDiagnostic[]) => {
+    const primaryDiagnostic = diagnostics[0];
+    if (!primaryDiagnostic) {
+      notifyFn(baseMessage);
+      return;
+    }
+
+    const docHint = primaryDiagnostic.docHint ? ` Hint: ${primaryDiagnostic.docHint}.` : '';
+    const defaultHint = primaryDiagnostic.defaultHint ? ` Default: ${primaryDiagnostic.defaultHint}.` : '';
+    notifyFn(
+      `${baseMessage} ${primaryDiagnostic.path}: ${primaryDiagnostic.message} Suggested fix: ${primaryDiagnostic.suggestedFix}.${docHint}${defaultHint}`
+    );
+  };
 
   const ensureSchemaFile = () => {
     const destinationPath = resolve(pathDeps.cfgDir, pathDeps.schemaFile);
@@ -250,7 +246,6 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
       `[config-import] Failed to parse bundled default config at "${pathDeps.defaultCfg}". Using safe fallback defaults.`
     );
     notifyWithPrimaryDiagnostic(
-      notifyFn,
       "Couldn't parse the bundled default config. Falling back to safe defaults.",
       parsedDefaultConfigResult.diagnostics
     );
@@ -295,7 +290,6 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
         `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
       );
       notifyWithPrimaryDiagnostic(
-        notifyFn,
         "Couldn't parse config file. Using default config instead.",
         userCfgResult.diagnostics
       );
@@ -308,7 +302,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
       console.warn(
         `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
       );
-      notifyWithPrimaryDiagnostic(notifyFn, "Couldn't parse config file. Using default config instead.", []);
+      notifyWithPrimaryDiagnostic("Couldn't parse config file. Using default config instead.", []);
       return {
         config: cloneRawConfig(defaultConfigFallback),
         diagnostics: []
@@ -363,40 +357,45 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
   return {_import, getDefaultConfig};
 };
 
-const configImportModule = createConfigImportModule({
-  _init: (...args) => {
-    const initModule = requireFromHere('./init');
-    const defaultInit = initModule._init as ConfigInit;
-    return defaultInit(...args);
+// Lazy loaders keep `paths`, `init`, and `notify` out of the static import
+// graph so tests running outside Electron are not forced to load the Electron
+// IPC stack at module initialisation.
+const lazyInit = (...args: Parameters<ConfigInit>): ReturnType<ConfigInit> => {
+  const initModule = requireFromHere('./init');
+  return (initModule._init as ConfigInit)(...args);
+};
+
+const lazyNotify = (...args: Parameters<ConfigImportDependencies['notify']>): void => {
+  const notifyModule = requireFromHere('../notify');
+  (notifyModule.default as ConfigImportDependencies['notify'])(...args);
+};
+
+const lazyPaths: ConfigImportPaths = {
+  get cfgDir() {
+    return requireFromHere('./paths').cfgDir as string;
   },
-  notify: (...args) => {
-    const notifyModule = requireFromHere('../notify');
-    const defaultNotify = notifyModule.default as ConfigImportDependencies['notify'];
-    return defaultNotify(...args);
+  get cfgPath() {
+    return requireFromHere('./paths').cfgPath as string;
   },
-  paths: {
-    get cfgDir() {
-      return requireFromHere('./paths').cfgDir as string;
-    },
-    get cfgPath() {
-      return requireFromHere('./paths').cfgPath as string;
-    },
-    get defaultCfg() {
-      return requireFromHere('./paths').defaultCfg as string;
-    },
-    defaultPlatformKeyPath: () => {
-      return requireFromHere('./paths').defaultPlatformKeyPath() as string;
-    },
-    get plugs() {
-      return requireFromHere('./paths').plugs as ConfigImportPaths['plugs'];
-    },
-    get schemaFile() {
-      return requireFromHere('./paths').schemaFile as string;
-    },
-    get schemaPath() {
-      return requireFromHere('./paths').schemaPath as string;
-    }
+  get defaultCfg() {
+    return requireFromHere('./paths').defaultCfg as string;
+  },
+  defaultPlatformKeyPath: () => requireFromHere('./paths').defaultPlatformKeyPath() as string,
+  get plugs() {
+    return requireFromHere('./paths').plugs as ConfigImportPaths['plugs'];
+  },
+  get schemaFile() {
+    return requireFromHere('./paths').schemaFile as string;
+  },
+  get schemaPath() {
+    return requireFromHere('./paths').schemaPath as string;
   }
+};
+
+const configImportModule = createConfigImportModule({
+  _init: lazyInit,
+  notify: lazyNotify,
+  paths: lazyPaths
 });
 
 export const _import = configImportModule._import;
