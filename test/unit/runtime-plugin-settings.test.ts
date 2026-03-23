@@ -135,7 +135,7 @@ test('runtime plugin settings import remains safe on Windows when config paths r
     }`);
 
     const namespace = runtimePluginModule.ensureRuntimePluginSettingsPersisted({
-      configFilePath: 'C:\\\\Users\\\\tester\\\\AppData\\\\Roaming\\\\Hyper\\\\config.json5',
+      configFilePath: 'C:\\Users\\tester\\AppData\\Roaming\\Hyper\\config.json5',
       readFile,
       writeFile
     });
