@@ -10,8 +10,6 @@ import JSON5 from 'json5';
 
 import {createConfigImportModule, type ConfigImportPaths} from '../../app/config/import';
 
-const originalConsoleWarn = console.warn;
-
 type ConfigInit = Parameters<typeof createConfigImportModule>[0]['_init'];
 
 type ConfigImportHarness = {
@@ -92,20 +90,16 @@ const createConfigImportHarness = async (): Promise<ConfigImportHarness> => {
     // Do not call mock.restore() — this harness uses no mock.module()
     // registrations. A global restore would tear down module mocks from
     // other suites running concurrently and cause nondeterministic failures.
-    try {
-      console.warn = originalConsoleWarn;
-    } finally {
-      removeSync(workspaceRoot);
-    }
+    removeSync(workspaceRoot);
   };
 
   try {
-    console.warn = warnMock as typeof console.warn;
     mkdirpSync(join(workspaceRoot, 'defaults'));
     const configModule = createConfigImportModule({
       _init: initMock as ConfigInit,
       notify: notifyMock as typeof import('../../app/notify').default,
-      paths: mockPaths
+      paths: mockPaths,
+      warn: warnMock
     });
 
     return {

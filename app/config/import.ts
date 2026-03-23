@@ -32,6 +32,7 @@ type ConfigImportDependencies = {
   _init: ConfigInit;
   notify: (title: string, body?: string, details?: {error?: unknown}) => void;
   paths: ConfigImportPaths;
+  warn?: typeof console.warn;
 };
 
 /** A file path used to identify a config artefact in diagnostics. */
@@ -107,11 +108,16 @@ const keymapDiagnosticHints = {
   }
 } as const;
 
-const reportDiagnostics = (context: string, source: ConfigFilePath, diagnostics: configValidationDiagnostic[]) => {
+const reportDiagnostics = (
+  warnFn: typeof console.warn,
+  context: string,
+  source: ConfigFilePath,
+  diagnostics: configValidationDiagnostic[]
+) => {
   if (diagnostics.length === 0) {
     return;
   }
-  console.warn(`[config-import] ${context}`, {source: source.path, diagnostics});
+  warnFn(`[config-import] ${context}`, {source: source.path, diagnostics});
 };
 
 /**
@@ -168,8 +174,9 @@ const stringifyConfig = (config: rawConfig): string => stringifyJson5(config);
  */
 export const createConfigImportModule = (dependencies: ConfigImportDependencies) => {
   const {_init: initConfig, notify: notifyFn} = dependencies;
+  const warnFn = dependencies.warn ?? console.warn;
   const pathDeps = dependencies.paths;
-  let defaultConfig: rawConfig;
+  let defaultConfig: rawConfig | undefined;
 
   const notifyWithPrimaryDiagnostic = (baseMessage: string, diagnostics: configValidationDiagnostic[]) => {
     const primaryDiagnostic = diagnostics[0];
@@ -208,7 +215,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
       return;
     }
 
-    console.warn(
+    warnFn(
       `[config-import] User config file missing at "${pathDeps.cfgPath}". Bootstrapping from default config template.`
     );
     try {
@@ -232,7 +239,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
     const filePath: ConfigFilePath = {path: pathDeps.defaultCfg};
     const parsedDefaultConfigResult = parseRawConfig({filePath, rawContent: defaultCfgRaw});
     if (parsedDefaultConfigResult.usedFallback) {
-      reportDiagnostics('Bundled default config diagnostics.', filePath, parsedDefaultConfigResult.diagnostics);
+      reportDiagnostics(warnFn, 'Bundled default config diagnostics.', filePath, parsedDefaultConfigResult.diagnostics);
     }
 
     if (!parsedDefaultConfigResult.usedFallback && parsedDefaultConfigResult.value !== null) {
@@ -267,7 +274,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
 
     const keymapResult = parseKeymapConfig({filePath, rawContent: content});
     if (keymapResult.usedFallback) {
-      reportDiagnostics('Platform keymap diagnostics.', filePath, keymapResult.diagnostics);
+      reportDiagnostics(warnFn, 'Platform keymap diagnostics.', filePath, keymapResult.diagnostics);
     }
     return keymapResult.value;
   };
@@ -277,7 +284,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
     try {
       const userCfgResult = parseRawConfig({filePath, rawContent: readFileSync(pathDeps.cfgPath, 'utf8')});
       if (userCfgResult.usedFallback) {
-        reportDiagnostics('User config diagnostics.', filePath, userCfgResult.diagnostics);
+        reportDiagnostics(warnFn, 'User config diagnostics.', filePath, userCfgResult.diagnostics);
       }
       if (!userCfgResult.usedFallback && userCfgResult.value !== null) {
         return {
@@ -286,7 +293,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
         };
       }
 
-      console.warn(
+      warnFn(
         `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
       );
       notifyWithPrimaryDiagnostic(
@@ -299,7 +306,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
       };
     } catch (err) {
       console.error(`[config-import] Failed to read or parse user config at "${pathDeps.cfgPath}".`, err);
-      console.warn(
+      warnFn(
         `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
       );
       notifyWithPrimaryDiagnostic("Couldn't parse config file. Using default config instead.", []);
@@ -312,7 +319,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
 
   const _importConf = () => {
     if (isConfigImportDebugEnabled()) {
-      console.warn('[config-import] Initializing config import using app-local JSON5 helpers.');
+      warnFn('[config-import] Initializing config import using app-local JSON5 helpers.');
     }
     // init plugin directories if not present
     mkdirpSync(pathDeps.plugs.base);
@@ -370,25 +377,31 @@ const lazyNotify = (...args: Parameters<ConfigImportDependencies['notify']>): vo
   (notifyModule.default as ConfigImportDependencies['notify'])(...args);
 };
 
+let cachedPathsModule: ReturnType<typeof requireFromHere> | undefined;
+const getPathsModule = () => {
+  cachedPathsModule ??= requireFromHere('./paths');
+  return cachedPathsModule;
+};
+
 const lazyPaths: ConfigImportPaths = {
   get cfgDir() {
-    return requireFromHere('./paths').cfgDir as string;
+    return getPathsModule().cfgDir as string;
   },
   get cfgPath() {
-    return requireFromHere('./paths').cfgPath as string;
+    return getPathsModule().cfgPath as string;
   },
   get defaultCfg() {
-    return requireFromHere('./paths').defaultCfg as string;
+    return getPathsModule().defaultCfg as string;
   },
-  defaultPlatformKeyPath: () => requireFromHere('./paths').defaultPlatformKeyPath() as string,
+  defaultPlatformKeyPath: () => getPathsModule().defaultPlatformKeyPath() as string,
   get plugs() {
-    return requireFromHere('./paths').plugs as ConfigImportPaths['plugs'];
+    return getPathsModule().plugs as ConfigImportPaths['plugs'];
   },
   get schemaFile() {
-    return requireFromHere('./paths').schemaFile as string;
+    return getPathsModule().schemaFile as string;
   },
   get schemaPath() {
-    return requireFromHere('./paths').schemaPath as string;
+    return getPathsModule().schemaPath as string;
   }
 };
 
