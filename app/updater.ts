@@ -55,7 +55,15 @@ const buildFeedUrl = (canary: boolean, currentVersion: string) => {
   return `https://${updatePrefix}.hyper.is/update/${isLinux ? 'deb' : platform}${archSuffix}/${currentVersion}`;
 };
 
-const isCanary = (updateChannel: string) => updateChannel === 'canary';
+/** Discriminated union for update channels; prevents arbitrary string drift. */
+type UpdateChannel = 'stable' | 'canary';
+
+/**
+ * Parses a raw config string into an UpdateChannel, defaulting to 'stable'.
+ */
+const parseUpdateChannel = (raw: string): UpdateChannel => (raw === 'canary' ? 'canary' : 'stable');
+
+const isCanary = (channel: UpdateChannel) => channel === 'canary';
 
 /**
  * Scheduler seam for timer operations.
@@ -76,6 +84,13 @@ interface LoggerSeam {
   error: (...args: unknown[]) => void;
 }
 
+/** Value object carrying the metadata emitted for an available update. */
+interface ReleaseInfo {
+  readonly releaseNotes: string;
+  readonly releaseName: string;
+  readonly updateUrl?: string;
+}
+
 /**
  * Options for the updater function.
  */
@@ -92,7 +107,7 @@ async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
   const config = await getDecoratedConfigWithRetry();
 
   // If defined in the config, switch to the "canary" channel
-  if (config.updateChannel && isCanary(config.updateChannel)) {
+  if (config.updateChannel && isCanary(parseUpdateChannel(config.updateChannel))) {
     canaryUpdates = true;
   }
 
@@ -128,8 +143,8 @@ const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
 
   const {rpc} = win;
 
-  const emitUpdateAvailable = (releaseNotes: string, releaseName: string, updateUrl?: string) => {
-    const releaseUrl = updateUrl || `https://github.com/vercel/hyper/releases/tag/${releaseName}`;
+  const emitUpdateAvailable = ({releaseNotes, releaseName, updateUrl}: ReleaseInfo) => {
+    const releaseUrl = updateUrl ?? `https://github.com/vercel/hyper/releases/tag/${releaseName}`;
     rpc.emit('update available', {releaseNotes, releaseName, releaseUrl, canInstall: !isLinux});
   };
 
@@ -143,7 +158,7 @@ const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
     const releaseName = releaseNameArg || version;
     const updateUrl = updateUrlArg || undefined;
 
-    emitUpdateAvailable(releaseNotes, releaseName, updateUrl);
+    emitUpdateAvailable({releaseNotes, releaseName, updateUrl});
   };
 
   const onUpdateDownloaded = (
@@ -153,7 +168,7 @@ const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
     _date: Date,
     updateUrl: string
   ) => {
-    emitUpdateAvailable(releaseNotes, releaseName, updateUrl);
+    emitUpdateAvailable({releaseNotes, releaseName, updateUrl});
   };
 
   if (isLinux) {
@@ -168,7 +183,7 @@ const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
 
   app.config.subscribe(async () => {
     const {updateChannel} = await getDecoratedConfigWithRetry();
-    const newUpdateIsCanary = isCanary(updateChannel);
+    const newUpdateIsCanary = isCanary(parseUpdateChannel(updateChannel));
 
     if (newUpdateIsCanary !== canaryUpdates) {
       const feedURL = buildFeedUrl(newUpdateIsCanary, version);
