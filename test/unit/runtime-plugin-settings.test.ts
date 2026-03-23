@@ -81,6 +81,16 @@ const assertParseErrorBehaviour = <T>(
   }
 };
 
+/**
+ * Temporarily overrides `process.platform` for the duration of `action`.
+ *
+ * @param platform - The platform string to set for the duration of the call.
+ * @param action   - The function to execute with the overridden platform.
+ * @returns        The value returned by `action`.
+ *
+ * The original `process.platform` value is always restored in a `finally`
+ * block, so the override is guaranteed to be unwound even if `action` throws.
+ */
 const withProcessPlatform = async <T>(platform: NodeJS.Platform, action: () => Promise<T> | T): Promise<T> => {
   const originalPlatform = process.platform;
 

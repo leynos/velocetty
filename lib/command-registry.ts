@@ -49,7 +49,15 @@ const createLegacyDefinition = (id: CommandId): CommandDefinition => ({
 
 export const closeSearchAction = (uid?: string, keyEvent?: {catched?: boolean}) => {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
-    const targetUid = uid || getState().sessions.activeUid!;
+    const targetUid = uid ?? getState().sessions.activeUid;
+    if (!targetUid) {
+      // No active session yet — propagate the key event and bail.
+      if (keyEvent) {
+        keyEvent.catched = false;
+      }
+      return;
+    }
+
     if (getState().sessions.sessions[targetUid]?.search) {
       dispatch({
         type: SESSION_SEARCH,
@@ -238,7 +246,11 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
     }
 
     Object.keys(cmds).forEach((commandId) => {
-      assignLegacyHandler(asCommandId(commandId), cmds[commandId]);
+      const handler = cmds[commandId];
+      if (!handler) {
+        return;
+      }
+      assignLegacyHandler(asCommandId(commandId), handler);
     });
   };
 
