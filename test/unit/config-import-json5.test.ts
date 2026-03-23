@@ -89,9 +89,11 @@ const createConfigImportHarness = async (): Promise<ConfigImportHarness> => {
       return;
     }
     cleanupCalled = true;
+    // Do not call mock.restore() — this harness uses no mock.module()
+    // registrations. A global restore would tear down module mocks from
+    // other suites running concurrently and cause nondeterministic failures.
     try {
       console.warn = originalConsoleWarn;
-      mock.restore();
     } finally {
       removeSync(workspaceRoot);
     }
