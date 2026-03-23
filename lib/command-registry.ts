@@ -44,10 +44,7 @@ const createLegacyDefinition = (id: CommandId): CommandDefinition => ({
 });
 
 const closeSearchAction = (uid?: string, keyEvent?: {catched?: boolean}) => {
-  return (
-    dispatch: HyperDispatch,
-    getState: () => {sessions: {activeUid: string; sessions: Record<string, {search?: boolean}>}}
-  ) => {
+  return (dispatch: HyperDispatch, getState: () => any) => {
     const targetUid = uid || getState().sessions.activeUid;
     if (getState().sessions.sessions[targetUid]?.search) {
       dispatch({
@@ -319,10 +316,11 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
 const commandRegistryModule = createCommandRegistryModule({
   focusActiveTerm: () => window.focusActiveTerm(),
   transport: {
-    invoke: async (channel) => {
+    invoke: (async (channel: string, ...args: unknown[]) => {
       const {transport} = await import('./transport');
-      return transport.invoke(channel);
-    }
+      // Forward all args to avoid silently dropping IpcCommands payload args.
+      return (transport.invoke as (c: string, ...a: unknown[]) => Promise<unknown>)(channel, ...args);
+    }) as RendererCommandTransport['invoke']
   }
 });
 
