@@ -16,6 +16,7 @@ type ConfigInit = Parameters<typeof createConfigImportModule>[0]['_init'];
 
 type ConfigImportHarness = {
   _import: ReturnType<typeof createConfigImportModule>['_import'];
+  getDefaultConfig: ReturnType<typeof createConfigImportModule>['getDefaultConfig'];
   cleanup: () => void;
   initMock: ReturnType<typeof mock<(userCfg: unknown, defaultCfg: unknown) => {userCfg: unknown; defaultCfg: unknown}>>;
   mockPaths: ConfigImportPaths;
@@ -107,6 +108,7 @@ const createConfigImportHarness = async (): Promise<ConfigImportHarness> => {
 
     return {
       _import: configModule._import,
+      getDefaultConfig: configModule.getDefaultConfig,
       cleanup,
       initMock,
       mockPaths,
@@ -294,6 +296,60 @@ test('bootstraps missing config with JSON5 output without legacy migration paths
     const expectedConfig = JSON5.parse(defaultConfigFixture);
     expect(writtenConfig.plugins).toEqual(['plugin-a']);
     expect(writtenConfig).toEqual(expectedConfig);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('getDefaultConfig lazily loads and caches the default config', async () => {
+  const harness = await createConfigImportHarness();
+  try {
+    writeFileSync(
+      harness.mockPaths.defaultCfg,
+      `{
+      config: { defaultProfile: 'default', profiles: [{ name: 'default', config: {} }] },
+      plugins: [],
+      localPlugins: [],
+      keymaps: {}
+    }`,
+      'utf8'
+    );
+    writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), '{}', 'utf8');
+    writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+
+    const result = harness.getDefaultConfig();
+
+    expect(typeof result).toBe('object');
+    expect(existsSync(harness.mockPaths.plugs.base)).toBe(true);
+    expect(existsSync(harness.mockPaths.plugs.local)).toBe(true);
+    expect(existsSync(join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(true);
+    expect(harness.initMock).not.toHaveBeenCalled();
+    expect(harness.notifyMock).not.toHaveBeenCalled();
+
+    // Second call must return the same cached object reference.
+    const result2 = harness.getDefaultConfig();
+    expect(result2).toBe(result);
+    expect(harness.initMock).not.toHaveBeenCalled();
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('getDefaultConfig falls back to safe defaults when bundled default config is invalid', async () => {
+  const harness = await createConfigImportHarness();
+  try {
+    // Malformed: plugins is a string rather than an array.
+    writeFileSync(harness.mockPaths.defaultCfg, '{plugins: "not-an-array"}', 'utf8');
+    // Empty platform keymap so keymaps stays {} after merge.
+    writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), '{}', 'utf8');
+    writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+
+    const result = harness.getDefaultConfig();
+
+    expect(result).toEqual({plugins: [], localPlugins: [], keymaps: {}});
+    expect(harness.notifyMock).toHaveBeenCalledTimes(1);
+    expect(harness.notifyMock.mock.calls[0]?.[0]).toContain('Suggested fix:');
+    expect(harness.initMock).not.toHaveBeenCalled();
   } finally {
     harness.cleanup();
   }
