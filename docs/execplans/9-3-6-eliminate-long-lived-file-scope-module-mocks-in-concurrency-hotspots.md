@@ -133,7 +133,7 @@ be isolated cleanly without them:
   gate stack succeed.
 - Capture every focused probe and required gate with `tee` under `/tmp/` so the
   branch has durable evidence.
-- Implementation may proceed only after explicit user approval of this plan.
+- Implementation has been completed and all gates have passed.
 
 ## Tolerances (exception triggers)
 
@@ -351,6 +351,7 @@ validation after the docs are updated:
 ```bash
 set -o pipefail
 bunx markdownlint-cli2 "docs/**/*.md" | tee /tmp/markdownlint-velocetty-$(git branch --show).out
+nixie --no-sandbox
 ```
 
 Do not mark `9.3.6` done until:
