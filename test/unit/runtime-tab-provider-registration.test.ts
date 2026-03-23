@@ -18,7 +18,6 @@ type RuntimeTabProviderHarness = {
 };
 
 const registerPluginsModuleMocks = (
-  _rendererConfigSubscriptions: Array<() => void>,
   getRendererConfig: () => RendererConfig,
   subscribeRendererConfigMock: RuntimeTabProviderHarness['subscribeRendererConfigMock']
 ) => {
@@ -68,7 +67,7 @@ const createRuntimeTabProviderHarness = async (): Promise<RuntimeTabProviderHarn
   };
 
   try {
-    registerPluginsModuleMocks(rendererConfigSubscriptions, () => rendererConfig, subscribeRendererConfigMock);
+    registerPluginsModuleMocks(() => rendererConfig, subscribeRendererConfigMock);
     const plugins = await import(`../../lib/utils/plugins.ts?runtime_tab_provider_${randomUUID()}`);
 
     return {
