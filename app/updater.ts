@@ -49,6 +49,8 @@ let isInit = false;
 let isInitializing = false;
 // Default to the "stable" update channel
 let canaryUpdates = false;
+// Guard to ensure autoUpdater error listener is only registered once
+let errorListenerRegistered = false;
 
 const buildFeedUrl = (canary: boolean) => {
   const updatePrefix = canary ? 'releases-canary' : 'releases';
@@ -99,18 +101,20 @@ async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
   isInitializing = true;
 
   try {
-    autoUpdater.on('error', (err) => {
-      logger.error('Error fetching updates', `${err.message} (${err.stack})`);
-    });
+    // Only register the error listener once to make retries idempotent
+    if (!errorListenerRegistered) {
+      autoUpdater.on('error', (err) => {
+        logger.error('Error fetching updates', `${err.message} (${err.stack})`);
+      });
+      errorListenerRegistered = true;
+    }
 
     const config = await getDecoratedConfigWithRetry();
 
-    // If defined in the config, switch to the "canary" channel
-    if (isCanaryChannel(config.updateChannel)) {
-      canaryUpdates = true;
-    }
+    // Derive canary status for this attempt; do not mutate module state until success
+    const attemptIsCanary = isCanaryChannel(config.updateChannel);
 
-    const feedURL = buildFeedUrl(canaryUpdates);
+    const feedURL = buildFeedUrl(attemptIsCanary);
 
     autoUpdater.setFeedURL({url: feedURL});
 
@@ -128,6 +132,8 @@ async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
       }, ms('30m'));
     }
 
+    // Only update module-level state after successful initialization
+    canaryUpdates = attemptIsCanary;
     isInit = true;
   } finally {
     isInitializing = false;
