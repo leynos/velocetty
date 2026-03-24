@@ -250,16 +250,17 @@ jobs:
           # fpm is a Ruby gem for building rpm, deb, and pacman packages
           # Use Bundler with committed Gemfile.lock for reproducible dependency resolution
           # Extract the Bundler version from Gemfile.lock (BUNDLED WITH section)
-          bundler_version=$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d ' ')
+          # Non-fatal awk extraction that falls back to empty string on error
+          bundler_version=$(awk '/^BUNDLED WITH/{getline; print; exit}' Gemfile.lock 2>/dev/null | tr -d ' ' || true)
           # Fallback to hard-pinned version if extraction fails or result is empty
           if [ -z "$bundler_version" ]; then
             bundler_version="2.4.0"
           fi
           echo "Installing Bundler version: $bundler_version"
           sudo gem install bundler -v "$bundler_version" --no-document
-          sudo bundle _${bundler_version}_ install --jobs 4 --retry 3 --frozen
+          sudo bundle _"${bundler_version}"_ install --jobs 4 --retry 3 --frozen
           # Generate binstub so fpm is available in PATH for electron-builder
-          sudo bundle _${bundler_version}_ binstubs fpm --path /usr/local/bin
+          sudo bundle _"${bundler_version}"_ binstubs fpm --path /usr/local/bin
       - name: Install appimagetool for AppImage builds
         run: |
           set -euo pipefail
