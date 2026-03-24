@@ -248,21 +248,23 @@ jobs:
       - name: Install fpm for rpm/pacman package builds
         run: |
           # fpm is a Ruby gem for building rpm, deb, and pacman packages
-          # Pinned to v1.15.1 for reproducible builds; update periodically
-          sudo gem install fpm -v '~> 1.15.1' --no-document
+          # Pinned to 1.15.1 for reproducible builds; update periodically
+          sudo gem install fpm -v '1.15.1' --no-document
       - name: Install appimagetool for AppImage builds
         run: |
           set -euo pipefail
           # Install libfuse2 first (required for AppImage to run)
           sudo apt-get install -y libfuse2
           # Download and install appimagetool for AppImage builds
-          # Using continuous release for aarch64 support; verify file integrity
+          # Note: Using continuous release as stable releases lack aarch64 assets
           appimage_url="https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage"
           wget --timeout=60 -q "$appimage_url" -O /tmp/appimagetool
-          # Verify file is a valid ELF binary and make executable
-          file /tmp/appimagetool | grep -q "ELF" || { echo "Downloaded file is not a valid ELF binary"; exit 1; }
+          # Primary: verify SHA-256 checksum (appimagetool continuous aarch64)
+          echo 'c36d6f293fbf978a8e87dbc9c7af32f095eb06bbf992f073ddd652abba7e6b2e  /tmp/appimagetool' | sha256sum -c -
           chmod +x /tmp/appimagetool
-          # Test appimagetool works (print version)
+          # Secondary: verify file is a valid ELF binary
+          file /tmp/appimagetool | grep -q "ELF" || { echo "Downloaded file is not a valid ELF binary"; exit 1; }
+          # Secondary: test appimagetool works (print version)
           /tmp/appimagetool --version || { echo "appimagetool is not functional"; exit 1; }
           sudo mv /tmp/appimagetool /usr/local/bin/appimagetool
       - name: Run lint gate
