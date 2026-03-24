@@ -121,8 +121,8 @@ Document with evidence so future work benefits.
   after the main refactoring was complete.
   Evidence: 53.8% of function arguments were plain `string` types, exceeding
   the 39% threshold. Required two follow-up refactorings:
-  1. Introduced `UpdateChannel` type and `ReleaseInfo` interface to replace
-     loose string parameters
+  1. Introduced `ReleaseInfo` interface and the helper function
+     `isCanaryChannel(raw?: string)` to replace loose string parameters
   2. Removed redundant `currentVersion` parameter from `buildFeedUrl`
   Impact: The threshold was brought below 39% while maintaining all test
   coverage and backward compatibility.
