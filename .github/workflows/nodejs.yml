@@ -252,7 +252,9 @@ jobs:
       - name: Run build gate
         run: bun run build
       - name: Build
-        run: bun bin/run-electron-builder.cjs -l deb rpm AppImage pacman --arm64 -c electron-builder-linux-ci.json
+        # Limit to deb only for aarch64 CI builds; rpm/AppImage/pacman require
+        # additional tooling (fpm, appimagetool) that can hang or fail under CI.
+        run: bun bin/run-electron-builder.cjs -l deb --arm64 -c electron-builder-linux-ci.json
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_V8_SNAPSHOT_COPY: '1'
@@ -261,9 +263,5 @@ jobs:
         with:
           name: build-linux-arm64
           path: |
-            dist/*.snap
-            dist/*.AppImage
             dist/*.deb
-            dist/*.rpm
-            dist/*.pacman
           if-no-files-found: warn
