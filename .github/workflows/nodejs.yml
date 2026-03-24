@@ -248,15 +248,18 @@ jobs:
       - name: Install fpm for rpm/pacman package builds
         run: |
           # fpm is a Ruby gem for building rpm, deb, and pacman packages
-          sudo gem install fpm --no-document
+          # Pinned to v1.15.1 for reproducible builds; update periodically
+          sudo gem install fpm -v '~> 1.15.1' --no-document
       - name: Install appimagetool for AppImage builds
         run: |
+          set -euo pipefail
           # Download and install appimagetool for AppImage builds
-          appimage_url="https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage"
+          # Pinned to v1.9.1 for reproducible builds; update periodically
+          appimage_url="https://github.com/AppImage/AppImageKit/releases/download/1.9.1/appimagetool-aarch64.AppImage"
           wget -q "$appimage_url" -O /tmp/appimagetool
+          # Verify SHA256 checksum (appimagetool v1.9.1 aarch64)
+          echo 'd918b4df547b8e7ab457a33f39f1ac84ebcc29fdb4b75136f08e626fa3c952f1  /tmp/appimagetool' | sha256sum -c -
           chmod +x /tmp/appimagetool
-          # Extract and install system-wide
-          /tmp/appimagetool --appimage-extract >/dev/null 2>&1 || true
           sudo mv /tmp/appimagetool /usr/local/bin/appimagetool
           # Ensure runtime deps for AppImage
           sudo apt-get install -y libfuse2
