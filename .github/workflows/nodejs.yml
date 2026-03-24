@@ -248,8 +248,11 @@ jobs:
       - name: Install fpm for rpm/pacman package builds
         run: |
           # fpm is a Ruby gem for building rpm, deb, and pacman packages
-          # Pinned to 1.15.1 for reproducible builds; update periodically
-          sudo gem install fpm -v '1.15.1' --no-document
+          # Use Bundler with committed Gemfile.lock for reproducible dependency resolution
+          sudo gem install bundler --no-document
+          sudo bundle install --jobs 4 --retry 3
+          # Generate binstub so fpm is available in PATH for electron-builder
+          sudo bundle binstubs fpm --path /usr/local/bin
       - name: Install appimagetool for AppImage builds
         run: |
           set -euo pipefail
@@ -258,7 +261,7 @@ jobs:
           # Download and install appimagetool for AppImage builds
           # Pinned to release 12 for reproducible builds; update periodically
           appimage_url="https://github.com/AppImage/AppImageKit/releases/download/12/appimagetool-aarch64.AppImage"
-          wget --timeout=60 -q "$appimage_url" -O /tmp/appimagetool
+          wget --timeout=60 -q --tries=3 --waitretry=5 --retry-connrefused "$appimage_url" -O /tmp/appimagetool
           # Primary: verify SHA-256 checksum (appimagetool 12 aarch64)
           echo 'c9d058310a4e04b9fbbd81340fff2b5fb44943a630b31881e321719f271bd41a  /tmp/appimagetool' | sha256sum -c -
           chmod +x /tmp/appimagetool
