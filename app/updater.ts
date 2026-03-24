@@ -55,15 +55,11 @@ const buildFeedUrl = (canary: boolean) => {
   return `https://${updatePrefix}.hyper.is/update/${isLinux ? 'deb' : platform}${archSuffix}/${version}`;
 };
 
-/** Discriminated union for update channels; prevents arbitrary string drift. */
-type UpdateChannel = 'stable' | 'canary';
-
 /**
- * Parses a raw config string into an UpdateChannel, defaulting to 'stable'.
+ * Checks if the raw config channel value indicates canary updates.
+ * Treats undefined and non-'canary' values as stable.
  */
-const parseUpdateChannel = (raw: string): UpdateChannel => (raw === 'canary' ? 'canary' : 'stable');
-
-const isCanary = (channel: UpdateChannel) => channel === 'canary';
+const isCanaryChannel = (raw?: string): boolean => raw === 'canary';
 
 /**
  * Scheduler seam for timer operations.
@@ -71,9 +67,7 @@ const isCanary = (channel: UpdateChannel) => channel === 'canary';
  */
 interface SchedulerSeam {
   setTimeout: typeof globalThis.setTimeout;
-  clearTimeout: typeof globalThis.clearTimeout;
   setInterval: typeof globalThis.setInterval;
-  clearInterval: typeof globalThis.clearInterval;
 }
 
 /**
@@ -107,7 +101,7 @@ async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
   const config = await getDecoratedConfigWithRetry();
 
   // If defined in the config, switch to the "canary" channel
-  if (config.updateChannel && isCanary(parseUpdateChannel(config.updateChannel))) {
+  if (isCanaryChannel(config.updateChannel)) {
     canaryUpdates = true;
   }
 
@@ -131,9 +125,7 @@ async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
 const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
   const scheduler = options?.scheduler ?? {
     setTimeout: globalThis.setTimeout,
-    clearTimeout: globalThis.clearTimeout,
-    setInterval: globalThis.setInterval,
-    clearInterval: globalThis.clearInterval
+    setInterval: globalThis.setInterval
   };
   const logger = options?.logger ?? console;
 
@@ -183,7 +175,7 @@ const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
 
   app.config.subscribe(async () => {
     const {updateChannel} = await getDecoratedConfigWithRetry();
-    const newUpdateIsCanary = isCanary(parseUpdateChannel(updateChannel));
+    const newUpdateIsCanary = isCanaryChannel(updateChannel);
 
     if (newUpdateIsCanary !== canaryUpdates) {
       const feedURL = buildFeedUrl(newUpdateIsCanary);

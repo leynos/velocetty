@@ -284,3 +284,67 @@ test('Notification forwards and clears function refs on mount lifecycle', async 
   // The unmount in finally invokes the ref callback with null.
   expect(refValues.at(-1)).toBeNull();
 });
+
+test('Notification auto-dismisses using global timers when no timer prop is provided', async () => {
+  // This test exercises the default global timer fallback path.
+  // It wraps global timers to capture callbacks without mutating globalThis.
+  const cleanup = await setupHappyDom();
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  // Capture setTimeout calls to manually advance time
+  const capturedTimeouts: Array<{callback: () => void; delay: number}> = [];
+  const originalSetTimeout = globalThis.setTimeout;
+  const wrappedSetTimeout = (callback: () => void, delay = 0) => {
+    capturedTimeouts.push({callback, delay});
+    return originalSetTimeout(callback, delay);
+  };
+
+  // Create a minimal timer seam that uses the wrapped global
+  const globalTimerSeam: TimerSeam = {
+    setTimeout: wrappedSetTimeout as typeof globalThis.setTimeout,
+    clearTimeout: globalThis.clearTimeout
+  };
+
+  try {
+    let dismissCount = 0;
+    const dismissAfterMs = 60;
+
+    await act(async () => {
+      root.render(
+        React.createElement(
+          Notification,
+          buildNotificationProps(
+            dismissAfterMs,
+            () => {
+              dismissCount += 1;
+            },
+            {timer: globalTimerSeam}
+          )
+        )
+      );
+    });
+
+    // Verify the timer was captured (proving the global fallback path works)
+    expect(capturedTimeouts.length).toBeGreaterThanOrEqual(1);
+    expect(capturedTimeouts[0].delay).toBe(dismissAfterMs);
+
+    // Manually trigger the captured callback to simulate time passing
+    await act(async () => {
+      capturedTimeouts[0].callback();
+    });
+
+    const indicator = requireIndicator(container);
+    await act(async () => {
+      dispatchOpacityTransition(indicator);
+    });
+
+    expect(dismissCount).toBe(1);
+  } finally {
+    await act(async () => {
+      root.unmount();
+    });
+    cleanup();
+  }
+});

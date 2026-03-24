@@ -42,37 +42,21 @@ const settle = async () => {
 const createSchedulerSeam = () => {
   const timeoutCallbacks: Array<() => void> = [];
   const intervalCallbacks: Array<() => void> = [];
-  const clearedTimeouts: number[] = [];
-  const clearedIntervals: number[] = [];
   let nextTimerId = 0;
 
   return {
     timeoutCallbacks,
     intervalCallbacks,
-    clearedTimeouts,
-    clearedIntervals,
     scheduler: {
       setTimeout: (callback: () => void) => {
         nextTimerId += 1;
         timeoutCallbacks.push(callback);
         return nextTimerId as unknown as NodeJS.Timeout;
       },
-      clearTimeout: (timer?: NodeJS.Timeout) => {
-        const timerId = Number(timer);
-        if (Number.isFinite(timerId)) {
-          clearedTimeouts.push(timerId);
-        }
-      },
       setInterval: (callback: () => void) => {
         nextTimerId += 1;
         intervalCallbacks.push(callback);
         return nextTimerId as unknown as NodeJS.Timeout;
-      },
-      clearInterval: (timer?: NodeJS.Timeout) => {
-        const timerId = Number(timer);
-        if (Number.isFinite(timerId)) {
-          clearedIntervals.push(timerId);
-        }
       }
     }
   };

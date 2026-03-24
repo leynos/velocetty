@@ -78,36 +78,36 @@ Known uncertainties that might affect the plan:
 
 ## Progress
 
-Use a list with checkboxes to summarise granular steps. Every stopping point
+Use a list with checkboxes to summarize granular steps. Every stopping point
 must be documented here, even if it requires splitting a partially completed
 task into two ("done" vs. "remaining"). This section must always reflect the
 actual current state of the work.
 
-- [ ] (Pending) Stage A: Analysis and seam design
-  - [ ] Review notification.tsx timer usage patterns
-  - [ ] Review updater.ts timer and logger usage patterns
-  - [ ] Design timer seam interface for notification component
-  - [ ] Design scheduler/logger seam interface for updater module
+- [x] (2025-03-23) Stage A: Analysis and seam design
+  - [x] Review notification.tsx timer usage patterns
+  - [x] Review updater.ts timer and logger usage patterns
+  - [x] Design timer seam interface for notification component
+  - [x] Design scheduler/logger seam interface for updater module
 
-- [ ] (Pending) Stage B: Notification timer seam implementation
-  - [ ] Add optional timer seam to Notification component props
-  - [ ] Update useNotification hook to accept injected timer methods
-  - [ ] Refactor notification.test.ts to use injected seams
-  - [ ] Remove global timer replacement from notification.test.ts
-  - [ ] Verify notification tests pass with `--concurrent`
+- [x] (2025-03-23) Stage B: Notification timer seam implementation
+  - [x] Add optional timer seam to Notification component props
+  - [x] Update useNotification hook to accept injected timer methods
+  - [x] Refactor notification.test.ts to use injected seams
+  - [x] Remove global timer replacement from notification.test.ts
+  - [x] Verify notification tests pass with `--concurrent`
 
-- [ ] (Pending) Stage C: Updater scheduler/logger seam implementation
-  - [ ] Add optional scheduler seam to updater function signature
-  - [ ] Add optional logger seam to updater function signature
-  - [ ] Update updater.ts to use injected seams with global fallbacks
-  - [ ] Refactor updater.test.ts to use injected seams
-  - [ ] Remove global timer and console.error replacement from updater.test.ts
-  - [ ] Verify updater tests pass with `--concurrent`
+- [x] (2025-03-23) Stage C: Updater scheduler/logger seam implementation
+  - [x] Add optional scheduler seam to updater function signature
+  - [x] Add optional logger seam to updater function signature
+  - [x] Update updater.ts to use injected seams with global fallbacks
+  - [x] Refactor updater.test.ts to use injected seams
+  - [x] Remove global timer and console.error replacement from updater.test.ts
+  - [x] Verify updater tests pass with `--concurrent`
 
-- [ ] (Pending) Stage D: Documentation and quality gates
-  - [ ] Update developers-guide.md with seam injection patterns
-  - [ ] Mark roadmap item 9.3.7 as done
-  - [ ] Run full validation: `bun install`, `make build`, `make check-fmt`,
+- [x] (2025-03-23) Stage D: Documentation and quality gates
+  - [x] Update developers-guide.md with seam injection patterns
+  - [x] Mark roadmap item 9.3.7 as done
+  - [x] Run full validation: `bun install`, `make build`, `make check-fmt`,
     `make lint`, `make test`
 
 ## Surprises & Discoveries
@@ -115,19 +115,74 @@ actual current state of the work.
 Unexpected findings during implementation that were not anticipated as risks.
 Document with evidence so future work benefits.
 
-(None yet)
+- Observation: CodeScene flagged string-heavy function arguments in updater.ts
+  after the main refactoring was complete.
+  Evidence: 53.8% of function arguments were plain `string` types, exceeding
+  the 39% threshold. Required two follow-up refactorings:
+  1. Introduced `UpdateChannel` type and `ReleaseInfo` interface to replace
+     loose string parameters
+  2. Removed redundant `currentVersion` parameter from `buildFeedUrl`
+  Impact: The threshold was brought below 39% while maintaining all test
+  coverage and backward compatibility.
+
+- Observation: The nullish coalescing operator (`??`) behaves differently from
+  logical OR (`||`) when handling empty strings.
+  Evidence: `emitUpdateAvailable` initially used `updateUrl ?? defaultUrl`,
+  causing test failures when `updateUrl` was an empty string `''`.
+  Impact: Changed to `updateUrl || defaultUrl` to treat empty strings as
+  falsy and trigger the fallback, matching original behaviour.
 
 ## Decision log
 
 Record every significant decision made while working on the plan.
 
-(None yet)
+- Decision: Use `useMemo` to memoize the default timer seam in
+  `useNotification` hook to prevent unnecessary effect re-runs.
+  Rationale: Without memoization, a new `{setTimeout, clearTimeout}` object
+  is created on every render, causing effect dependencies to change and
+  triggering unnecessary re-runs of `setDismissTimer` and cleanup effects.
+  Date/Author: 2025-03-23
+
+- Decision: Collapse `UpdateChannel` + `parseUpdateChannel` + `isCanary` into
+  a single `isCanaryChannel(raw?: string): boolean` helper.
+  Rationale: Reduces cognitive load and removes the need for callers to
+  handle type conversions. The single helper safely handles undefined and
+  non-'canary' values.
+  Date/Author: 2025-03-23
+
+- Decision: Narrow `SchedulerSeam` to only expose `setTimeout` and
+  `setInterval` (remove `clearTimeout`/`clearInterval`).
+  Rationale: The updater module never calls the clear methods. Narrowing
+  the seam reduces surface area while preserving full testability.
+  Date/Author: 2025-03-23
 
 ## Outcomes & retrospective
 
 Summarize outcomes, gaps, and lessons learned at completion.
 
-(None yet - to be filled at completion)
+### Outcomes
+
+- Successfully replaced process-global timer and logger mutations with
+  dependency injection seams in both notification and updater test suites.
+- All 270 unit tests pass, including concurrent execution of the target
+  test files (`notification.test.ts` and `updater.test.ts`).
+- No global timer or logger mutations remain in either test file.
+- Documentation updated in `developers-guide.md` with seam injection patterns.
+- Roadmap item 9.3.7 marked as complete.
+- CodeScene string-heavy argument warnings resolved through follow-up
+  refactoring.
+
+### Lessons learned
+
+- Memoizing default seams is critical to prevent React effect re-runs;
+  creating new objects on every render defeats the stability benefits of
+  dependency injection.
+- The distinction between `||` and `??` matters when empty strings are
+  valid inputs that should trigger fallbacks.
+- Narrowing seam interfaces to only the methods actually used keeps the
+  contract minimal and maintainable.
+- Single-purpose helper functions (`isCanaryChannel`) can replace type +
+  parser + predicate trios, reducing indirection without losing type safety.
 
 ## Context and orientation
 

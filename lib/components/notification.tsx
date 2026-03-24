@@ -4,7 +4,7 @@
  * for the renderer notification bar.
  */
 // biome-ignore lint/style/useImportType: React value is required for the current JSX runtime.
-import React, {forwardRef, useCallback, useEffect, useRef, useState} from 'react';
+import React, {forwardRef, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import type {NotificationProps, TimerSeam} from '../../typings/hyper';
 
@@ -16,11 +16,12 @@ const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLD
   const transitionNode = useRef<HTMLDivElement | null>(null);
   const [dismissing, setDismissing] = useState(false);
 
-  // Use injected timer seam or fall back to globals
-  const {setTimeout, clearTimeout} = timer ?? {
-    setTimeout: globalThis.setTimeout,
-    clearTimeout: globalThis.clearTimeout
-  };
+  // Use injected timer seam or fall back to globals (memoized to avoid effect re-runs)
+  const timerSeam = useMemo(
+    () => timer ?? {setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout},
+    [timer]
+  );
+  const {setTimeout, clearTimeout} = timerSeam;
 
   const handleDismiss = useCallback(() => {
     setDismissing(true);
