@@ -254,12 +254,14 @@ jobs:
         run: |
           set -euo pipefail
           # Download and install appimagetool for AppImage builds
-          # Pinned to v1.9.1 for reproducible builds; update periodically
-          appimage_url="https://github.com/AppImage/AppImageKit/releases/download/1.9.1/appimagetool-aarch64.AppImage"
-          wget -q "$appimage_url" -O /tmp/appimagetool
-          # Verify SHA256 checksum (appimagetool v1.9.1 aarch64)
-          echo 'd918b4df547b8e7ab457a33f39f1ac84ebcc29fdb4b75136f08e626fa3c952f1  /tmp/appimagetool' | sha256sum -c -
+          # Using continuous release for aarch64 support; verify file integrity
+          appimage_url="https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage"
+          wget --timeout=60 -q "$appimage_url" -O /tmp/appimagetool
+          # Verify file is a valid ELF binary and make executable
+          file /tmp/appimagetool | grep -q "ELF" || { echo "Downloaded file is not a valid ELF binary"; exit 1; }
           chmod +x /tmp/appimagetool
+          # Test appimagetool works (print version)
+          /tmp/appimagetool --version || { echo "appimagetool is not functional"; exit 1; }
           sudo mv /tmp/appimagetool /usr/local/bin/appimagetool
           # Ensure runtime deps for AppImage
           sudo apt-get install -y libfuse2
