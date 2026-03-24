@@ -250,7 +250,7 @@ jobs:
           # fpm is a Ruby gem for building rpm, deb, and pacman packages
           # Use Bundler with committed Gemfile.lock for reproducible dependency resolution
           sudo gem install bundler --no-document
-          sudo bundle install --jobs 4 --retry 3
+          sudo bundle install --jobs 4 --retry 3 --frozen
           # Generate binstub so fpm is available in PATH for electron-builder
           sudo bundle binstubs fpm --path /usr/local/bin
       - name: Install appimagetool for AppImage builds
