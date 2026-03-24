@@ -253,6 +253,8 @@ jobs:
       - name: Install appimagetool for AppImage builds
         run: |
           set -euo pipefail
+          # Install libfuse2 first (required for AppImage to run)
+          sudo apt-get install -y libfuse2
           # Download and install appimagetool for AppImage builds
           # Using continuous release for aarch64 support; verify file integrity
           appimage_url="https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage"
@@ -263,8 +265,6 @@ jobs:
           # Test appimagetool works (print version)
           /tmp/appimagetool --version || { echo "appimagetool is not functional"; exit 1; }
           sudo mv /tmp/appimagetool /usr/local/bin/appimagetool
-          # Ensure runtime deps for AppImage
-          sudo apt-get install -y libfuse2
       - name: Run lint gate
         run: make lint
       - name: Run test gate
