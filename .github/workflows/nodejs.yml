@@ -259,11 +259,11 @@ jobs:
           # Install libfuse2 first (required for AppImage to run)
           sudo apt-get install -y libfuse2
           # Download and install appimagetool for AppImage builds
-          # Pinned to release 12 for reproducible builds; update periodically
-          appimage_url="https://github.com/AppImage/AppImageKit/releases/download/12/appimagetool-aarch64.AppImage"
+          # Pinned to release 1.9.1 for reproducible builds; update periodically
+          appimage_url="https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-aarch64.AppImage"
           wget --timeout=60 -q --tries=3 --waitretry=5 --retry-connrefused "$appimage_url" -O /tmp/appimagetool
-          # Primary: verify SHA-256 checksum (appimagetool 12 aarch64)
-          echo 'c9d058310a4e04b9fbbd81340fff2b5fb44943a630b31881e321719f271bd41a  /tmp/appimagetool' | sha256sum -c -
+          # Primary: verify SHA-256 checksum (appimagetool 1.9.1 aarch64)
+          echo 'f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158  /tmp/appimagetool' | sha256sum -c -
           chmod +x /tmp/appimagetool
           # Secondary: verify file is a valid ELF binary
           file /tmp/appimagetool | grep -q "ELF" || { echo "Downloaded file is not a valid ELF binary"; exit 1; }
