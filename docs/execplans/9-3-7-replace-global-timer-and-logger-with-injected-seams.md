@@ -138,7 +138,7 @@ Record every significant decision made while working on the plan.
 
 - Decision: Use `useMemo` to memoize the default timer seam in
   `useNotification` hook to prevent unnecessary effect re-runs.
-  Rationale: Without memoization, a new `{setTimeout, clearTimeout}` object
+  Rationale: Without memoization, a new `{setTimeout, clearTimeout}` default object
   is created on every render, causing effect dependencies to change and
   triggering unnecessary re-runs of `setDismissTimer` and cleanup effects.
   Date/Author: 2025-03-23
@@ -190,21 +190,22 @@ Summarize outcomes, gaps, and lessons learned at completion.
 
 The codebase has two test files that mutate process-global functions:
 
-1. `test/unit/notification.test.ts` (lines 46-89): Defines `createFakeTimers()`
-   that replaces `globalThis.setTimeout` and `globalThis.clearTimeout` during
-   each test. The fake timers are installed before rendering and restored in
-   `finally` blocks.
+1. `test/unit/notification.test.ts` (lines 46-89): Originally defined `createFakeTimers()`
+   that replaced `globalThis.setTimeout` and `globalThis.clearTimeout` during
+   each test. The fake timers were installed before rendering and restored in
+   `finally` blocks. This has been replaced with injected timer seams.
 
-2. `test/unit/updater.test.ts` (lines 42-105): Defines `createTimerCapture()`
-   that replaces `globalThis.setTimeout`, `globalThis.clearTimeout`,
-   `globalThis.setInterval`, and `globalThis.clearInterval`. Also defines
-   `createConsoleErrorCapture()` that replaces `console.error`. These are
-   installed at test start and restored in `finally` blocks.
+2. `test/unit/updater.test.ts` (lines 42-105): Originally defined `createTimerCapture()`
+   that replaced `globalThis.setTimeout`, `globalThis.clearTimeout`,
+   `globalThis.setInterval`, and `globalThis.clearInterval`. Also defined
+   `createConsoleErrorCapture()` that replaced `console.error`. These were
+   installed at test start and restored in `finally` blocks. This has been
+   replaced with injected scheduler and logger seams.
 
 ### Target files
 
 1. `lib/components/notification.tsx`: React component that uses
-   `setTimeout`/`clearTimeout` for auto-dismiss timing (lines 59-69). The timer
+   `setTimeout`/`clearTimeout` for auto-dismiss timing. The timer
    calls are inside the `useNotification` hook.
 
 2. `app/updater.ts`: Module that uses `setTimeout`/`setInterval` for update
@@ -291,7 +292,7 @@ interface TimerSeam {
 
 2. Extend `NotificationProps` to accept optional `timer?: TimerSeam`.
 
-3. Update `useNotification` to accept optional timer parameter and use it
+4. Update `useNotification` to accept optional timer parameter and use it
    instead of globals:
 
 ```typescript
@@ -300,10 +301,12 @@ const useNotification = (
   ref: React.ForwardedRef<HTMLDivElement>,
   timer?: TimerSeam
 ) => {
-  const {setTimeout, clearTimeout} = timer ?? {
-    setTimeout: globalThis.setTimeout,
-    clearTimeout: globalThis.clearTimeout
-  };
+  // Memoize the default to prevent effect re-runs
+  const timerSeam = useMemo(
+    () => timer ?? {setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout},
+    [timer]
+  );
+  const {setTimeout, clearTimeout} = timerSeam;
   // ... use setTimeout/clearTimeout from destructured timer
 };
 ```
@@ -370,9 +373,7 @@ In `app/updater.ts`:
 ```typescript
 interface SchedulerSeam {
   setTimeout: typeof globalThis.setTimeout;
-  clearTimeout: typeof globalThis.clearTimeout;
   setInterval: typeof globalThis.setInterval;
-  clearInterval: typeof globalThis.clearInterval;
 }
 
 interface LoggerSeam {
@@ -383,7 +384,7 @@ interface LoggerSeam {
 2. Update `updater` function signature to accept optional seams:
 
 ```typescript
-interface UpdaterOptions {
+export interface UpdaterOptions {
   scheduler?: SchedulerSeam;
   logger?: LoggerSeam;
 }
@@ -391,23 +392,29 @@ interface UpdaterOptions {
 const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
   const scheduler = options?.scheduler ?? {
     setTimeout: globalThis.setTimeout,
-    clearTimeout: globalThis.clearTimeout,
-    setInterval: globalThis.setInterval,
-    clearInterval: globalThis.clearInterval
+    setInterval: globalThis.setInterval
   };
   const logger = options?.logger ?? console;
   // ... pass scheduler/logger through to init or use directly
 };
 ```
 
-3. Update `init` to accept and use scheduler/logger:
+3. Update `init` to accept and use scheduler/logger with concurrency guard:
 
 ```typescript
 async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
-  autoUpdater.on('error', (err) => {
-    logger.error('Error fetching updates', `${err.message} (${err.stack})`);
-  });
-  // ... use scheduler.setTimeout and scheduler.setInterval
+  if (isInitializing) return;
+  isInitializing = true;
+
+  try {
+    autoUpdater.on('error', (err) => {
+      logger.error('Error fetching updates', `${err.message} (${err.stack})`);
+    });
+    // ... use scheduler.setTimeout and scheduler.setInterval
+    isInit = true;
+  } finally {
+    isInitializing = false;
+  }
 }
 ```
 
@@ -421,33 +428,21 @@ In `test/unit/updater.test.ts`:
 const createSchedulerSeam = () => {
   const timeoutCallbacks: Array<() => void> = [];
   const intervalCallbacks: Array<() => void> = [];
-  const clearedTimeouts: number[] = [];
-  const clearedIntervals: number[] = [];
   let nextTimerId = 0;
 
   return {
     timeoutCallbacks,
     intervalCallbacks,
-    clearedTimeouts,
-    clearedIntervals,
     scheduler: {
       setTimeout: (callback: () => void) => {
         nextTimerId += 1;
         timeoutCallbacks.push(callback);
         return nextTimerId as unknown as NodeJS.Timeout;
       },
-      clearTimeout: (timer?: NodeJS.Timeout) => {
-        const timerId = Number(timer);
-        if (Number.isFinite(timerId)) clearedTimeouts.push(timerId);
-      },
       setInterval: (callback: () => void) => {
         nextTimerId += 1;
         intervalCallbacks.push(callback);
         return nextTimerId as unknown as NodeJS.Timeout;
-      },
-      clearInterval: (timer?: NodeJS.Timeout) => {
-        const timerId = Number(timer);
-        if (Number.isFinite(timerId)) clearedIntervals.push(timerId);
       }
     }
   };
@@ -475,6 +470,9 @@ const {default: updater} = await loadUpdater();
 updater(winStub as unknown as Electron.BrowserWindow, {scheduler, logger});
 ```
 
+Note: The scheduler seam only exposes `setTimeout` and `setInterval` since the
+updater module does not call the clear methods.
+
 4. Remove all `timers.install()`, `timers.restore()`, `consoleCapture.install()`,
    and `consoleCapture.restore()` calls.
 
@@ -487,9 +485,9 @@ after the existing 9.3.6 section and before "End-to-end (E2E) tests":
 For roadmap item 9.3.7 and similar timer/logger-dependent module work, use
 injected seams instead of process-global mutations:
 
-- Pass timer implementations (`setTimeout`, `clearTimeout`, `setInterval`,
-  `clearInterval`) through component props or function options rather than
-  replacing `globalThis` methods.
+- Pass timer implementations (`setTimeout`, `clearTimeout` for notification;
+  `setTimeout`, `setInterval` for updater) through component props or function
+  options rather than replacing `globalThis` methods.
 - Pass logger implementations (`console.error`, etc.) through function options
   rather than replacing `console` methods.
 - Keep global fallbacks for production code when seams are not provided.
@@ -512,8 +510,7 @@ interface.
 - Tests: Both notification and updater unit test suites pass.
 - Concurrent safety: Both suites pass with `bun test --concurrent`.
 - No global mutations: Neither suite replaces `globalThis.setTimeout`,
-  `globalThis.clearTimeout`, `globalThis.setInterval`,
-  `globalThis.clearInterval`, or `console.error`.
+  `globalThis.clearTimeout`, `globalThis.setInterval`, or `console.error`.
 - Lint/typecheck: `make lint` and `make typecheck` pass with no new errors.
 - Build: `make build` succeeds.
 - Format: `make check-fmt` succeeds.
@@ -554,7 +551,7 @@ interface.
 4. Verify no global replacements in test files:
 
    ```bash
-   grep -E 'globalThis\.(setTimeout|clearTimeout|setInterval|clearInterval)' \
+   grep -E 'globalThis\.(setTimeout|clearTimeout|setInterval)' \
      test/unit/notification.test.ts test/unit/updater.test.ts || echo "No global timer mutations found"
    grep -E 'console\.error\s*=' \
      test/unit/updater.test.ts || echo "No console.error mutation found"
@@ -586,8 +583,11 @@ interface TimerSeam {
   setTimeout: typeof globalThis.setTimeout;
   clearTimeout: typeof globalThis.clearTimeout;
 }
+```
 
-// Extended NotificationProps
+In `typings/hyper.d.ts`:
+
+```typescript
 interface NotificationProps {
   // ... existing props
   timer?: TimerSeam;
@@ -599,16 +599,14 @@ In `app/updater.ts`:
 ```typescript
 interface SchedulerSeam {
   setTimeout: typeof globalThis.setTimeout;
-  clearTimeout: typeof globalThis.clearTimeout;
   setInterval: typeof globalThis.setInterval;
-  clearInterval: typeof globalThis.clearInterval;
 }
 
 interface LoggerSeam {
   error: (...args: unknown[]) => void;
 }
 
-interface UpdaterOptions {
+export interface UpdaterOptions {
   scheduler?: SchedulerSeam;
   logger?: LoggerSeam;
 }

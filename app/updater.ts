@@ -46,6 +46,7 @@ const checkForUpdates = async () => {
 };
 
 let isInit = false;
+let isInitializing = false;
 // Default to the "stable" update channel
 let canaryUpdates = false;
 
@@ -94,32 +95,39 @@ export interface UpdaterOptions {
 }
 
 async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
-  autoUpdater.on('error', (err) => {
-    logger.error('Error fetching updates', `${err.message} (${err.stack})`);
-  });
+  if (isInitializing) return;
+  isInitializing = true;
 
-  const config = await getDecoratedConfigWithRetry();
+  try {
+    autoUpdater.on('error', (err) => {
+      logger.error('Error fetching updates', `${err.message} (${err.stack})`);
+    });
 
-  // If defined in the config, switch to the "canary" channel
-  if (isCanaryChannel(config.updateChannel)) {
-    canaryUpdates = true;
+    const config = await getDecoratedConfigWithRetry();
+
+    // If defined in the config, switch to the "canary" channel
+    if (isCanaryChannel(config.updateChannel)) {
+      canaryUpdates = true;
+    }
+
+    const feedURL = buildFeedUrl(canaryUpdates);
+
+    autoUpdater.setFeedURL({url: feedURL});
+
+    if (process.env.NODE_ENV !== 'test') {
+      scheduler.setTimeout(() => {
+        void checkForUpdates();
+      }, ms('10s'));
+
+      scheduler.setInterval(() => {
+        void checkForUpdates();
+      }, ms('30m'));
+    }
+
+    isInit = true;
+  } finally {
+    isInitializing = false;
   }
-
-  const feedURL = buildFeedUrl(canaryUpdates);
-
-  autoUpdater.setFeedURL({url: feedURL});
-
-  if (process.env.NODE_ENV !== 'test') {
-    scheduler.setTimeout(() => {
-      void checkForUpdates();
-    }, ms('10s'));
-
-    scheduler.setInterval(() => {
-      void checkForUpdates();
-    }, ms('30m'));
-  }
-
-  isInit = true;
 }
 
 const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
@@ -129,7 +137,7 @@ const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
   };
   const logger = options?.logger ?? console;
 
-  if (!isInit) {
+  if (!isInit && !isInitializing) {
     void init(scheduler, logger);
   }
 

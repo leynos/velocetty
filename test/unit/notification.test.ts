@@ -301,16 +301,15 @@ test('Notification auto-dismisses using global timers when no timer prop is prov
     return originalSetTimeout(callback, delay);
   };
 
-  // Create a minimal timer seam that uses the wrapped global
-  const globalTimerSeam: TimerSeam = {
-    setTimeout: wrappedSetTimeout as typeof globalThis.setTimeout,
-    clearTimeout: globalThis.clearTimeout
-  };
+  // Temporarily wrap global setTimeout to capture calls
+  // @ts-expect-error - wrapping for test observation
+  globalThis.setTimeout = wrappedSetTimeout;
 
   try {
     let dismissCount = 0;
     const dismissAfterMs = 60;
 
+    // IMPORTANT: No timer prop provided - this exercises the fallback path
     await act(async () => {
       root.render(
         React.createElement(
@@ -319,14 +318,17 @@ test('Notification auto-dismisses using global timers when no timer prop is prov
             dismissAfterMs,
             () => {
               dismissCount += 1;
-            },
-            {timer: globalTimerSeam}
+            }
+            // timer prop intentionally omitted to test fallback
           )
         )
       );
     });
 
-    // Verify the timer was captured (proving the global fallback path works)
+    // Restore global setTimeout immediately after render
+    globalThis.setTimeout = originalSetTimeout;
+
+    // Verify the timer was captured (proving the global fallback path was used)
     expect(capturedTimeouts.length).toBeGreaterThanOrEqual(1);
     expect(capturedTimeouts[0].delay).toBe(dismissAfterMs);
 
@@ -342,6 +344,8 @@ test('Notification auto-dismisses using global timers when no timer prop is prov
 
     expect(dismissCount).toBe(1);
   } finally {
+    // Ensure global is restored even if test fails
+    globalThis.setTimeout = originalSetTimeout;
     await act(async () => {
       root.unmount();
     });
