@@ -287,28 +287,15 @@ test('Notification forwards and clears function refs on mount lifecycle', async 
 
 test('Notification auto-dismisses using global timers when no timer prop is provided', async () => {
   // This test exercises the default global timer fallback path.
-  // It wraps global timers to capture callbacks without mutating globalThis.
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
 
-  // Capture setTimeout calls to manually advance time
-  const capturedTimeouts: Array<{callback: () => void; delay: number}> = [];
-  const originalSetTimeout = globalThis.setTimeout;
-  const wrappedSetTimeout = (callback: () => void, delay = 0) => {
-    capturedTimeouts.push({callback, delay});
-    return originalSetTimeout(callback, delay);
-  };
-
-  // Temporarily wrap global setTimeout to capture calls
-  // @ts-expect-error - wrapping for test observation
-  globalThis.setTimeout = wrappedSetTimeout;
+  let dismissCount = 0;
+  const dismissAfterMs = 60;
 
   try {
-    let dismissCount = 0;
-    const dismissAfterMs = 60;
-
     // IMPORTANT: No timer prop provided - this exercises the fallback path
     await act(async () => {
       root.render(
@@ -325,16 +312,9 @@ test('Notification auto-dismisses using global timers when no timer prop is prov
       );
     });
 
-    // Restore global setTimeout immediately after render
-    globalThis.setTimeout = originalSetTimeout;
-
-    // Verify the timer was captured (proving the global fallback path was used)
-    expect(capturedTimeouts.length).toBeGreaterThanOrEqual(1);
-    expect(capturedTimeouts[0].delay).toBe(dismissAfterMs);
-
-    // Manually trigger the captured callback to simulate time passing
+    // Wait for the real timer to fire
     await act(async () => {
-      capturedTimeouts[0].callback();
+      await new Promise<void>((resolve) => setTimeout(resolve, dismissAfterMs + 20));
     });
 
     const indicator = requireIndicator(container);
@@ -344,8 +324,6 @@ test('Notification auto-dismisses using global timers when no timer prop is prov
 
     expect(dismissCount).toBe(1);
   } finally {
-    // Ensure global is restored even if test fails
-    globalThis.setTimeout = originalSetTimeout;
     await act(async () => {
       root.unmount();
     });

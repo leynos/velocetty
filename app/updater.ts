@@ -116,11 +116,15 @@ async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
 
     if (process.env.NODE_ENV !== 'test') {
       scheduler.setTimeout(() => {
-        void checkForUpdates();
+        void checkForUpdates().catch((err: unknown) => {
+          logger.error('Error checking for updates', err);
+        });
       }, ms('10s'));
 
       scheduler.setInterval(() => {
-        void checkForUpdates();
+        void checkForUpdates().catch((err: unknown) => {
+          logger.error('Error checking for updates', err);
+        });
       }, ms('30m'));
     }
 
@@ -138,7 +142,9 @@ const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
   const logger = options?.logger ?? console;
 
   if (!isInit && !isInitializing) {
-    void init(scheduler, logger);
+    void init(scheduler, logger).catch((err: unknown) => {
+      logger.error('Error starting updater', err);
+    });
   }
 
   const {rpc} = win;
@@ -181,18 +187,24 @@ const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
     autoUpdater.quitAndInstall();
   });
 
-  app.config.subscribe(async () => {
-    const {updateChannel} = await getDecoratedConfigWithRetry();
-    const newUpdateIsCanary = isCanaryChannel(updateChannel);
+  app.config.subscribe(() => {
+    void (async () => {
+      const {updateChannel} = await getDecoratedConfigWithRetry();
+      const newUpdateIsCanary = isCanaryChannel(updateChannel);
 
-    if (newUpdateIsCanary !== canaryUpdates) {
-      const feedURL = buildFeedUrl(newUpdateIsCanary);
+      if (newUpdateIsCanary !== canaryUpdates) {
+        const feedURL = buildFeedUrl(newUpdateIsCanary);
 
-      autoUpdater.setFeedURL({url: feedURL});
-      void checkForUpdates();
+        autoUpdater.setFeedURL({url: feedURL});
+        void checkForUpdates().catch((err: unknown) => {
+          logger.error('Error checking for updates after channel change', err);
+        });
 
-      canaryUpdates = newUpdateIsCanary;
-    }
+        canaryUpdates = newUpdateIsCanary;
+      }
+    })().catch((err: unknown) => {
+      logger.error('Error handling config change in updater', err);
+    });
   });
 
   win.on('close', () => {

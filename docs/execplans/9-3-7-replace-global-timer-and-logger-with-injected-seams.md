@@ -1,4 +1,6 @@
+<!-- markdownlint-disable MD013 -->
 # Replace process-global timer and logger overrides with injected seams in DOM-heavy unit tests
+<!-- markdownlint-enable MD013 -->
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -83,20 +85,20 @@ must be documented here, even if it requires splitting a partially completed
 task into two ("done" vs. "remaining"). This section must always reflect the
 actual current state of the work.
 
-- [x] (2025-03-23) Stage A: Analysis and seam design
+- [x] (2026-03-23) Stage A: Analysis and seam design
   - [x] Review notification.tsx timer usage patterns
   - [x] Review updater.ts timer and logger usage patterns
   - [x] Design timer seam interface for notification component
   - [x] Design scheduler/logger seam interface for updater module
 
-- [x] (2025-03-23) Stage B: Notification timer seam implementation
+- [x] (2026-03-23) Stage B: Notification timer seam implementation
   - [x] Add optional timer seam to Notification component props
   - [x] Update useNotification hook to accept injected timer methods
   - [x] Refactor notification.test.ts to use injected seams
   - [x] Remove global timer replacement from notification.test.ts
   - [x] Verify notification tests pass with `--concurrent`
 
-- [x] (2025-03-23) Stage C: Updater scheduler/logger seam implementation
+- [x] (2026-03-23) Stage C: Updater scheduler/logger seam implementation
   - [x] Add optional scheduler seam to updater function signature
   - [x] Add optional logger seam to updater function signature
   - [x] Update updater.ts to use injected seams with global fallbacks
@@ -104,7 +106,7 @@ actual current state of the work.
   - [x] Remove global timer and console.error replacement from updater.test.ts
   - [x] Verify updater tests pass with `--concurrent`
 
-- [x] (2025-03-23) Stage D: Documentation and quality gates
+- [x] (2026-03-23) Stage D: Documentation and quality gates
   - [x] Update developers-guide.md with seam injection patterns
   - [x] Mark roadmap item 9.3.7 as done
   - [x] Run full validation: `bun install`, `make build`, `make check-fmt`,
@@ -141,20 +143,20 @@ Record every significant decision made while working on the plan.
   Rationale: Without memoization, a new `{setTimeout, clearTimeout}` default object
   is created on every render, causing effect dependencies to change and
   triggering unnecessary re-runs of `setDismissTimer` and cleanup effects.
-  Date/Author: 2025-03-23
+  Date/Author: 2026-03-23
 
 - Decision: Collapse `UpdateChannel` + `parseUpdateChannel` + `isCanary` into
   a single `isCanaryChannel(raw?: string): boolean` helper.
   Rationale: Reduces cognitive load and removes the need for callers to
   handle type conversions. The single helper safely handles undefined and
   non-'canary' values.
-  Date/Author: 2025-03-23
+  Date/Author: 2026-03-23
 
 - Decision: Narrow `SchedulerSeam` to only expose `setTimeout` and
   `setInterval` (remove `clearTimeout`/`clearInterval`).
   Rationale: The updater module never calls the clear methods. Narrowing
   the seam reduces surface area while preserving full testability.
-  Date/Author: 2025-03-23
+  Date/Author: 2026-03-23
 
 ## Outcomes & retrospective
 
@@ -290,9 +292,9 @@ interface TimerSeam {
 }
 ```
 
-2. Extend `NotificationProps` to accept optional `timer?: TimerSeam`.
+1. Extend `NotificationProps` to accept optional `timer?: TimerSeam`.
 
-4. Update `useNotification` to accept optional timer parameter and use it
+2. Update `useNotification` to accept optional timer parameter and use it
    instead of globals:
 
 ```typescript
@@ -311,7 +313,7 @@ const useNotification = (
 };
 ```
 
-4. Pass timer from props through to `useNotification` in the component.
+1. Pass timer from props through to `useNotification` in the component.
 
 In `test/unit/notification.test.ts`:
 
@@ -354,7 +356,7 @@ const createFakeTimerSeam = () => {
 };
 ```
 
-3. Update each test to pass `timerSeam` through props:
+1. Update each test to pass `timerSeam` through props:
 
 ```typescript
 const {advanceTimersByTime, timerSeam} = createFakeTimerSeam();
@@ -362,7 +364,7 @@ const {advanceTimersByTime, timerSeam} = createFakeTimerSeam();
 // ... use advanceTimersByTime instead of timers.advanceTimersByTime
 ```
 
-4. Remove all `timers.install()` and `timers.restore()` calls.
+1. Remove all `timers.install()` and `timers.restore()` calls.
 
 ### Stage C: Updater changes
 
@@ -381,7 +383,7 @@ interface LoggerSeam {
 }
 ```
 
-2. Update `updater` function signature to accept optional seams:
+1. Update `updater` function signature to accept optional seams:
 
 ```typescript
 export interface UpdaterOptions {
@@ -399,7 +401,7 @@ const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
 };
 ```
 
-3. Update `init` to accept and use scheduler/logger with concurrency guard:
+1. Update `init` to accept and use scheduler/logger with concurrency guard:
 
 ```typescript
 async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
@@ -461,7 +463,7 @@ const createLoggerSeam = () => {
 };
 ```
 
-3. Update tests to pass seams through `updater(win, {scheduler, logger})`:
+1. Update tests to pass seams through `updater(win, {scheduler, logger})`:
 
 ```typescript
 const {scheduler, timeoutCallbacks, intervalCallbacks} = createSchedulerSeam();
@@ -473,7 +475,7 @@ updater(winStub as unknown as Electron.BrowserWindow, {scheduler, logger});
 Note: The scheduler seam only exposes `setTimeout` and `setInterval` since the
 updater module does not call the clear methods.
 
-4. Remove all `timers.install()`, `timers.restore()`, `consoleCapture.install()`,
+1. Remove all `timers.install()`, `timers.restore()`, `consoleCapture.install()`,
    and `consoleCapture.restore()` calls.
 
 ### Stage D: Documentation update
@@ -501,7 +503,6 @@ injected seams instead of process-global mutations:
 Suites that rely on timer or logger seams must not mutate global state during
 test execution; instead, provide test-doubles through the module's public
 interface.
-```
 
 ## Validation and acceptance
 
