@@ -46,54 +46,116 @@ const checkForUpdates = async () => {
 };
 
 let isInit = false;
+let isInitializing = false;
 // Default to the "stable" update channel
 let canaryUpdates = false;
+// Guard to ensure autoUpdater error listener is only registered once
+let errorListenerRegistered = false;
 
-const buildFeedUrl = (canary: boolean, currentVersion: string) => {
+const buildFeedUrl = (canary: boolean) => {
   const updatePrefix = canary ? 'releases-canary' : 'releases';
   const archSuffix = process.arch === 'arm64' || app.runningUnderARM64Translation ? '_arm64' : '';
-  return `https://${updatePrefix}.hyper.is/update/${isLinux ? 'deb' : platform}${archSuffix}/${currentVersion}`;
+  return `https://${updatePrefix}.hyper.is/update/${isLinux ? 'deb' : platform}${archSuffix}/${version}`;
 };
 
-const isCanary = (updateChannel: string) => updateChannel === 'canary';
+/**
+ * Checks if the raw config channel value indicates canary updates.
+ * Treats undefined and non-'canary' values as stable.
+ */
+const isCanaryChannel = (raw?: string): boolean => raw === 'canary';
 
-async function init() {
-  autoUpdater.on('error', (err) => {
-    console.error('Error fetching updates', `${err.message} (${err.stack})`);
-  });
-
-  const config = await getDecoratedConfigWithRetry();
-
-  // If defined in the config, switch to the "canary" channel
-  if (config.updateChannel && isCanary(config.updateChannel)) {
-    canaryUpdates = true;
-  }
-
-  const feedURL = buildFeedUrl(canaryUpdates, version);
-
-  autoUpdater.setFeedURL({url: feedURL});
-
-  if (process.env.NODE_ENV !== 'test') {
-    setTimeout(() => {
-      void checkForUpdates();
-    }, ms('10s'));
-
-    setInterval(() => {
-      void checkForUpdates();
-    }, ms('30m'));
-  }
-
-  isInit = true;
+/**
+ * Scheduler seam for timer operations.
+ * Allows injection of test doubles in unit tests.
+ */
+interface SchedulerSeam {
+  setTimeout: typeof globalThis.setTimeout;
+  setInterval: typeof globalThis.setInterval;
 }
 
-const updater = (win: BrowserWindow) => {
-  if (!isInit) {
-    void init();
+/**
+ * Logger seam for error logging.
+ * Allows injection of test doubles in unit tests.
+ */
+interface LoggerSeam {
+  error: (...args: unknown[]) => void;
+}
+
+/** Value object carrying the metadata emitted for an available update. */
+interface ReleaseInfo {
+  readonly releaseNotes: string;
+  readonly releaseName: string;
+  readonly updateUrl?: string;
+}
+
+/**
+ * Options for the updater function.
+ */
+export interface UpdaterOptions {
+  scheduler?: SchedulerSeam;
+  logger?: LoggerSeam;
+}
+
+async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
+  if (isInitializing) return;
+  isInitializing = true;
+
+  try {
+    // Only register the error listener once to make retries idempotent
+    if (!errorListenerRegistered) {
+      autoUpdater.on('error', (err) => {
+        logger.error('Error fetching updates', `${err.message} (${err.stack})`);
+      });
+      errorListenerRegistered = true;
+    }
+
+    const config = await getDecoratedConfigWithRetry();
+
+    // Derive canary status for this attempt; do not mutate module state until success
+    const attemptIsCanary = isCanaryChannel(config.updateChannel);
+
+    const feedURL = buildFeedUrl(attemptIsCanary);
+
+    autoUpdater.setFeedURL({url: feedURL});
+
+    if (process.env.NODE_ENV !== 'test') {
+      scheduler.setTimeout(() => {
+        void checkForUpdates().catch((err: unknown) => {
+          logger.error('Error checking for updates', err);
+        });
+      }, ms('10s'));
+
+      scheduler.setInterval(() => {
+        void checkForUpdates().catch((err: unknown) => {
+          logger.error('Error checking for updates', err);
+        });
+      }, ms('30m'));
+    }
+
+    // Only update module-level state after successful initialization
+    canaryUpdates = attemptIsCanary;
+    isInit = true;
+  } finally {
+    isInitializing = false;
+  }
+}
+
+const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
+  const scheduler = options?.scheduler ?? {
+    setTimeout: globalThis.setTimeout,
+    setInterval: globalThis.setInterval
+  };
+  const logger = options?.logger ?? console;
+
+  if (!isInit && !isInitializing) {
+    void init(scheduler, logger).catch((err: unknown) => {
+      logger.error('Error starting updater', err);
+    });
   }
 
   const {rpc} = win;
 
-  const emitUpdateAvailable = (releaseNotes: string, releaseName: string, updateUrl?: string) => {
+  const emitUpdateAvailable = ({releaseNotes, releaseName, updateUrl}: ReleaseInfo) => {
     const releaseUrl = updateUrl || `https://github.com/vercel/hyper/releases/tag/${releaseName}`;
     rpc.emit('update available', {releaseNotes, releaseName, releaseUrl, canInstall: !isLinux});
   };
@@ -108,7 +170,7 @@ const updater = (win: BrowserWindow) => {
     const releaseName = releaseNameArg || version;
     const updateUrl = updateUrlArg || undefined;
 
-    emitUpdateAvailable(releaseNotes, releaseName, updateUrl);
+    emitUpdateAvailable({releaseNotes, releaseName, updateUrl});
   };
 
   const onUpdateDownloaded = (
@@ -118,7 +180,7 @@ const updater = (win: BrowserWindow) => {
     _date: Date,
     updateUrl: string
   ) => {
-    emitUpdateAvailable(releaseNotes, releaseName, updateUrl);
+    emitUpdateAvailable({releaseNotes, releaseName, updateUrl});
   };
 
   if (isLinux) {
@@ -131,18 +193,24 @@ const updater = (win: BrowserWindow) => {
     autoUpdater.quitAndInstall();
   });
 
-  app.config.subscribe(async () => {
-    const {updateChannel} = await getDecoratedConfigWithRetry();
-    const newUpdateIsCanary = isCanary(updateChannel);
+  app.config.subscribe(() => {
+    void (async () => {
+      const {updateChannel} = await getDecoratedConfigWithRetry();
+      const newUpdateIsCanary = isCanaryChannel(updateChannel);
 
-    if (newUpdateIsCanary !== canaryUpdates) {
-      const feedURL = buildFeedUrl(newUpdateIsCanary, version);
+      if (newUpdateIsCanary !== canaryUpdates) {
+        const feedURL = buildFeedUrl(newUpdateIsCanary);
 
-      autoUpdater.setFeedURL({url: feedURL});
-      void checkForUpdates();
+        autoUpdater.setFeedURL({url: feedURL});
+        void checkForUpdates().catch((err: unknown) => {
+          logger.error('Error checking for updates after channel change', err);
+        });
 
-      canaryUpdates = newUpdateIsCanary;
-    }
+        canaryUpdates = newUpdateIsCanary;
+      }
+    })().catch((err: unknown) => {
+      logger.error('Error handling config change in updater', err);
+    });
   });
 
   win.on('close', () => {

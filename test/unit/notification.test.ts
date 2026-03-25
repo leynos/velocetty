@@ -7,7 +7,7 @@ import {expect, test} from 'bun:test';
 import Notification from '../../lib/components/notification';
 import {setupHappyDom} from '../testUtils/happy-dom';
 
-type NotificationProps = React.ComponentProps<typeof Notification>;
+import type {NotificationProps, TimerSeam} from '../../typings/hyper';
 
 const buildNotificationProps = (
   dismissAfter: number,
@@ -20,9 +20,11 @@ const buildNotificationProps = (
   text: 'Hello',
   ...overrides
 });
+
 const dispatchOpacityTransition = (indicator: Element) => {
   indicator.dispatchEvent(buildTransitionEvent(indicator, 'opacity'));
 };
+
 const buildTransitionEvent = (target: Element, propertyName: string) => {
   // Happy DOM does not fully populate TransitionEvent fields.
   const event = new Event('transitionend') as TransitionEvent;
@@ -30,44 +32,29 @@ const buildTransitionEvent = (target: Element, propertyName: string) => {
   Object.defineProperty(event, 'target', {value: target});
   return event;
 };
+
 /**
- * Creates a deterministic timer adapter for unit tests.
+ * Creates a fake timer seam for deterministic timer control in tests.
  *
- * @returns Helper functions to install/restore timers and advance time.
+ * @returns Helper with advanceTimersByTime and a TimerSeam implementation.
  *
  * @example
  * ```ts
- * const timers = createFakeTimers();
- * timers.install();
- * timers.advanceTimersByTime(100);
- * timers.restore();
+ * const {advanceTimersByTime, timerSeam} = createFakeTimerSeam();
+ * // render with timer={timerSeam} prop
+ * advanceTimersByTime(100);
  * ```
  */
-const createFakeTimers = () => {
+const createFakeTimerSeam = () => {
   let now = 0;
   let nextId = 1;
-  let scheduled: Array<{id: number; runAt: number; callback: () => void}> = [];
-  const originalSetTimeout = globalThis.setTimeout;
-  const originalClearTimeout = globalThis.clearTimeout;
-
-  const setTimeoutMock = (callback: () => void, delay = 0) => {
-    const id = nextId;
-    nextId += 1;
-    scheduled.push({id, runAt: now + delay, callback});
-    scheduled.sort((a, b) => a.runAt - b.runAt);
-    return id as unknown as NodeJS.Timeout;
-  };
-
-  const clearTimeoutMock = (handle?: NodeJS.Timeout) => {
-    const id = Number(handle);
-    scheduled = scheduled.filter((timer) => timer.id !== id);
-  };
+  const scheduled: Array<{id: number; runAt: number; callback: () => void}> = [];
 
   const advanceTimersByTime = (ms: number) => {
     const target = now + ms;
     while (scheduled.length > 0 && scheduled[0].runAt <= target) {
       const [nextTimer] = scheduled;
-      scheduled = scheduled.slice(1);
+      scheduled.shift();
       now = nextTimer.runAt;
       nextTimer.callback();
       scheduled.sort((a, b) => a.runAt - b.runAt);
@@ -75,18 +62,23 @@ const createFakeTimers = () => {
     now = target;
   };
 
-  const install = () => {
-    globalThis.setTimeout = setTimeoutMock as typeof globalThis.setTimeout;
-    globalThis.clearTimeout = clearTimeoutMock as typeof globalThis.clearTimeout;
+  const timerSeam: TimerSeam = {
+    setTimeout: (callback: () => void, delay = 0) => {
+      const id = nextId++;
+      scheduled.push({id, runAt: now + delay, callback});
+      scheduled.sort((a, b) => a.runAt - b.runAt);
+      return id as unknown as NodeJS.Timeout;
+    },
+    clearTimeout: (handle?: NodeJS.Timeout) => {
+      const id = Number(handle);
+      const index = scheduled.findIndex((t) => t.id === id);
+      if (index !== -1) scheduled.splice(index, 1);
+    }
   };
 
-  const restore = () => {
-    globalThis.setTimeout = originalSetTimeout;
-    globalThis.clearTimeout = originalClearTimeout;
-  };
-
-  return {advanceTimersByTime, install, restore};
+  return {advanceTimersByTime, timerSeam};
 };
+
 const requireIndicator = (container: HTMLElement) => {
   const indicator = container.querySelector('.notification_indicator');
   expect(indicator).toBeTruthy();
@@ -95,6 +87,7 @@ const requireIndicator = (container: HTMLElement) => {
   }
   return indicator;
 };
+
 const requireDismissButton = (container: HTMLElement) => {
   const button = container.querySelector('.notification_dismissLink');
   expect(button).toBeTruthy();
@@ -104,14 +97,14 @@ const requireDismissButton = (container: HTMLElement) => {
   return button;
 };
 
-test.serial('Notification auto-dismisses after the timeout on mount', async () => {
+test('Notification auto-dismisses after the timeout on mount', async () => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
 
-  const timers = createFakeTimers();
-  timers.install();
+  const {advanceTimersByTime, timerSeam} = createFakeTimerSeam();
+
   try {
     let dismissCount = 0;
     const dismissAfterMs = 60;
@@ -120,15 +113,19 @@ test.serial('Notification auto-dismisses after the timeout on mount', async () =
       root.render(
         React.createElement(
           Notification,
-          buildNotificationProps(dismissAfterMs, () => {
-            dismissCount += 1;
-          })
+          buildNotificationProps(
+            dismissAfterMs,
+            () => {
+              dismissCount += 1;
+            },
+            {timer: timerSeam}
+          )
         )
       );
     });
 
     await act(async () => {
-      timers.advanceTimersByTime(dismissAfterMs + bufferMs);
+      advanceTimersByTime(dismissAfterMs + bufferMs);
     });
     const indicator = requireIndicator(container);
     await act(async () => {
@@ -137,7 +134,6 @@ test.serial('Notification auto-dismisses after the timeout on mount', async () =
 
     expect(dismissCount).toBe(1);
   } finally {
-    timers.restore();
     await act(async () => {
       root.unmount();
     });
@@ -145,14 +141,14 @@ test.serial('Notification auto-dismisses after the timeout on mount', async () =
   }
 });
 
-test.serial('Notification resets the timer when text changes', async () => {
+test('Notification resets the timer when text changes', async () => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
 
-  const timers = createFakeTimers();
-  timers.install();
+  const {advanceTimersByTime, timerSeam} = createFakeTimerSeam();
+
   try {
     let dismissCount = 0;
     const dismissAfterMs = 80;
@@ -161,21 +157,27 @@ test.serial('Notification resets the timer when text changes', async () => {
     };
     await act(async () => {
       root.render(
-        React.createElement(Notification, buildNotificationProps(dismissAfterMs, onDismiss, {text: 'First'}))
+        React.createElement(
+          Notification,
+          buildNotificationProps(dismissAfterMs, onDismiss, {text: 'First', timer: timerSeam})
+        )
       );
     });
 
     await act(async () => {
-      timers.advanceTimersByTime(40);
+      advanceTimersByTime(40);
     });
     await act(async () => {
       root.render(
-        React.createElement(Notification, buildNotificationProps(dismissAfterMs, onDismiss, {text: 'Second'}))
+        React.createElement(
+          Notification,
+          buildNotificationProps(dismissAfterMs, onDismiss, {text: 'Second', timer: timerSeam})
+        )
       );
     });
 
     await act(async () => {
-      timers.advanceTimersByTime(50);
+      advanceTimersByTime(50);
     });
     let indicator = requireIndicator(container);
     await act(async () => {
@@ -184,7 +186,7 @@ test.serial('Notification resets the timer when text changes', async () => {
     expect(dismissCount).toBe(0);
 
     await act(async () => {
-      timers.advanceTimersByTime(40);
+      advanceTimersByTime(40);
     });
     indicator = requireIndicator(container);
     await act(async () => {
@@ -192,7 +194,6 @@ test.serial('Notification resets the timer when text changes', async () => {
     });
     expect(dismissCount).toBe(1);
   } finally {
-    timers.restore();
     await act(async () => {
       root.unmount();
     });
@@ -200,11 +201,13 @@ test.serial('Notification resets the timer when text changes', async () => {
   }
 });
 
-test.serial('Notification handles manual dismiss transition for user-dismissable notices', async () => {
+test('Notification handles manual dismiss transition for user-dismissable notices', async () => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
+
+  const {timerSeam} = createFakeTimerSeam();
 
   try {
     let dismissCount = 0;
@@ -217,7 +220,7 @@ test.serial('Notification handles manual dismiss transition for user-dismissable
             () => {
               dismissCount += 1;
             },
-            {userDismissable: true, userDismissColor: '#fff'}
+            {userDismissable: true, userDismissColor: '#fff', timer: timerSeam}
           )
         )
       );
@@ -247,7 +250,7 @@ test.serial('Notification handles manual dismiss transition for user-dismissable
   }
 });
 
-test.serial('Notification forwards and clears function refs on mount lifecycle', async () => {
+test('Notification forwards and clears function refs on mount lifecycle', async () => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -258,11 +261,13 @@ test.serial('Notification forwards and clears function refs on mount lifecycle',
     refValues.push(element);
   };
 
+  const {timerSeam} = createFakeTimerSeam();
+
   try {
     await act(async () => {
       root.render(
         React.createElement(Notification, {
-          ...buildNotificationProps(250, () => {}),
+          ...buildNotificationProps(250, () => {}, {timer: timerSeam}),
           ref: notificationRef
         })
       );
@@ -278,4 +283,50 @@ test.serial('Notification forwards and clears function refs on mount lifecycle',
 
   // The unmount in finally invokes the ref callback with null.
   expect(refValues.at(-1)).toBeNull();
+});
+
+test('Notification auto-dismisses using global timers when no timer prop is provided', async () => {
+  // This test exercises the default global timer fallback path.
+  const cleanup = await setupHappyDom();
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  let dismissCount = 0;
+  const dismissAfterMs = 60;
+
+  try {
+    // IMPORTANT: No timer prop provided - this exercises the fallback path
+    await act(async () => {
+      root.render(
+        React.createElement(
+          Notification,
+          buildNotificationProps(
+            dismissAfterMs,
+            () => {
+              dismissCount += 1;
+            }
+            // timer prop intentionally omitted to test fallback
+          )
+        )
+      );
+    });
+
+    // Wait for the real timer to fire
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, dismissAfterMs + 20));
+    });
+
+    const indicator = requireIndicator(container);
+    await act(async () => {
+      dispatchOpacityTransition(indicator);
+    });
+
+    expect(dismissCount).toBe(1);
+  } finally {
+    await act(async () => {
+      root.unmount();
+    });
+    cleanup();
+  }
 });

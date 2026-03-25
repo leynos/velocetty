@@ -258,12 +258,18 @@ export type TabsProps = {
   openNewTab: (profile: string) => void;
 } & extensionProps;
 
+export type TimerSeam = {
+  setTimeout: typeof globalThis.setTimeout;
+  clearTimeout: typeof globalThis.clearTimeout;
+};
+
 export type NotificationProps = {
   backgroundColor: string;
   color?: string;
   dismissAfter?: number;
   onDismiss: Function;
   text?: string | null;
+  timer?: TimerSeam;
   userDismissable?: boolean | null;
   userDismissColor?: string;
 } & extensionProps;

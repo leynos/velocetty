@@ -39,67 +39,37 @@ const settle = async () => {
   await Promise.resolve();
 };
 
-const createTimerCapture = () => {
-  const originalSetTimeout = globalThis.setTimeout;
-  const originalClearTimeout = globalThis.clearTimeout;
-  const originalSetInterval = globalThis.setInterval;
-  const originalClearInterval = globalThis.clearInterval;
+const createSchedulerSeam = () => {
   const timeoutCallbacks: Array<() => void> = [];
   const intervalCallbacks: Array<() => void> = [];
-  const clearedTimeouts: number[] = [];
-  const clearedIntervals: number[] = [];
   let nextTimerId = 0;
 
   return {
     timeoutCallbacks,
     intervalCallbacks,
-    clearedTimeouts,
-    clearedIntervals,
-    install: () => {
-      globalThis.setTimeout = ((callback: () => void) => {
+    scheduler: {
+      setTimeout: (callback: () => void) => {
         nextTimerId += 1;
         timeoutCallbacks.push(callback);
         return nextTimerId as unknown as NodeJS.Timeout;
-      }) as typeof globalThis.setTimeout;
-      globalThis.clearTimeout = ((timer?: NodeJS.Timeout) => {
-        const timerId = Number(timer);
-        if (Number.isFinite(timerId)) {
-          clearedTimeouts.push(timerId);
-        }
-      }) as typeof globalThis.clearTimeout;
-      globalThis.setInterval = ((callback: () => void) => {
+      },
+      setInterval: (callback: () => void) => {
         nextTimerId += 1;
         intervalCallbacks.push(callback);
         return nextTimerId as unknown as NodeJS.Timeout;
-      }) as typeof globalThis.setInterval;
-      globalThis.clearInterval = ((timer?: NodeJS.Timeout) => {
-        const timerId = Number(timer);
-        if (Number.isFinite(timerId)) {
-          clearedIntervals.push(timerId);
-        }
-      }) as typeof globalThis.clearInterval;
-    },
-    restore: () => {
-      globalThis.setTimeout = originalSetTimeout;
-      globalThis.clearTimeout = originalClearTimeout;
-      globalThis.setInterval = originalSetInterval;
-      globalThis.clearInterval = originalClearInterval;
+      }
     }
   };
 };
 
-const createConsoleErrorCapture = () => {
-  const originalConsoleError = console.error;
+const createLoggerSeam = () => {
   const errorCalls: unknown[][] = [];
   return {
     errorCalls,
-    install: () => {
-      console.error = (...args: unknown[]) => {
+    logger: {
+      error: (...args: unknown[]) => {
         errorCalls.push(args);
-      };
-    },
-    restore: () => {
-      console.error = originalConsoleError;
+      }
     }
   };
 };
@@ -194,9 +164,8 @@ const loadUpdater = async () => {
 
 test.serial('updater wires lifecycle handlers, timers, and channel updates', async () => {
   const originalNodeEnv = process.env.NODE_ENV;
-  const timers = createTimerCapture();
+  const {scheduler, timeoutCallbacks, intervalCallbacks} = createSchedulerSeam();
   process.env.NODE_ENV = 'production';
-  timers.install();
 
   try {
     const emitCalls: Array<[string, Record<string, unknown>]> = [];
@@ -232,7 +201,7 @@ test.serial('updater wires lifecycle handlers, timers, and channel updates', asy
     registerUpdaterMocks(autoUpdater, () => configState);
 
     const {default: updater} = await loadUpdater();
-    updater(winStub as unknown as Electron.BrowserWindow);
+    updater(winStub as unknown as Electron.BrowserWindow, {scheduler});
     await settle();
 
     const updateHandler = getUpdateHandler();
@@ -254,10 +223,10 @@ test.serial('updater wires lifecycle handlers, timers, and channel updates', asy
       ]
     ]);
 
-    expect(timers.timeoutCallbacks).toHaveLength(1);
-    expect(timers.intervalCallbacks).toHaveLength(1);
-    timers.timeoutCallbacks[0]();
-    timers.intervalCallbacks[0]();
+    expect(timeoutCallbacks).toHaveLength(1);
+    expect(intervalCallbacks).toHaveLength(1);
+    timeoutCallbacks[0]();
+    intervalCallbacks[0]();
     await settle();
     expect(getCheckForUpdatesCalls()).toBe(2);
 
@@ -279,17 +248,14 @@ test.serial('updater wires lifecycle handlers, timers, and channel updates', asy
     expect(getRemovedListeners()).toEqual([process.platform === 'linux' ? 'update-available' : 'update-downloaded']);
   } finally {
     process.env.NODE_ENV = originalNodeEnv;
-    timers.restore();
   }
 });
 
 test.serial('updater honours disableAutoUpdates and handles updater error events', async () => {
   const originalNodeEnv = process.env.NODE_ENV;
-  const timers = createTimerCapture();
-  const consoleCapture = createConsoleErrorCapture();
+  const {scheduler, timeoutCallbacks, intervalCallbacks} = createSchedulerSeam();
+  const {logger, errorCalls} = createLoggerSeam();
   process.env.NODE_ENV = 'production';
-  consoleCapture.install();
-  timers.install();
 
   try {
     const emitCalls: Array<[string, Record<string, unknown>]> = [];
@@ -314,14 +280,14 @@ test.serial('updater honours disableAutoUpdates and handles updater error events
 
     registerUpdaterMocks(autoUpdater, () => configState);
     const {default: updater} = await loadUpdater();
-    updater(winStub as unknown as Electron.BrowserWindow);
+    updater(winStub as unknown as Electron.BrowserWindow, {scheduler, logger});
     await settle();
 
-    expect(timers.timeoutCallbacks).toHaveLength(1);
-    expect(timers.intervalCallbacks).toHaveLength(1);
+    expect(timeoutCallbacks).toHaveLength(1);
+    expect(intervalCallbacks).toHaveLength(1);
 
-    timers.timeoutCallbacks[0]();
-    timers.intervalCallbacks[0]();
+    timeoutCallbacks[0]();
+    intervalCallbacks[0]();
     await settle();
 
     expect(getCheckForUpdatesCalls()).toBe(0);
@@ -334,12 +300,10 @@ test.serial('updater honours disableAutoUpdates and handles updater error events
     }
     const error = new Error('simulated updater error');
     errorHandler(error);
-    expect(consoleCapture.errorCalls).toHaveLength(1);
-    expect(String(consoleCapture.errorCalls[0][0])).toContain('Error fetching updates');
-    expect(String(consoleCapture.errorCalls[0][1])).toContain('simulated updater error');
+    expect(errorCalls).toHaveLength(1);
+    expect(String(errorCalls[0][0])).toContain('Error fetching updates');
+    expect(String(errorCalls[0][1])).toContain('simulated updater error');
   } finally {
     process.env.NODE_ENV = originalNodeEnv;
-    consoleCapture.restore();
-    timers.restore();
   }
 });
