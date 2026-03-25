@@ -579,20 +579,21 @@ Unit tests run under Bun's built-in test runner. Use one of the following:
   coverage and 50% function coverage as the Bun-reported proxy for the
   documented 50% branch target.
 
-`make test` now executes the shared unit suite through `bun run test:unit:run`
-without forcing `--max-concurrency=1`. Roadmap item `9.3.1` removed the
-dedicated bootstrap-process quarantine by moving renderer bootstrap assertions
-behind injected seams instead of file-scope module mocks, and roadmap item
-`9.3.2` removes the serialized guardrail from the default local and CI unit
-gate.
+`make test` executes the shared unit suite through `bun run test:unit:run`,
+which runs with `--concurrent` (maximum concurrency) as the default. Roadmap
+item `9.3.1` removed the dedicated bootstrap-process quarantine by moving
+renderer bootstrap assertions behind injected seams instead of file-scope module
+mocks; roadmap item `9.3.2` removed the serialized guardrail from the default
+local and CI unit gate; and roadmap items `9.3.3` through `9.3.7` hardened
+test-suite isolation so explicit concurrency can be the default.
 
 When checking for order-dependent regressions, replay the unit suite with fixed
-seeds. For example:
+seeds and explicit concurrency:
 
 ```bash
-bun test --randomize --seed 2444615283 test/unit
-bun test --randomize --seed 1337 test/unit
-bun test --randomize --seed 20260306 test/unit
+bun test --concurrent --randomize --seed 2444615283 test/unit
+bun test --concurrent --randomize --seed 1337 test/unit
+bun test --concurrent --randomize --seed 20260306 test/unit
 ```
 
 To obtain a serialized reproduction path while diagnosing a suspected
@@ -604,9 +605,8 @@ bun run test:unit:serialized
 bun run test:unit:serialized:shuffled
 ```
 
-For roadmap item `9.3.3` and similar renderer-isolation work, use a focused
-explicit-concurrency stress run against the renderer event and renderer-metric
-suites:
+For focused stress testing of specific suites under explicit concurrency, use
+targeted runs:
 
 ```bash
 bun test --concurrent \
@@ -615,8 +615,7 @@ bun test --concurrent \
 ```
 
 This command supplements the default `make test` path and the seeded
-randomized reruns above. It does not replace the default gate restored by
-roadmap item `9.3.2`.
+randomized reruns above.
 
 For roadmap item `9.3.4` and similar filesystem-fixture isolation work, use a
 focused explicit-concurrency stress run against the directory-bootstrap helper

@@ -553,14 +553,14 @@ Scope notes:
     `console.error`.
   - [x] Success criteria: the notification and updater suites no longer mutate
     process-global timer or logger functions during their assertions.
-- [ ] 9.3.8. Promote `--concurrent` to the default unit-test gate after the
+- [x] 9.3.8. Promote `--concurrent` to the default unit-test gate after the
   explicit-concurrency fixes land. Requires 9.3.3, 9.3.4, 9.3.5, 9.3.6, and
   9.3.7. See [velocetty-design.md](velocetty-design.md) §Testing.
-  - [ ] Update local and CI default unit-test scripts to add `--concurrent`
-    only after the targeted hardening tasks above are complete.
-  - [ ] Keep seeded stress commands and serialized diagnostics available for
+  - [x] Update local and CI default unit-test scripts to add `--concurrent`
+    after the targeted hardening tasks above are complete.
+  - [x] Keep seeded stress commands and serialized diagnostics available for
     triage after the default-gate flip.
-  - [ ] Success criteria:
+  - [x] Success criteria:
     `bun test --concurrent --randomize --seed 2444615283 test/unit`,
     `bun test --concurrent --randomize --seed 1337 test/unit`, and
     `bun test --concurrent --randomize --seed 20260306 test/unit` all pass,
