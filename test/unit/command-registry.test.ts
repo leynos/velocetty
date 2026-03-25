@@ -30,11 +30,9 @@ const createCommandRegistryTestHarness = async (): Promise<CommandRegistryTestHa
   });
 
   moduleInstanceCounter += 1;
-  const {
-    createCommandRegistryModule,
-    closeSearchAction,
-    shouldPreventDefault
-  } = await import(`../../lib/command-registry.ts?command_registry_test=${moduleInstanceCounter}`);
+  const {createCommandRegistryModule, closeSearchAction, shouldPreventDefault} = await import(
+    `../../lib/command-registry.ts?command_registry_test=${moduleInstanceCounter}`
+  );
 
   const moduleInstance = createCommandRegistryModule({
     closeSearch: closeSearchAction,
