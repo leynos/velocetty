@@ -2,6 +2,7 @@
 import {expect, mock, test} from 'bun:test';
 import type {CommandDefinition, CommandId} from '@shared/types/commands';
 import {goldenPathCommandDefinition, GOLDEN_PATH_COMMAND_ID} from '@shared/runtime/golden-path-demo';
+import {shouldPreventDefault} from '../../lib/command-registry';
 
 const asCommandId = (value: string): CommandId => value as CommandId;
 const TEST_COMMAND_PREFIX = 'test:command-registry';
@@ -44,6 +45,7 @@ const createCommandRegistryTestHarness = async (): Promise<CommandRegistryTestHa
 
   return {
     ...moduleInstance,
+    // Intentionally no-op: DI means no module-level state was mutated.
     cleanup: () => {},
     invokeMock,
     setDecoratedKeymaps: (keymaps) => {
@@ -392,14 +394,9 @@ test('validateArgs returns structured errors for unknown commands', async () => 
   }
 });
 
-test('shouldPreventDefault keeps Electron role commands unblocked', async () => {
-  // shouldPreventDefault is a pure function, so we can use a minimal harness
-  const harness = await createCommandRegistryTestHarness();
-  try {
-    expect(harness.shouldPreventDefault('editor:copy')).toBe(false);
-    expect(harness.shouldPreventDefault('window:toggleFullScreen')).toBe(false);
-    expect(harness.shouldPreventDefault('tab:new')).toBe(true);
-  } finally {
-    harness.cleanup();
-  }
+test('shouldPreventDefault keeps Electron role commands unblocked', () => {
+  // shouldPreventDefault is a pure function; no harness needed.
+  expect(shouldPreventDefault('editor:copy')).toBe(false);
+  expect(shouldPreventDefault('window:toggleFullScreen')).toBe(false);
+  expect(shouldPreventDefault('tab:new')).toBe(true);
 });

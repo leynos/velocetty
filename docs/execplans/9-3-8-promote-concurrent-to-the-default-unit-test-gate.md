@@ -87,7 +87,7 @@ Known uncertainties that might affect the plan:
 
 ## Progress
 
-Use a list with checkboxes to summarise granular steps:
+Use a list with checkboxes to summarize granular steps:
 
 - [x] Stage A: Verify all prerequisite fixes (9.3.3-9.3.7) are marked done
   in `docs/roadmap.md`.
@@ -190,7 +190,7 @@ them safe for explicit concurrent execution:
   maximum concurrency regardless of CPU count.
 - **Serialized**: Running with `--max-concurrency=1`, which forces sequential
   test execution.
-- **Shuffled**: Running with `--randomize`, which randomises test order
+- **Shuffled**: Running with `--randomize`, which randomizes test order
   within files.
 
 ## Plan of work
