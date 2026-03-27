@@ -8,17 +8,20 @@ const TEST_COMMAND_PREFIX = 'test:command-registry';
 
 let moduleInstanceCounter = 0;
 
+type CommandRegistryModule = typeof import('../../lib/command-registry.ts');
+
 type CommandRegistryTestHarness = {
   cleanup: () => void;
   invokeMock: ReturnType<typeof mock<(channel: string, ...args: unknown[]) => Promise<unknown>>>;
   setDecoratedKeymaps: (keymaps: Record<string, string[]>) => void;
   setRuntimeCommands: (commands: CommandDefinition[]) => void;
-} & Awaited<ReturnType<typeof createCommandRegistryModule>>;
+  shouldPreventDefault: CommandRegistryModule['shouldPreventDefault'];
+} & ReturnType<CommandRegistryModule['createCommandRegistryModule']>;
 
-async function createCommandRegistryModule() {
+async function importFreshCommandRegistryModule(): Promise<CommandRegistryModule> {
   moduleInstanceCounter += 1;
   const mod = await import(`../../lib/command-registry.ts?${moduleInstanceCounter}`);
-  return mod;
+  return mod as CommandRegistryModule;
 }
 
 const createCommandRegistryTestHarness = async (): Promise<CommandRegistryTestHarness> => {
@@ -38,7 +41,7 @@ const createCommandRegistryTestHarness = async (): Promise<CommandRegistryTestHa
     throw new Error(`Unexpected IPC channel: ${channel}`);
   });
 
-  const {createCommandRegistryModule: factory, shouldPreventDefault: spd} = await createCommandRegistryModule();
+  const {createCommandRegistryModule: factory, shouldPreventDefault: spd} = await importFreshCommandRegistryModule();
 
   const moduleInstance = factory({
     closeSearch: () => () => {},
@@ -403,12 +406,8 @@ test('validateArgs returns structured errors for unknown commands', async () => 
 });
 
 test('shouldPreventDefault keeps Electron role commands unblocked', async () => {
-  const harness = await createCommandRegistryTestHarness();
-  try {
-    expect(harness.shouldPreventDefault('editor:copy')).toBe(false);
-    expect(harness.shouldPreventDefault('window:toggleFullScreen')).toBe(false);
-    expect(harness.shouldPreventDefault('tab:new')).toBe(true);
-  } finally {
-    harness.cleanup();
-  }
+  const {shouldPreventDefault} = await importFreshCommandRegistryModule();
+  expect(shouldPreventDefault('editor:copy')).toBe(false);
+  expect(shouldPreventDefault('window:toggleFullScreen')).toBe(false);
+  expect(shouldPreventDefault('tab:new')).toBe(true);
 });
