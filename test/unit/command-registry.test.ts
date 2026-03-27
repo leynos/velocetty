@@ -8,8 +8,16 @@ const TEST_COMMAND_PREFIX = 'test:command-registry';
 
 let moduleInstanceCounter = 0;
 
+/** Type alias for the command-registry module to enable precise typing of dynamic imports. */
 type CommandRegistryModule = typeof import('../../lib/command-registry.ts');
 
+/**
+ * Test harness exposing the command registry API plus mock helpers and state setters.
+ *
+ * Composes the factory-produced registry instance with test-specific controls:
+ * `invokeMock` for IPC interception, `setDecoratedKeymaps`/`setRuntimeCommands`
+ * for fixture injection, and `cleanup` for resource disposal.
+ */
 type CommandRegistryTestHarness = {
   cleanup: () => void;
   invokeMock: ReturnType<typeof mock<(channel: string, ...args: unknown[]) => Promise<unknown>>>;
@@ -18,12 +26,29 @@ type CommandRegistryTestHarness = {
   shouldPreventDefault: CommandRegistryModule['shouldPreventDefault'];
 } & ReturnType<CommandRegistryModule['createCommandRegistryModule']>;
 
+/**
+ * Imports a fresh instance of the command-registry module, bypassing Bun's module cache.
+ *
+ * Increments a counter to generate unique query strings for each import, ensuring
+ * isolated module instances required for concurrent test execution.
+ *
+ * @returns Promise resolving to the imported module with full type information.
+ */
 async function importFreshCommandRegistryModule(): Promise<CommandRegistryModule> {
   moduleInstanceCounter += 1;
   const mod = await import(`../../lib/command-registry.ts?${moduleInstanceCounter}`);
   return mod as CommandRegistryModule;
 }
 
+/**
+ * Creates an isolated test harness with mock IPC and fixture state management.
+ *
+ * Sets up `invokeMock` to intercept `getRuntimePluginCommands` and `getDecoratedKeymaps`
+ * IPC channels, returning cloned fixture data. Returns a harness combining the
+ * registry API with mock controls and state setters.
+ *
+ * @returns Promise resolving to the configured test harness.
+ */
 const createCommandRegistryTestHarness = async (): Promise<CommandRegistryTestHarness> => {
   let decoratedKeymaps: Record<string, string[]> = {};
   let runtimeCommands: CommandDefinition[] = [];
@@ -66,6 +91,13 @@ const createCommandRegistryTestHarness = async (): Promise<CommandRegistryTestHa
   };
 };
 
+/**
+ * Factory for creating minimal command definitions suitable for test fixtures.
+ *
+ * @param commandId - Unique identifier for the command (used as both id and default title).
+ * @param title - Display title; defaults to the commandId if not provided.
+ * @returns A minimal CommandDefinition with 'frontend' kind and the specified metadata.
+ */
 const createCommandDefinition = (commandId: string, title = commandId): CommandDefinition => ({
   id: asCommandId(commandId),
   kind: 'frontend',
