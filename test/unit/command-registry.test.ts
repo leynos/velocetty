@@ -2,7 +2,7 @@
 import {expect, mock, test} from 'bun:test';
 import type {CommandDefinition, CommandId} from '@shared/types/commands';
 import {goldenPathCommandDefinition, GOLDEN_PATH_COMMAND_ID} from '@shared/runtime/golden-path-demo';
-import {createCommandRegistryModule, closeSearchAction, shouldPreventDefault} from '../../lib/command-registry';
+import {createCommandRegistryModule, shouldPreventDefault} from '../../lib/command-registry';
 
 const asCommandId = (value: string): CommandId => value as CommandId;
 const TEST_COMMAND_PREFIX = 'test:command-registry';
@@ -29,7 +29,7 @@ const createCommandRegistryTestHarness = (): CommandRegistryTestHarness => {
   });
 
   const moduleInstance = createCommandRegistryModule({
-    closeSearch: closeSearchAction,
+    closeSearch: () => () => {},
     focusActiveTerm: () => {},
     transport: {
       invoke: invokeMock
