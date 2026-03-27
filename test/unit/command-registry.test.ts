@@ -10,7 +10,7 @@ let moduleInstanceCounter = 0;
 
 type CommandRegistryTestHarness = {
   cleanup: () => void;
-  invokeMock: ReturnType<typeof mock<(channel: string) => Promise<unknown>>>;
+  invokeMock: ReturnType<typeof mock<(channel: string, ...args: unknown[]) => Promise<unknown>>>;
   setDecoratedKeymaps: (keymaps: Record<string, string[]>) => void;
   setRuntimeCommands: (commands: CommandDefinition[]) => void;
 } & Awaited<ReturnType<typeof createCommandRegistryModule>>;
@@ -25,7 +25,10 @@ const createCommandRegistryTestHarness = async (): Promise<CommandRegistryTestHa
   let decoratedKeymaps: Record<string, string[]> = {};
   let runtimeCommands: CommandDefinition[] = [];
 
-  const invokeMock = mock(async (channel: string) => {
+  const invokeMock = mock(async (channel: string, ...args: unknown[]) => {
+    if (args.length > 0) {
+      throw new Error(`Unexpected IPC args for channel "${channel}"`);
+    }
     if (channel === 'getRuntimePluginCommands') {
       return structuredClone(runtimeCommands);
     }
