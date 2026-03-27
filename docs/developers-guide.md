@@ -309,6 +309,73 @@ Required coverage categories before cut-over:
 Follow `docs/execplans/replace-webpack-babel-with-esbuild.md` for migration
 ordering and milestone gates.
 
+## CSS Modules conventions
+
+Roadmap item `1.4.16` establishes CSS Modules as the standard for renderer
+component styling, replacing `styled-jsx`. Follow these conventions when adding
+or modifying component styles:
+
+- Co-locate CSS Module files with their components:
+  - Component: `lib/components/example.tsx`
+  - Styles: `lib/components/example.module.css`
+
+- Use camelCase for class names in CSS Modules:
+
+  ```css
+  /* example.module.css */
+  .exampleContainer { padding: 1rem; }
+  .exampleHeader { font-size: 1.5rem; }
+  ```
+
+  ```tsx
+  // example.tsx
+  import styles from './example.module.css';
+  <div className={styles.exampleContainer}>
+  ```
+
+- For dynamic theme values (colours, fonts), use CSS custom properties passed
+  via the `style` prop:
+
+  ```tsx
+  const themeVars: React.CSSProperties = {
+    '--example-fg': foregroundColor,
+    '--example-bg': backgroundColor,
+  };
+  <div className={styles.exampleContainer} style={themeVars}>
+  ```
+
+  ```css
+  .exampleContainer {
+    color: var(--example-fg);
+    background-color: var(--example-bg);
+  }
+  ```
+
+- For platform-dependent styles (macOS vs others), use modifier classes with
+  `clsx` rather than CSS interpolation:
+
+  ```tsx
+  <div className={clsx(styles.tabsNav, isMac ? styles.tabsNavMac : styles.tabsNavNonMac)}>
+  ```
+
+- For global selectors (pseudo-elements like `::-webkit-scrollbar`), use the
+  `:global()` wrapper inside the module:
+
+  ```css
+  .host :global(::-webkit-scrollbar) { width: 5px; }
+  .host :global(::-webkit-scrollbar-thumb) { background: var(--thumb-color); }
+  ```
+
+- Do not use `styled-jsx` for new components; migrate existing components to
+  CSS Modules when modifying them.
+
+- Keep legacy class names that may be targeted by plugins during migration;
+  document any intentional breaking changes.
+
+See `docs/execplans/1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md`
+for the complete migration approach, inventory of remaining `styled-jsx`
+callsites, and worked examples.
+
 ## Electron runtime alignment
 
 When upgrading Electron, keep runtime and native-module rebuild settings aligned

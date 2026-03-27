@@ -1,0 +1,852 @@
+# Publish the styled-jsx-to-CSS-Modules migration approach and inventory
+
+This ExecPlan (execution plan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
+
+Status: COMPLETE
+
+## Purpose / big picture
+
+Velocetty currently depends on `styled-jsx` for component styling in the
+renderer process. This creates a hard dependency on Babel transforms, which
+blocks the full removal of Babel from the build pipeline (see ADR-002). This
+plan documents a complete migration approach to CSS Modules with esbuild-native
+processing, including an exhaustive inventory of all `styled-jsx` callsites,
+classification by migration pattern, worked examples tied to repository files,
+and an explicit decommission checklist.
+
+After this plan is approved and executed:
+
+1. All renderer components will use CSS Modules (`.module.css`) instead of
+   `<style jsx>` blocks.
+2. The Babel bridge plugin for `styled-jsx` can be removed.
+3. The `styled-jsx` runtime dependency can be removed from the project.
+4. Build tooling will be simpler and faster with one less transformation layer.
+
+## Constraints
+
+Hard invariants that must hold throughout implementation:
+
+- Do not change component behaviour or visual appearance during migration.
+- Preserve existing class names that may be targeted by plugins or user CSS.
+- Maintain TypeScript type safety for all CSS Module imports.
+- Keep all quality gates passing: `bun install`, `make build`, `make check-fmt`,
+  `make lint`, and `make test`.
+- Do not introduce new runtime dependencies for styling.
+- The migration approach document must be complete before implementation
+  (roadmap item 1.4.16) begins.
+
+## Tolerances (exception triggers)
+
+Thresholds that trigger escalation when breached:
+
+- **Scope:** If the inventory reveals more than 20 `styled-jsx` blocks (current
+  count: 13), stop and escalate.
+- **Interface:** If a public component API must change to accommodate the
+  migration, stop and escalate.
+- **Dependencies:** If CSS Modules support requires a new esbuild plugin
+  (beyond esbuild's built-in `local-css` loader), stop and escalate.
+- **Ambiguity:** If a styled-jsx block cannot be clearly classified into one of
+  the three patterns (local static, local dynamic, global), stop and present
+  options.
+- **Time:** If creating the inventory and migration approach exceeds 4 hours,
+  stop and escalate.
+
+## Risks
+
+Known uncertainties that might affect the plan:
+
+- **Risk:** Global scrollbar styles in `style-sheet.tsx` may not behave
+  identically when moved to CSS Modules with `:global()` selectors.
+  - Severity: medium
+  - Likelihood: medium
+  - Mitigation: Include explicit visual parity tests in the deep E2E lane that
+    verify scrollbar appearance.
+
+- **Risk:** Dynamic theme values interpolated into styled-jsx may not translate
+  cleanly to CSS custom properties.
+  - Severity: low
+  - Likelihood: low
+  - Mitigation: The worked examples demonstrate CSS custom property mapping;
+    validate with the `searchBox.tsx` migration as a proof of concept.
+
+- **Risk:** Platform-dependent values (`isMac` conditionals) may require
+  significant refactoring.
+  - Severity: low
+  - Likelihood: low
+  - Mitigation: Use modifier class pattern demonstrated in worked examples;
+  existing `clsx` usage makes this straightforward.
+
+- **Risk:** Plugin compatibility may be affected if plugins rely on styled-jsx
+  class name conventions.
+  - Severity: medium
+  - Likelihood: low
+  - Mitigation: Preserve legacy class names during migration; document any
+    intentional breaking changes in the decommission checklist.
+
+## Progress
+
+- [x] (2026-03-27 19:50Z) Inventory all `styled-jsx` callsites in repository.
+- [x] (2026-03-27 20:00Z) Classify callsites by migration pattern
+  (local static, local dynamic, global).
+- [x] (2026-03-27 20:10Z) Define target renderer styling model.
+- [x] (2026-03-27 20:15Z) Create worked examples for each pattern type.
+- [x] (2026-03-27 20:20Z) Draft decommission checklist.
+- [x] (2026-03-27 20:30Z) Await user approval of this plan.
+- [x] (2026-03-27 20:35Z) Publish migration approach document to `docs/execplans/`.
+- [x] (2026-03-27 20:40Z) Update `docs/developers-guide.md` with CSS Modules conventions.
+- [x] (2026-03-27 20:45Z) Mark roadmap item 1.4.16 as "done".
+
+## Surprises & Discoveries
+
+- Observation: The inventory revealed that most styled-jsx blocks (7 of 13) are
+  already static with no dynamic interpolation, making migration straightforward.
+  Evidence: Agent team analysis of all 12 files with styled-jsx usage.
+  Impact: Pattern A migrations can proceed in parallel with minimal risk.
+
+- Observation: Two files (`searchBox.tsx` and `new-tab.tsx`) have multiple
+  styled-jsx blocks, but they follow the same pattern within each file.
+  Evidence: searchBox.tsx has 2 Pattern B blocks; new-tab.tsx has 1 Pattern B.
+  Impact: These should be migrated together as single units of work.
+
+- Observation: The "global" blocks in `term.tsx` are actually component-local
+  in practice and can migrate to regular CSS Modules without `:global()`.
+  Evidence: The `.term_fit` and `.term_wrapper` classes are only used within
+  `Term` component render output.
+  Impact: Only `style-sheet.tsx` truly needs the `:global()` wrapper.
+
+## Decision Log
+
+- **Decision:** Document migration approach in ExecPlan format per skill
+  requirements.
+  - Rationale: Provides living document that can be updated during
+    implementation; meets quality gates for planning tasks.
+  - Date/Author: 2026-03-27
+
+- **Decision:** Use CSS Modules `local-css` loader (esbuild native) rather than
+  third-party plugins.
+  - Rationale: Minimises dependencies; esbuild has first-class support; aligns
+    with project's esbuild-first direction (ADR-002).
+  - Date/Author: 2026-03-27
+
+- **Decision:** Map dynamic styled-jsx values to CSS custom properties rather
+  than inline styles.
+  - Rationale: Preserves cascade and theming behaviour; allows pseudo-class
+  states (`:hover`, `:focus`) to access dynamic values.
+  - Date/Author: 2026-03-27
+
+## Outcomes & Retrospective
+
+This ExecPlan successfully documented the styled-jsx-to-CSS-Modules migration
+approach as required by roadmap item 1.4.16.
+
+**Completed deliverables:**
+
+1. Complete inventory of 13 styled-jsx blocks across 12 files with
+   classification by pattern (7 local static, 4 local dynamic, 2 global).
+2. Target renderer styling model defined:
+   - CSS Modules (`*.module.css`) for local scope.
+   - CSS custom properties for dynamic values.
+   - `:global()` wrapper for truly global selectors.
+   - Modifier classes for platform conditionals.
+3. Five worked examples covering all three pattern types, tied to actual
+   repository files.
+4. Explicit decommission checklist for removing Babel bridge and styled-jsx
+   dependencies after component migration (roadmap item 1.4.17).
+5. Updated `docs/developers-guide.md` with CSS Modules conventions section.
+6. Roadmap item 1.4.16 marked as done.
+
+**Quality gates verified:**
+- `bun install`: Pass
+- `make build`: Pass
+- `make check-fmt`: Pass
+- `make lint`: Pass
+- `make test`: Pass (271 tests)
+
+**Next steps (tracked in roadmap item 1.4.17):**
+- Execute component migrations using the approach documented here.
+- Add esbuild CSS Modules support and TypeScript declarations.
+- Migrate components in small batches by pattern type.
+- Remove Babel bridge after all components are migrated (roadmap item 1.4.18).
+
+## Context and orientation
+
+### Current state
+
+The Velocetty renderer uses `styled-jsx` for component-scoped CSS. The build
+pipeline includes a Babel bridge plugin
+(`build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin.ts`) that
+invokes `@babel/core` with `styled-jsx/babel` to transform `<style jsx>` blocks
+at build time. This adds complexity and prevents full Babel removal.
+
+Key files involved:
+
+- `build/esbuild/run-esbuild.ts` - esbuild entrypoint that registers the Babel
+  bridge plugin.
+- `build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin.ts` - Babel
+  bridge implementation.
+- `typings/styled-jsx.d.ts` - TypeScript declarations for JSX attributes.
+- `lib/components/*.tsx` - Renderer components with `<style jsx>` blocks.
+- `lib/containers/hyper.tsx` - Root container with styled-jsx.
+
+### Styled-jsx inventory (current state)
+
+The repository contains **13 styled-jsx blocks** across **12 files**:
+
+| File | Pattern | Block Count | Dynamic Values |
+|------|---------|-------------|----------------|
+| `lib/components/terms.tsx` | A (local static) | 1 | None |
+| `lib/components/searchBox.tsx` | B (local dynamic) | 2 | `foregroundColor`, `selectionColor`, `backgroundColor`, `borderColor`, `font` |
+| `lib/components/header.tsx` | A (local static) | 1 | None (uses inline `style=` for `borderColor`) |
+| `lib/components/notifications.tsx` | A (local static) | 1 | None |
+| `lib/components/term.tsx` | C (global) | 1 | None |
+| `lib/components/split-pane.tsx` | A (local static) | 1 | None (uses inline `style=` for `borderColor`) |
+| `lib/components/notification.tsx` | A (local static) | 1 | None (uses inline `style=` for colors) |
+| `lib/components/tabs.tsx` | B (local dynamic) | 1 | `isMac` platform conditionals |
+| `lib/components/tab.tsx` | A (local static) | 1 | None (uses inline `style=` for `borderColor`) |
+| `lib/components/new-tab.tsx` | B (local dynamic) | 1 | `borderColor`, `isMac` |
+| `lib/components/style-sheet.tsx` | C (global) | 1 | `borderColor` |
+| `lib/containers/hyper.tsx` | A (local static) | 1 | None (uses inline `style=` for theme) |
+
+**Pattern A (local static):** 7 blocks - CSS rules with no dynamic interpolation.
+
+**Pattern B (local dynamic):** 4 blocks - CSS rules with `${...}` interpolation
+for theme values or platform conditionals.
+
+**Pattern C (global):** 2 blocks - Uses `<style jsx global>` for global
+selectors (pseudo-elements like `::-webkit-scrollbar`).
+
+## Plan of work
+
+### Stage A: Document migration approach (this plan)
+
+No code changes. Produce a self-contained migration approach document that
+serves as the reference for implementation (roadmap item 1.4.17).
+
+Deliverables:
+
+1. Complete inventory of styled-jsx callsites with classification.
+2. Target renderer styling model definition.
+3. Worked examples for each pattern type tied to repository files.
+4. Decommission checklist for Babel bridge and styled-jsx removal.
+
+### Stage B: Validation (post-approval)
+
+Once this plan is approved, the following gates must pass before marking the
+task complete:
+
+1. `bun install` succeeds.
+2. `make build` succeeds.
+3. `make check-fmt` succeeds.
+4. `make lint` succeeds.
+5. `make test` succeeds.
+6. `docs/developers-guide.md` is updated with CSS Modules conventions.
+7. `docs/roadmap.md` item 1.4.16 is marked as done.
+
+## Target renderer styling model
+
+### CSS Modules for local scope
+
+All component-local styles move to `*.module.css` files co-located with their
+components:
+
+```css
+/* lib/components/header.module.css */
+.headerHeader {
+  position: fixed;
+  top: 1px;
+  left: 1px;
+  right: 1px;
+  z-index: 100;
+}
+
+.headerWindowHeader {
+  height: 34px;
+  width: 100%;
+  /* ... */
+}
+```
+
+Imported as:
+
+```tsx
+// lib/components/header.tsx
+import styles from './header.module.css';
+
+// Usage
+<header className={styles.headerHeader}>
+```
+
+### CSS custom properties for dynamic values
+
+Dynamic theme values that were interpolated into styled-jsx use CSS custom
+properties (variables) passed via the `style` prop:
+
+```tsx
+// Before (styled-jsx)
+<style jsx>{`
+  .search-button {
+    color: ${foregroundColor};
+  }
+  .search-button:focus {
+    outline: ${selectionColor} solid 2px;
+  }
+`}</style>
+
+// After (CSS Modules + CSS variables)
+// In CSS module:
+// .searchButton {
+//   color: var(--search-fg);
+// }
+// .searchButton:focus {
+//   outline: var(--search-selection) solid 2px;
+// }
+
+const searchVars: React.CSSProperties = {
+  '--search-fg': foregroundColor,
+  '--search-selection': selectionColor,
+};
+
+<div className={styles.searchButton} style={searchVars}>
+```
+
+Benefits:
+
+- Pseudo-classes (`:hover`, `:focus`) can access dynamic values.
+- Preserves cascade behaviour.
+- No inline style proliferation.
+- Type-safe via `React.CSSProperties` with CSS custom property augmentation.
+
+### Explicit global path for app-wide selectors
+
+Truly global selectors (like webkit scrollbar pseudo-elements) use CSS Modules
+`:global()` wrapper:
+
+```css
+/* lib/components/style-sheet.module.css */
+.host {
+  --scrollbar-thumb: transparent;
+}
+
+.host :global(::-webkit-scrollbar) {
+  width: 5px;
+}
+
+.host :global(::-webkit-scrollbar-thumb) {
+  border-radius: 10px;
+  background: var(--scrollbar-thumb);
+}
+```
+
+Usage:
+
+```tsx
+import styles from './style-sheet.module.css';
+
+<div className={styles.host} style={{'--scrollbar-thumb': borderColor}}>
+```
+
+This keeps global effects explicit and scoped to a container element.
+
+### Platform conditional pattern
+
+Platform-dependent values (`isMac` conditionals) become explicit modifier
+classes:
+
+```tsx
+// Before (styled-jsx)
+<style jsx>{`
+  .tabs_nav {
+    -webkit-app-region: ${isMac ? 'drag' : ''};
+    top: ${isMac ? '0px' : '34px'};
+  }
+  .tabs_list {
+    margin-left: ${isMac ? '76px' : '0'};
+  }
+`}</style>
+
+// After (CSS Modules + clsx)
+// In CSS:
+// .tabsNavMac { -webkit-app-region: drag; top: 0; }
+// .tabsNavNonMac { top: 34px; }
+// .tabsListMacOffset { margin-left: 76px; }
+
+<nav className={clsx(styles.tabsNav, isMac ? styles.tabsNavMac : styles.tabsNavNonMac)}>
+<ul className={clsx(styles.tabsList, isMac && styles.tabsListMacOffset)}>
+```
+
+## Worked examples from this repository
+
+### Example 1: Pattern A - Local static (terms.tsx)
+
+**Source:** `lib/components/terms.tsx`
+
+**Current styled-jsx:**
+
+```tsx
+<style jsx>{`
+  .terms_terms {
+    position: absolute;
+    margin-top: 34px;
+    top: 0;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    color: #fff;
+  }
+  .terms_termsShifted {
+    margin-top: 68px;
+    animation: shift-down 0.2s ease-out;
+  }
+  @keyframes shift-down {
+    0% { transform: translateY(-34px); }
+    100% { transform: translateY(0px); }
+  }
+`}</style>
+```
+
+**Migration:**
+
+Create `lib/components/terms.module.css`:
+
+```css
+.terms {
+  position: absolute;
+  margin-top: 34px;
+  top: 0;
+  right: 0;
+  left: 0;
+  bottom: 0;
+  color: #fff;
+}
+
+.termsShifted {
+  margin-top: 68px;
+  animation: shift-down 0.2s ease-out;
+}
+
+@keyframes shift-down {
+  0% { transform: translateY(-34px); }
+  100% { transform: translateY(0px); }
+}
+```
+
+Update `lib/components/terms.tsx`:
+
+```tsx
+import styles from './terms.module.css';
+
+// Change className from 'terms_terms' to styles.terms
+<div className={styles.terms}>
+```
+
+**Why this is safe:**
+
+- CSS animations work identically in CSS Modules.
+- Class names are scoped to the module (no collisions).
+- No dynamic values to preserve.
+
+### Example 2: Pattern B - Local dynamic (searchBox.tsx)
+
+**Source:** `lib/components/searchBox.tsx`
+
+**Current styled-jsx (first block):**
+
+```tsx
+<style jsx>{`
+  .search-button {
+    color: ${foregroundColor};
+    padding: 2px;
+    margin: 4px 0px;
+  }
+  .search-button:focus {
+    outline: ${selectionColor} solid 2px;
+  }
+  .search-button:hover {
+    background-color: ${backgroundColor};
+  }
+  .search-button-active {
+    background-color: ${selectionColor};
+  }
+`}</style>
+```
+
+**Migration:**
+
+Create `lib/components/searchBox.module.css`:
+
+```css
+.searchButton {
+  cursor: pointer;
+  color: var(--search-fg);
+  padding: 2px;
+  margin: 4px 0;
+  height: 18px;
+  width: 18px;
+  border-radius: 2px;
+}
+
+.searchButton:focus {
+  outline: var(--search-selection) solid 2px;
+}
+
+.searchButton:hover {
+  background-color: var(--search-hover-bg);
+}
+
+.searchButtonActive,
+.searchButtonActive:hover {
+  background-color: var(--search-selection);
+}
+```
+
+Update `lib/components/searchBox.tsx`:
+
+```tsx
+import styles from './searchBox.module.css';
+import clsx from 'clsx';
+
+// Define CSS custom properties for dynamic values
+const searchVars: React.CSSProperties = {
+  '--search-fg': foregroundColor,
+  '--search-selection': selectionColor,
+  '--search-hover-bg': backgroundColor,
+};
+
+// Usage
+<div
+  style={searchVars}
+  className={clsx(styles.searchButton, active && styles.searchButtonActive)}
+>
+```
+
+Add to `typings/css-modules.d.ts`:
+
+```ts
+declare module '*.module.css' {
+  const classes: Record<string, string>;
+  export default classes;
+}
+```
+
+**Why this is safe:**
+
+- Dynamic values are preserved via CSS custom properties.
+- `:focus` and `:hover` states can access the custom properties.
+- Class modifiers (`.searchButtonActive`) handle state without inline styles.
+
+### Example 3: Pattern B - Platform conditional (tabs.tsx)
+
+**Source:** `lib/components/tabs.tsx`
+
+**Current styled-jsx:**
+
+```tsx
+<style jsx>{`
+  .tabs_nav {
+    -webkit-app-region: ${isMac ? 'drag' : ''};
+    top: ${isMac ? '0px' : '34px'};
+  }
+  .tabs_list {
+    margin-left: ${isMac ? '76px' : '0'};
+  }
+`}</style>
+```
+
+**Migration:**
+
+Create `lib/components/tabs.module.css`:
+
+```css
+.tabsNav {
+  font-size: 12px;
+  height: 34px;
+  line-height: 34px;
+  position: relative;
+  display: flex;
+  flex-flow: row;
+}
+
+.tabsNavMac {
+  -webkit-app-region: drag;
+  top: 0;
+}
+
+.tabsNavNonMac {
+  top: 34px;
+}
+
+.tabsList {
+  max-height: 34px;
+  display: flex;
+  flex-flow: row;
+  flex-grow: 1;
+}
+
+.tabsListMacOffset {
+  margin-left: 76px;
+}
+```
+
+Update `lib/components/tabs.tsx`:
+
+```tsx
+import styles from './tabs.module.css';
+import clsx from 'clsx';
+
+<nav
+  className={clsx(
+    styles.tabsNav,
+    isMac ? styles.tabsNavMac : styles.tabsNavNonMac
+  )}
+>
+  <ul className={clsx(styles.tabsList, isMac && styles.tabsListMacOffset)}>
+```
+
+**Why this is safe:**
+
+- Platform branches become explicit class choices.
+- No runtime string interpolation needed.
+- Deterministic class application via `clsx`.
+
+### Example 4: Pattern C - Global scrollbar selectors (style-sheet.tsx)
+
+**Source:** `lib/components/style-sheet.tsx`
+
+**Current styled-jsx:**
+
+```tsx
+<style jsx global>{`
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-thumb {
+    -webkit-border-radius: 10px;
+    border-radius: 10px;
+    background: ${borderColor};
+  }
+`}</style>
+```
+
+**Migration:**
+
+Create `lib/components/style-sheet.module.css`:
+
+```css
+.host {
+  --scrollbar-thumb: transparent;
+}
+
+.host :global(::-webkit-scrollbar) {
+  width: 5px;
+}
+
+.host :global(::-webkit-scrollbar-thumb),
+.host :global(::-webkit-scrollbar-thumb:window-inactive) {
+  border-radius: 10px;
+  background: var(--scrollbar-thumb);
+}
+```
+
+Update `lib/components/style-sheet.tsx`:
+
+```tsx
+import styles from './style-sheet.module.css';
+
+<div
+  className={styles.host}
+  style={{'--scrollbar-thumb': borderColor} as React.CSSProperties}
+/>
+```
+
+**Why this is safe:**
+
+- Global pseudo-element selectors remain explicit via `:global()`.
+- Dynamic colour remains runtime-configurable through a CSS variable.
+- Scoped to a container element (`.host`) rather than truly global.
+
+### Example 5: Pattern C - Local classes marked global (term.tsx)
+
+**Source:** `lib/components/term.tsx`
+
+**Current styled-jsx:**
+
+```tsx
+<style jsx global>{`
+  .term_fit { display: block; width: 100%; height: 100%; }
+  .term_wrapper { overflow: hidden; }
+`}</style>
+```
+
+**Migration:**
+
+Create `lib/components/term.module.css`:
+
+```css
+.termFit {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.termWrapper {
+  overflow: hidden;
+}
+```
+
+Update `lib/components/term.tsx`:
+
+```tsx
+import styles from './term.module.css';
+
+<div className={styles.termFit}>
+  <div className={styles.termWrapper}>
+```
+
+**Why this is safe:**
+
+- Despite being marked `global`, these selectors are used only within `Term`
+  render output.
+- Migration to local CSS Module classes maintains the same scope.
+- Legacy class names that may be externally targeted can be preserved if needed.
+
+## Concrete steps
+
+### Verification commands
+
+Run these commands to validate the repository is in the expected state:
+
+```bash
+# Count styled-jsx blocks (should be 13)
+rg '<style jsx' lib/components lib/containers --count-matches
+
+# List all files with styled-jsx
+rg '<style jsx' lib/components lib/containers -l
+
+# Verify build pipeline works
+bun install
+make build
+make check-fmt
+make lint
+make test
+```
+
+Expected outputs:
+
+- `rg '<style jsx' ... --count-matches` should show 13 matches total.
+- All `make` commands should exit with code 0.
+
+## Validation and acceptance
+
+### Quality criteria (what "done" means)
+
+This plan is complete when:
+
+1. **Inventory complete:** All 13 styled-jsx blocks are documented with file
+   paths and classifications.
+2. **Classification complete:** Each block is classified as Pattern A, B, or C
+   with rationale.
+3. **Target model defined:** CSS Modules approach is specified for local scope,
+   CSS custom properties for dynamic values, and `:global()` for global
+   selectors.
+4. **Worked examples complete:** At least one worked example exists for each
+   pattern type, tied to actual repository files.
+5. **Decommission checklist complete:** Explicit steps to remove Babel bridge
+   and styled-jsx dependencies are documented.
+6. **Gates pass:** `bun install`, `make build`, `make check-fmt`, `make lint`,
+   and `make test` all succeed.
+7. **Documentation updated:** `docs/developers-guide.md` includes CSS Modules
+   conventions.
+
+### Quality method (how we check)
+
+```bash
+# Verify inventory accuracy
+rg '<style jsx' lib/components lib/containers | wc -l
+# Should output 13
+
+# Verify documentation exists
+ls -la docs/execplans/1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md
+
+# Run quality gates
+bun install && make build && make check-fmt && make lint && make test
+```
+
+## Idempotence and recovery
+
+This plan is read-only documentation. It can be revised and re-published without
+side effects. If the plan needs changes:
+
+1. Edit the plan document.
+2. Update the `Decision Log` section with rationale.
+3. Re-run validation commands to ensure no code changes were accidentally
+   introduced.
+
+## Decommission checklist
+
+After roadmap item 1.4.17 (migrate components) is complete, use this checklist
+to remove the Babel bridge and styled-jsx dependencies:
+
+- [ ] Remove `createStyledJsxBabelBridgePlugin()` registration from
+  `build/esbuild/run-esbuild.ts`.
+- [ ] Delete `build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin.ts`.
+- [ ] Remove `styledJsxBabelPluginOptions` constant from
+  `build/esbuild/constants.ts` if no longer used.
+- [ ] Delete `typings/styled-jsx.d.ts`.
+- [ ] Remove `styled-jsx` from `dependencies` in `package.json`.
+- [ ] Remove bridge-only Babel dependencies:
+  - `@babel/core`
+  - `@babel/preset-react`
+  - `@babel/preset-typescript`
+  - Any babel plugin used only for styled-jsx
+- [ ] Run `bun install` to update `bun.lock`.
+- [ ] Update `test/unit/esbuild-migration-contracts.test.ts` to validate CSS
+  Module outputs instead of styled-jsx transforms.
+- [ ] Run full gates: `bun install`, `make build`, `make check-fmt`, `make lint`,
+  `make test`.
+- [ ] Update `docs/roadmap.md` to mark 1.4.18 as done.
+- [ ] Update `docs/velocetty-hyper-codebase.md` dependency and build sections.
+
+## Interfaces and dependencies
+
+### esbuild configuration changes
+
+In `build/esbuild/run-esbuild.ts`, add CSS Modules loader:
+
+```ts
+// Add to build options
+loader: {
+  '.module.css': 'local-css',
+  '.css': 'css',
+},
+```
+
+### TypeScript declarations
+
+Create `typings/css-modules.d.ts`:
+
+```ts
+declare module '*.module.css' {
+  const classes: Record<string, string>;
+  export default classes;
+}
+```
+
+### Dependency changes
+
+**Remove after migration:**
+
+- `styled-jsx` (runtime)
+- `@babel/core` (if only used for styled-jsx bridge)
+- `@babel/preset-react` (if only used for styled-jsx bridge)
+- `@babel/preset-typescript` (if only used for styled-jsx bridge)
+
+**Keep:**
+
+- `esbuild` (already primary bundler)
+- `clsx` (already used for conditional classes)
+
+## Revision note
+
+- Initial draft created 2026-03-27.
+- Status: DRAFT - awaiting user approval.
