@@ -253,7 +253,7 @@ Update `docs/developers-guide.md` in the "Unit tests (Bun)" section:
 
 2. Update or add the explicit concurrent stress test command examples.
 
-3. Update the seeded randomisation examples to show the `--concurrent` flag
+3. Update the seeded randomization examples to show the `--concurrent` flag
    (since that is now the default path).
 
 Update `docs/roadmap.md`:
