@@ -79,7 +79,7 @@ Deliverables (core):
 - Command registry:
 
 - Stable command IDs (`terminal.splitPane`, `tab.close`,
-  `workspace.openSettings`, etc.)
+  `workspace.openSettings`, `link.open`, `link.copyUrl`, etc.)
 
 - Metadata: title, category, description, icon (optional), searchable keywords.
 
@@ -92,6 +92,10 @@ Deliverables (core):
 
 - Single invocation path used by keyboard shortcuts, command palette, menus,
   buttons, and plugin calls.
+
+- Recognized URLs expose a contextual menu with `Open` and `Copy URL`, both
+  routed through commands so link actions stay consistent with the rest of the
+  UI.
 
 - Supports async commands and cancellation semantics where sensible.
 
@@ -297,7 +301,9 @@ Visible-only WebGL; stable multi-pane; measurable latency improvements.
 Phase 3: JSON5 + command system + keybindings (do these together)
 
 Config is canonical; command palette exists; keybinding editor works; plugins
-can register commands safely; UI actions route through commands.
+can register commands safely; UI actions route through commands; recognized
+URLs expose `Open` and `Copy URL` contextual actions through the same command
+path.
 
 Phase 4: Settings tab + schema-driven plugin settings
 

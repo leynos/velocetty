@@ -300,6 +300,18 @@ Scope notes:
   - [ ] Replace direct action calls with command invocations.
   - [ ] Audit existing menu entries for command coverage.
   - [ ] Success criteria: no UI action bypasses the dispatcher.
+- [ ] 4.3.3. Add contextual URL menus with `Open` and `Copy URL`. Requires
+  4.1.1 and 4.3.2. See [velocetty-design.md](velocetty-design.md) §URL context
+  menus and
+  [PRD](velocetty-product-requirements-document.md) §Command system and
+  keybinding management.
+  - [ ] Detect recognized URLs in terminal and renderer surfaces that already
+    expose validated link targets.
+  - [ ] Route both menu entries through `link.open` and `link.copyUrl`
+    commands with validated URL arguments.
+  - [ ] Success criteria: right-clicking a recognized URL shows `Open` and
+    `Copy URL`, `Open` launches the external handler, and `Copy URL` copies the
+    exact URL string.
 
 ## 5. Settings tab and schema-driven plugin settings
 

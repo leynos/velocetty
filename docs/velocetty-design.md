@@ -451,7 +451,7 @@ Command ID conventions:
 
 - First segment indicates domain: `terminal.\*`, `tab.\*`, `window.\*`,
 
-&nbsp; `workspace.\*`, `settings.\*`, `plugin.\*`.
+&nbsp; `workspace.\*`, `settings.\*`, `link.\*`, `plugin.\*`.
 
 
 
@@ -468,6 +468,10 @@ Examples:
 - `settings.open`
 
 - `settings.openKeybindings`
+
+- `link.open`
+
+- `link.copyUrl`
 
 - `plugin.reload`
 
@@ -746,6 +750,28 @@ Interim Electron integration:
 - Replace the internal wiring so menu click handlers call `dispatch.invoke()`
 
 &nbsp; for a command ID rather than directly emitting legacy RPC events.
+
+### URL context menus
+
+Recognized URL targets should expose a secondary-click context menu with only
+two entries: `Open` and `Copy URL`. This applies to xterm.js-detected web
+links and other renderer surfaces that present validated URLs.[^prd]
+
+- `link.open` accepts a validated URL argument and forwards it to the external
+
+&nbsp; open handler already used for direct link activation.
+
+- `link.copyUrl` accepts the same validated URL argument and copies the exact
+
+&nbsp; URL string to the clipboard.
+
+- The context menu should appear only when hit-testing resolves to a valid URL,
+
+&nbsp; and both entries should dispatch through the command system so telemetry,
+
+&nbsp; permission checks, and future keybinding or palette exposure remain
+
+&nbsp; consistent.
 
 
 
@@ -2241,6 +2267,8 @@ This follows the PRD sequencing, expressed as roadmap-style tasks.[^prd]
 - \[ ] 3.4. Keybinding engine with chords and `when` support.
 
 - \[ ] 3.5. Ensure menus and buttons route through command dispatcher.
+
+- \[ ] 3.6. Add contextual URL actions for `Open` and `Copy URL`.
 
 
 
