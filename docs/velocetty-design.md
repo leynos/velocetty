@@ -1898,6 +1898,24 @@ loopback WebSocket using the same protocol used for remote connections. This
 
 reduces duplication: the UI always speaks one protocol.
 
+### Required preparation before the host swap
+
+The protocol definition and loopback transport are necessary, but they are not
+sufficient to make the Tauri/Rust cut-over low-risk.
+
+Before replacing the Electron/Node host, the implementation should add an
+intermediate backend-service step on the current runtime:
+
+- Freeze a protocol-facing backend service contract that defines session
+  lifecycle, event taxonomy, teardown semantics, structured error codes, and
+  capability/redaction metadata without host-specific types.
+- Implement a headless/local backend service shell on the existing runtime that
+  serves the protobuf/WebSocket protocol over loopback and adapts current
+  command, PTY, config, and plugin/storage services behind that contract.
+- Add parity coverage for bootstrap and PTY behaviour through the protocol path
+  before the Rust PTY rewrite starts, so the host migration becomes an
+  implementation swap rather than a simultaneous protocol and backend rewrite.
+
 ### Migration follow-up concerns
 
 Current Electron transport work provides a functional command/event
@@ -2271,22 +2289,30 @@ This follows the PRD sequencing, expressed as roadmap-style tasks.[^prd]
 ### 6. Tauri host integration
 
 
+- \[ ] 6.1. Define protobuf messages and a loopback WebSocket server in the
+  backend.
 
-- \[ ] 6.1. Introduce a backend abstraction layer with transport adapters.
+- \[ ] 6.2. Freeze the protocol-facing backend service contract and implement a
+  headless/local backend service shell on the current runtime.
 
-- \[ ] 6.2. Prototype PTY manager in Rust and integrate with frontend.
+- \[ ] 6.3. Add protocol-path parity coverage for bootstrap and PTY lifecycle
+  before swapping hosts.
 
-- \[ ] 6.3. Package desktop app with Tauri, including update strategy.
+- \[ ] 6.4. Introduce host adapters that map Electron and Tauri to the backend
+  service contract.
+
+- \[ ] 6.5. Prototype PTY manager in Rust and integrate with frontend.
+
+- \[ ] 6.6. Package desktop app with Tauri, including update strategy.
 
 
 
 ### 7. Remote frontend + protocol
 
 
+- \[ ] 7.1. Auth + capability negotiation.
 
-- \[ ] 7.1. Protobuf definitions and WebSocket server in backend.
-
-- \[ ] 7.2. Auth + capability negotiation.
+- \[ ] 7.2. Redaction of sensitive metadata for remote surfaces.
 
 - \[ ] 7.3. Remote browser UI that can attach and drive command invocations.
 

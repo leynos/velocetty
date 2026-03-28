@@ -379,24 +379,63 @@ Scope notes:
   - [ ] Success criteria: WebSocket transport handles PTY throughput without
     command latency regressions.
 
-### 7.2. Backend abstraction layer
+### 7.2. Backend service shell and contract freeze
 
-- [ ] 7.2.1. Define a backend service interface shared by Electron and Tauri.
-  Requires 1.1.2. See [velocetty-design.md](velocetty-design.md) §Host
+- [ ] 7.2.1. Define a protocol-facing backend service contract. Requires 1.1.2
+  and 7.1.2. See [velocetty-design.md](velocetty-design.md) §Host migration:
+  Electron to Tauri.
+  - [ ] Freeze session lifecycle, event taxonomy, teardown semantics,
+    structured error codes, and capability/redaction metadata without
+    host-specific types.
+  - [ ] Map command execution, PTY operations, config I/O, and plugin/storage
+    operations to the contract.
+  - [ ] Success criteria: the current backend can implement the contract
+    without leaking Electron IPC, Tauri commands, or Rust-specific types into
+    the frontend.
+- [ ] 7.2.2. Implement a headless/local backend service shell on the current
+  runtime. Requires 7.2.1. See
+  [velocetty-product-requirements-document.md](velocetty-product-requirements-document.md)
+  §8) Frontend/backend segregation + remote frontend + protobuf/WebSocket
+  comms.
+  - [ ] Expose the protobuf/WebSocket protocol over loopback from the existing
+    backend runtime.
+  - [ ] Adapt current command, PTY, config, and plugin/storage services behind
+    the new shell.
+  - [ ] Success criteria: a local harness can drive command invocation and PTY
+    lifecycle entirely through the protocol without Tauri or direct Electron
+    IPC in the frontend path.
+- [ ] 7.2.3. Add protocol-path parity coverage before the host swap. Requires
+  2.2.2 and 7.2.2. See [velocetty-design.md](velocetty-design.md) §Host
   migration: Electron to Tauri.
-  - [ ] Map command execution, PTY operations, and config I/O to the interface.
-  - [ ] Ensure structured error propagation to the frontend.
-  - [ ] Success criteria: frontend does not import host-specific modules.
+  - [ ] Assert bootstrap event flows (`ready`, `session add`, and
+    `update available`) through the protocol-backed shell.
+  - [ ] Verify PTY batching, resize, close, restart, and exit semantics match
+    the Electron path.
+  - [ ] Success criteria: protocol-backed runs preserve current
+    PTY/bootstrap behaviour and throughput before the Rust replacement starts.
 
-### 7.3. Tauri PTY and packaging
+### 7.3. Backend adapter layer
 
-- [ ] 7.3.1. Implement Rust PTY manager and integrate with the command layer.
-  Requires 7.2.1. See [velocetty-design.md](velocetty-design.md) §Target (Tauri)
-  approach.
+- [ ] 7.3.1. Implement host adapters that satisfy the backend service contract
+  for Electron and Tauri. Requires 7.2.1. See
+  [velocetty-design.md](velocetty-design.md) §Host migration: Electron to
+  Tauri.
+  - [ ] Map command execution, PTY operations, config I/O, and plugin/storage
+    operations to the contract for each host.
+  - [ ] Ensure structured error propagation and teardown semantics remain
+    consistent across hosts.
+  - [ ] Success criteria: frontend composes against one backend contract while
+    host-specific code is isolated to adapter modules.
+
+### 7.4. Tauri PTY and packaging
+
+- [ ] 7.4.1. Implement Rust PTY manager and integrate with the command layer.
+  Requires 7.2.3 and 7.3.1. See
+  [velocetty-design.md](velocetty-design.md) §Target (Tauri) approach.
   - [ ] Match session semantics to the existing batcher model.
   - [ ] Support resize, close, and restart flows.
   - [ ] Success criteria: feature parity with the Electron PTY path.
-- [ ] 7.3.2. Package the app with Tauri and update strategy. Requires 7.3.1. See
+- [ ] 7.4.2. Package the app with Tauri and update strategy. Requires 7.4.1. See
   [velocetty-design.md](velocetty-design.md) §Target (Tauri) approach.
   - [ ] Define update channels and signing requirements.
   - [ ] Ensure config and plugin paths remain stable.
@@ -407,7 +446,7 @@ Scope notes:
 
 ### 8.1. Authentication, authorisation, and redaction
 
-- [ ] 8.1.1. Implement auth and capability negotiation. Requires 7.1.2. See
+- [ ] 8.1.1. Implement auth and capability negotiation. Requires 7.2.2. See
   [velocetty-design.md](velocetty-design.md) §Authentication and
   authorisation.
   - [ ] Issue and store local loopback tokens securely.
@@ -424,7 +463,7 @@ Scope notes:
 
 ### 8.2. Remote browser UI
 
-- [ ] 8.2.1. Implement a remote-capable frontend shell. Requires 7.1.2. See
+- [ ] 8.2.1. Implement a remote-capable frontend shell. Requires 8.1.1. See
   [velocetty-design.md](velocetty-design.md) §Remote frontend:
   protobuf/WebSocket protocol.
   - [ ] Connect to the backend via WebSocket and perform handshake.
