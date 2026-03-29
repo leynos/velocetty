@@ -444,19 +444,19 @@ Scope notes:
 
 ## 8. Remote frontend: auth, redaction, and browser UI
 
-This remote frontend section is limited to authentication and authorisation,
+This remote frontend section is limited to authentication and authorization,
 content redaction, and browser UI attachment flows. Protocol definition,
 loopback WebSocket transport, backend service shell work, and host-adapter
 changes remain in section 7 and are out of scope here.
 
-### 8.1. Authentication, authorisation, and redaction
+### 8.1. Authentication, authorization, and redaction
 
 - [ ] 8.1.1. Implement auth and capability negotiation. Requires 7.2.2. See
   [velocetty-design.md](velocetty-design.md) §Authentication and
-  authorisation.
+  authorization.
   - [ ] Issue and store local loopback tokens securely.
   - [ ] Bind capability sets to remote sessions.
-  - [ ] Success criteria: unauthorised connections cannot invoke privileged
+  - [ ] Success criteria: unauthorized connections cannot invoke privileged
     commands.
 - [ ] 8.1.2. Implement redaction of sensitive metadata. Requires 6.2.1 and
   8.1.1. See [velocetty-design.md](velocetty-design.md) §Redaction and sensitive
