@@ -279,3 +279,32 @@ export type configValidationDiagnostic = {
   /** Optional default value hint when a safe fallback exists. */
   defaultHint?: string;
 };
+
+/** Classification for configuration reload capability. */
+export type ConfigReloadClassification = 'live' | 'restart';
+
+/** Diagnostic entry for a configuration change that requires restart. */
+export type ConfigReloadDiagnostic = {
+  /** The configuration key path that changed. */
+  path: string;
+  /** Human-readable message explaining the change and its impact. */
+  message: string;
+  /** Whether this change can be live-reloaded or requires restart. */
+  classification: ConfigReloadClassification;
+  /** Explanation of why this classification was chosen. */
+  rationale: string;
+};
+
+/** Result of a configuration reload operation. */
+export type ConfigReloadResult = {
+  /** Whether the reload was successful. */
+  success: boolean;
+  /** The new effective configuration after reload. */
+  config: configOptions;
+  /** Keys of settings that were applied live (no restart needed). */
+  appliedLive: string[];
+  /** Diagnostics for settings that require restart to take effect. */
+  restartRequired: ConfigReloadDiagnostic[];
+  /** Any validation errors that occurred during reload. */
+  validationErrors: configValidationDiagnostic[];
+};

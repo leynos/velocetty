@@ -157,6 +157,126 @@ for active configuration files:
   `config.json5`; avoid full-file canonical rewrites for targeted runtime
   settings updates.
 
+## Configuration layering and reloadability practice
+
+Roadmap item `3.1.2` defines configuration layering rules and hot-reload semantics.
+Follow these rules when adding or changing configuration settings:
+
+### Layering rules
+
+Configuration merges in the following precedence order (highest to lowest):
+
+1. **Runtime overrides** (ephemeral, in-memory only, not persisted)
+2. **User config** (`config.json5`)
+3. **Built-in defaults** (bundled with the app)
+
+Workspace-level overrides are deferred to a future milestone.
+
+Merge semantics:
+
+- **Objects**: deep merge (nested properties recursively merged).
+- **Arrays**: replace (user array completely replaces default array).
+
+Use `resolveConfigLayers()` from `app/config/layering.ts` to resolve the effective
+configuration:
+
+```typescript
+import {resolveConfigLayers} from './config/layering';
+
+const effectiveConfig = resolveConfigLayers(defaults, userConfig, runtimeOverrides);
+```
+
+### Reloadability classification
+
+Every configuration key must have a reloadability classification:
+
+- **`live`**: Changes apply immediately without restart (theme, fonts, keybindings).
+- **`restart`**: Changes require application restart (shell settings, update channel).
+
+Classify new settings in `shared/src/constants/config-reloadability.ts`:
+
+```typescript
+// In profileConfigReloadability (or rootConfigReloadability for root keys)
+newSetting: {
+  classification: 'live', // or 'restart'
+  rationale: 'Brief explanation of why this classification was chosen'
+}
+```
+
+Classification guidelines:
+
+| Live-reloadable | Restart-required |
+|-----------------|------------------|
+| Theme/UI appearance (colors, padding) | Backend transport (shell, shellArgs) |
+| Font settings (family, size, weight) | Update channel / auto-update settings |
+| Cursor appearance (shape, blink, color) | Environment variables (env) |
+| Keybindings | WebGL renderer (deferred to CONFIG-001) |
+| Custom CSS (css, termCSS) | Process-level configuration |
+
+### Detecting and handling config changes
+
+Use `createReloadHandler()` from `app/config/reload-handler.ts` to process config
+reloads with automatic classification:
+
+```typescript
+import {createReloadHandler} from './config/reload-handler';
+
+const handler = createReloadHandler({
+  getCurrentConfig: () => currentConfig,
+  applyLiveConfig: (config) => { /* apply live changes */ },
+  emitRestartWarning: (diagnostics) => { /* notify user */ }
+});
+
+const result = handler.processReload(newConfig);
+// result.appliedLive: keys applied immediately
+// result.restartRequired: diagnostics for keys requiring restart
+```
+
+### Settings UI integration
+
+When building settings UI components:
+
+1. Use `keyRequiresRestart(key)` to check if a setting requires restart.
+2. Display restart-required indicators using `RestartRequiredIndicator` component.
+3. Show inline warnings when users modify non-reloadable settings using
+   `InlineRestartWarning` component.
+4. Use `useConfigReloadability()` hook for reactive classification checks.
+
+Example:
+
+```tsx
+import {RestartRequiredIndicator, InlineRestartWarning} from
+  '../components/restart-required-indicator';
+
+function ShellSetting() {
+  return (
+    <div>
+      <label>
+        Shell Path
+        <RestartRequiredIndicator configKey="shell" />
+      </label>
+      <input type="text" />
+      <InlineRestartWarning configKey="shell" show={hasChanged} />
+    </div>
+  );
+}
+```
+
+### Testing requirements
+
+Add unit tests when adding new configuration settings:
+
+- Test the reloadability classification in `test/unit/config-reloadability.test.ts`.
+- Test merge semantics in `test/unit/config-layering.test.ts`.
+- Test hot-reload detection in `test/unit/config-hot-reload.test.ts`.
+
+### Deferred features
+
+The following features are explicitly deferred:
+
+- **WebGL renderer hot-reload**: Tracked under CONFIG-001 in `docs/tracking-issues.md`.
+- **Workspace-level overrides**: Will be implemented in a future milestone.
+
 ## Visible-only WebGL rendering practice
 
 Roadmap item `2.1.1` introduces visible-only WebGL allocation. Follow these
@@ -495,77 +615,6 @@ manifests in the same change and keep the app manifest on exact versions to
 avoid duplicate React instances in plugins. React 19 requires aligning
 `react-redux` 9.x with `redux` 5.x, plus matching `@types/react` and
 `@types/react-dom` versions in `package.json`.
-
-## CSS Modules conventions
-
-Roadmap item `1.4.16` establishes the migration approach from `styled-jsx` to
-CSS Modules. Follow these conventions for renderer component styling:
-
-- Co-locate CSS Module files with their components using the naming convention
-  `ComponentName.module.css` (for example, `Header.module.css` alongside
-  `Header.tsx`).
-- Import CSS Modules using the default import pattern:
-
-  ```tsx
-  import styles from './Header.module.css';
-  ```
-
-- Reference classes via the imported `styles` object:
-
-  ```tsx
-  <header className={styles.header}>
-  ```
-
-- Use `clsx` for conditional class application:
-
-  ```tsx
-  import clsx from 'clsx';
-
-  <div className={clsx(styles.base, active && styles.active)}>
-  ```
-
-- Map dynamic theme values to CSS custom properties (variables) rather than
-  inline styles to preserve cascade and pseudo-class access:
-
-  ```tsx
-  const vars: React.CSSProperties = {
-    '--search-fg': foregroundColor,
-    '--search-selection': selectionColor,
-  };
-
-  <div className={styles.searchButton} style={vars}>
-  ```
-
-  ```css
-  .searchButton {
-    color: var(--search-fg);
-  }
-  .searchButton:focus {
-    outline: var(--search-selection) solid 2px;
-  }
-  ```
-
-- Use the `:global()` wrapper in CSS Modules only for truly global selectors
-  (for example, WebKit scrollbar pseudo-elements). Keep the scope as narrow as
-  possible:
-
-  ```css
-  .host :global(::-webkit-scrollbar) {
-    width: 5px;
-  }
-  ```
-
-- Preserve existing class names that may be targeted by plugins or user CSS
-  during migration. Where legacy class names must be maintained for
-  compatibility, apply them alongside CSS Module classes:
-
-  ```tsx
-  <div className={clsx(styles.termFit, 'term_fit')}>
-  ```
-
-Cross-links:
-[1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md](execplans/1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md),
-[adr-002-replace-webpack-babel-with-esbuild.md](adr-002-replace-webpack-babel-with-esbuild.md).
 
 ## Formatting and linting
 

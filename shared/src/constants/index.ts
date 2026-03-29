@@ -1,4 +1,8 @@
 /** @file Shared bootstrap action constants and action contracts. */
+
+// Re-export config reloadability module
+export * from './config-reloadability';
+
 /** Action type constant for bootstrap initialization. */
 export const INIT = 'INIT';
 
