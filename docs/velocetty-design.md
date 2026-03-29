@@ -2289,32 +2289,32 @@ This follows the PRD sequencing, expressed as roadmap-style tasks.[^prd]
 ### 6. Tauri host integration
 
 
-- \[ ] 6.1. Define protobuf messages and a loopback WebSocket server in the
+- [ ] 6.1. Define protobuf messages and a loopback WebSocket server in the
   backend.
 
-- \[ ] 6.2. Freeze the protocol-facing backend service contract and implement a
+- [ ] 6.2. Freeze the protocol-facing backend service contract and implement a
   headless/local backend service shell on the current runtime.
 
-- \[ ] 6.3. Add protocol-path parity coverage for bootstrap and PTY lifecycle
+- [ ] 6.3. Add protocol-path parity coverage for bootstrap and PTY lifecycle
   before swapping hosts.
 
-- \[ ] 6.4. Introduce host adapters that map Electron and Tauri to the backend
+- [ ] 6.4. Introduce host adapters that map Electron and Tauri to the backend
   service contract.
 
-- \[ ] 6.5. Prototype PTY manager in Rust and integrate with frontend.
+- [ ] 6.5. Prototype PTY manager in Rust and integrate with frontend.
 
-- \[ ] 6.6. Package desktop app with Tauri, including update strategy.
+- [ ] 6.6. Package desktop app with Tauri, including update strategy.
 
 
 
 ### 7. Remote frontend + protocol
 
 
-- \[ ] 7.1. Auth + capability negotiation.
+- [ ] 7.1. Auth + capability negotiation.
 
-- \[ ] 7.2. Redaction of sensitive metadata for remote surfaces.
+- [ ] 7.2. Redaction of sensitive metadata for remote surfaces.
 
-- \[ ] 7.3. Remote browser UI that can attach and drive command invocations.
+- [ ] 7.3. Remote browser UI that can attach and drive command invocations.
 
 
 

@@ -442,7 +442,12 @@ Scope notes:
   - [ ] Success criteria: builds install, run, and update on macOS, Linux, and
     Windows.
 
-## 8. Remote frontend and protocol
+## 8. Remote frontend: auth, redaction, and browser UI
+
+This remote frontend section is limited to authentication and authorisation,
+content redaction, and browser UI attachment flows. Protocol definition,
+loopback WebSocket transport, backend service shell work, and host-adapter
+changes remain in section 7 and are out of scope here.
 
 ### 8.1. Authentication, authorisation, and redaction
 
