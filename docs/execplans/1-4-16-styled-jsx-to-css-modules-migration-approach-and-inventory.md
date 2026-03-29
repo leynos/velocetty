@@ -228,15 +228,20 @@ Verify the plan contains:
 ### Quality gates (no code changes)
 
 As this is a documentation-only task, the quality gates verify no unintended
-modifications. See [Quality method (validation approach)](#quality-method-validation-approach)
-for the specific commands.
+modifications:
 
-High-level checks:
+```bash
+# Verify inventory accuracy
+rg '<style jsx' lib/components lib/containers | wc -l
+# Should output 13
 
-- Verify inventory accuracy (13 styled-jsx blocks).
-- Verify no source files were modified.
-- Standard gates pass: `bun install`, `make build`, `make check-fmt`, `make lint`,
-  `make test`.
+# Verify no source files were modified
+git diff --stat lib/ app/
+# Should show no changes
+
+# Standard gates must still pass
+bun install && make build && make check-fmt && make lint && make test
+```
 
 ## Target renderer styling model
 
@@ -777,17 +782,8 @@ This plan is complete when:
 
 ### Quality method (validation approach)
 
-```bash
-# Verify inventory accuracy
-rg '<style jsx' lib/components lib/containers | wc -l
-# Should output 13
-
-# Verify documentation exists
-ls -la docs/execplans/1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md
-
-# Run quality gates
-bun install && make build && make check-fmt && make lint && make test
-```
+See [Quality gates (no code changes)](#quality-gates-no-code-changes) for the
+specific validation commands.
 
 ## Idempotence and recovery
 
