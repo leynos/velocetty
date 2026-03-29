@@ -139,7 +139,7 @@ is deferred to roadmap items 1.4.17 and 1.4.18.
 
 - **Decision:** Use CSS Modules `local-css` loader (esbuild native) rather than
   third-party plugins.
-  - Rationale: Minimises dependencies; esbuild has first-class support; aligns
+  - Rationale: Minimizes dependencies; esbuild has first-class support; aligns
     with project's esbuild-first direction (ADR-002).
   - Date/Author: 2026-03-27
 
@@ -450,7 +450,15 @@ import styles from './terms.module.css';
 
 **Source:** `lib/components/searchBox.tsx`
 
-**Current styled-jsx (first block):**
+**Current styled-jsx (first block - SearchButton component):**
+
+**Note:** `searchBox.tsx` contains a second styled-jsx block with classes
+`.search-container`, `.search-input`, `.flex-row`, `.search-box` using dynamic
+values (`backgroundColor`, `borderColor`, `foregroundColor`, `font`). Migrate
+this block using the same pattern: create corresponding CSS rules, expose
+values as custom properties (`--search-bg`, `--search-border`, `--search-fg`,
+`--search-font`), and apply via the `style` prop with `clsx` for conditional
+classes.
 
 ```tsx
 <style jsx>{`
@@ -621,6 +629,9 @@ import clsx from 'clsx';
   ::-webkit-scrollbar-thumb {
     -webkit-border-radius: 10px;
     border-radius: 10px;
+    background: ${borderColor};
+  }
+  ::-webkit-scrollbar-thumb:window-inactive {
     background: ${borderColor};
   }
 `}</style>

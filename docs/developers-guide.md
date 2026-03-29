@@ -564,7 +564,7 @@ CSS Modules. Follow these conventions for renderer component styling:
   ```
 
 Cross-links:
-[1-4-16-styled-jsx-to-CSS-Modules-migration-approach-and-inventory.md](execplans/1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md),
+[1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md](execplans/1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md),
 [adr-002-replace-webpack-babel-with-esbuild.md](adr-002-replace-webpack-babel-with-esbuild.md).
 
 ## Formatting and linting
