@@ -76,6 +76,7 @@ jobs:
           cp build/canary.icns build/icon.icns
       - name: Build
         uses: ./.github/actions/build-packaged-app
+        timeout-minutes: 30
         with:
           gh_token: ${{ secrets.GITHUB_TOKEN }}
           csc_link: ${{ runner.os == 'macOS' && secrets.MAC_CERT_P12_BASE64 || '' }}
