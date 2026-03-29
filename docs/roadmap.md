@@ -138,17 +138,17 @@ Scope notes:
   - [x] Success criteria: CI lanes are green for macOS aarch64, Linux aarch64,
     and Windows x64; armv7 lanes are removed; Windows aarch64 is either running
     in CI or explicitly tracked as blocked with a documented mitigation path.
-- [x] 1.4.16. Publish the styled-jsx-to-CSS-Modules migration approach and
+- [ ] 1.4.16. Publish the styled-jsx-to-CSS-Modules migration approach and
   inventory for Babel removal. Requires 1.4.14.
   See [adr-002-replace-webpack-babel-with-esbuild.md](adr-002-replace-webpack-babel-with-esbuild.md)
   §Required plugin and bespoke-transform analysis, and
-  [1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md](execplans/1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md).
-  - [x] Document all `styled-jsx` callsites and classify by migration pattern
+  [1-4-16-migrate-styled-jsx-to-css-modules-and-remove-babel.md](execplans/1-4-16-migrate-styled-jsx-to-css-modules-and-remove-babel.md).
+  - [ ] Document all `styled-jsx` callsites and classify by migration pattern
     (local static, local dynamic, and global selectors).
-  - [x] Define the target renderer styling model (CSS Modules for local scope,
+  - [ ] Define the target renderer styling model (CSS Modules for local scope,
     explicit global path for app-wide selectors, and custom-property policy for
     dynamic values).
-  - [x] Success criteria: migration approach document is published with worked
+  - [ ] Success criteria: migration approach document is published with worked
     examples tied to repository files and an explicit decommission checklist.
 - [ ] 1.4.17. Migrate renderer style blocks from styled-jsx to CSS Modules.
   Requires 1.4.16.
