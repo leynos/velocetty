@@ -502,12 +502,12 @@ Roadmap item `1.4.16` establishes the migration approach from `styled-jsx` to
 CSS Modules. Follow these conventions for renderer component styling:
 
 - Co-locate CSS Module files with their components using the naming convention
-  `ComponentName.module.css` (for example, `header.module.css` alongside
-  `header.tsx`).
+  `ComponentName.module.css` (for example, `Header.module.css` alongside
+  `Header.tsx`).
 - Import CSS Modules using the default import pattern:
 
   ```tsx
-  import styles from './header.module.css';
+  import styles from './Header.module.css';
   ```
 
 - Reference classes via the imported `styles` object:
@@ -546,7 +546,7 @@ CSS Modules. Follow these conventions for renderer component styling:
   ```
 
 - Use the `:global()` wrapper in CSS Modules only for truly global selectors
-  (for example, webkit scrollbar pseudo-elements). Keep the scope as narrow as
+  (for example, WebKit scrollbar pseudo-elements). Keep the scope as narrow as
   possible:
 
   ```css

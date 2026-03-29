@@ -11,7 +11,8 @@ Status: COMPLETE
 
 Velocetty currently depends on `styled-jsx` for component styling in the
 renderer process. This creates a hard dependency on Babel transforms, which
-blocks the full removal of Babel from the build pipeline (see ADR-002).
+blocks the full removal of Babel from the build pipeline (see Architectural
+Decision Record ADR-002).
 
 This ExecPlan documents the migration approach for roadmap item 1.4.16. It is
 a **planning and documentation task only** - no source files are modified. The
@@ -70,7 +71,8 @@ Known uncertainties that might affect the plan:
   identically when moved to CSS Modules with `:global()` selectors.
   - Severity: medium
   - Likelihood: medium
-  - Mitigation: Include explicit visual parity tests in the deep E2E lane that
+  - Mitigation: Include explicit visual parity tests in the deep end-to-end
+  (E2E) lane that
     verify scrollbar appearance.
 
 - **Risk:** Dynamic theme values interpolated into styled-jsx may not translate
@@ -754,7 +756,7 @@ This plan is complete when:
 7. **Documentation updated:** `docs/developers-guide.md` includes CSS Modules
    conventions.
 
-### Quality method (how we check)
+### Quality method (validation approach)
 
 ```bash
 # Verify inventory accuracy
