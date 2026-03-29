@@ -379,7 +379,7 @@ Scope notes:
   - [ ] Success criteria: WebSocket transport handles PTY throughput without
     command latency regressions.
 
-### 7.2. Backend service shell and contract freeze
+### 7.2. Backend service contract and local shell
 
 - [ ] 7.2.1. Define a protocol-facing backend service contract. Requires 1.1.2
   and 7.1.2. See [velocetty-design.md](velocetty-design.md) §Host migration:
@@ -392,8 +392,8 @@ Scope notes:
   - [ ] Success criteria: the current backend can implement the contract
     without leaking Electron IPC, Tauri commands, or Rust-specific types into
     the frontend.
-- [ ] 7.2.2. Implement a headless/local backend service shell on the current
-  runtime. Requires 7.2.1. See
+- [ ] 7.2.2. Implement a local backend service shell on the current runtime.
+  Requires 7.2.1. See
   [velocetty-product-requirements-document.md](velocetty-product-requirements-document.md)
   §8) Frontend/backend segregation + remote frontend + protobuf/WebSocket
   comms.
@@ -414,10 +414,10 @@ Scope notes:
   - [ ] Success criteria: protocol-backed runs preserve current
     PTY/bootstrap behaviour and throughput before the Rust replacement starts.
 
-### 7.3. Backend adapter layer
+### 7.3. Host adapter modules
 
-- [ ] 7.3.1. Implement host adapters that satisfy the backend service contract
-  for Electron and Tauri. Requires 7.2.1. See
+- [ ] 7.3.1. Implement host adapter modules that satisfy the backend service
+  contract for Electron and Tauri. Requires 7.2.2. See
   [velocetty-design.md](velocetty-design.md) §Host migration: Electron to
   Tauri.
   - [ ] Map command execution, PTY operations, config I/O, and plugin/storage
@@ -468,7 +468,8 @@ changes remain in section 7 and are out of scope here.
 
 ### 8.2. Remote browser UI
 
-- [ ] 8.2.1. Implement a remote-capable frontend shell. Requires 8.1.1. See
+- [ ] 8.2.1. Implement a remote-capable frontend shell. Requires 7.2.2 and
+  8.1.2. See
   [velocetty-design.md](velocetty-design.md) §Remote frontend:
   protobuf/WebSocket protocol.
   - [ ] Connect to the backend via WebSocket and perform handshake.

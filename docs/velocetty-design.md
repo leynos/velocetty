@@ -1909,12 +1909,16 @@ intermediate backend-service step on the current runtime:
 - Freeze a protocol-facing backend service contract that defines session
   lifecycle, event taxonomy, teardown semantics, structured error codes, and
   capability/redaction metadata without host-specific types.
-- Implement a headless/local backend service shell on the existing runtime that
-  serves the protobuf/WebSocket protocol over loopback and adapts current
-  command, PTY, config, and plugin/storage services behind that contract.
+- Implement a local backend service shell on the existing runtime that serves
+  the protobuf/WebSocket protocol over loopback and adapts current command,
+  PTY, config, and plugin/storage services behind that contract.
 - Add parity coverage for bootstrap and PTY behaviour through the protocol path
   before the Rust PTY rewrite starts, so the host migration becomes an
   implementation swap rather than a simultaneous protocol and backend rewrite.
+
+In this split, the local backend service shell proves the backend behaviour on
+the current runtime, while later host adapter modules bind Electron and Tauri
+to that same contract without changing the frontend-facing service layer.
 
 ### Migration follow-up concerns
 
@@ -2293,13 +2297,13 @@ This follows the PRD sequencing, expressed as roadmap-style tasks.[^prd]
   backend.
 
 - [ ] 6.2. Freeze the protocol-facing backend service contract and implement a
-  headless/local backend service shell on the current runtime.
+  local backend service shell on the current runtime.
 
 - [ ] 6.3. Add protocol-path parity coverage for bootstrap and PTY lifecycle
   before swapping hosts.
 
-- [ ] 6.4. Introduce host adapters that map Electron and Tauri to the backend
-  service contract.
+- [ ] 6.4. Introduce host adapter modules that map Electron and Tauri to the
+  backend service contract.
 
 - [ ] 6.5. Prototype PTY manager in Rust and integrate with frontend.
 
