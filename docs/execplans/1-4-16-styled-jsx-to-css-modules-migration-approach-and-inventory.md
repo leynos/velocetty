@@ -859,7 +859,7 @@ declare module '*.module.css' {
 - `esbuild` (already primary bundler)
 - `clsx` (already used for conditional classes)
 
-## Revision note
+## Revision history
 
-- Initial draft created 2026-03-27.
-- Status: DRAFT - awaiting user approval.
+- **Historical:** Initial draft created 2026-03-27. Status was DRAFT — awaiting
+  user approval. (Superseded by current COMPLETE status.)
