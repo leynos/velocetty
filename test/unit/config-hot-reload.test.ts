@@ -20,6 +20,10 @@ import {
   getKeyReloadClassification
 } from '../../app/config/reload-handler';
 
+function makeLiveDiagnostic(path: string): ConfigReloadDiagnostic {
+  return {path, message: '', classification: 'live', rationale: ''};
+}
+
 describe('config-hot-reload', () => {
   describe('classifyConfigChange', () => {
     it('should classify live-reloadable settings correctly', () => {
@@ -172,11 +176,8 @@ describe('config-hot-reload', () => {
     it('should extract only live-reloadable changes', () => {
       const oldConfig = {fontSize: 12, shell: '/bin/bash'} as configOptions;
       const newConfig = {fontSize: 14, shell: '/bin/zsh'} as configOptions;
-      const liveDiagnostics: ConfigReloadDiagnostic[] = [
-        {path: 'fontSize', message: '', classification: 'live', rationale: ''}
-      ];
 
-      const result = extractLiveConfigChanges(oldConfig, newConfig, liveDiagnostics);
+      const result = extractLiveConfigChanges(oldConfig, newConfig, [makeLiveDiagnostic('fontSize')]);
 
       expect(result.fontSize).toBe(14);
       expect(result.shell).toBeUndefined();
@@ -195,11 +196,8 @@ describe('config-hot-reload', () => {
     it('should handle nested config objects', () => {
       const oldConfig = {colors: {red: '#ff0000'}, fontSize: 12} as configOptions;
       const newConfig = {colors: {red: '#cc0000'}, fontSize: 14} as configOptions;
-      const liveDiagnostics: ConfigReloadDiagnostic[] = [
-        {path: 'colors', message: '', classification: 'live', rationale: ''}
-      ];
 
-      const result = extractLiveConfigChanges(oldConfig, newConfig, liveDiagnostics);
+      const result = extractLiveConfigChanges(oldConfig, newConfig, [makeLiveDiagnostic('colors')]);
 
       expect(result.colors).toEqual({red: '#cc0000'});
       expect(result.fontSize).toBeUndefined();
@@ -213,6 +211,16 @@ describe('config-hot-reload', () => {
       emitRestartWarning: () => {},
       warn: () => {}
     });
+
+    function createShellChangeDeps() {
+      const warnings: ConfigReloadDiagnostic[][] = [];
+      const deps = {
+        ...createMockDependencies(),
+        getCurrentConfig: () => ({shell: '/bin/bash'}) as configOptions,
+        emitRestartWarning: (diagnostics: ConfigReloadDiagnostic[]) => warnings.push(diagnostics)
+      };
+      return {deps, warnings};
+    }
 
     it('should return handler functions', () => {
       const handler = createReloadHandler(createMockDependencies());
@@ -242,16 +250,10 @@ describe('config-hot-reload', () => {
     });
 
     it('should queue restart-required changes', () => {
-      const warnings: ConfigReloadDiagnostic[][] = [];
-      const deps = {
-        ...createMockDependencies(),
-        getCurrentConfig: () => ({shell: '/bin/bash'}) as configOptions,
-        emitRestartWarning: (diagnostics: ConfigReloadDiagnostic[]) => warnings.push(diagnostics)
-      };
+      const {deps, warnings} = createShellChangeDeps();
       const handler = createReloadHandler(deps);
 
-      const newConfig = {shell: '/bin/zsh'} as configOptions;
-      const result = handler.processReload(newConfig);
+      const result = handler.processReload({shell: '/bin/zsh'} as configOptions);
 
       expect(result.restartRequired.length).toBe(1);
       expect(result.restartRequired[0].path).toBe('shell');
@@ -297,16 +299,10 @@ describe('config-hot-reload', () => {
     });
 
     it('should not emit warnings when emitWarnings is false', () => {
-      const warnings: ConfigReloadDiagnostic[][] = [];
-      const deps = {
-        ...createMockDependencies(),
-        getCurrentConfig: () => ({shell: '/bin/bash'}) as configOptions,
-        emitRestartWarning: (diagnostics: ConfigReloadDiagnostic[]) => warnings.push(diagnostics)
-      };
+      const {deps, warnings} = createShellChangeDeps();
       const handler = createReloadHandler(deps);
 
-      const newConfig = {shell: '/bin/zsh'} as configOptions;
-      handler.processReload(newConfig, {emitWarnings: false});
+      handler.processReload({shell: '/bin/zsh'} as configOptions, {emitWarnings: false});
 
       expect(warnings.length).toBe(0);
       expect(handler.isRestartRequired()).toBe(false);
