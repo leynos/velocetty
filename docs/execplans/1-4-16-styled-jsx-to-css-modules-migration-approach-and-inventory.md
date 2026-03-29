@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -105,9 +105,9 @@ is deferred to roadmap items 1.4.17 and 1.4.18.
 - [x] (2026-03-27 20:10Z) Define target renderer styling model.
 - [x] (2026-03-27 20:15Z) Create worked examples for each pattern type.
 - [x] (2026-03-27 20:20Z) Draft decommission checklist for 1.4.18.
-- [ ] Await user approval of this plan.
-- [ ] Upon approval: Update `docs/developers-guide.md` with CSS Modules conventions.
-- [ ] Upon approval: Mark roadmap item 1.4.16 as "done".
+- [x] Await user approval of this plan.
+- [x] Upon approval: Update `docs/developers-guide.md` with CSS Modules conventions.
+- [x] Upon approval: Mark roadmap item 1.4.16 as "done".
 
 ## Surprises & Discoveries
 
@@ -188,7 +188,7 @@ Key files involved:
 The repository contains **13 styled-jsx blocks** across **12 files**:
 
 | File | Pattern | Block Count | Dynamic Values |
-|------|---------|-------------|----------------|
+| ---- | ------- | ----------- | ---------------- |
 | `lib/components/terms.tsx` | A (local static) | 1 | None |
 | `lib/components/searchBox.tsx` | B (local dynamic) | 2 | `foregroundColor`, `selectionColor`, `backgroundColor`, `borderColor`, `font` |
 | `lib/components/header.tsx` | A (local static) | 1 | None (uses inline `style=` for `borderColor`) |
