@@ -228,20 +228,15 @@ Verify the plan contains:
 ### Quality gates (no code changes)
 
 As this is a documentation-only task, the quality gates verify no unintended
-modifications:
+modifications. See [Quality method (validation approach)](#quality-method-validation-approach)
+for the specific commands.
 
-```bash
-# Verify inventory accuracy
-rg '<style jsx' lib/components lib/containers | wc -l
-# Should output 13
+High-level checks:
 
-# Verify no source files were modified
-git diff --stat lib/ app/
-# Should show no changes
-
-# Standard gates must still pass
-bun install && make build && make check-fmt && make lint && make test
-```
+- Verify inventory accuracy (13 styled-jsx blocks).
+- Verify no source files were modified.
+- Standard gates pass: `bun install`, `make build`, `make check-fmt`, `make lint`,
+  `make test`.
 
 ## Target renderer styling model
 
