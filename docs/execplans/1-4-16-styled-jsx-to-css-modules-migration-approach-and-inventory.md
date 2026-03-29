@@ -628,40 +628,49 @@ import clsx from 'clsx';
 
 **Migration:**
 
-Create `lib/components/style-sheet.module.css`:
+Create `lib/components/terms.module.css` (scrollbar rules applied to the
+terms container):
 
 ```css
-.host {
+.terms {
   --scrollbar-thumb: transparent;
 }
 
-.host :global(::-webkit-scrollbar) {
+.terms :global(::-webkit-scrollbar) {
   width: 5px;
 }
 
-.host :global(::-webkit-scrollbar-thumb),
-.host :global(::-webkit-scrollbar-thumb:window-inactive) {
+.terms :global(::-webkit-scrollbar-thumb),
+.terms :global(::-webkit-scrollbar-thumb:window-inactive) {
   border-radius: 10px;
   background: var(--scrollbar-thumb);
 }
 ```
 
-Update `lib/components/style-sheet.tsx`:
+Update `lib/components/terms.tsx` to apply the host class and CSS variable
+to the actual content ancestor:
 
 ```tsx
-import styles from './style-sheet.module.css';
+import styles from './terms.module.css';
 
+// In render(): the .terms class is on the ancestor that contains scrollbars
 <div
-  className={styles.host}
+  className={clsx(styles.terms, shift && styles.termsShifted)}
   style={{'--scrollbar-thumb': borderColor} as React.CSSProperties}
-/>
+>
+  {/* Terminal content renders here */}
+</div>
 ```
+
+Remove the `StyleSheet` component or have it render `null` after migration,
+as its styling responsibility moves to the terms container.
 
 **Why this is safe:**
 
+- The scrollbar selector matches because `.terms` is an ancestor of the
+  terminal content (unlike a self-closing sibling element).
 - Global pseudo-element selectors remain explicit via `:global()`.
 - Dynamic colour remains runtime-configurable through a CSS variable.
-- Scoped to a container element (`.host`) rather than truly global.
 
 ### Example 5: Pattern C - Local classes marked global (term.tsx)
 
