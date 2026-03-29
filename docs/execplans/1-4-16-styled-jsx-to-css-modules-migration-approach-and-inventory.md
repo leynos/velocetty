@@ -705,17 +705,21 @@ Update `lib/components/term.tsx`:
 
 ```tsx
 import styles from './term.module.css';
+import clsx from 'clsx';
 
-<div className={styles.termFit}>
-  <div className={styles.termWrapper}>
+// Preserve legacy class names for tooling compatibility
+<div className={clsx(styles.termFit, 'term_fit', 'term_term')}>
+  <div className={clsx(styles.termWrapper, 'term_wrapper')}>
 ```
 
 **Why this is safe:**
 
-- Despite being marked `global`, these selectors are used only within `Term`
-  render output.
-- Migration to local CSS Module classes maintains the same scope.
-- Legacy class names that may be externally targeted can be preserved if needed.
+- Legacy class names (`.term_fit`, `.term_wrapper`, `.term_term`) are preserved
+  for repository tooling compatibility (e.g., E2E buffer reader queries,
+  terminal wiring).
+- CSS Module classes provide scoped styling while legacy classes maintain
+  external selector contracts.
+- The `clsx` pattern allows gradual migration without breaking integrations.
 
 ## Concrete steps
 
