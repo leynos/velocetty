@@ -496,6 +496,77 @@ avoid duplicate React instances in plugins. React 19 requires aligning
 `react-redux` 9.x with `redux` 5.x, plus matching `@types/react` and
 `@types/react-dom` versions in `package.json`.
 
+## CSS Modules conventions
+
+Roadmap item `1.4.16` establishes the migration approach from `styled-jsx` to
+CSS Modules. Follow these conventions for renderer component styling:
+
+- Co-locate CSS Module files with their components using the naming convention
+  `ComponentName.module.css` (for example, `Header.module.css` alongside
+  `Header.tsx`).
+- Import CSS Modules using the default import pattern:
+
+  ```tsx
+  import styles from './Header.module.css';
+  ```
+
+- Reference classes via the imported `styles` object:
+
+  ```tsx
+  <header className={styles.header}>
+  ```
+
+- Use `clsx` for conditional class application:
+
+  ```tsx
+  import clsx from 'clsx';
+
+  <div className={clsx(styles.base, active && styles.active)}>
+  ```
+
+- Map dynamic theme values to CSS custom properties (variables) rather than
+  inline styles to preserve cascade and pseudo-class access:
+
+  ```tsx
+  const vars: React.CSSProperties = {
+    '--search-fg': foregroundColor,
+    '--search-selection': selectionColor,
+  };
+
+  <div className={styles.searchButton} style={vars}>
+  ```
+
+  ```css
+  .searchButton {
+    color: var(--search-fg);
+  }
+  .searchButton:focus {
+    outline: var(--search-selection) solid 2px;
+  }
+  ```
+
+- Use the `:global()` wrapper in CSS Modules only for truly global selectors
+  (for example, WebKit scrollbar pseudo-elements). Keep the scope as narrow as
+  possible:
+
+  ```css
+  .host :global(::-webkit-scrollbar) {
+    width: 5px;
+  }
+  ```
+
+- Preserve existing class names that may be targeted by plugins or user CSS
+  during migration. Where legacy class names must be maintained for
+  compatibility, apply them alongside CSS Module classes:
+
+  ```tsx
+  <div className={clsx(styles.termFit, 'term_fit')}>
+  ```
+
+Cross-links:
+[1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md](execplans/1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md),
+[adr-002-replace-webpack-babel-with-esbuild.md](adr-002-replace-webpack-babel-with-esbuild.md).
+
 ## Formatting and linting
 
 Run the standard gates before opening a pull request:
