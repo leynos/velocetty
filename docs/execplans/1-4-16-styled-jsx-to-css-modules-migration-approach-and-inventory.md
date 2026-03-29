@@ -11,19 +11,27 @@ Status: DRAFT
 
 Velocetty currently depends on `styled-jsx` for component styling in the
 renderer process. This creates a hard dependency on Babel transforms, which
-blocks the full removal of Babel from the build pipeline (see ADR-002). This
-plan documents a complete migration approach to CSS Modules with esbuild-native
-processing, including an exhaustive inventory of all `styled-jsx` callsites,
-classification by migration pattern, worked examples tied to repository files,
-and an explicit decommission checklist.
+blocks the full removal of Babel from the build pipeline (see ADR-002).
 
-After this plan is approved and executed:
+This ExecPlan documents the migration approach for roadmap item 1.4.16. It is
+a **planning and documentation task only** - no source files are modified. The
+deliverable is a self-contained reference document that will guide subsequent
+implementation work in roadmap items 1.4.17 (component migration) and 1.4.18
+(Babel bridge removal).
 
-1. All renderer components will use CSS Modules (`.module.css`) instead of
-   `<style jsx>` blocks.
-2. The Babel bridge plugin for `styled-jsx` can be removed.
-3. The `styled-jsx` runtime dependency can be removed from the project.
-4. Build tooling will be simpler and faster with one less transformation layer.
+This document provides:
+
+1. An exhaustive inventory of all `styled-jsx` callsites in the repository.
+2. Classification of each callsite by migration pattern (local static, local
+   dynamic, global selectors).
+3. Definition of the target renderer styling model (CSS Modules for local scope,
+   CSS custom properties for dynamic values, `:global()` for app-wide selectors).
+4. Worked examples tied to actual repository files.
+5. An explicit decommission checklist for removing Babel bridge and styled-jsx
+   dependencies after component migration is complete.
+
+Success is measured by the completeness and clarity of this documentation,
+not by code changes. Implementation is explicitly out of scope for this task.
 
 ## Constraints
 
