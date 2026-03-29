@@ -6,7 +6,7 @@
  * - Classification helpers work correctly
  */
 import {describe, it, expect} from 'bun:test';
-import type {configOptions, rawConfig} from '@shared/types/config';
+import type {configOptions} from '@shared/types/config';
 import {
   rootConfigReloadability,
   profileConfigReloadability,
@@ -15,8 +15,7 @@ import {
   getReloadability,
   requiresRestart,
   isLiveReloadable,
-  getConfigKeys,
-  type Reloadability
+  getConfigKeys
 } from '@shared/constants/config-reloadability';
 
 describe('config-reloadability', () => {

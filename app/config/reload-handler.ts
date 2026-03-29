@@ -8,16 +8,11 @@
  * - Restart-required changes: queued with structured diagnostics for UI warning
  */
 
-import type {
-  configOptions,
-  ConfigReloadDiagnostic,
-  ConfigReloadResult,
-  configValidationDiagnostic
-} from '@shared/types/config';
+import type {configOptions, ConfigReloadDiagnostic, ConfigReloadResult} from '@shared/types/config';
 // Define Reloadability type locally to avoid cross-package import issues
 // between build and test environments
 type Reloadability = 'live' | 'restart';
-import {getChangedKeys, configValueDiffers, type ConfigLayer} from './layering';
+import {getChangedKeys} from './layering';
 
 /** Dependencies required by the reload handler. */
 export type ReloadHandlerDependencies = {
@@ -322,7 +317,7 @@ export const partitionChanges = (diagnostics: ConfigReloadDiagnostic[]) => {
  * @returns Partial config with only live-reloadable changes.
  */
 export const extractLiveConfigChanges = (
-  oldConfig: configOptions,
+  _oldConfig: configOptions,
   newConfig: configOptions,
   liveDiagnostics: ConfigReloadDiagnostic[]
 ): Partial<configOptions> => {

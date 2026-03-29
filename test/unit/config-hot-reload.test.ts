@@ -6,7 +6,7 @@
  * - Mixed changes apply live subset and warn on remainder
  * - Classification helpers work correctly
  */
-import {describe, it, expect, beforeEach} from 'bun:test';
+import {describe, it, expect} from 'bun:test';
 import type {configOptions, ConfigReloadDiagnostic} from '@shared/types/config';
 import {
   classifyConfigChange,
