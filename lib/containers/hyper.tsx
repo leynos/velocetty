@@ -23,6 +23,7 @@ import {connect} from '../utils/plugins';
 import {HeaderContainer} from './header';
 import NotificationsContainer from './notifications';
 import TermsContainer from './terms';
+import styles from './hyper.module.css';
 
 const isMac = /Mac/.test(navigator.userAgent);
 
@@ -111,7 +112,7 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
     <div id="hyper" ref={ref}>
       <div
         style={{fontFamily: uiFontFamily, borderColor, borderWidth}}
-        className={`hyper_main ${isMac_ && 'hyper_mainRounded'} ${fullScreen ? 'fullScreen' : ''}`}
+        className={`${styles.hyperMain} ${isMac_ ? styles.hyperMainRounded : ''} ${fullScreen ? 'fullScreen' : ''}`}
       >
         <HeaderContainer />
         <TermsContainer ref_={onTermsRef} />
@@ -122,25 +123,9 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
 
       {props.customChildren}
 
-      <style jsx={true}>{`
-        .hyper_main {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          border: 1px solid #333;
-        }
-
-        .hyper_mainRounded {
-          border-radius: 10.5px;
-          overflow: hidden;
-        }
-      `}</style>
-
       {/*
         Add custom CSS to Hyper.
-        We add a scope to the customCSS so that it can get around the weighting applied by styled-jsx
+        We add a scope to the customCSS so that it applies within the Hyper container.
       */}
       <style dangerouslySetInnerHTML={{__html: stylis('#hyper', customCSS)}} />
     </div>

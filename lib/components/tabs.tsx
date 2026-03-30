@@ -7,6 +7,7 @@ import {decorate, getTabProps, subscribeTabDecorationUpdates} from '../utils/plu
 
 import DropdownButton from './new-tab';
 import Tab_ from './tab';
+import styles from './tabs.module.css';
 
 const Tab = decorate(Tab_, 'Tab');
 const isMac = /Mac/.test(navigator.userAgent);
@@ -24,12 +25,18 @@ const Tabs = forwardRef(function Tabs(props: TabsProps, ref: React.ForwardedRef<
   }, []);
 
   return (
-    <nav className={`tabs_nav ${hide ? 'tabs_hiddenNav' : ''}`} ref={ref}>
+    <nav
+      className={`${styles.tabsNav} ${hide ? styles.tabsHiddenNav : ''} ${isMac ? styles.tabsNavMac : styles.tabsNavNonMac}`}
+      ref={ref}
+    >
       {props.customChildrenBefore}
-      {tabs.length === 1 && isMac ? <div className="tabs_title">{tabs[0].title}</div> : null}
+      {tabs.length === 1 && isMac ? <div className={styles.tabsTitle}>{tabs[0].title}</div> : null}
       {tabs.length > 1 ? (
         <>
-          <ul key="list" className={`tabs_list ${fullScreen && isMac ? 'tabs_fullScreen' : ''}`}>
+          <ul
+            key="list"
+            className={`${styles.tabsList} ${isMac ? styles.tabsListMacOffset : ''} ${fullScreen && isMac ? styles.tabsFullScreen : ''}`}
+          >
             {tabs.map((tab, i) => {
               const {uid, title, isActive, hasActivity} = tab;
               const tabProps = getTabProps({...tab, tabIndex: i}, props, {
@@ -49,69 +56,13 @@ const Tabs = forwardRef(function Tabs(props: TabsProps, ref: React.ForwardedRef<
             <div
               key="shim"
               style={{borderColor}}
-              className={`tabs_borderShim ${fullScreen ? 'tabs_borderShimUndo' : ''}`}
+              className={`${styles.tabsBorderShim} ${fullScreen ? styles.tabsBorderShimUndo : ''}`}
             />
           )}
         </>
       ) : null}
       <DropdownButton {...props} tabsVisible={tabs.length > 1} />
       {props.customChildren}
-      <style jsx={true}>{`
-        .tabs_nav {
-          font-size: 12px;
-          height: 34px;
-          line-height: 34px;
-          vertical-align: middle;
-          color: #9b9b9b;
-          cursor: default;
-          position: relative;
-          -webkit-user-select: none;
-          -webkit-app-region: ${isMac ? 'drag' : ''};
-          top: ${isMac ? '0px' : '34px'};
-          display: flex;
-          flex-flow: row;
-        }
-
-        .tabs_hiddenNav {
-          display: none;
-        }
-
-        .tabs_title {
-          text-align: center;
-          color: #fff;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          padding-left: 76px;
-          padding-right: 76px;
-          flex-grow: 1;
-        }
-
-        .tabs_list {
-          max-height: 34px;
-          display: flex;
-          flex-flow: row;
-          margin-left: ${isMac ? '76px' : '0'};
-          flex-grow: 1;
-        }
-
-        .tabs_fullScreen {
-          margin-left: -1px;
-        }
-
-        .tabs_borderShim {
-          position: absolute;
-          width: 76px;
-          bottom: 0;
-          border-color: #ccc;
-          border-bottom-style: solid;
-          border-bottom-width: 1px;
-        }
-
-        .tabs_borderShimUndo {
-          border-bottom-width: 0px;
-        }
-      `}</style>
     </nav>
   );
 });

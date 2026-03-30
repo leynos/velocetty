@@ -150,15 +150,15 @@ Scope notes:
     dynamic values).
   - [x] Success criteria: migration approach document is published with worked
     examples tied to repository files and an explicit decommission checklist.
-- [ ] 1.4.17. Migrate renderer style blocks from styled-jsx to CSS Modules.
+- [x] 1.4.17. Migrate renderer style blocks from styled-jsx to CSS Modules.
   Requires 1.4.16.
   See [velocetty-design.md](velocetty-design.md) §Renderer process and
   [1-4-16-migrate-styled-jsx-to-css-modules-and-remove-babel.md](execplans/1-4-16-migrate-styled-jsx-to-css-modules-and-remove-babel.md).
-  - [ ] Add esbuild CSS Modules support (`.module.css` using `local-css`) and
+  - [x] Add esbuild CSS Modules support (`.module.css` using `local-css`) and
     TypeScript module declarations for CSS imports.
-  - [ ] Migrate `lib/components/**` and `lib/containers/hyper.tsx` away from
+  - [x] Migrate `lib/components/**` and `lib/containers/hyper.tsx` away from
     `<style jsx>` and `<style jsx global>` with parity-focused tests.
-  - [ ] Success criteria: no renderer source files contain `<style jsx` and
+  - [x] Success criteria: no renderer source files contain `<style jsx` and
     style behaviour remains stable in unit and end-to-end checks.
 - [ ] 1.4.18. Remove styled-jsx bridge tooling and bridge-only Babel
   dependencies after migration parity is complete. Requires 1.4.17.

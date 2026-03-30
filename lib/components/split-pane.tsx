@@ -3,6 +3,7 @@ import React, {useState, useEffect, useRef, forwardRef} from 'react';
 import sum from 'lodash/sum';
 
 import type {SplitPaneProps} from '../../typings/hyper';
+import styles from './split-pane.module.css';
 
 const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const dragPanePosition = useRef<number>(0);
@@ -99,7 +100,10 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
   // right height for the horizontal panes
   const sizes = props.sizes || new Array<number>(children.length).fill(1 / children.length);
   return (
-    <div className={`splitpane_panes splitpane_panes_${direction}`} ref={ref}>
+    <div
+      className={`${styles.splitpanePanes} ${direction === 'vertical' ? styles.splitpanePanesVertical : styles.splitpanePanesHorizontal}`}
+      ref={ref}
+    >
       {children.map((child, i) => {
         const style = {
           // flexBasis doesn't work for the first horizontal pane, height need to be specified
@@ -110,7 +114,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
 
         return (
           <React.Fragment key={i}>
-            <div className="splitpane_pane" style={style}>
+            <div className={styles.splitpanePane} style={style}>
               {child}
             </div>
             {i < children.length - 1 ? (
@@ -118,76 +122,13 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
                 onMouseDown={(e) => handleDragStart(e, i)}
                 onDoubleClick={(e) => handleAutoResize(e, i)}
                 style={{backgroundColor: borderColor}}
-                className={`splitpane_divider splitpane_divider_${direction}`}
+                className={`${styles.splitpaneDivider} ${direction === 'vertical' ? styles.splitpaneDividerVertical : styles.splitpaneDividerHorizontal}`}
               />
             ) : null}
           </React.Fragment>
         );
       })}
-      <div style={{display: dragging ? 'block' : 'none'}} className="splitpane_shim" />
-
-      <style jsx={true}>{`
-        .splitpane_panes {
-          display: flex;
-          flex: 1;
-          outline: none;
-          position: relative;
-          width: 100%;
-          height: 100%;
-        }
-
-        .splitpane_panes_vertical {
-          flex-direction: row;
-        }
-
-        .splitpane_panes_horizontal {
-          flex-direction: column;
-        }
-
-        .splitpane_pane {
-          flex: 1;
-          outline: none;
-          position: relative;
-        }
-
-        .splitpane_divider {
-          box-sizing: border-box;
-          z-index: 1;
-          background-clip: padding-box;
-          flex-shrink: 0;
-        }
-
-        .splitpane_divider_vertical {
-          border-left: 5px solid rgba(255, 255, 255, 0);
-          border-right: 5px solid rgba(255, 255, 255, 0);
-          width: 11px;
-          margin: 0 -5px;
-          cursor: col-resize;
-        }
-
-        .splitpane_divider_horizontal {
-          height: 11px;
-          margin: -5px 0;
-          border-top: 5px solid rgba(255, 255, 255, 0);
-          border-bottom: 5px solid rgba(255, 255, 255, 0);
-          cursor: row-resize;
-          width: 100%;
-        }
-
-        /*
-          this shim is used to make sure mousemove events
-          trigger in all the draggable area of the screen
-          this is not the case due to hterm's <iframe>
-        */
-        .splitpane_shim {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: transparent;
-        }
-      `}</style>
+      <div style={{display: dragging ? 'block' : 'none'}} className={styles.splitpaneShim} />
     </div>
   );
 });

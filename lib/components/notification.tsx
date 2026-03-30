@@ -7,6 +7,7 @@
 import React, {forwardRef, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import type {NotificationProps, TimerSeam} from '../../typings/hyper';
+import styles from './notification.module.css';
 
 const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLDivElement>, timer?: TimerSeam) => {
   const {backgroundColor, dismissAfter, onDismiss, text} = props;
@@ -117,7 +118,7 @@ const Notification = forwardRef(function Notification(
       {props.userDismissable ? (
         <button
           type="button"
-          className="notification_dismissLink"
+          className={styles.notificationDismissLink}
           onClick={handleDismiss}
           style={{color: props.userDismissColor}}
         >
@@ -125,36 +126,6 @@ const Notification = forwardRef(function Notification(
         </button>
       ) : null}
       {props.customChildren}
-
-      <style jsx={true}>{`
-        .notification_indicator {
-          display: inline-block;
-          cursor: default;
-          -webkit-user-select: none;
-          background: rgba(255, 255, 255, 0.2);
-          padding: 8px 14px 9px;
-          margin-left: 10px;
-          transition: 150ms opacity ease;
-          color: #fff;
-          font-size: 12px;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
-            'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-        }
-
-        .notification_dismissLink {
-          position: relative;
-          left: 4px;
-          cursor: pointer;
-          font-weight: 600;
-          color: currentColor;
-          transition: font-weight 0.1s ease-in-out;
-        }
-
-        .notification_dismissLink:hover,
-        .notification_dismissLink:focus {
-          font-weight: 900;
-        }
-      `}</style>
     </div>
   );
 });

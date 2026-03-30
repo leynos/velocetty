@@ -1,0 +1,69 @@
+.searchButton {
+  cursor: pointer;
+  color: var(--search-fg);
+  padding: 2px;
+  margin: 4px 0;
+  height: 18px;
+  width: 18px;
+  border-radius: 2px;
+}
+
+.searchButton:focus {
+  outline: var(--search-selection) solid 2px;
+}
+
+.searchButton:hover {
+  background-color: var(--search-hover-bg);
+}
+
+.searchButtonActive,
+.searchButtonActive:hover {
+  background-color: var(--search-selection);
+}
+
+.searchContainer {
+  background-color: var(--search-bg);
+  border: 1px solid var(--search-border);
+  border-radius: 2px;
+  position: absolute;
+  right: 13px;
+  top: 4px;
+  z-index: 10;
+  padding: 4px;
+  font-family: var(--search-font);
+  font-size: 12px;
+}
+
+.searchInput {
+  outline: none;
+  background-color: transparent;
+  border: none;
+  color: var(--search-fg);
+  align-self: stretch;
+  width: 100px;
+}
+
+.flexRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+}
+
+.searchBox {
+  border: none;
+  border-radius: 2px;
+  outline: var(--search-border) solid 1px;
+  background-color: var(--search-bg);
+  color: var(--search-fg);
+  padding: 0 4px;
+}
+
+.searchInput::placeholder {
+  color: var(--search-fg);
+}
+
+.searchBox:focus-within {
+  outline: var(--search-selection) solid 2px;
+}

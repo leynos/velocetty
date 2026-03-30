@@ -1,0 +1,13 @@
+.hyperMain {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid #333;
+}
+
+.hyperMainRounded {
+  border-radius: 10.5px;
+  overflow: hidden;
+}

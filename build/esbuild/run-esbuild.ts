@@ -69,7 +69,8 @@ export const createRendererBuildOptions = (mode: BuildMode, rootDir: string): Bu
     sourcemap: isProductionMode(mode) ? 'external' : 'linked',
     loader: {
       ...(baseBuildOptions.loader ?? {}),
-      '.css': 'css'
+      '.css': 'css',
+      '.module.css': 'local-css'
     },
     plugins: [
       createStyledJsxBabelBridgePlugin(),

@@ -93,6 +93,44 @@ test('translation: styled-jsx bridge transforms JSX style blocks', async () => {
   }
 });
 
+test('translation: CSS Modules are bundled with scoped class names in renderer build', async () => {
+  const rootDir = await createTempDir();
+  try {
+    const cssPath = path.join(rootDir, 'fixture.module.css');
+    const entryPoint = path.join(rootDir, 'fixture.tsx');
+    await writeFixtureFile(cssPath, '.searchBox { color: red; }');
+    await writeFixtureFile(
+      entryPoint,
+      [
+        "import React from 'react';",
+        "import styles from './fixture.module.css';",
+        'export const Fixture = () => (',
+        '  <div className={styles.searchBox}>ok</div>',
+        ');'
+      ].join('\n')
+    );
+
+    const buildResult = await runEsbuildBuild({
+      entryPoints: [entryPoint],
+      bundle: true,
+      write: false,
+      outfile: path.join(rootDir, 'bundle.js'),
+      platform: 'browser',
+      format: 'iife',
+      external: ['react', 'react/jsx-runtime'],
+      loader: {'.module.css': 'local-css'}
+    });
+
+    const bundleOutput = buildResult.outputFiles.find((file) => file.path.endsWith('.js'))?.text ?? '';
+    // CSS Module class name is present in the class map object
+    expect(bundleOutput.includes('searchBox')).toBe(true);
+    // The scoped class name (prefixed with module name) is generated
+    expect(bundleOutput.includes('_searchBox')).toBe(true);
+  } finally {
+    await rm(rootDir, {recursive: true, force: true});
+  }
+});
+
 test('packaging: hyper-app and renderer copy flows preserve required files', async () => {
   const rootDir = await createTempDir();
   try {

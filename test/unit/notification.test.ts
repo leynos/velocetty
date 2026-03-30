@@ -89,7 +89,8 @@ const requireIndicator = (container: HTMLElement) => {
 };
 
 const requireDismissButton = (container: HTMLElement) => {
-  const button = container.querySelector('.notification_dismissLink');
+  const indicator = requireIndicator(container);
+  const button = indicator.querySelector('button[type="button"]');
   expect(button).toBeTruthy();
   if (!button) {
     throw new Error('Expected dismiss button to be present.');

@@ -6,6 +6,7 @@ import type {NotificationsProps} from '../../typings/hyper';
 import {decorate} from '../utils/plugins';
 
 import Notification_ from './notification';
+import styles from './notifications.module.css';
 
 const Notification = decorate(Notification_, 'Notification');
 
@@ -14,7 +15,7 @@ const Notifications = forwardRef(function Notifications(
   ref: React.ForwardedRef<HTMLDivElement>
 ) {
   return (
-    <div className="notifications_view" ref={ref}>
+    <div className={styles.notificationsView} ref={ref}>
       {props.customChildrenBefore}
       {props.fontShowing && (
         <Notification
@@ -120,14 +121,6 @@ const Notifications = forwardRef(function Notifications(
         </Notification>
       )}
       {props.customChildren}
-
-      <style jsx={true}>{`
-        .notifications_view {
-          position: fixed;
-          bottom: 20px;
-          right: 20px;
-        }
-      `}</style>
     </div>
   );
 });
