@@ -62,8 +62,12 @@ const truncateValue = (value: unknown, maxLength = 50): string => {
   if (typeof value === 'string') {
     return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
   }
-  const str = JSON.stringify(value);
-  return str.length > maxLength ? `${str.slice(0, maxLength)}...` : str;
+  try {
+    const str = JSON.stringify(value);
+    return str.length > maxLength ? `${str.slice(0, maxLength)}...` : str;
+  } catch {
+    return '[unserializable]';
+  }
 };
 
 /**
@@ -143,11 +147,7 @@ export const detectConfigChanges = (oldConfig: configOptions, newConfig: configO
   const changedKeys = getChangedKeys(oldConfig as Record<string, unknown>, newConfig as Record<string, unknown>);
 
   return changedKeys.map((key) =>
-    classifyConfigChange(
-      key as string,
-      (oldConfig as Record<string, unknown>)[key],
-      (newConfig as Record<string, unknown>)[key]
-    )
+    classifyConfigChange(key, (oldConfig as Record<string, unknown>)[key], (newConfig as Record<string, unknown>)[key])
   );
 };
 
@@ -175,7 +175,9 @@ export const partitionChanges = (diagnostics: ConfigReloadDiagnostic[]) => {
 /**
  * Extracts the live-reloadable subset of configuration changes.
  *
- * @param _oldConfig - The previous configuration.
+ * The _oldConfig parameter is intentionally unused/reserved for future API symmetry.
+ *
+ * @param _oldConfig - The previous configuration (unused).
  * @param newConfig - The new configuration.
  * @param liveDiagnostics - Diagnostics for live-reloadable changes.
  * @returns Partial config with only live-reloadable changes.
@@ -296,7 +298,10 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
    *
    * @returns The current reload handler state.
    */
-  const getState = (): Readonly<ReloadHandlerState> => ({...state});
+  const getState = (): Readonly<ReloadHandlerState> => ({
+    ...state,
+    pendingRestartChanges: [...state.pendingRestartChanges]
+  });
 
   /**
    * Checks if there are pending restart-required changes.
