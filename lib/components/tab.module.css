@@ -104,6 +104,6 @@
   width: 6px;
   height: 6px;
   vertical-align: middle;
-  fill: currentColor;
-  shape-rendering: crispEdges;
+  fill: currentcolor;
+  shape-rendering: crispedges;
 }

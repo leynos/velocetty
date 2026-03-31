@@ -4,7 +4,7 @@ import {createRoot} from 'react-dom/client';
 
 import {expect, test} from 'bun:test';
 
-import Notification from '../../lib/components/notification';
+import Notification, {styles as notificationStyles} from '../../lib/components/notification';
 import {setupHappyDom} from '../testUtils/happy-dom';
 
 import type {NotificationProps, TimerSeam} from '../../typings/hyper';
@@ -80,7 +80,7 @@ const createFakeTimerSeam = () => {
 };
 
 const requireIndicator = (container: HTMLElement) => {
-  const indicator = container.querySelector('.notification_indicator');
+  const indicator = container.querySelector(`.${notificationStyles.notificationIndicator}`);
   expect(indicator).toBeTruthy();
   if (!indicator) {
     throw new Error('Expected notification indicator to be present.');

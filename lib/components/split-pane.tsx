@@ -1,3 +1,5 @@
+/** @file Resizable split pane container supporting horizontal and vertical layouts. */
+
 import React, {useState, useEffect, useRef, forwardRef} from 'react';
 
 import sum from 'lodash/sum';

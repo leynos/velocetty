@@ -43,7 +43,7 @@
   -webkit-app-region: no-drag;
   color: #fff;
   opacity: 0.5;
-  shape-rendering: crispEdges;
+  shape-rendering: crispedges;
 }
 
 .headerShape:hover {

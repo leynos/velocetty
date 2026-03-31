@@ -43,14 +43,13 @@
 }
 
 .newTab {
+  appearance: none;
   background: transparent;
   color: #fff;
-  border-left: 1px;
-  border-bottom: 1px;
-  border-left-style: solid;
-  border-bottom-style: solid;
-  border-left-width: 1px;
-  border-bottom-width: 1px;
+  border-left: 1px solid;
+  border-bottom: 1px solid;
+  border-top: none;
+  border-right: none;
   cursor: pointer;
   font-size: 12px;
   height: 34px;

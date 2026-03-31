@@ -1,3 +1,5 @@
+/** @file New tab button component with profile selection dropdown. */
+
 import {useRef, useState} from 'react';
 
 import {VscChevronDown} from '@react-icons/all-files/vsc/VscChevronDown';
@@ -34,7 +36,8 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
   };
 
   return (
-    <div
+    <button
+      type="button"
       ref={ref}
       title="New Tab"
       className={`${styles.newTab} ${isMac ? styles.newTabMac : ''} ${tabsVisible ? styles.tabsVisible : styles.tabsHidden}`}
@@ -46,7 +49,7 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
       <VscChevronDown style={{verticalAlign: 'middle'}} />
 
       {dropdownOpen && (
-        <ul key="dropdown" className={styles.profileDropdown} style={tabVars}>
+        <ul key="dropdown" className={styles.profileDropdown}>
           {profiles.map((profile) => (
             <li
               key={profile.name}
@@ -63,7 +66,7 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
           ))}
         </ul>
       )}
-    </div>
+    </button>
   );
 };
 

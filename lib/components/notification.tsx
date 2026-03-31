@@ -136,4 +136,5 @@ const Notification = forwardRef(function Notification(
 
 Notification.displayName = 'Notification';
 
+export {styles};
 export default Notification;

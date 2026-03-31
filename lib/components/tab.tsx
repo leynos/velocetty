@@ -2,6 +2,8 @@
 import type React from 'react';
 import {forwardRef} from 'react';
 
+import clsx from 'clsx';
+
 import type {TabProps} from '../../typings/hyper';
 import styles from './tab.module.css';
 
@@ -28,14 +30,18 @@ const Tab = forwardRef(function Tab(props: TabProps, ref: React.ForwardedRef<HTM
     <li
       onClick={props.onClick}
       style={{borderColor}}
-      className={`${styles.tabTab} ${isFirst ? styles.tabFirst : ''} ${isActive ? styles.tabActive : ''} ${
-        isFirst && isActive ? styles.tabFirstActive : ''
-      } ${hasActivity ? styles.tabHasActivity : ''}`}
+      className={clsx(
+        styles.tabTab,
+        isFirst && styles.tabFirst,
+        isActive && styles.tabActive,
+        isFirst && isActive && styles.tabFirstActive,
+        hasActivity && styles.tabHasActivity
+      )}
       ref={ref}
     >
       {props.customChildrenBefore}
       <span
-        className={`${styles.tabText} ${isLast ? styles.tabTextLast : ''} ${isActive ? styles.tabTextActive : ''}`}
+        className={clsx(styles.tabText, isLast && styles.tabTextLast, isActive && styles.tabTextActive)}
         onClick={handleClick}
         onMouseUp={handleMouseUp}
       >

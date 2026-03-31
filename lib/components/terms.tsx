@@ -1,3 +1,5 @@
+/** @file Container component managing multiple terminal groups and sessions. */
+
 import React from 'react';
 
 import type {TermsProps, HyperDispatch} from '../../typings/hyper';

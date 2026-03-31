@@ -1,3 +1,4 @@
+/** @file Renders the header UI with window controls, hamburger menu, and Tabs composition. */
 import type React from 'react';
 import {forwardRef, useState} from 'react';
 
