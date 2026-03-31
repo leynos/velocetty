@@ -148,7 +148,7 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
             : `${results.resultIndex + 1} of ${results.resultCount}`}
       </span>
 
-      <div className="flex-row">
+      <div className={styles.flexRow}>
         <SearchButton
           onClick={() => prev(searchTermRef.current)}
           active={false}

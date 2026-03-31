@@ -115,7 +115,7 @@ const Notification = forwardRef(function Notification(
     <div
       ref={onElement}
       style={{opacity, backgroundColor, color}}
-      className={`${styles.notificationIndicator} notification_indicator`}
+      className={styles.notificationIndicator}
     >
       {props.customChildrenBefore}
       {props.children || props.text}
