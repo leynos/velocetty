@@ -212,6 +212,49 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
     hasPendingRestartChanges: false
   };
 
+  const applyLiveChangesIfEnabled = (
+    currentConfig: configOptions,
+    newConfig: configOptions,
+    liveChanges: ConfigReloadDiagnostic[],
+    autoApplyLive: boolean
+  ): void => {
+    if (!autoApplyLive || liveChanges.length === 0) return;
+    const liveConfig = extractLiveConfigChanges(currentConfig, newConfig, liveChanges);
+    applyLiveConfig(liveConfig);
+    warn('[reload-handler] Applied live-reloadable config changes:', {
+      keys: liveChanges.map((d) => d.path)
+    });
+    // Update last applied config with live changes
+    // Use shallow copy with explicit assignment to properly handle undefined values (key removals)
+    const nextAppliedConfig: Record<string, unknown> = {...currentConfig};
+    for (const key of Object.keys(liveConfig)) {
+      nextAppliedConfig[key] = (liveConfig as Record<string, unknown>)[key];
+    }
+    state = {
+      ...state,
+      lastAppliedConfig: nextAppliedConfig as configOptions
+    };
+  };
+
+  const updatePendingRestartState = (restartChanges: ConfigReloadDiagnostic[], emitWarnings: boolean): void => {
+    const pendingMap = new Map<string, ConfigReloadDiagnostic>();
+    for (const change of restartChanges) {
+      pendingMap.set(change.path, change);
+    }
+    state = {
+      ...state,
+      pendingRestartChanges: Array.from(pendingMap.values()),
+      hasPendingRestartChanges: pendingMap.size > 0
+    };
+    if (emitWarnings && restartChanges.length > 0) {
+      emitRestartWarning(restartChanges);
+      warn('[reload-handler] Queued restart-required config changes:', {
+        keys: restartChanges.map((d) => d.path),
+        pendingCount: pendingMap.size
+      });
+    }
+  };
+
   /**
    * Processes a configuration reload, classifying and routing changes.
    *
@@ -226,61 +269,11 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
     const opts = {...defaultDetectionOptions, ...options};
     const currentConfig = state.lastAppliedConfig;
 
-    // Detect all changes
     const allChanges = detectConfigChanges(currentConfig, newConfig);
     const {liveChanges, restartChanges} = partitionChanges(allChanges);
 
-    // Compute live config once for both application and state update
-    const liveConfig =
-      opts.autoApplyLive && liveChanges.length > 0
-        ? extractLiveConfigChanges(currentConfig, newConfig, liveChanges)
-        : ({} as Partial<configOptions>);
-
-    // Apply live changes if enabled
-    if (opts.autoApplyLive && liveChanges.length > 0) {
-      applyLiveConfig(liveConfig);
-
-      warn('[reload-handler] Applied live-reloadable config changes:', {
-        keys: liveChanges.map((d) => d.path)
-      });
-    }
-
-    // Always update pending restart state (even when not emitting warnings)
-    // Build pending set from current restartChanges only (clears stale entries)
-    const pendingMap = new Map<string, ConfigReloadDiagnostic>();
-    for (const change of restartChanges) {
-      pendingMap.set(change.path, change);
-    }
-
-    // Update state with current pending changes
-    state = {
-      ...state,
-      pendingRestartChanges: Array.from(pendingMap.values()),
-      hasPendingRestartChanges: pendingMap.size > 0
-    };
-
-    // Emit warnings only when enabled and there are changes
-    if (opts.emitWarnings && restartChanges.length > 0) {
-      emitRestartWarning(restartChanges);
-
-      warn('[reload-handler] Queued restart-required config changes:', {
-        keys: restartChanges.map((d) => d.path),
-        pendingCount: pendingMap.size
-      });
-    }
-
-    // Update last applied config with live changes
-    // Use shallow copy with explicit assignment to properly handle undefined values (key removals)
-    if (liveChanges.length > 0 && opts.autoApplyLive) {
-      const nextAppliedConfig: Record<string, unknown> = {...currentConfig};
-      for (const key of Object.keys(liveConfig)) {
-        nextAppliedConfig[key] = (liveConfig as Record<string, unknown>)[key];
-      }
-      state = {
-        ...state,
-        lastAppliedConfig: nextAppliedConfig as configOptions
-      };
-    }
+    applyLiveChangesIfEnabled(currentConfig, newConfig, liveChanges, opts.autoApplyLive);
+    updatePendingRestartState(restartChanges, opts.emitWarnings);
 
     return {
       success: true,
