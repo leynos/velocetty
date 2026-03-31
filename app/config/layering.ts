@@ -116,6 +116,13 @@ export const mergeLayers = (layers: ConfigLayer[]): configOptions => {
     result = deepMerge(result, layer.config);
   }
 
+  const required: (keyof configOptions)[] = ['defaultProfile', 'profiles'];
+  for (const key of required) {
+    if (!(key in result)) {
+      throw new Error(`Missing required config field: ${String(key)}`);
+    }
+  }
+
   return result as configOptions;
 };
 

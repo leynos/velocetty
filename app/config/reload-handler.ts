@@ -79,6 +79,11 @@ const truncateValue = (value: unknown, maxLength = 50): string => {
  */
 const requiresRestart = (key: string, scope: 'root' | 'profile' | 'keymap' | 'plugin'): boolean => {
   const entry = getReloadability(key, scope);
+  if (entry === undefined) {
+    console.debug(
+      `[reload-handler] Unknown config key "${key}" (scope: ${scope}) - using default restart-required classification`
+    );
+  }
   return entry?.classification === 'restart' || entry === undefined;
 };
 
@@ -91,6 +96,11 @@ const requiresRestart = (key: string, scope: 'root' | 'profile' | 'keymap' | 'pl
  */
 const isLiveReloadable = (key: string, scope: 'root' | 'profile' | 'keymap' | 'plugin'): boolean => {
   const entry = getReloadability(key, scope);
+  if (entry === undefined) {
+    console.debug(
+      `[reload-handler] Unknown config key "${key}" (scope: ${scope}) - using default restart-required classification`
+    );
+  }
   return entry?.classification === 'live';
 };
 
