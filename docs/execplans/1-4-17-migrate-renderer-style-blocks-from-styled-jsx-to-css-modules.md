@@ -196,7 +196,8 @@ The renderer is bundled by `build/esbuild/run-esbuild.ts`:
    `*.module.css`.
 3. Add a migration contract test in
    `test/unit/esbuild-migration-contracts.test.ts` that builds a fixture
-   importing `*.module.css` and asserts the output contains hashed class names.
+   importing `*.module.css` and asserts the output contains filename-prefixed
+   scoped class names produced by esbuild local-css (e.g., `fixture_searchBox`).
 4. Run `make build`, `make lint`, and `make test` to confirm the pipeline
    changes do not break existing code.
 
@@ -272,8 +273,8 @@ must return no matches.
 
 1. Update `test/unit/esbuild-migration-contracts.test.ts`:
    - Replace the styled-jsx bridge translation test with a CSS Module
-     bundling test that asserts `.module.css` imports produce hashed class
-     maps in the renderer bundle.
+     bundling test that asserts `.module.css` imports produce filename-prefixed
+     scoped class names (e.g., `fixture_searchBox`) in the renderer bundle.
    - Keep the `usesStyledJsx` detection test if the bridge plugin still
      exists, or rewrite it to assert the detection helper is removed in
      `1.4.18`.
