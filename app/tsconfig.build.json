@@ -2,7 +2,6 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "allowJs": false,
-    "baseUrl": ".",
     "declarationDir": "../dist/tmp/appdts/",
     "exactOptionalPropertyTypes": false,
     "module": "commonjs",
@@ -12,7 +11,7 @@
     "noUncheckedIndexedAccess": false,
     "outDir": "../dist/app",
     "paths": {
-      "@shared/*": ["../shared/src/*"]
+      "@shared/*": ["../dist/shared/*"]
     },
     "noImplicitAny": false,
     "useUnknownInCatchVariables": false,

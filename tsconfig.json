@@ -1,6 +1,12 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["shared/src/*"],
+      "@app/*": ["app/*"],
+      "@lib/*": ["lib/*"]
+    },
     "exactOptionalPropertyTypes": false,
     "noImplicitOverride": false,
     "outDir": "./dist/",

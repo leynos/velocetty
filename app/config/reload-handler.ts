@@ -9,7 +9,7 @@
  */
 
 import type {configOptions, ConfigReloadDiagnostic, ConfigReloadResult} from '@shared/types/config';
-import {type Reloadability, getKeyScope, getReloadability} from '../../shared/src/constants/config-reloadability';
+import {type Reloadability, getKeyScope, getReloadability} from '@shared/constants/config-reloadability';
 import {getChangedKeys, deepMerge} from './layering';
 
 /** Dependencies required by the reload handler. */
