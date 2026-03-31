@@ -9,8 +9,9 @@
  */
 
 import type {configOptions, ConfigReloadDiagnostic, ConfigReloadResult} from '@shared/types/config';
-import {type Reloadability, getKeyScope, getReloadability} from '@shared/constants/config-reloadability';
-import {getChangedKeys, deepMerge} from './layering';
+import type {Reloadability} from '@shared/constants/config-reloadability';
+import {getKeyScope, getReloadability} from '@shared/constants/config-reloadability';
+import {getChangedKeys} from './layering';
 
 /** Dependencies required by the reload handler. */
 export type ReloadHandlerDependencies = {
@@ -45,6 +46,24 @@ export type ReloadDetectionOptions = {
 const defaultDetectionOptions: ReloadDetectionOptions = {
   autoApplyLive: true,
   emitWarnings: true
+};
+
+/**
+ * Truncates a value for safe display in diagnostic messages.
+ * Prevents leaking secrets or flooding logs with large objects.
+ *
+ * @param value - The value to truncate.
+ * @param maxLength - Maximum length before truncation (default: 50).
+ * @returns Truncated string representation.
+ */
+const truncateValue = (value: unknown, maxLength = 50): string => {
+  if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
+  if (typeof value === 'string') {
+    return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+  }
+  const str = JSON.stringify(value);
+  return str.length > maxLength ? `${str.slice(0, maxLength)}...` : str;
 };
 
 /**
@@ -94,7 +113,7 @@ export const classifyConfigChange = (key: string, oldValue: unknown, newValue: u
   }
 
   const classification = entry.classification;
-  const changeDescription = `${key}: ${JSON.stringify(oldValue)} → ${JSON.stringify(newValue)}`;
+  const changeDescription = `${key}: ${truncateValue(oldValue)} → ${truncateValue(newValue)}`;
 
   if (classification === 'live') {
     return {
@@ -211,9 +230,14 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
     const allChanges = detectConfigChanges(currentConfig, newConfig);
     const {liveChanges, restartChanges} = partitionChanges(allChanges);
 
+    // Compute live config once for both application and state update
+    const liveConfig =
+      opts.autoApplyLive && liveChanges.length > 0
+        ? extractLiveConfigChanges(currentConfig, newConfig, liveChanges)
+        : ({} as Partial<configOptions>);
+
     // Apply live changes if enabled
     if (opts.autoApplyLive && liveChanges.length > 0) {
-      const liveConfig = extractLiveConfigChanges(currentConfig, newConfig, liveChanges);
       applyLiveConfig(liveConfig);
 
       warn('[reload-handler] Applied live-reloadable config changes:', {
@@ -246,10 +270,15 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
     }
 
     // Update last applied config with live changes
+    // Use shallow copy with explicit assignment to properly handle undefined values (key removals)
     if (liveChanges.length > 0 && opts.autoApplyLive) {
+      const nextAppliedConfig: Record<string, unknown> = {...currentConfig};
+      for (const key of Object.keys(liveConfig)) {
+        nextAppliedConfig[key] = (liveConfig as Record<string, unknown>)[key];
+      }
       state = {
         ...state,
-        lastAppliedConfig: deepMerge(currentConfig, extractLiveConfigChanges(currentConfig, newConfig, liveChanges))
+        lastAppliedConfig: nextAppliedConfig as configOptions
       };
     }
 
