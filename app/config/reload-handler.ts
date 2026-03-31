@@ -10,7 +10,7 @@
 
 import type {configOptions, ConfigReloadDiagnostic, ConfigReloadResult} from '@shared/types/config';
 import {type Reloadability, getKeyScope, getReloadability} from '../../shared/src/constants/config-reloadability';
-import {getChangedKeys} from './layering';
+import {getChangedKeys, deepMerge} from './layering';
 
 /** Dependencies required by the reload handler. */
 export type ReloadHandlerDependencies = {
@@ -51,10 +51,10 @@ const defaultDetectionOptions: ReloadDetectionOptions = {
  * Checks if a config key requires restart when changed.
  *
  * @param key - The configuration key to check.
- * @param scope - The scope of the config key ('root' or 'profile').
+ * @param scope - The scope of the config key.
  * @returns True if the setting requires restart, false if live-reloadable.
  */
-const requiresRestart = (key: string, scope: 'root' | 'profile'): boolean => {
+const requiresRestart = (key: string, scope: 'root' | 'profile' | 'keymap' | 'plugin'): boolean => {
   const entry = getReloadability(key, scope);
   return entry?.classification === 'restart' || entry === undefined;
 };
@@ -63,10 +63,10 @@ const requiresRestart = (key: string, scope: 'root' | 'profile'): boolean => {
  * Checks if a config key can be live-reloaded.
  *
  * @param key - The configuration key to check.
- * @param scope - The scope of the config key ('root' or 'profile').
+ * @param scope - The scope of the config key.
  * @returns True if the setting is live-reloadable, false if restart is required.
  */
-const isLiveReloadable = (key: string, scope: 'root' | 'profile'): boolean => {
+const isLiveReloadable = (key: string, scope: 'root' | 'profile' | 'keymap' | 'plugin'): boolean => {
   const entry = getReloadability(key, scope);
   return entry?.classification === 'live';
 };
@@ -247,17 +247,17 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
     }
 
     // Update last applied config with live changes
-    if (liveChanges.length > 0) {
+    if (liveChanges.length > 0 && opts.autoApplyLive) {
       state = {
         ...state,
-        lastAppliedConfig: {...currentConfig, ...extractLiveConfigChanges(currentConfig, newConfig, liveChanges)}
+        lastAppliedConfig: deepMerge(currentConfig, extractLiveConfigChanges(currentConfig, newConfig, liveChanges))
       };
     }
 
     return {
       success: true,
       config: newConfig,
-      appliedLive: liveChanges.map((d) => d.path),
+      appliedLive: opts.autoApplyLive ? liveChanges.map((d) => d.path) : [],
       restartRequired: restartChanges,
       validationErrors: []
     };

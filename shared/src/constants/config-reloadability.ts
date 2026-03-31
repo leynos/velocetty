@@ -346,13 +346,32 @@ export const ROOT_KEYS = new Set([
 ]);
 
 /**
+ * Set of plugin-related configuration keys.
+ */
+const PLUGIN_KEYS = new Set(['plugins', 'localPlugins']);
+
+/**
+ * Set of keymap-related configuration keys.
+ */
+const KEYMAP_KEYS = new Set(['keymap']);
+
+/**
  * Determines the scope of a configuration key.
  *
  * @param key - The configuration key.
- * @returns 'root' if it's a root-level key, 'profile' otherwise.
+ * @returns The scope classification: 'root', 'profile', 'plugin', or 'keymap'.
  */
-export const getKeyScope = (key: string): 'root' | 'profile' => {
-  return ROOT_KEYS.has(key) ? 'root' : 'profile';
+export const getKeyScope = (key: string): ConfigScope => {
+  if (ROOT_KEYS.has(key)) {
+    return 'root';
+  }
+  if (PLUGIN_KEYS.has(key)) {
+    return 'plugin';
+  }
+  if (KEYMAP_KEYS.has(key)) {
+    return 'keymap';
+  }
+  return 'profile';
 };
 
 /**
