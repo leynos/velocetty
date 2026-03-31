@@ -2,12 +2,12 @@
   --scrollbar-thumb: transparent;
 }
 
-.host :global(::-webkit-scrollbar) {
+:global(::-webkit-scrollbar) {
   width: 5px;
 }
 
-.host :global(::-webkit-scrollbar-thumb),
-.host :global(::-webkit-scrollbar-thumb:window-inactive) {
+:global(::-webkit-scrollbar-thumb),
+:global(::-webkit-scrollbar-thumb:window-inactive) {
   border-radius: 10px;
   background: var(--scrollbar-thumb);
 }
