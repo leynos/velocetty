@@ -11,7 +11,7 @@
 import type {configOptions, ConfigReloadDiagnostic, ConfigReloadResult} from '@shared/types/config';
 import type {Reloadability} from '@shared/constants/config-reloadability';
 import {getKeyScope, getReloadability} from '@shared/constants/config-reloadability';
-import {getChangedKeys} from './layering';
+import {getChangedKeys, deepMerge} from './layering';
 
 /** Dependencies required by the reload handler. */
 export type ReloadHandlerDependencies = {
@@ -224,15 +224,9 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
     warn('[reload-handler] Applied live-reloadable config changes:', {
       keys: liveChanges.map((d) => d.path)
     });
-    // Update last applied config with live changes
-    // Use shallow copy with explicit assignment to properly handle undefined values (key removals)
-    const nextAppliedConfig: Record<string, unknown> = {...currentConfig};
-    for (const key of Object.keys(liveConfig)) {
-      nextAppliedConfig[key] = (liveConfig as Record<string, unknown>)[key];
-    }
     state = {
       ...state,
-      lastAppliedConfig: nextAppliedConfig as configOptions
+      lastAppliedConfig: deepMerge(currentConfig, liveConfig)
     };
   };
 
