@@ -3,15 +3,14 @@
  * Provides utilities for determining if config changes require restart
  * and tracking pending restart-required changes.
  */
-import {useCallback, useMemo} from 'react';
-
 import {
   keyRequiresRestart,
   keyIsLiveReloadable,
   getKeyReloadClassification,
   getReloadability,
+  getKeyScope,
   type Reloadability
-} from '../../shared/src/constants/config-reloadability';
+} from '@shared/constants/config-reloadability';
 
 /** Options for useConfigReloadability hook. */
 export type UseConfigReloadabilityOptions = {
@@ -35,10 +34,68 @@ export type UseConfigReloadabilityReturn = {
   getClassification: (key: string) => Reloadability | undefined;
   /** Function to get full reloadability entry with rationale. */
   getReloadabilityEntry: (key: string) => {classification: Reloadability; rationale: string} | undefined;
-  /** Function to filter keys by classification. */
+  /** Function to filter keys by classification (includes unknown keys when classification is 'restart'). */
   filterKeysByClassification: (keys: string[], classification: Reloadability) => string[];
-  /** Function to partition keys by reloadability. */
+  /** Function to partition keys by reloadability (unknown keys default to restart). */
   partitionKeys: (keys: string[]) => {live: string[]; restart: string[]};
+};
+
+/**
+ * Gets the full reloadability entry for a config key.
+ *
+ * @param key - The configuration key.
+ * @returns The reloadability entry with classification and rationale, or undefined.
+ */
+export const getReloadabilityEntry = (key: string): {classification: Reloadability; rationale: string} | undefined => {
+  const scope = getKeyScope(key);
+  const entry = getReloadability(key, scope);
+  return entry ? {classification: entry.classification, rationale: entry.rationale} : undefined;
+};
+
+/**
+ * Filters keys by their reloadability classification.
+ *
+ * Note: When filtering for 'restart', unknown keys are included (safety default).
+ * When filtering for 'live', only known live-reloadable keys are returned.
+ *
+ * @param keys - Array of configuration keys to filter.
+ * @param classification - The classification to filter by ('live' or 'restart').
+ * @returns Array of keys matching the classification.
+ */
+export const filterKeysByClassification = (keys: string[], classification: Reloadability): string[] => {
+  return keys.filter((key) => {
+    const keyClassification = getKeyReloadClassification(key);
+    if (classification === 'restart') {
+      // Include both explicitly restart-classified keys AND unknown keys (safety default)
+      return keyClassification === 'restart' || keyClassification === undefined;
+    }
+    return keyClassification === classification;
+  });
+};
+
+/**
+ * Partitions keys into live-reloadable and restart-required categories.
+ *
+ * Unknown keys default to restart-required for safety.
+ *
+ * @param keys - Array of configuration keys to partition.
+ * @returns Object with live and restart arrays.
+ */
+export const partitionKeys = (keys: string[]): {live: string[]; restart: string[]} => {
+  const live: string[] = [];
+  const restart: string[] = [];
+
+  for (const key of keys) {
+    const classification = getKeyReloadClassification(key);
+    if (classification === 'live') {
+      live.push(key);
+    } else {
+      // Unknown keys (undefined) default to restart for safety
+      restart.push(key);
+    }
+  }
+
+  return {live, restart};
 };
 
 /**
@@ -87,84 +144,21 @@ export type UseConfigReloadabilityReturn = {
 export const useConfigReloadability = (options: UseConfigReloadabilityOptions = {}): UseConfigReloadabilityReturn => {
   const {configKey} = options;
 
-  // Memoized values for the specified key
-  const requiresRestartValue = useMemo(() => {
-    return configKey ? keyRequiresRestart(configKey) : false;
-  }, [configKey]);
-
-  const isLiveReloadableValue = useMemo(() => {
-    return configKey ? keyIsLiveReloadable(configKey) : false;
-  }, [configKey]);
-
-  const classificationValue = useMemo(() => {
-    return configKey ? getKeyReloadClassification(configKey) : undefined;
-  }, [configKey]);
-
-  // Utility functions that work with any key
-  const checkRequiresRestart = useCallback((key: string): boolean => {
-    return keyRequiresRestart(key);
-  }, []);
-
-  const checkIsLiveReloadable = useCallback((key: string): boolean => {
-    return keyIsLiveReloadable(key);
-  }, []);
-
-  const getClassification = useCallback((key: string): Reloadability | undefined => {
-    return getKeyReloadClassification(key);
-  }, []);
-
-  const getReloadabilityEntry = useCallback(
-    (key: string): {classification: Reloadability; rationale: string} | undefined => {
-      const scope = isRootKey(key) ? 'root' : 'profile';
-      const entry = getReloadability(key, scope);
-      return entry ? {classification: entry.classification, rationale: entry.rationale} : undefined;
-    },
-    []
-  );
-
-  const filterKeysByClassification = useCallback((keys: string[], classification: Reloadability): string[] => {
-    return keys.filter((key) => getKeyReloadClassification(key) === classification);
-  }, []);
-
-  const partitionKeys = useCallback((keys: string[]): {live: string[]; restart: string[]} => {
-    const live: string[] = [];
-    const restart: string[] = [];
-
-    for (const key of keys) {
-      const classification = getKeyReloadClassification(key);
-      if (classification === 'live') {
-        live.push(key);
-      } else {
-        // Unknown keys default to restart for safety
-        restart.push(key);
-      }
-    }
-
-    return {live, restart};
-  }, []);
+  // Simple derived values - no memoization needed for cheap pure functions
+  const requiresRestart = !!(configKey && keyRequiresRestart(configKey));
+  const isLiveReloadable = !!(configKey && keyIsLiveReloadable(configKey));
+  const classification = configKey ? getKeyReloadClassification(configKey) : undefined;
 
   return {
-    requiresRestart: requiresRestartValue,
-    isLiveReloadable: isLiveReloadableValue,
-    classification: classificationValue,
-    checkRequiresRestart,
-    checkIsLiveReloadable,
-    getClassification,
+    requiresRestart,
+    isLiveReloadable,
+    classification,
+    // Direct function references - no useCallback needed
+    checkRequiresRestart: keyRequiresRestart,
+    checkIsLiveReloadable: keyIsLiveReloadable,
+    getClassification: getKeyReloadClassification,
     getReloadabilityEntry,
     filterKeysByClassification,
     partitionKeys
   };
-};
-
-/** Set of root-level configuration keys. */
-const ROOT_KEYS = new Set(['autoUpdatePlugins', 'defaultSSHApp', 'disableAutoUpdates', 'updateChannel', 'useConpty']);
-
-/**
- * Checks if a configuration key is a root-level key.
- *
- * @param key - The configuration key to check.
- * @returns True if the key is a root-level key.
- */
-const isRootKey = (key: string): boolean => {
-  return ROOT_KEYS.has(key);
 };

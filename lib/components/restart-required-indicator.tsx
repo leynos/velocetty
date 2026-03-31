@@ -7,7 +7,7 @@
 // biome-ignore lint/style/useImportType: React value is required for the current JSX runtime.
 import React, {useMemo} from 'react';
 
-import {keyRequiresRestart, getKeyReloadClassification} from '../../shared/src/constants/config-reloadability';
+import {keyRequiresRestart, getKeyReloadClassification} from '@shared/constants/config-reloadability';
 
 /** Props for the RestartRequiredIndicator component. */
 export type RestartRequiredIndicatorProps = {

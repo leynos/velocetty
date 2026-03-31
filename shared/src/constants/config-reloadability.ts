@@ -270,10 +270,7 @@ export const pluginReloadability: ConfigReloadabilityRegistry = {
  * // { classification: 'live', rationale: 'Font setting...' }
  * ```
  */
-export const getReloadability = (
-  key: string,
-  scope: 'root' | 'profile' | 'keymap' | 'plugin'
-): ReloadabilityEntry | undefined => {
+export const getReloadability = (key: string, scope: ConfigScope): ReloadabilityEntry | undefined => {
   switch (scope) {
     case 'root':
       return rootConfigReloadability[key];
@@ -295,7 +292,7 @@ export const getReloadability = (
  * @param scope - The scope of the config key ('root', 'profile', or 'keymap').
  * @returns True if the setting requires restart, false if live-reloadable.
  */
-export const requiresRestart = (key: string, scope: 'root' | 'profile' | 'keymap' | 'plugin'): boolean => {
+export const requiresRestart = (key: string, scope: ConfigScope): boolean => {
   const entry = getReloadability(key, scope);
   // Default to restart-required for safety when classification is unknown
   return entry?.classification === 'restart' || entry === undefined;
@@ -308,7 +305,7 @@ export const requiresRestart = (key: string, scope: 'root' | 'profile' | 'keymap
  * @param scope - The scope of the config key ('root', 'profile', or 'keymap').
  * @returns True if the setting is live-reloadable, false if restart is required.
  */
-export const isLiveReloadable = (key: string, scope: 'root' | 'profile' | 'keymap' | 'plugin'): boolean => {
+export const isLiveReloadable = (key: string, scope: ConfigScope): boolean => {
   const entry = getReloadability(key, scope);
   return entry?.classification === 'live';
 };
@@ -319,7 +316,7 @@ export const isLiveReloadable = (key: string, scope: 'root' | 'profile' | 'keyma
  * @param scope - The scope to enumerate.
  * @returns Array of config keys in that scope.
  */
-export const getConfigKeys = (scope: 'root' | 'profile' | 'keymap' | 'plugin'): string[] => {
+export const getConfigKeys = (scope: ConfigScope): string[] => {
   switch (scope) {
     case 'root':
       return Object.keys(rootConfigReloadability);
@@ -334,10 +331,19 @@ export const getConfigKeys = (scope: 'root' | 'profile' | 'keymap' | 'plugin'): 
   }
 };
 
+/** Configuration key scope types. */
+export type ConfigScope = 'root' | 'profile' | 'keymap' | 'plugin';
+
 /**
  * Set of root-level configuration keys for automatic scope detection.
  */
-const ROOT_KEYS = new Set(['autoUpdatePlugins', 'defaultSSHApp', 'disableAutoUpdates', 'updateChannel', 'useConpty']);
+export const ROOT_KEYS = new Set([
+  'autoUpdatePlugins',
+  'defaultSSHApp',
+  'disableAutoUpdates',
+  'updateChannel',
+  'useConpty'
+]);
 
 /**
  * Determines the scope of a configuration key.
@@ -345,7 +351,7 @@ const ROOT_KEYS = new Set(['autoUpdatePlugins', 'defaultSSHApp', 'disableAutoUpd
  * @param key - The configuration key.
  * @returns 'root' if it's a root-level key, 'profile' otherwise.
  */
-const getKeyScope = (key: string): 'root' | 'profile' => {
+export const getKeyScope = (key: string): 'root' | 'profile' => {
   return ROOT_KEYS.has(key) ? 'root' : 'profile';
 };
 

@@ -207,9 +207,9 @@ Classification guidelines:
 
 | Live-reloadable | Restart-required |
 |-----------------|------------------|
-| Theme/UI appearance (colors, padding) | Backend transport (shell, shellArgs) |
+| Theme/UI appearance (colours, padding) | Backend transport (shell, shellArgs) |
 | Font settings (family, size, weight) | Update channel / auto-update settings |
-| Cursor appearance (shape, blink, color) | Environment variables (env) |
+| Cursor appearance (shape, blink, colour) | Environment variables (env) |
 | Keybindings | WebGL renderer (deferred to CONFIG-001) |
 | Custom CSS (css, termCSS) | Process-level configuration |
 

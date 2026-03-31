@@ -40,7 +40,8 @@ const defaultMergeOptions: DeepMergeOptions = {
  * - Nested objects are recursively merged
  * - Arrays are replaced entirely (not merged)
  * - Primitive values are replaced
- * - null/undefined in source does not overwrite target (allows defaults to persist)
+ * - undefined in source does not overwrite target (allows defaults to persist)
+ * - null in source overwrites target (explicit null is a deliberate reset)
  *
  * @param target - The base object (lower precedence).
  * @param source - The override object (higher precedence).
@@ -154,7 +155,7 @@ export const resolveConfigLayers = (
  * like plugins, localPlugins, and keymaps.
  *
  * @param raw - The raw configuration payload.
- * @returns The configOptions portion, or empty object if none.
+ * @returns The configOptions portion, or null if none.
  */
 export const extractConfigOptions = (raw: rawConfig): Partial<configOptions> | null => {
   return raw.config ?? null;
