@@ -94,7 +94,7 @@ describe('config-reloadability', () => {
 
       for (const key of expectedPluginKeys) {
         expect(pluginReloadability[key]).toBeDefined();
-        expect(pluginReloadability[key].classification).toMatch(/^(live|restart)$/);
+        expect(pluginReloadability[key].classification).toBe('live');
         expect(pluginReloadability[key].rationale.length).toBeGreaterThan(0);
       }
     });

@@ -65,12 +65,12 @@ keybindings layering tracked by `3.2.1` or plugin settings storage tracked by
 - Interface: if public config contracts outside 3.1.2 must change, stop and
   escalate.
 - Ambiguity: if reloadable versus non-reloadable classification cannot be
-  determined for a setting using design document guidance, stop and request
+  determined for a setting using design document guidance, stop, and request
   explicit direction.
 - Dependency: if a new external dependency is required for hot-reload
   implementation, stop and escalate first.
-- Iteration: if any one failing gate repeats 3 times without progress, stop and
-  record blocker state.
+- Iteration: if any one failing gate repeats 3 times without progress, stop,
+  and record blocker state.
 - Evidence: if any required gate exits non-zero or is interrupted, keep status
   partial and do not mark roadmap item done.
 
@@ -276,8 +276,8 @@ bun test --max-concurrency=1 test/unit/config-reloadability.test.ts 2>&1 | tee "
 - Add diff detection comparing old versus new config.
 - Route changes through live-apply or warning-queue paths.
 - Target files:
-  - `app/config/reload-handler.ts` (new file)
-  - Redux reducer handling `CONFIG_RELOAD`
+  - `app/config/reload-handler.ts` (new file).
+  - Redux reducer handling `CONFIG_RELOAD`.
 
 7. Add hot-reload detection tests:
 
@@ -293,7 +293,7 @@ bun test --max-concurrency=1 test/unit/config-reloadability.test.ts 2>&1 | tee "
 - Update settings UI components to consume reloadability metadata.
 - Add restart-required indicators (icons, labels, inline warnings).
 - Target files:
-  - Settings UI components in `lib/components/` or `frontend/`
+  - Settings UI components in `lib/components/` or `frontend/`.
 
 10. Update developer guidance:
 
@@ -393,9 +393,9 @@ Expected evidence artifacts:
 - `/tmp/check-fmt-<project>-<branch>.out`
 - `/tmp/lint-<project>-<branch>.out`
 - `/tmp/test-<project>-<branch>.out`
-- Optional docs logs:
+- Optional documentation logs:
   `/tmp/markdownlint-<project>-<branch>.out` and
-  `/tmp/nixie-<project>-<branch>.out`
+  `/tmp/nixie-<project>-<branch>.out`.
 
 Classification reference from design document (`velocetty-design.md`):
 

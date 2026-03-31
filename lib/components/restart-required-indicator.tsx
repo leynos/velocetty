@@ -88,7 +88,7 @@ export type InlineRestartWarningProps = {
  * <InlineRestartWarning configKey="shell" show={hasChanged} />
  * ```
  */
-export const InlineRestartWarning: React.FC<InlineRestartWarningProps> = ({configKey, show = true, message}) => {
+export const InlineRestartWarning: React.FC<InlineRestartWarningProps> = ({configKey, show = false, message}) => {
   const classification = useMemo(() => getKeyReloadClassification(configKey), [configKey]);
 
   if (!show || classification !== 'restart') {
@@ -136,6 +136,25 @@ export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({hasPendingC
     return null;
   }
 
+  const content = (
+    <>
+      <span className="badge-icon">⟳</span>
+      <span className="badge-text">
+        Restart required
+        {pendingCount !== undefined && pendingCount > 0 && ` (${pendingCount})`}
+      </span>
+    </>
+  );
+
+  // Render as non-interactive element when no onClick handler provided
+  if (!onClick) {
+    return (
+      <output className="config-reload-badge" aria-label="Configuration changes require restart">
+        {content}
+      </output>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -143,11 +162,7 @@ export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({hasPendingC
       onClick={onClick}
       title="Configuration changes require restart"
     >
-      <span className="badge-icon">⟳</span>
-      <span className="badge-text">
-        Restart required
-        {pendingCount !== undefined && pendingCount > 0 && ` (${pendingCount})`}
-      </span>
+      {content}
       <style jsx={true}>{`
         .config-reload-badge {
           display: inline-flex;

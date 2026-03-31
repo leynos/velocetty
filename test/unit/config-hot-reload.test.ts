@@ -304,8 +304,9 @@ describe('config-hot-reload', () => {
 
       handler.processReload({shell: '/bin/zsh'} as configOptions, {emitWarnings: false});
 
+      // Warnings should not be emitted, but restart state should still be tracked
       expect(warnings.length).toBe(0);
-      expect(handler.isRestartRequired()).toBe(false);
+      expect(handler.isRestartRequired()).toBe(true);
     });
 
     it('should clear pending changes on clearPendingChanges call', () => {

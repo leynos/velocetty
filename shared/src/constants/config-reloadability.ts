@@ -10,14 +10,15 @@
  * - Restart required: backend transport settings, update channel, process-level
  *   configuration, WebGL renderer (deferred to CONFIG-001)
  */
+import type {ConfigReloadClassification} from '../types/config';
 
-/** Classification values for configuration reloadability. */
-export type Reloadability = 'live' | 'restart';
+/** Re-export for convenience. */
+export type Reloadability = ConfigReloadClassification;
 
 /** Entry in the reloadability registry with classification and rationale. */
 export type ReloadabilityEntry = {
   /** The reload capability classification for this setting. */
-  readonly classification: Reloadability;
+  readonly classification: ConfigReloadClassification;
   /** Human-readable explanation of why this classification was chosen. */
   readonly rationale: string;
 };
@@ -38,6 +39,10 @@ export const rootConfigReloadability: ConfigReloadabilityRegistry = {
     classification: 'restart',
     rationale: 'Affects background plugin update scheduling; requires process-level timer reconfiguration'
   },
+  defaultProfile: {
+    classification: 'live',
+    rationale: 'Default profile selection; affects next session creation'
+  },
   defaultSSHApp: {
     classification: 'restart',
     rationale: 'Affects OS protocol handler registration; requires process-level changes'
@@ -45,6 +50,10 @@ export const rootConfigReloadability: ConfigReloadabilityRegistry = {
   disableAutoUpdates: {
     classification: 'restart',
     rationale: 'Affects update check scheduling; requires process-level timer reconfiguration'
+  },
+  profiles: {
+    classification: 'live',
+    rationale: 'Available profile configurations; can be updated for subsequent sessions'
   },
   updateChannel: {
     classification: 'restart',
@@ -336,14 +345,9 @@ export type ConfigScope = 'root' | 'profile' | 'keymap' | 'plugin';
 
 /**
  * Set of root-level configuration keys for automatic scope detection.
+ * Derived from rootConfigReloadability to maintain single source of truth.
  */
-export const ROOT_KEYS = new Set([
-  'autoUpdatePlugins',
-  'defaultSSHApp',
-  'disableAutoUpdates',
-  'updateChannel',
-  'useConpty'
-]);
+export const ROOT_KEYS = new Set(Object.keys(rootConfigReloadability));
 
 /**
  * Set of plugin-related configuration keys.

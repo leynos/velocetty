@@ -65,7 +65,7 @@ describe('config-reloadability-ui', () => {
 
   describe('classification coverage', () => {
     it('should classify all profile config keys', () => {
-      const profileKeys = ['backgroundColor', 'bell', 'cursorBlink', 'fontSize', 'shell', 'updateChannel'];
+      const profileKeys = ['backgroundColor', 'bell', 'cursorBlink', 'fontSize', 'shell'];
 
       for (const key of profileKeys) {
         const classification = getKeyReloadClassification(key);

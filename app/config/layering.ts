@@ -108,7 +108,7 @@ export const deepMerge = <T extends Record<string, unknown>>(
  * // {fontSize: 14, colors: {red: '#ff0000', blue: '#0000ff'}}
  * ```
  */
-export const mergeLayers = (layers: ConfigLayer[]): configOptions => {
+export const mergeLayers = (layers: ConfigLayer[]): Partial<configOptions> => {
   // Start with empty object and merge each layer in sequence
   let result = {} as Record<string, unknown>;
 
@@ -116,7 +116,7 @@ export const mergeLayers = (layers: ConfigLayer[]): configOptions => {
     result = deepMerge(result, layer.config);
   }
 
-  return result as configOptions;
+  return result as Partial<configOptions>;
 };
 
 /**

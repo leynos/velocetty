@@ -166,14 +166,12 @@ export const extractLiveConfigChanges = (
   newConfig: configOptions,
   liveDiagnostics: ConfigReloadDiagnostic[]
 ): Partial<configOptions> => {
-  const liveKeys = new Set(liveDiagnostics.map((d) => d.path));
   const result: Record<string, unknown> = {};
 
-  for (const key of liveKeys) {
-    const newValue = (newConfig as Record<string, unknown>)[key];
-    if (newValue !== undefined) {
-      result[key] = newValue;
-    }
+  // Iterate live diagnostics and extract values from newConfig
+  // Including undefined values to properly handle key removals
+  for (const {path: key} of liveDiagnostics) {
+    result[key] = (newConfig as Record<string, unknown>)[key];
   }
 
   return result as Partial<configOptions>;
@@ -223,10 +221,8 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
       });
     }
 
-    // Emit warnings for restart-required changes
-    if (opts.emitWarnings && restartChanges.length > 0) {
-      emitRestartWarning(restartChanges);
-
+    // Always update pending restart state (even when not emitting warnings)
+    if (restartChanges.length > 0) {
       // Deduplicate pending changes by key path (newer changes overwrite older ones)
       const pendingMap = new Map(state.pendingRestartChanges.map((d) => [d.path, d]));
       for (const change of restartChanges) {
@@ -240,10 +236,15 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
         hasPendingRestartChanges: true
       };
 
-      warn('[reload-handler] Queued restart-required config changes:', {
-        keys: restartChanges.map((d) => d.path),
-        pendingCount: pendingMap.size
-      });
+      // Emit warnings only when enabled
+      if (opts.emitWarnings) {
+        emitRestartWarning(restartChanges);
+
+        warn('[reload-handler] Queued restart-required config changes:', {
+          keys: restartChanges.map((d) => d.path),
+          pendingCount: pendingMap.size
+        });
+      }
     }
 
     // Update last applied config with live changes

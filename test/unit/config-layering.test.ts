@@ -228,7 +228,8 @@ describe('config-layering', () => {
       const raw = {
         plugins: [],
         localPlugins: [],
-        keymaps: {}
+        keymaps: {},
+        config: undefined
       };
       const result = extractConfigOptions(raw);
 
