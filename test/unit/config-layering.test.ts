@@ -335,13 +335,33 @@ describe('config-layering', () => {
       expect(configValueDiffers(left, right, 'nested')).toBe(true);
     });
 
-    it('should use strict equality for arrays', () => {
+    it('should compare arrays by value, not reference', () => {
       const left = {arr: [1, 2, 3]};
       const right = {arr: [1, 2, 3]};
 
-      // Arrays are compared by reference, not deep equality
-      expect(configValueDiffers(left, right, 'arr')).toBe(true);
+      // Arrays with same values should be equal (compared by value)
+      expect(configValueDiffers(left, right, 'arr')).toBe(false);
       expect(configValueDiffers(left, left, 'arr')).toBe(false);
+
+      // Different array values should be detected
+      const different = {arr: [1, 2, 4]};
+      expect(configValueDiffers(left, different, 'arr')).toBe(true);
+
+      // Different lengths should be detected
+      const shorter = {arr: [1, 2]};
+      expect(configValueDiffers(left, shorter, 'arr')).toBe(true);
+    });
+
+    it('should handle nested arrays in objects', () => {
+      const left = {config: {shellArgs: ['--login', '-i']}};
+      const right = {config: {shellArgs: ['--login', '-i']}};
+
+      // Nested arrays with same values should be equal
+      expect(configValueDiffers(left, right, 'config')).toBe(false);
+
+      // Different nested array values should be detected
+      const different = {config: {shellArgs: ['--login']}};
+      expect(configValueDiffers(left, different, 'config')).toBe(true);
     });
   });
 

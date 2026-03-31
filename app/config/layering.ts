@@ -194,9 +194,77 @@ export const createRuntimeOverrideLayer = (overrides: Partial<configOptions>): C
 });
 
 /**
+ * Checks if a value is an array.
+ *
+ * @param value - The value to check.
+ * @returns True if the value is an array.
+ */
+const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
+
+/**
+ * Deeply compares two values for equality.
+ *
+ * - Objects: recursively compare all properties
+ * - Arrays: compare elements by value (not by reference)
+ * - Primitives: use strict equality
+ *
+ * @param left - The first value.
+ * @param right - The second value.
+ * @returns True if the values are deeply equal.
+ */
+const deepEqual = (left: unknown, right: unknown): boolean => {
+  // Handle reference equality and primitives
+  if (left === right) {
+    return true;
+  }
+
+  // Handle null/undefined
+  if (left === null || right === null) {
+    return left === right;
+  }
+  if (left === undefined || right === undefined) {
+    return left === right;
+  }
+
+  // Handle arrays - compare by value, not reference
+  if (isArray(left) && isArray(right)) {
+    if (left.length !== right.length) {
+      return false;
+    }
+    for (let i = 0; i < left.length; i++) {
+      if (!deepEqual(left[i], right[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Handle plain objects
+  if (isRecord(left) && isRecord(right)) {
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+
+    if (leftKeys.length !== rightKeys.length) {
+      return false;
+    }
+
+    for (const key of leftKeys) {
+      if (!Object.hasOwn(right, key) || !deepEqual(left[key], right[key])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  // Different types or non-equal primitives
+  return false;
+};
+
+/**
  * Checks if a configuration value differs between two config objects.
  *
- * Performs deep comparison for objects, strict equality for primitives.
+ * Performs deep comparison for objects and arrays, strict equality for primitives.
  *
  * @param left - The first configuration object.
  * @param right - The second configuration object.
@@ -215,26 +283,7 @@ export const configValueDiffers = <T extends Record<string, unknown>>(left: T, r
     return true;
   }
 
-  // Deep comparison for objects (not arrays)
-  if (isRecord(leftValue) && isRecord(rightValue)) {
-    const leftKeys = Object.keys(leftValue);
-    const rightKeys = Object.keys(rightValue);
-
-    if (leftKeys.length !== rightKeys.length) {
-      return true;
-    }
-
-    for (const nestedKey of leftKeys) {
-      if (configValueDiffers(leftValue, rightValue, nestedKey)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  // For arrays and primitives, use strict equality
-  return leftValue !== rightValue;
+  return !deepEqual(leftValue, rightValue);
 };
 
 /**
