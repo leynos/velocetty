@@ -108,7 +108,7 @@ export const deepMerge = <T extends Record<string, unknown>>(
  * // {fontSize: 14, colors: {red: '#ff0000', blue: '#0000ff'}}
  * ```
  */
-export const mergeLayers = (layers: ConfigLayer[]): Partial<configOptions> => {
+export const mergeLayers = (layers: ConfigLayer[]): configOptions => {
   // Start with empty object and merge each layer in sequence
   let result = {} as Record<string, unknown>;
 
@@ -116,7 +116,7 @@ export const mergeLayers = (layers: ConfigLayer[]): Partial<configOptions> => {
     result = deepMerge(result, layer.config);
   }
 
-  return result as Partial<configOptions>;
+  return result as configOptions;
 };
 
 /**
@@ -213,53 +213,33 @@ const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
  * @returns True if the values are deeply equal.
  */
 const deepEqual = (left: unknown, right: unknown): boolean => {
-  // Handle reference equality and primitives
-  if (left === right) {
-    return true;
-  }
-
-  // Handle null/undefined
-  if (left === null || right === null) {
-    return left === right;
-  }
-  if (left === undefined || right === undefined) {
-    return left === right;
-  }
-
-  // Handle arrays - compare by value, not reference
-  if (isArray(left) && isArray(right)) {
-    if (left.length !== right.length) {
-      return false;
-    }
-    for (let i = 0; i < left.length; i++) {
-      if (!deepEqual(left[i], right[i])) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  // Handle plain objects
-  if (isRecord(left) && isRecord(right)) {
-    const leftKeys = Object.keys(left);
-    const rightKeys = Object.keys(right);
-
-    if (leftKeys.length !== rightKeys.length) {
-      return false;
-    }
-
-    for (const key of leftKeys) {
-      if (!Object.hasOwn(right, key) || !deepEqual(left[key], right[key])) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  // Different types or non-equal primitives
+  if (left === right) return true;
+  if (left == null || right == null) return left === right;
+  if (isArray(left) && isArray(right)) return arraysEqual(left, right);
+  if (isRecord(left) && isRecord(right)) return recordsEqual(left, right);
   return false;
 };
+
+/**
+ * Compares two arrays for deep equality, element by element.
+ */
+function arraysEqual(left: unknown[], right: unknown[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((item, i) => deepEqual(item, right[i]));
+}
+
+/**
+ * Compares two plain record objects for deep equality.
+ */
+function recordsEqual(left: Record<string, unknown>, right: Record<string, unknown>): boolean {
+  const leftKeys = Object.keys(left);
+  if (leftKeys.length !== Object.keys(right).length) {
+    return false;
+  }
+  return leftKeys.every((key) => Object.hasOwn(right, key) && deepEqual(left[key], right[key]));
+}
 
 /**
  * Checks if a configuration value differs between two config objects.

@@ -222,29 +222,27 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
     }
 
     // Always update pending restart state (even when not emitting warnings)
-    if (restartChanges.length > 0) {
-      // Deduplicate pending changes by key path (newer changes overwrite older ones)
-      const pendingMap = new Map(state.pendingRestartChanges.map((d) => [d.path, d]));
-      for (const change of restartChanges) {
-        pendingMap.set(change.path, change);
-      }
+    // Build pending set from current restartChanges only (clears stale entries)
+    const pendingMap = new Map<string, ConfigReloadDiagnostic>();
+    for (const change of restartChanges) {
+      pendingMap.set(change.path, change);
+    }
 
-      // Update state with deduplicated pending changes
-      state = {
-        ...state,
-        pendingRestartChanges: Array.from(pendingMap.values()),
-        hasPendingRestartChanges: true
-      };
+    // Update state with current pending changes
+    state = {
+      ...state,
+      pendingRestartChanges: Array.from(pendingMap.values()),
+      hasPendingRestartChanges: pendingMap.size > 0
+    };
 
-      // Emit warnings only when enabled
-      if (opts.emitWarnings) {
-        emitRestartWarning(restartChanges);
+    // Emit warnings only when enabled and there are changes
+    if (opts.emitWarnings && restartChanges.length > 0) {
+      emitRestartWarning(restartChanges);
 
-        warn('[reload-handler] Queued restart-required config changes:', {
-          keys: restartChanges.map((d) => d.path),
-          pendingCount: pendingMap.size
-        });
-      }
+      warn('[reload-handler] Queued restart-required config changes:', {
+        keys: restartChanges.map((d) => d.path),
+        pendingCount: pendingMap.size
+      });
     }
 
     // Update last applied config with live changes

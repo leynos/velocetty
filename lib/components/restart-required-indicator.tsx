@@ -151,6 +151,27 @@ export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({hasPendingC
     return (
       <output className="config-reload-badge" aria-label="Configuration changes require restart">
         {content}
+        <style jsx={true}>{`
+          .config-reload-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background-color: #f59e0b; /* amber-500 */
+            color: white;
+            border-radius: 4px;
+            font-size: 0.8125em;
+            font-weight: 500;
+          }
+
+          .badge-icon {
+            font-size: 1em;
+          }
+
+          .badge-text {
+            white-space: nowrap;
+          }
+        `}</style>
       </output>
     );
   }
