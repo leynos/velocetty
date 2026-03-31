@@ -345,6 +345,30 @@ describe('config-hot-reload', () => {
       expect(pending.map((d) => d.path)).toContain('updateChannel');
     });
 
+    it('should deduplicate pending restart changes for the same key', () => {
+      const deps = {
+        ...createMockDependencies(),
+        getCurrentConfig: () => ({shell: '/bin/bash'}) as configOptions
+      };
+      const handler = createReloadHandler(deps);
+
+      // First reload - change shell to zsh
+      handler.processReload({shell: '/bin/zsh'} as configOptions);
+      expect(handler.getPendingRestartDiagnostics().length).toBe(1);
+      expect(handler.getPendingRestartDiagnostics()[0].path).toBe('shell');
+
+      // Second reload - change shell again to fish
+      // The diagnostic should be updated, not duplicated
+      handler.processReload({shell: '/bin/fish'} as configOptions);
+      const pending = handler.getPendingRestartDiagnostics();
+
+      // Should still only have 1 pending change (not 2)
+      expect(pending.length).toBe(1);
+      expect(pending[0].path).toBe('shell');
+      // The message should reflect the most recent change
+      expect(pending[0].message).toContain('/bin/fish');
+    });
+
     it('should return immutable state', () => {
       const handler = createReloadHandler(createMockDependencies());
       const state1 = handler.getState();

@@ -227,15 +227,22 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
     if (opts.emitWarnings && restartChanges.length > 0) {
       emitRestartWarning(restartChanges);
 
-      // Update state with pending changes
+      // Deduplicate pending changes by key path (newer changes overwrite older ones)
+      const pendingMap = new Map(state.pendingRestartChanges.map((d) => [d.path, d]));
+      for (const change of restartChanges) {
+        pendingMap.set(change.path, change);
+      }
+
+      // Update state with deduplicated pending changes
       state = {
         ...state,
-        pendingRestartChanges: [...state.pendingRestartChanges, ...restartChanges],
+        pendingRestartChanges: Array.from(pendingMap.values()),
         hasPendingRestartChanges: true
       };
 
       warn('[reload-handler] Queued restart-required config changes:', {
-        keys: restartChanges.map((d) => d.path)
+        keys: restartChanges.map((d) => d.path),
+        pendingCount: pendingMap.size
       });
     }
 
