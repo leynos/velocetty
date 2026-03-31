@@ -20,7 +20,7 @@ all renderer style blocks to CSS Modules so that:
 
 After this change, a developer can add co-located `*.module.css` files for
 renderer components and esbuild will bundle them natively. No renderer source
-files will contain `<style jsx` tags.
+files will contain `<style jsx>` tags.
 
 ## Constraints
 
@@ -71,7 +71,7 @@ files will contain `<style jsx` tags.
   Severity: low
   Likelihood: medium
   Mitigation: scope `:global()` selectors to a container class so they apply
-  within the component subtree. Validate with existing E2E fast-lane checks.
+  within the component subtree. Validate with existing end-to-end (E2E) fast-lane checks.
 
 - Risk: dynamic theme values interpolated into styled-jsx blocks lose
   pseudo-class access when moved to inline `style=`.
@@ -411,7 +411,7 @@ Quality criteria (what "done" means):
 - Documentation: `docs/developers-guide.md` is accurate and `docs/roadmap.md`
   marks `1.4.17` as done.
 
-Quality method (how we check):
+Quality method (verification steps):
 
 - Run the full gate sequence (`bun install`, `make build`, `make check-fmt`,
   `make lint`, `make test`) locally.

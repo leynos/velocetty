@@ -112,7 +112,11 @@ const Notification = forwardRef(function Notification(
   const {handleDismiss, onElement, opacity} = useNotification(props, ref, props.timer);
   const {backgroundColor, color} = props;
   return (
-    <div ref={onElement} style={{opacity, backgroundColor, color}} className="notification_indicator">
+    <div
+      ref={onElement}
+      style={{opacity, backgroundColor, color}}
+      className={`${styles.notificationIndicator} notification_indicator`}
+    >
       {props.customChildrenBefore}
       {props.children || props.text}
       {props.userDismissable ? (
