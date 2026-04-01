@@ -212,7 +212,8 @@ Add unit tests:
 
 Update settings UI to display restart-required indicators:
 
-- Settings schema metadata includes `requiresRestart: boolean` flag.
+- UI consults the reloadability registry (`shared/src/constants/config-reloadability.ts`)
+  to determine registry-derived reloadability for each setting.
 - UI renders warning icon or label next to non-reloadable settings.
 - When a user modifies a non-reloadable setting, an inline warning appears
   explaining the restart requirement.
@@ -251,8 +252,8 @@ nl -ba docs/velocetty-design.md | sed -n '1042,1080p'
 2. Classification audit and registry creation:
 
 - Audit `shared/src/types/config.ts` `configOptions` fields.
-- Create `shared/src/constants/config-reloadability.ts` (or extend
-  `shared/src/constants/config.ts`) with reloadability registry.
+- Create `shared/src/constants/config-reloadability.ts` with reloadability
+  registry as the single source of truth.
 - Document rationale for each classification in source comments.
 
 3. Add classification completeness tests:
