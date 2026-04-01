@@ -113,6 +113,29 @@ export const InlineRestartWarning: React.FC<InlineRestartWarningProps> = ({confi
   );
 };
 
+/** Common CSS styles for the config reload badge (used by both output and button variants). */
+const commonBadgeStyles = `
+  .config-reload-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background-color: #f59e0b; /* amber-500 */
+    color: white;
+    border-radius: 4px;
+    font-size: 0.8125em;
+    font-weight: 500;
+  }
+
+  .badge-icon {
+    font-size: 1em;
+  }
+
+  .badge-text {
+    white-space: nowrap;
+  }
+`;
+
 /** Props for the ConfigReloadBadge component. */
 export type ConfigReloadBadgeProps = {
   /** Whether to show the badge (when there are pending restart-required changes). */
@@ -151,27 +174,7 @@ export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({hasPendingC
     return (
       <output className="config-reload-badge" aria-label="Configuration changes require restart">
         {content}
-        <style jsx={true}>{`
-          .config-reload-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            background-color: #f59e0b; /* amber-500 */
-            color: white;
-            border-radius: 4px;
-            font-size: 0.8125em;
-            font-weight: 500;
-          }
-
-          .badge-icon {
-            font-size: 1em;
-          }
-
-          .badge-text {
-            white-space: nowrap;
-          }
-        `}</style>
+        <style jsx={true}>{commonBadgeStyles}</style>
       </output>
     );
   }
@@ -185,17 +188,10 @@ export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({hasPendingC
     >
       {content}
       <style jsx={true}>{`
+        ${commonBadgeStyles}
+
         .config-reload-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 4px 10px;
-          background-color: #f59e0b; /* amber-500 */
-          color: white;
           border: none;
-          border-radius: 4px;
-          font-size: 0.8125em;
-          font-weight: 500;
           cursor: pointer;
           transition: background-color 0.15s ease;
         }
@@ -207,14 +203,6 @@ export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({hasPendingC
         .config-reload-badge:focus {
           outline: 2px solid #fbbf24; /* amber-400 */
           outline-offset: 2px;
-        }
-
-        .badge-icon {
-          font-size: 1em;
-        }
-
-        .badge-text {
-          white-space: nowrap;
         }
       `}</style>
     </button>
@@ -233,6 +221,13 @@ export type LiveReloadIndicatorProps = {
  * Indicator component showing that a setting can be live-reloaded.
  *
  * This is optional UI sugar to indicate which settings apply immediately.
+ *
+ * Note: The `show` prop defaults to `true` (unlike `InlineRestartWarning` which
+ * defaults to `false`) because live reload indicators are non-disruptive and
+ * informational. They indicate a positive capability (changes apply immediately)
+ * rather than a warning about required action. This follows the design principle
+ * that purely informational indicators should be visible by default, while
+ * disruptive warnings should require explicit opt-in via `show={true}`.
  *
  * @example
  * ```tsx

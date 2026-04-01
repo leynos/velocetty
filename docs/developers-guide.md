@@ -266,8 +266,8 @@ function ShellSetting() {
 
 Add unit tests when adding new configuration settings:
 
-- Test the reloadability classification in `test/unit/config-reloadability.test.ts`.
-- Test merge semantics in `test/unit/config-layering.test.ts`.
+- Verify reloadability classification via `test/unit/config-reloadability.test.ts`.
+- Validate merge semantics in `test/unit/config-layering.test.ts`.
 - Test hot-reload detection in `test/unit/config-hot-reload.test.ts`.
 
 ### Deferred features

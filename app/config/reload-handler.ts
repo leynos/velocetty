@@ -11,7 +11,32 @@
 import type {configOptions, ConfigReloadDiagnostic, ConfigReloadResult} from '@shared/types/config';
 import type {Reloadability} from '@shared/constants/config-reloadability';
 import {getKeyScope, getReloadability} from '@shared/constants/config-reloadability';
-import {getChangedKeys, deepMerge} from './layering';
+import {getChangedKeys} from './layering';
+
+/**
+ * Merges live config changes into current config, treating undefined as deletion.
+ *
+ * Unlike deepMerge which skips undefined to preserve defaults, this function
+ * deletes keys explicitly set to undefined (for key removals in live reload).
+ *
+ * @param currentConfig - The base configuration.
+ * @param liveConfig - The live changes to apply (undefined values delete keys).
+ * @returns A new configuration with live changes applied.
+ */
+const mergeLiveConfig = (currentConfig: configOptions, liveConfig: Partial<configOptions>): configOptions => {
+  const result = {...currentConfig} as Record<string, unknown>;
+
+  for (const [key, value] of Object.entries(liveConfig)) {
+    if (value === undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete result[key];
+    } else {
+      result[key] = value;
+    }
+  }
+
+  return result as configOptions;
+};
 
 /** Dependencies required by the reload handler. */
 export type ReloadHandlerDependencies = {
@@ -238,7 +263,7 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
     });
     state = {
       ...state,
-      lastAppliedConfig: deepMerge(currentConfig, liveConfig)
+      lastAppliedConfig: mergeLiveConfig(currentConfig, liveConfig)
     };
   };
 

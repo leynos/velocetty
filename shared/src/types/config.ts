@@ -305,6 +305,12 @@ export type ConfigReloadResult = {
   appliedLive: string[];
   /** Diagnostics for settings that require restart to take effect. */
   restartRequired: ConfigReloadDiagnostic[];
-  /** Any validation errors that occurred during reload. */
+  /**
+   * Any validation errors that occurred during reload.
+   * @deprecated This field is currently unused and always empty. It is reserved
+   * for future implementation of validation error reporting during config reload.
+   * TODO: Implement validation error population in reload-handler.ts processReload()
+   *       when adding schema validation for live-reloadable changes.
+   */
   validationErrors: configValidationDiagnostic[];
 };

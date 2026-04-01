@@ -46,6 +46,12 @@ const createBaseBuildOptions = (mode: BuildMode, rootDir: string): BuildOptions 
     },
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode)
+    },
+    // TypeScript path alias resolution matching tsconfig.json paths
+    alias: {
+      '@shared': path.join(rootDir, 'shared/src'),
+      '@app': path.join(rootDir, 'app'),
+      '@lib': path.join(rootDir, 'lib')
     }
   };
 };
