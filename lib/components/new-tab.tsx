@@ -31,8 +31,8 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
   });
 
   const tabVars: React.CSSProperties = {
-    '--new-tab-border': borderColor,
-    '--new-tab-bg': backgroundColor
+    ['--new-tab-border' as string]: borderColor,
+    ['--new-tab-bg' as string]: backgroundColor
   };
 
   return (

@@ -45,9 +45,9 @@ const SearchButton = ({
   );
 
   const buttonVars: React.CSSProperties = {
-    '--search-fg': foregroundColor,
-    '--search-selection': selectionColor,
-    '--search-hover-bg': backgroundColor
+    ['--search-fg' as string]: foregroundColor,
+    ['--search-selection' as string]: selectionColor,
+    ['--search-hover-bg' as string]: backgroundColor
   };
 
   return (
@@ -108,12 +108,12 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
   };
 
   const searchVars: React.CSSProperties = {
-    '--search-fg': foregroundColor,
-    '--search-selection': selectionColor,
-    '--search-hover-bg': borderColor,
-    '--search-bg': backgroundColor,
-    '--search-border': borderColor,
-    '--search-font': font
+    ['--search-fg' as string]: foregroundColor,
+    ['--search-selection' as string]: selectionColor,
+    ['--search-hover-bg' as string]: borderColor,
+    ['--search-bg' as string]: backgroundColor,
+    ['--search-border' as string]: borderColor,
+    ['--search-font' as string]: font
   };
 
   return (

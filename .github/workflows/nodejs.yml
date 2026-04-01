@@ -39,12 +39,12 @@ jobs:
         id: setup_node_gyp_python
         run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
       - name: Export node-gyp environment
-        run: >
-          printf 'PYTHON=%s\nnpm_config_python=%s\nnpm_config_node_gyp=%s\n'
-          "${{ steps.setup_node_gyp_python.outputs.python }}"
-          "${{ steps.setup_node_gyp_python.outputs.python }}"
-          "${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js"
-          >> "$GITHUB_ENV"
+        run: |
+          cat << 'EOF' >> "$GITHUB_ENV"
+          PYTHON=${{ steps.setup_node_gyp_python.outputs.python }}
+          npm_config_python=${{ steps.setup_node_gyp_python.outputs.python }}
+          npm_config_node_gyp=${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
+          EOF
       - name: Install
         if: runner.os != 'Windows'
         run: bun install
@@ -160,12 +160,12 @@ jobs:
         id: setup_node_gyp_python
         run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
       - name: Export node-gyp environment
-        run: >
-          printf 'PYTHON=%s\nnpm_config_python=%s\nnpm_config_node_gyp=%s\n'
-          "${{ steps.setup_node_gyp_python.outputs.python }}"
-          "${{ steps.setup_node_gyp_python.outputs.python }}"
-          "${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js"
-          >> "$GITHUB_ENV"
+        run: |
+          cat << 'EOF' >> "$GITHUB_ENV"
+          PYTHON=${{ steps.setup_node_gyp_python.outputs.python }}
+          npm_config_python=${{ steps.setup_node_gyp_python.outputs.python }}
+          npm_config_node_gyp=${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
+          EOF
       - name: Install
         run: bun install
       - name: Install Linux build and E2E runtime deps
@@ -213,12 +213,12 @@ jobs:
         id: setup_node_gyp_python
         run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
       - name: Export node-gyp environment
-        run: >
-          printf 'PYTHON=%s\nnpm_config_python=%s\nnpm_config_node_gyp=%s\n'
-          "${{ steps.setup_node_gyp_python.outputs.python }}"
-          "${{ steps.setup_node_gyp_python.outputs.python }}"
-          "${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js"
-          >> "$GITHUB_ENV"
+        run: |
+          cat << 'EOF' >> "$GITHUB_ENV"
+          PYTHON=${{ steps.setup_node_gyp_python.outputs.python }}
+          npm_config_python=${{ steps.setup_node_gyp_python.outputs.python }}
+          npm_config_node_gyp=${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js
+          EOF
       - name: Prepare x64 snapshot sysroot for Linux aarch64
         run: |
           set -euo pipefail
