@@ -6,4 +6,9 @@
   --tab-fg: #ccc;
   --tab-active-fg: #fff;
   --tab-activity-fg: #50e3c2;
+
+  /* Tab icon colors */
+  --tab-icon-fg: #e9e9e9;
+  --tab-icon-hover-fg: #fff;
+  --tab-icon-active-fg: #909090;
 }
