@@ -226,12 +226,12 @@ const createPostcssPluginWithoutModules = (): Plugin => {
     name: 'postcss-no-modules',
     setup(build) {
       const originalOnLoad = build.onLoad.bind(build);
-      const onLoadCallbacks: Array<{filter: RegExp; callback: OnLoadCallback}> = [];
+      const onLoadCallbacks: Array<{filter: RegExp; namespace: string | undefined; callback: OnLoadCallback}> = [];
 
-      // Intercept onLoad registrations
+      // Intercept onLoad registrations - capture but don't register yet
       build.onLoad = (options: {filter: RegExp; namespace?: string}, callback: OnLoadCallback) => {
-        onLoadCallbacks.push({filter: options.filter, callback});
-        return originalOnLoad(options, callback);
+        onLoadCallbacks.push({filter: options.filter, namespace: options.namespace, callback});
+        // Don't call originalOnLoad here - we want the wrapper to be the only handler
       };
 
       // Call base plugin setup
@@ -245,8 +245,12 @@ const createPostcssPluginWithoutModules = (): Plugin => {
           return undefined;
         }
         // Process regular CSS files with PostCSS
-        for (const {filter, callback} of onLoadCallbacks) {
+        for (const {filter, namespace, callback} of onLoadCallbacks) {
           if (filter.test(args.path)) {
+            // Check namespace match if specified
+            if (namespace !== undefined && args.namespace !== namespace) {
+              continue;
+            }
             return callback(args);
           }
         }
