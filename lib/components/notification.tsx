@@ -7,7 +7,6 @@
 import React, {forwardRef, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import type {NotificationProps, TimerSeam} from '../../typings/hyper';
-import styles from './notification.module.css';
 
 const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLDivElement>, timer?: TimerSeam) => {
   const {backgroundColor, dismissAfter, onDismiss, text} = props;
@@ -112,13 +111,18 @@ const Notification = forwardRef(function Notification(
   const {handleDismiss, onElement, opacity} = useNotification(props, ref, props.timer);
   const {backgroundColor, color} = props;
   return (
-    <div ref={onElement} style={{opacity, backgroundColor, color}} className={styles.notificationIndicator}>
+    <div
+      ref={onElement}
+      style={{opacity, backgroundColor, color}}
+      className="inline-block cursor-default select-none bg-white/20 px-3.5 py-2 ml-2.5 transition-opacity duration-150 text-white text-xs font-sans"
+      data-testid="notification-indicator"
+    >
       {props.customChildrenBefore}
       {props.children || props.text}
       {props.userDismissable ? (
         <button
           type="button"
-          className={styles.notificationDismissLink}
+          className="relative left-1 cursor-pointer font-semibold text-current transition-[font-weight] duration-100 ease-in-out hover:font-black focus:font-black"
           onClick={handleDismiss}
           style={{color: props.userDismissColor}}
         >
@@ -132,5 +136,4 @@ const Notification = forwardRef(function Notification(
 
 Notification.displayName = 'Notification';
 
-export {styles};
 export default Notification;

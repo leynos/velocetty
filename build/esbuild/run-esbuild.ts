@@ -10,6 +10,8 @@ import {createIgnoreImportsPlugin} from './esbuild-plugins/ignore-imports-plugin
 import {createNodeBuiltinsPlugin} from './esbuild-plugins/node-builtins-plugin';
 import {createRendererExternalsPlugin} from './esbuild-plugins/renderer-externals-plugin';
 import {createStyledJsxBabelBridgePlugin} from './esbuild-plugins/styled-jsx-babel-bridge-plugin';
+import postcssPlugin from '@chialab/esbuild-plugin-postcss';
+import type {Plugin} from 'esbuild';
 
 export type BuildMode = 'development' | 'production';
 export type BuildTarget = 'hyper-app' | 'renderer' | 'cli';
@@ -73,6 +75,7 @@ export const createRendererBuildOptions = (mode: BuildMode, rootDir: string): Bu
       '.module.css': 'local-css'
     },
     plugins: [
+      createPostcssPluginWithoutModules(),
       createStyledJsxBabelBridgePlugin(),
       createRendererExternalsPlugin(),
       createNodeBuiltinsPlugin(),
@@ -206,4 +209,48 @@ const runTargets = async (options: RunEsbuildOptions) => {
 /** Runs the selected esbuild targets in watch or one-shot mode. */
 export const runEsbuild = async (options: RunEsbuildOptions) => {
   await runTargets(options);
+};
+
+/**
+ * Creates a PostCSS plugin that skips CSS Module files (.module.css).
+ * This allows esbuild's local-css loader to handle CSS Modules directly
+ * without PostCSS preprocessing.
+ *
+ * @returns An esbuild plugin that filters out CSS Modules from PostCSS processing.
+ */
+const createPostcssPluginWithoutModules = (): Plugin => {
+  const basePlugin = postcssPlugin();
+  return {
+    ...basePlugin,
+    name: 'postcss-no-modules',
+    setup(build) {
+      const originalOnLoad = build.onLoad.bind(build);
+      const onLoadCallbacks: Array<{filter: RegExp; callback: Function}> = [];
+
+      // Intercept onLoad registrations
+      build.onLoad = (options: {filter: RegExp; namespace?: string}, callback: Function) => {
+        onLoadCallbacks.push({filter: options.filter, callback});
+        return originalOnLoad(options, callback);
+      };
+
+      // Call base plugin setup
+      basePlugin.setup(build);
+
+      // Override to filter out .module.css files
+      build.onLoad = originalOnLoad;
+      build.onLoad({filter: /\.css$/}, async (args) => {
+        // Skip CSS Module files
+        if (args.path.endsWith('.module.css')) {
+          return undefined;
+        }
+        // Process regular CSS files with PostCSS
+        for (const {filter, callback} of onLoadCallbacks) {
+          if (filter.test(args.path)) {
+            return callback(args);
+          }
+        }
+        return undefined;
+      });
+    }
+  };
 };
