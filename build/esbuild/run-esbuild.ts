@@ -67,8 +67,8 @@ export const createRendererBuildOptions = (mode: BuildMode, rootDir: string): Bu
     platform: 'browser',
     format: 'iife',
     target: ['es2022'],
-    // Enable 'style' condition for Tailwind CSS v4 package exports
-    conditions: ['style'],
+    // Enable 'style' and 'module' conditions for Tailwind CSS v4 package exports
+    conditions: ['style', 'module'],
     sourcemap: isProductionMode(mode) ? 'external' : 'linked',
     loader: {
       ...(baseBuildOptions.loader ?? {}),
@@ -251,7 +251,10 @@ const createPostcssPluginWithoutModules = (): Plugin => {
             if (namespace !== undefined && args.namespace !== namespace) {
               continue;
             }
-            return callback(args);
+            const result = await callback(args);
+            if (result !== null && result !== undefined) {
+              return result;
+            }
           }
         }
         return undefined;
