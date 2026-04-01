@@ -77,6 +77,22 @@ const SENSITIVE_KEYS = ['env', 'plugins', 'bellSound'];
 
 const isReloadDebugEnabled = () => process.env.DEBUG_CONFIG_RELOAD === '1';
 
+/** Returns true when the key is in the sensitive-keys list. */
+const isSensitiveKey = (key?: string): boolean => key !== undefined && SENSITIVE_KEYS.includes(key);
+
+/** Truncates a string to `maxLength` characters, appending `...` when cut. */
+const truncateString = (value: string, maxLength: number): string =>
+  value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+
+/**
+ * Formats a primitive (number or boolean) as a string.
+ * Returns `null` for all other types.
+ */
+const formatPrimitive = (value: unknown): string | null => {
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return null;
+};
+
 /**
  * Truncates a value for safe display in diagnostic messages.
  * Prevents leaking secrets or flooding logs with large objects.
@@ -87,18 +103,11 @@ const isReloadDebugEnabled = () => process.env.DEBUG_CONFIG_RELOAD === '1';
  * @returns Truncated or redacted string representation.
  */
 const truncateValue = (value: unknown, key?: string, maxLength = 50): string => {
-  if (key && SENSITIVE_KEYS.includes(key)) {
-    return '[redacted]';
-  }
+  if (isSensitiveKey(key)) return '[redacted]';
   if (value === undefined) return 'undefined';
   if (value === null) return 'null';
-  if (typeof value === 'string') {
-    return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
-  }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  return '[object]';
+  if (typeof value === 'string') return truncateString(value, maxLength);
+  return formatPrimitive(value) ?? '[object]';
 };
 
 /**
