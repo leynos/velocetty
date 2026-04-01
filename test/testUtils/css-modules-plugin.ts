@@ -14,8 +14,7 @@ const extractClassNames = (css: string): string[] => {
   const classNames: string[] = [];
   // Match CSS class selectors (e.g., .className, .class-name, .class_name)
   const classRegex = /\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g;
-  let match;
-  while ((match = classRegex.exec(css)) !== null) {
+  for (const match of css.matchAll(classRegex)) {
     classNames.push(match[1]);
   }
   return [...new Set(classNames)]; // Remove duplicates

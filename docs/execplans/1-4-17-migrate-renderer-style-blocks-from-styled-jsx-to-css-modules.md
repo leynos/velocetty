@@ -71,7 +71,8 @@ files will contain `<style jsx>` tags.
   Severity: low
   Likelihood: medium
   Mitigation: scope `:global()` selectors to a container class so they apply
-  within the component subtree. Validate with existing end-to-end (E2E) fast-lane checks.
+  within the component subtree. Validate with existing end-to-end (E2E) fast-lane
+  checks.
 
 - Risk: dynamic theme values interpolated into styled-jsx blocks lose
   pseudo-class access when moved to inline `style=`.
@@ -88,7 +89,8 @@ files will contain `<style jsx>` tags.
 - [x] (2026-03-29) Migrate Pattern C files (global selectors).
 - [x] (2026-03-29) Migrate Pattern B files (local dynamic styles).
 - [x] (2026-03-29) Add parity-focused tests and update migration contract tests.
-- [x] (2026-03-29) Update `docs/developers-guide.md` and mark roadmap item `1.4.17` as done.
+- [x] (2026-03-29) Update `docs/developers-guide.md` and mark roadmap item
+  `1.4.17` as done.
 - [x] (2026-03-29) Run full quality gates: all passed.
 
 ## Surprises & discoveries
