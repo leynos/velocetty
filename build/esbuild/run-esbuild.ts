@@ -239,26 +239,15 @@ const createPostcssPluginWithoutModules = (): Plugin => {
 
       // Override to filter out .module.css files
       build.onLoad = originalOnLoad;
-      build.onLoad({filter: /\.css$/}, async (args) => {
-        // Skip CSS Module files
-        if (args.path.endsWith('.module.css')) {
-          return undefined;
-        }
-        // Process regular CSS files with PostCSS
-        for (const {filter, namespace, callback} of onLoadCallbacks) {
-          if (filter.test(args.path)) {
-            // Check namespace match if specified
-            if (namespace !== undefined && args.namespace !== namespace) {
-              continue;
-            }
-            const result = await callback(args);
-            if (result !== null && result !== undefined) {
-              return result;
-            }
+      for (const {filter, namespace, callback} of onLoadCallbacks) {
+        build.onLoad({filter, namespace}, async (args) => {
+          // Skip CSS Module files
+          if (args.path.endsWith('.module.css')) {
+            return undefined;
           }
-        }
-        return undefined;
-      });
+          return await callback(args);
+        });
+      }
     }
   };
 };
