@@ -155,15 +155,15 @@ Roadmap/design anchors:
 Audit all `configOptions` fields and classify each as `liveReloadable` or
 `requiresRestart`, using design document guidance as primary source.
 
-Create a source-of-truth registry in `shared/src/constants/config.ts` that
-maps config keys to their reload capability, with explicit classification
-rationale in comments.
+Create a source-of-truth registry in
+`shared/src/constants/config-reloadability.ts` that maps config keys to their
+reload capability, with explicit classification rationale in comments.
 
 Add unit tests that verify the classification registry is complete (every
 config key has a classification) and consistent (no key appears in both
 categories).
 
-Do not proceed to Stage B until classification is documented and red tests
+Do not proceed to Stage B until classification is documented, and red tests
 fail for current behaviour.
 
 ### Stage B: Layering implementation and merge semantics
@@ -214,8 +214,8 @@ Update settings UI to display restart-required indicators:
 
 - Settings schema metadata includes `requiresRestart: boolean` flag.
 - UI renders warning icon or label next to non-reloadable settings.
-- When user modifies a non-reloadable setting, inline warning appears
-  explaining restart requirement.
+- When a user modifies a non-reloadable setting, an inline warning appears
+  explaining the restart requirement.
 
 Add or update component-level tests verifying restart-required indicators
 render correctly.
