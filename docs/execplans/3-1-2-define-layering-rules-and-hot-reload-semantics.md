@@ -455,7 +455,7 @@ Deferred to CONFIG-001:
   (`applyLiveConfig`, `emitRestartWarning`) with try/catch to avoid aborting
   the reload result and leaving state inconsistent.
   Evidence: PR review feedback on `app/config/reload-handler.ts`.
-  Impact: Added error-handering paths and deterministic state updates.
+  Impact: Added error-handling paths and deterministic state updates.
 
 - Observation: Presentational components in `lib/components/restart-required-indicator.tsx`
   originally performed registry lookups during render, coupling view code to
