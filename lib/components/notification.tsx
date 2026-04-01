@@ -114,7 +114,7 @@ const Notification = forwardRef(function Notification(
     <div
       ref={onElement}
       style={{opacity, backgroundColor, color}}
-      className="inline-block cursor-default select-none bg-white/20 px-3.5 py-2 ml-2.5 transition-opacity duration-150 text-white text-xs font-sans"
+      className="inline-block cursor-default select-none bg-white/20 px-3.5 py-2 ml-2.5 transition-opacity duration-150 text-white text-xs font-sans notification_indicator"
       data-testid="notification-indicator"
     >
       {props.customChildrenBefore}
