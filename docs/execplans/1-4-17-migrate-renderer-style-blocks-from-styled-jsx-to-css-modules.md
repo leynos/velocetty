@@ -446,14 +446,14 @@ after each stage.
 - **CSS custom properties**: use the `style` attribute to pass dynamic values
   into module scopes.
 - **TypeScript declarations**: `typings/css-modules.d.ts` must declare
-  `*.module.css` default exports as `Record<string, string>`.
+  `*.module.css` default exports as `Readonly<Record<string, string>>`.
 
 Example module declaration:
 
 ```ts
 // typings/css-modules.d.ts
 declare module '*.module.css' {
-  const classes: Record<string, string>;
+  const classes: Readonly<Record<string, string>>;
   export default classes;
 }
 ```

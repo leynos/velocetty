@@ -27,12 +27,9 @@ const tabListItemClass = (isFirst: boolean, isActive: boolean, hasActivity: bool
 /**
  * Computes the class name for the tab text span.
  *
- * @param isLast - Whether this is the last tab in the list.
- * @param isActive - Whether this tab is currently active.
  * @returns The computed class name string.
  */
-const tabTextClass = (isLast: boolean, isActive: boolean): string =>
-  clsx(styles.tabText, isLast && styles.tabTextLast, isActive && styles.tabTextActive);
+const tabTextClass = (): string => styles.tabText;
 
 /**
  * Handles click events on the tab, invoking the select handler for left clicks
@@ -61,7 +58,7 @@ const onTabMouseUp = (event: React.MouseEvent, onClose: () => void): void => {
 };
 
 const Tab = forwardRef(function Tab(props: TabProps, ref: React.ForwardedRef<HTMLLIElement>) {
-  const {isActive, isFirst, isLast, borderColor, hasActivity} = props;
+  const {isActive, isFirst, borderColor, hasActivity} = props;
 
   const handleClick = (event: React.MouseEvent) => onTabClick(event, isActive, props.onSelect);
   const handleMouseUp = (event: React.MouseEvent) => onTabMouseUp(event, props.onClose);
@@ -74,16 +71,24 @@ const Tab = forwardRef(function Tab(props: TabProps, ref: React.ForwardedRef<HTM
       ref={ref}
     >
       {props.customChildrenBefore}
-      <span className={tabTextClass(isLast, isActive)} onClick={handleClick} onMouseUp={handleMouseUp}>
+      <span className={tabTextClass()} onClick={handleClick} onMouseUp={handleMouseUp}>
         <span title={props.text} className={styles.tabTextInner}>
           {props.text}
         </span>
       </span>
-      <i className={styles.tabIcon} onClick={props.onClose}>
+      <button
+        type="button"
+        className={styles.tabIcon}
+        aria-label={`Close ${props.text}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          props.onClose();
+        }}
+      >
         <svg className={styles.tabShape}>
           <use xlinkHref="./renderer/assets/icons.svg#close-tab" />
         </svg>
-      </i>
+      </button>
       {props.customChildren}
     </li>
   );

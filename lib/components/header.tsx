@@ -106,34 +106,50 @@ const Header = forwardRef(function Header(props: HeaderProps, ref: React.Forward
           style={{borderColor}}
         >
           {hambMenu && (
-            <svg
+            <button
+              type="button"
               className={`${styles.headerShape} ${left ? styles.headerHamburgerMenuRight : styles.headerHamburgerMenuLeft}`}
               onClick={handleHamburgerMenuClick}
+              aria-label="Open menu"
             >
-              <use xlinkHref="./renderer/assets/icons.svg#hamburger-menu" />
-            </svg>
+              <svg className={styles.headerShape}>
+                <use xlinkHref="./renderer/assets/icons.svg#hamburger-menu" />
+              </svg>
+            </button>
           )}
           <span className={styles.headerAppTitle}>{title}</span>
           {winCtrls && (
             <div className={`${styles.headerWindowControls} ${left ? styles.headerWindowControlsLeft : ''}`}>
-              <div className={`${left ? styles.headerMinimizeWindowLeft : ''}`} onClick={handleMinimizeClick}>
+              <button
+                type="button"
+                className={`${styles.headerShape} ${left ? styles.headerMinimizeWindowLeft : ''}`}
+                onClick={handleMinimizeClick}
+                aria-label="Minimise window"
+              >
                 <svg className={styles.headerShape}>
                   <use xlinkHref="./renderer/assets/icons.svg#minimize-window" />
                 </svg>
-              </div>
-              <div className={`${left ? styles.headerMaximizeWindowLeft : ''}`} onClick={handleMaximizeClick}>
+              </button>
+              <button
+                type="button"
+                className={`${styles.headerShape} ${left ? styles.headerMaximizeWindowLeft : ''}`}
+                onClick={handleMaximizeClick}
+                aria-label={props.maximized ? 'Restore window' : 'Maximise window'}
+              >
                 <svg className={styles.headerShape}>
                   <use xlinkHref={maxButtonHref} />
                 </svg>
-              </div>
-              <div
-                className={`${styles.headerCloseWindow} ${left ? styles.headerCloseWindowLeft : ''}`}
+              </button>
+              <button
+                type="button"
+                className={`${styles.headerShape} ${styles.headerCloseWindow} ${left ? styles.headerCloseWindowLeft : ''}`}
                 onClick={handleCloseClick}
+                aria-label="Close window"
               >
                 <svg className={styles.headerShape}>
                   <use xlinkHref="./renderer/assets/icons.svg#close-window" />
                 </svg>
-              </div>
+              </button>
             </div>
           )}
         </div>

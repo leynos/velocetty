@@ -36,23 +36,28 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
   };
 
   return (
-    <button
-      type="button"
-      ref={ref}
-      title="New Tab"
-      className={`${styles.newTab} ${isMac ? styles.newTabMac : ''} ${tabsVisible ? styles.tabsVisible : styles.tabsHidden}`}
-      onClick={toggleDropdown}
-      onDoubleClick={(e) => e.stopPropagation()}
-      onBlur={() => setDropdownOpen(false)}
-      style={tabVars}
-    >
-      <VscChevronDown style={{verticalAlign: 'middle'}} />
+    <div ref={ref}>
+      <button
+        type="button"
+        title="New Tab"
+        aria-label="New Tab"
+        aria-haspopup="menu"
+        aria-expanded={dropdownOpen}
+        className={`${styles.newTab} ${isMac ? styles.newTabMac : ''} ${tabsVisible ? styles.tabsVisible : styles.tabsHidden}`}
+        onClick={toggleDropdown}
+        onDoubleClick={(e) => e.stopPropagation()}
+        style={tabVars}
+      >
+        <VscChevronDown style={{verticalAlign: 'middle'}} />
+      </button>
 
       {dropdownOpen && (
-        <ul key="dropdown" className={styles.profileDropdown}>
+        <div key="dropdown" className={styles.profileDropdown} role="menu">
           {profiles.map((profile) => (
-            <li
+            <button
               key={profile.name}
+              type="button"
+              role="menuitem"
               onClick={() => {
                 openNewTab(profile.name);
                 setDropdownOpen(false);
@@ -62,11 +67,11 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
               }`}
             >
               {profile.name}
-            </li>
+            </button>
           ))}
-        </ul>
+        </div>
       )}
-    </button>
+    </div>
   );
 };
 
