@@ -1,3 +1,4 @@
+/** @file Search box component for find-in-page functionality with case sensitivity, whole word, and regex toggles. */
 import type React from 'react';
 import {useCallback, useRef, useEffect, forwardRef} from 'react';
 

@@ -40,7 +40,7 @@ const tabTextClass = (): string => styles.tabText;
  * @param onSelect - Callback to invoke when the tab should be selected.
  */
 const onTabClick = (event: React.MouseEvent, isActive: boolean, onSelect: () => void): void => {
-  if (event.nativeEvent.which === 1 && !isActive) {
+  if (event.button === 0 && !isActive) {
     onSelect();
   }
 };
@@ -52,7 +52,7 @@ const onTabClick = (event: React.MouseEvent, isActive: boolean, onSelect: () => 
  * @param onClose - Callback to invoke when the tab should be closed.
  */
 const onTabMouseUp = (event: React.MouseEvent, onClose: () => void): void => {
-  if (event.nativeEvent.which === 2) {
+  if (event.button === 1) {
     onClose();
   }
 };

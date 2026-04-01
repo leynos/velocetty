@@ -68,7 +68,6 @@
     color 0.2s ease,
     transform 0.25s ease,
     background-color 0.1s ease;
-  pointer-events: none;
   position: absolute;
   right: 7px;
   top: 10px;
