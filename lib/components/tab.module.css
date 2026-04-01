@@ -1,6 +1,6 @@
 .tabTab {
-  color: #ccc;
-  border-color: #ccc;
+  color: var(--tab-fg);
+  border-color: var(--tab-fg);
   border-bottom-width: 1px;
   border-bottom-style: solid;
   border-left-width: 1px;
@@ -11,7 +11,7 @@
 }
 
 .tabTab:hover {
-  color: #ccc;
+  color: var(--tab-fg);
 }
 
 .tabFirst {
@@ -25,20 +25,20 @@
 }
 
 .tabActive {
-  color: #fff;
+  color: var(--tab-active-fg);
   border-bottom-width: 0;
 }
 
 .tabActive:hover {
-  color: #fff;
+  color: var(--tab-active-fg);
 }
 
 .tabHasActivity {
-  color: #50e3c2;
+  color: var(--tab-activity-fg);
 }
 
 .tabHasActivity:hover {
-  color: #50e3c2;
+  color: var(--tab-activity-fg);
 }
 
 .tabText {
@@ -90,6 +90,8 @@
 .tabIcon:focus-visible {
   background-color: rgba(255, 255, 255, 0.13);
   color: #fff;
+  opacity: 1;
+  transform: none;
 }
 
 .tabIcon:active {
@@ -109,7 +111,6 @@
   top: 4px;
   width: 6px;
   height: 6px;
-  vertical-align: middle;
   fill: currentcolor;
   shape-rendering: crispedges;
 }

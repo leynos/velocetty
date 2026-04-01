@@ -25,13 +25,6 @@ const tabListItemClass = (isFirst: boolean, isActive: boolean, hasActivity: bool
   );
 
 /**
- * Computes the class name for the tab text span.
- *
- * @returns The computed class name string.
- */
-const tabTextClass = (): string => styles.tabText;
-
-/**
  * Handles click events on the tab, invoking the select handler for left clicks
  * on inactive tabs.
  *
@@ -71,7 +64,7 @@ const Tab = forwardRef(function Tab(props: TabProps, ref: React.ForwardedRef<HTM
       ref={ref}
     >
       {props.customChildrenBefore}
-      <span className={tabTextClass()} onClick={handleClick} onMouseUp={handleMouseUp}>
+      <span className={styles.tabText} onClick={handleClick} onMouseUp={handleMouseUp}>
         <span title={props.text} className={styles.tabTextInner}>
           {props.text}
         </span>
@@ -86,7 +79,7 @@ const Tab = forwardRef(function Tab(props: TabProps, ref: React.ForwardedRef<HTM
         }}
       >
         <svg className={styles.tabShape}>
-          <use xlinkHref="./renderer/assets/icons.svg#close-tab" />
+          <use href="./renderer/assets/icons.svg#close-tab" />
         </svg>
       </button>
       {props.customChildren}

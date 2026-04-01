@@ -1,2 +1,9 @@
 /** @file Tailwind CSS entry point for the application. */
 @import "tailwindcss/index.css";
+
+:root {
+  /* Tab colors */
+  --tab-fg: #ccc;
+  --tab-active-fg: #fff;
+  --tab-activity-fg: #50e3c2;
+}
