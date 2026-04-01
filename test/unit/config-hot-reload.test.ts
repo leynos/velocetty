@@ -209,7 +209,7 @@ describe('config-hot-reload', () => {
       getCurrentConfig: () => ({fontSize: 12, backgroundColor: '#000'}) as configOptions,
       applyLiveConfig: () => {},
       emitRestartWarning: () => {},
-      warn: () => {}
+      logger: {warn: () => {}, debug: () => {}}
     });
 
     function createShellChangeDeps() {
@@ -368,6 +368,39 @@ describe('config-hot-reload', () => {
       expect(pending[0].path).toBe('shell');
       // The message should reflect the most recent change
       expect(pending[0].message).toContain('/bin/fish');
+    });
+
+    it('should return success false when applyLiveConfig throws', () => {
+      const deps = {
+        ...createMockDependencies(),
+        applyLiveConfig: () => {
+          throw new Error('Live apply failed');
+        }
+      };
+      const handler = createReloadHandler(deps);
+
+      const newConfig = {fontSize: 14, backgroundColor: '#000'} as configOptions;
+      const result = handler.processReload(newConfig);
+
+      expect(result.success).toBe(false);
+      expect(result.appliedLive).toEqual([]);
+    });
+
+    it('should return success false when emitRestartWarning throws', () => {
+      const deps = {
+        ...createMockDependencies(),
+        getCurrentConfig: () => ({shell: '/bin/bash'}) as configOptions,
+        emitRestartWarning: () => {
+          throw new Error('Emit failed');
+        }
+      };
+      const handler = createReloadHandler(deps);
+
+      const result = handler.processReload({shell: '/bin/zsh'} as configOptions);
+
+      expect(result.success).toBe(false);
+      expect(handler.isRestartRequired()).toBe(false);
+      expect(result.restartRequired).toEqual([]);
     });
 
     it('should return immutable state', () => {

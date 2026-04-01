@@ -38,6 +38,14 @@ const mergeLiveConfig = (currentConfig: configOptions, liveConfig: Partial<confi
   return result as configOptions;
 };
 
+/** Minimal logger interface for reload handler diagnostics. */
+export type ReloadHandlerLogger = {
+  /** Emit a warning-level log message. */
+  readonly warn: (message: string, ...args: unknown[]) => void;
+  /** Emit a debug-level log message. */
+  readonly debug: (message: string, ...args: unknown[]) => void;
+};
+
 /** Dependencies required by the reload handler. */
 export type ReloadHandlerDependencies = {
   /** Function to get the current effective configuration. */
@@ -46,8 +54,8 @@ export type ReloadHandlerDependencies = {
   readonly applyLiveConfig: (config: Partial<configOptions>) => void;
   /** Function to emit restart-required warnings to the UI. */
   readonly emitRestartWarning: (diagnostics: ConfigReloadDiagnostic[]) => void;
-  /** Optional logger for diagnostic output. */
-  readonly warn?: typeof console.warn;
+  /** Optional logger for diagnostic output. Defaults to no-op. */
+  readonly logger?: ReloadHandlerLogger;
 };
 
 /** Internal state tracking for the reload handler. */
@@ -117,11 +125,14 @@ const truncateValue = (value: unknown, key?: string, maxLength = 50): string => 
  * @param scope - The scope of the config key.
  * @returns True if the setting requires restart, false if live-reloadable.
  */
-const requiresRestart = (key: string, scope: 'root' | 'profile' | 'keymap' | 'plugin'): boolean => {
+const requiresRestart = (
+  key: string,
+  scope: 'root' | 'profile' | 'keymap' | 'plugin',
+  logger?: ReloadHandlerLogger
+): boolean => {
   const entry = getReloadability(key, scope);
-  if (entry === undefined && isReloadDebugEnabled()) {
-    // eslint-disable-next-line no-console
-    console.debug(
+  if (entry === undefined && isReloadDebugEnabled() && logger) {
+    logger.debug(
       `[reload-handler] Unknown config key "${key}" (scope: ${scope}) - using default restart-required classification`
     );
   }
@@ -135,11 +146,14 @@ const requiresRestart = (key: string, scope: 'root' | 'profile' | 'keymap' | 'pl
  * @param scope - The scope of the config key.
  * @returns True if the setting is live-reloadable, false if restart is required.
  */
-const isLiveReloadable = (key: string, scope: 'root' | 'profile' | 'keymap' | 'plugin'): boolean => {
+const isLiveReloadable = (
+  key: string,
+  scope: 'root' | 'profile' | 'keymap' | 'plugin',
+  logger?: ReloadHandlerLogger
+): boolean => {
   const entry = getReloadability(key, scope);
-  if (entry === undefined && isReloadDebugEnabled()) {
-    // eslint-disable-next-line no-console
-    console.debug(
+  if (entry === undefined && isReloadDebugEnabled() && logger) {
+    logger.debug(
       `[reload-handler] Unknown config key "${key}" (scope: ${scope}) - using default restart-required classification`
     );
   }
@@ -260,7 +274,11 @@ export const extractLiveConfigChanges = (
  * @returns Reload handler functions and state accessors.
  */
 export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => {
-  const {getCurrentConfig, applyLiveConfig, emitRestartWarning, warn = console.warn} = dependencies;
+  const {getCurrentConfig, applyLiveConfig, emitRestartWarning, logger} = dependencies;
+  const log: ReloadHandlerLogger = logger ?? {
+    warn: () => {},
+    debug: () => {}
+  };
 
   // Initialize state with current config
   let state: ReloadHandlerState = {
@@ -274,36 +292,52 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
     newConfig: configOptions,
     liveChanges: ConfigReloadDiagnostic[],
     autoApplyLive: boolean
-  ): void => {
-    if (!autoApplyLive || liveChanges.length === 0) return;
+  ): {success: boolean; error?: unknown} => {
+    if (!autoApplyLive || liveChanges.length === 0) return {success: true};
     const liveConfig = extractLiveConfigChanges(currentConfig, newConfig, liveChanges);
-    applyLiveConfig(liveConfig);
-    warn('[reload-handler] Applied live-reloadable config changes:', {
-      keys: liveChanges.map((d) => d.path)
-    });
-    state = {
-      ...state,
-      lastAppliedConfig: mergeLiveConfig(currentConfig, liveConfig)
-    };
+    try {
+      applyLiveConfig(liveConfig);
+      log.warn('[reload-handler] Applied live-reloadable config changes:', {
+        keys: liveChanges.map((d) => d.path)
+      });
+      state = {
+        ...state,
+        lastAppliedConfig: mergeLiveConfig(currentConfig, liveConfig)
+      };
+      return {success: true};
+    } catch (err) {
+      log.warn('[reload-handler] Failed to apply live config changes:', err);
+      return {success: false, error: err};
+    }
   };
 
-  const updatePendingRestartState = (restartChanges: ConfigReloadDiagnostic[], emitWarnings: boolean): void => {
+  const updatePendingRestartState = (
+    restartChanges: ConfigReloadDiagnostic[],
+    emitWarnings: boolean
+  ): {success: boolean; error?: unknown} => {
+    if (restartChanges.length === 0) return {success: true};
     const pendingMap = new Map<string, ConfigReloadDiagnostic>();
     for (const change of restartChanges) {
       pendingMap.set(change.path, change);
+    }
+    if (emitWarnings) {
+      try {
+        emitRestartWarning(restartChanges);
+      } catch (err) {
+        log.warn('[reload-handler] Failed to emit restart warning:', err);
+        return {success: false, error: err};
+      }
     }
     state = {
       ...state,
       pendingRestartChanges: Array.from(pendingMap.values()),
       hasPendingRestartChanges: pendingMap.size > 0
     };
-    if (emitWarnings && restartChanges.length > 0) {
-      emitRestartWarning(restartChanges);
-      warn('[reload-handler] Queued restart-required config changes:', {
-        keys: restartChanges.map((d) => d.path),
-        pendingCount: pendingMap.size
-      });
-    }
+    log.warn('[reload-handler] Queued restart-required config changes:', {
+      keys: restartChanges.map((d) => d.path),
+      pendingCount: pendingMap.size
+    });
+    return {success: true};
   };
 
   /**
@@ -323,14 +357,16 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
     const allChanges = detectConfigChanges(currentConfig, newConfig);
     const {liveChanges, restartChanges} = partitionChanges(allChanges);
 
-    applyLiveChangesIfEnabled(currentConfig, newConfig, liveChanges, opts.autoApplyLive);
-    updatePendingRestartState(restartChanges, opts.emitWarnings);
+    const liveResult = applyLiveChangesIfEnabled(currentConfig, newConfig, liveChanges, opts.autoApplyLive);
+    const restartResult = updatePendingRestartState(restartChanges, opts.emitWarnings);
+
+    const success = liveResult.success && restartResult.success;
 
     return {
-      success: true,
+      success,
       config: state.lastAppliedConfig,
-      appliedLive: opts.autoApplyLive ? liveChanges.map((d) => d.path) : [],
-      restartRequired: restartChanges,
+      appliedLive: opts.autoApplyLive && liveResult.success ? liveChanges.map((d) => d.path) : [],
+      restartRequired: restartResult.success ? restartChanges : [],
       validationErrors: []
     };
   };

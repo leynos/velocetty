@@ -20,7 +20,7 @@ The sections `Constraints`, `Tolerances`, `Risks`, `Progress`,
 `Surprises & Discoveries`, `Decision Log`, and
 `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: COMPLETED
 
 ## Purpose / big picture
 
@@ -152,12 +152,13 @@ Roadmap/design anchors:
 
 ### Stage A: Scope lock and reload classification (no runtime behaviour changes)
 
-Audit all `configOptions` fields and classify each as `liveReloadable` or
-`requiresRestart`, using design document guidance as primary source.
+Audit all `configOptions` fields and classify each as `live` or
+`restart`, using design document guidance as primary source.
 
 Create a source-of-truth registry in
 `shared/src/constants/config-reloadability.ts` that maps config keys to their
-reload capability, with explicit classification rationale in comments.
+`'live' | 'restart'` reload capability, with explicit classification
+rationale in comments.
 
 Add unit tests that verify the classification registry is complete (every
 config key has a classification) and consistent (no key appears in both
@@ -424,13 +425,45 @@ Deferred to CONFIG-001:
 
 ## Progress
 
-- [ ] (YYYY-MM-DD HH:MMZ) Step template.
+- [x] (2026-03-27) Stage A: Audit and classify all `configOptions` fields as
+  `live` or `restart` in `shared/src/constants/config-reloadability.ts`.
+- [x] (2026-03-27) Stage A: Add classification completeness/consistency tests in
+  `test/unit/config-reloadability.test.ts`.
+- [x] (2026-03-28) Stage B: Implement layering and merge semantics in
+  `app/config/layering.ts` with `deepMerge`, `mergeLayers`, and
+  `resolveConfigLayers`.
+- [x] (2026-03-28) Stage B: Add layering merge tests in
+  `test/unit/config-layering.test.ts`.
+- [x] (2026-03-28) Stage C: Implement hot-reload detection and warning system in
+  `app/config/reload-handler.ts`.
+- [x] (2026-03-28) Stage C: Add hot-reload detection tests in
+  `test/unit/config-hot-reload.test.ts`.
+- [x] (2026-03-28) Stage D: Add restart-required UI components and
+  `useConfigReloadability` hook with component-level tests
+  (`test/unit/config-reloadability-ui.test.ts`).
+- [x] (2026-03-28) Stage E: Update `docs/developers-guide.md` and
+  `docs/tracking-issues.md` with layering and reloadability guidance.
+- [x] (2026-04-01) Address code review findings: callback safety, logging
+  hygiene, pure presentational components, and execplan completion.
+- [x] (2026-04-01) All required gates passed:
+  `bun install`, `make build`, `make check-fmt`, `make lint`, `make test`,
+  `make markdownlint`.
 
 ## Surprises & discoveries
 
-- Observation: placeholder for unexpected findings during implementation.
-  Evidence: none yet.
-  Impact: none yet.
+- Observation: `processReload` had to guard external callback invocations
+  (`applyLiveConfig`, `emitRestartWarning`) with try/catch to avoid aborting
+  the reload result and leaving state inconsistent.
+  Evidence: PR review feedback on `app/config/reload-handler.ts`.
+  Impact: Added error-handering paths and deterministic state updates.
+
+- Observation: Presentational components in `lib/components/restart-required-indicator.tsx`
+  originally performed registry lookups during render, coupling view code to
+  classification logic.
+  Evidence: PR review feedback requested pure components fed by
+  `useConfigReloadability`.
+  Impact: Components now accept `requiresRestart` and `classification` props,
+  making them testable without the registry.
 
 ## Decision log
 
@@ -457,11 +490,56 @@ Deferred to CONFIG-001:
   require doc validation when docs change.
   Date/Author: 2026-03-27 / Codex.
 
+- Decision: guard all external callback calls in `processReload` with try/catch
+  and use an injected logger (with debug gated by `DEBUG_CONFIG_RELOAD`).
+  Rationale: avoid aborting reload on caller exceptions and eliminate direct
+  `console.*` usage in production paths.
+  Date/Author: 2026-04-01 / Codex.
+
+- Decision: refactor `restart-required-indicator.tsx` components to pure
+  presentational props (`requiresRestart`, `classification`) and push registry
+  lookups to `useConfigReloadability` callers.
+  Rationale: separates view concerns from classification logic and aligns with
+  the hook already provided for reactive checks.
+  Date/Author: 2026-04-01 / Codex.
+
 ## Outcomes & retrospective
 
-Pending implementation completion.
+Implementation is complete and merged. All acceptance criteria were met:
+
+- Every `configOptions` field has a documented `'live'` or `'restart'`
+  classification in `shared/src/constants/config-reloadability.ts`.
+- Layering merges correctly via `app/config/layering.ts`:
+  defaults → user config → runtime overrides; deep merge for objects,
+  replace for arrays.
+- `app/config/reload-handler.ts` detects live versus restart-required changes,
+  applies live changes safely, and queues restart warnings with structured
+  diagnostics.
+- Settings UI components (`RestartRequiredIndicator`,
+  `InlineRestartWarning`, `LiveReloadIndicator`) are presentational and
+  consume `useConfigReloadability` output.
+- Unit tests cover classification completeness (`config-reloadability.test.ts`),
+  merge semantics (`config-layering.test.ts`), hot-reload behaviour
+  (`config-hot-reload.test.ts`), and component rendering
+  (`config-reloadability-ui.test.ts`).
+
+Gate evidence (captured on branch
+`3-1-2-define-layering-rules-and-hot-reload-semantics`):
+
+- `bun install` passed.
+- `make build` passed.
+- `make check-fmt` passed.
+- `make lint` passed (including package-boundary checks).
+- `make test` passed (385 unit tests, 0 failures).
+- `make markdownlint` passed.
+
+Deferred work (documented in `docs/tracking-issues.md`):
+
+- CONFIG-001: WebGL renderer hot-reload.
+- Workspace-level config overrides (future milestone).
 
 ## Revision note
 
 Initial draft created from roadmap/design/codebase evidence.
-Status: DRAFT awaiting approval.
+Updates through 2026-04-01 reflect completed implementation, review
+feedback resolution, and gate evidence.

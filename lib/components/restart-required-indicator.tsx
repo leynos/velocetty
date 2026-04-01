@@ -3,24 +3,26 @@
  * Displays a visual indicator next to settings that require an application
  * restart to take effect. Also provides inline warning when user modifies
  * such a setting.
+ *
+ * These are pure/presentational components: callers should use
+ * `useConfigReloadability(configKey)` and pass the resulting
+ * `requiresRestart` and `classification` values as props.
  */
 // biome-ignore lint/style/useImportType: React value is required for the current JSX runtime.
-import React, {useMemo} from 'react';
+import React from 'react';
 
-import {keyRequiresRestart, getKeyReloadClassification} from '@shared/constants/config-reloadability';
+import type {ConfigReloadClassification} from '@shared/types/config';
 
 /** Props for the RestartRequiredIndicator component. */
 export type RestartRequiredIndicatorProps = {
-  /** The configuration key this indicator is for. */
-  configKey: string;
+  /** Whether the setting requires restart. */
+  requiresRestart: boolean;
   /** Tooltip text for the indicator. */
   tooltip: string;
   /** Accessible label for the indicator. */
   ariaLabel: string;
   /** Override content for the indicator (defaults to a restart glyph if omitted). */
   children?: React.ReactNode;
-  /** Whether to show the indicator even if the key is live-reloadable. */
-  forceShow?: boolean;
   /** Additional CSS class names. */
   className?: string;
 };
@@ -30,10 +32,12 @@ export type RestartRequiredIndicatorProps = {
  *
  * @example
  * ```tsx
+ * const { requiresRestart } = useConfigReloadability({ configKey: 'fontSize' });
+ *
  * <label>
  *   Font Size
  *   <RestartRequiredIndicator
- *     configKey="fontSize"
+ *     requiresRestart={requiresRestart}
  *     tooltip="Changing this setting requires a restart to take effect."
  *     ariaLabel="Requires restart"
  *   />
@@ -41,17 +45,12 @@ export type RestartRequiredIndicatorProps = {
  * ```
  */
 export const RestartRequiredIndicator: React.FC<RestartRequiredIndicatorProps> = ({
-  configKey,
+  requiresRestart,
   tooltip,
   ariaLabel,
   children,
-  forceShow = false,
   className = ''
 }) => {
-  const requiresRestart = useMemo(() => {
-    return forceShow || keyRequiresRestart(configKey);
-  }, [configKey, forceShow]);
-
   if (!requiresRestart) {
     return null;
   }
@@ -75,8 +74,8 @@ export const RestartRequiredIndicator: React.FC<RestartRequiredIndicatorProps> =
 
 /** Props for the InlineRestartWarning component. */
 export type InlineRestartWarningProps = {
-  /** The configuration key that was changed. */
-  configKey: string;
+  /** Reload classification for the setting. */
+  classification: ConfigReloadClassification | undefined;
   /** Whether to show the warning. */
   show?: boolean;
   /** Message to display. */
@@ -88,12 +87,12 @@ export type InlineRestartWarningProps = {
  *
  * @example
  * ```tsx
- * <InlineRestartWarning configKey="shell" show={hasChanged} message="This change will take effect after restarting." />
+ * const { classification } = useConfigReloadability({ configKey: 'shell' });
+ *
+ * <InlineRestartWarning classification={classification} show={hasChanged} message="This change will take effect after restarting." />
  * ```
  */
-export const InlineRestartWarning: React.FC<InlineRestartWarningProps> = ({configKey, show = false, message}) => {
-  const classification = useMemo(() => getKeyReloadClassification(configKey), [configKey]);
-
+export const InlineRestartWarning: React.FC<InlineRestartWarningProps> = ({classification, show = false, message}) => {
   if (!show || classification !== 'restart') {
     return null;
   }
@@ -229,8 +228,8 @@ export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({
 
 /** Props for the LiveReloadIndicator component. */
 export type LiveReloadIndicatorProps = {
-  /** The configuration key this indicator is for. */
-  configKey: string;
+  /** Reload classification for the setting. */
+  classification: ConfigReloadClassification | undefined;
   /** Whether to show the indicator. */
   show?: boolean;
   /** Tooltip text for the indicator. */
@@ -255,10 +254,12 @@ export type LiveReloadIndicatorProps = {
  *
  * @example
  * ```tsx
+ * const { classification } = useConfigReloadability({ configKey: 'fontSize' });
+ *
  * <label>
  *   Font Size
  *   <LiveReloadIndicator
- *     configKey="fontSize"
+ *     classification={classification}
  *     tooltip="This setting can be changed without restarting"
  *     ariaLabel="Live reloadable"
  *   />
@@ -266,14 +267,12 @@ export type LiveReloadIndicatorProps = {
  * ```
  */
 export const LiveReloadIndicator: React.FC<LiveReloadIndicatorProps> = ({
-  configKey,
+  classification,
   show = true,
   tooltip,
   ariaLabel,
   children
 }) => {
-  const classification = useMemo(() => getKeyReloadClassification(configKey), [configKey]);
-
   if (!show || classification !== 'live') {
     return null;
   }

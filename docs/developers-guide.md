@@ -245,28 +245,41 @@ const result = handler.processReload(newConfig);
 
 When building settings UI components:
 
-1. Use `keyRequiresRestart(key)` to check if a setting requires restart.
-2. Display restart-required indicators using `RestartRequiredIndicator` component.
+1. Use `useConfigReloadability({configKey})` to obtain `requiresRestart` and
+   `classification` for a setting.
+2. Display restart-required indicators using `RestartRequiredIndicator` component,
+   passing `requiresRestart` from the hook.
 3. Show inline warnings when users modify non-reloadable settings using
-   `InlineRestartWarning` component.
-4. Use `useConfigReloadability()` hook for reactive classification checks.
+   `InlineRestartWarning` component, passing `classification` from the hook.
+4. Use `keyRequiresRestart(key)` for imperative checks outside React render.
 
 Example:
 
 ```tsx
 import {RestartRequiredIndicator, InlineRestartWarning} from
   '../components/restart-required-indicator';
+import {useConfigReloadability} from '../hooks/use-config-reloadability';
 
 function ShellSetting() {
   const hasChanged = true; // example: derived from form state
+  const {requiresRestart, classification} = useConfigReloadability({configKey: 'shell'});
+
   return (
     <div>
       <label>
         Shell Path
-        <RestartRequiredIndicator configKey="shell" />
+        <RestartRequiredIndicator
+          requiresRestart={requiresRestart}
+          tooltip="Changing the shell requires a restart to take effect."
+          ariaLabel="Requires restart"
+        />
       </label>
       <input type="text" />
-      <InlineRestartWarning configKey="shell" show={hasChanged} />
+      <InlineRestartWarning
+        classification={classification}
+        show={hasChanged}
+        message="This change will take effect after restarting the application."
+      />
     </div>
   );
 }
