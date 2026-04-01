@@ -369,7 +369,8 @@ Planned interface additions/updates:
 - `ConfigReloadResult` type capturing applied changes and queued warnings.
 - `ConfigReloadDiagnostic` type for restart-required warnings (may extend
   existing `configValidationDiagnostic`).
-- Settings UI derives reloadability from the registry-driven approach rather than schema metadata.
+- Settings UI derives reloadability from the registry-driven approach rather
+  than schema metadata.
 
 Planned dependency posture:
 
