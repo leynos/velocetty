@@ -234,17 +234,17 @@ const createPostcssPluginWithoutModules = (): Plugin => {
         // Don't call originalOnLoad here - we want the wrapper to be the only handler
       };
 
-      // Call base plugin setup
-      basePlugin.setup(build);
+      try {
+        // Call base plugin setup
+        basePlugin.setup(build);
+      } finally {
+        // Always restore original onLoad, even if an exception occurred
+        build.onLoad = originalOnLoad;
+      }
 
-      // Override to filter out .module.css files
-      build.onLoad = originalOnLoad;
+      // Re-register captured handlers with the original onLoad
       for (const {filter, namespace, callback} of onLoadCallbacks) {
         build.onLoad({filter, namespace}, async (args) => {
-          // Skip CSS Module files
-          if (args.path.endsWith('.module.css')) {
-            return undefined;
-          }
           return await callback(args);
         });
       }
