@@ -3,6 +3,7 @@
  * Returns an identity mapping where class names map to themselves.
  */
 import type {BunPlugin} from 'bun';
+import {plugin} from 'bun';
 
 /**
  * Parses CSS content to extract class names.
@@ -52,8 +53,6 @@ const cssModulesPlugin: BunPlugin = {
 };
 
 // Register the plugin with Bun
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const {plugin} = require('bun');
 plugin(cssModulesPlugin);
 
 export default cssModulesPlugin;

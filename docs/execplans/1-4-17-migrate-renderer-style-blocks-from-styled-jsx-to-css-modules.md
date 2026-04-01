@@ -322,7 +322,7 @@ make test
 
 Expected: all pass with no new warnings.
 
-### Step 2: Migrate Pattern A files
+### Step 2: Migrate Pattern-A files
 
 For each file, run a focused build and lint check:
 
@@ -411,7 +411,7 @@ Quality criteria (what "done" means):
   `lib/containers`.
 - Build verification: `make build` produces a renderer bundle with no
   `styled-jsx/style` runtime imports.
-- Documentation: `docs/developers-guide.md` is accurate and `docs/roadmap.md`
+- Documentation: `docs/developers-guide.md` is accurate, and `docs/roadmap.md`
   marks `1.4.17` as done.
 
 Quality method (verification steps):
