@@ -177,7 +177,9 @@ describe('config-hot-reload', () => {
       const oldConfig = {fontSize: 12, shell: '/bin/bash'} as configOptions;
       const newConfig = {fontSize: 14, shell: '/bin/zsh'} as configOptions;
 
-      const result = extractLiveConfigChanges(oldConfig, newConfig, [makeLiveDiagnostic('fontSize')]);
+      const result = extractLiveConfigChanges(oldConfig, newConfig, [
+        makeLiveDiagnostic('fontSize')
+      ]) as Partial<configOptions>;
 
       expect(result.fontSize).toBe(14);
       expect(result.shell).toBeUndefined();
@@ -197,7 +199,9 @@ describe('config-hot-reload', () => {
       const oldConfig = {colors: {red: '#ff0000'}, fontSize: 12} as configOptions;
       const newConfig = {colors: {red: '#cc0000'}, fontSize: 14} as configOptions;
 
-      const result = extractLiveConfigChanges(oldConfig, newConfig, [makeLiveDiagnostic('colors')]);
+      const result = extractLiveConfigChanges(oldConfig, newConfig, [
+        makeLiveDiagnostic('colors')
+      ]) as Partial<configOptions>;
 
       expect(result.colors).toEqual({red: '#cc0000'});
       expect(result.fontSize).toBeUndefined();
@@ -236,7 +240,7 @@ describe('config-hot-reload', () => {
       const applied: Partial<configOptions>[] = [];
       const deps = {
         ...createMockDependencies(),
-        applyLiveConfig: (config: Partial<configOptions>) => applied.push(config)
+        applyLiveConfig: (config: unknown) => applied.push(config as Partial<configOptions>)
       };
       const handler = createReloadHandler(deps);
 
@@ -288,7 +292,7 @@ describe('config-hot-reload', () => {
       const applied: Partial<configOptions>[] = [];
       const deps = {
         ...createMockDependencies(),
-        applyLiveConfig: (config: Partial<configOptions>) => applied.push(config)
+        applyLiveConfig: (config: unknown) => applied.push(config as Partial<configOptions>)
       };
       const handler = createReloadHandler(deps);
 
@@ -384,6 +388,8 @@ describe('config-hot-reload', () => {
 
       expect(result.success).toBe(false);
       expect(result.appliedLive).toEqual([]);
+      expect(result.errors).toBeDefined();
+      expect(result.errors!.length).toBe(1);
     });
 
     it('should return success false when emitRestartWarning throws', () => {
@@ -401,6 +407,8 @@ describe('config-hot-reload', () => {
       expect(result.success).toBe(false);
       expect(handler.isRestartRequired()).toBe(false);
       expect(result.restartRequired).toEqual([]);
+      expect(result.errors).toBeDefined();
+      expect(result.errors!.length).toBe(1);
     });
 
     it('should return immutable state', () => {

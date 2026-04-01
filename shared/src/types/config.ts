@@ -313,4 +313,6 @@ export type ConfigReloadResult = {
    *       when adding schema validation for live-reloadable changes.
    */
   validationErrors: configValidationDiagnostic[];
+  /** Callback or internal errors that occurred during reload. */
+  errors?: unknown[];
 };

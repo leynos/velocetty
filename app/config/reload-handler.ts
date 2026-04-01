@@ -13,6 +13,9 @@ import type {Reloadability} from '@shared/constants/config-reloadability';
 import {getKeyScope, getReloadability} from '@shared/constants/config-reloadability';
 import {getChangedKeys} from './layering';
 
+/** Explicit live-patch type that models deletion by setting keys to `undefined`. */
+export type LiveConfigPatch = Record<string, unknown>;
+
 /**
  * Merges live config changes into current config, treating undefined as deletion.
  *
@@ -23,12 +26,11 @@ import {getChangedKeys} from './layering';
  * @param liveConfig - The live changes to apply (undefined values delete keys).
  * @returns A new configuration with live changes applied.
  */
-const mergeLiveConfig = (currentConfig: configOptions, liveConfig: Partial<configOptions>): configOptions => {
-  const result = {...currentConfig} as Record<string, unknown>;
+const mergeLiveConfig = (currentConfig: configOptions, liveConfig: LiveConfigPatch): configOptions => {
+  const result: LiveConfigPatch = {...currentConfig};
 
   for (const [key, value] of Object.entries(liveConfig)) {
     if (value === undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
       delete result[key];
     } else {
       result[key] = value;
@@ -51,7 +53,7 @@ export type ReloadHandlerDependencies = {
   /** Function to get the current effective configuration. */
   readonly getCurrentConfig: () => configOptions;
   /** Function to apply live configuration changes. */
-  readonly applyLiveConfig: (config: Partial<configOptions>) => void;
+  readonly applyLiveConfig: (config: LiveConfigPatch) => void;
   /** Function to emit restart-required warnings to the UI. */
   readonly emitRestartWarning: (diagnostics: ConfigReloadDiagnostic[]) => void;
   /** Optional logger for diagnostic output. Defaults to no-op. */
@@ -255,16 +257,16 @@ export const extractLiveConfigChanges = (
   _oldConfig: configOptions,
   newConfig: configOptions,
   liveDiagnostics: ConfigReloadDiagnostic[]
-): Partial<configOptions> => {
-  const result: Record<string, unknown> = {};
+): LiveConfigPatch => {
+  const result: LiveConfigPatch = {};
 
   // Iterate live diagnostics and extract values from newConfig
   // Including undefined values to properly handle key removals
   for (const {path: key} of liveDiagnostics) {
-    result[key] = (newConfig as Record<string, unknown>)[key];
+    result[key] = (newConfig as LiveConfigPatch)[key];
   }
 
-  return result as Partial<configOptions>;
+  return result;
 };
 
 /**
@@ -361,13 +363,17 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
     const restartResult = updatePendingRestartState(restartChanges, opts.emitWarnings);
 
     const success = liveResult.success && restartResult.success;
+    const errors: unknown[] = [];
+    if (liveResult.error) errors.push(liveResult.error);
+    if (restartResult.error) errors.push(restartResult.error);
 
     return {
       success,
       config: state.lastAppliedConfig,
       appliedLive: opts.autoApplyLive && liveResult.success ? liveChanges.map((d) => d.path) : [],
       restartRequired: restartResult.success ? restartChanges : [],
-      validationErrors: []
+      validationErrors: [],
+      errors: errors.length > 0 ? errors : undefined
     };
   };
 
@@ -379,6 +385,7 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
   const clearPendingChanges = () => {
     state = {
       ...state,
+      lastAppliedConfig: structuredClone(getCurrentConfig()),
       pendingRestartChanges: [],
       hasPendingRestartChanges: false
     };
