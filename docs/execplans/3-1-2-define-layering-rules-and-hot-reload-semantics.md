@@ -376,8 +376,8 @@ Planned interface additions/updates:
 Planned dependency posture:
 
 - Reuse existing JSON5 parsing and roundtrip-retention from 3.1.1.
-- Reuse existing Redux action infrastructure (`CONFIG_LOAD`, `CONFIG_RELOAD`).
-- Reuse existing notification system for warning surfaces.
+- Build on existing Redux action infrastructure (`CONFIG_LOAD`, `CONFIG_RELOAD`).
+- Leverage the existing notification system for warning surfaces.
 - No new external dependencies planned.
 
 ## Idempotence and recovery
