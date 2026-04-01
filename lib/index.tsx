@@ -1,4 +1,5 @@
 import './v8-snapshot-util';
+import './tailwind.css';
 import {webFrame} from 'electron';
 
 import {createRoot} from 'react-dom/client';

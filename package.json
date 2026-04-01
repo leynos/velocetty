@@ -103,7 +103,6 @@
     "@biomejs/biome": "^2.3.13",
     "@chialab/esbuild-plugin-postcss": "^1.0.1",
     "@electron/rebuild": "^3.6.0",
-    "@tailwindcss/cli": "^4.2.2",
     "@types/args": "^5.0.3",
     "@types/async-retry": "^1.4.3",
     "@types/color": "^3.0.6",

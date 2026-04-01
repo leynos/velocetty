@@ -2,7 +2,7 @@
 import {copyFile, mkdir} from 'node:fs/promises';
 import path from 'node:path';
 
-import {build, context, type BuildContext, type BuildOptions} from 'esbuild';
+import {build, context, type BuildContext, type BuildOptions, type Plugin, type PluginBuild} from 'esbuild';
 
 import {ensureDirectoryPath} from '../../bin/shared/ensure-directory-path.js';
 import {copyHyperAppArtifacts, copyRendererArtifacts} from './copy-artifacts';
@@ -11,7 +11,6 @@ import {createNodeBuiltinsPlugin} from './esbuild-plugins/node-builtins-plugin';
 import {createRendererExternalsPlugin} from './esbuild-plugins/renderer-externals-plugin';
 import {createStyledJsxBabelBridgePlugin} from './esbuild-plugins/styled-jsx-babel-bridge-plugin';
 import postcssPlugin from '@chialab/esbuild-plugin-postcss';
-import type {Plugin} from 'esbuild';
 
 export type BuildMode = 'development' | 'production';
 export type BuildTarget = 'hyper-app' | 'renderer' | 'cli';
@@ -225,10 +224,10 @@ const createPostcssPluginWithoutModules = (): Plugin => {
     name: 'postcss-no-modules',
     setup(build) {
       const originalOnLoad = build.onLoad.bind(build);
-      const onLoadCallbacks: Array<{filter: RegExp; callback: Function}> = [];
+      const onLoadCallbacks: Array<{filter: RegExp; callback: OnLoadCallback}> = [];
 
       // Intercept onLoad registrations
-      build.onLoad = (options: {filter: RegExp; namespace?: string}, callback: Function) => {
+      build.onLoad = (options: {filter: RegExp; namespace?: string}, callback: OnLoadCallback) => {
         onLoadCallbacks.push({filter: options.filter, callback});
         return originalOnLoad(options, callback);
       };
@@ -254,3 +253,6 @@ const createPostcssPluginWithoutModules = (): Plugin => {
     }
   };
 };
+
+/** Type for esbuild onLoad callbacks, extracted from PluginBuild['onLoad'] */
+type OnLoadCallback = Parameters<PluginBuild['onLoad']>[1];
