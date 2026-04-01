@@ -178,6 +178,7 @@ Implement deep merge for objects, replace for arrays as per design spec.
 Merge should produce a single resolved `configOptions` shape for consumption.
 
 Add unit tests verifying merge behaviour:
+
 - User values override defaults.
 - Nested objects merge deeply rather than replace.
 - Arrays in user config replace arrays from defaults.
@@ -196,11 +197,13 @@ Implement reload capability checking in the config reload path:
   a structured warning diagnostic, and surface UI notification.
 
 Add notification/warning infrastructure:
+
 - Extend `configValidationDiagnostic` or create parallel
   `ConfigReloadDiagnostic` type for restart-required warnings.
 - Add restart-required indicator capability to settings UI metadata.
 
 Add unit tests:
+
 - Live-reloadable changes apply without restart warning.
 - Restart-required changes trigger warning diagnostics.
 - Mixed changes apply live-reloadable subset and warn on remainder.
@@ -220,11 +223,13 @@ render correctly.
 ### Stage E: Documentation, tracking issue alignment, and full gates
 
 Update `docs/developers-guide.md` with:
+
 - Layering rules and merge semantics for config contributors.
 - How to classify new settings as live-reloadable or restart-required.
 - Warning system behaviour for non-reloadable changes.
 
 Update `docs/tracking-issues.md`:
+
 - Reference CONFIG-001 for WebGL renderer hot-reload deferral.
 - Add any new tracking items for deferred workspace-level overrides.
 
