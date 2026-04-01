@@ -1,5 +1,5 @@
 /** @file Tailwind CSS entry point for the application. */
-@import "tailwindcss/index.css";
+@import "tailwindcss";
 
 :root {
   /* Tab colors */
