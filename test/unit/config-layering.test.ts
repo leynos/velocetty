@@ -1,10 +1,23 @@
 /** @file Unit tests for configuration layering and merge semantics.
  *
- * Verifies that:
- * - Deep merge correctly merges nested objects
- * - Arrays are replaced, not merged
- * - Layer resolution follows correct precedence order
- * - Runtime overrides take precedence over user and defaults
+ * ## Merge Invariants
+ *
+ * - **Precedence order**: Runtime > User > Defaults (highest to lowest)
+ * - **Arrays**: Replaced entirely, not concatenated or merged
+ * - **Objects**: Deep merged recursively (nested fields combine across layers)
+ * - **Undefined values**: Skipped in source (allows defaults to persist)
+ * - **Null values**: Explicitly overwrite target (deliberate reset)
+ *
+ * ## Test Coverage
+ *
+ * - Deep merge behavior for nested objects
+ * - Array replacement (not merging)
+ * - Layer resolution with correct precedence
+ * - Runtime overrides taking precedence over user and defaults
+ * - Config layer type guards and validation
+ * - Change detection between config objects
+ *
+ * @see {@link ../../app/config/layering.ts} - Implementation module
  */
 import {describe, it, expect} from 'bun:test';
 import type {configOptions} from '@shared/types/config';
@@ -19,6 +32,25 @@ import {
   getChangedKeys,
   type ConfigLayer
 } from '../../app/config/layering';
+
+/** Creates a defaults layer config with required fields and optional overrides. */
+const makeDefaults = (overrides: Partial<configOptions> = {}): configOptions =>
+  ({
+    defaultProfile: 'default',
+    profiles: [],
+    fontSize: 12,
+    backgroundColor: '#000',
+    ...overrides
+  }) as configOptions;
+
+/** Creates a user config layer with optional overrides. */
+const makeUserConfig = (overrides: Partial<configOptions> = {}): Partial<configOptions> => ({
+  fontSize: 14,
+  ...overrides
+});
+
+/** Creates runtime overrides with optional additional properties. */
+const makeRuntimeOverrides = (overrides: Partial<configOptions> = {}): Partial<configOptions> => overrides;
 
 describe('config-layering', () => {
   describe('deepMerge', () => {
@@ -126,8 +158,8 @@ describe('config-layering', () => {
   describe('mergeLayers', () => {
     it('should merge layers in order', () => {
       const layers: ConfigLayer[] = [
-        {type: 'defaults', config: {defaultProfile: 'default', profiles: [], fontSize: 12, backgroundColor: '#000'}},
-        {type: 'user', config: {fontSize: 14}}
+        {type: 'defaults', config: makeDefaults({fontSize: 12, backgroundColor: '#000'})},
+        {type: 'user', config: makeUserConfig({fontSize: 14})}
       ];
       const result = mergeLayers(layers);
 
@@ -137,9 +169,9 @@ describe('config-layering', () => {
 
     it('should apply runtime overrides over user config', () => {
       const layers: ConfigLayer[] = [
-        {type: 'defaults', config: {defaultProfile: 'default', profiles: [], fontSize: 12, cursorBlink: false}},
-        {type: 'user', config: {fontSize: 14}},
-        {type: 'runtime', config: {cursorBlink: true}}
+        {type: 'defaults', config: makeDefaults({fontSize: 12, cursorBlink: false})},
+        {type: 'user', config: makeUserConfig({fontSize: 14})},
+        {type: 'runtime', config: makeRuntimeOverrides({cursorBlink: true})}
       ];
       const result = mergeLayers(layers);
 
@@ -155,10 +187,10 @@ describe('config-layering', () => {
       const layers: ConfigLayer[] = [
         {
           type: 'defaults',
-          config: {defaultProfile: 'default', profiles: [], colors: {red: '#ff0000', blue: '#0000ff'}}
+          config: makeDefaults({colors: {red: '#ff0000', blue: '#0000ff'}})
         },
-        {type: 'user', config: {colors: {green: '#00ff00'}}},
-        {type: 'runtime', config: {colors: {blue: '#000099'}}} // override blue
+        {type: 'user', config: makeUserConfig({colors: {green: '#00ff00'}})},
+        {type: 'runtime', config: makeRuntimeOverrides({colors: {blue: '#000099'}})} // override blue
       ];
       const result = mergeLayers(layers);
 
@@ -172,14 +204,9 @@ describe('config-layering', () => {
 
   describe('resolveConfigLayers', () => {
     it('should resolve defaults → user → runtime in correct order', () => {
-      const defaults = {
-        defaultProfile: 'default',
-        profiles: [],
-        fontSize: 12,
-        backgroundColor: '#000'
-      } as configOptions;
-      const userConfig = {fontSize: 14};
-      const runtimeOverrides = {backgroundColor: '#fff'};
+      const defaults = makeDefaults({fontSize: 12, backgroundColor: '#000'});
+      const userConfig = makeUserConfig({fontSize: 14});
+      const runtimeOverrides = makeRuntimeOverrides({backgroundColor: '#fff'});
 
       const result = resolveConfigLayers(defaults, userConfig, runtimeOverrides);
 
@@ -188,8 +215,8 @@ describe('config-layering', () => {
     });
 
     it('should work without runtime overrides', () => {
-      const defaults = {defaultProfile: 'default', profiles: [], fontSize: 12} as configOptions;
-      const userConfig = {fontSize: 14};
+      const defaults = makeDefaults({fontSize: 12});
+      const userConfig = makeUserConfig({fontSize: 14});
 
       const result = resolveConfigLayers(defaults, userConfig);
 
@@ -197,12 +224,7 @@ describe('config-layering', () => {
     });
 
     it('should handle empty user config', () => {
-      const defaults = {
-        defaultProfile: 'default',
-        profiles: [],
-        fontSize: 12,
-        backgroundColor: '#000'
-      } as configOptions;
+      const defaults = makeDefaults({fontSize: 12, backgroundColor: '#000'});
       const userConfig = {};
 
       const result = resolveConfigLayers(defaults, userConfig);
