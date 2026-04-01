@@ -153,7 +153,10 @@ describe('config-layering', () => {
 
     it('should deeply merge across multiple layers', () => {
       const layers: ConfigLayer[] = [
-        {type: 'defaults', config: {defaultProfile: 'default', profiles: [], colors: {red: '#ff0000', blue: '#0000ff'}}},
+        {
+          type: 'defaults',
+          config: {defaultProfile: 'default', profiles: [], colors: {red: '#ff0000', blue: '#0000ff'}}
+        },
         {type: 'user', config: {colors: {green: '#00ff00'}}},
         {type: 'runtime', config: {colors: {blue: '#000099'}}} // override blue
       ];
@@ -169,7 +172,12 @@ describe('config-layering', () => {
 
   describe('resolveConfigLayers', () => {
     it('should resolve defaults → user → runtime in correct order', () => {
-      const defaults = {defaultProfile: 'default', profiles: [], fontSize: 12, backgroundColor: '#000'} as configOptions;
+      const defaults = {
+        defaultProfile: 'default',
+        profiles: [],
+        fontSize: 12,
+        backgroundColor: '#000'
+      } as configOptions;
       const userConfig = {fontSize: 14};
       const runtimeOverrides = {backgroundColor: '#fff'};
 
@@ -189,7 +197,12 @@ describe('config-layering', () => {
     });
 
     it('should handle empty user config', () => {
-      const defaults = {defaultProfile: 'default', profiles: [], fontSize: 12, backgroundColor: '#000'} as configOptions;
+      const defaults = {
+        defaultProfile: 'default',
+        profiles: [],
+        fontSize: 12,
+        backgroundColor: '#000'
+      } as configOptions;
       const userConfig = {};
 
       const result = resolveConfigLayers(defaults, userConfig);
