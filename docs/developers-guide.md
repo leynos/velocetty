@@ -182,6 +182,11 @@ configuration:
 
 ```typescript
 import {resolveConfigLayers} from './config/layering';
+import type {configOptions} from '@shared/types/config';
+
+const defaults = {} as configOptions;
+const userConfig = {} as Partial<configOptions>;
+const runtimeOverrides = {} as Partial<configOptions>;
 
 const effectiveConfig = resolveConfigLayers(defaults, userConfig, runtimeOverrides);
 ```
@@ -220,6 +225,10 @@ reloads with automatic classification:
 
 ```typescript
 import {createReloadHandler} from './config/reload-handler';
+import type {configOptions} from '@shared/types/config';
+
+const currentConfig = {} as configOptions;
+const newConfig = {} as configOptions;
 
 const handler = createReloadHandler({
   getCurrentConfig: () => currentConfig,
@@ -249,6 +258,7 @@ import {RestartRequiredIndicator, InlineRestartWarning} from
   '../components/restart-required-indicator';
 
 function ShellSetting() {
+  const hasChanged = true; // example: derived from form state
   return (
     <div>
       <label>

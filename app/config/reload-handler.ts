@@ -73,26 +73,32 @@ const defaultDetectionOptions: ReloadDetectionOptions = {
   emitWarnings: true
 };
 
+const SENSITIVE_KEYS = ['env', 'plugins', 'bellSound'];
+
+const isReloadDebugEnabled = () => process.env.DEBUG_CONFIG_RELOAD === '1';
+
 /**
  * Truncates a value for safe display in diagnostic messages.
  * Prevents leaking secrets or flooding logs with large objects.
  *
  * @param value - The value to truncate.
+ * @param key - The configuration key (used to redact sensitive values).
  * @param maxLength - Maximum length before truncation (default: 50).
- * @returns Truncated string representation.
+ * @returns Truncated or redacted string representation.
  */
-const truncateValue = (value: unknown, maxLength = 50): string => {
+const truncateValue = (value: unknown, key?: string, maxLength = 50): string => {
+  if (key && SENSITIVE_KEYS.includes(key)) {
+    return '[redacted]';
+  }
   if (value === undefined) return 'undefined';
   if (value === null) return 'null';
   if (typeof value === 'string') {
     return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
   }
-  try {
-    const str = JSON.stringify(value);
-    return str.length > maxLength ? `${str.slice(0, maxLength)}...` : str;
-  } catch {
-    return '[unserializable]';
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
   }
+  return '[object]';
 };
 
 /**
@@ -104,7 +110,8 @@ const truncateValue = (value: unknown, maxLength = 50): string => {
  */
 const requiresRestart = (key: string, scope: 'root' | 'profile' | 'keymap' | 'plugin'): boolean => {
   const entry = getReloadability(key, scope);
-  if (entry === undefined) {
+  if (entry === undefined && isReloadDebugEnabled()) {
+    // eslint-disable-next-line no-console
     console.debug(
       `[reload-handler] Unknown config key "${key}" (scope: ${scope}) - using default restart-required classification`
     );
@@ -121,7 +128,8 @@ const requiresRestart = (key: string, scope: 'root' | 'profile' | 'keymap' | 'pl
  */
 const isLiveReloadable = (key: string, scope: 'root' | 'profile' | 'keymap' | 'plugin'): boolean => {
   const entry = getReloadability(key, scope);
-  if (entry === undefined) {
+  if (entry === undefined && isReloadDebugEnabled()) {
+    // eslint-disable-next-line no-console
     console.debug(
       `[reload-handler] Unknown config key "${key}" (scope: ${scope}) - using default restart-required classification`
     );
@@ -152,7 +160,10 @@ export const classifyConfigChange = (key: string, oldValue: unknown, newValue: u
   }
 
   const classification = entry.classification;
-  const changeDescription = `${key}: ${truncateValue(oldValue)} → ${truncateValue(newValue)}`;
+  const isSensitive = SENSITIVE_KEYS.includes(key);
+  const changeDescription = isSensitive
+    ? `${key}: ${truncateValue(oldValue, key)}`
+    : `${key}: ${truncateValue(oldValue, key)} \u2192 ${truncateValue(newValue, key)}`;
 
   if (classification === 'live') {
     return {
@@ -308,7 +319,7 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
 
     return {
       success: true,
-      config: newConfig,
+      config: state.lastAppliedConfig,
       appliedLive: opts.autoApplyLive ? liveChanges.map((d) => d.path) : [],
       restartRequired: restartChanges,
       validationErrors: []
@@ -335,7 +346,8 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
    */
   const getState = (): Readonly<ReloadHandlerState> => ({
     ...state,
-    pendingRestartChanges: [...state.pendingRestartChanges]
+    lastAppliedConfig: structuredClone(state.lastAppliedConfig),
+    pendingRestartChanges: state.pendingRestartChanges.map((d) => ({...d}))
   });
 
   /**
@@ -350,7 +362,7 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
    *
    * @returns Array of pending restart-required diagnostics.
    */
-  const getPendingRestartDiagnostics = (): ConfigReloadDiagnostic[] => [...state.pendingRestartChanges];
+  const getPendingRestartDiagnostics = (): ConfigReloadDiagnostic[] => state.pendingRestartChanges.map((d) => ({...d}));
 
   return {
     processReload,

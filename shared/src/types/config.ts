@@ -283,7 +283,7 @@ export type configValidationDiagnostic = {
 /** Classification for configuration reload capability. */
 export type ConfigReloadClassification = 'live' | 'restart';
 
-/** Diagnostic entry for a configuration change that requires restart. */
+/** Diagnostic entry for a configuration change that may require restart or can be live-reloaded. */
 export type ConfigReloadDiagnostic = {
   /** The configuration key path that changed. */
   path: string;

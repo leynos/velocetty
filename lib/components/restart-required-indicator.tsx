@@ -13,8 +13,12 @@ import {keyRequiresRestart, getKeyReloadClassification} from '@shared/constants/
 export type RestartRequiredIndicatorProps = {
   /** The configuration key this indicator is for. */
   configKey: string;
-  /** Optional custom tooltip text. */
-  tooltip?: string;
+  /** Tooltip text for the indicator. */
+  tooltip: string;
+  /** Accessible label for the indicator. */
+  ariaLabel: string;
+  /** Override content for the indicator (defaults to a restart glyph if omitted). */
+  children?: React.ReactNode;
   /** Whether to show the indicator even if the key is live-reloadable. */
   forceShow?: boolean;
   /** Additional CSS class names. */
@@ -28,13 +32,19 @@ export type RestartRequiredIndicatorProps = {
  * ```tsx
  * <label>
  *   Font Size
- *   <RestartRequiredIndicator configKey="fontSize" />
+ *   <RestartRequiredIndicator
+ *     configKey="fontSize"
+ *     tooltip="Changing this setting requires a restart to take effect."
+ *     ariaLabel="Requires restart"
+ *   />
  * </label>
  * ```
  */
 export const RestartRequiredIndicator: React.FC<RestartRequiredIndicatorProps> = ({
   configKey,
   tooltip,
+  ariaLabel,
+  children,
   forceShow = false,
   className = ''
 }) => {
@@ -46,16 +56,9 @@ export const RestartRequiredIndicator: React.FC<RestartRequiredIndicatorProps> =
     return null;
   }
 
-  const defaultTooltip = `Changing this setting requires a restart to take effect.`;
-
   return (
-    <span
-      className={`restart-required-indicator ${className}`}
-      title={tooltip ?? defaultTooltip}
-      aria-label="Requires restart"
-      role="img"
-    >
-      ⟳
+    <span className={`restart-required-indicator ${className}`} title={tooltip} aria-label={ariaLabel} role="img">
+      {children ?? '⟳'}
       <style jsx={true}>{`
         .restart-required-indicator {
           display: inline-flex;
@@ -76,8 +79,8 @@ export type InlineRestartWarningProps = {
   configKey: string;
   /** Whether to show the warning. */
   show?: boolean;
-  /** Custom message to display. */
-  message?: string;
+  /** Message to display. */
+  message: string;
 };
 
 /**
@@ -85,7 +88,7 @@ export type InlineRestartWarningProps = {
  *
  * @example
  * ```tsx
- * <InlineRestartWarning configKey="shell" show={hasChanged} />
+ * <InlineRestartWarning configKey="shell" show={hasChanged} message="This change will take effect after restarting." />
  * ```
  */
 export const InlineRestartWarning: React.FC<InlineRestartWarningProps> = ({configKey, show = false, message}) => {
@@ -97,7 +100,7 @@ export const InlineRestartWarning: React.FC<InlineRestartWarningProps> = ({confi
 
   return (
     <div className="inline-restart-warning" role="alert">
-      {message ?? 'This change will take effect after restarting the application.'}
+      {message}
       <style jsx={true}>{`
         .inline-restart-warning {
           margin-top: 4px;
@@ -142,6 +145,12 @@ export type ConfigReloadBadgeProps = {
   hasPendingChanges: boolean;
   /** The number of pending changes (optional). */
   pendingCount?: number;
+  /** Label text for the badge (e.g., "Restart required"). */
+  label: string;
+  /** Accessible label for the badge. */
+  ariaLabel: string;
+  /** Title text for the interactive button variant. */
+  title?: string;
   /** Callback when the badge is clicked (e.g., to show details). */
   onClick?: () => void;
 };
@@ -151,10 +160,24 @@ export type ConfigReloadBadgeProps = {
  *
  * @example
  * ```tsx
- * <ConfigReloadBadge hasPendingChanges={true} pendingCount={2} onClick={showDetails} />
+ * <ConfigReloadBadge
+ *   hasPendingChanges={true}
+ *   pendingCount={2}
+ *   label="Restart required"
+ *   ariaLabel="Configuration changes require restart"
+ *   title="Configuration changes require restart"
+ *   onClick={showDetails}
+ * />
  * ```
  */
-export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({hasPendingChanges, pendingCount, onClick}) => {
+export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({
+  hasPendingChanges,
+  pendingCount,
+  label,
+  ariaLabel,
+  title,
+  onClick
+}) => {
   if (!hasPendingChanges) {
     return null;
   }
@@ -163,7 +186,7 @@ export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({hasPendingC
     <>
       <span className="badge-icon">⟳</span>
       <span className="badge-text">
-        Restart required
+        {label}
         {pendingCount !== undefined && pendingCount > 0 && ` (${pendingCount})`}
       </span>
     </>
@@ -172,7 +195,7 @@ export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({hasPendingC
   // Render as non-interactive element when no onClick handler provided
   if (!onClick) {
     return (
-      <output className="config-reload-badge" aria-label="Configuration changes require restart">
+      <output className="config-reload-badge" aria-label={ariaLabel}>
         {content}
         <style jsx={true}>{commonBadgeStyles}</style>
       </output>
@@ -180,12 +203,7 @@ export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({hasPendingC
   }
 
   return (
-    <button
-      type="button"
-      className="config-reload-badge"
-      onClick={onClick}
-      title="Configuration changes require restart"
-    >
+    <button type="button" className="config-reload-badge" onClick={onClick} title={title ?? ariaLabel}>
       {content}
       <style jsx={true}>{`
         ${commonBadgeStyles}
@@ -215,6 +233,12 @@ export type LiveReloadIndicatorProps = {
   configKey: string;
   /** Whether to show the indicator. */
   show?: boolean;
+  /** Tooltip text for the indicator. */
+  tooltip: string;
+  /** Accessible label for the indicator. */
+  ariaLabel: string;
+  /** Override content for the indicator. */
+  children?: React.ReactNode;
 };
 
 /**
@@ -233,11 +257,21 @@ export type LiveReloadIndicatorProps = {
  * ```tsx
  * <label>
  *   Font Size
- *   <LiveReloadIndicator configKey="fontSize" />
+ *   <LiveReloadIndicator
+ *     configKey="fontSize"
+ *     tooltip="This setting can be changed without restarting"
+ *     ariaLabel="Live reloadable"
+ *   />
  * </label>
  * ```
  */
-export const LiveReloadIndicator: React.FC<LiveReloadIndicatorProps> = ({configKey, show = true}) => {
+export const LiveReloadIndicator: React.FC<LiveReloadIndicatorProps> = ({
+  configKey,
+  show = true,
+  tooltip,
+  ariaLabel,
+  children
+}) => {
   const classification = useMemo(() => getKeyReloadClassification(configKey), [configKey]);
 
   if (!show || classification !== 'live') {
@@ -245,13 +279,8 @@ export const LiveReloadIndicator: React.FC<LiveReloadIndicatorProps> = ({configK
   }
 
   return (
-    <span
-      className="live-reload-indicator"
-      title="This setting can be changed without restarting"
-      aria-label="Live reloadable"
-      role="img"
-    >
-      ⚡
+    <span className="live-reload-indicator" title={tooltip} aria-label={ariaLabel} role="img">
+      {children ?? '⚡'}
       <style jsx={true}>{`
         .live-reload-indicator {
           display: inline-flex;

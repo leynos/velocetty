@@ -29,8 +29,8 @@ hot-reload semantics that define which settings apply without restart and which
 trigger a restart-required warning. After this work:
 
 - Configuration merges predictably through layers:
-  built-in defaults → user `config.json5` → optional workspace overrides →
-  ephemeral runtime overrides.
+  built-in defaults → user `config.json5` → ephemeral runtime overrides
+  (workspace overrides: deferred).
 - Each setting declares its reload capability: live-reloadable changes apply
   immediately; non-reloadable changes surface a clear warning in the UI.
 - The settings UI displays restart-required indicators next to non-reloadable
@@ -266,11 +266,9 @@ bun test --max-concurrency=1 test/unit/config-reloadability.test.ts 2>&1 | tee "
 
 4. Implement layering and merge semantics:
 
-- Extend `app/config/json5-config.ts` with merge helpers.
-- Update `app/config/import.ts` layering resolution order.
+- Implement merge helpers and layering orchestration in `app/config/layering.ts`.
 - Target files:
-  - `app/config/json5-config.ts` (merge implementation)
-  - `app/config/import.ts` (layering orchestration)
+  - `app/config/layering.ts` (merge implementation and layering orchestration)
 
 5. Add layering merge tests:
 
@@ -371,7 +369,7 @@ Planned interface additions/updates:
 - `ConfigReloadResult` type capturing applied changes and queued warnings.
 - `ConfigReloadDiagnostic` type for restart-required warnings (may extend
   existing `configValidationDiagnostic`).
-- Settings schema metadata extension: `requiresRestart?: boolean`.
+- Settings UI derives reloadability from the registry-driven approach rather than schema metadata.
 
 Planned dependency posture:
 
