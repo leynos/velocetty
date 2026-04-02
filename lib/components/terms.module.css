@@ -49,3 +49,13 @@
 .termsTermGroupActive {
   left: 0;
 }
+
+:global(::-webkit-scrollbar) {
+  width: 5px;
+}
+
+:global(::-webkit-scrollbar-thumb),
+:global(::-webkit-scrollbar-thumb:window-inactive) {
+  border-radius: 10px;
+  background: var(--scrollbar-thumb);
+}

@@ -49,7 +49,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     paneIndex.current = index;
   };
 
-  const getSizes = () => {
+  const getSizes = useCallback(() => {
     const {sizes} = props;
     let sizes_: number[];
 
@@ -62,7 +62,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
       sizes_ = count;
     }
     return sizes_;
-  };
+  }, [props.sizes, props.children]);
 
   const onDrag = useCallback(
     (ev: MouseEvent) => {
@@ -83,7 +83,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
       }
       props.onResize(sizes_);
     },
-    [d3, getSizes, props]
+    [d3, getSizes, props.onResize]
   );
 
   const onDragEnd = useCallback(() => {
@@ -96,7 +96,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     return () => {
       onDragEnd();
     };
-  }, []);
+  }, [onDragEnd]);
 
   const {children, direction, borderColor} = props;
   const sizeProperty = direction === 'horizontal' ? 'height' : 'width';

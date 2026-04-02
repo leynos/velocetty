@@ -26,7 +26,7 @@
 }
 
 .headerWindowHeaderWithBorder {
-  border-color: #ccc;
+  border-color: var(--header-border);
   border-bottom-style: solid;
   border-bottom-width: 1px;
 }
@@ -98,9 +98,9 @@
 }
 
 .headerCloseWindow:hover {
-  color: #fe354e;
+  color: var(--close-btn-danger);
 }
 
 .headerCloseWindow:active {
-  color: #fe354e;
+  color: var(--close-btn-danger-active);
 }

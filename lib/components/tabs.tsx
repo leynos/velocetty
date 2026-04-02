@@ -44,7 +44,7 @@ const TabItem = ({tab, index, totalTabs, borderColor, onChange, onClose, parentP
     onClose: handleClose
   });
 
-  return <Tab key={`tab-${uid}`} {...tabProps} />;
+  return <Tab {...tabProps} />;
 };
 
 const Tabs = forwardRef(function Tabs(props: TabsProps, ref: React.ForwardedRef<HTMLElement>) {

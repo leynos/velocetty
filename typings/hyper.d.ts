@@ -214,14 +214,6 @@ import type Terms from '../lib/components/terms';
 import type {TermsConnectedProps} from '../lib/containers/terms';
 export type TermsProps = TermsConnectedProps & extensionProps & {ref_: (terms: Terms | null) => void};
 
-export type StyleSheetProps = {
-  backgroundColor: string;
-  borderColor: string;
-  fontFamily: string;
-  foregroundColor: string;
-  className?: string;
-} & extensionProps;
-
 export type TabProps = {
   borderColor: string;
   hasActivity: boolean;
