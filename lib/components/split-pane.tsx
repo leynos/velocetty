@@ -33,6 +33,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
   const d2 = props.direction === 'horizontal' ? 'top' : 'left';
   const panesSize = useRef<number[] | null>(null);
   const paneContainerSize = useRef<number | null>(null);
+  const lastEmittedSizesRef = useRef<number[] | null>(null);
   const [dragging, setDragging] = useState(false);
 
   // Use a ref to access latest props without recreating callbacks during drag
@@ -76,6 +77,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     paneIndex.current = index;
     panesSize.current = getSizes();
     paneContainerSize.current = parent.getBoundingClientRect()[d1];
+    lastEmittedSizesRef.current = null;
   };
 
   const getSizes = useCallback(() => {
@@ -116,6 +118,11 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
         sizes_[i + 1] += clampedDelta;
       }
       dragTarget.current?.style.setProperty(d2, `${dividerPosition}px`);
+      if (lastEmittedSizesRef.current && sizes_.every((size, index) => size === lastEmittedSizesRef.current?.[index])) {
+        return;
+      }
+
+      lastEmittedSizesRef.current = [...sizes_];
       propsRef.current.onResize(sizes_);
     },
     [getSizes]
@@ -127,6 +134,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     panesSize.current = null;
     paneContainerSize.current = null;
     dragOffset.current = 0;
+    lastEmittedSizesRef.current = null;
     setDragging(false);
   }, [onDrag]);
 

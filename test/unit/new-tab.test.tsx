@@ -92,7 +92,7 @@ test('closes the dropdown when Escape is pressed', async () => {
   }
 });
 
-test('closes the dropdown when focus leaves the component boundary', async () => {
+test('prevents the default Escape key action when closing the dropdown', async () => {
   const {cleanup, container, root} = await renderNewTab();
 
   try {
@@ -104,8 +104,39 @@ test('closes the dropdown when focus leaves the component boundary', async () =>
       await waitFor(0);
     });
 
+    const escapeEvent = new window.KeyboardEvent('keydown', {bubbles: true, cancelable: true, key: 'Escape'});
+
+    await act(async () => {
+      button?.dispatchEvent(escapeEvent);
+      await waitFor(0);
+    });
+
+    expect(escapeEvent.defaultPrevented).toBe(true);
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+  } finally {
+    await act(async () => {
+      root.unmount();
+      await waitFor(0);
+    });
+    cleanup();
+  }
+});
+
+test('closes the dropdown when focus leaves the component boundary', async () => {
+  const {cleanup, container, root} = await renderNewTab();
+  let outsideButton: HTMLButtonElement | null = null;
+
+  try {
+    const button = container.querySelector('button');
+    expect(button).toBeTruthy();
+
+    await act(async () => {
+      button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
+      await waitFor(0);
+    });
+
     const dropdown = container.querySelector('[role="menu"]');
-    const outsideButton = document.createElement('button');
+    outsideButton = document.createElement('button');
     document.body.appendChild(outsideButton);
     expect(dropdown).toBeTruthy();
 
@@ -115,8 +146,8 @@ test('closes the dropdown when focus leaves the component boundary', async () =>
     });
 
     expect(container.querySelector('[role="menu"]')).toBeNull();
-    outsideButton.remove();
   } finally {
+    outsideButton?.remove();
     await act(async () => {
       root.unmount();
       await waitFor(0);

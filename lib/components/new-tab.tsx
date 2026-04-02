@@ -43,6 +43,7 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
       return;
     }
 
+    event.preventDefault();
     closeDropdown();
   };
 
