@@ -13,7 +13,6 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
   const paneIndex = useRef<number>(0);
   const d1 = props.direction === 'horizontal' ? 'height' : 'width';
   const d2 = props.direction === 'horizontal' ? 'top' : 'left';
-  const d3 = props.direction === 'horizontal' ? 'clientY' : 'clientX';
   const panesSize = useRef<number | null>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -77,8 +76,10 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
       }
       const sizes_ = getSizes();
 
+      // Read direction from propsRef to avoid stale closure during drag
+      const axis = propsRef.current.direction === 'horizontal' ? 'clientY' : 'clientX';
       const i = paneIndex.current;
-      const pos = ev[d3];
+      const pos = ev[axis];
       const d = Math.abs(dragPanePosition.current - pos) / panesSize.current;
       if (pos > dragPanePosition.current) {
         sizes_[i] += d;
@@ -89,7 +90,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
       }
       propsRef.current.onResize(sizes_);
     },
-    [d3, getSizes]
+    [getSizes]
   );
 
   const onDragEnd = useCallback(() => {

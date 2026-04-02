@@ -16,6 +16,10 @@ interface Props {
   borderColor: string;
   tabsVisible: boolean;
 }
+
+/** CSS custom property names for theming */
+type CSSVars = Record<`--${string}`, string>;
+
 const isMac = /Mac/.test(navigator.userAgent);
 
 const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, borderColor, tabsVisible}: Props) => {
@@ -30,9 +34,9 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
     setDropdownOpen(false);
   });
 
-  const tabVars: React.CSSProperties = {
-    ['--new-tab-border' as string]: borderColor,
-    ['--new-tab-bg' as string]: backgroundColor
+  const tabVars: React.CSSProperties & CSSVars = {
+    '--new-tab-border': borderColor,
+    '--new-tab-bg': backgroundColor
   };
 
   return (
