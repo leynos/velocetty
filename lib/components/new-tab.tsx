@@ -40,12 +40,11 @@ function profileItemClass(name: string, defaultProfile: string, profileCount: nu
 }
 
 /**
- * Returns `true` when focus is moving to an element outside the given
- * container, indicating the dropdown should be closed.
+ * Returns `true` when `target` is a DOM node that lies within `container`.
+ * Used to decide whether a blur event should close the dropdown.
  */
-function isFocusLeavingContainer(event: React.FocusEvent<HTMLElement>, container: HTMLElement | null): boolean {
-  const next = event.relatedTarget;
-  return !(next && 'nodeType' in next && container?.contains(next as Node));
+function isFocusWithinDropdown(target: EventTarget | null, container: Node | null): boolean {
+  return target !== null && 'nodeType' in target && (container?.contains(target as Node) ?? false);
 }
 
 const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, borderColor, tabsVisible}: Props) => {
@@ -74,9 +73,10 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
   };
 
   const handleDropdownBlur = (event: React.FocusEvent<HTMLDivElement>) => {
-    if (isFocusLeavingContainer(event, ref.current)) {
-      closeDropdown();
+    if (isFocusWithinDropdown(event.relatedTarget, ref.current)) {
+      return;
     }
+    closeDropdown();
   };
 
   const tabVars: React.CSSProperties & CSSVars = {
