@@ -231,11 +231,11 @@ Scope notes:
   - [x] Provide defaults and schema-derived documentation strings.
   - [x] Success criteria: invalid config reports path, message, and suggested
     fix.
-- [ ] 3.1.2. Define layering rules and hot-reload semantics. See
+- [x] 3.1.2. Define layering rules and hot-reload semantics. See
   [velocetty-design.md](velocetty-design.md) §Layering rules.
-  - [ ] Implement defaults → user config → runtime overrides.
-  - [ ] Specify which changes require restart vs live reload.
-  - [ ] Success criteria: live-reloadable settings apply without UI restart,
+  - [x] Implement defaults → user config → runtime overrides.
+  - [x] Specify which changes require restart vs live reload.
+  - [x] Success criteria: live-reloadable settings apply without UI restart,
     and non-reloadable settings display clear warnings.
 
 ### 3.2. Keybindings and plugin settings storage
