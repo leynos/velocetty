@@ -14,12 +14,50 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
   const panesSize = useRef<number | null>(null);
   const [dragging, setDragging] = useState(false);
 
+  // Keep mutable refs so drag listeners always read the latest props
+  // without being re-registered mid-drag.
+  const propsRef = useRef(props);
+  propsRef.current = props;
+
+  const getSizes = useRef(() => {
+    const {sizes, children} = propsRef.current;
+    if (sizes) {
+      return [...sizes.asMutable()];
+    }
+    const total = children.length;
+    return new Array<number>(total).fill(1 / total);
+  });
+
+  const onDrag = useRef((ev: MouseEvent) => {
+    if (!panesSize.current) {
+      return;
+    }
+    const sizes_ = getSizes.current();
+    const i = paneIndex.current;
+    const pos = ev[d3];
+    const d = Math.abs(dragPanePosition.current - pos) / panesSize.current!;
+    if (pos > dragPanePosition.current) {
+      sizes_[i] += d;
+      sizes_[i + 1] -= d;
+    } else {
+      sizes_[i] -= d;
+      sizes_[i + 1] += d;
+    }
+    propsRef.current.onResize(sizes_);
+  });
+
+  const onDragEnd = useRef(() => {
+    window.removeEventListener('mousemove', onDrag.current);
+    window.removeEventListener('mouseup', onDragEnd.current);
+    setDragging(false);
+  });
+
   const handleAutoResize = (ev: React.MouseEvent<HTMLDivElement>, index: number) => {
     ev.preventDefault();
 
     paneIndex.current = index;
 
-    const sizes_ = getSizes();
+    const sizes_ = getSizes.current();
     sizes_[paneIndex.current] = 0;
     sizes_[paneIndex.current + 1] = 0;
 
@@ -38,57 +76,17 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
       return;
     }
     setDragging(true);
-    window.addEventListener('mousemove', onDrag);
-    window.addEventListener('mouseup', onDragEnd);
+    window.addEventListener('mousemove', onDrag.current);
+    window.addEventListener('mouseup', onDragEnd.current);
     dragTarget.current = target;
     dragPanePosition.current = dragTarget.current.getBoundingClientRect()[d2];
     panesSize.current = parent.getBoundingClientRect()[d1];
     paneIndex.current = index;
   };
 
-  const getSizes = () => {
-    const {sizes} = props;
-    let sizes_: number[];
-
-    if (sizes) {
-      sizes_ = [...sizes.asMutable()];
-    } else {
-      const total = props.children.length;
-      const count = new Array<number>(total).fill(1 / total);
-
-      sizes_ = count;
-    }
-    return sizes_;
-  };
-
-  const onDrag = (ev: MouseEvent) => {
-    if (!panesSize.current) {
-      return;
-    }
-    const sizes_ = getSizes();
-
-    const i = paneIndex.current;
-    const pos = ev[d3];
-    const d = Math.abs(dragPanePosition.current - pos) / panesSize.current!;
-    if (pos > dragPanePosition.current) {
-      sizes_[i] += d;
-      sizes_[i + 1] -= d;
-    } else {
-      sizes_[i] -= d;
-      sizes_[i + 1] += d;
-    }
-    props.onResize(sizes_);
-  };
-
-  const onDragEnd = () => {
-    window.removeEventListener('mousemove', onDrag);
-    window.removeEventListener('mouseup', onDragEnd);
-    setDragging(false);
-  };
-
   useEffect(() => {
     return () => {
-      onDragEnd();
+      onDragEnd.current();
     };
   }, []);
 
