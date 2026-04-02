@@ -83,12 +83,13 @@ const defaultDetectionOptions: ReloadDetectionOptions = {
   emitWarnings: true
 };
 
-const SENSITIVE_KEYS = ['env', 'plugins', 'bellSound'];
+const SENSITIVE_KEYS = ['env', 'plugins', 'bellSound'] as const;
 
 const isReloadDebugEnabled = () => process.env.DEBUG_CONFIG_RELOAD === '1';
 
 /** Returns true when the key is in the sensitive-keys list. */
-const isSensitiveKey = (key?: string): boolean => key !== undefined && SENSITIVE_KEYS.includes(key);
+const isSensitiveKey = (key?: unknown): key is (typeof SENSITIVE_KEYS)[number] =>
+  typeof key === 'string' && SENSITIVE_KEYS.includes(key as (typeof SENSITIVE_KEYS)[number]);
 
 /** Truncates a string to `maxLength` characters, appending `...` when cut. */
 const truncateString = (value: string, maxLength: number): string =>
@@ -185,7 +186,7 @@ export const classifyConfigChange = (key: string, oldValue: unknown, newValue: u
   }
 
   const classification = entry.classification;
-  const isSensitive = SENSITIVE_KEYS.includes(key);
+  const isSensitive = SENSITIVE_KEYS.includes(key as (typeof SENSITIVE_KEYS)[number]);
   const changeDescription = isSensitive
     ? `${key}: ${truncateValue(oldValue, key)}`
     : `${key}: ${truncateValue(oldValue, key)} \u2192 ${truncateValue(newValue, key)}`;
