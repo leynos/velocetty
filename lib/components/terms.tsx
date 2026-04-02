@@ -10,7 +10,7 @@ import {decorate, getTermGroupProps} from '../utils/plugins';
 import StyleSheet_ from './style-sheet';
 import type Term from './term';
 import TermGroup_ from './term-group';
-import styles from './terms.module.css';
+import * as styles from './terms.module.css';
 
 const TermGroup = decorate(TermGroup_, 'TermGroup');
 const StyleSheet = decorate(StyleSheet_, 'StyleSheet');

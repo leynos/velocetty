@@ -5,7 +5,7 @@ import {forwardRef} from 'react';
 import clsx from 'clsx';
 
 import type {TabProps} from '../../typings/hyper';
-import styles from './tab.module.css';
+import * as styles from './tab.module.css';
 
 /**
  * Computes the class name for the tab list item.

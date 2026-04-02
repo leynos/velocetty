@@ -7,7 +7,7 @@ import {decorate, getTabProps, subscribeTabDecorationUpdates} from '../utils/plu
 
 import DropdownButton from './new-tab';
 import Tab_ from './tab';
-import styles from './tabs.module.css';
+import * as styles from './tabs.module.css';
 
 const Tab = decorate(Tab_, 'Tab');
 const isMac = /Mac/.test(navigator.userAgent);

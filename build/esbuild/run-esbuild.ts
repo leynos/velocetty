@@ -213,11 +213,11 @@ export const runEsbuild = async (options: RunEsbuildOptions) => {
 };
 
 /**
- * Creates a PostCSS plugin that skips CSS Module files (.module.css).
- * This allows esbuild's local-css loader to handle CSS Modules directly
- * without PostCSS preprocessing.
+ * Creates a PostCSS plugin that intercepts handler registrations and re-registers
+ * all captured handlers with the original build.onLoad. This allows the PostCSS
+ * plugin to run while preserving proper handler chaining.
  *
- * @returns An esbuild plugin that filters out CSS Modules from PostCSS processing.
+ * @returns An esbuild plugin that wraps and re-emits captured PostCSS handlers.
  */
 const createPostcssPluginWithoutModules = (): Plugin => {
   const basePlugin = postcssPlugin();
@@ -244,9 +244,7 @@ const createPostcssPluginWithoutModules = (): Plugin => {
 
       // Re-register captured handlers with the original onLoad
       for (const {filter, namespace, callback} of onLoadCallbacks) {
-        build.onLoad({filter, namespace}, async (args) => {
-          return await callback(args);
-        });
+        build.onLoad({filter, namespace}, (args) => callback(args));
       }
     }
   };

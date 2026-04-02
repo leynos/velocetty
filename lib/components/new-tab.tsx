@@ -6,7 +6,7 @@ import {VscChevronDown} from '@react-icons/all-files/vsc/VscChevronDown';
 import useClickAway from 'react-use/lib/useClickAway';
 
 import type {configOptions} from '@shared/types/config';
-import styles from './new-tab.module.css';
+import * as styles from './new-tab.module.css';
 
 interface Props {
   defaultProfile: string;

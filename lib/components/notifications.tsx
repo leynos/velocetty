@@ -6,7 +6,7 @@ import type {NotificationsProps} from '../../typings/hyper';
 import {decorate} from '../utils/plugins';
 
 import Notification_ from './notification';
-import styles from './notifications.module.css';
+import * as styles from './notifications.module.css';
 
 const Notification = decorate(Notification_, 'Notification');
 

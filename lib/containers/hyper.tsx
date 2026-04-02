@@ -23,7 +23,7 @@ import {connect} from '../utils/plugins';
 import {HeaderContainer} from './header';
 import NotificationsContainer from './notifications';
 import TermsContainer from './terms';
-import styles from './hyper.module.css';
+import * as styles from './hyper.module.css';
 
 const isMac = /Mac/.test(navigator.userAgent);
 

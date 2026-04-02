@@ -36,7 +36,7 @@ import {decorate} from '../utils/plugins';
 import {WebGLContextPool} from '../utils/webgl-context-pool';
 
 import _SearchBox from './searchBox';
-import styles from './term.module.css';
+import * as styles from './term.module.css';
 
 import 'xterm/css/xterm.css';
 

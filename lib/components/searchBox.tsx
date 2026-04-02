@@ -11,7 +11,7 @@ import {VscWholeWord} from '@react-icons/all-files/vsc/VscWholeWord';
 import clsx from 'clsx';
 
 import type {SearchBoxProps} from '../../typings/hyper';
-import styles from './searchBox.module.css';
+import * as styles from './searchBox.module.css';
 
 type SearchButtonColors = {
   foregroundColor: string;

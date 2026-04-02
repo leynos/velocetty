@@ -6,7 +6,7 @@ import type {HeaderProps} from '../../typings/hyper';
 import {decorate, getTabsProps} from '../utils/plugins';
 
 import Tabs_ from './tabs';
-import styles from './header.module.css';
+import * as styles from './header.module.css';
 
 const Tabs = decorate(Tabs_, 'Tabs');
 
