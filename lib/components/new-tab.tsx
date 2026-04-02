@@ -24,7 +24,7 @@ const isMac = /Mac/.test(navigator.userAgent);
 
 const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, borderColor, tabsVisible}: Props) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const ref = useRef(null);
+  const ref = useRef<HTMLDivElement | null>(null);
 
   const toggleDropdown = () => {
     setDropdownOpen(!dropdownOpen);
@@ -38,6 +38,13 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
     '--new-tab-border': borderColor,
     '--new-tab-bg': backgroundColor
   };
+  const buttonClassName = [
+    styles.newTab,
+    isMac ? styles.newTabMac : null,
+    tabsVisible ? styles.tabsVisible : styles.tabsHidden
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div ref={ref} style={tabVars}>
@@ -47,7 +54,7 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
         aria-label="New Tab"
         aria-haspopup="menu"
         aria-expanded={dropdownOpen}
-        className={`${styles.newTab} ${isMac ? styles.newTabMac : ''} ${tabsVisible ? styles.tabsVisible : styles.tabsHidden}`}
+        className={buttonClassName}
         onClick={toggleDropdown}
         onDoubleClick={(e) => e.stopPropagation()}
       >
@@ -65,9 +72,12 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
                 openNewTab(profile.name);
                 setDropdownOpen(false);
               }}
-              className={`${styles.profileDropdownItem} ${
-                profile.name === defaultProfile && profiles.length > 1 ? styles.profileDropdownItemDefault : ''
-              }`}
+              className={[
+                styles.profileDropdownItem,
+                profile.name === defaultProfile && profiles.length > 1 ? styles.profileDropdownItemDefault : null
+              ]
+                .filter(Boolean)
+                .join(' ')}
             >
               {profile.name}
             </button>

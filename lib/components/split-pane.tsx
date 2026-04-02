@@ -13,7 +13,8 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
   const paneIndex = useRef<number>(0);
   const d1 = props.direction === 'horizontal' ? 'height' : 'width';
   const d2 = props.direction === 'horizontal' ? 'top' : 'left';
-  const panesSize = useRef<number | null>(null);
+  const panesSize = useRef<number[] | null>(null);
+  const paneContainerSize = useRef<number | null>(null);
   const [dragging, setDragging] = useState(false);
 
   // Use a ref to access latest props without recreating callbacks during drag
@@ -50,8 +51,9 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     window.addEventListener('mouseup', onDragEnd);
     dragTarget.current = target;
     dragPanePosition.current = dragTarget.current.getBoundingClientRect()[d2];
-    panesSize.current = parent.getBoundingClientRect()[d1];
     paneIndex.current = index;
+    panesSize.current = getSizes();
+    paneContainerSize.current = parent.getBoundingClientRect()[d1];
   };
 
   const getSizes = useCallback(() => {
@@ -71,16 +73,16 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
 
   const onDrag = useCallback(
     (ev: MouseEvent) => {
-      if (!panesSize.current) {
+      if (!panesSize.current || !paneContainerSize.current) {
         return;
       }
-      const sizes_ = getSizes();
+      const sizes_ = [...panesSize.current];
 
       // Read direction from propsRef to avoid stale closure during drag
       const axis = propsRef.current.direction === 'horizontal' ? 'clientY' : 'clientX';
       const i = paneIndex.current;
       const pos = ev[axis];
-      const d = Math.abs(dragPanePosition.current - pos) / panesSize.current;
+      const d = Math.abs(dragPanePosition.current - pos) / paneContainerSize.current;
       if (pos > dragPanePosition.current) {
         sizes_[i] += d;
         sizes_[i + 1] -= d;
@@ -96,6 +98,8 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
   const onDragEnd = useCallback(() => {
     window.removeEventListener('mousemove', onDrag);
     window.removeEventListener('mouseup', onDragEnd);
+    panesSize.current = null;
+    paneContainerSize.current = null;
     setDragging(false);
   }, [onDrag]);
 

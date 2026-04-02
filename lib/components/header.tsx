@@ -5,10 +5,19 @@ import {forwardRef, useState} from 'react';
 import type {HeaderProps} from '../../typings/hyper';
 import {decorate, getTabsProps} from '../utils/plugins';
 
+import {orderWindowControlButtons, stopDoubleClickPropagation} from './header-controls';
 import Tabs_ from './tabs';
 import * as styles from './header.module.css';
 
 const Tabs = decorate(Tabs_, 'Tabs');
+
+type WindowControlButton = {
+  key: string;
+  ariaLabel: string;
+  href: string;
+  onClick: () => void;
+  className: string;
+};
 
 const Header = forwardRef(function Header(props: HeaderProps, ref: React.ForwardedRef<HTMLElement>) {
   const [headerMouseDownWindowX, setHeaderMouseDownWindowX] = useState<number>(0);
@@ -91,6 +100,30 @@ const Header = forwardRef(function Header(props: HeaderProps, ref: React.Forward
   const maxButtonHref = props.maximized
     ? './renderer/assets/icons.svg#restore-window'
     : './renderer/assets/icons.svg#maximize-window';
+  const windowControlButtons = [
+    {
+      key: 'minimize',
+      ariaLabel: props.minimizeWindowAria,
+      href: './renderer/assets/icons.svg#minimize-window',
+      onClick: handleMinimizeClick,
+      className: styles.headerShapeButton
+    },
+    {
+      key: 'maximize',
+      ariaLabel: props.maximized ? props.restoreWindowAria : props.maximizeWindowAria,
+      href: maxButtonHref,
+      onClick: handleMaximizeClick,
+      className: styles.headerShapeButton
+    },
+    {
+      key: 'close',
+      ariaLabel: props.closeWindowAria,
+      href: './renderer/assets/icons.svg#close-window',
+      onClick: handleCloseClick,
+      className: `${styles.headerShapeButton} ${styles.headerCloseWindow}`
+    }
+  ] satisfies [WindowControlButton, WindowControlButton, WindowControlButton];
+  const orderedWindowControlButtons = orderWindowControlButtons(windowControlButtons, left);
 
   return (
     <header
@@ -110,7 +143,8 @@ const Header = forwardRef(function Header(props: HeaderProps, ref: React.Forward
               type="button"
               className={`${styles.headerShapeButton} ${left ? styles.headerHamburgerMenuRight : styles.headerHamburgerMenuLeft}`}
               onClick={handleHamburgerMenuClick}
-              aria-label="Open menu"
+              onDoubleClick={stopDoubleClickPropagation}
+              aria-label={props.openMenuAria}
             >
               <svg className={styles.headerShape}>
                 <use xlinkHref="./renderer/assets/icons.svg#hamburger-menu" />
@@ -120,36 +154,20 @@ const Header = forwardRef(function Header(props: HeaderProps, ref: React.Forward
           <span className={styles.headerAppTitle}>{title}</span>
           {winCtrls && (
             <div className={`${styles.headerWindowControls} ${left ? styles.headerWindowControlsLeft : ''}`}>
-              <button
-                type="button"
-                className={`${styles.headerShapeButton} ${left ? styles.headerMinimizeWindowLeft : ''}`}
-                onClick={handleMinimizeClick}
-                aria-label="Minimise window"
-              >
-                <svg className={styles.headerShape}>
-                  <use xlinkHref="./renderer/assets/icons.svg#minimize-window" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className={`${styles.headerShapeButton} ${left ? styles.headerMaximizeWindowLeft : ''}`}
-                onClick={handleMaximizeClick}
-                aria-label={props.maximized ? 'Restore window' : 'Maximise window'}
-              >
-                <svg className={styles.headerShape}>
-                  <use xlinkHref={maxButtonHref} />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className={`${styles.headerShapeButton} ${styles.headerCloseWindow} ${left ? styles.headerCloseWindowLeft : ''}`}
-                onClick={handleCloseClick}
-                aria-label="Close window"
-              >
-                <svg className={styles.headerShape}>
-                  <use xlinkHref="./renderer/assets/icons.svg#close-window" />
-                </svg>
-              </button>
+              {orderedWindowControlButtons.map((button) => (
+                <button
+                  key={button.key}
+                  type="button"
+                  className={button.className}
+                  onClick={button.onClick}
+                  onDoubleClick={stopDoubleClickPropagation}
+                  aria-label={button.ariaLabel}
+                >
+                  <svg className={styles.headerShape}>
+                    <use xlinkHref={button.href} />
+                  </svg>
+                </button>
+              ))}
             </div>
           )}
         </div>

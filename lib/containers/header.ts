@@ -1,9 +1,11 @@
+import React from 'react';
 import {createSelector} from 'reselect';
 
 import type {HyperState, HyperDispatch, ITab} from '../../typings/hyper';
 import {closeTab, changeTab, maximize, openHamburgerMenu, unmaximize, minimize, close} from '../actions/header';
 import {requestTermGroup} from '../actions/term-groups';
 import Header from '../components/header';
+import {useTranslation} from '../hooks/use-translation';
 import {getRootGroups} from '../selectors';
 import {connect} from '../utils/plugins';
 
@@ -81,6 +83,19 @@ const mapDispatchToProps = (dispatch: HyperDispatch) => {
   };
 };
 
-export const HeaderContainer = connect(mapStateToProps, mapDispatchToProps, null)(Header, 'Header');
+const HeaderWithTranslation = (props: HeaderConnectedProps) => {
+  const t = useTranslation();
+
+  return React.createElement(Header, {
+    ...props,
+    openMenuAria: t('openMenu'),
+    minimizeWindowAria: t('minimizeWindow'),
+    maximizeWindowAria: t('maximizeWindow'),
+    restoreWindowAria: t('restoreWindow'),
+    closeWindowAria: t('closeWindow')
+  });
+};
+
+export const HeaderContainer = connect(mapStateToProps, mapDispatchToProps, null)(HeaderWithTranslation, 'Header');
 
 export type HeaderConnectedProps = ReturnType<typeof mapStateToProps> & ReturnType<typeof mapDispatchToProps>;

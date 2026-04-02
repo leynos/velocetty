@@ -13,7 +13,6 @@
 
 .headerWindowHeader {
   height: 34px;
-  width: 100%;
   position: fixed;
   top: 1px;
   left: 1px;
@@ -42,7 +41,7 @@
   border: none;
   font: inherit;
   padding: 0;
-  color: inherit;
+  color: #fff;
   cursor: default;
   display: flex;
 }
@@ -60,7 +59,8 @@
   height: 34px;
   padding: 12px 15px 12px 15px;
   -webkit-app-region: no-drag;
-  color: #fff;
+  color: inherit;
+  fill: currentColor;
   opacity: 0.5;
   shape-rendering: crispedges;
 }
@@ -97,18 +97,7 @@
 
 .headerWindowControlsLeft {
   left: 0px;
-}
-
-.headerCloseWindowLeft {
-  order: 1;
-}
-
-.headerMinimizeWindowLeft {
-  order: 2;
-}
-
-.headerMaximizeWindowLeft {
-  order: 3;
+  right: auto;
 }
 
 .headerCloseWindow:hover {

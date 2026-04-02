@@ -202,7 +202,14 @@ type extensionProps = Partial<{
 }>;
 
 import type {HeaderConnectedProps} from '../lib/containers/header';
-export type HeaderProps = HeaderConnectedProps & extensionProps;
+export type HeaderAriaProps = {
+  openMenuAria: string;
+  minimizeWindowAria: string;
+  maximizeWindowAria: string;
+  restoreWindowAria: string;
+  closeWindowAria: string;
+};
+export type HeaderProps = HeaderConnectedProps & HeaderAriaProps & extensionProps;
 
 import type {HyperConnectedProps} from '../lib/containers/hyper';
 export type HyperProps = HyperConnectedProps & extensionProps;
