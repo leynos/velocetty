@@ -108,7 +108,7 @@ const Header = forwardRef(function Header(props: HeaderProps, ref: React.Forward
           {hambMenu && (
             <button
               type="button"
-              className={`${styles.headerShape} ${left ? styles.headerHamburgerMenuRight : styles.headerHamburgerMenuLeft}`}
+              className={`${styles.headerShapeButton} ${left ? styles.headerHamburgerMenuRight : styles.headerHamburgerMenuLeft}`}
               onClick={handleHamburgerMenuClick}
               aria-label="Open menu"
             >
@@ -122,7 +122,7 @@ const Header = forwardRef(function Header(props: HeaderProps, ref: React.Forward
             <div className={`${styles.headerWindowControls} ${left ? styles.headerWindowControlsLeft : ''}`}>
               <button
                 type="button"
-                className={`${styles.headerShape} ${left ? styles.headerMinimizeWindowLeft : ''}`}
+                className={`${styles.headerShapeButton} ${left ? styles.headerMinimizeWindowLeft : ''}`}
                 onClick={handleMinimizeClick}
                 aria-label="Minimise window"
               >
@@ -132,7 +132,7 @@ const Header = forwardRef(function Header(props: HeaderProps, ref: React.Forward
               </button>
               <button
                 type="button"
-                className={`${styles.headerShape} ${left ? styles.headerMaximizeWindowLeft : ''}`}
+                className={`${styles.headerShapeButton} ${left ? styles.headerMaximizeWindowLeft : ''}`}
                 onClick={handleMaximizeClick}
                 aria-label={props.maximized ? 'Restore window' : 'Maximise window'}
               >
@@ -142,7 +142,7 @@ const Header = forwardRef(function Header(props: HeaderProps, ref: React.Forward
               </button>
               <button
                 type="button"
-                className={`${styles.headerShape} ${styles.headerCloseWindow} ${left ? styles.headerCloseWindowLeft : ''}`}
+                className={`${styles.headerShapeButton} ${styles.headerCloseWindow} ${left ? styles.headerCloseWindowLeft : ''}`}
                 onClick={handleCloseClick}
                 aria-label="Close window"
               >

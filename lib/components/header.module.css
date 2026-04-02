@@ -35,8 +35,27 @@
   font-size: 12px;
 }
 
-.headerShape,
-.headerShape > svg {
+.headerShapeButton {
+  -webkit-app-region: no-drag;
+  appearance: none;
+  background: none;
+  border: none;
+  font: inherit;
+  padding: 0;
+  color: inherit;
+  cursor: default;
+  display: flex;
+}
+
+.headerShapeButton:hover > .headerShape {
+  opacity: 1;
+}
+
+.headerShapeButton:active > .headerShape {
+  opacity: 0.3;
+}
+
+.headerShape {
   width: 40px;
   height: 34px;
   padding: 12px 15px 12px 15px;
@@ -44,11 +63,6 @@
   color: #fff;
   opacity: 0.5;
   shape-rendering: crispedges;
-  /* Reset native button styles */
-  appearance: none;
-  background: none;
-  border: none;
-  font: inherit;
 }
 
 .headerShape:hover {
