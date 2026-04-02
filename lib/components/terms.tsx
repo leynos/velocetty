@@ -7,13 +7,11 @@ import {registerCommandHandlers} from '../command-registry';
 import {ObjectTypedKeys} from '../utils/object';
 import {decorate, getTermGroupProps} from '../utils/plugins';
 
-import StyleSheet_ from './style-sheet';
 import type Term from './term';
 import TermGroup_ from './term-group';
 import * as styles from './terms.module.css';
 
 const TermGroup = decorate(TermGroup_, 'TermGroup');
-const StyleSheet = decorate(StyleSheet_, 'StyleSheet');
 
 const isMac = /Mac/.test(navigator.userAgent);
 
@@ -78,7 +76,10 @@ export default class Terms extends React.Component<React.PropsWithChildren<Terms
   render() {
     const shift = !isMac && this.props.termGroups.length > 1;
     return (
-      <div className={`${styles.termsTerms} ${shift ? styles.termsTermsShifted : styles.termsTermsNotShifted}`}>
+      <div
+        className={`${styles.termsTerms} ${shift ? styles.termsTermsShifted : styles.termsTermsNotShifted}`}
+        style={{'--scrollbar-thumb': this.props.borderColor} as React.CSSProperties}
+      >
         {this.props.customChildrenBefore}
         {this.props.termGroups.map((termGroup) => {
           const {uid} = termGroup;
@@ -138,13 +139,6 @@ export default class Terms extends React.Component<React.PropsWithChildren<Terms
           );
         })}
         {this.props.customChildren}
-        <StyleSheet
-          backgroundColor={this.props.backgroundColor}
-          customCSS={this.props.customCSS}
-          fontFamily={this.props.fontFamily}
-          foregroundColor={this.props.foregroundColor}
-          borderColor={this.props.borderColor}
-        />
       </div>
     );
   }

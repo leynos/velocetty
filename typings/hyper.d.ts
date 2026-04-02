@@ -219,6 +219,7 @@ export type StyleSheetProps = {
   borderColor: string;
   fontFamily: string;
   foregroundColor: string;
+  className?: string;
 } & extensionProps;
 
 export type TabProps = {

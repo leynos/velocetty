@@ -1,6 +1,6 @@
 /** @file Resizable split pane container supporting horizontal and vertical layouts. */
 
-import React, {useState, useEffect, useRef, forwardRef} from 'react';
+import React, {useState, useEffect, useRef, useCallback, forwardRef} from 'react';
 
 import sum from 'lodash/sum';
 
@@ -64,30 +64,33 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     return sizes_;
   };
 
-  const onDrag = (ev: MouseEvent) => {
-    if (!panesSize.current) {
-      return;
-    }
-    const sizes_ = getSizes();
+  const onDrag = useCallback(
+    (ev: MouseEvent) => {
+      if (!panesSize.current) {
+        return;
+      }
+      const sizes_ = getSizes();
 
-    const i = paneIndex.current;
-    const pos = ev[d3];
-    const d = Math.abs(dragPanePosition.current - pos) / panesSize.current!;
-    if (pos > dragPanePosition.current) {
-      sizes_[i] += d;
-      sizes_[i + 1] -= d;
-    } else {
-      sizes_[i] -= d;
-      sizes_[i + 1] += d;
-    }
-    props.onResize(sizes_);
-  };
+      const i = paneIndex.current;
+      const pos = ev[d3];
+      const d = Math.abs(dragPanePosition.current - pos) / panesSize.current;
+      if (pos > dragPanePosition.current) {
+        sizes_[i] += d;
+        sizes_[i + 1] -= d;
+      } else {
+        sizes_[i] -= d;
+        sizes_[i + 1] += d;
+      }
+      props.onResize(sizes_);
+    },
+    [d3, getSizes, props]
+  );
 
-  const onDragEnd = () => {
+  const onDragEnd = useCallback(() => {
     window.removeEventListener('mousemove', onDrag);
     window.removeEventListener('mouseup', onDragEnd);
     setDragging(false);
-  };
+  }, [onDrag]);
 
   useEffect(() => {
     return () => {

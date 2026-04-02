@@ -44,6 +44,11 @@
   color: #fff;
   opacity: 0.5;
   shape-rendering: crispedges;
+  /* Reset native button styles */
+  appearance: none;
+  background: none;
+  border: none;
+  font: inherit;
 }
 
 .headerShape:hover {

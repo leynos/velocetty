@@ -6,9 +6,15 @@ import type {StyleSheetProps} from '../../typings/hyper';
 import * as styles from './style-sheet.module.css';
 
 const StyleSheet = forwardRef(function StyleSheet(props: StyleSheetProps, ref: React.ForwardedRef<HTMLDivElement>) {
-  const {borderColor} = props;
+  const {borderColor, className} = props;
 
-  return <div ref={ref} className={styles.host} style={{'--scrollbar-thumb': borderColor} as React.CSSProperties} />;
+  return (
+    <div
+      ref={ref}
+      className={`${styles.host} ${className ?? ''}`}
+      style={{'--scrollbar-thumb': borderColor} as React.CSSProperties}
+    />
+  );
 });
 
 StyleSheet.displayName = 'StyleSheet';
