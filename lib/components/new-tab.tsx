@@ -22,6 +22,32 @@ type CSSVars = Record<`--${string}`, string>;
 
 const isMac = /Mac/.test(navigator.userAgent);
 
+/** Returns the CSS class string for the new-tab trigger button. */
+function newTabButtonClass(tabsVisible: boolean): string {
+  return [styles.newTab, isMac ? styles.newTabMac : null, tabsVisible ? styles.tabsVisible : styles.tabsHidden]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/** Returns the CSS class string for a profile dropdown item. */
+function profileItemClass(name: string, defaultProfile: string, profileCount: number): string {
+  return [
+    styles.profileDropdownItem,
+    name === defaultProfile && profileCount > 1 ? styles.profileDropdownItemDefault : null
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/**
+ * Returns `true` when focus is moving to an element outside the given
+ * container, indicating the dropdown should be closed.
+ */
+function isFocusLeavingContainer(event: React.FocusEvent<HTMLElement>, container: HTMLElement | null): boolean {
+  const next = event.relatedTarget;
+  return !(next && 'nodeType' in next && container?.contains(next as Node));
+}
+
 const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, borderColor, tabsVisible}: Props) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
@@ -48,12 +74,9 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
   };
 
   const handleDropdownBlur = (event: React.FocusEvent<HTMLDivElement>) => {
-    const nextFocusedElement = event.relatedTarget;
-    if (nextFocusedElement && 'nodeType' in nextFocusedElement && ref.current?.contains(nextFocusedElement as Node)) {
-      return;
+    if (isFocusLeavingContainer(event, ref.current)) {
+      closeDropdown();
     }
-
-    closeDropdown();
   };
 
   const tabVars: React.CSSProperties & CSSVars = {
@@ -61,13 +84,6 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
     '--new-tab-bg': backgroundColor,
     position: 'relative'
   };
-  const buttonClassName = [
-    styles.newTab,
-    isMac ? styles.newTabMac : null,
-    tabsVisible ? styles.tabsVisible : styles.tabsHidden
-  ]
-    .filter(Boolean)
-    .join(' ');
 
   return (
     <div ref={ref} style={tabVars}>
@@ -77,7 +93,7 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
         aria-label="New Tab"
         aria-haspopup="menu"
         aria-expanded={dropdownOpen}
-        className={buttonClassName}
+        className={newTabButtonClass(tabsVisible)}
         onClick={toggleDropdown}
         onKeyDown={handleEscapeKey}
         onDoubleClick={(e) => e.stopPropagation()}
@@ -102,12 +118,7 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
                 openNewTab(profile.name);
                 closeDropdown();
               }}
-              className={[
-                styles.profileDropdownItem,
-                profile.name === defaultProfile && profiles.length > 1 ? styles.profileDropdownItemDefault : null
-              ]
-                .filter(Boolean)
-                .join(' ')}
+              className={profileItemClass(profile.name, defaultProfile, profiles.length)}
             >
               {profile.name}
             </button>
