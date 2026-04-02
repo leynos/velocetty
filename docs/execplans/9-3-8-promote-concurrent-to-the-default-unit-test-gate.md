@@ -12,9 +12,10 @@ Status: COMPLETE
 This change promotes explicit Bun `--concurrent` execution from an opt-in
 stress-test flag to the default for all unit-test gates (local and CI). After
 completion, running `make test` or `bun run test:unit` will execute the full
-unit-test suite with concurrent test execution enabled (subject to Bun's
-scheduler limit), reducing local feedback loop times and ensuring the
-hardening work from roadmap items 9.3.3 through 9.3.7 remains effective.
+unit-test suite with concurrent test execution enabled
+(subject to Bun's scheduler limit), reducing local feedback loop
+times and ensuring the hardening work from roadmap items 9.3.3 through 9.3.7
+remains effective.
 
 Observable success: the three seeded concurrent stress runs pass, and the
 standard quality gates (`bun install`, `make build`, `make check-fmt`,
@@ -28,9 +29,9 @@ Hard invariants that must hold throughout implementation:
 1. **Preserve diagnostic commands**: `test:unit:serialized`,
    `test:unit:serialized:shuffled`, and `test:unit:shuffled` must remain
    available for triage after the default-gate flip.
-2. **Do not break Continuous Integration (CI)**:
-   The `.github/workflows/nodejs.yml` workflow must continue to pass without
-   modification (it calls `make test`).
+2. **Do not break Continuous Integration (CI)**: The CI workflow in
+   `.github/workflows/nodejs.yml` must continue to pass without modification
+   (it calls `make test`).
 3. **Do not break existing seeded commands**: The exact commands documented in
    `docs/developers-guide.md` for seeded stress testing must remain valid.
 4. **No new dependencies**: This change must not introduce new npm packages or

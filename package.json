@@ -13,7 +13,7 @@
     "build:frontend": "bunx tsgo --project frontend/tsconfig.json --noEmit",
     "build:backend": "bunx tsgo --project backend/tsconfig.json --noEmit",
     "build:packages": "bun run build:shared && bun run build:frontend && bun run build:backend",
-    "build": "bun run build:packages && bunx cross-env NODE_ENV=production bun ./build/esbuild/build.ts --mode=production && bunx tsgo --project app/tsconfig.json",
+    "build": "bun run build:packages && bunx cross-env NODE_ENV=production bun ./build/esbuild/build.ts --mode=production && bunx tsgo --project app/tsconfig.build.json",
     "build:hyper-app": "bun ./build/esbuild/build.ts --mode=production --target=hyper-app",
     "lint": "bun node_modules/@biomejs/biome/bin/biome check . && bun run check:boundaries",
     "check:types": "bunx tsgo --project tsconfig.typecheck.json",

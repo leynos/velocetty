@@ -39,10 +39,12 @@ jobs:
         id: setup_node_gyp_python
         run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
       - name: Export node-gyp environment
-        run: |
-          printf 'PYTHON=%s\n' "${{ steps.setup_node_gyp_python.outputs.python }}" >> "$GITHUB_ENV"
-          printf 'npm_config_python=%s\n' "${{ steps.setup_node_gyp_python.outputs.python }}" >> "$GITHUB_ENV"
-          printf 'npm_config_node_gyp=%s\n' "${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
+        run: >
+          printf 'PYTHON=%s\nnpm_config_python=%s\nnpm_config_node_gyp=%s\n'
+          "${{ steps.setup_node_gyp_python.outputs.python }}"
+          "${{ steps.setup_node_gyp_python.outputs.python }}"
+          "${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js"
+          >> "$GITHUB_ENV"
       - name: Install
         if: runner.os != 'Windows'
         run: bun install
@@ -76,6 +78,7 @@ jobs:
           cp build/canary.icns build/icon.icns
       - name: Build
         uses: ./.github/actions/build-packaged-app
+        timeout-minutes: 90
         with:
           gh_token: ${{ secrets.GITHUB_TOKEN }}
           csc_link: ${{ runner.os == 'macOS' && secrets.MAC_CERT_P12_BASE64 || '' }}
@@ -131,7 +134,7 @@ jobs:
         if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest'
         env:
           PR_NUM: ${{ github.event.number }}
-        run: echo $PR_NUM > pr_num.txt
+        run: echo "$PR_NUM" > pr_num.txt
       - name: Upload the pr num
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest'
@@ -157,10 +160,12 @@ jobs:
         id: setup_node_gyp_python
         run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
       - name: Export node-gyp environment
-        run: |
-          printf 'PYTHON=%s\n' "${{ steps.setup_node_gyp_python.outputs.python }}" >> "$GITHUB_ENV"
-          printf 'npm_config_python=%s\n' "${{ steps.setup_node_gyp_python.outputs.python }}" >> "$GITHUB_ENV"
-          printf 'npm_config_node_gyp=%s\n' "${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
+        run: >
+          printf 'PYTHON=%s\nnpm_config_python=%s\nnpm_config_node_gyp=%s\n'
+          "${{ steps.setup_node_gyp_python.outputs.python }}"
+          "${{ steps.setup_node_gyp_python.outputs.python }}"
+          "${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js"
+          >> "$GITHUB_ENV"
       - name: Install
         run: bun install
       - name: Install Linux build and E2E runtime deps
@@ -208,10 +213,12 @@ jobs:
         id: setup_node_gyp_python
         run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
       - name: Export node-gyp environment
-        run: |
-          printf 'PYTHON=%s\n' "${{ steps.setup_node_gyp_python.outputs.python }}" >> "$GITHUB_ENV"
-          printf 'npm_config_python=%s\n' "${{ steps.setup_node_gyp_python.outputs.python }}" >> "$GITHUB_ENV"
-          printf 'npm_config_node_gyp=%s\n' "${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
+        run: >
+          printf 'PYTHON=%s\nnpm_config_python=%s\nnpm_config_node_gyp=%s\n'
+          "${{ steps.setup_node_gyp_python.outputs.python }}"
+          "${{ steps.setup_node_gyp_python.outputs.python }}"
+          "${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js"
+          >> "$GITHUB_ENV"
       - name: Prepare x64 snapshot sysroot for Linux aarch64
         run: |
           set -euo pipefail

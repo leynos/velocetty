@@ -70,7 +70,7 @@ Issue: [#22](https://github.com/leynos/velocetty/issues/22)
 
 Status: Open  
 Owner: TBD  
-Last updated: 2026-02-12
+Last updated: 2026-03-27
 
 ### CONFIG-001 summary
 
@@ -78,11 +78,42 @@ Last updated: 2026-02-12
   `webGLRenderer`.
 - Apply renderer-setting changes to existing sessions without reopening tabs.
 - Preserve fallback behavior when WebGL contexts are unavailable.
+- The reloadability registry in `shared/src/constants/config-reloadability.ts`
+  currently classifies `webGLRenderer` as `restart`-required pending this work.
 
 ### CONFIG-001 exit criteria
 
 - Changing `webGLRenderer` takes effect for active sessions without restart.
+- Update `webGLRenderer` classification to `live` in the reloadability registry.
 - Unit or integration tests cover hot-reload behavior and fallback handling.
+- `make lint` and `make test` remain green.
+
+## CONFIG-002 Support workspace-level configuration overrides
+
+Status: Open  
+Owner: TBD  
+Last updated: 2026-03-27
+
+### CONFIG-002 summary
+
+- Implement workspace-level configuration overrides (e.g., `.velocetty/config.json5`
+  in a project root).
+- Extend the layering system to support: defaults → user → workspace → runtime.
+- Define workspace discovery and resolution rules.
+- Coordinate with reloadability semantics when workspace settings change.
+
+### CONFIG-002 background
+
+Deferred from roadmap item `3.1.2`. The layering infrastructure in
+`app/config/layering.ts` supports workspace layers, but the workspace discovery
+and resolution paths are not yet defined.
+
+### CONFIG-002 exit criteria
+
+- Workspace config files are discovered and loaded.
+- Layering order is: defaults → user → workspace → runtime.
+- Changes to workspace settings trigger appropriate reload/restart warnings.
+- Documentation updated in `docs/developers-guide.md`.
 - `make lint` and `make test` remain green.
 
 ## WINARM64-001 Track Windows aarch64 CI enablement after Bun support lands
