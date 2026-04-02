@@ -1,3 +1,19 @@
+/**
+ * @file Connects the header view to renderer state, header actions, and
+ * translation-backed accessibility labels.
+ *
+ * Responsibilities:
+ * - Select tab, activity, chrome, and profile state for the header UI.
+ * - Bind header interactions to actions such as `closeTab`, `changeTab`,
+ *   `maximize`, `unmaximize`, `minimize`, `close`,
+ *   `openHamburgerMenu`, and `requestTermGroup`.
+ * - Inject translated aria labels via `useTranslation` before exporting the
+ *   connected `HeaderContainer`.
+ *
+ * Usage:
+ * - Imported by the renderer container tree where the connected header chrome
+ *   is required.
+ */
 import React from 'react';
 import {createSelector} from 'reselect';
 

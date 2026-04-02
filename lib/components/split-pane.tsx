@@ -1,4 +1,21 @@
-/** @file Resizable split pane container supporting horizontal and vertical layouts. */
+/**
+ * @file Renders the `SplitPane` component used by
+ * `lib/components/term-group.tsx` to size sibling panes in horizontal and
+ * vertical term layouts.
+ *
+ * Responsibilities:
+ * - Preserve the total size of the two panes adjacent to a divider during
+ *   drag and double-click resize operations.
+ * - Honour the `direction`, `sizes`, `borderColor`, and `onResize` props that
+ *   define the caller contract for pane layout and resize feedback.
+ *
+ * Resize invariants:
+ * - Keep emitted pane sizes within the inclusive `[0, 1]` range.
+ * - Preserve the combined size of the two panes beside the active divider.
+ * - Clamp drag deltas when either pane reaches its minimum size of `0`.
+ * - Keep panes outside the active divider fixed while only the adjacent pair
+ *   flexes during a resize gesture.
+ */
 
 import React, {useState, useEffect, useRef, useCallback, forwardRef} from 'react';
 
@@ -9,6 +26,7 @@ import * as styles from './split-pane.module.css';
 
 const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const dragPanePosition = useRef<number>(0);
+  const dragOffset = useRef<number>(0);
   const dragTarget = useRef<HTMLDivElement | null>(null);
   const paneIndex = useRef<number>(0);
   const d1 = props.direction === 'horizontal' ? 'height' : 'width';
@@ -50,7 +68,11 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     window.addEventListener('mousemove', onDrag);
     window.addEventListener('mouseup', onDragEnd);
     dragTarget.current = target;
-    dragPanePosition.current = dragTarget.current.getBoundingClientRect()[d2];
+    const pointerAxis = propsRef.current.direction === 'horizontal' ? 'clientY' : 'clientX';
+    const pointer = ev[pointerAxis];
+    const dividerRect = dragTarget.current.getBoundingClientRect();
+    dragPanePosition.current = pointer;
+    dragOffset.current = pointer - dividerRect[d2];
     paneIndex.current = index;
     panesSize.current = getSizes();
     paneContainerSize.current = parent.getBoundingClientRect()[d1];
@@ -81,15 +103,19 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
       // Read direction from propsRef to avoid stale closure during drag
       const axis = propsRef.current.direction === 'horizontal' ? 'clientY' : 'clientX';
       const i = paneIndex.current;
-      const pos = ev[axis];
-      const d = Math.abs(dragPanePosition.current - pos) / paneContainerSize.current;
-      if (pos > dragPanePosition.current) {
-        sizes_[i] += d;
-        sizes_[i + 1] -= d;
+      const pointer = ev[axis];
+      const dividerPosition = pointer - dragOffset.current;
+      const d = Math.abs(dragPanePosition.current - pointer) / paneContainerSize.current;
+      if (pointer > dragPanePosition.current) {
+        const clampedDelta = Math.min(d, sizes_[i + 1]);
+        sizes_[i] += clampedDelta;
+        sizes_[i + 1] -= clampedDelta;
       } else {
-        sizes_[i] -= d;
-        sizes_[i + 1] += d;
+        const clampedDelta = Math.min(d, sizes_[i]);
+        sizes_[i] -= clampedDelta;
+        sizes_[i + 1] += clampedDelta;
       }
+      dragTarget.current?.style.setProperty(d2, `${dividerPosition}px`);
       propsRef.current.onResize(sizes_);
     },
     [getSizes]
@@ -100,6 +126,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     window.removeEventListener('mouseup', onDragEnd);
     panesSize.current = null;
     paneContainerSize.current = null;
+    dragOffset.current = 0;
     setDragging(false);
   }, [onDrag]);
 

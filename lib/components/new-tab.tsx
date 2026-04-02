@@ -34,9 +34,31 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
     setDropdownOpen(false);
   });
 
+  const closeDropdown = () => {
+    setDropdownOpen(false);
+  };
+
+  const handleEscapeKey = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key !== 'Escape') {
+      return;
+    }
+
+    closeDropdown();
+  };
+
+  const handleDropdownBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+    const nextFocusedElement = event.relatedTarget;
+    if (nextFocusedElement && 'nodeType' in nextFocusedElement && ref.current?.contains(nextFocusedElement as Node)) {
+      return;
+    }
+
+    closeDropdown();
+  };
+
   const tabVars: React.CSSProperties & CSSVars = {
     '--new-tab-border': borderColor,
-    '--new-tab-bg': backgroundColor
+    '--new-tab-bg': backgroundColor,
+    position: 'relative'
   };
   const buttonClassName = [
     styles.newTab,
@@ -56,13 +78,20 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
         aria-expanded={dropdownOpen}
         className={buttonClassName}
         onClick={toggleDropdown}
+        onKeyDown={handleEscapeKey}
         onDoubleClick={(e) => e.stopPropagation()}
       >
         <VscChevronDown style={{verticalAlign: 'middle'}} />
       </button>
 
       {dropdownOpen && (
-        <div key="dropdown" className={styles.profileDropdown} role="menu">
+        <div
+          key="dropdown"
+          className={styles.profileDropdown}
+          role="menu"
+          onBlur={handleDropdownBlur}
+          onKeyDown={handleEscapeKey}
+        >
           {profiles.map((profile) => (
             <button
               key={profile.name}
@@ -70,7 +99,7 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
               role="menuitem"
               onClick={() => {
                 openNewTab(profile.name);
-                setDropdownOpen(false);
+                closeDropdown();
               }}
               className={[
                 styles.profileDropdownItem,

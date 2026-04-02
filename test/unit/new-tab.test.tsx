@@ -9,7 +9,7 @@ import {waitFor} from '../testUtils/waitFor';
 
 type NewTabComponent = typeof import('../../lib/components/new-tab').default;
 
-test('filters empty class name segments for the button and menu items', async () => {
+const renderNewTab = async () => {
   const cleanup = await setupHappyDom();
   const {default: NewTab} = (await import(`../../lib/components/new-tab.tsx?new_tab_test=${Date.now()}`)) as {
     default: NewTabComponent;
@@ -18,24 +18,30 @@ test('filters empty class name segments for the button and menu items', async ()
   document.body.appendChild(container);
   const root = createRoot(container);
 
-  try {
-    await act(async () => {
-      root.render(
-        React.createElement(NewTab, {
-          defaultProfile: 'default',
-          profiles: [
-            {name: 'default', config: {}},
-            {name: 'secondary', config: {}}
-          ],
-          openNewTab: () => {},
-          backgroundColor: '#000',
-          borderColor: '#333',
-          tabsVisible: false
-        })
-      );
-      await waitFor(0);
-    });
+  await act(async () => {
+    root.render(
+      React.createElement(NewTab, {
+        defaultProfile: 'default',
+        profiles: [
+          {name: 'default', config: {}},
+          {name: 'secondary', config: {}}
+        ],
+        openNewTab: () => {},
+        backgroundColor: '#000',
+        borderColor: '#333',
+        tabsVisible: false
+      })
+    );
+    await waitFor(0);
+  });
 
+  return {cleanup, container, root};
+};
+
+test('filters empty class name segments for the button and menu items', async () => {
+  const {cleanup, container, root} = await renderNewTab();
+
+  try {
     const button = container.querySelector('button');
     expect(button).toBeTruthy();
     expect(button?.className.includes('  ')).toBe(false);
@@ -48,6 +54,68 @@ test('filters empty class name segments for the button and menu items', async ()
     const menuItems = Array.from(container.querySelectorAll('button[role="menuitem"]'));
     expect(menuItems.length).toBe(2);
     expect(menuItems.every((item) => !item.className.includes('  '))).toBe(true);
+  } finally {
+    await act(async () => {
+      root.unmount();
+      await waitFor(0);
+    });
+    cleanup();
+  }
+});
+
+test('closes the dropdown when Escape is pressed', async () => {
+  const {cleanup, container, root} = await renderNewTab();
+
+  try {
+    const button = container.querySelector('button');
+    expect(button).toBeTruthy();
+
+    await act(async () => {
+      button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
+      await waitFor(0);
+    });
+
+    expect(container.querySelector('[role="menu"]')).toBeTruthy();
+
+    await act(async () => {
+      button?.dispatchEvent(new window.KeyboardEvent('keydown', {bubbles: true, key: 'Escape'}));
+      await waitFor(0);
+    });
+
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+  } finally {
+    await act(async () => {
+      root.unmount();
+      await waitFor(0);
+    });
+    cleanup();
+  }
+});
+
+test('closes the dropdown when focus leaves the component boundary', async () => {
+  const {cleanup, container, root} = await renderNewTab();
+
+  try {
+    const button = container.querySelector('button');
+    expect(button).toBeTruthy();
+
+    await act(async () => {
+      button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
+      await waitFor(0);
+    });
+
+    const dropdown = container.querySelector('[role="menu"]');
+    const outsideButton = document.createElement('button');
+    document.body.appendChild(outsideButton);
+    expect(dropdown).toBeTruthy();
+
+    await act(async () => {
+      dropdown?.dispatchEvent(new window.FocusEvent('focusout', {bubbles: true, relatedTarget: outsideButton}));
+      await waitFor(0);
+    });
+
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    outsideButton.remove();
   } finally {
     await act(async () => {
       root.unmount();

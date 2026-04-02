@@ -65,14 +65,6 @@
   shape-rendering: crispedges;
 }
 
-.headerShape:hover {
-  opacity: 1;
-}
-
-.headerShape:active {
-  opacity: 0.3;
-}
-
 .headerHamburgerMenuLeft {
   position: fixed;
   top: 0;
