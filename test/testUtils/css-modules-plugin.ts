@@ -26,9 +26,8 @@ const extractClassNames = (css: string): string[] => {
  *
  * @example
  * ```ts
- * import {plugin} from 'bun';
- * import cssModulesPlugin from './css-modules-plugin';
- * plugin(cssModulesPlugin);
+ * // The plugin self-registers on import
+ * import './css-modules-plugin';
  * ```
  */
 const cssModulesPlugin: BunPlugin = {

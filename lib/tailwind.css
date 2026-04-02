@@ -16,4 +16,9 @@
   --header-border: #ccc;
   --close-btn-danger: #ef4444;
   --close-btn-danger-active: #dc2626;
+
+  /* Terms container */
+  --terms-margin-base: 34px;
+  --terms-margin-shifted: 68px;
+  --terms-offscreen-left: -9999em;
 }

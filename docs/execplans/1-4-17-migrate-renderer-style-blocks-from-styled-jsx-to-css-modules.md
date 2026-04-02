@@ -301,8 +301,7 @@ must return no matches.
 
 ## Concrete steps
 
-All commands are run from the repository root
-(`/data/leynos/Projects/velocetty.worktrees/1-4-17-migrate-renderer-style-blocks-from-styled-jsx-to-css-modules`).
+All commands are run from the repository root (`<repository-root>`).
 
 ### Step 1: Prepare the pipeline
 

@@ -35,7 +35,9 @@
   flex-grow: 1;
 }
 
-.tabsList {
+/* Legacy "tabs_list" class preserved for Hyper plugin compatibility */
+.tabsList,
+:global(.tabs_list) {
   max-height: 34px;
   display: flex;
   flex-flow: row;

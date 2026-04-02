@@ -1,6 +1,8 @@
+/** @file Terminal container styles with group visibility management. */
+
 .termsTerms {
   position: absolute;
-  margin-top: 34px;
+  margin-top: var(--terms-margin-base);
   top: 0;
   right: 0;
   left: 0;
@@ -9,18 +11,18 @@
 }
 
 .termsTermsShifted {
-  margin-top: 68px;
+  margin-top: var(--terms-margin-shifted);
   animation: shift-down 0.2s ease-out;
 }
 
 .termsTermsNotShifted {
-  margin-top: 34px;
+  margin-top: var(--terms-margin-base);
   animation: shift-up 0.3s ease;
 }
 
 @keyframes shift-down {
   0% {
-    transform: translateY(-34px);
+    transform: translateY(calc(var(--terms-margin-base) * -1));
   }
   100% {
     transform: translateY(0px);
@@ -29,7 +31,7 @@
 
 @keyframes shift-up {
   0% {
-    transform: translateY(34px);
+    transform: translateY(var(--terms-margin-base));
   }
   100% {
     transform: translateY(0px);
@@ -43,7 +45,7 @@
   position: absolute;
   top: 0;
   /* Offscreen to pause xterm rendering, thanks to IntersectionObserver */
-  left: -9999em;
+  left: var(--terms-offscreen-left);
 }
 
 .termsTermGroupActive {

@@ -17,6 +17,12 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
   const panesSize = useRef<number | null>(null);
   const [dragging, setDragging] = useState(false);
 
+  // Use a ref to access latest props without recreating callbacks during drag
+  const propsRef = useRef(props);
+  useEffect(() => {
+    propsRef.current = props;
+  }, [props]);
+
   const handleAutoResize = (ev: React.MouseEvent<HTMLDivElement>, index: number) => {
     ev.preventDefault();
 
@@ -50,19 +56,19 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
   };
 
   const getSizes = useCallback(() => {
-    const {sizes} = props;
+    const {sizes} = propsRef.current;
     let sizes_: number[];
 
     if (sizes) {
       sizes_ = [...sizes.asMutable()];
     } else {
-      const total = props.children.length;
+      const total = propsRef.current.children.length;
       const count = new Array<number>(total).fill(1 / total);
 
       sizes_ = count;
     }
     return sizes_;
-  }, [props.sizes, props.children]);
+  }, []);
 
   const onDrag = useCallback(
     (ev: MouseEvent) => {
@@ -81,9 +87,9 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
         sizes_[i] -= d;
         sizes_[i + 1] += d;
       }
-      props.onResize(sizes_);
+      propsRef.current.onResize(sizes_);
     },
-    [d3, getSizes, props.onResize]
+    [d3, getSizes]
   );
 
   const onDragEnd = useCallback(() => {

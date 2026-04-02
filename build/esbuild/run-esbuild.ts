@@ -244,7 +244,7 @@ const createPostcssPluginWithoutModules = (): Plugin => {
 
       // Re-register captured handlers with the original onLoad
       for (const {filter, namespace, callback} of onLoadCallbacks) {
-        build.onLoad({filter, namespace}, (args) => callback(args));
+        build.onLoad({filter, namespace}, callback);
       }
     }
   };

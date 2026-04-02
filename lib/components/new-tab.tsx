@@ -36,7 +36,7 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
   };
 
   return (
-    <div ref={ref}>
+    <div ref={ref} style={tabVars}>
       <button
         type="button"
         title="New Tab"
@@ -46,7 +46,6 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
         className={`${styles.newTab} ${isMac ? styles.newTabMac : ''} ${tabsVisible ? styles.tabsVisible : styles.tabsHidden}`}
         onClick={toggleDropdown}
         onDoubleClick={(e) => e.stopPropagation()}
-        style={tabVars}
       >
         <VscChevronDown style={{verticalAlign: 'middle'}} />
       </button>
