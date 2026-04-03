@@ -89,7 +89,6 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
-      searchTermRef.current = event.currentTarget.value;
       if (event.shiftKey && event.key === 'Enter') {
         prev(searchTermRef.current);
       } else if (event.key === 'Enter') {
@@ -128,6 +127,7 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
         <input
           className={styles.searchInput}
           type="text"
+          aria-label="Search"
           onChange={updateSearch}
           onKeyDown={handleKeyDown}
           ref={inputRef}
