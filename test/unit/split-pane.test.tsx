@@ -84,15 +84,7 @@ test('supports keyboard resizing and separator semantics', async () => {
     await act(async () => {
       divider.focus();
       divider.dispatchEvent(new window.KeyboardEvent('keydown', {bubbles: true, cancelable: true, key: 'ArrowRight'}));
-      await waitFor(0);
-    });
-
-    await act(async () => {
       divider.dispatchEvent(new window.KeyboardEvent('keydown', {bubbles: true, cancelable: true, key: 'End'}));
-      await waitFor(0);
-    });
-
-    await act(async () => {
       divider.dispatchEvent(new window.KeyboardEvent('keydown', {bubbles: true, cancelable: true, key: 'Home'}));
       await waitFor(0);
     });
