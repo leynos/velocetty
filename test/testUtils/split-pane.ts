@@ -11,6 +11,91 @@ import {waitFor} from './waitFor';
 
 export type SplitPaneDirection = 'horizontal' | 'vertical';
 
+/** Options for a pointer-driven drag scenario in `SplitPane` unit tests. */
+export interface DragTestOptions {
+  direction: SplitPaneDirection;
+  initialSizes: number[];
+  /**
+   * Geometry to stub on the pane container and divider.
+   * Omit only for tests that never dispatch mouse events.
+   */
+  geometry?: {
+    paneLeft: number;
+    paneTop: number;
+    paneWidth: number;
+    paneHeight: number;
+    dividerLeft: number;
+    dividerTop: number;
+    dividerWidth: number;
+    dividerHeight: number;
+  };
+  /** Coordinates for the initial `mousedown` event on the divider. */
+  mousedownEvent: {clientX: number; clientY: number};
+  /**
+   * Ordered list of `mousemove` batches. Each entry is wrapped in its own
+   * `act` call; within a batch every event is dispatched before `waitFor`.
+   */
+  mousemoveBatches: Array<Array<{clientX: number; clientY: number}>>;
+  /** Called after all `mousemove` acts and before `mouseup`. */
+  assertResizeCalls: (resizeCalls: number[][]) => void;
+  /** Optional assertions to run immediately after the `mouseup` act. */
+  afterMouseUp?: (divider: HTMLElement) => void;
+}
+
+/**
+ * Runs a complete drag scenario: sets geometry, dispatches pointer events,
+ * asserts resize emissions, dispatches `mouseup`, then unmounts.
+ */
+export async function runDragTest({
+  direction,
+  initialSizes,
+  geometry,
+  mousedownEvent,
+  mousemoveBatches,
+  assertResizeCalls,
+  afterMouseUp
+}: DragTestOptions): Promise<void> {
+  const {cleanup, root, resizeCalls, panes, divider} = await renderControlledSplitPane({
+    direction,
+    initialSizes
+  });
+
+  try {
+    if (geometry) {
+      setSplitPaneGeometry({panes, divider, ...geometry});
+    }
+
+    await act(async () => {
+      divider.dispatchEvent(new window.MouseEvent('mousedown', {bubbles: true, ...mousedownEvent}));
+      await waitFor(0);
+    });
+
+    for (const batch of mousemoveBatches) {
+      await act(async () => {
+        for (const coords of batch) {
+          window.dispatchEvent(new window.MouseEvent('mousemove', {bubbles: true, ...coords}));
+        }
+        await waitFor(0);
+      });
+    }
+
+    assertResizeCalls(resizeCalls);
+
+    await act(async () => {
+      window.dispatchEvent(new window.MouseEvent('mouseup', {bubbles: true}));
+      await waitFor(0);
+    });
+
+    afterMouseUp?.(divider);
+  } finally {
+    await act(async () => {
+      root.unmount();
+      await waitFor(0);
+    });
+    cleanup();
+  }
+}
+
 export const buildRect = ({
   left,
   top,
