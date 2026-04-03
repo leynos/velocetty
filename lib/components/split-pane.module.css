@@ -30,6 +30,14 @@
   z-index: 1;
   background-clip: padding-box;
   flex-shrink: 0;
+  position: relative;
+  border: 0;
+  margin: 0;
+}
+
+.splitpaneDivider:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
 }
 
 .splitpaneDividerVertical {

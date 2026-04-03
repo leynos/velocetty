@@ -3,12 +3,8 @@
  * overflow handling in the main application container.
  */
 .hyperMain {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border: 1px solid #333;
+  @apply fixed inset-0;
+  border: 1px solid var(--border-color);
 }
 
 .hyperMainRounded {

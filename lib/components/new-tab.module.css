@@ -13,7 +13,6 @@
   z-index: 1000;
   padding: 0;
   margin: 0;
-  list-style-type: none;
   white-space: nowrap;
   min-width: 120px;
   border-color: var(--new-tab-border);
@@ -61,6 +60,7 @@
   padding: 0 16px;
   position: relative;
   text-align: center;
+  user-select: none;
   -webkit-user-select: none;
   top: 0;
 }

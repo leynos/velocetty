@@ -7,6 +7,7 @@ import {act} from 'react';
 import {afterEach, beforeEach, expect, mock, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
+import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {waitFor} from '../testUtils/waitFor';
 
 type HeaderWithTranslationComponent = typeof import('../../lib/containers/header.ts').HeaderWithTranslation;
@@ -86,20 +87,7 @@ const registerHeaderWithTranslationMocks = () => {
     ipcRenderer: mockedIpcRenderer
   }));
 
-  mock.module('../../lib/utils/plugins', () => ({
-    connect: () => (Component: unknown) => Component,
-    decorate: (Component: unknown) => Component,
-    getTabProps: (_tab: unknown, _parentProps: unknown, props: unknown) => props,
-    getTabsProps: (_parentProps: unknown, props: unknown) => props,
-    subscribeTabDecorationUpdates: () => () => {}
-  }));
-  mock.module('../../lib/utils/plugins.ts', () => ({
-    connect: () => (Component: unknown) => Component,
-    decorate: (Component: unknown) => Component,
-    getTabProps: (_tab: unknown, _parentProps: unknown, props: unknown) => props,
-    getTabsProps: (_parentProps: unknown, props: unknown) => props,
-    subscribeTabDecorationUpdates: () => () => {}
-  }));
+  registerPluginsModuleMocks();
 
   mock.module('../../lib/components/tabs', () => ({default: () => null}));
   mock.module('../../lib/components/tabs.tsx', () => ({default: () => null}));

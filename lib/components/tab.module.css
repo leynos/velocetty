@@ -3,19 +3,9 @@
  * activity and title overflow styling, and row/column text composition helpers.
  */
 .tabTab {
+  @apply relative grow list-none border-b border-l border-solid;
   color: var(--tab-fg);
   border-color: var(--tab-fg);
-  border-bottom-width: 1px;
-  border-bottom-style: solid;
-  border-left-width: 1px;
-  border-left-style: solid;
-  list-style-type: none;
-  flex-grow: 1;
-  position: relative;
-}
-
-.tabTab:hover {
-  color: var(--tab-fg);
 }
 
 .tabFirst {
@@ -33,73 +23,46 @@
   border-bottom-width: 0;
 }
 
-.tabActive:hover {
-  color: var(--tab-active-fg);
-}
-
 .tabHasActivity {
   color: var(--tab-activity-fg);
 }
 
-.tabHasActivity:hover {
-  color: var(--tab-activity-fg);
-}
-
 .tabText {
+  @apply relative block h-[34px] w-full overflow-hidden;
   transition: color 0.2s ease;
-  height: 34px;
-  display: block;
-  width: 100%;
-  position: relative;
-  overflow: hidden;
 }
 
 .tabTextInner {
-  position: absolute;
-  left: 24px;
-  right: 24px;
+  @apply absolute left-6 right-6 overflow-hidden whitespace-nowrap text-center;
   top: 0;
   bottom: 0;
-  text-align: center;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  overflow: hidden;
 }
 
 .tabIcon {
+  @apply absolute inline-block cursor-pointer rounded-full border-none bg-transparent p-0;
+  /* Preserve legacy icon alignment inside the fixed 34px tab row. */
+  @apply right-[7px] top-[10px] h-[14px] w-[14px] m-0;
   transition:
     opacity 0.2s ease,
     color 0.2s ease,
     transform 0.25s ease,
     background-color 0.1s ease;
-  position: absolute;
-  right: 7px;
-  top: 10px;
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 100%;
   color: var(--tab-icon-fg);
   opacity: 0;
   transform: scale(0.95);
-  /* Reset native button styles */
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
 }
 
 .tabIcon:hover,
 .tabIcon:focus-visible {
-  background-color: rgba(255, 255, 255, 0.13);
+  background-color: var(--tab-icon-bg-hover);
   color: var(--tab-icon-hover-fg);
   opacity: 1;
   transform: none;
 }
 
 .tabIcon:active {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--tab-icon-bg-active);
   color: var(--tab-icon-active-fg);
 }
 
@@ -109,11 +72,7 @@
 }
 
 .tabShape {
-  position: absolute;
-  left: 4px;
-  top: 4px;
-  width: 6px;
-  height: 6px;
+  @apply absolute left-1 top-1 h-1.5 w-1.5;
   fill: currentcolor;
   shape-rendering: crispedges;
 }

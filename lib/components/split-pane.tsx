@@ -24,10 +24,24 @@ import sum from 'lodash/sum';
 import type {SplitPaneProps} from '../../typings/hyper';
 import * as styles from './split-pane.module.css';
 
+const KEYBOARD_RESIZE_STEP = 0.05;
+const KEYBOARD_PAGE_RESIZE_STEP = 0.1;
+
+const resizeAdjacentPanes = (sizes: number[], index: number, nextLeadingPaneSize: number) => {
+  const nextSizes = [...sizes];
+  const pairTotal = sizes[index] + sizes[index + 1];
+  const clampedLeadingPaneSize = Math.min(Math.max(nextLeadingPaneSize, 0), pairTotal);
+
+  nextSizes[index] = clampedLeadingPaneSize;
+  nextSizes[index + 1] = pairTotal - clampedLeadingPaneSize;
+
+  return nextSizes;
+};
+
 const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const dragPanePosition = useRef<number>(0);
   const dragOffset = useRef<number>(0);
-  const dragTarget = useRef<HTMLDivElement | null>(null);
+  const dragTarget = useRef<HTMLElement | null>(null);
   const paneIndex = useRef<number>(0);
   const dragPointerAxisRef = useRef<'clientX' | 'clientY'>(props.direction === 'horizontal' ? 'clientY' : 'clientX');
   const dragD1Ref = useRef<'height' | 'width'>(props.direction === 'horizontal' ? 'height' : 'width');
@@ -44,7 +58,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     propsRef.current = props;
   }, [props]);
 
-  const handleAutoResize = (ev: React.MouseEvent<HTMLDivElement>, index: number) => {
+  const handleAutoResize = (ev: React.MouseEvent<HTMLElement>, index: number) => {
     ev.preventDefault();
 
     paneIndex.current = index;
@@ -60,9 +74,9 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     propsRef.current.onResize(sizes_);
   };
 
-  const handleDragStart = (ev: React.MouseEvent<HTMLDivElement>, index: number) => {
+  const handleDragStart = (ev: React.MouseEvent<HTMLElement>, index: number) => {
     ev.preventDefault();
-    const target = ev.target as HTMLDivElement;
+    const target = ev.currentTarget;
     const parent = target.parentElement;
     if (!parent) {
       return;
@@ -99,6 +113,19 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     return sizes_;
   }, []);
 
+  const resizePanePair = useCallback(
+    (index: number, nextLeadingPaneSize: number) => {
+      const sizes_ = getSizes();
+      const nextSizes = resizeAdjacentPanes(sizes_, index, nextLeadingPaneSize);
+      if (nextSizes.every((size, nextIndex) => size === sizes_[nextIndex])) {
+        return;
+      }
+
+      propsRef.current.onResize(nextSizes);
+    },
+    [getSizes]
+  );
+
   const onDrag = useCallback((ev: MouseEvent) => {
     if (!panesSize.current || !paneContainerSize.current) {
       return;
@@ -131,6 +158,9 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
   const onDragEnd = useCallback(() => {
     window.removeEventListener('mousemove', onDrag);
     window.removeEventListener('mouseup', onDragEnd);
+    dragTarget.current?.style.removeProperty('left');
+    dragTarget.current?.style.removeProperty('top');
+    dragTarget.current = null;
     panesSize.current = null;
     paneContainerSize.current = null;
     dragOffset.current = 0;
@@ -144,8 +174,61 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     };
   }, [onDragEnd]);
 
+  const handleKeyResize = (event: React.KeyboardEvent<HTMLElement>, index: number) => {
+    const sizes_ = getSizes();
+    const currentLeadingPaneSize = sizes_[index];
+    const pairTotal = currentLeadingPaneSize + sizes_[index + 1];
+    const isVerticalDivider = propsRef.current.direction === 'vertical';
+    let nextLeadingPaneSize: number | null = null;
+
+    switch (event.key) {
+      case 'ArrowLeft':
+        if (isVerticalDivider) {
+          nextLeadingPaneSize = currentLeadingPaneSize - KEYBOARD_RESIZE_STEP;
+        }
+        break;
+      case 'ArrowRight':
+        if (isVerticalDivider) {
+          nextLeadingPaneSize = currentLeadingPaneSize + KEYBOARD_RESIZE_STEP;
+        }
+        break;
+      case 'ArrowUp':
+        if (!isVerticalDivider) {
+          nextLeadingPaneSize = currentLeadingPaneSize - KEYBOARD_RESIZE_STEP;
+        }
+        break;
+      case 'ArrowDown':
+        if (!isVerticalDivider) {
+          nextLeadingPaneSize = currentLeadingPaneSize + KEYBOARD_RESIZE_STEP;
+        }
+        break;
+      case 'PageUp':
+        nextLeadingPaneSize = currentLeadingPaneSize - KEYBOARD_PAGE_RESIZE_STEP;
+        break;
+      case 'PageDown':
+        nextLeadingPaneSize = currentLeadingPaneSize + KEYBOARD_PAGE_RESIZE_STEP;
+        break;
+      case 'Home':
+        nextLeadingPaneSize = 0;
+        break;
+      case 'End':
+        nextLeadingPaneSize = pairTotal;
+        break;
+      default:
+        break;
+    }
+
+    if (nextLeadingPaneSize === null) {
+      return;
+    }
+
+    event.preventDefault();
+    resizePanePair(index, nextLeadingPaneSize);
+  };
+
   const {children, direction, borderColor} = props;
   const sizeProperty = direction === 'horizontal' ? 'height' : 'width';
+  const separatorOrientation = direction === 'vertical' ? 'vertical' : 'horizontal';
   // workaround for the fact that if we don't specify
   // sizes, sometimes flex fails to calculate the
   // right height for the horizontal panes
@@ -169,9 +252,16 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
               {child}
             </div>
             {i < children.length - 1 ? (
-              <div
+              <hr
                 onMouseDown={(e) => handleDragStart(e, i)}
                 onDoubleClick={(e) => handleAutoResize(e, i)}
+                onKeyDown={(event) => handleKeyResize(event, i)}
+                tabIndex={0}
+                aria-label="Resize panes"
+                aria-orientation={separatorOrientation}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(sizes[i] * 100)}
                 style={{backgroundColor: borderColor}}
                 className={`${styles.splitpaneDivider} ${direction === 'vertical' ? styles.splitpaneDividerVertical : styles.splitpaneDividerHorizontal}`}
               />

@@ -3,6 +3,13 @@
  * states and search input token spacing tokens for `--search-*` variables.
  */
 .searchButton {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
   cursor: pointer;
   color: var(--search-fg);
   padding: 2px;
