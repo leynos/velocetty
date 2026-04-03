@@ -97,8 +97,10 @@ test('applies drag deltas from the pointer-anchored drag-start snapshot instead 
     });
 
     expect(resizeCalls).toHaveLength(2);
-    expect(resizeCalls[0]).toEqual([0.35, 0.6499999999999999]);
-    expect(resizeCalls[1]).toEqual([0.36, 0.6399999999999999]);
+    expect(resizeCalls[0][0]).toBeCloseTo(0.35, 12);
+    expect(resizeCalls[0][1]).toBeCloseTo(0.65, 12);
+    expect(resizeCalls[1][0]).toBeCloseTo(0.36, 12);
+    expect(resizeCalls[1][1]).toBeCloseTo(0.64, 12);
   } finally {
     await act(async () => {
       window.dispatchEvent(new window.MouseEvent('mouseup', {bubbles: true}));

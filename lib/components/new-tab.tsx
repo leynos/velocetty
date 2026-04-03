@@ -1,4 +1,30 @@
-/** @file New tab button component with profile selection dropdown. */
+/**
+ * @file New tab button and profile dropdown component used by terminal tabs.
+ *
+ * Purpose:
+ * - Renders the profile-selection trigger button and a dropdown menu bound to
+ *   `tab.visible` styling and dynamic theme variables.
+ * - Encapsulates keyboard and click/focus behaviours so profile switching is
+ *   accessible and does not depend on page-level event handlers.
+ *
+ * Required invariants:
+ * - Trigger button must keep `aria-label="New Tab"`, `aria-haspopup="menu"`,
+ *   and `aria-expanded` in sync with `dropdownOpen`.
+ * - Dropdown wrapper must remain `role="menu"` and each profile option must keep
+ *   `role="menuitem"` for assistive navigation and expected keyboard semantics.
+ * - Focus leaving the component (`onBlur` when `relatedTarget` is external) must
+ *   close the dropdown; `Escape` closes only while the dropdown is open.
+ * - Required CSS modules for theme and geometry: `styles.newTab`,
+ *   `styles.newTabMac`, `styles.tabsVisible`, `styles.tabsHidden`,
+ *   `styles.profileDropdown`, `styles.profileDropdownItem`,
+ *   `styles.profileDropdownItemDefault`.
+ * - Required CSS custom properties on the wrapper: `--new-tab-border`,
+ *   `--new-tab-bg`.
+ *
+ * Related modules:
+ * - `lib/components/new-tab.module.css`
+ * - `test/unit/new-tab.test.tsx`
+ */
 
 import {useRef, useState} from 'react';
 

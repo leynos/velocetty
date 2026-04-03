@@ -57,7 +57,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     sizes_[paneIndex.current] = availableWidth / 2;
     sizes_[paneIndex.current + 1] = availableWidth / 2;
 
-    props.onResize(sizes_);
+    propsRef.current.onResize(sizes_);
   };
 
   const handleDragStart = (ev: React.MouseEvent<HTMLDivElement>, index: number) => {
@@ -99,37 +99,34 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     return sizes_;
   }, []);
 
-  const onDrag = useCallback(
-    (ev: MouseEvent) => {
-      if (!panesSize.current || !paneContainerSize.current) {
-        return;
-      }
-      const sizes_ = [...panesSize.current];
+  const onDrag = useCallback((ev: MouseEvent) => {
+    if (!panesSize.current || !paneContainerSize.current) {
+      return;
+    }
+    const sizes_ = [...panesSize.current];
 
-      const axis = dragPointerAxisRef.current;
-      const i = paneIndex.current;
-      const pointer = ev[axis];
-      const dividerPosition = pointer - dragOffset.current;
-      const d = Math.abs(dragPanePosition.current - pointer) / paneContainerSize.current;
-      if (pointer > dragPanePosition.current) {
-        const clampedDelta = Math.min(d, sizes_[i + 1]);
-        sizes_[i] += clampedDelta;
-        sizes_[i + 1] -= clampedDelta;
-      } else {
-        const clampedDelta = Math.min(d, sizes_[i]);
-        sizes_[i] -= clampedDelta;
-        sizes_[i + 1] += clampedDelta;
-      }
-      dragTarget.current?.style.setProperty(dragD2Ref.current, `${dividerPosition}px`);
-      if (lastEmittedSizesRef.current && sizes_.every((size, index) => size === lastEmittedSizesRef.current?.[index])) {
-        return;
-      }
+    const axis = dragPointerAxisRef.current;
+    const i = paneIndex.current;
+    const pointer = ev[axis];
+    const dividerPosition = pointer - dragOffset.current;
+    const d = Math.abs(dragPanePosition.current - pointer) / paneContainerSize.current;
+    if (pointer > dragPanePosition.current) {
+      const clampedDelta = Math.min(d, sizes_[i + 1]);
+      sizes_[i] += clampedDelta;
+      sizes_[i + 1] -= clampedDelta;
+    } else {
+      const clampedDelta = Math.min(d, sizes_[i]);
+      sizes_[i] -= clampedDelta;
+      sizes_[i + 1] += clampedDelta;
+    }
+    dragTarget.current?.style.setProperty(dragD2Ref.current, `${dividerPosition}px`);
+    if (lastEmittedSizesRef.current && sizes_.every((size, index) => size === lastEmittedSizesRef.current?.[index])) {
+      return;
+    }
 
-      lastEmittedSizesRef.current = [...sizes_];
-      propsRef.current.onResize(sizes_);
-    },
-    [getSizes]
-  );
+    lastEmittedSizesRef.current = [...sizes_];
+    propsRef.current.onResize(sizes_);
+  }, []);
 
   const onDragEnd = useCallback(() => {
     window.removeEventListener('mousemove', onDrag);

@@ -1,4 +1,7 @@
-/** @file Verifies new-tab class-name assembly without duplicate spaces, Escape-key dismissal behaviour, preventDefault handling, and focus-boundary closing. */
+/**
+ * @file Verifies new-tab class-name assembly without duplicate spaces, Escape-key
+ * dismissal behaviour, preventDefault handling, and focus-boundary closing.
+ */
 import React, {act} from 'react';
 import {createRoot} from 'react-dom/client';
 
@@ -11,6 +14,10 @@ type NewTabComponent = typeof import('../../lib/components/new-tab').default;
 
 const renderNewTab = async () => {
   const cleanup = await setupHappyDom();
+  // Bun's ESM loader caches modules aggressively. A unique `?new_tab_test=`
+  // query string is appended here to force a fresh module evaluation for each
+  // test run; keep in mind this pattern is Bun-specific and may need adjustment
+  // for other runners.
   const {default: NewTab} = (await import(`../../lib/components/new-tab.tsx?new_tab_test=${Date.now()}`)) as {
     default: NewTabComponent;
   };
