@@ -132,6 +132,14 @@ export const waitForRenderedPanes = async (container: HTMLDivElement) => {
   throw new Error('Expected split pane root to be rendered.');
 };
 
+/**
+ * Returns `true` when `element` is a rendered HTML element whose tag name
+ * matches `tagName` exactly.
+ */
+function isHtmlElementWithTag(element: Element | undefined, tagName: string): boolean {
+  return element != null && 'tagName' in element && element.tagName === tagName;
+}
+
 export const renderControlledSplitPane = async ({
   direction,
   initialSizes
@@ -172,8 +180,8 @@ export const renderControlledSplitPane = async ({
     });
 
     const panes = await waitForRenderedPanes(container);
-    const divider = panes.children[1];
-    if (!(divider && 'tagName' in divider) || divider.tagName !== 'HR') {
+    const divider = panes.children[1] as Element | undefined;
+    if (!isHtmlElementWithTag(divider, 'HR')) {
       throw new Error('Expected split pane divider to be rendered.');
     }
 
