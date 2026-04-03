@@ -18,6 +18,7 @@
  * - Tests: `test/unit/split-pane.test.tsx`
  */
 import React, {act, useState} from 'react';
+import {flushSync} from 'react-dom';
 import {createRoot} from 'react-dom/client';
 
 import Immutable from 'seamless-immutable';
@@ -237,7 +238,9 @@ export const renderControlledSplitPane = async ({
 
   try {
     await act(async () => {
-      root.render(React.createElement(ControlledSplitPane));
+      flushSync(() => {
+        root.render(React.createElement(ControlledSplitPane));
+      });
       await waitFor(0);
     });
 
