@@ -11,7 +11,15 @@ const headerLabelDefaults = {
 type TranslationKey = keyof typeof headerLabelDefaults;
 
 const translationDictionaries: Partial<Record<string, Partial<Record<TranslationKey, string>>>> = {
-  en: headerLabelDefaults
+  en: headerLabelDefaults,
+  'en-gb': {
+    openMenu: 'Open menu (UK)',
+    closeWindow: 'Close the window'
+  },
+  fr: {
+    openMenu: 'Ouvrir le menu',
+    closeWindow: 'Fermer la fenêtre'
+  }
 };
 
 const getPreferredLocale = () => {

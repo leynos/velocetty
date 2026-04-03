@@ -1,3 +1,7 @@
+/**
+ * @file Search bar container and control styles, including icon/button focus
+ * states and search input token spacing tokens for `--search-*` variables.
+ */
 .searchButton {
   cursor: pointer;
   color: var(--search-fg);

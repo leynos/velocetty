@@ -25,6 +25,30 @@ must follow locally.
   for renderer, CLI, and app copy artefacts.
 - Keep documentation wrapped to 80 columns and code blocks to 120 columns.
 
+## CSS Modules conventions
+
+- Import local classes with typed CSS modules from component directories:
+  `import * as styles from './<name>.module.css';`
+- Use `styles.<className>` through `className={styles.value}` and keep dynamic
+  class composition in JS/TS; avoid ad-hoc string concatenation across
+  unrelated modules.
+- Prefer static imports for `.module.css` inside the renderer pipeline and keep
+  them co-located with the component that owns the styles.
+- For PostCSS + Tailwind + daisyUI integration, keep Tailwind entrypoints in
+  `tailwind.config.ts` and preserve existing variable pipelines in `tokens/` and
+  `src/` style exports where still used.
+- In esbuild, keep CSS modules handled by `loader: {'.css': 'css'}` and ensure
+  `plugins` compose PostCSS transforms before CSS module scoping so shared token
+  imports remain stable.
+- Preserve legacy global selectors only when an upstream plugin path depends on
+  them, such as `:global(.tabs_list)` in `tabs.module.css`; document every new
+  compatibility class at usage site.
+- Centralise reusable token values in component-level custom properties
+  (for example `--search-*`, `--tab-*`, `--header-*`) and avoid magic literals in
+  `.module.css` declarations.
+- Keep `.module.css` scoped styles for component ownership, and use global CSS
+  files only for app shell, base resets, and third-party plugin interop.
+
 ## Package boundaries
 
 Roadmap item `1.1.1` establishes explicit package boundaries for new

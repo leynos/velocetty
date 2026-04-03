@@ -1,3 +1,7 @@
+/**
+ * @file Styles for the new-tab menu trigger and profile dropdown including
+ * spacing, borders, and theming hooks tied to `--new-tab-*` CSS variables.
+ */
 .profileDropdown {
   border-width: 1px;
   border-style: solid;

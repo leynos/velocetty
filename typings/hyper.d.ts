@@ -1,3 +1,7 @@
+/**
+ * @file Global type surface for Velocetty renderer-main contracts, including
+ * shared immutable UI/runtime state shapes and ambient browser global helpers.
+ */
 // eslint-disable-next-line eslint-comments/disable-enable-pair
 /* eslint-disable import/order */
 import type {Immutable} from 'seamless-immutable';

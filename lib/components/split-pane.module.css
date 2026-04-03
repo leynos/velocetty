@@ -1,3 +1,7 @@
+/**
+ * @file Resize-divider and flex-pane layout styles that coordinate mouse-anchored
+ * split tracking with fixed-height shim and orientation-specific direction classes.
+ */
 .splitpanePanes {
   display: flex;
   flex: 1;

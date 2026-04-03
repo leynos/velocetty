@@ -1,3 +1,6 @@
+/**
+ * @file Terminal container sizing helpers used by layout wrappers and fit logic.
+ */
 .termFit {
   display: block;
   width: 100%;

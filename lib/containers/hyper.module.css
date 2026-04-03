@@ -1,3 +1,7 @@
+/**
+ * @file Root hyper window shell styles for fixed chrome, rounded borders and
+ * overflow handling in the main application container.
+ */
 .hyperMain {
   position: fixed;
   top: 0;

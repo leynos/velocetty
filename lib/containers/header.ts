@@ -99,7 +99,7 @@ const mapDispatchToProps = (dispatch: HyperDispatch) => {
   };
 };
 
-const HeaderWithTranslation = (props: HeaderConnectedProps) => {
+export const HeaderWithTranslation = (props: HeaderConnectedProps) => {
   const t = useTranslation();
 
   return React.createElement(Header, {

@@ -1,3 +1,7 @@
+/**
+ * @file Styles for the terminal header chrome, including fixed bar geometry,
+ * drag regions, and legacy compatibility class names for plugin-hosted themes.
+ */
 .headerHeader {
   position: fixed;
   top: 1px;

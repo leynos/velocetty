@@ -7,6 +7,7 @@ export type PluginsMockExports = {
   connect: () => PluginDecorator;
   decorate: PluginDecorator;
   getTabProps: (tab: unknown, parentProps: unknown, props: unknown) => unknown;
+  getTabsProps: (parentProps: unknown, props: unknown) => unknown;
   subscribeTabDecorationUpdates: (listener: () => void) => () => void;
 };
 
@@ -18,6 +19,7 @@ const createDefaultPluginsMockExports = (): PluginsMockExports => ({
   connect: () => (Component: unknown) => Component,
   decorate: (Component: unknown) => Component,
   getTabProps: (_tab: unknown, _parentProps: unknown, props: unknown) => props,
+  getTabsProps: (_parentProps: unknown, props: unknown) => props,
   subscribeTabDecorationUpdates: () => () => {}
 });
 

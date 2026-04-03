@@ -1,3 +1,7 @@
+/**
+ * @file Tab shell styles including active/inactive visual states, separators,
+ * activity and title overflow styling, and row/column text composition helpers.
+ */
 .tabTab {
   color: var(--tab-fg);
   border-color: var(--tab-fg);

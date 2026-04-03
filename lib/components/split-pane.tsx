@@ -81,7 +81,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     paneIndex.current = index;
     panesSize.current = getSizes();
     paneContainerSize.current = parent.getBoundingClientRect()[dragD1Ref.current];
-    lastEmittedSizesRef.current = panesSize.current ? [...panesSize.current] : null;
+    lastEmittedSizesRef.current = getSizes();
   };
 
   const getSizes = useCallback(() => {
