@@ -20,44 +20,33 @@
 }
 
 .profileDropdownItem {
-  padding: 0 20px;
-  height: 34px;
+  @apply block h-[34px] cursor-pointer px-5 text-start text-xs capitalize text-white select-none appearance-none;
   line-height: 34px;
-  cursor: pointer;
-  font-size: 12px;
-  color: #fff;
-  background-color: transparent;
+  background: none;
+  border: none;
   border-bottom: 1px solid var(--new-tab-border);
-  text-align: start;
-  text-transform: capitalize;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-user-select: none;
 }
 
 .profileDropdownItem:hover {
+  @apply bg-transparent;
   background-color: var(--new-tab-border);
 }
 
 .profileDropdownItemDefault {
-  font-weight: bold;
+  @apply font-bold;
 }
 
 .newTab {
-  appearance: none;
+  @apply relative top-0 h-[34px] cursor-pointer border-b border-l border-r-0 border-t-0 bg-transparent px-4 text-center text-xs leading-[34px] text-white select-none appearance-none;
   background: transparent;
-  color: #fff;
-  border-left: 1px solid;
-  border-bottom: 1px solid;
-  border-top: none;
   border-right: none;
-  cursor: pointer;
-  font-size: 12px;
-  height: 34px;
-  line-height: 34px;
-  padding: 0 16px;
-  position: relative;
-  text-align: center;
-  user-select: none;
+  border-top: none;
+  -webkit-appearance: none;
   -webkit-user-select: none;
-  top: 0;
 }
 
 .newTabMac {
@@ -69,9 +58,8 @@
 }
 
 .tabsHidden {
+  @apply absolute right-0;
   border-color: transparent;
-  position: absolute;
-  right: 0;
 }
 
 .tabsHidden:hover {

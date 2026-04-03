@@ -174,6 +174,7 @@ test('injects translated window-control and menu aria labels', async () => {
   expect(container.querySelector(`button[aria-label="${translatedLabels.openMenuAria}"]`)).toBeTruthy();
   expect(container.querySelector(`button[aria-label="${translatedLabels.minimizeWindowAria}"]`)).toBeTruthy();
   expect(container.querySelector(`button[aria-label="${translatedLabels.maximizeWindowAria}"]`)).toBeTruthy();
+  expect(container.querySelector(`button[aria-label="${translatedLabels.restoreWindowAria}"]`)).toBeNull();
   expect(container.querySelector(`button[aria-label="${translatedLabels.closeWindowAria}"]`)).toBeTruthy();
 
   await act(async () => {
@@ -186,6 +187,7 @@ test('uses restore label when window is maximized', async () => {
   const {container, root} = await renderHeaderWithTranslation({maximized: true});
 
   expect(container.querySelector(`button[aria-label="${translatedLabels.restoreWindowAria}"]`)).toBeTruthy();
+  expect(container.querySelector(`button[aria-label="${translatedLabels.maximizeWindowAria}"]`)).toBeNull();
 
   await act(async () => {
     root.unmount();
