@@ -3,6 +3,7 @@
  * dismissal behaviour, preventDefault handling, and focus-boundary closing.
  */
 import React, {act} from 'react';
+import {flushSync} from 'react-dom';
 import {createRoot} from 'react-dom/client';
 
 import {expect, test} from 'bun:test';
@@ -26,19 +27,21 @@ const renderNewTab = async () => {
   const root = createRoot(container);
 
   await act(async () => {
-    root.render(
-      React.createElement(NewTab, {
-        defaultProfile: 'default',
-        profiles: [
-          {name: 'default', config: {}},
-          {name: 'secondary', config: {}}
-        ],
-        openNewTab: () => {},
-        backgroundColor: '#000',
-        borderColor: '#333',
-        tabsVisible: false
-      })
-    );
+    flushSync(() => {
+      root.render(
+        React.createElement(NewTab, {
+          defaultProfile: 'default',
+          profiles: [
+            {name: 'default', config: {}},
+            {name: 'secondary', config: {}}
+          ],
+          openNewTab: () => {},
+          backgroundColor: '#000',
+          borderColor: '#333',
+          tabsVisible: false
+        })
+      );
+    });
     await waitFor(0);
   });
 

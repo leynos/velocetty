@@ -75,7 +75,7 @@ test('applies drag deltas from the pointer-anchored drag-start snapshot for hori
 });
 
 test('supports keyboard resizing and separator semantics', async () => {
-  const {cleanup, root, resizeCalls, divider} = await renderControlledSplitPane({
+  const {dispose, resizeCalls, divider} = await renderControlledSplitPane({
     direction: 'vertical',
     initialSizes: [0.3, 0.7]
   });
@@ -103,11 +103,7 @@ test('supports keyboard resizing and separator semantics', async () => {
     expect(resizeCalls[1]).toEqual([1, 0]);
     expect(resizeCalls[2]).toEqual([0, 1]);
   } finally {
-    await act(async () => {
-      root.unmount();
-      await waitFor(0);
-    });
-    cleanup();
+    await dispose();
   }
 });
 

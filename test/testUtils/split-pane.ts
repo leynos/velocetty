@@ -73,7 +73,7 @@ export async function runDragTest({
   assertResizeCalls,
   afterMouseUp
 }: DragTestOptions): Promise<void> {
-  const {cleanup, root, resizeCalls, panes, divider} = await renderControlledSplitPane({
+  const {dispose, resizeCalls, panes, divider} = await renderControlledSplitPane({
     direction,
     initialSizes
   });
@@ -106,11 +106,7 @@ export async function runDragTest({
 
     afterMouseUp?.(divider);
   } finally {
-    await act(async () => {
-      root.unmount();
-      await waitFor(0);
-    });
-    cleanup();
+    await dispose();
   }
 }
 
@@ -183,6 +179,13 @@ export const renderControlledSplitPane = async ({
   document.body.appendChild(container);
   const root = createRoot(container);
   const resizeCalls: number[][] = [];
+  const dispose = async () => {
+    await act(async () => {
+      root.unmount();
+      await waitFor(0);
+    });
+    cleanup();
+  };
 
   const ControlledSplitPane = () => {
     const [sizes, setSizes] = useState(initialSizes);
@@ -216,17 +219,13 @@ export const renderControlledSplitPane = async ({
       throw new Error('Expected split pane divider to be rendered.');
     }
 
-    return {cleanup, root, resizeCalls, panes, divider: divider as HTMLElement};
+    return {dispose, resizeCalls, panes, divider: divider as HTMLElement};
   } catch (error) {
     try {
-      await act(async () => {
-        root.unmount();
-        await waitFor(0);
-      });
+      await dispose();
     } catch {
       // Best-effort cleanup only. Re-throw the original setup failure below.
     }
-    cleanup();
     throw error;
   }
 };
