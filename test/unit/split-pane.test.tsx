@@ -240,8 +240,7 @@ test('does not re-emit identical sizes when dragging against a saturated edge', 
       await waitFor(0);
     });
 
-    expect(resizeCalls).toHaveLength(1);
-    expect(resizeCalls[0]).toEqual([1, 0]);
+    expect(resizeCalls).toHaveLength(0);
   } finally {
     await act(async () => {
       window.dispatchEvent(new window.MouseEvent('mouseup', {bubbles: true}));
