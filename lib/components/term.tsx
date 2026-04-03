@@ -1,5 +1,5 @@
 /** @file Terminal renderer component and xterm integration. */
-import {clipboard, shell} from 'electron';
+import * as electron from 'electron';
 import React from 'react';
 
 import Color from 'color';
@@ -39,6 +39,8 @@ import _SearchBox from './searchBox';
 import * as styles from './term.module.css';
 
 import 'xterm/css/xterm.css';
+
+const {clipboard, shell} = electron;
 
 type ViewportDimensions = Readonly<{width: number; height: number}>;
 type TerminalSize = Readonly<{cols: number; rows: number}>;

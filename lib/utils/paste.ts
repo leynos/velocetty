@@ -1,6 +1,8 @@
-import {clipboard} from 'electron';
+import * as electron from 'electron';
 
 import plist from 'plist';
+
+const {clipboard} = electron;
 
 const getPath = (platform: string) => {
   switch (platform) {

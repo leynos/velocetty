@@ -1,5 +1,6 @@
 /** @file Verifies Hyper side effects for key bindings and focus. */
 import React, {act} from 'react';
+import {flushSync} from 'react-dom';
 import {createRoot} from 'react-dom/client';
 
 import {afterEach, beforeEach, expect, mock, test} from 'bun:test';
@@ -76,7 +77,9 @@ const renderHyper = (
   root: ReturnType<typeof createRoot>,
   overrides: Partial<HyperProps> = {}
 ) => {
-  root.render(React.createElement(Hyper, buildHyperProps(overrides)));
+  flushSync(() => {
+    root.render(React.createElement(Hyper, buildHyperProps(overrides)));
+  });
 };
 
 /** Transport mock that captures on/off calls for select-all wiring. */
