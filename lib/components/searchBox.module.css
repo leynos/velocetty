@@ -3,6 +3,7 @@
  * states and search input token spacing tokens for `--search-*` variables.
  */
 .searchButton {
+  @apply my-1 h-[18px] w-[18px] rounded-sm p-0.5;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -12,11 +13,6 @@
   box-shadow: none;
   cursor: pointer;
   color: var(--search-fg);
-  padding: 2px;
-  margin: 4px 0;
-  height: 18px;
-  width: 18px;
-  border-radius: 2px;
 }
 
 .searchButton:focus {
@@ -33,16 +29,10 @@
 }
 
 .searchContainer {
+  @apply absolute top-1 right-[13px] z-10 rounded-sm p-1 text-xs;
   background-color: var(--search-bg);
   border: 1px solid var(--search-border);
-  border-radius: 2px;
-  position: absolute;
-  right: 13px;
-  top: 4px;
-  z-index: 10;
-  padding: 4px;
   font-family: var(--search-font);
-  font-size: 12px;
 }
 
 .searchInput {
@@ -54,21 +44,12 @@
   width: 100px;
 }
 
-.flexRow {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  gap: 4px;
-}
-
 .searchBox {
+  @apply rounded-sm px-1;
   border: none;
-  border-radius: 2px;
   outline: var(--search-border) solid 1px;
   background-color: var(--search-bg);
   color: var(--search-fg);
-  padding: 0 4px;
 }
 
 .searchInput::placeholder {

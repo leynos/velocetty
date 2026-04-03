@@ -115,8 +115,12 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
   };
 
   return (
-    <div className={`${styles.flexRow} ${styles.searchContainer}`} ref={ref} style={searchVars}>
-      <div className={`${styles.flexRow} ${styles.searchBox}`}>
+    <div
+      className={`flex flex-row justify-between items-center gap-1 ${styles.searchContainer}`}
+      ref={ref}
+      style={searchVars}
+    >
+      <div className={`flex flex-row justify-between items-center gap-1 ${styles.searchBox}`}>
         <input
           className={styles.searchInput}
           type="text"
@@ -164,7 +168,7 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
             : `${results.resultIndex + 1} of ${results.resultCount}`}
       </span>
 
-      <div className={styles.flexRow}>
+      <div className="flex flex-row justify-between items-center gap-1">
         <SearchButton
           onClick={() => prev(searchTermRef.current)}
           active={false}

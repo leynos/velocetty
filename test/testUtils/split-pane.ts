@@ -1,4 +1,22 @@
-/** @file Shared `SplitPane` render and geometry helpers for unit tests. */
+/**
+ * @file split-pane.ts provides `SplitPane` test harness utilities for
+ * `lib/components/split-pane.tsx`.
+ *
+ * Purpose:
+ * - Mount a controlled `SplitPane` harness for renderer unit tests.
+ * - Stub pane and divider geometry so resize calculations use deterministic
+ *   DOM measurements.
+ *
+ * Invariants:
+ * - Mount `SplitPane` through `renderControlledSplitPane` so the harness
+ *   commits before tests inspect pane and divider nodes.
+ * - Stub pane-container and divider geometry consistently before dispatching
+ *   pointer events so drag scenarios observe stable measurements.
+ *
+ * Cross-links:
+ * - Implementation: `lib/components/split-pane.tsx`
+ * - Tests: `test/unit/split-pane.test.tsx`
+ */
 import React, {act, useState} from 'react';
 import {flushSync} from 'react-dom';
 import {createRoot} from 'react-dom/client';
@@ -119,18 +137,31 @@ export const buildRect = ({
     toJSON: () => ({})
   }) as DOMRect;
 
-export const waitForRenderedPanes = async (container: HTMLDivElement) => {
-  for (let attempts = 0; attempts < 20; attempts += 1) {
-    if (container.firstElementChild) {
-      return container.firstElementChild as HTMLDivElement;
-    }
-    await act(async () => {
-      await waitFor(0);
-    });
-  }
+export const waitForRenderedPanes = async (container: HTMLDivElement) =>
+  await new Promise<HTMLDivElement>((resolve) => {
+    let settled = false;
+    const PaneMutationObserver = window.MutationObserver;
 
-  throw new Error('Expected split pane root to be rendered.');
-};
+    const observer = new PaneMutationObserver(() => {
+      const element = container.firstElementChild as Element | undefined;
+      if (settled || !isHtmlElementWithTag(element, 'DIV')) {
+        return;
+      }
+
+      settled = true;
+      observer.disconnect();
+      resolve(element as HTMLDivElement);
+    });
+
+    const element = container.firstElementChild as Element | undefined;
+    if (isHtmlElementWithTag(element, 'DIV')) {
+      settled = true;
+      resolve(element as HTMLDivElement);
+      return;
+    }
+
+    observer.observe(container, {childList: true});
+  });
 
 /**
  * Returns `true` when `element` is a rendered HTML element whose tag name

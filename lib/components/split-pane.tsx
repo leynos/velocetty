@@ -238,6 +238,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
       ref={ref}
     >
       {children.map((child, i) => {
+        const cumulativeBefore = sum(sizes.slice(0, i));
         const style = {
           // flexBasis doesn't work for the first horizontal pane, height need to be specified
           [sizeProperty]: `${sizes[i] * 100}%`,
@@ -258,9 +259,9 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
                 tabIndex={0}
                 aria-label="Resize panes"
                 aria-orientation={separatorOrientation}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(sizes[i] * 100)}
+                aria-valuemin={Math.round(cumulativeBefore * 100)}
+                aria-valuemax={Math.round((cumulativeBefore + sizes[i] + sizes[i + 1]) * 100)}
+                aria-valuenow={Math.round((cumulativeBefore + sizes[i]) * 100)}
                 style={{backgroundColor: borderColor}}
                 className={`${styles.splitpaneDivider} ${direction === 'vertical' ? styles.splitpaneDividerVertical : styles.splitpaneDividerHorizontal}`}
               />

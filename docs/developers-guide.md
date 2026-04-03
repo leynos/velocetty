@@ -30,10 +30,10 @@ must follow locally.
 - Import local classes with typed CSS modules from component directories:
   `import * as styles from './<name>.module.css';`
 - Use `styles.<className>` through `className={styles.value}` and keep dynamic
-  class composition in JS/TS; avoid ad-hoc string concatenation across
+  class composition in JS/TS; avoid ad hoc string concatenation across
   unrelated modules.
-- Prefer static imports for `.module.css` inside the renderer pipeline and keep
-  them co-located with the component that owns the styles.
+- Prefer static imports for `.module.css` inside the renderer pipeline, and
+  keep them co-located with the component that owns the styles.
 - For PostCSS + Tailwind + daisyUI integration, keep Tailwind entrypoints in
   `tailwind.config.ts` and preserve existing variable pipelines in `tokens/` and
   `src/` style exports where still used.

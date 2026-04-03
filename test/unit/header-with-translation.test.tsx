@@ -1,4 +1,17 @@
-/** @file Verifies translated ARIA labels are injected into the header view. */
+/**
+ * @file Verifies translated ARIA labels in the header view exported from
+ * `lib/containers/header.ts`.
+ *
+ * Invariants:
+ * - The translation fixture must continue to expose stable ARIA label strings
+ *   for the menu and window-control buttons.
+ * - The rendered header must inject those translated labels into the expected
+ *   button controls when the header is mounted in Happy DOM.
+ *
+ * Cross-links:
+ * - Container: `lib/containers/header.ts`
+ * - Translation hook usage: `lib/hooks/use-translation.ts`
+ */
 import React from 'react';
 import type {HeaderConnectedProps} from '../../typings/hyper';
 import {createRoot} from 'react-dom/client';
@@ -31,6 +44,29 @@ const makeProfiles = (): MockProfileCollection => {
     asMutable: () => profiles
   });
 };
+
+const makeHeaderProps = (overrides: Partial<HeaderConnectedProps> = {}): HeaderConnectedProps => ({
+  isMac: false,
+  tabs: [{uid: 'tab-1', title: 'Shell', isActive: true, hasActivity: false}],
+  activeMarkers: {},
+  borderColor: '#555',
+  backgroundColor: '#111',
+  maximized: false,
+  fullScreen: false,
+  showHamburgerMenu: '',
+  showWindowControls: '',
+  defaultProfile: 'default',
+  profiles: overrides.profiles ?? makeProfiles(),
+  onCloseTab: () => {},
+  onChangeTab: () => {},
+  maximize: () => {},
+  unmaximize: () => {},
+  openHamburgerMenu: () => {},
+  minimize: () => {},
+  close: () => {},
+  openNewTab: () => {},
+  ...overrides
+});
 
 let HeaderWithTranslation: HeaderWithTranslationComponent;
 let cleanupHappyDom: (() => void) | null = null;
@@ -96,6 +132,7 @@ const registerHeaderWithTranslationMocks = () => {
 const loadHeaderWithTranslation = async () => {
   mock.restore();
   cleanupHappyDom?.();
+  cleanupHappyDom = null;
   cleanupHappyDom = await setupHappyDom();
   registerHeaderWithTranslationMocks();
   moduleInstanceCounter += 1;
@@ -113,34 +150,15 @@ afterEach(() => {
     restoreWindowRequire();
   } finally {
     cleanupHappyDom?.();
+    cleanupHappyDom = null;
     mock.restore();
   }
 });
 
-const renderHeaderWithTranslation = async () => {
+const renderHeaderWithTranslation = async (overrides: Partial<HeaderConnectedProps> = {}) => {
   const container = document.createElement('div');
   const root = createRoot(container);
-  const props: HeaderConnectedProps = {
-    isMac: false,
-    tabs: [{uid: 'tab-1', title: 'Shell', isActive: true, hasActivity: false}],
-    activeMarkers: {},
-    borderColor: '#555',
-    backgroundColor: '#111',
-    maximized: false,
-    fullScreen: false,
-    showHamburgerMenu: '',
-    showWindowControls: '',
-    defaultProfile: 'default',
-    profiles: makeProfiles(),
-    onCloseTab: () => {},
-    onChangeTab: () => {},
-    maximize: () => {},
-    unmaximize: () => {},
-    openHamburgerMenu: () => {},
-    minimize: () => {},
-    close: () => {},
-    openNewTab: () => {}
-  };
+  const props = makeHeaderProps(overrides);
 
   await act(async () => {
     root.render(React.createElement(HeaderWithTranslation, props));
@@ -165,35 +183,7 @@ test('injects translated window-control and menu aria labels', async () => {
 });
 
 test('uses restore label when window is maximized', async () => {
-  const container = document.createElement('div');
-  const root = createRoot(container);
-
-  await act(async () => {
-    root.render(
-      React.createElement(HeaderWithTranslation, {
-        isMac: false,
-        tabs: [{uid: 'tab-1', title: 'Shell', isActive: true, hasActivity: false}],
-        activeMarkers: {},
-        borderColor: '#555',
-        backgroundColor: '#111',
-        maximized: true,
-        fullScreen: false,
-        showHamburgerMenu: '',
-        showWindowControls: '',
-        defaultProfile: 'default',
-        profiles: makeProfiles(),
-        onCloseTab: () => {},
-        onChangeTab: () => {},
-        maximize: () => {},
-        unmaximize: () => {},
-        openHamburgerMenu: () => {},
-        minimize: () => {},
-        close: () => {},
-        openNewTab: () => {}
-      } satisfies HeaderConnectedProps)
-    );
-    await waitFor(0);
-  });
+  const {container, root} = await renderHeaderWithTranslation({maximized: true});
 
   expect(container.querySelector(`button[aria-label="${translatedLabels.restoreWindowAria}"]`)).toBeTruthy();
 

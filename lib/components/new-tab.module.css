@@ -27,12 +27,7 @@
   font-size: 12px;
   color: #fff;
   background-color: transparent;
-  border-width: 0;
-  border-style: solid;
-  border-color: transparent;
-  border-bottom-width: 1px;
-  border-bottom-style: solid;
-  border-bottom-color: var(--new-tab-border);
+  border-bottom: 1px solid var(--new-tab-border);
   text-align: start;
   text-transform: capitalize;
 }
