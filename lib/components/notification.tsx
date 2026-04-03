@@ -85,10 +85,6 @@ const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLD
   }, [resetDismissTimer, text]);
 
   useEffect(() => {
-    dismissingRef.current = dismissing;
-  }, [dismissing]);
-
-  useEffect(() => {
     return () => {
       clearTimeout(dismissTimer.current);
       if (transitionNode.current && transitionHandler.current) {
