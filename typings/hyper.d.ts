@@ -1,3 +1,7 @@
+/**
+ * @file Global type surface for Velocetty renderer-main contracts, including
+ * shared immutable UI/runtime state shapes and ambient browser global helpers.
+ */
 // eslint-disable-next-line eslint-comments/disable-enable-pair
 /* eslint-disable import/order */
 import type {Immutable} from 'seamless-immutable';
@@ -202,7 +206,14 @@ type extensionProps = Partial<{
 }>;
 
 import type {HeaderConnectedProps} from '../lib/containers/header';
-export type HeaderProps = HeaderConnectedProps & extensionProps;
+export type HeaderAriaProps = {
+  openMenuAria: string;
+  minimizeWindowAria: string;
+  maximizeWindowAria: string;
+  restoreWindowAria: string;
+  closeWindowAria: string;
+};
+export type HeaderProps = HeaderConnectedProps & HeaderAriaProps & extensionProps;
 
 import type {HyperConnectedProps} from '../lib/containers/hyper';
 export type HyperProps = HyperConnectedProps & extensionProps;
@@ -213,13 +224,6 @@ export type NotificationsProps = NotificationsConnectedProps & extensionProps;
 import type Terms from '../lib/components/terms';
 import type {TermsConnectedProps} from '../lib/containers/terms';
 export type TermsProps = TermsConnectedProps & extensionProps & {ref_: (terms: Terms | null) => void};
-
-export type StyleSheetProps = {
-  backgroundColor: string;
-  borderColor: string;
-  fontFamily: string;
-  foregroundColor: string;
-} & extensionProps;
 
 export type TabProps = {
   borderColor: string;

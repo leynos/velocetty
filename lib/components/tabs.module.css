@@ -1,0 +1,70 @@
+/**
+ * @file Tab navigation bar styling with mac/non-mac offsets, full-screen
+ * adjustments, and legacy `tabs_list` compatibility preservation.
+ */
+.tabsNav {
+  font-size: 12px;
+  height: 34px;
+  line-height: 34px;
+  vertical-align: middle;
+  color: #9b9b9b;
+  cursor: default;
+  position: relative;
+  -webkit-user-select: none;
+  display: flex;
+  flex-flow: row;
+}
+
+.tabsNavMac {
+  -webkit-app-region: drag;
+  top: 0;
+}
+
+.tabsNavNonMac {
+  top: 34px;
+}
+
+.tabsHiddenNav {
+  display: none;
+}
+
+.tabsTitle {
+  text-align: center;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 76px;
+  padding-right: 76px;
+  flex-grow: 1;
+}
+
+/* Legacy "tabs_list" class preserved for Hyper plugin compatibility */
+.tabsList,
+:global(.tabs_list) {
+  max-height: 34px;
+  display: flex;
+  flex-flow: row;
+  flex-grow: 1;
+}
+
+.tabsListMacOffset {
+  margin-left: 76px;
+}
+
+.tabsFullScreen {
+  margin-left: -1px;
+}
+
+.tabsBorderShim {
+  position: absolute;
+  width: 76px;
+  bottom: 0;
+  border-color: #ccc;
+  border-bottom-style: solid;
+  border-bottom-width: 1px;
+}
+
+.tabsBorderShimUndo {
+  border-bottom-width: 0px;
+}

@@ -1,5 +1,5 @@
 /** @file Terminal renderer component and xterm integration. */
-import {clipboard, shell} from 'electron';
+import * as electron from 'electron';
 import React from 'react';
 
 import Color from 'color';
@@ -36,8 +36,11 @@ import {decorate} from '../utils/plugins';
 import {WebGLContextPool} from '../utils/webgl-context-pool';
 
 import _SearchBox from './searchBox';
+import * as styles from './term.module.css';
 
 import 'xterm/css/xterm.css';
+
+const {clipboard, shell} = electron;
 
 type ViewportDimensions = Readonly<{width: number; height: number}>;
 type TerminalSize = Readonly<{cols: number; rows: number}>;
@@ -303,7 +306,7 @@ export default class Term extends React.PureComponent<
     // The parent element for the terminal is attached and removed manually so
     // that we can preserve it across mounts and unmounts of the component
     this.termRef = props.term?.element?.parentElement ?? document.createElement('div');
-    this.termRef.className = 'term_fit term_term';
+    this.termRef.className = `${styles.termFit} term_fit term_term`;
 
     this.termWrapperRef?.appendChild(this.termRef);
 
@@ -1122,9 +1125,12 @@ export default class Term extends React.PureComponent<
 
   render() {
     return (
-      <div className={`term_fit ${this.props.isTermActive ? 'term_active' : ''}`} onMouseUp={this.onMouseUp}>
+      <div
+        className={`${styles.termFit} term_fit ${this.props.isTermActive ? 'term_active' : ''}`}
+        onMouseUp={this.onMouseUp}
+      >
         {this.props.customChildrenBefore}
-        <div ref={this.onTermWrapperRef} className="term_fit term_wrapper" />
+        <div ref={this.onTermWrapperRef} className={`${styles.termFit} ${styles.termWrapper} term_fit term_wrapper`} />
         {this.props.customChildren}
         {this.props.search ? (
           <SearchBox
@@ -1160,18 +1166,6 @@ export default class Term extends React.PureComponent<
             font={this.props.uiFontFamily}
           />
         ) : null}
-        <style jsx={true} global={true}>{`
-          .term_fit {
-            display: block;
-            width: 100%;
-            height: 100%;
-          }
-
-          .term_wrapper {
-            /* TODO: decide whether to keep this or not based on understanding what xterm-selection is for */
-            overflow: hidden;
-          }
-        `}</style>
       </div>
     );
   }

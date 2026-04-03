@@ -1,0 +1,67 @@
+/**
+ * @file Styles for the new-tab menu trigger and profile dropdown including
+ * spacing, borders, and theming hooks tied to `--new-tab-*` CSS variables.
+ */
+.profileDropdown {
+  border-width: 1px;
+  border-style: solid;
+  border-bottom-width: 0;
+  border-right-width: 0;
+  position: absolute;
+  top: 33px;
+  right: 0;
+  z-index: 1000;
+  padding: 0;
+  margin: 0;
+  white-space: nowrap;
+  min-width: 120px;
+  border-color: var(--new-tab-border);
+  background-color: var(--new-tab-bg);
+}
+
+.profileDropdownItem {
+  @apply block h-[34px] cursor-pointer px-5 text-start text-xs capitalize text-white select-none appearance-none;
+  line-height: 34px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--new-tab-border);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-user-select: none;
+}
+
+.profileDropdownItem:hover {
+  @apply bg-transparent;
+  background-color: var(--new-tab-border);
+}
+
+.profileDropdownItemDefault {
+  @apply font-bold;
+}
+
+.newTab {
+  @apply relative top-0 h-[34px] cursor-pointer border-b border-l border-r-0 border-t-0 bg-transparent px-4 text-center text-xs leading-[34px] text-white select-none appearance-none;
+  background: transparent;
+  border-right: none;
+  border-top: none;
+  -webkit-appearance: none;
+  -webkit-user-select: none;
+}
+
+.newTabMac {
+  -webkit-app-region: drag;
+}
+
+.tabsVisible {
+  border-color: var(--new-tab-border);
+}
+
+.tabsHidden {
+  @apply absolute right-0;
+  border-color: transparent;
+}
+
+.tabsHidden:hover {
+  border-color: var(--new-tab-border);
+}

@@ -1,5 +1,6 @@
 /** @file Verifies tab decoration refreshes are driven by subscribed update events. */
 import React, {act} from 'react';
+import {flushSync} from 'react-dom';
 import {createRoot} from 'react-dom/client';
 
 import {afterEach, beforeEach, expect, mock, spyOn, test} from 'bun:test';
@@ -82,22 +83,24 @@ afterEach(() => {
 
 const mountTabs = async (root: ReturnType<typeof createRoot>) => {
   await act(async () => {
-    root.render(
-      React.createElement(Tabs, {
-        tabs: [
-          {uid: 'tab-1', title: 'One', isActive: true, hasActivity: false},
-          {uid: 'tab-2', title: 'Two', isActive: false, hasActivity: false}
-        ],
-        borderColor: '#333',
-        backgroundColor: '#000',
-        onChange: () => {},
-        onClose: () => {},
-        fullScreen: false,
-        defaultProfile: 'default',
-        profiles: [{name: 'default', config: {}}],
-        openNewTab: () => {}
-      })
-    );
+    flushSync(() => {
+      root.render(
+        React.createElement(Tabs, {
+          tabs: [
+            {uid: 'tab-1', title: 'One', isActive: true, hasActivity: false},
+            {uid: 'tab-2', title: 'Two', isActive: false, hasActivity: false}
+          ],
+          borderColor: '#333',
+          backgroundColor: '#000',
+          onChange: () => {},
+          onClose: () => {},
+          fullScreen: false,
+          defaultProfile: 'default',
+          profiles: [{name: 'default', config: {}}],
+          openNewTab: () => {}
+        })
+      );
+    });
     await waitFor(0);
   });
 };
@@ -114,7 +117,9 @@ test('re-renders tabs when provider update callback fires', async () => {
   expect((getTabPropsMock.mock.calls[1]?.[0] as {tabIndex?: number}).tabIndex).toBe(1);
 
   await act(async () => {
-    decorationListener?.();
+    flushSync(() => {
+      decorationListener?.();
+    });
     await waitFor(0);
   });
 

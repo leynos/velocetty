@@ -1,0 +1,61 @@
+/**
+ * @file Search bar container and control styles, including icon/button focus
+ * states and search input token spacing tokens for `--search-*` variables.
+ */
+.searchButton {
+  @apply my-1 h-[18px] w-[18px] rounded-sm p-0.5;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  cursor: pointer;
+  color: var(--search-fg);
+}
+
+.searchButton:focus {
+  outline: var(--search-selection) solid 2px;
+}
+
+.searchButton:hover {
+  background-color: var(--search-hover-bg);
+}
+
+.searchButtonActive,
+.searchButtonActive:hover {
+  background-color: var(--search-selection);
+}
+
+.searchContainer {
+  @apply absolute top-1 right-[13px] z-10 rounded-sm p-1 text-xs;
+  background-color: var(--search-bg);
+  border: 1px solid var(--search-border);
+  font-family: var(--search-font);
+}
+
+.searchInput {
+  outline: none;
+  background-color: transparent;
+  border: none;
+  color: var(--search-fg);
+  align-self: stretch;
+  width: 100px;
+}
+
+.searchBox {
+  @apply rounded-sm px-1;
+  border: none;
+  outline: var(--search-border) solid 1px;
+  background-color: var(--search-bg);
+  color: var(--search-fg);
+}
+
+.searchInput::placeholder {
+  color: var(--search-fg);
+}
+
+.searchBox:focus-within {
+  outline: var(--search-selection) solid 2px;
+}

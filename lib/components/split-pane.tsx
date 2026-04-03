@@ -1,20 +1,96 @@
-import React, {useState, useEffect, useRef, forwardRef} from 'react';
+/**
+ * @file Renders the `SplitPane` component used by
+ * `lib/components/term-group.tsx` to size sibling panes in horizontal and
+ * vertical term layouts.
+ *
+ * Responsibilities:
+ * - Preserve the total size of the two panes adjacent to a divider during
+ *   drag and double-click resize operations.
+ * - Honour the `direction`, `sizes`, `borderColor`, and `onResize` props that
+ *   define the caller contract for pane layout and resize feedback.
+ *
+ * Resize invariants:
+ * - Keep emitted pane sizes within the inclusive `[0, 1]` range.
+ * - Preserve the combined size of the two panes beside the active divider.
+ * - Clamp drag deltas when either pane reaches its minimum size of `0`.
+ * - Keep panes outside the active divider fixed while only the adjacent pair
+ *   flexes during a resize gesture.
+ */
+
+import React, {useState, useEffect, useRef, useCallback, forwardRef} from 'react';
 
 import sum from 'lodash/sum';
 
 import type {SplitPaneProps} from '../../typings/hyper';
+import * as styles from './split-pane.module.css';
+
+const KEYBOARD_RESIZE_STEP = 0.05;
+const KEYBOARD_PAGE_RESIZE_STEP = 0.1;
+
+const resizeAdjacentPanes = (sizes: number[], index: number, nextLeadingPaneSize: number) => {
+  const nextSizes = [...sizes];
+  const pairTotal = sizes[index] + sizes[index + 1];
+  const clampedLeadingPaneSize = Math.min(Math.max(nextLeadingPaneSize, 0), pairTotal);
+
+  nextSizes[index] = clampedLeadingPaneSize;
+  nextSizes[index + 1] = pairTotal - clampedLeadingPaneSize;
+
+  return nextSizes;
+};
+
+/**
+ * Maps each keyboard key to a function that computes the next leading-pane
+ * size. Returns `null` when the key does not apply for the current
+ * orientation.
+ */
+const KEY_RESIZE_ACTIONS: Partial<
+  Record<string, (isVertical: boolean, current: number, total: number) => number | null>
+> = {
+  ArrowLeft: (v, c) => (v ? c - KEYBOARD_RESIZE_STEP : null),
+  ArrowRight: (v, c) => (v ? c + KEYBOARD_RESIZE_STEP : null),
+  ArrowUp: (v, c) => (v ? null : c - KEYBOARD_RESIZE_STEP),
+  ArrowDown: (v, c) => (v ? null : c + KEYBOARD_RESIZE_STEP),
+  PageUp: (_v, c) => c - KEYBOARD_PAGE_RESIZE_STEP,
+  PageDown: (_v, c) => c + KEYBOARD_PAGE_RESIZE_STEP,
+  Home: () => 0,
+  End: (_v, _c, total) => total
+};
+
+/**
+ * Returns the next leading-pane size for a keyboard resize event, or `null`
+ * when the key is not a recognised resize key for the current orientation.
+ */
+function computeKeyResizeTarget(
+  key: string,
+  isVertical: boolean,
+  currentSize: number,
+  pairTotal: number
+): number | null {
+  const action = KEY_RESIZE_ACTIONS[key];
+  return action ? action(isVertical, currentSize, pairTotal) : null;
+}
 
 const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const dragPanePosition = useRef<number>(0);
-  const dragTarget = useRef<HTMLDivElement | null>(null);
+  const dragOffset = useRef<number>(0);
+  const dragTarget = useRef<HTMLElement | null>(null);
   const paneIndex = useRef<number>(0);
-  const d1 = props.direction === 'horizontal' ? 'height' : 'width';
-  const d2 = props.direction === 'horizontal' ? 'top' : 'left';
-  const d3 = props.direction === 'horizontal' ? 'clientY' : 'clientX';
-  const panesSize = useRef<number | null>(null);
+  const dragPointerAxisRef = useRef<'clientX' | 'clientY'>(props.direction === 'horizontal' ? 'clientY' : 'clientX');
+  const dragD1Ref = useRef<'height' | 'width'>(props.direction === 'horizontal' ? 'height' : 'width');
+  const dragD2Ref = useRef<'top' | 'left'>(props.direction === 'horizontal' ? 'top' : 'left');
+  const dragStartPointerRef = useRef<number>(0);
+  const panesSize = useRef<number[] | null>(null);
+  const paneContainerSize = useRef<number | null>(null);
+  const lastEmittedSizesRef = useRef<number[] | null>(null);
   const [dragging, setDragging] = useState(false);
 
-  const handleAutoResize = (ev: React.MouseEvent<HTMLDivElement>, index: number) => {
+  // Use a ref to access latest props without recreating callbacks during drag
+  const propsRef = useRef(props);
+  useEffect(() => {
+    propsRef.current = props;
+  }, [props]);
+
+  const handleAutoResize = (ev: React.MouseEvent<HTMLElement>, index: number) => {
     ev.preventDefault();
 
     paneIndex.current = index;
@@ -27,12 +103,12 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     sizes_[paneIndex.current] = availableWidth / 2;
     sizes_[paneIndex.current + 1] = availableWidth / 2;
 
-    props.onResize(sizes_);
+    propsRef.current.onResize(sizes_);
   };
 
-  const handleDragStart = (ev: React.MouseEvent<HTMLDivElement>, index: number) => {
+  const handleDragStart = (ev: React.MouseEvent<HTMLElement>, index: number) => {
     ev.preventDefault();
-    const target = ev.target as HTMLDivElement;
+    const target = ev.currentTarget;
     const parent = target.parentElement;
     if (!parent) {
       return;
@@ -41,66 +117,128 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     window.addEventListener('mousemove', onDrag);
     window.addEventListener('mouseup', onDragEnd);
     dragTarget.current = target;
-    dragPanePosition.current = dragTarget.current.getBoundingClientRect()[d2];
-    panesSize.current = parent.getBoundingClientRect()[d1];
+    dragPointerAxisRef.current = propsRef.current.direction === 'horizontal' ? 'clientY' : 'clientX';
+    dragD1Ref.current = propsRef.current.direction === 'horizontal' ? 'height' : 'width';
+    dragD2Ref.current = propsRef.current.direction === 'horizontal' ? 'top' : 'left';
+    dragStartPointerRef.current = ev[dragPointerAxisRef.current];
+    const dividerRect = dragTarget.current.getBoundingClientRect();
+    dragPanePosition.current = dragStartPointerRef.current;
+    dragOffset.current = dragStartPointerRef.current - dividerRect[dragD2Ref.current];
     paneIndex.current = index;
+    panesSize.current = getSizes();
+    paneContainerSize.current = parent.getBoundingClientRect()[dragD1Ref.current];
+    lastEmittedSizesRef.current = getSizes();
   };
 
-  const getSizes = () => {
-    const {sizes} = props;
+  const getSizes = useCallback(() => {
+    const {sizes} = propsRef.current;
     let sizes_: number[];
 
     if (sizes) {
       sizes_ = [...sizes.asMutable()];
     } else {
-      const total = props.children.length;
+      const total = propsRef.current.children.length;
       const count = new Array<number>(total).fill(1 / total);
 
       sizes_ = count;
     }
     return sizes_;
-  };
+  }, []);
 
-  const onDrag = (ev: MouseEvent) => {
-    if (!panesSize.current) {
+  const resizePanePair = useCallback(
+    (index: number, nextLeadingPaneSize: number) => {
+      const sizes_ = getSizes();
+      const nextSizes = resizeAdjacentPanes(sizes_, index, nextLeadingPaneSize);
+      if (nextSizes.every((size, nextIndex) => size === sizes_[nextIndex])) {
+        return;
+      }
+
+      propsRef.current.onResize(nextSizes);
+    },
+    [getSizes]
+  );
+
+  const onDrag = useCallback((ev: MouseEvent) => {
+    if (!panesSize.current || !paneContainerSize.current) {
       return;
     }
-    const sizes_ = getSizes();
+    const sizes_ = [...panesSize.current];
 
+    const axis = dragPointerAxisRef.current;
     const i = paneIndex.current;
-    const pos = ev[d3];
-    const d = Math.abs(dragPanePosition.current - pos) / panesSize.current!;
-    if (pos > dragPanePosition.current) {
-      sizes_[i] += d;
-      sizes_[i + 1] -= d;
+    const pointer = ev[axis];
+    const dividerPosition = pointer - dragOffset.current;
+    const d = Math.abs(dragPanePosition.current - pointer) / paneContainerSize.current;
+    if (pointer > dragPanePosition.current) {
+      const clampedDelta = Math.min(d, sizes_[i + 1]);
+      sizes_[i] += clampedDelta;
+      sizes_[i + 1] -= clampedDelta;
     } else {
-      sizes_[i] -= d;
-      sizes_[i + 1] += d;
+      const clampedDelta = Math.min(d, sizes_[i]);
+      sizes_[i] -= clampedDelta;
+      sizes_[i + 1] += clampedDelta;
     }
-    props.onResize(sizes_);
-  };
+    dragTarget.current?.style.setProperty(dragD2Ref.current, `${dividerPosition}px`);
+    if (lastEmittedSizesRef.current && sizes_.every((size, index) => size === lastEmittedSizesRef.current?.[index])) {
+      return;
+    }
 
-  const onDragEnd = () => {
+    lastEmittedSizesRef.current = [...sizes_];
+    propsRef.current.onResize(sizes_);
+  }, []);
+
+  const onDragEnd = useCallback(() => {
     window.removeEventListener('mousemove', onDrag);
     window.removeEventListener('mouseup', onDragEnd);
+    dragTarget.current?.style.removeProperty('left');
+    dragTarget.current?.style.removeProperty('top');
+    dragTarget.current = null;
+    panesSize.current = null;
+    paneContainerSize.current = null;
+    dragOffset.current = 0;
+    lastEmittedSizesRef.current = null;
     setDragging(false);
-  };
+  }, [onDrag]);
 
   useEffect(() => {
     return () => {
       onDragEnd();
     };
-  }, []);
+  }, [onDragEnd]);
+
+  const handleKeyResize = (event: React.KeyboardEvent<HTMLElement>, index: number) => {
+    const sizes_ = getSizes();
+    const currentLeadingPaneSize = sizes_[index];
+    const pairTotal = currentLeadingPaneSize + sizes_[index + 1];
+    const nextLeadingPaneSize = computeKeyResizeTarget(
+      event.key,
+      propsRef.current.direction === 'vertical',
+      currentLeadingPaneSize,
+      pairTotal
+    );
+
+    if (nextLeadingPaneSize === null) {
+      return;
+    }
+
+    event.preventDefault();
+    resizePanePair(index, nextLeadingPaneSize);
+  };
 
   const {children, direction, borderColor} = props;
   const sizeProperty = direction === 'horizontal' ? 'height' : 'width';
+  const separatorOrientation = direction === 'vertical' ? 'vertical' : 'horizontal';
   // workaround for the fact that if we don't specify
   // sizes, sometimes flex fails to calculate the
   // right height for the horizontal panes
   const sizes = props.sizes || new Array<number>(children.length).fill(1 / children.length);
   return (
-    <div className={`splitpane_panes splitpane_panes_${direction}`} ref={ref}>
+    <div
+      className={`${styles.splitpanePanes} ${direction === 'vertical' ? styles.splitpanePanesVertical : styles.splitpanePanesHorizontal}`}
+      ref={ref}
+    >
       {children.map((child, i) => {
+        const cumulativeBefore = sum(sizes.slice(0, i));
         const style = {
           // flexBasis doesn't work for the first horizontal pane, height need to be specified
           [sizeProperty]: `${sizes[i] * 100}%`,
@@ -110,84 +248,28 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
 
         return (
           <React.Fragment key={i}>
-            <div className="splitpane_pane" style={style}>
+            <div className={styles.splitpanePane} style={style}>
               {child}
             </div>
             {i < children.length - 1 ? (
-              <div
+              <hr
                 onMouseDown={(e) => handleDragStart(e, i)}
                 onDoubleClick={(e) => handleAutoResize(e, i)}
+                onKeyDown={(event) => handleKeyResize(event, i)}
+                tabIndex={0}
+                aria-label="Resize panes"
+                aria-orientation={separatorOrientation}
+                aria-valuemin={Math.round(cumulativeBefore * 100)}
+                aria-valuemax={Math.round((cumulativeBefore + sizes[i] + sizes[i + 1]) * 100)}
+                aria-valuenow={Math.round((cumulativeBefore + sizes[i]) * 100)}
                 style={{backgroundColor: borderColor}}
-                className={`splitpane_divider splitpane_divider_${direction}`}
+                className={`${styles.splitpaneDivider} ${direction === 'vertical' ? styles.splitpaneDividerVertical : styles.splitpaneDividerHorizontal}`}
               />
             ) : null}
           </React.Fragment>
         );
       })}
-      <div style={{display: dragging ? 'block' : 'none'}} className="splitpane_shim" />
-
-      <style jsx={true}>{`
-        .splitpane_panes {
-          display: flex;
-          flex: 1;
-          outline: none;
-          position: relative;
-          width: 100%;
-          height: 100%;
-        }
-
-        .splitpane_panes_vertical {
-          flex-direction: row;
-        }
-
-        .splitpane_panes_horizontal {
-          flex-direction: column;
-        }
-
-        .splitpane_pane {
-          flex: 1;
-          outline: none;
-          position: relative;
-        }
-
-        .splitpane_divider {
-          box-sizing: border-box;
-          z-index: 1;
-          background-clip: padding-box;
-          flex-shrink: 0;
-        }
-
-        .splitpane_divider_vertical {
-          border-left: 5px solid rgba(255, 255, 255, 0);
-          border-right: 5px solid rgba(255, 255, 255, 0);
-          width: 11px;
-          margin: 0 -5px;
-          cursor: col-resize;
-        }
-
-        .splitpane_divider_horizontal {
-          height: 11px;
-          margin: -5px 0;
-          border-top: 5px solid rgba(255, 255, 255, 0);
-          border-bottom: 5px solid rgba(255, 255, 255, 0);
-          cursor: row-resize;
-          width: 100%;
-        }
-
-        /*
-          this shim is used to make sure mousemove events
-          trigger in all the draggable area of the screen
-          this is not the case due to hterm's <iframe>
-        */
-        .splitpane_shim {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: transparent;
-        }
-      `}</style>
+      <div style={{display: dragging ? 'block' : 'none'}} className={styles.splitpaneShim} />
     </div>
   );
 });

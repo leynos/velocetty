@@ -1,3 +1,4 @@
+/** @file Search box component for find-in-page functionality with case sensitivity, whole word, and regex toggles. */
 import type React from 'react';
 import {useCallback, useRef, useEffect, forwardRef} from 'react';
 
@@ -10,6 +11,7 @@ import {VscWholeWord} from '@react-icons/all-files/vsc/VscWholeWord';
 import clsx from 'clsx';
 
 import type {SearchBoxProps} from '../../typings/hyper';
+import * as styles from './searchBox.module.css';
 
 type SearchButtonColors = {
   foregroundColor: string;
@@ -22,6 +24,8 @@ type SearchButtonProps = React.PropsWithChildren<
     onClick: () => void;
     active: boolean;
     title: string;
+    'aria-label'?: string;
+    pressed?: boolean;
   } & SearchButtonColors
 >;
 
@@ -29,56 +33,31 @@ const SearchButton = ({
   onClick,
   active,
   title,
+  'aria-label': ariaLabel,
+  pressed,
   foregroundColor,
   backgroundColor,
   selectionColor,
   children
 }: SearchButtonProps) => {
-  const handleKeyUp = useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        onClick();
-      }
-    },
-    [onClick]
-  );
+  const buttonVars: React.CSSProperties = {
+    ['--search-fg' as string]: foregroundColor,
+    ['--search-selection' as string]: selectionColor,
+    ['--search-hover-bg' as string]: backgroundColor
+  };
 
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      className={clsx('search-button', {'search-button-active': active})}
-      onKeyUp={handleKeyUp}
+      className={clsx(styles.searchButton, active && styles.searchButtonActive)}
+      style={buttonVars}
       title={title}
+      aria-label={ariaLabel ?? title}
+      aria-pressed={pressed}
     >
       {children}
-      <style jsx={true}>{`
-          .search-button {
-            cursor: pointer;
-            color: ${foregroundColor};
-            padding: 2px;
-            margin: 4px 0px;
-            height: 18px;
-            width: 18px;
-            border-radius: 2px;
-          }
-
-          .search-button:focus {
-            outline: ${selectionColor} solid 2px;
-          }
-
-          .search-button:hover {
-            background-color: ${backgroundColor};
-          }
-
-          .search-button-active {
-            background-color: ${selectionColor};
-          }
-
-          .search-button-active:hover {
-            background-color: ${selectionColor};
-          }
-      `}</style>
-    </div>
+    </button>
   );
 };
 
@@ -104,7 +83,11 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
   const searchTermRef = useRef<string>('');
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleChange = useCallback(
+  const updateSearch = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    searchTermRef.current = event.currentTarget.value;
+  }, []);
+
+  const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       searchTermRef.current = event.currentTarget.value;
       if (event.shiftKey && event.key === 'Enter') {
@@ -126,20 +109,58 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
     foregroundColor
   };
 
-  return (
-    <div className="flex-row search-container" ref={ref}>
-      <div className="flex-row search-box">
-        <input className="search-input" type="text" onKeyDown={handleChange} ref={inputRef} placeholder="Search" />
+  const searchVars: React.CSSProperties = {
+    ['--search-fg' as string]: foregroundColor,
+    ['--search-selection' as string]: selectionColor,
+    ['--search-hover-bg' as string]: borderColor,
+    ['--search-bg' as string]: backgroundColor,
+    ['--search-border' as string]: borderColor,
+    ['--search-font' as string]: font
+  };
 
-        <SearchButton onClick={toggleCaseSensitive} active={caseSensitive} title="Match Case" {...searchButtonColors}>
+  return (
+    <div
+      className={`flex flex-row justify-between items-center gap-1 ${styles.searchContainer}`}
+      ref={ref}
+      style={searchVars}
+    >
+      <div className={`flex flex-row justify-between items-center gap-1 ${styles.searchBox}`}>
+        <input
+          className={styles.searchInput}
+          type="text"
+          onChange={updateSearch}
+          onKeyDown={handleKeyDown}
+          ref={inputRef}
+          placeholder="Search"
+        />
+
+        <SearchButton
+          onClick={toggleCaseSensitive}
+          active={caseSensitive}
+          pressed={caseSensitive}
+          title="Match Case"
+          {...searchButtonColors}
+        >
           <VscCaseSensitive size="14px" />
         </SearchButton>
 
-        <SearchButton onClick={toggleWholeWord} active={wholeWord} title="Match Whole Word" {...searchButtonColors}>
+        <SearchButton
+          onClick={toggleWholeWord}
+          active={wholeWord}
+          pressed={wholeWord}
+          title="Match Whole Word"
+          {...searchButtonColors}
+        >
           <VscWholeWord size="14px" />
         </SearchButton>
 
-        <SearchButton onClick={toggleRegex} active={regex} title="Use Regular Expression" {...searchButtonColors}>
+        <SearchButton
+          onClick={toggleRegex}
+          active={regex}
+          pressed={regex}
+          title="Use Regular Expression"
+          {...searchButtonColors}
+        >
           <VscRegex size="14px" />
         </SearchButton>
       </div>
@@ -152,7 +173,7 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
             : `${results.resultIndex + 1} of ${results.resultCount}`}
       </span>
 
-      <div className="flex-row">
+      <div className="flex flex-row justify-between items-center gap-1">
         <SearchButton
           onClick={() => prev(searchTermRef.current)}
           active={false}
@@ -175,54 +196,6 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
           <VscClose size="14px" />
         </SearchButton>
       </div>
-      <style jsx={true}>{`
-        .search-container {
-          background-color: ${backgroundColor};
-          border: 1px solid ${borderColor};
-          border-radius: 2px;
-          position: absolute;
-          right: 13px;
-          top: 4px;
-          z-index: 10;
-          padding: 4px;
-          font-family: ${font};
-          font-size: 12px;
-        }
-
-        .search-input {
-          outline: none;
-          background-color: transparent;
-          border: none;
-          color: ${foregroundColor};
-          align-self: stretch;
-          width: 100px;
-        }
-
-        .flex-row {
-          display: flex;
-          flex-direction: row;
-          justify-content: space-between;
-          align-items: center;
-          gap: 4px;
-        }
-
-        .search-box {
-          border: none;
-          border-radius: 2px;
-          outline: ${borderColor} solid 1px;
-          background-color: ${backgroundColor};
-          color: ${foregroundColor};
-          padding: 0px 4px;
-        }
-
-        .search-input::placeholder {
-          color: ${foregroundColor};
-        }
-
-        .search-box:focus-within {
-          outline: ${selectionColor} solid 2px;
-        }
-      `}</style>
     </div>
   );
 });

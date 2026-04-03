@@ -2,166 +2,88 @@
 import type React from 'react';
 import {forwardRef} from 'react';
 
+import clsx from 'clsx';
+
 import type {TabProps} from '../../typings/hyper';
+import * as styles from './tab.module.css';
+
+/**
+ * Computes the class name for the tab list item.
+ *
+ * @param isFirst - Whether this is the first tab in the list.
+ * @param isActive - Whether this tab is currently active.
+ * @param hasActivity - Whether this tab has unseen activity.
+ * @returns The computed class name string.
+ */
+const tabListItemClass = (isFirst: boolean, isActive: boolean, hasActivity: boolean): string =>
+  clsx(
+    styles.tabTab,
+    isFirst && styles.tabFirst,
+    isActive && styles.tabActive,
+    isFirst && isActive && styles.tabFirstActive,
+    hasActivity && styles.tabHasActivity
+  );
+
+/**
+ * Handles click events on the tab, invoking the select handler for left clicks
+ * on inactive tabs.
+ *
+ * @param event - The React mouse event.
+ * @param isActive - Whether the tab is currently active.
+ * @param onSelect - Callback to invoke when the tab should be selected.
+ */
+const onTabClick = (event: React.MouseEvent, isActive: boolean, onSelect: () => void): void => {
+  if (event.button === 0 && !isActive) {
+    onSelect();
+  }
+};
+
+/**
+ * Handles mouse up events on the tab, invoking the close handler for middle clicks.
+ *
+ * @param event - The React mouse event.
+ * @param onClose - Callback to invoke when the tab should be closed.
+ */
+const onTabMouseUp = (event: React.MouseEvent, onClose: () => void): void => {
+  if (event.button === 1) {
+    onClose();
+  }
+};
 
 const Tab = forwardRef(function Tab(props: TabProps, ref: React.ForwardedRef<HTMLLIElement>) {
-  const handleClick = (event: React.MouseEvent) => {
-    const isLeftClick = event.nativeEvent.which === 1;
+  const {isActive, isFirst, borderColor, hasActivity} = props;
 
-    if (isLeftClick && !props.isActive) {
-      props.onSelect();
-    }
-  };
-
-  const handleMouseUp = (event: React.MouseEvent) => {
-    const isMiddleClick = event.nativeEvent.which === 2;
-
-    if (isMiddleClick) {
-      props.onClose();
-    }
-  };
-
-  const {isActive, isFirst, isLast, borderColor, hasActivity} = props;
+  const handleClick = (event: React.MouseEvent) => onTabClick(event, isActive, props.onSelect);
+  const handleMouseUp = (event: React.MouseEvent) => onTabMouseUp(event, props.onClose);
 
   return (
-    <>
-      <li
-        onClick={props.onClick}
-        style={{borderColor}}
-        className={`tab_tab ${isFirst ? 'tab_first' : ''} ${isActive ? 'tab_active' : ''} ${
-          isFirst && isActive ? 'tab_firstActive' : ''
-        } ${hasActivity ? 'tab_hasActivity' : ''}`}
-        ref={ref}
-      >
-        {props.customChildrenBefore}
-        <span
-          className={`tab_text ${isLast ? 'tab_textLast' : ''} ${isActive ? 'tab_textActive' : ''}`}
-          onClick={handleClick}
-          onMouseUp={handleMouseUp}
-        >
-          <span title={props.text} className="tab_textInner">
-            {props.text}
-          </span>
+    <li
+      onClick={props.onClick}
+      style={{borderColor}}
+      className={tabListItemClass(isFirst, isActive, hasActivity)}
+      ref={ref}
+    >
+      {props.customChildrenBefore}
+      <span className={styles.tabText} onClick={handleClick} onMouseUp={handleMouseUp}>
+        <span title={props.text} className={styles.tabTextInner}>
+          {props.text}
         </span>
-        <i className="tab_icon" onClick={props.onClose}>
-          <svg className="tab_shape">
-            <use xlinkHref="./renderer/assets/icons.svg#close-tab" />
-          </svg>
-        </i>
-        {props.customChildren}
-      </li>
-
-      <style jsx={true}>{`
-        .tab_tab {
-          color: #ccc;
-          border-color: #ccc;
-          border-bottom-width: 1px;
-          border-bottom-style: solid;
-          border-left-width: 1px;
-          border-left-style: solid;
-          list-style-type: none;
-          flex-grow: 1;
-          position: relative;
-        }
-
-        .tab_tab:hover {
-          color: #ccc;
-        }
-
-        .tab_first {
-          border-left-width: 0;
-          padding-left: 1px;
-        }
-
-        .tab_firstActive {
-          border-left-width: 1px;
-          padding-left: 0;
-        }
-
-        .tab_active {
-          color: #fff;
-          border-bottom-width: 0;
-        }
-        .tab_active:hover {
-          color: #fff;
-        }
-
-        .tab_hasActivity {
-          color: #50e3c2;
-        }
-
-        .tab_hasActivity:hover {
-          color: #50e3c2;
-        }
-
-        .tab_text {
-          transition: color 0.2s ease;
-          height: 34px;
-          display: block;
-          width: 100%;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .tab_textInner {
-          position: absolute;
-          left: 24px;
-          right: 24px;
-          top: 0;
-          bottom: 0;
-          text-align: center;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          overflow: hidden;
-        }
-
-        .tab_icon {
-          transition:
-            opacity 0.2s ease,
-            color 0.2s ease,
-            transform 0.25s ease,
-            background-color 0.1s ease;
-          pointer-events: none;
-          position: absolute;
-          right: 7px;
-          top: 10px;
-          display: inline-block;
-          width: 14px;
-          height: 14px;
-          border-radius: 100%;
-          color: #e9e9e9;
-          opacity: 0;
-          transform: scale(0.95);
-        }
-
-        .tab_icon:hover {
-          background-color: rgba(255, 255, 255, 0.13);
-          color: #fff;
-        }
-
-        .tab_icon:active {
-          background-color: rgba(255, 255, 255, 0.1);
-          color: #909090;
-        }
-
-        .tab_tab:hover .tab_icon {
-          opacity: 1;
-          transform: none;
-          pointer-events: all;
-        }
-
-        .tab_shape {
-          position: absolute;
-          left: 4px;
-          top: 4px;
-          width: 6px;
-          height: 6px;
-          vertical-align: middle;
-          fill: currentColor;
-          shape-rendering: crispEdges;
-        }
-      `}</style>
-    </>
+      </span>
+      <button
+        type="button"
+        className={styles.tabIcon}
+        aria-label={`Close ${props.text}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          props.onClose();
+        }}
+      >
+        <svg className={styles.tabShape}>
+          <use href="./renderer/assets/icons.svg#close-tab" />
+        </svg>
+      </button>
+      {props.customChildren}
+    </li>
   );
 });
 

@@ -1,5 +1,6 @@
 /** @file Exercises notification timing and dismissal behaviour. */
 import React, {act} from 'react';
+import {flushSync} from 'react-dom';
 import {createRoot} from 'react-dom/client';
 
 import {expect, test} from 'bun:test';
@@ -80,7 +81,7 @@ const createFakeTimerSeam = () => {
 };
 
 const requireIndicator = (container: HTMLElement) => {
-  const indicator = container.querySelector('.notification_indicator');
+  const indicator = container.querySelector('[data-testid="notification-indicator"]');
   expect(indicator).toBeTruthy();
   if (!indicator) {
     throw new Error('Expected notification indicator to be present.');
@@ -89,7 +90,8 @@ const requireIndicator = (container: HTMLElement) => {
 };
 
 const requireDismissButton = (container: HTMLElement) => {
-  const button = container.querySelector('.notification_dismissLink');
+  const indicator = requireIndicator(container);
+  const button = indicator.querySelector('button[type="button"]');
   expect(button).toBeTruthy();
   if (!button) {
     throw new Error('Expected dismiss button to be present.');
@@ -110,18 +112,20 @@ test('Notification auto-dismisses after the timeout on mount', async () => {
     const dismissAfterMs = 60;
     const bufferMs = 60;
     await act(async () => {
-      root.render(
-        React.createElement(
-          Notification,
-          buildNotificationProps(
-            dismissAfterMs,
-            () => {
-              dismissCount += 1;
-            },
-            {timer: timerSeam}
+      flushSync(() => {
+        root.render(
+          React.createElement(
+            Notification,
+            buildNotificationProps(
+              dismissAfterMs,
+              () => {
+                dismissCount += 1;
+              },
+              {timer: timerSeam}
+            )
           )
-        )
-      );
+        );
+      });
     });
 
     await act(async () => {
@@ -156,24 +160,28 @@ test('Notification resets the timer when text changes', async () => {
       dismissCount += 1;
     };
     await act(async () => {
-      root.render(
-        React.createElement(
-          Notification,
-          buildNotificationProps(dismissAfterMs, onDismiss, {text: 'First', timer: timerSeam})
-        )
-      );
+      flushSync(() => {
+        root.render(
+          React.createElement(
+            Notification,
+            buildNotificationProps(dismissAfterMs, onDismiss, {text: 'First', timer: timerSeam})
+          )
+        );
+      });
     });
 
     await act(async () => {
       advanceTimersByTime(40);
     });
     await act(async () => {
-      root.render(
-        React.createElement(
-          Notification,
-          buildNotificationProps(dismissAfterMs, onDismiss, {text: 'Second', timer: timerSeam})
-        )
-      );
+      flushSync(() => {
+        root.render(
+          React.createElement(
+            Notification,
+            buildNotificationProps(dismissAfterMs, onDismiss, {text: 'Second', timer: timerSeam})
+          )
+        );
+      });
     });
 
     await act(async () => {
@@ -212,18 +220,20 @@ test('Notification handles manual dismiss transition for user-dismissable notice
   try {
     let dismissCount = 0;
     await act(async () => {
-      root.render(
-        React.createElement(
-          Notification,
-          buildNotificationProps(
-            1_000,
-            () => {
-              dismissCount += 1;
-            },
-            {userDismissable: true, userDismissColor: '#fff', timer: timerSeam}
+      flushSync(() => {
+        root.render(
+          React.createElement(
+            Notification,
+            buildNotificationProps(
+              1_000,
+              () => {
+                dismissCount += 1;
+              },
+              {userDismissable: true, userDismissColor: '#fff', timer: timerSeam}
+            )
           )
-        )
-      );
+        );
+      });
     });
 
     const dismissButton = requireDismissButton(container) as HTMLButtonElement;
@@ -265,12 +275,14 @@ test('Notification forwards and clears function refs on mount lifecycle', async 
 
   try {
     await act(async () => {
-      root.render(
-        React.createElement(Notification, {
-          ...buildNotificationProps(250, () => {}, {timer: timerSeam}),
-          ref: notificationRef
-        })
-      );
+      flushSync(() => {
+        root.render(
+          React.createElement(Notification, {
+            ...buildNotificationProps(250, () => {}, {timer: timerSeam}),
+            ref: notificationRef
+          })
+        );
+      });
     });
 
     expect(refValues.some((value) => value !== null)).toBe(true);
@@ -298,18 +310,20 @@ test('Notification auto-dismisses using global timers when no timer prop is prov
   try {
     // IMPORTANT: No timer prop provided - this exercises the fallback path
     await act(async () => {
-      root.render(
-        React.createElement(
-          Notification,
-          buildNotificationProps(
-            dismissAfterMs,
-            () => {
-              dismissCount += 1;
-            }
-            // timer prop intentionally omitted to test fallback
+      flushSync(() => {
+        root.render(
+          React.createElement(
+            Notification,
+            buildNotificationProps(
+              dismissAfterMs,
+              () => {
+                dismissCount += 1;
+              }
+              // timer prop intentionally omitted to test fallback
+            )
           )
-        )
-      );
+        );
+      });
     });
 
     // Wait for the real timer to fire

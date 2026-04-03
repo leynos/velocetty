@@ -9,9 +9,6 @@
     "email": "team@zeit.co"
   },
   "repository": "zeit/hyper",
-  "scripts": {
-    "postinstall": "npx patch-package"
-  },
   "dependencies": {
     "@electron/remote": "2.1.2",
     "async-retry": "1.3.3",

@@ -1,0 +1,63 @@
+/** @file Terminal container styles with group visibility management. */
+
+.termsTerms {
+  position: absolute;
+  margin-top: var(--terms-margin-base);
+  top: 0;
+  right: 0;
+  left: 0;
+  bottom: 0;
+  color: #fff;
+}
+
+.termsTermsShifted {
+  margin-top: var(--terms-margin-shifted);
+  animation: shift-down 0.2s ease-out;
+}
+
+.termsTermsNotShifted {
+  margin-top: var(--terms-margin-base);
+  animation: shift-up 0.3s ease;
+}
+
+@keyframes shift-down {
+  0% {
+    transform: translateY(calc(var(--terms-margin-base) * -1));
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes shift-up {
+  0% {
+    transform: translateY(var(--terms-margin-base));
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.termsTermGroup {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  /* Offscreen to pause xterm rendering, thanks to IntersectionObserver */
+  left: var(--terms-offscreen-left);
+}
+
+.termsTermGroupActive {
+  left: 0;
+}
+
+:global(::-webkit-scrollbar) {
+  width: 5px;
+}
+
+:global(::-webkit-scrollbar-thumb),
+:global(::-webkit-scrollbar-thumb:window-inactive) {
+  border-radius: 10px;
+  background: var(--scrollbar-thumb);
+}

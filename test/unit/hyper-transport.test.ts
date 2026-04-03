@@ -1,5 +1,6 @@
 /** @file Verifies Hyper subscribes and unsubscribes via transport lifecycle. */
 import React, {act} from 'react';
+import {flushSync} from 'react-dom';
 import {createRoot} from 'react-dom/client';
 
 import {afterEach, beforeEach, describe, expect, mock, test} from 'bun:test';
@@ -103,7 +104,9 @@ const setupHyperContainer = () => {
 
 const mountHyper = async (root: ReturnType<typeof createRoot>, overrides: Partial<HyperProps> = {}) => {
   await act(async () => {
-    root.render(React.createElement(Hyper, buildHyperProps(overrides)));
+    flushSync(() => {
+      root.render(React.createElement(Hyper, buildHyperProps(overrides)));
+    });
     await waitFor(0);
   });
 };

@@ -1,15 +1,51 @@
 /** @file Renders the tabs strip and new tab controls. */
 import type React from 'react';
-import {forwardRef, useEffect, useReducer} from 'react';
+import {forwardRef, useCallback, useEffect, useReducer} from 'react';
 
 import type {TabsProps} from '../../typings/hyper';
 import {decorate, getTabProps, subscribeTabDecorationUpdates} from '../utils/plugins';
 
 import DropdownButton from './new-tab';
 import Tab_ from './tab';
+import * as styles from './tabs.module.css';
 
 const Tab = decorate(Tab_, 'Tab');
 const isMac = /Mac/.test(navigator.userAgent);
+
+type TabItemProps = {
+  tab: TabsProps['tabs'][number];
+  index: number;
+  totalTabs: number;
+  borderColor: string;
+  onChange: TabsProps['onChange'];
+  onClose: TabsProps['onClose'];
+  parentProps: TabsProps;
+};
+
+const TabItem = ({tab, index, totalTabs, borderColor, onChange, onClose, parentProps}: TabItemProps) => {
+  const {uid, title, isActive, hasActivity} = tab;
+
+  const handleSelect = useCallback(() => {
+    onChange(uid);
+  }, [onChange, uid]);
+
+  const handleClose = useCallback(() => {
+    onClose(uid);
+  }, [onClose, uid]);
+
+  const tabProps = getTabProps({...tab, tabIndex: index}, parentProps, {
+    text: title === '' ? 'Shell' : title,
+    isFirst: index === 0,
+    isLast: totalTabs - 1 === index,
+    borderColor,
+    isActive,
+    hasActivity,
+    onSelect: handleSelect,
+    onClose: handleClose
+  });
+
+  return <Tab {...tabProps} />;
+};
 
 const Tabs = forwardRef(function Tabs(props: TabsProps, ref: React.ForwardedRef<HTMLElement>) {
   const [, forceDecorationRender] = useReducer((version: number) => version + 1, 0);
@@ -24,94 +60,42 @@ const Tabs = forwardRef(function Tabs(props: TabsProps, ref: React.ForwardedRef<
   }, []);
 
   return (
-    <nav className={`tabs_nav ${hide ? 'tabs_hiddenNav' : ''}`} ref={ref}>
+    <nav
+      className={`${styles.tabsNav} ${hide ? styles.tabsHiddenNav : ''} ${isMac ? styles.tabsNavMac : styles.tabsNavNonMac}`}
+      ref={ref}
+    >
       {props.customChildrenBefore}
-      {tabs.length === 1 && isMac ? <div className="tabs_title">{tabs[0].title}</div> : null}
+      {tabs.length === 1 && isMac ? <div className={styles.tabsTitle}>{tabs[0].title}</div> : null}
       {tabs.length > 1 ? (
         <>
-          <ul key="list" className={`tabs_list ${fullScreen && isMac ? 'tabs_fullScreen' : ''}`}>
-            {tabs.map((tab, i) => {
-              const {uid, title, isActive, hasActivity} = tab;
-              const tabProps = getTabProps({...tab, tabIndex: i}, props, {
-                text: title === '' ? 'Shell' : title,
-                isFirst: i === 0,
-                isLast: tabs.length - 1 === i,
-                borderColor,
-                isActive,
-                hasActivity,
-                onSelect: onChange.bind(null, uid),
-                onClose: onClose.bind(null, uid)
-              });
-              return <Tab key={`tab-${uid}`} {...tabProps} />;
-            })}
+          <ul
+            key="list"
+            className={`${styles.tabsList} ${isMac ? styles.tabsListMacOffset : ''} ${fullScreen && isMac ? styles.tabsFullScreen : ''}`}
+          >
+            {tabs.map((tab, i) => (
+              <TabItem
+                key={tab.uid}
+                borderColor={borderColor}
+                index={i}
+                onChange={onChange}
+                onClose={onClose}
+                parentProps={props}
+                tab={tab}
+                totalTabs={tabs.length}
+              />
+            ))}
           </ul>
           {isMac && (
             <div
               key="shim"
               style={{borderColor}}
-              className={`tabs_borderShim ${fullScreen ? 'tabs_borderShimUndo' : ''}`}
+              className={`${styles.tabsBorderShim} ${fullScreen ? styles.tabsBorderShimUndo : ''}`}
             />
           )}
         </>
       ) : null}
       <DropdownButton {...props} tabsVisible={tabs.length > 1} />
       {props.customChildren}
-      <style jsx={true}>{`
-        .tabs_nav {
-          font-size: 12px;
-          height: 34px;
-          line-height: 34px;
-          vertical-align: middle;
-          color: #9b9b9b;
-          cursor: default;
-          position: relative;
-          -webkit-user-select: none;
-          -webkit-app-region: ${isMac ? 'drag' : ''};
-          top: ${isMac ? '0px' : '34px'};
-          display: flex;
-          flex-flow: row;
-        }
-
-        .tabs_hiddenNav {
-          display: none;
-        }
-
-        .tabs_title {
-          text-align: center;
-          color: #fff;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          padding-left: 76px;
-          padding-right: 76px;
-          flex-grow: 1;
-        }
-
-        .tabs_list {
-          max-height: 34px;
-          display: flex;
-          flex-flow: row;
-          margin-left: ${isMac ? '76px' : '0'};
-          flex-grow: 1;
-        }
-
-        .tabs_fullScreen {
-          margin-left: -1px;
-        }
-
-        .tabs_borderShim {
-          position: absolute;
-          width: 76px;
-          bottom: 0;
-          border-color: #ccc;
-          border-bottom-style: solid;
-          border-bottom-width: 1px;
-        }
-
-        .tabs_borderShimUndo {
-          border-bottom-width: 0px;
-        }
-      `}</style>
     </nav>
   );
 });

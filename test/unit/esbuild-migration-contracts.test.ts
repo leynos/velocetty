@@ -93,6 +93,47 @@ test('translation: styled-jsx bridge transforms JSX style blocks', async () => {
   }
 });
 
+test('translation: CSS Modules are bundled with scoped class names in renderer build', async () => {
+  const rootDir = await createTempDir();
+  try {
+    // Verify the renderer build options include CSS Module loader configuration
+    const rendererOptions = createRendererBuildOptions('development', rootDir);
+    expect(rendererOptions.loader?.['.module.css']).toBe('local-css');
+
+    const cssPath = path.join(rootDir, 'fixture.module.css');
+    const entryPoint = path.join(rootDir, 'fixture.tsx');
+    await writeFixtureFile(cssPath, '.searchBox { color: red; }');
+    await writeFixtureFile(
+      entryPoint,
+      [
+        "import React from 'react';",
+        "import styles from './fixture.module.css';",
+        'export const Fixture = () => (',
+        '  <div className={styles.searchBox}>ok</div>',
+        ');'
+      ].join('\n')
+    );
+
+    // Build using the renderer options to ensure real configuration is tested
+    const buildResult = await runEsbuildBuild({
+      ...rendererOptions,
+      entryPoints: [entryPoint],
+      bundle: true,
+      write: false,
+      outfile: path.join(rootDir, 'bundle.js')
+    });
+
+    const bundleOutput = buildResult.outputFiles.find((file) => file.path.endsWith('.js'))?.text ?? '';
+    // CSS Module class map contains the searchBox key with a non-empty scoped value
+    const classMapMatch = bundleOutput.match(/searchBox:\s*"([^"]+)"/);
+    expect(classMapMatch).toBeTruthy();
+    // The scoped class name follows the expected pattern (module prefix + underscore + class name)
+    expect(classMapMatch?.[1]).toMatch(/^fixture_searchBox$/);
+  } finally {
+    await rm(rootDir, {recursive: true, force: true});
+  }
+});
+
 test('packaging: hyper-app and renderer copy flows preserve required files', async () => {
   const rootDir = await createTempDir();
   try {

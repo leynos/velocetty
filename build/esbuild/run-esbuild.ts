@@ -2,7 +2,7 @@
 import {copyFile, mkdir} from 'node:fs/promises';
 import path from 'node:path';
 
-import {build, context, type BuildContext, type BuildOptions} from 'esbuild';
+import {build, context, type BuildContext, type BuildOptions, type Plugin, type PluginBuild} from 'esbuild';
 
 import {ensureDirectoryPath} from '../../bin/shared/ensure-directory-path.js';
 import {copyHyperAppArtifacts, copyRendererArtifacts} from './copy-artifacts';
@@ -10,6 +10,7 @@ import {createIgnoreImportsPlugin} from './esbuild-plugins/ignore-imports-plugin
 import {createNodeBuiltinsPlugin} from './esbuild-plugins/node-builtins-plugin';
 import {createRendererExternalsPlugin} from './esbuild-plugins/renderer-externals-plugin';
 import {createStyledJsxBabelBridgePlugin} from './esbuild-plugins/styled-jsx-babel-bridge-plugin';
+import postcssPlugin from '@chialab/esbuild-plugin-postcss';
 
 export type BuildMode = 'development' | 'production';
 export type BuildTarget = 'hyper-app' | 'renderer' | 'cli';
@@ -66,12 +67,16 @@ export const createRendererBuildOptions = (mode: BuildMode, rootDir: string): Bu
     platform: 'browser',
     format: 'iife',
     target: ['es2022'],
+    // Enable 'style' and 'module' conditions for Tailwind CSS v4 package exports
+    conditions: ['style', 'module'],
     sourcemap: isProductionMode(mode) ? 'external' : 'linked',
     loader: {
       ...(baseBuildOptions.loader ?? {}),
-      '.css': 'css'
+      '.css': 'css',
+      '.module.css': 'local-css'
     },
     plugins: [
+      createPostcssPluginWithoutModules(),
       createStyledJsxBabelBridgePlugin(),
       createRendererExternalsPlugin(),
       createNodeBuiltinsPlugin(),
@@ -206,3 +211,44 @@ const runTargets = async (options: RunEsbuildOptions) => {
 export const runEsbuild = async (options: RunEsbuildOptions) => {
   await runTargets(options);
 };
+
+/**
+ * Creates a PostCSS plugin that intercepts handler registrations and re-registers
+ * all captured handlers with the original build.onLoad. This allows the PostCSS
+ * plugin to run while preserving proper handler chaining.
+ *
+ * @returns An esbuild plugin that wraps and re-emits captured PostCSS handlers.
+ */
+const createPostcssPluginWithoutModules = (): Plugin => {
+  const basePlugin = postcssPlugin();
+  return {
+    ...basePlugin,
+    name: 'postcss-no-modules',
+    setup(build) {
+      const originalOnLoad = build.onLoad.bind(build);
+      const onLoadCallbacks: Array<{filter: RegExp; namespace: string | undefined; callback: OnLoadCallback}> = [];
+
+      // Intercept onLoad registrations - capture but don't register yet
+      build.onLoad = (options: {filter: RegExp; namespace?: string}, callback: OnLoadCallback) => {
+        onLoadCallbacks.push({filter: options.filter, namespace: options.namespace, callback});
+        // Don't call originalOnLoad here - we want the wrapper to be the only handler
+      };
+
+      try {
+        // Call base plugin setup
+        basePlugin.setup(build);
+      } finally {
+        // Always restore original onLoad, even if an exception occurred
+        build.onLoad = originalOnLoad;
+      }
+
+      // Re-register captured handlers with the original onLoad
+      for (const {filter, namespace, callback} of onLoadCallbacks) {
+        build.onLoad({filter, namespace}, callback);
+      }
+    }
+  };
+};
+
+/** Type for esbuild onLoad callbacks, extracted from PluginBuild['onLoad'] */
+type OnLoadCallback = Parameters<PluginBuild['onLoad']>[1];

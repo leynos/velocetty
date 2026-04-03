@@ -1,12 +1,23 @@
+/** @file Renders the header UI with window controls, hamburger menu, and Tabs composition. */
 import type React from 'react';
 import {forwardRef, useState} from 'react';
 
 import type {HeaderProps} from '../../typings/hyper';
 import {decorate, getTabsProps} from '../utils/plugins';
 
+import {orderWindowControlButtons, stopDoubleClickPropagation} from './header-controls';
 import Tabs_ from './tabs';
+import * as styles from './header.module.css';
 
 const Tabs = decorate(Tabs_, 'Tabs');
+
+type WindowControlButton = {
+  key: string;
+  ariaLabel: string;
+  href: string;
+  onClick: () => void;
+  className: string;
+};
 
 const Header = forwardRef(function Header(props: HeaderProps, ref: React.ForwardedRef<HTMLElement>) {
   const [headerMouseDownWindowX, setHeaderMouseDownWindowX] = useState<number>(0);
@@ -89,10 +100,34 @@ const Header = forwardRef(function Header(props: HeaderProps, ref: React.Forward
   const maxButtonHref = props.maximized
     ? './renderer/assets/icons.svg#restore-window'
     : './renderer/assets/icons.svg#maximize-window';
+  const windowControlButtons = [
+    {
+      key: 'minimize',
+      ariaLabel: props.minimizeWindowAria,
+      href: './renderer/assets/icons.svg#minimize-window',
+      onClick: handleMinimizeClick,
+      className: styles.headerShapeButton
+    },
+    {
+      key: 'maximize',
+      ariaLabel: props.maximized ? props.restoreWindowAria : props.maximizeWindowAria,
+      href: maxButtonHref,
+      onClick: handleMaximizeClick,
+      className: styles.headerShapeButton
+    },
+    {
+      key: 'close',
+      ariaLabel: props.closeWindowAria,
+      href: './renderer/assets/icons.svg#close-window',
+      onClick: handleCloseClick,
+      className: `${styles.headerShapeButton} ${styles.headerCloseWindow}`
+    }
+  ] satisfies [WindowControlButton, WindowControlButton, WindowControlButton];
+  const orderedWindowControlButtons = orderWindowControlButtons(windowControlButtons, left);
 
   return (
     <header
-      className={`header_header ${isMac && 'header_headerRounded'}`}
+      className={`${styles.headerHeader} ${isMac ? styles.headerHeaderRounded : ''}`}
       onMouseDown={handleHeaderMouseDown}
       onMouseUp={() => window.focusActiveTerm()}
       onDoubleClick={handleMaximizeClick}
@@ -100,35 +135,39 @@ const Header = forwardRef(function Header(props: HeaderProps, ref: React.Forward
     >
       {!isMac && (
         <div
-          className={`header_windowHeader ${props.tabs.length > 1 ? 'header_windowHeaderWithBorder' : ''}`}
+          className={`${styles.headerWindowHeader} ${props.tabs.length > 1 ? styles.headerWindowHeaderWithBorder : ''}`}
           style={{borderColor}}
         >
           {hambMenu && (
-            <svg
-              className={`header_shape ${left ? 'header_hamburgerMenuRight' : 'header_hamburgerMenuLeft'}`}
+            <button
+              type="button"
+              className={`${styles.headerShapeButton} ${left ? styles.headerHamburgerMenuRight : styles.headerHamburgerMenuLeft}`}
               onClick={handleHamburgerMenuClick}
+              onDoubleClick={stopDoubleClickPropagation}
+              aria-label={props.openMenuAria}
             >
-              <use xlinkHref="./renderer/assets/icons.svg#hamburger-menu" />
-            </svg>
+              <svg className={styles.headerShape}>
+                <use xlinkHref="./renderer/assets/icons.svg#hamburger-menu" />
+              </svg>
+            </button>
           )}
-          <span className="header_appTitle">{title}</span>
+          <span className={styles.headerAppTitle}>{title}</span>
           {winCtrls && (
-            <div className={`header_windowControls ${left ? 'header_windowControlsLeft' : ''}`}>
-              <div className={`${left ? 'header_minimizeWindowLeft' : ''}`} onClick={handleMinimizeClick}>
-                <svg className="header_shape">
-                  <use xlinkHref="./renderer/assets/icons.svg#minimize-window" />
-                </svg>
-              </div>
-              <div className={`${left ? 'header_maximizeWindowLeft' : ''}`} onClick={handleMaximizeClick}>
-                <svg className="header_shape">
-                  <use xlinkHref={maxButtonHref} />
-                </svg>
-              </div>
-              <div className={`header_closeWindow ${left ? 'header_closeWindowLeft' : ''}`} onClick={handleCloseClick}>
-                <svg className="header_shape">
-                  <use xlinkHref="./renderer/assets/icons.svg#close-window" />
-                </svg>
-              </div>
+            <div className={`${styles.headerWindowControls} ${left ? styles.headerWindowControlsLeft : ''}`}>
+              {orderedWindowControlButtons.map((button) => (
+                <button
+                  key={button.key}
+                  type="button"
+                  className={button.className}
+                  onClick={button.onClick}
+                  onDoubleClick={stopDoubleClickPropagation}
+                  aria-label={button.ariaLabel}
+                >
+                  <svg className={styles.headerShape}>
+                    <use xlinkHref={button.href} />
+                  </svg>
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -148,110 +187,6 @@ const Header = forwardRef(function Header(props: HeaderProps, ref: React.Forward
         })}
       />
       {props.customChildren}
-
-      <style jsx={true}>{`
-        .header_header {
-          position: fixed;
-          top: 1px;
-          left: 1px;
-          right: 1px;
-          z-index: 100;
-        }
-
-        .header_headerRounded {
-          border-top-left-radius: 4px;
-          border-top-right-radius: 4px;
-        }
-
-        .header_windowHeader {
-          height: 34px;
-          width: 100%;
-          position: fixed;
-          top: 1px;
-          left: 1px;
-          right: 1px;
-          -webkit-app-region: drag;
-          -webkit-user-select: none;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-        }
-
-        .header_windowHeaderWithBorder {
-          border-color: #ccc;
-          border-bottom-style: solid;
-          border-bottom-width: 1px;
-        }
-
-        .header_appTitle {
-          font-size: 12px;
-        }
-
-        .header_shape,
-        .header_shape > svg {
-          width: 40px;
-          height: 34px;
-          padding: 12px 15px 12px 15px;
-          -webkit-app-region: no-drag;
-          color: #fff;
-          opacity: 0.5;
-          shape-rendering: crispEdges;
-        }
-
-        .header_shape:hover {
-          opacity: 1;
-        }
-
-        .header_shape:active {
-          opacity: 0.3;
-        }
-
-        .header_hamburgerMenuLeft {
-          position: fixed;
-          top: 0;
-          left: 0;
-        }
-
-        .header_hamburgerMenuRight {
-          position: fixed;
-          top: 0;
-          right: 0;
-        }
-
-        .header_windowControls {
-          display: flex;
-          width: 120px;
-          height: 34px;
-          justify-content: space-between;
-          position: fixed;
-          top: 0;
-          right: 0;
-        }
-
-        .header_windowControlsLeft {
-          left: 0px;
-        }
-
-        .header_closeWindowLeft {
-          order: 1;
-        }
-
-        .header_minimizeWindowLeft {
-          order: 2;
-        }
-
-        .header_maximizeWindowLeft {
-          order: 3;
-        }
-
-        .header_closeWindow:hover {
-          color: #fe354e;
-        }
-
-        .header_closeWindow:active {
-          color: #fe354e;
-        }
-      `}</style>
     </header>
   );
 });

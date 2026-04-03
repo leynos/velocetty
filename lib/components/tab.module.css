@@ -1,0 +1,78 @@
+/**
+ * @file Tab shell styles including active/inactive visual states, separators,
+ * activity and title overflow styling, and row/column text composition helpers.
+ */
+.tabTab {
+  @apply relative grow list-none border-b border-l border-solid;
+  color: var(--tab-fg);
+  border-color: var(--tab-fg);
+}
+
+.tabFirst {
+  border-left-width: 0;
+  padding-left: 1px;
+}
+
+.tabFirstActive {
+  border-left-width: 1px;
+  padding-left: 0;
+}
+
+.tabActive {
+  color: var(--tab-active-fg);
+  border-bottom-width: 0;
+}
+
+.tabHasActivity {
+  color: var(--tab-activity-fg);
+}
+
+.tabText {
+  @apply relative block h-[34px] w-full overflow-hidden;
+  transition: color 0.2s ease;
+}
+
+.tabTextInner {
+  @apply absolute left-6 right-6 overflow-hidden whitespace-nowrap text-center;
+  top: 0;
+  bottom: 0;
+  text-overflow: ellipsis;
+}
+
+.tabIcon {
+  @apply absolute inline-block cursor-pointer rounded-full border-none bg-transparent p-0;
+  /* Preserve legacy icon alignment inside the fixed 34px tab row. */
+  @apply right-[7px] top-[10px] h-[14px] w-[14px] m-0;
+  transition:
+    opacity 0.2s ease,
+    color 0.2s ease,
+    transform 0.25s ease,
+    background-color 0.1s ease;
+  color: var(--tab-icon-fg);
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.tabIcon:hover,
+.tabIcon:focus-visible {
+  background-color: var(--tab-icon-bg-hover);
+  color: var(--tab-icon-hover-fg);
+  opacity: 1;
+  transform: none;
+}
+
+.tabIcon:active {
+  background-color: var(--tab-icon-bg-active);
+  color: var(--tab-icon-active-fg);
+}
+
+.tabTab:hover .tabIcon {
+  opacity: 1;
+  transform: none;
+}
+
+.tabShape {
+  @apply absolute left-1 top-1 h-1.5 w-1.5;
+  fill: currentcolor;
+  shape-rendering: crispedges;
+}
