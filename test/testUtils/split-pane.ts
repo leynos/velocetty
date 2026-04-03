@@ -77,6 +77,7 @@ export const renderControlledSplitPane = async ({
 
   await act(async () => {
     root.render(React.createElement(ControlledSplitPane));
+    await waitFor(0);
   });
 
   const panes = await waitForRenderedPanes(container);
