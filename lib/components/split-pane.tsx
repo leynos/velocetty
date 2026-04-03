@@ -38,6 +38,38 @@ const resizeAdjacentPanes = (sizes: number[], index: number, nextLeadingPaneSize
   return nextSizes;
 };
 
+/**
+ * Maps each keyboard key to a function that computes the next leading-pane
+ * size. Returns `null` when the key does not apply for the current
+ * orientation.
+ */
+const KEY_RESIZE_ACTIONS: Partial<
+  Record<string, (isVertical: boolean, current: number, total: number) => number | null>
+> = {
+  ArrowLeft: (v, c) => (v ? c - KEYBOARD_RESIZE_STEP : null),
+  ArrowRight: (v, c) => (v ? c + KEYBOARD_RESIZE_STEP : null),
+  ArrowUp: (v, c) => (v ? null : c - KEYBOARD_RESIZE_STEP),
+  ArrowDown: (v, c) => (v ? null : c + KEYBOARD_RESIZE_STEP),
+  PageUp: (_v, c) => c - KEYBOARD_PAGE_RESIZE_STEP,
+  PageDown: (_v, c) => c + KEYBOARD_PAGE_RESIZE_STEP,
+  Home: () => 0,
+  End: (_v, _c, total) => total
+};
+
+/**
+ * Returns the next leading-pane size for a keyboard resize event, or `null`
+ * when the key is not a recognised resize key for the current orientation.
+ */
+function computeKeyResizeTarget(
+  key: string,
+  isVertical: boolean,
+  currentSize: number,
+  pairTotal: number
+): number | null {
+  const action = KEY_RESIZE_ACTIONS[key];
+  return action ? action(isVertical, currentSize, pairTotal) : null;
+}
+
 const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const dragPanePosition = useRef<number>(0);
   const dragOffset = useRef<number>(0);
@@ -178,45 +210,12 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     const sizes_ = getSizes();
     const currentLeadingPaneSize = sizes_[index];
     const pairTotal = currentLeadingPaneSize + sizes_[index + 1];
-    const isVerticalDivider = propsRef.current.direction === 'vertical';
-    let nextLeadingPaneSize: number | null = null;
-
-    switch (event.key) {
-      case 'ArrowLeft':
-        if (isVerticalDivider) {
-          nextLeadingPaneSize = currentLeadingPaneSize - KEYBOARD_RESIZE_STEP;
-        }
-        break;
-      case 'ArrowRight':
-        if (isVerticalDivider) {
-          nextLeadingPaneSize = currentLeadingPaneSize + KEYBOARD_RESIZE_STEP;
-        }
-        break;
-      case 'ArrowUp':
-        if (!isVerticalDivider) {
-          nextLeadingPaneSize = currentLeadingPaneSize - KEYBOARD_RESIZE_STEP;
-        }
-        break;
-      case 'ArrowDown':
-        if (!isVerticalDivider) {
-          nextLeadingPaneSize = currentLeadingPaneSize + KEYBOARD_RESIZE_STEP;
-        }
-        break;
-      case 'PageUp':
-        nextLeadingPaneSize = currentLeadingPaneSize - KEYBOARD_PAGE_RESIZE_STEP;
-        break;
-      case 'PageDown':
-        nextLeadingPaneSize = currentLeadingPaneSize + KEYBOARD_PAGE_RESIZE_STEP;
-        break;
-      case 'Home':
-        nextLeadingPaneSize = 0;
-        break;
-      case 'End':
-        nextLeadingPaneSize = pairTotal;
-        break;
-      default:
-        break;
-    }
+    const nextLeadingPaneSize = computeKeyResizeTarget(
+      event.key,
+      propsRef.current.direction === 'vertical',
+      currentLeadingPaneSize,
+      pairTotal
+    );
 
     if (nextLeadingPaneSize === null) {
       return;
