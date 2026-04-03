@@ -1,4 +1,4 @@
-/** @file Verifies new-tab class name assembly stays free of duplicate spaces. */
+/** @file Verifies new-tab class-name assembly without duplicate spaces, Escape-key dismissal behaviour, preventDefault handling, and focus-boundary closing. */
 import React, {act} from 'react';
 import {createRoot} from 'react-dom/client';
 

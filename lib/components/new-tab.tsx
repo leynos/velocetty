@@ -67,6 +67,9 @@ const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, 
     if (event.key !== 'Escape') {
       return;
     }
+    if (!dropdownOpen) {
+      return;
+    }
 
     event.preventDefault();
     closeDropdown();

@@ -29,8 +29,10 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
   const dragOffset = useRef<number>(0);
   const dragTarget = useRef<HTMLDivElement | null>(null);
   const paneIndex = useRef<number>(0);
-  const d1 = props.direction === 'horizontal' ? 'height' : 'width';
-  const d2 = props.direction === 'horizontal' ? 'top' : 'left';
+  const dragPointerAxisRef = useRef<'clientX' | 'clientY'>(props.direction === 'horizontal' ? 'clientY' : 'clientX');
+  const dragD1Ref = useRef<'height' | 'width'>(props.direction === 'horizontal' ? 'height' : 'width');
+  const dragD2Ref = useRef<'top' | 'left'>(props.direction === 'horizontal' ? 'top' : 'left');
+  const dragStartPointerRef = useRef<number>(0);
   const panesSize = useRef<number[] | null>(null);
   const paneContainerSize = useRef<number | null>(null);
   const lastEmittedSizesRef = useRef<number[] | null>(null);
@@ -69,15 +71,17 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     window.addEventListener('mousemove', onDrag);
     window.addEventListener('mouseup', onDragEnd);
     dragTarget.current = target;
-    const pointerAxis = propsRef.current.direction === 'horizontal' ? 'clientY' : 'clientX';
-    const pointer = ev[pointerAxis];
+    dragPointerAxisRef.current = propsRef.current.direction === 'horizontal' ? 'clientY' : 'clientX';
+    dragD1Ref.current = propsRef.current.direction === 'horizontal' ? 'height' : 'width';
+    dragD2Ref.current = propsRef.current.direction === 'horizontal' ? 'top' : 'left';
+    dragStartPointerRef.current = ev[dragPointerAxisRef.current];
     const dividerRect = dragTarget.current.getBoundingClientRect();
-    dragPanePosition.current = pointer;
-    dragOffset.current = pointer - dividerRect[d2];
+    dragPanePosition.current = dragStartPointerRef.current;
+    dragOffset.current = dragStartPointerRef.current - dividerRect[dragD2Ref.current];
     paneIndex.current = index;
     panesSize.current = getSizes();
-    paneContainerSize.current = parent.getBoundingClientRect()[d1];
-    lastEmittedSizesRef.current = null;
+    paneContainerSize.current = parent.getBoundingClientRect()[dragD1Ref.current];
+    lastEmittedSizesRef.current = panesSize.current ? [...panesSize.current] : null;
   };
 
   const getSizes = useCallback(() => {
@@ -102,8 +106,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
       }
       const sizes_ = [...panesSize.current];
 
-      // Read direction from propsRef to avoid stale closure during drag
-      const axis = propsRef.current.direction === 'horizontal' ? 'clientY' : 'clientX';
+      const axis = dragPointerAxisRef.current;
       const i = paneIndex.current;
       const pointer = ev[axis];
       const dividerPosition = pointer - dragOffset.current;
@@ -117,7 +120,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
         sizes_[i] -= clampedDelta;
         sizes_[i + 1] += clampedDelta;
       }
-      dragTarget.current?.style.setProperty(d2, `${dividerPosition}px`);
+      dragTarget.current?.style.setProperty(dragD2Ref.current, `${dividerPosition}px`);
       if (lastEmittedSizesRef.current && sizes_.every((size, index) => size === lastEmittedSizesRef.current?.[index])) {
         return;
       }
