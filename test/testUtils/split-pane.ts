@@ -1,5 +1,6 @@
 /** @file Shared `SplitPane` render and geometry helpers for unit tests. */
 import React, {act, useState} from 'react';
+import {flushSync} from 'react-dom';
 import {createRoot} from 'react-dom/client';
 
 import Immutable from 'seamless-immutable';
@@ -35,10 +36,12 @@ export const buildRect = ({
 
 export const waitForRenderedPanes = async (container: HTMLDivElement) => {
   for (let attempts = 0; attempts < 20; attempts += 1) {
-    if (container.firstElementChild?.tagName === 'DIV') {
+    if (container.firstElementChild) {
       return container.firstElementChild as HTMLDivElement;
     }
-    await waitFor(0);
+    await act(async () => {
+      await waitFor(0);
+    });
   }
 
   throw new Error('Expected split pane root to be rendered.');
@@ -75,18 +78,33 @@ export const renderControlledSplitPane = async ({
     );
   };
 
-  await act(async () => {
-    root.render(React.createElement(ControlledSplitPane));
-    await waitFor(0);
-  });
+  try {
+    await act(async () => {
+      flushSync(() => {
+        root.render(React.createElement(ControlledSplitPane));
+      });
+      await waitFor(0);
+    });
 
-  const panes = await waitForRenderedPanes(container);
-  const divider = panes.children[1];
-  if (!(divider && 'tagName' in divider) || divider.tagName !== 'HR') {
-    throw new Error('Expected split pane divider to be rendered.');
+    const panes = await waitForRenderedPanes(container);
+    const divider = panes.children[1];
+    if (!(divider && 'tagName' in divider) || divider.tagName !== 'HR') {
+      throw new Error('Expected split pane divider to be rendered.');
+    }
+
+    return {cleanup, root, resizeCalls, panes, divider: divider as HTMLElement};
+  } catch (error) {
+    try {
+      await act(async () => {
+        root.unmount();
+        await waitFor(0);
+      });
+    } catch {
+      // Best-effort cleanup only. Re-throw the original setup failure below.
+    }
+    cleanup();
+    throw error;
   }
-
-  return {cleanup, root, resizeCalls, panes, divider: divider as HTMLElement};
 };
 
 export const setSplitPaneGeometry = ({
