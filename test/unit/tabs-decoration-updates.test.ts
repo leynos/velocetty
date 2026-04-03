@@ -117,7 +117,9 @@ test('re-renders tabs when provider update callback fires', async () => {
   expect((getTabPropsMock.mock.calls[1]?.[0] as {tabIndex?: number}).tabIndex).toBe(1);
 
   await act(async () => {
-    decorationListener?.();
+    flushSync(() => {
+      decorationListener?.();
+    });
     await waitFor(0);
   });
 
