@@ -18,7 +18,6 @@
  * - Tests: `test/unit/split-pane.test.tsx`
  */
 import React, {act, useState} from 'react';
-import {flushSync} from 'react-dom';
 import {createRoot} from 'react-dom/client';
 
 import Immutable from 'seamless-immutable';
@@ -110,6 +109,13 @@ export async function runDragTest({
   }
 }
 
+/**
+ * Builds a synthetic `DOMRect` for test-only layout stubbing.
+ *
+ * The `left`, `top`, `width`, and `height` values are interpreted as pixel
+ * coordinates and dimensions, and the returned rect includes the derived
+ * `right` and `bottom` fields expected by layout consumers.
+ */
 export const buildRect = ({
   left,
   top,
@@ -134,24 +140,36 @@ export const buildRect = ({
   }) as DOMRect;
 
 export const waitForRenderedPanes = async (container: HTMLDivElement) =>
-  await new Promise<HTMLDivElement>((resolve) => {
+  await new Promise<HTMLDivElement>((resolve, reject) => {
     let settled = false;
     const PaneMutationObserver = window.MutationObserver;
+    let observer: MutationObserver | null = null;
+    const timeoutId = window.setTimeout(() => {
+      if (settled) {
+        return;
+      }
 
-    const observer = new PaneMutationObserver(() => {
+      settled = true;
+      observer?.disconnect();
+      reject(new Error('Timed out waiting for the split pane root to render.'));
+    }, 1_000);
+
+    observer = new PaneMutationObserver(() => {
       const element = container.firstElementChild as Element | undefined;
       if (settled || !isHtmlElementWithTag(element, 'DIV')) {
         return;
       }
 
       settled = true;
-      observer.disconnect();
+      window.clearTimeout(timeoutId);
+      observer?.disconnect();
       resolve(element as HTMLDivElement);
     });
 
     const element = container.firstElementChild as Element | undefined;
     if (isHtmlElementWithTag(element, 'DIV')) {
       settled = true;
+      window.clearTimeout(timeoutId);
       resolve(element as HTMLDivElement);
       return;
     }
@@ -167,6 +185,15 @@ function isHtmlElementWithTag(element: Element | undefined, tagName: string): bo
   return element != null && 'tagName' in element && element.tagName === tagName;
 }
 
+/**
+ * Mounts a controlled `SplitPane` into a detached `div` container and returns
+ * the mounted pane wrapper, divider element, resize-call log, and async
+ * disposer used by the split-pane unit tests.
+ *
+ * The harness renders a two-pane `SplitPane` with the supplied `direction`
+ * and `initialSizes`, records every `onResize` emission, and assumes callers
+ * dispose the mount through the returned helper once assertions are complete.
+ */
 export const renderControlledSplitPane = async ({
   direction,
   initialSizes
@@ -180,11 +207,14 @@ export const renderControlledSplitPane = async ({
   const root = createRoot(container);
   const resizeCalls: number[][] = [];
   const dispose = async () => {
-    await act(async () => {
-      root.unmount();
-      await waitFor(0);
-    });
-    cleanup();
+    try {
+      await act(async () => {
+        root.unmount();
+        await waitFor(0);
+      });
+    } finally {
+      cleanup();
+    }
   };
 
   const ControlledSplitPane = () => {
@@ -207,9 +237,7 @@ export const renderControlledSplitPane = async ({
 
   try {
     await act(async () => {
-      flushSync(() => {
-        root.render(React.createElement(ControlledSplitPane));
-      });
+      root.render(React.createElement(ControlledSplitPane));
       await waitFor(0);
     });
 
@@ -230,6 +258,14 @@ export const renderControlledSplitPane = async ({
   }
 };
 
+/**
+ * Stubs pane-container and divider geometry for `SplitPane` tests.
+ *
+ * The `panes` wrapper and `divider` element must match the DOM structure
+ * returned by `renderControlledSplitPane`. All geometry values are pixel
+ * units, and this helper mutates `getBoundingClientRect()` on those nodes so
+ * drag and resize tests observe deterministic layout measurements.
+ */
 export const setSplitPaneGeometry = ({
   panes,
   divider,
