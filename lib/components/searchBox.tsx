@@ -61,6 +61,72 @@ const SearchButton = ({
   );
 };
 
+type SearchResultsCountProps = {
+  results: SearchBoxProps['results'];
+};
+
+const SearchResultsCount = ({results}: SearchResultsCountProps) => (
+  <span style={{minWidth: '60px', marginLeft: '4px'}}>
+    {results === undefined
+      ? ''
+      : results.resultCount === 0
+        ? 'No results'
+        : `${results.resultIndex + 1} of ${results.resultCount}`}
+  </span>
+);
+
+type SearchNavigationProps = {
+  prev: SearchBoxProps['prev'];
+  next: SearchBoxProps['next'];
+  close: SearchBoxProps['close'];
+  searchTermRef: React.RefObject<string>;
+} & SearchButtonColors;
+
+const SearchNavigation = ({
+  prev,
+  next,
+  close,
+  searchTermRef,
+  foregroundColor,
+  backgroundColor,
+  selectionColor
+}: SearchNavigationProps) => (
+  <div className="flex flex-row justify-between items-center gap-1">
+    <SearchButton
+      onClick={() => prev(searchTermRef.current)}
+      active={false}
+      title="Previous Match"
+      foregroundColor={foregroundColor}
+      backgroundColor={backgroundColor}
+      selectionColor={selectionColor}
+    >
+      <VscArrowUp size="14px" />
+    </SearchButton>
+
+    <SearchButton
+      onClick={() => next(searchTermRef.current)}
+      active={false}
+      title="Next Match"
+      foregroundColor={foregroundColor}
+      backgroundColor={backgroundColor}
+      selectionColor={selectionColor}
+    >
+      <VscArrowDown size="14px" />
+    </SearchButton>
+
+    <SearchButton
+      onClick={close}
+      active={false}
+      title="Close"
+      foregroundColor={foregroundColor}
+      backgroundColor={backgroundColor}
+      selectionColor={selectionColor}
+    >
+      <VscClose size="14px" />
+    </SearchButton>
+  </div>
+);
+
 const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const {
     caseSensitive,
@@ -166,37 +232,9 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
         </SearchButton>
       </div>
 
-      <span style={{minWidth: '60px', marginLeft: '4px'}}>
-        {results === undefined
-          ? ''
-          : results.resultCount === 0
-            ? 'No results'
-            : `${results.resultIndex + 1} of ${results.resultCount}`}
-      </span>
+      <SearchResultsCount results={results} />
 
-      <div className="flex flex-row justify-between items-center gap-1">
-        <SearchButton
-          onClick={() => prev(searchTermRef.current)}
-          active={false}
-          title="Previous Match"
-          {...searchButtonColors}
-        >
-          <VscArrowUp size="14px" />
-        </SearchButton>
-
-        <SearchButton
-          onClick={() => next(searchTermRef.current)}
-          active={false}
-          title="Next Match"
-          {...searchButtonColors}
-        >
-          <VscArrowDown size="14px" />
-        </SearchButton>
-
-        <SearchButton onClick={close} active={false} title="Close" {...searchButtonColors}>
-          <VscClose size="14px" />
-        </SearchButton>
-      </div>
+      <SearchNavigation prev={prev} next={next} close={close} searchTermRef={searchTermRef} {...searchButtonColors} />
     </div>
   );
 });
