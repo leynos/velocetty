@@ -81,5 +81,5 @@ test('returns the translated search label for renderer search UI', () => {
     return t('search');
   });
 
-  expect(translation).toBe('Search');
+  expect(translation).toBe('Rechercher');
 });

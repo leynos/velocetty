@@ -19,11 +19,21 @@ const translationDictionaries: Partial<Record<string, Partial<Record<Translation
   en: headerLabelDefaults,
   'en-gb': {
     openMenu: 'Open menu (UK)',
-    closeWindow: 'Close the window'
+    closeWindow: 'Close the window',
+    search: 'Search',
+    noResults: 'No results',
+    previousMatch: 'Previous Match',
+    nextMatch: 'Next Match',
+    close: 'Close'
   },
   fr: {
     openMenu: 'Ouvrir le menu',
-    closeWindow: 'Fermer la fenêtre'
+    closeWindow: 'Fermer la fenêtre',
+    search: 'Rechercher',
+    noResults: 'Aucun résultat',
+    previousMatch: 'Résultat précédent',
+    nextMatch: 'Résultat suivant',
+    close: 'Fermer'
   }
 };
 
