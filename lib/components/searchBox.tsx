@@ -145,6 +145,9 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
     previousMatchLabel,
     nextMatchLabel,
     closeLabel,
+    matchCaseLabel,
+    matchWholeWordLabel,
+    useRegexLabel,
     toggleCaseSensitive,
     toggleWholeWord,
     toggleRegex,
@@ -216,7 +219,7 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
           onClick={toggleCaseSensitive}
           active={caseSensitive}
           pressed={caseSensitive}
-          title="Match Case"
+          title={matchCaseLabel}
           {...searchButtonColors}
         >
           <VscCaseSensitive size="14px" />
@@ -226,7 +229,7 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
           onClick={toggleWholeWord}
           active={wholeWord}
           pressed={wholeWord}
-          title="Match Whole Word"
+          title={matchWholeWordLabel}
           {...searchButtonColors}
         >
           <VscWholeWord size="14px" />
@@ -236,7 +239,7 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
           onClick={toggleRegex}
           active={regex}
           pressed={regex}
-          title="Use Regular Expression"
+          title={useRegexLabel}
           {...searchButtonColors}
         >
           <VscRegex size="14px" />
