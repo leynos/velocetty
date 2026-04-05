@@ -74,3 +74,12 @@ test('defaults to English when navigator information is unavailable', () => {
 
   expect(translation).toBe('Restore window');
 });
+
+test('returns the translated search label for renderer search UI', () => {
+  const translation = withNavigator({languages: ['fr-CA', 'fr'], language: 'fr'}, () => {
+    const t = useTranslation();
+    return t('search');
+  });
+
+  expect(translation).toBe('Search');
+});

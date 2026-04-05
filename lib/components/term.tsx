@@ -29,6 +29,7 @@ import {asRendererUid, asSessionId} from '@shared/types/common';
 import type {RendererFallbackReason, RendererRuntimeMetrics, RendererType, RendererUid} from '@shared/types/common';
 import terms from '../terms';
 import {transport} from '../transport';
+import {useTranslation} from '../hooks/use-translation';
 import {clock} from '../utils/clock';
 import {isPaneVisible} from '../utils/pane-visibility';
 import processClipboard from '../utils/paste';
@@ -55,6 +56,14 @@ type RendererReportPayload = Readonly<{
 const asTimeMs = (value: number): TimeMs => value as TimeMs;
 
 const SearchBox = decorate(_SearchBox, 'SearchBox');
+
+type TranslatedSearchBoxProps = Omit<import('../../typings/hyper').SearchBoxProps, 'searchLabel'>;
+
+const TranslatedSearchBox = (props: TranslatedSearchBoxProps) => {
+  const t = useTranslation();
+
+  return <SearchBox {...props} searchLabel={t('search')} />;
+};
 
 const isWindows = ['Windows', 'Win16', 'Win32', 'WinCE'].includes(navigator.platform) || process.platform === 'win32';
 
@@ -1133,7 +1142,7 @@ export default class Term extends React.PureComponent<
         <div ref={this.onTermWrapperRef} className={`${styles.termFit} ${styles.termWrapper} term_fit term_wrapper`} />
         {this.props.customChildren}
         {this.props.search ? (
-          <SearchBox
+          <TranslatedSearchBox
             next={this.searchNext}
             prev={this.searchPrevious}
             close={this.closeSearchBox}

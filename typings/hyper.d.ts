@@ -348,6 +348,7 @@ export type SearchBoxProps = {
   wholeWord: boolean;
   regex: boolean;
   results: {resultIndex: number; resultCount: number} | undefined;
+  searchLabel: string;
   toggleCaseSensitive: () => void;
   toggleWholeWord: () => void;
   toggleRegex: () => void;

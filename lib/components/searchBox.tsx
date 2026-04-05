@@ -67,6 +67,7 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
     wholeWord,
     regex,
     results,
+    searchLabel,
     toggleCaseSensitive,
     toggleWholeWord,
     toggleRegex,
@@ -127,11 +128,11 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
         <input
           className={styles.searchInput}
           type="text"
-          aria-label="Search"
+          aria-label={searchLabel}
           onChange={updateSearch}
           onKeyDown={handleKeyDown}
           ref={inputRef}
-          placeholder="Search"
+          placeholder={searchLabel}
         />
 
         <SearchButton

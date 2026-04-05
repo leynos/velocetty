@@ -5,7 +5,8 @@ const headerLabelDefaults = {
   minimizeWindow: 'Minimise window',
   maximizeWindow: 'Maximise window',
   restoreWindow: 'Restore window',
-  closeWindow: 'Close window'
+  closeWindow: 'Close window',
+  search: 'Search'
 } as const;
 
 type TranslationKey = keyof typeof headerLabelDefaults;
