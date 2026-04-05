@@ -63,16 +63,17 @@ const SearchButton = ({
 
 type SearchResultsCountProps = {
   results: SearchBoxProps['results'];
+  noResultsLabel: string;
 };
 
-const SearchResultsCount = ({results}: SearchResultsCountProps) => (
-  <span style={{minWidth: '60px', marginLeft: '4px'}}>
+const SearchResultsCount = ({results, noResultsLabel}: SearchResultsCountProps) => (
+  <output style={{minWidth: '60px', marginLeft: '4px'}} aria-live="polite" aria-atomic="true">
     {results === undefined
       ? ''
       : results.resultCount === 0
-        ? 'No results'
+        ? noResultsLabel
         : `${results.resultIndex + 1} of ${results.resultCount}`}
-  </span>
+  </output>
 );
 
 type SearchNavigationProps = {
@@ -80,6 +81,9 @@ type SearchNavigationProps = {
   next: SearchBoxProps['next'];
   close: SearchBoxProps['close'];
   searchTermRef: React.RefObject<string>;
+  previousMatchLabel: string;
+  nextMatchLabel: string;
+  closeLabel: string;
 } & SearchButtonColors;
 
 const SearchNavigation = ({
@@ -89,13 +93,16 @@ const SearchNavigation = ({
   searchTermRef,
   foregroundColor,
   backgroundColor,
-  selectionColor
+  selectionColor,
+  previousMatchLabel,
+  nextMatchLabel,
+  closeLabel
 }: SearchNavigationProps) => (
   <div className="flex flex-row justify-between items-center gap-1">
     <SearchButton
       onClick={() => prev(searchTermRef.current)}
       active={false}
-      title="Previous Match"
+      title={previousMatchLabel}
       foregroundColor={foregroundColor}
       backgroundColor={backgroundColor}
       selectionColor={selectionColor}
@@ -106,7 +113,7 @@ const SearchNavigation = ({
     <SearchButton
       onClick={() => next(searchTermRef.current)}
       active={false}
-      title="Next Match"
+      title={nextMatchLabel}
       foregroundColor={foregroundColor}
       backgroundColor={backgroundColor}
       selectionColor={selectionColor}
@@ -117,7 +124,7 @@ const SearchNavigation = ({
     <SearchButton
       onClick={close}
       active={false}
-      title="Close"
+      title={closeLabel}
       foregroundColor={foregroundColor}
       backgroundColor={backgroundColor}
       selectionColor={selectionColor}
@@ -134,6 +141,10 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
     regex,
     results,
     searchLabel,
+    noResultsLabel,
+    previousMatchLabel,
+    nextMatchLabel,
+    closeLabel,
     toggleCaseSensitive,
     toggleWholeWord,
     toggleRegex,
@@ -232,9 +243,18 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
         </SearchButton>
       </div>
 
-      <SearchResultsCount results={results} />
+      <SearchResultsCount results={results} noResultsLabel={noResultsLabel} />
 
-      <SearchNavigation prev={prev} next={next} close={close} searchTermRef={searchTermRef} {...searchButtonColors} />
+      <SearchNavigation
+        prev={prev}
+        next={next}
+        close={close}
+        searchTermRef={searchTermRef}
+        previousMatchLabel={previousMatchLabel}
+        nextMatchLabel={nextMatchLabel}
+        closeLabel={closeLabel}
+        {...searchButtonColors}
+      />
     </div>
   );
 });

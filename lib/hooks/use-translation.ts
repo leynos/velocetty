@@ -6,7 +6,11 @@ const headerLabelDefaults = {
   maximizeWindow: 'Maximise window',
   restoreWindow: 'Restore window',
   closeWindow: 'Close window',
-  search: 'Search'
+  search: 'Search',
+  noResults: 'No results',
+  previousMatch: 'Previous Match',
+  nextMatch: 'Next Match',
+  close: 'Close'
 } as const;
 
 type TranslationKey = keyof typeof headerLabelDefaults;

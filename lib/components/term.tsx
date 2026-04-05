@@ -57,12 +57,24 @@ const asTimeMs = (value: number): TimeMs => value as TimeMs;
 
 const SearchBox = decorate(_SearchBox, 'SearchBox');
 
-type TranslatedSearchBoxProps = Omit<import('../../typings/hyper').SearchBoxProps, 'searchLabel'>;
+type TranslatedSearchBoxProps = Omit<
+  import('../../typings/hyper').SearchBoxProps,
+  'searchLabel' | 'noResultsLabel' | 'previousMatchLabel' | 'nextMatchLabel' | 'closeLabel'
+>;
 
 const TranslatedSearchBox = (props: TranslatedSearchBoxProps) => {
   const t = useTranslation();
 
-  return <SearchBox {...props} searchLabel={t('search')} />;
+  return (
+    <SearchBox
+      {...props}
+      searchLabel={t('search')}
+      noResultsLabel={t('noResults')}
+      previousMatchLabel={t('previousMatch')}
+      nextMatchLabel={t('nextMatch')}
+      closeLabel={t('close')}
+    />
+  );
 };
 
 const isWindows = ['Windows', 'Win16', 'Win32', 'WinCE'].includes(navigator.platform) || process.platform === 'win32';
