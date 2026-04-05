@@ -179,7 +179,7 @@ const renderHeaderWithTranslation = async (overrides: Partial<HeaderConnectedPro
   return {container, root, cleanup};
 };
 
-test('injects translated window-control and menu aria labels', async () => {
+test.serial('injects translated window-control and menu aria labels', async () => {
   const {container, cleanup} = await renderHeaderWithTranslation();
 
   try {
@@ -193,7 +193,7 @@ test('injects translated window-control and menu aria labels', async () => {
   }
 });
 
-test('uses restore label when window is maximized', async () => {
+test.serial('uses restore label when window is maximized', async () => {
   const {container, cleanup} = await renderHeaderWithTranslation({maximized: true});
 
   try {
