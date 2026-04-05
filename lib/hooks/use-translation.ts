@@ -10,7 +10,10 @@ const headerLabelDefaults = {
   noResults: 'No results',
   previousMatch: 'Previous Match',
   nextMatch: 'Next Match',
-  close: 'Close'
+  close: 'Close',
+  matchCase: 'Match Case',
+  matchWholeWord: 'Match Whole Word',
+  useRegex: 'Use Regular Expression'
 } as const;
 
 type TranslationKey = keyof typeof headerLabelDefaults;
@@ -24,7 +27,10 @@ const translationDictionaries: Partial<Record<string, Partial<Record<Translation
     noResults: 'No results',
     previousMatch: 'Previous Match',
     nextMatch: 'Next Match',
-    close: 'Close'
+    close: 'Close',
+    matchCase: 'Match Case',
+    matchWholeWord: 'Match Whole Word',
+    useRegex: 'Use Regular Expression'
   },
   fr: {
     openMenu: 'Ouvrir le menu',
@@ -33,7 +39,10 @@ const translationDictionaries: Partial<Record<string, Partial<Record<Translation
     noResults: 'Aucun résultat',
     previousMatch: 'Résultat précédent',
     nextMatch: 'Résultat suivant',
-    close: 'Fermer'
+    close: 'Fermer',
+    matchCase: 'Respecter la casse',
+    matchWholeWord: 'Mot entier',
+    useRegex: 'Expression régulière'
   }
 };
 
