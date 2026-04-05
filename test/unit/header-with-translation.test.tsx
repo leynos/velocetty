@@ -45,6 +45,10 @@ const makeProfiles = (): MockProfileCollection => {
   });
 };
 
+const TabsMock = React.forwardRef<unknown, React.ComponentProps<'div'>>((_props, _ref) => {
+  return null;
+});
+
 const makeHeaderProps = (overrides: Partial<HeaderConnectedProps> = {}): HeaderConnectedProps => ({
   isMac: false,
   tabs: [{uid: 'tab-1', title: 'Shell', isActive: true, hasActivity: false}],
@@ -127,8 +131,8 @@ const registerHeaderWithTranslationMocks = () => {
 
   // Bun may resolve this import with or without the `.tsx` suffix, so both
   // module IDs must be mocked to keep the tabs component consistently stubbed.
-  mock.module('../../lib/components/tabs', () => ({default: () => null}));
-  mock.module('../../lib/components/tabs.tsx', () => ({default: () => null}));
+  mock.module('../../lib/components/tabs', () => ({default: TabsMock}));
+  mock.module('../../lib/components/tabs.tsx', () => ({default: TabsMock}));
 };
 
 const loadHeaderWithTranslation = async () => {
