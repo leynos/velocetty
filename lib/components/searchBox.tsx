@@ -61,6 +61,54 @@ const SearchButton = ({
   );
 };
 
+type SearchInputControlsProps = {
+  caseSensitive: boolean;
+  wholeWord: boolean;
+  regex: boolean;
+  searchLabel: string;
+  updateSearch: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  handleKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  toggleCaseSensitive: () => void;
+  toggleWholeWord: () => void;
+  toggleRegex: () => void;
+} & SearchButtonColors;
+
+const SearchInputControls = ({
+  caseSensitive,
+  wholeWord,
+  regex,
+  searchLabel,
+  updateSearch,
+  handleKeyDown,
+  inputRef,
+  toggleCaseSensitive,
+  toggleWholeWord,
+  toggleRegex,
+  ...colors
+}: SearchInputControlsProps) => (
+  <div className={`flex flex-row justify-between items-center gap-1 ${styles.searchBox}`}>
+    <input
+      className={styles.searchInput}
+      type="text"
+      aria-label={searchLabel}
+      onChange={updateSearch}
+      onKeyDown={handleKeyDown}
+      ref={inputRef}
+      placeholder={searchLabel}
+    />
+    <SearchButton onClick={toggleCaseSensitive} active={caseSensitive} pressed={caseSensitive} title="Match Case" {...colors}>
+      <VscCaseSensitive size="14px" />
+    </SearchButton>
+    <SearchButton onClick={toggleWholeWord} active={wholeWord} pressed={wholeWord} title="Match Whole Word" {...colors}>
+      <VscWholeWord size="14px" />
+    </SearchButton>
+    <SearchButton onClick={toggleRegex} active={regex} pressed={regex} title="Use Regular Expression" {...colors}>
+      <VscRegex size="14px" />
+    </SearchButton>
+  </div>
+);
+
 const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const {
     caseSensitive,
@@ -124,47 +172,19 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
       ref={ref}
       style={searchVars}
     >
-      <div className={`flex flex-row justify-between items-center gap-1 ${styles.searchBox}`}>
-        <input
-          className={styles.searchInput}
-          type="text"
-          aria-label={searchLabel}
-          onChange={updateSearch}
-          onKeyDown={handleKeyDown}
-          ref={inputRef}
-          placeholder={searchLabel}
-        />
-
-        <SearchButton
-          onClick={toggleCaseSensitive}
-          active={caseSensitive}
-          pressed={caseSensitive}
-          title="Match Case"
-          {...searchButtonColors}
-        >
-          <VscCaseSensitive size="14px" />
-        </SearchButton>
-
-        <SearchButton
-          onClick={toggleWholeWord}
-          active={wholeWord}
-          pressed={wholeWord}
-          title="Match Whole Word"
-          {...searchButtonColors}
-        >
-          <VscWholeWord size="14px" />
-        </SearchButton>
-
-        <SearchButton
-          onClick={toggleRegex}
-          active={regex}
-          pressed={regex}
-          title="Use Regular Expression"
-          {...searchButtonColors}
-        >
-          <VscRegex size="14px" />
-        </SearchButton>
-      </div>
+      <SearchInputControls
+        caseSensitive={caseSensitive}
+        wholeWord={wholeWord}
+        regex={regex}
+        searchLabel={searchLabel}
+        updateSearch={updateSearch}
+        handleKeyDown={handleKeyDown}
+        inputRef={inputRef}
+        toggleCaseSensitive={toggleCaseSensitive}
+        toggleWholeWord={toggleWholeWord}
+        toggleRegex={toggleRegex}
+        {...searchButtonColors}
+      />
 
       <span style={{minWidth: '60px', marginLeft: '4px'}}>
         {results === undefined
