@@ -59,7 +59,7 @@ const SearchBox = decorate(_SearchBox, 'SearchBox');
 
 type TranslatedSearchBoxProps = Omit<
   import('../../typings/hyper').SearchBoxProps,
-  'searchLabel' | 'noResultsLabel' | 'previousMatchLabel' | 'nextMatchLabel' | 'closeLabel'
+  'searchLabel' | 'noResultsLabel' | 'previousMatchLabel' | 'nextMatchLabel' | 'closeLabel' | 'matchCaseLabel' | 'matchWholeWordLabel' | 'useRegexLabel'
 >;
 
 const TranslatedSearchBox = (props: TranslatedSearchBoxProps) => {
@@ -73,6 +73,9 @@ const TranslatedSearchBox = (props: TranslatedSearchBoxProps) => {
       previousMatchLabel={t('previousMatch')}
       nextMatchLabel={t('nextMatch')}
       closeLabel={t('close')}
+      matchCaseLabel={t('matchCase')}
+      matchWholeWordLabel={t('matchWholeWord')}
+      useRegexLabel={t('useRegex')}
     />
   );
 };

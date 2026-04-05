@@ -353,6 +353,9 @@ export type SearchBoxProps = {
   previousMatchLabel: string;
   nextMatchLabel: string;
   closeLabel: string;
+  matchCaseLabel: string;
+  matchWholeWordLabel: string;
+  useRegexLabel: string;
   toggleCaseSensitive: () => void;
   toggleWholeWord: () => void;
   toggleRegex: () => void;
