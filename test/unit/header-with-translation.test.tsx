@@ -45,6 +45,10 @@ const makeProfiles = (): MockProfileCollection => {
   });
 };
 
+const TabsMock = React.forwardRef<unknown, React.ComponentProps<'div'>>((_props, _ref) => {
+  return null;
+});
+
 const makeHeaderProps = (overrides: Partial<HeaderConnectedProps> = {}): HeaderConnectedProps => ({
   isMac: false,
   tabs: [{uid: 'tab-1', title: 'Shell', isActive: true, hasActivity: false}],
@@ -56,7 +60,6 @@ const makeHeaderProps = (overrides: Partial<HeaderConnectedProps> = {}): HeaderC
   showHamburgerMenu: '',
   showWindowControls: '',
   defaultProfile: 'default',
-  profiles: overrides.profiles ?? makeProfiles(),
   onCloseTab: () => {},
   onChangeTab: () => {},
   maximize: () => {},
@@ -65,7 +68,8 @@ const makeHeaderProps = (overrides: Partial<HeaderConnectedProps> = {}): HeaderC
   minimize: () => {},
   close: () => {},
   openNewTab: () => {},
-  ...overrides
+  ...overrides,
+  profiles: overrides.profiles ?? makeProfiles()
 });
 
 let HeaderWithTranslation: HeaderWithTranslationComponent;
@@ -125,8 +129,10 @@ const registerHeaderWithTranslationMocks = () => {
 
   registerPluginsModuleMocks();
 
-  mock.module('../../lib/components/tabs', () => ({default: () => null}));
-  mock.module('../../lib/components/tabs.tsx', () => ({default: () => null}));
+  // Bun may resolve this import with or without the `.tsx` suffix, so both
+  // module IDs must be mocked to keep the tabs component consistently stubbed.
+  mock.module('../../lib/components/tabs', () => ({default: TabsMock}));
+  mock.module('../../lib/components/tabs.tsx', () => ({default: TabsMock}));
 };
 
 const loadHeaderWithTranslation = async () => {
@@ -157,6 +163,7 @@ afterEach(() => {
 
 const renderHeaderWithTranslation = async (overrides: Partial<HeaderConnectedProps> = {}) => {
   const container = document.createElement('div');
+  document.body.append(container);
   const root = createRoot(container);
   const props = makeHeaderProps(overrides);
 
@@ -165,32 +172,38 @@ const renderHeaderWithTranslation = async (overrides: Partial<HeaderConnectedPro
     await waitFor(0);
   });
 
-  return {container, root};
+  const cleanup = async () => {
+    await act(async () => {
+      root.unmount();
+      await waitFor(0);
+    });
+    container.remove();
+  };
+
+  return {container, root, cleanup};
 };
 
-test('injects translated window-control and menu aria labels', async () => {
-  const {container, root} = await renderHeaderWithTranslation();
+test.serial('injects translated window-control and menu aria labels', async () => {
+  const {container, cleanup} = await renderHeaderWithTranslation();
 
-  expect(container.querySelector(`button[aria-label="${translatedLabels.openMenuAria}"]`)).toBeTruthy();
-  expect(container.querySelector(`button[aria-label="${translatedLabels.minimizeWindowAria}"]`)).toBeTruthy();
-  expect(container.querySelector(`button[aria-label="${translatedLabels.maximizeWindowAria}"]`)).toBeTruthy();
-  expect(container.querySelector(`button[aria-label="${translatedLabels.restoreWindowAria}"]`)).toBeNull();
-  expect(container.querySelector(`button[aria-label="${translatedLabels.closeWindowAria}"]`)).toBeTruthy();
-
-  await act(async () => {
-    root.unmount();
-    await waitFor(0);
-  });
+  try {
+    expect(container.querySelector(`button[aria-label="${translatedLabels.openMenuAria}"]`)).toBeTruthy();
+    expect(container.querySelector(`button[aria-label="${translatedLabels.minimizeWindowAria}"]`)).toBeTruthy();
+    expect(container.querySelector(`button[aria-label="${translatedLabels.maximizeWindowAria}"]`)).toBeTruthy();
+    expect(container.querySelector(`button[aria-label="${translatedLabels.restoreWindowAria}"]`)).toBeNull();
+    expect(container.querySelector(`button[aria-label="${translatedLabels.closeWindowAria}"]`)).toBeTruthy();
+  } finally {
+    await cleanup();
+  }
 });
 
-test('uses restore label when window is maximized', async () => {
-  const {container, root} = await renderHeaderWithTranslation({maximized: true});
+test.serial('uses restore label when window is maximized', async () => {
+  const {container, cleanup} = await renderHeaderWithTranslation({maximized: true});
 
-  expect(container.querySelector(`button[aria-label="${translatedLabels.restoreWindowAria}"]`)).toBeTruthy();
-  expect(container.querySelector(`button[aria-label="${translatedLabels.maximizeWindowAria}"]`)).toBeNull();
-
-  await act(async () => {
-    root.unmount();
-    await waitFor(0);
-  });
+  try {
+    expect(container.querySelector(`button[aria-label="${translatedLabels.restoreWindowAria}"]`)).toBeTruthy();
+    expect(container.querySelector(`button[aria-label="${translatedLabels.maximizeWindowAria}"]`)).toBeNull();
+  } finally {
+    await cleanup();
+  }
 });

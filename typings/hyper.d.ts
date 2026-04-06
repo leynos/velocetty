@@ -348,6 +348,14 @@ export type SearchBoxProps = {
   wholeWord: boolean;
   regex: boolean;
   results: {resultIndex: number; resultCount: number} | undefined;
+  searchLabel: string;
+  noResultsLabel: string;
+  previousMatchLabel: string;
+  nextMatchLabel: string;
+  closeLabel: string;
+  matchCaseLabel: string;
+  matchWholeWordLabel: string;
+  useRegexLabel: string;
   toggleCaseSensitive: () => void;
   toggleWholeWord: () => void;
   toggleRegex: () => void;

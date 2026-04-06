@@ -5,7 +5,15 @@ const headerLabelDefaults = {
   minimizeWindow: 'Minimise window',
   maximizeWindow: 'Maximise window',
   restoreWindow: 'Restore window',
-  closeWindow: 'Close window'
+  closeWindow: 'Close window',
+  search: 'Search',
+  noResults: 'No results',
+  matchCase: 'Match Case',
+  matchWholeWord: 'Match Whole Word',
+  useRegex: 'Use Regular Expression',
+  previousMatch: 'Previous Match',
+  nextMatch: 'Next Match',
+  close: 'Close'
 } as const;
 
 type TranslationKey = keyof typeof headerLabelDefaults;
@@ -14,11 +22,27 @@ const translationDictionaries: Partial<Record<string, Partial<Record<Translation
   en: headerLabelDefaults,
   'en-gb': {
     openMenu: 'Open menu (UK)',
-    closeWindow: 'Close the window'
+    closeWindow: 'Close the window',
+    search: 'Search',
+    noResults: 'No results',
+    matchCase: 'Match Case',
+    matchWholeWord: 'Match Whole Word',
+    useRegex: 'Use Regular Expression',
+    previousMatch: 'Previous Match',
+    nextMatch: 'Next Match',
+    close: 'Close'
   },
   fr: {
     openMenu: 'Ouvrir le menu',
-    closeWindow: 'Fermer la fenêtre'
+    closeWindow: 'Fermer la fenêtre',
+    search: 'Rechercher',
+    noResults: 'Aucun résultat',
+    matchCase: 'Respecter la casse',
+    matchWholeWord: 'Mot entier',
+    useRegex: 'Expression régulière',
+    previousMatch: 'Résultat précédent',
+    nextMatch: 'Résultat suivant',
+    close: 'Fermer'
   }
 };
 
