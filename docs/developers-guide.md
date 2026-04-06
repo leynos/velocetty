@@ -1026,26 +1026,34 @@ pattern has two layers:
    explicit typed prop. This makes labels testable in isolation and keeps the
    component independent of the translation mechanism.
 
-2. **Translation wrapper** (e.g., `TranslatedSearchBox` in
-   `lib/components/term.tsx`) calls `useTranslation()` and maps each
-   `TranslationKey` to the corresponding prop before forwarding the rest
-   unchanged:
+2. **Translation logic hook** – encapsulate translation lookup in a dedicated
+   logic hook (e.g., `useSearchBoxLabels`) that calls `useTranslation()` and
+   returns the mapped labels. View components receive labels via props and
+   remain pure:
 
    ```tsx
-   const TranslatedSearchBox = (props: TranslatedSearchBoxProps) => {
+   const useSearchBoxLabels = () => {
      const t = useTranslation();
-     return (
-       <SearchBox
-         {...props}
-         searchLabel={t('search')}
-         noResultsLabel={t('noResults')}
-         matchCaseLabel={t('matchCase')}
-         matchWholeWordLabel={t('matchWholeWord')}
-         useRegexLabel={t('useRegex')}
-         previousMatchLabel={t('previousMatch')}
-         nextMatchLabel={t('nextMatch')}
-         closeLabel={t('close')}
-       />
-     );
+     return {
+       searchLabel: t('search'),
+       noResultsLabel: t('noResults'),
+       matchCaseLabel: t('matchCase'),
+       matchWholeWordLabel: t('matchWholeWord'),
+       useRegexLabel: t('useRegex'),
+       previousMatchLabel: t('previousMatch'),
+       nextMatchLabel: t('nextMatch'),
+       closeLabel: t('close')
+     };
+   };
+
+   // Usage in a parent component
+   const ParentComponent = (props) => {
+     const labels = useSearchBoxLabels();
+     return <SearchBox {...props} {...labels} />;
    };
    ```
+
+   **Exception:** `TranslatedSearchBox` in `lib/components/term.tsx` is a
+   documented wrapper component that calls `useTranslation()` directly. This
+   is an intentional exception to the hook-based pattern for historical
+   compatibility; new code should prefer the `useSearchBoxLabels` approach.
