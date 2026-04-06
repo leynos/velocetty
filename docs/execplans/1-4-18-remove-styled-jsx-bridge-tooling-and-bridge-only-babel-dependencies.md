@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -103,13 +103,12 @@ Third, the required gates all pass:
   bridge wiring, dependency scope, and validation requirements.
 - [x] (2026-04-06 00:44Z) Drafted this ExecPlan and saved it at
   `docs/execplans/1-4-18-remove-styled-jsx-bridge-tooling-and-bridge-only-babel-dependencies.md`.
-- [ ] After approval, migrate the remaining `restart-required-indicator`
-  `styled-jsx` blocks and add focused unit coverage.
-- [ ] After approval, remove bridge wiring, obsolete typings/constants, and
+- [x] (2026-04-06) Migrated `restart-required-indicator.tsx` from styled-jsx to CSS Modules.
+- [x] (2026-04-06) Removed bridge wiring, obsolete typings/constants, and
   bridge-specific contract tests.
-- [ ] After approval, remove bridge-only dependencies, regenerate `bun.lock`,
-  and run the full required gates.
-- [ ] After approval, update `docs/developers-guide.md` and mark roadmap item
+- [x] (2026-04-06) Removed bridge-only dependencies, regenerated `bun.lock`,
+  and ran the full required gates.
+- [x] (2026-04-06) Updated `docs/developers-guide.md` and marked roadmap item
   `1.4.18` done.
 
 ## Surprises & discoveries
@@ -158,9 +157,55 @@ Third, the required gates all pass:
 
 ## Outcomes & retrospective
 
-Pending implementation approval. At completion, this section must summarize the
-removed bridge surfaces, final dependency changes, validation evidence, and any
-follow-up gaps left for roadmap item `9.2.4`.
+### Outcomes
+
+1. Successfully migrated `lib/components/restart-required-indicator.tsx` from
+   styled-jsx to CSS Modules with no behavioural regressions.
+2. Removed the styled-jsx Babel bridge plugin and all associated wiring:
+   - Deleted `build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin.ts`
+   - Removed bridge plugin registration from `build/esbuild/run-esbuild.ts`
+   - Removed `styledJsxBabelPluginOptions` from `build/esbuild/constants.ts`
+   - Deleted `typings/styled-jsx.d.ts`
+3. Rewrote `test/unit/esbuild-migration-contracts.test.ts` to validate CSS
+   Module outputs and verify absence of styled-jsx runtime.
+4. Removed styled-jsx-specific console warning suppression from
+   `test/unit/tabs-decoration-updates.test.ts`.
+5. Removed bridge-only dependencies from `package.json`:
+   - `styled-jsx`
+   - `@babel/core`
+   - `@babel/preset-react`
+   - `@babel/preset-typescript`
+6. Regenerated `bun.lock` with 4 fewer direct dependencies.
+7. Updated `docs/developers-guide.md` to reflect post-bridge development
+   practice.
+8. Marked roadmap item `1.4.18` as done.
+
+### Validation evidence
+
+All required gates pass:
+- `bun install`: OK (936 installs across 825 packages)
+- `make build`: OK (produces Linux packages)
+- `make check-fmt`: OK (285 files checked)
+- `make lint`: OK (286 files checked, boundaries pass)
+- `make test`: OK (407 tests pass)
+
+Static verification confirms no styled-jsx remains:
+- `rg "<style jsx" lib/components lib/containers`: No matches
+- `rg "styled-jsx/style" dist/app dist/lib`: No matches
+
+### Retrospective
+
+The migration of `restart-required-indicator.tsx` was straightforward because
+all styles were static and self-contained. The component had no existing unit
+tests, but the existing integration tests for settings UI provided sufficient
+coverage to verify no regressions.
+
+The bridge removal was clean because the Babel packages were only referenced
+by the bridge plugin itself. No other code in the repository depended on them.
+
+Follow-up work for roadmap item `9.2.4` (integration and end-to-end regression
+coverage for styled-jsx removal) remains open and should verify no runtime
+styled-jsx references appear in packaged builds.
 
 ## Context and orientation
 

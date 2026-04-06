@@ -13,6 +13,8 @@ import React from 'react';
 
 import type {ConfigReloadClassification} from '@shared/types/config';
 
+import styles from './restart-required-indicator.module.css';
+
 /** Props for the RestartRequiredIndicator component. */
 export type RestartRequiredIndicatorProps = {
   /** Whether the setting requires restart. */
@@ -56,18 +58,13 @@ export const RestartRequiredIndicator: React.FC<RestartRequiredIndicatorProps> =
   }
 
   return (
-    <span className={`restart-required-indicator ${className}`} title={tooltip} aria-label={ariaLabel} role="img">
+    <span
+      className={`${styles.restartRequiredIndicator} ${className}`}
+      title={tooltip}
+      aria-label={ariaLabel}
+      role="img"
+    >
       {children ?? '⟳'}
-      <style jsx={true}>{`
-        .restart-required-indicator {
-          display: inline-flex;
-          align-items: center;
-          margin-left: 4px;
-          color: #f59e0b; /* amber-500 */
-          font-size: 0.875em;
-          cursor: help;
-        }
-      `}</style>
     </span>
   );
 };
@@ -98,45 +95,11 @@ export const InlineRestartWarning: React.FC<InlineRestartWarningProps> = ({class
   }
 
   return (
-    <div className="inline-restart-warning" role="alert">
+    <div className={styles.inlineRestartWarning} role="alert">
       {message}
-      <style jsx={true}>{`
-        .inline-restart-warning {
-          margin-top: 4px;
-          padding: 8px 12px;
-          background-color: rgba(245, 158, 11, 0.1); /* amber-500 at 10% */
-          border-left: 3px solid #f59e0b; /* amber-500 */
-          border-radius: 0 4px 4px 0;
-          font-size: 0.875em;
-          color: #d97706; /* amber-600 */
-        }
-      `}</style>
     </div>
   );
 };
-
-/** Common CSS styles for the config reload badge (used by both output and button variants). */
-const commonBadgeStyles = `
-  .config-reload-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    background-color: #f59e0b; /* amber-500 */
-    color: white;
-    border-radius: 4px;
-    font-size: 0.8125em;
-    font-weight: 500;
-  }
-
-  .badge-icon {
-    font-size: 1em;
-  }
-
-  .badge-text {
-    white-space: nowrap;
-  }
-`;
 
 /** Props for the ConfigReloadBadge component. */
 export type ConfigReloadBadgeProps = {
@@ -183,8 +146,8 @@ export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({
 
   const content = (
     <>
-      <span className="badge-icon">⟳</span>
-      <span className="badge-text">
+      <span className={styles.badgeIcon}>⟳</span>
+      <span className={styles.badgeText}>
         {label}
         {pendingCount !== undefined && pendingCount > 0 && ` (${pendingCount})`}
       </span>
@@ -194,34 +157,15 @@ export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({
   // Render as non-interactive element when no onClick handler provided
   if (!onClick) {
     return (
-      <output className="config-reload-badge" aria-label={ariaLabel}>
+      <output className={styles.configReloadBadge} aria-label={ariaLabel}>
         {content}
-        <style jsx={true}>{commonBadgeStyles}</style>
       </output>
     );
   }
 
   return (
-    <button type="button" className="config-reload-badge" onClick={onClick} title={title ?? ariaLabel}>
+    <button type="button" className={styles.configReloadBadgeButton} onClick={onClick} title={title ?? ariaLabel}>
       {content}
-      <style jsx={true}>{`
-        ${commonBadgeStyles}
-
-        .config-reload-badge {
-          border: none;
-          cursor: pointer;
-          transition: background-color 0.15s ease;
-        }
-
-        .config-reload-badge:hover {
-          background-color: #d97706; /* amber-600 */
-        }
-
-        .config-reload-badge:focus {
-          outline: 2px solid #fbbf24; /* amber-400 */
-          outline-offset: 2px;
-        }
-      `}</style>
     </button>
   );
 };
@@ -278,18 +222,8 @@ export const LiveReloadIndicator: React.FC<LiveReloadIndicatorProps> = ({
   }
 
   return (
-    <span className="live-reload-indicator" title={tooltip} aria-label={ariaLabel} role="img">
+    <span className={styles.liveReloadIndicator} title={tooltip} aria-label={ariaLabel} role="img">
       {children ?? '⚡'}
-      <style jsx={true}>{`
-        .live-reload-indicator {
-          display: inline-flex;
-          align-items: center;
-          margin-left: 4px;
-          color: #10b981; /* emerald-500 */
-          font-size: 0.875em;
-          cursor: help;
-        }
-      `}</style>
     </span>
   );
 };

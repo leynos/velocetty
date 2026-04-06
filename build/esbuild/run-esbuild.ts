@@ -9,7 +9,6 @@ import {copyHyperAppArtifacts, copyRendererArtifacts} from './copy-artifacts';
 import {createIgnoreImportsPlugin} from './esbuild-plugins/ignore-imports-plugin';
 import {createNodeBuiltinsPlugin} from './esbuild-plugins/node-builtins-plugin';
 import {createRendererExternalsPlugin} from './esbuild-plugins/renderer-externals-plugin';
-import {createStyledJsxBabelBridgePlugin} from './esbuild-plugins/styled-jsx-babel-bridge-plugin';
 import postcssPlugin from '@chialab/esbuild-plugin-postcss';
 
 export type BuildMode = 'development' | 'production';
@@ -77,7 +76,6 @@ export const createRendererBuildOptions = (mode: BuildMode, rootDir: string): Bu
     },
     plugins: [
       createPostcssPluginWithoutModules(),
-      createStyledJsxBabelBridgePlugin(),
       createRendererExternalsPlugin(),
       createNodeBuiltinsPlugin(),
       createIgnoreImportsPlugin()
