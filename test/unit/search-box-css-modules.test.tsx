@@ -106,49 +106,23 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
 // SearchResultsCount
 // ---------------------------------------------------------------------------
 
-test('SearchResultsCount shows empty content when results are undefined', async () => {
-  const {container, teardown} = await renderSearchBox({results: undefined});
+const searchResultsCountCases: Array<[string, Partial<SearchBoxProps>, string]> = [
+  ['shows empty content when results are undefined', {results: undefined}, ''],
+  [
+    'shows noResultsLabel when result count is zero',
+    {results: {resultIndex: 0, resultCount: 0}, noResultsLabel: 'No results'},
+    'No results'
+  ],
+  ['shows one-based index and total when results are present', {results: {resultIndex: 2, resultCount: 7}}, '3 of 7'],
+  ['shows "1 of 1" when a single result is found', {results: {resultIndex: 0, resultCount: 1}}, '1 of 1']
+];
+
+test.each(searchResultsCountCases)('SearchResultsCount %s', async (_description, overrides, expectedTextContent) => {
+  const {container, teardown} = await renderSearchBox(overrides);
   try {
     const output = container.querySelector('output');
     expect(output).toBeTruthy();
-    expect(output?.textContent?.trim()).toBe('');
-  } finally {
-    await teardown();
-  }
-});
-
-test('SearchResultsCount shows noResultsLabel when result count is zero', async () => {
-  const {container, teardown} = await renderSearchBox({
-    results: {resultIndex: 0, resultCount: 0},
-    noResultsLabel: 'No results'
-  });
-  try {
-    const output = container.querySelector('output');
-    expect(output?.textContent).toBe('No results');
-  } finally {
-    await teardown();
-  }
-});
-
-test('SearchResultsCount shows one-based index and total when results are present', async () => {
-  const {container, teardown} = await renderSearchBox({
-    results: {resultIndex: 2, resultCount: 7}
-  });
-  try {
-    const output = container.querySelector('output');
-    expect(output?.textContent).toBe('3 of 7');
-  } finally {
-    await teardown();
-  }
-});
-
-test('SearchResultsCount shows "1 of 1" when a single result is found', async () => {
-  const {container, teardown} = await renderSearchBox({
-    results: {resultIndex: 0, resultCount: 1}
-  });
-  try {
-    const output = container.querySelector('output');
-    expect(output?.textContent).toBe('1 of 1');
+    expect(output?.textContent?.trim()).toBe(expectedTextContent);
   } finally {
     await teardown();
   }
@@ -158,30 +132,18 @@ test('SearchResultsCount shows "1 of 1" when a single result is found', async ()
 // SearchNavigation – button labels
 // ---------------------------------------------------------------------------
 
-test('SearchNavigation applies previousMatchLabel as the Previous button title', async () => {
-  const {container, teardown} = await renderSearchBox({previousMatchLabel: 'Previous Match'});
-  try {
-    const button = container.querySelector('button[title="Previous Match"]');
-    expect(button).toBeTruthy();
-  } finally {
-    await teardown();
-  }
-});
+const searchNavigationLabelCases: Array<[keyof SearchBoxProps, string]> = [
+  ['previousMatchLabel', 'Previous Match'],
+  ['nextMatchLabel', 'Next Match'],
+  ['closeLabel', 'Close']
+];
 
-test('SearchNavigation applies nextMatchLabel as the Next button title', async () => {
-  const {container, teardown} = await renderSearchBox({nextMatchLabel: 'Next Match'});
+test.each(
+  searchNavigationLabelCases
+)('SearchNavigation applies %s as a navigation button title', async (prop, expectedTitle) => {
+  const {container, teardown} = await renderSearchBox({[prop]: expectedTitle} as Partial<SearchBoxProps>);
   try {
-    const button = container.querySelector('button[title="Next Match"]');
-    expect(button).toBeTruthy();
-  } finally {
-    await teardown();
-  }
-});
-
-test('SearchNavigation applies closeLabel as the Close button title', async () => {
-  const {container, teardown} = await renderSearchBox({closeLabel: 'Close'});
-  try {
-    const button = container.querySelector('button[title="Close"]');
+    const button = container.querySelector(`button[title="${expectedTitle}"]`);
     expect(button).toBeTruthy();
   } finally {
     await teardown();
@@ -192,61 +154,29 @@ test('SearchNavigation applies closeLabel as the Close button title', async () =
 // SearchNavigation – button callbacks
 // ---------------------------------------------------------------------------
 
-test('SearchNavigation invokes the prev callback when the Previous button is clicked', async () => {
-  let prevCalled = false;
-  const {container, teardown} = await renderSearchBox({
-    prev: () => {
-      prevCalled = true;
-    }
-  });
-  try {
-    const button = container.querySelector<HTMLButtonElement>('button[title="Previous Match"]');
-    expect(button).toBeTruthy();
-    await act(async () => {
-      button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
-      await waitFor(0);
-    });
-    expect(prevCalled).toBe(true);
-  } finally {
-    await teardown();
-  }
-});
+const searchNavigationCallbackCases: Array<[keyof SearchBoxProps, string]> = [
+  ['prev', 'Previous Match'],
+  ['next', 'Next Match'],
+  ['close', 'Close']
+];
 
-test('SearchNavigation invokes the next callback when the Next button is clicked', async () => {
-  let nextCalled = false;
+test.each(
+  searchNavigationCallbackCases
+)('SearchNavigation invokes the %s callback when its button is clicked', async (prop, buttonTitle) => {
+  let called = false;
   const {container, teardown} = await renderSearchBox({
-    next: () => {
-      nextCalled = true;
+    [prop]: () => {
+      called = true;
     }
-  });
+  } as Partial<SearchBoxProps>);
   try {
-    const button = container.querySelector<HTMLButtonElement>('button[title="Next Match"]');
+    const button = container.querySelector<HTMLButtonElement>(`button[title="${buttonTitle}"]`);
     expect(button).toBeTruthy();
     await act(async () => {
       button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
       await waitFor(0);
     });
-    expect(nextCalled).toBe(true);
-  } finally {
-    await teardown();
-  }
-});
-
-test('SearchNavigation invokes the close callback when the Close button is clicked', async () => {
-  let closeCalled = false;
-  const {container, teardown} = await renderSearchBox({
-    close: () => {
-      closeCalled = true;
-    }
-  });
-  try {
-    const button = container.querySelector<HTMLButtonElement>('button[title="Close"]');
-    expect(button).toBeTruthy();
-    await act(async () => {
-      button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
-      await waitFor(0);
-    });
-    expect(closeCalled).toBe(true);
+    expect(called).toBe(true);
   } finally {
     await teardown();
   }
@@ -272,30 +202,16 @@ test('SearchBox wires searchLabel to the input aria-label and placeholder', asyn
   }
 });
 
-test('SearchBox wires matchCaseLabel to the Match Case toggle button title', async () => {
-  const {container, teardown} = await renderSearchBox({matchCaseLabel: 'Match Case'});
-  try {
-    const button = container.querySelector('button[title="Match Case"]');
-    expect(button).toBeTruthy();
-  } finally {
-    await teardown();
-  }
-});
+const searchBoxToggleLabelCases: Array<[keyof SearchBoxProps, string]> = [
+  ['matchCaseLabel', 'Match Case'],
+  ['matchWholeWordLabel', 'Match Whole Word'],
+  ['useRegexLabel', 'Use Regular Expression']
+];
 
-test('SearchBox wires matchWholeWordLabel to the Match Whole Word toggle button title', async () => {
-  const {container, teardown} = await renderSearchBox({matchWholeWordLabel: 'Match Whole Word'});
+test.each(searchBoxToggleLabelCases)('SearchBox wires %s to its toggle button title', async (prop, expectedTitle) => {
+  const {container, teardown} = await renderSearchBox({[prop]: expectedTitle} as Partial<SearchBoxProps>);
   try {
-    const button = container.querySelector('button[title="Match Whole Word"]');
-    expect(button).toBeTruthy();
-  } finally {
-    await teardown();
-  }
-});
-
-test('SearchBox wires useRegexLabel to the Use Regular Expression toggle button title', async () => {
-  const {container, teardown} = await renderSearchBox({useRegexLabel: 'Use Regular Expression'});
-  try {
-    const button = container.querySelector('button[title="Use Regular Expression"]');
+    const button = container.querySelector(`button[title="${expectedTitle}"]`);
     expect(button).toBeTruthy();
   } finally {
     await teardown();
