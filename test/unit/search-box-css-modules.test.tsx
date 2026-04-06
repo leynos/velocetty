@@ -264,9 +264,9 @@ test('SearchBox wires searchLabel to the input aria-label and placeholder', asyn
 });
 
 const searchBoxToggleLabelCases: Array<[keyof SearchBoxProps, string]> = [
-  ['matchCaseLabel', 'Match Case'],
-  ['matchWholeWordLabel', 'Match Whole Word'],
-  ['useRegexLabel', 'Use Regular Expression']
+  ['matchCaseLabel', 'Custom Match Case Label'],
+  ['matchWholeWordLabel', 'Custom Whole Word Label'],
+  ['useRegexLabel', 'Custom Regex Label']
 ];
 
 test.each(searchBoxToggleLabelCases)('SearchBox wires %s to its toggle button title', async (prop, expectedTitle) => {
@@ -283,12 +283,15 @@ test('SearchBox toggle buttons reflect aria-pressed state from caseSensitive, wh
   const {container, teardown} = await renderSearchBox({
     caseSensitive: true,
     wholeWord: true,
-    regex: false
+    regex: false,
+    matchCaseLabel: 'Aria Match Case',
+    matchWholeWordLabel: 'Aria Whole Word',
+    useRegexLabel: 'Aria Regex'
   });
   try {
-    const matchCaseBtn = container.querySelector<HTMLButtonElement>('button[title="Match Case"]');
-    const wholeWordBtn = container.querySelector<HTMLButtonElement>('button[title="Match Whole Word"]');
-    const regexBtn = container.querySelector<HTMLButtonElement>('button[title="Use Regular Expression"]');
+    const matchCaseBtn = container.querySelector<HTMLButtonElement>('button[title="Aria Match Case"]');
+    const wholeWordBtn = container.querySelector<HTMLButtonElement>('button[title="Aria Whole Word"]');
+    const regexBtn = container.querySelector<HTMLButtonElement>('button[title="Aria Regex"]');
 
     expect(matchCaseBtn?.getAttribute('aria-pressed')).toBe('true');
     expect(wholeWordBtn?.getAttribute('aria-pressed')).toBe('true');
