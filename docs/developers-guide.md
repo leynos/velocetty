@@ -664,6 +664,9 @@ avoid duplicate React instances in plugins. React 19 requires aligning
 `react-redux` 9.x with `redux` 5.x, plus matching `@types/react` and
 `@types/react-dom` versions in `package.json`.
 
+
+## React component composition and translation patterns
+
 ## Formatting and linting
 
 Run the standard gates before opening a pull request:
@@ -972,3 +975,77 @@ not already exist.
 
 `make test` runs linting plus the unit test suite. It intentionally omits
 E2E tests to keep the default loop fast.
+
+### Sub-component extraction
+
+When a renderer component grows beyond a single responsibility, extract
+internal sub-components as module-private `const` declarations in the same
+file. Only export the public-facing component. This keeps the module API
+surface small while enabling focused unit tests through the parent's rendered
+output.
+
+Example: `lib/components/searchBox.tsx` defines `SearchResultsCount` and
+`SearchNavigation` as internal constants and exports only `SearchBox`.
+
+
+### Translation key conventions
+
+Translation keys live in `lib/hooks/use-translation.ts`. Every key must have
+an English default in `headerLabelDefaults`; partial locale dictionaries
+fall back to the default for any missing key. When adding new labels:
+
+1. Add the key and its English value to `headerLabelDefaults`.
+2. Add translations to each locale dictionary in `translationDictionaries`.
+3. Add the prop to the presentational component's prop type.
+4. Wire the prop in the translation wrapper.
+5. Extend `test/unit/use-translation.test.ts` to assert the key in each
+   supported locale.
+
+
+### Preserving legacy plugin-targeted class names
+
+When migrating styled-jsx blocks to CSS Modules, class names that external
+plugins or user custom CSS may target must remain attached to the same
+elements. Apply both the CSS Module token and the legacy string:
+
+```tsx
+<div className={`${styles.termFit} term_fit`}>
+```
+
+Document intentionally retired legacy class names in the migration ExecPlan
+under `Decision log`.
+
+
+### Label-threading with translation wrappers
+
+Accessibility labels that vary by locale are threaded via a narrow prop
+interface rather than read directly inside the presentational component. The
+pattern has two layers:
+
+1. **Presentational component** (`SearchBox`) accepts every label as an
+   explicit typed prop. This makes labels testable in isolation and keeps the
+   component independent of the translation mechanism.
+
+2. **Translation wrapper** (e.g., `TranslatedSearchBox` in
+   `lib/components/term.tsx`) calls `useTranslation()` and maps each
+   `TranslationKey` to the corresponding prop before forwarding the rest
+   unchanged:
+
+   ```tsx
+   const TranslatedSearchBox = (props: TranslatedSearchBoxProps) => {
+     const t = useTranslation();
+     return (
+       <SearchBox
+         {...props}
+         searchLabel={t('search')}
+         noResultsLabel={t('noResults')}
+         matchCaseLabel={t('matchCase')}
+         matchWholeWordLabel={t('matchWholeWord')}
+         useRegexLabel={t('useRegex')}
+         previousMatchLabel={t('previousMatch')}
+         nextMatchLabel={t('nextMatch')}
+         closeLabel={t('close')}
+       />
+     );
+   };
+   ```

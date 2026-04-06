@@ -83,3 +83,78 @@ test('returns the translated search label for renderer search UI', () => {
 
   expect(translation).toBe('Rechercher');
 });
+
+test('returns all eight search-UI translation keys for English locale', () => {
+  const results = withNavigator({languages: ['en'], language: 'en'}, () => {
+    const t = useTranslation();
+    return {
+      search: t('search'),
+      noResults: t('noResults'),
+      matchCase: t('matchCase'),
+      matchWholeWord: t('matchWholeWord'),
+      useRegex: t('useRegex'),
+      previousMatch: t('previousMatch'),
+      nextMatch: t('nextMatch'),
+      close: t('close')
+    };
+  });
+
+  expect(results.search).toBe('Search');
+  expect(results.noResults).toBe('No results');
+  expect(results.matchCase).toBe('Match Case');
+  expect(results.matchWholeWord).toBe('Match Whole Word');
+  expect(results.useRegex).toBe('Use Regular Expression');
+  expect(results.previousMatch).toBe('Previous Match');
+  expect(results.nextMatch).toBe('Next Match');
+  expect(results.close).toBe('Close');
+});
+
+test('returns all eight search-UI translation keys for en-gb locale', () => {
+  const results = withNavigator({languages: ['en-gb'], language: 'en-gb'}, () => {
+    const t = useTranslation();
+    return {
+      search: t('search'),
+      noResults: t('noResults'),
+      matchCase: t('matchCase'),
+      matchWholeWord: t('matchWholeWord'),
+      useRegex: t('useRegex'),
+      previousMatch: t('previousMatch'),
+      nextMatch: t('nextMatch'),
+      close: t('close')
+    };
+  });
+
+  expect(results.search).toBe('Search');
+  expect(results.noResults).toBe('No results');
+  expect(results.matchCase).toBe('Match Case');
+  expect(results.matchWholeWord).toBe('Match Whole Word');
+  expect(results.useRegex).toBe('Use Regular Expression');
+  expect(results.previousMatch).toBe('Previous Match');
+  expect(results.nextMatch).toBe('Next Match');
+  expect(results.close).toBe('Close');
+});
+
+test('returns all eight search-UI translation keys for French locale', () => {
+  const results = withNavigator({languages: ['fr'], language: 'fr'}, () => {
+    const t = useTranslation();
+    return {
+      search: t('search'),
+      noResults: t('noResults'),
+      matchCase: t('matchCase'),
+      matchWholeWord: t('matchWholeWord'),
+      useRegex: t('useRegex'),
+      previousMatch: t('previousMatch'),
+      nextMatch: t('nextMatch'),
+      close: t('close')
+    };
+  });
+
+  expect(results.search).toBe('Rechercher');
+  expect(results.noResults).toBe('Aucun résultat');
+  expect(results.matchCase).toBe('Respecter la casse');
+  expect(results.matchWholeWord).toBe('Mot entier');
+  expect(results.useRegex).toBe('Expression régulière');
+  expect(results.previousMatch).toBe('Résultat précédent');
+  expect(results.nextMatch).toBe('Résultat suivant');
+  expect(results.close).toBe('Fermer');
+});
