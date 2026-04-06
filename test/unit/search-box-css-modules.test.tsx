@@ -151,9 +151,9 @@ test.each(searchResultsCountCases)('SearchResultsCount %s', async (_description,
 // ---------------------------------------------------------------------------
 
 const searchNavigationLabelCases: Array<[keyof SearchBoxProps, string]> = [
-  ['previousMatchLabel', 'Previous Match'],
-  ['nextMatchLabel', 'Next Match'],
-  ['closeLabel', 'Close']
+  ['previousMatchLabel', 'Custom Prev Label'],
+  ['nextMatchLabel', 'Custom Next Label'],
+  ['closeLabel', 'Custom Close Label']
 ];
 
 test.each(
@@ -172,15 +172,15 @@ test.each(
 // SearchNavigation – button callbacks
 // ---------------------------------------------------------------------------
 
-const searchNavigationCallbackCases: Array<[keyof SearchBoxProps, string]> = [
-  ['prev', 'Previous Match'],
-  ['next', 'Next Match'],
-  ['close', 'Close']
+const searchNavigationCallbackCases: Array<[keyof SearchBoxProps, string, string]> = [
+  ['prev', 'previousMatchLabel', 'Custom Prev Callback'],
+  ['next', 'nextMatchLabel', 'Custom Next Callback'],
+  ['close', 'closeLabel', 'Custom Close Callback']
 ];
 
 test.each(
   searchNavigationCallbackCases
-)('SearchNavigation invokes the %s callback when its button is clicked', async (prop, buttonTitle) => {
+)('SearchNavigation invokes the %s callback when its button is clicked', async (prop, labelProp, buttonTitle) => {
   const searchTerm = 'test-query';
   let called = false;
   let receivedTerm: string | null = null;
@@ -193,7 +193,8 @@ test.each(
   };
 
   const {container, teardown} = await renderSearchBox({
-    [prop]: callback
+    [prop]: callback,
+    [labelProp]: buttonTitle
   } as Partial<SearchBoxProps>);
 
   try {
