@@ -24,9 +24,21 @@ import {expect, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {waitFor} from '../testUtils/waitFor';
-import SearchBox from '../../lib/components/searchBox';
 
 import type {SearchBoxProps} from '../../typings/hyper';
+
+type SearchBoxComponent = typeof import('../../lib/components/searchBox').default;
+
+let SearchBox: SearchBoxComponent;
+let moduleCounter = 0;
+
+const loadSearchBox = async (): Promise<SearchBoxComponent> => {
+  moduleCounter += 1;
+  const mod = (await import(`../../lib/components/searchBox.tsx?search_box_css_modules=${moduleCounter}`)) as {
+    default: SearchBoxComponent;
+  };
+  return mod.default;
+};
 
 // Import translation defaults to ensure test labels stay in sync with the app
 const translationDefaults = {
@@ -81,6 +93,8 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
   let root: ReturnType<typeof createRoot> | null = null;
 
   try {
+    SearchBox = await loadSearchBox();
+
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
