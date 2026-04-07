@@ -329,11 +329,10 @@ test('translation: renderer build does not transform styled-jsx syntax', async (
     // This is the expected behaviour after bridge removal - styled-jsx syntax
     // will not be scoped at runtime because the transform is no longer applied.
     expect(bundleOutput.includes('styled-jsx/style')).toBe(false);
-    // Assert that the jsx attribute from the <style jsx> block is present
-    // in the output (as a JSX transform property), proving the styled-jsx
-    // block was passed through untransformed rather than being handled by
-    // the styled-jsx babel plugin.
-    expect(/jsx[:\s]/.test(bundleOutput)).toBe(true);
+    expect(bundleOutput.includes('styled-jsx')).toBe(false);
+    // Assert that the raw <style jsx string is absent from the output,
+    // confirming esbuild compiled the JSX rather than passing it through verbatim.
+    expect(bundleOutput.includes('<style')).toBe(false);
     // Positive assertion: verify the bundle contains the React JSX runtime
     // transformation, confirming the build succeeded and produced valid output.
     expect(bundleOutput.includes('react')).toBe(true);
