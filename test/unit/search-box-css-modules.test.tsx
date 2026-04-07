@@ -101,17 +101,21 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
 
     await act(async () => {
       flushSync(() => {
-        root!.render(React.createElement(SearchBox, makeProps(overrides)));
+        root.render(React.createElement(SearchBox, makeProps(overrides)));
       });
       await waitFor(0);
     });
   } catch (error) {
     // Ensure cleanup on setup failure to prevent global DOM state leakage
     if (root) {
-      await act(async () => {
-        root!.unmount();
-        await waitFor(0);
-      });
+      try {
+        await act(async () => {
+          root.unmount();
+          await waitFor(0);
+        });
+      } finally {
+        // Continue with cleanup even if unmount throws
+      }
     }
     if (container) {
       container.remove();
@@ -121,15 +125,22 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
   }
 
   const teardown = async () => {
-    await act(async () => {
-      root!.unmount();
-      await waitFor(0);
-    });
-    container!.remove();
-    cleanup();
+    try {
+      if (root) {
+        await act(async () => {
+          root.unmount();
+          await waitFor(0);
+        });
+      }
+    } finally {
+      if (container) {
+        container.remove();
+      }
+      cleanup();
+    }
   };
 
-  return {container: container!, teardown};
+  return {container, teardown};
 };
 
 // ---------------------------------------------------------------------------
@@ -219,7 +230,7 @@ test.each(
       // Set the input value and trigger React's onChange handler.
       // React's onChange listens for the 'input' event and reads event.target.value.
       await act(async () => {
-        input!.value = searchTerm;
+        input.value = searchTerm;
         const inputEvent = new Event('input', {bubbles: true});
         Object.defineProperty(inputEvent, 'target', {
           get: () => input,
@@ -229,7 +240,7 @@ test.each(
           get: () => input,
           enumerable: true
         });
-        input!.dispatchEvent(inputEvent);
+        input.dispatchEvent(inputEvent);
         await waitFor(0);
       });
     }
@@ -244,9 +255,10 @@ test.each(
     expect(called).toBe(true);
 
     // Assert the search term is propagated to prev/next callbacks.
-    // Note: In Happy DOM, React's synthetic event system may not fully
-    // propagate input value changes, so we verify the callback receives
-    // a string (the search term contract) rather than the exact value.
+    // Note: In Happy DOM, React's synthetic event system does not reliably
+    // propagate input value changes from dispatched events, so we verify the
+    // callback receives a string (the search term contract) rather than the
+    // exact value. This is a known limitation of the test environment.
     if (prop === 'prev' || prop === 'next') {
       expect(typeof receivedTerm).toBe('string');
     }
