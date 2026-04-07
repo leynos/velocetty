@@ -108,14 +108,14 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
   } catch (error) {
     // Ensure cleanup on setup failure to prevent global DOM state leakage
     if (root) {
-      try {
-        await act(async () => {
-          root.unmount();
-          await waitFor(0);
-        });
-      } finally {
-        // Continue with cleanup even if unmount throws
-      }
+      // Explicitly swallow errors from unmount - cleanup continues regardless
+      await act(async () => {
+        root.unmount();
+        await waitFor(0);
+      }).then(
+        () => {},
+        () => {}
+      );
     }
     if (container) {
       container.remove();
@@ -125,19 +125,20 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
   }
 
   const teardown = async () => {
-    try {
-      if (root) {
-        await act(async () => {
-          root.unmount();
-          await waitFor(0);
-        });
-      }
-    } finally {
-      if (container) {
-        container.remove();
-      }
-      cleanup();
+    if (root) {
+      // Explicitly swallow errors from unmount - cleanup continues regardless
+      await act(async () => {
+        root.unmount();
+        await waitFor(0);
+      }).then(
+        () => {},
+        () => {}
+      );
     }
+    if (container) {
+      container.remove();
+    }
+    cleanup();
   };
 
   return {container, teardown};
