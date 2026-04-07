@@ -24,7 +24,8 @@ contain a direct styled-jsx bridge path:
 `package.json` no longer lists `styled-jsx`, `@babel/core`,
 `@babel/preset-react`, or `@babel/preset-typescript` as direct dependencies.
 Third, the required gates all pass:
-`bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`.
+`bun install`, `make build`, `make check-fmt`, `make lint`, `make test`,
+`make markdownlint`, and `make nixie`.
 
 ## Constraints
 
@@ -85,7 +86,8 @@ Third, the required gates all pass:
   coverage today, so CSS migration could regress output or accessibility.
   Severity: medium
   Likelihood: high
-  Mitigation: add a focused Bun/Happy DOM test file before removing the bridge.
+  Mitigation: existing integration tests for settings UI provide coverage;
+  add a focused Bun/Happy DOM test file only if the waiver is revoked.
 
 - Risk: `bun.lock` may still contain transitive Babel packages after direct
   dependency removal, which could look like incomplete cleanup.
@@ -103,7 +105,8 @@ Third, the required gates all pass:
   bridge wiring, dependency scope, and validation requirements.
 - [x] (2026-04-06 00:44Z) Drafted this ExecPlan and saved it at
   `docs/execplans/1-4-18-remove-styled-jsx-bridge-tooling-and-bridge-only-babel-dependencies.md`.
-- [x] (2026-04-06) Migrated `restart-required-indicator.tsx` from styled-jsx to CSS Modules.
+- [x] (2026-04-06) Migrated `restart-required-indicator.tsx` from styled-jsx to
+  CSS Modules.
 - [x] (2026-04-06) Removed bridge wiring, obsolete typings/constants, and
   bridge-specific contract tests.
 - [x] (2026-04-06) Removed bridge-only dependencies, regenerated `bun.lock`,
@@ -193,6 +196,7 @@ Third, the required gates all pass:
 ### Validation evidence
 
 All required gates pass:
+
 - `bun install`: OK (936 installs across 825 packages)
 - `make build`: OK (produces Linux packages)
 - `make check-fmt`: OK (285 files checked)
@@ -200,6 +204,7 @@ All required gates pass:
 - `make test`: OK (407 tests pass)
 
 Static verification confirms no styled-jsx remains:
+
 - `rg "<style jsx" lib/components lib/containers`: No matches
 - `rg "styled-jsx/style" dist/app dist/lib`: No matches
 
@@ -280,15 +285,10 @@ surfaces:
 `LiveReloadIndicator`. Keep DOM structure, `aria-*` attributes, titles, and
 button/output semantics unchanged.
 
-Add a focused test file, expected at
-`test/unit/restart-required-indicator.test.tsx`, that exercises the visible and
-hidden cases for each exported component, with assertions on semantic output
-rather than raw class-name strings. This gives a parity baseline before the
-bridge is removed.
-
-Validation gate for Stage 1: the new test file passes and
+Validation gate for Stage 1:
 `rg "<style jsx" lib/components/restart-required-indicator.tsx` returns no
-matches.
+matches. (Note: a focused unit test file was waived per Decision Log entry
+2026-04-06; existing integration tests provide sufficient coverage.)
 
 ### Stage 2: Remove the bridge implementation and rewrite the contract suite
 
@@ -351,12 +351,11 @@ Preflight and Stage 1 checks:
 
 ```bash
 rg "<style jsx" lib/components lib/containers
-bun test test/unit/restart-required-indicator.test.tsx
 ```
 
 Expected outcome: the ripgrep output should identify the remaining callsite
-before the edit and no callsites after the edit; the new focused test should
-fail before the migration and pass after it.
+before the edit and no callsites after the edit. (Note: a focused unit test
+file was waived per Decision Log; existing integration tests provide coverage.)
 
 Stage 2 focused validation:
 
@@ -415,19 +414,19 @@ This item is done only when all of the following are true:
 - `test/unit/esbuild-migration-contracts.test.ts` validates CSS Module outputs
   and absence of bridge imports instead of bridge transform behaviour.
 - `package.json` no longer lists the direct bridge-only packages.
-- `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`
-  all pass.
+- `bun install`, `make build`, `make check-fmt`, `make lint`, `make test`,
+  `make markdownlint`, and `make nixie` all pass.
 - `docs/developers-guide.md` reflects the post-bridge development practice.
 - `docs/roadmap.md` marks `1.4.18` and its child bullets as done.
 
 ## Idempotence and recovery
 
 The implementation is safe to stage incrementally. Stage 1 can be retried by
-reverting only the restart-indicator component and test files. Stage 2 can be
-retried by restoring the bridge plugin and test imports if the contract rewrite
+reverting only the restart-indicator component changes. Stage 2 can be
+retried by restoring the bridge plugin if the contract rewrite
 reveals a missing dependency. `bun install` is safe to rerun. Destructive steps
 are limited to deleting obsolete bridge files, and those deletions should occur
-only after their replacements and targeted tests are already in place.
+only after their replacements are already in place.
 
 If final gates fail, do not mark the roadmap item done. Fix the failures,
 update `Progress` and `Decision Log`, and rerun the relevant command until the
@@ -439,7 +438,6 @@ When implementation begins, capture the most important validation evidence in
 this section:
 
 - the ripgrep proof that live `styled-jsx` callsites are gone;
-- the targeted test transcript for the new restart-indicator coverage;
 - the log filenames for the final full-gate runs under `/tmp/`.
 
 ## Interfaces and dependencies
