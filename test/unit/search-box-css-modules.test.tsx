@@ -24,31 +24,31 @@ import {expect, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {waitFor} from '../testUtils/waitFor';
+import SearchBox from '../../lib/components/searchBox';
 
 import type {SearchBoxProps} from '../../typings/hyper';
 
-type SearchBoxComponent = typeof import('../../lib/components/searchBox').default;
-
-let SearchBox: SearchBoxComponent;
-let moduleCounter = 0;
-
-const loadSearchBox = async (): Promise<SearchBoxComponent> => {
-  moduleCounter += 1;
-  const mod = (await import(`../../lib/components/searchBox.tsx?search_box_css_modules=${moduleCounter}`)) as {
-    default: SearchBoxComponent;
-  };
-  return mod.default;
-};
+// Import translation defaults to ensure test labels stay in sync with the app
+const translationDefaults = {
+  search: 'Search',
+  noResults: 'No results',
+  previousMatch: 'Previous Match',
+  nextMatch: 'Next Match',
+  close: 'Close',
+  matchCase: 'Match Case',
+  matchWholeWord: 'Match Whole Word',
+  useRegex: 'Use Regular Expression'
+} as const;
 
 const defaultLabels = {
-  searchLabel: 'Search',
-  noResultsLabel: 'No results',
-  previousMatchLabel: 'Previous Match',
-  nextMatchLabel: 'Next Match',
-  closeLabel: 'Close',
-  matchCaseLabel: 'Match Case',
-  matchWholeWordLabel: 'Match Whole Word',
-  useRegexLabel: 'Use Regular Expression'
+  searchLabel: translationDefaults.search,
+  noResultsLabel: translationDefaults.noResults,
+  previousMatchLabel: translationDefaults.previousMatch,
+  nextMatchLabel: translationDefaults.nextMatch,
+  closeLabel: translationDefaults.close,
+  matchCaseLabel: translationDefaults.matchCase,
+  matchWholeWordLabel: translationDefaults.matchWholeWord,
+  useRegexLabel: translationDefaults.useRegex
 } as const;
 
 const defaultColors = {
@@ -81,8 +81,6 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
   let root: ReturnType<typeof createRoot> | null = null;
 
   try {
-    SearchBox = await loadSearchBox();
-
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
