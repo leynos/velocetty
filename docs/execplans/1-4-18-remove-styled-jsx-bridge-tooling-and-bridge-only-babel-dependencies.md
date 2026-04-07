@@ -264,7 +264,7 @@ practice documentation misleading.
 Implementation should use the `worker` droid for bounded parallel audit work:
 
 1. Before Stage 2, one worker re-checks for remaining live `styled-jsx`
-   callsites and bridge references so the main diff does not miss a hidden
+   callsites and bridge references, so the main diff does not miss a hidden
    dependency.
 2. Before Stage 4, one worker audits dependency and documentation drift after
    the code changes, specifically checking whether `docs/developers-guide.md`
