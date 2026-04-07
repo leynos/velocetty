@@ -164,7 +164,13 @@ export const ConfigReloadBadge: React.FC<ConfigReloadBadgeProps> = ({
   }
 
   return (
-    <button type="button" className={styles.configReloadBadgeButton} onClick={onClick} title={title ?? ariaLabel}>
+    <button
+      type="button"
+      className={styles.configReloadBadgeButton}
+      onClick={onClick}
+      title={title ?? ariaLabel}
+      aria-label={ariaLabel}
+    >
       {content}
     </button>
   );

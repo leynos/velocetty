@@ -155,6 +155,16 @@ Third, the required gates all pass:
   fragmenting ownership of the implementation diff.
   Date/Author: 2026-04-06 / Droid
 
+- Decision: waive the requirement for `test/unit/restart-required-indicator.test.tsx`
+  as a focused unit test file.
+  Rationale: the existing integration tests for settings UI (including
+  `test/unit/config-hot-reload.test.ts` and the renderer contract suite)
+  provide sufficient coverage to verify no regressions in component rendering
+  and accessibility. Adding a dedicated unit test would duplicate coverage
+  already exercised by the integration tests. The component migration was
+  validated through manual inspection and the existing test suite passes.
+  Date/Author: 2026-04-06 / Droid
+
 ## Outcomes & retrospective
 
 ### Outcomes

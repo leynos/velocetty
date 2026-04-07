@@ -25,17 +25,22 @@
   color: #d97706; /* amber-600 */
 }
 
-/* ConfigReloadBadge styles */
-.configReloadBadge {
+/* ConfigReloadBadge base styles (shared between output and button variants) */
+.configReloadBadgeBase {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  background-color: #f59e0b; /* amber-500 */
-  color: white;
+  background-color: #b45309; /* amber-700 - darker for accessibility contrast */
+  color: #ffffff;
   border-radius: 4px;
   font-size: 0.8125em;
   font-weight: 500;
+}
+
+/* Output variant of ConfigReloadBadge */
+.configReloadBadge {
+  composes: configReloadBadgeBase;
 }
 
 .badgeIcon {
@@ -48,22 +53,14 @@
 
 /* Button variant of ConfigReloadBadge */
 .configReloadBadgeButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background-color: #f59e0b; /* amber-500 */
-  color: white;
-  border-radius: 4px;
-  font-size: 0.8125em;
-  font-weight: 500;
+  composes: configReloadBadgeBase;
   border: none;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
 
 .configReloadBadgeButton:hover {
-  background-color: #d97706; /* amber-600 */
+  background-color: #92400e; /* amber-800 - darker for accessible hover state */
 }
 
 .configReloadBadgeButton:focus {
