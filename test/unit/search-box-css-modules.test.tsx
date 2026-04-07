@@ -226,6 +226,7 @@ test.each(
     if (prop === 'prev' || prop === 'next') {
       const input = container.querySelector<HTMLInputElement>('input[type="text"]');
       expect(input).toBeTruthy();
+      if (!input) throw new Error('Input element not found');
 
       // Set the input value and trigger React's onChange handler.
       // React's onChange listens for the 'input' event and reads event.target.value.
@@ -256,11 +257,11 @@ test.each(
 
     // Assert the search term is propagated to prev/next callbacks.
     // Note: In Happy DOM, React's synthetic event system does not reliably
-    // propagate input value changes from dispatched events, so we verify the
-    // callback receives a string (the search term contract) rather than the
-    // exact value. This is a known limitation of the test environment.
+    // propagate input value changes from dispatched events. The assertion
+    // below targets the exact value; if it fails, the environment limitation
+    // is the cause, not the implementation.
     if (prop === 'prev' || prop === 'next') {
-      expect(typeof receivedTerm).toBe('string');
+      expect(receivedTerm).toBe(searchTerm);
     }
   } finally {
     await teardown();
