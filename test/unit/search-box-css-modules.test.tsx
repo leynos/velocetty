@@ -200,109 +200,63 @@ test.each(
 // The prev/next cases are marked as failing because Happy DOM does not reliably
 // propagate React synthetic event values. When the environment is upgraded to
 // support proper event propagation, remove the .failing() modifier.
-test.failing('SearchNavigation invokes the prev callback with the search term', async () => {
-  const searchTerm = 'test-query';
-  let called = false;
-  let receivedTerm: string | null = null;
+const navTermCallbackCases: Array<[keyof SearchBoxProps, keyof SearchBoxProps, string]> = [
+  ['prev', 'previousMatchLabel', 'Custom Prev Callback'],
+  ['next', 'nextMatchLabel', 'Custom Next Callback']
+];
 
-  const callback = (term?: string) => {
-    called = true;
-    if (term !== undefined) {
-      receivedTerm = term;
+for (const [callbackProp, labelProp, buttonTitle] of navTermCallbackCases) {
+  test.failing(`SearchNavigation invokes the ${callbackProp} callback with the search term`, async () => {
+    const searchTerm = 'test-query';
+    let called = false;
+    let receivedTerm: string | null = null;
+
+    const callback = (term?: string) => {
+      called = true;
+      if (term !== undefined) {
+        receivedTerm = term;
+      }
+    };
+
+    const {container, teardown} = await renderSearchBox({
+      [callbackProp]: callback,
+      [labelProp]: buttonTitle
+    } as Partial<SearchBoxProps>);
+
+    try {
+      const input = container.querySelector<HTMLInputElement>('input[type="text"]');
+      expect(input).toBeTruthy();
+      if (!input) throw new Error('Input element not found');
+
+      await act(async () => {
+        input.value = searchTerm;
+        const inputEvent = new Event('input', {bubbles: true});
+        Object.defineProperty(inputEvent, 'target', {
+          get: () => input,
+          enumerable: true
+        });
+        Object.defineProperty(inputEvent, 'currentTarget', {
+          get: () => input,
+          enumerable: true
+        });
+        input.dispatchEvent(inputEvent);
+        await waitFor(0);
+      });
+
+      const button = container.querySelector<HTMLButtonElement>(`button[title="${buttonTitle}"]`);
+      expect(button).toBeTruthy();
+      await act(async () => {
+        button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
+        await waitFor(0);
+      });
+
+      expect(called).toBe(true);
+      expect(receivedTerm).toBe(searchTerm);
+    } finally {
+      await teardown();
     }
-  };
-
-  const {container, teardown} = await renderSearchBox({
-    prev: callback,
-    previousMatchLabel: 'Custom Prev Callback'
   });
-
-  try {
-    const input = container.querySelector<HTMLInputElement>('input[type="text"]');
-    expect(input).toBeTruthy();
-    if (!input) throw new Error('Input element not found');
-
-    // Set the input value and trigger React's onChange handler
-    await act(async () => {
-      input.value = searchTerm;
-      const inputEvent = new Event('input', {bubbles: true});
-      Object.defineProperty(inputEvent, 'target', {
-        get: () => input,
-        enumerable: true
-      });
-      Object.defineProperty(inputEvent, 'currentTarget', {
-        get: () => input,
-        enumerable: true
-      });
-      input.dispatchEvent(inputEvent);
-      await waitFor(0);
-    });
-
-    const button = container.querySelector<HTMLButtonElement>('button[title="Custom Prev Callback"]');
-    expect(button).toBeTruthy();
-    await act(async () => {
-      button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
-      await waitFor(0);
-    });
-
-    expect(called).toBe(true);
-    expect(receivedTerm).toBe(searchTerm);
-  } finally {
-    await teardown();
-  }
-});
-
-test.failing('SearchNavigation invokes the next callback with the search term', async () => {
-  const searchTerm = 'test-query';
-  let called = false;
-  let receivedTerm: string | null = null;
-
-  const callback = (term?: string) => {
-    called = true;
-    if (term !== undefined) {
-      receivedTerm = term;
-    }
-  };
-
-  const {container, teardown} = await renderSearchBox({
-    next: callback,
-    nextMatchLabel: 'Custom Next Callback'
-  });
-
-  try {
-    const input = container.querySelector<HTMLInputElement>('input[type="text"]');
-    expect(input).toBeTruthy();
-    if (!input) throw new Error('Input element not found');
-
-    // Set the input value and trigger React's onChange handler
-    await act(async () => {
-      input.value = searchTerm;
-      const inputEvent = new Event('input', {bubbles: true});
-      Object.defineProperty(inputEvent, 'target', {
-        get: () => input,
-        enumerable: true
-      });
-      Object.defineProperty(inputEvent, 'currentTarget', {
-        get: () => input,
-        enumerable: true
-      });
-      input.dispatchEvent(inputEvent);
-      await waitFor(0);
-    });
-
-    const button = container.querySelector<HTMLButtonElement>('button[title="Custom Next Callback"]');
-    expect(button).toBeTruthy();
-    await act(async () => {
-      button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
-      await waitFor(0);
-    });
-
-    expect(called).toBe(true);
-    expect(receivedTerm).toBe(searchTerm);
-  } finally {
-    await teardown();
-  }
-});
+}
 
 test('SearchNavigation invokes the close callback when its button is clicked', async () => {
   let called = false;
