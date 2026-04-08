@@ -1047,7 +1047,11 @@ pattern has two layers:
    };
 
    // Usage in a parent component
-   const ParentComponent = (props) => {
+   type ParentComponentProps = Omit<
+     SearchBoxProps,
+     keyof ReturnType<typeof useSearchBoxLabels>
+   >;
+   const ParentComponent = (props: ParentComponentProps) => {
      const labels = useSearchBoxLabels();
      return <SearchBox {...props} {...labels} />;
    };
