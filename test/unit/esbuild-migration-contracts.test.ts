@@ -289,13 +289,12 @@ test('translation: build options keep source maps in development and minify in p
   expect(productionCli.minify).toBe(true);
 });
 
-test('translation: renderer build does not transform styled-jsx syntax', async () => {
+test('translation: renderer build removes styled-jsx syntax', async () => {
   const rootDir = await createTempDir();
   try {
     // Create a fixture containing styled-jsx syntax that would have triggered
-    // the bridge in the past. Without the bridge, esbuild passes the JSX
-    // through untransformed, which would cause runtime failures since the
-    // styled-jsx runtime is not available.
+    // the bridge in the past. After bridge removal, the renderer build should
+    // compile JSX and remove styled-jsx/runtime usages entirely.
     const entryPoint = path.join(rootDir, 'fixture.tsx');
     await writeFixtureFile(
       entryPoint,
@@ -323,11 +322,9 @@ test('translation: renderer build does not transform styled-jsx syntax', async (
 
     const bundleOutput = buildResult.outputFiles.find((file) => file.path.endsWith('.js'))?.text ?? '';
 
-    // Without the bridge plugin, styled-jsx blocks are passed through as raw
-    // JSX elements. The output should contain the raw style tag JSX, proving
-    // that esbuild does not transform styled-jsx syntax.
-    // This is the expected behaviour after bridge removal - styled-jsx syntax
-    // will not be scoped at runtime because the transform is no longer applied.
+    // After bridge removal, the renderer build compiles JSX and removes
+    // styled-jsx/runtime usages. The bundle must NOT contain 'styled-jsx',
+    // 'styled-jsx/style', or raw '<style' tags.
     expect(bundleOutput.includes('styled-jsx/style')).toBe(false);
     expect(bundleOutput.includes('styled-jsx')).toBe(false);
     // Assert that the raw <style jsx string is absent from the output,

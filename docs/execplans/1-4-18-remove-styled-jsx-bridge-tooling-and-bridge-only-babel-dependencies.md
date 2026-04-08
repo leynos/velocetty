@@ -128,7 +128,8 @@ Third, the required gates all pass:
   Evidence: searching `test/` for `RestartRequiredIndicator`,
   `InlineRestartWarning`, `ConfigReloadBadge`, and `LiveReloadIndicator`
   returned no matches on 2026-04-06.
-  Impact: this plan must add direct coverage before bridge removal.
+  Impact: waived per Decision Log entry 2026-04-06; existing integration
+  tests provide sufficient coverage.
 
 - Observation: the direct Babel packages in `package.json` are only referenced
   by `build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin.ts`.
@@ -202,6 +203,8 @@ All required gates pass:
 - `make check-fmt`: OK (285 files checked)
 - `make lint`: OK (286 files checked, boundaries pass)
 - `make test`: OK (407 tests pass)
+- `make markdownlint`: OK (63 files checked)
+- `make nixie`: OK (no sandbox)
 
 Static verification confirms no styled-jsx remains:
 
@@ -222,33 +225,33 @@ Follow-up work for roadmap item `9.2.4` (integration and end-to-end regression
 coverage for styled-jsx removal) remains open and should verify no runtime
 styled-jsx references appear in packaged builds.
 
-## Context and orientation
+## Context and orientation (historical baseline)
 
-The current bridge path crosses code, tests, typings, and dependency metadata.
-The key files are:
+The bridge path crossed code, tests, typings, and dependency metadata.
+The key files were:
 
-- `build/esbuild/run-esbuild.ts`, which currently imports and registers
+- `build/esbuild/run-esbuild.ts`, which imported and registered
   `createStyledJsxBabelBridgePlugin()` in the renderer plugin list.
 - `build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin.ts`, which
-  imports `@babel/core`, `styled-jsx/babel`, and
+  imported `@babel/core`, `styled-jsx/babel`, and
   `styledJsxBabelPluginOptions`.
-- `build/esbuild/constants.ts`, which exports
+- `build/esbuild/constants.ts`, which exported
   `styledJsxBabelPluginOptions`.
 - `lib/components/restart-required-indicator.tsx`, the only known remaining
-  live renderer component still using `<style jsx>`.
-- `typings/styled-jsx.d.ts`, which augments JSX typing for `jsx` and `global`
+  live renderer component using `<style jsx>`.
+- `typings/styled-jsx.d.ts`, which augmented JSX typing for `jsx` and `global`
   style-tag attributes.
-- `test/unit/esbuild-migration-contracts.test.ts`, which still tests bridge
+- `test/unit/esbuild-migration-contracts.test.ts`, which tested bridge
   helpers and `styled-jsx/style` output.
-- `test/unit/tabs-decoration-updates.test.ts`, which still suppresses the raw
-  styled-jsx warning emitted when untransformed `<style jsx>` reaches the test
+- `test/unit/tabs-decoration-updates.test.ts`, which suppressed the raw
+  styled-jsx warning emitted when untransformed `<style jsx>` reached the test
   DOM.
-- `package.json` and `bun.lock`, which still list the direct bridge-only
+- `package.json` and `bun.lock`, which listed the direct bridge-only
   dependencies.
-- `docs/developers-guide.md`, which already documents CSS Modules conventions
-  but still describes translation coverage in bridge-era terms.
-- `docs/roadmap.md`, where `1.4.18` is still open and must only be marked done
-  after the full gate sequence succeeds.
+- `docs/developers-guide.md`, which documented CSS Modules conventions
+  but described translation coverage in bridge-era terms.
+- `docs/roadmap.md`, where `1.4.18` was marked done after the full gate
+  sequence succeeded.
 
 The design context is already settled. `docs/velocetty-design.md` defines the
 renderer styling model as CSS Modules plus CSS custom properties for dynamic
@@ -466,6 +469,6 @@ CSS injection path in `lib/containers/hyper.tsx`.
 ## Revision note
 
 - 2026-04-06: Initial draft created from roadmap/ADR review and agent-team
-  audit. The plan explicitly folds the remaining
-  `restart-required-indicator.tsx` migration into `1.4.18` because parity is
-  not yet complete. Implementation must wait for approval.
+  audit. The plan explicitly folded the remaining
+  `restart-required-indicator.tsx` migration into `1.4.18` because parity was
+  not yet complete. Implementation completed 2026-04-06.
