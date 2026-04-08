@@ -29,12 +29,8 @@ import type {SearchBoxProps} from '../../typings/hyper';
 
 type SearchBoxComponent = typeof import('../../lib/components/searchBox').default;
 
-let SearchBox: SearchBoxComponent;
-let moduleCounter = 0;
-
-const loadSearchBox = async (): Promise<SearchBoxComponent> => {
-  moduleCounter += 1;
-  const mod = (await import(`../../lib/components/searchBox.tsx?search_box_css_modules=${moduleCounter}`)) as {
+const loadSearchBox = async (counter: number): Promise<SearchBoxComponent> => {
+  const mod = (await import(`../../lib/components/searchBox.tsx?search_box_css_modules=${counter}`)) as {
     default: SearchBoxComponent;
   };
   return mod.default;
@@ -88,13 +84,15 @@ const makeProps = (overrides: Partial<SearchBoxProps> = {}): SearchBoxProps => (
 });
 
 const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
+  // Local counter for cache-busting to ensure each test gets a fresh module
+  const moduleCounter = Date.now() + Math.random();
+  const SearchBox = await loadSearchBox(moduleCounter);
+
   const cleanup = await setupHappyDom();
   let container: HTMLDivElement | null = null;
   let root: ReturnType<typeof createRoot> | null = null;
 
   try {
-    SearchBox = await loadSearchBox();
-
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);

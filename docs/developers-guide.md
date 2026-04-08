@@ -1000,7 +1000,9 @@ fall back to the default for any missing key. When adding new labels:
 4. Wire the prop in the translation wrapper.
 5. Extend `test/unit/use-translation.test.ts` to assert the key in each
    supported locale.
-
+6. Extend/verify the SearchBox DOM-wiring suite
+   (`test/unit/search-box-css-modules.test.tsx`) to ensure the label is
+   rendered and attached correctly in the SearchBox component.
 
 ### Preserving legacy plugin-targeted class names
 
