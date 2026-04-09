@@ -104,23 +104,25 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
     document.body.appendChild(container);
     root = createRoot(container);
 
-    await act(async () => {
+    if (!root) {
+      throw new Error('Failed to create React root');
+    }
+    act(() => {
       flushSync(() => {
         root.render(React.createElement(SearchBoxComponent, makeProps(overrides)));
       });
-      await waitFor(0);
     });
+    await waitFor(0);
   } catch (error) {
     // Ensure cleanup on setup failure to prevent global DOM state leakage
     if (root) {
       // Explicitly swallow errors from unmount - cleanup continues regardless
-      await act(async () => {
-        root.unmount();
-        await waitFor(0);
-      }).then(
-        () => {},
-        () => {}
-      );
+      act(() => {
+        flushSync(() => {
+          root.unmount();
+        });
+      });
+      await waitFor(0);
     }
     if (container) {
       container.remove();
@@ -132,13 +134,12 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
   const teardown = async () => {
     if (root) {
       // Explicitly swallow errors from unmount - cleanup continues regardless
-      await act(async () => {
-        root.unmount();
-        await waitFor(0);
-      }).then(
-        () => {},
-        () => {}
-      );
+      act(() => {
+        flushSync(() => {
+          root.unmount();
+        });
+      });
+      await waitFor(0);
     }
     if (container) {
       container.remove();
