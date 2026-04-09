@@ -997,7 +997,10 @@ fall back to the default for any missing key. When adding new labels:
 1. Add the key and its English value to `headerLabelDefaults` in `lib/hooks/use-translation.ts`.
 2. Add translations to each locale dictionary in `translationDictionaries` in `lib/hooks/use-translation.ts`.
 3. Add the prop to the presentational component's prop type.
-4. Wire the label into the logic hook (`useSearchBoxLabels`) and then into any wrapper that threads those hook-provided labels into the presentational component; mention `useTranslation` only as the historical exception where a wrapper still directly calls it.
+4. Wire the label into the logic hook (`useSearchBoxLabels`) and then into any
+   wrapper that threads those hook-provided labels into the presentational
+   component; mention `useTranslation` only as the historical exception where a
+   wrapper still directly calls it.
 5. Extend `test/unit/use-translation.test.ts` to assert the key in each
    supported locale.
 6. Extend/verify the SearchBox DOM-wiring suite
