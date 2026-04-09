@@ -465,10 +465,10 @@ bundler scripts, bundler configuration, or custom esbuild plugin logic.
 Contract suites must stay in place and green before changing default build
 paths or plugin behaviour.
 
-Required coverage categories before cut-over:
+Required coverage categories:
 
-- Translation outcomes: verify `styled-jsx` scoped/global behaviour, externals
-  mapping, source maps, and production minification output.
+- Translation outcomes: verify CSS Modules bundling, externals mapping,
+  source maps, and production minification output.
 - Packaging outcomes: verify copied artefacts under `dist/app/` and CLI
   artefact shape (including shebang integrity).
 - Bespoke plugin validation: add deterministic unit tests for each custom

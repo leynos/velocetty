@@ -17,11 +17,6 @@ import {
   createRendererExternalsPlugin,
   resolveRendererExternalPath
 } from '../../build/esbuild/esbuild-plugins/renderer-externals-plugin';
-import {
-  createStyledJsxBabelBridgePlugin,
-  transformStyledJsxSource,
-  usesStyledJsx
-} from '../../build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin';
 
 /** Creates an isolated temporary directory for build fixture tests. */
 const createTempDir = () => mkdtemp(path.join(tmpdir(), 'velocetty-esbuild-'));
@@ -55,43 +50,6 @@ const testPluginWithFixture = async (fixtureCode: string, buildOptions: PluginFi
     await rm(rootDir, {recursive: true, force: true});
   }
 };
-
-test('translation: styled-jsx bridge transforms JSX style blocks', async () => {
-  const rootDir = await createTempDir();
-  try {
-    const entryPoint = path.join(rootDir, 'fixture.tsx');
-    await writeFixtureFile(
-      entryPoint,
-      [
-        "import React from 'react';",
-        'export const Fixture = () => (',
-        '  <div>',
-        '    <span className="x">ok</span>',
-        '    <style jsx={true}>{`.x { color: red; }`}</style>',
-        '    <style jsx={true} global={true}>{`body { margin: 0; }`}</style>',
-        '  </div>',
-        ');'
-      ].join('\n')
-    );
-
-    const buildResult = await runEsbuildBuild({
-      entryPoints: [entryPoint],
-      bundle: true,
-      write: false,
-      outfile: path.join(rootDir, 'bundle.js'),
-      platform: 'browser',
-      format: 'iife',
-      external: ['react', 'react/jsx-runtime', 'styled-jsx/style'],
-      plugins: [createStyledJsxBabelBridgePlugin()]
-    });
-
-    const bundleOutput = buildResult.outputFiles.find((file) => file.path.endsWith('.js'))?.text ?? '';
-    expect(bundleOutput.includes('styled-jsx/style')).toBe(true);
-    expect(bundleOutput.includes('<style jsx')).toBe(false);
-  } finally {
-    await rm(rootDir, {recursive: true, force: true});
-  }
-});
 
 test('translation: CSS Modules are bundled with scoped class names in renderer build', async () => {
   const rootDir = await createTempDir();
@@ -331,42 +289,54 @@ test('translation: build options keep source maps in development and minify in p
   expect(productionCli.minify).toBe(true);
 });
 
-test('translation: styled-jsx usage detection only flags matching files', () => {
-  const detectionCases = [
-    {source: '<style jsx={true}>{``}</style>', expected: true},
-    {source: '<style jsx>{``}</style>', expected: true},
-    {source: '<style jsx global>{``}</style>', expected: true},
-    {
-      source: `<style
-  jsx
-  global={true}
->{\`\`}</style>`,
-      expected: true
-    },
-    {source: '<style jsxx>{``}</style>', expected: false},
-    {source: '<style data-jsx>{``}</style>', expected: false},
-    {source: '<style>{``}</style>', expected: false}
-  ];
+test('translation: renderer build removes styled-jsx syntax', async () => {
+  const rootDir = await createTempDir();
+  try {
+    // Create a fixture containing styled-jsx syntax that would have triggered
+    // the bridge in the past. After bridge removal, the renderer build should
+    // compile JSX and remove styled-jsx/runtime usages entirely.
+    const entryPoint = path.join(rootDir, 'fixture.tsx');
+    await writeFixtureFile(
+      entryPoint,
+      [
+        "import React from 'react';",
+        'export const Fixture = () => (',
+        '  <div>',
+        '    <span className="x">ok</span>',
+        '    <style jsx>{`',
+        '      .x { color: red; }',
+        '    `}</style>',
+        '  </div>',
+        ');'
+      ].join('\n')
+    );
 
-  for (const detectionCase of detectionCases) {
-    expect(usesStyledJsx(detectionCase.source)).toBe(detectionCase.expected);
+    const rendererOptions = createRendererBuildOptions('development', rootDir);
+    const buildResult = await runEsbuildBuild({
+      ...rendererOptions,
+      entryPoints: [entryPoint],
+      bundle: true,
+      write: false,
+      outfile: path.join(rootDir, 'bundle.js')
+    });
+
+    const bundleOutput = buildResult.outputFiles.find((file) => file.path.endsWith('.js'))?.text ?? '';
+
+    // After bridge removal, the renderer build compiles JSX and removes
+    // styled-jsx/runtime usages. The bundle must NOT contain 'styled-jsx',
+    // 'styled-jsx/style', or raw '<style' tags.
+    expect(bundleOutput.includes('styled-jsx/style')).toBe(false);
+    expect(bundleOutput.includes('styled-jsx')).toBe(false);
+    // Assert that the raw <style jsx string is absent from the output,
+    // confirming esbuild compiled the JSX rather than passing it through verbatim.
+    expect(bundleOutput.includes('<style')).toBe(false);
+    // Positive assertion: verify the bundle contains the React JSX runtime
+    // transformation, confirming the build succeeded and produced valid output.
+    expect(bundleOutput.includes('react')).toBe(true);
+    expect(bundleOutput.includes('createElement') || bundleOutput.includes('jsx')).toBe(true);
+  } finally {
+    await rm(rootDir, {recursive: true, force: true});
   }
-});
-
-test('translation: styled-jsx transform emits inline source maps when requested', async () => {
-  const source = [
-    'export const Fixture = () => (',
-    '  <div>',
-    '    <style jsx>{`.x { color: red; }`}</style>',
-    '  </div>',
-    ');'
-  ].join('\n');
-
-  const transformedWithoutMap = await transformStyledJsxSource(source, '/tmp/fixture.tsx', false);
-  const transformedWithMap = await transformStyledJsxSource(source, '/tmp/fixture.tsx', true);
-
-  expect(transformedWithoutMap.code.includes('sourceMappingURL')).toBe(false);
-  expect(transformedWithMap.code.includes('sourceMappingURL=data:')).toBe(true);
 });
 
 test('translation: esbuild handles shebang-bearing dependencies without shebang-loader', async () => {

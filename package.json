@@ -81,7 +81,6 @@
     "reselect": "^4.1.8",
     "seamless-immutable": "^7.1.4",
     "semver": "^7.6.0",
-    "styled-jsx": "^5.1.2",
     "stylis": "^3.5.4",
     "typescript-json-schema": "^0.67.1",
     "uuid": "^9.0.1",
@@ -97,9 +96,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@babel/core": "^7.29.0",
-    "@babel/preset-react": "^7.28.5",
-    "@babel/preset-typescript": "^7.28.5",
     "@biomejs/biome": "^2.3.13",
     "@chialab/esbuild-plugin-postcss": "^1.0.1",
     "@electron/rebuild": "^3.6.0",

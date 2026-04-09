@@ -160,17 +160,17 @@ Scope notes:
     `<style jsx>` and `<style jsx global>` with parity-focused tests.
   - [x] Success criteria: no renderer source files contain `<style jsx` and
     style behaviour remains stable in unit and end-to-end checks.
-- [ ] 1.4.18. Remove styled-jsx bridge tooling and bridge-only Babel
+- [x] 1.4.18. Remove styled-jsx bridge tooling and bridge-only Babel
   dependencies after migration parity is complete. Requires 1.4.17.
   See [adr-002-replace-webpack-babel-with-esbuild.md](adr-002-replace-webpack-babel-with-esbuild.md)
   §Validation gaps and required testing coverage.
-  - [ ] Remove bridge integration from `build/esbuild/run-esbuild.ts` and
+  - [x] Remove bridge integration from `build/esbuild/run-esbuild.ts` and
     remove bridge implementation files/constants.
-  - [ ] Remove `typings/styled-jsx.d.ts` and update migration contract tests to
+  - [x] Remove `typings/styled-jsx.d.ts` and update migration contract tests to
     validate CSS Modules outputs instead of `styled-jsx/style` transforms.
-  - [ ] Remove bridge-only Babel and styled-jsx dependencies from manifests and
+  - [x] Remove bridge-only Babel and styled-jsx dependencies from manifests and
     lockfile once build/test gates are green.
-  - [ ] Success criteria: `bun install`, `make build`, `make check-fmt`,
+  - [x] Success criteria: `bun install`, `make build`, `make check-fmt`,
     `make lint`, and `make test` pass with no direct styled-jsx bridge path.
 - [ ] 1.4.19. Close post-removal hardening tasks for security and compatibility.
   Requires 1.4.18 and 9.2.4.

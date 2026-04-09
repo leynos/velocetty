@@ -41,7 +41,3 @@ export type RendererExternalModule = keyof typeof rendererExternalRequireMap;
 // `.js.map` requests are sidecar source maps we do not ship at runtime, and
 // `spawn-sync` is blocked in the renderer by the IPC child-process shim.
 export const ignoredImportPatterns = [/.*\.js\.map$/i, /^spawn-sync$/i] as const;
-
-export const styledJsxBabelPluginOptions = {
-  vendorPrefixes: false
-} as const;

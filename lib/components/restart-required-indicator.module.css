@@ -1,0 +1,79 @@
+/** @file CSS Module for restart-required indicator components.
+ *
+ * Provides scoped styles for RestartRequiredIndicator, InlineRestartWarning,
+ * ConfigReloadBadge, and LiveReloadIndicator components.
+ */
+
+/* RestartRequiredIndicator styles */
+.restartRequiredIndicator {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  color: #f59e0b; /* amber-500 */
+  font-size: 0.875em;
+  cursor: help;
+}
+
+/* InlineRestartWarning styles */
+.inlineRestartWarning {
+  margin-top: 4px;
+  padding: 8px 12px;
+  background-color: rgba(245, 158, 11, 0.1); /* amber-500 at 10% */
+  border-left: 3px solid #f59e0b; /* amber-500 */
+  border-radius: 0 4px 4px 0;
+  font-size: 0.875em;
+  color: #d97706; /* amber-600 */
+}
+
+/* ConfigReloadBadge base styles (shared between output and button variants) */
+.configReloadBadgeBase {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background-color: #b45309; /* amber-700 - darker for accessibility contrast */
+  color: #ffffff;
+  border-radius: 4px;
+  font-size: 0.8125em;
+  font-weight: 500;
+}
+
+/* Output variant of ConfigReloadBadge */
+.configReloadBadge {
+  composes: configReloadBadgeBase;
+}
+
+.badgeIcon {
+  font-size: 1em;
+}
+
+.badgeText {
+  white-space: nowrap;
+}
+
+/* Button variant of ConfigReloadBadge */
+.configReloadBadgeButton {
+  composes: configReloadBadgeBase;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.configReloadBadgeButton:hover {
+  background-color: #92400e; /* amber-800 - darker for accessible hover state */
+}
+
+.configReloadBadgeButton:focus {
+  outline: 2px solid #fbbf24; /* amber-400 */
+  outline-offset: 2px;
+}
+
+/* LiveReloadIndicator styles */
+.liveReloadIndicator {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  color: #10b981; /* emerald-500 */
+  font-size: 0.875em;
+  cursor: help;
+}
