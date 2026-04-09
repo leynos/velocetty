@@ -27,17 +27,25 @@ import {waitFor} from '../testUtils/waitFor';
 
 import type {SearchBoxProps} from '../../typings/hyper';
 
-type SearchBoxComponent = typeof import('../../lib/components/searchBox').default;
+import SearchBoxComponent from '../../lib/components/searchBox';
 
-const loadSearchBox = async (counter: number): Promise<SearchBoxComponent> => {
-  const mod = (await import(`../../lib/components/searchBox.tsx?search_box_css_modules=${counter}`)) as {
-    default: SearchBoxComponent;
-  };
-  return mod.default;
+/**
+ * Reset helper to clear any module-level state between tests.
+ * Currently a no-op because SearchBox.tsx has no module-level singletons that
+ * leak state across renders. Dynamic imports were previously used with ESM
+ * cache-busting (via query strings like `?search_box_css_modules=${counter}`)
+ * to force a fresh module load per test, but this is a workaround for the
+ * lack of a jest.resetModules() equivalent in bun:test. If state leakage
+ * becomes an issue, implement cleanup here.
+ */
+const resetSearchBoxState = () => {
+  // No-op: SearchBox.tsx has no module-level state to reset.
+  // If this changes, add cleanup logic here and invoke before each test.
 };
 
-// Import translation defaults to ensure test labels stay in sync with the app
-const translationDefaults = {
+// Static fixture for test labels; not kept in sync with the app defaults.
+// This is a local copy of headerLabelDefaults for test isolation.
+const testLabelFixture = {
   search: 'Search',
   noResults: 'No results',
   previousMatch: 'Previous Match',
@@ -49,14 +57,14 @@ const translationDefaults = {
 } as const;
 
 const defaultLabels = {
-  searchLabel: translationDefaults.search,
-  noResultsLabel: translationDefaults.noResults,
-  previousMatchLabel: translationDefaults.previousMatch,
-  nextMatchLabel: translationDefaults.nextMatch,
-  closeLabel: translationDefaults.close,
-  matchCaseLabel: translationDefaults.matchCase,
-  matchWholeWordLabel: translationDefaults.matchWholeWord,
-  useRegexLabel: translationDefaults.useRegex
+  searchLabel: testLabelFixture.search,
+  noResultsLabel: testLabelFixture.noResults,
+  previousMatchLabel: testLabelFixture.previousMatch,
+  nextMatchLabel: testLabelFixture.nextMatch,
+  closeLabel: testLabelFixture.close,
+  matchCaseLabel: testLabelFixture.matchCase,
+  matchWholeWordLabel: testLabelFixture.matchWholeWord,
+  useRegexLabel: testLabelFixture.useRegex
 } as const;
 
 const defaultColors = {
@@ -84,9 +92,8 @@ const makeProps = (overrides: Partial<SearchBoxProps> = {}): SearchBoxProps => (
 });
 
 const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
-  // Local counter for cache-busting to ensure each test gets a fresh module
-  const moduleCounter = Date.now() + Math.random();
-  const SearchBox = await loadSearchBox(moduleCounter);
+  // Invoke reset helper to clear any module-level state before rendering
+  resetSearchBoxState();
 
   const cleanup = await setupHappyDom();
   let container: HTMLDivElement | null = null;
@@ -99,7 +106,7 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
 
     await act(async () => {
       flushSync(() => {
-        root.render(React.createElement(SearchBox, makeProps(overrides)));
+        root.render(React.createElement(SearchBoxComponent, makeProps(overrides)));
       });
       await waitFor(0);
     });
