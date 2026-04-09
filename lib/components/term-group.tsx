@@ -36,7 +36,7 @@ class TermGroup_ extends React.PureComponent<TermGroupProps> {
     return map[uid];
   }
 
-  renderSplit(groups: JSX.Element[]) {
+  renderSplit(groups: React.JSX.Element[]) {
     const [first, ...rest] = groups;
     if (rest.length === 0) {
       return first;

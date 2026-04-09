@@ -664,7 +664,6 @@ avoid duplicate React instances in plugins. React 19 requires aligning
 `react-redux` 9.x with `redux` 5.x, plus matching `@types/react` and
 `@types/react-dom` versions in `package.json`.
 
-
 ## React component composition and translation patterns
 
 ## Formatting and linting
@@ -987,7 +986,6 @@ output.
 Example: `lib/components/searchBox.tsx` defines `SearchResultsCount` and
 `SearchNavigation` as internal constants and exports only `SearchBox`.
 
-
 ### Translation key conventions
 
 Translation keys live in `lib/hooks/use-translation.ts`. Every key must have
@@ -1019,7 +1017,6 @@ elements. Apply both the CSS Module token and the legacy string:
 
 Document intentionally retired legacy class names in the migration ExecPlan
 under `Decision log`.
-
 
 ### Label-threading with translation wrappers
 
