@@ -108,7 +108,6 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
     }
     await act(async () => {
       root.render(React.createElement(SearchBoxComponent, makeProps(overrides)));
-      await waitFor(0);
     });
   } catch (error) {
     // Ensure cleanup on setup failure to prevent global DOM state leakage
@@ -117,7 +116,6 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
         // Explicitly swallow errors from unmount - cleanup continues regardless
         await act(async () => {
           root.unmount();
-          await waitFor(0);
         });
       }
     } catch {
@@ -136,7 +134,6 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
       // Explicitly swallow errors from unmount - cleanup continues regardless
       await act(async () => {
         root.unmount();
-        await waitFor(0);
       });
     }
     if (container) {
