@@ -112,17 +112,22 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
     });
   } catch (error) {
     // Ensure cleanup on setup failure to prevent global DOM state leakage
-    if (root) {
-      // Explicitly swallow errors from unmount - cleanup continues regardless
-      await act(async () => {
-        root.unmount();
-        await waitFor(0);
-      });
+    try {
+      if (root) {
+        // Explicitly swallow errors from unmount - cleanup continues regardless
+        await act(async () => {
+          root.unmount();
+          await waitFor(0);
+        });
+      }
+    } catch {
+      // Swallow unmount errors to ensure cleanup proceeds
+    } finally {
+      if (container) {
+        container.remove();
+      }
+      cleanup();
     }
-    if (container) {
-      container.remove();
-    }
-    cleanup();
     throw error;
   }
 
