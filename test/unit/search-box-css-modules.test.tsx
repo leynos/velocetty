@@ -22,6 +22,7 @@ import {createRoot} from 'react-dom/client';
 import {expect, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
+import {pollForElement} from '../testUtils/pollFor';
 import {waitFor} from '../testUtils/waitFor';
 
 import type {SearchBoxProps} from '../../typings/hyper';
@@ -163,9 +164,8 @@ const searchResultsCountCases: Array<[string, Partial<SearchBoxProps>, string]> 
 test.each(searchResultsCountCases)('SearchResultsCount %s', async (_description, overrides, expectedTextContent) => {
   const {container, teardown} = await renderSearchBox(overrides);
   try {
-    const output = container.querySelector('output');
-    expect(output).toBeTruthy();
-    expect(output?.textContent?.trim()).toBe(expectedTextContent);
+    const output = await pollForElement(container, 'output');
+    expect(output.textContent?.trim()).toBe(expectedTextContent);
   } finally {
     await teardown();
   }
@@ -186,7 +186,7 @@ test.each(
 )('SearchNavigation applies %s as a navigation button title', async (prop, expectedTitle) => {
   const {container, teardown} = await renderSearchBox({[prop]: expectedTitle} as Partial<SearchBoxProps>);
   try {
-    const button = container.querySelector(`button[title="${expectedTitle}"]`);
+    const button = await pollForElement(container, `button[title="${expectedTitle}"]`);
     expect(button).toBeTruthy();
   } finally {
     await teardown();
@@ -271,7 +271,7 @@ test('SearchNavigation invokes the close callback when its button is clicked', a
   });
 
   try {
-    const button = container.querySelector<HTMLButtonElement>('button[title="Custom Close Callback"]');
+    const button = (await pollForElement(container, 'button[title="Custom Close Callback"]')) as HTMLButtonElement;
     expect(button).toBeTruthy();
     await act(async () => {
       button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
@@ -296,9 +296,9 @@ test('SearchNavigation invokes the close callback when its button is clicked', a
 test('SearchBox wires searchLabel to the input aria-label and placeholder', async () => {
   const {container, teardown} = await renderSearchBox({searchLabel: 'Find in terminal'});
   try {
-    const input = container.querySelector<HTMLInputElement>('input[type="text"]');
-    expect(input?.getAttribute('aria-label')).toBe('Find in terminal');
-    expect(input?.getAttribute('placeholder')).toBe('Find in terminal');
+    const input = (await pollForElement(container, 'input[type="text"]')) as HTMLInputElement;
+    expect(input.getAttribute('aria-label')).toBe('Find in terminal');
+    expect(input.getAttribute('placeholder')).toBe('Find in terminal');
   } finally {
     await teardown();
   }
@@ -313,7 +313,7 @@ const searchBoxToggleLabelCases: Array<[keyof SearchBoxProps, string]> = [
 test.each(searchBoxToggleLabelCases)('SearchBox wires %s to its toggle button title', async (prop, expectedTitle) => {
   const {container, teardown} = await renderSearchBox({[prop]: expectedTitle} as Partial<SearchBoxProps>);
   try {
-    const button = container.querySelector(`button[title="${expectedTitle}"]`);
+    const button = await pollForElement(container, `button[title="${expectedTitle}"]`);
     expect(button).toBeTruthy();
   } finally {
     await teardown();
@@ -330,13 +330,13 @@ test('SearchBox toggle buttons reflect aria-pressed state from caseSensitive, wh
     useRegexLabel: 'Aria Regex'
   });
   try {
-    const matchCaseBtn = container.querySelector<HTMLButtonElement>('button[title="Aria Match Case"]');
-    const wholeWordBtn = container.querySelector<HTMLButtonElement>('button[title="Aria Whole Word"]');
-    const regexBtn = container.querySelector<HTMLButtonElement>('button[title="Aria Regex"]');
+    const matchCaseBtn = await pollForElement(container, 'button[title="Aria Match Case"]');
+    const wholeWordBtn = await pollForElement(container, 'button[title="Aria Whole Word"]');
+    const regexBtn = await pollForElement(container, 'button[title="Aria Regex"]');
 
-    expect(matchCaseBtn?.getAttribute('aria-pressed')).toBe('true');
-    expect(wholeWordBtn?.getAttribute('aria-pressed')).toBe('true');
-    expect(regexBtn?.getAttribute('aria-pressed')).toBe('false');
+    expect(matchCaseBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(wholeWordBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(regexBtn.getAttribute('aria-pressed')).toBe('false');
   } finally {
     await teardown();
   }
@@ -345,9 +345,9 @@ test('SearchBox toggle buttons reflect aria-pressed state from caseSensitive, wh
 test('SearchBox output element carries aria-live polite for screen-reader announcements', async () => {
   const {container, teardown} = await renderSearchBox();
   try {
-    const output = container.querySelector('output');
-    expect(output?.getAttribute('aria-live')).toBe('polite');
-    expect(output?.getAttribute('aria-atomic')).toBe('true');
+    const output = await pollForElement(container, 'output');
+    expect(output.getAttribute('aria-live')).toBe('polite');
+    expect(output.getAttribute('aria-atomic')).toBe('true');
   } finally {
     await teardown();
   }
