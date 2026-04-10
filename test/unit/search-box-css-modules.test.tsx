@@ -27,21 +27,24 @@ import {pollForElement} from '../testUtils/pollFor';
 import {waitFor} from '../testUtils/waitFor';
 
 import type {SearchBoxProps} from '../../typings/hyper';
+type SearchBoxComponent = React.ComponentType<SearchBoxProps>;
 
-import SearchBoxComponent from '../../lib/components/searchBox';
+let searchBoxModuleInstanceCounter = 0;
 
 /**
- * Reset helper to clear any module-level state between tests.
- * Currently a no-op because SearchBox.tsx has no module-level singletons that
- * leak state across renders. Dynamic imports were previously used with ESM
- * cache-busting (via query strings like `?search_box_css_modules=${counter}`)
- * to force a fresh module load per test, but this is a workaround for the
- * lack of a jest.resetModules() equivalent in bun:test. If state leakage
- * becomes an issue, implement cleanup here.
+ * Loads a fresh SearchBox module instance for each test render.
+ *
+ * Bun's module mocks are process-global across concurrent test files. This
+ * suite exercises the real SearchBox component, while other suites may mock
+ * the same import path. A cache-busting query string keeps this suite isolated
+ * from those external mocks and from any cached module state.
  */
-const resetSearchBoxState = () => {
-  // No-op: SearchBox.tsx has no module-level state to reset.
-  // If this changes, add cleanup logic here and invoke before each test.
+const loadSearchBoxComponent = async (): Promise<SearchBoxComponent> => {
+  searchBoxModuleInstanceCounter += 1;
+  const {default: SearchBoxComponent} = (await import(
+    `../../lib/components/searchBox.tsx?search_box_css_modules=${searchBoxModuleInstanceCounter}`
+  )) as {default: SearchBoxComponent};
+  return SearchBoxComponent;
 };
 
 // Static fixture for test labels; not kept in sync with the app defaults.
@@ -93,10 +96,8 @@ const makeProps = (overrides: Partial<SearchBoxProps> = {}): SearchBoxProps => (
 });
 
 const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
-  // Invoke reset helper to clear any module-level state before rendering
-  resetSearchBoxState();
-
   const cleanup = await setupHappyDom();
+  const SearchBoxComponent = await loadSearchBoxComponent();
   let container: HTMLDivElement | null = null;
   let root: ReturnType<typeof createRoot> | null = null;
 
