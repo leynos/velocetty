@@ -21,27 +21,75 @@
  * expect(output.textContent?.trim()).toBe('expected');
  * ```
  */
+const getContainerDocument = (container: ParentNode): Document | null => {
+  if ('ownerDocument' in container && container.ownerDocument) {
+    return container.ownerDocument;
+  }
+
+  if ('defaultView' in container) {
+    return container as Document;
+  }
+
+  return null;
+};
+
 export const pollForElement = (container: ParentNode, selector: string, timeoutMs = 2000): Promise<Element> =>
   new Promise((resolve, reject) => {
-    const existing = container.querySelector(selector);
+    const getElement = () => container.querySelector(selector);
+    const existing = getElement();
     if (existing) {
       resolve(existing);
       return;
     }
 
+    const containerDocument = getContainerDocument(container);
+    const windowMutationObserver = containerDocument?.defaultView?.MutationObserver;
+    const MutationObserverCtor = windowMutationObserver ?? globalThis.MutationObserver;
+    let observer: MutationObserver | null = null;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+        pollTimer = null;
+      }
+      observer?.disconnect();
+    };
+
+    const resolveIfPresent = () => {
+      const el = getElement();
+      if (el) {
+        cleanup();
+        resolve(el);
+        return true;
+      }
+
+      return false;
+    };
+
+    const schedulePoll = () => {
+      pollTimer = setTimeout(() => {
+        if (!resolveIfPresent()) {
+          schedulePoll();
+        }
+      }, 16);
+    };
+
     const timer = setTimeout(() => {
-      observer.disconnect();
+      cleanup();
       reject(new Error(`pollForElement: "${selector}" not found within ${timeoutMs} ms`));
     }, timeoutMs);
 
-    const observer = new MutationObserver(() => {
-      const el = container.querySelector(selector);
-      if (el) {
-        clearTimeout(timer);
-        observer.disconnect();
-        resolve(el);
-      }
-    });
+    observer = MutationObserverCtor
+      ? new MutationObserverCtor(() => {
+          resolveIfPresent();
+        })
+      : null;
 
-    observer.observe(container, {childList: true, subtree: true, attributes: true});
+    observer?.observe(container as Node, {childList: true, subtree: true, attributes: true});
+
+    schedulePoll();
+
+    resolveIfPresent();
   });
