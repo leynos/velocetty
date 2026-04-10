@@ -83,3 +83,66 @@ test('returns the translated search label for renderer search UI', () => {
 
   expect(translation).toBe('Rechercher');
 });
+
+const searchUiCases: Array<[string, MutableNavigator, Record<string, string>]> = [
+  [
+    'English',
+    {languages: ['en'], language: 'en'},
+    {
+      search: 'Search',
+      noResults: 'No results',
+      matchCase: 'Match Case',
+      matchWholeWord: 'Match Whole Word',
+      useRegex: 'Use Regular Expression',
+      previousMatch: 'Previous Match',
+      nextMatch: 'Next Match',
+      close: 'Close'
+    }
+  ],
+  [
+    'en-gb',
+    {languages: ['en-gb'], language: 'en-gb'},
+    {
+      search: 'Search',
+      noResults: 'No results',
+      matchCase: 'Match Case',
+      matchWholeWord: 'Match Whole Word',
+      useRegex: 'Use Regular Expression',
+      previousMatch: 'Previous Match',
+      nextMatch: 'Next Match',
+      close: 'Close'
+    }
+  ],
+  [
+    'French',
+    {languages: ['fr'], language: 'fr'},
+    {
+      search: 'Rechercher',
+      noResults: 'Aucun résultat',
+      matchCase: 'Respecter la casse',
+      matchWholeWord: 'Mot entier',
+      useRegex: 'Expression régulière',
+      previousMatch: 'Résultat précédent',
+      nextMatch: 'Résultat suivant',
+      close: 'Fermer'
+    }
+  ]
+];
+
+test.each(searchUiCases)('returns all eight search-UI translation keys for %s locale', (_localeName, nav, expected) => {
+  const results = withNavigator(nav, () => {
+    const t = useTranslation();
+    return {
+      search: t('search'),
+      noResults: t('noResults'),
+      matchCase: t('matchCase'),
+      matchWholeWord: t('matchWholeWord'),
+      useRegex: t('useRegex'),
+      previousMatch: t('previousMatch'),
+      nextMatch: t('nextMatch'),
+      close: t('close')
+    };
+  });
+
+  expect(results).toEqual(expected);
+});

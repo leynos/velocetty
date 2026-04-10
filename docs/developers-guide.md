@@ -664,6 +664,8 @@ avoid duplicate React instances in plugins. React 19 requires aligning
 `react-redux` 9.x with `redux` 5.x, plus matching `@types/react` and
 `@types/react-dom` versions in `package.json`.
 
+## React component composition and translation patterns
+
 ## Formatting and linting
 
 Run the standard gates before opening a pull request:
@@ -972,3 +974,92 @@ not already exist.
 
 `make test` runs linting plus the unit test suite. It intentionally omits
 E2E tests to keep the default loop fast.
+
+### Sub-component extraction
+
+When a renderer component grows beyond a single responsibility, extract
+internal sub-components as module-private `const` declarations in the same
+file. Only export the public-facing component. This keeps the module API
+surface small while enabling focused unit tests through the parent's rendered
+output.
+
+Example: `lib/components/searchBox.tsx` defines `SearchResultsCount` and
+`SearchNavigation` as internal constants and exports only `SearchBox`.
+
+### Translation key conventions
+
+Translation keys live in `lib/hooks/use-translation.ts`. Every key must have
+an English default in `headerLabelDefaults`; partial locale dictionaries
+fall back to the default for any missing key. When adding new labels:
+
+1. Add the key and its English value to `headerLabelDefaults` in `lib/hooks/use-translation.ts`.
+2. Add translations to each locale dictionary in `translationDictionaries` in `lib/hooks/use-translation.ts`.
+3. Add the prop to the presentational component's prop type.
+4. Wire the label into the logic hook (`useSearchBoxLabels`) and then into any
+   wrapper that threads those hook-provided labels into the presentational
+   component; mention `useTranslation` only as the historical exception where a
+   wrapper still directly calls it.
+5. Extend `test/unit/use-translation.test.ts` to assert the key in each
+   supported locale.
+6. Extend/verify the SearchBox DOM-wiring suite
+   (`test/unit/search-box-css-modules.test.tsx`) to ensure the label is
+   rendered and attached correctly in the SearchBox component.
+
+### Preserving legacy plugin-targeted class names
+
+When migrating styled-jsx blocks to CSS Modules, class names that external
+plugins or user custom CSS may target must remain attached to the same
+elements. Apply both the CSS Module token and the legacy string:
+
+```tsx
+<div className={`${styles.termFit} term_fit`}>
+```
+
+Document intentionally retired legacy class names in the migration ExecPlan
+under `Decision log`.
+
+### Label-threading with translation wrappers
+
+Accessibility labels that vary by locale are threaded via a narrow prop
+interface rather than read directly inside the presentational component. The
+pattern has two layers:
+
+1. **Presentational component** (`SearchBox`) accepts every label as an
+   explicit typed prop. This makes labels testable in isolation and keeps the
+   component independent of the translation mechanism.
+
+2. **Translation logic hook** – encapsulate translation lookup in a dedicated
+   logic hook (e.g., `useSearchBoxLabels`) that calls `useTranslation()` and
+   returns the mapped labels. View components receive labels via props and
+   remain pure:
+
+   ```tsx
+   const useSearchBoxLabels = () => {
+     const t = useTranslation();
+     return {
+       searchLabel: t('search'),
+       noResultsLabel: t('noResults'),
+       matchCaseLabel: t('matchCase'),
+       matchWholeWordLabel: t('matchWholeWord'),
+       useRegexLabel: t('useRegex'),
+       previousMatchLabel: t('previousMatch'),
+       nextMatchLabel: t('nextMatch'),
+       closeLabel: t('close')
+     };
+   };
+
+   // Usage in a parent component
+   type ParentComponentProps = Omit<
+     SearchBoxProps,
+     keyof ReturnType<typeof useSearchBoxLabels>
+   >;
+   const ParentComponent = (props: ParentComponentProps) => {
+     const labels = useSearchBoxLabels();
+     return <SearchBox {...props} {...labels} />;
+   };
+   ```
+
+   **Exception:** `TranslatedSearchBox` in `lib/components/term.tsx` is a
+   documented wrapper component that calls `useTranslation()` directly. This
+   is an intentional exception to the hook-based pattern for historical
+   compatibility; new code should prefer the `useSearchBoxLabels` approach.
