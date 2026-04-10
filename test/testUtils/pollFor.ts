@@ -1,12 +1,17 @@
 /**
  * @file Polling helper for DOM elements using MutationObserver.
  *
- * Resolves once `predicate` returns truthy, or rejects after `timeoutMs`.
+ * `pollForElement(container, selector, timeoutMs)` resolves once an element
+ * matching `selector` is found within `container`, or rejects after
+ * `timeoutMs`.
  * Uses MutationObserver so there is no fixed sleep — it reacts to DOM changes.
  */
 
 /**
  * Polls for an element matching `selector` within `container`.
+ *
+ * Resolves when a matching element is found within the container, or rejects
+ * after `timeoutMs`.
  *
  * @param container - The parent node to search within.
  * @param selector - The CSS selector to match.
