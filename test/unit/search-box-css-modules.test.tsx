@@ -17,6 +17,7 @@
  * - Translation hook: `lib/hooks/use-translation.ts`
  */
 import React, {act} from 'react';
+import {flushSync} from 'react-dom';
 import {createRoot} from 'react-dom/client';
 
 import {expect, test} from 'bun:test';
@@ -108,7 +109,10 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
       throw new Error('Failed to create React root');
     }
     await act(async () => {
-      root.render(React.createElement(SearchBoxComponent, makeProps(overrides)));
+      flushSync(() => {
+        root.render(React.createElement(SearchBoxComponent, makeProps(overrides)));
+      });
+      await waitFor(0);
     });
   } catch (error) {
     // Ensure cleanup on setup failure to prevent global DOM state leakage
@@ -117,6 +121,7 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
         // Explicitly swallow errors from unmount - cleanup continues regardless
         await act(async () => {
           root.unmount();
+          await waitFor(0);
         });
       }
     } catch {
@@ -135,6 +140,7 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
       // Explicitly swallow errors from unmount - cleanup continues regardless
       await act(async () => {
         root.unmount();
+        await waitFor(0);
       });
     }
     if (container) {
@@ -161,15 +167,17 @@ const searchResultsCountCases: Array<[string, Partial<SearchBoxProps>, string]> 
   ['shows "1 of 1" when a single result is found', {results: {resultIndex: 0, resultCount: 1}}, '1 of 1']
 ];
 
-test.each(searchResultsCountCases)('SearchResultsCount %s', async (_description, overrides, expectedTextContent) => {
-  const {container, teardown} = await renderSearchBox(overrides);
-  try {
-    const output = await pollForElement(container, 'output');
-    expect(output.textContent?.trim()).toBe(expectedTextContent);
-  } finally {
-    await teardown();
-  }
-});
+for (const [description, overrides, expectedTextContent] of searchResultsCountCases) {
+  test.serial(`SearchResultsCount ${description}`, async () => {
+    const {container, teardown} = await renderSearchBox(overrides);
+    try {
+      const output = await pollForElement(container, 'output');
+      expect(output.textContent?.trim()).toBe(expectedTextContent);
+    } finally {
+      await teardown();
+    }
+  });
+}
 
 // ---------------------------------------------------------------------------
 // SearchNavigation – button labels
@@ -181,17 +189,17 @@ const searchNavigationLabelCases: Array<[keyof SearchBoxProps, string]> = [
   ['closeLabel', 'Custom Close Label']
 ];
 
-test.each(
-  searchNavigationLabelCases
-)('SearchNavigation applies %s as a navigation button title', async (prop, expectedTitle) => {
-  const {container, teardown} = await renderSearchBox({[prop]: expectedTitle} as Partial<SearchBoxProps>);
-  try {
-    const button = await pollForElement(container, `button[title="${expectedTitle}"]`);
-    expect(button).toBeTruthy();
-  } finally {
-    await teardown();
-  }
-});
+for (const [prop, expectedTitle] of searchNavigationLabelCases) {
+  test.serial(`SearchNavigation applies ${prop} as a navigation button title`, async () => {
+    const {container, teardown} = await renderSearchBox({[prop]: expectedTitle} as Partial<SearchBoxProps>);
+    try {
+      const button = await pollForElement(container, `button[title="${expectedTitle}"]`);
+      expect(button).toBeTruthy();
+    } finally {
+      await teardown();
+    }
+  });
+}
 
 // ---------------------------------------------------------------------------
 // SearchNavigation – button callbacks
@@ -207,7 +215,7 @@ const navTermCallbackCases: Array<[keyof SearchBoxProps, keyof SearchBoxProps, s
 ];
 
 for (const [callbackProp, labelProp, buttonTitle] of navTermCallbackCases) {
-  test.failing(`SearchNavigation invokes the ${callbackProp} callback with the search term`, async () => {
+  test.serial.failing(`SearchNavigation invokes the ${callbackProp} callback with the search term`, async () => {
     const searchTerm = 'test-query';
     let called = false;
     let receivedTerm: string | null = null;
@@ -259,7 +267,7 @@ for (const [callbackProp, labelProp, buttonTitle] of navTermCallbackCases) {
   });
 }
 
-test('SearchNavigation invokes the close callback when its button is clicked', async () => {
+test.serial('SearchNavigation invokes the close callback when its button is clicked', async () => {
   let called = false;
   const callback = () => {
     called = true;
@@ -293,7 +301,7 @@ test('SearchNavigation invokes the close callback when its button is clicked', a
 // propagate end-to-end without further wiring changes.
 // ---------------------------------------------------------------------------
 
-test('SearchBox wires searchLabel to the input aria-label and placeholder', async () => {
+test.serial('SearchBox wires searchLabel to the input aria-label and placeholder', async () => {
   const {container, teardown} = await renderSearchBox({searchLabel: 'Find in terminal'});
   try {
     const input = (await pollForElement(container, 'input[type="text"]')) as HTMLInputElement;
@@ -310,39 +318,44 @@ const searchBoxToggleLabelCases: Array<[keyof SearchBoxProps, string]> = [
   ['useRegexLabel', 'Custom Regex Label']
 ];
 
-test.each(searchBoxToggleLabelCases)('SearchBox wires %s to its toggle button title', async (prop, expectedTitle) => {
-  const {container, teardown} = await renderSearchBox({[prop]: expectedTitle} as Partial<SearchBoxProps>);
-  try {
-    const button = await pollForElement(container, `button[title="${expectedTitle}"]`);
-    expect(button).toBeTruthy();
-  } finally {
-    await teardown();
-  }
-});
-
-test('SearchBox toggle buttons reflect aria-pressed state from caseSensitive, wholeWord, and regex props', async () => {
-  const {container, teardown} = await renderSearchBox({
-    caseSensitive: true,
-    wholeWord: true,
-    regex: false,
-    matchCaseLabel: 'Aria Match Case',
-    matchWholeWordLabel: 'Aria Whole Word',
-    useRegexLabel: 'Aria Regex'
+for (const [prop, expectedTitle] of searchBoxToggleLabelCases) {
+  test.serial(`SearchBox wires ${prop} to its toggle button title`, async () => {
+    const {container, teardown} = await renderSearchBox({[prop]: expectedTitle} as Partial<SearchBoxProps>);
+    try {
+      const button = await pollForElement(container, `button[title="${expectedTitle}"]`);
+      expect(button).toBeTruthy();
+    } finally {
+      await teardown();
+    }
   });
-  try {
-    const matchCaseBtn = await pollForElement(container, 'button[title="Aria Match Case"]');
-    const wholeWordBtn = await pollForElement(container, 'button[title="Aria Whole Word"]');
-    const regexBtn = await pollForElement(container, 'button[title="Aria Regex"]');
+}
 
-    expect(matchCaseBtn.getAttribute('aria-pressed')).toBe('true');
-    expect(wholeWordBtn.getAttribute('aria-pressed')).toBe('true');
-    expect(regexBtn.getAttribute('aria-pressed')).toBe('false');
-  } finally {
-    await teardown();
+test.serial(
+  'SearchBox toggle buttons reflect aria-pressed state from caseSensitive, wholeWord, and regex props',
+  async () => {
+    const {container, teardown} = await renderSearchBox({
+      caseSensitive: true,
+      wholeWord: true,
+      regex: false,
+      matchCaseLabel: 'Aria Match Case',
+      matchWholeWordLabel: 'Aria Whole Word',
+      useRegexLabel: 'Aria Regex'
+    });
+    try {
+      const matchCaseBtn = await pollForElement(container, 'button[title="Aria Match Case"]');
+      const wholeWordBtn = await pollForElement(container, 'button[title="Aria Whole Word"]');
+      const regexBtn = await pollForElement(container, 'button[title="Aria Regex"]');
+
+      expect(matchCaseBtn.getAttribute('aria-pressed')).toBe('true');
+      expect(wholeWordBtn.getAttribute('aria-pressed')).toBe('true');
+      expect(regexBtn.getAttribute('aria-pressed')).toBe('false');
+    } finally {
+      await teardown();
+    }
   }
-});
+);
 
-test('SearchBox output element carries aria-live polite for screen-reader announcements', async () => {
+test.serial('SearchBox output element carries aria-live polite for screen-reader announcements', async () => {
   const {container, teardown} = await renderSearchBox();
   try {
     const output = await pollForElement(container, 'output');
