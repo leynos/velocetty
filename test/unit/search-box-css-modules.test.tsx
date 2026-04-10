@@ -17,7 +17,6 @@
  * - Translation hook: `lib/hooks/use-translation.ts`
  */
 import React, {act} from 'react';
-import {flushSync} from 'react-dom';
 import {createRoot} from 'react-dom/client';
 
 import {expect, test} from 'bun:test';
@@ -107,22 +106,18 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
     if (!root) {
       throw new Error('Failed to create React root');
     }
-    act(() => {
-      flushSync(() => {
-        root.render(React.createElement(SearchBoxComponent, makeProps(overrides)));
-      });
+    await act(async () => {
+      root.render(React.createElement(SearchBoxComponent, makeProps(overrides)));
+      await waitFor(0);
     });
-    await waitFor(0);
   } catch (error) {
     // Ensure cleanup on setup failure to prevent global DOM state leakage
     if (root) {
       // Explicitly swallow errors from unmount - cleanup continues regardless
-      act(() => {
-        flushSync(() => {
-          root.unmount();
-        });
+      await act(async () => {
+        root.unmount();
+        await waitFor(0);
       });
-      await waitFor(0);
     }
     if (container) {
       container.remove();
@@ -134,12 +129,10 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
   const teardown = async () => {
     if (root) {
       // Explicitly swallow errors from unmount - cleanup continues regardless
-      act(() => {
-        flushSync(() => {
-          root.unmount();
-        });
+      await act(async () => {
+        root.unmount();
+        await waitFor(0);
       });
-      await waitFor(0);
     }
     if (container) {
       container.remove();
