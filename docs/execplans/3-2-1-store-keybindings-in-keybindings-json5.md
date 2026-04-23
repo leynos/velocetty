@@ -475,7 +475,8 @@ Evidence acceptance:
 - [x] 2026-04-23 23:38Z: Ran the required sequential gates plus doc validation:
   `bun install`, `make build`, `make check-fmt`, `make lint`, `make test`,
   `bunx markdownlint-cli2 "docs/**/*.md"`, and `nixie --no-sandbox`.
-- [ ] Commit and push the completed change.
+- [x] 2026-04-23 23:43Z: Committed the implementation as `61fd1cc4` and pushed
+  branch `3-2-1-store-keybindings-in-keybindings-json5` to `origin`.
 
 ## Surprises & Discoveries
 
