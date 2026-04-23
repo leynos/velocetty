@@ -6,7 +6,7 @@ import type {parsedConfig, configOptions} from '@shared/types/config';
 
 import {_import, getDefaultConfig} from './config/import';
 import _openConfig from './config/open';
-import {cfgPath, cfgDir} from './config/paths';
+import {cfgPath, cfgDir, keybindingsPath} from './config/paths';
 import notify from './notify';
 import {getColorMap} from './utils/colors';
 
@@ -54,7 +54,7 @@ const _watch = () => {
     }, 100);
   };
 
-  _watcher = chokidar.watch(cfgPath);
+  _watcher = chokidar.watch([cfgPath, keybindingsPath]);
   _watcher.on('change', onChange);
   _watcher.on('error', (error) => {
     console.error('error watching config', error);

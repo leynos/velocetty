@@ -240,12 +240,12 @@ Scope notes:
 
 ### 3.2. Keybindings and plugin settings storage
 
-- [ ] 3.2.1. Store keybindings in `keybindings.json5`. See
+- [x] 3.2.1. Store keybindings in `keybindings.json5`. See
   [velocetty-design.md](velocetty-design.md) §Configuration system: JSON5 and
   layering.
-  - [ ] Provide read/write utilities with schema validation.
-  - [ ] Support export/import in the same format.
-  - [ ] Success criteria: keybinding edits persist and hot-reload cleanly.
+  - [x] Provide read/write utilities with schema validation.
+  - [x] Support export/import in the same format.
+  - [x] Success criteria: keybinding edits persist and hot-reload cleanly.
 - [ ] 3.2.2. Persist plugin settings under namespaced keys. See
   [velocetty-design.md](velocetty-design.md) §Plugin settings persistence.
   - [ ] Define namespace conventions per plugin ID.

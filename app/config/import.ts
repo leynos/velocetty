@@ -3,14 +3,15 @@ import {createRequire} from 'node:module';
 import {resolve} from 'node:path';
 
 import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
-import {z} from 'zod';
 
 import type {configValidationDiagnostic, parsedConfig, rawConfig} from '@shared/types/config';
+import {createKeybindingsModule, parseKeybindingsSource} from './keybindings';
 import {parseJson5WithSchemaDiagnostics, safeParseRawConfig, stringifyJson5, type ParseSchema} from './json5-config';
 
 type LoadedConfig = {
   config: rawConfig;
   diagnostics: configValidationDiagnostic[];
+  usedFallback: boolean;
 };
 
 type ConfigInit = (userCfg: rawConfig, defaultCfg: rawConfig) => parsedConfig;
@@ -19,6 +20,7 @@ export type ConfigImportPaths = {
   cfgDir: string;
   cfgPath: string;
   defaultCfg: string;
+  keybindingsPath: string;
   defaultPlatformKeyPath: () => string;
   plugs: {
     base: string;
@@ -55,23 +57,6 @@ const defaultRawConfigFallback: rawConfig = {
 /** Creates an isolated copy of a raw config payload for safe mutation. */
 const cloneRawConfig = (config: rawConfig): rawConfig => structuredClone(config);
 
-const keymapValueSchema = z.union([z.string(), z.array(z.string())]);
-const keymapRecordSchema = z.record(z.string(), keymapValueSchema);
-
-const keymapSchema: ParseSchema<Record<string, string | string[]>> = {
-  safeParse: (value) => {
-    const parsed = keymapRecordSchema.safeParse(value);
-    if (!parsed.success) {
-      return {
-        success: false,
-        error: parsed.error
-      };
-    }
-
-    return {success: true, data: parsed.data};
-  }
-};
-
 const rawConfigSchema: ParseSchema<rawConfig> = {
   safeParse: (value) => safeParseRawConfig(value)
 };
@@ -100,13 +85,6 @@ const rawConfigDiagnosticHints = {
 } as const;
 
 const requireFromHere = createRequire(__filename);
-
-const keymapDiagnosticHints = {
-  '/': {
-    docHint: 'Keymap entries map command ids to keybinding strings or arrays.',
-    defaultHint: '{}'
-  }
-} as const;
 
 const reportDiagnostics = (
   warnFn: typeof console.warn,
@@ -150,19 +128,6 @@ const parseRawConfig = (source: ConfigSource) =>
     diagnosticHints: rawConfigDiagnosticHints
   });
 
-/**
- * Parses JSON5 keymap text and validates that each entry is a string or string array.
- *
- * Returns parsed keymaps plus diagnostics when fallback is used.
- */
-const parseKeymapConfig = (source: ConfigSource) =>
-  parseConfigSource(source, {
-    schema: keymapSchema,
-    fallback: {},
-    itemType: 'keymap',
-    diagnosticHints: keymapDiagnosticHints
-  });
-
 /** Serializes config using deterministic JSON5 formatting for stable snapshots. */
 const stringifyConfig = (config: rawConfig): string => stringifyJson5(config);
 
@@ -177,6 +142,16 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
   const warnFn = dependencies.warn ?? console.warn;
   const pathDeps = dependencies.paths;
   let defaultConfig: rawConfig | undefined;
+  let keybindingsModule: ReturnType<typeof createKeybindingsModule> | undefined;
+
+  const getKeybindingsModule = () => {
+    keybindingsModule ??= createKeybindingsModule({
+      filePath: pathDeps.keybindingsPath,
+      notify: notifyFn,
+      warn: warnFn
+    });
+    return keybindingsModule;
+  };
 
   const notifyWithPrimaryDiagnostic = (baseMessage: string, diagnostics: configValidationDiagnostic[]) => {
     const primaryDiagnostic = diagnostics[0];
@@ -184,7 +159,6 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
       notifyFn(baseMessage);
       return;
     }
-
     const docHint = primaryDiagnostic.docHint ? ` Hint: ${primaryDiagnostic.docHint}.` : '';
     const defaultHint = primaryDiagnostic.defaultHint ? ` Default: ${primaryDiagnostic.defaultHint}.` : '';
     notifyFn(
@@ -204,7 +178,6 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
       notifyFn("Couldn't update config schema metadata. Config editor validation may be stale.");
     }
   };
-
   /**
    * Bootstraps the user config file from the provided default template.
    *
@@ -212,7 +185,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
    */
   const ensureUserConfigFile = (defaultConfigTemplate: rawConfig) => {
     if (existsSync(pathDeps.cfgPath)) {
-      return;
+      return false;
     }
 
     warnFn(
@@ -220,12 +193,13 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
     );
     try {
       writeFileSync(pathDeps.cfgPath, stringifyConfig(defaultConfigTemplate), 'utf8');
+      return true;
     } catch (error) {
       console.error(`[config-import] Failed to write bootstrapped user config at "${pathDeps.cfgPath}".`, error);
       notifyFn("Couldn't create a user config file. Check permissions and available disk space.");
+      return false;
     }
   };
-
   const isConfigImportDebugEnabled = () => process.env.DEBUG_CONFIG_IMPORT === '1';
 
   const loadDefaultConfig = (): LoadedConfig => {
@@ -245,7 +219,8 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
     if (!parsedDefaultConfigResult.usedFallback && parsedDefaultConfigResult.value !== null) {
       return {
         config: parsedDefaultConfigResult.value,
-        diagnostics: parsedDefaultConfigResult.diagnostics
+        diagnostics: parsedDefaultConfigResult.diagnostics,
+        usedFallback: false
       };
     }
 
@@ -258,7 +233,8 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
     );
     return {
       config: cloneRawConfig(defaultRawConfigFallback),
-      diagnostics: parsedDefaultConfigResult.diagnostics
+      diagnostics: parsedDefaultConfigResult.diagnostics,
+      usedFallback: true
     };
   };
 
@@ -272,7 +248,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
       console.error(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`, err);
     }
 
-    const keymapResult = parseKeymapConfig({filePath, rawContent: content});
+    const keymapResult = parseKeybindingsSource({filePath, rawContent: content});
     if (keymapResult.usedFallback) {
       reportDiagnostics(warnFn, 'Platform keymap diagnostics.', filePath, keymapResult.diagnostics);
     }
@@ -289,7 +265,8 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
       if (!userCfgResult.usedFallback && userCfgResult.value !== null) {
         return {
           config: userCfgResult.value,
-          diagnostics: userCfgResult.diagnostics
+          diagnostics: userCfgResult.diagnostics,
+          usedFallback: false
         };
       }
 
@@ -302,7 +279,8 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
       );
       return {
         config: cloneRawConfig(defaultConfigFallback),
-        diagnostics: userCfgResult.diagnostics
+        diagnostics: userCfgResult.diagnostics,
+        usedFallback: true
       };
     } catch (err) {
       console.error(`[config-import] Failed to read or parse user config at "${pathDeps.cfgPath}".`, err);
@@ -312,7 +290,8 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
       notifyWithPrimaryDiagnostic("Couldn't parse config file. Using default config instead.", []);
       return {
         config: cloneRawConfig(defaultConfigFallback),
-        diagnostics: []
+        diagnostics: [],
+        usedFallback: true
       };
     }
   };
@@ -328,11 +307,15 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
 
     const {config: _defaultCfg} = loadDefaultConfig();
 
-    ensureUserConfigFile(_defaultCfg);
+    const userConfigBootstrapped = ensureUserConfigFile(_defaultCfg);
 
     _defaultCfg.keymaps = loadPlatformKeymap();
 
-    const {config: userCfg} = loadUserConfig(_defaultCfg);
+    const userConfigResult = loadUserConfig(_defaultCfg);
+    const userCfg = cloneRawConfig(userConfigResult.config);
+    const bootstrapKeymaps = userConfigResult.usedFallback || userConfigBootstrapped ? {} : (userCfg.keymaps ?? {});
+    const keybindingsResult = getKeybindingsModule().loadUserKeybindings({bootstrapFrom: bootstrapKeymaps});
+    userCfg.keymaps = keybindingsResult.keymaps;
 
     return {userCfg, defaultCfg: _defaultCfg};
   };
@@ -360,7 +343,6 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
     }
     return defaultConfig;
   };
-
   return {_import, getDefaultConfig};
 };
 
@@ -392,6 +374,9 @@ const lazyPaths: ConfigImportPaths = {
   },
   get defaultCfg() {
     return getPathsModule().defaultCfg as string;
+  },
+  get keybindingsPath() {
+    return getPathsModule().keybindingsPath as string;
   },
   defaultPlatformKeyPath: () => getPathsModule().defaultPlatformKeyPath() as string,
   get plugs() {
