@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be
 kept up to date as work proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -39,8 +39,7 @@ Success is observable when:
 5. `docs/roadmap.md` marks item `9.2.4` done only after the full
    validation sequence passes.
 
-This document is planning-only. Implementation must not begin until the
-user explicitly approves this ExecPlan.
+Implementation completed on 2026-04-23 after explicit user approval.
 
 ## Documentation and skills
 
@@ -196,18 +195,28 @@ behaviour cleanly.
   running tests.
 - [x] (2026-04-23) Drafted this ExecPlan at
   `docs/execplans/9-2-4-integration-and-regression-coverage-for-styled-jsx-removal.md`.
-- [ ] Await user approval.
-- [ ] Establish the failing regression checks that demonstrate the gap in
-  current coverage.
-- [ ] Extend unit/build contract coverage for packaged artefacts and CSS
-  Modules parity anchors.
-- [ ] Extend the fast E2E lane with packaged-output styled-jsx residue
-  checks.
-- [ ] Extend the deep E2E lane with one deterministic style-parity
-  scenario covering the three migration patterns.
-- [ ] Update `docs/developers-guide.md` and mark roadmap item `9.2.4`
-  done after the full validation sequence passes.
-- [ ] Record final outcomes, surprises, and retrospective notes here.
+- [x] (2026-04-23) User approved implementation in this worktree and the
+  plan moved to `IN PROGRESS`.
+- [x] (2026-04-23) Re-read the existing unit, fast-lane, and deep-lane
+  assertions to confirm that `9.2.4` was still a coverage gap rather than
+  a production regression.
+- [x] (2026-04-23) Extended unit/build coverage with packaged-output
+  residue scanning, `.tabs_list` CSS selector preservation, `SearchBox`
+  theme-variable assertions, `NewTab` theme-variable assertions, and
+  `Term` legacy-class render assertions.
+- [x] (2026-04-23) Added a shared packaged-output residue helper and
+  wired the fast E2E lane to fail before launch if
+  `dist/app/renderer/bundle.js` or `bundle.css` contains forbidden
+  styled-jsx residue.
+- [x] (2026-04-23) Added `test/e2e-deep/style-parity.e2e.ts` to verify
+  themed new-tab styling plus live `term_fit` / `term_wrapper`
+  compatibility classes in the packaged renderer.
+- [x] (2026-04-23) Updated `docs/developers-guide.md` with the `9.2.4`
+  regression checklist and marked roadmap item `9.2.4` complete.
+- [x] (2026-04-23) Ran the full repository validation stack, including
+  the fast and deep E2E lanes under `xvfb-run --auto-servernum` in this
+  WSL environment, and recorded the remaining environment observations
+  below.
 
 ## Surprises & Discoveries
 
@@ -223,11 +232,37 @@ behaviour cleanly.
   `test/e2e/electron-e2e-helpers.ts` are the natural place to add
   packaged `styled-jsx` residue checks.
 
+- Observation: `.tabs_list` is preserved through the selector contract in
+  `lib/components/tabs.module.css`, not by attaching the literal class to
+  the `<ul>` at render time.
+  Impact: coverage should assert selector preservation for tabs, while
+  `.term_fit` and `.term_wrapper` remain the DOM-attached legacy classes.
+
 - Observation: the deep E2E lane currently proves only terminal input and
   rendered output.
   Impact: the new style-parity coverage should either extend that file in
   a bounded way or split into a second deep-lane test file if size or
   readability would suffer.
+
+- Observation: direct Linux/WSL E2E launches without an X display crash
+  before `[e2e] renderer-ready`, even when the residue scan passes.
+  Impact: the repository's documented `xvfb-run --auto-servernum` wrapper
+  from `docs/testing-wsl2.md` is required for reliable local E2E
+  validation in this environment.
+
+- Observation: `nixie --no-sandbox` also depends on Puppeteer's pinned
+  `chrome-headless-shell@131.0.6778.204`, not just any installed Chrome
+  build.
+  Impact: local Mermaid validation in this environment required
+  installing that exact browser build before the documentation gate would
+  pass.
+
+- Observation: the first `make build` attempt failed during
+  `electron-builder` packaging with a transient JSON parse error while
+  AppImage metadata was being emitted.
+  Impact: a single rerun completed successfully with no code changes,
+  so the failure appears to be environmental or tool-level noise rather
+  than a regression introduced by this work.
 
 ## Decision Log
 
@@ -247,6 +282,30 @@ behaviour cleanly.
   Rationale: fast-lane additions should focus on packaged artefact
   cleanliness and cheap startup checks, while deep-lane additions should
   carry the richer style-parity assertions.
+  Date/Author: 2026-04-23 / Codex
+
+- Decision: treat global-selector compatibility as two related but
+  distinct contracts.
+  Rationale: `Term` still exposes literal legacy classes in the live DOM,
+  while `Tabs` preserves `.tabs_list` through a shared CSS selector in the
+  module stylesheet. The assertions should reflect the actual migration
+  model instead of assuming every legacy selector still appears as a DOM
+  class name.
+  Date/Author: 2026-04-23 / Codex
+
+- Decision: keep the new deep-lane parity assertions in a dedicated
+  `test/e2e-deep/style-parity.e2e.ts` file.
+  Rationale: `terminal-input-path.e2e.ts` already owns the interaction
+  path. A second deep-lane file keeps the style contract readable and
+  avoids mixing unrelated failure modes in one long test.
+  Date/Author: 2026-04-23 / Codex
+
+- Decision: use DOM selectors for the new-tab parity scenario instead of
+  relying on Playwright accessibility-role lookup.
+  Rationale: the packaged renderer reliably exposes the DOM contract
+  (`button[title="New Tab"]` and `button[aria-label="New Tab"]`), while
+  `getByRole(...)` proved brittle in this environment even after the
+  window finished loading.
   Date/Author: 2026-04-23 / Codex
 
 ## Plan of work
@@ -416,4 +475,40 @@ Acceptance criteria:
 
 ## Outcomes & Retrospective
 
-Pending implementation approval.
+Implemented the `9.2.4` regression contract with focused coverage rather
+than production-code churn:
+
+1. Added shared styled-jsx residue scanning in
+   `test/testUtils/styled-jsx-residue.ts` and used it to strengthen both
+   unit/build coverage and the fast E2E lane.
+2. Extended unit coverage so the repository now explicitly checks:
+   packaged-output residue detection, preserved `.tabs_list` CSS
+   selector output, `SearchBox` theme custom properties, `NewTab` theme
+   custom properties, and `Term` legacy DOM classes.
+3. Added `test/e2e-deep/style-parity.e2e.ts` so the deep lane now
+   validates a live packaged renderer for local CSS Module styling,
+   dynamic theme values, and preserved terminal compatibility classes.
+4. Updated `docs/developers-guide.md` and `docs/roadmap.md` so the
+   regression workflow is discoverable outside this ExecPlan.
+
+Validation summary:
+
+- `bun fmt`: pass
+- `bun install`: pass
+- `make build`: pass on rerun after one transient packaging failure
+- `make check-fmt`: pass
+- `make lint`: pass
+- `make test`: pass
+- `xvfb-run --auto-servernum bun run test:e2e:fast`: pass
+- `xvfb-run --auto-servernum bun run test:e2e:deep`: pass
+- `bunx markdownlint-cli2 "docs/**/*.md"`: pass
+- `nixie --no-sandbox`: pass after installing Puppeteer's pinned
+  `chrome-headless-shell@131.0.6778.204`
+
+Lessons learned:
+
+- The deepest styled-jsx-removal contract is better expressed as a mix of
+  artefact scanning, DOM class assertions, and narrow computed-style
+  checks than as a visual-regression harness.
+- WSL validation for Electron and Mermaid needs explicit browser/display
+  prerequisites; once those are present, the new coverage remains stable.

@@ -366,3 +366,32 @@ test.serial('SearchBox output element carries aria-live polite for screen-reader
     await teardown();
   }
 });
+
+test.serial('SearchBox exposes CSS custom properties and CSS Module classes for themed controls', async () => {
+  const {container, teardown} = await renderSearchBox();
+  try {
+    const searchContainer = container.firstElementChild;
+    const searchInput = container.querySelector<HTMLInputElement>('input[type="text"]');
+    const toggleButton = container.querySelector<HTMLButtonElement>(`button[title="${defaultLabels.matchCaseLabel}"]`);
+
+    expect(searchContainer).toBeTruthy();
+    expect(searchInput).toBeTruthy();
+    expect(toggleButton).toBeTruthy();
+
+    if (!searchContainer || !searchInput || !toggleButton) {
+      throw new Error('Expected search container, input, and toggle button to be present');
+    }
+
+    expect(searchContainer.className).toContain('searchContainer');
+    expect(searchContainer.className).not.toContain('  ');
+    expect(searchContainer.style.getPropertyValue('--search-bg')).toBe(defaultColors.backgroundColor);
+    expect(searchContainer.style.getPropertyValue('--search-border')).toBe(defaultColors.borderColor);
+    expect(searchContainer.style.getPropertyValue('--search-fg')).toBe(defaultColors.foregroundColor);
+    expect(searchContainer.style.getPropertyValue('--search-selection')).toBe(defaultColors.selectionColor);
+    expect(searchContainer.style.getPropertyValue('--search-font')).toBe(defaultColors.font);
+    expect(searchInput.className).toContain('searchInput');
+    expect(toggleButton.className).toContain('searchButton');
+  } finally {
+    await teardown();
+  }
+});

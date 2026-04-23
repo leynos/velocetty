@@ -17,6 +17,7 @@ import {
   createRendererExternalsPlugin,
   resolveRendererExternalPath
 } from '../../build/esbuild/esbuild-plugins/renderer-externals-plugin';
+import {collectStyledJsxResidueMatches, formatStyledJsxResidueMatches} from '../testUtils/styled-jsx-residue';
 
 /** Creates an isolated temporary directory for build fixture tests. */
 const createTempDir = () => mkdtemp(path.join(tmpdir(), 'velocetty-esbuild-'));
@@ -87,6 +88,31 @@ test('translation: CSS Modules are bundled with scoped class names in renderer b
     expect(classMapMatch).toBeTruthy();
     // The scoped class name follows the expected pattern (module prefix + underscore + class name)
     expect(classMapMatch?.[1]).toMatch(/^fixture_searchBox$/);
+  } finally {
+    await rm(rootDir, {recursive: true, force: true});
+  }
+});
+
+test('translation: renderer CSS bundle preserves the legacy tabs_list selector contract', async () => {
+  const rootDir = await createTempDir();
+  try {
+    const entryPoint = path.join(rootDir, 'fixture.ts');
+    await writeFixtureFile(
+      entryPoint,
+      `import ${JSON.stringify(path.join(process.cwd(), 'lib/components/tabs.module.css'))};`
+    );
+
+    const rendererOptions = createRendererBuildOptions('development', rootDir);
+    const buildResult = await runEsbuildBuild({
+      ...rendererOptions,
+      entryPoints: [entryPoint],
+      bundle: true,
+      write: false,
+      outfile: path.join(rootDir, 'bundle.js')
+    });
+
+    const cssOutput = buildResult.outputFiles.find((file) => file.path.endsWith('.css'))?.text ?? '';
+    expect(cssOutput).toContain('.tabs_list');
   } finally {
     await rm(rootDir, {recursive: true, force: true});
   }
@@ -334,6 +360,27 @@ test('translation: renderer build removes styled-jsx syntax', async () => {
     // transformation, confirming the build succeeded and produced valid output.
     expect(bundleOutput.includes('react')).toBe(true);
     expect(bundleOutput.includes('createElement') || bundleOutput.includes('jsx')).toBe(true);
+  } finally {
+    await rm(rootDir, {recursive: true, force: true});
+  }
+});
+
+test('translation: packaged-output residue scan reports offending renderer artefacts', async () => {
+  const rootDir = await createTempDir();
+  try {
+    const cleanFile = path.join(rootDir, 'dist', 'app', 'renderer', 'bundle.css');
+    const offendingFile = path.join(rootDir, 'dist', 'app', 'renderer', 'bundle.js');
+    await writeFixtureFile(cleanFile, '.searchBox { color: var(--search-fg); }');
+    await writeFixtureFile(
+      offendingFile,
+      ["import 'styled-jsx/style';", 'export const stale = "<style jsx>{`.x { color: red; }`}</style>";'].join('\n')
+    );
+
+    const matches = await collectStyledJsxResidueMatches([cleanFile, offendingFile]);
+
+    expect(formatStyledJsxResidueMatches(matches)).toEqual([
+      `${offendingFile} [styled-jsx/style, styled-jsx, <style jsx]`
+    ]);
   } finally {
     await rm(rootDir, {recursive: true, force: true});
   }
