@@ -14,6 +14,7 @@ import {app} from 'electron';
 import isDev from 'electron-is-dev';
 
 const cfgFile = 'config.json5';
+const keybindingsFile = 'keybindings.json5';
 const legacyCfgFile = 'hyper.json';
 const defaultCfgFile = 'config-default.json';
 const schemaFile = 'schema.json';
@@ -28,6 +29,7 @@ let cfgDir = process.env.XDG_CONFIG_HOME
     : join(homeDirectory, '.config', 'Hyper');
 
 let cfgPath = join(cfgDir, cfgFile);
+let keybindingsPath = join(cfgDir, keybindingsFile);
 const legacyCfgPath = join(cfgDir, legacyCfgFile);
 const schemaPath = resolve(__dirname, schemaFile);
 
@@ -54,10 +56,12 @@ if (isDev) {
   if (fileExists(devCfg)) {
     cfgPath = devCfg;
     cfgDir = devDir;
+    keybindingsPath = join(devDir, keybindingsFile);
     console.log('using config file:', cfgPath);
   } else if (fileExists(devLegacyCfg)) {
     cfgPath = devLegacyCfg;
     cfgDir = devDir;
+    keybindingsPath = join(devDir, keybindingsFile);
     console.warn(
       `using legacy config file: ${cfgPath}. Rename to "${cfgFile}" to align with JSON5 config conventions.`
     );
@@ -119,6 +123,8 @@ const defaultPlatformKeyPath = () => {
 export {
   cfgDir,
   cfgPath,
+  keybindingsFile,
+  keybindingsPath,
   cfgFile,
   defaultCfg,
   icon,

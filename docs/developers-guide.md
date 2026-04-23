@@ -173,6 +173,8 @@ for active configuration files:
 - Parse and write `config.json5` as JSON5 (including comments and trailing
   commas).
 - Do not rely on `.hyper.js` migration; legacy migration paths were removed.
+- Persist user keybinding overrides in `keybindings.json5`, not inside
+  `config.json5`.
 - Persist runtime plugin settings under `config.plugins.<plugin-id>` in
   `config.json5`.
 - Keep config-validation diagnostics structured with required fields:
@@ -201,6 +203,28 @@ Merge semantics:
 
 - **Objects**: deep merge (nested properties recursively merged).
 - **Arrays**: replace (user array completely replaces default array).
+
+Keybindings follow a parallel layering model:
+
+1. **Core defaults** (`app/keymaps/<platform>.json`)
+2. **Plugin defaults** (runtime contributions, not persisted)
+3. **User overrides** (`keybindings.json5`)
+
+When touching keybinding storage:
+
+- Treat `config.json5.keymaps` as a legacy bootstrap source only. If
+  `keybindings.json5` is missing, existing user keymaps may be copied there
+  once; after that, `keybindings.json5` is the source of truth.
+- Keep `keybindings.json5` JSON5-compatible, including comments and trailing
+  commas.
+- Preserve the last known good in-memory keybindings if `keybindings.json5`
+  becomes invalid during hot reload, and surface structured diagnostics rather
+  than clearing active shortcuts.
+- Extend `test/unit/config-import-json5.test.ts`,
+  `test/unit/config-import-keybindings-json5.test.ts`,
+  `test/unit/keybindings-json5.test.ts`, and
+  `test/unit/config-keybindings-watch.test.ts` when the keybindings file
+  format or reload behaviour changes.
 
 Use `resolveConfigLayers()` from `app/config/layering.ts` to resolve the effective
 configuration:
