@@ -37,7 +37,7 @@ This ExecPlan is a living document. The sections `Constraints`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT (2026-04-22)
+Status: COMPLETE (2026-04-23)
 
 ## Purpose / big picture
 
@@ -455,10 +455,27 @@ Evidence acceptance:
   explorer sub-agents.
 - [x] 2026-04-22 23:03Z: Drafted this ExecPlan with explicit scope boundaries
   for `3.2.1`, including migration, watcher, and import/export decisions.
-- [ ] Await explicit user approval before implementation.
+- [x] 2026-04-23 22:37Z: User approved implementation by asking to proceed with
+  this ExecPlan and keep it updated during execution.
+- [x] 2026-04-23 22:44Z: Revalidated the current branch, repo instructions,
+  earlier rollout notes, and code surfaces before editing.
 - [ ] Add failing tests that lock in `keybindings.json5` storage semantics.
 - [ ] Implement dedicated keybinding storage, migration, and reload wiring.
 - [ ] Update documentation, run all gates, and mark roadmap item `3.2.1` done.
+- [x] 2026-04-23 23:21Z: Added and passed focused coverage for
+  `keybindings.json5` bootstrap, precedence, import/export, and dual-file
+  reload behaviour in `test/unit/config-import-json5.test.ts`,
+  `test/unit/config-import-keybindings-json5.test.ts`,
+  `test/unit/keybindings-json5.test.ts`, and
+  `test/unit/config-keybindings-watch.test.ts`.
+- [x] 2026-04-23 23:26Z: Implemented dedicated keybindings storage helpers,
+  rewired config import to source user keymaps from `keybindings.json5`,
+  extended the config watcher to include both config files, and updated
+  contributor-facing docs plus the roadmap entry.
+- [x] 2026-04-23 23:38Z: Ran the required sequential gates plus doc validation:
+  `bun install`, `make build`, `make check-fmt`, `make lint`, `make test`,
+  `bunx markdownlint-cli2 "docs/**/*.md"`, and `nixie --no-sandbox`.
+- [ ] Commit and push the completed change.
 
 ## Surprises & Discoveries
 
@@ -472,6 +489,21 @@ Evidence acceptance:
 - The current codebase appears not to expose keybinding import/export commands
   yet, even though the design docs mention them. The implementation should keep
   that gap visible instead of quietly widening scope.
+- `grepai` is currently unavailable in this environment because its local
+  Qdrant backend is not reachable. Execution is falling back to `leta` plus
+  exact `rg` searches, which keeps discovery within repo guidance without
+  blocking the milestone.
+- `app/config/import.ts` already owns JSON5 diagnostics and bootstrap flows for
+  `config.json5`, which makes it the right place to add keybindings-file
+  bootstrap, parse, and last-known-good handling rather than introducing a
+  separate top-level import pipeline.
+- Runtime plugin settings still persist under `config.json5` and already reuse
+  comment-preserving JSON5 patching. That persistence path remains in scope as
+  precedent only; `3.2.1` should not move plugin settings into the new file.
+- The new storage helper and the config-import harness both crossed the repo’s
+  400-line file-size limit during implementation. The fix was to move
+  keybindings-specific parsing into `app/config/keybindings.ts` and split the
+  config-import tests into a shared harness plus focused specs.
 
 ## Decision Log
 
@@ -494,13 +526,76 @@ Evidence acceptance:
   Rationale: repo instructions explicitly forbid sub-agents from running tests,
   and the branch needs one owner for the sequential validation loop.
 
+- 2026-04-23: Keep legacy `config.json5` `keymaps` as a one-time bootstrap
+  source only, and do not remove them automatically during this milestone.
+  Rationale: reading them only when `keybindings.json5` is missing preserves
+  user data without widening scope into comment-preserving deletion patches for
+  `config.json5`.
+
+- 2026-04-23: Implement import/export as focused app-config utility functions
+  rather than new UI or command-palette surfaces.
+  Rationale: the roadmap item requires the file format and utility layer, while
+  command/UI affordances are explicitly separated into later roadmap work.
+
+- 2026-04-23: Avoid seeding `keybindings.json5` from a freshly bootstrapped
+  default `config.json5`.
+  Rationale: only pre-existing user `config.json5.keymaps` entries represent
+  migration-worthy user data; a newly generated config file should still
+  produce an empty `keybindings.json5` unless real legacy overrides existed.
+
 ## Outcomes & Retrospective
 
-Implementation has not started. This section should be completed only after the
-plan is approved and executed, and must summarize:
+Velocetty now stores user keybinding overrides in `keybindings.json5`, keeps
+`config.json5.keymaps` as a one-time bootstrap source only, validates and
+roundtrips the dedicated file through focused import/export helpers, and watches
+both config files so keybinding edits reload through the existing renderer
+rebinding path. Invalid `keybindings.json5` content now preserves the last known
+good in-memory keymaps and emits structured diagnostics instead of clearing
+shortcuts.
 
-- what shipped;
-- which files changed and why at a high level;
-- which risks materialized and how they were resolved;
-- exact gate outcomes and log paths;
-- any deferred follow-up work that remains outside roadmap item `3.2.1`.
+High-level change areas:
+
+- `app/config/paths.ts`, `app/config/import.ts`, `app/config.ts`, and the new
+  `app/config/keybindings.ts` introduce the dedicated file path, bootstrap and
+  load the new JSON5 payload, preserve last-known-good keymaps, and watch both
+  config files.
+- `docs/developers-guide.md` and `docs/roadmap.md` now describe the split
+  between `config.json5` and `keybindings.json5`, the legacy bootstrap
+  behaviour, and the new tests that must move with future changes.
+- New tests in `test/unit/config-import-keybindings-json5.test.ts`,
+  `test/unit/keybindings-json5.test.ts`, and
+  `test/unit/config-keybindings-watch.test.ts`, plus updates to
+  `test/unit/config-import-json5.test.ts`, lock in bootstrap, precedence,
+  import/export, and dual-file reload behaviour.
+
+Materialized risks and resolutions:
+
+- Bootstrap ambiguity: a newly generated default `config.json5` briefly looked
+  like a legacy migration source. The fix was to seed `keybindings.json5` only
+  from pre-existing user `config.json5.keymaps`, not from freshly bootstrapped
+  defaults.
+- File-size hygiene: `app/config/import.ts` and the original config-import test
+  file crossed the repo’s 400-line limit during implementation. The fix was to
+  move keybindings-specific parsing into `app/config/keybindings.ts` and split
+  the test surface with a shared harness.
+
+Validation evidence:
+
+- `bun install` passed. Log: `/tmp/bun-install-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
+- `make build` passed. Log: `/tmp/build-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
+- `make check-fmt` passed after a `bun fmt` cleanup pass. Log:
+  `/tmp/check-fmt-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
+- `make lint` passed. Log: `/tmp/lint-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
+- `make test` passed with `434` unit tests green. Log:
+  `/tmp/test-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
+- `bunx markdownlint-cli2 "docs/**/*.md"` passed. Log:
+  `/tmp/markdownlint-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
+- `nixie --no-sandbox` passed. Log:
+  `/tmp/nixie-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
+
+Deferred follow-up work outside roadmap item `3.2.1` remains unchanged:
+
+- workspace-specific keybinding overrides;
+- command or UI affordances for opening, importing, and exporting keybindings;
+- any broader cleanup of legacy `config.json5.keymaps` data after the bootstrap
+  window.

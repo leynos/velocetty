@@ -8,14 +8,23 @@ import {isJsonObject} from './utils/runtime-guards';
 import {createConfigImportModule} from './config/import';
 import {_init} from './config/init';
 import _openConfig from './config/open';
-import {cfgPath, cfgDir, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath} from './config/paths';
+import {
+  cfgPath,
+  cfgDir,
+  defaultCfg,
+  defaultPlatformKeyPath,
+  keybindingsPath,
+  plugs,
+  schemaFile,
+  schemaPath
+} from './config/paths';
 import notify from './notify';
 import {getColorMap} from './utils/colours';
 
 const {_import, getDefaultConfig} = createConfigImportModule({
   _init,
   notify,
-  paths: {cfgDir, cfgPath, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath}
+  paths: {cfgDir, cfgPath, defaultCfg, defaultPlatformKeyPath, keybindingsPath, plugs, schemaFile, schemaPath}
 });
 
 const watchers: Function[] = [];
@@ -70,7 +79,7 @@ const _watch = () => {
     }, 100);
   };
 
-  _watcher = chokidar.watch(cfgPath);
+  _watcher = chokidar.watch([cfgPath, keybindingsPath]);
   _watcher.on('change', onChange);
   _watcher.on('error', (error) => {
     console.error('error watching config', error);
