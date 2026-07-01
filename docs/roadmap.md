@@ -12,6 +12,12 @@ Scope notes:
 - Dependencies are called out explicitly using dotted notation.
 - Each task references the design or PRD section it implements.
 
+## Out of scope for this roadmap
+
+- Marketplace, payments, or plugin monetization flows.
+- Multi-user collaboration or shared terminal sessions.
+- Persisting full terminal scrollback across restarts.
+
 ## 1. Core scaffolding and shared contracts
 
 ### 1.1. Repository split and build foundations
@@ -584,7 +590,7 @@ changes remain in section 7 and are out of scope here.
     `test/unit/v8-snapshot-util.test.ts`.
   - [x] Remove config-path, plugin-config, and mocked module bleed in
     `test/unit/cli-api-behaviour.test.ts`.
-- [x] Success criteria: targeted
+  - [x] Success criteria: targeted
     `bun test --concurrent test/unit/v8-snapshot-util.test.ts test/unit/cli-api-behaviour.test.ts`
     passes 100 consecutive local runs with stable config and snapshot
     expectations.
@@ -623,9 +629,3 @@ changes remain in section 7 and are out of scope here.
     `bun test --concurrent --randomize --seed 20260306 test/unit` all pass,
     and then `bun install`, `make build`, `make check-fmt`, `make lint`, and
     `make test` pass with `--concurrent` in the default unit-test path.
-
-## Out of scope for this roadmap
-
-- Marketplace, payments, or plugin monetization flows.
-- Multi-user collaboration or shared terminal sessions.
-- Persisting full terminal scrollback across restarts.
