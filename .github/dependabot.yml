@@ -1,25 +1,44 @@
 version: 2
 updates:
-- package-ecosystem: npm
+# Root package.json uses a bun.lock, so the bun ecosystem manages it.
+- package-ecosystem: bun
   directory: "/"
   schedule:
     interval: weekly
     time: '11:00'
   open-pull-requests-limit: 30
-  target-branch: canary
-  versioning-strategy: increase
+  labels:
+    - "dependencies"
+    - "bun"
+  cooldown:
+    default-days: 7
+    semver-major-days: 14
 - package-ecosystem: npm
-  directory: "/app"
+  directories:
+    - "/app"
+    - "/backend"
+    - "/frontend"
+    - "/shared"
   schedule:
     interval: weekly
     time: '11:00'
   open-pull-requests-limit: 30
-  target-branch: canary
   versioning-strategy: increase
+  labels:
+    - "dependencies"
+    - "npm"
+  cooldown:
+    default-days: 7
+    semver-major-days: 14
 - package-ecosystem: github-actions
   directory: "/"
   schedule:
     interval: weekly
     time: '11:00'
   open-pull-requests-limit: 30
-  target-branch: canary
+  labels:
+    - "dependencies"
+    - "github-actions"
+  cooldown:
+    default-days: 7
+    semver-major-days: 14
