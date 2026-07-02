@@ -42,7 +42,7 @@ jobs:
       - name: Read the pr_num file
         if: steps.pr_num_exists.outputs.exists == '1'
         id: pr_num_reader
-        uses: juliangruber/read-file-action@v1.1.7
+        uses: juliangruber/read-file-action@v1.1.8
         with:
           path: ./pr_num.txt
       - name: Collect screenshots
