@@ -79,7 +79,7 @@
         "inquirer": "^13.3.0",
         "node-addon-api": "^8.0.0",
         "node-gyp": "^10.0.0",
-        "node-gyp-build": "^4.7.1",
+        "node-gyp-build": "^4.8.4",
         "parse-url": "^8.1.0",
         "playwright": "^1.58.2",
         "plist": "^3.1.0",
@@ -92,7 +92,6 @@
   },
   "patchedDependencies": {
     "leveldown@5.6.0": "patches/leveldown@5.6.0.patch",
-    "node-gyp-build@4.7.1": "patches/node-gyp-build@4.7.1.patch",
   },
   "overrides": {
     "@babel/runtime": "^7.28.6",
@@ -1079,7 +1078,7 @@
 
     "node-gyp": ["node-gyp@10.3.1", "", { "dependencies": { "env-paths": "^2.2.0", "exponential-backoff": "^3.1.1", "glob": "^10.3.10", "graceful-fs": "^4.2.6", "make-fetch-happen": "^13.0.0", "nopt": "^7.0.0", "proc-log": "^4.1.0", "semver": "^7.3.5", "tar": "^6.2.1", "which": "^4.0.0" }, "bin": { "node-gyp": "bin/node-gyp.js" } }, "sha512-Pp3nFHBThHzVtNY7U6JfPjvT/DTE8+o/4xKsLQtBoU+j2HLsGlhcfzflAoUreaJbNmYnX+LlLi0qjV8kpyO6xQ=="],
 
-    "node-gyp-build": ["node-gyp-build@4.7.1", "", {}, "sha512-wTSrZ+8lsRRa3I3H8Xr65dLWSgCvY2l4AOnaeKdPA9TB/WYMPaTcrzf3rXvFoVvjKNVnu0CcWSx54qq9GKRUYg=="],
+    "node-gyp-build": ["node-gyp-build@4.8.4", "", { "bin": { "node-gyp-build": "bin.js", "node-gyp-build-optional": "optional.js", "node-gyp-build-test": "build-test.js" } }, "sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ=="],
 
     "node-releases": ["node-releases@2.0.27", "", {}, "sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA=="],
 
