@@ -118,7 +118,7 @@
     "concurrently": "^8.2.2",
     "cpy-cli": "^7.0.0",
     "cross-env": "^10.1.0",
-    "electron": "^40.2.1",
+    "electron": "^42.4.1",
     "electron-builder": "^24.13.3",
     "electron-link": "^0.6.0",
     "electron-mksnapshot": "^40.2.1",
