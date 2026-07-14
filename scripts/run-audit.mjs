@@ -16,7 +16,7 @@ import {
 } from '../security/audit-utils.js';
 import packageJson from '../package.json' with {type: 'json'};
 
-const normalise = (path) =>
+const normalize = (path) =>
   typeof realpathSync.native === 'function' ? realpathSync.native(path) : realpathSync(path);
 
 const workspacePackageName = packageJson.name;
@@ -139,7 +139,7 @@ function isExecutedDirectly(meta) {
   try {
     const scriptPath = fileURLToPath(meta.url);
     const absoluteInvokedPath = resolve(invokedPath);
-    return normalise(scriptPath) === normalise(absoluteInvokedPath);
+    return normalize(scriptPath) === normalize(absoluteInvokedPath);
   } catch {
     // Treat resolution failures as "not invoked directly".
     return false;

@@ -77,7 +77,7 @@ Last updated: 2026-03-27
 - Remove the current requirement to restart terminal sessions after changing
   `webGLRenderer`.
 - Apply renderer-setting changes to existing sessions without reopening tabs.
-- Preserve fallback behavior when WebGL contexts are unavailable.
+- Preserve fallback behaviour when WebGL contexts are unavailable.
 - The reloadability registry in `shared/src/constants/config-reloadability.ts`
   currently classifies `webGLRenderer` as `restart`-required pending this work.
 
@@ -85,7 +85,7 @@ Last updated: 2026-03-27
 
 - Changing `webGLRenderer` takes effect for active sessions without restart.
 - Update `webGLRenderer` classification to `live` in the reloadability registry.
-- Unit or integration tests cover hot-reload behavior and fallback handling.
+- Unit or integration tests cover hot-reload behaviour and fallback handling.
 - `make lint` and `make test` remain green.
 
 ## CONFIG-002 Support workspace-level configuration overrides

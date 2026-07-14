@@ -1,16 +1,16 @@
 import {spawnSync} from 'node:child_process';
 
-import {normaliseArch} from './shared/arch.js';
+import {normalizeArch} from './shared/arch.js';
 
 function shouldSkipAllSnapshots() {
   return process.env.SKIP_V8_SNAPSHOT === '1';
 }
 
 function resolveTargetArchitectures() {
-  const hostArch = normaliseArch(process.arch);
+  const hostArch = normalizeArch(process.arch);
   const isArm64Host = hostArch === 'arm64';
   const skipX64Snapshot = process.env.SKIP_X64_V8_SNAPSHOT === '1';
-  // x64 Linux hosts rely on Electron's cross-arch mksnapshot artifact
+  // x64 Linux hosts rely on Electron's cross-arch mksnapshot artefact
   // (`clang_x64_v8_arm64`) to build arm64 snapshots in CI.
   // Non-Linux arm64 hosts often lack a reliable x64 runner for mksnapshot.
   const canRunX64Snapshots = !isArm64Host || process.platform === 'linux';

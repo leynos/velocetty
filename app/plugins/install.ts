@@ -1,5 +1,5 @@
 /**
- * @file Handles plugin installation via Bun in a serialised queue.
+ * @file Handles plugin installation via Bun in a serialized queue.
  *
  * Spawns `bun install` in the plugins directory with production dependencies
  * only, using a concurrency-1 queue to avoid parallel install conflicts.

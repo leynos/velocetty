@@ -263,7 +263,7 @@ Success is observable when:
   Date/Author: 2026-02-24 / Codex
 - Decision: factor repeated plugin module mock wiring into
   `test/testUtils/plugins-mock.ts`.
-  Rationale: keeps Bun path-mocking behavior consistent across the Hyper and
+  Rationale: keeps Bun path-mocking behaviour consistent across the Hyper and
   renderer unit suites and reduces duplicated `createPluginExports` factories.
   Date/Author: 2026-02-24 / Codex
 - Decision: keep `SKIP_V8_SNAPSHOT=1` for Linux aarch64 install speed, but add a

@@ -25,6 +25,29 @@ must follow locally.
   for renderer, CLI, and app copy artefacts.
 - Keep documentation wrapped to 80 columns and code blocks to 120 columns.
 
+## Spelling gate
+
+Run `make spelling` to enforce en-GB-oxendict spelling in tracked Markdown and
+the shared phrase policy across eligible tracked text. The gate uses Typos
+1.48.0 and the repository's generated `typos.toml`.
+
+The tracked configuration is built from the shared estate dictionary and the
+narrow `typos.local.toml` overlay. Run `make spelling-config-write` after an
+intentional policy change, and run `make spelling-config` to verify that the
+tracked output is current. The pinned builder refreshes the untracked local
+cache only when the authoritative dictionary is newer, so an already populated
+cache remains usable offline.
+
+Do not edit `typos.toml` directly. Preserve public APIs, serialized schema
+keys, CSS syntax, upstream action inputs, dependency names and formal product
+terms through narrow local policy. Keep quoted identifiers in inline code or
+fenced blocks. The exact phrase gate rejects the hyphenated variant in favour
+of `handwritten`, including in hidden tracked source.
+
+`make nixie` validates the repository's Mermaid diagrams. Continuous
+Integration installs Nixie 1.1.0 and its Merman 0.7.0 dependency on the Linux
+build leg without changing the product's cross-platform toolchain matrix.
+
 ## CSS modules conventions
 
 - Import local classes with typed CSS modules from component directories:
@@ -595,7 +618,7 @@ scope:
 - For Windows install, map `TMP`, `TEMP`, and `npm_config_tmp` to
   `${{ runner.temp }}` so `node-gyp` extraction uses a deterministic writable
   path instead of the short-name `%LOCALAPPDATA%` alias.
-- `bin/download-mksnapshot.js` now retries transient artifact download failures
+- `bin/download-mksnapshot.js` now retries transient artefact download failures
   (for example, `ECONNRESET`, timeout/DNS errors, and 5xx/429 responses) with
   exponential backoff before failing the installation.
 - Tune retry behaviour with `MKSNAPSHOT_DOWNLOAD_RETRY_ATTEMPTS` (default `4`)

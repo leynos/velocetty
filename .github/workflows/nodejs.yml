@@ -13,6 +13,7 @@ defaults:
     shell: bash
 env:
   NODE_VERSION: 24.11.1
+  MERMAN_CLI_VERSION: '0.7.0'
 jobs:
   build:
     if: github.event_name == 'push' || github.event_name == 'pull_request'
@@ -35,6 +36,34 @@ jobs:
         uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2
         with:
           bun-version: 1.3.11
+      - name: Setup uv for spelling
+        if: runner.os == 'Linux'
+        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244
+        with:
+          enable-cache: false
+      - name: Spelling
+        if: runner.os == 'Linux'
+        run: make spelling
+      - name: Set up isolated Rust for Merman
+        if: runner.os == 'Linux'
+        run: rustup toolchain install 1.95.0 --profile minimal
+      - name: Cache Merman
+        if: runner.os == 'Linux'
+        id: cache-merman
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.cargo/bin/merman-cli
+          key: merman-cli-${{ runner.os }}-${{ runner.arch }}-${{ env.MERMAN_CLI_VERSION }}
+      - name: Install Mermaid validation tools
+        if: runner.os == 'Linux'
+        run: |
+          uv tool install nixie-cli==1.1.0
+          if [[ "${{ steps.cache-merman.outputs.cache-hit }}" != 'true' ]]; then
+            cargo +1.95.0 install merman-cli --version "=${MERMAN_CLI_VERSION}" --locked
+          fi
+      - name: Validate Mermaid diagrams
+        if: runner.os == 'Linux'
+        run: make nixie
       - name: Fix node-gyp and Python
         id: setup_node_gyp_python
         run: .github/scripts/setup-node-gyp-python.sh "$RUNNER_TEMP/node-gyp-python"
@@ -87,7 +116,7 @@ jobs:
           win_csc_key_password: ${{ runner.os == 'Windows' && secrets.WIN_CERT_P12_PASSWORD || '' }}
           apple_id: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
           apple_app_specific_password: ${{ runner.os == 'macOS' && secrets.APPLE_PASSWORD || '' }}
-      - name: Archive Build Artifacts
+      - name: Archive Build Artefacts
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: build-${{ matrix.os }}
@@ -130,7 +159,7 @@ jobs:
           name: e2e-${{ matrix.os }}
           path: dist/tmp/*.png
           if-no-files-found: warn
-      - name: Save the pr number in an artifact
+      - name: Save the pr number in an artefact
         if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest'
         env:
           PR_NUM: ${{ github.event.number }}
@@ -296,7 +325,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_V8_SNAPSHOT_COPY: '1'
-      - name: Archive Build Artifacts
+      - name: Archive Build Artefacts
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: build-linux-arm64

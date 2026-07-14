@@ -3,7 +3,7 @@
  *
  * Provides a single `createCommandRegistryModuleStub` function that returns
  * the full mock shape expected by `mock.module('../../lib/command-registry',
- * ...)` call sites in Hyper component test suites. Centralising this stub
+ * ...)` call sites in Hyper component test suites. Centralizing this stub
  * prevents duplicated inline shapes from drifting apart across test files.
  */
 

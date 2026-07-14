@@ -220,7 +220,7 @@ issue and rerun the failing command before proceeding. If `tsgo` does not
 support required flags, stop after documenting the issue in the Decision Log
 and ask for guidance.
 
-## Artifacts and Notes
+## Artefacts and Notes
 
 Keep the `tee` logs from validation in `/tmp` and summarize any failures in the
 Decision Log before retrying.

@@ -1,8 +1,8 @@
 /** @file Ensures Electron background colours normalize to hex values. */
 import {expect, test} from 'bun:test';
 
-import toElectronBackgroundColor from '../../app/utils/to-electron-background-color';
-import {isHexColor} from '../testUtils/is-hex-color';
+import toElectronBackgroundColor from '../../app/utils/to-electron-background-colour';
+import {isHexColor} from '../testUtils/is-hex-colour';
 
 test(`returns a color that's in hex`, () => {
   const inputs = [

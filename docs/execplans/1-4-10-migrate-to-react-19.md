@@ -257,7 +257,7 @@ fails, review the corresponding log in `/tmp/` and fix the underlying issue
 before re-running only the failed command. Use Git status to verify the lock
 file and documentation changes are expected after re-running.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Expected file touch list (may expand if compatibility fixes are needed):
 

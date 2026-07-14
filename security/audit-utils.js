@@ -1,6 +1,6 @@
 /** @file Shared helpers for running `bun audit` and reasoning about advisories.
  *
- * These helpers centralise the JSON parsing and filtering logic used by the
+ * These helpers centralize the JSON parsing and filtering logic used by the
  * security validation scripts. They ensure both the security gate and
  * workspace-specific audit wrappers interpret the CLI output consistently.
  *

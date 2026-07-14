@@ -220,121 +220,54 @@ protocol.
 
 
 ```mermaid
-
 flowchart TB
-
-&nbsp;   subgraph Frontend\["Frontend (React)"]
-
-&nbsp;       UI\["UI: Terminal, tabs, settings"]
-
-&nbsp;       CmdUI\["Command palette + keybinding editor"]
-
-&nbsp;       CmdClient\["Command client (invoke)"]
-
-&nbsp;       CtxKeys\["Context key service (when expressions)"]
-
-&nbsp;       PluginsUI\["Plugin runtime (web-safe)"]
-
-&nbsp;       TabDecor\["Tab decoration engine (slots + providers)"]
-
-&nbsp;       WebGLPool\["WebGL context pool"]
-
-&nbsp;   end
-
-
-
-&nbsp;   subgraph Shared\["Shared (types + schemas + protocol)"]
-
-&nbsp;       CmdDefs\["Command definitions + arg schemas"]
-
-&nbsp;       Keymaps\["Keybinding model + parser"]
-
-&nbsp;       ConfigSchema\["Config + plugin settings schema"]
-
-&nbsp;       Proto\["Protobuf protocol + versioning"]
-
-&nbsp;   end
-
-
-
-&nbsp;   subgraph Backend\["Backend (privileged)"]
-
-&nbsp;       Pty\["PTY/session manager"]
-
-&nbsp;       Fs\["Filesystem + config I/O + watch"]
-
-&nbsp;       PluginStore\["Plugin install/store/verify"]
-
-&nbsp;       Perms\["AuthZ (permissions) + redaction"]
-
-&nbsp;       CmdServer\["Command server (backend-owned commands)"]
-
-&nbsp;       WS\["WebSocket server (protobuf)"]
-
-&nbsp;   end
-
-
-
-&nbsp;   subgraph Host\["Host shell"]
-
-&nbsp;       Tauri\["Tauri desktop host (target)"]
-
-&nbsp;       Electron\["Electron host (interim)"]
-
-&nbsp;   end
-
-
-
-&nbsp;   subgraph Remote\["Remote frontend (optional)"]
-
-&nbsp;       WebUI\["Browser UI"]
-
-&nbsp;   end
-
-
-
-&nbsp;   UI --> CmdClient
-
-&nbsp;   CmdUI --> CmdClient
-
-&nbsp;   PluginsUI --> CmdClient
-
-&nbsp;   CmdClient --> CmdServer
-
-
-
-&nbsp;   CmdDefs --> CmdClient
-
-&nbsp;   CmdDefs --> CmdServer
-
-&nbsp;   Keymaps --> CmdUI
-
-&nbsp;   ConfigSchema --> Fs
-
-&nbsp;   Proto --> WS
-
-
-
-&nbsp;   CmdServer --> Pty
-
-&nbsp;   CmdServer --> Fs
-
-&nbsp;   CmdServer --> PluginStore
-
-&nbsp;   CmdServer --> Perms
-
-
-
-&nbsp;   Frontend <-->|"local transport"| Host
-
-&nbsp;   Host --> Backend
-
-
-
-&nbsp;   WebUI <-->|"WS + protobuf"| WS
-
-&nbsp;   Frontend <-->|"WS + protobuf (loopback)"| WS
-
+    subgraph Frontend["Frontend (React)"]
+        UI["UI: Terminal, tabs, settings"]
+        CmdUI["Command palette + keybinding editor"]
+        CmdClient["Command client (invoke)"]
+        CtxKeys["Context key service (when expressions)"]
+        PluginsUI["Plugin runtime (web-safe)"]
+        TabDecor["Tab decoration engine (slots + providers)"]
+        WebGLPool["WebGL context pool"]
+    end
+    subgraph Shared["Shared (types + schemas + protocol)"]
+        CmdDefs["Command definitions + arg schemas"]
+        Keymaps["Keybinding model + parser"]
+        ConfigSchema["Config + plugin settings schema"]
+        Proto["Protobuf protocol + versioning"]
+    end
+    subgraph Backend["Backend (privileged)"]
+        Pty["PTY/session manager"]
+        Fs["Filesystem + config I/O + watch"]
+        PluginStore["Plugin install/store/verify"]
+        Perms["AuthZ (permissions) + redaction"]
+        CmdServer["Command server (backend-owned commands)"]
+        WS["WebSocket server (protobuf)"]
+    end
+    subgraph Host["Host shell"]
+        Tauri["Tauri desktop host (target)"]
+        Electron["Electron host (interim)"]
+    end
+    subgraph Remote["Remote frontend (optional)"]
+        WebUI["Browser UI"]
+    end
+    UI --> CmdClient
+    CmdUI --> CmdClient
+    PluginsUI --> CmdClient
+    CmdClient --> CmdServer
+    CmdDefs --> CmdClient
+    CmdDefs --> CmdServer
+    Keymaps --> CmdUI
+    ConfigSchema --> Fs
+    Proto --> WS
+    CmdServer --> Pty
+    CmdServer --> Fs
+    CmdServer --> PluginStore
+    CmdServer --> Perms
+    Frontend <-->|"local transport"| Host
+    Host --> Backend
+    WebUI <-->|"WS + protobuf"| WS
+    Frontend <-->|"WS + protobuf (loopback)"| WS
 ```
 
 

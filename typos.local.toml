@@ -1,0 +1,24 @@
+# Repository-specific quotations and machine interfaces.
+
+schema = 1
+
+[oxford]
+stems = []
+
+[words]
+accepted = []
+
+[words.corrections]
+
+[patterns]
+ignore = [
+  # Preserve an established public TypeScript type and an external command.
+  '\bColorMap\b',
+  'nl -ba',
+]
+
+[files]
+exclude = [
+  # This standalone upstream bundle is marked as vendored in .gitattributes.
+  "bin/rimraf-standalone.js",
+]

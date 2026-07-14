@@ -128,7 +128,7 @@ const findChildSessions = (termGroups: ITermGroups, uid: string): string[] => {
 
 // Get the index of the next or previous group,
 // depending on the movement direction:
-const getNeighborIndex = (groups: string[], uid: string, type: string) => {
+const getNeighbourIndex = (groups: string[], uid: string, type: string) => {
   if (type === UI_MOVE_NEXT_PANE) {
     return (groups.indexOf(uid) + 1) % groups.length;
   }
@@ -136,7 +136,7 @@ const getNeighborIndex = (groups: string[], uid: string, type: string) => {
   return (groups.indexOf(uid) + groups.length - 1) % groups.length;
 };
 
-function moveToNeighborPane(type: typeof UI_MOVE_NEXT_PANE | typeof UI_MOVE_PREV_PANE) {
+function moveToNeighbourPane(type: typeof UI_MOVE_NEXT_PANE | typeof UI_MOVE_PREV_PANE) {
   return () => (dispatch: HyperDispatch, getState: () => HyperState) => {
     dispatch({
       type,
@@ -147,7 +147,7 @@ function moveToNeighborPane(type: typeof UI_MOVE_NEXT_PANE | typeof UI_MOVE_PREV
         if (childGroups.length === 1) {
           console.log('ignoring move for single group');
         } else {
-          const index = getNeighborIndex(childGroups, uid, type);
+          const index = getNeighbourIndex(childGroups, uid, type);
           const {sessionUid} = termGroups.termGroups[childGroups[index]];
           dispatch(setActiveSession(sessionUid!));
         }
@@ -156,8 +156,8 @@ function moveToNeighborPane(type: typeof UI_MOVE_NEXT_PANE | typeof UI_MOVE_PREV
   };
 }
 
-export const moveToNextPane = moveToNeighborPane(UI_MOVE_NEXT_PANE);
-export const moveToPreviousPane = moveToNeighborPane(UI_MOVE_PREV_PANE);
+export const moveToNextPane = moveToNeighbourPane(UI_MOVE_NEXT_PANE);
+export const moveToPreviousPane = moveToNeighbourPane(UI_MOVE_PREV_PANE);
 
 const getGroupUids = (state: HyperState) => {
   const rootGroups = getRootGroups(state);

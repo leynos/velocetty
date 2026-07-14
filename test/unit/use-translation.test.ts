@@ -1,4 +1,4 @@
-/** @file Verifies locale detection, locale matching, and translation fallback behavior. */
+/** @file Verifies locale detection, locale matching, and translation fallback behaviour. */
 import {expect, test} from 'bun:test';
 
 import {useTranslation} from '../../lib/hooks/use-translation';
@@ -63,7 +63,7 @@ test('falls back to defaults when key lookup is missing from the selected dictio
     return t('minimizeWindow');
   });
 
-  expect(minimizeLabel).toBe('Minimise window');
+  expect(minimizeLabel).toBe('Minimize window');
 });
 
 test('defaults to English when navigator information is unavailable', () => {

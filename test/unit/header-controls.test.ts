@@ -3,16 +3,16 @@ import {expect, mock, test} from 'bun:test';
 
 import {orderWindowControlButtons, stopDoubleClickPropagation} from '../../lib/components/header-controls';
 
-test('reorders left-aligned window controls to close, minimise, then maximise', () => {
-  const orderedButtons = orderWindowControlButtons(['minimise', 'maximise', 'close'], true);
+test('reorders left-aligned window controls to close, minimize, then maximize', () => {
+  const orderedButtons = orderWindowControlButtons(['minimize', 'maximize', 'close'], true);
 
-  expect(orderedButtons).toEqual(['close', 'minimise', 'maximise']);
+  expect(orderedButtons).toEqual(['close', 'minimize', 'maximize']);
 });
 
-test('preserves minimise, maximise, then close order for right-aligned controls', () => {
-  const orderedButtons = orderWindowControlButtons(['minimise', 'maximise', 'close'], false);
+test('preserves minimize, maximize, then close order for right-aligned controls', () => {
+  const orderedButtons = orderWindowControlButtons(['minimize', 'maximize', 'close'], false);
 
-  expect(orderedButtons).toEqual(['minimise', 'maximise', 'close']);
+  expect(orderedButtons).toEqual(['minimize', 'maximize', 'close']);
 });
 
 test('stops button double-click propagation before the title bar handler sees it', () => {

@@ -253,7 +253,7 @@ The edits are safe to reapply. If a step fails, re-run the command after
 correcting the file. If CI or runtime behaviour regresses, revert the specific
 workflow or runtime edits and reassess the Bun invocation strategy.
 
-## Artifacts and Notes
+## Artefacts and Notes
 
 Capture the `rg` output and test logs under `/tmp/*-velocetty-<branch>.out` for
 review and future debugging.

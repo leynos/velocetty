@@ -2,7 +2,7 @@
  * @file UI reducer for terminal presentation state and configuration merging.
  *
  * Invariants:
- * - Configuration input is validated and normalised before being merged.
+ * - Configuration input is validated and normalized before being merged.
  * - Session/UI/notification actions only mutate UI-owned state slices.
  * - Unknown actions fall through and return the prior state unchanged.
  *

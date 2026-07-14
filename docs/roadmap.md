@@ -626,6 +626,6 @@ changes remain in section 7 and are out of scope here.
 
 ## Out of scope for this roadmap
 
-- Marketplace, payments, or plugin monetisation flows.
+- Marketplace, payments, or plugin monetization flows.
 - Multi-user collaboration or shared terminal sessions.
 - Persisting full terminal scrollback across restarts.

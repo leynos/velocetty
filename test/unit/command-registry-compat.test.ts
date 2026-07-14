@@ -182,7 +182,7 @@ test('legacy search-close handler does not dispatch when session search is inact
     }
 
     // Session for the active uid has no search flag — thunk should not
-    // dispatch SESSION_SEARCH and should set catched to false instead.
+    // dispatch SESSION_SEARCH and should set caught to false instead.
     dispatchedThunk(innerDispatch as never, () => ({
       sessions: {
         activeUid: 'active-session',

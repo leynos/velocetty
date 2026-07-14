@@ -51,7 +51,7 @@ Velocetty addresses critical gaps in the terminal emulator market:
 2. **Limited Extensibility**: Most terminal applications offer minimal plugin
 
    capabilities. Velocetty inherits a powerful extension system with 40+ hooks,
-   enabling deep customization of behavior, appearance, and functionality.
+   enabling deep customization of behaviour, appearance, and functionality.
 
 3. **Modern Development Workflows**: Developers require terminals that integrate
 
@@ -62,7 +62,7 @@ Velocetty addresses critical gaps in the terminal emulator market:
 4. **Cross-Platform Consistency**: Development teams working across macOS,
 
    Windows, and Linux need consistent terminal experiences. Velocetty's
-   Electron-based architecture ensures uniform behavior and appearance.
+   Electron-based architecture ensures uniform behaviour and appearance.
 
 #### 1.1.3 Key stakeholders and users
 
@@ -176,7 +176,7 @@ Velocetty integrates with development environments through:
 3. **Extension System** - 40+ extension hooks spanning lifecycle, UI, state, and
 
    configuration - React component decoration for UI customization - Redux
-   middleware integration for behavior modification - Configuration and
+   middleware integration for behaviour modification - Configuration and
    environment decoration capabilities
 
 4. **Cross-Platform Distribution** - macOS: DMG and ZIP (x64 and arm64) -
@@ -263,7 +263,7 @@ flowchart LR
 
 2. **Plugin Decoration Pattern**: Extensions compose with core functionality
 
-   through decoration rather than replacement, preserving base behavior while
+   through decoration rather than replacement, preserving base behaviour while
    enabling customization.
 
 3. **Write-Middleware Bypass**: Performance-critical `SESSION_PTY_DATA` actions
@@ -347,7 +347,7 @@ flowchart LR
 
 2. **Configuration and Customization** - Edit JSON configuration file - Apply
 
-   themes and color schemes - Configure fonts, cursor, and rendering options -
+   themes and colour schemes - Configure fonts, cursor, and rendering options -
    Manage multiple shell profiles
 
 3. **Extension Management** - Install plugins via CLI (`hyper install <plugin>`)
@@ -613,9 +613,9 @@ flowchart TB
 
 ## 2. Product requirements
 
-### 2.1 Feature catalog
+### 2.1 Feature catalogue
 
-This section provides a comprehensive catalog of Velocetty's discrete, testable
+This section provides a comprehensive catalogue of Velocetty's discrete, testable
 features. Each feature is documented with metadata, descriptions, dependencies,
 and implementation context derived from the inherited Hyper codebase.
 
@@ -635,7 +635,7 @@ and implementation context derived from the inherited Hyper codebase.
 | -------- | --------- |
 | **Overview** | Full-featured terminal emulation powered by PTY (pseudo-terminal) sessions via node-pty and rendered through xterm.js with WebGL/Canvas acceleration |
 | **Business Value** | Provides the foundational terminal capability that all other features depend upon, enabling command-line workflows across all supported platforms |
-| **User Benefits** | Fast, responsive terminal experience with hardware-accelerated rendering, configurable fonts, colors, and cursor styles |
+| **User Benefits** | Fast, responsive terminal experience with hardware-accelerated rendering, configurable fonts, colours, and cursor styles |
 | **Technical Context** | Implements PTY management in `app/session.ts` with intelligent data batching (16ms time-based, 200KB size-based thresholds) to optimize IPC communication between main and renderer processes |
 
 ##### Dependencies
@@ -725,7 +725,7 @@ and implementation context derived from the inherited Hyper codebase.
 | -------- | --------- |
 | **Overview** | JSON-based configuration with schema validation, profile support, hot-reload capability, and XDG-compliant file paths |
 | **Business Value** | Enables customization and personalization while supporting programmatic configuration management and future preferences UI |
-| **User Benefits** | Customize appearance, behavior, and shell settings; create multiple profiles for different workflows |
+| **User Benefits** | Customize appearance, behaviour, and shell settings; create multiple profiles for different workflows |
 | **Technical Context** | Configuration subsystem in `app/config/` with schema validation via `app/config/schema.json`, hot-reload via chokidar file watching |
 
 ##### Dependencies (2.1.4 Configuration system)
@@ -905,7 +905,7 @@ and implementation context derived from the inherited Hyper codebase.
 | -------- | --------- |
 | **Overview** | Consistent functionality across macOS, Windows, and Linux with platform-appropriate integrations |
 | **Business Value** | Enables teams with mixed development environments to standardize on a single terminal solution |
-| **User Benefits** | Same features and appearance regardless of OS, platform-native behaviors where appropriate |
+| **User Benefits** | Same features and appearance regardless of OS, platform-native behaviours where appropriate |
 | **Technical Context** | Build configuration in `electron-builder.json`; platform utilities in `app/utils/` |
 
 ##### Dependencies (2.1.10 Cross-platform support)
@@ -1468,7 +1468,7 @@ flowchart TB
 
 | Consideration | Details |
 | --------------- | --------- |
-| **Technical Constraints** | node-pty behavior varies by platform (ConPTY vs WinPTY on Windows); platform-specific build requirements |
+| **Technical Constraints** | node-pty behaviour varies by platform (ConPTY vs WinPTY on Windows); platform-specific build requirements |
 | **Performance Requirements** | Native module rebuilding for each platform/architecture combination |
 | **Scalability Considerations** | x64 and arm64 builds for macOS and Windows; multiple Linux package formats |
 | **Security Implications** | Platform-specific security models (Gatekeeper on macOS, SmartScreen on Windows) |
@@ -1742,7 +1742,7 @@ current.
 
 **Architectural Note**: The `@electron/remote` package facilitates the
 communication pattern between processes, though its use is being deprecated in
-favor of explicit IPC messaging for security reasons.
+favour of explicit IPC messaging for security reasons.
 
 #### 3.2.2 UI framework stack
 
@@ -1853,7 +1853,7 @@ numerous other terminal interfaces. It provides:
 
 - Mouse event handling
 
-- ANSI color support
+- ANSI colour support
 
 - Accessibility features (screen reader mode)
 
@@ -1924,7 +1924,7 @@ configuration.
 | **Version Parsing** | `semver` | 7.6.0 | Semantic version comparison |
 | **Time Parsing** | `ms` | 2.1.3 | Human-readable time strings |
 | **URL Parsing** | `parse-url` | 8.1.0 | SSH URL handling |
-| **Color Utilities** | `color` | 4.2.3 | Color manipulation |
+| **Colour Utilities** | `color` | 4.2.3 | Colour manipulation |
 | **Class Names** | `clsx` | 2.1.0 | Conditional className composition |
 | **Plist Parsing** | `plist` | 3.1.0 | macOS plist file support |
 | **Keyboard Shortcuts** | `mousetrap` | Fork: `chabou/mousetrap#useCapture` | Keyboard shortcut handling |
@@ -2143,7 +2143,7 @@ Configuration Directory:
 
 **Design Decision**: Session state (including terminal scrollback) is
 intentionally not persisted across application restarts. This aligns with
-traditional terminal emulator behavior and avoids potential security concerns
+traditional terminal emulator behaviour and avoids potential security concerns
 with persisting command history.
 
 #### 3.5.4 Plugin storage
@@ -2327,7 +2327,7 @@ flowchart LR
 | **Caching** | Bun cache for faster installs |
 | **Matrix Strategy** | `[macos-latest, ubuntu-latest, windows-latest]` |
 | **Native Modules** | Automatic node-pty rebuilding per platform |
-| **Artifacts** | Installer uploads for each platform |
+| **Artefacts** | Installer uploads for each platform |
 | **E2E Reporting** | Screenshot capture with Imgur upload |
 
 #### 3.6.8 Packaging and distribution
@@ -2921,7 +2921,7 @@ flowchart TB
 
 ##### Configuration processing rules
 
-| Rule | Behavior |
+| Rule | Behaviour |
 | ------ | ---------- |
 | Missing Fields | Merged with defaults from `config-default.json` |
 | Invalid JSON | User notified, previous config retained |
@@ -3471,7 +3471,7 @@ stateDiagram-v2
 | -------- | ------------------ |
 | `SESSION_ADD` | Create or split term group |
 | `SESSION_ACTIVE_CHANGED` | Update active session tracking |
-| `SESSION_PTY_EXIT` | Mark session for exit behavior handling |
+| `SESSION_PTY_EXIT` | Mark session for exit behaviour handling |
 | `TERM_GROUP_EXIT` | Remove term group, rebalance siblings |
 | `TERM_GROUP_RESIZE` | Update size ratios in parent |
 
@@ -3947,7 +3947,7 @@ sequenceDiagram
 
 - 1.2 SYSTEM OVERVIEW - Architecture diagrams and component descriptions
 
-- 2.1 FEATURE CATALOG - Feature definitions and dependencies
+- 2.1 FEATURE CATALOGUE - Feature definitions and dependencies
 
 - 2.2 FUNCTIONAL REQUIREMENTS TABLES - Detailed requirements
 
@@ -4013,7 +4013,7 @@ overhead requires careful optimization through data batching strategies.
 
 2. **Composition over Replacement**: Plugin decoration pattern preserves base
 
-   behavior while enabling customization
+   behaviour while enabling customization
 
 3. **Performance-Critical Path Optimization**: Write middleware bypass and data
 
@@ -4708,7 +4708,7 @@ flowchart TB
 | Window Geometry | electron-store | Encrypted persistence, automatic serialization |
 | Terminal Content | In-memory only | Security (no command history logging), privacy |
 | Plugin Packages | npm/bun in plugins directory | Standard package management, familiar workflow |
-| Session State | Redux (not persisted) | Traditional terminal behavior, no startup delay |
+| Session State | Redux (not persisted) | Traditional terminal behaviour, no startup delay |
 
 #### 5.3.4 Caching strategy justification
 
@@ -5034,7 +5034,7 @@ flowchart TB
 
 - Section 1.2 SYSTEM OVERVIEW - Architectural context and success criteria
 
-- Section 2.1 FEATURE CATALOG - Feature dependencies and implementation context
+- Section 2.1 FEATURE CATALOGUE - Feature dependencies and implementation context
 
 - Section 3.2 FRAMEWORKS & LIBRARIES - Technology stack details
 
@@ -5377,7 +5377,7 @@ shell processes:
 | ------------------- | ------------------- | ----------------- |
 | **Quick Shell Failure** | `exitCode > 0` AND `duration < 1 second` | Attempt fallback shell, display warning |
 | **Fallback Failure** | Secondary shell also fails | Display error message, keep pane open |
-| **Normal Exit** | Exit code 0 or duration ≥ 1 second | Mark session ended, apply exit behavior |
+| **Normal Exit** | Exit code 0 or duration ≥ 1 second | Mark session ended, apply exit behaviour |
 | **PTY Spawn Failure** | node-pty throws exception | Log error, notify user, no session created |
 
 ##### WebGL context loss recovery (6.1.5 Desktop-appropriate resilience patterns)
@@ -5412,7 +5412,7 @@ flowchart TB
 The plugin system implements defensive error handling to prevent extension
 failures from crashing the application:
 
-| Hook Category | Error Handling Strategy | Fallback Behavior |
+| Hook Category | Error Handling Strategy | Fallback Behaviour |
 | --------------- | ------------------------ | ------------------- |
 | **Decoration Hooks** | Try-catch wrapper around hook execution | Return original component/config |
 | **Middleware Hooks** | Forward action unchanged on error | Skip middleware, continue pipeline |
@@ -5557,7 +5557,7 @@ The following sources were examined to compile this architectural documentation:
 
 Velocetty is a **desktop terminal emulator application** built on Electron. As
 such, traditional database design concepts—including relational schemas, entity-
-relationship modeling, distributed replication, and network-accessible database
+relationship modelling, distributed replication, and network-accessible database
 servers—are **not applicable** to this system.
 
 | Traditional Database Concept | Velocetty Reality |
@@ -5666,15 +5666,15 @@ flowchart TB
         subgraph ConfigSection["config (configOptions)"]
             AppSettings["Application Settings<br/>updateChannel, fontSize,<br/>fontFamily, shell"]
             RenderingSettings["Rendering Settings<br/>cursorColor, cursorShape,<br/>webGLRenderer, colors"]
-            ProfileSystem["Profile System<br/>defaultProfile, profiles[]"]
+            ProfileSystem["Profile System<br/>defaultProfile, profiles array"]
             BehaviorSettings["Behavior Settings<br/>scrollback, copyOnSelect,<br/>bell, env"]
         end
         
-        subgraph PluginsSection["plugins (string[])"]
+        subgraph PluginsSection["plugins (string array)"]
             PluginList["npm package names<br/>for remote plugins"]
         end
         
-        subgraph LocalPluginsSection["localPlugins (string[])"]
+        subgraph LocalPluginsSection["localPlugins (string array)"]
             LocalList["Directory names<br/>for local plugins"]
         end
         
@@ -5697,18 +5697,18 @@ Configuration validation is enforced through JSON Schema Draft-07, defined in
 | Schema Definition | Type | Purpose |
 | ------------------- | ------ | --------- |
 | **FontWeight** | Enum (100-900, normal, bold) | Font weight validation |
-| **ColorMap** | Object (16 required properties) | ANSI color palette validation |
+| **ColorMap** | Object (16 required properties) | ANSI colour palette validation |
 | **profileConfigOptions** | Object (subset of configOptions) | Per-profile overridable settings |
 | **configOptions** | Object (40+ properties) | Complete configuration structure |
 
-##### Color palette schema requirements
+##### Colour palette schema requirements
 
-The ColorMap type requires exactly 16 ANSI color definitions:
+The ColorMap type requires exactly 16 ANSI colour definitions:
 
-| Color Category | Properties |
+| Colour Category | Properties |
 | ---------------- | ------------ |
-| **Standard Colors** | black, red, green, yellow, blue, magenta, cyan, white |
-| **Bright Colors** | lightBlack, lightRed, lightGreen, lightYellow, lightBlue, lightMagenta, lightCyan, lightWhite |
+| **Standard Colours** | black, red, green, yellow, blue, magenta, cyan, white |
+| **Bright Colours** | lightBlack, lightRed, lightGreen, lightYellow, lightBlue, lightMagenta, lightCyan, lightWhite |
 
 ##### 6.2.3.3 Platform-specific path resolution
 
@@ -5771,7 +5771,7 @@ persisted:
 
 | State Slice | Key Properties | Persistence |
 | ------------- | ---------------- | ------------- |
-| **ui** | fontSize, fontFamily, colors, cursorColor, cursorShape, bell, notifications, fullScreen, maximized | **Not persisted** (reloaded from config) |
+| **ui** | fontSize, fontFamily, colours, cursorColour, cursorShape, bell, notifications, fullScreen, maximized | **Not persisted** (reloaded from config) |
 | **sessions** | sessions (Record<uid, session>), activeUid, search state | **Not persisted** (volatile) |
 | **termGroups** | termGroups (tree structure), activeSessions, activeRootGroup | **Not persisted** (volatile) |
 
@@ -5905,9 +5905,9 @@ flowchart TB
     CreateMarker --> Complete
 ```
 
-##### Migration artifacts
+##### Migration artefacts
 
-| Artifact | Location | Purpose |
+| Artefact | Location | Purpose |
 | ---------- | ---------- | --------- |
 | **migrated-hyper3-config.js** | `plugins/local/` | Contains non-serializable JavaScript code from legacy config |
 | **.migration-marker** | Configuration directory | Prevents duplicate migration attempts |
@@ -5986,7 +5986,7 @@ Velocetty implements privacy-first data handling as a core design principle:
 
 **Design Decision**: Session state (including terminal scrollback) is
 intentionally not persisted across application restarts. This aligns with
-traditional terminal emulator behavior and avoids potential security concerns
+traditional terminal emulator behaviour and avoids potential security concerns
 with persisting command history.
 
 ##### 6.2.8.2 Data retention rules
@@ -6154,7 +6154,7 @@ flowchart TB
 | **Window Geometry** | electron-store | Encrypted persistence, automatic serialization |
 | **Terminal Content** | In-memory only | Security (no command history logging), privacy |
 | **Plugin Packages** | npm/bun in plugins directory | Standard package management, familiar workflow |
-| **Session State** | Redux (not persisted) | Traditional terminal behavior, no startup delay |
+| **Session State** | Redux (not persisted) | Traditional terminal behaviour, no startup delay |
 
 ---
 
@@ -6165,7 +6165,7 @@ flowchart TB
 | Traditional Database Pattern | Applicability | Rationale |
 | ------------------------------ | --------------- | ----------- |
 | **Relational Schema** | ❌ Not Applicable | No entity relationships requiring normalization |
-| **Entity-Relationship Modeling** | ❌ Not Applicable | Flat configuration structure, no foreign keys |
+| **Entity-Relationship Modelling** | ❌ Not Applicable | Flat configuration structure, no foreign keys |
 | **Indexing Strategy** | ❌ Not Applicable | No query patterns requiring index optimization |
 | **Partitioning** | ❌ Not Applicable | Single-user, single-machine data scope |
 | **Replication** | ❌ Not Applicable | No distributed data requirements |
@@ -6271,7 +6271,7 @@ is inherently local, session-specific, and privacy-sensitive.
 
 Velocetty implements a **desktop-appropriate integration architecture** that
 differs fundamentally from traditional web service API patterns. As an Electron-
-based terminal emulator, the system's integration architecture centers on three
+based terminal emulator, the system's integration architecture centres on three
 primary integration domains:
 
 1. **Internal Process Integration**: Bidirectional IPC bridge between Electron
@@ -6897,7 +6897,7 @@ flowchart TB
 
 ##### Error handling by hook category
 
-| Hook Category | Error Strategy | Fallback Behavior |
+| Hook Category | Error Strategy | Fallback Behaviour |
 | --------------- | ---------------- | ------------------- |
 | **Decoration Hooks** | Try-catch wrapper | Return original component/config |
 | **Middleware Hooks** | Forward unchanged | Skip middleware, continue pipeline |
@@ -7257,7 +7257,7 @@ Plugins can access 40+ extension hooks defined in `app/plugins/extensions.ts`:
 While plugins have full trust access, Velocetty implements error isolation to
 prevent plugin failures from crashing the application:
 
-| Error Scenario | Isolation Mechanism | Recovery Behavior |
+| Error Scenario | Isolation Mechanism | Recovery Behaviour |
 | ---------------- | -------------------- | -------------------- |
 | Decoration failure | Try-catch boundary | Return original component |
 | Middleware exception | Error catch in pipeline | Skip middleware, forward action |
@@ -7383,7 +7383,7 @@ if (baseEnv.GOOGLE_API_KEY && process.env.GOOGLE_API_KEY === baseEnv.GOOGLE_API_
 | ---------- | -------- | ----------- |
 | `GOOGLE_API_KEY` | Removed from shell env | Prevent Electron API key leakage |
 | `TERM` | Set to `xterm-256color` | Proper terminal identification |
-| `COLORTERM` | Set to `truecolor` | Enable 24-bit color |
+| `COLORTERM` | Set to `truecolor` | Enable 24-bit colour |
 | `TERM_PROGRAM` | Set to `Hyper` | Application identification |
 
 ##### 6.4.5.3 Configuration file security
@@ -7689,7 +7689,7 @@ For users installing plugins:
 | **Review Code** | Examine plugin source before installation |
 | **Minimal Plugins** | Install only necessary extensions |
 | **Update Regularly** | Keep plugins current for security fixes |
-| **Report Issues** | Report suspicious plugin behavior |
+| **Report Issues** | Report suspicious plugin behaviour |
 
 ---
 
@@ -8083,7 +8083,7 @@ flowchart TB
 
 ##### Desktop resource allocation
 
-| Resource | Baseline Allocation | Scaling Behavior | Constraint |
+| Resource | Baseline Allocation | Scaling Behaviour | Constraint |
 | ---------- | --------------------- | ------------------ | ------------ |
 | Main Process Memory | ~50-100 MB | Fixed singleton | Single process |
 | Renderer Memory | ~150-200 MB per window | Per-window isolation | Available RAM |
@@ -8524,7 +8524,7 @@ GitHub provides the dashboard for CI/CD observability:
 | Actions Tab | Repository → Actions | Workflow runs, status, logs |
 | Security Tab | Repository → Security | CodeQL alerts, Dependabot alerts |
 | Pull Requests | Repository → Pull Requests | E2E screenshots, test results |
-| Releases | Repository → Releases | Build artifacts, changelogs |
+| Releases | Repository → Releases | Build artefacts, changelogs |
 
 ---
 
@@ -8713,7 +8713,7 @@ fundamentally shapes the testing strategy, which focuses on:
 
 1. **Unit Testing**: Validating core utility functions, business logic, and
 
-   isolated module behavior
+   isolated module behaviour
 
 2. **End-to-End Testing**: Smoke testing the packaged application to ensure it
 
@@ -8824,11 +8824,11 @@ flowchart TB
     subgraph UnitTests["Unit Test Files"]
         CLITest["cli-api.test.ts<br/>CLI npm Registry"]
         WindowTest["window-utils.test.ts<br/>Window Positioning"]
-        ColorTest["to-electron-background-color.test.ts<br/>Color Normalization"]
+        ColorTest["to-electron-background-colour.test.ts<br/>Color Normalization"]
     end
     
     subgraph TestUtilities["Test Utilities"]
-        HexColor["is-hex-color.ts<br/>Color Validation Helper"]
+        HexColor["is-hex-colour.ts<br/>Color Validation Helper"]
     end
     
     TestRoot --> UnitDir
@@ -8846,7 +8846,7 @@ flowchart TB
 | ----------- | ------------------- | ------------ | --------------- |
 | `cli-api.test.ts` | `cli/api.ts` | URL construction, scoped packages | npm registry URL building |
 | `window-utils.test.ts` | `app/utils/` | Multi-monitor validation | Window position calculations |
-| `to-electron-background-color.test.ts` | Color utilities | Hex conversion | Electron color normalization |
+| `to-electron-background-colour.test.ts` | Colour utilities | Hex conversion | Electron colour normalization |
 
 ##### 6.6.2.3 Mocking strategy
 
@@ -8893,7 +8893,7 @@ sequenceDiagram
 | Convention | Pattern | Example |
 | ------------ | --------- | --------- |
 | Test files | `*.test.ts` | `cli-api.test.ts` |
-| Test descriptions | Verb + expected behavior | `'existsOnNpm() builds the url for scoped packages'` |
+| Test descriptions | Verb + expected behaviour | `'existsOnNpm() builds the url for scoped packages'` |
 | Assertion style | Bun `expect()` matchers | `expect(getUrl).toBe(expectedUrl)` |
 
 ##### 6.6.2.5 Test data management
@@ -8914,7 +8914,7 @@ The `test/testUtils/` directory contains shared helper functions:
 
 | Utility | File | Purpose |
 | --------- | ------ | --------- |
-| `isHexColor()` | `is-hex-color.ts` | Validate 3/6/8-character hex color strings |
+| `isHexColor()` | `is-hex-colour.ts` | Validate 3/6/8-character hex colour strings |
 
 ---
 
@@ -8935,7 +8935,7 @@ suite. This is appropriate for the following reasons:
 ##### 6.6.3.2 Integration points and coverage
 
 Integration between components is validated through a combination of unit tests
-(for isolated interfaces) and E2E tests (for full-stack behavior).
+(for isolated interfaces) and E2E tests (for full-stack behaviour).
 
 ##### Component integration matrix
 
@@ -9008,7 +9008,7 @@ packaged application:
 | Launch | `_electron.launch()` with platform binary | Application starts without crash |
 | Stabilization | 5-second delay | Allow full initialization |
 | Production Mode | Check DevTools state | DevTools are not open |
-| Artifact Capture | Screenshot on teardown | Visual evidence for CI reporting |
+| Artefact Capture | Screenshot on teardown | Visual evidence for CI reporting |
 
 ##### 6.6.4.3 Platform-specific binary resolution
 
@@ -9083,9 +9083,9 @@ flowchart TB
     CloseApp --> Complete
 ```
 
-##### 6.6.4.5 Test artifact generation
+##### 6.6.4.5 Test artefact generation
 
-| Artifact Type | Location | Purpose |
+| Artefact Type | Location | Purpose |
 | --------------- | ---------- | --------- |
 | Screenshots | `dist/tmp/${platform}_test.png` | Visual validation, CI reporting |
 | Platform designation | `darwin`, `linux`, `win32` | Distinguish platform results |
@@ -9095,7 +9095,7 @@ flowchart TB
 | Limitation | Impact | Mitigation |
 | ------------ | -------- | ------------ |
 | Single smoke test | Limited functional coverage | Validates critical launch path |
-| No terminal interaction | PTY behavior untested in E2E | Unit tests cover session logic |
+| No terminal interaction | PTY behaviour untested in E2E | Unit tests cover session logic |
 | No plugin E2E tests | Plugin integration gaps | Plugin error isolation in code |
 | No keyboard input tests | Input handling untested | Manual testing required |
 | No multi-window tests | Window management gaps | Single window validation only |
@@ -9178,7 +9178,7 @@ Bun runs tests in a single process by default, with opt-in concurrency:
 | Concurrent execution | `--concurrent`, `test.concurrent()` | Faster async tests |
 | Serial fallback | `test.serial()` | Protect shared state |
 
-##### 6.6.5.5 Test reporting and artifacts
+##### 6.6.5.5 Test reporting and artefacts
 
 ##### E2E screenshot reporting workflow
 
@@ -9207,7 +9207,7 @@ flowchart TB
 
 ##### 6.6.5.6 Failed test handling
 
-| Failure Scenario | CI Behavior | Developer Action |
+| Failure Scenario | CI Behaviour | Developer Action |
 | ------------------ | ------------- | ------------------ |
 | Unit test failure | Job fails, PR blocked | Fix failing test |
 | E2E test failure | Job fails, screenshot captured | Review screenshot, debug |
@@ -9220,7 +9220,7 @@ flowchart TB
 | ---------- | ---------------- | -------- |
 | E2E stabilization delay | 5-second wait after window open | Active |
 | Extended timeout | 30-second E2E timeout | Active |
-| Screenshot on failure | Always capture artifacts | Active |
+| Screenshot on failure | Always capture artefacts | Active |
 | Test isolation | Single-process runner; use `test.serial` | Active |
 | Retry mechanism | Not implemented | Future consideration |
 
@@ -9296,7 +9296,7 @@ flowchart LR
 
 | Test Type | Count | Scope | Status |
 | ----------- | ------- | ------- | -------- |
-| Unit test files | 3 | CLI API, window utils, color conversion | Active |
+| Unit test files | 3 | CLI API, window utils, colour conversion | Active |
 | Unit test cases | 7+ | Individual test assertions | Active |
 | E2E test files | 1 | Application smoke test | Active |
 | E2E test scenarios | 1 | Launch and DevTools verification | Active |
@@ -9452,9 +9452,9 @@ mocked dependencies:
 | ----------------- | ---------------- | --------- |
 | Import test framework | `import {test, expect, mock} from 'bun:test'` | Access test runner |
 | Register mocks | `mock.module('../dep', () => stub)` | Prevent real I/O |
-| Define stubs | Object literal with dependency replacements | Control external behavior |
+| Define stubs | Object literal with dependency replacements | Control external behaviour |
 | Load module | `await import('../../module')` | Inject dependencies |
-| Assert results | `expect(actual).toBe(expected)` | Validate behavior |
+| Assert results | `expect(actual).toBe(expected)` | Validate behaviour |
 
 ##### 6.6.9.2 E2E test pattern example
 
@@ -9465,7 +9465,7 @@ mocked dependencies:
 | Launch application | `_electron.launch({ executablePath })` | Start packaged app |
 | Wait for window | `electronApp.firstWindow()` | Application ready |
 | Stabilization | `setTimeout()` delay | Ensure full initialization |
-| Assertions | Verify application state | Validate behavior |
+| Assertions | Verify application state | Validate behaviour |
 | Cleanup | `electronApp.close()` | Release resources |
 
 ##### 6.6.9.3 Testing recommendations
@@ -9500,7 +9500,7 @@ mocked dependencies:
 | ----------- | ------------ | ------------- | ----- | ---------- |
 | CLI API | ✅ Covered | N/A | N/A | CodeQL |
 | Window Utils | ✅ Covered | N/A | Implicit | CodeQL |
-| Color Utils | ✅ Covered | N/A | N/A | CodeQL |
+| Colour Utils | ✅ Covered | N/A | N/A | CodeQL |
 | Session Manager | ❌ Not covered | E2E only | ✅ Smoke | CodeQL |
 | Redux Store | ❌ Not covered | E2E only | ✅ Smoke | CodeQL |
 | Terminal Component | ❌ Not covered | E2E only | ✅ Smoke | CodeQL |
@@ -9533,9 +9533,9 @@ mocked dependencies:
 
 - `test/unit/window-utils.test.ts` - Window utilities unit tests
 
-- `test/unit/to-electron-background-color.test.ts` - Color conversion tests
+- `test/unit/to-electron-background-colour.test.ts` - Colour conversion tests
 
-- `test/testUtils/is-hex-color.ts` - Test utility for hex color validation
+- `test/testUtils/is-hex-colour.ts` - Test utility for hex colour validation
 
 - `.github/workflows/nodejs.yml` - Main CI workflow
 
@@ -9618,10 +9618,10 @@ The user interface follows several core principles:
 | Principle | Implementation |
 | ----------- | ---------------- |
 | **Cross-Platform Consistency** | Single codebase renders consistently on macOS, Windows, and Linux via Chromium |
-| **Composition Over Replacement** | Plugin decoration pattern preserves base UI behavior while enabling customization |
+| **Composition Over Replacement** | Plugin decoration pattern preserves base UI behaviour while enabling customization |
 | **Performance-First Rendering** | WebGL-accelerated terminal rendering with intelligent fallback strategies |
 | **Keyboard-Centric Workflow** | Comprehensive keyboard shortcut system with platform-appropriate modifiers |
-| **Themeable Aesthetics** | Deep CSS customization with color palette, typography, and cursor styling |
+| **Themeable Aesthetics** | Deep CSS customization with colour palette, typography, and cursor styling |
 
 #### 7.1.2 UI technology stack
 
@@ -9838,9 +9838,9 @@ showWindowControls: boolean | 'left' | ''  // Default: true on Windows/Linux
 Manages the horizontal tab strip with support for multiple concurrent terminal
 sessions.
 
-##### Behavioral modes
+##### Behavioural modes
 
-| Condition | macOS Behavior | Windows/Linux Behavior |
+| Condition | macOS Behaviour | Windows/Linux Behaviour |
 | ----------- | ---------------- | ------------------------ |
 | Single Tab | Show title only (no tab UI) | Hidden entirely |
 | Multiple Tabs | Full tab bar with close buttons | Full tab bar with close buttons |
@@ -9859,11 +9859,11 @@ sessions.
 
 **Component**: `Tab` (`lib/components/tab.tsx`)
 
-Renders a single tab with interactive behaviors for selection and closing.
+Renders a single tab with interactive behaviours for selection and closing.
 
 ##### User interactions
 
-| Interaction | Behavior |
+| Interaction | Behaviour |
 | ------------- | ---------- |
 | Left-click | Select tab (if not already active) |
 | Middle-click | Close tab |
@@ -9999,7 +9999,7 @@ Enables horizontal and vertical terminal splitting with resizable dividers.
 
 ##### User interactions (7.3.7 Split pane system)
 
-| Interaction | Behavior |
+| Interaction | Behaviour |
 | ------------- | ---------- |
 | Drag divider | Resize adjacent panes proportionally |
 | Double-click divider | Auto-resize to default ratio |
@@ -10075,13 +10075,13 @@ flowchart TB
 | `fontFamily` | string | Terminal font stack |
 | `fontSize` | number | Base font size |
 | `fontSizeOverride` | number or null | Temporary zoom override |
-| `foregroundColor` | string | Text color |
-| `backgroundColor` | string | Background color |
-| `borderColor` | string | Window border color |
-| `cursorColor` | string | Cursor color |
+| `foregroundColor` | string | Text colour |
+| `backgroundColor` | string | Background colour |
+| `borderColor` | string | Window border colour |
+| `cursorColor` | string | Cursor colour |
 | `cursorShape` | 'BEAM' or 'UNDERLINE' or 'BLOCK' | Cursor style |
 | `cursorBlink` | boolean | Cursor animation |
-| `colors` | ColorMap | 16-color ANSI palette |
+| `colors` | ColorMap | 16-colour ANSI palette |
 | `maximized` | boolean | Window maximized state |
 | `fullScreen` | boolean | Fullscreen mode |
 | `notifications` | object | Notification visibility flags |
@@ -10272,18 +10272,18 @@ sequenceDiagram
 
 Velocetty supports comprehensive visual customization through configuration:
 
-##### Color configuration
+##### Colour configuration
 
 | Property | Purpose | Default |
 | ---------- | --------- | --------- |
 | `backgroundColor` | Terminal background | Platform-dependent |
-| `foregroundColor` | Primary text color | Platform-dependent |
+| `foregroundColor` | Primary text colour | Platform-dependent |
 | `borderColor` | Window border | Matches background |
-| `cursorColor` | Cursor fill | Accent color |
-| `cursorAccentColor` | Cursor text color | Background color |
+| `cursorColor` | Cursor fill | Accent colour |
+| `cursorAccentColor` | Cursor text colour | Background colour |
 | `selectionColor` | Selection highlight | Semi-transparent accent |
 
-##### Ansi color palette (16 colors)
+##### Ansi colour palette (16 colours)
 
 ```text
 colors: {
@@ -10318,7 +10318,7 @@ colors: {
 
 | Platform | Window Corners | Border | Transparency | Zoom Factor |
 | ---------- | ---------------- | -------- | -------------- | ------------- |
-| **macOS** | Rounded (10.5px) | 1px | Supported (alpha colors) | 1.0 |
+| **macOS** | Rounded (10.5px) | 1px | Supported (alpha colours) | 1.0 |
 | **Windows** | Square | 1px (0 when maximized) | Not supported | 1.0 |
 | **Linux** | Square | 1px (0 when maximized) | Not supported | 1.2 |
 
@@ -10368,7 +10368,7 @@ Platform-specific keymap files define keyboard shortcuts:
 
 #### 7.7.2 Mouse interactions
 
-| Component | Interaction | Behavior |
+| Component | Interaction | Behaviour |
 | ----------- | ------------- | ---------- |
 | **Header** | Double-click | Toggle maximize |
 | **Header** | Drag | Move window |
@@ -10483,7 +10483,7 @@ following features become available:
 
 - **Font Ligatures**: Programming ligatures via `LigaturesAddon`
 
-- **Transparency**: Alpha channel in background colors
+- **Transparency**: Alpha channel in background colours
 
 However, performance may be reduced compared to WebGL rendering, particularly
 for rapid terminal output.
@@ -10570,7 +10570,7 @@ xterm.js provides accessibility features through configuration:
 
 - 4.5 ERROR HANDLING FLOWS
 
-- 2.1 FEATURE CATALOG
+- 2.1 FEATURE CATALOGUE
 
 ## 8. Infrastructure
 
@@ -11153,7 +11153,7 @@ satisfy Gatekeeper requirements.
 | `WIN_CERT_P12_PASSWORD` | Windows | Certificate password |
 | `APPLE_ID` | macOS | Apple Developer account email |
 | `APPLE_PASSWORD` | macOS | App-specific password for notarization |
-| `GITHUB_TOKEN` | All | Release artifact publishing |
+| `GITHUB_TOKEN` | All | Release artefact publishing |
 
 ---
 
@@ -11226,12 +11226,12 @@ flowchart TB
 | Protocol | HTTPS | Secure transport |
 | Conditional Check | `disableAutoUpdates !== true` | User opt-out support |
 
-#### 8.6.5 Linux update behavior
+#### 8.6.5 Linux update behaviour
 
 Linux uses a custom implementation (`app/auto-updater-linux.ts`) due to
 Electron's limited Linux auto-update support:
 
-| HTTP Response | Event Emitted | Behavior |
+| HTTP Response | Event Emitted | Behaviour |
 | --------------- | --------------- | ---------- |
 | 204 No Content | `update-not-available` | No update needed |
 | JSON response | `update-available` | Parse `{name, notes, pub_date}` |
@@ -11363,7 +11363,7 @@ flowchart LR
 | Resource | GitHub Actions Usage | Notes |
 | ---------- | --------------------- | ------- |
 | **Build Minutes** | ~45-60 min per full matrix run | 3 platforms × ~15-20 min each |
-| **Storage** | ~500 MB artifacts per run | Platform installers + screenshots |
+| **Storage** | ~500 MB artefacts per run | Platform installers + screenshots |
 | **ARM Build** | ~30 min additional | QEMU emulation overhead |
 | **Cache Size** | ~500 MB per OS | Bun dependencies |
 
@@ -11406,12 +11406,12 @@ flowchart LR
 | Windows Code Signing | Certificate Authority | Re-issue from CA |
 | GitHub Secrets | GitHub Encrypted Secrets | Re-upload from secure storage |
 
-#### 8.10.3 Build artifact recovery
+#### 8.10.3 Build artefact recovery
 
-| Artifact Type | Recovery Source | Retention |
+| Artefact Type | Recovery Source | Retention |
 | --------------- | ----------------- | ----------- |
 | Platform Installers | GitHub Releases | Indefinite |
-| CI Artifacts | GitHub Actions | 90 days (default) |
+| CI Artefacts | GitHub Actions | 90 days (default) |
 | npm Packages | npm Registry | Indefinite |
 
 ---
@@ -11726,11 +11726,11 @@ Specification document.
 | **Canvas Renderer** | HTML5 Canvas-based fallback rendering backend when WebGL is unavailable or transparency is required |
 | **Terminal Emulation** | The process of simulating a physical terminal device in software, interpreting escape sequences and rendering output |
 | **Scrollback Buffer** | Memory-based storage of terminal output history allowing users to scroll back through previous content |
-| **Escape Sequence** | Control character sequences (VT100/xterm standard) used to control terminal behavior, cursor positioning, and text formatting |
+| **Escape Sequence** | Control character sequences (VT100/xterm standard) used to control terminal behaviour, cursor positioning, and text formatting |
 | **VT100** | Digital Equipment Corporation terminal standard from 1978 that established ANSI escape code conventions still used today |
 | **xterm** | The standard terminal emulator for the X Window System, whose escape sequence extensions are widely adopted |
-| **ANSI Colors** | Standard 16-color palette (8 standard + 8 bright) defined by ANSI X3.64 for terminal text coloring |
-| **True Color** | 24-bit RGB color support (16.7 million colors) in terminal emulators via SGR escape sequences |
+| **ANSI Colours** | Standard 16-colour palette (8 standard + 8 bright) defined by ANSI X3.64 for terminal text colouring |
+| **True Colour** | 24-bit RGB colour support (16.7 million colours) in terminal emulators via SGR escape sequences |
 
 #### 9.2.3 Data and state management terms
 
@@ -11751,7 +11751,7 @@ Specification document.
 
 | Term | Definition |
 | ------ | ------------ |
-| **Plugin Decoration** | Pattern where plugins wrap and extend core components rather than replacing them, preserving base behavior |
+| **Plugin Decoration** | Pattern where plugins wrap and extend core components rather than replacing them, preserving base behaviour |
 | **Higher-Order Component (HOC)** | React pattern where a function takes a component and returns an enhanced component with additional functionality |
 | **Extension Hook** | Named function exports that plugins provide to integrate with Velocetty's extension points (40+ hooks available) |
 | **Full Trust Model** | Security model where plugins execute with complete application privileges without sandboxing |
@@ -11771,7 +11771,7 @@ Specification document.
 | **Profile** | Named configuration preset containing shell, environment, and appearance customizations |
 | **XDG Compliance** | Following XDG Base Directory Specification for configuration file locations on Unix systems |
 | **JSON Schema** | Draft-07 schema definition used for configuration validation |
-| **ColorMap** | Configuration object containing 16 ANSI color definitions (8 standard + 8 bright colors) |
+| **ColorMap** | Configuration object containing 16 ANSI colour definitions (8 standard + 8 bright colours) |
 | **Default Shell** | The user's system default shell resolved via platform-specific methods |
 
 #### 9.2.6 UI component terms
@@ -11837,7 +11837,7 @@ Specification document.
 | --------- | --------------- | --------- |
 | **ABI** | Application Binary Interface | Node.js native module compatibility |
 | **API** | Application Programming Interface | Plugin hooks, IPC contracts, function interfaces |
-| **ANSI** | American National Standards Institute | Terminal color codes and escape sequences |
+| **ANSI** | American National Standards Institute | Terminal colour codes and escape sequences |
 | **CLI** | Command-Line Interface | `hyper` command tool for plugin management |
 | **CPU** | Central Processing Unit | Performance measurement context |
 | **CSS** | Cascading Style Sheets | UI styling via styled-jsx |
@@ -11885,7 +11885,7 @@ Specification document.
 | **CWD** | Current Working Directory | Shell process context |
 | **ESC** | Escape | Terminal control character (ASCII 27) |
 | **LF** | Line Feed | Unix line ending character |
-| **RGB** | Red, Green, Blue | Color specification format |
+| **RGB** | Red, Green, Blue | Colour specification format |
 | **SGR** | Select Graphic Rendition | Terminal text formatting escape sequence |
 | **VT100** | Video Terminal 100 | DEC terminal standard |
 | **WebGL** | Web Graphics Library | Browser 3D graphics API |
@@ -11962,7 +11962,7 @@ referenced in compiling this appendix:
 | 5.2 COMPONENT DETAILS | Component architecture, addon loading |
 | 6.4 Security Architecture | Security model, IPC contracts, plugin trust |
 | 6.6 Testing Strategy | Test frameworks, coverage strategy |
-| 7.8 PLUGIN EXTENSION POINTS | Extension hook catalog |
+| 7.8 PLUGIN EXTENSION POINTS | Extension hook catalogue |
 | 7.9 RENDERING CONSTRAINTS | WebGL limitations, renderer selection |
 | 8.2 BUILD INFRASTRUCTURE | Build tools, V8 snapshot configuration |
 | 8.6 AUTO-UPDATE INFRASTRUCTURE | Update channels, polling configuration |

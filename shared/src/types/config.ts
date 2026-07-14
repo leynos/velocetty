@@ -1,7 +1,7 @@
 /** @file Shared configuration schema and runtime configuration type contracts. */
 import type {FontWeight} from 'xterm';
 
-/** Terminal color palette model used by profile configuration. */
+/** Terminal colour palette model used by profile configuration. */
 export type ColorMap = {
   black: string;
   blue: string;
@@ -38,7 +38,7 @@ type rootConfigOptions = {
 
 type profileConfigOptions = {
   /**
-   * terminal background color
+   * terminal background colour
    *
    * opacity is only supported on macOS
    */
@@ -60,23 +60,23 @@ type profileConfigOptions = {
    * @nullable
    */
   bellSoundURL: string | null;
-  /** border color (window, tabs) */
+  /** border colour (window, tabs) */
   borderColor: string;
   /**
-   * the full list. if you're going to provide the full color palette,
-   * including the 6 x 6 color cubes and the grayscale map, just provide
-   * an array here instead of a color map object
+   * the full list. if you're going to provide the full colour palette,
+   * including the 6 x 6 colour cubes and the grayscale map, just provide
+   * an array here instead of a colour map object
    */
   colors: ColorMap;
   /** if `true` selected text will automatically be copied to the clipboard */
   copyOnSelect: boolean;
   /** custom CSS to embed in the main window */
   css: string;
-  /** terminal text color under BLOCK cursor */
+  /** terminal text colour under BLOCK cursor */
   cursorAccentColor: string;
   /** set to `true` for blinking cursor */
   cursorBlink: boolean;
-  /** terminal cursor background color and opacity (hex, rgb, hsl, hsv, hwb or cmyk) */
+  /** terminal cursor background colour and opacity (hex, rgb, hsl, hsv, hwb or cmyk) */
   cursorColor: string;
   /** `'BEAM'` for |, `'UNDERLINE'` for _, `'BLOCK'` for █ */
   cursorShape: 'BEAM' | 'UNDERLINE' | 'BLOCK';
@@ -92,7 +92,7 @@ type profileConfigOptions = {
   fontWeight: FontWeight;
   /** font weight for bold characters eg:'normal', '600', 'bold' */
   fontWeightBold: FontWeight;
-  /** color of the text */
+  /** colour of the text */
   foregroundColor: string;
   /**
    * Whether to enable Sixel and iTerm2 inline image protocol support or not.
@@ -128,7 +128,7 @@ type profileConfigOptions = {
    */
   screenReaderMode: boolean;
   scrollback: number;
-  /** terminal selection color */
+  /** terminal selection colour */
   selectionColor: string;
   /**
    * the shell to run when spawning a new session (e.g. /usr/local/bin/fish)

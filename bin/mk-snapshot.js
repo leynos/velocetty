@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 
 import electronLink from 'electron-link';
 
-import {normaliseArch} from './shared/arch.js';
+import {normalizeArch} from './shared/arch.js';
 import {ensureDirectoryPath} from './shared/ensure-directory-path.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -33,8 +33,8 @@ async function main() {
       if (typeof requiredModulePath !== 'string') {
         return false;
       }
-      const normalisedPath = requiredModulePath.replace(/\\/g, '/');
-      return excludedModuleMatchers.some((matcher) => matcher.test(normalisedPath));
+      const normalizedPath = requiredModulePath.replace(/\\/g, '/');
+      return excludedModuleMatchers.some((matcher) => matcher.test(normalizedPath));
     }
   });
 
@@ -44,7 +44,7 @@ async function main() {
   // Verify if we will be able to use this in `mksnapshot`
   vm.runInNewContext(result.snapshotScript, undefined, {filename: snapshotScriptPath, displayErrors: true});
 
-  const targetArch = normaliseArch(process.env.npm_config_arch || process.arch);
+  const targetArch = normalizeArch(process.env.npm_config_arch || process.arch);
   const outputBlobPath = `${cachePath}/${targetArch}`;
   await fs.promises.mkdir(outputBlobPath, {recursive: true});
 

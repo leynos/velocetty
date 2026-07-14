@@ -292,7 +292,7 @@ User approval received on `2026-02-27` to proceed with implementation.
 - Test-state resets that delete object keys can invalidate numeric counters and
   produce `NaN` peaks. This was resolved by adding a dedicated
   `resetRendererTracking()` helper for deterministic test setup.
-- Running `bun install` regenerates schema artifacts (`app/config/schema.json`
+- Running `bun install` regenerates schema artefacts (`app/config/schema.json`
   and `shared/schemas/schema.json`) as part of repository bootstrap hooks.
   These changes were reverted for this feature to keep scope limited to roadmap
   `2.2.1` behaviour.

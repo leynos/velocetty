@@ -39,7 +39,7 @@ const loadHappyDom = (): Promise<HappyDomModule> => {
   return happyDomModule;
 };
 
-/** Initialise Happy DOM globals for unit tests and return a cleanup function. */
+/** Initialize Happy DOM globals for unit tests and return a cleanup function. */
 export const setupHappyDom = async (): Promise<Cleanup> => {
   const releaseLease = await acquireHappyDomLease();
   let cleanupComplete = false;

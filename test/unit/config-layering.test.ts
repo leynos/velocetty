@@ -10,7 +10,7 @@
  *
  * ## Test Coverage
  *
- * - Deep merge behavior for nested objects
+ * - Deep merge behaviour for nested objects
  * - Array replacement (not merging)
  * - Layer resolution with correct precedence
  * - Runtime overrides taking precedence over user and defaults
@@ -130,7 +130,7 @@ describe('config-layering', () => {
       expect(result).toEqual({a: 1, b: null});
     });
 
-    it('should handle deeply nested color palette merge', () => {
+    it('should handle deeply nested colour palette merge', () => {
       const defaults = {
         colors: {
           black: '#000000',

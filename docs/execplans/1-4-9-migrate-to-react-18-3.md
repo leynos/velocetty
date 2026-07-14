@@ -263,7 +263,7 @@ after addressing the reported errors and confirm `bun.lock` remains consistent.
 If a validation gate fails, consult the corresponding log file in `/tmp/` and
 retry only after the underlying issue is fixed.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Store command outputs in `/tmp/*-velocetty-$(git branch --show).out` to retain
 proof of successful validation. Include any notable warnings in the

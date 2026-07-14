@@ -431,9 +431,9 @@ Quality method (verification steps):
   without affecting earlier stages.
 - Do not commit until the full gate sequence passes.
 
-## Artifacts and notes
+## Artefacts and notes
 
-No implementation artifacts yet. This section will hold concise transcripts
+No implementation artefacts yet. This section will hold concise transcripts
 after each stage.
 
 ## Interfaces and dependencies
