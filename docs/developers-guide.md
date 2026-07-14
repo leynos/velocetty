@@ -594,8 +594,10 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
 Windows runtime reliability baseline after roadmap item `1.4.15` Windows
 scope:
 
-- Keep Windows CI on `windows-latest` (x64) in the shared build matrix and run
-  Windows install in a dedicated workflow step.
+- Keep Windows CI on `windows-2022` (x64) in the shared build matrix and run
+  Windows install in a dedicated workflow step. This retains Visual Studio 2022
+  until Electron's node-gyp recognizes the Visual Studio 2026 toolchain used by
+  `windows-latest`.
 - Run `.github/scripts/setup-node-gyp-python.sh`
   `"$RUNNER_TEMP/node-gyp-python"` before `bun install`, then set `PYTHON`,
   `npm_config_python`, and `npm_config_node_gyp` from step outputs for the

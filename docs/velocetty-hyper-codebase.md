@@ -2293,7 +2293,7 @@ flowchart LR
     subgraph Matrix["Build Matrix"]
         MacOS["macOS-latest"]
         Ubuntu["ubuntu-latest"]
-        Windows["windows-latest"]
+        Windows["windows-2022"]
     end
     
     subgraph Artifacts["Artifacts"]
@@ -2325,7 +2325,7 @@ flowchart LR
 | --------- | ---------------- |
 | **Node.js Version** | 24.x |
 | **Caching** | Bun cache for faster installs |
-| **Matrix Strategy** | `[macos-latest, ubuntu-latest, windows-latest]` |
+| **Matrix Strategy** | `[macos-latest, ubuntu-latest, windows-2022]` |
 | **Native Modules** | Automatic node-pty rebuilding per platform |
 | **Artefacts** | Installer uploads for each platform |
 | **E2E Reporting** | Screenshot capture with Imgur upload |
@@ -8386,7 +8386,7 @@ flowchart TB
     subgraph BuildMatrix["Build Matrix"]
         MacOS["macOS-latest"]
         Ubuntu["ubuntu-latest"]
-        Windows["windows-latest"]
+        Windows["windows-2022"]
     end
     
     subgraph SecurityScanning["Security Scanning"]
@@ -9136,7 +9136,7 @@ flowchart TB
     subgraph BuildMatrix["Cross-Platform Matrix"]
         MacOS["macos-latest"]
         Ubuntu["ubuntu-latest"]
-        Windows["windows-latest"]
+        Windows["windows-2022"]
     end
     
     subgraph Artifacts["Artifacts"]
@@ -10914,7 +10914,7 @@ flowchart TB
     subgraph BuildMatrix["Cross-Platform Matrix"]
         MacOS["macos-latest"]
         Ubuntu["ubuntu-latest"]
-        Windows["windows-latest"]
+        Windows["windows-2022"]
     end
     
     subgraph ARMBuilds["ARM Build Jobs"]
@@ -10958,7 +10958,7 @@ flowchart TB
 | ---------- | ----------------- | ------- | --------------------- |
 | `macos-latest` | 18.x | bash | Xcode command-line tools |
 | `ubuntu-latest` | 18.x | bash | `libarchive-tools`, Xvfb for E2E |
-| `windows-latest` | 18.x | bash | windows-build-tools |
+| `windows-2022` | 18.x | bash | windows-build-tools |
 
 ##### ARM build job (Linux only)
 
