@@ -117,7 +117,7 @@ jobs:
           apple_id: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
           apple_app_specific_password: ${{ runner.os == 'macOS' && secrets.APPLE_PASSWORD || '' }}
       - name: Archive Build Artefacts
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: build-${{ matrix.os }}
           path: |
@@ -154,7 +154,7 @@ jobs:
           file dist/linux-unpacked/hyper || true
           ldd dist/linux-unpacked/hyper || true
       - name: Archive E2E test screenshot
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: e2e-${{ matrix.os }}
           path: dist/tmp/*.png
@@ -165,7 +165,7 @@ jobs:
           PR_NUM: ${{ github.event.number }}
         run: echo "$PR_NUM" > pr_num.txt
       - name: Upload the pr num
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest'
         with:
           name: pr_num
@@ -216,7 +216,7 @@ jobs:
           SHELL: /bin/bash
       - name: Upload deep-lane E2E artefacts
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: e2e-deep-linux
           path: |
@@ -326,7 +326,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_V8_SNAPSHOT_COPY: '1'
       - name: Archive Build Artefacts
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: build-linux-arm64
           path: |
