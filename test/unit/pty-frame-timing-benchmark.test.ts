@@ -10,13 +10,13 @@ import {
   readBatchingContractFromSessionSource,
   resolveBenchmarkEvidencePath,
   runPtyFrameTimingSyntheticBenchmark,
-  sanitiseToken
+  sanitizeToken
 } from '../../scripts/run-pty-frame-timing-benchmark.mjs';
 
-test('sanitiseToken normalises unsafe path characters', () => {
-  expect(sanitiseToken('feature/2-2-2 pty')).toBe('feature-2-2-2-pty');
-  expect(sanitiseToken('   ')).toBe('unknown');
-  expect(sanitiseToken('ok_name')).toBe('ok_name');
+test('sanitizeToken normalizes unsafe path characters', () => {
+  expect(sanitizeToken('feature/2-2-2 pty')).toBe('feature-2-2-2-pty');
+  expect(sanitizeToken('   ')).toBe('unknown');
+  expect(sanitizeToken('ok_name')).toBe('ok_name');
 });
 
 test('readBatchingContractFromSessionSource parses numeric and multiplied values', () => {

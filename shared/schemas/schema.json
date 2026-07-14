@@ -16,7 +16,7 @@
     "Partial<profileConfigOptions>": {
       "properties": {
         "backgroundColor": {
-          "description": "terminal background color\n\nopacity is only supported on macOS",
+          "description": "terminal background colour\n\nopacity is only supported on macOS",
           "type": "string"
         },
         "bell": {
@@ -32,11 +32,11 @@
           "type": ["string", "null"]
         },
         "borderColor": {
-          "description": "border color (window, tabs)",
+          "description": "border colour (window, tabs)",
           "type": "string"
         },
         "colors": {
-          "description": "the full list. if you're going to provide the full color palette,\nincluding the 6 x 6 color cubes and the grayscale map, just provide\nan array here instead of a color map object",
+          "description": "the full list. if you're going to provide the full colour palette,\nincluding the 6 x 6 colour cubes and the grayscale map, just provide\nan array here instead of a colour map object",
           "properties": {
             "black": {
               "type": "string"
@@ -116,7 +116,7 @@
           "type": "string"
         },
         "cursorAccentColor": {
-          "description": "terminal text color under BLOCK cursor",
+          "description": "terminal text colour under BLOCK cursor",
           "type": "string"
         },
         "cursorBlink": {
@@ -124,7 +124,7 @@
           "type": "boolean"
         },
         "cursorColor": {
-          "description": "terminal cursor background color and opacity (hex, rgb, hsl, hsv, hwb or cmyk)",
+          "description": "terminal cursor background colour and opacity (hex, rgb, hsl, hsv, hwb or cmyk)",
           "type": "string"
         },
         "cursorShape": {
@@ -160,7 +160,7 @@
           "description": "font weight for bold characters eg:'normal', '600', 'bold'"
         },
         "foregroundColor": {
-          "description": "color of the text",
+          "description": "colour of the text",
           "type": "string"
         },
         "imageSupport": {
@@ -211,7 +211,7 @@
           "type": "number"
         },
         "selectionColor": {
-          "description": "terminal selection color",
+          "description": "terminal selection colour",
           "type": "string"
         },
         "shell": {
@@ -306,7 +306,7 @@
         {
           "properties": {
             "backgroundColor": {
-              "description": "terminal background color\n\nopacity is only supported on macOS",
+              "description": "terminal background colour\n\nopacity is only supported on macOS",
               "type": "string"
             },
             "bell": {
@@ -322,11 +322,11 @@
               "type": ["string", "null"]
             },
             "borderColor": {
-              "description": "border color (window, tabs)",
+              "description": "border colour (window, tabs)",
               "type": "string"
             },
             "colors": {
-              "description": "the full list. if you're going to provide the full color palette,\nincluding the 6 x 6 color cubes and the grayscale map, just provide\nan array here instead of a color map object",
+              "description": "the full list. if you're going to provide the full colour palette,\nincluding the 6 x 6 colour cubes and the grayscale map, just provide\nan array here instead of a colour map object",
               "properties": {
                 "black": {
                   "type": "string"
@@ -406,7 +406,7 @@
               "type": "string"
             },
             "cursorAccentColor": {
-              "description": "terminal text color under BLOCK cursor",
+              "description": "terminal text colour under BLOCK cursor",
               "type": "string"
             },
             "cursorBlink": {
@@ -414,7 +414,7 @@
               "type": "boolean"
             },
             "cursorColor": {
-              "description": "terminal cursor background color and opacity (hex, rgb, hsl, hsv, hwb or cmyk)",
+              "description": "terminal cursor background colour and opacity (hex, rgb, hsl, hsv, hwb or cmyk)",
               "type": "string"
             },
             "cursorShape": {
@@ -450,7 +450,7 @@
               "description": "font weight for bold characters eg:'normal', '600', 'bold'"
             },
             "foregroundColor": {
-              "description": "color of the text",
+              "description": "colour of the text",
               "type": "string"
             },
             "imageSupport": {
@@ -501,7 +501,7 @@
               "type": "number"
             },
             "selectionColor": {
-              "description": "terminal selection color",
+              "description": "terminal selection colour",
               "type": "string"
             },
             "shell": {

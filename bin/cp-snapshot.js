@@ -28,7 +28,7 @@ function normalizeArch(arch, sourceLabel) {
   }
 
   if (UNSUPPORTED_ARCHES.has(arch)) {
-    throw new Error('Unsupported architecture "arm". Snapshot artifacts are available only for x64 and arm64.');
+    throw new Error('Unsupported architecture "arm". Snapshot artefacts are available only for x64 and arm64.');
   }
 
   throw new Error(

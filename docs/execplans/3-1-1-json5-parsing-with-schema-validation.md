@@ -310,9 +310,9 @@ Planned dependency posture:
   `Decision Log` before proceeding.
 - Do not mark roadmap done during partial gate states.
 
-## Artifacts and notes
+## Artefacts and notes
 
-Expected evidence artifacts:
+Expected evidence artefacts:
 
 - `/tmp/test-config-import-json5-<project>-<branch>.out`
 - `/tmp/bun-install-<project>-<branch>.out`
@@ -339,7 +339,7 @@ Agent-team planning notes:
 - [x] (2026-03-01 20:19Z) Created and populated context pack `pk_qoh4ak36`.
 - [x] (2026-03-01 20:22Z) Ran parallel agent-team plan synthesis and merged
   milestones, risks, and test-matrix proposals.
-- [x] (2026-03-01 20:25Z) Authored draft ExecPlan artifact at
+- [x] (2026-03-01 20:25Z) Authored draft ExecPlan artefact at
   `docs/execplans/3-1-1-json5-parsing-with-schema-validation.md`.
 - [x] (2026-03-02 00:32Z) Received explicit approval to begin implementation.
 - [x] (2026-03-02 00:52Z) Implemented structured JSON5 diagnostics in

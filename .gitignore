@@ -28,3 +28,10 @@ plugins
 !.vscode/launch.json
 .idea
 .grepai/
+__pycache__/
+.coverage
+.pytest_cache/
+.uv-cache/
+.uv-tools/
+.typos-oxendict-base.json
+.typos-oxendict-base.toml

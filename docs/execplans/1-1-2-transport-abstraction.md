@@ -423,10 +423,10 @@ If event wiring migration in `lib/index.tsx` introduces regressions, revert to
 adapter-backed command migration only, keep event-stream interfaces in place,
 and record the deferred event migration in `Decision log`.
 
-## Artifacts and notes
+## Artefacts and notes
 
-- Primary artifact: `docs/execplans/1-1-2-transport-abstraction.md`.
-- Expected implementation artifacts: new shared transport contract file,
+- Primary artefact: `docs/execplans/1-1-2-transport-abstraction.md`.
+- Expected implementation artefacts: new shared transport contract file,
   renderer Electron adapter module, command-layer updates, tests, and doc
   updates.
 - Keep this plan updated during execution, especially `Progress`,

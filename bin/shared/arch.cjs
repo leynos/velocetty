@@ -6,12 +6,12 @@ const ARCH_ALIASES = new Map([
 const SUPPORTED_SNAPSHOT_ARCHITECTURES = new Set(['x64', 'arm64']);
 
 /**
- * Normalises architecture aliases to Electron-supported values.
+ * Normalizes architecture aliases to Electron-supported values.
  * Supports the mappings aarch64 → arm64 and amd64 → x64.
  * @param {string | undefined} arch - The raw architecture string.
- * @returns {string} The normalised architecture.
+ * @returns {string} The normalized architecture.
  */
-function normaliseArch(arch) {
+function normalizeArch(arch) {
   if (!arch) {
     return DEFAULT_ARCH;
   }
@@ -20,23 +20,23 @@ function normaliseArch(arch) {
 }
 
 /**
- * Normalises and validates architectures used for snapshot assets.
+ * Normalizes and validates architectures used for snapshot assets.
  * @param {unknown} arch - The raw architecture value.
  * @param {string} sourceLabel - Description of the architecture source.
  * @returns {string} The validated snapshot architecture.
  */
-function normaliseSnapshotArch(arch, sourceLabel) {
+function normalizeSnapshotArch(arch, sourceLabel) {
   if (typeof arch !== 'string' || arch.length === 0) {
     throw new Error(`Expected a string architecture from ${sourceLabel}, received "${String(arch)}".`);
   }
 
-  const normalisedArch = normaliseArch(arch);
-  if (normalisedArch === 'arm') {
-    throw new Error('Unsupported architecture "arm". Snapshot artifacts are available only for x64 and arm64.');
+  const normalizedArch = normalizeArch(arch);
+  if (normalizedArch === 'arm') {
+    throw new Error('Unsupported architecture "arm". Snapshot artefacts are available only for x64 and arm64.');
   }
 
-  if (SUPPORTED_SNAPSHOT_ARCHITECTURES.has(normalisedArch)) {
-    return normalisedArch;
+  if (SUPPORTED_SNAPSHOT_ARCHITECTURES.has(normalizedArch)) {
+    return normalizedArch;
   }
 
   throw new Error(
@@ -46,7 +46,7 @@ function normaliseSnapshotArch(arch, sourceLabel) {
 }
 
 module.exports = {
-  normaliseArch,
-  normaliseSnapshotArch,
+  normalizeArch,
+  normalizeSnapshotArch,
   SUPPORTED_SNAPSHOT_ARCHITECTURES
 };

@@ -1,7 +1,7 @@
 // Packages
 import Color from 'color';
 
-// returns a background color that's in hex
+// returns a background colour that's in hex
 // format including the alpha channel (e.g.: `#00000050`)
 // input can be any css value (rgb, hsl, string…)
 const toElectronBackgroundColor = (bgColor: string) => {

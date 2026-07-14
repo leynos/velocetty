@@ -1,5 +1,5 @@
 name: Build packaged app
-description: Build distributable artifacts with optional signing secrets.
+description: Build distributable artefacts with optional signing secrets.
 
 inputs:
   gh_token:

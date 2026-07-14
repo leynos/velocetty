@@ -25,7 +25,7 @@ import Session from '../session';
 import updater from '../updater';
 import {clock} from '../utils/clock';
 import {recordInputSendToWriteLatency, setRendererType, unsetRendererType} from '../utils/renderer-utils';
-import toElectronBackgroundColor from '../utils/to-electron-background-color';
+import toElectronBackgroundColor from '../utils/to-electron-background-colour';
 
 import contextMenuTemplate from './contextmenu';
 
@@ -220,7 +220,7 @@ export function newWindow(
       notify('Shell configuration changed!', 'Open a new tab or window to start using the new shell');
     }
 
-    // update background color if necessary
+    // update background colour if necessary
     updateBackgroundColor();
 
     cfg = cfg_;

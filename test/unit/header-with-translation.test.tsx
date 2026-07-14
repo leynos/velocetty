@@ -27,8 +27,8 @@ type HeaderWithTranslationComponent = typeof import('../../lib/containers/header
 
 const translatedLabels = {
   openMenuAria: 'Open menu',
-  minimizeWindowAria: 'Minimise window',
-  maximizeWindowAria: 'Maximise window',
+  minimizeWindowAria: 'Minimize window',
+  maximizeWindowAria: 'Maximize window',
   restoreWindowAria: 'Restore window',
   closeWindowAria: 'Close window'
 };

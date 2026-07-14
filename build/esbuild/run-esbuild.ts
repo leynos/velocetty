@@ -5,7 +5,7 @@ import path from 'node:path';
 import {build, context, type BuildContext, type BuildOptions, type Plugin, type PluginBuild} from 'esbuild';
 
 import {ensureDirectoryPath} from '../../bin/shared/ensure-directory-path.js';
-import {copyHyperAppArtifacts, copyRendererArtifacts} from './copy-artifacts';
+import {copyHyperAppArtifacts, copyRendererArtifacts} from './copy-artefacts';
 import {createIgnoreImportsPlugin} from './esbuild-plugins/ignore-imports-plugin';
 import {createNodeBuiltinsPlugin} from './esbuild-plugins/node-builtins-plugin';
 import {createRendererExternalsPlugin} from './esbuild-plugins/renderer-externals-plugin';

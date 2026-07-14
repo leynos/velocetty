@@ -197,7 +197,7 @@ The repository contains **13 styled-jsx blocks** across **12 files**:
 | `lib/components/notifications.tsx` | A (local static) | 1 | None |
 | `lib/components/term.tsx` | C (global) | 1 | None |
 | `lib/components/split-pane.tsx` | A (local static) | 1 | None (uses inline `style=` for `borderColor`) |
-| `lib/components/notification.tsx` | A (local static) | 1 | None (uses inline `style=` for colors) |
+| `lib/components/notification.tsx` | A (local static) | 1 | None (uses inline `style=` for colours) |
 | `lib/components/tabs.tsx` | B (local dynamic) | 1 | `isMac` platform conditionals |
 | `lib/components/tab.tsx` | A (local static) | 1 | None (uses inline `style=` for `borderColor`) |
 | `lib/components/new-tab.tsx` | B (local dynamic) | 1 | `borderColor`, `isMac` |

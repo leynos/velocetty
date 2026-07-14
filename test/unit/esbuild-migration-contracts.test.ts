@@ -6,7 +6,7 @@ import path from 'node:path';
 import {build as runEsbuildBuild, type BuildOptions} from 'esbuild';
 import {expect, test} from 'bun:test';
 
-import {copyHyperAppArtifacts, copyRendererArtifacts} from '../../build/esbuild/copy-artifacts';
+import {copyHyperAppArtifacts, copyRendererArtifacts} from '../../build/esbuild/copy-artefacts';
 import {createCliBuildOptions, createRendererBuildOptions} from '../../build/esbuild/run-esbuild';
 import {
   shouldIgnoreImportPath,

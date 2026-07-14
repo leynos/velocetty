@@ -29,12 +29,12 @@ const toPosixPath = (filePath) => filePath.replace(/\\/g, '/');
  * Converts arbitrary identifiers into filesystem-safe tokens.
  *
  * Example:
- * `sanitiseToken("feature/2-2-2")` -> `"feature-2-2-2"`
+ * `sanitizeToken("feature/2-2-2")` -> `"feature-2-2-2"`
  */
-export const sanitiseToken = (value) => {
+export const sanitizeToken = (value) => {
   const trimmed = value.trim();
-  const sanitised = trimmed.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-+/g, '-');
-  return sanitised.length > 0 ? sanitised : 'unknown';
+  const sanitized = trimmed.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-+/g, '-');
+  return sanitized.length > 0 ? sanitized : 'unknown';
 };
 
 /**
@@ -175,8 +175,8 @@ export const resolveBenchmarkEvidencePath = ({evidencePath, projectName, branchN
     return path.resolve(evidencePath);
   }
 
-  const safeProjectName = sanitiseToken(projectName);
-  const safeBranchName = sanitiseToken(branchName);
+  const safeProjectName = sanitizeToken(projectName);
+  const safeBranchName = sanitizeToken(branchName);
   return path.join(os.tmpdir(), `benchmark-${safeProjectName}-${safeBranchName}-pty-frame-timing-synthetic-load.json`);
 };
 

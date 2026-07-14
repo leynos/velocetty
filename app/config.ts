@@ -8,7 +8,7 @@ import {_import, getDefaultConfig} from './config/import';
 import _openConfig from './config/open';
 import {cfgPath, cfgDir} from './config/paths';
 import notify from './notify';
-import {getColorMap} from './utils/colors';
+import {getColorMap} from './utils/colours';
 
 const watchers: Function[] = [];
 let cfg: parsedConfig = {} as any;
@@ -133,7 +133,7 @@ export {get as getWin, recordState as winRecord, defaults as windowDefaults} fro
 export const fixConfigDefaults = (decoratedConfig: configOptions) => {
   const defaultConfig = getDefaultConfig().config!;
   const colorOverrides = getColorMap(decoratedConfig.colors);
-  // We must have default colors for xterm css.
+  // We must have default colours for xterm css.
   decoratedConfig.colors = {...defaultConfig.colors, ...(colorOverrides ?? {})};
   return decoratedConfig;
 };

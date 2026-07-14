@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {downloadArtifact} from '@electron/get';
 import extractZip from 'extract-zip';
 
-import {normaliseArch} from './shared/arch.js';
+import {normalizeArch} from './shared/arch.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -75,7 +75,7 @@ function calculateRetryDelay(attempt, baseDelayMs) {
   return baseDelayMs * 2 ** (attempt - 1);
 }
 
-async function downloadArtifactWithRetry(options) {
+async function downloadArtefactWithRetry(options) {
   const maxAttempts = parsePositiveInteger(process.env.MKSNAPSHOT_DOWNLOAD_RETRY_ATTEMPTS, 4);
   const baseDelayMs = parsePositiveInteger(process.env.MKSNAPSHOT_DOWNLOAD_RETRY_DELAY_MS, 1000);
 
@@ -117,7 +117,7 @@ function resolveElectronVersion() {
 
 function parseDownloadConfig() {
   const platform = process.env.npm_config_platform || process.platform;
-  const arch = normaliseArch(process.env.npm_config_arch || process.arch);
+  const arch = normalizeArch(process.env.npm_config_arch || process.arch);
   const downloadArch = arch.startsWith('arm') && platform !== 'darwin' ? `${arch}-x64` : arch;
   const strictSslEnv = process.env.npm_config_strict_ssl;
   // npm's strict-ssl defaults to true; only disable verification explicitly.
@@ -156,7 +156,7 @@ async function main() {
 
   fs.mkdirSync(targetFolder, {recursive: true});
 
-  const zipPath = await downloadArtifactWithRetry({
+  const zipPath = await downloadArtefactWithRetry({
     version,
     artifactName: 'mksnapshot',
     platform,

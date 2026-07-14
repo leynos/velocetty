@@ -1,5 +1,5 @@
-// This menu label is overrided by OSX to be the appName
-// The label is set to appName here so it matches actual behavior
+// This menu label is overridden by OSX to be the appName
+// The label is set to appName here so it matches actual behaviour
 import {app} from 'electron';
 import type {BrowserWindow, MenuItemConstructorOptions} from 'electron';
 import type {CommandId} from '@shared/types/commands';

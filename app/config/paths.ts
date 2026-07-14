@@ -1,7 +1,7 @@
 /**
  * @file Exposes configuration paths and runtime metadata for the app.
  *
- * Centralises filesystem paths used across config, plugins, and CLI helpers,
+ * Centralizes filesystem paths used across config, plugins, and CLI helpers,
  * including the resolved Bun binary used for plugin installs.
  */
 import {execSync} from 'node:child_process';

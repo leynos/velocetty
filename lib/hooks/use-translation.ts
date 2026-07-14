@@ -2,8 +2,8 @@
 
 const headerLabelDefaults = {
   openMenu: 'Open menu',
-  minimizeWindow: 'Minimise window',
-  maximizeWindow: 'Maximise window',
+  minimizeWindow: 'Minimize window',
+  maximizeWindow: 'Maximize window',
   restoreWindow: 'Restore window',
   closeWindow: 'Close window',
   search: 'Search',

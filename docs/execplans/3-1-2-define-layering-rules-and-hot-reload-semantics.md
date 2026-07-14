@@ -389,9 +389,9 @@ Planned dependency posture:
   `Decision Log` before proceeding.
 - Do not mark roadmap done during partial gate states.
 
-## Artifacts and notes
+## Artefacts and notes
 
-Expected evidence artifacts:
+Expected evidence artefacts:
 
 - `/tmp/test-config-reloadability-<project>-<branch>.out`
 - `/tmp/bun-install-<project>-<branch>.out`

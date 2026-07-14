@@ -261,7 +261,7 @@ last working commit and re-apply the conversion carefully. If E2E tests
 fail due to Bun/Playwright incompatibilities, stop and escalate rather than
 adding workarounds that change production code.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Expected file changes include:
 

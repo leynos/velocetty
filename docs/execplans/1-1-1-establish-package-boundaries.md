@@ -397,7 +397,7 @@ fails:
 If packaging paths are disrupted, restore previous output wiring first, then
 continue migration with additive compatibility shims.
 
-## Artifacts and notes
+## Artefacts and notes
 
 - Primary output: this plan file.
 - Implementation is expected to touch project configuration, source imports,

@@ -1,5 +1,5 @@
 /**
- * @file Initialises the auto-updater, wires platform-specific update events,
+ * @file Initializes the auto-updater, wires platform-specific update events,
  * and manages update-channel configuration.
  */
 // Packages

@@ -366,7 +366,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
 
 // Lazy loaders keep `paths`, `init`, and `notify` out of the static import
 // graph so tests running outside Electron are not forced to load the Electron
-// IPC stack at module initialisation.
+// IPC stack at module initialization.
 const lazyInit = (...args: Parameters<ConfigInit>): ReturnType<ConfigInit> => {
   const initModule = requireFromHere('./init');
   return (initModule._init as ConfigInit)(...args);

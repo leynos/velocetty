@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 import fsExtra from 'fs-extra';
 import temp from 'temp';
 
-import {normaliseArch} from './shared/arch.js';
+import {normalizeArch} from './shared/arch.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -103,7 +103,7 @@ function resolveSysroot() {
 }
 
 function resolveRunner(binaryPath) {
-  const hostArch = normaliseArch(process.arch);
+  const hostArch = normalizeArch(process.arch);
   const isLinuxArmHost = process.platform === 'linux' && hostArch === 'arm64';
   if (!isLinuxArmHost || !isElfX86_64(binaryPath)) {
     return {command: binaryPath, prefix: []};
@@ -226,7 +226,7 @@ fs.copyFileSync(path.join(mksnapshotBinaryDir, 'snapshot_blob.bin'), path.join(o
 const v8ContextGenCommand = getBinaryPath('v8_context_snapshot_generator', mksnapshotBinaryDir);
 let v8ContextFile = 'v8_context_snapshot.bin';
 if (process.platform === 'darwin') {
-  const targetArch = normaliseArch(process.env.npm_config_arch || process.arch);
+  const targetArch = normalizeArch(process.env.npm_config_arch || process.arch);
   v8ContextFile = targetArch === 'arm64' ? 'v8_context_snapshot.arm64.bin' : 'v8_context_snapshot.x86_64.bin';
 }
 

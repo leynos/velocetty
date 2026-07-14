@@ -38,7 +38,7 @@ Success is observable when a developer can enable and disable the example
 plugin, restart or live-reload, and see all three behaviours working with
 tests proving they do not regress:
 
-- the command is registered and invokable via keybinding,
+- the command is registered and invocable via keybinding,
 - settings persist under a plugin namespace in JSON5 config,
 - tab decoration output updates from explicit events and remains deterministic.
 

@@ -435,7 +435,7 @@ If final gates fail, do not mark the roadmap item done. Fix the failures,
 update `Progress` and `Decision Log`, and rerun the relevant command until the
 gate passes or a tolerance threshold is reached.
 
-## Artifacts and notes
+## Artefacts and notes
 
 When implementation begins, capture the most important validation evidence in
 this section:

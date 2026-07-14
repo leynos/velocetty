@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-/** @file Syncs shared schema artifacts into the legacy app config location. */
+/** @file Syncs shared schema artefacts into the legacy app config location. */
 
 import {copyFileSync, mkdirSync} from 'node:fs';
 import {dirname, resolve} from 'node:path';

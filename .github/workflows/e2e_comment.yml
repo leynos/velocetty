@@ -13,7 +13,7 @@ jobs:
         env:
           WORKFLOW_RUN_INFO: ${{ toJSON(github.event.workflow_run) }}
         run: echo "$WORKFLOW_RUN_INFO"
-      - name: Download Artifacts
+      - name: Download Artefacts
         uses: dawidd6/action-download-artifact@v12
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -21,7 +21,7 @@ jobs:
           run_id: ${{ github.event.workflow_run.id }}
           name: ^e2e-
           name_is_regexp: true
-          path: e2e-artifacts
+          path: e2e-artefacts
           if_no_artifact_found: warn
       - name: Get PR number
         uses: dawidd6/action-download-artifact@v12
@@ -49,12 +49,12 @@ jobs:
         if: steps.pr_num_exists.outputs.exists == '1'
         run: |
           mkdir -p screenshots
-          mkdir -p e2e-artifacts
+          mkdir -p e2e-artefacts
           while IFS= read -r -d '' file; do
-            rel_path="${file#e2e-artifacts/}"
+            rel_path="${file#e2e-artefacts/}"
             safe_name=$(printf '%s' "$rel_path" | tr '/ ' '--')
             cp "$file" "screenshots/$safe_name"
-          done < <(find e2e-artifacts -type f -name '*.png' -print0)
+          done < <(find e2e-artefacts -type f -name '*.png' -print0)
       - name: Count screenshots
         id: screenshot_count
         if: steps.pr_num_exists.outputs.exists == '1'
@@ -79,7 +79,7 @@ jobs:
           MESSAGE: |
             Hi there,
             Thank you for contributing to Hyper!
-            You can get the build artifacts from [here](https://nightly.link/{1}/actions/runs/{2}).
+            You can get the build artefacts from [here](https://nightly.link/{1}/actions/runs/{2}).
             Here are screenshots of Hyper built from this pr.
             {0}
         with:

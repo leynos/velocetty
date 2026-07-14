@@ -58,7 +58,7 @@ const KEY_RESIZE_ACTIONS: Partial<
 
 /**
  * Returns the next leading-pane size for a keyboard resize event, or `null`
- * when the key is not a recognised resize key for the current orientation.
+ * when the key is not a recognized resize key for the current orientation.
  */
 function computeKeyResizeTarget(
   key: string,
