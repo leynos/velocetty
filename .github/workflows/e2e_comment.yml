@@ -14,7 +14,7 @@ jobs:
           WORKFLOW_RUN_INFO: ${{ toJSON(github.event.workflow_run) }}
         run: echo "$WORKFLOW_RUN_INFO"
       - name: Download Artefacts
-        uses: dawidd6/action-download-artifact@v12
+        uses: dawidd6/action-download-artifact@v21
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workflow: nodejs.yml
@@ -24,7 +24,7 @@ jobs:
           path: e2e-artefacts
           if_no_artifact_found: warn
       - name: Get PR number
-        uses: dawidd6/action-download-artifact@v12
+        uses: dawidd6/action-download-artifact@v21
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           workflow: nodejs.yml
