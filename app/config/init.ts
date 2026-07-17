@@ -4,7 +4,7 @@ import type {parsedConfig, rawConfig, configOptions} from '@shared/types/config'
 import notify from '../notify';
 import mapKeys from '../utils/map-keys';
 
-// init config
+/** Merges the user's raw config onto the default config, filling in required profile fields. */
 const _init = (userCfg: rawConfig, defaultCfg: rawConfig): parsedConfig => {
   return {
     config: (() => {

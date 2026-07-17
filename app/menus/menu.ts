@@ -40,6 +40,7 @@ const formatLatencySummary = (metrics: RuntimeLatencyMetrics) => {
   )}ms, last ${metrics.lastMs.toFixed(2)}ms (n=${metrics.sampleCount})`;
 };
 
+/** Assembles the full application menu template from the per-section menu builders. */
 export const createMenu = (getLoadedPluginVersions: () => {name: string; version: string}[]) => {
   const config = getConfig();
   // We take only first shortcut in array for each command
@@ -123,6 +124,7 @@ export const createMenu = (getLoadedPluginVersions: () => {name: string; version
   return menu;
 };
 
+/** Builds and caches the application menu from a template, returning it for `Menu.setApplicationMenu`. */
 export const buildMenu = (template: Electron.MenuItemConstructorOptions[]): Electron.Menu => {
   menu_ = Menu.buildFromTemplate(template);
   return menu_;

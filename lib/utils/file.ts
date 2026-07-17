@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import type {Stats} from 'node:fs';
 
+/** Reports whether the file described by `fileStat` is executable (always true on Windows). */
 export function isExecutable(fileStat: Stats): boolean {
   if (process.platform === 'win32') {
     return true;
@@ -21,6 +22,7 @@ export function isExecutable(fileStat: Stats): boolean {
   return Boolean(fileStat.mode & 0o0001 || fileStat.mode & 0o0010 || fileStat.mode & 0o0100);
 }
 
+/** Reads the file at `filePath` and resolves its contents as base64, or `null` on read failure. */
 export function getBase64FileData(filePath: string): Promise<string | null> {
   return new Promise((resolve): void => {
     return fs.readFile(filePath, (err, data) => {

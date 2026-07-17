@@ -17,9 +17,15 @@ declare const tabIdBrand: unique symbol;
 declare const tabDecorationProviderIdBrand: unique symbol;
 
 /** Branded identifier for tab-decoration context targets. */
-export type TabId = string & {[tabIdBrand]: 'TabId'};
+export type TabId = string & {
+  /** Nominal-typing brand; carries no runtime value. */
+  [tabIdBrand]: 'TabId';
+};
 /** Branded identifier for tab-decoration providers. */
-export type TabDecorationProviderId = string & {[tabDecorationProviderIdBrand]: 'TabDecorationProviderId'};
+export type TabDecorationProviderId = string & {
+  /** Nominal-typing brand; carries no runtime value. */
+  [tabDecorationProviderIdBrand]: 'TabDecorationProviderId';
+};
 
 /** Cast a raw tab identifier into the branded tab ID type. */
 export const asTabId = (value: string): TabId => value as TabId;
@@ -28,42 +34,68 @@ export const asTabDecorationProviderId = (value: string): TabDecorationProviderI
 
 /** Badge contribution shown alongside a tab label. */
 export type TabDecorationBadge = {
+  /** Short text shown on the badge. */
   text?: string;
+  /** Icon shown on the badge. */
   icon?: string;
+  /** Tooltip shown on hover. */
   tooltip?: string;
+  /** Severity styling for the badge. */
   kind?: 'info' | 'warn' | 'error';
 };
 
 /** Actionable widget contribution shown on a tab. */
 export type TabDecorationWidget = {
+  /** Icon shown for the widget. */
   icon: string;
+  /** Command invoked when the widget is activated. */
   command: CommandId;
+  /** Tooltip shown on hover. */
   tooltip?: string;
 };
 
 /** Combined decoration output for a single tab. */
 export type TabDecoration = {
-  icon?: {name: string; tooltip?: string};
+  /** Tab icon override, with its own tooltip. */
+  icon?: {
+    /** Icon name. */
+    name: string;
+    /** Tooltip shown on hover. */
+    tooltip?: string;
+  };
+  /** Tab title override. */
   title?: string;
+  /** Tab subtitle shown alongside the title. */
   subtitle?: string;
+  /** Badges to render on the tab, bounded and de-duplicated by the registry. */
   badges?: TabDecorationBadge[];
+  /** Widgets to render on the tab, bounded and de-duplicated by the registry. */
   widgets?: TabDecorationWidget[];
 };
 
 /** Runtime context passed to tab-decoration providers. */
 export type TabDecorationContext = {
+  /** Identifier of the tab being decorated. */
   tabId: TabId;
+  /** Index of the tab within its window. */
   tabIndex: number;
+  /** Whether the tab is the currently active tab. */
   active: boolean;
+  /** Whether the tab has unseen activity. */
   hasActivity: boolean;
+  /** Current tab title. */
   title?: string;
 };
 
 /** Contract for tab-decoration providers registered by plugins. */
 export type TabDecorationProvider = {
+  /** Unique identifier for the provider. */
   id: TabDecorationProviderId;
+  /** Higher-priority providers' decorations take precedence during merging. */
   priority: number;
+  /** Computes the decoration for a tab, or `null`/`undefined` to contribute nothing. */
   provideDecoration: (context: TabDecorationContext) => TabDecoration | null | undefined;
+  /** Optionally subscribes to change notifications, returning a disposer. */
   subscribe?: (onDidChange: () => void) => undefined | (() => void);
 };
 

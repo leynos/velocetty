@@ -32,7 +32,12 @@ import {
  * `openBraceIndex` points at the opening `{` character and `closeBraceIndex`
  * points at the matching closing `}` character.
  */
-export type Json5ObjectRange = {openBraceIndex: number; closeBraceIndex: number};
+export type Json5ObjectRange = {
+  /** Index of the opening `{` character. */
+  openBraceIndex: number;
+  /** Index of the matching closing `}` character. */
+  closeBraceIndex: number;
+};
 
 /**
  * Captures a parsed key/value entry inside a JSON5 object.
@@ -43,28 +48,40 @@ export type Json5ObjectRange = {openBraceIndex: number; closeBraceIndex: number}
  * `hasTrailingComma` is true when a comma follows the value before the next key.
  */
 export type Json5ObjectProperty = {
+  /** The parsed key name. */
   key: string;
+  /** Index of the first character of the key token. */
   keyStartIndex: number;
+  /** Index of the first non-whitespace/comment character of the value. */
   valueStartIndex: number;
+  /** Index of the terminating delimiter (`,` or `}` boundary) after the value. */
   valueEndIndex: number;
+  /** Whether a comma follows the value before the next key. */
   hasTrailingComma: boolean;
 };
 
 /** Read-only start/limit cursor window used for parser scans. */
 export type ParseRange = {
+  /** Inclusive index where the scan begins. */
   readonly startIndex: number;
+  /** Exclusive index where the scan must stop. */
   readonly limitIndex: number;
 };
 
 /** Read-only single cursor index wrapper used for parser helper calls. */
 export type IndexCursor = {
+  /** Current scan position within the source document. */
   readonly index: number;
 };
 
 /** Read-only key wrapper used for object-property lookups. */
 export type PropertyKey = {
+  /** The wrapped key string. */
   readonly value: string;
-} & {readonly __brand: 'PropertyKey'};
+} & {
+  /** Nominal-typing brand preventing accidental use of a plain string as a key. */
+  readonly __brand: 'PropertyKey';
+};
 
 /**
  * `propertyKey` constructs a `PropertyKey` from a raw key string.

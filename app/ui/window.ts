@@ -160,6 +160,7 @@ const parseSessionExtraOptions = (payload: unknown): sessionExtraOptions => {
   return parsedOptions;
 };
 
+/** Creates and wires up a new application window, including its RPC channel and pty sessions. */
 export function newWindow(
   options_: BrowserWindowConstructorOptions,
   cfg: configOptions,

@@ -6,6 +6,7 @@ import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
 
 const asCommandId = (command: string): CommandId => command as CommandId;
 
+/** Builds the View menu template for reload, dev tools, and zoom commands. */
 const viewMenu = (commandKeys: Record<string, string>, execCommand: MenuCommandRunner): MenuItemConstructorOptions => {
   const execWithBrowserWindow = makeMenuCommandExecutor(execCommand);
 

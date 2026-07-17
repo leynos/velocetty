@@ -6,6 +6,7 @@ import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
 
 const asCommandId = (command: string): CommandId => command as CommandId;
 
+/** Builds the Window menu template for tab and pane navigation, with a jump-to-tab submenu. */
 const windowMenu = (
   commandKeys: Record<string, string>,
   execCommand: MenuCommandRunner

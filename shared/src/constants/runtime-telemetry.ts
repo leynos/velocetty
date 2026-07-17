@@ -15,9 +15,11 @@ export const LONG_FRAME_THRESHOLD_MS = 16;
 /** Runtime metric reporting cadence from renderer to main process. */
 export const RUNTIME_METRICS_REPORT_INTERVAL_MS = 1000;
 
+/** Maximum number of pending input-send timestamps retained per session. */
 export const INPUT_SEND_TIMESTAMP_QUEUE_LIMIT = 128;
 const inputSendTimestampsByUid = new Map<RendererUid, number[]>();
 
+/** Returns the input-send timestamp queue for a session, creating it on first use. */
 export const getOrCreateTimestampQueue = (uid: RendererUid) => {
   const queue = inputSendTimestampsByUid.get(uid);
   if (queue) {

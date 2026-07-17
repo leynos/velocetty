@@ -33,11 +33,23 @@ export type UseConfigReloadabilityReturn = {
   /** Function to get classification for any key. */
   getClassification: (key: string) => Reloadability | undefined;
   /** Function to get full reloadability entry with rationale. */
-  getReloadabilityEntry: (key: string) => {classification: Reloadability; rationale: string} | undefined;
+  getReloadabilityEntry: (key: string) =>
+    | {
+        /** The reload classification for the key. */
+        classification: Reloadability;
+        /** Human-readable explanation for the classification. */
+        rationale: string;
+      }
+    | undefined;
   /** Function to filter keys by classification (includes unknown keys when classification is 'restart'). */
   filterKeysByClassification: (keys: string[], classification: Reloadability) => string[];
   /** Function to partition keys by reloadability (unknown keys default to restart). */
-  partitionKeys: (keys: string[]) => {live: string[]; restart: string[]};
+  partitionKeys: (keys: string[]) => {
+    /** Keys that can be applied without a restart. */
+    live: string[];
+    /** Keys that require a restart to take effect. */
+    restart: string[];
+  };
 };
 
 /**
@@ -46,7 +58,16 @@ export type UseConfigReloadabilityReturn = {
  * @param key - The configuration key.
  * @returns The reloadability entry with classification and rationale, or undefined.
  */
-export const getReloadabilityEntry = (key: string): {classification: Reloadability; rationale: string} | undefined => {
+export const getReloadabilityEntry = (
+  key: string
+):
+  | {
+      /** The reload classification for the key. */
+      classification: Reloadability;
+      /** Human-readable explanation for the classification. */
+      rationale: string;
+    }
+  | undefined => {
   const scope = getKeyScope(key);
   const entry = getReloadability(key, scope);
   return entry ? {classification: entry.classification, rationale: entry.rationale} : undefined;
@@ -81,7 +102,14 @@ export const filterKeysByClassification = (keys: string[], classification: Reloa
  * @param keys - Array of configuration keys to partition.
  * @returns Object with live and restart arrays.
  */
-export const partitionKeys = (keys: string[]): {live: string[]; restart: string[]} => {
+export const partitionKeys = (
+  keys: string[]
+): {
+  /** Keys that can be applied without a restart. */
+  live: string[];
+  /** Keys that require a restart to take effect. */
+  restart: string[];
+} => {
   const live: string[] = [];
   const restart: string[] = [];
 

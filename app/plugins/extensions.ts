@@ -1,3 +1,8 @@
+/**
+ * Plugin API hook names that Hyper recognizes when decorating and extending the app.
+ *
+ * @internal
+ */
 export const availableExtensions = new Set([
   'onApp',
   'onWindowClass',

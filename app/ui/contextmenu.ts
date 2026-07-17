@@ -24,6 +24,7 @@ const filterCutCopy = (selection: string, menuItem: MenuItemConstructorOptions) 
   return menuItem;
 };
 
+/** Builds the terminal's right-click context menu, merging edit and shell menu items. */
 const contextMenuTemplate = (selection: string) => {
   const commandKeys = getCommandKeys(getDecoratedKeymaps());
   const _shell = shellMenu(

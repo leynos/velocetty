@@ -21,6 +21,7 @@ const hasEffect = (action: unknown): action is HyperActions => {
   return 'effect' in action;
 };
 
+/** Middleware running action side effects after reducers have applied. */
 const effectsMiddleware: Middleware<{}, HyperState, Dispatch<HyperActions>> = () => (next) => (action) => {
   const ret = next(action);
   if (hasEffect(action) && typeof action.effect === 'function') {
@@ -32,4 +33,6 @@ const effectsMiddleware: Middleware<{}, HyperState, Dispatch<HyperActions>> = ()
   }
   return ret;
 };
+/** Redux middleware that runs each dispatched action's `effect` callback exactly once. */
+/** Middleware running action side effects after reducers have applied. */
 export default effectsMiddleware;

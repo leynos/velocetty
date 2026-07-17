@@ -5,13 +5,40 @@ import type {RendererCommandTransport} from '@shared/types/transport';
 import {z} from 'zod';
 import type {SplitRequestParams} from '../types/request-shapes';
 
-export type AddSessionDataParams = {uid: string; data: string};
-export type SendSessionDataParams = {uid: string | null; data: string; escaped?: boolean};
-export type AddNotificationParams = {text: string; url?: string | null; dismissable?: boolean};
+/** Parameters for appending incoming PTY output to a session's buffer. */
+export type AddSessionDataParams = {
+  /** Identifier of the session the data belongs to. */
+  uid: string;
+  /** Raw PTY output to append. */
+  data: string;
+};
+/** Parameters for sending input data to a session's PTY. */
+export type SendSessionDataParams = {
+  /** Identifier of the target session, or `null` to target the active session. */
+  uid: string | null;
+  /** Input to write to the PTY. */
+  data: string;
+  /** Whether `data` has already been escaped and should be sent verbatim. */
+  escaped?: boolean;
+};
+/** Parameters for showing a notification message to the user. */
+export type AddNotificationParams = {
+  /** Notification body text. */
+  text: string;
+  /** Optional link to open when the notification is clicked. */
+  url?: string | null;
+  /** Whether the user can dismiss the notification. */
+  dismissable?: boolean;
+};
+/** Parameters describing a newly available application update. */
 export type UpdateAvailableParams = {
+  /** Name of the release being offered. */
   releaseName: string;
+  /** Release notes describing the update. */
   notes: string;
+  /** URL of the release page. */
   releaseUrl: string;
+  /** Whether the update can be installed automatically. */
   canInstall: boolean;
 };
 
@@ -104,19 +131,32 @@ type WindowLike = WindowGlobalsLike &
     document: Document;
   };
 
+/** Injectable dependencies the renderer bootstrap needs, so tests can substitute fakes. */
 export type RendererBootstrapDependencies = {
+  /** Redux action creator modules dispatched by transport event handlers. */
   actions: BootstrapActionModules;
+  /** Config loader/subscriber used to hydrate and refresh renderer configuration. */
   config: ConfigModuleLike;
+  /** Creates the Redux store for the renderer. */
   configureStore: () => StoreLike;
+  /** Reads a file and resolves its contents as base64, for bell-sound hydration. */
   getBase64FileData: (path: string) => Promise<string | null>;
+  /** Mounts the React application against the given store. */
   mountApp: (store: StoreLike) => MountResult;
+  /** Host operating system platform, used to gate platform-specific zoom fixes. */
   platform: NodeJS.Platform;
+  /** Plugin subsystem module, reloaded on transport 'reload' events. */
   plugins: PluginModuleLike;
+  /** RPC client exposed as a window global for plugin and legacy access. */
   rpc: unknown;
+  /** Command transport used to receive events from the main process. */
   transport: RendererCommandTransport;
+  /** Electron webFrame, used to correct zoom factor on affected platforms. */
   webFrame?: {
+    /** Sets the renderer's zoom factor. */
     setZoomFactor: (zoomFactor: number) => void;
   };
+  /** Window-like object whose globals are populated with renderer singletons. */
   windowObject: WindowLike;
 };
 
@@ -412,13 +452,14 @@ export const exposeRendererGlobals = ({
   return restoreProperties;
 };
 
+/** True when the bell is configured to play a sound and a sound URL is set. */
+const isBellSoundEnabled = (config: configOptions): config is configOptions & {bellSoundURL: string} =>
+  typeof config.bell === 'string' && config.bell.toUpperCase() === 'SOUND' && Boolean(config.bellSoundURL);
+
 /**
  * Initializes config state and keeps bell-sound hydration aligned with later
  * config change events.
  */
-const isBellSoundEnabled = (config: configOptions): config is configOptions & {bellSoundURL: string} =>
-  typeof config.bell === 'string' && config.bell.toUpperCase() === 'SOUND' && Boolean(config.bellSoundURL);
-
 export const initializeRendererConfig = ({
   actions,
   config,
@@ -547,7 +588,7 @@ export const registerRendererTransportListeners = ({
   };
 };
 
-// Keep a concise alias for test helpers and bootstrap-focused imports.
+/** Concise alias of {@link registerRendererTransportListeners} for test helpers and bootstrap imports. */
 export const registerTransportListeners = registerRendererTransportListeners;
 
 /**

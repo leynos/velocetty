@@ -132,4 +132,5 @@ const reducer: ISessionReducer = (state = initialState, action) => {
   }
 };
 
+/** Sessions reducer, plugin-decorated to allow plugins to intercept and extend session state changes. */
 export default decorateSessionsReducer(reducer);

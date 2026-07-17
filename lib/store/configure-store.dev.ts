@@ -19,10 +19,13 @@ import * as plugins from '../utils/plugins';
 
 import writeMiddleware from './write-middleware';
 
+/** Build the development store with logging and hot-reload support. */
 const configureStoreForDevelopment = () => {
   const enhancer = composeWithDevTools(applyMiddleware(thunk, plugins.middleware, writeMiddleware, effects));
 
   return createStore(rootReducer, undefined, enhancer);
 };
 
+/** Creates the development Redux store with thunk, plugin, write, and effects middleware, plus DevTools. */
+/** Build the development store with logging and hot-reload support. */
 export default configureStoreForDevelopment;

@@ -19,8 +19,11 @@ import {runtimePluginManifests, type RuntimePluginManifest} from './golden-path-
 
 type RuntimePluginSettings = Record<string, unknown>;
 type RuntimePluginSettingsNamespace = Record<string, RuntimePluginSettings>;
+/** A keyboard shortcut assigned to more than one command. */
 export type KeybindingConflict = {
+  /** The colliding shortcut string. */
   readonly keys: string;
+  /** The commands that all claim this shortcut. */
   readonly commands: readonly string[];
 };
 type ReadTextFile = (path: string, encoding: BufferEncoding) => string;

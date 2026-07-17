@@ -86,6 +86,7 @@ type ConfigPathInput = {
  * Public CLI helper surface for inspecting and mutating Hyper plugin config.
  */
 export type CliApi = {
+  /** Resolved path to the Hyper config file this instance reads and writes. */
   readonly configPath: string;
   /** Returns `true` when the resolved config file exists on disk. */
   exists: () => boolean;

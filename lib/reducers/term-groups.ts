@@ -226,4 +226,5 @@ const reducer: ITermGroupReducer = (state = initialState, action) => {
   }
 };
 
+/** Term groups reducer, plugin-decorated to allow plugins to intercept and extend layout state changes. */
 export default decorateTermGroupsReducer(reducer);

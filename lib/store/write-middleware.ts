@@ -27,6 +27,7 @@ const isSessionPtyDataAction = (action: unknown): action is SessionPtyDataAction
   );
 };
 
+/** Middleware forwarding SESSION_USER_DATA writes to the active session. */
 const writeMiddleware: Middleware<{}, HyperState, Dispatch<HyperActions>> = () => (next) => (action) => {
   if (isSessionPtyDataAction(action)) {
     const term = terms[action.uid];
@@ -37,4 +38,6 @@ const writeMiddleware: Middleware<{}, HyperState, Dispatch<HyperActions>> = () =
   return next(action);
 };
 
+/** Redux middleware writing PTY output directly to the matching terminal, bypassing React reconciliation. */
+/** Middleware forwarding SESSION_USER_DATA writes to the active session. */
 export default writeMiddleware;

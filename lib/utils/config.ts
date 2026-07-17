@@ -16,10 +16,12 @@ Object.defineProperty(window, 'profileName', {
   }
 });
 
+/** Returns the plugin-decorated config for the current window's profile. */
 export function getConfig() {
   return plugins.getDecoratedConfig(window.profileName);
 }
 
+/** Registers `fn` for config and plugin change IPC events, returning an unsubscribe function. */
 export function subscribe(fn: (event: Electron.IpcRendererEvent, ...args: any[]) => void) {
   ipcRenderer.on('config change', fn);
   ipcRenderer.on('plugins change', fn);

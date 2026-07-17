@@ -50,6 +50,10 @@ const onTabMouseUp = (event: React.MouseEvent, onClose: () => void): void => {
   }
 };
 
+/**
+ * Single tab strip entry: selects on left click, closes on middle click or
+ * the close button, and reflects active/first/activity state in its styling.
+ */
 const Tab = forwardRef(function Tab(props: TabProps, ref: React.ForwardedRef<HTMLLIElement>) {
   const {isActive, isFirst, borderColor, hasActivity} = props;
 

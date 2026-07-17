@@ -11,6 +11,7 @@ import {transport} from '../transport';
 
 import {userExitTermGroup, setActiveGroup} from './term-groups';
 
+/** Requests that the given tab be closed and its term group exited. */
 export function closeTab(uid: string) {
   return (dispatch: HyperDispatch) => {
     dispatch({
@@ -23,6 +24,7 @@ export function closeTab(uid: string) {
   };
 }
 
+/** Requests that the given tab become the active tab. */
 export function changeTab(uid: string) {
   return (dispatch: HyperDispatch) => {
     dispatch({
@@ -35,6 +37,7 @@ export function changeTab(uid: string) {
   };
 }
 
+/** Requests that the main process maximize the application window. */
 export function maximize() {
   return (dispatch: HyperDispatch) => {
     dispatch({
@@ -46,6 +49,7 @@ export function maximize() {
   };
 }
 
+/** Requests that the main process restore the window from its maximized state. */
 export function unmaximize() {
   return (dispatch: HyperDispatch) => {
     dispatch({
@@ -57,6 +61,7 @@ export function unmaximize() {
   };
 }
 
+/** Requests that the main process open the hamburger menu at the given screen coordinates. */
 export function openHamburgerMenu(coordinates: {x: number; y: number}) {
   return (dispatch: HyperDispatch) => {
     dispatch({
@@ -68,6 +73,7 @@ export function openHamburgerMenu(coordinates: {x: number; y: number}) {
   };
 }
 
+/** Requests that the main process minimize the application window. */
 export function minimize() {
   return (dispatch: HyperDispatch) => {
     dispatch({
@@ -79,6 +85,7 @@ export function minimize() {
   };
 }
 
+/** Requests that the main process close the application window. */
 export function close() {
   return (dispatch: HyperDispatch) => {
     dispatch({

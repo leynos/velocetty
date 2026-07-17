@@ -73,6 +73,10 @@ function isFocusWithinDropdown(target: EventTarget | null, container: Node | nul
   return target !== null && 'nodeType' in target && (container?.contains(target as Node) ?? false);
 }
 
+/**
+ * New-tab trigger button that opens a profile dropdown; selecting a profile
+ * opens a tab with that profile and clicking away or `Escape` closes it.
+ */
 const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, borderColor, tabsVisible}: Props) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);

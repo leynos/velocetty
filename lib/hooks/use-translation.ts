@@ -61,6 +61,7 @@ const getTranslationDictionary = (locale: string) => {
   return translationDictionaries[normalizedLocale] ?? translationDictionaries[language] ?? headerLabelDefaults;
 };
 
+/** Returns a lookup function for header accessibility labels in the user's preferred locale. */
 export const useTranslation = () => {
   const translationDictionary = getTranslationDictionary(getPreferredLocale());
 

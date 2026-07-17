@@ -10,9 +10,13 @@ import type {FilterNever, MainEvents, RendererEvents, TypedEmitter} from '@share
 
 /** Main-process RPC server that routes renderer events over IPC. */
 export class Server {
+  /** Internal event bus used to dispatch events received from the renderer. */
   emitter: TypedEmitter<MainEvents>;
+  /** Whether `destroy` has already run and this server should no longer register listeners. */
   destroyed = false;
+  /** The window this RPC server is bound to. */
   win: BrowserWindow;
+  /** Unique per-window channel id used for IPC message routing. */
   id!: string;
 
   constructor(win: BrowserWindow) {
@@ -50,6 +54,7 @@ export class Server {
     }
   }
 
+  /** The bound window's web contents, for sending/observing renderer IPC. */
   get wc() {
     return this.win.webContents;
   }
@@ -62,19 +67,23 @@ export class Server {
     return this.emitter.emit(ev as FilterNever<MainEvents>, data as MainEvents[FilterNever<MainEvents>]);
   }
 
+  /** IPC handler registered on `this.id`, forwarding renderer events onto `emitter`. */
   ipcListener = <U extends keyof MainEvents>(_event: IpcMainEvent, {ev, data}: {ev: U; data?: MainEvents[U]}) =>
     this.emitMainEvent(ev, data);
 
+  /** Subscribes to a renderer-originated event. */
   on = <U extends keyof MainEvents>(ev: U, fn: (arg0: MainEvents[U]) => void) => {
     this.emitter.on(ev, fn);
     return this;
   };
 
+  /** Subscribes to a renderer-originated event for a single occurrence. */
   once = <U extends keyof MainEvents>(ev: U, fn: (arg0: MainEvents[U]) => void) => {
     this.emitter.once(ev, fn);
     return this;
   };
 
+  /** Sends an event to the renderer, returning false if the window has been destroyed. */
   emit<U extends Exclude<keyof RendererEvents, FilterNever<RendererEvents>>>(ch: U): boolean;
   emit<U extends FilterNever<RendererEvents>>(ch: U, data: RendererEvents[U]): boolean;
   emit<U extends keyof RendererEvents>(ch: U, data?: RendererEvents[U]) {
@@ -87,6 +96,7 @@ export class Server {
     return false;
   }
 
+  /** Tears down IPC listeners for this server, or marks it destroyed if not yet registered. */
   destroy() {
     this.emitter.removeAllListeners();
     this.wc.removeAllListeners();
@@ -99,6 +109,7 @@ export class Server {
   }
 }
 
+/** Creates an RPC server bound to a browser window's renderer process. */
 const createRPC = (win: BrowserWindow) => {
   return new Server(win);
 };

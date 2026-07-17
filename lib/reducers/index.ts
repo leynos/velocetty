@@ -23,6 +23,9 @@ const reducers: ReducersMapObject<HyperState, HyperActions> = {
   termGroups
 };
 
+/** Combined root reducer for the renderer store. */
 const rootReducer = combineReducers(reducers);
 
+/** Root Redux reducer composing the `ui`, `sessions`, and `termGroups` slices. */
+/** Combined root reducer for the renderer store. */
 export default rootReducer;

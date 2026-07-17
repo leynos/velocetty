@@ -136,28 +136,40 @@ Hyper.displayName = 'Hyper';
 
 const mapStateToProps = (state: HyperState) => {
   return {
+    /** Whether the renderer is running on macOS, so chrome can match platform conventions. */
     isMac,
+    /** User-supplied custom CSS, scoped to the `#hyper` container and injected at render time. */
     customCSS: state.ui.css,
+    /** Font family applied to header and other chrome text. */
     uiFontFamily: state.ui.uiFontFamily,
+    /** Window border colour, sourced from the active theme/config. */
     borderColor: state.ui.borderColor,
+    /** Uid of the currently active session, used to keep terminal focus in sync. */
     activeSession: state.sessions.activeUid,
+    /** Window background colour, sourced from the active theme/config. */
     backgroundColor: state.ui.backgroundColor,
+    /** Whether the window is currently maximized, used to size the border. */
     maximized: state.ui.maximized,
+    /** Whether the window is in fullscreen, toggling the rounded-corner chrome. */
     fullScreen: state.ui.fullScreen,
+    /** Timestamp of the last config update, used to re-attach key listeners on config change. */
     lastConfigUpdate: state.ui._lastUpdate
   };
 };
 
 const mapDispatchToProps = (dispatch: HyperDispatch) => {
   return {
+    /** Runs a registered command handler for the given keybinding-triggered command. */
     execCommand: (command: CommandId, fn: ((e: unknown, dispatch: HyperDispatch) => void) | undefined, e: unknown) => {
       dispatch(uiActions.execCommand(command, fn, e));
     }
   };
 };
 
+/** Top-level Hyper window container, connected to renderer state and command dispatch. */
 const HyperContainer = connect(mapStateToProps, mapDispatchToProps, null, {forwardRef: true})(Hyper, 'Hyper');
 
 export default HyperContainer;
 
+/** Props supplied to the Hyper window by `connect`, combining state selections and dispatch bindings. */
 export type HyperConnectedProps = ReturnType<typeof mapStateToProps> & ReturnType<typeof mapDispatchToProps>;

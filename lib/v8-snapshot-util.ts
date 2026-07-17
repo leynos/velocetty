@@ -23,7 +23,9 @@ type SnapshotRuntimeEnvironment = {
   window?: SnapshotRuntimeWindow;
 };
 
+/** Handle returned by {@link bootstrapSnapshotRuntime} for undoing its module loader patch. */
 export type SnapshotBootstrapHandle = {
+  /** Restores the module loader to its pre-bootstrap state, once. */
   restore(): void;
 };
 
@@ -84,6 +86,10 @@ const rebuildSnapshotLoaderChain = (
   return nextLoad;
 };
 
+/**
+ * Wires the V8 snapshot's custom module loader into Node's `require`, so snapshotted modules
+ * are served from the snapshot cache instead of being re-required from disk.
+ */
 export const bootstrapSnapshotRuntime = (
   runtimeHost: SnapshotRuntimeEnvironment = globalThis as SnapshotRuntimeEnvironment
 ): SnapshotBootstrapHandle | null => {

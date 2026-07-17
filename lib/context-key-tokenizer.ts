@@ -3,9 +3,21 @@ import type {ContextKeyValue, WhenComparisonOperator} from '@shared/types/contex
 
 import {WhenExpressionSyntaxError} from './context-key-syntax-error';
 
+/** Category of a `when` expression token. */
 export type TokenKind = 'identifier' | 'literal' | 'operator' | 'lparen' | 'rparen' | 'eof';
-export type Token = {kind: TokenKind; lexeme: string; index: number; literal?: ContextKeyValue};
+/** A single lexical token produced by {@link tokenize}. */
+export type Token = {
+  /** The token's category. */
+  kind: TokenKind;
+  /** The raw source text that produced this token. */
+  lexeme: string;
+  /** Character offset in the source at which this token begins. */
+  index: number;
+  /** Decoded value, present for `literal` tokens. */
+  literal?: ContextKeyValue;
+};
 
+/** Comparison operators recognized in `when` expressions, ordered longest-match first. */
 export const COMPARISON_OPERATORS: readonly WhenComparisonOperator[] = ['==', '!=', '<', '<=', '>', '>='];
 const TWO_CHAR_OPERATORS = ['&&', '||', ...COMPARISON_OPERATORS] as const;
 const SINGLE_CHAR_OPERATORS = ['!', '<', '>'] as const;

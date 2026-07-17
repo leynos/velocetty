@@ -31,6 +31,7 @@ function addValues(hyperKey: HKEY, commandKey: HKEY) {
   }
 }
 
+/** Registers "Open Hyper here" entries in the Windows Explorer right-click menu. */
 export const add = () => {
   regKeys.forEach((regKey) => {
     try {
@@ -49,6 +50,7 @@ export const add = () => {
   });
 };
 
+/** Removes the "Open Hyper here" entries from the Windows Explorer right-click menu. */
 export const remove = () => {
   regKeys.forEach((regKey) => {
     try {

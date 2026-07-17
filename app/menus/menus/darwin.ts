@@ -4,6 +4,7 @@ import {app} from 'electron';
 import type {BrowserWindow, MenuItemConstructorOptions} from 'electron';
 import type {CommandId} from '@shared/types/commands';
 
+/** Builds the macOS application menu (labelled with the app name), shown only on Darwin. */
 const darwinMenu = (
   commandKeys: Record<string, string>,
   execCommand: (command: CommandId, focusedWindow?: BrowserWindow) => void,

@@ -14,6 +14,7 @@ const watchers: Function[] = [];
 let cfg: parsedConfig = {} as any;
 let _watcher: chokidar.FSWatcher;
 
+/** Lists deprecated CSS selectors still present in a configuration's `css`/`termCSS`. */
 export const getDeprecatedCSS = (config: configOptions) => {
   const deprecated: string[] = [];
   const deprecatedCSS = ['x-screen', 'x-row', 'cursor-node', '::selection'];
@@ -69,6 +70,7 @@ const _watch = () => {
   });
 };
 
+/** Registers a callback to run whenever the on-disk configuration is reloaded. */
 export const subscribe = (fn: Function) => {
   watchers.push(fn);
   return () => {
@@ -76,24 +78,29 @@ export const subscribe = (fn: Function) => {
   };
 };
 
+/** Returns the directory holding the user's configuration, for plugins to resolve paths against. */
 export const getConfigDir = () => {
   // expose config directory to load plugin from the right place
   return cfgDir;
 };
 
+/** Resolves the profile name to use when none is specified, falling back to the first profile. */
 export const getDefaultProfile = () => {
   return cfg.config.defaultProfile || cfg.config.profiles[0]?.name || 'default';
 };
 
 // get config for the default profile, keeping it for backward compatibility
+/** Returns the resolved configuration for the default profile. */
 export const getConfig = () => {
   return getProfileConfig(getDefaultProfile());
 };
 
+/** Returns the list of configured profiles. */
 export const getProfiles = () => {
   return cfg.config.profiles;
 };
 
+/** Merges a named profile's overrides onto the base configuration. */
 export const getProfileConfig = (profileName: string): configOptions => {
   const {profiles, defaultProfile, ...baseConfig} = cfg.config;
   const profileConfig = profiles.find((p) => p.name === profileName)?.config || {};
@@ -107,21 +114,30 @@ export const getProfileConfig = (profileName: string): configOptions => {
   return {...baseConfig, defaultProfile, profiles};
 };
 
+/** Opens the configuration file for editing in the user's preferred editor. */
 export const openConfig = () => {
   return _openConfig();
 };
 
-export const getPlugins = (): {plugins: string[]; localPlugins: string[]} => {
+/** Returns the configured plugin module names, split by npm-published vs. local plugins. */
+export const getPlugins = (): {
+  /** npm-published plugin module names. */
+  plugins: string[];
+  /** Locally developed plugin module names. */
+  localPlugins: string[];
+} => {
   return {
     plugins: cfg.plugins,
     localPlugins: cfg.localPlugins
   };
 };
 
+/** Returns the configured keymap overrides. */
 export const getKeymaps = () => {
   return cfg.keymaps;
 };
 
+/** Loads the configuration and starts watching it for changes. */
 export const setup = () => {
   cfg = _import();
   _watch();
@@ -130,6 +146,7 @@ export const setup = () => {
 
 export {get as getWin, recordState as winRecord, defaults as windowDefaults} from './config/windows';
 
+/** Fills in default colours on a plugin-decorated config so xterm CSS always has values to use. */
 export const fixConfigDefaults = (decoratedConfig: configOptions) => {
   const defaultConfig = getDefaultConfig().config!;
   const colorOverrides = getColorMap(decoratedConfig.colors);
@@ -138,6 +155,7 @@ export const fixConfigDefaults = (decoratedConfig: configOptions) => {
   return decoratedConfig;
 };
 
+/** Rewrites legacy hterm CSS selectors in a config to their xterm.js equivalents. */
 export const htermConfigTranslate = (config: configOptions) => {
   const cssReplacements: Record<string, string> = {
     'x-screen x-row([ {.[])': '.xterm-rows > div$1',

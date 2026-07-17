@@ -17,7 +17,10 @@ import * as plugins from '../utils/plugins';
 
 import writeMiddleware from './write-middleware';
 
+/** Build the production store with the minimal middleware chain. */
 const configureStoreForProd = () =>
   createStore(rootReducer, undefined, applyMiddleware(thunk, plugins.middleware, writeMiddleware, effects));
 
+/** Creates the production Redux store with thunk, plugin, write, and effects middleware. */
+/** Build the production store with the minimal middleware chain. */
 export default configureStoreForProd;

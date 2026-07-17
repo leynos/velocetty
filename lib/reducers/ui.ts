@@ -872,4 +872,5 @@ const reducer: IUiReducer = (state = initial, action) => {
   return state_;
 };
 
+/** UI reducer, plugin-decorated to allow plugins to intercept and extend UI state changes. */
 export default decorateUIReducer(reducer);
