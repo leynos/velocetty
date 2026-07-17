@@ -47,6 +47,11 @@ const TabItem = ({tab, index, totalTabs, borderColor, onChange, onClose, parentP
   return <Tab {...tabProps} />;
 };
 
+/**
+ * Tab strip that lists open tabs (hidden on non-mac when only one tab is
+ * open), re-renders on plugin tab-decoration updates, and hosts the
+ * new-tab dropdown.
+ */
 const Tabs = forwardRef(function Tabs(props: TabsProps, ref: React.ForwardedRef<HTMLElement>) {
   const [, forceDecorationRender] = useReducer((version: number) => version + 1, 0);
   const {tabs = [], borderColor, onChange, onClose, fullScreen} = props;

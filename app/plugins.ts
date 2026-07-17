@@ -121,6 +121,7 @@ function checkDeprecatedExtendKeymaps() {
 
 let updating = false;
 
+/** Reinstalls plugins from `package.json`, then reloads and notifies watchers of the update. */
 function updatePlugins({force = false} = {}) {
   if (updating) {
     return notify('Plugin update in progress');
@@ -200,8 +201,14 @@ function clearCache() {
 
 export {updatePlugins};
 
+/** Returns the name and version of every currently loaded plugin, for the About dialog. */
 export const getLoadedPluginVersions = () => {
-  return modules.map((mod) => ({name: mod._name, version: mod._version}));
+  return modules.map((mod) => ({
+    /** The plugin's module directory name. */
+    name: mod._name,
+    /** The plugin's `package.json` version, or `undefined` when it could not be read. */
+    version: mod._version
+  }));
 };
 
 // we schedule the initial plugins update
@@ -272,6 +279,7 @@ function toDependencies(plugins_: {plugins: string[]}) {
   return obj;
 }
 
+/** Registers a callback to run whenever the loaded plugin set changes. */
 export const subscribe = (fn: Function) => {
   watchers.push(fn);
   return () => {
@@ -279,11 +287,14 @@ export const subscribe = (fn: Function) => {
   };
 };
 
+/** Resolves the on-disk paths of every configured plugin, npm-installed and local. */
 function getPaths() {
   return {
+    /** Resolved paths of npm-installed plugins. */
     plugins: plugins.plugins.map((name) => {
       return resolve(path, 'node_modules', name.split('#')[0]);
     }),
+    /** Resolved paths of locally developed plugins. */
     localPlugins: plugins.localPlugins.map((name) => {
       return resolve(localPath, name);
     })
@@ -293,9 +304,14 @@ function getPaths() {
 // expose to renderer
 export {getPaths};
 
-// get paths from renderer
+/** Returns the base directories plugins and local plugins are installed under. */
 export const getBasePaths = () => {
-  return {path, localPath};
+  return {
+    /** Directory holding npm-installed plugins. */
+    path,
+    /** Directory holding locally developed plugins. */
+    localPath
+  };
 };
 
 function requirePlugins(): any[] {
@@ -335,6 +351,7 @@ function requirePlugins(): any[] {
   return [...plugins_, ...localPlugins].map(load).filter((v): v is Record<string, any> => Boolean(v));
 }
 
+/** Invokes each loaded plugin's `onApp` hook, reporting per-plugin errors without aborting. */
 export const onApp = (app_: App) => {
   modules.forEach((plugin) => {
     if (plugin.onApp) {
@@ -349,6 +366,7 @@ export const onApp = (app_: App) => {
   });
 };
 
+/** Invokes each loaded plugin's `onWindowClass` hook, reporting per-plugin errors without aborting. */
 export const onWindowClass = (win: BrowserWindow) => {
   modules.forEach((plugin) => {
     if (plugin.onWindowClass) {
@@ -363,6 +381,7 @@ export const onWindowClass = (win: BrowserWindow) => {
   });
 };
 
+/** Invokes each loaded plugin's `onWindow` hook, reporting per-plugin errors without aborting. */
 export const onWindow = (win: BrowserWindow) => {
   modules.forEach((plugin) => {
     if (plugin.onWindow) {
@@ -409,8 +428,15 @@ function decorateClass(base: any, key: string) {
   return decorateEntity(base, key, 'function');
 }
 
+/** Collects deprecated CSS selectors introduced by each plugin's decorated config, by plugin name. */
 export const getDeprecatedConfig = () => {
-  const deprecated: Record<string, {css: string[]}> = {};
+  const deprecated: Record<
+    string,
+    {
+      /** Deprecated CSS selectors this plugin's decorated config still uses. */
+      css: string[];
+    }
+  > = {};
   const baseConfig = config.getConfig();
   modules.forEach((plugin) => {
     if (!plugin.decorateConfig) {
@@ -435,14 +461,17 @@ export const getDeprecatedConfig = () => {
   return deprecated;
 };
 
+/** Applies each plugin's `decorateMenu` hook to the application menu template. */
 export const decorateMenu = (tpl: MenuItemConstructorOptions[]) => {
   return decorateObject(tpl, 'decorateMenu');
 };
 
+/** Applies each plugin's `decorateEnv` hook to the base shell environment. */
 export const getDecoratedEnv = (baseEnv: Record<string, string>) => {
   return decorateObject(baseEnv, 'decorateEnv');
 };
 
+/** Resolves a profile's config, decorated by plugins and normalized for the terminal. */
 export const getDecoratedConfig = (profile: string) => {
   ensureRuntimeDefaultsPersisted();
   const baseConfig = config.getProfileConfig(profile);
@@ -452,6 +481,7 @@ export const getDecoratedConfig = (profile: string) => {
   return translatedConfig;
 };
 
+/** Resolves keymaps merged from config, runtime plugin contributions, and plugin decoration. */
 export const getDecoratedKeymaps = () => {
   ensureRuntimeDefaultsPersisted();
   const baseKeymaps = config.getKeymaps();
@@ -462,27 +492,33 @@ export const getDecoratedKeymaps = () => {
   return decoratedKeymaps;
 };
 
+/** Returns command definitions contributed by runtime plugins. */
 export const getRuntimePluginCommands = () => {
   ensureRuntimeDefaultsPersisted();
   return getRuntimePluginCommandDefinitions(config.getConfig());
 };
 
+/** Applies each plugin's `decorateBrowserOptions` hook to the window's Electron options. */
 export const getDecoratedBrowserOptions = <T>(defaults: T): T => {
   return decorateObject(defaults, 'decorateBrowserOptions');
 };
 
+/** Applies each plugin's `decorateWindowClass` hook to the window class. */
 export const decorateWindowClass = <T>(defaults: T): T => {
   return decorateObject(defaults, 'decorateWindowClass');
 };
 
+/** Applies each plugin's `decorateSessionOptions` hook to the pty session options. */
 export const decorateSessionOptions = <T>(defaults: T): T => {
   return decorateObject(defaults, 'decorateSessionOptions');
 };
 
+/** Applies each plugin's `decorateSessionClass` hook to the session class. */
 export const decorateSessionClass = <T>(Session: T): T => {
   return decorateClass(Session, 'decorateSessionClass');
 };
 
+/** Converts a plugin list into an npm dependencies map, keyed by package name. */
 export {toDependencies as _toDependencies};
 
 const ipcMain = _ipcMain as IpcMainWithCommands;

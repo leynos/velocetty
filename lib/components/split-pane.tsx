@@ -70,6 +70,11 @@ function computeKeyResizeTarget(
   return action ? action(isVertical, currentSize, pairTotal) : null;
 }
 
+/**
+ * Lays out sibling term panes with draggable, keyboard-resizable dividers,
+ * emitting new pane sizes via `onResize` while keeping the pair's combined
+ * size constant.
+ */
 const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const dragPanePosition = useRef<number>(0);
   const dragOffset = useRef<number>(0);

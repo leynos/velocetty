@@ -8,6 +8,7 @@ export const INIT = 'INIT';
 
 /** Action contract for initialization events. */
 export interface InitAction {
+  /** Discriminates this action as `INIT`. */
   readonly type: typeof INIT;
 }
 

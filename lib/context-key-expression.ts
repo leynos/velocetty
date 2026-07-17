@@ -1,4 +1,8 @@
-/** @file Public `when` parser and evaluator exports. */
+/**
+ * Public `when` parser and evaluator exports.
+ *
+ * @module
+ */
 export {
   compileWhenExpression,
   parseWhenExpression,

@@ -7,6 +7,7 @@ import type {VelocettyRuntimeGlobals} from '../../typings/runtime-globals';
 
 export type {VelocettyRuntimeGlobals};
 
+/** Subset of the main-process plugins module's IPC commands used from the renderer. */
 export type RemotePluginsModule = Pick<
   IpcCommands,
   | 'getLoadedPluginVersions'
@@ -27,6 +28,7 @@ const getCandidatePluginModulePaths = (): string[] => {
   return Array.from(new Set(candidates));
 };
 
+/** Resolves and requires the main-process plugins module, trying each candidate path in turn. */
 export const loadRemotePluginsModule = () => {
   const candidates = getCandidatePluginModulePaths();
   let lastError: unknown;

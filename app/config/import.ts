@@ -15,16 +15,26 @@ type LoadedConfig = {
 
 type ConfigInit = (userCfg: rawConfig, defaultCfg: rawConfig) => parsedConfig;
 
+/** Filesystem locations that config import needs, injected so tests can substitute fakes. */
 export type ConfigImportPaths = {
+  /** Directory holding the user's configuration files. */
   cfgDir: string;
+  /** Path to the user's configuration file. */
   cfgPath: string;
+  /** Path to the bundled default configuration template. */
   defaultCfg: string;
+  /** Resolves the path to the platform-specific default keymap file. */
   defaultPlatformKeyPath: () => string;
+  /** Plugin directory layout used when seeding the config. */
   plugs: {
+    /** Directory for npm-installed plugins. */
     base: string;
+    /** Directory for locally developed plugins. */
     local: string;
   };
+  /** Filename of the bundled JSON schema for editor validation. */
   schemaFile: string;
+  /** Path to the bundled JSON schema source file. */
   schemaPath: string;
 };
 
@@ -337,6 +347,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
     return {userCfg, defaultCfg: _defaultCfg};
   };
 
+  /** Imports and validates the user and default configuration, ready for use. */
   const _import = () => {
     const imported = _importConf();
     defaultConfig = imported.defaultCfg;
@@ -411,5 +422,7 @@ const configImportModule = createConfigImportModule({
   paths: lazyPaths
 });
 
+/** Imports and validates the user and default configuration, ready for use. */
 export const _import = configImportModule._import;
+/** Returns the cached default config payload, importing it first if needed. */
 export const getDefaultConfig = configImportModule.getDefaultConfig;

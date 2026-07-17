@@ -1,4 +1,4 @@
-.PHONY: all check-fmt typecheck lint test coverage build build-fast clean \
+.PHONY: all check-fmt typecheck docs-check lint test coverage build build-fast clean \
 	markdownlint nixie spelling spelling-config spelling-config-write \
 	spelling-phrase-check spelling-helper-test
 
@@ -21,13 +21,19 @@ SPELLING_HELPER_PYTEST = PYTHONPATH=scripts $(UV_ENV) $(UV) run --no-project \
 	--python 3.14 --with pathspec==$(PATHSPEC_VERSION) --with pytest==9.0.2 \
 	--with pytest-cov==7.0.0 python -m pytest
 
-all: check-fmt typecheck lint test spelling
+all: check-fmt typecheck docs-check lint test spelling
 
 check-fmt:
 	bun node_modules/@biomejs/biome/bin/biome check --linter-enabled=false --assist-enabled=false .
 
 typecheck:
 	bun run check:types
+
+# Zero-tolerance documentation gate: TypeDoc's notDocumented validation over
+# the shared, frontend, backend, and app/cli/lib surfaces (typedoc.*.json).
+# Emits no documentation artefacts.
+docs-check:
+	bun run docs:check
 
 lint:
 	bun run lint

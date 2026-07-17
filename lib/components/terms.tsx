@@ -15,8 +15,14 @@ const TermGroup = decorate(TermGroup_, 'TermGroup');
 
 const isMac = /Mac/.test(navigator.userAgent);
 
+/**
+ * Renders every root term group as a shifted/unshifted tab pane, keeping a
+ * lookup of mounted `Term` instances and wiring plugin-registered commands.
+ */
 export default class Terms extends React.Component<React.PropsWithChildren<TermsProps>> {
+  /** Mounted `Term` instances keyed by session uid. */
   terms: Record<string, Term>;
+  /** Registers plugin command handlers dispatched against this component's actions. */
   registerCommands: (cmds: Record<string, (e: unknown, dispatch: HyperDispatch) => void>) => void;
   constructor(props: TermsProps, context: any) {
     super(props, context);
@@ -32,20 +38,24 @@ export default class Terms extends React.Component<React.PropsWithChildren<Terms
     );
   }
 
+  /** Registers a mounted `Term` instance under its session uid. */
   onRef = (uid: string, term: Term | null) => {
     if (term) {
       this.terms[uid] = term;
     }
   };
 
+  /** Returns the mounted `Term` instance for a session uid, if any. */
   getTermByUid(uid: string) {
     return this.terms[uid];
   }
 
+  /** Returns the mounted `Term` instance for the currently active session. */
   getActiveTerm() {
     return this.getTermByUid(this.props.activeSession!);
   }
 
+  /** Registers a mounted `Term` instance under its session uid. */
   onTerminal(uid: string, term: Term) {
     this.terms[uid] = term;
   }
@@ -73,6 +83,7 @@ export default class Terms extends React.Component<React.PropsWithChildren<Terms
     this.props.ref_(null);
   }
 
+  /** Renders each root term group's tab pane, shifting the layout when multiple tabs are open on non-mac. */
   render() {
     const shift = !isMac && this.props.termGroups.length > 1;
     return (

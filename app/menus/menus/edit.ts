@@ -6,6 +6,7 @@ import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
 
 const asCommandId = (command: string): CommandId => command as CommandId;
 
+/** Builds the Edit menu template, with clipboard, caret movement, and buffer commands. */
 const editMenu = (commandKeys: Record<string, string>, execCommand: MenuCommandRunner) => {
   const execWithBrowserWindow = makeMenuCommandExecutor(execCommand);
 
@@ -147,7 +148,9 @@ const editMenu = (commandKeys: Record<string, string>, execCommand: MenuCommandR
   }
 
   return {
+    /** The menu bar label for this menu. */
     label: 'Edit',
+    /** The Edit menu's items, in display order. */
     submenu
   };
 };

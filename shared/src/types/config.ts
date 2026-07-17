@@ -3,21 +3,37 @@ import type {FontWeight} from 'xterm';
 
 /** Terminal colour palette model used by profile configuration. */
 export type ColorMap = {
+  /** ANSI colour 0 (normal black). */
   black: string;
+  /** ANSI colour 4 (normal blue). */
   blue: string;
+  /** ANSI colour 6 (normal cyan). */
   cyan: string;
+  /** ANSI colour 2 (normal green). */
   green: string;
+  /** ANSI colour 8 (bright black / grey). */
   lightBlack: string;
+  /** ANSI colour 12 (bright blue). */
   lightBlue: string;
+  /** ANSI colour 14 (bright cyan). */
   lightCyan: string;
+  /** ANSI colour 10 (bright green). */
   lightGreen: string;
+  /** ANSI colour 13 (bright magenta). */
   lightMagenta: string;
+  /** ANSI colour 9 (bright red). */
   lightRed: string;
+  /** ANSI colour 15 (bright white). */
   lightWhite: string;
+  /** ANSI colour 11 (bright yellow). */
   lightYellow: string;
+  /** ANSI colour 5 (normal magenta). */
   magenta: string;
+  /** ANSI colour 1 (normal red). */
   red: string;
+  /** ANSI colour 7 (normal white). */
   white: string;
+  /** ANSI colour 3 (normal yellow). */
   yellow: string;
 };
 
@@ -224,6 +240,7 @@ export type configOptions = rootConfigOptions &
      * A list of profiles to use
      */
     profiles: {
+      /** Name used to select this profile when launching or splitting sessions. */
       name: string;
       /**
        * Specify all the options you want to override for each profile.
@@ -235,6 +252,7 @@ export type configOptions = rootConfigOptions &
 
 /** Raw user configuration payload as stored in config files. */
 export type rawConfig = {
+  /** Root configuration options as parsed from the config file, before profile merging. */
   config?: configOptions;
   /**
    * a list of plugins to fetch and install from npm
@@ -260,9 +278,13 @@ export type rawConfig = {
 
 /** Parsed configuration with normalized plugin and keymap arrays. */
 export type parsedConfig = {
+  /** Fully merged configuration, ready for use by the running application. */
   config: configOptions;
+  /** Normalized list of npm plugin specifiers to load. */
   plugins: string[];
+  /** Normalized list of local (non-npm) plugin directories to load. */
   localPlugins: string[];
+  /** Keymap bindings normalized to an array of key combinations per action. */
   keymaps: Record<string, string[]>;
 };
 

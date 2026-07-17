@@ -1,6 +1,7 @@
 import type {BrowserWindow, MenuItemConstructorOptions} from 'electron';
 import type {CommandId} from '@shared/types/commands';
 
+/** Builds the Tools menu template, including Windows-only system context menu commands. */
 const toolsMenu = (
   commands: Record<string, string>,
   execCommand: (command: CommandId, focusedWindow?: BrowserWindow) => void

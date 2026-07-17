@@ -318,13 +318,20 @@ function getDecorated<P extends Record<string, any>>(
   return decorated[name];
 }
 
-// for each component, we return a higher-order component
-// that wraps with the higher-order components
-// exposed by plugins
+/**
+ * Returns a higher-order component that wraps `Component_` with the chain of higher-order
+ * components exposed by plugins for `name`, falling back to the undecorated component on crash.
+ */
 export function decorate<P extends Record<string, any>>(
   Component_: React.ComponentType<P>,
   name: string
-): React.ComponentClass<P, {hasError: boolean}> {
+): React.ComponentClass<
+  P,
+  {
+    /** Whether the decorated plugin chain has crashed and fallen back to the undecorated component. */
+    hasError: boolean;
+  }
+> {
   return class DecoratedComponent extends React.Component<P, {hasError: boolean}> {
     constructor(props: P) {
       super(props);
@@ -600,6 +607,7 @@ const loadModules = () => {
 // load modules for initial decoration
 loadModules();
 
+/** Clears cached plugin modules and require-cache entries, then reloads plugins from disk. */
 export function reload() {
   clearModulesCache();
   loadModules();
@@ -608,6 +616,7 @@ export function reload() {
   decorated = {};
 }
 
+/** Subscribes to tab decoration provider changes, returning an unsubscribe function. */
 export const subscribeTabDecorationUpdates = (listener: () => void) => {
   return subscribeTabDecorationProviderChanges(listener);
 };
@@ -644,6 +653,7 @@ function getProps(name: keyof typeof propsDecorators, props: any, ...fnArgs: any
   return props_ || props;
 }
 
+/** Applies each plugin's `getTermGroupProps` decorator in turn, returning the merged props. */
 export function getTermGroupProps<T extends Assignable<TermGroupOwnProps, T>>(
   uid: string,
   parentProps: any,
@@ -652,14 +662,17 @@ export function getTermGroupProps<T extends Assignable<TermGroupOwnProps, T>>(
   return getProps('getTermGroupProps', props, uid, parentProps);
 }
 
+/** Applies each plugin's `getTermProps` decorator in turn, returning the merged props. */
 export function getTermProps<T extends Assignable<TermProps, T>>(uid: string, parentProps: any, props: T): T {
   return getProps('getTermProps', props, uid, parentProps);
 }
 
+/** Applies each plugin's `getTabsProps` decorator in turn, returning the merged props. */
 export function getTabsProps<T extends Assignable<TabsProps, T>>(parentProps: any, props: T): T {
   return getProps('getTabsProps', props, parentProps);
 }
 
+/** Resolves the tab's decoration and applies each plugin's `getTabProps` decorator, merging the result. */
 export function getTabProps<T extends Assignable<TabProps, T>>(
   tab: TabLike,
   parentProps: ParentPropsLike,
@@ -678,9 +691,10 @@ export function getTabProps<T extends Assignable<TabProps, T>>(
   return getProps('getTabProps', decoratedProps, tab, parentProps);
 }
 
-// connects + decorates a class
-// plugins can override mapToState, dispatchToProps
-// and the class gets decorated (proxied)
+/**
+ * Connects and decorates a class, letting plugins override `mapToState`/`mapDispatchToProps`
+ * and wrap the resulting component.
+ */
 export function connect<StateProps extends Record<string, unknown>, DispatchProps extends Record<string, unknown>>(
   stateFn: (state: HyperState) => StateProps,
   dispatchFn: (dispatch: HyperDispatch) => DispatchProps,
@@ -791,19 +805,22 @@ const decorateReducer: {
   };
 };
 
+/** Wraps a term-groups reducer so registered plugin `reduceTermGroups` hooks run after it. */
 export function decorateTermGroupsReducer(fn: ITermGroupReducer) {
   return decorateReducer('reduceTermGroups', fn);
 }
 
+/** Wraps a UI reducer so registered plugin `reduceUI` hooks run after it. */
 export function decorateUIReducer(fn: IUiReducer) {
   return decorateReducer('reduceUI', fn);
 }
 
+/** Wraps a sessions reducer so registered plugin `reduceSessions` hooks run after it. */
 export function decorateSessionsReducer(fn: ISessionReducer) {
   return decorateReducer('reduceSessions', fn);
 }
 
-// redux middleware generator
+/** Redux middleware that chains together all plugin-registered middleware, in registration order. */
 export const middleware: Middleware<{}, HyperState, Dispatch<HyperActions>> = (store) => (next) => (action) => {
   const nextMiddleware = (remaining: Middleware[]) => (action_: any) =>
     remaining.length ? remaining[0](store)(nextMiddleware(remaining.slice(1)))(action_) : next(action_);

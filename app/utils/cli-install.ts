@@ -131,6 +131,7 @@ const logNotify = (withNotification: boolean, title: string, body: string, detai
   withNotification && notify(title, body, details);
 };
 
+/** Installs the `hyper` CLI command for the current platform (symlink or PATH entry). */
 export const installCLI = async (withNotification: boolean) => {
   if (process.platform === 'win32') {
     try {

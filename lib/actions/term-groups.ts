@@ -59,9 +59,12 @@ function requestSplit(direction: 'VERTICAL' | 'HORIZONTAL') {
     };
 }
 
+/** Requests a new session split vertically from the active (or specified) session. */
 export const requestVerticalSplit = requestSplit(DIRECTION.VERTICAL);
+/** Requests a new session split horizontally from the active (or specified) session. */
 export const requestHorizontalSplit = requestSplit(DIRECTION.HORIZONTAL);
 
+/** Requests that the given term group be resized to the provided pane size ratios. */
 export function resizeTermGroup(uid: string, sizes: number[]): HyperActions {
   return {
     uid: asTermGroupId(uid),
@@ -70,6 +73,7 @@ export function resizeTermGroup(uid: string, sizes: number[]): HyperActions {
   };
 }
 
+/** Requests a brand new tab (root term group) with a session in it. */
 export function requestTermGroup({activeUid: requestedActiveUid, profile: requestedProfile}: SplitRequestParams = {}) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     dispatch({
@@ -86,6 +90,7 @@ export function requestTermGroup({activeUid: requestedActiveUid, profile: reques
   };
 }
 
+/** Requests that the session belonging to the given term group become the active session. */
 export function setActiveGroup(uid: string) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     const {termGroups} = getState();
@@ -133,6 +138,7 @@ const findNextSessionUid = (state: ITermState, group: ITermGroup) => {
   return findFirstSession(state, state.termGroups[nextUid]);
 };
 
+/** Requests that the term group containing a PTY-terminated session be exited. */
 export function ptyExitTermGroup(sessionUid: string) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     const {termGroups} = getState();
@@ -158,6 +164,7 @@ export function ptyExitTermGroup(sessionUid: string) {
   };
 }
 
+/** Requests that the given term group and its sessions be closed by the user. */
 export function userExitTermGroup(uid: string) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     const {termGroups} = getState();
@@ -190,6 +197,7 @@ export function userExitTermGroup(uid: string) {
   };
 }
 
+/** Requests that the currently active term group be exited. */
 export function exitActiveTermGroup() {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     dispatch({

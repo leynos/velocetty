@@ -1,0 +1,6 @@
+{
+  "extends": "./typedoc.base.json",
+  "tsconfig": "frontend/tsconfig.typedoc.json",
+  "entryPoints": ["frontend/src"],
+  "entryPointStrategy": "expand"
+}

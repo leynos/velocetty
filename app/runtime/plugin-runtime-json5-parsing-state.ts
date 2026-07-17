@@ -9,10 +9,15 @@
  * `depth` tracks nested object brace depth.
  */
 export type ParsingState = {
+  /** The active quote delimiter when inside a string, or `null` otherwise. */
   inString: '"' | "'" | null;
+  /** Whether the previous character was an escape (`\`). */
   isEscaped: boolean;
+  /** Whether the cursor is currently inside a `//` line comment. */
   inLineComment: boolean;
+  /** Whether the cursor is currently inside a block comment. */
   inBlockComment: boolean;
+  /** Nested object brace depth. */
   depth: number;
 };
 
@@ -42,7 +47,12 @@ export const processBlockComment = (
   state: ParsingState,
   current: string,
   next: string
-): {state: ParsingState; skipNext: boolean} =>
+): {
+  /** The (possibly updated) parser state. */
+  state: ParsingState;
+  /** Whether the caller should advance past the next character. */
+  skipNext: boolean;
+} =>
   current === '*' && next === '/'
     ? {state: {...state, inBlockComment: false}, skipNext: true}
     : {state, skipNext: false};

@@ -6,11 +6,13 @@ export const CHANGE_TAB = 'CHANGE_TAB';
 
 /** Action contract for close-tab events. */
 export interface CloseTabAction {
+  /** Discriminates this action as `CLOSE_TAB`. */
   readonly type: typeof CLOSE_TAB;
 }
 
 /** Action contract for change-tab events. */
 export interface ChangeTabAction {
+  /** Discriminates this action as `CHANGE_TAB`. */
   readonly type: typeof CHANGE_TAB;
 }
 

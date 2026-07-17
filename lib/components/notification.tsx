@@ -102,6 +102,10 @@ const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLD
   };
 };
 
+/**
+ * Notification bar item that fades out and auto-dismisses after
+ * `dismissAfter` ms, or immediately on user click when `userDismissable`.
+ */
 const Notification = forwardRef(function Notification(
   props: React.PropsWithChildren<NotificationProps>,
   ref: React.ForwardedRef<HTMLDivElement>

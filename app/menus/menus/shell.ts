@@ -6,6 +6,7 @@ import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
 
 const asCommandId = (command: string): CommandId => command as CommandId;
 
+/** Builds the Shell/File menu template, including per-profile tab and pane submenus. */
 const shellMenu = (
   commandKeys: Record<string, string>,
   execCommand: MenuCommandRunner,

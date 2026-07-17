@@ -2,6 +2,7 @@ import {app, Notification} from 'electron';
 
 import {icon} from './config/paths';
 
+/** Logs and shows a native OS notification, deferring until Electron is ready if needed. */
 export default function notify(title: string, body = '', details: {error?: any} = {}) {
   console.log(`[Notification] ${title}: ${body}`);
   if (details.error) {

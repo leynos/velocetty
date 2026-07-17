@@ -9,31 +9,52 @@ import type {rawConfig} from '@shared/types/config';
 type RuntimePluginSettings = Record<string, unknown>;
 /** Represents a JSON5 object property key with validation semantics. */
 export type PropertyKey = {
+  /** The wrapped key string. */
   readonly value: string;
-} & {readonly __brand: 'PropertyKey'};
+} & {
+  /** Nominal-typing brand preventing accidental use of a plain string as a key. */
+  readonly __brand: 'PropertyKey';
+};
 
 /** Represents a plugin identifier. */
 export type PluginId = {
+  /** The wrapped plugin id string. */
   readonly value: string;
-} & {readonly __brand: 'PluginId'};
+} & {
+  /** Nominal-typing brand preventing accidental use of a plain string as a plugin id. */
+  readonly __brand: 'PluginId';
+};
 
 /** Represents a path through nested JSON5 objects. */
 export type PropertyPath = {
+  /** The path's property keys, from outermost to innermost. */
   readonly segments: readonly PropertyKey[];
-} & {readonly __brand: 'PropertyPath'};
+} & {
+  /** Nominal-typing brand preventing accidental use of a plain array as a path. */
+  readonly __brand: 'PropertyPath';
+};
 
+/** Wraps a raw string as a validated {@link PropertyKey}. */
 export const propertyKey = (value: string): PropertyKey => ({value}) as PropertyKey;
+/** Wraps a raw string as a validated {@link PluginId}. */
 export const pluginId = (value: string): PluginId => ({value}) as PluginId;
+/** Wraps a sequence of key segments as a validated {@link PropertyPath}. */
 export const propertyPath = (segments: readonly PropertyKey[]): PropertyPath => ({segments}) as PropertyPath;
 /** Nominal type representing a raw JSON5 document string.
  *  Prevents confusing arbitrary strings with a document under round-trip. */
-export type Json5Document = string & {readonly __brand: 'Json5Document'};
+export type Json5Document = string & {
+  /** Nominal-typing brand preventing accidental use of a plain string as a document. */
+  readonly __brand: 'Json5Document';
+};
 
 /** Wraps a raw string as a Json5Document. No validation is performed. */
 export const json5Document = (raw: string): Json5Document => raw as Json5Document;
 
+/** A single plugin's settings to persist into the JSON5 config document. */
 export type PluginPersistencePatch = {
+  /** The plugin whose settings are being persisted. */
   pluginId: PluginId;
+  /** The settings values to write. */
   settings: RuntimePluginSettings;
 };
 
@@ -209,6 +230,7 @@ const applyPluginSettingsPatch = (doc: Json5Document, patch: PluginPersistencePa
   return upsertObjectProperty(nextDoc, pluginsRange, propertyKey(patch.pluginId.value), patch.settings);
 };
 
+/** Applies each plugin's settings patch to the document, preserving formatting and comments. */
 export const applyPluginSettingsPatches = (
   doc: Json5Document,
   patches: readonly PluginPersistencePatch[]
@@ -224,6 +246,7 @@ export const applyPluginSettingsPatches = (
   return nextDoc;
 };
 
+/** Parses and validates a JSON5 document as a raw config, returning `null` on failure. */
 export const parseConfigJson5Strict = (doc: Json5Document): rawConfig | null => {
   try {
     const parsed = JSON5.parse(doc) as unknown;

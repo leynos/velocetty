@@ -13,6 +13,7 @@ import type {
 import {SESSION_SEARCH} from '@shared/constants/sessions';
 import Ajv, {type ErrorObject, type ValidateFunction} from 'ajv';
 
+/** A legacy-style command handler invoked with the triggering event and the dispatch function. */
 export type CommandHandler = (event: unknown, dispatch: HyperDispatch) => void;
 
 interface RegisteredCommand extends CommandDefinition {
@@ -47,6 +48,7 @@ const createLegacyDefinition = (id: CommandId): CommandDefinition => ({
   }
 });
 
+/** Requests that the active (or given) session's search be closed, deferring to the terminal if none is open. */
 export const closeSearchAction = (uid?: string, keyEvent?: {catched?: boolean}) => {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     const targetUid = uid ?? getState().sessions.activeUid;
@@ -111,6 +113,7 @@ const serializeAjvErrors = (errors: ErrorObject[] | null | undefined): CommandVa
     };
   });
 
+/** Builds an isolated command registry module, wiring in legacy search-close and focus dependencies. */
 export const createCommandRegistryModule = (dependencies: CommandRegistryDependencies) => {
   const ajv = new Ajv({allErrors: true});
   const validatorsByCommandId = new Map<CommandId, ValidateFunction>();
@@ -301,30 +304,55 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
   };
 
   return {
+    /** Public `CommandRegistry<CommandHandler>` view exposing the core CRUD and validation API. */
     commandRegistry,
+    /** Alias of {@link register} for legacy call sites. */
     createCommand,
+    /** Alias of {@link remove} for legacy call sites. */
     deleteCommand,
+    /** Alias of {@link list} for legacy call sites. */
     enumerateCommands,
+    /** Looks up a command definition by id, returning a clone. */
     get,
+    /** Alias of {@link get} for legacy call sites. */
     getCommand,
+    /** Alias of {@link get} for legacy call sites. */
     getCommandDefinition,
+    /** Returns the handler registered for a command id, if any. */
     getCommandHandler,
+    /** Syncs runtime plugin commands and resolves the current shortcut-to-action keymap. */
     getRegisteredKeys,
+    /** Reports whether a command id is registered. */
     has,
+    /** Alias of {@link has} for legacy call sites. */
     hasCommand,
+    /** Alias of {@link has} for legacy call sites. */
     hasCommandDefinition,
+    /** Lists all registered command definitions, sorted by id. */
     list,
+    /** Alias of {@link list} for legacy call sites. */
     listCommands,
+    /** Adds or replaces a command definition, clearing any cached validator. */
     register,
+    /** Alias of {@link register} for legacy call sites. */
     registerCommand,
+    /** Bulk-registers legacy `{commandId: handler}` maps as handlers on existing/legacy definitions. */
     registerCommandHandlers,
+    /** Removes a command definition and its cached validator. */
     remove,
+    /** Alias of {@link remove} for legacy call sites. */
     removeCommand,
+    /** Alias of {@link register} for legacy call sites. */
     replaceCommand,
+    /** Alias of {@link register} for legacy call sites. */
     update,
+    /** Alias of {@link register} for legacy call sites. */
     updateCommand,
+    /** Validates command arguments against the command's compiled JSON schema. */
     validateArgs,
+    /** Alias of {@link validateArgs} for legacy call sites. */
     validateCommandArgs,
+    /** Alias of {@link validateArgs} for legacy call sites. */
     validateCommandArgsFor
   };
 };
@@ -346,29 +374,65 @@ const commandRegistryModule = createCommandRegistryModule({
 });
 
 /** Core CRUD and validation API. */
-export const {validateArgs, register, update, remove, get, list, has} = commandRegistryModule;
+export const {
+  /** Validates command arguments against the command's compiled JSON schema. */
+  validateArgs,
+  /** Adds or replaces a command definition, clearing any cached validator. */
+  register,
+  /** Alias of {@link register} for legacy call sites. */
+  update,
+  /** Removes a command definition and its cached validator. */
+  remove,
+  /** Looks up a command definition by id, returning a clone. */
+  get,
+  /** Lists all registered command definitions, sorted by id. */
+  list,
+  /** Reports whether a command id is registered. */
+  has
+} = commandRegistryModule;
 
 /** Public `CommandRegistry<CommandHandler>` entry point with CRUD and validation APIs. */
 export const commandRegistry: CommandRegistry<CommandHandler> = commandRegistryModule.commandRegistry;
 
 /** Async key resolution, handler management, and bulk registration. */
-export const {getRegisteredKeys, registerCommandHandlers, getCommandHandler} = commandRegistryModule;
+export const {
+  /** Syncs runtime plugin commands and resolves the current shortcut-to-action keymap. */
+  getRegisteredKeys,
+  /** Bulk-registers legacy `{commandId: handler}` maps as handlers on existing/legacy definitions. */
+  registerCommandHandlers,
+  /** Returns the handler registered for a command id, if any. */
+  getCommandHandler
+} = commandRegistryModule;
 
 /** Compat aliases — retained for call sites that use legacy command-verb naming. */
 export const {
+  /** Alias of {@link register} for legacy call sites. */
   registerCommand,
+  /** Alias of {@link register} for legacy call sites. */
   createCommand,
+  /** Alias of {@link register} for legacy call sites. */
   updateCommand,
+  /** Alias of {@link register} for legacy call sites. */
   replaceCommand,
+  /** Alias of {@link remove} for legacy call sites. */
   removeCommand,
+  /** Alias of {@link remove} for legacy call sites. */
   deleteCommand,
+  /** Alias of {@link get} for legacy call sites. */
   getCommand,
+  /** Alias of {@link get} for legacy call sites. */
   getCommandDefinition,
+  /** Alias of {@link list} for legacy call sites. */
   listCommands,
+  /** Alias of {@link list} for legacy call sites. */
   enumerateCommands,
+  /** Alias of {@link has} for legacy call sites. */
   hasCommand,
+  /** Alias of {@link has} for legacy call sites. */
   hasCommandDefinition,
+  /** Alias of {@link validateArgs} for legacy call sites. */
   validateCommandArgs,
+  /** Alias of {@link validateArgs} for legacy call sites. */
   validateCommandArgsFor
 } = commandRegistryModule;
 
@@ -387,4 +451,5 @@ const roleCommands = [
   'window:toggleFullScreen'
 ];
 
+/** Reports whether a command should be intercepted rather than left to reach Electron's menu roles. */
 export const shouldPreventDefault = (command: string) => !roleCommands.includes(command);

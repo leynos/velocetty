@@ -7,6 +7,7 @@ import {version} from './package.json';
 
 const NEWS_URL = 'https://hyper-news.now.sh';
 
+/** Polls the Hyper news endpoint for a notification message and forwards it to the renderer. */
 export default function fetchNotifications(win: BrowserWindow) {
   const {rpc} = win;
   const retry = (err?: Error) => {

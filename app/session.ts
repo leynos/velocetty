@@ -91,12 +91,19 @@ interface SessionOptions {
   shellArgs?: string[];
   profile: string;
 }
+/** A terminal session backed by a pty, batching output for efficient IPC delivery. */
 export default class Session extends EventEmitter {
+  /** The underlying pty process, or `null` before `init` has spawned one. */
   pty: IPty | null;
+  /** Batches pty output for efficient delivery to the renderer. */
   batcher: DataBatcher | null;
+  /** The shell executable path currently in use. */
   shell: string | null;
+  /** Whether the session has already emitted `exit` and should not do so again. */
   ended: boolean;
+  /** Timestamp (ms) the session was constructed, used to detect early shell exit. */
   initTimestamp: number;
+  /** Name of the profile this session was created from. */
   profile!: string;
   constructor(options: SessionOptions) {
     super();
@@ -108,6 +115,7 @@ export default class Session extends EventEmitter {
     this.init(options);
   }
 
+  /** Spawns the pty and wires up data/exit handling, retrying with a fallback shell on early exit. */
   init({uid, rows, cols, cwd, shell: _shell, shellArgs: _shellArgs, profile}: SessionOptions) {
     this.profile = profile;
     const envFromConfig = config.getProfileConfig(profile).env || {};
@@ -218,10 +226,12 @@ No fallback available, please check the shell config.
     this.shell = shell;
   }
 
+  /** Ends the session by destroying the underlying pty. */
   exit() {
     this.destroy();
   }
 
+  /** Writes input to the pty, if one is running. */
   write(data: string) {
     if (this.pty) {
       this.pty.write(data);
@@ -230,6 +240,7 @@ No fallback available, please check the shell config.
     }
   }
 
+  /** Resizes the pty to match the terminal's current dimensions. */
   resize({cols, rows}: {cols: number; rows: number}) {
     if (this.pty) {
       try {
@@ -243,6 +254,7 @@ No fallback available, please check the shell config.
     }
   }
 
+  /** Kills the pty process and marks the session as ended. */
   destroy() {
     if (this.pty) {
       try {

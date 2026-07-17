@@ -153,10 +153,15 @@ const mapDispatchToProps = (dispatch: HyperDispatch, ownProps: TermGroupOwnProps
   }
 });
 
+/**
+ * Term-group node: renders a single terminal for a leaf group, or splits
+ * into `SplitPane`-arranged child groups for a branch group.
+ */
 const TermGroup = connect(mapStateToProps, mapDispatchToProps, null, {forwardRef: true})(TermGroup_);
 
 const DecoratedTermGroup = decorate(TermGroup, 'TermGroup');
 
 export default TermGroup;
 
+/** Props supplied to a term group by `connect`: its child groups and resize dispatch binding. */
 export type TermGroupConnectedProps = ReturnType<typeof mapStateToProps> & ReturnType<typeof mapDispatchToProps>;

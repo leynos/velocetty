@@ -47,6 +47,7 @@ class AutoUpdater extends EventEmitter implements Electron.AutoUpdater {
   }
 }
 
+/** Shared auto-updater instance used on Linux, where Electron's built-in updater is unavailable. */
 const autoUpdaterLinux = new AutoUpdater();
 
 export default autoUpdaterLinux;

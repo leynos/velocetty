@@ -13,27 +13,36 @@ import {app} from 'electron';
 
 import isDev from 'electron-is-dev';
 
+/** Filename of the current-format config file, relative to `cfgDir`. */
 const cfgFile = 'config.json5';
 const legacyCfgFile = 'hyper.json';
 const defaultCfgFile = 'config-default.json';
+/** Filename of the bundled JSON schema, relative to `cfgDir`. */
 const schemaFile = 'schema.json';
+/** The current user's home directory. */
 const homeDirectory = homedir();
 
-// If the user defines XDG_CONFIG_HOME they definitely want their config there,
-// otherwise use the home directory in linux/mac and userdata in windows
+/**
+ * Directory holding the user's configuration; may be reassigned below for legacy or
+ * dev overrides. If the user defines XDG_CONFIG_HOME they definitely want their
+ * config there, otherwise use the home directory on Linux/macOS and userdata on Windows.
+ */
 let cfgDir = process.env.XDG_CONFIG_HOME
   ? join(process.env.XDG_CONFIG_HOME, 'Hyper')
   : process.platform === 'win32'
     ? app.getPath('userData')
     : join(homeDirectory, '.config', 'Hyper');
 
+/** Path to the user's config file; may be reassigned below for legacy or dev overrides. */
 let cfgPath = join(cfgDir, cfgFile);
 const legacyCfgPath = join(cfgDir, legacyCfgFile);
+/** Path to the bundled JSON schema source file. */
 const schemaPath = resolve(__dirname, schemaFile);
 
 const devDir = resolve(__dirname, '../..');
 const devCfg = join(devDir, cfgFile);
 const devLegacyCfg = join(devDir, legacyCfgFile);
+/** Path to the bundled default configuration template. */
 const defaultCfg = resolve(__dirname, defaultCfgFile);
 
 const fileExists = (path: string): boolean => {
@@ -65,9 +74,13 @@ if (isDev) {
 }
 
 const plugins = resolve(cfgDir, 'plugins');
+/** Plugin storage locations, relative to the config directory. */
 const plugs = {
+  /** Directory for npm-installed plugins. */
   base: plugins,
+  /** Directory for locally developed plugins. */
   local: resolve(plugins, 'local'),
+  /** Directory for cached plugin installs. */
   cache: resolve(plugins, 'cache')
 };
 /** The Bun executable name for the current platform. */
@@ -93,9 +106,12 @@ const bun = (() => {
     return bunExecutable;
   }
 })();
+/** Path to the bundled `hyper` CLI launcher script. */
 const cliScriptPath = resolve(__dirname, '../../bin/hyper');
+/** Path where the `hyper` CLI symlink is installed on Linux/macOS. */
 const cliLinkPath = '/usr/local/bin/hyper';
 
+/** Path to the application icon used outside of packaged builds. */
 const icon = resolve(__dirname, '../static/icon96x96.png');
 
 const keymapPath = resolve(__dirname, '../keymaps');
@@ -103,6 +119,7 @@ const darwinKeys = join(keymapPath, 'darwin.json');
 const win32Keys = join(keymapPath, 'win32.json');
 const linuxKeys = join(keymapPath, 'linux.json');
 
+/** Resolves the bundled default keymap file for the current platform. */
 const defaultPlatformKeyPath = () => {
   switch (process.platform) {
     case 'darwin':

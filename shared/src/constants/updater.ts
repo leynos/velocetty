@@ -11,15 +11,21 @@ export const UPDATE_AVAILABLE = 'UPDATE_AVAILABLE';
 
 /** Action contract for install-update events. */
 export interface UpdateInstallAction {
+  /** Discriminates this action as `UPDATE_INSTALL`. */
   readonly type: typeof UPDATE_INSTALL;
 }
 
 /** Action contract for update-available events. */
 export interface UpdateAvailableAction {
+  /** Discriminates this action as `UPDATE_AVAILABLE`. */
   readonly type: typeof UPDATE_AVAILABLE;
+  /** Version string of the available update. */
   readonly version: string;
+  /** Release notes for the update, if provided. */
   readonly notes: string | null;
+  /** URL of the release page for the update. */
   readonly releaseUrl: string;
+  /** Whether the update can be installed automatically. */
   readonly canInstall: boolean;
 }
 

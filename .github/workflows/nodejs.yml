@@ -99,6 +99,7 @@ jobs:
       - name: Run Makefile lint and unit-test gates
         run: |
           make lint
+          make docs-check
           make test
       - name: Getting Build Icon
         if: github.ref == 'refs/heads/canary' || github.base_ref == 'canary'

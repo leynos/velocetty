@@ -19,6 +19,7 @@ const colorList = [
   'grayscale'
 ];
 
+/** Converts a positional colour array into a named palette map; passes non-arrays through unchanged. */
 export const getColorMap: <T>(colors: T) => T extends (infer U)[] ? {[k: string]: U} : T = (colors) => {
   if (!Array.isArray(colors)) {
     return colors;

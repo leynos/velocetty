@@ -11,6 +11,7 @@ const generatePrefixedCommand = (command: string, shortcuts: string[]) => {
   return result;
 };
 
+/** Normalizes keymap shortcuts, migrating deprecated `cmd` bindings and expanding `:prefix` commands. */
 const mapKeys = (config: Record<string, string[] | string>) => {
   return Object.keys(config).reduce((keymap: Record<string, string[]>, command: string) => {
     if (!command) {

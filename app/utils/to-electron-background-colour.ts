@@ -1,9 +1,10 @@
 // Packages
 import Color from 'color';
 
-// returns a background colour that's in hex
-// format including the alpha channel (e.g.: `#00000050`)
-// input can be any css value (rgb, hsl, string…)
+/**
+ * Converts any CSS colour value (rgb, hsl, string...) to Electron's hex-with-alpha
+ * background colour format (e.g. `#00000050`).
+ */
 const toElectronBackgroundColor = (bgColor: string) => {
   const color = Color(bgColor);
 

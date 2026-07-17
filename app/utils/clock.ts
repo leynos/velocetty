@@ -19,7 +19,6 @@
 /**
  * Semantic contract for wall-clock providers used by runtime telemetry.
  *
- * @export
  * @remarks
  * Implementations must return epoch milliseconds, remain deterministic under
  * test doubles, and avoid side effects.
@@ -40,7 +39,6 @@ export interface Clock {
 /**
  * Default wall-clock implementation backed by `Date.now()`.
  *
- * @export
  * @remarks
  * This default is intentionally simple and can be replaced in tests by mocking
  * the module or injecting an alternative `Clock`.

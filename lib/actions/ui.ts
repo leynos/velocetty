@@ -35,6 +35,7 @@ import {transport} from '../transport';
 import {requestSession, sendSessionData, setActiveSession} from './sessions';
 import {setActiveGroup} from './term-groups';
 
+/** Requests that the context menu for the given selection be shown, unless quick-edit is active. */
 export function openContextMenu(uid: string, selection: string) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     dispatch({
@@ -51,6 +52,7 @@ export function openContextMenu(uid: string, selection: string) {
   };
 }
 
+/** Requests that the terminal font size be increased by one point. */
 export function increaseFontSize() {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     dispatch({
@@ -68,6 +70,7 @@ export function increaseFontSize() {
   };
 }
 
+/** Requests that the terminal font size be decreased by one point, floored to avoid xterm rendering issues. */
 export function decreaseFontSize() {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     dispatch({
@@ -86,12 +89,14 @@ export function decreaseFontSize() {
   };
 }
 
+/** Requests that the terminal font size be reset to its configured default. */
 export function resetFontSize(): HyperActions {
   return {
     type: UI_FONT_SIZE_RESET
   };
 }
 
+/** Requests that font smoothing be recalculated for the current device pixel ratio. */
 export function setFontSmoothing() {
   return (dispatch: HyperDispatch) => {
     setTimeout(() => {
@@ -106,6 +111,7 @@ export function setFontSmoothing() {
   };
 }
 
+/** Requests that the store record the window's updated maximized state. */
 export function windowGeometryUpdated({isMaximized}: {isMaximized: boolean}): HyperActions {
   return {
     type: UI_WINDOW_GEOMETRY_CHANGED,
@@ -156,7 +162,9 @@ function moveToNeighbourPane(type: typeof UI_MOVE_NEXT_PANE | typeof UI_MOVE_PRE
   };
 }
 
+/** Requests that focus move to the next pane in the active tab. */
 export const moveToNextPane = moveToNeighbourPane(UI_MOVE_NEXT_PANE);
+/** Requests that focus move to the previous pane in the active tab. */
 export const moveToPreviousPane = moveToNeighbourPane(UI_MOVE_PREV_PANE);
 
 const getGroupUids = (state: HyperState) => {
@@ -164,6 +172,7 @@ const getGroupUids = (state: HyperState) => {
   return rootGroups.map(({uid}) => uid);
 };
 
+/** Requests that the active tab move one position to the left. */
 export function moveLeft() {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     dispatch({
@@ -184,6 +193,7 @@ export function moveLeft() {
   };
 }
 
+/** Requests that the active tab move one position to the right. */
 export function moveRight() {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     dispatch({
@@ -204,6 +214,7 @@ export function moveRight() {
   };
 }
 
+/** Requests that the tab at index `i` (or the last tab) become active. */
 export function moveTo(i: number | 'last') {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     if (i === 'last') {
@@ -233,6 +244,7 @@ export function moveTo(i: number | 'last') {
   };
 }
 
+/** Requests that the window's moved position be recorded and font smoothing recalculated. */
 export function windowMove(window: any) {
   return (dispatch: HyperDispatch) => {
     dispatch({
@@ -245,6 +257,7 @@ export function windowMove(window: any) {
   };
 }
 
+/** Requests that font smoothing be recalculated after a window geometry change. */
 export function windowGeometryChange() {
   return (dispatch: HyperDispatch) => {
     dispatch({
@@ -256,6 +269,7 @@ export function windowGeometryChange() {
   };
 }
 
+/** Requests that the file at `path` be opened: run if executable, or `cd`'d into if a directory. */
 export function openFile(path: string) {
   return (dispatch: HyperDispatch) => {
     dispatch({
@@ -284,18 +298,21 @@ export function openFile(path: string) {
   };
 }
 
+/** Requests that the application window enter full-screen mode. */
 export function enterFullScreen(): HyperActions {
   return {
     type: UI_ENTER_FULLSCREEN
   };
 }
 
+/** Requests that the application window leave full-screen mode. */
 export function leaveFullScreen(): HyperActions {
   return {
     type: UI_LEAVE_FULLSCREEN
   };
 }
 
+/** Requests a new session that runs the SSH command derived from the parsed URL. */
 export function openSSH(parsedUrl: ReturnType<typeof parseUrl>) {
   return (dispatch: HyperDispatch) => {
     dispatch({
@@ -319,6 +336,7 @@ export function openSSH(parsedUrl: ReturnType<typeof parseUrl>) {
   };
 }
 
+/** Requests that the given registered command be executed, via its handler or the transport. */
 export function execCommand(
   command: CommandId,
   fn: ((e: unknown, dispatch: HyperDispatch) => void) | undefined,
@@ -326,8 +344,11 @@ export function execCommand(
 ) {
   return (dispatch: HyperDispatch) =>
     dispatch({
+      /** Redux action type dispatched when a registered command is executed. */
       type: UI_COMMAND_EXEC,
+      /** Identifier of the command being executed. */
       command,
+      /** Runs the command's handler if one was supplied, else emits it over the transport. */
       effect() {
         if (fn) {
           fn(e, dispatch);

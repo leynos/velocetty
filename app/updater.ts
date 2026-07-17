@@ -92,7 +92,9 @@ interface ReleaseInfo {
  * Options for the updater function.
  */
 export interface UpdaterOptions {
+  /** Timer functions to use; overridable so tests can inject fakes. */
   scheduler?: SchedulerSeam;
+  /** Logger to use for error reporting; overridable so tests can inject fakes. */
   logger?: LoggerSeam;
 }
 
@@ -140,6 +142,7 @@ async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
   }
 }
 
+/** Initializes the auto-updater for a window and wires update-available/downloaded events. */
 const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
   const scheduler = options?.scheduler ?? {
     setTimeout: globalThis.setTimeout,

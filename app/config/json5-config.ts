@@ -3,10 +3,25 @@ import JSON5 from 'json5';
 
 import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
 
-export type ParseSuccess<T> = {success: true; data: T};
-export type ParseFailure = {success: false; error: Error};
+/** A successful schema parse, carrying the validated data. */
+export type ParseSuccess<T> = {
+  /** Discriminant confirming the parse succeeded. */
+  success: true;
+  /** The validated value. */
+  data: T;
+};
+/** A failed schema parse, carrying the validation error. */
+export type ParseFailure = {
+  /** Discriminant confirming the parse failed. */
+  success: false;
+  /** The validation error, optionally carrying a structured diagnostic. */
+  error: Error;
+};
+/** The outcome of validating a value against a {@link ParseSchema}. */
 export type ParseResult<T> = ParseSuccess<T> | ParseFailure;
+/** A minimal schema contract, satisfied by both hand-rolled validators and Zod schemas. */
 export type ParseSchema<T> = {
+  /** Validates `value`, returning a discriminated success/failure result. */
   readonly safeParse: (value: unknown) => ParseResult<T>;
 };
 
@@ -20,18 +35,29 @@ type ParseDiagnosticContext = {
 type SchemaDiagnosticContext = Pick<ParseDiagnosticContext, 'itemType' | 'diagnosticHints'>;
 type ErrorMessageContext = Pick<ParseDiagnosticContext, 'source' | 'itemType'>;
 
+/** Inputs for parsing and validating a raw JSON5 document against a schema. */
 export interface ParseOptions<T> {
+  /** The raw JSON5 text to parse. */
   readonly raw: string;
+  /** A human-readable identifier for the source, used in diagnostics. */
   readonly source: string;
+  /** The schema to validate the parsed value against. */
   readonly schema: ParseSchema<T>;
+  /** The value to use when parsing or validation fails. */
   readonly fallback: T;
+  /** A label for the kind of item being parsed, used in diagnostic messages. */
   readonly itemType?: string;
+  /** Per-path hints merged into diagnostics to help users fix invalid config. */
   readonly diagnosticHints?: DiagnosticHints;
 }
 
+/** The result of parsing with diagnostics, always returning a usable value. */
 export type ParseWithDiagnosticsResult<T> = {
+  /** The parsed value, or `fallback` when parsing/validation failed. */
   value: T;
+  /** Diagnostics describing why the fallback was used, if it was. */
   diagnostics: configValidationDiagnostic[];
+  /** Whether `value` is the fallback rather than a successfully parsed result. */
   usedFallback: boolean;
 };
 
@@ -47,12 +73,15 @@ const createDiagnosticError = (diagnostic: configValidationDiagnostic): Diagnost
 
 const getPathForField = (field: string): string => `/${field}`;
 
+/** Narrows a value to a plain object (excluding arrays and `null`). */
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+/** Narrows a value to an array whose every element is a string. */
 export const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 
+/** Narrows a value to a keymap record: string or string-array bindings per command. */
 export const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
   isRecord(value) && Object.values(value).every((entry) => typeof entry === 'string' || isStringArray(entry));
 
@@ -91,6 +120,7 @@ const validateKeymapField: FieldValidator = makeFieldValidator(
   (field) => `Set \`${field}\` entries to keybinding strings or string arrays.`
 );
 
+/** Validates that a parsed payload has the expected top-level raw-config shape. */
 export const validateRawConfig = (value: unknown): ParseResult<Record<string, unknown>> => {
   if (!isRecord(value)) {
     return {
@@ -120,6 +150,7 @@ export const validateRawConfig = (value: unknown): ParseResult<Record<string, un
   return {success: true, data: value};
 };
 
+/** Validates a parsed payload and casts it to the raw config type on success. */
 export const safeParseRawConfig = (value: unknown): ParseResult<rawConfig> => {
   const parsed = validateRawConfig(value);
   if (!parsed.success) {
@@ -249,6 +280,7 @@ const toParseDiagnostic = (error: unknown, context: ParseDiagnosticContext): con
   );
 };
 
+/** Parses JSON5 text against a schema, returning a fallback value plus diagnostics on failure. */
 export const parseJson5WithSchemaDiagnostics = <T>(options: ParseOptions<T>): ParseWithDiagnosticsResult<T> => {
   const {raw, source, schema, fallback, itemType = 'config', diagnosticHints} = options;
   try {
@@ -271,6 +303,7 @@ export const parseJson5WithSchemaDiagnostics = <T>(options: ParseOptions<T>): Pa
   }
 };
 
+/** Parses JSON5 text against a schema, logging a warning and returning the fallback on failure. */
 export const parseJson5WithSchema = <T>(options: ParseOptions<T>): T => {
   const {source, itemType = 'config'} = options;
   const result = parseJson5WithSchemaDiagnostics(options);
@@ -284,6 +317,7 @@ export const parseJson5WithSchema = <T>(options: ParseOptions<T>): T => {
   return result.value;
 };
 
+/** Recursively sorts object keys so serialized output is deterministic. */
 export const sortKeys = (value: unknown): unknown => {
   if (Array.isArray(value)) {
     return value.map((item) => sortKeys(item));
@@ -300,4 +334,5 @@ export const sortKeys = (value: unknown): unknown => {
   return value;
 };
 
+/** Serializes a value as pretty-printed JSON5 with keys sorted for stable diffs. */
 export const stringifyJson5 = (value: unknown): string => `${JSON5.stringify(sortKeys(value), null, 2)}\n`;

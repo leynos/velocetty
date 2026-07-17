@@ -10,6 +10,10 @@ import * as styles from './notifications.module.css';
 
 const Notification = decorate(Notification_, 'Notification');
 
+/**
+ * Stacks the font-size, resize, update, and message notifications above the
+ * terminal, showing only the ones flagged visible in the connected props.
+ */
 const Notifications = forwardRef(function Notifications(
   props: NotificationsProps,
   ref: React.ForwardedRef<HTMLDivElement>

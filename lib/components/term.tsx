@@ -212,11 +212,17 @@ const getTermOptions = (props: TermProps): ITerminalOptions => {
 };
 
 const createRuntimeFrameTimingMetrics = () => ({
+  /** Number of animation frames sampled since the metrics were last reported. */
   sampleCount: 0,
+  /** Sum of sampled frame durations, in milliseconds. */
   totalMs: 0,
+  /** Longest sampled frame duration, in milliseconds. */
   maxMs: 0,
+  /** Duration of the most recently sampled frame, in milliseconds. */
   lastMs: 0,
+  /** Count of frames whose duration exceeded `longFrameThresholdMs`. */
   longFrameCount: 0,
+  /** Frame duration, in milliseconds, above which a frame counts as "long". */
   longFrameThresholdMs: LONG_FRAME_THRESHOLD_MS
 });
 
@@ -224,57 +230,103 @@ const createRuntimeFrameTimingMetrics = () => ({
 export default class Term extends React.PureComponent<
   TermProps,
   {
+    /** Options applied to the next find-in-terminal search. */
     searchOptions: {
+      /** Whether the find-in-terminal search matches letter case exactly. */
       caseSensitive: boolean;
+      /** Whether the find-in-terminal search matches whole words only. */
       wholeWord: boolean;
+      /** Whether the find-in-terminal search term is treated as a regular expression. */
       regex: boolean;
     };
+    /** Result summary of the most recent search; undefined until a search runs. */
     searchResults:
       | {
+          /** Index of the currently focused search match, for the "n of m" label. */
           resultIndex: number;
+          /** Total number of search matches found for the current term. */
           resultCount: number;
         }
       | undefined;
   }
 > {
+  /** DOM node that hosts the xterm instance; kept across mounts so terms survive pane moves. */
   termRef: HTMLElement | null;
+  /** Wrapper element observed for resize so the terminal can be re-fitted and re-visibility-checked. */
   termWrapperRef: HTMLElement | null;
+  /** Last xterm options applied, used to diff and apply only changed options on update. */
   termOptions: ITerminalOptions;
+  /** Disposables for xterm event listeners, torn down on unmount. */
   disposableListeners: IDisposable[];
+  /** Built-in bell sound played when no custom `bellSound` prop is set. */
   defaultBellSound: HTMLAudioElement | null;
+  /** Bell sound actually played on terminal bell events, or `null` when the bell is disabled. */
   bellSound: HTMLAudioElement | null;
+  /** Keeps the terminal sized to its container. */
   fitAddon: FitAddon;
+  /** Powers find-in-terminal search and match highlighting. */
   searchAddon: SearchAddon;
+  /** Canvas-based renderer addon, used as the WebGL fallback. */
   canvasAddon: CanvasAddon | null;
+  /** WebGL renderer addon, used when supported and not in cooldown after failures. */
   webglAddon: WebglAddon | null;
+  /** Ligature-rendering addon, active only alongside the canvas renderer. */
   ligaturesAddon: LigaturesAddon | null;
+  /** Renderer type last reported per terminal uid, shown in the main process's About dialog. */
   static rendererTypes: Record<RendererUid, RendererType> = {};
+  /** Underlying xterm.js terminal instance. */
   term!: Terminal;
+  /** Observes the wrapper element to trigger a debounced fit/visibility sync on resize. */
   resizeObserver?: ResizeObserver;
+  /** Debounce timer for the resize observer's fit/visibility sync. */
   resizeTimeout?: NodeJS.Timeout;
+  /** Pending animation frame for the debounced renderer visibility sync, or `null` when idle. */
   visibilityFrame: number | null;
+  /** Ensures the transparent-background WebGL warning is only logged once. */
   hasWarnedAboutTransparentWebGL: boolean;
+  /** Ensures the unsupported-WebGL2 warning is only logged once. */
   hasWarnedAboutUnsupportedWebGL: boolean;
+  /** Count of consecutive WebGL failures, used to decide when to back off retrying. */
   webglFailureCount: number;
+  /** Timestamp of the most recent WebGL failure, used to compute retry cooldowns. */
   webglLastFailureAt: number;
+  /** Minimum delay before retrying the WebGL renderer after a failure. */
   webglCooldownMs: number;
+  /** Failure count above which WebGL retries back off using `webglFailureDecayMs`. */
   webglFailureThreshold: number;
+  /** Time after which accumulated WebGL failures are forgotten. */
   webglFailureDecayMs: number;
+  /** Handle for the scheduled deterministic renderer retry, or `null` when none is pending. */
   webglRetryTimer: number | NodeJS.Timeout | null;
+  /** Handle for the active frame-timing `requestAnimationFrame` loop, or `null` when stopped. */
   frameTimingRaf: TimeMs | null;
+  /** Timestamp of the previous tracked animation frame, used to compute frame duration. */
   lastFrameTimestamp: TimeMs | null;
+  /** Recent keydown timestamps, used to attribute input-latency samples to keystrokes. */
   keydownTimestamps: TimeMs[];
+  /** Set when runtime metrics have changed since they were last reported to the main process. */
   hasUnreportedRuntimeMetrics: boolean;
+  /** Timestamp of the last runtime metrics report, used to throttle reporting frequency. */
   lastRuntimeMetricsReportAt: TimeMs;
+  /** Rolling keydown-to-input-send latency metrics reported for renderer diagnostics. */
   runtimeInputLatencyMetrics: ReturnType<typeof createRuntimeLatencyMetrics>;
+  /** Rolling animation-frame timing metrics reported for renderer diagnostics. */
   runtimeFrameTimingMetrics: ReturnType<typeof createRuntimeFrameTimingMetrics>;
+  /** Colours used to highlight active and inactive search matches. */
   searchDecorations: ISearchDecorationOptions;
+  /** Local component state backing the find-in-terminal search UI. */
   state = {
+    /** Options applied to the next find-in-terminal search. */
     searchOptions: {
+      /** Whether the find-in-terminal search matches letter case exactly. */
       caseSensitive: false,
+      /** Whether the find-in-terminal search matches whole words only. */
       wholeWord: false,
+      /** Whether the find-in-terminal search term is treated as a regular expression. */
       regex: false
     },
+    /** Current search match position/count, or `undefined` before a search has run. */
+    /** Result summary of the most recent search; undefined until a search runs. */
     searchResults: undefined
   };
 
@@ -318,6 +370,7 @@ export default class Term extends React.PureComponent<
   }
 
   // The main process shows this in the About dialog
+  /** Records the active renderer type/metrics for a terminal and forwards changes to the main process. */
   static reportRenderer(payload: RendererReportPayload) {
     const {uid, type, reason, runtimeMetrics} = payload;
     const hasTypeChanged = Term.rendererTypes[uid] !== type;
@@ -499,6 +552,10 @@ export default class Term extends React.PureComponent<
     terms[this.props.uid] = this;
   }
 
+  /**
+   * Returns the main window `document`. Retained for plugin backwards
+   * compatibility from when each terminal had its own iframe `document`.
+   */
   getTermDocument() {
     console.warn(
       'The underlying terminal engine of Hyper no longer ' +
@@ -510,8 +567,11 @@ export default class Term extends React.PureComponent<
     return document;
   }
 
-  // intercepting paste event for any necessary processing of
-  // clipboard data, if result is falsy, paste event continues
+  /**
+   * Intercepts window paste events for the active pane, letting
+   * `processClipboard` rewrite content before it reaches the terminal. If
+   * nothing is processed, the paste event continues unmodified.
+   */
   onWindowPaste = (e: Event) => {
     if (!this.props.isTermActive) return;
 
@@ -523,6 +583,7 @@ export default class Term extends React.PureComponent<
     }
   };
 
+  /** Copies the current selection on right-click paste (`quickEdit`) or on select (`copyOnSelect`). */
   onMouseUp = (e: React.MouseEvent) => {
     if (this.props.quickEdit && e.button === 2) {
       if (this.term.hasSelection()) {
@@ -536,22 +597,27 @@ export default class Term extends React.PureComponent<
     }
   };
 
+  /** Writes raw data to the terminal, as if it had come from the shell. */
   write(data: string | Uint8Array) {
     this.term.write(data);
   }
 
+  /** Moves keyboard focus into the terminal. */
   focus = () => {
     this.term.focus();
   };
 
+  /** Clears the terminal's scrollback and screen. */
   clear() {
     this.term.clear();
   }
 
+  /** Resets the terminal to its initial state (colours, modes, cursor position). */
   reset() {
     this.term.reset();
   }
 
+  /** Advances the find-in-terminal search to the next match for `searchTerm`. */
   searchNext = (searchTerm: string) => {
     this.searchAddon.findNext(searchTerm, {
       ...this.state.searchOptions,
@@ -559,6 +625,7 @@ export default class Term extends React.PureComponent<
     });
   };
 
+  /** Moves the find-in-terminal search to the previous match for `searchTerm`. */
   searchPrevious = (searchTerm: string) => {
     this.searchAddon.findPrevious(searchTerm, {
       ...this.state.searchOptions,
@@ -566,6 +633,7 @@ export default class Term extends React.PureComponent<
     });
   };
 
+  /** Closes the find-in-terminal search box, clears match decorations, and refocuses the terminal. */
   closeSearchBox = () => {
     this.props.onCloseSearch();
     this.searchAddon.clearDecorations();
@@ -577,15 +645,18 @@ export default class Term extends React.PureComponent<
     this.term.focus();
   };
 
+  /** Resizes the underlying terminal to the given column/row count. */
   resize(size: TerminalSize) {
     const {cols, rows} = size;
     this.term.resize(cols, rows);
   }
 
+  /** Selects the entire terminal buffer. */
   selectAll() {
     this.term.selectAll();
   }
 
+  /** Re-fits the terminal to its wrapper's current size, if the wrapper is mounted. */
   fitResize() {
     if (!this.termWrapperRef) {
       return;
@@ -593,6 +664,10 @@ export default class Term extends React.PureComponent<
     this.fitAddon.fit();
   }
 
+  /**
+   * xterm custom key handler: records keydown timestamps for input-latency
+   * metrics, and lets Mousetrap-flagged command keys bypass terminal input.
+   */
   keyboardHandler = (e: KeyboardEvent & {catched?: boolean}) => {
     // Has Mousetrap flagged this event as a command?
     const shouldProcess = !e.catched;
@@ -741,6 +816,7 @@ export default class Term extends React.PureComponent<
     this.lastFrameTimestamp = null;
   }
 
+  /** Selects the audio played on bell: `sound` if given, the default bell, or none when `bell` is falsy. */
   setBellSound(bell: 'SOUND' | false, sound: string | null) {
     if (bell && bell.toUpperCase() === 'SOUND') {
       this.bellSound = sound ? new Audio(sound) : this.defaultBellSound;
@@ -749,6 +825,7 @@ export default class Term extends React.PureComponent<
     }
   }
 
+  /** Plays the configured bell sound, if any. */
   ringBell() {
     void this.bellSound?.play();
   }
@@ -779,6 +856,7 @@ export default class Term extends React.PureComponent<
     return Math.max(this.webglCooldownMs, this.webglLastFailureAt + this.webglCooldownMs - currentTime);
   }
 
+  /** Handles a lost WebGL context by falling back to the canvas renderer and scheduling a retry. */
   onWebGLContextLoss = () => {
     console.warn('WebGL context lost. Falling back to canvas-based rendering.');
     this.recordWebGLFailure();
@@ -788,6 +866,7 @@ export default class Term extends React.PureComponent<
     this.scheduleDeterministicRendererRetry();
   };
 
+  /** Handles this pane's WebGL context slot being evicted by the shared pool, falling back to canvas. */
   onWebGLEvicted = () => {
     this.recordWebGLFailure();
     this.detachWebGLRenderer();
@@ -795,6 +874,7 @@ export default class Term extends React.PureComponent<
     this.scheduleDeterministicRendererRetry();
   };
 
+  /** Schedules a single retry of renderer selection after a WebGL failure's cooldown elapses. */
   scheduleDeterministicRendererRetry = () => {
     if (this.webglRetryTimer !== null) {
       return;
@@ -806,6 +886,7 @@ export default class Term extends React.PureComponent<
     }, this.getWebGLRetryDelayMs());
   };
 
+  /** Debounces renderer visibility re-checks to at most once per animation frame. */
   scheduleRendererVisibilitySync = () => {
     if (this.visibilityFrame !== null) {
       return;
@@ -857,6 +938,7 @@ export default class Term extends React.PureComponent<
     this.webglLastFailureAt = 0;
   }
 
+  /** Whether the WebGL renderer can be used now, given the theme, browser support, and failure history. */
   canUseWebGLRenderer(hasFailureCooldown = this.hasWebGLFailureCooldown()) {
     if (!this.props.webGLRenderer) {
       return false;
@@ -884,6 +966,7 @@ export default class Term extends React.PureComponent<
     return bounds.right <= 0 || bounds.bottom <= 0 || bounds.left >= viewport.width || bounds.top >= viewport.height;
   }
 
+  /** Whether the pane is outside the viewport or covered by another element at its centre point. */
   isPaneOccluded(bounds: DOMRect) {
     const viewport: ViewportDimensions = {width: window.innerWidth, height: window.innerHeight};
 
@@ -902,6 +985,7 @@ export default class Term extends React.PureComponent<
     return this.termWrapperRef ? !this.termWrapperRef.contains(topElement) : true;
   }
 
+  /** Whether the pane is on the active tab, has non-zero size, and is not occluded. */
   isPaneVisible() {
     if (!this.termWrapperRef) {
       return false;
@@ -915,6 +999,7 @@ export default class Term extends React.PureComponent<
     });
   }
 
+  /** Loads the canvas renderer (and ligature support, unless disabled) and reports the switch. */
   ensureCanvasRenderer(reason?: RendererFallbackReason) {
     if (!this.canvasAddon) {
       this.canvasAddon = new CanvasAddon();
@@ -932,6 +1017,7 @@ export default class Term extends React.PureComponent<
     Term.reportRenderer({uid: asRendererUid(this.props.uid), type: 'Canvas', reason});
   }
 
+  /** Releases this pane's WebGL context pool slot and disposes its WebGL renderer addon. */
   detachWebGLRenderer() {
     webGLPoolReleaseHandlers.delete(this.props.uid);
     sharedWebGLContextPool?.release(this.props.uid);
@@ -942,6 +1028,7 @@ export default class Term extends React.PureComponent<
     }
   }
 
+  /** Acquires a shared WebGL context slot and loads the WebGL renderer, falling back to canvas on failure. */
   ensureWebGLRenderer(webGLContextPool = getWebGLContextPool(this.props.webGLRendererMaxContexts)) {
     try {
       // Acquire/release manages logical slot ownership only. Each pane still
@@ -984,6 +1071,7 @@ export default class Term extends React.PureComponent<
     }
   }
 
+  /** Chooses canvas or WebGL rendering based on pane visibility, theme, and recent WebGL failures. */
   syncRendererForVisibility() {
     if (!this.termRef) {
       return;
@@ -1097,6 +1185,7 @@ export default class Term extends React.PureComponent<
     this.handleActiveRootGroupChange(prevProps);
   }
 
+  /** Ref callback for the wrapper element; wires up a debounced resize observer while mounted. */
   onTermWrapperRef = (component: HTMLElement | null) => {
     this.termWrapperRef = component;
 
@@ -1154,6 +1243,7 @@ export default class Term extends React.PureComponent<
     });
   }
 
+  /** Renders the terminal wrapper and, when `props.search` is set, the find-in-terminal search box. */
   render() {
     return (
       <div

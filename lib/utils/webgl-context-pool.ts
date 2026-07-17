@@ -1,17 +1,26 @@
 /** @file Tracks WebGL context allocations with strict capacity and LRU eviction. */
 
+/** Configuration for a {@link WebGLContextPool}. */
 export type WebGLContextPoolOptions = Readonly<{
+  /** Maximum number of contexts the pool retains before evicting the least recently visible one. */
   maxContexts: number;
 }>;
 
+/** Creates a new WebGL context for a pool entry. */
 export type WebGLContextFactory<TContext> = () => TContext;
 
+/** Disposes of a WebGL context evicted or released from a pool. */
 export type WebGLContextDisposer<TContext> = (context: TContext, paneId: string) => void;
 
+/** Outcome of acquiring a context from a {@link WebGLContextPool}. */
 export type WebGLAcquireResult<TContext> = Readonly<{
+  /** The acquired (new or reused) context. */
   context: TContext;
+  /** Whether an existing context for the pane was reused rather than created. */
   reused: boolean;
+  /** Pane id evicted to make room, if any. */
   evictedPaneId: string | null;
+  /** Context evicted to make room, if any. */
   evictedContext: TContext | null;
 }>;
 
@@ -26,6 +35,7 @@ const assertValidMaxContexts = (maxContexts: number) => {
   }
 };
 
+/** Fixed-capacity pool of WebGL contexts keyed by pane id, evicting the least recently visible pane. */
 export class WebGLContextPool<TContext> {
   readonly #entries = new Map<string, WebGLPoolEntry<TContext>>();
   readonly #maxContexts: number;
@@ -36,22 +46,27 @@ export class WebGLContextPool<TContext> {
     this.#maxContexts = options.maxContexts;
   }
 
+  /** The pool's configured maximum context capacity. */
   get maxContexts() {
     return this.#maxContexts;
   }
 
+  /** The number of contexts currently held by the pool. */
   get size() {
     return this.#entries.size;
   }
 
+  /** Reports whether the pool currently holds a context for `paneId`. */
   has(paneId: string) {
     return this.#entries.has(paneId);
   }
 
+  /** Returns the context held for `paneId`, if any, without affecting its recency. */
   get(paneId: string) {
     return this.#entries.get(paneId)?.context;
   }
 
+  /** Returns the pane's context, or creates one, evicting the least recently visible pane if at capacity. */
   acquire(
     paneId: string,
     createContext: WebGLContextFactory<TContext>,
@@ -102,6 +117,7 @@ export class WebGLContextPool<TContext> {
     };
   }
 
+  /** Removes and returns the pane's context, disposing it via `disposeContext` if given. */
   release(paneId: string, disposeContext?: WebGLContextDisposer<TContext>) {
     const entry = this.#entries.get(paneId);
     if (!entry) {
@@ -113,6 +129,7 @@ export class WebGLContextPool<TContext> {
     return entry.context;
   }
 
+  /** Marks the pane's context as recently visible; reports whether an entry existed to touch. */
   touch(paneId: string) {
     const entry = this.#entries.get(paneId);
     if (!entry) {
@@ -123,6 +140,7 @@ export class WebGLContextPool<TContext> {
     return true;
   }
 
+  /** Removes all held contexts, disposing each via `disposeContext` if given. */
   clear(disposeContext?: WebGLContextDisposer<TContext>) {
     if (disposeContext) {
       for (const [paneId, entry] of this.#entries) {

@@ -19,6 +19,11 @@ type WindowControlButton = {
   className: string;
 };
 
+/**
+ * Window header chrome: hamburger menu, window controls, and the tab strip.
+ * Also owns the click-vs-drag disambiguation used when the header doubles as
+ * the window's draggable title bar.
+ */
 const Header = forwardRef(function Header(props: HeaderProps, ref: React.ForwardedRef<HTMLElement>) {
   const [headerMouseDownWindowX, setHeaderMouseDownWindowX] = useState<number>(0);
   const [headerMouseDownWindowY, setHeaderMouseDownWindowY] = useState<number>(0);

@@ -15,6 +15,7 @@ import type {
   TypedEmitter
 } from '@shared/types/common';
 
+/** Minimal `ipcRenderer` surface the RPC client needs to subscribe to and send messages. */
 export type RpcClientIpc = Pick<IpcRendererWithCommands, 'on' | 'removeListener' | 'send'>;
 
 type RpcWindowState = {
@@ -44,8 +45,11 @@ const resolveIpcRenderer = (): RpcClientIpc => {
 
 /** Renderer-side RPC client that forwards typed events over IPC. */
 export default class Client {
+  /** Local event emitter that renderer event listeners are attached to. */
   emitter: TypedEmitter<RendererEvents>;
+  /** The `ipcRenderer`-like transport used to send and receive IPC messages. */
   ipc: RpcClientIpc;
+  /** The window's RPC channel id, assigned once the main process signals readiness. */
   id!: string;
   private initListener?: InitListener;
 
@@ -101,25 +105,30 @@ export default class Client {
     return this.emitter.emit(ch as FilterNever<RendererEvents>, data as RendererEvents[FilterNever<RendererEvents>]);
   }
 
+  /** Decodes an IPC message envelope and re-emits it on the local emitter. */
   ipcListener = <U extends keyof RendererEvents>(
     _event: IpcRendererEvent,
     {ch, data}: {ch: U; data?: RendererEvents[U]}
   ) => this.emitRendererEvent(ch, data);
 
+  /** Registers a listener for a renderer event. */
   on = <U extends keyof RendererEvents>(ev: U, fn: (arg0: RendererEvents[U]) => void) => {
     this.emitter.on(ev, fn);
     return this;
   };
 
+  /** Alias of {@link removeListener}. */
   off = <U extends keyof RendererEvents>(ev: U, fn: (arg0: RendererEvents[U]) => void) => {
     return this.removeListener(ev, fn);
   };
 
+  /** Registers a one-shot listener for a renderer event. */
   once = <U extends keyof RendererEvents>(ev: U, fn: (arg0: RendererEvents[U]) => void) => {
     this.emitter.once(ev, fn);
     return this;
   };
 
+  /** Sends a typed command to the main process over IPC; throws if not yet ready. */
   emit<U extends Exclude<keyof MainEvents, FilterNever<MainEvents>>>(ev: U): boolean;
   emit<U extends FilterNever<MainEvents>>(ev: U, data: MainEvents[U]): boolean;
   emit<U extends keyof MainEvents>(ev: U, data?: MainEvents[U]) {
@@ -130,16 +139,19 @@ export default class Client {
     return true;
   }
 
+  /** Removes a previously registered listener for a renderer event. */
   removeListener = <U extends keyof RendererEvents>(ev: U, fn: (arg0: RendererEvents[U]) => void) => {
     this.emitter.removeListener(ev, fn);
     return this;
   };
 
+  /** Removes all listeners, or all listeners for a given event if specified. */
   removeAllListeners = <U extends keyof RendererEvents>(event?: U) => {
     this.emitter.removeAllListeners(event);
     return this;
   };
 
+  /** Tears down all listeners and detaches this client from its IPC channel. */
   destroy = () => {
     this.removeAllListeners();
     this.detachInitListener();

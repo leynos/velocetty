@@ -241,7 +241,12 @@ export const partitionChanges = (diagnostics: ConfigReloadDiagnostic[]) => {
     }
   }
 
-  return {liveChanges, restartChanges};
+  return {
+    /** Changes that can be applied without restarting the application. */
+    liveChanges,
+    /** Changes that require an application restart to take effect. */
+    restartChanges
+  };
 };
 
 /**

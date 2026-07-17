@@ -134,6 +134,10 @@ const SearchNavigation = ({
   </div>
 );
 
+/**
+ * Find-in-terminal bar: search input, case/whole-word/regex toggles, match
+ * count, and prev/next/close navigation, all driven by the connected props.
+ */
 const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const {
     caseSensitive,

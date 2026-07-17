@@ -25,6 +25,7 @@ const getPath = (platform: string) => {
   }
 };
 
+/** Returns file paths from the clipboard for drag-and-drop-style paste on macOS/Windows, else `null`. */
 export default function processClipboard() {
   return getPath(process.platform);
 }

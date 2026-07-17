@@ -63,6 +63,7 @@ const openNotepad = (file: string) =>
     });
   });
 
+/** Opens the config file in the user's default editor, falling back to notepad on Windows. */
 const openConfig = () => {
   // If the user has no default editor for .json5 files, fallback to notepad.
   if (process.platform === 'win32') {

@@ -9,6 +9,7 @@ import {version} from '../../package.json';
 
 const {arch, env, platform, versions} = process;
 
+/** Builds the Help menu template, including the pre-filled GitHub issue report link. */
 const helpMenu = (_commands: Record<string, string>, showAbout: () => void): MenuItemConstructorOptions => {
   const submenu: MenuItemConstructorOptions[] = [
     {
