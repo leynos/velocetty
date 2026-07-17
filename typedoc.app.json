@@ -1,0 +1,6 @@
+{
+  "extends": "./typedoc.base.json",
+  "tsconfig": "tsconfig.typecheck.json",
+  "entryPoints": ["app", "cli", "lib"],
+  "entryPointStrategy": "expand"
+}

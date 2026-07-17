@@ -1,0 +1,31 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "emit": "none",
+  "commentStyle": "jsdoc",
+  "excludeExternals": true,
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "exclude": ["**/*.d.ts", "**/node_modules/**", "**/dist/**", "**/test/**", "**/tests/**"],
+  "validation": {
+    "notDocumented": true,
+    "notExported": false,
+    "invalidLink": false,
+    "invalidPath": false,
+    "rewrittenLink": false,
+    "unusedMergeModuleWith": false
+  },
+  "requiredToBeDocumented": [
+    "Enum",
+    "EnumMember",
+    "Variable",
+    "Function",
+    "Class",
+    "Interface",
+    "Property",
+    "Method",
+    "Accessor",
+    "TypeAlias"
+  ],
+  "treatValidationWarningsAsErrors": true
+}

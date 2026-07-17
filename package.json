@@ -17,6 +17,7 @@
     "build:hyper-app": "bun ./build/esbuild/build.ts --mode=production --target=hyper-app",
     "lint": "bun node_modules/@biomejs/biome/bin/biome check . && bun run check:boundaries",
     "check:types": "bunx tsgo --project tsconfig.typecheck.json",
+    "docs:check": "typedoc --options typedoc.shared.json && typedoc --options typedoc.frontend.json && typedoc --options typedoc.backend.json && typedoc --options typedoc.app.json",
     "audit": "bun scripts/run-audit.mjs",
     "test": "bun run lint && bun run test:unit",
     "test:unit:run": "bun test --concurrent test/unit",
@@ -136,6 +137,7 @@
     "postcss": "^8.5.8",
     "prettier": "^3.2.5",
     "tailwindcss": "^4.2.2",
+    "typedoc": "^0.28.20",
     "typescript": "^5.4.5"
   },
   "overrides": {
