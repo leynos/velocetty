@@ -1,5 +1,8 @@
 # Velocetty
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](
+https://deepwiki.com/leynos/velocetty)
+
 A modern, extensible terminal built on open web standards.
 
 Velocetty is a fork of [Hyper][hyper] by Vercel, extending the original
