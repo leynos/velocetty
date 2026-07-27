@@ -14,8 +14,8 @@ The repository currently uses AVA for unit tests and a Bun bridge test to
 invoke the AVA suite. This layering adds runtime and tooling dependencies,
 slows the feedback loop, and complicates test configuration. The project goal
 is to reduce dev dependencies and speed up builds. Bun already ships with a
-built-in test runner, so a decision is required on whether to replace AVA with Bun
-`test`.[^bun-test]
+built-in test runner, so a decision is required on whether to replace AVA with
+Bun `test`.[^bun-test]
 
 ## Decision Drivers
 
@@ -58,16 +58,15 @@ compatibility, but not everything is implemented.[^bun-test]
 ### Option C: Hybrid model (AVA for legacy tests, Bun for new tests)
 
 This reduces immediate migration risk but preserves duplicate tooling. It also
-creates ambiguity about preferred test APIs and increases maintenance
-overhead.
+creates ambiguity about preferred test APIs and increases maintenance overhead.
 
-| Topic | AVA | Bun test |
-| --- | --- | --- |
-| Concurrency and isolation | Runs files in separate processes[^ava-docs] | Single-process runner[^bun-test] |
-| TypeScript and JSX | Supported (via tooling) | Supported out of the box[^bun-test] |
-| Snapshots | Supported | Supported[^bun-test] |
-| Coverage | External tooling | Built-in coverage reporting[^bun-coverage] |
-| Dependency footprint | AVA + tooling | Bun runtime only |
+| Topic                     | AVA                                         | Bun test                                   |
+| ------------------------- | ------------------------------------------- | ------------------------------------------ |
+| Concurrency and isolation | Runs files in separate processes[^ava-docs] | Single-process runner[^bun-test]           |
+| TypeScript and JSX        | Supported (via tooling)                     | Supported out of the box[^bun-test]        |
+| Snapshots                 | Supported                                   | Supported[^bun-test]                       |
+| Coverage                  | External tooling                            | Built-in coverage reporting[^bun-coverage] |
+| Dependency footprint      | AVA + tooling                               | Bun runtime only                           |
 
 _Table 1: Comparison of AVA and Bun test runner capabilities._
 

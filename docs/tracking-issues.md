@@ -30,11 +30,11 @@ Issue: [#23](https://github.com/leynos/velocetty/issues/23)
 ### BOUNDARY-001 summary
 
 - Extend `scripts/check-package-boundaries.mjs` to detect boundary violations in
-  CommonJS `require(...)` usage as well as ECMAScript modules (ESM)
-  `import`/`export` forms.
+  CommonJS `require(...)` usage as well as ECMAScript modules (ESM) `import`/
+  `export` forms.
 - Prefer Abstract Syntax Tree (AST)-based parsing over regex-only
-  matching so alias, relative, dynamic, and CommonJS import forms are
-  evaluated consistently.
+  matching so alias, relative, dynamic, and CommonJS import forms are evaluated
+  consistently.
 - Add targeted unit tests for the checker to prevent regressions in import
   detection logic.
 
@@ -96,7 +96,8 @@ Last updated: 2026-03-27
 
 ### CONFIG-002 summary
 
-- Implement workspace-level configuration overrides (e.g., `.velocetty/config.json5`
+- Implement workspace-level configuration overrides (e.g.,
+  `.velocetty/config.json5`
   in a project root).
 - Extend the layering system to support: defaults → user → workspace → runtime.
 - Define workspace discovery and resolution rules.
@@ -128,8 +129,8 @@ Issue: [#35](https://github.com/leynos/velocetty/issues/35)
 - Roadmap item `1.4.15` currently uses the blocker path for Windows aarch64
   because Bun does not publish a Windows arm64 runtime artefact.
 - Evidence captured on 2026-02-25 from the latest Bun release
-  (`bun-v1.3.9`, published 2026-02-08): assets include `bun-windows-x64*`
-  and no Windows arm64 asset.
+  (`bun-v1.3.9`, published 2026-02-08): assets include `bun-windows-x64*` and
+  no Windows arm64 asset.
 - Mitigation: keep Windows x64 CI as the required host-platform lane and
   re-evaluate Windows aarch64 lane enablement on each Bun release.
 

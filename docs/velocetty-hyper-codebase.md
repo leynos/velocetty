@@ -12,8 +12,8 @@
 
 - Cross-links: [Velocetty design](docs/velocetty-design.md), [Product
 
-  requirements](docs/velocetty-product-requirements-document.md), and [Testing
-  with Bun](docs/testing-with-bun.md).
+  requirements](docs/velocetty-product-requirements-document.md), and
+  [Testing with Bun](docs/testing-with-bun.md).
 
 ## 1. Introduction
 
@@ -23,20 +23,20 @@
 
 Velocetty is a fork of **Hyper** (version 4.0.0-canary.5), a terminal emulator
 originally built and maintained by Vercel (formerly ZEIT) and the open-source
-community. Licensed under the MIT License, Velocetty inherits Hyper's mission to
-create "a beautiful and extensible experience for command-line interface users,
-built on open web standards."
+community. Licensed under the MIT License, Velocetty inherits Hyper's mission
+to create "a beautiful and extensible experience for command-line interface
+users, built on open web standards."
 
 The project represents a strategic evolution of a mature, feature-rich terminal
 application that leverages web technologies to deliver a modern, customizable
 command-line experience across all major desktop platforms.
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Current Version** | 4.0.0-canary.5 |
-| **License** | MIT (Vercel, Inc., 2018) |
-| **Primary Language** | TypeScript |
-| **Platform Support** | macOS, Windows, Linux |
+| Attribute            | Value                    |
+| -------------------- | ------------------------ |
+| **Current Version**  | 4.0.0-canary.5           |
+| **License**          | MIT (Vercel, Inc., 2018) |
+| **Primary Language** | TypeScript               |
+| **Platform Support** | macOS, Windows, Linux    |
 
 #### 1.1.2 Core business problem
 
@@ -66,26 +66,26 @@ Velocetty addresses critical gaps in the terminal emulator market:
 
 #### 1.1.3 Key stakeholders and users
 
-| Stakeholder Category | Description | Primary Needs |
-| --------------------- | ------------- | --------------- |
-| **CLI Power Users** | Developers and system administrators who spend significant time in terminals | Speed, stability, customization, keyboard efficiency |
-| **Extension Developers** | Community members creating plugins and themes | Comprehensive APIs, documentation, stable extension points |
-| **Enterprise DevOps Teams** | Organizations standardizing development environments | Cross-platform consistency, configuration management, security |
-| **Design-Conscious Developers** | Users valuing aesthetics alongside functionality | Theming, visual customization, modern UI patterns |
+| Stakeholder Category            | Description                                                                  | Primary Needs                                                  |
+| ------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| **CLI Power Users**             | Developers and system administrators who spend significant time in terminals | Speed, stability, customization, keyboard efficiency           |
+| **Extension Developers**        | Community members creating plugins and themes                                | Comprehensive APIs, documentation, stable extension points     |
+| **Enterprise DevOps Teams**     | Organizations standardizing development environments                         | Cross-platform consistency, configuration management, security |
+| **Design-Conscious Developers** | Users valuing aesthetics alongside functionality                             | Theming, visual customization, modern UI patterns              |
 
 #### 1.1.4 Expected business impact and value proposition
 
 ##### Value Proposition Matrix
 
-| Dimension | Current State (Hyper) | Velocetty Enhancement |
-| ----------- | ---------------------- | ---------------------- |
-| **Performance** | WebGL rendering with 16-terminal limit | Intelligent WebGL allocation for visible panes |
-| **Configuration** | JSON format (v4) | JSON5 with comments and improved tooling |
-| **Architecture** | IPC-dependent Electron model | Cleaner frontend/backend separation |
-| **Tab UI** | Basic decoration hooks | Normalized, stable tab handle API |
-| **Plugin Security** | Full trust, in-process | Exploration of sandboxing options |
+| Dimension           | Current State (Hyper)                  | Velocetty Enhancement                          |
+| ------------------- | -------------------------------------- | ---------------------------------------------- |
+| **Performance**     | WebGL rendering with 16-terminal limit | Intelligent WebGL allocation for visible panes |
+| **Configuration**   | JSON format (v4)                       | JSON5 with comments and improved tooling       |
+| **Architecture**    | IPC-dependent Electron model           | Cleaner frontend/backend separation            |
+| **Tab UI**          | Basic decoration hooks                 | Normalized, stable tab handle API              |
+| **Plugin Security** | Full trust, in-process                 | Exploration of sandboxing options              |
 
----
+______________________________________________________________________
 
 ### 1.2 System overview
 
@@ -94,8 +94,9 @@ Velocetty addresses critical gaps in the terminal emulator market:
 ##### Business context and market positioning
 
 Velocetty operates in the terminal emulator segment, competing with native
-applications (iTerm2, Windows Terminal, GNOME Terminal) and web-technology-based
-alternatives (Hyper, Tabby, Warp). The project differentiates through:
+applications (iTerm2, Windows Terminal, GNOME Terminal) and
+web-technology-based alternatives (Hyper, Tabby, Warp). The project
+differentiates through:
 
 - **Web Standards Foundation**: Rendering via Chromium enables rich UI
 
@@ -150,12 +151,12 @@ flowchart TB
 
 Velocetty integrates with development environments through:
 
-| Integration Point | Mechanism | Evidence |
-| ------------------ | ----------- | ---------- |
-| Shell Environments | PTY session spawning via node-pty | `app/session.ts` |
-| SSH Connections | Default client for `ssh://` protocol handler | `app/index.ts` |
-| Configuration | JSON file with XDG compliance | `app/config/paths.ts` |
-| Plugin Ecosystem | NPM-based plugin distribution | `cli/` tooling |
+| Integration Point  | Mechanism                                    | Evidence              |
+| ------------------ | -------------------------------------------- | --------------------- |
+| Shell Environments | PTY session spawning via node-pty            | `app/session.ts`      |
+| SSH Connections    | Default client for `ssh://` protocol handler | `app/index.ts`        |
+| Configuration      | JSON file with XDG compliance                | `app/config/paths.ts` |
+| Plugin Ecosystem   | NPM-based plugin distribution                | `cli/` tooling        |
 
 #### 1.2.2 High-level description
 
@@ -225,33 +226,33 @@ flowchart LR
 
 ###### Component Inventory
 
-| Component | Location | Responsibility |
-| ----------- | ---------- | ---------------- |
-| Main Process Entry | `app/index.ts` | Electron initialization, window management, auto-updates |
-| Configuration System | `app/config/` | JSON config loading, validation, migration, defaults |
-| Plugin Manager | `app/plugins.ts`, `lib/utils/plugins.ts` | Extension loading, decoration, lifecycle hooks |
-| Session Manager | `app/session.ts` | PTY creation, data batching, session lifecycle |
-| RPC Bridge | `app/rpc.ts`, `lib/utils/rpc.ts` | IPC abstraction between processes |
-| UI Components | `lib/components/` | React terminal UI (Header, Tabs, Term, SplitPane) |
-| State Management | `lib/reducers/`, `lib/actions/` | Redux store with UI, sessions, term-groups slices |
-| CLI Tool | `cli/` | Plugin installation, configuration, app launching |
-| Menu System | `app/menus/` | Application menus with platform-specific variants |
-| Keymaps | `app/keymaps/` | Platform-specific keyboard shortcut definitions |
+| Component            | Location                                 | Responsibility                                           |
+| -------------------- | ---------------------------------------- | -------------------------------------------------------- |
+| Main Process Entry   | `app/index.ts`                           | Electron initialization, window management, auto-updates |
+| Configuration System | `app/config/`                            | JSON config loading, validation, migration, defaults     |
+| Plugin Manager       | `app/plugins.ts`, `lib/utils/plugins.ts` | Extension loading, decoration, lifecycle hooks           |
+| Session Manager      | `app/session.ts`                         | PTY creation, data batching, session lifecycle           |
+| RPC Bridge           | `app/rpc.ts`, `lib/utils/rpc.ts`         | IPC abstraction between processes                        |
+| UI Components        | `lib/components/`                        | React terminal UI (Header, Tabs, Term, SplitPane)        |
+| State Management     | `lib/reducers/`, `lib/actions/`          | Redux store with UI, sessions, term-groups slices        |
+| CLI Tool             | `cli/`                                   | Plugin installation, configuration, app launching        |
+| Menu System          | `app/menus/`                             | Application menus with platform-specific variants        |
+| Keymaps              | `app/keymaps/`                           | Platform-specific keyboard shortcut definitions          |
 
 ##### Core technical approach
 
 ###### Technology Stack
 
-| Layer | Technology | Version | Purpose |
-| ------- | ------------ | --------- | --------- |
-| Runtime Shell | Electron | 40.2.1 | Desktop application framework |
-| Main Process | Node.js/TypeScript | 5.4.5 | OS integration, PTY management |
-| Renderer Framework | React | 19.2.4 | UI component architecture |
-| State Management | Redux | 5.0.1 | Centralized state with middleware |
-| Terminal Core | xterm.js | 5.3.0 | Terminal emulation and rendering |
-| GPU Rendering | xterm-addon-webgl | 0.16.0 | Hardware-accelerated display |
-| Build System | esbuild | 0.25.12 | Module bundling and optimization |
-| Packaging | electron-builder | 24.13.3 | Cross-platform distribution |
+| Layer              | Technology         | Version | Purpose                           |
+| ------------------ | ------------------ | ------- | --------------------------------- |
+| Runtime Shell      | Electron           | 40.2.1  | Desktop application framework     |
+| Main Process       | Node.js/TypeScript | 5.4.5   | OS integration, PTY management    |
+| Renderer Framework | React              | 19.2.4  | UI component architecture         |
+| State Management   | Redux              | 5.0.1   | Centralized state with middleware |
+| Terminal Core      | xterm.js           | 5.3.0   | Terminal emulation and rendering  |
+| GPU Rendering      | xterm-addon-webgl  | 0.16.0  | Hardware-accelerated display      |
+| Build System       | esbuild            | 0.25.12 | Module bundling and optimization  |
+| Packaging          | electron-builder   | 24.13.3 | Cross-platform distribution       |
 
 ###### Architectural Patterns
 
@@ -268,8 +269,8 @@ flowchart LR
 
 3. **Write-Middleware Bypass**: Performance-critical `SESSION_PTY_DATA` actions
 
-   bypass Redux middleware entirely to minimize latency for high-volume terminal
-   output.
+   bypass Redux middleware entirely to minimize latency for high-volume
+   terminal output.
 
 4. **Lazy PTY Creation**: First PTY session is created as early as possible
 
@@ -279,13 +280,13 @@ flowchart LR
 
 ##### Measurable objectives
 
-| Objective | Metric | Target |
-| ----------- | -------- | -------- |
-| Application Startup | Cold start time | < 2 seconds |
-| Terminal Responsiveness | Keystroke-to-echo latency | < 50ms |
-| Memory Efficiency | Idle memory consumption | < 300 MB |
-| Rendering Performance | Frame rate during scrolling | 60 fps (WebGL) |
-| Plugin Load Time | Extension initialization | < 500ms total |
+| Objective               | Metric                      | Target         |
+| ----------------------- | --------------------------- | -------------- |
+| Application Startup     | Cold start time             | < 2 seconds    |
+| Terminal Responsiveness | Keystroke-to-echo latency   | < 50ms         |
+| Memory Efficiency       | Idle memory consumption     | < 300 MB       |
+| Rendering Performance   | Frame rate during scrolling | 60 fps (WebGL) |
+| Plugin Load Time        | Extension initialization    | < 500ms total  |
 
 ##### Critical success factors
 
@@ -309,15 +310,15 @@ flowchart LR
 
 ##### Key performance indicators (KPIs)
 
-| KPI Category | Indicator | Measurement Method |
-| -------------- | ----------- | ------------------- |
-| **Reliability** | Crash-free session rate | Telemetry/crash reports |
-| **Performance** | P95 render frame time | Internal instrumentation |
-| **Adoption** | Active installations | Update check analytics |
-| **Ecosystem** | Published extensions | Plugin registry count |
-| **Quality** | Open bug count | GitHub issue tracking |
+| KPI Category    | Indicator               | Measurement Method       |
+| --------------- | ----------------------- | ------------------------ |
+| **Reliability** | Crash-free session rate | Telemetry/crash reports  |
+| **Performance** | P95 render frame time   | Internal instrumentation |
+| **Adoption**    | Active installations    | Update check analytics   |
+| **Ecosystem**   | Published extensions    | Plugin registry count    |
+| **Quality**     | Open bug count          | GitHub issue tracking    |
 
----
+______________________________________________________________________
 
 ### 1.3 Scope
 
@@ -327,15 +328,15 @@ flowchart LR
 
 ###### Must-Have Capabilities
 
-| Category | Feature | Implementation Evidence |
-| ---------- | --------- | ------------------------ |
-| **Terminal Emulation** | Full PTY session management | `app/session.ts` - node-pty integration |
-| **Rendering** | WebGL/Canvas/DOM rendering pipeline | xterm-addon-webgl, xterm-addon-canvas |
-| **Multi-Session** | Tabs, windows, and split panes | `lib/components/tabs.tsx`, `lib/components/split-pane.tsx` |
-| **Search** | In-terminal search with regex support | xterm-addon-search integration |
-| **Configuration** | JSON-based settings with profiles | `app/config/`, `typings/config.d.ts` |
-| **Extensions** | Full plugin lifecycle management | `app/plugins.ts`, `lib/utils/plugins.ts` |
-| **Updates** | Auto-update with stable/canary channels | `app/auto-updater.ts` |
+| Category               | Feature                                 | Implementation Evidence                                    |
+| ---------------------- | --------------------------------------- | ---------------------------------------------------------- |
+| **Terminal Emulation** | Full PTY session management             | `app/session.ts` - node-pty integration                    |
+| **Rendering**          | WebGL/Canvas/DOM rendering pipeline     | xterm-addon-webgl, xterm-addon-canvas                      |
+| **Multi-Session**      | Tabs, windows, and split panes          | `lib/components/tabs.tsx`, `lib/components/split-pane.tsx` |
+| **Search**             | In-terminal search with regex support   | xterm-addon-search integration                             |
+| **Configuration**      | JSON-based settings with profiles       | `app/config/`, `typings/config.d.ts`                       |
+| **Extensions**         | Full plugin lifecycle management        | `app/plugins.ts`, `lib/utils/plugins.ts`                   |
+| **Updates**            | Auto-update with stable/canary channels | `app/auto-updater.ts`                                      |
 
 ###### Primary User Workflows
 
@@ -362,12 +363,12 @@ flowchart LR
 
 ###### Essential Integrations
 
-| Integration | Type | Scope |
-| ------------- | ------ | ------- |
-| SSH Protocol Handler | System | Default client for `ssh://` URLs |
-| Shell Detection | Runtime | Auto-detect user's default shell |
+| Integration           | Type          | Scope                             |
+| --------------------- | ------------- | --------------------------------- |
+| SSH Protocol Handler  | System        | Default client for `ssh://` URLs  |
+| Shell Detection       | Runtime       | Auto-detect user's default shell  |
 | Environment Variables | Configuration | Pass custom env to shell sessions |
-| Working Directory | Session | Preserve CWD for new tabs/splits |
+| Working Directory     | Session       | Preserve CWD for new tabs/splits  |
 
 ###### Key Technical Requirements
 
@@ -421,13 +422,13 @@ flowchart TB
 
 ###### User Groups Covered
 
-| User Group | Support Level | Notes |
-| ------------ | -------------- | ------- |
-| Individual Developers | Full | Primary target audience |
-| Development Teams | Full | Shared configuration support |
-| System Administrators | Full | SSH and remote access workflows |
-| Extension Developers | Full | Comprehensive API documentation |
-| Enterprise IT | Partial | Basic deployment, no central management |
+| User Group            | Support Level | Notes                                   |
+| --------------------- | ------------- | --------------------------------------- |
+| Individual Developers | Full          | Primary target audience                 |
+| Development Teams     | Full          | Shared configuration support            |
+| System Administrators | Full          | SSH and remote access workflows         |
+| Extension Developers  | Full          | Comprehensive API documentation         |
+| Enterprise IT         | Partial       | Basic deployment, no central management |
 
 ###### Geographic/Market Coverage
 
@@ -441,27 +442,27 @@ flowchart TB
 
 ###### Data Domains Included
 
-| Data Domain | Scope | Storage Location |
-| ------------- | ------- | ----------------- |
-| Configuration | User preferences, profiles | `~/.config/Hyper/hyper.json` |
-| Plugins | Installed extensions | `~/.config/Hyper/plugins/` |
-| Session State | Window/tab layout | In-memory (per session) |
-| Terminal History | Scrollback buffer | In-memory (configurable limit) |
+| Data Domain      | Scope                      | Storage Location               |
+| ---------------- | -------------------------- | ------------------------------ |
+| Configuration    | User preferences, profiles | `~/.config/Hyper/hyper.json`   |
+| Plugins          | Installed extensions       | `~/.config/Hyper/plugins/`     |
+| Session State    | Window/tab layout          | In-memory (per session)        |
+| Terminal History | Scrollback buffer          | In-memory (configurable limit) |
 
 #### 1.3.2 Out-of-scope
 
 ##### Explicitly excluded features
 
-| Feature | Rationale | Future Consideration |
-| --------- | ----------- | --------------------- |
-| **Remote Frontend Architecture** | Requires significant architectural changes to IPC model | Planned for Velocetty roadmap |
-| **Protobuf/WebSocket Communications** | Dependent on remote frontend work | Post-MVP consideration |
-| **Tauri Migration** | Major platform shift requiring ecosystem adaptation | Under evaluation |
-| **Plugin Sandboxing** | Conflicts with current full-trust execution model | Design challenge to address |
-| **Mobile Applications** | Electron-based architecture not suitable for mobile | Not planned |
-| **Cloud Configuration Sync** | Requires backend infrastructure | Out of initial scope |
-| **Integrated SSH Key Management** | Security complexity, existing tools sufficient | Not planned |
-| **Built-in Multiplexer (tmux-like)** | Scope creep, users have existing solutions | Not planned |
+| Feature                               | Rationale                                               | Future Consideration          |
+| ------------------------------------- | ------------------------------------------------------- | ----------------------------- |
+| **Remote Frontend Architecture**      | Requires significant architectural changes to IPC model | Planned for Velocetty roadmap |
+| **Protobuf/WebSocket Communications** | Dependent on remote frontend work                       | Post-MVP consideration        |
+| **Tauri Migration**                   | Major platform shift requiring ecosystem adaptation     | Under evaluation              |
+| **Plugin Sandboxing**                 | Conflicts with current full-trust execution model       | Design challenge to address   |
+| **Mobile Applications**               | Electron-based architecture not suitable for mobile     | Not planned                   |
+| **Cloud Configuration Sync**          | Requires backend infrastructure                         | Out of initial scope          |
+| **Integrated SSH Key Management**     | Security complexity, existing tools sufficient          | Not planned                   |
+| **Built-in Multiplexer (tmux-like)**  | Scope creep, users have existing solutions              | Not planned                   |
 
 ##### Future phase considerations
 
@@ -501,12 +502,12 @@ flowchart TB
 
 ##### Integration points not covered
 
-| Integration | Status | Alternative |
-| ------------- | -------- | ------------- |
-| IDE Integration APIs | Out of scope | Plugins can provide basic integration |
-| CI/CD Pipeline Integration | Out of scope | Standard terminal access |
-| Container Runtime Integration | Out of scope | Users manage via shell |
-| Centralized Enterprise Deployment | Out of scope | Manual installation/configuration |
+| Integration                       | Status       | Alternative                           |
+| --------------------------------- | ------------ | ------------------------------------- |
+| IDE Integration APIs              | Out of scope | Plugins can provide basic integration |
+| CI/CD Pipeline Integration        | Out of scope | Standard terminal access              |
+| Container Runtime Integration     | Out of scope | Users manage via shell                |
+| Centralized Enterprise Deployment | Out of scope | Manual installation/configuration     |
 
 ##### Unsupported use cases
 
@@ -530,81 +531,81 @@ flowchart TB
 
    (`screenReaderMode` config), full WCAG compliance is not guaranteed.
 
----
+______________________________________________________________________
 
 ### 1.4 Document conventions
 
 #### 1.4.1 Terminology
 
-| Term | Definition |
-| ------ | ------------ |
-| **PTY** | Pseudo-terminal; OS facility enabling terminal emulation |
-| **Main Process** | Electron's Node.js-based process handling OS integration |
-| **Renderer Process** | Chromium-based process rendering the UI per window |
-| **IPC** | Inter-Process Communication between main and renderer |
-| **Extension/Plugin** | Third-party module extending Velocetty functionality |
-| **Profile** | Named configuration preset for shell and terminal settings |
-| **Term Group** | Logical grouping of split terminal panes within a tab |
+| Term                 | Definition                                                 |
+| -------------------- | ---------------------------------------------------------- |
+| **PTY**              | Pseudo-terminal; OS facility enabling terminal emulation   |
+| **Main Process**     | Electron's Node.js-based process handling OS integration   |
+| **Renderer Process** | Chromium-based process rendering the UI per window         |
+| **IPC**              | Inter-Process Communication between main and renderer      |
+| **Extension/Plugin** | Third-party module extending Velocetty functionality       |
+| **Profile**          | Named configuration preset for shell and terminal settings |
+| **Term Group**       | Logical grouping of split terminal panes within a tab      |
 
 #### 1.4.2 Version information
 
-| Component | Version | Notes |
-| ----------- | --------- | ------- |
+| Component        | Version        | Notes                |
+| ---------------- | -------------- | -------------------- |
 | Velocetty (base) | 4.0.0-canary.5 | Fork of Hyper canary |
-| Electron | 40.2.1 | Runtime framework |
-| xterm.js | 5.3.0 | Terminal emulation |
-| React | 19.2.4 | UI framework |
-| TypeScript | 5.4.5 | Development language |
+| Electron         | 40.2.1         | Runtime framework    |
+| xterm.js         | 5.3.0          | Terminal emulation   |
+| React            | 19.2.4         | UI framework         |
+| TypeScript       | 5.4.5          | Development language |
 
----
+______________________________________________________________________
 
 ### 1.5 References
 
 #### 1.5.1 Repository files examined
 
-| File Path | Relevance |
-| ----------- | ----------- |
-| `README.md` | Project overview, installation, contribution guidelines |
-| `package.json` | Dependencies, scripts, project metadata |
-| `PLUGINS.md` | Plugin development workflow and API documentation |
-| `app/index.ts` | Main process entry point and window management |
-| `app/session.ts` | PTY session implementation with data batching |
-| `app/plugins.ts` | Main process plugin loading and management |
-| `app/config/config-default.json` | Default configuration values |
-| `app/config/paths.ts` | Configuration file path resolution |
-| `typings/config.d.ts` | Configuration schema TypeScript definitions |
-| `electron-builder.json` | Cross-platform packaging configuration |
-| `lib/utils/plugins.ts` | Renderer process plugin utilities |
-| `lib/components/` | React UI component implementations |
-| `lib/reducers/` | Redux state management |
+| File Path                        | Relevance                                               |
+| -------------------------------- | ------------------------------------------------------- |
+| `README.md`                      | Project overview, installation, contribution guidelines |
+| `package.json`                   | Dependencies, scripts, project metadata                 |
+| `PLUGINS.md`                     | Plugin development workflow and API documentation       |
+| `app/index.ts`                   | Main process entry point and window management          |
+| `app/session.ts`                 | PTY session implementation with data batching           |
+| `app/plugins.ts`                 | Main process plugin loading and management              |
+| `app/config/config-default.json` | Default configuration values                            |
+| `app/config/paths.ts`            | Configuration file path resolution                      |
+| `typings/config.d.ts`            | Configuration schema TypeScript definitions             |
+| `electron-builder.json`          | Cross-platform packaging configuration                  |
+| `lib/utils/plugins.ts`           | Renderer process plugin utilities                       |
+| `lib/components/`                | React UI component implementations                      |
+| `lib/reducers/`                  | Redux state management                                  |
 
 #### 1.5.2 Repository folders explored
 
-| Folder Path | Contents |
-| ------------- | ---------- |
-| `app/` | Main process implementation |
-| `app/config/` | Configuration subsystem (defaults, paths, migration) |
-| `app/plugins/` | Extension hooks and installer |
-| `app/menus/` | Application menu definitions |
-| `app/keymaps/` | Platform-specific keyboard shortcuts |
-| `lib/` | Renderer process implementation |
-| `lib/components/` | React UI components |
-| `lib/reducers/` | Redux reducers |
-| `lib/actions/` | Redux action creators |
-| `lib/store/` | Redux store configuration |
-| `lib/utils/` | Renderer utilities |
-| `cli/` | CLI tool implementation |
-| `typings/` | TypeScript type definitions |
-| `test/` | Testing infrastructure |
+| Folder Path       | Contents                                             |
+| ----------------- | ---------------------------------------------------- |
+| `app/`            | Main process implementation                          |
+| `app/config/`     | Configuration subsystem (defaults, paths, migration) |
+| `app/plugins/`    | Extension hooks and installer                        |
+| `app/menus/`      | Application menu definitions                         |
+| `app/keymaps/`    | Platform-specific keyboard shortcuts                 |
+| `lib/`            | Renderer process implementation                      |
+| `lib/components/` | React UI components                                  |
+| `lib/reducers/`   | Redux reducers                                       |
+| `lib/actions/`    | Redux action creators                                |
+| `lib/store/`      | Redux store configuration                            |
+| `lib/utils/`      | Renderer utilities                                   |
+| `cli/`            | CLI tool implementation                              |
+| `typings/`        | TypeScript type definitions                          |
+| `test/`           | Testing infrastructure                               |
 
 #### 1.5.3 External references
 
-| Source | Topic | Date |
-| -------- | ------- | ------ |
-| [npm: xterm-addon-webgl](https://www.npmjs.com/package/xterm-addon-webgl)[^ext-xterm-addon-webgl] | WebGL addon deprecation notice, recommending @xterm/* scoped packages | 2025 |
-| [DoltHub blog](https://www.dolthub.com/blog/)[^ext-dolthub] | Electron vs Tauri architectural comparison | November 2025 |
-| [RaftLabs](https://www.raftlabs.com/)[^ext-raftlabs] | Tauri 2.0 adoption metrics (35% YoY growth) and performance benchmarks | September 2025 |
-| [GitHub: xterm.js](https://github.com/xtermjs/xterm.js)[^ext-xtermjs] | WebGL renderer limitations and texture atlas management | Various |
+| Source                                                                                            | Topic                                                                  | Date           |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | -------------- |
+| [npm: xterm-addon-webgl](https://www.npmjs.com/package/xterm-addon-webgl)[^ext-xterm-addon-webgl] | WebGL addon deprecation notice, recommending @xterm/* scoped packages  | 2025           |
+| [DoltHub blog](https://www.dolthub.com/blog/)[^ext-dolthub]                                       | Electron vs Tauri architectural comparison                             | November 2025  |
+| [RaftLabs](https://www.raftlabs.com/)[^ext-raftlabs]                                              | Tauri 2.0 adoption metrics (35% YoY growth) and performance benchmarks | September 2025 |
+| [GitHub: xterm.js](https://github.com/xtermjs/xterm.js)[^ext-xtermjs]                             | WebGL renderer limitations and texture atlas management                | Various        |
 
 [^ext-xterm-addon-webgl]: <https://www.npmjs.com/package/xterm-addon-webgl>
 [^ext-dolthub]: <https://www.dolthub.com/blog/>
@@ -615,369 +616,370 @@ flowchart TB
 
 ### 2.1 Feature catalogue
 
-This section provides a comprehensive catalogue of Velocetty's discrete, testable
-features. Each feature is documented with metadata, descriptions, dependencies,
-and implementation context derived from the inherited Hyper codebase.
+This section provides a comprehensive catalogue of Velocetty's discrete,
+testable features. Each feature is documented with metadata, descriptions,
+dependencies, and implementation context derived from the inherited Hyper
+codebase.
 
 #### 2.1.1 Terminal emulation core
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Feature ID** | F-001 |
-| **Feature Name** | Terminal Emulation Core |
-| **Category** | Core Functionality |
-| **Priority Level** | Critical |
-| **Status** | Completed |
+| Attribute          | Value                   |
+| ------------------ | ----------------------- |
+| **Feature ID**     | F-001                   |
+| **Feature Name**   | Terminal Emulation Core |
+| **Category**       | Core Functionality      |
+| **Priority Level** | Critical                |
+| **Status**         | Completed               |
 
 ##### Description
 
-| Aspect | Details |
-| -------- | --------- |
-| **Overview** | Full-featured terminal emulation powered by PTY (pseudo-terminal) sessions via node-pty and rendered through xterm.js with WebGL/Canvas acceleration |
-| **Business Value** | Provides the foundational terminal capability that all other features depend upon, enabling command-line workflows across all supported platforms |
-| **User Benefits** | Fast, responsive terminal experience with hardware-accelerated rendering, configurable fonts, colours, and cursor styles |
+| Aspect                | Details                                                                                                                                                                                       |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Overview**          | Full-featured terminal emulation powered by PTY (pseudo-terminal) sessions via node-pty and rendered through xterm.js with WebGL/Canvas acceleration                                          |
+| **Business Value**    | Provides the foundational terminal capability that all other features depend upon, enabling command-line workflows across all supported platforms                                             |
+| **User Benefits**     | Fast, responsive terminal experience with hardware-accelerated rendering, configurable fonts, colours, and cursor styles                                                                      |
 | **Technical Context** | Implements PTY management in `app/session.ts` with intelligent data batching (16ms time-based, 200KB size-based thresholds) to optimize IPC communication between main and renderer processes |
 
 ##### Dependencies
 
-| Dependency Type | Details |
-| ----------------- | --------- |
-| **Prerequisite Features** | None (foundational feature) |
-| **System Dependencies** | node-pty native module, operating system PTY support |
-| **External Dependencies** | xterm.js 5.3.0, xterm-addon-webgl 0.16.0, xterm-addon-canvas 0.5.0 |
-| **Integration Requirements** | Electron IPC bridge (`app/rpc.ts`), Redux store for session state |
+| Dependency Type              | Details                                                            |
+| ---------------------------- | ------------------------------------------------------------------ |
+| **Prerequisite Features**    | None (foundational feature)                                        |
+| **System Dependencies**      | node-pty native module, operating system PTY support               |
+| **External Dependencies**    | xterm.js 5.3.0, xterm-addon-webgl 0.16.0, xterm-addon-canvas 0.5.0 |
+| **Integration Requirements** | Electron IPC bridge (`app/rpc.ts`), Redux store for session state  |
 
----
+______________________________________________________________________
 
 #### 2.1.2 Multi-session architecture
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Feature ID** | F-002 |
-| **Feature Name** | Multi-Session Architecture |
-| **Category** | Core Functionality |
-| **Priority Level** | Critical |
-| **Status** | Completed |
+| Attribute          | Value                      |
+| ------------------ | -------------------------- |
+| **Feature ID**     | F-002                      |
+| **Feature Name**   | Multi-Session Architecture |
+| **Category**       | Core Functionality         |
+| **Priority Level** | Critical                   |
+| **Status**         | Completed                  |
 
 ##### Description (2.1.2 Multi-session architecture)
 
-| Aspect | Details |
-| -------- | --------- |
-| **Overview** | Support for multiple windows, tabs within windows, and horizontal/vertical split panes within tabs |
-| **Business Value** | Enables power users to manage multiple concurrent terminal sessions efficiently, supporting complex development workflows |
-| **User Benefits** | Organize work across windows/tabs, view multiple terminals side-by-side, quickly navigate between sessions |
+| Aspect                | Details                                                                                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Overview**          | Support for multiple windows, tabs within windows, and horizontal/vertical split panes within tabs                                                 |
+| **Business Value**    | Enables power users to manage multiple concurrent terminal sessions efficiently, supporting complex development workflows                          |
+| **User Benefits**     | Organize work across windows/tabs, view multiple terminals side-by-side, quickly navigate between sessions                                         |
 | **Technical Context** | Term groups organized as tree structure in `lib/reducers/term-groups.ts` with parent/child relationships; split pane minimum size constraint of 5% |
 
 ##### Dependencies (2.1.2 Multi-session architecture)
 
-| Dependency Type | Details |
-| ----------------- | --------- |
-| **Prerequisite Features** | F-001 (Terminal Emulation Core) |
-| **System Dependencies** | Electron BrowserWindow management |
-| **External Dependencies** | electron-store for window state persistence |
+| Dependency Type              | Details                                              |
+| ---------------------------- | ---------------------------------------------------- |
+| **Prerequisite Features**    | F-001 (Terminal Emulation Core)                      |
+| **System Dependencies**      | Electron BrowserWindow management                    |
+| **External Dependencies**    | electron-store for window state persistence          |
 | **Integration Requirements** | Redux state slices for sessions, term-groups, and UI |
 
----
+______________________________________________________________________
 
 #### 2.1.3 In-terminal search
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Feature ID** | F-003 |
-| **Feature Name** | In-Terminal Search |
-| **Category** | User Productivity |
-| **Priority Level** | High |
-| **Status** | Completed |
+| Attribute          | Value              |
+| ------------------ | ------------------ |
+| **Feature ID**     | F-003              |
+| **Feature Name**   | In-Terminal Search |
+| **Category**       | User Productivity  |
+| **Priority Level** | High               |
+| **Status**         | Completed          |
 
 ##### Description (2.1.3 In-terminal search)
 
-| Aspect | Details |
-| -------- | --------- |
-| **Overview** | Search functionality within terminal scrollback buffer with support for case sensitivity, whole word matching, and regular expressions |
-| **Business Value** | Improves developer productivity by enabling quick location of command output, error messages, and log entries |
-| **User Benefits** | Find text in terminal history, navigate search results, filter with regex patterns |
-| **Technical Context** | Implemented via `xterm-addon-search` 0.13.0 with overlay component in `lib/components/searchBox.tsx` |
+| Aspect                | Details                                                                                                                                |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Overview**          | Search functionality within terminal scrollback buffer with support for case sensitivity, whole word matching, and regular expressions |
+| **Business Value**    | Improves developer productivity by enabling quick location of command output, error messages, and log entries                          |
+| **User Benefits**     | Find text in terminal history, navigate search results, filter with regex patterns                                                     |
+| **Technical Context** | Implemented via `xterm-addon-search` 0.13.0 with overlay component in `lib/components/searchBox.tsx`                                   |
 
 ##### Dependencies (2.1.3 In-terminal search)
 
-| Dependency Type | Details |
-| ----------------- | --------- |
-| **Prerequisite Features** | F-001 (Terminal Emulation Core) |
-| **System Dependencies** | None |
-| **External Dependencies** | xterm-addon-search 0.13.0 |
+| Dependency Type              | Details                                                                |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| **Prerequisite Features**    | F-001 (Terminal Emulation Core)                                        |
+| **System Dependencies**      | None                                                                   |
+| **External Dependencies**    | xterm-addon-search 0.13.0                                              |
 | **Integration Requirements** | Redux actions in `lib/actions/sessions.ts` for search state management |
 
----
+______________________________________________________________________
 
 #### 2.1.4 Configuration system
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Feature ID** | F-004 |
-| **Feature Name** | Configuration System |
-| **Category** | System Management |
-| **Priority Level** | Critical |
-| **Status** | Completed |
+| Attribute          | Value                |
+| ------------------ | -------------------- |
+| **Feature ID**     | F-004                |
+| **Feature Name**   | Configuration System |
+| **Category**       | System Management    |
+| **Priority Level** | Critical             |
+| **Status**         | Completed            |
 
 ##### Description (2.1.4 Configuration system)
 
-| Aspect | Details |
-| -------- | --------- |
-| **Overview** | JSON-based configuration with schema validation, profile support, hot-reload capability, and XDG-compliant file paths |
-| **Business Value** | Enables customization and personalization while supporting programmatic configuration management and future preferences UI |
-| **User Benefits** | Customize appearance, behaviour, and shell settings; create multiple profiles for different workflows |
+| Aspect                | Details                                                                                                                             |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Overview**          | JSON-based configuration with schema validation, profile support, hot-reload capability, and XDG-compliant file paths               |
+| **Business Value**    | Enables customization and personalization while supporting programmatic configuration management and future preferences UI          |
+| **User Benefits**     | Customize appearance, behaviour, and shell settings; create multiple profiles for different workflows                               |
 | **Technical Context** | Configuration subsystem in `app/config/` with schema validation via `app/config/schema.json`, hot-reload via chokidar file watching |
 
 ##### Dependencies (2.1.4 Configuration system)
 
-| Dependency Type | Details |
-| ----------------- | --------- |
-| **Prerequisite Features** | None (foundational feature) |
-| **System Dependencies** | File system access, XDG directory resolution |
-| **External Dependencies** | chokidar for file watching, electron-store for persistence |
+| Dependency Type              | Details                                                        |
+| ---------------------------- | -------------------------------------------------------------- |
+| **Prerequisite Features**    | None (foundational feature)                                    |
+| **System Dependencies**      | File system access, XDG directory resolution                   |
+| **External Dependencies**    | chokidar for file watching, electron-store for persistence     |
 | **Integration Requirements** | IPC bridge for renderer config access, plugin decoration hooks |
 
----
+______________________________________________________________________
 
 #### 2.1.5 Plugin/extension system
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Feature ID** | F-005 |
-| **Feature Name** | Plugin/Extension System |
-| **Category** | Extensibility |
-| **Priority Level** | Critical |
-| **Status** | Completed |
+| Attribute          | Value                   |
+| ------------------ | ----------------------- |
+| **Feature ID**     | F-005                   |
+| **Feature Name**   | Plugin/Extension System |
+| **Category**       | Extensibility           |
+| **Priority Level** | Critical                |
+| **Status**         | Completed               |
 
 ##### Description (2.1.5 Plugin/extension system)
 
-| Aspect | Details |
-| -------- | --------- |
-| **Overview** | Comprehensive extension system with 40+ hooks spanning lifecycle, UI decoration, state management, and configuration |
-| **Business Value** | Enables community-driven innovation and deep customization, differentiating Velocetty from traditional terminal emulators |
-| **User Benefits** | Install themes, add features, customize UI, integrate with external tools |
+| Aspect                | Details                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Overview**          | Comprehensive extension system with 40+ hooks spanning lifecycle, UI decoration, state management, and configuration                              |
+| **Business Value**    | Enables community-driven innovation and deep customization, differentiating Velocetty from traditional terminal emulators                         |
+| **User Benefits**     | Install themes, add features, customize UI, integrate with external tools                                                                         |
 | **Technical Context** | Extension hooks defined in `app/plugins/extensions.ts`; plugins are universal Node.js modules loaded by both Electron main and renderer processes |
 
 ##### Dependencies (2.1.5 Plugin/extension system)
 
-| Dependency Type | Details |
-| ----------------- | --------- |
-| **Prerequisite Features** | F-004 (Configuration System) |
-| **System Dependencies** | Node.js module resolution, npm/bun package management, bundled Bun binary in `resources/bin` |
-| **External Dependencies** | npm registry for plugin distribution |
-| **Integration Requirements** | React component decoration, Redux middleware/reducer integration |
+| Dependency Type              | Details                                                                                      |
+| ---------------------------- | -------------------------------------------------------------------------------------------- |
+| **Prerequisite Features**    | F-004 (Configuration System)                                                                 |
+| **System Dependencies**      | Node.js module resolution, npm/bun package management, bundled Bun binary in `resources/bin` |
+| **External Dependencies**    | npm registry for plugin distribution                                                         |
+| **Integration Requirements** | React component decoration, Redux middleware/reducer integration                             |
 
----
+______________________________________________________________________
 
 #### 2.1.6 Keyboard shortcuts system
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Feature ID** | F-006 |
-| **Feature Name** | Keyboard Shortcuts System |
-| **Category** | User Productivity |
-| **Priority Level** | High |
-| **Status** | Completed |
+| Attribute          | Value                     |
+| ------------------ | ------------------------- |
+| **Feature ID**     | F-006                     |
+| **Feature Name**   | Keyboard Shortcuts System |
+| **Category**       | User Productivity         |
+| **Priority Level** | High                      |
+| **Status**         | Completed                 |
 
 ##### Description (2.1.6 Keyboard shortcuts system)
 
-| Aspect | Details |
-| -------- | --------- |
-| **Overview** | Platform-specific keyboard shortcut definitions with command registry for consistent action dispatch |
-| **Business Value** | Provides keyboard-driven efficiency expected by power users and ensures platform-appropriate modifier keys |
-| **User Benefits** | Efficient navigation, session management, and editing without mouse interaction |
+| Aspect                | Details                                                                                                                 |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Overview**          | Platform-specific keyboard shortcut definitions with command registry for consistent action dispatch                    |
+| **Business Value**    | Provides keyboard-driven efficiency expected by power users and ensures platform-appropriate modifier keys              |
+| **User Benefits**     | Efficient navigation, session management, and editing without mouse interaction                                         |
 | **Technical Context** | Platform keymaps in `app/keymaps/` (darwin.json, linux.json, win32.json); command registry in `lib/command-registry.ts` |
 
 ##### Dependencies (2.1.6 Keyboard shortcuts system)
 
-| Dependency Type | Details |
-| ----------------- | --------- |
-| **Prerequisite Features** | None |
-| **System Dependencies** | Electron keyboard event handling |
-| **External Dependencies** | None |
+| Dependency Type              | Details                                         |
+| ---------------------------- | ----------------------------------------------- |
+| **Prerequisite Features**    | None                                            |
+| **System Dependencies**      | Electron keyboard event handling                |
+| **External Dependencies**    | None                                            |
 | **Integration Requirements** | Menu system acceleration, Redux action dispatch |
 
----
+______________________________________________________________________
 
 #### 2.1.7 Application menu system
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Feature ID** | F-007 |
-| **Feature Name** | Application Menu System |
-| **Category** | User Interface |
-| **Priority Level** | High |
-| **Status** | Completed |
+| Attribute          | Value                   |
+| ------------------ | ----------------------- |
+| **Feature ID**     | F-007                   |
+| **Feature Name**   | Application Menu System |
+| **Category**       | User Interface          |
+| **Priority Level** | High                    |
+| **Status**         | Completed               |
 
 ##### Description (2.1.7 Application menu system)
 
-| Aspect | Details |
-| -------- | --------- |
-| **Overview** | Platform-native application menus with dynamic profile submenus and command acceleration |
-| **Business Value** | Provides discoverable access to functionality and aligns with platform UI conventions |
-| **User Benefits** | Access all features through familiar menu structure, learn keyboard shortcuts via menu hints |
+| Aspect                | Details                                                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Overview**          | Platform-native application menus with dynamic profile submenus and command acceleration                        |
+| **Business Value**    | Provides discoverable access to functionality and aligns with platform UI conventions                           |
+| **User Benefits**     | Access all features through familiar menu structure, learn keyboard shortcuts via menu hints                    |
 | **Technical Context** | Menu templates in `app/menus/menus/` with platform variants; dynamic profile menu generation from configuration |
 
 ##### Dependencies (2.1.7 Application menu system)
 
-| Dependency Type | Details |
-| ----------------- | --------- |
-| **Prerequisite Features** | F-004 (Configuration System), F-006 (Keyboard Shortcuts) |
-| **System Dependencies** | Electron Menu API |
-| **External Dependencies** | None |
+| Dependency Type              | Details                                                         |
+| ---------------------------- | --------------------------------------------------------------- |
+| **Prerequisite Features**    | F-004 (Configuration System), F-006 (Keyboard Shortcuts)        |
+| **System Dependencies**      | Electron Menu API                                               |
+| **External Dependencies**    | None                                                            |
 | **Integration Requirements** | Configuration system for profile menus, plugin decoration hooks |
 
----
+______________________________________________________________________
 
 #### 2.1.8 Auto-update system
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Feature ID** | F-008 |
-| **Feature Name** | Auto-Update System |
-| **Category** | System Management |
-| **Priority Level** | High |
-| **Status** | Completed |
+| Attribute          | Value              |
+| ------------------ | ------------------ |
+| **Feature ID**     | F-008              |
+| **Feature Name**   | Auto-Update System |
+| **Category**       | System Management  |
+| **Priority Level** | High               |
+| **Status**         | Completed          |
 
 ##### Description (2.1.8 Auto-update system)
 
-| Aspect | Details |
-| -------- | --------- |
-| **Overview** | Automatic application updates with stable and canary channel support, platform-specific update mechanisms |
-| **Business Value** | Ensures users receive security patches and new features without manual intervention |
-| **User Benefits** | Automatic notifications of updates, easy update installation, channel selection for early access |
+| Aspect                | Details                                                                                                                                      |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Overview**          | Automatic application updates with stable and canary channel support, platform-specific update mechanisms                                    |
+| **Business Value**    | Ensures users receive security patches and new features without manual intervention                                                          |
+| **User Benefits**     | Automatic notifications of updates, easy update installation, channel selection for early access                                             |
 | **Technical Context** | Implemented in `app/updater.ts` with Linux-specific handler in `app/auto-updater-linux.ts`; polling at 10s initial, then 30-minute intervals |
 
 ##### Dependencies (2.1.8 Auto-update system)
 
-| Dependency Type | Details |
-| ----------------- | --------- |
-| **Prerequisite Features** | F-011 (Notification System) |
-| **System Dependencies** | Network access, platform update frameworks |
-| **External Dependencies** | Update manifest servers (releases.hyper.is) |
+| Dependency Type              | Details                                                              |
+| ---------------------------- | -------------------------------------------------------------------- |
+| **Prerequisite Features**    | F-011 (Notification System)                                          |
+| **System Dependencies**      | Network access, platform update frameworks                           |
+| **External Dependencies**    | Update manifest servers (releases.hyper.is)                          |
 | **Integration Requirements** | Configuration for channel selection, notification system for prompts |
 
----
+______________________________________________________________________
 
 #### 2.1.9 Command-line interface (CLI)
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Feature ID** | F-009 |
-| **Feature Name** | Command-Line Interface |
-| **Category** | User Productivity |
-| **Priority Level** | Medium |
-| **Status** | Completed |
+| Attribute          | Value                  |
+| ------------------ | ---------------------- |
+| **Feature ID**     | F-009                  |
+| **Feature Name**   | Command-Line Interface |
+| **Category**       | User Productivity      |
+| **Priority Level** | Medium                 |
+| **Status**         | Completed              |
 
 ##### Description (2.1.9 Command-line interface (CLI))
 
-| Aspect | Details |
-| -------- | --------- |
-| **Overview** | CLI tool for plugin management, application launching, and configuration tasks |
-| **Business Value** | Enables scripted plugin management and integration with development workflows |
-| **User Benefits** | Install/remove plugins from terminal, search plugin registry, launch application |
-| **Technical Context** | Implemented in `cli/` directory with API operations in `cli/api.ts` |
+| Aspect                | Details                                                                          |
+| --------------------- | -------------------------------------------------------------------------------- |
+| **Overview**          | CLI tool for plugin management, application launching, and configuration tasks   |
+| **Business Value**    | Enables scripted plugin management and integration with development workflows    |
+| **User Benefits**     | Install/remove plugins from terminal, search plugin registry, launch application |
+| **Technical Context** | Implemented in `cli/` directory with API operations in `cli/api.ts`              |
 
 ##### Dependencies (2.1.9 Command-line interface (CLI))
 
-| Dependency Type | Details |
-| ----------------- | --------- |
-| **Prerequisite Features** | F-005 (Plugin System), F-004 (Configuration System) |
-| **System Dependencies** | Node.js runtime, npm/bun, bundled Bun binary in `resources/bin` |
-| **External Dependencies** | npm registry API |
-| **Integration Requirements** | Configuration file access, plugin directory management |
+| Dependency Type              | Details                                                         |
+| ---------------------------- | --------------------------------------------------------------- |
+| **Prerequisite Features**    | F-005 (Plugin System), F-004 (Configuration System)             |
+| **System Dependencies**      | Node.js runtime, npm/bun, bundled Bun binary in `resources/bin` |
+| **External Dependencies**    | npm registry API                                                |
+| **Integration Requirements** | Configuration file access, plugin directory management          |
 
----
+______________________________________________________________________
 
 #### 2.1.10 Cross-platform support
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Feature ID** | F-010 |
-| **Feature Name** | Cross-Platform Support |
-| **Category** | Platform Support |
-| **Priority Level** | Critical |
-| **Status** | Completed |
+| Attribute          | Value                  |
+| ------------------ | ---------------------- |
+| **Feature ID**     | F-010                  |
+| **Feature Name**   | Cross-Platform Support |
+| **Category**       | Platform Support       |
+| **Priority Level** | Critical               |
+| **Status**         | Completed              |
 
 ##### Description (2.1.10 Cross-platform support)
 
-| Aspect | Details |
-| -------- | --------- |
-| **Overview** | Consistent functionality across macOS, Windows, and Linux with platform-appropriate integrations |
-| **Business Value** | Enables teams with mixed development environments to standardize on a single terminal solution |
-| **User Benefits** | Same features and appearance regardless of OS, platform-native behaviours where appropriate |
-| **Technical Context** | Build configuration in `electron-builder.json`; platform utilities in `app/utils/` |
+| Aspect                | Details                                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------ |
+| **Overview**          | Consistent functionality across macOS, Windows, and Linux with platform-appropriate integrations |
+| **Business Value**    | Enables teams with mixed development environments to standardize on a single terminal solution   |
+| **User Benefits**     | Same features and appearance regardless of OS, platform-native behaviours where appropriate      |
+| **Technical Context** | Build configuration in `electron-builder.json`; platform utilities in `app/utils/`               |
 
 ##### Dependencies (2.1.10 Cross-platform support)
 
-| Dependency Type | Details |
-| ----------------- | --------- |
-| **Prerequisite Features** | All core features |
-| **System Dependencies** | Platform-specific native modules (node-pty variants) |
-| **External Dependencies** | electron-builder 24.13.3 |
-| **Integration Requirements** | Platform-specific keymaps, menus, update mechanisms |
+| Dependency Type              | Details                                              |
+| ---------------------------- | ---------------------------------------------------- |
+| **Prerequisite Features**    | All core features                                    |
+| **System Dependencies**      | Platform-specific native modules (node-pty variants) |
+| **External Dependencies**    | electron-builder 24.13.3                             |
+| **Integration Requirements** | Platform-specific keymaps, menus, update mechanisms  |
 
----
+______________________________________________________________________
 
 #### 2.1.11 Notification system
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Feature ID** | F-011 |
-| **Feature Name** | Notification System |
-| **Category** | User Interface |
-| **Priority Level** | Medium |
-| **Status** | Completed |
+| Attribute          | Value               |
+| ------------------ | ------------------- |
+| **Feature ID**     | F-011               |
+| **Feature Name**   | Notification System |
+| **Category**       | User Interface      |
+| **Priority Level** | Medium              |
+| **Status**         | Completed           |
 
 ##### Description (2.1.11 Notification system)
 
-| Aspect | Details |
-| -------- | --------- |
-| **Overview** | In-application and native system notifications for events, updates, and plugin messages |
-| **Business Value** | Keeps users informed of important events without interrupting workflow |
-| **User Benefits** | Receive update notifications, resize confirmations, plugin messages |
-| **Technical Context** | Implemented in `app/notifications.ts` and `lib/components/notifications.tsx` |
+| Aspect                | Details                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| **Overview**          | In-application and native system notifications for events, updates, and plugin messages |
+| **Business Value**    | Keeps users informed of important events without interrupting workflow                  |
+| **User Benefits**     | Receive update notifications, resize confirmations, plugin messages                     |
+| **Technical Context** | Implemented in `app/notifications.ts` and `lib/components/notifications.tsx`            |
 
 ##### Dependencies (2.1.11 Notification system)
 
-| Dependency Type | Details |
-| ----------------- | --------- |
-| **Prerequisite Features** | None |
-| **System Dependencies** | Native notification APIs |
-| **External Dependencies** | None |
+| Dependency Type              | Details                                 |
+| ---------------------------- | --------------------------------------- |
+| **Prerequisite Features**    | None                                    |
+| **System Dependencies**      | Native notification APIs                |
+| **External Dependencies**    | None                                    |
 | **Integration Requirements** | Redux state for notification management |
 
----
+______________________________________________________________________
 
 #### 2.1.12 Performance optimization
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Feature ID** | F-012 |
-| **Feature Name** | Performance Optimization |
-| **Category** | Core Functionality |
-| **Priority Level** | High |
-| **Status** | Completed |
+| Attribute          | Value                    |
+| ------------------ | ------------------------ |
+| **Feature ID**     | F-012                    |
+| **Feature Name**   | Performance Optimization |
+| **Category**       | Core Functionality       |
+| **Priority Level** | High                     |
+| **Status**         | Completed                |
 
 ##### Description (2.1.12 Performance optimization)
 
-| Aspect | Details |
-| -------- | --------- |
-| **Overview** | Suite of performance optimizations including data batching, V8 snapshots, WebGL rendering, and middleware bypass |
-| **Business Value** | Ensures Velocetty remains competitive with native terminal emulators despite web technology overhead |
-| **User Benefits** | Fast application startup, responsive terminal output, smooth scrolling |
+| Aspect                | Details                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Overview**          | Suite of performance optimizations including data batching, V8 snapshots, WebGL rendering, and middleware bypass                                  |
+| **Business Value**    | Ensures Velocetty remains competitive with native terminal emulators despite web technology overhead                                              |
+| **User Benefits**     | Fast application startup, responsive terminal output, smooth scrolling                                                                            |
 | **Technical Context** | Data batching in `app/session.ts`, write middleware bypass in `lib/store/write-middleware.ts`, V8 snapshot utilities in `lib/v8-snapshot-util.ts` |
 
 ##### Dependencies (2.1.12 Performance optimization)
 
-| Dependency Type | Details |
-| ----------------- | --------- |
-| **Prerequisite Features** | F-001 (Terminal Emulation Core) |
-| **System Dependencies** | GPU for WebGL acceleration |
-| **External Dependencies** | xterm-addon-webgl 0.16.0 |
+| Dependency Type              | Details                               |
+| ---------------------------- | ------------------------------------- |
+| **Prerequisite Features**    | F-001 (Terminal Emulation Core)       |
+| **System Dependencies**      | GPU for WebGL acceleration            |
+| **External Dependencies**    | xterm-addon-webgl 0.16.0              |
 | **Integration Requirements** | Custom Redux middleware configuration |
 
----
+______________________________________________________________________
 
 ### 2.2 Functional requirements tables
 
@@ -985,357 +987,357 @@ and implementation context derived from the inherited Hyper codebase.
 
 ##### Requirements table
 
-| Requirement ID | Description | Priority |
-| ---------------- | ------------- | ---------- |
-| F-001-RQ-001 | Create PTY session with specified shell | Must-Have |
-| F-001-RQ-002 | Render terminal output via xterm.js | Must-Have |
-| F-001-RQ-003 | Support configurable font size and family | Must-Have |
-| F-001-RQ-004 | Implement data batching for IPC optimization | Must-Have |
-| F-001-RQ-005 | Support WebGL hardware-accelerated rendering | Should-Have |
-| F-001-RQ-006 | Provide canvas fallback when WebGL unavailable | Must-Have |
-| F-001-RQ-007 | Support configurable scrollback buffer | Should-Have |
-| F-001-RQ-008 | Handle terminal resize events | Must-Have |
+| Requirement ID | Description                                    | Priority    |
+| -------------- | ---------------------------------------------- | ----------- |
+| F-001-RQ-001   | Create PTY session with specified shell        | Must-Have   |
+| F-001-RQ-002   | Render terminal output via xterm.js            | Must-Have   |
+| F-001-RQ-003   | Support configurable font size and family      | Must-Have   |
+| F-001-RQ-004   | Implement data batching for IPC optimization   | Must-Have   |
+| F-001-RQ-005   | Support WebGL hardware-accelerated rendering   | Should-Have |
+| F-001-RQ-006   | Provide canvas fallback when WebGL unavailable | Must-Have   |
+| F-001-RQ-007   | Support configurable scrollback buffer         | Should-Have |
+| F-001-RQ-008   | Handle terminal resize events                  | Must-Have   |
 
 ##### F-001-RQ-001: PTY session creation
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Acceptance Criteria** | System creates PTY session within 500ms of request; session connects to configured shell; session receives and transmits data |
-| **Complexity** | High |
-| **Input Parameters** | Shell path, shell arguments, environment variables, initial working directory, rows, columns |
-| **Output/Response** | Session UID, PTY PID, session metadata object |
-| **Performance Criteria** | Session ready within 500ms; first PTY created during app startup |
-| **Data Requirements** | Session stored in Redux state with uid, title, shell, pid, cols, rows, profile, cwd |
+| Attribute                | Specification                                                                                                                 |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Acceptance Criteria**  | System creates PTY session within 500ms of request; session connects to configured shell; session receives and transmits data |
+| **Complexity**           | High                                                                                                                          |
+| **Input Parameters**     | Shell path, shell arguments, environment variables, initial working directory, rows, columns                                  |
+| **Output/Response**      | Session UID, PTY PID, session metadata object                                                                                 |
+| **Performance Criteria** | Session ready within 500ms; first PTY created during app startup                                                              |
+| **Data Requirements**    | Session stored in Redux state with uid, title, shell, pid, cols, rows, profile, cwd                                           |
 
-| Validation Category | Rules |
-| --------------------- | ------- |
-| **Business Rules** | Default shell determined by OS if not configured; CWD preserved from parent session if `preserveCWD` enabled |
-| **Data Validation** | Shell path must exist and be executable; rows/cols must be positive integers |
-| **Security Requirements** | Environment variables sanitized; shell execution respects OS permissions |
+| Validation Category       | Rules                                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **Business Rules**        | Default shell determined by OS if not configured; CWD preserved from parent session if `preserveCWD` enabled |
+| **Data Validation**       | Shell path must exist and be executable; rows/cols must be positive integers                                 |
+| **Security Requirements** | Environment variables sanitized; shell execution respects OS permissions                                     |
 
 ##### F-001-RQ-002: terminal output rendering
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Acceptance Criteria** | All terminal output rendered correctly; ANSI escape sequences interpreted; 60fps during rapid output with WebGL |
-| **Complexity** | High |
-| **Input Parameters** | PTY data buffer, terminal dimensions |
-| **Output/Response** | Rendered terminal display in canvas element |
-| **Performance Criteria** | Frame time < 16.67ms for 60fps; data batching at 16ms/200KB thresholds |
-| **Data Requirements** | Terminal buffer stored in xterm.js instance |
+| Attribute                | Specification                                                                                                   |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| **Acceptance Criteria**  | All terminal output rendered correctly; ANSI escape sequences interpreted; 60fps during rapid output with WebGL |
+| **Complexity**           | High                                                                                                            |
+| **Input Parameters**     | PTY data buffer, terminal dimensions                                                                            |
+| **Output/Response**      | Rendered terminal display in canvas element                                                                     |
+| **Performance Criteria** | Frame time < 16.67ms for 60fps; data batching at 16ms/200KB thresholds                                          |
+| **Data Requirements**    | Terminal buffer stored in xterm.js instance                                                                     |
 
-| Validation Category | Rules |
-| --------------------- | ------- |
-| **Business Rules** | Batch data before IPC transmission; bypass Redux for `SESSION_PTY_DATA` actions |
-| **Data Validation** | Buffer data UTF-8 encoded |
-| **Security Requirements** | Terminal escape sequences cannot access local resources |
+| Validation Category       | Rules                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| **Business Rules**        | Batch data before IPC transmission; bypass Redux for `SESSION_PTY_DATA` actions |
+| **Data Validation**       | Buffer data UTF-8 encoded                                                       |
+| **Security Requirements** | Terminal escape sequences cannot access local resources                         |
 
 ##### F-001-RQ-005: WebGL rendering
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Acceptance Criteria** | WebGL renderer activates when enabled; falls back gracefully; maximum 16 simultaneous WebGL contexts |
-| **Complexity** | Medium |
-| **Input Parameters** | `webGLRenderer` configuration boolean |
-| **Output/Response** | Hardware-accelerated terminal rendering |
-| **Performance Criteria** | 60fps scrolling; reduced CPU usage compared to canvas |
-| **Data Requirements** | WebGL context per visible terminal |
+| Attribute                | Specification                                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| **Acceptance Criteria**  | WebGL renderer activates when enabled; falls back gracefully; maximum 16 simultaneous WebGL contexts |
+| **Complexity**           | Medium                                                                                               |
+| **Input Parameters**     | `webGLRenderer` configuration boolean                                                                |
+| **Output/Response**      | Hardware-accelerated terminal rendering                                                              |
+| **Performance Criteria** | 60fps scrolling; reduced CPU usage compared to canvas                                                |
+| **Data Requirements**    | WebGL context per visible terminal                                                                   |
 
-| Validation Category | Rules |
-| --------------------- | ------- |
-| **Business Rules** | WebGL disabled by default; limit of 16 visible terminals with WebGL; allocation priority for visible panes |
-| **Data Validation** | GPU capabilities detected at runtime |
-| **Security Requirements** | WebGL context isolation per terminal |
+| Validation Category       | Rules                                                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Business Rules**        | WebGL disabled by default; limit of 16 visible terminals with WebGL; allocation priority for visible panes |
+| **Data Validation**       | GPU capabilities detected at runtime                                                                       |
+| **Security Requirements** | WebGL context isolation per terminal                                                                       |
 
----
+______________________________________________________________________
 
 #### 2.2.2 Multi-session architecture (F-002)
 
 ##### Requirements table (2.2.2 Multi-session architecture (F-002))
 
-| Requirement ID | Description | Priority |
-| ---------------- | ------------- | ---------- |
-| F-002-RQ-001 | Create new terminal tabs | Must-Have |
-| F-002-RQ-002 | Create new windows | Must-Have |
-| F-002-RQ-003 | Split panes horizontally | Must-Have |
-| F-002-RQ-004 | Split panes vertically | Must-Have |
-| F-002-RQ-005 | Navigate between tabs | Must-Have |
-| F-002-RQ-006 | Navigate between panes | Must-Have |
-| F-002-RQ-007 | Resize split panes | Should-Have |
-| F-002-RQ-008 | Close sessions with confirmation | Must-Have |
+| Requirement ID | Description                      | Priority    |
+| -------------- | -------------------------------- | ----------- |
+| F-002-RQ-001   | Create new terminal tabs         | Must-Have   |
+| F-002-RQ-002   | Create new windows               | Must-Have   |
+| F-002-RQ-003   | Split panes horizontally         | Must-Have   |
+| F-002-RQ-004   | Split panes vertically           | Must-Have   |
+| F-002-RQ-005   | Navigate between tabs            | Must-Have   |
+| F-002-RQ-006   | Navigate between panes           | Must-Have   |
+| F-002-RQ-007   | Resize split panes               | Should-Have |
+| F-002-RQ-008   | Close sessions with confirmation | Must-Have   |
 
 ##### F-002-RQ-001: tab creation
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Acceptance Criteria** | New tab created with active session; tab appears in tab bar; tab becomes active |
-| **Complexity** | Medium |
-| **Input Parameters** | Optional profile name, optional working directory |
-| **Output/Response** | New tab UI element, new session instance |
-| **Performance Criteria** | Tab visible within 200ms of request |
-| **Data Requirements** | Term group entry in Redux state |
+| Attribute                | Specification                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| **Acceptance Criteria**  | New tab created with active session; tab appears in tab bar; tab becomes active |
+| **Complexity**           | Medium                                                                          |
+| **Input Parameters**     | Optional profile name, optional working directory                               |
+| **Output/Response**      | New tab UI element, new session instance                                        |
+| **Performance Criteria** | Tab visible within 200ms of request                                             |
+| **Data Requirements**    | Term group entry in Redux state                                                 |
 
-| Validation Category | Rules |
-| --------------------- | ------- |
-| **Business Rules** | Use default profile if none specified; inherit CWD from active session if `preserveCWD` enabled |
-| **Data Validation** | Profile name must exist in configuration |
-| **Security Requirements** | Session inherits configured environment only |
+| Validation Category       | Rules                                                                                           |
+| ------------------------- | ----------------------------------------------------------------------------------------------- |
+| **Business Rules**        | Use default profile if none specified; inherit CWD from active session if `preserveCWD` enabled |
+| **Data Validation**       | Profile name must exist in configuration                                                        |
+| **Security Requirements** | Session inherits configured environment only                                                    |
 
 ##### F-002-RQ-003: horizontal split
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Acceptance Criteria** | Active pane splits into two side-by-side panes; both panes have active sessions; minimum pane width enforced |
-| **Complexity** | Medium |
-| **Input Parameters** | Active term group UID, optional profile |
-| **Output/Response** | Two term groups with horizontal relationship |
-| **Performance Criteria** | Split operation completes within 300ms |
-| **Data Requirements** | Parent term group with children array; split ratio stored |
+| Attribute                | Specification                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| **Acceptance Criteria**  | Active pane splits into two side-by-side panes; both panes have active sessions; minimum pane width enforced |
+| **Complexity**           | Medium                                                                                                       |
+| **Input Parameters**     | Active term group UID, optional profile                                                                      |
+| **Output/Response**      | Two term groups with horizontal relationship                                                                 |
+| **Performance Criteria** | Split operation completes within 300ms                                                                       |
+| **Data Requirements**    | Parent term group with children array; split ratio stored                                                    |
 
-| Validation Category | Rules |
-| --------------------- | ------- |
-| **Business Rules** | Minimum pane size is 5% of container; split creates 50/50 division by default |
-| **Data Validation** | Term group must exist and be active |
-| **Security Requirements** | New session follows security model of parent |
+| Validation Category       | Rules                                                                         |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| **Business Rules**        | Minimum pane size is 5% of container; split creates 50/50 division by default |
+| **Data Validation**       | Term group must exist and be active                                           |
+| **Security Requirements** | New session follows security model of parent                                  |
 
----
+______________________________________________________________________
 
 #### 2.2.3 In-terminal search (F-003)
 
 ##### Requirements table (2.2.3 In-terminal search (F-003))
 
-| Requirement ID | Description | Priority |
-| ---------------- | ------------- | ---------- |
-| F-003-RQ-001 | Open search overlay | Must-Have |
-| F-003-RQ-002 | Search terminal buffer for text | Must-Have |
-| F-003-RQ-003 | Navigate to next/previous result | Must-Have |
-| F-003-RQ-004 | Toggle case sensitivity | Should-Have |
-| F-003-RQ-005 | Toggle whole word matching | Should-Have |
-| F-003-RQ-006 | Support regular expressions | Should-Have |
-| F-003-RQ-007 | Close search overlay | Must-Have |
+| Requirement ID | Description                      | Priority    |
+| -------------- | -------------------------------- | ----------- |
+| F-003-RQ-001   | Open search overlay              | Must-Have   |
+| F-003-RQ-002   | Search terminal buffer for text  | Must-Have   |
+| F-003-RQ-003   | Navigate to next/previous result | Must-Have   |
+| F-003-RQ-004   | Toggle case sensitivity          | Should-Have |
+| F-003-RQ-005   | Toggle whole word matching       | Should-Have |
+| F-003-RQ-006   | Support regular expressions      | Should-Have |
+| F-003-RQ-007   | Close search overlay             | Must-Have   |
 
 ##### F-003-RQ-002: buffer search
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Acceptance Criteria** | Search term found in scrollback buffer; results highlighted; result count displayed |
-| **Complexity** | Medium |
-| **Input Parameters** | Search query string, search options (case, whole word, regex) |
-| **Output/Response** | Highlighted matches in terminal, result count |
-| **Performance Criteria** | Search completes within 100ms for default scrollback (1000 lines) |
-| **Data Requirements** | Search state stored in session Redux slice |
+| Attribute                | Specification                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| **Acceptance Criteria**  | Search term found in scrollback buffer; results highlighted; result count displayed |
+| **Complexity**           | Medium                                                                              |
+| **Input Parameters**     | Search query string, search options (case, whole word, regex)                       |
+| **Output/Response**      | Highlighted matches in terminal, result count                                       |
+| **Performance Criteria** | Search completes within 100ms for default scrollback (1000 lines)                   |
+| **Data Requirements**    | Search state stored in session Redux slice                                          |
 
-| Validation Category | Rules |
-| --------------------- | ------- |
-| **Business Rules** | Search operates on visible and scrollback buffer; empty query clears highlights |
-| **Data Validation** | Regex patterns validated before execution |
-| **Security Requirements** | Search limited to local terminal buffer |
+| Validation Category       | Rules                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| **Business Rules**        | Search operates on visible and scrollback buffer; empty query clears highlights |
+| **Data Validation**       | Regex patterns validated before execution                                       |
+| **Security Requirements** | Search limited to local terminal buffer                                         |
 
----
+______________________________________________________________________
 
 #### 2.2.4 Configuration system (F-004)
 
 ##### Requirements table (2.2.4 Configuration system (F-004))
 
-| Requirement ID | Description | Priority |
-| ---------------- | ------------- | ---------- |
-| F-004-RQ-001 | Load JSON configuration file | Must-Have |
-| F-004-RQ-002 | Validate configuration against schema | Must-Have |
-| F-004-RQ-003 | Apply default values for missing options | Must-Have |
-| F-004-RQ-004 | Hot-reload configuration changes | Should-Have |
-| F-004-RQ-005 | Support multiple profiles | Should-Have |
-| F-004-RQ-006 | Migrate legacy v3 configurations | Should-Have |
-| F-004-RQ-007 | Store configuration in XDG-compliant paths | Must-Have |
+| Requirement ID | Description                                | Priority    |
+| -------------- | ------------------------------------------ | ----------- |
+| F-004-RQ-001   | Load JSON configuration file               | Must-Have   |
+| F-004-RQ-002   | Validate configuration against schema      | Must-Have   |
+| F-004-RQ-003   | Apply default values for missing options   | Must-Have   |
+| F-004-RQ-004   | Hot-reload configuration changes           | Should-Have |
+| F-004-RQ-005   | Support multiple profiles                  | Should-Have |
+| F-004-RQ-006   | Migrate legacy v3 configurations           | Should-Have |
+| F-004-RQ-007   | Store configuration in XDG-compliant paths | Must-Have   |
 
 ##### F-004-RQ-001: configuration loading
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Acceptance Criteria** | Configuration loaded on startup; values accessible to main and renderer processes; errors reported clearly |
-| **Complexity** | Medium |
-| **Input Parameters** | Configuration file path |
-| **Output/Response** | Parsed configuration object |
-| **Performance Criteria** | Configuration loaded within 50ms |
-| **Data Requirements** | Configuration schema in `app/config/schema.json` |
+| Attribute                | Specification                                                                                              |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| **Acceptance Criteria**  | Configuration loaded on startup; values accessible to main and renderer processes; errors reported clearly |
+| **Complexity**           | Medium                                                                                                     |
+| **Input Parameters**     | Configuration file path                                                                                    |
+| **Output/Response**      | Parsed configuration object                                                                                |
+| **Performance Criteria** | Configuration loaded within 50ms                                                                           |
+| **Data Requirements**    | Configuration schema in `app/config/schema.json`                                                           |
 
-| Validation Category | Rules |
-| --------------------- | ------- |
-| **Business Rules** | Use default config if file missing; merge user config with defaults |
-| **Data Validation** | JSON syntax validation; schema validation for all fields |
-| **Security Requirements** | Configuration file permissions checked on startup |
+| Validation Category       | Rules                                                               |
+| ------------------------- | ------------------------------------------------------------------- |
+| **Business Rules**        | Use default config if file missing; merge user config with defaults |
+| **Data Validation**       | JSON syntax validation; schema validation for all fields            |
+| **Security Requirements** | Configuration file permissions checked on startup                   |
 
 ##### F-004-RQ-004: hot reload
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Acceptance Criteria** | Configuration changes detected automatically; new settings applied without restart; invalid changes rejected gracefully |
-| **Complexity** | Medium |
-| **Input Parameters** | File system change event |
-| **Output/Response** | Updated configuration state, notification to user |
-| **Performance Criteria** | Changes applied within 1 second of file save |
-| **Data Requirements** | File watcher instance via chokidar |
+| Attribute                | Specification                                                                                                           |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| **Acceptance Criteria**  | Configuration changes detected automatically; new settings applied without restart; invalid changes rejected gracefully |
+| **Complexity**           | Medium                                                                                                                  |
+| **Input Parameters**     | File system change event                                                                                                |
+| **Output/Response**      | Updated configuration state, notification to user                                                                       |
+| **Performance Criteria** | Changes applied within 1 second of file save                                                                            |
+| **Data Requirements**    | File watcher instance via chokidar                                                                                      |
 
-| Validation Category | Rules |
-| --------------------- | ------- |
-| **Business Rules** | Validate new config before applying; notify user of successful reload |
-| **Data Validation** | Full schema validation on reload |
-| **Security Requirements** | Reject configurations with potentially malicious values |
+| Validation Category       | Rules                                                                 |
+| ------------------------- | --------------------------------------------------------------------- |
+| **Business Rules**        | Validate new config before applying; notify user of successful reload |
+| **Data Validation**       | Full schema validation on reload                                      |
+| **Security Requirements** | Reject configurations with potentially malicious values               |
 
----
+______________________________________________________________________
 
 #### 2.2.5 Plugin/extension system (F-005)
 
 ##### Requirements table (2.2.5 Plugin/extension system (F-005))
 
-| Requirement ID | Description | Priority |
-| ---------------- | ------------- | ---------- |
-| F-005-RQ-001 | Load plugins from configuration | Must-Have |
-| F-005-RQ-002 | Install plugins via CLI | Must-Have |
-| F-005-RQ-003 | Provide lifecycle hooks | Must-Have |
-| F-005-RQ-004 | Support UI decoration hooks | Must-Have |
-| F-005-RQ-005 | Support Redux middleware integration | Should-Have |
-| F-005-RQ-006 | Support configuration decoration | Should-Have |
-| F-005-RQ-007 | Hot-reload plugins | Should-Have |
-| F-005-RQ-008 | Support local plugin development | Should-Have |
+| Requirement ID | Description                          | Priority    |
+| -------------- | ------------------------------------ | ----------- |
+| F-005-RQ-001   | Load plugins from configuration      | Must-Have   |
+| F-005-RQ-002   | Install plugins via CLI              | Must-Have   |
+| F-005-RQ-003   | Provide lifecycle hooks              | Must-Have   |
+| F-005-RQ-004   | Support UI decoration hooks          | Must-Have   |
+| F-005-RQ-005   | Support Redux middleware integration | Should-Have |
+| F-005-RQ-006   | Support configuration decoration     | Should-Have |
+| F-005-RQ-007   | Hot-reload plugins                   | Should-Have |
+| F-005-RQ-008   | Support local plugin development     | Should-Have |
 
 ##### F-005-RQ-001: plugin loading
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Acceptance Criteria** | Plugins loaded from `plugins` and `localPlugins` arrays; main and renderer hooks invoked; load errors reported |
-| **Complexity** | High |
-| **Input Parameters** | Plugin names from configuration |
-| **Output/Response** | Loaded plugin modules with registered hooks |
-| **Performance Criteria** | Total plugin load time < 500ms |
-| **Data Requirements** | Plugin modules in `~/.config/Hyper/plugins/` |
+| Attribute                | Specification                                                                                                  |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| **Acceptance Criteria**  | Plugins loaded from `plugins` and `localPlugins` arrays; main and renderer hooks invoked; load errors reported |
+| **Complexity**           | High                                                                                                           |
+| **Input Parameters**     | Plugin names from configuration                                                                                |
+| **Output/Response**      | Loaded plugin modules with registered hooks                                                                    |
+| **Performance Criteria** | Total plugin load time < 500ms                                                                                 |
+| **Data Requirements**    | Plugin modules in `~/.config/Hyper/plugins/`                                                                   |
 
-| Validation Category | Rules |
-| --------------------- | ------- |
-| **Business Rules** | Local plugins take precedence; plugins loaded in order specified |
-| **Data Validation** | Plugin must export valid hook functions |
-| **Security Requirements** | Full-trust execution model (no sandboxing) |
+| Validation Category       | Rules                                                            |
+| ------------------------- | ---------------------------------------------------------------- |
+| **Business Rules**        | Local plugins take precedence; plugins loaded in order specified |
+| **Data Validation**       | Plugin must export valid hook functions                          |
+| **Security Requirements** | Full-trust execution model (no sandboxing)                       |
 
 ##### F-005-RQ-004: UI decoration hooks
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Acceptance Criteria** | Plugins can decorate React components; decoration composes with base component; decorated components render correctly |
-| **Complexity** | High |
-| **Input Parameters** | Base React component, component props |
-| **Output/Response** | Decorated React component |
-| **Performance Criteria** | Decoration adds < 5ms per component render |
-| **Data Requirements** | Decoration hooks for: Term, Header, Tabs, Tab, Notifications, TermGroup, SplitPane, Hyper |
+| Attribute                | Specification                                                                                                         |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| **Acceptance Criteria**  | Plugins can decorate React components; decoration composes with base component; decorated components render correctly |
+| **Complexity**           | High                                                                                                                  |
+| **Input Parameters**     | Base React component, component props                                                                                 |
+| **Output/Response**      | Decorated React component                                                                                             |
+| **Performance Criteria** | Decoration adds < 5ms per component render                                                                            |
+| **Data Requirements**    | Decoration hooks for: Term, Header, Tabs, Tab, Notifications, TermGroup, SplitPane, Hyper                             |
 
-| Validation Category | Rules |
-| --------------------- | ------- |
-| **Business Rules** | Decorations compose in plugin order; base component always receives original props |
-| **Data Validation** | Decorated component must be valid React component |
-| **Security Requirements** | UI decorations cannot access privileged APIs directly |
+| Validation Category       | Rules                                                                              |
+| ------------------------- | ---------------------------------------------------------------------------------- |
+| **Business Rules**        | Decorations compose in plugin order; base component always receives original props |
+| **Data Validation**       | Decorated component must be valid React component                                  |
+| **Security Requirements** | UI decorations cannot access privileged APIs directly                              |
 
----
+______________________________________________________________________
 
 #### 2.2.6 Keyboard shortcuts system (F-006)
 
 ##### Requirements table (2.2.6 Keyboard shortcuts system (F-006))
 
-| Requirement ID | Description | Priority |
-| ---------------- | ------------- | ---------- |
-| F-006-RQ-001 | Load platform-specific keymaps | Must-Have |
-| F-006-RQ-002 | Register keyboard shortcuts | Must-Have |
-| F-006-RQ-003 | Dispatch commands on shortcut activation | Must-Have |
-| F-006-RQ-004 | Support customizable keymaps via plugins | Should-Have |
-| F-006-RQ-005 | Support prefix commands with numbered variants | Should-Have |
+| Requirement ID | Description                                    | Priority    |
+| -------------- | ---------------------------------------------- | ----------- |
+| F-006-RQ-001   | Load platform-specific keymaps                 | Must-Have   |
+| F-006-RQ-002   | Register keyboard shortcuts                    | Must-Have   |
+| F-006-RQ-003   | Dispatch commands on shortcut activation       | Must-Have   |
+| F-006-RQ-004   | Support customizable keymaps via plugins       | Should-Have |
+| F-006-RQ-005   | Support prefix commands with numbered variants | Should-Have |
 
 ##### F-006-RQ-001: platform keymaps
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Acceptance Criteria** | Correct keymap loaded per platform; Command modifier on macOS, Ctrl on Windows/Linux; shortcuts function correctly |
-| **Complexity** | Medium |
-| **Input Parameters** | Platform identifier (darwin/linux/win32) |
-| **Output/Response** | Loaded keymap configuration |
-| **Performance Criteria** | Keymap loaded during startup |
-| **Data Requirements** | Keymap files in `app/keymaps/` |
+| Attribute                | Specification                                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| **Acceptance Criteria**  | Correct keymap loaded per platform; Command modifier on macOS, Ctrl on Windows/Linux; shortcuts function correctly |
+| **Complexity**           | Medium                                                                                                             |
+| **Input Parameters**     | Platform identifier (darwin/linux/win32)                                                                           |
+| **Output/Response**      | Loaded keymap configuration                                                                                        |
+| **Performance Criteria** | Keymap loaded during startup                                                                                       |
+| **Data Requirements**    | Keymap files in `app/keymaps/`                                                                                     |
 
-| Validation Category | Rules |
-| --------------------- | ------- |
-| **Business Rules** | Platform detection via `process.platform`; fallback to linux keymap if unknown |
-| **Data Validation** | Keymap JSON schema validation |
-| **Security Requirements** | Shortcuts cannot execute arbitrary code |
+| Validation Category       | Rules                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------ |
+| **Business Rules**        | Platform detection via `process.platform`; fallback to linux keymap if unknown |
+| **Data Validation**       | Keymap JSON schema validation                                                  |
+| **Security Requirements** | Shortcuts cannot execute arbitrary code                                        |
 
----
+______________________________________________________________________
 
 #### 2.2.7 Auto-update system (F-008)
 
 ##### Requirements table (2.2.7 Auto-update system (F-008))
 
-| Requirement ID | Description | Priority |
-| ---------------- | ------------- | ---------- |
-| F-008-RQ-001 | Check for updates on startup | Must-Have |
-| F-008-RQ-002 | Check for updates periodically | Must-Have |
-| F-008-RQ-003 | Support stable and canary channels | Must-Have |
-| F-008-RQ-004 | Notify user of available updates | Must-Have |
-| F-008-RQ-005 | Download and install updates | Must-Have |
-| F-008-RQ-006 | Support architecture-aware updates | Should-Have |
-| F-008-RQ-007 | Allow disabling auto-updates | Should-Have |
+| Requirement ID | Description                        | Priority    |
+| -------------- | ---------------------------------- | ----------- |
+| F-008-RQ-001   | Check for updates on startup       | Must-Have   |
+| F-008-RQ-002   | Check for updates periodically     | Must-Have   |
+| F-008-RQ-003   | Support stable and canary channels | Must-Have   |
+| F-008-RQ-004   | Notify user of available updates   | Must-Have   |
+| F-008-RQ-005   | Download and install updates       | Must-Have   |
+| F-008-RQ-006   | Support architecture-aware updates | Should-Have |
+| F-008-RQ-007   | Allow disabling auto-updates       | Should-Have |
 
 ##### F-008-RQ-002: periodic update checks
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Acceptance Criteria** | Update check at startup; subsequent checks every 30 minutes; network errors handled gracefully |
-| **Complexity** | Medium |
-| **Input Parameters** | Update channel from configuration |
-| **Output/Response** | Update availability status, version information |
-| **Performance Criteria** | Check completes within 5 seconds |
-| **Data Requirements** | Update manifest from releases server |
+| Attribute                | Specification                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------- |
+| **Acceptance Criteria**  | Update check at startup; subsequent checks every 30 minutes; network errors handled gracefully |
+| **Complexity**           | Medium                                                                                         |
+| **Input Parameters**     | Update channel from configuration                                                              |
+| **Output/Response**      | Update availability status, version information                                                |
+| **Performance Criteria** | Check completes within 5 seconds                                                               |
+| **Data Requirements**    | Update manifest from releases server                                                           |
 
-| Validation Category | Rules |
-| --------------------- | ------- |
-| **Business Rules** | Initial check at 10 seconds after startup; 30-minute interval thereafter |
-| **Data Validation** | Version comparison validation |
-| **Security Requirements** | Update signatures verified before installation |
+| Validation Category       | Rules                                                                    |
+| ------------------------- | ------------------------------------------------------------------------ |
+| **Business Rules**        | Initial check at 10 seconds after startup; 30-minute interval thereafter |
+| **Data Validation**       | Version comparison validation                                            |
+| **Security Requirements** | Update signatures verified before installation                           |
 
----
+______________________________________________________________________
 
 #### 2.2.8 CLI tool (F-009)
 
 ##### Requirements table (2.2.8 CLI tool (F-009))
 
-| Requirement ID | Description | Priority |
-| ---------------- | ------------- | ---------- |
-| F-009-RQ-001 | Install plugins by name | Must-Have |
-| F-009-RQ-002 | Uninstall plugins | Must-Have |
-| F-009-RQ-003 | List installed plugins | Must-Have |
-| F-009-RQ-004 | Search npm registry for plugins | Should-Have |
-| F-009-RQ-005 | Open plugin documentation | Should-Have |
-| F-009-RQ-006 | Launch Hyper application | Should-Have |
+| Requirement ID | Description                     | Priority    |
+| -------------- | ------------------------------- | ----------- |
+| F-009-RQ-001   | Install plugins by name         | Must-Have   |
+| F-009-RQ-002   | Uninstall plugins               | Must-Have   |
+| F-009-RQ-003   | List installed plugins          | Must-Have   |
+| F-009-RQ-004   | Search npm registry for plugins | Should-Have |
+| F-009-RQ-005   | Open plugin documentation       | Should-Have |
+| F-009-RQ-006   | Launch Hyper application        | Should-Have |
 
 ##### F-009-RQ-001: plugin installation
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Acceptance Criteria** | Plugin installed to correct directory; configuration updated; installation confirmed |
-| **Complexity** | Medium |
-| **Input Parameters** | Plugin name or npm package identifier |
-| **Output/Response** | Installation success/failure status |
-| **Performance Criteria** | Installation completes within 5-minute timeout |
-| **Data Requirements** | Plugin installed to `~/.config/Hyper/plugins/node_modules/` |
+| Attribute                | Specification                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------ |
+| **Acceptance Criteria**  | Plugin installed to correct directory; configuration updated; installation confirmed |
+| **Complexity**           | Medium                                                                               |
+| **Input Parameters**     | Plugin name or npm package identifier                                                |
+| **Output/Response**      | Installation success/failure status                                                  |
+| **Performance Criteria** | Installation completes within 5-minute timeout                                       |
+| **Data Requirements**    | Plugin installed to `~/.config/Hyper/plugins/node_modules/`                          |
 
-| Validation Category | Rules |
-| --------------------- | ------- |
-| **Business Rules** | Use bun for package installation; 5-minute timeout |
-| **Data Validation** | Plugin name validated against npm registry |
-| **Security Requirements** | npm package integrity verification |
+| Validation Category       | Rules                                              |
+| ------------------------- | -------------------------------------------------- |
+| **Business Rules**        | Use bun for package installation; 5-minute timeout |
+| **Data Validation**       | Plugin name validated against npm registry         |
+| **Security Requirements** | npm package integrity verification                 |
 
----
+______________________________________________________________________
 
 ### 2.3 Feature relationships
 
 #### 2.3.1 Feature dependencies map
 
-The following diagram illustrates the dependency relationships between Velocetty
-features:
+The following diagram illustrates the dependency relationships between
+Velocetty features:
 
 ```mermaid
 flowchart TB
@@ -1375,145 +1377,145 @@ flowchart TB
 
 #### 2.3.2 Integration points
 
-| Source Feature | Target Feature | Integration Type |
-| ---------------- | ---------------- | ------------------ |
-| F-001 Terminal Core | F-002 Multi-Session | Session embedding in term groups |
-| F-001 Terminal Core | F-003 Search | Search addon attachment to xterm instance |
-| F-001 Terminal Core | F-012 Performance | Data batching, WebGL rendering |
-| F-004 Configuration | F-005 Plugins | Plugin list, decoration hooks |
-| F-004 Configuration | F-006 Keymaps | Keymap decoration hook |
-| F-004 Configuration | F-007 Menus | Menu decoration, profile menus |
-| F-005 Plugins | F-002 Multi-Session | Term group decoration |
-| F-005 Plugins | F-006 Keymaps | `decorateKeymaps` hook |
-| F-006 Keymaps | F-007 Menus | Accelerator keys in menu items |
-| F-008 Auto-Update | F-011 Notifications | Update availability notifications |
-| F-009 CLI | F-004 Configuration | Configuration file modification |
-| F-009 CLI | F-005 Plugins | Plugin installation/removal |
+| Source Feature      | Target Feature      | Integration Type                          |
+| ------------------- | ------------------- | ----------------------------------------- |
+| F-001 Terminal Core | F-002 Multi-Session | Session embedding in term groups          |
+| F-001 Terminal Core | F-003 Search        | Search addon attachment to xterm instance |
+| F-001 Terminal Core | F-012 Performance   | Data batching, WebGL rendering            |
+| F-004 Configuration | F-005 Plugins       | Plugin list, decoration hooks             |
+| F-004 Configuration | F-006 Keymaps       | Keymap decoration hook                    |
+| F-004 Configuration | F-007 Menus         | Menu decoration, profile menus            |
+| F-005 Plugins       | F-002 Multi-Session | Term group decoration                     |
+| F-005 Plugins       | F-006 Keymaps       | `decorateKeymaps` hook                    |
+| F-006 Keymaps       | F-007 Menus         | Accelerator keys in menu items            |
+| F-008 Auto-Update   | F-011 Notifications | Update availability notifications         |
+| F-009 CLI           | F-004 Configuration | Configuration file modification           |
+| F-009 CLI           | F-005 Plugins       | Plugin installation/removal               |
 
 #### 2.3.3 Shared components
 
-| Component | Location | Used By Features |
-| ----------- | ---------- | ------------------ |
-| Redux Store | `lib/store/` | F-001, F-002, F-003, F-004, F-005, F-011 |
-| IPC Bridge | `app/rpc.ts`, `lib/utils/rpc.ts` | F-001, F-004, F-005, F-008 |
-| React Component Library | `lib/components/` | F-002, F-003, F-005, F-007, F-011 |
-| Command Registry | `lib/command-registry.ts` | F-006, F-007 |
-| Notification Manager | `app/notifications.ts` | F-008, F-011, F-012 |
+| Component               | Location                         | Used By Features                         |
+| ----------------------- | -------------------------------- | ---------------------------------------- |
+| Redux Store             | `lib/store/`                     | F-001, F-002, F-003, F-004, F-005, F-011 |
+| IPC Bridge              | `app/rpc.ts`, `lib/utils/rpc.ts` | F-001, F-004, F-005, F-008               |
+| React Component Library | `lib/components/`                | F-002, F-003, F-005, F-007, F-011        |
+| Command Registry        | `lib/command-registry.ts`        | F-006, F-007                             |
+| Notification Manager    | `app/notifications.ts`           | F-008, F-011, F-012                      |
 
 #### 2.3.4 Common services
 
-| Service | Location | Consuming Features |
-| --------- | ---------- | ------------------- |
-| Configuration Service | `app/config/` | All features |
-| Plugin Loader | `app/plugins.ts` | F-005, F-007, F-006 |
-| Session Manager | `app/session.ts` | F-001, F-002 |
-| File Watcher | via chokidar | F-004 |
-| Package Manager | via bun | F-005, F-009 |
+| Service               | Location         | Consuming Features  |
+| --------------------- | ---------------- | ------------------- |
+| Configuration Service | `app/config/`    | All features        |
+| Plugin Loader         | `app/plugins.ts` | F-005, F-007, F-006 |
+| Session Manager       | `app/session.ts` | F-001, F-002        |
+| File Watcher          | via chokidar     | F-004               |
+| Package Manager       | via bun          | F-005, F-009        |
 
----
+______________________________________________________________________
 
 ### 2.4 Implementation considerations
 
 #### 2.4.1 Terminal emulation core (F-001)
 
-| Consideration | Details |
-| --------------- | --------- |
-| **Technical Constraints** | xterm.js canvas rendering means plugins cannot access DOM representation of terminal rows; terminal view is not a rich DOM surface for extensions |
-| **Performance Requirements** | Data batching at 16ms/200KB thresholds essential for IPC optimization; `SESSION_PTY_DATA` must bypass Redux middleware; WebGL limited to 16 simultaneous contexts |
-| **Scalability Considerations** | Memory grows with scrollback buffer size and session count; each session maintains separate PTY process |
-| **Security Implications** | PTY sessions execute with user privileges; environment variable passing must be controlled |
-| **Maintenance Requirements** | node-pty requires native module rebuilding for Electron version changes; xterm.js updates may require addon compatibility testing |
+| Consideration                  | Details                                                                                                                                                           |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Technical Constraints**      | xterm.js canvas rendering means plugins cannot access DOM representation of terminal rows; terminal view is not a rich DOM surface for extensions                 |
+| **Performance Requirements**   | Data batching at 16ms/200KB thresholds essential for IPC optimization; `SESSION_PTY_DATA` must bypass Redux middleware; WebGL limited to 16 simultaneous contexts |
+| **Scalability Considerations** | Memory grows with scrollback buffer size and session count; each session maintains separate PTY process                                                           |
+| **Security Implications**      | PTY sessions execute with user privileges; environment variable passing must be controlled                                                                        |
+| **Maintenance Requirements**   | node-pty requires native module rebuilding for Electron version changes; xterm.js updates may require addon compatibility testing                                 |
 
 #### 2.4.2 Multi-session architecture (F-002)
 
-| Consideration | Details |
-| --------------- | --------- |
-| **Technical Constraints** | Term group tree structure limits certain layout configurations; minimum 5% pane size enforced |
-| **Performance Requirements** | Window state persistence should not block UI; session state stored in memory, not persisted across restarts |
-| **Scalability Considerations** | Multiple windows create multiple renderer processes with associated memory overhead |
-| **Security Implications** | Per-window session isolation; sessions cannot access other session data |
-| **Maintenance Requirements** | Term group reducer logic complex; split/resize operations must maintain tree consistency |
+| Consideration                  | Details                                                                                                     |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| **Technical Constraints**      | Term group tree structure limits certain layout configurations; minimum 5% pane size enforced               |
+| **Performance Requirements**   | Window state persistence should not block UI; session state stored in memory, not persisted across restarts |
+| **Scalability Considerations** | Multiple windows create multiple renderer processes with associated memory overhead                         |
+| **Security Implications**      | Per-window session isolation; sessions cannot access other session data                                     |
+| **Maintenance Requirements**   | Term group reducer logic complex; split/resize operations must maintain tree consistency                    |
 
 #### 2.4.3 Configuration system (F-004)
 
-| Consideration | Details |
-| --------------- | --------- |
-| **Technical Constraints** | JSON format limits to structured data; custom code migration required from v3 JavaScript configs |
-| **Performance Requirements** | Hot-reload must validate without blocking UI; schema validation at startup |
-| **Scalability Considerations** | Profile count may grow; consider configuration file size limits |
-| **Security Implications** | Configuration file should be user-writable only; plugin names validated before installation |
-| **Maintenance Requirements** | Schema must be updated with new configuration options; migration paths for version changes |
+| Consideration                  | Details                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------ |
+| **Technical Constraints**      | JSON format limits to structured data; custom code migration required from v3 JavaScript configs |
+| **Performance Requirements**   | Hot-reload must validate without blocking UI; schema validation at startup                       |
+| **Scalability Considerations** | Profile count may grow; consider configuration file size limits                                  |
+| **Security Implications**      | Configuration file should be user-writable only; plugin names validated before installation      |
+| **Maintenance Requirements**   | Schema must be updated with new configuration options; migration paths for version changes       |
 
 #### 2.4.4 Plugin/extension system (F-005)
 
-| Consideration | Details |
-| --------------- | --------- |
-| **Technical Constraints** | Full-trust execution model means plugins can access all process capabilities; no sandboxing available; plugins are Node.js modules loaded in-process |
-| **Performance Requirements** | Total plugin load time < 500ms; decoration functions should not block render |
-| **Scalability Considerations** | Plugin count impacts startup time; plugin compatibility across Electron versions |
-| **Security Implications** | Plugins have full access to file system, network, and process; users must trust plugin authors; no capability-based permissions |
-| **Maintenance Requirements** | 40+ hooks must remain stable for ecosystem compatibility; breaking changes require major version |
+| Consideration                  | Details                                                                                                                                              |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Technical Constraints**      | Full-trust execution model means plugins can access all process capabilities; no sandboxing available; plugins are Node.js modules loaded in-process |
+| **Performance Requirements**   | Total plugin load time < 500ms; decoration functions should not block render                                                                         |
+| **Scalability Considerations** | Plugin count impacts startup time; plugin compatibility across Electron versions                                                                     |
+| **Security Implications**      | Plugins have full access to file system, network, and process; users must trust plugin authors; no capability-based permissions                      |
+| **Maintenance Requirements**   | 40+ hooks must remain stable for ecosystem compatibility; breaking changes require major version                                                     |
 
 #### 2.4.5 Performance optimization (F-012)
 
-| Consideration | Details |
-| --------------- | --------- |
-| **Technical Constraints** | WebGL renderer limited to 16 visible terminals simultaneously; IPC JSON encoding/decoding overhead unavoidable |
-| **Performance Requirements** | V8 snapshot must be regenerated for dependency changes; write middleware must handle high-volume data |
-| **Scalability Considerations** | WebGL allocation should prioritize visible panes rather than first-come-first-served |
-| **Security Implications** | WebGL context isolation per terminal |
-| **Maintenance Requirements** | Batching thresholds may require tuning; WebGL compatibility testing across GPU vendors |
+| Consideration                  | Details                                                                                                        |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| **Technical Constraints**      | WebGL renderer limited to 16 visible terminals simultaneously; IPC JSON encoding/decoding overhead unavoidable |
+| **Performance Requirements**   | V8 snapshot must be regenerated for dependency changes; write middleware must handle high-volume data          |
+| **Scalability Considerations** | WebGL allocation should prioritize visible panes rather than first-come-first-served                           |
+| **Security Implications**      | WebGL context isolation per terminal                                                                           |
+| **Maintenance Requirements**   | Batching thresholds may require tuning; WebGL compatibility testing across GPU vendors                         |
 
 #### 2.4.6 Cross-platform support (F-010)
 
-| Consideration | Details |
-| --------------- | --------- |
-| **Technical Constraints** | node-pty behaviour varies by platform (ConPTY vs WinPTY on Windows); platform-specific build requirements |
-| **Performance Requirements** | Native module rebuilding for each platform/architecture combination |
-| **Scalability Considerations** | x64 and arm64 builds for macOS and Windows; multiple Linux package formats |
-| **Security Implications** | Platform-specific security models (Gatekeeper on macOS, SmartScreen on Windows) |
-| **Maintenance Requirements** | electron-builder configuration for all targets; platform-specific testing required |
+| Consideration                  | Details                                                                                                   |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| **Technical Constraints**      | node-pty behaviour varies by platform (ConPTY vs WinPTY on Windows); platform-specific build requirements |
+| **Performance Requirements**   | Native module rebuilding for each platform/architecture combination                                       |
+| **Scalability Considerations** | x64 and arm64 builds for macOS and Windows; multiple Linux package formats                                |
+| **Security Implications**      | Platform-specific security models (Gatekeeper on macOS, SmartScreen on Windows)                           |
+| **Maintenance Requirements**   | electron-builder configuration for all targets; platform-specific testing required                        |
 
----
+______________________________________________________________________
 
 ### 2.5 Traceability matrix
 
 #### 2.5.1 Feature to source file mapping
 
-| Feature ID | Primary Source Files |
-| ------------ | --------------------- |
-| F-001 | `app/session.ts`, `lib/components/term.tsx` |
-| F-002 | `lib/reducers/term-groups.ts`, `lib/components/tabs.tsx`, `lib/components/split-pane.tsx` |
-| F-003 | `lib/components/searchBox.tsx`, `lib/actions/sessions.ts` |
-| F-004 | `app/config/`, `typings/config.d.ts`, `app/config/config-default.json` |
-| F-005 | `app/plugins.ts`, `app/plugins/extensions.ts`, `lib/utils/plugins.ts` |
-| F-006 | `app/keymaps/`, `lib/command-registry.ts`, `app/commands.ts` |
-| F-007 | `app/menus/`, `app/menus/menus/` |
-| F-008 | `app/updater.ts`, `app/auto-updater-linux.ts` |
-| F-009 | `cli/api.ts`, `cli/index.ts` |
-| F-010 | `electron-builder.json`, `app/utils/` |
-| F-011 | `app/notifications.ts`, `lib/components/notifications.tsx` |
-| F-012 | `app/session.ts`, `lib/store/write-middleware.ts`, `lib/v8-snapshot-util.ts` |
+| Feature ID | Primary Source Files                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------- |
+| F-001      | `app/session.ts`, `lib/components/term.tsx`                                               |
+| F-002      | `lib/reducers/term-groups.ts`, `lib/components/tabs.tsx`, `lib/components/split-pane.tsx` |
+| F-003      | `lib/components/searchBox.tsx`, `lib/actions/sessions.ts`                                 |
+| F-004      | `app/config/`, `typings/config.d.ts`, `app/config/config-default.json`                    |
+| F-005      | `app/plugins.ts`, `app/plugins/extensions.ts`, `lib/utils/plugins.ts`                     |
+| F-006      | `app/keymaps/`, `lib/command-registry.ts`, `app/commands.ts`                              |
+| F-007      | `app/menus/`, `app/menus/menus/`                                                          |
+| F-008      | `app/updater.ts`, `app/auto-updater-linux.ts`                                             |
+| F-009      | `cli/api.ts`, `cli/index.ts`                                                              |
+| F-010      | `electron-builder.json`, `app/utils/`                                                     |
+| F-011      | `app/notifications.ts`, `lib/components/notifications.tsx`                                |
+| F-012      | `app/session.ts`, `lib/store/write-middleware.ts`, `lib/v8-snapshot-util.ts`              |
 
 #### 2.5.2 Requirement to component mapping
 
-| Requirement ID | Components | Dependencies |
-| ---------------- | ------------ | -------------- |
-| F-001-RQ-001 | Session Manager, node-pty | Electron IPC |
-| F-001-RQ-002 | xterm.js, Term Component | React, Redux |
-| F-001-RQ-005 | xterm-addon-webgl | GPU driver |
-| F-002-RQ-001 | Tabs Component, Term Groups Reducer | Redux |
-| F-002-RQ-003 | SplitPane Component, Term Groups Actions | React |
-| F-003-RQ-002 | xterm-addon-search, SearchBox Component | xterm.js |
-| F-004-RQ-001 | Config Module, JSON Schema | File system |
-| F-004-RQ-004 | Chokidar, Config Module | File system |
-| F-005-RQ-001 | Plugin Loader, Extensions Registry | Node.js modules |
-| F-005-RQ-004 | React HOCs, Plugin Connectors | React |
-| F-006-RQ-001 | Keymap Loader, Command Registry | Electron |
-| F-008-RQ-002 | Updater Module, Auto-Updater | Network, Electron |
-| F-009-RQ-001 | CLI API, Bun | npm registry |
+| Requirement ID | Components                               | Dependencies      |
+| -------------- | ---------------------------------------- | ----------------- |
+| F-001-RQ-001   | Session Manager, node-pty                | Electron IPC      |
+| F-001-RQ-002   | xterm.js, Term Component                 | React, Redux      |
+| F-001-RQ-005   | xterm-addon-webgl                        | GPU driver        |
+| F-002-RQ-001   | Tabs Component, Term Groups Reducer      | Redux             |
+| F-002-RQ-003   | SplitPane Component, Term Groups Actions | React             |
+| F-003-RQ-002   | xterm-addon-search, SearchBox Component  | xterm.js          |
+| F-004-RQ-001   | Config Module, JSON Schema               | File system       |
+| F-004-RQ-004   | Chokidar, Config Module                  | File system       |
+| F-005-RQ-001   | Plugin Loader, Extensions Registry       | Node.js modules   |
+| F-005-RQ-004   | React HOCs, Plugin Connectors            | React             |
+| F-006-RQ-001   | Keymap Loader, Command Registry          | Electron          |
+| F-008-RQ-002   | Updater Module, Auto-Updater             | Network, Electron |
+| F-009-RQ-001   | CLI API, Bun                             | npm registry      |
 
----
+______________________________________________________________________
 
 ### 2.6 References
 
@@ -1607,21 +1609,21 @@ flowchart TB
 
 ## 3. Technology stack
 
-This section provides a comprehensive reference of the technologies, frameworks,
-libraries, and tools that comprise Velocetty's technical foundation. As a fork
-of the Hyper terminal emulator originally developed by Vercel, Velocetty
-inherits a mature, web-standards-based technology stack optimized for terminal
-emulation across desktop platforms.
+This section provides a comprehensive reference of the technologies,
+frameworks, libraries, and tools that comprise Velocetty's technical
+foundation. As a fork of the Hyper terminal emulator originally developed by
+Vercel, Velocetty inherits a mature, web-standards-based technology stack
+optimized for terminal emulation across desktop platforms.
 
 ### 3.1 Programming languages
 
 #### 3.1.1 Primary language: TypeScript
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Version** | 5.4.5 |
-| **Target** | ES2022 |
-| **Module System** | CommonJS |
+| Attribute         | Value                                         |
+| ----------------- | --------------------------------------------- |
+| **Version**       | 5.4.5                                         |
+| **Target**        | ES2022                                        |
+| **Module System** | CommonJS                                      |
 | **Configuration** | `tsconfig.base.json` with strict mode enabled |
 
 Compilation and type checking use `tsgo` from `@typescript/native-preview`
@@ -1668,20 +1670,20 @@ Base Configuration (tsconfig.base.json):
 
 #### 3.1.2 Secondary languages
 
-| Language | Usage | Locations |
-| ---------- | ------- | ----------- |
-| **JavaScript** | Configuration files, legacy interop | `release.js`, `scripts/` |
-| **JSON** | Configuration, schemas, package manifests | `package.json`, `schema.json`, `*.json` keymaps |
-| **CSS** | Styling within styled-jsx templates | Embedded in React components |
+| Language       | Usage                                     | Locations                                       |
+| -------------- | ----------------------------------------- | ----------------------------------------------- |
+| **JavaScript** | Configuration files, legacy interop       | `release.js`, `scripts/`                        |
+| **JSON**       | Configuration, schemas, package manifests | `package.json`, `schema.json`, `*.json` keymaps |
+| **CSS**        | Styling within styled-jsx templates       | Embedded in React components                    |
 
 #### 3.1.3 Language constraints and dependencies
 
-| Constraint | Description |
-| ------------ | ------------- |
-| **Node.js Runtime** | Application code executes as JavaScript in Node.js 24.x (bundled with Electron 40); TypeScript is compiled during build |
-| **Chromium V8** | Renderer process JavaScript executed by Chromium's V8 engine |
-| **Native Module Compatibility** | `node-pty` requires matching Node.js ABI version for native bindings |
-| **ES Module Limitations** | CommonJS required for Electron main process compatibility |
+| Constraint                      | Description                                                                                                             |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Node.js Runtime**             | Application code executes as JavaScript in Node.js 24.x (bundled with Electron 40); TypeScript is compiled during build |
+| **Chromium V8**                 | Renderer process JavaScript executed by Chromium's V8 engine                                                            |
+| **Native Module Compatibility** | `node-pty` requires matching Node.js ABI version for native bindings                                                    |
+| **ES Module Limitations**       | CommonJS required for Electron main process compatibility                                                               |
 
 ### 3.2 Frameworks & libraries
 
@@ -1715,13 +1717,13 @@ flowchart TB
 
 ##### Core framework: Electron
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Package** | `electron` |
-| **Version** | 40.2.1 |
-| **Chromium Version** | 144.0.7559.111 |
-| **Node.js Version** | 24.11.1 (bundled) |
-| **Support Status** | Current baseline on the Architecture Decision Record (ADR)-004 migration path |
+| Attribute            | Value                                                                         |
+| -------------------- | ----------------------------------------------------------------------------- |
+| **Package**          | `electron`                                                                    |
+| **Version**          | 40.2.1                                                                        |
+| **Chromium Version** | 144.0.7559.111                                                                |
+| **Node.js Version**  | 24.11.1 (bundled)                                                             |
+| **Support Status**   | Current baseline on the Architecture Decision Record (ADR)-004 migration path |
 
 **Selection Justification**: Electron provides the cross-platform desktop
 application framework enabling Velocetty to deliver consistent terminal
@@ -1736,9 +1738,9 @@ current.
 
 ##### IPC communication layer
 
-| Package | Version | Purpose |
-| --------- | --------- | --------- |
-| `@electron/remote` | 2.1.2 | Enables renderer process access to main process modules |
+| Package            | Version | Purpose                                                 |
+| ------------------ | ------- | ------------------------------------------------------- |
+| `@electron/remote` | 2.1.2   | Enables renderer process access to main process modules |
 
 **Architectural Note**: The `@electron/remote` package facilitates the
 communication pattern between processes, though its use is being deprecated in
@@ -1772,27 +1774,27 @@ flowchart LR
 
 ##### React ecosystem
 
-| Package | Version | Purpose | Justification |
-| --------- | --------- | --------- | --------------- |
-| `react` | 19.2.4 | Component-based UI architecture | Industry-standard for complex UIs; enables plugin decoration pattern |
-| `react-dom` | 19.2.4 | DOM rendering bindings | Required for React browser rendering |
-| `styled-jsx` | 5.1.2 | Scoped CSS-in-JS styling | Provides component-local styles without global CSS conflicts |
-| `stylis` | 3.5.4 | CSS preprocessing | Runtime CSS processing for styled-jsx |
+| Package      | Version | Purpose                         | Justification                                                        |
+| ------------ | ------- | ------------------------------- | -------------------------------------------------------------------- |
+| `react`      | 19.2.4  | Component-based UI architecture | Industry-standard for complex UIs; enables plugin decoration pattern |
+| `react-dom`  | 19.2.4  | DOM rendering bindings          | Required for React browser rendering                                 |
+| `styled-jsx` | 5.1.2   | Scoped CSS-in-JS styling        | Provides component-local styles without global CSS conflicts         |
+| `stylis`     | 3.5.4   | CSS preprocessing               | Runtime CSS processing for styled-jsx                                |
 
-**Selection Justification**: React was chosen for its composability model, which
-directly enables Velocetty's powerful plugin decoration system. Plugins can wrap
-and extend React components (tabs, header, terminal view, split panes) through
-the `decorate*` hooks defined in the extension API.
+**Selection Justification**: React was chosen for its composability model,
+which directly enables Velocetty's powerful plugin decoration system. Plugins
+can wrap and extend React components (tabs, header, terminal view, split panes)
+through the `decorate*` hooks defined in the extension API.
 
 ##### Redux state management
 
-| Package | Version | Purpose | Justification |
-| --------- | --------- | --------- | --------------- |
-| `redux` | 5.0.1 | Centralized state container | Predictable state for complex multi-session UI |
-| `react-redux` | 9.2.0 | React-Redux bindings | Connect React components to Redux store |
-| `redux-thunk` | 3.1.0 | Async action middleware | Handle asynchronous operations (PTY data, plugin loading) |
-| `reselect` | 4.1.8 | Memoized selector library | Performance optimization for derived state |
-| `seamless-immutable` | 7.1.4 | Immutable data structures | Prevent accidental state mutations |
+| Package              | Version | Purpose                     | Justification                                             |
+| -------------------- | ------- | --------------------------- | --------------------------------------------------------- |
+| `redux`              | 5.0.1   | Centralized state container | Predictable state for complex multi-session UI            |
+| `react-redux`        | 9.2.0   | React-Redux bindings        | Connect React components to Redux store                   |
+| `redux-thunk`        | 3.1.0   | Async action middleware     | Handle asynchronous operations (PTY data, plugin loading) |
+| `reselect`           | 4.1.8   | Memoized selector library   | Performance optimization for derived state                |
+| `seamless-immutable` | 7.1.4   | Immutable data structures   | Prevent accidental state mutations                        |
 
 **Architectural Pattern**: The Redux store manages three primary state slices:
 
@@ -1807,8 +1809,9 @@ the `decorate*` hooks defined in the extension API.
   structure
 
 **Performance Optimization**: The `SESSION_PTY_DATA` action bypasses Redux
-middleware entirely via the write middleware pattern (`lib/store/write-
-middleware.ts`) to minimize latency for high-volume terminal output.
+middleware entirely via the write middleware pattern
+(`lib/store/write- middleware.ts`) to minimize latency for high-volume terminal
+output.
 
 #### 3.2.3 Terminal emulation stack
 
@@ -1839,9 +1842,9 @@ flowchart TB
 
 ### xterm.js core
 
-| Package | Version | Purpose |
-| --------- | --------- | --------- |
-| `xterm` | 5.3.0 | Full terminal emulation (VT100/xterm) |
+| Package | Version | Purpose                               |
+| ------- | ------- | ------------------------------------- |
+| `xterm` | 5.3.0   | Full terminal emulation (VT100/xterm) |
 
 **Selection Justification**: xterm.js is the industry-standard terminal
 emulation library for web applications, powering VS Code, Hyper, Tabby, and
@@ -1859,10 +1862,10 @@ numerous other terminal interfaces. It provides:
 
 #### Rendering addons
 
-| Package | Version | Purpose | Constraint |
-| --------- | --------- | --------- | ------------ |
-| `xterm-addon-webgl` | 0.16.0 | Hardware-accelerated GPU rendering | **Maximum 16 simultaneous WebGL contexts** |
-| `xterm-addon-canvas` | 0.5.0 | Canvas-based fallback renderer | Used when WebGL unavailable or contexts exhausted |
+| Package              | Version | Purpose                            | Constraint                                        |
+| -------------------- | ------- | ---------------------------------- | ------------------------------------------------- |
+| `xterm-addon-webgl`  | 0.16.0  | Hardware-accelerated GPU rendering | **Maximum 16 simultaneous WebGL contexts**        |
+| `xterm-addon-canvas` | 0.5.0   | Canvas-based fallback renderer     | Used when WebGL unavailable or contexts exhausted |
 
 **Critical Constraint**: The WebGL renderer is limited to 16 simultaneous
 terminal contexts. This browser-level limitation means that when viewing more
@@ -1872,14 +1875,14 @@ than using first-come-first-served allocation.
 
 ##### Feature addons
 
-| Package | Version | Purpose |
-| --------- | --------- | --------- |
-| `xterm-addon-fit` | 0.8.0 | Automatic terminal sizing to container |
-| `xterm-addon-search` | 0.13.0 | In-terminal text search with regex support |
-| `xterm-addon-web-links` | 0.9.0 | Clickable URL detection and handling |
-| `xterm-addon-image` | 0.5.0 | Terminal image protocol support |
-| `xterm-addon-ligatures` | 0.7.0 | Programming font ligature rendering |
-| `xterm-addon-unicode11` | 0.6.0 | Unicode 11 character width support |
+| Package                 | Version | Purpose                                    |
+| ----------------------- | ------- | ------------------------------------------ |
+| `xterm-addon-fit`       | 0.8.0   | Automatic terminal sizing to container     |
+| `xterm-addon-search`    | 0.13.0  | In-terminal text search with regex support |
+| `xterm-addon-web-links` | 0.9.0   | Clickable URL detection and handling       |
+| `xterm-addon-image`     | 0.5.0   | Terminal image protocol support            |
+| `xterm-addon-ligatures` | 0.7.0   | Programming font ligature rendering        |
+| `xterm-addon-unicode11` | 0.6.0   | Unicode 11 character width support         |
 
 **Rendering Architecture Note**: xterm.js renders terminal output to a canvas
 element, not a DOM structure. This means plugins cannot directly manipulate
@@ -1888,14 +1891,14 @@ indicators) must use explicit APIs rather than DOM inspection.
 
 #### 3.2.4 PTY and shell integration
 
-| Package | Version | Purpose |
-| --------- | --------- | --------- |
-| `node-pty` | 1.0.0 | Native pseudo-terminal spawning |
-| `default-shell` | 1.0.1 | System default shell detection |
-| `shell-env` | 3.0.1 | Shell environment extraction |
-| `os-locale` | 5.0.0 | System locale detection |
-| `sudo-prompt` | 9.2.1 | Elevated privilege execution (macOS/Linux) |
-| `native-reg` | 1.1.1 | Windows registry access (optional dependency) |
+| Package         | Version | Purpose                                       |
+| --------------- | ------- | --------------------------------------------- |
+| `node-pty`      | 1.0.0   | Native pseudo-terminal spawning               |
+| `default-shell` | 1.0.1   | System default shell detection                |
+| `shell-env`     | 3.0.1   | Shell environment extraction                  |
+| `os-locale`     | 5.0.0   | System locale detection                       |
+| `sudo-prompt`   | 9.2.1   | Elevated privilege execution (macOS/Linux)    |
+| `native-reg`    | 1.1.1   | Windows registry access (optional dependency) |
 
 **Selection Justification**: `node-pty` provides the native binding layer
 between Node.js and operating system pseudo-terminal facilities. It supports:
@@ -1911,32 +1914,32 @@ configuration.
 
 #### 3.2.5 Utility libraries
 
-| Category | Package | Version | Purpose |
-| ---------- | --------- | --------- | --------- |
-| **File Operations** | `fs-extra` | 11.2.0 | Enhanced file system operations |
-| **File Watching** | `chokidar` | 3.6.0 | Configuration hot-reload |
-| **HTTP Client** | `got` | 12.4.1 | Plugin registry requests |
-| **Electron HTTP** | `electron-fetch` | 1.9.1 | Main process HTTP requests |
-| **Retry Logic** | `async-retry` | 1.3.3 | Retryable network operations |
-| **Storage** | `electron-store` | 8.2.0 | Window state persistence |
-| **Utility Functions** | `lodash` | 4.17.21 | General utilities |
-| **UUID Generation** | `uuid` | 9.0.1 | Unique identifier generation |
-| **Version Parsing** | `semver` | 7.6.0 | Semantic version comparison |
-| **Time Parsing** | `ms` | 2.1.3 | Human-readable time strings |
-| **URL Parsing** | `parse-url` | 8.1.0 | SSH URL handling |
-| **Colour Utilities** | `color` | 4.2.3 | Colour manipulation |
-| **Class Names** | `clsx` | 2.1.0 | Conditional className composition |
-| **Plist Parsing** | `plist` | 3.1.0 | macOS plist file support |
-| **Keyboard Shortcuts** | `mousetrap` | Fork: `chabou/mousetrap#useCapture` | Keyboard shortcut handling |
+| Category               | Package          | Version                             | Purpose                           |
+| ---------------------- | ---------------- | ----------------------------------- | --------------------------------- |
+| **File Operations**    | `fs-extra`       | 11.2.0                              | Enhanced file system operations   |
+| **File Watching**      | `chokidar`       | 3.6.0                               | Configuration hot-reload          |
+| **HTTP Client**        | `got`            | 12.4.1                              | Plugin registry requests          |
+| **Electron HTTP**      | `electron-fetch` | 1.9.1                               | Main process HTTP requests        |
+| **Retry Logic**        | `async-retry`    | 1.3.3                               | Retryable network operations      |
+| **Storage**            | `electron-store` | 8.2.0                               | Window state persistence          |
+| **Utility Functions**  | `lodash`         | 4.17.21                             | General utilities                 |
+| **UUID Generation**    | `uuid`           | 9.0.1                               | Unique identifier generation      |
+| **Version Parsing**    | `semver`         | 7.6.0                               | Semantic version comparison       |
+| **Time Parsing**       | `ms`             | 2.1.3                               | Human-readable time strings       |
+| **URL Parsing**        | `parse-url`      | 8.1.0                               | SSH URL handling                  |
+| **Colour Utilities**   | `color`          | 4.2.3                               | Colour manipulation               |
+| **Class Names**        | `clsx`           | 2.1.0                               | Conditional className composition |
+| **Plist Parsing**      | `plist`          | 3.1.0                               | macOS plist file support          |
+| **Keyboard Shortcuts** | `mousetrap`      | Fork: `chabou/mousetrap#useCapture` | Keyboard shortcut handling        |
 
 ### 3.3 Open source dependencies
 
 #### 3.3.1 Package registry configuration
 
-| Registry | Purpose |
-| ---------- | --------- |
-| **npm** | Primary package registry for all JavaScript/TypeScript dependencies |
-| **registry-url** | Dynamic registry resolution for plugin installation |
+| Registry         | Purpose                                                             |
+| ---------------- | ------------------------------------------------------------------- |
+| **npm**          | Primary package registry for all JavaScript/TypeScript dependencies |
+| **registry-url** | Dynamic registry resolution for plugin installation                 |
 
 #### 3.3.2 Root package dependencies
 
@@ -1990,19 +1993,19 @@ Optional Dependencies:
 
 #### 3.3.4 Dependency version policy
 
-| Policy | Description |
-| -------- | ------------- |
+| Policy             | Description                                                                                        |
+| ------------------ | -------------------------------------------------------------------------------------------------- |
 | **Exact Versions** | Critical dependencies (Electron, React, xterm.js) use exact versions to ensure reproducible builds |
-| **Caret Ranges** | Utility libraries use caret (`^`) ranges for automatic patch updates |
-| **Lock File** | `bun.lock` ensures consistent dependency resolution across environments |
+| **Caret Ranges**   | Utility libraries use caret (`^`) ranges for automatic patch updates                               |
+| **Lock File**      | `bun.lock` ensures consistent dependency resolution across environments                            |
 
 #### 3.3.5 Security considerations
 
-| Consideration | Mitigation |
-| --------------- | ------------ |
-| **Supply Chain Risk** | Dependency audit via `bun run audit` (wrapper for `bun audit`) in CI pipeline |
-| **Native Module Security** | `node-pty` executes with user privileges; no elevation by default |
-| **Plugin Trust Model** | Plugins are full-trust Node.js modules with unrestricted access |
+| Consideration              | Mitigation                                                                    |
+| -------------------------- | ----------------------------------------------------------------------------- |
+| **Supply Chain Risk**      | Dependency audit via `bun run audit` (wrapper for `bun audit`) in CI pipeline |
+| **Native Module Security** | `node-pty` executes with user privileges; no elevation by default             |
+| **Plugin Trust Model**     | Plugins are full-trust Node.js modules with unrestricted access               |
 
 ### 3.4 Third-party services
 
@@ -2031,13 +2034,13 @@ flowchart LR
 
 #### 3.4.2 Auto-update service
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Stable Channel URL** | `<https://releases.hyper.is/update/{platform}/{version}`> |
+| Attribute              | Value                                                                  |
+| ---------------------- | ---------------------------------------------------------------------- |
+| **Stable Channel URL** | `<https://releases.hyper.is/update/{platform}/{version}`>              |
 | **Canary Channel URL** | `<https://releases-canary.hyper.is/update/{platform}_arm64/{version}`> |
-| **Protocol** | HTTPS (TLS 1.2+) |
-| **Polling Interval** | 10 seconds initial, then 30 minutes |
-| **Implementation** | `app/updater.ts`, `app/auto-updater-linux.ts` |
+| **Protocol**           | HTTPS (TLS 1.2+)                                                       |
+| **Polling Interval**   | 10 seconds initial, then 30 minutes                                    |
+| **Implementation**     | `app/updater.ts`, `app/auto-updater-linux.ts`                          |
 
 **Service Dependencies**:
 
@@ -2047,9 +2050,9 @@ flowchart LR
 
 #### 3.4.3 Plugin discovery and distribution
 
-| Service | Endpoint | Purpose |
-| --------- | ---------- | --------- |
-| **npm Registry** | `registry.npmjs.org` | Plugin package installation and updates |
+| Service            | Endpoint                | Purpose                                 |
+| ------------------ | ----------------------- | --------------------------------------- |
+| **npm Registry**   | `registry.npmjs.org`    | Plugin package installation and updates |
 | **npms.io Search** | `api.npms.io/v2/search` | Plugin discovery via `hyper search` CLI |
 
 **Plugin Tags**:
@@ -2060,17 +2063,17 @@ flowchart LR
 
 #### 3.4.4 Notification service
 
-| Attribute | Value |
-| ----------- | ------- |
-| **Endpoint** | `NEWS_URL` constant (configurable) |
-| **Headers** | `X-Hyper-Version`, `X-Hyper-Platform` |
-| **Purpose** | Fetch product announcements and notifications |
-| **Implementation** | `app/notifications.ts` |
+| Attribute          | Value                                         |
+| ------------------ | --------------------------------------------- |
+| **Endpoint**       | `NEWS_URL` constant (configurable)            |
+| **Headers**        | `X-Hyper-Version`, `X-Hyper-Platform`         |
+| **Purpose**        | Fetch product announcements and notifications |
+| **Implementation** | `app/notifications.ts`                        |
 
 #### 3.4.5 Protocol handlers
 
-| Protocol | Handler | Registration |
-| ---------- | --------- | -------------- |
+| Protocol | Handler            | Registration                                  |
+| -------- | ------------------ | --------------------------------------------- |
 | `ssh://` | Default SSH client | `electron-builder.json` protocol registration |
 
 ### 3.5 Databases & storage
@@ -2109,19 +2112,19 @@ flowchart TB
 
 #### 3.5.2 Configuration storage
 
-| Storage Type | Technology | Location | Purpose |
-| -------------- | ------------ | ---------- | --------- |
-| **User Configuration** | JSON File | `~/.config/Hyper/hyper.json` | User settings, profiles, plugin list |
-| **Configuration Schema** | JSON Schema | `app/config/schema.json` | Configuration validation |
-| **Legacy Migration** | JavaScript → JSON | Auto-converted from `.hyper.js` | Backward compatibility |
+| Storage Type             | Technology        | Location                        | Purpose                              |
+| ------------------------ | ----------------- | ------------------------------- | ------------------------------------ |
+| **User Configuration**   | JSON File         | `~/.config/Hyper/hyper.json`    | User settings, profiles, plugin list |
+| **Configuration Schema** | JSON Schema       | `app/config/schema.json`        | Configuration validation             |
+| **Legacy Migration**     | JavaScript → JSON | Auto-converted from `.hyper.js` | Backward compatibility               |
 
 ##### Platform-specific paths
 
-| Platform | Configuration Directory |
-| ---------- | ------------------------ |
-| **Linux** | `$XDG_CONFIG_HOME/Hyper` or `~/.config/Hyper` |
-| **macOS** | `~/.config/Hyper` |
-| **Windows** | `%APPDATA%/Hyper` |
+| Platform    | Configuration Directory                       |
+| ----------- | --------------------------------------------- |
+| **Linux**   | `$XDG_CONFIG_HOME/Hyper` or `~/.config/Hyper` |
+| **macOS**   | `~/.config/Hyper`                             |
+| **Windows** | `%APPDATA%/Hyper`                             |
 
 ##### Configuration file structure
 
@@ -2136,10 +2139,10 @@ Configuration Directory:
 
 #### 3.5.3 Application state storage
 
-| Storage Type | Technology | Persistence | Purpose |
-| -------------- | ------------ | ------------- | --------- |
-| **Window State** | `electron-store` | Persisted across restarts | Window position, size, maximized state |
-| **Session State** | Redux (in-memory) | Lost on restart | Active sessions, terminal content, tab state |
+| Storage Type      | Technology        | Persistence               | Purpose                                      |
+| ----------------- | ----------------- | ------------------------- | -------------------------------------------- |
+| **Window State**  | `electron-store`  | Persisted across restarts | Window position, size, maximized state       |
+| **Session State** | Redux (in-memory) | Lost on restart           | Active sessions, terminal content, tab state |
 
 **Design Decision**: Session state (including terminal scrollback) is
 intentionally not persisted across application restarts. This aligns with
@@ -2148,28 +2151,28 @@ with persisting command history.
 
 #### 3.5.4 Plugin storage
 
-| Location | Purpose |
-| ---------- | --------- |
-| `~/.config/Hyper/plugins/node_modules/` | Installed plugin packages from npm |
-| `~/.config/Hyper/plugins/local/` | User-created or migrated local plugins |
-| `~/.config/Hyper/plugins/package.json` | Plugin dependency manifest |
+| Location                                | Purpose                                |
+| --------------------------------------- | -------------------------------------- |
+| `~/.config/Hyper/plugins/node_modules/` | Installed plugin packages from npm     |
+| `~/.config/Hyper/plugins/local/`        | User-created or migrated local plugins |
+| `~/.config/Hyper/plugins/package.json`  | Plugin dependency manifest             |
 
 #### 3.5.5 Data persistence strategy
 
-| Data Type | Strategy | Rationale |
-| ----------- | ---------- | ----------- |
-| **Configuration** | File-based JSON with hot-reload | Enables programmatic editing and preferences UI |
-| **Window Geometry** | electron-store (encrypted JSON) | Persist user's window arrangement preferences |
-| **Terminal Content** | In-memory only | Security and privacy (no command history logging) |
-| **Plugin State** | File system + npm manifest | Standard npm package management model |
+| Data Type            | Strategy                        | Rationale                                         |
+| -------------------- | ------------------------------- | ------------------------------------------------- |
+| **Configuration**    | File-based JSON with hot-reload | Enables programmatic editing and preferences UI   |
+| **Window Geometry**  | electron-store (encrypted JSON) | Persist user's window arrangement preferences     |
+| **Terminal Content** | In-memory only                  | Security and privacy (no command history logging) |
+| **Plugin State**     | File system + npm manifest      | Standard npm package management model             |
 
 #### 3.5.6 Caching strategy
 
-| Cache Type | Implementation | Purpose |
-| ------------ | ---------------- | --------- |
-| **Configuration Cache** | In-memory after file load | Avoid repeated file I/O |
-| **Hot-Reload** | chokidar file watching | Detect configuration changes without restart |
-| **V8 Snapshot** | Precompiled JavaScript snapshot | Faster application startup |
+| Cache Type              | Implementation                  | Purpose                                      |
+| ----------------------- | ------------------------------- | -------------------------------------------- |
+| **Configuration Cache** | In-memory after file load       | Avoid repeated file I/O                      |
+| **Hot-Reload**          | chokidar file watching          | Detect configuration changes without restart |
+| **V8 Snapshot**         | Precompiled JavaScript snapshot | Faster application startup                   |
 
 ### 3.6 Development & deployment
 
@@ -2207,22 +2210,22 @@ flowchart TB
 
 #### 3.6.2 Core build tools
 
-| Tool | Version | Purpose |
-| ------ | --------- | --------- |
-| **esbuild** | 0.25.12 | Bundling, transpilation, and minification for renderer and CLI |
-| **Babel (targeted bridge)** | 7.24.x | `styled-jsx` transform path used by esbuild plugin |
-| **tsgo (TypeScript native preview)** | 7.0.0-dev.20260128.1 | Type checking and transpilation |
+| Tool                                 | Version              | Purpose                                                        |
+| ------------------------------------ | -------------------- | -------------------------------------------------------------- |
+| **esbuild**                          | 0.25.12              | Bundling, transpilation, and minification for renderer and CLI |
+| **Babel (targeted bridge)**          | 7.24.x               | `styled-jsx` transform path used by esbuild plugin             |
+| **tsgo (TypeScript native preview)** | 7.0.0-dev.20260128.1 | Type checking and transpilation                                |
 
 #### 3.6.3 esbuild target configuration
 
 Velocetty uses one esbuild entrypoint script (`build/esbuild/build.ts`) that
 builds three targets:
 
-| Configuration | Target | Entry | Output |
-| --------------- | -------- | ------- | -------- |
-| **hyper-app** | `electron-main` | Copy-only static assets | `target/` directory |
-| **hyper** | `electron-renderer` | `lib/index.tsx` | `target/renderer/bundle.js` |
-| **hyper-cli** | Node.js | `cli/index.ts` | `bin/cli.js` |
+| Configuration | Target              | Entry                   | Output                      |
+| ------------- | ------------------- | ----------------------- | --------------------------- |
+| **hyper-app** | `electron-main`     | Copy-only static assets | `target/` directory         |
+| **hyper**     | `electron-renderer` | `lib/index.tsx`         | `target/renderer/bundle.js` |
+| **hyper-cli** | Node.js             | `cli/index.ts`          | `bin/cli.js`                |
 
 #### 3.6.4 Development workflow
 
@@ -2251,26 +2254,26 @@ bun run dist       # Build + electron-builder packaging
 
 #### 3.6.5 Testing framework
 
-| Tool | Version | Purpose |
-| ---- | ------- | ------- |
-| **Bun test runner** | 1.3.11 | Unit test runner (Jest-compatible) |
-| **Playwright** | 1.43.1 | End-to-end testing for packaged application |
-| **Bun `mock.module`** | 1.3.11 | Module mocking for unit tests |
+| Tool                  | Version | Purpose                                     |
+| --------------------- | ------- | ------------------------------------------- |
+| **Bun test runner**   | 1.3.11  | Unit test runner (Jest-compatible)          |
+| **Playwright**        | 1.43.1  | End-to-end testing for packaged application |
+| **Bun `mock.module`** | 1.3.11  | Module mocking for unit tests               |
 
 ##### Test configurations
 
-| Configuration | Location | Timeout | Purpose |
-| ------------- | -------- | ------- | ------- |
-| `*.test.ts` | `test/unit/` | Default | Unit tests |
-| `*.test.ts` | `test/e2e/` | 30 seconds | End-to-end tests (gated) |
+| Configuration | Location     | Timeout    | Purpose                  |
+| ------------- | ------------ | ---------- | ------------------------ |
+| `*.test.ts`   | `test/unit/` | Default    | Unit tests               |
+| `*.test.ts`   | `test/e2e/`  | 30 seconds | End-to-end tests (gated) |
 
 #### 3.6.6 Code quality tools
 
-| Tool | Version | Purpose |
-| ------ | --------- | --------- |
-| **ESLint** | 8.57.0 | Linting with TypeScript, React, Import plugins |
-| **Prettier** | 3.2.5 | Code formatting (120 cols, 2 spaces, single quotes) |
-| **Husky** | 9.0.11 | Git hooks for pre-commit linting |
+| Tool         | Version | Purpose                                             |
+| ------------ | ------- | --------------------------------------------------- |
+| **ESLint**   | 8.57.0  | Linting with TypeScript, React, Import plugins      |
+| **Prettier** | 3.2.5   | Code formatting (120 cols, 2 spaces, single quotes) |
+| **Husky**    | 9.0.11  | Git hooks for pre-commit linting                    |
 
 #### 3.6.7 CI/CD pipeline
 
@@ -2313,47 +2316,47 @@ flowchart LR
 
 ##### GitHub actions workflows
 
-| Workflow | Purpose |
-| ---------- | --------- |
-| `nodejs.yml` | Multi-platform CI build and test |
-| `codeql-analysis.yml` | Security vulnerability scanning |
-| `e2e_comment.yml` | Post E2E results to pull requests |
+| Workflow              | Purpose                           |
+| --------------------- | --------------------------------- |
+| `nodejs.yml`          | Multi-platform CI build and test  |
+| `codeql-analysis.yml` | Security vulnerability scanning   |
+| `e2e_comment.yml`     | Post E2E results to pull requests |
 
 ##### CI pipeline features
 
-| Feature | Implementation |
-| --------- | ---------------- |
-| **Node.js Version** | 24.x |
-| **Caching** | Bun cache for faster installs |
+| Feature             | Implementation                                |
+| ------------------- | --------------------------------------------- |
+| **Node.js Version** | 24.x                                          |
+| **Caching**         | Bun cache for faster installs                 |
 | **Matrix Strategy** | `[macos-latest, ubuntu-latest, windows-2022]` |
-| **Native Modules** | Automatic node-pty rebuilding per platform |
-| **Artefacts** | Installer uploads for each platform |
-| **E2E Reporting** | Screenshot capture with Imgur upload |
+| **Native Modules**  | Automatic node-pty rebuilding per platform    |
+| **Artefacts**       | Installer uploads for each platform           |
+| **E2E Reporting**   | Screenshot capture with Imgur upload          |
 
 #### 3.6.8 Packaging and distribution
 
 ##### Electron-builder configuration
 
-| Platform | Formats | Architectures |
-| ---------- | --------- | --------------- |
-| **macOS** | DMG, ZIP | x64, arm64 (Apple Silicon) |
-| **Windows** | NSIS installer | x64, arm64 |
-| **Linux** | deb, rpm, AppImage, snap, pacman | x64 (arm64 via separate job) |
+| Platform    | Formats                          | Architectures                |
+| ----------- | -------------------------------- | ---------------------------- |
+| **macOS**   | DMG, ZIP                         | x64, arm64 (Apple Silicon)   |
+| **Windows** | NSIS installer                   | x64, arm64                   |
+| **Linux**   | deb, rpm, AppImage, snap, pacman | x64 (arm64 via separate job) |
 
 ##### Code signing
 
-| Platform | Mechanism |
-| ---------- | ----------- |
-| **macOS** | Notarization via `bin/notarize.js`, entitlements in `build/mac/entitlements.plist` |
-| **Windows** | RFC3161 timestamping via Comodo |
-| **Linux** | No code signing (user trust model) |
+| Platform    | Mechanism                                                                          |
+| ----------- | ---------------------------------------------------------------------------------- |
+| **macOS**   | Notarization via `bin/notarize.js`, entitlements in `build/mac/entitlements.plist` |
+| **Windows** | RFC3161 timestamping via Comodo                                                    |
+| **Linux**   | No code signing (user trust model)                                                 |
 
 #### 3.6.9 V8 snapshot optimization
 
-| Tool | Purpose |
-| ------ | --------- |
+| Tool                  | Purpose                                  |
+| --------------------- | ---------------------------------------- |
 | `electron-mksnapshot` | Generate V8 snapshots for faster startup |
-| `electron-link` | Module linking for snapshot generation |
+| `electron-link`       | Module linking for snapshot generation   |
 
 **Scripts**: `v8-snapshot`, `mk-snapshot`, `cp-snapshot` in `package.json`
 
@@ -2383,109 +2386,109 @@ flowchart TB
 
 #### 3.7.2 Version compatibility requirements
 
-| Integration | Requirement | Constraint |
-| ------------- | ------------- | ------------ |
-| **Electron ↔ Node.js** | Bundled Node.js 24.11.1 | Native modules must target this Application Binary Interface (ABI) |
-| **Electron ↔ Chromium** | Chromium 144.0.7559.111 bundled | WebGL/Canvas rendering APIs |
-| **React ↔ Redux** | react-redux 9.x | Requires React 18.0+ hooks API |
-| **xterm.js ↔ Addons** | xterm 5.x series | Addons must match major version |
-| **node-pty ↔ Electron** | Rebuild required per version | `electron-rebuild` in post-install |
+| Integration             | Requirement                     | Constraint                                                         |
+| ----------------------- | ------------------------------- | ------------------------------------------------------------------ |
+| **Electron ↔ Node.js**  | Bundled Node.js 24.11.1         | Native modules must target this Application Binary Interface (ABI) |
+| **Electron ↔ Chromium** | Chromium 144.0.7559.111 bundled | WebGL/Canvas rendering APIs                                        |
+| **React ↔ Redux**       | react-redux 9.x                 | Requires React 18.0+ hooks API                                     |
+| **xterm.js ↔ Addons**   | xterm 5.x series                | Addons must match major version                                    |
+| **node-pty ↔ Electron** | Rebuild required per version    | `electron-rebuild` in post-install                                 |
 
 #### 3.7.3 Plugin integration requirements
 
-| Requirement | Description |
-| ------------- | ------------- |
-| **Module Format** | CommonJS (required for Electron main process) |
-| **React Version** | Must be compatible with React 19 |
-| **Redux Middleware** | Must follow Redux middleware signature |
+| Requirement            | Description                                        |
+| ---------------------- | -------------------------------------------------- |
+| **Module Format**      | CommonJS (required for Electron main process)      |
+| **React Version**      | Must be compatible with React 19                   |
+| **Redux Middleware**   | Must follow Redux middleware signature             |
 | **Decoration Pattern** | Must compose with existing components, not replace |
 
 #### 3.7.4 Security considerations
 
-| Consideration | Current State | Mitigation |
-| --------------- | --------------- | ------------ |
-| **Electron upgrade trajectory** | Electron 40 baseline adopted | Keep Electron 40 patch releases current |
-| **Plugin Trust Model** | Full-trust execution (no sandboxing) | User education; future sandbox consideration |
-| **IPC Security** | `@electron/remote` enables cross-process access | Migrate to explicit IPC messaging |
-| **Native Module Access** | `node-pty` has full system access | Runs with user privileges only |
+| Consideration                   | Current State                                   | Mitigation                                   |
+| ------------------------------- | ----------------------------------------------- | -------------------------------------------- |
+| **Electron upgrade trajectory** | Electron 40 baseline adopted                    | Keep Electron 40 patch releases current      |
+| **Plugin Trust Model**          | Full-trust execution (no sandboxing)            | User education; future sandbox consideration |
+| **IPC Security**                | `@electron/remote` enables cross-process access | Migrate to explicit IPC messaging            |
+| **Native Module Access**        | `node-pty` has full system access               | Runs with user privileges only               |
 
 ### 3.8 Technology stack summary
 
 #### 3.8.1 Layer overview
 
-| Layer | Primary Technologies | Purpose |
-| ------- | --------------------- | --------- |
-| **Application Shell** | Electron 40.2.1 | Cross-platform desktop framework |
-| **Main Process** | Node.js/TypeScript, node-pty | OS integration, PTY management |
-| **Renderer Process** | React 19.2.4, Redux 5.0.1 | UI components, state management |
-| **Terminal Rendering** | xterm.js 5.3.0 + WebGL addon | Terminal emulation and display |
-| **Build System** | esbuild 0.25.12, tsgo 7.0.0-dev.20260128.1, node-gyp 10.x, node-gyp-build 4.x | Module bundling, type safety, native module compilation |
-| **Distribution** | electron-builder 24.13.3 | Cross-platform packaging |
+| Layer                  | Primary Technologies                                                          | Purpose                                                 |
+| ---------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **Application Shell**  | Electron 40.2.1                                                               | Cross-platform desktop framework                        |
+| **Main Process**       | Node.js/TypeScript, node-pty                                                  | OS integration, PTY management                          |
+| **Renderer Process**   | React 19.2.4, Redux 5.0.1                                                     | UI components, state management                         |
+| **Terminal Rendering** | xterm.js 5.3.0 + WebGL addon                                                  | Terminal emulation and display                          |
+| **Build System**       | esbuild 0.25.12, tsgo 7.0.0-dev.20260128.1, node-gyp 10.x, node-gyp-build 4.x | Module bundling, type safety, native module compilation |
+| **Distribution**       | electron-builder 24.13.3                                                      | Cross-platform packaging                                |
 
 #### 3.8.2 Technology selection criteria
 
-| Criterion | Approach |
-| ----------- | ---------- |
-| **Cross-Platform** | Electron enables single codebase for macOS, Windows, Linux |
-| **Performance** | WebGL rendering, V8 snapshots, data batching |
-| **Extensibility** | React/Redux enable deep plugin integration |
-| **Developer Experience** | TypeScript provides type safety and tooling |
-| **Community** | All major technologies have active ecosystems |
+| Criterion                | Approach                                                   |
+| ------------------------ | ---------------------------------------------------------- |
+| **Cross-Platform**       | Electron enables single codebase for macOS, Windows, Linux |
+| **Performance**          | WebGL rendering, V8 snapshots, data batching               |
+| **Extensibility**        | React/Redux enable deep plugin integration                 |
+| **Developer Experience** | TypeScript provides type safety and tooling                |
+| **Community**            | All major technologies have active ecosystems              |
 
 #### 3.8.3 Technical debt and future considerations
 
-| Item | Priority | Description |
-| ------ | ---------- | ------------- |
-| **Electron Upgrade** | Critical | Electron 40 baseline adopted; keep patch releases current |
-| **xterm.js Package Migration** | Medium | Migrate from `xterm` to scoped `@xterm/*` packages |
-| **IPC Modernization** | Medium | Replace `@electron/remote` with explicit IPC |
-| **Plugin Sandboxing** | Low | Investigate capability-based plugin permissions |
+| Item                           | Priority | Description                                               |
+| ------------------------------ | -------- | --------------------------------------------------------- |
+| **Electron Upgrade**           | Critical | Electron 40 baseline adopted; keep patch releases current |
+| **xterm.js Package Migration** | Medium   | Migrate from `xterm` to scoped `@xterm/*` packages        |
+| **IPC Modernization**          | Medium   | Replace `@electron/remote` with explicit IPC              |
+| **Plugin Sandboxing**          | Low      | Investigate capability-based plugin permissions           |
 
----
+______________________________________________________________________
 
 ### 3.9 References
 
 #### 3.9.1 Repository files examined
 
-| File | Relevance |
-| ------ | ----------- |
-| `package.json` | Root dependencies, scripts, development configuration |
-| `app/package.json` | Runtime dependencies bundled with application |
-| `build/esbuild/build.ts` | Build orchestration for all bundle targets |
-| `build/esbuild/esbuild-plugins/` | esbuild plugin implementations and bridge transforms |
-| `tsconfig.base.json` | TypeScript compiler configuration |
-| `electron-builder.json` | Cross-platform packaging configuration |
-| `lib/components/term.tsx` | Terminal component with xterm.js addon integration |
-| `app/session.ts` | PTY session management with data batching |
-| `app/updater.ts` | Auto-update service integration |
-| `app/config/paths.ts` | Configuration file path resolution |
-| `app/config/schema.json` | Configuration schema validation |
-| `README.md` | Development workflow documentation |
-| `PLUGINS.md` | Plugin API and development guide |
+| File                             | Relevance                                             |
+| -------------------------------- | ----------------------------------------------------- |
+| `package.json`                   | Root dependencies, scripts, development configuration |
+| `app/package.json`               | Runtime dependencies bundled with application         |
+| `build/esbuild/build.ts`         | Build orchestration for all bundle targets            |
+| `build/esbuild/esbuild-plugins/` | esbuild plugin implementations and bridge transforms  |
+| `tsconfig.base.json`             | TypeScript compiler configuration                     |
+| `electron-builder.json`          | Cross-platform packaging configuration                |
+| `lib/components/term.tsx`        | Terminal component with xterm.js addon integration    |
+| `app/session.ts`                 | PTY session management with data batching             |
+| `app/updater.ts`                 | Auto-update service integration                       |
+| `app/config/paths.ts`            | Configuration file path resolution                    |
+| `app/config/schema.json`         | Configuration schema validation                       |
+| `README.md`                      | Development workflow documentation                    |
+| `PLUGINS.md`                     | Plugin API and development guide                      |
 
 #### 3.9.2 Repository folders examined
 
-| Folder | Contents |
-| -------- | ---------- |
-| `app/` | Main process implementation (Electron main) |
-| `app/config/` | Configuration subsystem |
-| `lib/` | Renderer process implementation (React UI) |
-| `lib/components/` | React component hierarchy |
-| `lib/store/` | Redux store configuration |
-| `lib/reducers/` | Redux state reducers |
-| `lib/actions/` | Redux action creators |
-| `cli/` | Command-line interface tool |
-| `test/` | Unit and E2E test suites |
-| `typings/` | TypeScript type definitions |
-| `.github/workflows/` | CI/CD pipeline definitions |
+| Folder               | Contents                                    |
+| -------------------- | ------------------------------------------- |
+| `app/`               | Main process implementation (Electron main) |
+| `app/config/`        | Configuration subsystem                     |
+| `lib/`               | Renderer process implementation (React UI)  |
+| `lib/components/`    | React component hierarchy                   |
+| `lib/store/`         | Redux store configuration                   |
+| `lib/reducers/`      | Redux state reducers                        |
+| `lib/actions/`       | Redux action creators                       |
+| `cli/`               | Command-line interface tool                 |
+| `test/`              | Unit and E2E test suites                    |
+| `typings/`           | TypeScript type definitions                 |
+| `.github/workflows/` | CI/CD pipeline definitions                  |
 
 #### 3.9.3 External sources referenced
 
-| Source | Information Retrieved |
-| -------- | ---------------------- |
-| Electron Documentation | Electron 40 release/runtime compatibility details |
-| npm Registry | xterm.js 5.3.0 current status, package deprecation notices |
-| xterm.js GitHub | Package migration to @xterm/* scoped packages |
+| Source                 | Information Retrieved                                      |
+| ---------------------- | ---------------------------------------------------------- |
+| Electron Documentation | Electron 40 release/runtime compatibility details          |
+| npm Registry           | xterm.js 5.3.0 current status, package deprecation notices |
+| xterm.js GitHub        | Package migration to @xterm/* scoped packages              |
 
 ## 4. Process flowchart
 
@@ -2579,14 +2582,14 @@ flowchart TB
 
 ##### Startup timing constraints
 
-| Phase | Target Duration | Critical Path |
-| ------- | ---------------- | --------------- |
-| CLI Argument Processing | < 50ms | Sequential |
-| Configuration Loading | < 50ms | Sequential |
-| Window Creation | < 200ms | Parallel with menu setup |
-| Renderer Initialization | < 500ms | Sequential after window load |
-| First PTY Spawn | < 500ms | Final step |
-| **Total Cold Start** | **< 2 seconds** | End-to-end |
+| Phase                   | Target Duration | Critical Path                |
+| ----------------------- | --------------- | ---------------------------- |
+| CLI Argument Processing | < 50ms          | Sequential                   |
+| Configuration Loading   | < 50ms          | Sequential                   |
+| Window Creation         | < 200ms         | Parallel with menu setup     |
+| Renderer Initialization | < 500ms         | Sequential after window load |
+| First PTY Spawn         | < 500ms         | Final step                   |
+| **Total Cold Start**    | **< 2 seconds** | End-to-end                   |
 
 #### 4.1.2 Session lifecycle flow
 
@@ -2675,12 +2678,12 @@ flowchart TB
 
 ##### Data batching specification
 
-| Parameter | Value | Purpose |
-| ----------- | ------- | --------- |
-| `BATCH_DURATION_MS` | 16ms | Time-based flush threshold (60fps aligned) |
-| `BATCH_MAX_SIZE` | 200KB | Size-based flush threshold for rapid output |
-| String Decoder | UTF-8 | Character encoding handling |
-| Batch Prefix | 36-char UUID | Session identification for routing |
+| Parameter           | Value        | Purpose                                     |
+| ------------------- | ------------ | ------------------------------------------- |
+| `BATCH_DURATION_MS` | 16ms         | Time-based flush threshold (60fps aligned)  |
+| `BATCH_MAX_SIZE`    | 200KB        | Size-based flush threshold for rapid output |
+| String Decoder      | UTF-8        | Character encoding handling                 |
+| Batch Prefix        | 36-char UUID | Session identification for routing          |
 
 #### 4.1.3 Terminal rendering flow
 
@@ -2771,11 +2774,11 @@ flowchart TB
 
 ##### WebGL context management
 
-| Constraint | Value | Mitigation |
-| ------------ | ------- | ------------ |
-| Max WebGL Contexts | 16 simultaneous | Prioritize visible panes |
-| Transparency Support | Not supported | Fallback to CanvasAddon |
-| Context Loss | GPU resource exhaustion | Automatic CanvasAddon fallback |
+| Constraint           | Value                   | Mitigation                     |
+| -------------------- | ----------------------- | ------------------------------ |
+| Max WebGL Contexts   | 16 simultaneous         | Prioritize visible panes       |
+| Transparency Support | Not supported           | Fallback to CanvasAddon        |
+| Context Loss         | GPU resource exhaustion | Automatic CanvasAddon fallback |
 
 ### 4.2 Integration workflows
 
@@ -2845,13 +2848,13 @@ flowchart TB
 
 ##### Key RPC events
 
-| Event Category | Direction | Examples |
-| ---------------- | ----------- | ---------- |
-| Session Events | Main → Renderer | `session add`, `session data`, `session exit` |
+| Event Category    | Direction       | Examples                                                   |
+| ----------------- | --------------- | ---------------------------------------------------------- |
+| Session Events    | Main → Renderer | `session add`, `session data`, `session exit`              |
 | Terminal Commands | Main → Renderer | `split horizontal`, `split vertical`, `search`, `navigate` |
-| Window Events | Main → Renderer | `fullscreen`, `geometry change`, `move` |
-| Update Events | Main → Renderer | `update available` |
-| User Actions | Renderer → Main | `new`, `close`, `resize`, `data` |
+| Window Events     | Main → Renderer | `fullscreen`, `geometry change`, `move`                    |
+| Update Events     | Main → Renderer | `update available`                                         |
+| User Actions      | Renderer → Main | `new`, `close`, `resize`, `data`                           |
 
 #### 4.2.2 Configuration hot-reload flow
 
@@ -2921,13 +2924,13 @@ flowchart TB
 
 ##### Configuration processing rules
 
-| Rule | Behaviour |
-| ------ | ---------- |
-| Missing Fields | Merged with defaults from `config-default.json` |
-| Invalid JSON | User notified, previous config retained |
-| Schema Violations | Normalized with defaults, user warned |
-| Deprecated CSS | Warning notification shown |
-| Profile Override | Deep merge profile over base config |
+| Rule              | Behaviour                                       |
+| ----------------- | ----------------------------------------------- |
+| Missing Fields    | Merged with defaults from `config-default.json` |
+| Invalid JSON      | User notified, previous config retained         |
+| Schema Violations | Normalized with defaults, user warned           |
+| Deprecated CSS    | Warning notification shown                      |
+| Profile Override  | Deep merge profile over base config             |
 
 #### 4.2.3 Plugin loading and decoration flow
 
@@ -3022,14 +3025,14 @@ flowchart TB
 
 ##### Available extension hooks (40+)
 
-| Category | Hooks |
-| ---------- | ------- |
-| **Lifecycle** | `onApp`, `onWindowClass`, `onWindow`, `onRendererWindow`, `onUnload` |
-| **Configuration** | `decorateConfig`, `decorateKeymaps`, `decorateEnv`, `decorateMenu` |
-| **UI Decoration** | `decorateTerm`, `decorateHeader`, `decorateTabs`, `decorateTab`, `decorateTerms`, `decorateTermGroup`, `decorateSplitPane`, `decorateNotification`, `decorateNotifications`, `decorateHyper` |
-| **State Mapping** | `getTermProps`, `getTabProps`, `getTabsProps`, `getTermGroupProps` |
-| **Redux Integration** | `middleware`, `reduceUI`, `reduceSessions`, `reduceTermGroups` |
-| **Session** | `decorateSessionClass`, `decorateSessionOptions`, `decorateBrowserOptions`, `decorateWindowClass` |
+| Category              | Hooks                                                                                                                                                                                        |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Lifecycle**         | `onApp`, `onWindowClass`, `onWindow`, `onRendererWindow`, `onUnload`                                                                                                                         |
+| **Configuration**     | `decorateConfig`, `decorateKeymaps`, `decorateEnv`, `decorateMenu`                                                                                                                           |
+| **UI Decoration**     | `decorateTerm`, `decorateHeader`, `decorateTabs`, `decorateTab`, `decorateTerms`, `decorateTermGroup`, `decorateSplitPane`, `decorateNotification`, `decorateNotifications`, `decorateHyper` |
+| **State Mapping**     | `getTermProps`, `getTabProps`, `getTabsProps`, `getTermGroupProps`                                                                                                                           |
+| **Redux Integration** | `middleware`, `reduceUI`, `reduceSessions`, `reduceTermGroups`                                                                                                                               |
+| **Session**           | `decorateSessionClass`, `decorateSessionOptions`, `decorateBrowserOptions`, `decorateWindowClass`                                                                                            |
 
 ### 4.3 Core feature flows
 
@@ -3112,12 +3115,12 @@ flowchart TB
 
 ##### Pane size management
 
-| Operation | Algorithm | Constraint |
-| ----------- | ----------- | ------------ |
-| `insertRebalance` | Proportionally reduce existing sizes | New pane gets fair share |
-| `removalRebalance` | Distribute removed size to siblings | Sizes normalize to 100% |
-| Minimum Size | 5% (`MIN_SIZE = 0.05`) | Prevents invisible panes |
-| Default Split | 50/50 division | Equal distribution |
+| Operation          | Algorithm                            | Constraint               |
+| ------------------ | ------------------------------------ | ------------------------ |
+| `insertRebalance`  | Proportionally reduce existing sizes | New pane gets fair share |
+| `removalRebalance` | Distribute removed size to siblings  | Sizes normalize to 100%  |
+| Minimum Size       | 5% (`MIN_SIZE = 0.05`)               | Prevents invisible panes |
+| Default Split      | 50/50 division                       | Equal distribution       |
 
 #### 4.3.2 In-terminal search flow
 
@@ -3206,12 +3209,12 @@ flowchart TB
 
 ##### Search options
 
-| Option | Description | Default |
-| -------- | ------------- | --------- |
-| Case Sensitive | Match exact case | false |
-| Whole Word | Match complete words only | false |
-| Regex | Use regular expression patterns | false |
-| Incremental | Search as user types | true |
+| Option         | Description                     | Default |
+| -------------- | ------------------------------- | ------- |
+| Case Sensitive | Match exact case                | false   |
+| Whole Word     | Match complete words only       | false   |
+| Regex          | Use regular expression patterns | false   |
+| Incremental    | Search as user types            | true    |
 
 #### 4.3.3 Auto-update flow
 
@@ -3306,19 +3309,19 @@ flowchart TB
 
 ##### Update schedule parameters
 
-| Parameter | Value | Purpose |
-| ----------- | ------- | --------- |
-| Initial Delay | 10 seconds | Allow app to fully initialize |
-| Check Interval | 30 minutes | Balance freshness vs. network overhead |
-| Timeout | 5 seconds | Prevent hanging on slow networks |
-| Channels | stable, canary | Release track selection |
+| Parameter      | Value          | Purpose                                |
+| -------------- | -------------- | -------------------------------------- |
+| Initial Delay  | 10 seconds     | Allow app to fully initialize          |
+| Check Interval | 30 minutes     | Balance freshness vs. network overhead |
+| Timeout        | 5 seconds      | Prevent hanging on slow networks       |
+| Channels       | stable, canary | Release track selection                |
 
 ### 4.4 State management flows
 
 #### 4.4.1 Redux state flow
 
-The Redux store manages application state with a specialized middleware pipeline
-optimized for terminal data throughput.
+The Redux store manages application state with a specialized middleware
+pipeline optimized for terminal data throughput.
 
 ```mermaid
 flowchart TB
@@ -3399,11 +3402,11 @@ flowchart TB
 
 ##### State slices
 
-| Slice | Location | Responsibility |
-| ------- | ---------- | ---------------- |
-| `ui` | `lib/reducers/ui.ts` | Configuration, window state, notifications, activity markers |
-| `sessions` | `lib/reducers/sessions.ts` | Session records, activeUid, search state |
-| `termGroups` | `lib/reducers/term-groups.ts` | Term group tree, activeSessions map, activeRootGroup |
+| Slice        | Location                      | Responsibility                                               |
+| ------------ | ----------------------------- | ------------------------------------------------------------ |
+| `ui`         | `lib/reducers/ui.ts`          | Configuration, window state, notifications, activity markers |
+| `sessions`   | `lib/reducers/sessions.ts`    | Session records, activeUid, search state                     |
+| `termGroups` | `lib/reducers/term-groups.ts` | Term group tree, activeSessions map, activeRootGroup         |
 
 ##### Write middleware performance optimization
 
@@ -3467,13 +3470,13 @@ stateDiagram-v2
 
 ##### Term group actions
 
-| Action | State Transition |
-| -------- | ------------------ |
-| `SESSION_ADD` | Create or split term group |
-| `SESSION_ACTIVE_CHANGED` | Update active session tracking |
-| `SESSION_PTY_EXIT` | Mark session for exit behaviour handling |
-| `TERM_GROUP_EXIT` | Remove term group, rebalance siblings |
-| `TERM_GROUP_RESIZE` | Update size ratios in parent |
+| Action                   | State Transition                         |
+| ------------------------ | ---------------------------------------- |
+| `SESSION_ADD`            | Create or split term group               |
+| `SESSION_ACTIVE_CHANGED` | Update active session tracking           |
+| `SESSION_PTY_EXIT`       | Mark session for exit behaviour handling |
+| `TERM_GROUP_EXIT`        | Remove term group, rebalance siblings    |
+| `TERM_GROUP_RESIZE`      | Update size ratios in parent             |
 
 ### 4.5 Error handling flows
 
@@ -3711,14 +3714,14 @@ flowchart TB
 
 ##### CLI commands summary
 
-| Command | Purpose | Implementation |
-| --------- | --------- | ---------------- |
-| `hyper install <plugin>` | Install plugin from npm | `cli/api.ts` - Updates config, triggers bun install |
-| `hyper uninstall <plugin>` | Remove installed plugin | `cli/api.ts` - Removes from config |
-| `hyper list` | List installed plugins | Reads from config file |
-| `hyper search <query>` | Search npm for plugins | Queries npm registry |
-| `hyper docs <plugin>` | Open plugin documentation | Opens npm package page |
-| `hyper` (no args) | Launch Velocetty application | Spawns Electron process |
+| Command                    | Purpose                      | Implementation                                      |
+| -------------------------- | ---------------------------- | --------------------------------------------------- |
+| `hyper install <plugin>`   | Install plugin from npm      | `cli/api.ts` - Updates config, triggers bun install |
+| `hyper uninstall <plugin>` | Remove installed plugin      | `cli/api.ts` - Removes from config                  |
+| `hyper list`               | List installed plugins       | Reads from config file                              |
+| `hyper search <query>`     | Search npm for plugins       | Queries npm registry                                |
+| `hyper docs <plugin>`      | Open plugin documentation    | Opens npm package page                              |
+| `hyper` (no args)          | Launch Velocetty application | Spawns Electron process                             |
 
 ### 4.7 Sequence diagrams
 
@@ -3830,42 +3833,42 @@ sequenceDiagram
 
 #### 4.8.1 Business rules by process step
 
-| Process | Step | Business Rule |
-| --------- | ------ | --------------- |
-| **Session Creation** | Shell Selection | Use default shell from OS if not configured |
-| **Session Creation** | CWD | Inherit from parent session if `preserveCWD` enabled |
-| **Session Creation** | Environment | Sanitize sensitive variables before passing to shell |
-| **Data Batching** | Threshold | Flush at 16ms OR 200KB, whichever first |
-| **Data Batching** | Encoding | UTF-8 via StringDecoder |
-| **Pane Split** | Minimum Size | 5% minimum pane dimension |
-| **Pane Split** | Default Ratio | 50/50 division on new split |
-| **Configuration** | Validation | JSON syntax + schema validation required |
-| **Configuration** | Defaults | Missing fields merged from default config |
-| **Plugin Loading** | Order | Local plugins take precedence over global |
-| **Plugin Loading** | Validation | Must export valid extension hooks |
-| **WebGL Allocation** | Limit | Maximum 16 simultaneous WebGL contexts |
-| **Update Checks** | Schedule | 10s initial, then every 30 minutes |
+| Process              | Step            | Business Rule                                        |
+| -------------------- | --------------- | ---------------------------------------------------- |
+| **Session Creation** | Shell Selection | Use default shell from OS if not configured          |
+| **Session Creation** | CWD             | Inherit from parent session if `preserveCWD` enabled |
+| **Session Creation** | Environment     | Sanitize sensitive variables before passing to shell |
+| **Data Batching**    | Threshold       | Flush at 16ms OR 200KB, whichever first              |
+| **Data Batching**    | Encoding        | UTF-8 via StringDecoder                              |
+| **Pane Split**       | Minimum Size    | 5% minimum pane dimension                            |
+| **Pane Split**       | Default Ratio   | 50/50 division on new split                          |
+| **Configuration**    | Validation      | JSON syntax + schema validation required             |
+| **Configuration**    | Defaults        | Missing fields merged from default config            |
+| **Plugin Loading**   | Order           | Local plugins take precedence over global            |
+| **Plugin Loading**   | Validation      | Must export valid extension hooks                    |
+| **WebGL Allocation** | Limit           | Maximum 16 simultaneous WebGL contexts               |
+| **Update Checks**    | Schedule        | 10s initial, then every 30 minutes                   |
 
 #### 4.8.2 Authorization checkpoints
 
-| Checkpoint | Verification | Implementation |
-| ------------ | -------------- | ---------------- |
-| PTY Spawn | User process privileges | OS-level via node-pty |
-| File System Access | User read/write permissions | Node.js fs module |
-| Plugin Installation | npm registry validation | CLI api.ts validation |
-| Configuration Write | User home directory access | XDG path resolution |
-| Auto-Update | Signature verification | Electron autoUpdater |
+| Checkpoint          | Verification                | Implementation        |
+| ------------------- | --------------------------- | --------------------- |
+| PTY Spawn           | User process privileges     | OS-level via node-pty |
+| File System Access  | User read/write permissions | Node.js fs module     |
+| Plugin Installation | npm registry validation     | CLI api.ts validation |
+| Configuration Write | User home directory access  | XDG path resolution   |
+| Auto-Update         | Signature verification      | Electron autoUpdater  |
 
 #### 4.8.3 Data validation requirements
 
-| Data | Validation Rule | Error Handling |
-| ------ | ----------------- | ---------------- |
-| Config JSON | Valid JSON syntax | Retain previous config, notify user |
-| Config Schema | Match schema.json | Merge with defaults |
-| Plugin Name | Valid npm package identifier | Reject with error message |
-| Session UID | 36-character UUID v4 | Generated internally |
-| Rows/Cols | Positive integers | Clamp to valid range |
-| Search Regex | Valid regular expression | Display regex error |
+| Data          | Validation Rule              | Error Handling                      |
+| ------------- | ---------------------------- | ----------------------------------- |
+| Config JSON   | Valid JSON syntax            | Retain previous config, notify user |
+| Config Schema | Match schema.json            | Merge with defaults                 |
+| Plugin Name   | Valid npm package identifier | Reject with error message           |
+| Session UID   | 36-character UUID v4         | Generated internally                |
+| Rows/Cols     | Positive integers            | Clamp to valid range                |
+| Search Regex  | Valid regular expression     | Display regex error                 |
 
 ### 4.9 References
 
@@ -3982,8 +3985,8 @@ bidirectional IPC bridge:
 - **Renderer Process (Chromium Engine)**: Executes the React/Redux UI
 
   application, hosts xterm.js terminal rendering, and manages plugin UI
-  extensions. Each window spawns an isolated renderer process with access to web
-  platform APIs and WebGL acceleration.
+  extensions. Each window spawns an isolated renderer process with access to
+  web platform APIs and WebGL acceleration.
 
 - **IPC Bridge**: A UUID-keyed RPC channel with typed event emitters facilitates
 
@@ -3992,13 +3995,13 @@ bidirectional IPC bridge:
 
 **Rationale for Architecture Selection**:
 
-| Design Goal | Architectural Response |
-| ------------- | ---------------------- |
-| Cross-platform consistency | Electron provides unified API across macOS, Windows, and Linux |
-| Rich UI capabilities | Chromium rendering enables CSS styling, WebGL, and React component architecture |
-| Native OS integration | Main process Node.js runtime accesses PTY, file system, and system menus |
-| Extensibility substrate | React/Redux composition model enables deep plugin decoration |
-| Performance optimization | Process isolation enables targeted optimizations (batching, middleware bypass) |
+| Design Goal                | Architectural Response                                                          |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| Cross-platform consistency | Electron provides unified API across macOS, Windows, and Linux                  |
+| Rich UI capabilities       | Chromium rendering enables CSS styling, WebGL, and React component architecture |
+| Native OS integration      | Main process Node.js runtime accesses PTY, file system, and system menus        |
+| Extensibility substrate    | React/Redux composition model enables deep plugin decoration                    |
+| Performance optimization   | Process isolation enables targeted optimizations (batching, middleware bypass)  |
 
 The architecture explicitly acknowledges the IPC overhead inherent in Electron
 applications. As documented in Hyper's performance engineering work, terminal
@@ -4067,18 +4070,18 @@ flowchart TB
 
 #### 5.1.2 Core components table
 
-| Component Name | Primary Responsibility | Key Dependencies | Integration Points |
-| ---------------- | ---------------------- | ------------------ | ------------------- |
-| Main Process Entry (`app/index.ts`) | Electron initialization, window lifecycle, event routing | `@electron/remote`, config module, plugins module | IPC bridge, OS event handlers |
-| Configuration System (`app/config/`) | JSON config loading, schema validation, hot-reload | chokidar, electron-store, fs-extra | Plugin decoration, renderer bridge |
-| Session Manager (`app/session.ts`) | PTY lifecycle, data batching, shell spawning | node-pty 1.1.0, DataBatcher class | RPC to renderer, plugin env hooks |
-| RPC Bridge (`app/rpc.ts`, `lib/utils/rpc.ts`) | Typed bidirectional IPC communication | Electron ipcMain/ipcRenderer, uuid | All cross-process communication |
-| Plugin Manager (`app/plugins.ts`, `lib/utils/plugins.ts`) | Extension loading, decoration, lifecycle hooks | electron-store, Module._load patching | Both processes, all extensible components |
-| Redux Store (`lib/store/`) | Centralized renderer state management | Redux 5.0.1, redux-thunk, seamless-immutable | React containers, plugin middleware |
-| Terminal Component (`lib/components/term.tsx`) | xterm.js hosting, addon management, WebGL/Canvas rendering | xterm.js 5.3.0, WebGL/Canvas addons | Redux state, session data stream |
-| UI Components (`lib/components/`) | React component tree for terminal UI | React 19.2.4, styled-jsx | Redux containers, plugin decoration |
-| CLI Tool (`cli/`) | Plugin management, application launching | args, got, npm registry | Config file, npm ecosystem |
-| Menu System (`app/menus/`) | Application and context menus | Electron Menu API, keymaps | Command dispatcher, config system |
+| Component Name                                            | Primary Responsibility                                     | Key Dependencies                                  | Integration Points                        |
+| --------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------- |
+| Main Process Entry (`app/index.ts`)                       | Electron initialization, window lifecycle, event routing   | `@electron/remote`, config module, plugins module | IPC bridge, OS event handlers             |
+| Configuration System (`app/config/`)                      | JSON config loading, schema validation, hot-reload         | chokidar, electron-store, fs-extra                | Plugin decoration, renderer bridge        |
+| Session Manager (`app/session.ts`)                        | PTY lifecycle, data batching, shell spawning               | node-pty 1.1.0, DataBatcher class                 | RPC to renderer, plugin env hooks         |
+| RPC Bridge (`app/rpc.ts`, `lib/utils/rpc.ts`)             | Typed bidirectional IPC communication                      | Electron ipcMain/ipcRenderer, uuid                | All cross-process communication           |
+| Plugin Manager (`app/plugins.ts`, `lib/utils/plugins.ts`) | Extension loading, decoration, lifecycle hooks             | electron-store, Module._load patching             | Both processes, all extensible components |
+| Redux Store (`lib/store/`)                                | Centralized renderer state management                      | Redux 5.0.1, redux-thunk, seamless-immutable      | React containers, plugin middleware       |
+| Terminal Component (`lib/components/term.tsx`)            | xterm.js hosting, addon management, WebGL/Canvas rendering | xterm.js 5.3.0, WebGL/Canvas addons               | Redux state, session data stream          |
+| UI Components (`lib/components/`)                         | React component tree for terminal UI                       | React 19.2.4, styled-jsx                          | Redux containers, plugin decoration       |
+| CLI Tool (`cli/`)                                         | Plugin management, application launching                   | args, got, npm registry                           | Config file, npm ecosystem                |
+| Menu System (`app/menus/`)                                | Application and context menus                              | Electron Menu API, keymaps                        | Command dispatcher, config system         |
 
 #### 5.1.3 Data flow description
 
@@ -4112,8 +4115,8 @@ designed to minimize latency while managing IPC overhead:
    Canvas fallback
 
 This flow explicitly bypasses Redux state management for terminal data to
-eliminate serialization overhead, achieving the < 50ms keystroke-to-echo latency
-target.
+eliminate serialization overhead, achieving the < 50ms keystroke-to-echo
+latency target.
 
 ##### User input flow (renderer → main)
 
@@ -4187,15 +4190,15 @@ Plugin extensions compose with core functionality through decoration:
 
 #### 5.1.4 External integration points
 
-| System Name | Integration Type | Data Exchange Pattern | Protocol/Format |
-| ------------- | ------------------ | ---------------------- | ----------------- |
-| Shell Process | Terminal I/O | Bidirectional stream | PTY binary/UTF-8 via node-pty |
-| npm Registry | Plugin discovery | HTTP REST request | JSON response via npms.io API |
-| File System | Configuration persistence | Synchronous/async file I/O | JSON with schema validation |
-| Update Server | Auto-update polling | HTTP GET with version check | JSON manifest response |
-| GitHub | Issue reporting | URL redirect | Browser launch with prefilled template |
+| System Name   | Integration Type          | Data Exchange Pattern       | Protocol/Format                        |
+| ------------- | ------------------------- | --------------------------- | -------------------------------------- |
+| Shell Process | Terminal I/O              | Bidirectional stream        | PTY binary/UTF-8 via node-pty          |
+| npm Registry  | Plugin discovery          | HTTP REST request           | JSON response via npms.io API          |
+| File System   | Configuration persistence | Synchronous/async file I/O  | JSON with schema validation            |
+| Update Server | Auto-update polling       | HTTP GET with version check | JSON manifest response                 |
+| GitHub        | Issue reporting           | URL redirect                | Browser launch with prefilled template |
 
----
+______________________________________________________________________
 
 ### 5.2 Component details
 
@@ -4229,13 +4232,13 @@ Plugin extensions compose with core functionality through decoration:
 
 **Key Interfaces and APIs**:
 
-| Interface | Signature | Purpose |
-| ----------- | ----------- | --------- |
-| `app.createWindow` | `(fn?, options?, profileName?) => BrowserWindow` | Window factory exposed to plugins |
-| `app.getWindows` | `() => Set<BrowserWindow>` | Retrieve all managed windows |
-| `app.getLastFocusedWindow` | `() => BrowserWindow or null` | Focus tracking for commands |
-| `app.config` | `ConfigModule` | Configuration subsystem reference |
-| `app.plugins` | `PluginsModule` | Plugin subsystem reference |
+| Interface                  | Signature                                        | Purpose                           |
+| -------------------------- | ------------------------------------------------ | --------------------------------- |
+| `app.createWindow`         | `(fn?, options?, profileName?) => BrowserWindow` | Window factory exposed to plugins |
+| `app.getWindows`           | `() => Set<BrowserWindow>`                       | Retrieve all managed windows      |
+| `app.getLastFocusedWindow` | `() => BrowserWindow or null`                    | Focus tracking for commands       |
+| `app.config`               | `ConfigModule`                                   | Configuration subsystem reference |
+| `app.plugins`              | `PluginsModule`                                  | Plugin subsystem reference        |
 
 **Scaling Considerations**:
 
@@ -4267,22 +4270,22 @@ Plugin extensions compose with core functionality through decoration:
 
 **Key Interfaces and APIs**:
 
-| Interface | Purpose |
-| ----------- | --------- |
-| `Session.init(options)` | Initialize PTY with shell configuration |
-| `Session.write(data)` | Forward user input to PTY |
-| `Session.resize({cols, rows})` | Update terminal dimensions |
-| `Session.destroy()` | Terminate PTY and cleanup resources |
-| `DataBatcher.write(chunk)` | Accumulate data for batching |
-| `DataBatcher.flush()` | Force immediate batch transmission |
+| Interface                      | Purpose                                 |
+| ------------------------------ | --------------------------------------- |
+| `Session.init(options)`        | Initialize PTY with shell configuration |
+| `Session.write(data)`          | Forward user input to PTY               |
+| `Session.resize({cols, rows})` | Update terminal dimensions              |
+| `Session.destroy()`            | Terminate PTY and cleanup resources     |
+| `DataBatcher.write(chunk)`     | Accumulate data for batching            |
+| `DataBatcher.flush()`          | Force immediate batch transmission      |
 
 **Data Batching Configuration**:
 
-| Parameter | Value | Rationale |
-| ----------- | ------- | ----------- |
-| `BATCH_DURATION_MS` | 16ms | Aligned with 60fps frame timing |
-| `BATCH_MAX_SIZE` | 200KB | Prevents memory accumulation during rapid output |
-| Batch Prefix | 36-character UUID | Session routing identifier |
+| Parameter           | Value             | Rationale                                        |
+| ------------------- | ----------------- | ------------------------------------------------ |
+| `BATCH_DURATION_MS` | 16ms              | Aligned with 60fps frame timing                  |
+| `BATCH_MAX_SIZE`    | 200KB             | Prevents memory accumulation during rapid output |
+| Batch Prefix        | 36-character UUID | Session routing identifier                       |
 
 **Error Handling**:
 
@@ -4306,11 +4309,11 @@ Plugin extensions compose with core functionality through decoration:
 
 **Key Interfaces and APIs**:
 
-| Method | Signature | Purpose |
-| -------- | ----------- | --------- |
-| `Server.on` | `<E extends keyof MainEvents>(ev, fn) => this` | Register typed event handler |
-| `Server.emit` | `<E extends keyof RendererEvents>(ch, data?) => boolean` | Send typed event to renderer |
-| `Server.destroy` | `() => void` | Cleanup channel resources |
+| Method           | Signature                                                | Purpose                      |
+| ---------------- | -------------------------------------------------------- | ---------------------------- |
+| `Server.on`      | `<E extends keyof MainEvents>(ev, fn) => this`           | Register typed event handler |
+| `Server.emit`    | `<E extends keyof RendererEvents>(ch, data?) => boolean` | Send typed event to renderer |
+| `Server.destroy` | `() => void`                                             | Cleanup channel resources    |
 
 **Implementation Pattern**:
 
@@ -4368,13 +4371,13 @@ sequenceDiagram
 
 **RPC Event Handlers (Key Categories)**:
 
-| Category | Events | Purpose |
-| ---------- | -------- | --------- |
-| Session | `session add`, `session data`, `session exit` | Terminal session lifecycle |
-| Navigation | `move left req`, `move right req`, `move jump req` | Tab/pane navigation |
-| Terminal Groups | `split request horizontal/vertical`, `termgroup add req` | Split pane management |
-| Window State | `enter full screen`, `leave full screen`, `windowGeometry change` | Window chrome state |
-| Configuration | `config change` | Hot-reload support |
+| Category        | Events                                                            | Purpose                    |
+| --------------- | ----------------------------------------------------------------- | -------------------------- |
+| Session         | `session add`, `session data`, `session exit`                     | Terminal session lifecycle |
+| Navigation      | `move left req`, `move right req`, `move jump req`                | Tab/pane navigation        |
+| Terminal Groups | `split request horizontal/vertical`, `termgroup add req`          | Split pane management      |
+| Window State    | `enter full screen`, `leave full screen`, `windowGeometry change` | Window chrome state        |
+| Configuration   | `config change`                                                   | Hot-reload support         |
 
 ##### Redux store (`lib/store/`)
 
@@ -4418,11 +4421,11 @@ flowchart LR
 
 **State Slices**:
 
-| Slice | Location | Key State Properties |
-| ------- | ---------- | --------------------- |
-| `ui` | `lib/reducers/ui.ts` | Config values, window state, notifications, activity markers |
-| `sessions` | `lib/reducers/sessions.ts` | Session records, activeUid, search state |
-| `termGroups` | `lib/reducers/term-groups.ts` | Term group tree, activeSessions map, activeRootGroup |
+| Slice        | Location                      | Key State Properties                                         |
+| ------------ | ----------------------------- | ------------------------------------------------------------ |
+| `ui`         | `lib/reducers/ui.ts`          | Config values, window state, notifications, activity markers |
+| `sessions`   | `lib/reducers/sessions.ts`    | Session records, activeUid, search state                     |
+| `termGroups` | `lib/reducers/term-groups.ts` | Term group tree, activeSessions map, activeRootGroup         |
 
 **Write Middleware Performance Bypass**:
 
@@ -4537,11 +4540,11 @@ flowchart TB
 
 **WebGL Constraints**:
 
-| Constraint | Value | Mitigation |
-| ------------ | ------- | ------------ |
-| Max simultaneous contexts | 16 | Prioritize visible panes |
-| Transparency support | Not supported | Automatic Canvas fallback |
-| Context loss | GPU resource exhaustion | `onContextLoss` handler with Canvas fallback |
+| Constraint                | Value                   | Mitigation                                   |
+| ------------------------- | ----------------------- | -------------------------------------------- |
+| Max simultaneous contexts | 16                      | Prioritize visible panes                     |
+| Transparency support      | Not supported           | Automatic Canvas fallback                    |
+| Context loss              | GPU resource exhaustion | `onContextLoss` handler with Canvas fallback |
 
 #### 5.2.3 Configuration system (`app/config/`)
 
@@ -4565,22 +4568,22 @@ flowchart TB
 
 **Key Files**:
 
-| File | Purpose |
-| ------ | --------- |
+| File                  | Purpose                                      |
+| --------------------- | -------------------------------------------- |
 | `config-default.json` | Baseline configuration with schema reference |
-| `schema.json` | JSON Schema for validation |
-| `paths.ts` | XDG-compliant path resolution |
-| `import.ts` | Synchronous boot-time loading |
-| `init.ts` | Config normalization and merge |
-| `migrate.ts` | Hyper 3 → Hyper 4 migration |
+| `schema.json`         | JSON Schema for validation                   |
+| `paths.ts`            | XDG-compliant path resolution                |
+| `import.ts`           | Synchronous boot-time loading                |
+| `init.ts`             | Config normalization and merge               |
+| `migrate.ts`          | Hyper 3 → Hyper 4 migration                  |
 
 **Platform-Specific Paths**:
 
-| Platform | Configuration Directory |
-| ---------- | ------------------------ |
-| Linux | `$XDG_CONFIG_HOME/Hyper` or `~/.config/Hyper` |
-| macOS | `~/.config/Hyper` |
-| Windows | `%APPDATA%/Hyper` |
+| Platform | Configuration Directory                       |
+| -------- | --------------------------------------------- |
+| Linux    | `$XDG_CONFIG_HOME/Hyper` or `~/.config/Hyper` |
+| macOS    | `~/.config/Hyper`                             |
+| Windows  | `%APPDATA%/Hyper`                             |
 
 #### 5.2.4 Plugin manager (`app/plugins.ts`, `lib/utils/plugins.ts`)
 
@@ -4596,13 +4599,13 @@ flowchart TB
 
 **Extension Hooks (40+ Total)**:
 
-| Category | Hooks |
-| ---------- | ------- |
-| Lifecycle | `onApp`, `onWindowClass`, `onWindow`, `onRendererWindow`, `onUnload` |
-| Decoration | `decorateWindowClass`, `decorateSessionClass`, `decorateSessionOptions`, `decorateBrowserOptions`, `decorateMenu`, `decorateConfig`, `decorateKeymaps`, `decorateEnv`, `decorateTerm`, `decorateHyper`, `decorateHeader`, `decorateTabs`, `decorateTab`, `decorateTerms`, `decorateTermGroup`, `decorateSplitPane`, `decorateNotification`, `decorateNotifications` |
-| State Management | `middleware`, `reduceUI`, `reduceSessions`, `reduceTermGroups` |
-| Props Injection | `getTermProps`, `getTabProps`, `getTabsProps`, `getTermGroupProps` |
-| State Mapping | `mapHyperTermState`, `mapTermsState`, `mapHeaderState`, `mapNotificationsState`, `mapHyperTermDispatch`, `mapTermsDispatch`, `mapHeaderDispatch`, `mapNotificationsDispatch` |
+| Category         | Hooks                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lifecycle        | `onApp`, `onWindowClass`, `onWindow`, `onRendererWindow`, `onUnload`                                                                                                                                                                                                                                                                                                |
+| Decoration       | `decorateWindowClass`, `decorateSessionClass`, `decorateSessionOptions`, `decorateBrowserOptions`, `decorateMenu`, `decorateConfig`, `decorateKeymaps`, `decorateEnv`, `decorateTerm`, `decorateHyper`, `decorateHeader`, `decorateTabs`, `decorateTab`, `decorateTerms`, `decorateTermGroup`, `decorateSplitPane`, `decorateNotification`, `decorateNotifications` |
+| State Management | `middleware`, `reduceUI`, `reduceSessions`, `reduceTermGroups`                                                                                                                                                                                                                                                                                                      |
+| Props Injection  | `getTermProps`, `getTabProps`, `getTabsProps`, `getTermGroupProps`                                                                                                                                                                                                                                                                                                  |
+| State Mapping    | `mapHyperTermState`, `mapTermsState`, `mapHeaderState`, `mapNotificationsState`, `mapHyperTermDispatch`, `mapTermsDispatch`, `mapHeaderDispatch`, `mapNotificationsDispatch`                                                                                                                                                                                        |
 
 **Plugin Installation Flow**:
 
@@ -4644,30 +4647,30 @@ flowchart TB
 
 **Command Summary**:
 
-| Command | Implementation | Purpose |
-| --------- | --------------- | --------- |
-| `hyper install <plugin>` | `cli/api.ts` | Add plugin to config, trigger bun install |
-| `hyper uninstall <plugin>` | `cli/api.ts` | Remove plugin from config |
-| `hyper list` | `cli/api.ts` | List installed plugins |
-| `hyper search <query>` | npms.io API | Search npm registry for plugins |
-| `hyper docs <plugin>` | Browser launch | Open plugin documentation |
-| `hyper` (default) | Electron spawn | Launch Velocetty application |
+| Command                    | Implementation | Purpose                                   |
+| -------------------------- | -------------- | ----------------------------------------- |
+| `hyper install <plugin>`   | `cli/api.ts`   | Add plugin to config, trigger bun install |
+| `hyper uninstall <plugin>` | `cli/api.ts`   | Remove plugin from config                 |
+| `hyper list`               | `cli/api.ts`   | List installed plugins                    |
+| `hyper search <query>`     | npms.io API    | Search npm registry for plugins           |
+| `hyper docs <plugin>`      | Browser launch | Open plugin documentation                 |
+| `hyper` (default)          | Electron spawn | Launch Velocetty application              |
 
----
+______________________________________________________________________
 
 ### 5.3 Technical decisions
 
 #### 5.3.1 Architecture style decisions
 
-| Decision | Choice | Rationale | Tradeoffs |
-| ---------- | -------- | ----------- | ----------- |
-| Application Shell | Electron 40.2.1 | Cross-platform desktop with web tech UI; deep codebase integration | Larger binary (~100MB), Chromium memory overhead, current baseline on ADR-004 path |
-| Process Model | Main/Renderer split | Security isolation, native access in main, web UI in renderer | IPC overhead, state synchronization complexity |
-| UI Framework | React 19.2.4 | Component composition model enables plugin decoration pattern | Bundle size, rendering overhead vs. native UI |
-| State Management | Redux 5.0.1 | Predictable state, plugin middleware integration, time-travel debugging | Boilerplate, performance overhead for high-frequency updates |
-| Terminal Engine | xterm.js 5.3.0 | Mature ecosystem, WebGL support, addon architecture | Browser-based limitations, no native text rendering |
-| IPC Optimization | Custom data batching | Reduce serialization overhead, align with frame timing | Added complexity, latency tradeoff |
-| Plugin Model | Full trust execution | Maximum extensibility, React/Redux composition | Security risk, no sandboxing |
+| Decision          | Choice               | Rationale                                                               | Tradeoffs                                                                          |
+| ----------------- | -------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Application Shell | Electron 40.2.1      | Cross-platform desktop with web tech UI; deep codebase integration      | Larger binary (~100MB), Chromium memory overhead, current baseline on ADR-004 path |
+| Process Model     | Main/Renderer split  | Security isolation, native access in main, web UI in renderer           | IPC overhead, state synchronization complexity                                     |
+| UI Framework      | React 19.2.4         | Component composition model enables plugin decoration pattern           | Bundle size, rendering overhead vs. native UI                                      |
+| State Management  | Redux 5.0.1          | Predictable state, plugin middleware integration, time-travel debugging | Boilerplate, performance overhead for high-frequency updates                       |
+| Terminal Engine   | xterm.js 5.3.0       | Mature ecosystem, WebGL support, addon architecture                     | Browser-based limitations, no native text rendering                                |
+| IPC Optimization  | Custom data batching | Reduce serialization overhead, align with frame timing                  | Added complexity, latency tradeoff                                                 |
+| Plugin Model      | Full trust execution | Maximum extensibility, React/Redux composition                          | Security risk, no sandboxing                                                       |
 
 #### 5.3.2 Communication pattern decisions
 
@@ -4702,34 +4705,34 @@ flowchart TB
 
 #### 5.3.3 Data storage solution rationale
 
-| Data Type | Solution | Rationale |
-| ----------- | ---------- | ----------- |
-| User Configuration | JSON file with schema | Programmatic editing, future preferences UI, validation |
-| Window Geometry | electron-store | Encrypted persistence, automatic serialization |
-| Terminal Content | In-memory only | Security (no command history logging), privacy |
-| Plugin Packages | npm/bun in plugins directory | Standard package management, familiar workflow |
-| Session State | Redux (not persisted) | Traditional terminal behaviour, no startup delay |
+| Data Type          | Solution                     | Rationale                                               |
+| ------------------ | ---------------------------- | ------------------------------------------------------- |
+| User Configuration | JSON file with schema        | Programmatic editing, future preferences UI, validation |
+| Window Geometry    | electron-store               | Encrypted persistence, automatic serialization          |
+| Terminal Content   | In-memory only               | Security (no command history logging), privacy          |
+| Plugin Packages    | npm/bun in plugins directory | Standard package management, familiar workflow          |
+| Session State      | Redux (not persisted)        | Traditional terminal behaviour, no startup delay        |
 
 #### 5.3.4 Caching strategy justification
 
-| Cache Type | Implementation | Justification |
-| ------------ | ---------------- | --------------- |
-| Configuration Cache | In-memory after load | Avoid repeated file I/O on hot paths |
-| Hot-Reload | chokidar file watching | Enable live updates without restart |
-| V8 Snapshot | Precompiled JavaScript | Reduce cold start time by ~200ms |
-| Module._load Patch | Shared React/ReactDOM | Prevent duplicate React instances in plugins |
+| Cache Type          | Implementation         | Justification                                |
+| ------------------- | ---------------------- | -------------------------------------------- |
+| Configuration Cache | In-memory after load   | Avoid repeated file I/O on hot paths         |
+| Hot-Reload          | chokidar file watching | Enable live updates without restart          |
+| V8 Snapshot         | Precompiled JavaScript | Reduce cold start time by ~200ms             |
+| Module._load Patch  | Shared React/ReactDOM  | Prevent duplicate React instances in plugins |
 
 #### 5.3.5 Security mechanism analysis
 
-| Concern | Current State | Risk Level | Mitigation Path |
-| --------- | -------------- | ------------ | ----------------- |
-| Electron Version | 40.2.1 (current baseline) | **High** | Keep Electron 40 patch releases current |
-| Plugin Trust Model | Full trust execution | **High** | User education; future sandbox consideration |
-| `@electron/remote` | Enabled for cross-process access | **Medium** | Migrate to explicit IPC messaging |
-| Node Integration | Enabled in renderer | **Medium** | Required for plugin system architecture |
-| PTY Access | Full system access | **Low** | Runs with user privileges only |
+| Concern            | Current State                    | Risk Level | Mitigation Path                              |
+| ------------------ | -------------------------------- | ---------- | -------------------------------------------- |
+| Electron Version   | 40.2.1 (current baseline)        | **High**   | Keep Electron 40 patch releases current      |
+| Plugin Trust Model | Full trust execution             | **High**   | User education; future sandbox consideration |
+| `@electron/remote` | Enabled for cross-process access | **Medium** | Migrate to explicit IPC messaging            |
+| Node Integration   | Enabled in renderer              | **Medium** | Required for plugin system architecture      |
+| PTY Access         | Full system access               | **Low**    | Runs with user privileges only               |
 
----
+______________________________________________________________________
 
 ### 5.4 Cross-cutting concerns
 
@@ -4738,12 +4741,12 @@ flowchart TB
 Velocetty implements a lightweight observability model appropriate for desktop
 applications:
 
-| Observability Aspect | Implementation | Location |
-| --------------------- | ---------------- | ---------- |
-| Crash Reporting | Electron crash handler | Main process |
-| Performance Metrics | Internal timing instrumentation | Session manager, renderer |
-| Update Analytics | Update check telemetry | `app/updater.ts` |
-| User Feedback | GitHub issue templates | Browser redirect |
+| Observability Aspect | Implementation                  | Location                  |
+| -------------------- | ------------------------------- | ------------------------- |
+| Crash Reporting      | Electron crash handler          | Main process              |
+| Performance Metrics  | Internal timing instrumentation | Session manager, renderer |
+| Update Analytics     | Update check telemetry          | `app/updater.ts`          |
+| User Feedback        | GitHub issue templates          | Browser redirect          |
 
 **Performance Monitoring Points**:
 
@@ -4757,12 +4760,12 @@ applications:
 
 #### 5.4.2 Logging and tracing strategy
 
-| Process | Logging Mechanism | Output Destination |
-| --------- | ------------------- | ------------------- |
-| Main Process | Console logging | stdout/stderr, developer tools |
-| Renderer Process | Console logging | Chrome DevTools console |
-| Plugin Errors | Toast notifications | In-app notification tray |
-| Development Mode | Redux DevTools | Chrome extension |
+| Process          | Logging Mechanism   | Output Destination             |
+| ---------------- | ------------------- | ------------------------------ |
+| Main Process     | Console logging     | stdout/stderr, developer tools |
+| Renderer Process | Console logging     | Chrome DevTools console        |
+| Plugin Errors    | Toast notifications | In-app notification tray       |
+| Development Mode | Redux DevTools      | Chrome extension               |
 
 **Log Categories**:
 
@@ -4905,28 +4908,28 @@ flowchart TB
 
 #### 5.4.4 Performance requirements and SLAs
 
-| Metric | Target | Measurement Point |
-| -------- | -------- | ------------------- |
-| Cold start time | < 2 seconds | Application launch to first terminal ready |
-| Keystroke-to-echo latency | < 50ms | Input event to visible character |
-| Idle memory consumption | < 300 MB | Single window, single tab |
-| Frame rate (WebGL scrolling) | 60 fps | Continuous output rendering |
-| Plugin load time | < 500ms total | All extensions initialized |
-| Configuration hot-reload | < 100ms | File change to UI update |
-| IPC batch efficiency | 60-90% reduction | Calls vs. unbatched baseline |
+| Metric                       | Target           | Measurement Point                          |
+| ---------------------------- | ---------------- | ------------------------------------------ |
+| Cold start time              | < 2 seconds      | Application launch to first terminal ready |
+| Keystroke-to-echo latency    | < 50ms           | Input event to visible character           |
+| Idle memory consumption      | < 300 MB         | Single window, single tab                  |
+| Frame rate (WebGL scrolling) | 60 fps           | Continuous output rendering                |
+| Plugin load time             | < 500ms total    | All extensions initialized                 |
+| Configuration hot-reload     | < 100ms          | File change to UI update                   |
+| IPC batch efficiency         | 60-90% reduction | Calls vs. unbatched baseline               |
 
 #### 5.4.5 Disaster recovery procedures
 
-| Failure Scenario | Detection | Recovery Procedure |
-| ----------------- | ----------- | ------------------- |
-| Configuration corruption | Schema validation failure | Restore from defaults, notify user |
-| Plugin crash | Error boundary catch | Disable plugin, continue with core functionality |
-| WebGL context loss | `onContextLoss` event | Automatic fallback to Canvas renderer |
-| PTY spawn failure | Quick exit detection | Fallback shell, display warning |
-| Main process crash | Electron crash handler | Restart application, restore window geometry |
-| Renderer crash | Renderer process exit | Recreate window, restore session if possible |
+| Failure Scenario         | Detection                 | Recovery Procedure                               |
+| ------------------------ | ------------------------- | ------------------------------------------------ |
+| Configuration corruption | Schema validation failure | Restore from defaults, notify user               |
+| Plugin crash             | Error boundary catch      | Disable plugin, continue with core functionality |
+| WebGL context loss       | `onContextLoss` event     | Automatic fallback to Canvas renderer            |
+| PTY spawn failure        | Quick exit detection      | Fallback shell, display warning                  |
+| Main process crash       | Electron crash handler    | Restart application, restore window geometry     |
+| Renderer crash           | Renderer process exit     | Recreate window, restore session if possible     |
 
----
+______________________________________________________________________
 
 ### 5.5 References
 
@@ -5034,7 +5037,8 @@ flowchart TB
 
 - Section 1.2 SYSTEM OVERVIEW - Architectural context and success criteria
 
-- Section 2.1 FEATURE CATALOGUE - Feature dependencies and implementation context
+- Section 2.1 FEATURE CATALOGUE - Feature dependencies and implementation
+  context
 
 - Section 3.2 FRAMEWORKS & LIBRARIES - Technology stack details
 
@@ -5068,14 +5072,14 @@ traditional microservices architecture concepts—including service discovery,
 load balancing, auto-scaling, and circuit breakers—are **not applicable** to
 this system.
 
-| Architectural Characteristic | Velocetty Reality | Traditional Microservices |
-| ------------------------------ | ------------------- | --------------------------- |
-| **Deployment Model** | Single desktop application per user | Distributed network services |
-| **Process Communication** | Electron IPC (in-application) | HTTP/gRPC/Message Queues |
-| **Scaling Model** | Window/tab level (single-user) | Pod/instance replication |
-| **Service Discovery** | Not needed (local processes) | Consul/Kubernetes/DNS-based |
-| **Data Storage** | Local filesystem + memory | Distributed databases |
-| **Load Distribution** | N/A | Round-robin, weighted, etc. |
+| Architectural Characteristic | Velocetty Reality                   | Traditional Microservices    |
+| ---------------------------- | ----------------------------------- | ---------------------------- |
+| **Deployment Model**         | Single desktop application per user | Distributed network services |
+| **Process Communication**    | Electron IPC (in-application)       | HTTP/gRPC/Message Queues     |
+| **Scaling Model**            | Window/tab level (single-user)      | Pod/instance replication     |
+| **Service Discovery**        | Not needed (local processes)        | Consul/Kubernetes/DNS-based  |
+| **Data Storage**             | Local filesystem + memory           | Distributed databases        |
+| **Load Distribution**        | N/A                                 | Round-robin, weighted, etc.  |
 
 ##### Rationale for non-applicability
 
@@ -5154,31 +5158,31 @@ flowchart TB
 The Main Process runs in the Node.js environment and handles operating system
 integration, native APIs, and privileged operations.
 
-| Component | File Location | Responsibilities |
-| ----------- | --------------- | ------------------ |
-| **Application Entry** | `app/index.ts` | Electron initialization, CLI argument processing, window lifecycle, SSH protocol handler registration |
-| **Session Manager** | `app/session.ts` | PTY lifecycle management, data batching (16ms/200KB thresholds), shell spawning with fallback |
-| **Configuration System** | `app/config/` | JSON config loading, schema validation, hot-reload via chokidar, XDG path compliance |
-| **Plugin Manager** | `app/plugins.ts` | Extension loading, decoration orchestration, lifecycle hooks (`onApp`, `onWindow`, `onUnload`) |
-| **RPC Bridge (Server)** | `app/rpc.ts` | UUID-keyed IPC channel management, typed event routing to renderer |
-| **Menu System** | `app/menus/` | Application and context menus, platform-specific variants, command dispatch |
-| **Auto Updater** | `app/updater.ts` | Update channel polling, version checking, manifest retrieval |
-| **Notification Service** | `app/notifications.ts` | News polling, notification dispatch to renderer |
+| Component                | File Location          | Responsibilities                                                                                      |
+| ------------------------ | ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| **Application Entry**    | `app/index.ts`         | Electron initialization, CLI argument processing, window lifecycle, SSH protocol handler registration |
+| **Session Manager**      | `app/session.ts`       | PTY lifecycle management, data batching (16ms/200KB thresholds), shell spawning with fallback         |
+| **Configuration System** | `app/config/`          | JSON config loading, schema validation, hot-reload via chokidar, XDG path compliance                  |
+| **Plugin Manager**       | `app/plugins.ts`       | Extension loading, decoration orchestration, lifecycle hooks (`onApp`, `onWindow`, `onUnload`)        |
+| **RPC Bridge (Server)**  | `app/rpc.ts`           | UUID-keyed IPC channel management, typed event routing to renderer                                    |
+| **Menu System**          | `app/menus/`           | Application and context menus, platform-specific variants, command dispatch                           |
+| **Auto Updater**         | `app/updater.ts`       | Update channel polling, version checking, manifest retrieval                                          |
+| **Notification Service** | `app/notifications.ts` | News polling, notification dispatch to renderer                                                       |
 
 ##### Renderer process components
 
 The Renderer Process executes within Chromium and manages the visual interface,
 user interactions, and terminal rendering.
 
-| Component | File Location | Responsibilities |
-| ----------- | --------------- | ------------------ |
-| **Renderer Entry** | `lib/index.tsx` | React 19 bootstrap, 30+ RPC event handler registration, Redux store initialization |
-| **Redux Store** | `lib/store/` | Centralized state management, plugin middleware integration, write middleware bypass |
-| **Terminal Component** | `lib/components/term.tsx` | xterm.js hosting, WebGL/Canvas addon management, context loss recovery |
-| **RPC Client** | `lib/utils/rpc.ts` | IPC communication with main process, typed event emission |
-| **UI Components** | `lib/components/` | React component tree (Header, Tabs, Terms, SplitPane, Notifications) |
-| **Command Registry** | `lib/command-registry.ts` | Keyboard shortcut registration, command dispatch |
-| **Plugin Utilities** | `lib/utils/plugins.ts` | Renderer-side plugin orchestration, decoration composition |
+| Component              | File Location             | Responsibilities                                                                     |
+| ---------------------- | ------------------------- | ------------------------------------------------------------------------------------ |
+| **Renderer Entry**     | `lib/index.tsx`           | React 19 bootstrap, 30+ RPC event handler registration, Redux store initialization   |
+| **Redux Store**        | `lib/store/`              | Centralized state management, plugin middleware integration, write middleware bypass |
+| **Terminal Component** | `lib/components/term.tsx` | xterm.js hosting, WebGL/Canvas addon management, context loss recovery               |
+| **RPC Client**         | `lib/utils/rpc.ts`        | IPC communication with main process, typed event emission                            |
+| **UI Components**      | `lib/components/`         | React component tree (Header, Tabs, Terms, SplitPane, Notifications)                 |
+| **Command Registry**   | `lib/command-registry.ts` | Keyboard shortcut registration, command dispatch                                     |
+| **Plugin Utilities**   | `lib/utils/plugins.ts`    | Renderer-side plugin orchestration, decoration composition                           |
 
 #### 6.1.3 Inter-process communication patterns
 
@@ -5227,18 +5231,18 @@ sequenceDiagram
 The IPC bridge uses strongly-typed event definitions to ensure communication
 integrity between processes.
 
-| Event Direction | Event Type | Payload | Purpose |
-| ---------------- | ------------ | --------- | --------- |
-| **Renderer → Main** | `data` | `{uid, data, escaped?}` | User keyboard input |
-| **Renderer → Main** | `resize` | `{uid, cols, rows}` | Terminal dimension change |
-| **Renderer → Main** | `new` | `{profile?, splitDirection?, cwd?}` | New session request |
-| **Renderer → Main** | `exit` | `{uid}` | Session termination request |
-| **Renderer → Main** | `close` | `{}` | Window close request |
-| **Main → Renderer** | `session add` | `{uid, shell, pid, cols, rows, profile}` | Session creation notification |
-| **Main → Renderer** | `session data` | `string` (UUID-prefixed batch) | Terminal output data |
-| **Main → Renderer** | `session exit` | `{uid}` | Session termination notification |
-| **Main → Renderer** | `config change` | `{}` | Configuration hot-reload trigger |
-| **Main → Renderer** | `move left req` | `{}` | Tab navigation command |
+| Event Direction     | Event Type      | Payload                                  | Purpose                          |
+| ------------------- | --------------- | ---------------------------------------- | -------------------------------- |
+| **Renderer → Main** | `data`          | `{uid, data, escaped?}`                  | User keyboard input              |
+| **Renderer → Main** | `resize`        | `{uid, cols, rows}`                      | Terminal dimension change        |
+| **Renderer → Main** | `new`           | `{profile?, splitDirection?, cwd?}`      | New session request              |
+| **Renderer → Main** | `exit`          | `{uid}`                                  | Session termination request      |
+| **Renderer → Main** | `close`         | `{}`                                     | Window close request             |
+| **Main → Renderer** | `session add`   | `{uid, shell, pid, cols, rows, profile}` | Session creation notification    |
+| **Main → Renderer** | `session data`  | `string` (UUID-prefixed batch)           | Terminal output data             |
+| **Main → Renderer** | `session exit`  | `{uid}`                                  | Session termination notification |
+| **Main → Renderer** | `config change` | `{}`                                     | Configuration hot-reload trigger |
+| **Main → Renderer** | `move left req` | `{}`                                     | Tab navigation command           |
 
 ##### Data batching strategy
 
@@ -5268,12 +5272,12 @@ flowchart TB
     Reset --> PTYOutput
 ```
 
-| Batching Parameter | Value | Rationale |
-| ------------------- | ------- | ----------- |
-| **Time Threshold** | 16ms | Aligned with 60fps frame timing for smooth rendering |
-| **Size Threshold** | 200KB | Prevents memory accumulation during rapid output (e.g., `find ~`) |
-| **Batch Prefix** | 36-character UUID | Session identification for multi-session routing |
-| **IPC Call Reduction** | 60-90% | Empirical reduction vs. unbatched transmission |
+| Batching Parameter     | Value             | Rationale                                                         |
+| ---------------------- | ----------------- | ----------------------------------------------------------------- |
+| **Time Threshold**     | 16ms              | Aligned with 60fps frame timing for smooth rendering              |
+| **Size Threshold**     | 200KB             | Prevents memory accumulation during rapid output (e.g., `find ~`) |
+| **Batch Prefix**       | 36-character UUID | Session identification for multi-session routing                  |
+| **IPC Call Reduction** | 60-90%            | Empirical reduction vs. unbatched transmission                    |
 
 #### 6.1.4 Desktop-appropriate scalability design
 
@@ -5283,12 +5287,12 @@ Traditional horizontal and vertical scaling concepts do not apply to Velocetty
 as a desktop application. However, the architecture supports **window-level and
 tab-level scaling** within the single-user context.
 
-| Scaling Dimension | Implementation | Constraints |
-| ------------------- | ---------------- | ------------- |
-| **Window Instances** | Multiple BrowserWindow instances | Each window spawns isolated renderer process |
-| **Terminal Tabs** | Redux state-managed tab collection | Limited by available memory and PTY handles |
-| **Split Panes** | Term group hierarchy in Redux state | WebGL context limit of 16 simultaneous contexts |
-| **PTY Sessions** | Session map with UUID keys | OS limit on pseudo-terminal file descriptors |
+| Scaling Dimension    | Implementation                      | Constraints                                     |
+| -------------------- | ----------------------------------- | ----------------------------------------------- |
+| **Window Instances** | Multiple BrowserWindow instances    | Each window spawns isolated renderer process    |
+| **Terminal Tabs**    | Redux state-managed tab collection  | Limited by available memory and PTY handles     |
+| **Split Panes**      | Term group hierarchy in Redux state | WebGL context limit of 16 simultaneous contexts |
+| **PTY Sessions**     | Session map with UUID keys          | OS limit on pseudo-terminal file descriptors    |
 
 ##### Resource allocation strategy
 
@@ -5311,25 +5315,25 @@ flowchart LR
     end
 ```
 
-| Resource | Allocation Strategy | Target Metric |
-| ---------- | -------------------- | -------------- |
-| **Memory (Idle)** | Single window, single tab baseline | < 300 MB |
-| **WebGL Contexts** | Prioritize visible panes, Canvas fallback for overflow | Max 16 active |
-| **PTY Handles** | On-demand creation, cleanup on session exit | OS-dependent limit |
-| **CPU** | Event-driven, batch processing to reduce overhead | < 5% idle CPU |
+| Resource           | Allocation Strategy                                    | Target Metric      |
+| ------------------ | ------------------------------------------------------ | ------------------ |
+| **Memory (Idle)**  | Single window, single tab baseline                     | < 300 MB           |
+| **WebGL Contexts** | Prioritize visible panes, Canvas fallback for overflow | Max 16 active      |
+| **PTY Handles**    | On-demand creation, cleanup on session exit            | OS-dependent limit |
+| **CPU**            | Event-driven, batch processing to reduce overhead      | < 5% idle CPU      |
 
 ##### Performance optimization techniques
 
 The architecture implements several performance optimizations appropriate for
 desktop terminal applications:
 
-| Technique | Implementation | Impact |
-| ----------- | ---------------- | -------- |
+| Technique                   | Implementation                                                    | Impact                                                |
+| --------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------- |
 | **Write Middleware Bypass** | `SESSION_PTY_DATA` actions skip Redux, write directly to xterm.js | Eliminates serialization overhead for terminal output |
-| **Data Batching** | 16ms/200KB threshold batching in Session Manager | 60-90% reduction in IPC calls |
-| **V8 Snapshots** | Precompiled JavaScript for renderer initialization | ~200ms cold start reduction |
-| **Lazy Addon Loading** | Terminal addons loaded on-demand based on configuration | Reduced initial memory footprint |
-| **WebGL Prioritization** | GPU-accelerated rendering for visible terminals | 60fps scrolling performance |
+| **Data Batching**           | 16ms/200KB threshold batching in Session Manager                  | 60-90% reduction in IPC calls                         |
+| **V8 Snapshots**            | Precompiled JavaScript for renderer initialization                | ~200ms cold start reduction                           |
+| **Lazy Addon Loading**      | Terminal addons loaded on-demand based on configuration           | Reduced initial memory footprint                      |
+| **WebGL Prioritization**    | GPU-accelerated rendering for visible terminals                   | 60fps scrolling performance                           |
 
 #### 6.1.5 Desktop-appropriate resilience patterns
 
@@ -5373,12 +5377,12 @@ flowchart TB
 The Session Manager implements intelligent failure detection and recovery for
 shell processes:
 
-| Failure Condition | Detection Criteria | Recovery Action |
-| ------------------- | ------------------- | ----------------- |
-| **Quick Shell Failure** | `exitCode > 0` AND `duration < 1 second` | Attempt fallback shell, display warning |
-| **Fallback Failure** | Secondary shell also fails | Display error message, keep pane open |
-| **Normal Exit** | Exit code 0 or duration ≥ 1 second | Mark session ended, apply exit behaviour |
-| **PTY Spawn Failure** | node-pty throws exception | Log error, notify user, no session created |
+| Failure Condition       | Detection Criteria                       | Recovery Action                            |
+| ----------------------- | ---------------------------------------- | ------------------------------------------ |
+| **Quick Shell Failure** | `exitCode > 0` AND `duration < 1 second` | Attempt fallback shell, display warning    |
+| **Fallback Failure**    | Secondary shell also fails               | Display error message, keep pane open      |
+| **Normal Exit**         | Exit code 0 or duration ≥ 1 second       | Mark session ended, apply exit behaviour   |
+| **PTY Spawn Failure**   | node-pty throws exception                | Log error, notify user, no session created |
 
 ##### WebGL context loss recovery (6.1.5 Desktop-appropriate resilience patterns)
 
@@ -5412,23 +5416,23 @@ flowchart TB
 The plugin system implements defensive error handling to prevent extension
 failures from crashing the application:
 
-| Hook Category | Error Handling Strategy | Fallback Behaviour |
-| --------------- | ------------------------ | ------------------- |
-| **Decoration Hooks** | Try-catch wrapper around hook execution | Return original component/config |
-| **Middleware Hooks** | Forward action unchanged on error | Skip middleware, continue pipeline |
-| **Lifecycle Hooks** | Log error and continue startup | Application starts without plugin |
-| **Reducer Hooks** | Return previous state on error | State unchanged by failed plugin |
+| Hook Category        | Error Handling Strategy                 | Fallback Behaviour                 |
+| -------------------- | --------------------------------------- | ---------------------------------- |
+| **Decoration Hooks** | Try-catch wrapper around hook execution | Return original component/config   |
+| **Middleware Hooks** | Forward action unchanged on error       | Skip middleware, continue pipeline |
+| **Lifecycle Hooks**  | Log error and continue startup          | Application starts without plugin  |
+| **Reducer Hooks**    | Return previous state on error          | State unchanged by failed plugin   |
 
 ##### Disaster recovery procedures
 
-| Failure Scenario | Detection Method | Recovery Procedure |
-| ----------------- | ------------------ | ------------------- |
-| **Configuration Corruption** | JSON schema validation failure | Restore from `config-default.json`, notify user |
-| **Plugin Crash** | Error boundary catch in decoration | Disable specific plugin, continue with core |
-| **WebGL Context Loss** | `onContextLoss` callback | Automatic fallback to Canvas renderer |
-| **Main Process Crash** | Electron crash handler | Restart application, restore window geometry |
-| **Renderer Crash** | Renderer process exit event | Recreate window, restore session if possible |
-| **PTY Spawn Failure** | Quick exit detection (< 1 second) | Fallback shell with warning message |
+| Failure Scenario             | Detection Method                   | Recovery Procedure                              |
+| ---------------------------- | ---------------------------------- | ----------------------------------------------- |
+| **Configuration Corruption** | JSON schema validation failure     | Restore from `config-default.json`, notify user |
+| **Plugin Crash**             | Error boundary catch in decoration | Disable specific plugin, continue with core     |
+| **WebGL Context Loss**       | `onContextLoss` callback           | Automatic fallback to Canvas renderer           |
+| **Main Process Crash**       | Electron crash handler             | Restart application, restore window geometry    |
+| **Renderer Crash**           | Renderer process exit event        | Recreate window, restore session if possible    |
+| **PTY Spawn Failure**        | Quick exit detection (< 1 second)  | Fallback shell with warning message             |
 
 #### 6.1.6 Service degradation policies
 
@@ -5453,51 +5457,51 @@ flowchart TB
     Level3 -->|"Shell failure"| Level4
 ```
 
-| Degradation Level | Trigger Condition | User Impact | Recovery Path |
-| ------------------- | ------------------- | ------------- | --------------- |
-| **Level 0** | Normal operation | Full performance | N/A |
-| **Level 1** | WebGL context limit (16) or transparency enabled | Reduced scroll performance | Close terminals to free WebGL contexts |
-| **Level 2** | Memory pressure detection | No ligatures or inline images | Reduce terminal count |
-| **Level 3** | Plugin throws unrecoverable error | Specific plugin features unavailable | Uninstall/fix plugin |
-| **Level 4** | Primary shell fails to spawn | Using system default shell | Fix shell configuration |
+| Degradation Level | Trigger Condition                                | User Impact                          | Recovery Path                          |
+| ----------------- | ------------------------------------------------ | ------------------------------------ | -------------------------------------- |
+| **Level 0**       | Normal operation                                 | Full performance                     | N/A                                    |
+| **Level 1**       | WebGL context limit (16) or transparency enabled | Reduced scroll performance           | Close terminals to free WebGL contexts |
+| **Level 2**       | Memory pressure detection                        | No ligatures or inline images        | Reduce terminal count                  |
+| **Level 3**       | Plugin throws unrecoverable error                | Specific plugin features unavailable | Uninstall/fix plugin                   |
+| **Level 4**       | Primary shell fails to spawn                     | Using system default shell           | Fix shell configuration                |
 
 #### 6.1.7 Performance requirements and SLAs
 
 ##### Desktop application performance targets
 
-| Metric | Target | Measurement Point |
-| -------- | -------- | ------------------- |
-| **Cold Start Time** | < 2 seconds | Application launch to first terminal ready |
-| **Keystroke-to-Echo Latency** | < 50ms | Input event to visible character |
-| **Idle Memory Consumption** | < 300 MB | Single window, single tab |
-| **Frame Rate (WebGL)** | 60 fps | Continuous output rendering during scroll |
-| **Plugin Load Time** | < 500ms total | All extensions initialized |
-| **Configuration Hot-Reload** | < 100ms | File change to UI update |
-| **IPC Batch Efficiency** | 60-90% reduction | Calls vs. unbatched baseline |
+| Metric                        | Target           | Measurement Point                          |
+| ----------------------------- | ---------------- | ------------------------------------------ |
+| **Cold Start Time**           | < 2 seconds      | Application launch to first terminal ready |
+| **Keystroke-to-Echo Latency** | < 50ms           | Input event to visible character           |
+| **Idle Memory Consumption**   | < 300 MB         | Single window, single tab                  |
+| **Frame Rate (WebGL)**        | 60 fps           | Continuous output rendering during scroll  |
+| **Plugin Load Time**          | < 500ms total    | All extensions initialized                 |
+| **Configuration Hot-Reload**  | < 100ms          | File change to UI update                   |
+| **IPC Batch Efficiency**      | 60-90% reduction | Calls vs. unbatched baseline               |
 
 ##### Performance monitoring points
 
 The application includes internal instrumentation for performance tracking:
 
-| Monitoring Point | Implementation | Location |
-| ----------------- | ---------------- | ---------- |
-| **Cold Start Timing** | Application ready timestamp | Main process initialization |
-| **Batch Flush Frequency** | DataBatcher flush count | `app/session.ts` |
-| **Frame Render Timing** | RequestAnimationFrame instrumentation | Terminal component |
-| **Plugin Load Aggregation** | Per-plugin load time collection | Plugin manager |
+| Monitoring Point            | Implementation                        | Location                    |
+| --------------------------- | ------------------------------------- | --------------------------- |
+| **Cold Start Timing**       | Application ready timestamp           | Main process initialization |
+| **Batch Flush Frequency**   | DataBatcher flush count               | `app/session.ts`            |
+| **Frame Render Timing**     | RequestAnimationFrame instrumentation | Terminal component          |
+| **Plugin Load Aggregation** | Per-plugin load time collection       | Plugin manager              |
 
 #### 6.1.8 Summary: why traditional service patterns don't apply
 
-| Traditional Service Pattern | Applicability | Rationale |
-| ---------------------------- | --------------- | ----------- |
-| **Service Discovery** | ❌ Not Applicable | Single desktop application, no network service registration |
-| **Load Balancing** | ❌ Not Applicable | No distributed workload to balance |
-| **Auto-Scaling** | ❌ Not Applicable | Single-user desktop application context |
-| **Circuit Breakers** | ❌ Not Applicable | No network service dependencies for core functionality |
-| **Horizontal Scaling** | ❌ Not Applicable | Window/tab level is the only "scaling" dimension |
-| **Vertical Scaling** | ⚠️ Limited | User machine resources dictate limits |
-| **Disaster Recovery** | ⚠️ Desktop-Adapted | Local config backup, window geometry restoration |
-| **Service Mesh** | ❌ Not Applicable | No inter-service network communication |
+| Traditional Service Pattern | Applicability      | Rationale                                                   |
+| --------------------------- | ------------------ | ----------------------------------------------------------- |
+| **Service Discovery**       | ❌ Not Applicable  | Single desktop application, no network service registration |
+| **Load Balancing**          | ❌ Not Applicable  | No distributed workload to balance                          |
+| **Auto-Scaling**            | ❌ Not Applicable  | Single-user desktop application context                     |
+| **Circuit Breakers**        | ❌ Not Applicable  | No network service dependencies for core functionality      |
+| **Horizontal Scaling**      | ❌ Not Applicable  | Window/tab level is the only "scaling" dimension            |
+| **Vertical Scaling**        | ⚠️ Limited         | User machine resources dictate limits                       |
+| **Disaster Recovery**       | ⚠️ Desktop-Adapted | Local config backup, window geometry restoration            |
+| **Service Mesh**            | ❌ Not Applicable  | No inter-service network communication                      |
 
 Velocetty's architecture instead focuses on:
 
@@ -5556,20 +5560,20 @@ The following sources were examined to compile this architectural documentation:
 ##### 6.2.1.1 Traditional database design: not applicable
 
 Velocetty is a **desktop terminal emulator application** built on Electron. As
-such, traditional database design concepts—including relational schemas, entity-
-relationship modelling, distributed replication, and network-accessible database
-servers—are **not applicable** to this system.
+such, traditional database design concepts—including relational schemas,
+entity- relationship modelling, distributed replication, and network-accessible
+database servers—are **not applicable** to this system.
 
-| Traditional Database Concept | Velocetty Reality |
-| ------------------------------ | ------------------- |
-| **Relational Database** | No SQL database; uses JSON files |
-| **Entity-Relationship Model** | Flat JSON configuration structure |
-| **Network Database Server** | No database server; local filesystem only |
-| **Distributed Replication** | Single-user desktop application |
-| **ACID Transactions** | File-based atomic writes |
-| **Query Language** | Direct file I/O with JavaScript parsing |
-| **Connection Pooling** | Not applicable; no database connections |
-| **Database Migrations** | Configuration file migrations (v3 → v4) |
+| Traditional Database Concept  | Velocetty Reality                         |
+| ----------------------------- | ----------------------------------------- |
+| **Relational Database**       | No SQL database; uses JSON files          |
+| **Entity-Relationship Model** | Flat JSON configuration structure         |
+| **Network Database Server**   | No database server; local filesystem only |
+| **Distributed Replication**   | Single-user desktop application           |
+| **ACID Transactions**         | File-based atomic writes                  |
+| **Query Language**            | Direct file I/O with JavaScript parsing   |
+| **Connection Pooling**        | Not applicable; no database connections   |
+| **Database Migrations**       | Configuration file migrations (v3 → v4)   |
 
 ##### 6.2.1.2 Rationale for non-applicability
 
@@ -5583,8 +5587,8 @@ requirements:
 
 2. **No Network Service Dependencies**: Core functionality operates entirely
 
-   locally—PTY sessions communicate with local shell processes, configuration is
-   read from local files, and application state exists in memory.
+   locally—PTY sessions communicate with local shell processes, configuration
+   is read from local files, and application state exists in memory.
 
 3. **Stateful Desktop Paradigm**: Terminal sessions maintain local state
 
@@ -5596,7 +5600,7 @@ requirements:
    command history) is intentionally NOT persisted to avoid security concerns
    with storing potentially sensitive command output.
 
----
+______________________________________________________________________
 
 #### 6.2.2 File-based storage architecture
 
@@ -5643,13 +5647,13 @@ flowchart TB
 
 ##### 6.2.2.2 Storage layer classification
 
-| Storage Layer | Technology | Persistence Model | Data Lifetime |
-| --------------- | ------------ | ------------------- | --------------- |
-| **Configuration Storage** | JSON files with schema validation | Persistent across restarts | User-managed, survives application updates |
-| **Application State** | electron-store + Redux in-memory | Partial persistence | Window geometry persisted; session state volatile |
-| **Plugin Storage** | npm/bun filesystem structure | Persistent across restarts | Managed via CLI commands |
+| Storage Layer             | Technology                        | Persistence Model          | Data Lifetime                                     |
+| ------------------------- | --------------------------------- | -------------------------- | ------------------------------------------------- |
+| **Configuration Storage** | JSON files with schema validation | Persistent across restarts | User-managed, survives application updates        |
+| **Application State**     | electron-store + Redux in-memory  | Partial persistence        | Window geometry persisted; session state volatile |
+| **Plugin Storage**        | npm/bun filesystem structure      | Persistent across restarts | Managed via CLI commands                          |
 
----
+______________________________________________________________________
 
 #### 6.2.3 Schema design
 
@@ -5694,32 +5698,32 @@ flowchart TB
 Configuration validation is enforced through JSON Schema Draft-07, defined in
 `app/config/schema.json`:
 
-| Schema Definition | Type | Purpose |
-| ------------------- | ------ | --------- |
-| **FontWeight** | Enum (100-900, normal, bold) | Font weight validation |
-| **ColorMap** | Object (16 required properties) | ANSI colour palette validation |
+| Schema Definition        | Type                             | Purpose                          |
+| ------------------------ | -------------------------------- | -------------------------------- |
+| **FontWeight**           | Enum (100-900, normal, bold)     | Font weight validation           |
+| **ColorMap**             | Object (16 required properties)  | ANSI colour palette validation   |
 | **profileConfigOptions** | Object (subset of configOptions) | Per-profile overridable settings |
-| **configOptions** | Object (40+ properties) | Complete configuration structure |
+| **configOptions**        | Object (40+ properties)          | Complete configuration structure |
 
 ##### Colour palette schema requirements
 
 The ColorMap type requires exactly 16 ANSI colour definitions:
 
-| Colour Category | Properties |
-| ---------------- | ------------ |
-| **Standard Colours** | black, red, green, yellow, blue, magenta, cyan, white |
-| **Bright Colours** | lightBlack, lightRed, lightGreen, lightYellow, lightBlue, lightMagenta, lightCyan, lightWhite |
+| Colour Category      | Properties                                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------- |
+| **Standard Colours** | black, red, green, yellow, blue, magenta, cyan, white                                         |
+| **Bright Colours**   | lightBlack, lightRed, lightGreen, lightYellow, lightBlue, lightMagenta, lightCyan, lightWhite |
 
 ##### 6.2.3.3 Platform-specific path resolution
 
 Configuration file locations follow XDG Base Directory Specification on Unix-
 like systems:
 
-| Platform | Configuration Directory | Resolution Logic |
-| ---------- | ------------------------ | ------------------ |
-| **Linux** | `$XDG_CONFIG_HOME/Hyper` | Falls back to `~/.config/Hyper` if unset |
-| **macOS** | `~/.config/Hyper` | Consistent with Linux for cross-platform tools |
-| **Windows** | `%APPDATA%/Hyper` | Uses Electron's `app.getPath('userData')` |
+| Platform    | Configuration Directory  | Resolution Logic                               |
+| ----------- | ------------------------ | ---------------------------------------------- |
+| **Linux**   | `$XDG_CONFIG_HOME/Hyper` | Falls back to `~/.config/Hyper` if unset       |
+| **macOS**   | `~/.config/Hyper`        | Consistent with Linux for cross-platform tools |
+| **Windows** | `%APPDATA%/Hyper`        | Uses Electron's `app.getPath('userData')`      |
 
 ##### Directory structure
 
@@ -5734,7 +5738,7 @@ Configuration Directory:
 └── .migration-marker       # Migration state tracking
 ```
 
----
+______________________________________________________________________
 
 #### 6.2.4 Data models and structures
 
@@ -5769,11 +5773,11 @@ flowchart TB
 Session and UI state is managed entirely in memory via Redux, intentionally not
 persisted:
 
-| State Slice | Key Properties | Persistence |
-| ------------- | ---------------- | ------------- |
-| **ui** | fontSize, fontFamily, colours, cursorColour, cursorShape, bell, notifications, fullScreen, maximized | **Not persisted** (reloaded from config) |
-| **sessions** | sessions (Record<uid, session>), activeUid, search state | **Not persisted** (volatile) |
-| **termGroups** | termGroups (tree structure), activeSessions, activeRootGroup | **Not persisted** (volatile) |
+| State Slice    | Key Properties                                                                                       | Persistence                              |
+| -------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **ui**         | fontSize, fontFamily, colours, cursorColour, cursorShape, bell, notifications, fullScreen, maximized | **Not persisted** (reloaded from config) |
+| **sessions**   | sessions (Record<uid, session>), activeUid, search state                                             | **Not persisted** (volatile)             |
+| **termGroups** | termGroups (tree structure), activeSessions, activeRootGroup                                         | **Not persisted** (volatile)             |
 
 ##### Session record structure
 
@@ -5797,12 +5801,12 @@ flowchart LR
 Window geometry is persisted using `electron-store` for restoration across
 application restarts:
 
-| Property | Type | Default Value | Purpose |
-| ---------- | ------ | --------------- | --------- |
-| **windowPosition** | `[number, number]` | `[50, 50]` | Window X, Y coordinates |
-| **windowSize** | `[number, number]` | `[540, 380]` | Window width, height |
+| Property           | Type               | Default Value | Purpose                 |
+| ------------------ | ------------------ | ------------- | ----------------------- |
+| **windowPosition** | `[number, number]` | `[50, 50]`    | Window X, Y coordinates |
+| **windowSize**     | `[number, number]` | `[540, 380]`  | Window width, height    |
 
----
+______________________________________________________________________
 
 #### 6.2.5 Data flow diagrams
 
@@ -5871,7 +5875,7 @@ flowchart TB
     PluginInstall --> InstalledPlugins
 ```
 
----
+______________________________________________________________________
 
 #### 6.2.6 Data management
 
@@ -5907,32 +5911,32 @@ flowchart TB
 
 ##### Migration artefacts
 
-| Artefact | Location | Purpose |
-| ---------- | ---------- | --------- |
-| **migrated-hyper3-config.js** | `plugins/local/` | Contains non-serializable JavaScript code from legacy config |
-| **.migration-marker** | Configuration directory | Prevents duplicate migration attempts |
-| **hyper.json** | Configuration directory | New JSON configuration file |
+| Artefact                      | Location                | Purpose                                                      |
+| ----------------------------- | ----------------------- | ------------------------------------------------------------ |
+| **migrated-hyper3-config.js** | `plugins/local/`        | Contains non-serializable JavaScript code from legacy config |
+| **.migration-marker**         | Configuration directory | Prevents duplicate migration attempts                        |
+| **hyper.json**                | Configuration directory | New JSON configuration file                                  |
 
 ##### 6.2.6.2 Versioning strategy
 
 Configuration versioning is implicit through schema evolution:
 
-| Version Indicator | Implementation | Purpose |
-| ------------------- | ---------------- | --------- |
+| Version Indicator     | Implementation               | Purpose                                  |
+| --------------------- | ---------------------------- | ---------------------------------------- |
 | **$schema Reference** | `"$schema": "./schema.json"` | Identifies schema version for validation |
-| **Migration Marker** | `.migration-marker` file | Tracks migration state from v3 to v4 |
-| **Plugin Manifest** | `plugins/package.json` | Tracks plugin versions via npm semver |
+| **Migration Marker**  | `.migration-marker` file     | Tracks migration state from v3 to v4     |
+| **Plugin Manifest**   | `plugins/package.json`       | Tracks plugin versions via npm semver    |
 
 ##### 6.2.6.3 Archival policies
 
-| Data Category | Archival Policy | Rationale |
-| --------------- | ----------------- | ----------- |
-| **User Configuration** | User-managed backup | User responsibility; no automatic archival |
-| **Terminal Content** | No archival | Privacy by design; content is volatile |
-| **Plugin Packages** | npm registry serves as archive | Reinstallable from registry |
-| **Window Geometry** | Auto-restored on launch | Persisted in electron-store |
+| Data Category          | Archival Policy                | Rationale                                  |
+| ---------------------- | ------------------------------ | ------------------------------------------ |
+| **User Configuration** | User-managed backup            | User responsibility; no automatic archival |
+| **Terminal Content**   | No archival                    | Privacy by design; content is volatile     |
+| **Plugin Packages**    | npm registry serves as archive | Reinstallable from registry                |
+| **Window Geometry**    | Auto-restored on launch        | Persisted in electron-store                |
 
----
+______________________________________________________________________
 
 #### 6.2.7 Caching strategy
 
@@ -5962,14 +5966,14 @@ flowchart TB
 
 ##### 6.2.7.2 Cache policies
 
-| Cache Type | Implementation | Invalidation Trigger | Purpose |
-| ------------ | ---------------- | --------------------- | --------- |
-| **Configuration Cache** | In-memory variable (`cfg`) | File change detected by chokidar | Avoid repeated file I/O on hot paths |
-| **Hot-Reload Debounce** | 100ms setTimeout | New file change restarts timer | Ensure write completion before reload |
-| **V8 Snapshot** | Precompiled JavaScript blob | Application rebuild | Reduce cold start time (~200ms improvement) |
-| **Module._load Patch** | Shared React/ReactDOM instances | Application restart | Prevent duplicate React instances in plugins |
+| Cache Type              | Implementation                  | Invalidation Trigger             | Purpose                                      |
+| ----------------------- | ------------------------------- | -------------------------------- | -------------------------------------------- |
+| **Configuration Cache** | In-memory variable (`cfg`)      | File change detected by chokidar | Avoid repeated file I/O on hot paths         |
+| **Hot-Reload Debounce** | 100ms setTimeout                | New file change restarts timer   | Ensure write completion before reload        |
+| **V8 Snapshot**         | Precompiled JavaScript blob     | Application rebuild              | Reduce cold start time (~200ms improvement)  |
+| **Module._load Patch**  | Shared React/ReactDOM instances | Application restart              | Prevent duplicate React instances in plugins |
 
----
+______________________________________________________________________
 
 #### 6.2.8 Compliance considerations
 
@@ -5977,12 +5981,12 @@ flowchart TB
 
 Velocetty implements privacy-first data handling as a core design principle:
 
-| Data Category | Privacy Treatment | Implementation |
-| --------------- | ------------------- | ---------------- |
-| **Terminal Content** | Not persisted | Scrollback buffer exists only in xterm.js memory |
-| **Command History** | Shell-managed | Delegated to underlying shell (bash_history, etc.) |
-| **Session State** | Volatile | Redux state lost on application restart |
-| **User Configuration** | Local only | No telemetry; no cloud sync |
+| Data Category          | Privacy Treatment | Implementation                                     |
+| ---------------------- | ----------------- | -------------------------------------------------- |
+| **Terminal Content**   | Not persisted     | Scrollback buffer exists only in xterm.js memory   |
+| **Command History**    | Shell-managed     | Delegated to underlying shell (bash_history, etc.) |
+| **Session State**      | Volatile          | Redux state lost on application restart            |
+| **User Configuration** | Local only        | No telemetry; no cloud sync                        |
 
 **Design Decision**: Session state (including terminal scrollback) is
 intentionally not persisted across application restarts. This aligns with
@@ -5991,24 +5995,24 @@ with persisting command history.
 
 ##### 6.2.8.2 Data retention rules
 
-| Data Type | Retention Period | Cleanup Mechanism |
-| ----------- | ------------------ | ------------------- |
-| **Configuration File** | Indefinite (user-managed) | Manual deletion by user |
-| **Window Geometry** | Indefinite | electron-store automatic management |
-| **Plugin Packages** | Until uninstalled | CLI `hyper uninstall` command |
-| **Terminal Sessions** | Application lifetime | Automatic on window close |
-| **Scrollback Buffer** | Session lifetime | Automatic on session exit |
+| Data Type              | Retention Period          | Cleanup Mechanism                   |
+| ---------------------- | ------------------------- | ----------------------------------- |
+| **Configuration File** | Indefinite (user-managed) | Manual deletion by user             |
+| **Window Geometry**    | Indefinite                | electron-store automatic management |
+| **Plugin Packages**    | Until uninstalled         | CLI `hyper uninstall` command       |
+| **Terminal Sessions**  | Application lifetime      | Automatic on window close           |
+| **Scrollback Buffer**  | Session lifetime          | Automatic on session exit           |
 
 ##### 6.2.8.3 Access controls
 
-| Resource | Access Control | Implementation |
-| ---------- | ---------------- | ---------------- |
-| **Configuration Files** | OS filesystem permissions | Standard Unix/Windows file permissions |
-| **Plugin Execution** | Full trust model | Plugins run with application privileges |
-| **PTY Sessions** | User privileges | Shells spawn with current user context |
-| **electron-store** | Encrypted storage | Built-in electron-store encryption |
+| Resource                | Access Control            | Implementation                          |
+| ----------------------- | ------------------------- | --------------------------------------- |
+| **Configuration Files** | OS filesystem permissions | Standard Unix/Windows file permissions  |
+| **Plugin Execution**    | Full trust model          | Plugins run with application privileges |
+| **PTY Sessions**        | User privileges           | Shells spawn with current user context  |
+| **electron-store**      | Encrypted storage         | Built-in electron-store encryption      |
 
----
+______________________________________________________________________
 
 #### 6.2.9 Backup and fault tolerance
 
@@ -6038,25 +6042,25 @@ flowchart TB
 
 ##### 6.2.9.2 Configuration corruption recovery
 
-| Failure Scenario | Detection Method | Recovery Action |
-| ------------------ | ------------------ | ----------------- |
-| **Invalid JSON Syntax** | JSON.parse() exception | Log error, restore defaults, notify user |
-| **Schema Validation Failure** | JSON Schema validation | Merge with defaults, use valid values only |
-| **Missing Configuration File** | File existence check | Generate from config-default.json |
-| **Permission Denied** | File read exception | Use in-memory defaults, notify user |
+| Failure Scenario               | Detection Method       | Recovery Action                            |
+| ------------------------------ | ---------------------- | ------------------------------------------ |
+| **Invalid JSON Syntax**        | JSON.parse() exception | Log error, restore defaults, notify user   |
+| **Schema Validation Failure**  | JSON Schema validation | Merge with defaults, use valid values only |
+| **Missing Configuration File** | File existence check   | Generate from config-default.json          |
+| **Permission Denied**          | File read exception    | Use in-memory defaults, notify user        |
 
 ##### 6.2.9.3 Backup recommendations
 
 Since Velocetty does not implement automatic backup, users are responsible for
 preserving their configuration:
 
-| Backup Target | Recommended Approach |
-| --------------- | --------------------- |
-| **hyper.json** | Version control or manual backup |
-| **plugins/local/** | Include in dotfiles repository |
+| Backup Target       | Recommended Approach                     |
+| ------------------- | ---------------------------------------- |
+| **hyper.json**      | Version control or manual backup         |
+| **plugins/local/**  | Include in dotfiles repository           |
 | **Window Geometry** | Automatically restored; no backup needed |
 
----
+______________________________________________________________________
 
 #### 6.2.10 Performance optimization
 
@@ -6087,23 +6091,23 @@ flowchart LR
 
 Terminal output data is batched before crossing the IPC boundary:
 
-| Parameter | Value | Rationale |
-| ----------- | ------- | ----------- |
-| **Time Threshold** | 16ms | Aligned with 60fps frame timing |
-| **Size Threshold** | 200KB | Prevents memory accumulation during rapid output |
-| **Batch Prefix** | 36-character UUID | Session routing identifier |
-| **IPC Call Reduction** | 60-90% | Empirical reduction vs. unbatched transmission |
+| Parameter              | Value             | Rationale                                        |
+| ---------------------- | ----------------- | ------------------------------------------------ |
+| **Time Threshold**     | 16ms              | Aligned with 60fps frame timing                  |
+| **Size Threshold**     | 200KB             | Prevents memory accumulation during rapid output |
+| **Batch Prefix**       | 36-character UUID | Session routing identifier                       |
+| **IPC Call Reduction** | 60-90%            | Empirical reduction vs. unbatched transmission   |
 
 ##### 6.2.10.3 Configuration access optimization
 
-| Optimization | Implementation | Impact |
-| -------------- | ---------------- | -------- |
-| **Single File Load** | Configuration loaded once at startup | No repeated disk I/O |
-| **In-Memory Cache** | Parsed config stored in module-level variable | O(1) access time |
-| **Lazy Plugin Loading** | Addons loaded based on configuration flags | Reduced initial memory |
-| **Subscriber Pattern** | Interested parties register for config changes | Efficient update propagation |
+| Optimization            | Implementation                                 | Impact                       |
+| ----------------------- | ---------------------------------------------- | ---------------------------- |
+| **Single File Load**    | Configuration loaded once at startup           | No repeated disk I/O         |
+| **In-Memory Cache**     | Parsed config stored in module-level variable  | O(1) access time             |
+| **Lazy Plugin Loading** | Addons loaded based on configuration flags     | Reduced initial memory       |
+| **Subscriber Pattern**  | Interested parties register for config changes | Efficient update propagation |
 
----
+______________________________________________________________________
 
 #### 6.2.11 Data flow summary
 
@@ -6148,31 +6152,31 @@ flowchart TB
 
 ##### 6.2.11.2 Storage technology summary
 
-| Storage Need | Technology Choice | Rationale |
-| -------------- | ------------------- | ----------- |
-| **User Configuration** | JSON file with JSON Schema | Programmatic editing, editor IntelliSense, validation |
-| **Window Geometry** | electron-store | Encrypted persistence, automatic serialization |
-| **Terminal Content** | In-memory only | Security (no command history logging), privacy |
-| **Plugin Packages** | npm/bun in plugins directory | Standard package management, familiar workflow |
-| **Session State** | Redux (not persisted) | Traditional terminal behaviour, no startup delay |
+| Storage Need           | Technology Choice            | Rationale                                             |
+| ---------------------- | ---------------------------- | ----------------------------------------------------- |
+| **User Configuration** | JSON file with JSON Schema   | Programmatic editing, editor IntelliSense, validation |
+| **Window Geometry**    | electron-store               | Encrypted persistence, automatic serialization        |
+| **Terminal Content**   | In-memory only               | Security (no command history logging), privacy        |
+| **Plugin Packages**    | npm/bun in plugins directory | Standard package management, familiar workflow        |
+| **Session State**      | Redux (not persisted)        | Traditional terminal behaviour, no startup delay      |
 
----
+______________________________________________________________________
 
 #### 6.2.12 Why traditional database patterns do not apply
 
 ##### 6.2.12.1 Pattern applicability matrix
 
-| Traditional Database Pattern | Applicability | Rationale |
-| ------------------------------ | --------------- | ----------- |
-| **Relational Schema** | ❌ Not Applicable | No entity relationships requiring normalization |
-| **Entity-Relationship Modelling** | ❌ Not Applicable | Flat configuration structure, no foreign keys |
-| **Indexing Strategy** | ❌ Not Applicable | No query patterns requiring index optimization |
-| **Partitioning** | ❌ Not Applicable | Single-user, single-machine data scope |
-| **Replication** | ❌ Not Applicable | No distributed data requirements |
-| **Connection Pooling** | ❌ Not Applicable | No database connections to pool |
-| **Query Optimization** | ❌ Not Applicable | Direct file I/O, no query language |
-| **Read/Write Splitting** | ❌ Not Applicable | Single-process file access |
-| **ACID Transactions** | ⚠️ Partially Applicable | Atomic file writes via fs-extra |
+| Traditional Database Pattern      | Applicability           | Rationale                                       |
+| --------------------------------- | ----------------------- | ----------------------------------------------- |
+| **Relational Schema**             | ❌ Not Applicable       | No entity relationships requiring normalization |
+| **Entity-Relationship Modelling** | ❌ Not Applicable       | Flat configuration structure, no foreign keys   |
+| **Indexing Strategy**             | ❌ Not Applicable       | No query patterns requiring index optimization  |
+| **Partitioning**                  | ❌ Not Applicable       | Single-user, single-machine data scope          |
+| **Replication**                   | ❌ Not Applicable       | No distributed data requirements                |
+| **Connection Pooling**            | ❌ Not Applicable       | No database connections to pool                 |
+| **Query Optimization**            | ❌ Not Applicable       | Direct file I/O, no query language              |
+| **Read/Write Splitting**          | ❌ Not Applicable       | Single-process file access                      |
+| **ACID Transactions**             | ⚠️ Partially Applicable | Atomic file writes via fs-extra                 |
 
 ##### 6.2.12.2 Desktop application data architecture summary
 
@@ -6188,10 +6192,10 @@ Velocetty's architecture instead focuses on:
 
 - **npm ecosystem** for plugin package management
 
-This approach aligns with the desktop terminal emulator paradigm where user data
-is inherently local, session-specific, and privacy-sensitive.
+This approach aligns with the desktop terminal emulator paradigm where user
+data is inherently local, session-specific, and privacy-sensitive.
 
----
+______________________________________________________________________
 
 #### 6.2.13 References
 
@@ -6270,9 +6274,9 @@ is inherently local, session-specific, and privacy-sensitive.
 #### 6.3.1 Integration architecture overview
 
 Velocetty implements a **desktop-appropriate integration architecture** that
-differs fundamentally from traditional web service API patterns. As an Electron-
-based terminal emulator, the system's integration architecture centres on three
-primary integration domains:
+differs fundamentally from traditional web service API patterns. As an
+Electron- based terminal emulator, the system's integration architecture
+centres on three primary integration domains:
 
 1. **Internal Process Integration**: Bidirectional IPC bridge between Electron
 
@@ -6286,11 +6290,11 @@ primary integration domains:
 
    application customization
 
-| Integration Domain | Protocol | Purpose |
-| -------------------- | ---------- | --------- |
-| Internal IPC | Electron IPC (UUID-keyed) | Cross-process communication |
-| External Services | HTTPS REST | Update checks, plugin discovery |
-| Plugin System | CommonJS Module Loading | Extensibility substrate |
+| Integration Domain | Protocol                  | Purpose                         |
+| ------------------ | ------------------------- | ------------------------------- |
+| Internal IPC       | Electron IPC (UUID-keyed) | Cross-process communication     |
+| External Services  | HTTPS REST                | Update checks, plugin discovery |
+| Plugin System      | CommonJS Module Loading   | Extensibility substrate         |
 
 ##### 6.3.1.1 Traditional API patterns: limited applicability
 
@@ -6298,14 +6302,14 @@ Unlike web services that expose REST/GraphQL endpoints, Velocetty operates as a
 single-user desktop application. Traditional API design concepts require
 reinterpretation:
 
-| Traditional Concept | Velocetty Implementation |
-| -------------------- | -------------------------- |
-| REST Endpoints | Typed IPC events between processes |
-| Authentication | N/A (single-user local context) |
-| Authorization | Full-trust model within application boundary |
-| Rate Limiting | Time-based polling intervals for external services |
-| API Versioning | Typed event contracts with backward compatibility |
-| API Documentation | TypeScript type definitions (`typings/common.d.ts`) |
+| Traditional Concept | Velocetty Implementation                            |
+| ------------------- | --------------------------------------------------- |
+| REST Endpoints      | Typed IPC events between processes                  |
+| Authentication      | N/A (single-user local context)                     |
+| Authorization       | Full-trust model within application boundary        |
+| Rate Limiting       | Time-based polling intervals for external services  |
+| API Versioning      | Typed event contracts with backward compatibility   |
+| API Documentation   | TypeScript type definitions (`typings/common.d.ts`) |
 
 ```mermaid
 flowchart TB
@@ -6351,7 +6355,7 @@ flowchart TB
     MainProcess <-->|"JSON I/O"| FileSystem
 ```
 
----
+______________________________________________________________________
 
 #### 6.3.2 IPC bridge architecture (internal API layer)
 
@@ -6360,13 +6364,13 @@ communication between the Electron main process and renderer processes.
 
 ##### 6.3.2.1 Protocol specification
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Transport Layer** | Electron IPC (`ipcMain`/`ipcRenderer`) |
-| **Channel Isolation** | 36-character UUID per BrowserWindow |
-| **Message Format** | JSON with TypeScript-typed events |
-| **Communication Pattern** | Bidirectional event-driven |
-| **Error Handling** | Destruction guards, null-safe emission |
+| Attribute                 | Specification                          |
+| ------------------------- | -------------------------------------- |
+| **Transport Layer**       | Electron IPC (`ipcMain`/`ipcRenderer`) |
+| **Channel Isolation**     | 36-character UUID per BrowserWindow    |
+| **Message Format**        | JSON with TypeScript-typed events      |
+| **Communication Pattern** | Bidirectional event-driven             |
+| **Error Handling**        | Destruction guards, null-safe emission |
 
 ##### Channel initialization sequence
 
@@ -6410,27 +6414,27 @@ The IPC bridge enforces type safety through strongly-typed event definitions in
 
 ##### Mainevents (renderer → main)
 
-| Event | Payload | Purpose |
-| ------- | --------- | --------- |
-| `data` | `{uid: string, data: string, escaped?: boolean}` | User keyboard input |
-| `resize` | `{uid: string, cols: number, rows: number}` | Terminal dimension change |
-| `new` | `{profile?: string, splitDirection?: string, cwd?: string}` | New session request |
-| `exit` | `{uid: string}` | Session termination request |
-| `close` | `{}` | Window close request |
-| `command` | `string` | Command dispatch (menu/shortcut) |
-| `maximize` / `minimize` / `unmaximize` | `{}` | Window state controls |
+| Event                                  | Payload                                                     | Purpose                          |
+| -------------------------------------- | ----------------------------------------------------------- | -------------------------------- |
+| `data`                                 | `{uid: string, data: string, escaped?: boolean}`            | User keyboard input              |
+| `resize`                               | `{uid: string, cols: number, rows: number}`                 | Terminal dimension change        |
+| `new`                                  | `{profile?: string, splitDirection?: string, cwd?: string}` | New session request              |
+| `exit`                                 | `{uid: string}`                                             | Session termination request      |
+| `close`                                | `{}`                                                        | Window close request             |
+| `command`                              | `string`                                                    | Command dispatch (menu/shortcut) |
+| `maximize` / `minimize` / `unmaximize` | `{}`                                                        | Window state controls            |
 
 ##### Rendererevents (main → renderer)
 
-| Event | Payload | Purpose |
-| ------- | --------- | --------- |
-| `session add` | `{uid, shell, pid, cols, rows, profile}` | Session creation notification |
-| `session data` | `string` (UUID-prefixed batch) | Terminal output data |
-| `session exit` | `{uid: string}` | Session termination notification |
-| `config change` | `{}` | Configuration hot-reload trigger |
-| `update available` | `{version, notes, canInstall}` | Update notification |
-| `split request horizontal` | `{}` | Split pane command |
-| `move left req` / `move right req` | `{}` | Tab navigation |
+| Event                              | Payload                                  | Purpose                          |
+| ---------------------------------- | ---------------------------------------- | -------------------------------- |
+| `session add`                      | `{uid, shell, pid, cols, rows, profile}` | Session creation notification    |
+| `session data`                     | `string` (UUID-prefixed batch)           | Terminal output data             |
+| `session exit`                     | `{uid: string}`                          | Session termination notification |
+| `config change`                    | `{}`                                     | Configuration hot-reload trigger |
+| `update available`                 | `{version, notes, canInstall}`           | Update notification              |
+| `split request horizontal`         | `{}`                                     | Split pane command               |
+| `move left req` / `move right req` | `{}`                                     | Tab navigation                   |
 
 ##### 6.3.2.3 IPC command interface (request-response pattern)
 
@@ -6460,17 +6464,17 @@ flowchart LR
     Response -->|"Response"| InvokeCmd
 ```
 
-| Command | Signature | Response |
-| --------- | ----------- | ---------- |
-| `child_process.exec` | `(command, options)` | `{stdout: string, stderr: string}` |
-| `child_process.execFile` | `(file, args, options)` | `{stdout: string, stderr: string}` |
-| `getLoadedPluginVersions` | `()` | `{name: string, version: string}[]` |
-| `getPaths` | `()` | `{plugins: string[], localPlugins: string[]}` |
-| `getBasePaths` | `()` | `{path: string, localPath: string}` |
-| `getDecoratedConfig` | `(profile?: string)` | `configOptions` |
-| `getDecoratedKeymaps` | `()` | `Record<string, string[]>` |
+| Command                   | Signature               | Response                                      |
+| ------------------------- | ----------------------- | --------------------------------------------- |
+| `child_process.exec`      | `(command, options)`    | `{stdout: string, stderr: string}`            |
+| `child_process.execFile`  | `(file, args, options)` | `{stdout: string, stderr: string}`            |
+| `getLoadedPluginVersions` | `()`                    | `{name: string, version: string}[]`           |
+| `getPaths`                | `()`                    | `{plugins: string[], localPlugins: string[]}` |
+| `getBasePaths`            | `()`                    | `{path: string, localPath: string}`           |
+| `getDecoratedConfig`      | `(profile?: string)`    | `configOptions`                               |
+| `getDecoratedKeymaps`     | `()`                    | `Record<string, string[]>`                    |
 
----
+______________________________________________________________________
 
 #### 6.3.3 Message processing architecture
 
@@ -6514,17 +6518,17 @@ flowchart TB
 
 ##### Batching parameters
 
-| Parameter | Value | Rationale |
-| ----------- | ------- | ----------- |
-| **Time Threshold** | 16ms | Aligned with 60fps frame timing for smooth rendering |
-| **Size Threshold** | 200KB | Prevents memory accumulation during rapid output (e.g., `find ~`) |
-| **Batch Prefix** | 36-character UUID | Session identification for multi-session routing |
-| **IPC Call Reduction** | 60-90% | Empirical reduction vs. unbatched transmission |
+| Parameter              | Value             | Rationale                                                         |
+| ---------------------- | ----------------- | ----------------------------------------------------------------- |
+| **Time Threshold**     | 16ms              | Aligned with 60fps frame timing for smooth rendering              |
+| **Size Threshold**     | 200KB             | Prevents memory accumulation during rapid output (e.g., `find ~`) |
+| **Batch Prefix**       | 36-character UUID | Session identification for multi-session routing                  |
+| **IPC Call Reduction** | 60-90%            | Empirical reduction vs. unbatched transmission                    |
 
 ##### 6.3.3.2 Redux middleware pipeline
 
-The renderer process employs a carefully ordered middleware pipeline for message
-processing:
+The renderer process employs a carefully ordered middleware pipeline for
+message processing:
 
 ```mermaid
 flowchart LR
@@ -6544,13 +6548,13 @@ flowchart LR
     EF --> Reducer["Reducers"]
 ```
 
-| Middleware | Position | Purpose |
-| ------------ | ---------- | --------- |
-| `thunk` | 1st | Enable async action creators |
-| `plugins.middleware` | 2nd | Plugin middleware hook integration |
-| `thunk` | 3rd | Handle plugin-created thunks |
-| `writeMiddleware` | 4th | Performance bypass for terminal data |
-| `effects` | 5th | Execute action side effects |
+| Middleware           | Position | Purpose                              |
+| -------------------- | -------- | ------------------------------------ |
+| `thunk`              | 1st      | Enable async action creators         |
+| `plugins.middleware` | 2nd      | Plugin middleware hook integration   |
+| `thunk`              | 3rd      | Handle plugin-created thunks         |
+| `writeMiddleware`    | 4th      | Performance bypass for terminal data |
+| `effects`            | 5th      | Execute action side effects          |
 
 ##### 6.3.3.3 Write middleware performance bypass
 
@@ -6619,7 +6623,7 @@ sequenceDiagram
     Middleware->>Renderer: Forward to Reducers (metadata only)
 ```
 
----
+______________________________________________________________________
 
 #### 6.3.4 External service integration
 
@@ -6654,56 +6658,56 @@ flowchart TB
 
 ##### Auto-update service
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Stable Channel URL** | `<https://releases.hyper.is/update/{platform}/{version}`> |
+| Attribute              | Specification                                                          |
+| ---------------------- | ---------------------------------------------------------------------- |
+| **Stable Channel URL** | `<https://releases.hyper.is/update/{platform}/{version}`>              |
 | **Canary Channel URL** | `<https://releases-canary.hyper.is/update/{platform}_arm64/{version}`> |
-| **Protocol** | HTTPS (TLS 1.2+) |
-| **Initial Poll Delay** | 10 seconds after startup |
-| **Polling Interval** | 30 minutes |
-| **Platform Values** | `darwin`, `darwin_arm64`, `win32`, `linux` |
-| **Response Format** | JSON update manifest |
-| **Authentication** | None (public endpoints) |
+| **Protocol**           | HTTPS (TLS 1.2+)                                                       |
+| **Initial Poll Delay** | 10 seconds after startup                                               |
+| **Polling Interval**   | 30 minutes                                                             |
+| **Platform Values**    | `darwin`, `darwin_arm64`, `win32`, `linux`                             |
+| **Response Format**    | JSON update manifest                                                   |
+| **Authentication**     | None (public endpoints)                                                |
 
 ##### npm registry integration
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Registry URL** | User-configured via `registry-url` package |
-| **Default Registry** | `<https://registry.npmjs.org/`> |
-| **Request Timeout** | 10 seconds |
-| **Response Format** | JSON with `versions` metadata |
-| **Purpose** | Plugin installation validation |
+| Attribute            | Specification                              |
+| -------------------- | ------------------------------------------ |
+| **Registry URL**     | User-configured via `registry-url` package |
+| **Default Registry** | `<https://registry.npmjs.org/`>            |
+| **Request Timeout**  | 10 seconds                                 |
+| **Response Format**  | JSON with `versions` metadata              |
+| **Purpose**          | Plugin installation validation             |
 
 ### npms.io search API
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Endpoint** | `<https://api.npms.io/v2/search`> |
-| **Query Format** | `q={pattern}+keywords:hyper-plugin,hyper-theme&size=250` |
-| **Response Format** | JSON array of package metadata |
-| **Purpose** | Plugin discovery (`hyper search` CLI) |
+| Attribute           | Specification                                            |
+| ------------------- | -------------------------------------------------------- |
+| **Endpoint**        | `<https://api.npms.io/v2/search`>                        |
+| **Query Format**    | `q={pattern}+keywords:hyper-plugin,hyper-theme&size=250` |
+| **Response Format** | JSON array of package metadata                           |
+| **Purpose**         | Plugin discovery (`hyper search` CLI)                    |
 
 #### Notification service
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Endpoint** | `NEWS_URL` constant |
-| **Request Headers** | `X-Hyper-Version`, `X-Hyper-Platform` |
-| **Polling Interval** | 30 minutes |
-| **Purpose** | Product announcements and notifications |
+| Attribute            | Specification                           |
+| -------------------- | --------------------------------------- |
+| **Endpoint**         | `NEWS_URL` constant                     |
+| **Request Headers**  | `X-Hyper-Version`, `X-Hyper-Platform`   |
+| **Polling Interval** | 30 minutes                              |
+| **Purpose**          | Product announcements and notifications |
 
 ##### 6.3.4.3 External integration error handling
 
-| Service | Error Type | Handling Strategy |
-| --------- | ------------ | ------------------- |
-| npm Registry | 404 Response | `"Plugin not found on npm"` error message |
-| npm Registry | Network Timeout | Timeout error after 10 seconds |
-| Update Server | Fetch Failure | Log error, continue normal operation |
-| Notification Service | Fetch Failure | Silent failure, retry on next interval |
-| npms.io Search | Any Error | Return empty results, display error |
+| Service              | Error Type      | Handling Strategy                         |
+| -------------------- | --------------- | ----------------------------------------- |
+| npm Registry         | 404 Response    | `"Plugin not found on npm"` error message |
+| npm Registry         | Network Timeout | Timeout error after 10 seconds            |
+| Update Server        | Fetch Failure   | Log error, continue normal operation      |
+| Notification Service | Fetch Failure   | Silent failure, retry on next interval    |
+| npms.io Search       | Any Error       | Return empty results, display error       |
 
----
+______________________________________________________________________
 
 #### 6.3.5 Plugin integration architecture
 
@@ -6761,14 +6765,14 @@ flowchart TB
 
 ##### 6.3.5.2 Extension hook categories
 
-| Category | Hooks | Process |
-| ---------- | ------- | --------- |
-| **Lifecycle** | `onApp`, `onWindowClass`, `onWindow`, `onRendererWindow`, `onUnload` | Both |
-| **Configuration** | `decorateConfig`, `decorateKeymaps`, `decorateEnv`, `decorateMenu` | Main |
-| **UI Decoration** | `decorateTerm`, `decorateHeader`, `decorateTabs`, `decorateTab`, `decorateTerms`, `decorateTermGroup`, `decorateSplitPane`, `decorateNotification`, `decorateNotifications`, `decorateHyper` | Renderer |
-| **State Mapping** | `getTermProps`, `getTabProps`, `getTabsProps`, `getTermGroupProps` | Renderer |
-| **Redux Integration** | `middleware`, `reduceUI`, `reduceSessions`, `reduceTermGroups` | Renderer |
-| **State Dispatchers** | `mapHyperTermState`, `mapTermsState`, `mapHeaderState`, `mapNotificationsState`, `mapHyperTermDispatch`, `mapTermsDispatch` | Renderer |
+| Category              | Hooks                                                                                                                                                                                        | Process  |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| **Lifecycle**         | `onApp`, `onWindowClass`, `onWindow`, `onRendererWindow`, `onUnload`                                                                                                                         | Both     |
+| **Configuration**     | `decorateConfig`, `decorateKeymaps`, `decorateEnv`, `decorateMenu`                                                                                                                           | Main     |
+| **UI Decoration**     | `decorateTerm`, `decorateHeader`, `decorateTabs`, `decorateTab`, `decorateTerms`, `decorateTermGroup`, `decorateSplitPane`, `decorateNotification`, `decorateNotifications`, `decorateHyper` | Renderer |
+| **State Mapping**     | `getTermProps`, `getTabProps`, `getTabsProps`, `getTermGroupProps`                                                                                                                           | Renderer |
+| **Redux Integration** | `middleware`, `reduceUI`, `reduceSessions`, `reduceTermGroups`                                                                                                                               | Renderer |
+| **State Dispatchers** | `mapHyperTermState`, `mapTermsState`, `mapHeaderState`, `mapNotificationsState`, `mapHyperTermDispatch`, `mapTermsDispatch`                                                                  | Renderer |
 
 ##### 6.3.5.3 Decoration composition pattern
 
@@ -6834,7 +6838,7 @@ sequenceDiagram
     end
 ```
 
----
+______________________________________________________________________
 
 #### 6.3.6 Error handling strategy
 
@@ -6897,24 +6901,24 @@ flowchart TB
 
 ##### Error handling by hook category
 
-| Hook Category | Error Strategy | Fallback Behaviour |
-| --------------- | ---------------- | ------------------- |
-| **Decoration Hooks** | Try-catch wrapper | Return original component/config |
-| **Middleware Hooks** | Forward unchanged | Skip middleware, continue pipeline |
-| **Lifecycle Hooks** | Log and continue | Application starts without plugin |
-| **Reducer Hooks** | Return previous state | State unchanged by failed plugin |
-| **Props Injection** | Merge failure isolation | Original props preserved |
+| Hook Category        | Error Strategy          | Fallback Behaviour                 |
+| -------------------- | ----------------------- | ---------------------------------- |
+| **Decoration Hooks** | Try-catch wrapper       | Return original component/config   |
+| **Middleware Hooks** | Forward unchanged       | Skip middleware, continue pipeline |
+| **Lifecycle Hooks**  | Log and continue        | Application starts without plugin  |
+| **Reducer Hooks**    | Return previous state   | State unchanged by failed plugin   |
+| **Props Injection**  | Merge failure isolation | Original props preserved           |
 
 ##### 6.3.6.2 IPC error handling
 
-| Error Condition | Detection | Recovery Action |
-| ----------------- | ----------- | ----------------- |
-| **Window Destroyed** | `win.isDestroyed()` check | Guard emission, return false |
-| **Channel Not Found** | UUID lookup failure | Log warning, no-op |
-| **Malformed Event** | JSON parse failure | Log error, discard event |
-| **Renderer Crash** | Process exit event | Recreate window, restore state |
+| Error Condition       | Detection                 | Recovery Action                |
+| --------------------- | ------------------------- | ------------------------------ |
+| **Window Destroyed**  | `win.isDestroyed()` check | Guard emission, return false   |
+| **Channel Not Found** | UUID lookup failure       | Log warning, no-op             |
+| **Malformed Event**   | JSON parse failure        | Log error, discard event       |
+| **Renderer Crash**    | Process exit event        | Recreate window, restore state |
 
----
+______________________________________________________________________
 
 #### 6.3.7 Protocol handler integration
 
@@ -6922,59 +6926,59 @@ flowchart TB
 
 Velocetty registers as the handler for `ssh://` protocol URLs:
 
-| Attribute | Specification |
-| ----------- | --------------- |
-| **Protocol** | `ssh://` |
-| **Registration** | `electron-builder.json` |
-| **Handler** | Main process routes to renderer via `rpc.emit('open ssh', parsed)` |
-| **Fallback** | Default system SSH client if parsing fails |
+| Attribute        | Specification                                                      |
+| ---------------- | ------------------------------------------------------------------ |
+| **Protocol**     | `ssh://`                                                           |
+| **Registration** | `electron-builder.json`                                            |
+| **Handler**      | Main process routes to renderer via `rpc.emit('open ssh', parsed)` |
+| **Fallback**     | Default system SSH client if parsing fails                         |
 
----
+______________________________________________________________________
 
 #### 6.3.8 Integration security considerations
 
 ##### 6.3.8.1 Security model
 
-| Aspect | Current Implementation | Risk Level |
-| -------- | ------------------------ | ------------ |
-| **Plugin Trust** | Full-trust execution (no sandboxing) | High |
-| **IPC Security** | `@electron/remote` enabled | Medium |
-| **External APIs** | Public endpoints, no authentication | Low |
-| **Native Module Access** | node-pty has full system access | Medium |
+| Aspect                   | Current Implementation               | Risk Level |
+| ------------------------ | ------------------------------------ | ---------- |
+| **Plugin Trust**         | Full-trust execution (no sandboxing) | High       |
+| **IPC Security**         | `@electron/remote` enabled           | Medium     |
+| **External APIs**        | Public endpoints, no authentication  | Low        |
+| **Native Module Access** | node-pty has full system access      | Medium     |
 
 ##### 6.3.8.2 Security mitigations
 
-| Risk | Mitigation Strategy |
-| ------ | --------------------- |
+| Risk                  | Mitigation Strategy                 |
+| --------------------- | ----------------------------------- |
 | **Malicious Plugins** | User education; npm package vetting |
-| **IPC Injection** | Typed event contracts; validation |
-| **Man-in-the-Middle** | HTTPS-only external connections |
-| **PTY Escape** | Runs with user privileges only |
+| **IPC Injection**     | Typed event contracts; validation   |
+| **Man-in-the-Middle** | HTTPS-only external connections     |
+| **PTY Escape**        | Runs with user privileges only      |
 
----
+______________________________________________________________________
 
 #### 6.3.9 Integration performance metrics
 
 ##### 6.3.9.1 Performance targets
 
-| Metric | Target | Measurement Point |
-| -------- | -------- | ------------------- |
-| **IPC Batch Efficiency** | 60-90% reduction | Calls vs. unbatched baseline |
-| **Keystroke-to-Echo** | < 50ms | Input event to visible character |
-| **Plugin Load Time** | < 500ms total | All extensions initialized |
-| **Config Hot-Reload** | < 100ms | File change to UI update |
-| **External API Timeout** | 10 seconds | npm registry, update server |
+| Metric                   | Target           | Measurement Point                |
+| ------------------------ | ---------------- | -------------------------------- |
+| **IPC Batch Efficiency** | 60-90% reduction | Calls vs. unbatched baseline     |
+| **Keystroke-to-Echo**    | < 50ms           | Input event to visible character |
+| **Plugin Load Time**     | < 500ms total    | All extensions initialized       |
+| **Config Hot-Reload**    | < 100ms          | File change to UI update         |
+| **External API Timeout** | 10 seconds       | npm registry, update server      |
 
 ##### 6.3.9.2 Integration monitoring points
 
-| Monitoring Point | Implementation | Location |
-| ------------------ | ---------------- | ---------- |
+| Monitoring Point          | Implementation          | Location         |
+| ------------------------- | ----------------------- | ---------------- |
 | **Batch Flush Frequency** | DataBatcher flush count | `app/session.ts` |
-| **IPC Event Throughput** | Event count per second | RPC bridge |
-| **Plugin Load Timing** | Per-plugin load time | Plugin manager |
-| **External API Latency** | Request duration | HTTP client |
+| **IPC Event Throughput**  | Event count per second  | RPC bridge       |
+| **Plugin Load Timing**    | Per-plugin load time    | Plugin manager   |
+| **External API Latency**  | Request duration        | HTTP client      |
 
----
+______________________________________________________________________
 
 #### 6.3.10 References
 
@@ -7089,15 +7093,15 @@ flowchart TB
 
 ##### 6.4.1.2 Traditional security concepts reinterpretation
 
-| Traditional Concept | Velocetty Implementation | Rationale |
-| -------------------- | -------------------------- | ----------- |
-| Authentication | N/A (single-user local context) | Desktop app inherits OS user identity |
-| Authorization | Full-trust model | Application runs with user privileges |
-| Session Management | Process-level via OS | Electron manages window lifecycle |
-| API Security | Typed IPC contracts | TypeScript-enforced event schemas |
-| Rate Limiting | Polling intervals | External service access only |
+| Traditional Concept | Velocetty Implementation        | Rationale                             |
+| ------------------- | ------------------------------- | ------------------------------------- |
+| Authentication      | N/A (single-user local context) | Desktop app inherits OS user identity |
+| Authorization       | Full-trust model                | Application runs with user privileges |
+| Session Management  | Process-level via OS            | Electron manages window lifecycle     |
+| API Security        | Typed IPC contracts             | TypeScript-enforced event schemas     |
+| Rate Limiting       | Polling intervals               | External service access only          |
 
----
+______________________________________________________________________
 
 #### 6.4.2 Electron security configuration
 
@@ -7106,11 +7110,11 @@ flowchart TB
 Velocetty's `BrowserWindow` configuration in `app/ui/window.ts` implements the
 following security-relevant settings:
 
-| Setting | Value | Security Implication | Justification |
-| --------- | ------- | --------------------- | --------------- |
-| `nodeIntegration` | `true` | **HIGH RISK** - Full Node.js API in renderer | Required for plugin decoration architecture |
-| `contextIsolation` | `false` | **MEDIUM RISK** - No web/Node context separation | Enables plugin React/Redux composition |
-| `navigateOnDragDrop` | `true` | LOW RISK - Local file handling | Terminal emulator usability |
+| Setting              | Value   | Security Implication                             | Justification                               |
+| -------------------- | ------- | ------------------------------------------------ | ------------------------------------------- |
+| `nodeIntegration`    | `true`  | **HIGH RISK** - Full Node.js API in renderer     | Required for plugin decoration architecture |
+| `contextIsolation`   | `false` | **MEDIUM RISK** - No web/Node context separation | Enables plugin React/Redux composition      |
+| `navigateOnDragDrop` | `true`  | LOW RISK - Local file handling                   | Terminal emulator usability                 |
 
 **Configuration Evidence** (`app/ui/window.ts`, lines 50-54): The
 `webPreferences` object explicitly enables `nodeIntegration` and disables
@@ -7122,10 +7126,10 @@ but is architecturally required for Velocetty's plugin system.
 Velocetty implements a Content Security Policy via HTML meta tag in
 `app/index.html`:
 
-| Directive | Value | Purpose |
-| ----------- | ------- | --------- |
-| `script-src` | `'self' 'unsafe-inline'` | Restrict script sources to application origin |
-| `'unsafe-inline'` | Enabled | Required for styled-jsx CSS-in-JS |
+| Directive         | Value                    | Purpose                                       |
+| ----------------- | ------------------------ | --------------------------------------------- |
+| `script-src`      | `'self' 'unsafe-inline'` | Restrict script sources to application origin |
+| `'unsafe-inline'` | Enabled                  | Required for styled-jsx CSS-in-JS             |
 
 **Security Analysis**: The CSP provides limited protection against external
 script injection but allows inline scripts necessary for the React/styled-jsx
@@ -7183,21 +7187,21 @@ process communication for the plugin architecture:
 
   `require('@electron/remote/main').enable(win.webContents)`
 
-| Aspect | Detail |
-| -------- | -------- |
-| **Purpose** | Enables renderer access to main process modules |
-| **Security Status** | Deprecated by Electron for security reasons |
-| **Migration Path** | Explicit IPC messaging (future consideration) |
-| **Current Risk** | Medium - Widens attack surface if renderer compromised |
+| Aspect              | Detail                                                 |
+| ------------------- | ------------------------------------------------------ |
+| **Purpose**         | Enables renderer access to main process modules        |
+| **Security Status** | Deprecated by Electron for security reasons            |
+| **Migration Path**  | Explicit IPC messaging (future consideration)          |
+| **Current Risk**    | Medium - Widens attack surface if renderer compromised |
 
----
+______________________________________________________________________
 
 #### 6.4.3 Plugin security model
 
 ##### 6.4.3.1 Full trust architecture
 
-Velocetty inherits Hyper's **full-trust plugin model**, where extensions execute
-with complete application privileges. This design decision prioritizes
+Velocetty inherits Hyper's **full-trust plugin model**, where extensions
+execute with complete application privileges. This design decision prioritizes
 extensibility over isolation:
 
 ```mermaid
@@ -7244,25 +7248,25 @@ flowchart TB
 
 Plugins can access 40+ extension hooks defined in `app/plugins/extensions.ts`:
 
-| Hook Category | Examples | Security Impact |
-| --------------- | ---------- | ----------------- |
-| **Lifecycle** | `onApp`, `onWindow`, `onUnload` | Full main process access |
-| **Decorators** | `decorateConfig`, `decorateMenu`, `decorateEnv` | Configuration manipulation |
-| **State Management** | `middleware`, `reduce*` | Redux state interception |
-| **UI Components** | `decorateTab`, `decorateTerm`, `decorateHeader` | UI injection |
-| **Props Mappers** | `mapTermsState`, `mapSessionsDispatch` | Data flow interception |
+| Hook Category        | Examples                                        | Security Impact            |
+| -------------------- | ----------------------------------------------- | -------------------------- |
+| **Lifecycle**        | `onApp`, `onWindow`, `onUnload`                 | Full main process access   |
+| **Decorators**       | `decorateConfig`, `decorateMenu`, `decorateEnv` | Configuration manipulation |
+| **State Management** | `middleware`, `reduce*`                         | Redux state interception   |
+| **UI Components**    | `decorateTab`, `decorateTerm`, `decorateHeader` | UI injection               |
+| **Props Mappers**    | `mapTermsState`, `mapSessionsDispatch`          | Data flow interception     |
 
 ##### 6.4.3.3 Plugin error isolation
 
 While plugins have full trust access, Velocetty implements error isolation to
 prevent plugin failures from crashing the application:
 
-| Error Scenario | Isolation Mechanism | Recovery Behaviour |
-| ---------------- | -------------------- | -------------------- |
-| Decoration failure | Try-catch boundary | Return original component |
-| Middleware exception | Error catch in pipeline | Skip middleware, forward action |
-| Lifecycle hook failure | Try-catch wrapper | Continue startup without plugin |
-| Renderer crash | Electron process isolation | Recreate window |
+| Error Scenario         | Isolation Mechanism        | Recovery Behaviour              |
+| ---------------------- | -------------------------- | ------------------------------- |
+| Decoration failure     | Try-catch boundary         | Return original component       |
+| Middleware exception   | Error catch in pipeline    | Skip middleware, forward action |
+| Lifecycle hook failure | Try-catch wrapper          | Continue startup without plugin |
+| Renderer crash         | Electron process isolation | Recreate window                 |
 
 **Evidence** (`lib/utils/plugins.ts`): The `decorate()` function wraps plugin
 decorators in try-catch blocks, logging errors and returning the original
@@ -7270,16 +7274,16 @@ component/value on failure.
 
 ##### 6.4.3.4 Plugin security policy matrix
 
-| Security Aspect | Current State | Risk Level | Mitigation |
-| ----------------- | --------------- | ------------ | ------------ |
-| Code Execution | Full trust | **High** | User education, trusted sources |
-| File System Access | Unrestricted | **High** | Runs with user privileges |
-| Network Access | Unrestricted | **High** | No outbound filtering |
-| State Manipulation | Full Redux access | **Medium** | Error isolation |
-| UI Injection | All components | **Medium** | Decoration pattern preserves base |
-| Sandboxing | None | **High** | Future consideration |
+| Security Aspect    | Current State     | Risk Level | Mitigation                        |
+| ------------------ | ----------------- | ---------- | --------------------------------- |
+| Code Execution     | Full trust        | **High**   | User education, trusted sources   |
+| File System Access | Unrestricted      | **High**   | Runs with user privileges         |
+| Network Access     | Unrestricted      | **High**   | No outbound filtering             |
+| State Manipulation | Full Redux access | **Medium** | Error isolation                   |
+| UI Injection       | All components    | **Medium** | Decoration pattern preserves base |
+| Sandboxing         | None              | **High**   | Future consideration              |
 
----
+______________________________________________________________________
 
 #### 6.4.4 IPC security
 
@@ -7288,12 +7292,12 @@ component/value on failure.
 Velocetty's IPC bridge (`app/rpc.ts`, `lib/utils/rpc.ts`) implements channel
 isolation using unique identifiers:
 
-| Attribute | Specification | Security Benefit |
-| ----------- | --------------- | ------------------ |
-| Channel Identifier | 36-character UUID per BrowserWindow | Prevents cross-window message leakage |
-| Message Format | JSON with TypeScript-typed events | Type safety, reduced injection risk |
-| Destruction Guards | Null-safe emission checks | Prevents messages to destroyed windows |
-| Handler Registration | Per-window listener lifecycle | Automatic cleanup on window close |
+| Attribute            | Specification                       | Security Benefit                       |
+| -------------------- | ----------------------------------- | -------------------------------------- |
+| Channel Identifier   | 36-character UUID per BrowserWindow | Prevents cross-window message leakage  |
+| Message Format       | JSON with TypeScript-typed events   | Type safety, reduced injection risk    |
+| Destruction Guards   | Null-safe emission checks           | Prevents messages to destroyed windows |
+| Handler Registration | Per-window listener lifecycle       | Automatic cleanup on window close      |
 
 ##### 6.4.4.2 IPC authentication flow
 
@@ -7334,36 +7338,36 @@ The IPC bridge enforces type safety through strongly-typed event definitions in
 
 **MainEvents (Renderer → Main)**:
 
-| Event | Payload Type | Authorization |
-| ------- | -------------- | --------------- |
-| `data` | `{uid: string, data: string}` | Session ownership (UUID) |
-| `resize` | `{uid: string, cols: number, rows: number}` | Session ownership |
-| `new` | `{profile?: string, cwd?: string}` | Implicit (any window) |
-| `exit` | `{uid: string}` | Session ownership |
-| `command` | `string` | Implicit (dispatch only) |
+| Event     | Payload Type                                | Authorization            |
+| --------- | ------------------------------------------- | ------------------------ |
+| `data`    | `{uid: string, data: string}`               | Session ownership (UUID) |
+| `resize`  | `{uid: string, cols: number, rows: number}` | Session ownership        |
+| `new`     | `{profile?: string, cwd?: string}`          | Implicit (any window)    |
+| `exit`    | `{uid: string}`                             | Session ownership        |
+| `command` | `string`                                    | Implicit (dispatch only) |
 
 **RendererEvents (Main → Renderer)**:
 
-| Event | Payload Type | Routing |
-| ------- | -------------- | --------- |
-| `session add` | `{uid, shell, pid, cols, rows}` | Window UUID |
-| `session data` | `string` (UUID-prefixed batch) | Session UUID prefix |
-| `config change` | `{}` | Broadcast to all |
-| `update available` | `{version, notes}` | Broadcast to all |
+| Event              | Payload Type                    | Routing             |
+| ------------------ | ------------------------------- | ------------------- |
+| `session add`      | `{uid, shell, pid, cols, rows}` | Window UUID         |
+| `session data`     | `string` (UUID-prefixed batch)  | Session UUID prefix |
+| `config change`    | `{}`                            | Broadcast to all    |
+| `update available` | `{version, notes}`              | Broadcast to all    |
 
----
+______________________________________________________________________
 
 #### 6.4.5 Data protection
 
 ##### 6.4.5.1 Data classification and protection
 
-| Data Type | Classification | Storage | Protection Method |
-| ----------- | --------------- | --------- | ------------------- |
-| Terminal Content | Sensitive | In-memory only | No persistence (privacy by design) |
-| Command History | Sensitive | Not logged | Never captured |
-| Configuration | Low | JSON file | File system permissions |
-| Window Geometry | Low | electron-store | Encrypted by default |
-| Environment Variables | Medium | Process memory | Sanitization on spawn |
+| Data Type             | Classification | Storage        | Protection Method                  |
+| --------------------- | -------------- | -------------- | ---------------------------------- |
+| Terminal Content      | Sensitive      | In-memory only | No persistence (privacy by design) |
+| Command History       | Sensitive      | Not logged     | Never captured                     |
+| Configuration         | Low            | JSON file      | File system permissions            |
+| Window Geometry       | Low            | electron-store | Encrypted by default               |
+| Environment Variables | Medium         | Process memory | Sanitization on spawn              |
 
 ##### 6.4.5.2 Environment variable sanitization
 
@@ -7379,32 +7383,32 @@ if (baseEnv.GOOGLE_API_KEY && process.env.GOOGLE_API_KEY === baseEnv.GOOGLE_API_
 }
 ```
 
-| Variable | Action | Rationale |
-| ---------- | -------- | ----------- |
-| `GOOGLE_API_KEY` | Removed from shell env | Prevent Electron API key leakage |
-| `TERM` | Set to `xterm-256color` | Proper terminal identification |
-| `COLORTERM` | Set to `truecolor` | Enable 24-bit colour |
-| `TERM_PROGRAM` | Set to `Hyper` | Application identification |
+| Variable         | Action                  | Rationale                        |
+| ---------------- | ----------------------- | -------------------------------- |
+| `GOOGLE_API_KEY` | Removed from shell env  | Prevent Electron API key leakage |
+| `TERM`           | Set to `xterm-256color` | Proper terminal identification   |
+| `COLORTERM`      | Set to `truecolor`      | Enable 24-bit colour             |
+| `TERM_PROGRAM`   | Set to `Hyper`          | Application identification       |
 
 ##### 6.4.5.3 Configuration file security
 
 **Configuration Paths** (XDG-compliant from `app/config/paths.ts`):
 
-| Platform | Path | Permissions |
-| ---------- | ------ | ------------- |
-| Linux | `$XDG_CONFIG_HOME/Hyper` or `~/.config/Hyper` | User-only (0700) |
-| macOS | `~/.config/Hyper` | User-only |
-| Windows | `%APPDATA%\Hyper` | User ACL |
+| Platform | Path                                          | Permissions      |
+| -------- | --------------------------------------------- | ---------------- |
+| Linux    | `$XDG_CONFIG_HOME/Hyper` or `~/.config/Hyper` | User-only (0700) |
+| macOS    | `~/.config/Hyper`                             | User-only        |
+| Windows  | `%APPDATA%\Hyper`                             | User ACL         |
 
 **Legacy Config Migration Security**: Legacy `.hyper.js` JavaScript
 configurations are evaluated using Node.js `vm.Script` in `app/config/init.ts`:
 
-| Aspect | Implementation |
-| -------- | ---------------- |
-| Sandbox Type | `vm.Script.runInNewContext()` |
+| Aspect         | Implementation                            |
+| -------------- | ----------------------------------------- |
+| Sandbox Type   | `vm.Script.runInNewContext()`             |
 | Security Level | Basic isolation (not a security boundary) |
-| Purpose | Legacy config value extraction only |
-| Scope | Read-only config migration |
+| Purpose        | Legacy config value extraction only       |
+| Scope          | Read-only config migration                |
 
 ##### 6.4.5.4 Data flow security diagram
 
@@ -7456,7 +7460,7 @@ flowchart TB
     SessionWrite -.->|"Privacy"| NoHistory
 ```
 
----
+______________________________________________________________________
 
 #### 6.4.6 Code signing and distribution security
 
@@ -7466,14 +7470,14 @@ Velocetty implements comprehensive macOS code signing and notarization:
 
 **Entitlements** (`build/mac/entitlements.plist`):
 
-| Entitlement | Purpose | Security Impact |
-| ------------- | --------- | ----------------- |
-| `com.apple.security.cs.allow-jit` | Just-in-time compilation | Required for V8 engine |
-| `com.apple.security.cs.allow-unsigned-executable-memory` | Runtime code generation | WebGL/JavaScript execution |
-| `com.apple.security.cs.disable-library-validation` | Plugin dynamic loading | Enables third-party plugins |
-| `com.apple.security.automation.apple-events` | AppleScript automation | Terminal workflow integration |
-| `com.apple.security.device.audio-input` | Microphone access | Terminal accessibility |
-| `com.apple.security.device.camera` | Camera access | Terminal accessibility |
+| Entitlement                                              | Purpose                  | Security Impact               |
+| -------------------------------------------------------- | ------------------------ | ----------------------------- |
+| `com.apple.security.cs.allow-jit`                        | Just-in-time compilation | Required for V8 engine        |
+| `com.apple.security.cs.allow-unsigned-executable-memory` | Runtime code generation  | WebGL/JavaScript execution    |
+| `com.apple.security.cs.disable-library-validation`       | Plugin dynamic loading   | Enables third-party plugins   |
+| `com.apple.security.automation.apple-events`             | AppleScript automation   | Terminal workflow integration |
+| `com.apple.security.device.audio-input`                  | Microphone access        | Terminal accessibility        |
+| `com.apple.security.device.camera`                       | Camera access            | Terminal accessibility        |
 
 **Notarization** (`bin/notarize.js`):
 
@@ -7485,11 +7489,11 @@ Velocetty implements comprehensive macOS code signing and notarization:
 
 ##### 6.4.6.2 Windows code signing
 
-| Attribute | Value |
-| ----------- | ------- |
+| Attribute        | Value                                        |
+| ---------------- | -------------------------------------------- |
 | Timestamp Server | `<http://timestamp.comodoca.com`> (RFC 3161) |
-| Configuration | `electron-builder.json` (line 39) |
-| Certificate | Environment-provided during CI/CD |
+| Configuration    | `electron-builder.json` (line 39)            |
+| Certificate      | Environment-provided during CI/CD            |
 
 ##### 6.4.6.3 Auto-update security
 
@@ -7528,35 +7532,35 @@ flowchart TB
     Download --> Apply
 ```
 
-| Update Attribute | Specification |
-| ------------------ | --------------- |
+| Update Attribute   | Specification            |
+| ------------------ | ------------------------ |
 | Initial Poll Delay | 10 seconds after startup |
-| Polling Interval | 30 minutes |
-| Protocol | HTTPS (TLS 1.2+) |
-| Authentication | None (public endpoints) |
-| Verification | Platform code signing |
+| Polling Interval   | 30 minutes               |
+| Protocol           | HTTPS (TLS 1.2+)         |
+| Authentication     | None (public endpoints)  |
+| Verification       | Platform code signing    |
 
----
+______________________________________________________________________
 
 #### 6.4.7 Security scanning and compliance
 
 ##### 6.4.7.1 Automated security scanning
 
-| Mechanism | Schedule | Scope | Configuration |
-| ----------- | ---------- | ------- | --------------- |
+| Mechanism       | Schedule                   | Scope                      | Configuration                           |
+| --------------- | -------------------------- | -------------------------- | --------------------------------------- |
 | CodeQL Analysis | Weekly (Fridays) + PR/Push | JavaScript vulnerabilities | `.github/workflows/codeql-analysis.yml` |
-| Dependabot | Weekly (Sundays) | npm + GitHub Actions | `.github/dependabot.yml` |
-| Target Branch | `canary` | Pre-release validation | GitHub workflow configuration |
+| Dependabot      | Weekly (Sundays)           | npm + GitHub Actions       | `.github/dependabot.yml`                |
+| Target Branch   | `canary`                   | Pre-release validation     | GitHub workflow configuration           |
 
 ##### 6.4.7.2 Dependency security
 
 **Dependabot Configuration** (`.github/dependabot.yml`):
 
-| Ecosystem | Update Frequency | Target Directory |
-| ----------- | ------------------ | ------------------ |
-| npm | Weekly | `/` (root) |
-| npm | Weekly | `/app` |
-| GitHub Actions | Weekly | `.github/workflows/` |
+| Ecosystem      | Update Frequency | Target Directory     |
+| -------------- | ---------------- | -------------------- |
+| npm            | Weekly           | `/` (root)           |
+| npm            | Weekly           | `/app`               |
+| GitHub Actions | Weekly           | `.github/workflows/` |
 
 ##### 6.4.7.3 Security scanning flow
 
@@ -7605,53 +7609,53 @@ flowchart LR
     Merge --> Release
 ```
 
----
+______________________________________________________________________
 
 #### 6.4.8 Known security concerns and technical debt
 
 ##### 6.4.8.1 Critical security issues
 
-| Concern | Current State | Risk Level | Evidence |
-| --------- | -------------- | ------------ | ---------- |
-| Electron Version | 40.2.1 (current baseline) | **Critical** | `app/package.json` |
-| Chromium Version | 144.0.7559.111 | **Critical** | Bundled with Electron 40 |
-| Node.js Version | 24.11.1 (bundled) | **High** | Bundled with Electron 40 |
-| Plugin Trust Model | Full trust, no sandboxing | **High** | Architectural decision |
-| `@electron/remote` | Enabled (deprecated) | **Medium** | `app/index.ts`, `app/ui/window.ts` |
-| Node Integration | Enabled in renderer | **Medium** | `app/ui/window.ts` |
-| Context Isolation | Disabled | **Medium** | `app/ui/window.ts` |
+| Concern            | Current State             | Risk Level   | Evidence                           |
+| ------------------ | ------------------------- | ------------ | ---------------------------------- |
+| Electron Version   | 40.2.1 (current baseline) | **Critical** | `app/package.json`                 |
+| Chromium Version   | 144.0.7559.111            | **Critical** | Bundled with Electron 40           |
+| Node.js Version    | 24.11.1 (bundled)         | **High**     | Bundled with Electron 40           |
+| Plugin Trust Model | Full trust, no sandboxing | **High**     | Architectural decision             |
+| `@electron/remote` | Enabled (deprecated)      | **Medium**   | `app/index.ts`, `app/ui/window.ts` |
+| Node Integration   | Enabled in renderer       | **Medium**   | `app/ui/window.ts`                 |
+| Context Isolation  | Disabled                  | **Medium**   | `app/ui/window.ts`                 |
 
 ##### 6.4.8.2 Electron 40 baseline risk profile
 
-| Area | Observation | Status in 40.2.1 |
-| ------ | ------------- | ------------------- |
-| Chromium baseline | Bundled Chromium 144.0.7559.111 aligns with the current staged target | Roadmap item 1.4.13 complete |
-| Main/renderer hardening | `nodeIntegration` enabled and `contextIsolation` disabled | Outstanding hardening debt |
-| Cross-process access | `@electron/remote` remains enabled | Planned migration to explicit IPC |
+| Area                    | Observation                                                           | Status in 40.2.1                  |
+| ----------------------- | --------------------------------------------------------------------- | --------------------------------- |
+| Chromium baseline       | Bundled Chromium 144.0.7559.111 aligns with the current staged target | Roadmap item 1.4.13 complete      |
+| Main/renderer hardening | `nodeIntegration` enabled and `contextIsolation` disabled             | Outstanding hardening debt        |
+| Cross-process access    | `@electron/remote` remains enabled                                    | Planned migration to explicit IPC |
 
 ##### 6.4.8.3 Security configuration compliance
 
-| Electron Best Practice | Velocetty Status | Compliance | Justification |
-| ----------------------- | ------------------ | ------------ | --------------- |
-| Disable `nodeIntegration` | Enabled | **Non-compliant** | Plugin architecture |
-| Enable `contextIsolation` | Disabled | **Non-compliant** | Plugin architecture |
-| Disable `@electron/remote` | Enabled | **Non-compliant** | Cross-process access |
-| Enable `sandbox` | Disabled | **Non-compliant** | Plugin Node.js access |
-| Define CSP | Partial (`'unsafe-inline'`) | **Partial** | styled-jsx requirement |
-| Use current Electron | 40.2.1 (current baseline) | **Partial** | Keep Electron 40 patch releases current |
+| Electron Best Practice     | Velocetty Status            | Compliance        | Justification                           |
+| -------------------------- | --------------------------- | ----------------- | --------------------------------------- |
+| Disable `nodeIntegration`  | Enabled                     | **Non-compliant** | Plugin architecture                     |
+| Enable `contextIsolation`  | Disabled                    | **Non-compliant** | Plugin architecture                     |
+| Disable `@electron/remote` | Enabled                     | **Non-compliant** | Cross-process access                    |
+| Enable `sandbox`           | Disabled                    | **Non-compliant** | Plugin Node.js access                   |
+| Define CSP                 | Partial (`'unsafe-inline'`) | **Partial**       | styled-jsx requirement                  |
+| Use current Electron       | 40.2.1 (current baseline)   | **Partial**       | Keep Electron 40 patch releases current |
 
----
+______________________________________________________________________
 
 #### 6.4.9 Security recommendations and mitigation strategies
 
 ##### 6.4.9.1 Short-term mitigations
 
-| Risk | Mitigation | Implementation |
-| ------ | ------------ | ---------------- |
-| Electron lifecycle drift | Continue staged upgrades | Priority upgrade path |
-| Plugin trust | User education | Documentation, trusted sources |
-| `@electron/remote` | Migrate to explicit IPC | Refactor cross-process calls |
-| CSP weakness | Review `'unsafe-inline'` necessity | Evaluate alternative styling |
+| Risk                     | Mitigation                         | Implementation                 |
+| ------------------------ | ---------------------------------- | ------------------------------ |
+| Electron lifecycle drift | Continue staged upgrades           | Priority upgrade path          |
+| Plugin trust             | User education                     | Documentation, trusted sources |
+| `@electron/remote`       | Migrate to explicit IPC            | Refactor cross-process calls   |
+| CSP weakness             | Review `'unsafe-inline'` necessity | Evaluate alternative styling   |
 
 ##### 6.4.9.2 Long-term security roadmap
 
@@ -7683,15 +7687,15 @@ flowchart TB
 
 For users installing plugins:
 
-| Practice | Description |
-| ---------- | ------------- |
-| **Trusted Sources** | Install only from npm with verified publishers |
-| **Review Code** | Examine plugin source before installation |
-| **Minimal Plugins** | Install only necessary extensions |
-| **Update Regularly** | Keep plugins current for security fixes |
-| **Report Issues** | Report suspicious plugin behaviour |
+| Practice             | Description                                    |
+| -------------------- | ---------------------------------------------- |
+| **Trusted Sources**  | Install only from npm with verified publishers |
+| **Review Code**      | Examine plugin source before installation      |
+| **Minimal Plugins**  | Install only necessary extensions              |
+| **Update Regularly** | Keep plugins current for security fixes        |
+| **Report Issues**    | Report suspicious plugin behaviour             |
 
----
+______________________________________________________________________
 
 #### 6.4.10 References
 
@@ -7775,14 +7779,14 @@ traditional sense of server-side monitoring infrastructure. Velocetty is an
 operating in a **single-user local context** with no backend services requiring
 enterprise APM solutions like Prometheus, Grafana, ELK stack, or Datadog.
 
-| Monitoring Characteristic | Velocetty Reality | Traditional Server Monitoring |
-| --------------------------- | ------------------- | ------------------------------- |
-| **Deployment Model** | Single desktop installation | Distributed cloud services |
-| **User Context** | Single user per instance | Multi-tenant, concurrent users |
-| **Telemetry Collection** | None (privacy by design) | Centralized metrics servers |
-| **Log Aggregation** | Local console/DevTools | ELK, Splunk, CloudWatch |
-| **Distributed Tracing** | N/A (single application) | Jaeger, Zipkin, X-Ray |
-| **Alert Management** | User notifications | PagerDuty, OpsGenie |
+| Monitoring Characteristic | Velocetty Reality           | Traditional Server Monitoring  |
+| ------------------------- | --------------------------- | ------------------------------ |
+| **Deployment Model**      | Single desktop installation | Distributed cloud services     |
+| **User Context**          | Single user per instance    | Multi-tenant, concurrent users |
+| **Telemetry Collection**  | None (privacy by design)    | Centralized metrics servers    |
+| **Log Aggregation**       | Local console/DevTools      | ELK, Splunk, CloudWatch        |
+| **Distributed Tracing**   | N/A (single application)    | Jaeger, Zipkin, X-Ray          |
+| **Alert Management**      | User notifications          | PagerDuty, OpsGenie            |
 
 ##### 6.5.1.2 Rationale for non-applicability
 
@@ -7837,7 +7841,7 @@ flowchart TB
     RuntimeObservability --> QualityAssurance
 ```
 
----
+______________________________________________________________________
 
 #### 6.5.2 Monitoring infrastructure
 
@@ -7848,22 +7852,22 @@ architecture.
 
 ##### Log output destinations by process
 
-| Process | Logging Mechanism | Output Destination | Evidence |
-| --------- | ------------------- | ------------------- | ---------- |
-| Main Process | `console.log/warn/error` | stdout/stderr, DevTools | `app/notify.ts` |
-| Renderer Process | `console.log/warn/error` | Chrome DevTools console | `lib/utils/notify.ts` |
-| Plugin Errors | Toast notifications + console | In-app notification tray + DevTools | `lib/utils/plugins.ts` |
-| Development Mode | Redux DevTools | Chrome extension | Redux store configuration |
+| Process          | Logging Mechanism             | Output Destination                  | Evidence                  |
+| ---------------- | ----------------------------- | ----------------------------------- | ------------------------- |
+| Main Process     | `console.log/warn/error`      | stdout/stderr, DevTools             | `app/notify.ts`           |
+| Renderer Process | `console.log/warn/error`      | Chrome DevTools console             | `lib/utils/notify.ts`     |
+| Plugin Errors    | Toast notifications + console | In-app notification tray + DevTools | `lib/utils/plugins.ts`    |
+| Development Mode | Redux DevTools                | Chrome extension                    | Redux store configuration |
 
 ##### Log categories and content
 
-| Log Category | Trigger Events | Example Content |
-| -------------- | ---------------- | ----------------- |
-| Startup Diagnostics | Application launch | Config loading, plugin initialization |
-| Session Lifecycle | PTY events | Session create, data flow, exit |
-| Error Stack Traces | Exceptions | Error messages with context |
-| Plugin Warnings | Extension failures | Plugin name + hook identification |
-| Performance Metrics | Timing measurements | Init time, batch flush counts |
+| Log Category        | Trigger Events      | Example Content                       |
+| ------------------- | ------------------- | ------------------------------------- |
+| Startup Diagnostics | Application launch  | Config loading, plugin initialization |
+| Session Lifecycle   | PTY events          | Session create, data flow, exit       |
+| Error Stack Traces  | Exceptions          | Error messages with context           |
+| Plugin Warnings     | Extension failures  | Plugin name + hook identification     |
+| Performance Metrics | Timing measurements | Init time, batch flush counts         |
 
 ##### Notification system architecture
 
@@ -7905,12 +7909,12 @@ development and debugging.
 
 ##### Instrumentation points
 
-| Measurement Point | Implementation | Location |
-| ------------------- | ---------------- | ---------- |
-| Renderer Init Time | `performance.now()` delta | `app/index.html` |
-| Session Duration | `Date.getTime()` timestamp | `app/session.ts` |
-| Renderer Type Tracking | IPC event reporting | `lib/components/term.tsx` |
-| Update Polling | Interval-based logging | `app/updater.ts` |
+| Measurement Point      | Implementation             | Location                  |
+| ---------------------- | -------------------------- | ------------------------- |
+| Renderer Init Time     | `performance.now()` delta  | `app/index.html`          |
+| Session Duration       | `Date.getTime()` timestamp | `app/session.ts`          |
+| Renderer Type Tracking | IPC event reporting        | `lib/components/term.tsx` |
+| Update Polling         | Interval-based logging     | `app/updater.ts`          |
 
 ##### Application init timing
 
@@ -7936,11 +7940,11 @@ sequenceDiagram
 
 The auto-update system includes minimal telemetry for update checks:
 
-| Telemetry Type | Implementation | Privacy Impact |
-| ---------------- | ---------------- | ---------------- |
-| Update Polling | HTTP requests to update server | IP address exposed to update server |
-| Error Logging | Local console only | No external transmission |
-| Crash Reporting | Electron crash handler | Local storage only |
+| Telemetry Type  | Implementation                 | Privacy Impact                      |
+| --------------- | ------------------------------ | ----------------------------------- |
+| Update Polling  | HTTP requests to update server | IP address exposed to update server |
+| Error Logging   | Local console only             | No external transmission            |
+| Crash Reporting | Electron crash handler         | Local storage only                  |
 
 ##### Auto-update monitoring flow
 
@@ -7973,25 +7977,25 @@ flowchart TB
     ConsoleError --> NoNotify
 ```
 
----
+______________________________________________________________________
 
 #### 6.5.3 Observability patterns
 
 ##### 6.5.3.1 Health check mechanisms
 
-Velocetty implements implicit health checks through error detection and recovery
-mechanisms rather than explicit health endpoints.
+Velocetty implements implicit health checks through error detection and
+recovery mechanisms rather than explicit health endpoints.
 
 ##### Health check matrix
 
-| Health Aspect | Detection Mechanism | Healthy State | Recovery Action |
-| --------------- | --------------------- | --------------- | ----------------- |
-| PTY Session | Exit code + duration analysis | Shell running normally | Fallback shell spawning |
-| WebGL Renderer | `onContextLoss` event | Context active | Canvas fallback |
-| Plugin System | Try-catch boundaries | No errors thrown | Return original component |
-| Configuration | JSON schema validation | Valid config loaded | Restore defaults |
-| Main Process | Electron crash handler | Process responsive | Application restart |
-| Renderer Process | Process exit detection | Window responsive | Window recreation |
+| Health Aspect    | Detection Mechanism           | Healthy State          | Recovery Action           |
+| ---------------- | ----------------------------- | ---------------------- | ------------------------- |
+| PTY Session      | Exit code + duration analysis | Shell running normally | Fallback shell spawning   |
+| WebGL Renderer   | `onContextLoss` event         | Context active         | Canvas fallback           |
+| Plugin System    | Try-catch boundaries          | No errors thrown       | Return original component |
+| Configuration    | JSON schema validation        | Valid config loaded    | Restore defaults          |
+| Main Process     | Electron crash handler        | Process responsive     | Application restart       |
+| Renderer Process | Process exit detection        | Window responsive      | Window recreation         |
 
 ##### Session health monitoring
 
@@ -8034,15 +8038,15 @@ applications.
 
 ##### Performance SLA targets
 
-| Metric | Target | Measurement Point | Priority |
-| -------- | -------- | ------------------- | ---------- |
-| Cold start time | < 2 seconds | App launch → first terminal ready | Critical |
-| Keystroke-to-echo latency | < 50ms | Input event → visible character | Critical |
-| Idle memory consumption | < 300 MB | Single window, single tab | High |
-| Frame rate (WebGL scrolling) | 60 fps | Continuous output rendering | High |
-| Plugin load time | < 500ms total | All extensions initialized | Medium |
-| Configuration hot-reload | < 100ms | File change → UI update | Medium |
-| IPC batch efficiency | 60-90% reduction | Calls vs. unbatched baseline | High |
+| Metric                       | Target           | Measurement Point                 | Priority |
+| ---------------------------- | ---------------- | --------------------------------- | -------- |
+| Cold start time              | < 2 seconds      | App launch → first terminal ready | Critical |
+| Keystroke-to-echo latency    | < 50ms           | Input event → visible character   | Critical |
+| Idle memory consumption      | < 300 MB         | Single window, single tab         | High     |
+| Frame rate (WebGL scrolling) | 60 fps           | Continuous output rendering       | High     |
+| Plugin load time             | < 500ms total    | All extensions initialized        | Medium   |
+| Configuration hot-reload     | < 100ms          | File change → UI update           | Medium   |
+| IPC batch efficiency         | 60-90% reduction | Calls vs. unbatched baseline      | High     |
 
 ##### Performance measurement architecture
 
@@ -8083,13 +8087,13 @@ flowchart TB
 
 ##### Desktop resource allocation
 
-| Resource | Baseline Allocation | Scaling Behaviour | Constraint |
-| ---------- | --------------------- | ------------------ | ------------ |
-| Main Process Memory | ~50-100 MB | Fixed singleton | Single process |
-| Renderer Memory | ~150-200 MB per window | Per-window isolation | Available RAM |
-| PTY Session Memory | ~5-10 MB per session | On-demand creation | OS FD limits |
-| WebGL Contexts | 16 maximum active | Visible panes prioritized | GPU hardware limit |
-| Canvas Contexts | Unlimited | Fallback for WebGL overflow | CPU-bound rendering |
+| Resource            | Baseline Allocation    | Scaling Behaviour           | Constraint          |
+| ------------------- | ---------------------- | --------------------------- | ------------------- |
+| Main Process Memory | ~50-100 MB             | Fixed singleton             | Single process      |
+| Renderer Memory     | ~150-200 MB per window | Per-window isolation        | Available RAM       |
+| PTY Session Memory  | ~5-10 MB per session   | On-demand creation          | OS FD limits        |
+| WebGL Contexts      | 16 maximum active      | Visible panes prioritized   | GPU hardware limit  |
+| Canvas Contexts     | Unlimited              | Fallback for WebGL overflow | CPU-bound rendering |
 
 ##### WebGL context capacity tracking
 
@@ -8126,7 +8130,7 @@ flowchart TB
     TrackTypes --> InfoEvent
 ```
 
----
+______________________________________________________________________
 
 #### 6.5.4 Error recovery and incident response
 
@@ -8266,14 +8270,14 @@ flowchart TB
 
 ##### 6.5.4.2 Disaster recovery procedures
 
-| Failure Scenario | Detection Method | Recovery Procedure | User Impact |
-| ------------------ | ------------------ | ------------------- | ------------- |
-| Configuration corruption | JSON schema validation failure | Restore from `config-default.json`, notify user | Settings reset to defaults |
-| Plugin crash | Error boundary catch | Disable plugin, continue with core | Plugin features unavailable |
-| WebGL context loss | `onContextLoss` callback | Automatic fallback to Canvas | Reduced scroll performance |
-| PTY spawn failure | Quick exit detection (< 1s) | Fallback shell with warning | Alternative shell used |
-| Main process crash | Electron crash handler | Restart application, restore geometry | Session state lost |
-| Renderer crash | Renderer process exit | Recreate window, restore session | Terminal state partially lost |
+| Failure Scenario         | Detection Method               | Recovery Procedure                              | User Impact                   |
+| ------------------------ | ------------------------------ | ----------------------------------------------- | ----------------------------- |
+| Configuration corruption | JSON schema validation failure | Restore from `config-default.json`, notify user | Settings reset to defaults    |
+| Plugin crash             | Error boundary catch           | Disable plugin, continue with core              | Plugin features unavailable   |
+| WebGL context loss       | `onContextLoss` callback       | Automatic fallback to Canvas                    | Reduced scroll performance    |
+| PTY spawn failure        | Quick exit detection (< 1s)    | Fallback shell with warning                     | Alternative shell used        |
+| Main process crash       | Electron crash handler         | Restart application, restore geometry           | Session state lost            |
+| Renderer crash           | Renderer process exit          | Recreate window, restore session                | Terminal state partially lost |
 
 ##### 6.5.4.3 Graceful degradation hierarchy
 
@@ -8293,15 +8297,15 @@ flowchart TB
     Level3 -->|"Shell failure"| Level4
 ```
 
-| Degradation Level | Trigger Condition | User Impact | Recovery Path |
-| ------------------- | ------------------- | ------------- | --------------- |
-| Level 0 | Normal operation | Full performance | N/A |
-| Level 1 | WebGL context limit (16) | Reduced scroll performance | Close terminals to free contexts |
-| Level 2 | Memory pressure | No ligatures/inline images | Reduce terminal count |
-| Level 3 | Plugin throws error | Plugin features unavailable | Uninstall/fix plugin |
-| Level 4 | Primary shell fails | Using system default shell | Fix shell configuration |
+| Degradation Level | Trigger Condition        | User Impact                 | Recovery Path                    |
+| ----------------- | ------------------------ | --------------------------- | -------------------------------- |
+| Level 0           | Normal operation         | Full performance            | N/A                              |
+| Level 1           | WebGL context limit (16) | Reduced scroll performance  | Close terminals to free contexts |
+| Level 2           | Memory pressure          | No ligatures/inline images  | Reduce terminal count            |
+| Level 3           | Plugin throws error      | Plugin features unavailable | Uninstall/fix plugin             |
+| Level 4           | Primary shell fails      | Using system default shell  | Fix shell configuration          |
 
----
+______________________________________________________________________
 
 #### 6.5.5 User feedback and issue reporting
 
@@ -8346,22 +8350,22 @@ flowchart TB
 
 ##### 6.5.5.2 Diagnostic information sources
 
-| Information Type | Location | Access Method |
-| ------------------ | ---------- | --------------- |
-| Error Logs | DevTools Console | View → Toggle Developer Tools |
-| Application Version | About Dialog | Hyper menu → About |
-| Configuration | `~/.config/Hyper/hyper.json` | File system access |
-| Installed Plugins | Config file `plugins` array | File system access |
-| OS Information | System settings | Platform-specific |
+| Information Type    | Location                     | Access Method                 |
+| ------------------- | ---------------------------- | ----------------------------- |
+| Error Logs          | DevTools Console             | View → Toggle Developer Tools |
+| Application Version | About Dialog                 | Hyper menu → About            |
+| Configuration       | `~/.config/Hyper/hyper.json` | File system access            |
+| Installed Plugins   | Config file `plugins` array  | File system access            |
+| OS Information      | System settings              | Platform-specific             |
 
----
+______________________________________________________________________
 
 #### 6.5.6 Quality assurance pipeline
 
 ##### 6.5.6.1 Continuous integration monitoring
 
-Velocetty's CI/CD pipeline provides automated quality assurance that serves as a
-pre-release monitoring mechanism.
+Velocetty's CI/CD pipeline provides automated quality assurance that serves as
+a pre-release monitoring mechanism.
 
 ##### CI pipeline architecture
 
@@ -8409,11 +8413,11 @@ flowchart TB
 
 ##### 6.5.6.2 Security scanning configuration
 
-| Mechanism | Schedule | Scope | Output |
-| ----------- | ---------- | ------- | -------- |
+| Mechanism       | Schedule         | Scope                      | Output                          |
+| --------------- | ---------------- | -------------------------- | ------------------------------- |
 | CodeQL Analysis | Weekly + PR/Push | JavaScript vulnerabilities | SARIF report to GitHub Security |
-| Dependabot | Weekly (Sundays) | npm + GitHub Actions | Automated update PRs |
-| Target Branch | `canary` | Pre-release validation | Security alerts |
+| Dependabot      | Weekly (Sundays) | npm + GitHub Actions       | Automated update PRs            |
+| Target Branch   | `canary`         | Pre-release validation     | Security alerts                 |
 
 ##### Security scanning workflow
 
@@ -8454,23 +8458,23 @@ flowchart LR
 
 ##### 6.5.6.3 Test coverage metrics
 
-| Test Type | Framework | Coverage Area |
-| ----------- | ----------- | --------------- |
-| Unit Tests | Bun test runner 1.3.11 | Core logic, utilities |
-| E2E Tests | Playwright 1.43.1 | Application smoke tests |
-| Lint Checks | ESLint 8.57.0 | Code quality standards |
-| Type Checking | tsgo 7.0.0-dev.20260128.1 | Static type analysis |
+| Test Type     | Framework                 | Coverage Area           |
+| ------------- | ------------------------- | ----------------------- |
+| Unit Tests    | Bun test runner 1.3.11    | Core logic, utilities   |
+| E2E Tests     | Playwright 1.43.1         | Application smoke tests |
+| Lint Checks   | ESLint 8.57.0             | Code quality standards  |
+| Type Checking | tsgo 7.0.0-dev.20260128.1 | Static type analysis    |
 
 ##### E2E test monitoring
 
-| E2E Aspect | Implementation | Purpose |
-| ------------ | ---------------- | --------- |
-| Smoke Test | Package application launch | Verify app starts correctly |
-| DevTools Check | Verify DevTools closed | Ensure production mode |
-| Screenshot Capture | On teardown/failure | Debug test failures |
-| Cross-Platform | macOS, Ubuntu, Windows | Platform compatibility |
+| E2E Aspect         | Implementation             | Purpose                     |
+| ------------------ | -------------------------- | --------------------------- |
+| Smoke Test         | Package application launch | Verify app starts correctly |
+| DevTools Check     | Verify DevTools closed     | Ensure production mode      |
+| Screenshot Capture | On teardown/failure        | Debug test failures         |
+| Cross-Platform     | macOS, Ubuntu, Windows     | Platform compatibility      |
 
----
+______________________________________________________________________
 
 #### 6.5.7 Dashboard and visualization
 
@@ -8519,14 +8523,14 @@ flowchart TB
 
 GitHub provides the dashboard for CI/CD observability:
 
-| Dashboard Element | Location | Content |
-| ------------------- | ---------- | --------- |
-| Actions Tab | Repository → Actions | Workflow runs, status, logs |
-| Security Tab | Repository → Security | CodeQL alerts, Dependabot alerts |
-| Pull Requests | Repository → Pull Requests | E2E screenshots, test results |
-| Releases | Repository → Releases | Build artefacts, changelogs |
+| Dashboard Element | Location                   | Content                          |
+| ----------------- | -------------------------- | -------------------------------- |
+| Actions Tab       | Repository → Actions       | Workflow runs, status, logs      |
+| Security Tab      | Repository → Security      | CodeQL alerts, Dependabot alerts |
+| Pull Requests     | Repository → Pull Requests | E2E screenshots, test results    |
+| Releases          | Repository → Releases      | Build artefacts, changelogs      |
 
----
+______________________________________________________________________
 
 #### 6.5.8 Alert definitions
 
@@ -8537,12 +8541,12 @@ runtime issues.
 
 ##### Alert categories and routing
 
-| Alert Category | Trigger Condition | Notification Type | Action Required |
-| ---------------- | ------------------- | ------------------- | ----------------- |
-| Plugin Error | Plugin hook throws exception | System notification + toast | Check DevTools |
-| Shell Failure | PTY spawn fails with fallback | Terminal buffer warning | Fix shell config |
-| Update Available | New version detected | System notification | Optional update |
-| Configuration Error | Schema validation failure | Console warning | Fix config file |
+| Alert Category      | Trigger Condition             | Notification Type           | Action Required  |
+| ------------------- | ----------------------------- | --------------------------- | ---------------- |
+| Plugin Error        | Plugin hook throws exception  | System notification + toast | Check DevTools   |
+| Shell Failure       | PTY spawn fails with fallback | Terminal buffer warning     | Fix shell config |
+| Update Available    | New version detected          | System notification         | Optional update  |
+| Configuration Error | Schema validation failure     | Console warning             | Fix config file  |
 
 ##### Alert flow diagram
 
@@ -8586,26 +8590,26 @@ flowchart TB
 
 ##### 6.5.8.2 CI/CD alerts
 
-| Alert Type | Trigger | Notification Channel |
-| ------------ | --------- | --------------------- |
-| Build Failure | CI workflow fails | GitHub email notification |
-| Security Alert | CodeQL finds vulnerability | GitHub Security tab |
-| Dependency Alert | Dependabot finds outdated package | Dependabot PR |
-| Test Failure | Unit/E2E tests fail | GitHub Actions UI |
+| Alert Type       | Trigger                           | Notification Channel      |
+| ---------------- | --------------------------------- | ------------------------- |
+| Build Failure    | CI workflow fails                 | GitHub email notification |
+| Security Alert   | CodeQL finds vulnerability        | GitHub Security tab       |
+| Dependency Alert | Dependabot finds outdated package | Dependabot PR             |
+| Test Failure     | Unit/E2E tests fail               | GitHub Actions UI         |
 
----
+______________________________________________________________________
 
 #### 6.5.9 Monitoring best practices for desktop development
 
 ##### 6.5.9.1 Recommended development practices
 
-| Practice | Implementation | Benefit |
-| ---------- | ---------------- | --------- |
+| Practice                  | Implementation                  | Benefit                  |
+| ------------------------- | ------------------------------- | ------------------------ |
 | DevTools Always Available | `View → Toggle Developer Tools` | Immediate access to logs |
-| Redux DevTools Extension | Install Chrome extension | State inspection |
-| Console Logging | Use structured `console.log` | Traceable diagnostics |
-| Error Boundaries | Wrap plugin hooks in try-catch | Isolate failures |
-| Performance Timing | Use `performance.now()` | Measure bottlenecks |
+| Redux DevTools Extension  | Install Chrome extension        | State inspection         |
+| Console Logging           | Use structured `console.log`    | Traceable diagnostics    |
+| Error Boundaries          | Wrap plugin hooks in try-catch  | Isolate failures         |
+| Performance Timing        | Use `performance.now()`         | Measure bottlenecks      |
 
 ##### 6.5.9.2 Debugging workflow
 
@@ -8641,7 +8645,7 @@ flowchart TB
     RootCauseAnalysis --> Resolution
 ```
 
----
+______________________________________________________________________
 
 #### 6.5.10 References
 
@@ -8782,17 +8786,17 @@ flowchart TB
 
 ##### 6.6.1.3 Testing tools and frameworks summary
 
-| Tool | Version | Purpose | Configuration |
-| ------ | --------- | --------- | --------------- |
-| Bun test runner | 1.3.11 | Unit test runner (Jest-compatible) | `bun test` |
-| Playwright | 1.43.1 | E2E testing for Electron applications | `test/e2e/*.test.ts` |
-| Bun `mock.module` | 1.3.11 | Module mocking and dependency injection | `mock.module()` |
-| Biome | 2.3.13 | Static analysis and formatting | `biome.json` |
-| tsgo (TypeScript native preview) | 7.0.0-dev.20260128.1 | Static type checking | `tsconfig.base.json` |
-| CodeQL | v3 | Security vulnerability scanning | `codeql-analysis.yml` |
-| Dependabot | v2 | Dependency update automation | `dependabot.yml` |
+| Tool                             | Version              | Purpose                                 | Configuration         |
+| -------------------------------- | -------------------- | --------------------------------------- | --------------------- |
+| Bun test runner                  | 1.3.11               | Unit test runner (Jest-compatible)      | `bun test`            |
+| Playwright                       | 1.43.1               | E2E testing for Electron applications   | `test/e2e/*.test.ts`  |
+| Bun `mock.module`                | 1.3.11               | Module mocking and dependency injection | `mock.module()`       |
+| Biome                            | 2.3.13               | Static analysis and formatting          | `biome.json`          |
+| tsgo (TypeScript native preview) | 7.0.0-dev.20260128.1 | Static type checking                    | `tsconfig.base.json`  |
+| CodeQL                           | v3                   | Security vulnerability scanning         | `codeql-analysis.yml` |
+| Dependabot                       | v2                   | Dependency update automation            | `dependabot.yml`      |
 
----
+______________________________________________________________________
 
 #### 6.6.2 Unit testing
 
@@ -8805,10 +8809,10 @@ step via `bun run check:types`.
 
 ##### Bun test discovery (unit)
 
-| Setting | Value | Purpose |
-| --------- | ------- | --------- |
-| Test root | `test/unit/` | Unit test directory |
-| File pattern | `*.test.ts` | Default Bun discovery |
+| Setting      | Value        | Purpose               |
+| ------------ | ------------ | --------------------- |
+| Test root    | `test/unit/` | Unit test directory   |
+| File pattern | `*.test.ts`  | Default Bun discovery |
 
 ##### 6.6.2.2 Test organization structure
 
@@ -8842,11 +8846,11 @@ flowchart TB
 
 ##### Test file coverage matrix
 
-| Test File | Module Under Test | Test Cases | Coverage Area |
-| ----------- | ------------------- | ------------ | --------------- |
-| `cli-api.test.ts` | `cli/api.ts` | URL construction, scoped packages | npm registry URL building |
-| `window-utils.test.ts` | `app/utils/` | Multi-monitor validation | Window position calculations |
-| `to-electron-background-colour.test.ts` | Colour utilities | Hex conversion | Electron colour normalization |
+| Test File                               | Module Under Test | Test Cases                        | Coverage Area                 |
+| --------------------------------------- | ----------------- | --------------------------------- | ----------------------------- |
+| `cli-api.test.ts`                       | `cli/api.ts`      | URL construction, scoped packages | npm registry URL building     |
+| `window-utils.test.ts`                  | `app/utils/`      | Multi-monitor validation          | Window position calculations  |
+| `to-electron-background-colour.test.ts` | Colour utilities  | Hex conversion                    | Electron colour normalization |
 
 ##### 6.6.2.3 Mocking strategy
 
@@ -8873,50 +8877,50 @@ sequenceDiagram
 
 ##### Dependency mocking matrix
 
-| Dependency | Mock Type | Test File | Purpose |
-| ------------ | ----------- | ----------- | --------- |
-| `got` | Promise-returning stub | `cli-api.test.ts` | Prevent actual HTTP calls |
-| `registry-url` | Static return value | `cli-api.test.ts` | Control npm registry URL |
-| `electron.screen` | Display layout object | `window-utils.test.ts` | Simulate monitor configurations |
+| Dependency        | Mock Type              | Test File              | Purpose                         |
+| ----------------- | ---------------------- | ---------------------- | ------------------------------- |
+| `got`             | Promise-returning stub | `cli-api.test.ts`      | Prevent actual HTTP calls       |
+| `registry-url`    | Static return value    | `cli-api.test.ts`      | Control npm registry URL        |
+| `electron.screen` | Display layout object  | `window-utils.test.ts` | Simulate monitor configurations |
 
 ##### Mocking best practices
 
-| Practice | Implementation | Evidence |
-| ---------- | ---------------- | ---------- |
-| Register mocks early | `mock.module()` before `import()` | Prevents accidental real I/O |
-| Inline stubs | Object literal syntax | Clear dependency specification |
-| Promise mocking | `Promise.resolve()` returns | Async API simulation |
-| Capture arguments | Variable assignment in stubs | URL verification |
+| Practice             | Implementation                    | Evidence                       |
+| -------------------- | --------------------------------- | ------------------------------ |
+| Register mocks early | `mock.module()` before `import()` | Prevents accidental real I/O   |
+| Inline stubs         | Object literal syntax             | Clear dependency specification |
+| Promise mocking      | `Promise.resolve()` returns       | Async API simulation           |
+| Capture arguments    | Variable assignment in stubs      | URL verification               |
 
 ##### 6.6.2.4 Test naming conventions
 
-| Convention | Pattern | Example |
-| ------------ | --------- | --------- |
-| Test files | `*.test.ts` | `cli-api.test.ts` |
+| Convention        | Pattern                   | Example                                              |
+| ----------------- | ------------------------- | ---------------------------------------------------- |
+| Test files        | `*.test.ts`               | `cli-api.test.ts`                                    |
 | Test descriptions | Verb + expected behaviour | `'existsOnNpm() builds the url for scoped packages'` |
-| Assertion style | Bun `expect()` matchers | `expect(getUrl).toBe(expectedUrl)` |
+| Assertion style   | Bun `expect()` matchers   | `expect(getUrl).toBe(expectedUrl)`                   |
 
 ##### 6.6.2.5 Test data management
 
 **Current Approach**: Test data is embedded inline within test cases using
 literal values:
 
-| Data Type | Management Strategy | Example |
-| ----------- | --------------------- | --------- |
-| URLs | String literals | `'<https://registry.npmjs.org/'`> |
-| Package names | Inline parameters | `'@scope/pkg'`, `'hyper-plugin'` |
-| Display configurations | Object literals | `{ bounds: { x: 0, y: 0, width: 1920, height: 1080 } }` |
-| Expected outputs | Assertion parameters | `'<https://registry.npmjs.org/@scope%2fpkg'`> |
+| Data Type              | Management Strategy  | Example                                                 |
+| ---------------------- | -------------------- | ------------------------------------------------------- |
+| URLs                   | String literals      | `'<https://registry.npmjs.org/'`>                       |
+| Package names          | Inline parameters    | `'@scope/pkg'`, `'hyper-plugin'`                        |
+| Display configurations | Object literals      | `{ bounds: { x: 0, y: 0, width: 1920, height: 1080 } }` |
+| Expected outputs       | Assertion parameters | `'<https://registry.npmjs.org/@scope%2fpkg'`>           |
 
 ##### 6.6.2.6 Test utilities
 
 The `test/testUtils/` directory contains shared helper functions:
 
-| Utility | File | Purpose |
-| --------- | ------ | --------- |
+| Utility        | File               | Purpose                                     |
+| -------------- | ------------------ | ------------------------------------------- |
 | `isHexColor()` | `is-hex-colour.ts` | Validate 3/6/8-character hex colour strings |
 
----
+______________________________________________________________________
 
 #### 6.6.3 Integration testing
 
@@ -8925,12 +8929,12 @@ The `test/testUtils/` directory contains shared helper functions:
 **Current State**: Velocetty does not implement a dedicated integration test
 suite. This is appropriate for the following reasons:
 
-| Factor | Assessment |
-| -------- | ------------ |
-| **Architecture** | Desktop application with no external service dependencies |
-| **Backend Services** | None—all functionality executes locally |
-| **Database** | No database layer (configuration stored in JSON files) |
-| **API Contracts** | IPC contracts tested through E2E smoke tests |
+| Factor               | Assessment                                                |
+| -------------------- | --------------------------------------------------------- |
+| **Architecture**     | Desktop application with no external service dependencies |
+| **Backend Services** | None—all functionality executes locally                   |
+| **Database**         | No database layer (configuration stored in JSON files)    |
+| **API Contracts**    | IPC contracts tested through E2E smoke tests              |
 
 ##### 6.6.3.2 Integration points and coverage
 
@@ -8939,13 +8943,13 @@ Integration between components is validated through a combination of unit tests
 
 ##### Component integration matrix
 
-| Integration Point | Components | Testing Approach | Current Coverage |
-| ------------------- | ------------ | ------------------ | ------------------ |
-| IPC Bridge | Main ↔ Renderer | E2E smoke test | Application launch validation |
-| PTY Sessions | Session Manager ↔ node-pty | E2E smoke test | Terminal functionality |
-| Plugin System | Plugin Loader ↔ Extensions | Error isolation (try-catch) | Not formally tested |
-| Configuration | Config Manager ↔ File System | Unit tests (CLI API) | Partial coverage |
-| Redux Store | Store ↔ Components | E2E smoke test | UI state management |
+| Integration Point | Components                   | Testing Approach            | Current Coverage              |
+| ----------------- | ---------------------------- | --------------------------- | ----------------------------- |
+| IPC Bridge        | Main ↔ Renderer              | E2E smoke test              | Application launch validation |
+| PTY Sessions      | Session Manager ↔ node-pty   | E2E smoke test              | Terminal functionality        |
+| Plugin System     | Plugin Loader ↔ Extensions   | Error isolation (try-catch) | Not formally tested           |
+| Configuration     | Config Manager ↔ File System | Unit tests (CLI API)        | Partial coverage              |
+| Redux Store       | Store ↔ Components           | E2E smoke test              | UI state management           |
 
 ##### 6.6.3.3 IPC integration testing flow
 
@@ -8970,14 +8974,14 @@ flowchart TB
 
 ##### 6.6.3.4 Future integration testing recommendations
 
-| Recommendation | Priority | Rationale |
-| ---------------- | ---------- | ----------- |
-| PTY session lifecycle tests | High | Validate shell spawn, data flow, exit handling |
-| Configuration hot-reload tests | Medium | Verify file watcher triggers UI updates |
-| Plugin error isolation tests | Medium | Ensure plugin failures don't crash application |
-| WebGL fallback tests | Low | Validate Canvas fallback on context loss |
+| Recommendation                 | Priority | Rationale                                      |
+| ------------------------------ | -------- | ---------------------------------------------- |
+| PTY session lifecycle tests    | High     | Validate shell spawn, data flow, exit handling |
+| Configuration hot-reload tests | Medium   | Verify file watcher triggers UI updates        |
+| Plugin error isolation tests   | Medium   | Ensure plugin failures don't crash application |
+| WebGL fallback tests           | Low      | Validate Canvas fallback on context loss       |
 
----
+______________________________________________________________________
 
 #### 6.6.4 End-to-end testing
 
@@ -8989,12 +8993,12 @@ Chrome DevTools Protocol (CDP).
 
 ##### E2E configuration (bun test)
 
-| Setting | Value | Purpose |
-| --------- | ------- | --------- |
-| Test directory | `test/e2e/` | E2E test discovery |
-| File pattern | `*.test.ts` | Default Bun discovery |
-| Timeout | `30_000 ms` | Per-test timeout for app launch |
-| Environment gate | `RUN_E2E=1` | Skip by default |
+| Setting          | Value       | Purpose                         |
+| ---------------- | ----------- | ------------------------------- |
+| Test directory   | `test/e2e/` | E2E test discovery              |
+| File pattern     | `*.test.ts` | Default Bun discovery           |
+| Timeout          | `30_000 ms` | Per-test timeout for app launch |
+| Environment gate | `RUN_E2E=1` | Skip by default                 |
 
 ##### 6.6.4.2 E2E test scenarios
 
@@ -9003,12 +9007,12 @@ Chrome DevTools Protocol (CDP).
 The E2E suite implements a single comprehensive smoke test that validates the
 packaged application:
 
-| Test Phase | Action | Validation |
-| ------------ | -------- | ------------ |
-| Launch | `_electron.launch()` with platform binary | Application starts without crash |
-| Stabilization | 5-second delay | Allow full initialization |
-| Production Mode | Check DevTools state | DevTools are not open |
-| Artefact Capture | Screenshot on teardown | Visual evidence for CI reporting |
+| Test Phase       | Action                                    | Validation                       |
+| ---------------- | ----------------------------------------- | -------------------------------- |
+| Launch           | `_electron.launch()` with platform binary | Application starts without crash |
+| Stabilization    | 5-second delay                            | Allow full initialization        |
+| Production Mode  | Check DevTools state                      | DevTools are not open            |
+| Artefact Capture | Screenshot on teardown                    | Visual evidence for CI reporting |
 
 ##### 6.6.4.3 Platform-specific binary resolution
 
@@ -9048,11 +9052,11 @@ flowchart TB
 
 ##### Binary path matrix
 
-| Platform | Binary Location | Notes |
-| ---------- | ----------------- | ------- |
-| macOS | `dist/mac/Hyper.app/Contents/MacOS/Hyper` | Application bundle structure |
-| Linux | `dist/linux-unpacked/hyper` | Unpacked Electron directory |
-| Windows | `dist/win-unpacked/Hyper.exe` | Windows executable |
+| Platform | Binary Location                           | Notes                        |
+| -------- | ----------------------------------------- | ---------------------------- |
+| macOS    | `dist/mac/Hyper.app/Contents/MacOS/Hyper` | Application bundle structure |
+| Linux    | `dist/linux-unpacked/hyper`               | Unpacked Electron directory  |
+| Windows  | `dist/win-unpacked/Hyper.exe`             | Windows executable           |
 
 ##### 6.6.4.4 E2E test execution flow
 
@@ -9085,32 +9089,32 @@ flowchart TB
 
 ##### 6.6.4.5 Test artefact generation
 
-| Artefact Type | Location | Purpose |
-| --------------- | ---------- | --------- |
-| Screenshots | `dist/tmp/${platform}_test.png` | Visual validation, CI reporting |
-| Platform designation | `darwin`, `linux`, `win32` | Distinguish platform results |
+| Artefact Type        | Location                        | Purpose                         |
+| -------------------- | ------------------------------- | ------------------------------- |
+| Screenshots          | `dist/tmp/${platform}_test.png` | Visual validation, CI reporting |
+| Platform designation | `darwin`, `linux`, `win32`      | Distinguish platform results    |
 
 ##### 6.6.4.6 E2E testing limitations
 
-| Limitation | Impact | Mitigation |
-| ------------ | -------- | ------------ |
-| Single smoke test | Limited functional coverage | Validates critical launch path |
+| Limitation              | Impact                        | Mitigation                     |
+| ----------------------- | ----------------------------- | ------------------------------ |
+| Single smoke test       | Limited functional coverage   | Validates critical launch path |
 | No terminal interaction | PTY behaviour untested in E2E | Unit tests cover session logic |
-| No plugin E2E tests | Plugin integration gaps | Plugin error isolation in code |
-| No keyboard input tests | Input handling untested | Manual testing required |
-| No multi-window tests | Window management gaps | Single window validation only |
+| No plugin E2E tests     | Plugin integration gaps       | Plugin error isolation in code |
+| No keyboard input tests | Input handling untested       | Manual testing required        |
+| No multi-window tests   | Window management gaps        | Single window validation only  |
 
 ##### 6.6.4.7 Linux display requirements
 
 E2E tests on Linux CI runners require a virtual display environment:
 
-| Component | Purpose | Implementation |
-| ----------- | --------- | ---------------- |
-| Xvfb | Virtual X11 framebuffer | `GabrielBB/xvfb-action@v1.6` |
-| Display number | X11 display allocation | Automatic via action |
-| Headless mode | No physical display needed | GitHub Actions hosted runner |
+| Component      | Purpose                    | Implementation               |
+| -------------- | -------------------------- | ---------------------------- |
+| Xvfb           | Virtual X11 framebuffer    | `GabrielBB/xvfb-action@v1.6` |
+| Display number | X11 display allocation     | Automatic via action         |
+| Headless mode  | No physical display needed | GitHub Actions hosted runner |
 
----
+______________________________________________________________________
 
 #### 6.6.5 Test automation
 
@@ -9152,31 +9156,31 @@ flowchart TB
 
 ##### 6.6.5.2 Test scripts configuration
 
-| Script | Command | Scope |
-| -------- | --------- | ------- |
-| `test` | `bun run lint && bun run test:unit` | Full test suite (lint + unit) |
-| `test:unit` | `bun test test/unit` | Unit tests only |
-| `test:unit:watch` | `bun test --watch test/unit` | Development watch mode |
-| `test:e2e` | `RUN_E2E=1 bun test test/e2e` | End-to-end tests |
+| Script            | Command                             | Scope                         |
+| ----------------- | ----------------------------------- | ----------------------------- |
+| `test`            | `bun run lint && bun run test:unit` | Full test suite (lint + unit) |
+| `test:unit`       | `bun test test/unit`                | Unit tests only               |
+| `test:unit:watch` | `bun test --watch test/unit`        | Development watch mode        |
+| `test:e2e`        | `RUN_E2E=1 bun test test/e2e`       | End-to-end tests              |
 
 ##### 6.6.5.3 Automated test triggers
 
-| Trigger | Event | Tests Executed |
-| --------- | ------- | ---------------- |
-| Push to `master` | Branch protection | Lint, Unit, Build, E2E |
+| Trigger          | Event                  | Tests Executed                 |
+| ---------------- | ---------------------- | ------------------------------ |
+| Push to `master` | Branch protection      | Lint, Unit, Build, E2E         |
 | Push to `canary` | Pre-release validation | Lint, Unit, Build, E2E, CodeQL |
-| Pull Request | Code review workflow | Lint, Unit, Build, E2E |
-| Weekly Schedule | Fridays 06:37 UTC | CodeQL security scan |
+| Pull Request     | Code review workflow   | Lint, Unit, Build, E2E         |
+| Weekly Schedule  | Fridays 06:37 UTC      | CodeQL security scan           |
 
 ##### 6.6.5.4 Parallel test execution
 
 Bun runs tests in a single process by default, with opt-in concurrency:
 
-| Feature | Bun implementation | Benefit |
-| --------- | ------------------- | --------- |
-| Default order | Sequential test execution | Deterministic runs |
-| Concurrent execution | `--concurrent`, `test.concurrent()` | Faster async tests |
-| Serial fallback | `test.serial()` | Protect shared state |
+| Feature              | Bun implementation                  | Benefit              |
+| -------------------- | ----------------------------------- | -------------------- |
+| Default order        | Sequential test execution           | Deterministic runs   |
+| Concurrent execution | `--concurrent`, `test.concurrent()` | Faster async tests   |
+| Serial fallback      | `test.serial()`                     | Protect shared state |
 
 ##### 6.6.5.5 Test reporting and artefacts
 
@@ -9207,24 +9211,24 @@ flowchart TB
 
 ##### 6.6.5.6 Failed test handling
 
-| Failure Scenario | CI Behaviour | Developer Action |
-| ------------------ | ------------- | ------------------ |
-| Unit test failure | Job fails, PR blocked | Fix failing test |
-| E2E test failure | Job fails, screenshot captured | Review screenshot, debug |
-| Lint failure | Job fails immediately | Fix code style |
-| Build failure | No E2E execution | Fix compilation errors |
+| Failure Scenario  | CI Behaviour                   | Developer Action         |
+| ----------------- | ------------------------------ | ------------------------ |
+| Unit test failure | Job fails, PR blocked          | Fix failing test         |
+| E2E test failure  | Job fails, screenshot captured | Review screenshot, debug |
+| Lint failure      | Job fails immediately          | Fix code style           |
+| Build failure     | No E2E execution               | Fix compilation errors   |
 
 ##### 6.6.5.7 Flaky test management
 
-| Strategy | Implementation | Status |
-| ---------- | ---------------- | -------- |
-| E2E stabilization delay | 5-second wait after window open | Active |
-| Extended timeout | 30-second E2E timeout | Active |
-| Screenshot on failure | Always capture artefacts | Active |
-| Test isolation | Single-process runner; use `test.serial` | Active |
-| Retry mechanism | Not implemented | Future consideration |
+| Strategy                | Implementation                           | Status               |
+| ----------------------- | ---------------------------------------- | -------------------- |
+| E2E stabilization delay | 5-second wait after window open          | Active               |
+| Extended timeout        | 30-second E2E timeout                    | Active               |
+| Screenshot on failure   | Always capture artefacts                 | Active               |
+| Test isolation          | Single-process runner; use `test.serial` | Active               |
+| Retry mechanism         | Not implemented                          | Future consideration |
 
----
+______________________________________________________________________
 
 #### 6.6.6 Security testing
 
@@ -9264,62 +9268,62 @@ flowchart LR
 
 ##### 6.6.6.2 Codeql configuration
 
-| Attribute | Value | Purpose |
-| ----------- | ------- | --------- |
-| Schedule | Weekly (Fridays 06:37 UTC) | Regular vulnerability scanning |
-| Triggers | Push to canary, PR to canary | Pre-release validation |
-| Languages | JavaScript | Primary codebase language |
-| Output | SARIF report | GitHub Security integration |
+| Attribute | Value                        | Purpose                        |
+| --------- | ---------------------------- | ------------------------------ |
+| Schedule  | Weekly (Fridays 06:37 UTC)   | Regular vulnerability scanning |
+| Triggers  | Push to canary, PR to canary | Pre-release validation         |
+| Languages | JavaScript                   | Primary codebase language      |
+| Output    | SARIF report                 | GitHub Security integration    |
 
 ##### 6.6.6.3 Dependabot configuration
 
-| Ecosystem | Directory | Schedule | Target Branch |
-| ----------- | ----------- | ---------- | --------------- |
-| npm | `/` | Weekly | canary |
-| npm | `/app` | Weekly | canary |
-| github-actions | `/` | Weekly | canary |
+| Ecosystem      | Directory | Schedule | Target Branch |
+| -------------- | --------- | -------- | ------------- |
+| npm            | `/`       | Weekly   | canary        |
+| npm            | `/app`    | Weekly   | canary        |
+| github-actions | `/`       | Weekly   | canary        |
 
 ##### 6.6.6.4 Security testing gaps
 
-| Gap | Risk | Recommendation |
-| ----- | ------ | ---------------- |
-| Plugin security | High—full trust model | User education, trusted sources |
-| Electron version | High—Electron 40 baseline | Keep Electron 40 patch releases current |
-| Context isolation | Medium—disabled | Evaluate migration feasibility |
-| CSP validation | Low—`unsafe-inline` | Review styled-jsx alternatives |
+| Gap               | Risk                      | Recommendation                          |
+| ----------------- | ------------------------- | --------------------------------------- |
+| Plugin security   | High—full trust model     | User education, trusted sources         |
+| Electron version  | High—Electron 40 baseline | Keep Electron 40 patch releases current |
+| Context isolation | Medium—disabled           | Evaluate migration feasibility          |
+| CSP validation    | Low—`unsafe-inline`       | Review styled-jsx alternatives          |
 
----
+______________________________________________________________________
 
 #### 6.6.7 Quality metrics
 
 ##### 6.6.7.1 Current test coverage
 
-| Test Type | Count | Scope | Status |
-| ----------- | ------- | ------- | -------- |
-| Unit test files | 3 | CLI API, window utils, colour conversion | Active |
-| Unit test cases | 7+ | Individual test assertions | Active |
-| E2E test files | 1 | Application smoke test | Active |
-| E2E test scenarios | 1 | Launch and DevTools verification | Active |
+| Test Type          | Count | Scope                                    | Status |
+| ------------------ | ----- | ---------------------------------------- | ------ |
+| Unit test files    | 3     | CLI API, window utils, colour conversion | Active |
+| Unit test cases    | 7+    | Individual test assertions               | Active |
+| E2E test files     | 1     | Application smoke test                   | Active |
+| E2E test scenarios | 1     | Launch and DevTools verification         | Active |
 
 **Note**: Velocetty does not currently implement code coverage measurement
 tooling (Istanbul/NYC). Coverage metrics are not formally tracked.
 
 ##### 6.6.7.2 Code coverage targets
 
-| Coverage Type | Current | Target | Priority |
-| --------------- | --------- | -------- | ---------- |
-| Line coverage | Not measured | 60% (recommended) | Medium |
-| Branch coverage | Not measured | 50% (recommended) | Medium |
-| Critical path coverage | E2E smoke only | Core workflows | High |
+| Coverage Type          | Current        | Target            | Priority |
+| ---------------------- | -------------- | ----------------- | -------- |
+| Line coverage          | Not measured   | 60% (recommended) | Medium   |
+| Branch coverage        | Not measured   | 50% (recommended) | Medium   |
+| Critical path coverage | E2E smoke only | Core workflows    | High     |
 
 ##### 6.6.7.3 Test success rate requirements
 
-| Requirement | Threshold | Enforcement |
-| ------------- | ----------- | ------------- |
-| Unit tests pass | 100% | CI job failure |
-| E2E smoke test pass | 100% | CI job failure |
-| Lint compliance | 100% | CI job failure |
-| Type checking | 100% | Build failure |
+| Requirement         | Threshold | Enforcement    |
+| ------------------- | --------- | -------------- |
+| Unit tests pass     | 100%      | CI job failure |
+| E2E smoke test pass | 100%      | CI job failure |
+| Lint compliance     | 100%      | CI job failure |
+| Type checking       | 100%      | Build failure  |
 
 ##### 6.6.7.4 Quality gates
 
@@ -9354,14 +9358,14 @@ flowchart TB
 
 ##### 6.6.7.5 Performance test thresholds
 
-| Metric | Target | Testing Method | Status |
-| -------- | -------- | ---------------- | -------- |
-| Cold start time | < 2 seconds | Manual, DevTools | Not automated |
-| Keystroke latency | < 50ms | Manual, DevTools | Not automated |
-| E2E launch time | < 30 seconds | Bun test timeout | Implicit |
-| Memory usage | < 300 MB (idle) | DevTools Memory | Manual only |
+| Metric            | Target          | Testing Method   | Status        |
+| ----------------- | --------------- | ---------------- | ------------- |
+| Cold start time   | < 2 seconds     | Manual, DevTools | Not automated |
+| Keystroke latency | < 50ms          | Manual, DevTools | Not automated |
+| E2E launch time   | < 30 seconds    | Bun test timeout | Implicit      |
+| Memory usage      | < 300 MB (idle) | DevTools Memory  | Manual only   |
 
----
+______________________________________________________________________
 
 #### 6.6.8 Test environment architecture
 
@@ -9393,13 +9397,13 @@ flowchart TB
 
 ##### 6.6.8.2 CI environment configuration
 
-| Environment Aspect | Configuration | Purpose |
-| ------------------- | --------------- | --------- |
-| Node.js version | 20.x | LTS compatibility |
-| Package manager | Bun with caching | Fast installs |
-| Build matrix | macOS, Ubuntu, Windows | Cross-platform |
-| Linux display | Xvfb (virtual) | Headless E2E |
-| Native modules | Auto-rebuild per platform | node-pty compatibility |
+| Environment Aspect | Configuration             | Purpose                |
+| ------------------ | ------------------------- | ---------------------- |
+| Node.js version    | 20.x                      | LTS compatibility      |
+| Package manager    | Bun with caching          | Fast installs          |
+| Build matrix       | macOS, Ubuntu, Windows    | Cross-platform         |
+| Linux display      | Xvfb (virtual)            | Headless E2E           |
+| Native modules     | Auto-rebuild per platform | node-pty compatibility |
 
 ##### 6.6.8.3 Test data flow diagram
 
@@ -9439,7 +9443,7 @@ flowchart TB
     Screenshots --> CIStatus
 ```
 
----
+______________________________________________________________________
 
 #### 6.6.9 Testing best practices and patterns
 
@@ -9448,78 +9452,78 @@ flowchart TB
 The following pattern demonstrates Velocetty's approach to unit testing with
 mocked dependencies:
 
-| Pattern Element | Implementation | Purpose |
-| ----------------- | ---------------- | --------- |
-| Import test framework | `import {test, expect, mock} from 'bun:test'` | Access test runner |
-| Register mocks | `mock.module('../dep', () => stub)` | Prevent real I/O |
-| Define stubs | Object literal with dependency replacements | Control external behaviour |
-| Load module | `await import('../../module')` | Inject dependencies |
-| Assert results | `expect(actual).toBe(expected)` | Validate behaviour |
+| Pattern Element       | Implementation                                | Purpose                    |
+| --------------------- | --------------------------------------------- | -------------------------- |
+| Import test framework | `import {test, expect, mock} from 'bun:test'` | Access test runner         |
+| Register mocks        | `mock.module('../dep', () => stub)`           | Prevent real I/O           |
+| Define stubs          | Object literal with dependency replacements   | Control external behaviour |
+| Load module           | `await import('../../module')`                | Inject dependencies        |
+| Assert results        | `expect(actual).toBe(expected)`               | Validate behaviour         |
 
 ##### 6.6.9.2 E2E test pattern example
 
-| Pattern Element | Implementation | Purpose |
-| ----------------- | ---------------- | --------- |
-| Import Playwright | `const { _electron } = require('playwright')` | Electron automation |
-| Resolve binary | Platform-specific path resolution | Cross-platform support |
-| Launch application | `_electron.launch({ executablePath })` | Start packaged app |
-| Wait for window | `electronApp.firstWindow()` | Application ready |
-| Stabilization | `setTimeout()` delay | Ensure full initialization |
-| Assertions | Verify application state | Validate behaviour |
-| Cleanup | `electronApp.close()` | Release resources |
+| Pattern Element    | Implementation                                | Purpose                    |
+| ------------------ | --------------------------------------------- | -------------------------- |
+| Import Playwright  | `const { _electron } = require('playwright')` | Electron automation        |
+| Resolve binary     | Platform-specific path resolution             | Cross-platform support     |
+| Launch application | `_electron.launch({ executablePath })`        | Start packaged app         |
+| Wait for window    | `electronApp.firstWindow()`                   | Application ready          |
+| Stabilization      | `setTimeout()` delay                          | Ensure full initialization |
+| Assertions         | Verify application state                      | Validate behaviour         |
+| Cleanup            | `electronApp.close()`                         | Release resources          |
 
 ##### 6.6.9.3 Testing recommendations
 
 ##### Recommended test coverage expansion
 
-| Area | Priority | Recommendation |
-| ------ | ---------- | ---------------- |
-| Redux reducers | High | Add unit tests for state transformations |
-| IPC handlers | High | Mock IPC, test event handling |
-| Plugin decoration | Medium | Test decoration composition |
-| React components | Medium | Add component tests with testing-library |
-| Configuration validation | Medium | Test schema validation |
-| Error recovery | Low | Test fallback mechanisms |
+| Area                     | Priority | Recommendation                           |
+| ------------------------ | -------- | ---------------------------------------- |
+| Redux reducers           | High     | Add unit tests for state transformations |
+| IPC handlers             | High     | Mock IPC, test event handling            |
+| Plugin decoration        | Medium   | Test decoration composition              |
+| React components         | Medium   | Add component tests with testing-library |
+| Configuration validation | Medium   | Test schema validation                   |
+| Error recovery           | Low      | Test fallback mechanisms                 |
 
 ##### Recommended tooling additions
 
-| Tool | Purpose | Priority |
-| ------ | --------- | ---------- |
-| Istanbul/NYC | Code coverage measurement | Medium |
-| @testing-library/react | Component testing | Medium |
-| Page Object Model | E2E test organization | Low |
-| Visual regression | Screenshot comparison | Low |
+| Tool                   | Purpose                   | Priority |
+| ---------------------- | ------------------------- | -------- |
+| Istanbul/NYC           | Code coverage measurement | Medium   |
+| @testing-library/react | Component testing         | Medium   |
+| Page Object Model      | E2E test organization     | Low      |
+| Visual regression      | Screenshot comparison     | Low      |
 
----
+______________________________________________________________________
 
 #### 6.6.10 Test strategy matrix
 
 ##### 6.6.10.1 Component test coverage matrix
 
-| Component | Unit Tests | Integration | E2E | Security |
-| ----------- | ------------ | ------------- | ----- | ---------- |
-| CLI API | ✅ Covered | N/A | N/A | CodeQL |
-| Window Utils | ✅ Covered | N/A | Implicit | CodeQL |
-| Colour Utils | ✅ Covered | N/A | N/A | CodeQL |
-| Session Manager | ❌ Not covered | E2E only | ✅ Smoke | CodeQL |
-| Redux Store | ❌ Not covered | E2E only | ✅ Smoke | CodeQL |
-| Terminal Component | ❌ Not covered | E2E only | ✅ Smoke | CodeQL |
-| Plugin System | ❌ Not covered | ❌ Not covered | ❌ Not covered | CodeQL |
-| IPC Bridge | ❌ Not covered | E2E only | ✅ Smoke | CodeQL |
-| Configuration | Partial | E2E only | ✅ Smoke | CodeQL |
+| Component          | Unit Tests     | Integration    | E2E            | Security |
+| ------------------ | -------------- | -------------- | -------------- | -------- |
+| CLI API            | ✅ Covered     | N/A            | N/A            | CodeQL   |
+| Window Utils       | ✅ Covered     | N/A            | Implicit       | CodeQL   |
+| Colour Utils       | ✅ Covered     | N/A            | N/A            | CodeQL   |
+| Session Manager    | ❌ Not covered | E2E only       | ✅ Smoke       | CodeQL   |
+| Redux Store        | ❌ Not covered | E2E only       | ✅ Smoke       | CodeQL   |
+| Terminal Component | ❌ Not covered | E2E only       | ✅ Smoke       | CodeQL   |
+| Plugin System      | ❌ Not covered | ❌ Not covered | ❌ Not covered | CodeQL   |
+| IPC Bridge         | ❌ Not covered | E2E only       | ✅ Smoke       | CodeQL   |
+| Configuration      | Partial        | E2E only       | ✅ Smoke       | CodeQL   |
 
 ##### 6.6.10.2 Test type strategy matrix
 
-| Test Type | Coverage Goal | Current Status | Gap |
-| ----------- | --------------- | ---------------- | ----- |
-| Unit | Core utilities, business logic | Limited (3 files) | Major components untested |
-| Integration | Component interactions | None explicit | Covered by E2E |
-| E2E | Application launch, smoke | Single test | Functional scenarios |
-| Performance | SLA validation | Manual only | No automation |
-| Security | Vulnerability detection | CodeQL + Dependabot | Plugin trust model |
-| Accessibility | Screen reader support | None | Not implemented |
+| Test Type     | Coverage Goal                  | Current Status      | Gap                       |
+| ------------- | ------------------------------ | ------------------- | ------------------------- |
+| Unit          | Core utilities, business logic | Limited (3 files)   | Major components untested |
+| Integration   | Component interactions         | None explicit       | Covered by E2E            |
+| E2E           | Application launch, smoke      | Single test         | Functional scenarios      |
+| Performance   | SLA validation                 | Manual only         | No automation             |
+| Security      | Vulnerability detection        | CodeQL + Dependabot | Plugin trust model        |
+| Accessibility | Screen reader support          | None                | Not implemented           |
 
----
+______________________________________________________________________
 
 #### 6.6.11 References
 
@@ -9615,32 +9619,32 @@ React/Redux-based plugin decoration.
 
 The user interface follows several core principles:
 
-| Principle | Implementation |
-| ----------- | ---------------- |
-| **Cross-Platform Consistency** | Single codebase renders consistently on macOS, Windows, and Linux via Chromium |
+| Principle                        | Implementation                                                                     |
+| -------------------------------- | ---------------------------------------------------------------------------------- |
+| **Cross-Platform Consistency**   | Single codebase renders consistently on macOS, Windows, and Linux via Chromium     |
 | **Composition Over Replacement** | Plugin decoration pattern preserves base UI behaviour while enabling customization |
-| **Performance-First Rendering** | WebGL-accelerated terminal rendering with intelligent fallback strategies |
-| **Keyboard-Centric Workflow** | Comprehensive keyboard shortcut system with platform-appropriate modifiers |
-| **Themeable Aesthetics** | Deep CSS customization with colour palette, typography, and cursor styling |
+| **Performance-First Rendering**  | WebGL-accelerated terminal rendering with intelligent fallback strategies          |
+| **Keyboard-Centric Workflow**    | Comprehensive keyboard shortcut system with platform-appropriate modifiers         |
+| **Themeable Aesthetics**         | Deep CSS customization with colour palette, typography, and cursor styling         |
 
 #### 7.1.2 UI technology stack
 
 The renderer process UI layer utilizes a modern JavaScript component
 architecture:
 
-| Technology | Version | Purpose | Justification |
-| ------------ | --------- | --------- | --------------- |
-| **Electron** | 40.2.1 | Application shell (Chromium 144.0.7559.111) | Cross-platform desktop integration |
-| **React** | 19.2.4 | Component-based UI framework | Enables plugin decoration pattern |
-| **Redux** | 5.0.1 | Centralized state management | Predictable state for complex multi-session UI |
-| **styled-jsx** | 5.1.2 | Scoped CSS-in-JS styling | Component-local styles without global conflicts |
-| **xterm.js** | 5.3.0 | Terminal emulation engine | Industry-standard terminal rendering |
-| **xterm-addon-webgl** | 0.16.0 | GPU-accelerated rendering | High-performance terminal output |
-| **xterm-addon-canvas** | 0.5.0 | Fallback renderer | Compatibility when WebGL unavailable |
-| **Mousetrap** | Fork | Keyboard shortcut handling | Platform-aware key binding |
-| **reselect** | 4.1.8 | Memoized Redux selectors | Performance optimization for derived state |
+| Technology             | Version | Purpose                                     | Justification                                   |
+| ---------------------- | ------- | ------------------------------------------- | ----------------------------------------------- |
+| **Electron**           | 40.2.1  | Application shell (Chromium 144.0.7559.111) | Cross-platform desktop integration              |
+| **React**              | 19.2.4  | Component-based UI framework                | Enables plugin decoration pattern               |
+| **Redux**              | 5.0.1   | Centralized state management                | Predictable state for complex multi-session UI  |
+| **styled-jsx**         | 5.1.2   | Scoped CSS-in-JS styling                    | Component-local styles without global conflicts |
+| **xterm.js**           | 5.3.0   | Terminal emulation engine                   | Industry-standard terminal rendering            |
+| **xterm-addon-webgl**  | 0.16.0  | GPU-accelerated rendering                   | High-performance terminal output                |
+| **xterm-addon-canvas** | 0.5.0   | Fallback renderer                           | Compatibility when WebGL unavailable            |
+| **Mousetrap**          | Fork    | Keyboard shortcut handling                  | Platform-aware key binding                      |
+| **reselect**           | 4.1.8   | Memoized Redux selectors                    | Performance optimization for derived state      |
 
----
+______________________________________________________________________
 
 ### 7.2 UI architecture
 
@@ -9750,13 +9754,13 @@ React application:
 
 **File**: `app/index.html`
 
-| Element | Purpose |
-| --------- | --------- |
+| Element                                       | Purpose                                 |
+| --------------------------------------------- | --------------------------------------- |
 | `<meta http-equiv="Content-Security-Policy">` | Security policy allowing inline scripts |
-| `<div id="mount">` | React application mount point |
-| `<script src="renderer/bundle.js">` | Compiled React/Redux application bundle |
+| `<div id="mount">`                            | React application mount point           |
+| `<script src="renderer/bundle.js">`           | Compiled React/Redux application bundle |
 
----
+______________________________________________________________________
 
 ### 7.3 Screen definitions
 
@@ -9769,12 +9773,12 @@ managing global keyboard shortcuts and state subscriptions.
 
 ##### Layout specifications
 
-| Property | Value | Platform Notes |
-| ---------- | ------- | ---------------- |
-| Position | Fixed, full viewport | All platforms |
-| Border Radius | 10.5px | macOS only |
-| Border Width | 1px (0px when maximized) | Non-Mac platforms |
-| z-index Layering | Header (100), Content (default), Notifications (fixed) | All platforms |
+| Property         | Value                                                  | Platform Notes    |
+| ---------------- | ------------------------------------------------------ | ----------------- |
+| Position         | Fixed, full viewport                                   | All platforms     |
+| Border Radius    | 10.5px                                                 | macOS only        |
+| Border Width     | 1px (0px when maximized)                               | Non-Mac platforms |
+| z-index Layering | Header (100), Content (default), Notifications (fixed) | All platforms     |
 
 ##### Architectural responsibilities
 
@@ -9809,20 +9813,20 @@ controls.
 
 ##### Layout specifications (7.3.2 Header and tab bar)
 
-| Property | Value |
-| ---------- | ------- |
-| Position | Fixed, top: 1px, left: 1px, right: 1px |
-| Height | 34px |
-| z-index | 100 |
-| Draggable Region | `-webkit-app-region: drag` |
+| Property         | Value                                  |
+| ---------------- | -------------------------------------- |
+| Position         | Fixed, top: 1px, left: 1px, right: 1px |
+| Height           | 34px                                   |
+| z-index          | 100                                    |
+| Draggable Region | `-webkit-app-region: drag`             |
 
 ##### Platform-specific variants
 
-| Platform | Window Controls | Hamburger Menu | Tab Layout |
-| ---------- | ----------------- | ---------------- | ------------ |
-| **macOS** | Hidden (native traffic lights) | Hidden | Left-padded 76px |
-| **Windows** | Right side (min/max/close) | Left side | Full width |
-| **Linux** | Configurable (left/right) | Configurable | Full width |
+| Platform    | Window Controls                | Hamburger Menu | Tab Layout       |
+| ----------- | ------------------------------ | -------------- | ---------------- |
+| **macOS**   | Hidden (native traffic lights) | Hidden         | Left-padded 76px |
+| **Windows** | Right side (min/max/close)     | Left side      | Full width       |
+| **Linux**   | Configurable (left/right)      | Configurable   | Full width       |
 
 ##### Configuration options
 
@@ -9840,20 +9844,20 @@ sessions.
 
 ##### Behavioural modes
 
-| Condition | macOS Behaviour | Windows/Linux Behaviour |
-| ----------- | ---------------- | ------------------------ |
-| Single Tab | Show title only (no tab UI) | Hidden entirely |
+| Condition     | macOS Behaviour                 | Windows/Linux Behaviour         |
+| ------------- | ------------------------------- | ------------------------------- |
+| Single Tab    | Show title only (no tab UI)     | Hidden entirely                 |
 | Multiple Tabs | Full tab bar with close buttons | Full tab bar with close buttons |
-| Overflow | Scrollable tab list | Scrollable tab list |
+| Overflow      | Scrollable tab list             | Scrollable tab list             |
 
 ##### Tab properties
 
-| Property | Type | Purpose |
-| ---------- | ------ | --------- |
-| `uid` | string | Unique session identifier |
-| `title` | string | Tab display text (shell title) |
-| `isActive` | boolean | Currently selected state |
-| `hasActivity` | boolean | Background tab has new output |
+| Property      | Type    | Purpose                        |
+| ------------- | ------- | ------------------------------ |
+| `uid`         | string  | Unique session identifier      |
+| `title`       | string  | Tab display text (shell title) |
+| `isActive`    | boolean | Currently selected state       |
+| `hasActivity` | boolean | Background tab has new output  |
 
 #### 7.3.4 Individual tab
 
@@ -9863,19 +9867,19 @@ Renders a single tab with interactive behaviours for selection and closing.
 
 ##### User interactions
 
-| Interaction | Behaviour |
-| ------------- | ---------- |
-| Left-click | Select tab (if not already active) |
-| Middle-click | Close tab |
-| Hover on close button | Reveal close icon |
-| Click close button | Trigger `onClose` callback |
+| Interaction           | Behaviour                          |
+| --------------------- | ---------------------------------- |
+| Left-click            | Select tab (if not already active) |
+| Middle-click          | Close tab                          |
+| Hover on close button | Reveal close icon                  |
+| Click close button    | Trigger `onClose` callback         |
 
 ##### Visual states
 
-| State | Styling |
-| ------- | --------- |
-| Active | Selected background, border emphasis |
-| Inactive | Default background |
+| State    | Styling                                                |
+| -------- | ------------------------------------------------------ |
+| Active   | Selected background, border emphasis                   |
+| Inactive | Default background                                     |
 | Activity | Visual indicator (dot/highlight) for background output |
 
 #### 7.3.5 Terminal view
@@ -9887,22 +9891,22 @@ selection.
 
 ### xterm.js configuration options
 
-| Option | Type | Description |
-| -------- | ------ | ------------- |
-| `macOptionIsMeta` | boolean | Alt key as Meta (macOS) |
-| `scrollback` | number | Lines retained in buffer |
-| `cursorStyle` | 'bar' or 'underline' or 'block' | Cursor shape |
-| `cursorBlink` | boolean | Cursor animation |
-| `fontFamily` | string | Terminal font stack |
-| `fontSize` | number | Font size in pixels |
-| `fontWeight` | FontWeight | Normal text weight |
-| `fontWeightBold` | FontWeight | Bold text weight |
-| `lineHeight` | number | Relative line spacing |
-| `letterSpacing` | number | Character spacing |
-| `allowTransparency` | boolean | Background alpha support |
-| `windowsMode` | boolean | Windows ConPTY mode |
-| `screenReaderMode` | boolean | Accessibility mode |
-| `overviewRulerWidth` | number | Scrollbar indicator width (20px) |
+| Option               | Type                            | Description                      |
+| -------------------- | ------------------------------- | -------------------------------- |
+| `macOptionIsMeta`    | boolean                         | Alt key as Meta (macOS)          |
+| `scrollback`         | number                          | Lines retained in buffer         |
+| `cursorStyle`        | 'bar' or 'underline' or 'block' | Cursor shape                     |
+| `cursorBlink`        | boolean                         | Cursor animation                 |
+| `fontFamily`         | string                          | Terminal font stack              |
+| `fontSize`           | number                          | Font size in pixels              |
+| `fontWeight`         | FontWeight                      | Normal text weight               |
+| `fontWeightBold`     | FontWeight                      | Bold text weight                 |
+| `lineHeight`         | number                          | Relative line spacing            |
+| `letterSpacing`      | number                          | Character spacing                |
+| `allowTransparency`  | boolean                         | Background alpha support         |
+| `windowsMode`        | boolean                         | Windows ConPTY mode              |
+| `screenReaderMode`   | boolean                         | Accessibility mode               |
+| `overviewRulerWidth` | number                          | Scrollbar indicator width (20px) |
 
 #### Addon loading sequence
 
@@ -9963,14 +9967,14 @@ Provides in-terminal text search with pattern matching options.
 
 ##### Features
 
-| Feature | Icon Source | Description |
-| --------- | ------------- | ------------- |
-| Case Sensitivity | VSCode icon set | Toggle exact case matching |
-| Whole Word | VSCode icon set | Match complete words only |
-| Regex | VSCode icon set | Regular expression patterns |
-| Result Count | Custom | Display matched count |
-| Navigation | Previous/Next | Cycle through results |
-| Close | X button | Dismiss search overlay |
+| Feature          | Icon Source     | Description                 |
+| ---------------- | --------------- | --------------------------- |
+| Case Sensitivity | VSCode icon set | Toggle exact case matching  |
+| Whole Word       | VSCode icon set | Match complete words only   |
+| Regex            | VSCode icon set | Regular expression patterns |
+| Result Count     | Custom          | Display matched count       |
+| Navigation       | Previous/Next   | Cycle through results       |
+| Close            | X button        | Dismiss search overlay      |
 
 ##### Search options schema
 
@@ -9991,19 +9995,19 @@ Enables horizontal and vertical terminal splitting with resizable dividers.
 
 ##### Split specifications
 
-| Property | Value | Description |
-| ---------- | ------- | ------------- |
-| Minimum Size | 5% (`MIN_SIZE = 0.05`) | Prevents invisible panes |
-| Default Split | 50/50 | Equal distribution |
-| Divider Width | Draggable region | Resize interaction zone |
+| Property      | Value                  | Description              |
+| ------------- | ---------------------- | ------------------------ |
+| Minimum Size  | 5% (`MIN_SIZE = 0.05`) | Prevents invisible panes |
+| Default Split | 50/50                  | Equal distribution       |
+| Divider Width | Draggable region       | Resize interaction zone  |
 
 ##### User interactions (7.3.7 Split pane system)
 
-| Interaction | Behaviour |
-| ------------- | ---------- |
-| Drag divider | Resize adjacent panes proportionally |
-| Double-click divider | Auto-resize to default ratio |
-| Full-viewport shim | Prevents event loss during drag |
+| Interaction          | Behaviour                            |
+| -------------------- | ------------------------------------ |
+| Drag divider         | Resize adjacent panes proportionally |
+| Double-click divider | Auto-resize to default ratio         |
+| Full-viewport shim   | Prevents event loss during drag      |
 
 #### 7.3.8 Notifications
 
@@ -10013,22 +10017,22 @@ Displays toast-style notifications for system events and user feedback.
 
 ##### Notification types
 
-| Type | Trigger | Actions Available |
-| ------ | --------- | ------------------- |
-| Font Size Change | Zoom in/out command | Dismiss |
-| Terminal Resize | Window resize | Dismiss |
-| Update Available | Auto-update check | Restart / Download |
-| Plugin Message | Plugin notification API | Custom actions |
+| Type             | Trigger                 | Actions Available  |
+| ---------------- | ----------------------- | ------------------ |
+| Font Size Change | Zoom in/out command     | Dismiss            |
+| Terminal Resize  | Window resize           | Dismiss            |
+| Update Available | Auto-update check       | Restart / Download |
+| Plugin Message   | Plugin notification API | Custom actions     |
 
 ##### Position and styling
 
-| Property | Value |
-| ---------- | ------- |
-| Position | Fixed, bottom-right corner |
-| Stacking | Vertical stack, newest on top |
+| Property  | Value                         |
+| --------- | ----------------------------- |
+| Position  | Fixed, bottom-right corner    |
+| Stacking  | Vertical stack, newest on top |
 | Animation | Slide-in/fade-out transitions |
 
----
+______________________________________________________________________
 
 ### 7.4 State management
 
@@ -10068,36 +10072,36 @@ flowchart TB
 
 **File**: `lib/reducers/ui.ts`
 
-| Property | Type | Purpose |
-| ---------- | ------ | --------- |
-| `css` | string | Custom CSS stylesheet |
-| `termCSS` | string | Terminal-specific CSS |
-| `fontFamily` | string | Terminal font stack |
-| `fontSize` | number | Base font size |
-| `fontSizeOverride` | number or null | Temporary zoom override |
-| `foregroundColor` | string | Text colour |
-| `backgroundColor` | string | Background colour |
-| `borderColor` | string | Window border colour |
-| `cursorColor` | string | Cursor colour |
-| `cursorShape` | 'BEAM' or 'UNDERLINE' or 'BLOCK' | Cursor style |
-| `cursorBlink` | boolean | Cursor animation |
-| `colors` | ColorMap | 16-colour ANSI palette |
-| `maximized` | boolean | Window maximized state |
-| `fullScreen` | boolean | Fullscreen mode |
-| `notifications` | object | Notification visibility flags |
-| `activityMarkers` | Record<string, boolean> | Background activity tracking |
-| `profiles` | Profile[] | Shell profile definitions |
-| `webGLRenderer` | boolean | WebGL renderer preference |
-| `imageSupport` | boolean | Terminal image protocol |
+| Property           | Type                             | Purpose                       |
+| ------------------ | -------------------------------- | ----------------------------- |
+| `css`              | string                           | Custom CSS stylesheet         |
+| `termCSS`          | string                           | Terminal-specific CSS         |
+| `fontFamily`       | string                           | Terminal font stack           |
+| `fontSize`         | number                           | Base font size                |
+| `fontSizeOverride` | number or null                   | Temporary zoom override       |
+| `foregroundColor`  | string                           | Text colour                   |
+| `backgroundColor`  | string                           | Background colour             |
+| `borderColor`      | string                           | Window border colour          |
+| `cursorColor`      | string                           | Cursor colour                 |
+| `cursorShape`      | 'BEAM' or 'UNDERLINE' or 'BLOCK' | Cursor style                  |
+| `cursorBlink`      | boolean                          | Cursor animation              |
+| `colors`           | ColorMap                         | 16-colour ANSI palette        |
+| `maximized`        | boolean                          | Window maximized state        |
+| `fullScreen`       | boolean                          | Fullscreen mode               |
+| `notifications`    | object                           | Notification visibility flags |
+| `activityMarkers`  | Record<string, boolean>          | Background activity tracking  |
+| `profiles`         | Profile[]                        | Shell profile definitions     |
+| `webGLRenderer`    | boolean                          | WebGL renderer preference     |
+| `imageSupport`     | boolean                          | Terminal image protocol       |
 
 #### 7.4.3 Sessions state slice
 
 **File**: `lib/reducers/sessions.ts`
 
-| Property | Type | Purpose |
-| ---------- | ------ | --------- |
-| `sessions` | Record<string, Session> | Session objects by UID |
-| `activeUid` | string or null | Currently focused session |
+| Property    | Type                    | Purpose                   |
+| ----------- | ----------------------- | ------------------------- |
+| `sessions`  | Record<string, Session> | Session objects by UID    |
+| `activeUid` | string or null          | Currently focused session |
 
 ##### Session object schema
 
@@ -10119,11 +10123,11 @@ Session {
 
 **File**: `lib/reducers/term-groups.ts`
 
-| Property | Type | Purpose |
-| ---------- | ------ | --------- |
-| `termGroups` | Record<string, TermGroup> | Term group objects by UID |
-| `activeSessions` | Record<string, string> | Root group → Active session mapping |
-| `activeRootGroup` | string or null | Currently active tab root |
+| Property          | Type                      | Purpose                             |
+| ----------------- | ------------------------- | ----------------------------------- |
+| `termGroups`      | Record<string, TermGroup> | Term group objects by UID           |
+| `activeSessions`  | Record<string, string>    | Root group → Active session mapping |
+| `activeRootGroup` | string or null            | Currently active tab root           |
 
 ##### Term group object schema
 
@@ -10159,8 +10163,8 @@ flowchart LR
 #### 7.4.6 Write middleware performance bypass
 
 The `writeMiddleware` (`lib/store/write-middleware.ts`) implements a critical
-performance optimization by bypassing Redux state management for terminal output
-data:
+performance optimization by bypassing Redux state management for terminal
+output data:
 
 ```mermaid
 flowchart TB
@@ -10186,7 +10190,7 @@ This bypass eliminates Redux serialization overhead for high-volume terminal
 output, achieving sub-50ms keystroke-to-echo latency even during rapid output
 scenarios (e.g., `find ~`, `cat largefile.log`).
 
----
+______________________________________________________________________
 
 ### 7.5 UI/backend interaction boundaries
 
@@ -10194,15 +10198,15 @@ scenarios (e.g., `find ~`, `cat largefile.log`).
 
 Communication between renderer and main processes follows typed event patterns:
 
-| Category | Events | Direction | Purpose |
-| ---------- | -------- | ----------- | --------- |
-| **Session Lifecycle** | `session add`, `session data`, `session exit` | Main → Renderer | PTY session management |
-| **Terminal Navigation** | `move left req`, `move right req`, `move jump req` | Main → Renderer | Tab/pane focus commands |
-| **Split Management** | `split request horizontal`, `split request vertical` | Main → Renderer | Pane splitting |
-| **Window State** | `enter full screen`, `leave full screen`, `windowGeometry change` | Main → Renderer | Window chrome state |
-| **Configuration** | `config change`, `plugins change` | Main → Renderer | Hot-reload notifications |
-| **Updates** | `update available` | Main → Renderer | Auto-update prompts |
-| **User Input** | `data`, `resize`, `exit`, `new` | Renderer → Main | User actions |
+| Category                | Events                                                            | Direction       | Purpose                  |
+| ----------------------- | ----------------------------------------------------------------- | --------------- | ------------------------ |
+| **Session Lifecycle**   | `session add`, `session data`, `session exit`                     | Main → Renderer | PTY session management   |
+| **Terminal Navigation** | `move left req`, `move right req`, `move jump req`                | Main → Renderer | Tab/pane focus commands  |
+| **Split Management**    | `split request horizontal`, `split request vertical`              | Main → Renderer | Pane splitting           |
+| **Window State**        | `enter full screen`, `leave full screen`, `windowGeometry change` | Main → Renderer | Window chrome state      |
+| **Configuration**       | `config change`, `plugins change`                                 | Main → Renderer | Hot-reload notifications |
+| **Updates**             | `update available`                                                | Main → Renderer | Auto-update prompts      |
+| **User Input**          | `data`, `resize`, `exit`, `new`                                   | Renderer → Main | User actions             |
 
 #### 7.5.2 RPC bridge architecture
 
@@ -10264,7 +10268,7 @@ sequenceDiagram
     Session->>PTY: pty.write(data)
 ```
 
----
+______________________________________________________________________
 
 ### 7.6 Visual design system
 
@@ -10274,14 +10278,14 @@ Velocetty supports comprehensive visual customization through configuration:
 
 ##### Colour configuration
 
-| Property | Purpose | Default |
-| ---------- | --------- | --------- |
-| `backgroundColor` | Terminal background | Platform-dependent |
-| `foregroundColor` | Primary text colour | Platform-dependent |
-| `borderColor` | Window border | Matches background |
-| `cursorColor` | Cursor fill | Accent colour |
-| `cursorAccentColor` | Cursor text colour | Background colour |
-| `selectionColor` | Selection highlight | Semi-transparent accent |
+| Property            | Purpose             | Default                 |
+| ------------------- | ------------------- | ----------------------- |
+| `backgroundColor`   | Terminal background | Platform-dependent      |
+| `foregroundColor`   | Primary text colour | Platform-dependent      |
+| `borderColor`       | Window border       | Matches background      |
+| `cursorColor`       | Cursor fill         | Accent colour           |
+| `cursorAccentColor` | Cursor text colour  | Background colour       |
+| `selectionColor`    | Selection highlight | Semi-transparent accent |
 
 ##### Ansi colour palette (16 colours)
 
@@ -10295,32 +10299,32 @@ colors: {
 
 #### 7.6.2 Typography system
 
-| Property | Type | Description |
-| ---------- | ------ | ------------- |
-| `fontFamily` | string | Font stack (e.g., "Menlo, Monaco, monospace") |
-| `fontSize` | number | Base size in pixels |
-| `fontWeight` | FontWeight | Normal text weight ('normal', '400', etc.) |
-| `fontWeightBold` | FontWeight | Bold text weight |
-| `lineHeight` | number | Relative line spacing |
-| `letterSpacing` | number | Character spacing adjustment |
-| `padding` | string | Terminal content padding (CSS format) |
+| Property         | Type       | Description                                   |
+| ---------------- | ---------- | --------------------------------------------- |
+| `fontFamily`     | string     | Font stack (e.g., "Menlo, Monaco, monospace") |
+| `fontSize`       | number     | Base size in pixels                           |
+| `fontWeight`     | FontWeight | Normal text weight ('normal', '400', etc.)    |
+| `fontWeightBold` | FontWeight | Bold text weight                              |
+| `lineHeight`     | number     | Relative line spacing                         |
+| `letterSpacing`  | number     | Character spacing adjustment                  |
+| `padding`        | string     | Terminal content padding (CSS format)         |
 
 #### 7.6.3 Cursor styles
 
-| Style | Visual | Configuration Value |
-| ------- | -------- | --------------------- |
-| Bar | `│` | `cursorShape: 'BEAM'` |
-| Underline | `_` | `cursorShape: 'UNDERLINE'` |
-| Block | `█` | `cursorShape: 'BLOCK'` |
-| Blink | Animated | `cursorBlink: true` |
+| Style     | Visual   | Configuration Value        |
+| --------- | -------- | -------------------------- |
+| Bar       | `│`      | `cursorShape: 'BEAM'`      |
+| Underline | `_`      | `cursorShape: 'UNDERLINE'` |
+| Block     | `█`      | `cursorShape: 'BLOCK'`     |
+| Blink     | Animated | `cursorBlink: true`        |
 
 #### 7.6.4 Platform-specific styling
 
-| Platform | Window Corners | Border | Transparency | Zoom Factor |
-| ---------- | ---------------- | -------- | -------------- | ------------- |
-| **macOS** | Rounded (10.5px) | 1px | Supported (alpha colours) | 1.0 |
-| **Windows** | Square | 1px (0 when maximized) | Not supported | 1.0 |
-| **Linux** | Square | 1px (0 when maximized) | Not supported | 1.2 |
+| Platform    | Window Corners   | Border                 | Transparency              | Zoom Factor |
+| ----------- | ---------------- | ---------------------- | ------------------------- | ----------- |
+| **macOS**   | Rounded (10.5px) | 1px                    | Supported (alpha colours) | 1.0         |
+| **Windows** | Square           | 1px (0 when maximized) | Not supported             | 1.0         |
+| **Linux**   | Square           | 1px (0 when maximized) | Not supported             | 1.2         |
 
 #### 7.6.5 Css architecture
 
@@ -10343,7 +10347,7 @@ colors: {
 
 - Scoped to `#hyper` container for isolation
 
----
+______________________________________________________________________
 
 ### 7.7 User interactions
 
@@ -10351,45 +10355,45 @@ colors: {
 
 Platform-specific keymap files define keyboard shortcuts:
 
-| File | Platform |
-| ------ | ---------- |
-| `app/keymaps/darwin.json` | macOS |
-| `app/keymaps/linux.json` | Linux |
-| `app/keymaps/win32.json` | Windows |
+| File                      | Platform |
+| ------------------------- | -------- |
+| `app/keymaps/darwin.json` | macOS    |
+| `app/keymaps/linux.json`  | Linux    |
+| `app/keymaps/win32.json`  | Windows  |
 
 ##### Key command categories
 
-| Category | Example Commands |
-| ---------- | ------------------ |
-| **Window/Tab** | New window, new tab, close tab, tab navigation |
+| Category            | Example Commands                                      |
+| ------------------- | ----------------------------------------------------- |
+| **Window/Tab**      | New window, new tab, close tab, tab navigation        |
 | **Pane Management** | Split horizontal/vertical, close pane, navigate panes |
-| **Editor** | Copy, paste, select all, find/search |
-| **View** | Zoom in/out, reset zoom, fullscreen, reload |
+| **Editor**          | Copy, paste, select all, find/search                  |
+| **View**            | Zoom in/out, reset zoom, fullscreen, reload           |
 
 #### 7.7.2 Mouse interactions
 
-| Component | Interaction | Behaviour |
-| ----------- | ------------- | ---------- |
-| **Header** | Double-click | Toggle maximize |
-| **Header** | Drag | Move window |
-| **Tab** | Left-click | Select tab |
-| **Tab** | Middle-click | Close tab |
-| **Tab Close Icon** | Click | Close tab |
-| **SplitPane Divider** | Drag | Resize panes |
-| **SplitPane Divider** | Double-click | Auto-resize to default |
-| **Terminal** | Right-click | Context menu (or quickEdit paste) |
-| **Terminal Link** | Cmd/Ctrl+click | Open URL in browser |
+| Component             | Interaction    | Behaviour                         |
+| --------------------- | -------------- | --------------------------------- |
+| **Header**            | Double-click   | Toggle maximize                   |
+| **Header**            | Drag           | Move window                       |
+| **Tab**               | Left-click     | Select tab                        |
+| **Tab**               | Middle-click   | Close tab                         |
+| **Tab Close Icon**    | Click          | Close tab                         |
+| **SplitPane Divider** | Drag           | Resize panes                      |
+| **SplitPane Divider** | Double-click   | Auto-resize to default            |
+| **Terminal**          | Right-click    | Context menu (or quickEdit paste) |
+| **Terminal Link**     | Cmd/Ctrl+click | Open URL in browser               |
 
 #### 7.7.3 Context menu
 
 **File**: `app/ui/contextmenu.ts`
 
-| Submenu | Items |
-| --------- | ------- |
-| **Edit** | Copy (conditional), Paste, Select All, Clear |
+| Submenu   | Items                                                     |
+| --------- | --------------------------------------------------------- |
+| **Edit**  | Copy (conditional), Paste, Select All, Clear              |
 | **Shell** | New Tab (with profiles), Split Horizontal, Split Vertical |
 
----
+______________________________________________________________________
 
 ### 7.8 Plugin extension points
 
@@ -10397,48 +10401,48 @@ Platform-specific keymap files define keyboard shortcuts:
 
 Plugins can wrap and extend React components through decoration hooks:
 
-| Hook | Target Component | Purpose |
-| ------ | ------------------ | --------- |
-| `decorateHyper` | HyperContainer | Main window wrapper |
-| `decorateHeader` | Header | Window header/titlebar |
-| `decorateTabs` | Tabs | Tab bar container |
-| `decorateTab` | Tab | Individual tab |
-| `decorateTerms` | Terms | Terminal area container |
-| `decorateTermGroup` | TermGroup | Split pane group |
-| `decorateTerm` | Term | xterm.js host |
-| `decorateSplitPane` | SplitPane | Resizable divider |
-| `decorateNotification` | Notification | Toast notification |
-| `decorateNotifications` | Notifications | Notification container |
-| `decorateSearchBox` | SearchBox | Search overlay |
+| Hook                    | Target Component | Purpose                 |
+| ----------------------- | ---------------- | ----------------------- |
+| `decorateHyper`         | HyperContainer   | Main window wrapper     |
+| `decorateHeader`        | Header           | Window header/titlebar  |
+| `decorateTabs`          | Tabs             | Tab bar container       |
+| `decorateTab`           | Tab              | Individual tab          |
+| `decorateTerms`         | Terms            | Terminal area container |
+| `decorateTermGroup`     | TermGroup        | Split pane group        |
+| `decorateTerm`          | Term             | xterm.js host           |
+| `decorateSplitPane`     | SplitPane        | Resizable divider       |
+| `decorateNotification`  | Notification     | Toast notification      |
+| `decorateNotifications` | Notifications    | Notification container  |
+| `decorateSearchBox`     | SearchBox        | Search overlay          |
 
 #### 7.8.2 Props injection hooks
 
-| Hook | Purpose |
-| ------ | --------- |
-| `getTermProps` | Inject props to Term component |
-| `getTabProps` | Inject props to Tab component |
-| `getTabsProps` | Inject props to Tabs component |
+| Hook                | Purpose                             |
+| ------------------- | ----------------------------------- |
+| `getTermProps`      | Inject props to Term component      |
+| `getTabProps`       | Inject props to Tab component       |
+| `getTabsProps`      | Inject props to Tabs component      |
 | `getTermGroupProps` | Inject props to TermGroup component |
 
 #### 7.8.3 State mapping hooks
 
-| Hook | Purpose |
-| ------ | --------- |
-| `mapHyperTermState` | Transform Hyper state for components |
-| `mapTermsState` | Transform state for Terms |
-| `mapHeaderState` | Transform state for Header |
-| `mapNotificationsState` | Transform state for Notifications |
+| Hook                    | Purpose                              |
+| ----------------------- | ------------------------------------ |
+| `mapHyperTermState`     | Transform Hyper state for components |
+| `mapTermsState`         | Transform state for Terms            |
+| `mapHeaderState`        | Transform state for Header           |
+| `mapNotificationsState` | Transform state for Notifications    |
 
 #### 7.8.4 Redux integration hooks
 
-| Hook | Purpose |
-| ------ | --------- |
-| `middleware` | Add custom Redux middleware |
-| `reduceUI` | Extend UI state reducer |
-| `reduceSessions` | Extend sessions state reducer |
+| Hook               | Purpose                          |
+| ------------------ | -------------------------------- |
+| `middleware`       | Add custom Redux middleware      |
+| `reduceUI`         | Extend UI state reducer          |
+| `reduceSessions`   | Extend sessions state reducer    |
 | `reduceTermGroups` | Extend term groups state reducer |
 
----
+______________________________________________________________________
 
 ### 7.9 Rendering constraints
 
@@ -10447,12 +10451,12 @@ Plugins can wrap and extend React components through decoration hooks:
 The xterm.js WebGL renderer has known constraints that impact UI design
 decisions:
 
-| Constraint | Value | Mitigation Strategy |
-| ------------ | ------- | --------------------- |
-| **Max WebGL Contexts** | 16 simultaneous | Prioritize visible panes for WebGL allocation |
-| **Transparency Support** | Not supported | Automatic Canvas fallback when `allowTransparency: true` |
-| **Context Loss** | GPU resource exhaustion | `onContextLoss` handler triggers Canvas fallback |
-| **Ligatures** | Not supported in WebGL | Disabled when using WebGL renderer |
+| Constraint               | Value                   | Mitigation Strategy                                      |
+| ------------------------ | ----------------------- | -------------------------------------------------------- |
+| **Max WebGL Contexts**   | 16 simultaneous         | Prioritize visible panes for WebGL allocation            |
+| **Transparency Support** | Not supported           | Automatic Canvas fallback when `allowTransparency: true` |
+| **Context Loss**         | GPU resource exhaustion | `onContextLoss` handler triggers Canvas fallback         |
+| **Ligatures**            | Not supported in WebGL  | Disabled when using WebGL renderer                       |
 
 #### 7.9.2 Renderer selection logic
 
@@ -10488,7 +10492,7 @@ following features become available:
 However, performance may be reduced compared to WebGL rendering, particularly
 for rapid terminal output.
 
----
+______________________________________________________________________
 
 ### 7.10 Accessibility considerations
 
@@ -10496,10 +10500,10 @@ for rapid terminal output.
 
 xterm.js provides accessibility features through configuration:
 
-| Property | Purpose |
-| ---------- | --------- |
+| Property                 | Purpose                            |
+| ------------------------ | ---------------------------------- |
 | `screenReaderMode: true` | Enable screen reader announcements |
-| `overviewRulerWidth: 20` | Scrollbar position indicator |
+| `overviewRulerWidth: 20` | Scrollbar position indicator       |
 
 #### 7.10.2 Keyboard navigation
 
@@ -10511,48 +10515,48 @@ xterm.js provides accessibility features through configuration:
 
 - Platform-appropriate modifier keys (Cmd on macOS, Ctrl on Windows/Linux)
 
----
+______________________________________________________________________
 
 ### 7.11 References
 
 #### Files examined (7.11 References)
 
-| File | Relevance |
-| ------ | ----------- |
-| `lib/components/term.tsx` | Terminal component, xterm.js integration, addon management |
-| `lib/components/header.tsx` | Header layout, window controls, platform variants |
-| `lib/components/tabs.tsx` | Tab bar component, multi-session management |
-| `lib/components/tab.tsx` | Individual tab rendering and interactions |
-| `lib/components/searchBox.tsx` | Search overlay UI, pattern matching options |
-| `lib/components/split-pane.tsx` | Split pane resizing and layout |
-| `lib/components/notifications.tsx` | Toast notification display |
-| `lib/containers/hyper.tsx` | Root container, keyboard shortcuts, state binding |
-| `lib/reducers/ui.ts` | UI state slice definition |
-| `lib/reducers/sessions.ts` | Sessions state slice definition |
-| `lib/reducers/term-groups.ts` | Term groups state slice definition |
-| `lib/store/write-middleware.ts` | Performance bypass for terminal data |
-| `lib/utils/rpc.ts` | Renderer-side RPC client |
-| `app/rpc.ts` | Main process RPC server |
-| `app/ui/window.ts` | Window factory and configuration |
-| `app/ui/contextmenu.ts` | Context menu definitions |
-| `app/keymaps/*.json` | Platform-specific keyboard shortcuts |
-| `app/index.html` | Renderer HTML entry point |
-| `typings/config.d.ts` | Configuration type definitions |
+| File                               | Relevance                                                  |
+| ---------------------------------- | ---------------------------------------------------------- |
+| `lib/components/term.tsx`          | Terminal component, xterm.js integration, addon management |
+| `lib/components/header.tsx`        | Header layout, window controls, platform variants          |
+| `lib/components/tabs.tsx`          | Tab bar component, multi-session management                |
+| `lib/components/tab.tsx`           | Individual tab rendering and interactions                  |
+| `lib/components/searchBox.tsx`     | Search overlay UI, pattern matching options                |
+| `lib/components/split-pane.tsx`    | Split pane resizing and layout                             |
+| `lib/components/notifications.tsx` | Toast notification display                                 |
+| `lib/containers/hyper.tsx`         | Root container, keyboard shortcuts, state binding          |
+| `lib/reducers/ui.ts`               | UI state slice definition                                  |
+| `lib/reducers/sessions.ts`         | Sessions state slice definition                            |
+| `lib/reducers/term-groups.ts`      | Term groups state slice definition                         |
+| `lib/store/write-middleware.ts`    | Performance bypass for terminal data                       |
+| `lib/utils/rpc.ts`                 | Renderer-side RPC client                                   |
+| `app/rpc.ts`                       | Main process RPC server                                    |
+| `app/ui/window.ts`                 | Window factory and configuration                           |
+| `app/ui/contextmenu.ts`            | Context menu definitions                                   |
+| `app/keymaps/*.json`               | Platform-specific keyboard shortcuts                       |
+| `app/index.html`                   | Renderer HTML entry point                                  |
+| `typings/config.d.ts`              | Configuration type definitions                             |
 
 ##### Folders explored (Files examined (7.11 References))
 
-| Folder | Contents |
-| -------- | ---------- |
-| `lib/components/` | React UI components |
+| Folder            | Contents                             |
+| ----------------- | ------------------------------------ |
+| `lib/components/` | React UI components                  |
 | `lib/containers/` | Redux-connected container components |
-| `lib/reducers/` | Redux state reducers |
-| `lib/actions/` | Redux action creators |
-| `lib/store/` | Redux store configuration |
-| `lib/utils/` | Renderer utilities and RPC |
-| `app/ui/` | Window factory and context menu |
-| `app/keymaps/` | Platform keyboard mappings |
-| `app/menus/` | Application menu templates |
-| `typings/` | TypeScript type definitions |
+| `lib/reducers/`   | Redux state reducers                 |
+| `lib/actions/`    | Redux action creators                |
+| `lib/store/`      | Redux store configuration            |
+| `lib/utils/`      | Renderer utilities and RPC           |
+| `app/ui/`         | Window factory and context menu      |
+| `app/keymaps/`    | Platform keyboard mappings           |
+| `app/menus/`      | Application menu templates           |
+| `typings/`        | TypeScript type definitions          |
 
 ##### Technical specification sections referenced (Files examined (7.11 References))
 
@@ -10612,16 +10616,16 @@ flowchart TB
 
 #### 8.1.2 Infrastructure non-applicability matrix
 
-| Traditional Infrastructure Concept | Velocetty Status | Rationale |
-| ----------------------------------- | ------------------ | ----------- |
-| **Cloud Provider Selection** | Not Applicable | No server-side deployment; all functionality executes locally |
-| **Containerization (Docker)** | Not Applicable | Desktop binary distribution via installers, not container images |
-| **Orchestration (Kubernetes)** | Not Applicable | Single-process desktop application per user installation |
-| **Database Infrastructure** | Not Applicable | Local JSON configuration files; no database layer |
-| **Load Balancing** | Not Applicable | Local execution only; no network request distribution |
-| **Auto-Scaling** | Not Applicable | Desktop application scales with user's hardware |
-| **Multi-Region Deployment** | Not Applicable | Application runs on user's local machine |
-| **Service Mesh** | Not Applicable | No microservices architecture |
+| Traditional Infrastructure Concept | Velocetty Status | Rationale                                                        |
+| ---------------------------------- | ---------------- | ---------------------------------------------------------------- |
+| **Cloud Provider Selection**       | Not Applicable   | No server-side deployment; all functionality executes locally    |
+| **Containerization (Docker)**      | Not Applicable   | Desktop binary distribution via installers, not container images |
+| **Orchestration (Kubernetes)**     | Not Applicable   | Single-process desktop application per user installation         |
+| **Database Infrastructure**        | Not Applicable   | Local JSON configuration files; no database layer                |
+| **Load Balancing**                 | Not Applicable   | Local execution only; no network request distribution            |
+| **Auto-Scaling**                   | Not Applicable   | Desktop application scales with user's hardware                  |
+| **Multi-Region Deployment**        | Not Applicable   | Application runs on user's local machine                         |
+| **Service Mesh**                   | Not Applicable   | No microservices architecture                                    |
 
 #### 8.1.3 Desktop-appropriate infrastructure model
 
@@ -10663,14 +10667,15 @@ flowchart LR
     Artifacts --> GitHub
 ```
 
----
+______________________________________________________________________
 
 ### 8.2 Build infrastructure
 
 #### 8.2.1 Build system architecture
 
-Velocetty employs a multi-stage build pipeline that transforms TypeScript source
-code into optimized, packaged desktop applications for three major platforms.
+Velocetty employs a multi-stage build pipeline that transforms TypeScript
+source code into optimized, packaged desktop applications for three major
+platforms.
 
 ```mermaid
 flowchart TB
@@ -10712,31 +10717,31 @@ flowchart TB
 
 #### 8.2.2 Core build tools
 
-| Tool | Version | Purpose | Configuration File |
-| ------ | --------- | --------- | ------------------- |
-| **esbuild** | 0.25.12 | Module bundling with shared plugin pipeline | `build/esbuild/build.ts` |
-| **Babel (targeted bridge)** | 7.24.x | `styled-jsx` transform for selected files | `build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin.ts` |
-| **tsgo (TypeScript native preview)** | 7.0.0-dev.20260128.1 | Type checking and transpilation | `tsconfig.base.json` |
-| **electron-builder** | 24.13.3 | Cross-platform packaging and distribution | `electron-builder.json` |
+| Tool                                 | Version              | Purpose                                     | Configuration File                                                |
+| ------------------------------------ | -------------------- | ------------------------------------------- | ----------------------------------------------------------------- |
+| **esbuild**                          | 0.25.12              | Module bundling with shared plugin pipeline | `build/esbuild/build.ts`                                          |
+| **Babel (targeted bridge)**          | 7.24.x               | `styled-jsx` transform for selected files   | `build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin.ts` |
+| **tsgo (TypeScript native preview)** | 7.0.0-dev.20260128.1 | Type checking and transpilation             | `tsconfig.base.json`                                              |
+| **electron-builder**                 | 24.13.3              | Cross-platform packaging and distribution   | `electron-builder.json`                                           |
 
 #### 8.2.3 esbuild target matrix
 
 Velocetty defines three build targets via `build/esbuild/build.ts`:
 
-| Configuration Name | Target | Entry Point | Output Location | Purpose |
-| ------------------- | -------- | ------------- | ----------------- | --------- |
-| **hyper-app** | `electron-main` | Static assets | `target/` | Main process copy pipeline |
-| **hyper** | `electron-renderer` | `lib/index.tsx` | `target/renderer/bundle.js` | Renderer process UI bundle |
-| **hyper-cli** | Node.js | `cli/index.ts` | `bin/cli.js` | CLI tool for plugin management |
+| Configuration Name | Target              | Entry Point     | Output Location             | Purpose                        |
+| ------------------ | ------------------- | --------------- | --------------------------- | ------------------------------ |
+| **hyper-app**      | `electron-main`     | Static assets   | `target/`                   | Main process copy pipeline     |
+| **hyper**          | `electron-renderer` | `lib/index.tsx` | `target/renderer/bundle.js` | Renderer process UI bundle     |
+| **hyper-cli**      | Node.js             | `cli/index.ts`  | `bin/cli.js`                | CLI tool for plugin management |
 
 #### 8.2.4 Build scripts configuration
 
-| Script | Command | Purpose |
-| -------- | --------- | --------- |
-| `build` | `NODE_ENV=production bun ./build/esbuild/build.ts --mode=production && tsgo --build` | Full production build |
-| `build:hyper-app` | `bun ./build/esbuild/build.ts --mode=production --target=hyper-app` | Static copy pipeline |
-| `dev` | `bun ./build/esbuild/build.ts --watch --mode=development` + `tsgo --build --watch` | Development watch mode |
-| `dist` | `bun run build && electron-builder` | Build + package for distribution |
+| Script            | Command                                                                              | Purpose                          |
+| ----------------- | ------------------------------------------------------------------------------------ | -------------------------------- |
+| `build`           | `NODE_ENV=production bun ./build/esbuild/build.ts --mode=production && tsgo --build` | Full production build            |
+| `build:hyper-app` | `bun ./build/esbuild/build.ts --mode=production --target=hyper-app`                  | Static copy pipeline             |
+| `dev`             | `bun ./build/esbuild/build.ts --watch --mode=development` + `tsgo --build --watch`   | Development watch mode           |
+| `dist`            | `bun run build && electron-builder`                                                  | Build + package for distribution |
 
 #### 8.2.5 V8 snapshot optimization
 
@@ -10773,12 +10778,12 @@ flowchart TB
     SnapshotGeneration --> TargetArchitectures
 ```
 
-| Script | Command | Purpose |
-| -------- | --------- | --------- |
-| `v8-snapshot` | Generates snapshots for x64 and arm64 on x64 hosts; arm64-only on Linux arm64 | Host-aware support |
-| `v8-snapshot:arch` | Architecture-specific generation | Targeted optimization |
-| `mk-snapshot` | Create V8 snapshot files | Primary generation |
-| `cp-snapshot` | Copy to Electron resources | Deployment step |
+| Script             | Command                                                                       | Purpose               |
+| ------------------ | ----------------------------------------------------------------------------- | --------------------- |
+| `v8-snapshot`      | Generates snapshots for x64 and arm64 on x64 hosts; arm64-only on Linux arm64 | Host-aware support    |
+| `v8-snapshot:arch` | Architecture-specific generation                                              | Targeted optimization |
+| `mk-snapshot`      | Create V8 snapshot files                                                      | Primary generation    |
+| `cp-snapshot`      | Copy to Electron resources                                                    | Deployment step       |
 
 On Linux arm64 hosts, snapshot generation is limited to arm64 and uses the x64
 mksnapshot binaries. Install `qemu-user` (qemu-x86_64) and ensure an x86_64
@@ -10788,7 +10793,7 @@ sysroot is available (for example, glibc/libstdc++ for x86_64 or a
 **Performance Impact**: V8 snapshots reduce cold start time by pre-compiling
 JavaScript to bytecode, targeting the < 2 second startup SLA.
 
----
+______________________________________________________________________
 
 ### 8.3 Cross-platform packaging
 
@@ -10797,24 +10802,24 @@ JavaScript to bytecode, targeting the < 2 second startup SLA.
 Velocetty packages applications for all major desktop platforms using electron-
 builder:
 
-| Platform | Package Formats | Architectures | Code Signing | Evidence |
-| ---------- | ---------------- | --------------- | -------------- | ---------- |
-| **macOS** | DMG, ZIP | x64, arm64 (Apple Silicon) | Apple Notarization | `electron-builder.json` |
-| **Windows** | NSIS Installer | x64, arm64 | RFC 3161 Timestamping | `electron-builder.json` |
-| **Linux** | deb, rpm, AppImage, snap, pacman | x64, arm64, armv7l | None (user trust model) | `electron-builder.json` |
+| Platform    | Package Formats                  | Architectures              | Code Signing            | Evidence                |
+| ----------- | -------------------------------- | -------------------------- | ----------------------- | ----------------------- |
+| **macOS**   | DMG, ZIP                         | x64, arm64 (Apple Silicon) | Apple Notarization      | `electron-builder.json` |
+| **Windows** | NSIS Installer                   | x64, arm64                 | RFC 3161 Timestamping   | `electron-builder.json` |
+| **Linux**   | deb, rpm, AppImage, snap, pacman | x64, arm64, armv7l         | None (user trust model) | `electron-builder.json` |
 
 #### 8.3.2 Packaging configuration
 
 ### Electron-builder.JSON core settings
 
-| Setting | Value | Purpose |
-| --------- | ------- | --------- |
-| `appId` | `co.zeit.hyper` | Application identifier |
-| `productName` | `Hyper` | Display name |
-| `artifactName` | `${productName}-${version}-${arch}.${ext}` | Output naming pattern |
-| `asar` | `true` | Archive application for distribution |
-| `asarUnpack` | `node_modules/node-pty`, `**/vscode-ripgrep/**` | Native modules requiring extraction |
-| `compression` | `normal` | Balance size vs. build time |
+| Setting        | Value                                           | Purpose                              |
+| -------------- | ----------------------------------------------- | ------------------------------------ |
+| `appId`        | `co.zeit.hyper`                                 | Application identifier               |
+| `productName`  | `Hyper`                                         | Display name                         |
+| `artifactName` | `${productName}-${version}-${arch}.${ext}`      | Output naming pattern                |
+| `asar`         | `true`                                          | Archive application for distribution |
+| `asarUnpack`   | `node_modules/node-pty`, `**/vscode-ripgrep/**` | Native modules requiring extraction  |
+| `compression`  | `normal`                                        | Balance size vs. build time          |
 
 #### 8.3.3 Platform-specific packaging configuration
 
@@ -10847,51 +10852,51 @@ flowchart TB
 
 ##### MacOS-specific settings
 
-| Setting | Value | Purpose |
-| --------- | ------- | --------- |
-| `target` | `[dmg, zip]` | Distribution formats |
-| `category` | `public.app-category.developer-tools` | App Store category |
-| `hardenedRuntime` | `true` | macOS security requirement |
-| `gatekeeperAssess` | `false` | Skip notarization check during build |
-| `entitlements` | `build/mac/entitlements.plist` | Security entitlements |
-| `afterSign` | `bin/notarize.js` | Post-sign notarization hook |
+| Setting            | Value                                 | Purpose                              |
+| ------------------ | ------------------------------------- | ------------------------------------ |
+| `target`           | `[dmg, zip]`                          | Distribution formats                 |
+| `category`         | `public.app-category.developer-tools` | App Store category                   |
+| `hardenedRuntime`  | `true`                                | macOS security requirement           |
+| `gatekeeperAssess` | `false`                               | Skip notarization check during build |
+| `entitlements`     | `build/mac/entitlements.plist`        | Security entitlements                |
+| `afterSign`        | `bin/notarize.js`                     | Post-sign notarization hook          |
 
 ##### Windows-specific settings
 
-| Setting | Value | Purpose |
-| --------- | ------- | --------- |
-| `target` | `nsis` | Installer type |
-| `publisherName` | `Vercel, Inc.` | Publisher identification |
-| `rfc3161TimeStampServer` | `<http://timestamp.comodoca.com`> | Code signing timestamp |
-| `protocols.name` | `ssh` | Protocol handler registration |
+| Setting                  | Value                             | Purpose                       |
+| ------------------------ | --------------------------------- | ----------------------------- |
+| `target`                 | `nsis`                            | Installer type                |
+| `publisherName`          | `Vercel, Inc.`                    | Publisher identification      |
+| `rfc3161TimeStampServer` | `<http://timestamp.comodoca.com`> | Code signing timestamp        |
+| `protocols.name`         | `ssh`                             | Protocol handler registration |
 
 ##### Linux-specific settings
 
-| Setting | Value | Purpose |
-| --------- | ------- | --------- |
-| `target` | `[deb, rpm, AppImage, snap, pacman]` | Distribution formats |
-| `category` | `TerminalEmulator;Development` | Desktop integration |
-| `maintainer` | `Vercel, Inc.` | Package metadata |
+| Setting      | Value                                | Purpose              |
+| ------------ | ------------------------------------ | -------------------- |
+| `target`     | `[deb, rpm, AppImage, snap, pacman]` | Distribution formats |
+| `category`   | `TerminalEmulator;Development`       | Desktop integration  |
+| `maintainer` | `Vercel, Inc.`                       | Package metadata     |
 
 #### 8.3.4 Native module handling
 
-Electron applications require native modules to be rebuilt for each platform and
-architecture. Velocetty unpacks the following native modules from the ASAR
+Electron applications require native modules to be rebuilt for each platform
+and architecture. Velocetty unpacks the following native modules from the ASAR
 archive:
 
-| Module | Purpose | Unpack Reason |
-| -------- | --------- | --------------- |
-| `node-pty` | PTY session management | Native bindings require filesystem access |
-| `vscode-ripgrep` | Fast file search (if used) | Native binary execution |
+| Module           | Purpose                    | Unpack Reason                             |
+| ---------------- | -------------------------- | ----------------------------------------- |
+| `node-pty`       | PTY session management     | Native bindings require filesystem access |
+| `vscode-ripgrep` | Fast file search (if used) | Native binary execution                   |
 
----
+______________________________________________________________________
 
 ### 8.4 CI/CD pipeline
 
 #### 8.4.1 Pipeline architecture overview
 
-Velocetty employs GitHub Actions for continuous integration and deployment, with
-a multi-platform build matrix ensuring cross-platform compatibility.
+Velocetty employs GitHub Actions for continuous integration and deployment,
+with a multi-platform build matrix ensuring cross-platform compatibility.
 
 ```mermaid
 flowchart TB
@@ -10944,28 +10949,28 @@ flowchart TB
 
 #### 8.4.2 GitHub actions workflow configuration
 
-| Workflow File | Trigger | Purpose |
-| --------------- | --------- | --------- |
-| `nodejs.yml` | Push (master/canary), Pull Request | Multi-platform CI build and test |
-| `codeql-analysis.yml` | Push, PR, Weekly Schedule | Security vulnerability scanning |
-| `e2e_comment.yml` | workflow_run completion | Post E2E screenshots to PRs |
+| Workflow File         | Trigger                            | Purpose                          |
+| --------------------- | ---------------------------------- | -------------------------------- |
+| `nodejs.yml`          | Push (master/canary), Pull Request | Multi-platform CI build and test |
+| `codeql-analysis.yml` | Push, PR, Weekly Schedule          | Security vulnerability scanning  |
+| `e2e_comment.yml`     | workflow_run completion            | Post E2E screenshots to PRs      |
 
 #### 8.4.3 Build matrix configuration
 
 ##### Primary build job
 
-| Platform | Node.js Version | Shell | Special Requirements |
-| ---------- | ----------------- | ------- | --------------------- |
-| `macos-latest` | 18.x | bash | Xcode command-line tools |
-| `ubuntu-latest` | 18.x | bash | `libarchive-tools`, Xvfb for E2E |
-| `windows-2022` | 18.x | bash | windows-build-tools |
+| Platform        | Node.js Version | Shell | Special Requirements             |
+| --------------- | --------------- | ----- | -------------------------------- |
+| `macos-latest`  | 18.x            | bash  | Xcode command-line tools         |
+| `ubuntu-latest` | 18.x            | bash  | `libarchive-tools`, Xvfb for E2E |
+| `windows-2022`  | 18.x            | bash  | windows-build-tools              |
 
 ##### ARM build job (Linux only)
 
-| Architecture | Base Image | CPU Emulation | Purpose |
-| -------------- | ------------ | --------------- | --------- |
-| `armv7l` | `raspios_lite:latest` | `cortex-a8` | Raspberry Pi 32-bit |
-| `arm64` | `raspios_lite_arm64:latest` | `cortex-a53` | Raspberry Pi 64-bit |
+| Architecture | Base Image                  | CPU Emulation | Purpose             |
+| ------------ | --------------------------- | ------------- | ------------------- |
+| `armv7l`     | `raspios_lite:latest`       | `cortex-a8`   | Raspberry Pi 32-bit |
+| `arm64`      | `raspios_lite_arm64:latest` | `cortex-a53`  | Raspberry Pi 64-bit |
 
 #### 8.4.4 Pipeline stages detail
 
@@ -11015,11 +11020,11 @@ flowchart LR
 
 #### 8.4.5 Dependency caching strategy
 
-| Cache Component | Key Pattern | Scope |
-| ----------------- | ------------- | ------- |
-| Bun Cache | `${{ runner.os }}-bun-${{ hashFiles('bun.lock', 'app/bun.lock') }}` | Per-OS, per-lockfile |
-| npm Cache | `npm-${{ runner.os }}` | Per-OS |
-| Save Trigger | Push events only | Avoid cache updates on PRs |
+| Cache Component | Key Pattern                                                         | Scope                      |
+| --------------- | ------------------------------------------------------------------- | -------------------------- |
+| Bun Cache       | `${{ runner.os }}-bun-${{ hashFiles('bun.lock', 'app/bun.lock') }}` | Per-OS, per-lockfile       |
+| npm Cache       | `npm-${{ runner.os }}`                                              | Per-OS                     |
+| Save Trigger    | Push events only                                                    | Avoid cache updates on PRs |
 
 #### 8.4.6 Quality gates
 
@@ -11052,16 +11057,16 @@ flowchart TB
     Gate5 -->|"Fail"| Fail
 ```
 
-| Quality Gate | Tool | Failure Action |
-| -------------- | ------ | ---------------- |
-| Lint | ESLint 8.57.0 + Prettier 3.2.5 | Job fails, PR blocked |
-| Type Check | tsgo 7.0.0-dev.20260128.1 | Build fails |
-| Unit Tests | Bun test runner 1.3.11 | Job fails, PR blocked |
-| Build | esbuild + electron-builder | Job fails |
-| E2E Tests | Playwright 1.43.1 | Job fails, screenshot captured |
-| Security | CodeQL | Security alert generated |
+| Quality Gate | Tool                           | Failure Action                 |
+| ------------ | ------------------------------ | ------------------------------ |
+| Lint         | ESLint 8.57.0 + Prettier 3.2.5 | Job fails, PR blocked          |
+| Type Check   | tsgo 7.0.0-dev.20260128.1      | Build fails                    |
+| Unit Tests   | Bun test runner 1.3.11         | Job fails, PR blocked          |
+| Build        | esbuild + electron-builder     | Job fails                      |
+| E2E Tests    | Playwright 1.43.1              | Job fails, screenshot captured |
+| Security     | CodeQL                         | Security alert generated       |
 
----
+______________________________________________________________________
 
 ### 8.5 Code signing and notarization
 
@@ -11109,60 +11114,60 @@ satisfy Gatekeeper requirements.
 
 ##### Notarization process
 
-| Step | Tool | Purpose |
-| ------ | ------ | --------- |
-| Code Signing | `codesign` | Sign application bundle |
+| Step         | Tool                 | Purpose                    |
+| ------------ | -------------------- | -------------------------- |
+| Code Signing | `codesign`           | Sign application bundle    |
 | Notarization | `@electron/notarize` | Submit to Apple for review |
-| Stapling | `stapler` | Attach notarization ticket |
+| Stapling     | `stapler`            | Attach notarization ticket |
 
 ##### Entitlements configuration (`build/mac/entitlements.plist`)
 
-| Entitlement | Purpose | Security Implication |
-| ------------- | --------- | --------------------- |
-| `com.apple.security.cs.allow-jit` | V8 JIT compilation | Required for JavaScript engine |
-| `com.apple.security.cs.allow-unsigned-executable-memory` | Runtime code generation | WebGL/JavaScript execution |
-| `com.apple.security.cs.disable-library-validation` | Plugin dynamic loading | Enables third-party extensions |
-| `com.apple.security.automation.apple-events` | AppleScript automation | Terminal workflow integration |
-| `com.apple.security.device.audio-input` | Microphone access | Accessibility features |
-| `com.apple.security.device.camera` | Camera access | Accessibility features |
+| Entitlement                                              | Purpose                 | Security Implication           |
+| -------------------------------------------------------- | ----------------------- | ------------------------------ |
+| `com.apple.security.cs.allow-jit`                        | V8 JIT compilation      | Required for JavaScript engine |
+| `com.apple.security.cs.allow-unsigned-executable-memory` | Runtime code generation | WebGL/JavaScript execution     |
+| `com.apple.security.cs.disable-library-validation`       | Plugin dynamic loading  | Enables third-party extensions |
+| `com.apple.security.automation.apple-events`             | AppleScript automation  | Terminal workflow integration  |
+| `com.apple.security.device.audio-input`                  | Microphone access       | Accessibility features         |
+| `com.apple.security.device.camera`                       | Camera access           | Accessibility features         |
 
 ##### Notarization hook (`bin/notarize.js`)
 
-| Configuration | Value |
-| --------------- | ------- |
-| Tool | `@electron/notarize` |
-| App Bundle ID | `co.zeit.hyper` |
+| Configuration      | Value                                              |
+| ------------------ | -------------------------------------------------- |
+| Tool               | `@electron/notarize`                               |
+| App Bundle ID      | `co.zeit.hyper`                                    |
 | Credentials Source | `APPLE_ID`, `APPLE_PASSWORD` environment variables |
-| Hook Timing | electron-builder `afterSign` |
+| Hook Timing        | electron-builder `afterSign`                       |
 
 #### 8.5.3 Windows code signing
 
-| Configuration | Value | Purpose |
-| --------------- | ------- | --------- |
-| Timestamp Server | `<http://timestamp.comodoca.com`> | RFC 3161 timestamping |
-| Certificate | Environment-provided via CI | `WIN_CERT_P12_BASE64` secret |
-| Algorithm | SHA-256 | Modern signing standard |
+| Configuration    | Value                             | Purpose                      |
+| ---------------- | --------------------------------- | ---------------------------- |
+| Timestamp Server | `<http://timestamp.comodoca.com`> | RFC 3161 timestamping        |
+| Certificate      | Environment-provided via CI       | `WIN_CERT_P12_BASE64` secret |
+| Algorithm        | SHA-256                           | Modern signing standard      |
 
 #### 8.5.4 CI signing secrets matrix
 
-| Secret Name | Platform | Purpose |
-| ------------- | ---------- | --------- |
-| `MAC_CERT_P12_BASE64` | macOS | Base64-encoded signing certificate |
-| `MAC_CERT_P12_PASSWORD` | macOS | Certificate password |
-| `WIN_CERT_P12_BASE64` | Windows | Base64-encoded signing certificate |
-| `WIN_CERT_P12_PASSWORD` | Windows | Certificate password |
-| `APPLE_ID` | macOS | Apple Developer account email |
-| `APPLE_PASSWORD` | macOS | App-specific password for notarization |
-| `GITHUB_TOKEN` | All | Release artefact publishing |
+| Secret Name             | Platform | Purpose                                |
+| ----------------------- | -------- | -------------------------------------- |
+| `MAC_CERT_P12_BASE64`   | macOS    | Base64-encoded signing certificate     |
+| `MAC_CERT_P12_PASSWORD` | macOS    | Certificate password                   |
+| `WIN_CERT_P12_BASE64`   | Windows  | Base64-encoded signing certificate     |
+| `WIN_CERT_P12_PASSWORD` | Windows  | Certificate password                   |
+| `APPLE_ID`              | macOS    | Apple Developer account email          |
+| `APPLE_PASSWORD`        | macOS    | App-specific password for notarization |
+| `GITHUB_TOKEN`          | All      | Release artefact publishing            |
 
----
+______________________________________________________________________
 
 ### 8.6 Auto-update infrastructure
 
 #### 8.6.1 Update system architecture
 
-Velocetty implements an auto-update system using Electron's `autoUpdater` module
-with external update servers.
+Velocetty implements an auto-update system using Electron's `autoUpdater`
+module with external update servers.
 
 ```mermaid
 flowchart TB
@@ -11201,43 +11206,43 @@ flowchart TB
 
 #### 8.6.2 Update channel configuration
 
-| Channel | Update Server URL Pattern | Purpose |
-| --------- | --------------------------- | --------- |
-| **Stable** | `<https://releases.hyper.is/update/{platform}/{version}`> | Production releases |
+| Channel    | Update Server URL Pattern                                        | Purpose             |
+| ---------- | ---------------------------------------------------------------- | ------------------- |
+| **Stable** | `<https://releases.hyper.is/update/{platform}/{version}`>        | Production releases |
 | **Canary** | `<https://releases-canary.hyper.is/update/{platform}/{version}`> | Pre-release testing |
 
 #### 8.6.3 Platform-specific update URLs
 
-| Platform | Architecture | URL Pattern |
-| ---------- | -------------- | ------------- |
-| macOS (x64) | x64 | `<https://releases{-canary}.hyper.is/update/darwin/{version}`> |
-| macOS (arm64) | arm64 | `<https://releases{-canary}.hyper.is/update/darwin_arm64/{version}`> |
-| Windows (x64) | x64 | `<https://releases{-canary}.hyper.is/update/win32/{version}`> |
-| Windows (arm64) | arm64 | `<https://releases{-canary}.hyper.is/update/win32_arm64/{version}`> |
-| Linux (x64) | x64 | `<https://releases{-canary}.hyper.is/update/deb/{version}`> |
-| Linux (arm64) | arm64 | `<https://releases{-canary}.hyper.is/update/deb_arm64/{version}`> |
+| Platform        | Architecture | URL Pattern                                                          |
+| --------------- | ------------ | -------------------------------------------------------------------- |
+| macOS (x64)     | x64          | `<https://releases{-canary}.hyper.is/update/darwin/{version}`>       |
+| macOS (arm64)   | arm64        | `<https://releases{-canary}.hyper.is/update/darwin_arm64/{version}`> |
+| Windows (x64)   | x64          | `<https://releases{-canary}.hyper.is/update/win32/{version}`>        |
+| Windows (arm64) | arm64        | `<https://releases{-canary}.hyper.is/update/win32_arm64/{version}`>  |
+| Linux (x64)     | x64          | `<https://releases{-canary}.hyper.is/update/deb/{version}`>          |
+| Linux (arm64)   | arm64        | `<https://releases{-canary}.hyper.is/update/deb_arm64/{version}`>    |
 
 #### 8.6.4 Update polling configuration
 
-| Parameter | Value | Purpose |
-| ----------- | ------- | --------- |
-| Initial Delay | 10 seconds | Allow application to fully initialize |
-| Polling Interval | 30 minutes | Balance freshness vs. server load |
-| Protocol | HTTPS | Secure transport |
-| Conditional Check | `disableAutoUpdates !== true` | User opt-out support |
+| Parameter         | Value                         | Purpose                               |
+| ----------------- | ----------------------------- | ------------------------------------- |
+| Initial Delay     | 10 seconds                    | Allow application to fully initialize |
+| Polling Interval  | 30 minutes                    | Balance freshness vs. server load     |
+| Protocol          | HTTPS                         | Secure transport                      |
+| Conditional Check | `disableAutoUpdates !== true` | User opt-out support                  |
 
 #### 8.6.5 Linux update behaviour
 
 Linux uses a custom implementation (`app/auto-updater-linux.ts`) due to
 Electron's limited Linux auto-update support:
 
-| HTTP Response | Event Emitted | Behaviour |
-| --------------- | --------------- | ---------- |
-| 204 No Content | `update-not-available` | No update needed |
-| JSON response | `update-available` | Parse `{name, notes, pub_date}` |
-| `quitAndInstall()` | Error | Not implemented on Linux |
+| HTTP Response      | Event Emitted          | Behaviour                       |
+| ------------------ | ---------------------- | ------------------------------- |
+| 204 No Content     | `update-not-available` | No update needed                |
+| JSON response      | `update-available`     | Parse `{name, notes, pub_date}` |
+| `quitAndInstall()` | Error                  | Not implemented on Linux        |
 
----
+______________________________________________________________________
 
 ### 8.7 Security scanning infrastructure
 
@@ -11277,31 +11282,31 @@ flowchart LR
 
 #### 8.7.2 Codeql configuration
 
-| Attribute | Value | Purpose |
-| ----------- | ------- | --------- |
-| Workflow | `.github/workflows/codeql-analysis.yml` | Configuration file |
-| Schedule | Weekly (Fridays 06:37 UTC) | Regular vulnerability scanning |
-| Triggers | Push to canary, PR to canary | Pre-release validation |
-| Languages | JavaScript | Primary codebase language |
-| Output | SARIF report | GitHub Security integration |
+| Attribute | Value                                   | Purpose                        |
+| --------- | --------------------------------------- | ------------------------------ |
+| Workflow  | `.github/workflows/codeql-analysis.yml` | Configuration file             |
+| Schedule  | Weekly (Fridays 06:37 UTC)              | Regular vulnerability scanning |
+| Triggers  | Push to canary, PR to canary            | Pre-release validation         |
+| Languages | JavaScript                              | Primary codebase language      |
+| Output    | SARIF report                            | GitHub Security integration    |
 
 #### 8.7.3 Dependabot configuration
 
-| Ecosystem | Directory | Schedule | Target Branch |
-| ----------- | ----------- | ---------- | --------------- |
-| npm | `/` | Weekly (Sundays 11:00) | canary |
-| npm | `/app` | Weekly (Sundays 11:00) | canary |
-| github-actions | `/` | Weekly (Sundays 11:00) | canary |
+| Ecosystem      | Directory | Schedule               | Target Branch |
+| -------------- | --------- | ---------------------- | ------------- |
+| npm            | `/`       | Weekly (Sundays 11:00) | canary        |
+| npm            | `/app`    | Weekly (Sundays 11:00) | canary        |
+| github-actions | `/`       | Weekly (Sundays 11:00) | canary        |
 
 ##### Dependabot settings
 
-| Setting | Value | Purpose |
-| --------- | ------- | --------- |
-| `open-pull-requests-limit` | 30 | Maximum concurrent PRs |
-| `versioning-strategy` | `increase` | Bump versions upward |
-| `target-branch` | `canary` | Pre-release integration |
+| Setting                    | Value      | Purpose                 |
+| -------------------------- | ---------- | ----------------------- |
+| `open-pull-requests-limit` | 30         | Maximum concurrent PRs  |
+| `versioning-strategy`      | `increase` | Bump versions upward    |
+| `target-branch`            | `canary`   | Pre-release integration |
 
----
+______________________________________________________________________
 
 ### 8.8 Environment promotion strategy
 
@@ -11346,75 +11351,75 @@ flowchart LR
 
 #### 8.8.2 Environment comparison matrix
 
-| Aspect | Development | Canary | Stable |
-| -------- | ------------- | -------- | -------- |
-| Branch | feature/* | canary | master |
-| Update Server | N/A (local) | releases-canary.hyper.is | releases.hyper.is |
-| Security Scanning | Local lint | CodeQL + Dependabot | Inherited from canary |
-| User Base | Developers only | Early adopters | All users |
-| Release Frequency | Continuous | Per-merge | Periodic (manual) |
+| Aspect            | Development     | Canary                   | Stable                |
+| ----------------- | --------------- | ------------------------ | --------------------- |
+| Branch            | feature/*       | canary                   | master                |
+| Update Server     | N/A (local)     | releases-canary.hyper.is | releases.hyper.is     |
+| Security Scanning | Local lint      | CodeQL + Dependabot      | Inherited from canary |
+| User Base         | Developers only | Early adopters           | All users             |
+| Release Frequency | Continuous      | Per-merge                | Periodic (manual)     |
 
----
+______________________________________________________________________
 
 ### 8.9 Infrastructure resource requirements
 
 #### 8.9.1 CI/CD resource consumption
 
-| Resource | GitHub Actions Usage | Notes |
-| ---------- | --------------------- | ------- |
-| **Build Minutes** | ~45-60 min per full matrix run | 3 platforms × ~15-20 min each |
-| **Storage** | ~500 MB artefacts per run | Platform installers + screenshots |
-| **ARM Build** | ~30 min additional | QEMU emulation overhead |
-| **Cache Size** | ~500 MB per OS | Bun dependencies |
+| Resource          | GitHub Actions Usage           | Notes                             |
+| ----------------- | ------------------------------ | --------------------------------- |
+| **Build Minutes** | ~45-60 min per full matrix run | 3 platforms × ~15-20 min each     |
+| **Storage**       | ~500 MB artefacts per run      | Platform installers + screenshots |
+| **ARM Build**     | ~30 min additional             | QEMU emulation overhead           |
+| **Cache Size**    | ~500 MB per OS                 | Bun dependencies                  |
 
 #### 8.9.2 External infrastructure dependencies
 
-| Service | Provider | Purpose | Cost Model |
-| --------- | ---------- | --------- | ------------ |
-| **GitHub Actions** | GitHub | CI/CD pipeline | Included with repository |
-| **Update Servers** | Vercel (hyper.is) | Auto-update distribution | Vercel hosting |
-| **npm Registry** | npm, Inc. | Plugin distribution | Free (public packages) |
-| **Apple Notary** | Apple | macOS notarization | Free with Developer account |
-| **Timestamp Server** | Comodo | Windows signing | Free public service |
+| Service              | Provider          | Purpose                  | Cost Model                  |
+| -------------------- | ----------------- | ------------------------ | --------------------------- |
+| **GitHub Actions**   | GitHub            | CI/CD pipeline           | Included with repository    |
+| **Update Servers**   | Vercel (hyper.is) | Auto-update distribution | Vercel hosting              |
+| **npm Registry**     | npm, Inc.         | Plugin distribution      | Free (public packages)      |
+| **Apple Notary**     | Apple             | macOS notarization       | Free with Developer account |
+| **Timestamp Server** | Comodo            | Windows signing          | Free public service         |
 
 #### 8.9.3 Developer machine requirements
 
-| Requirement | Minimum | Recommended | Purpose |
-| ------------- | --------- | ------------- | --------- |
-| **Node.js** | 18.x | 20.x LTS | Build toolchain |
-| **RAM** | 8 GB | 16 GB | Electron development |
-| **Storage** | 5 GB | 10 GB | Dependencies + builds |
-| **OS** | macOS/Windows/Linux | macOS | All-platform development |
+| Requirement | Minimum             | Recommended | Purpose                  |
+| ----------- | ------------------- | ----------- | ------------------------ |
+| **Node.js** | 18.x                | 20.x LTS    | Build toolchain          |
+| **RAM**     | 8 GB                | 16 GB       | Electron development     |
+| **Storage** | 5 GB                | 10 GB       | Dependencies + builds    |
+| **OS**      | macOS/Windows/Linux | macOS       | All-platform development |
 
----
+______________________________________________________________________
 
 ### 8.10 Disaster recovery and backup
 
 #### 8.10.1 Source code backup
 
-| Component | Backup Location | Recovery Procedure |
-| ----------- | ----------------- | ------------------- |
-| Source Code | GitHub repository | Git clone from origin |
-| CI Configuration | `.github/` directory | Restored with source |
-| Build Configuration | Repository root | Restored with source |
+| Component           | Backup Location      | Recovery Procedure    |
+| ------------------- | -------------------- | --------------------- |
+| Source Code         | GitHub repository    | Git clone from origin |
+| CI Configuration    | `.github/` directory | Restored with source  |
+| Build Configuration | Repository root      | Restored with source  |
 
 #### 8.10.2 Signing certificate management
 
-| Certificate Type | Storage | Recovery Procedure |
-| ------------------ | --------- | ------------------- |
-| Apple Developer | Apple Developer Portal | Re-export from portal |
-| Windows Code Signing | Certificate Authority | Re-issue from CA |
-| GitHub Secrets | GitHub Encrypted Secrets | Re-upload from secure storage |
+| Certificate Type     | Storage                  | Recovery Procedure            |
+| -------------------- | ------------------------ | ----------------------------- |
+| Apple Developer      | Apple Developer Portal   | Re-export from portal         |
+| Windows Code Signing | Certificate Authority    | Re-issue from CA              |
+| GitHub Secrets       | GitHub Encrypted Secrets | Re-upload from secure storage |
 
 #### 8.10.3 Build artefact recovery
 
-| Artefact Type | Recovery Source | Retention |
-| --------------- | ----------------- | ----------- |
-| Platform Installers | GitHub Releases | Indefinite |
-| CI Artefacts | GitHub Actions | 90 days (default) |
-| npm Packages | npm Registry | Indefinite |
+| Artefact Type       | Recovery Source | Retention         |
+| ------------------- | --------------- | ----------------- |
+| Platform Installers | GitHub Releases | Indefinite        |
+| CI Artefacts        | GitHub Actions  | 90 days (default) |
+| npm Packages        | npm Registry    | Indefinite        |
 
----
+______________________________________________________________________
 
 ### 8.11 Infrastructure monitoring
 
@@ -11447,15 +11452,15 @@ flowchart TB
 
 #### 8.11.2 Monitoring matrix
 
-| Monitoring Area | Tool | Dashboard Location | Alert Mechanism |
-| ----------------- | ------ | ------------------- | ----------------- |
-| Build Status | GitHub Actions | Repository → Actions tab | Email notification |
-| Security Vulnerabilities | CodeQL | Repository → Security tab | GitHub notification |
-| Dependency Updates | Dependabot | Repository → Pull Requests | PR creation |
-| E2E Test Results | Playwright | PR comments (screenshots) | CI job failure |
-| Release Status | GitHub Releases | Repository → Releases tab | Manual check |
+| Monitoring Area          | Tool            | Dashboard Location         | Alert Mechanism     |
+| ------------------------ | --------------- | -------------------------- | ------------------- |
+| Build Status             | GitHub Actions  | Repository → Actions tab   | Email notification  |
+| Security Vulnerabilities | CodeQL          | Repository → Security tab  | GitHub notification |
+| Dependency Updates       | Dependabot      | Repository → Pull Requests | PR creation         |
+| E2E Test Results         | Playwright      | PR comments (screenshots)  | CI job failure      |
+| Release Status           | GitHub Releases | Repository → Releases tab  | Manual check        |
 
----
+______________________________________________________________________
 
 ### 8.12 References
 
@@ -11540,85 +11545,85 @@ reference data that complement the main documentation body.
 The following table provides a comprehensive reference of core technology
 versions used in Velocetty:
 
-| Technology | Version | Purpose | Evidence |
-| ------------ | --------- | --------- | ---------- |
-| Electron | 40.2.1 | Desktop application framework | `app/package.json` |
-| Chromium | 144.0.7559.111 | Renderer engine (bundled) | Electron 40 bundle |
-| Node.js | 24.11.1 | Main process runtime (bundled) | Electron 40 bundle |
-| TypeScript | 5.4.5 | Primary development language | `package.json` |
-| React | 19.2.4 | UI component framework | `package.json` |
-| Redux | 5.0.1 | State management library | `package.json` |
-| xterm.js | 5.3.0 | Terminal emulation library | `package.json` |
-| esbuild | 0.25.12 | Module bundler | `package.json` |
-| electron-builder | 24.13.3 | Application packaging tool | `package.json` |
+| Technology       | Version        | Purpose                        | Evidence           |
+| ---------------- | -------------- | ------------------------------ | ------------------ |
+| Electron         | 40.2.1         | Desktop application framework  | `app/package.json` |
+| Chromium         | 144.0.7559.111 | Renderer engine (bundled)      | Electron 40 bundle |
+| Node.js          | 24.11.1        | Main process runtime (bundled) | Electron 40 bundle |
+| TypeScript       | 5.4.5          | Primary development language   | `package.json`     |
+| React            | 19.2.4         | UI component framework         | `package.json`     |
+| Redux            | 5.0.1          | State management library       | `package.json`     |
+| xterm.js         | 5.3.0          | Terminal emulation library     | `package.json`     |
+| esbuild          | 0.25.12        | Module bundler                 | `package.json`     |
+| electron-builder | 24.13.3        | Application packaging tool     | `package.json`     |
 
 #### 9.1.2 xterm.js addon versions
 
-| Addon | Version | Purpose |
-| ------- | --------- | --------- |
-| xterm-addon-webgl | 0.16.0 | GPU-accelerated WebGL rendering |
-| xterm-addon-canvas | 0.5.0 | Canvas fallback renderer |
-| xterm-addon-fit | 0.8.0 | Automatic terminal sizing |
-| xterm-addon-search | 0.13.0 | In-terminal text search |
-| xterm-addon-web-links | 0.9.0 | Clickable URL detection |
-| xterm-addon-image | 0.5.0 | Image display support |
-| xterm-addon-ligatures | 0.7.0 | Font ligature rendering |
-| xterm-addon-unicode11 | 0.6.0 | Unicode 11 support |
+| Addon                 | Version | Purpose                         |
+| --------------------- | ------- | ------------------------------- |
+| xterm-addon-webgl     | 0.16.0  | GPU-accelerated WebGL rendering |
+| xterm-addon-canvas    | 0.5.0   | Canvas fallback renderer        |
+| xterm-addon-fit       | 0.8.0   | Automatic terminal sizing       |
+| xterm-addon-search    | 0.13.0  | In-terminal text search         |
+| xterm-addon-web-links | 0.9.0   | Clickable URL detection         |
+| xterm-addon-image     | 0.5.0   | Image display support           |
+| xterm-addon-ligatures | 0.7.0   | Font ligature rendering         |
+| xterm-addon-unicode11 | 0.6.0   | Unicode 11 support              |
 
 #### 9.1.3 WebGL context constraints
 
 The xterm.js WebGL renderer operates under browser-imposed resource limitations:
 
-| Constraint | Value | Impact | Mitigation Strategy |
-| ------------ | ------- | -------- | --------------------- |
-| Maximum simultaneous WebGL contexts | 16 | Cannot render more than 16 terminals with WebGL simultaneously | Prioritize visible panes; automatic Canvas fallback |
-| Transparency support | Not available | WebGL cannot render backgrounds with alpha channel | Automatic Canvas fallback when `allowTransparency: true` |
-| Font ligatures | Not supported | Programming ligatures cannot render in WebGL mode | Use Canvas renderer for ligature support |
-| Context loss recovery | GPU resource exhaustion | WebGL context may be lost under memory pressure | `onContextLoss` handler triggers Canvas fallback |
+| Constraint                          | Value                   | Impact                                                         | Mitigation Strategy                                      |
+| ----------------------------------- | ----------------------- | -------------------------------------------------------------- | -------------------------------------------------------- |
+| Maximum simultaneous WebGL contexts | 16                      | Cannot render more than 16 terminals with WebGL simultaneously | Prioritize visible panes; automatic Canvas fallback      |
+| Transparency support                | Not available           | WebGL cannot render backgrounds with alpha channel             | Automatic Canvas fallback when `allowTransparency: true` |
+| Font ligatures                      | Not supported           | Programming ligatures cannot render in WebGL mode              | Use Canvas renderer for ligature support                 |
+| Context loss recovery               | GPU resource exhaustion | WebGL context may be lost under memory pressure                | `onContextLoss` handler triggers Canvas fallback         |
 
 #### 9.1.4 IPC data batching configuration
 
 Performance-critical parameters for terminal data transmission:
 
-| Parameter | Value | Rationale |
-| ----------- | ------- | ----------- |
-| Time threshold | 16ms | Aligned with 60fps frame timing for smooth rendering |
-| Size threshold | 200KB | Prevents memory accumulation during rapid output scenarios |
-| Batch prefix | 36-character UUID | Session routing identifier for multi-terminal windows |
-| IPC call reduction | 60-90% | Empirical improvement versus unbatched transmission |
+| Parameter          | Value             | Rationale                                                  |
+| ------------------ | ----------------- | ---------------------------------------------------------- |
+| Time threshold     | 16ms              | Aligned with 60fps frame timing for smooth rendering       |
+| Size threshold     | 200KB             | Prevents memory accumulation during rapid output scenarios |
+| Batch prefix       | 36-character UUID | Session routing identifier for multi-terminal windows      |
+| IPC call reduction | 60-90%            | Empirical improvement versus unbatched transmission        |
 
 #### 9.1.5 Platform-specific configuration paths
 
-| Platform | Configuration Directory | Notes |
-| ---------- | ------------------------- | ------- |
-| Linux | `$XDG_CONFIG_HOME/Hyper` or `~/.config/Hyper` | XDG Base Directory compliant |
-| macOS | `~/.config/Hyper` | Follows Unix convention |
-| Windows | `%APPDATA%/Hyper` | Standard Windows user data location |
+| Platform | Configuration Directory                       | Notes                               |
+| -------- | --------------------------------------------- | ----------------------------------- |
+| Linux    | `$XDG_CONFIG_HOME/Hyper` or `~/.config/Hyper` | XDG Base Directory compliant        |
+| macOS    | `~/.config/Hyper`                             | Follows Unix convention             |
+| Windows  | `%APPDATA%/Hyper`                             | Standard Windows user data location |
 
 #### 9.1.6 Plugin extension hook summary
 
 Velocetty exposes 40+ extension hooks organized into functional categories:
 
-| Category | Hook Count | Key Examples |
-| ---------- | ------------ | -------------- |
-| Lifecycle | 5 | `onApp`, `onWindow`, `onRendererWindow`, `onWindowClass`, `onUnload` |
-| Decoration | 18 | `decorateTerm`, `decorateTab`, `decorateConfig`, `decorateMenu`, `decorateEnv` |
-| State Management | 4 | `middleware`, `reduceUI`, `reduceSessions`, `reduceTermGroups` |
-| Props Injection | 4 | `getTermProps`, `getTabProps`, `getTabsProps`, `getTermGroupProps` |
-| State Mapping | 8 | `mapHyperTermState`, `mapTermsState`, `mapHeaderState`, `mapNotificationsState` |
+| Category         | Hook Count | Key Examples                                                                    |
+| ---------------- | ---------- | ------------------------------------------------------------------------------- |
+| Lifecycle        | 5          | `onApp`, `onWindow`, `onRendererWindow`, `onWindowClass`, `onUnload`            |
+| Decoration       | 18         | `decorateTerm`, `decorateTab`, `decorateConfig`, `decorateMenu`, `decorateEnv`  |
+| State Management | 4          | `middleware`, `reduceUI`, `reduceSessions`, `reduceTermGroups`                  |
+| Props Injection  | 4          | `getTermProps`, `getTabProps`, `getTabsProps`, `getTermGroupProps`              |
+| State Mapping    | 8          | `mapHyperTermState`, `mapTermsState`, `mapHeaderState`, `mapNotificationsState` |
 
 #### 9.1.7 Update channel URL patterns
 
-| Channel | Platform | URL Pattern |
-| --------- | ---------- | ------------- |
-| Stable | macOS (x64) | `<https://releases.hyper.is/update/darwin/{version}`> |
-| Stable | macOS (arm64) | `<https://releases.hyper.is/update/darwin_arm64/{version}`> |
-| Stable | Windows (x64) | `<https://releases.hyper.is/update/win32/{version}`> |
-| Stable | Windows (arm64) | `<https://releases.hyper.is/update/win32_arm64/{version}`> |
-| Stable | Linux (x64) | `<https://releases.hyper.is/update/deb/{version}`> |
-| Canary | macOS (x64) | `<https://releases-canary.hyper.is/update/darwin/{version}`> |
-| Canary | macOS (arm64) | `<https://releases-canary.hyper.is/update/darwin_arm64/{version}`> |
-| Canary | Windows (x64) | `<https://releases-canary.hyper.is/update/win32/{version}`> |
+| Channel | Platform        | URL Pattern                                                        |
+| ------- | --------------- | ------------------------------------------------------------------ |
+| Stable  | macOS (x64)     | `<https://releases.hyper.is/update/darwin/{version}`>              |
+| Stable  | macOS (arm64)   | `<https://releases.hyper.is/update/darwin_arm64/{version}`>        |
+| Stable  | Windows (x64)   | `<https://releases.hyper.is/update/win32/{version}`>               |
+| Stable  | Windows (arm64) | `<https://releases.hyper.is/update/win32_arm64/{version}`>         |
+| Stable  | Linux (x64)     | `<https://releases.hyper.is/update/deb/{version}`>                 |
+| Canary  | macOS (x64)     | `<https://releases-canary.hyper.is/update/darwin/{version}`>       |
+| Canary  | macOS (arm64)   | `<https://releases-canary.hyper.is/update/darwin_arm64/{version}`> |
+| Canary  | Windows (x64)   | `<https://releases-canary.hyper.is/update/win32/{version}`>        |
 
 #### 9.1.8 Terminal emulation standards
 
@@ -11659,14 +11664,14 @@ flowchart TB
 
 #### 9.1.9 Performance targets and SLAs
 
-| Metric | Target | Measurement Method |
-| -------- | -------- | ------------------- |
-| Cold start time | < 2 seconds | V8 snapshot optimization |
-| Hot start time | < 500ms | Window recreation |
-| Keystroke latency | < 50ms | User input to PTY write |
-| Terminal render latency | < 16ms | PTY data to screen update (60fps) |
-| Memory usage (idle) | < 300 MB | Single window with one terminal |
-| Memory per additional terminal | ~50 MB | Incremental overhead |
+| Metric                         | Target      | Measurement Method                |
+| ------------------------------ | ----------- | --------------------------------- |
+| Cold start time                | < 2 seconds | V8 snapshot optimization          |
+| Hot start time                 | < 500ms     | Window recreation                 |
+| Keystroke latency              | < 50ms      | User input to PTY write           |
+| Terminal render latency        | < 16ms      | PTY data to screen update (60fps) |
+| Memory usage (idle)            | < 300 MB    | Single window with one terminal   |
+| Memory per additional terminal | ~50 MB      | Incremental overhead              |
 
 #### 9.1.10 Redux middleware pipeline order
 
@@ -11688,15 +11693,15 @@ flowchart LR
     M4 --> M5
 ```
 
-| Position | Middleware | Purpose |
-| ---------- | ------------ | --------- |
-| 1 | `thunk` (first) | Enable async action creators |
-| 2 | `plugins.middleware` | Plugin-provided middleware chain |
-| 3 | `thunk` (second) | Handle plugin-dispatched thunks |
-| 4 | `writeMiddleware` | Bypass Redux for terminal data |
-| 5 | `effects` | Execute action callbacks |
+| Position | Middleware           | Purpose                          |
+| -------- | -------------------- | -------------------------------- |
+| 1        | `thunk` (first)      | Enable async action creators     |
+| 2        | `plugins.middleware` | Plugin-provided middleware chain |
+| 3        | `thunk` (second)     | Handle plugin-dispatched thunks  |
+| 4        | `writeMiddleware`    | Bypass Redux for terminal data   |
+| 5        | `effects`            | Execute action callbacks         |
 
----
+______________________________________________________________________
 
 ### 9.2 Glossary
 
@@ -11705,126 +11710,126 @@ Specification document.
 
 #### 9.2.1 Architecture and system terms
 
-| Term | Definition |
-| ------ | ------------ |
+| Term                         | Definition                                                                                                                                                  |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Split-Brain Architecture** | Electron's architectural pattern where the application runs in two separate execution contexts (main process and renderer process) that communicate via IPC |
-| **Main Process** | The Node.js-based Electron process responsible for OS integration, PTY session management, native menus, auto-updates, and plugin orchestration |
-| **Renderer Process** | The Chromium-based Electron process that executes the React/Redux UI application, hosts xterm.js terminal rendering, and manages plugin UI extensions |
-| **IPC Bridge** | A UUID-keyed bidirectional communication channel between main and renderer processes using typed event emitters |
-| **RPC Channel** | Remote Procedure Call channel that facilitates typed communication between Electron processes |
-| **Process Isolation** | Security and stability pattern separating concerns between main and renderer processes in Electron |
-| **Trust Boundary** | The logical security perimeter within which code executes with equivalent privileges |
+| **Main Process**             | The Node.js-based Electron process responsible for OS integration, PTY session management, native menus, auto-updates, and plugin orchestration             |
+| **Renderer Process**         | The Chromium-based Electron process that executes the React/Redux UI application, hosts xterm.js terminal rendering, and manages plugin UI extensions       |
+| **IPC Bridge**               | A UUID-keyed bidirectional communication channel between main and renderer processes using typed event emitters                                             |
+| **RPC Channel**              | Remote Procedure Call channel that facilitates typed communication between Electron processes                                                               |
+| **Process Isolation**        | Security and stability pattern separating concerns between main and renderer processes in Electron                                                          |
+| **Trust Boundary**           | The logical security perimeter within which code executes with equivalent privileges                                                                        |
 
 #### 9.2.2 Terminal emulation terms
 
-| Term | Definition |
-| ------ | ------------ |
+| Term                      | Definition                                                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **PTY (Pseudo-Terminal)** | An OS facility that emulates a terminal device, allowing an application to spawn shell processes and communicate with them as if through a physical terminal |
-| **node-pty** | Native Node.js addon providing PTY bindings for spawning and communicating with shell processes |
-| **xterm.js** | Industry-standard TypeScript terminal emulation library for web applications, providing VT100/xterm escape sequence support |
-| **WebGL Renderer** | Hardware-accelerated GPU rendering backend for xterm.js providing high-performance terminal display |
-| **Canvas Renderer** | HTML5 Canvas-based fallback rendering backend when WebGL is unavailable or transparency is required |
-| **Terminal Emulation** | The process of simulating a physical terminal device in software, interpreting escape sequences and rendering output |
-| **Scrollback Buffer** | Memory-based storage of terminal output history allowing users to scroll back through previous content |
-| **Escape Sequence** | Control character sequences (VT100/xterm standard) used to control terminal behaviour, cursor positioning, and text formatting |
-| **VT100** | Digital Equipment Corporation terminal standard from 1978 that established ANSI escape code conventions still used today |
-| **xterm** | The standard terminal emulator for the X Window System, whose escape sequence extensions are widely adopted |
-| **ANSI Colours** | Standard 16-colour palette (8 standard + 8 bright) defined by ANSI X3.64 for terminal text colouring |
-| **True Colour** | 24-bit RGB colour support (16.7 million colours) in terminal emulators via SGR escape sequences |
+| **node-pty**              | Native Node.js addon providing PTY bindings for spawning and communicating with shell processes                                                              |
+| **xterm.js**              | Industry-standard TypeScript terminal emulation library for web applications, providing VT100/xterm escape sequence support                                  |
+| **WebGL Renderer**        | Hardware-accelerated GPU rendering backend for xterm.js providing high-performance terminal display                                                          |
+| **Canvas Renderer**       | HTML5 Canvas-based fallback rendering backend when WebGL is unavailable or transparency is required                                                          |
+| **Terminal Emulation**    | The process of simulating a physical terminal device in software, interpreting escape sequences and rendering output                                         |
+| **Scrollback Buffer**     | Memory-based storage of terminal output history allowing users to scroll back through previous content                                                       |
+| **Escape Sequence**       | Control character sequences (VT100/xterm standard) used to control terminal behaviour, cursor positioning, and text formatting                               |
+| **VT100**                 | Digital Equipment Corporation terminal standard from 1978 that established ANSI escape code conventions still used today                                     |
+| **xterm**                 | The standard terminal emulator for the X Window System, whose escape sequence extensions are widely adopted                                                  |
+| **ANSI Colours**          | Standard 16-colour palette (8 standard + 8 bright) defined by ANSI X3.64 for terminal text colouring                                                         |
+| **True Colour**           | 24-bit RGB colour support (16.7 million colours) in terminal emulators via SGR escape sequences                                                              |
 
 #### 9.2.3 Data and state management terms
 
-| Term | Definition |
-| ------ | ------------ |
-| **Redux Store** | Centralized state container managing application state with predictable updates through actions and reducers |
-| **State Slice** | A logical partition of Redux state (ui, sessions, termGroups) managed by dedicated reducers |
+| Term                 | Definition                                                                                                       |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Redux Store**      | Centralized state container managing application state with predictable updates through actions and reducers     |
+| **State Slice**      | A logical partition of Redux state (ui, sessions, termGroups) managed by dedicated reducers                      |
 | **Write Middleware** | Performance optimization pattern that bypasses Redux for high-volume terminal data, directly writing to xterm.js |
-| **Data Batching** | Technique accumulating PTY output (16ms time / 200KB size thresholds) before IPC transmission to reduce overhead |
-| **Immutable State** | State management pattern using `seamless-immutable` to prevent accidental state mutations |
-| **Selector** | Memoized function (via `reselect`) computing derived data from Redux state efficiently |
-| **Thunk** | Redux middleware pattern enabling async actions by returning functions from action creators |
-| **Action** | Plain JavaScript object describing a state change with a `type` property and optional payload |
-| **Reducer** | Pure function that takes current state and an action, returning a new state |
-| **Middleware** | Function that intercepts Redux actions before they reach reducers, enabling side effects |
+| **Data Batching**    | Technique accumulating PTY output (16ms time / 200KB size thresholds) before IPC transmission to reduce overhead |
+| **Immutable State**  | State management pattern using `seamless-immutable` to prevent accidental state mutations                        |
+| **Selector**         | Memoized function (via `reselect`) computing derived data from Redux state efficiently                           |
+| **Thunk**            | Redux middleware pattern enabling async actions by returning functions from action creators                      |
+| **Action**           | Plain JavaScript object describing a state change with a `type` property and optional payload                    |
+| **Reducer**          | Pure function that takes current state and an action, returning a new state                                      |
+| **Middleware**       | Function that intercepts Redux actions before they reach reducers, enabling side effects                         |
 
 #### 9.2.4 Plugin system terms
 
-| Term | Definition |
-| ------ | ------------ |
-| **Plugin Decoration** | Pattern where plugins wrap and extend core components rather than replacing them, preserving base behaviour |
+| Term                             | Definition                                                                                                       |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Plugin Decoration**            | Pattern where plugins wrap and extend core components rather than replacing them, preserving base behaviour      |
 | **Higher-Order Component (HOC)** | React pattern where a function takes a component and returns an enhanced component with additional functionality |
-| **Extension Hook** | Named function exports that plugins provide to integrate with Velocetty's extension points (40+ hooks available) |
-| **Full Trust Model** | Security model where plugins execute with complete application privileges without sandboxing |
-| **Module._load Patching** | Technique for sharing React/ReactDOM instances between the main application and plugins |
-| **Lifecycle Hook** | Plugin functions (`onApp`, `onWindow`, `onUnload`) executed at specific application lifecycle events |
-| **Decorator Hook** | Plugin functions (`decorateTab`, `decorateTerm`, etc.) that wrap React components or configuration objects |
-| **Props Injection Hook** | Plugin functions (`getTermProps`, `getTabProps`) that inject additional props into React components |
-| **State Mapping Hook** | Plugin functions that transform Redux state before it reaches components |
+| **Extension Hook**               | Named function exports that plugins provide to integrate with Velocetty's extension points (40+ hooks available) |
+| **Full Trust Model**             | Security model where plugins execute with complete application privileges without sandboxing                     |
+| **Module._load Patching**        | Technique for sharing React/ReactDOM instances between the main application and plugins                          |
+| **Lifecycle Hook**               | Plugin functions (`onApp`, `onWindow`, `onUnload`) executed at specific application lifecycle events             |
+| **Decorator Hook**               | Plugin functions (`decorateTab`, `decorateTerm`, etc.) that wrap React components or configuration objects       |
+| **Props Injection Hook**         | Plugin functions (`getTermProps`, `getTabProps`) that inject additional props into React components              |
+| **State Mapping Hook**           | Plugin functions that transform Redux state before it reaches components                                         |
 
 #### 9.2.5 Configuration terms
 
-| Term | Definition |
-| ------ | ------------ |
-| **hyper.json** | JSON-format configuration file storing user settings, profiles, and plugin lists (v4 format) |
-| **Hot-Reload** | Feature enabling live configuration updates via file-watching without application restart |
-| **Configuration Migration** | Process converting Hyper v3 JavaScript configs (`.hyper.js`) to v4 JSON format |
-| **Profile** | Named configuration preset containing shell, environment, and appearance customizations |
-| **XDG Compliance** | Following XDG Base Directory Specification for configuration file locations on Unix systems |
-| **JSON Schema** | Draft-07 schema definition used for configuration validation |
-| **ColorMap** | Configuration object containing 16 ANSI colour definitions (8 standard + 8 bright colours) |
-| **Default Shell** | The user's system default shell resolved via platform-specific methods |
+| Term                        | Definition                                                                                   |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| **hyper.json**              | JSON-format configuration file storing user settings, profiles, and plugin lists (v4 format) |
+| **Hot-Reload**              | Feature enabling live configuration updates via file-watching without application restart    |
+| **Configuration Migration** | Process converting Hyper v3 JavaScript configs (`.hyper.js`) to v4 JSON format               |
+| **Profile**                 | Named configuration preset containing shell, environment, and appearance customizations      |
+| **XDG Compliance**          | Following XDG Base Directory Specification for configuration file locations on Unix systems  |
+| **JSON Schema**             | Draft-07 schema definition used for configuration validation                                 |
+| **ColorMap**                | Configuration object containing 16 ANSI colour definitions (8 standard + 8 bright colours)   |
+| **Default Shell**           | The user's system default shell resolved via platform-specific methods                       |
 
 #### 9.2.6 UI component terms
 
-| Term | Definition |
-| ------ | ------------ |
-| **HyperContainer** | Root React component serving as the main application wrapper |
-| **Term** | React component hosting an xterm.js terminal instance |
-| **TermGroup** | Container component managing split pane groups and terminal arrangements |
-| **SplitPane** | Component enabling horizontal and vertical terminal splitting with resizable dividers |
-| **Tab** | Individual tab component representing a terminal session in the tab bar |
-| **SearchBox** | Overlay component providing in-terminal text search with regex support |
-| **Header** | Window header component containing tabs and window controls |
-| **Notification** | Toast notification component for user messages |
-| **Terms** | Container component managing all terminal instances in a window |
+| Term               | Definition                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------- |
+| **HyperContainer** | Root React component serving as the main application wrapper                          |
+| **Term**           | React component hosting an xterm.js terminal instance                                 |
+| **TermGroup**      | Container component managing split pane groups and terminal arrangements              |
+| **SplitPane**      | Component enabling horizontal and vertical terminal splitting with resizable dividers |
+| **Tab**            | Individual tab component representing a terminal session in the tab bar               |
+| **SearchBox**      | Overlay component providing in-terminal text search with regex support                |
+| **Header**         | Window header component containing tabs and window controls                           |
+| **Notification**   | Toast notification component for user messages                                        |
+| **Terms**          | Container component managing all terminal instances in a window                       |
 
 #### 9.2.7 Build and packaging terms
 
-| Term | Definition |
-| ------ | ------------ |
-| **electron-builder** | Build tool for packaging Electron applications as platform-specific installers |
-| **V8 Snapshot** | Precompiled JavaScript blob improving cold start performance by bypassing runtime parsing |
-| **Code Signing** | Cryptographic signing of application binaries for distribution integrity verification |
-| **Notarization** | Apple's process for scanning and approving macOS applications for Gatekeeper acceptance |
-| **NSIS Installer** | Windows installer format produced by electron-builder using Nullsoft Scriptable Install System |
-| **DMG** | macOS disk image format for application distribution |
-| **AppImage** | Linux portable application format requiring no installation or root privileges |
-| **Entitlements** | macOS security declarations specifying application capabilities and permissions |
+| Term                 | Definition                                                                                     |
+| -------------------- | ---------------------------------------------------------------------------------------------- |
+| **electron-builder** | Build tool for packaging Electron applications as platform-specific installers                 |
+| **V8 Snapshot**      | Precompiled JavaScript blob improving cold start performance by bypassing runtime parsing      |
+| **Code Signing**     | Cryptographic signing of application binaries for distribution integrity verification          |
+| **Notarization**     | Apple's process for scanning and approving macOS applications for Gatekeeper acceptance        |
+| **NSIS Installer**   | Windows installer format produced by electron-builder using Nullsoft Scriptable Install System |
+| **DMG**              | macOS disk image format for application distribution                                           |
+| **AppImage**         | Linux portable application format requiring no installation or root privileges                 |
+| **Entitlements**     | macOS security declarations specifying application capabilities and permissions                |
 
 #### 9.2.8 Network and protocol terms
 
-| Term | Definition |
-| ------ | ------------ |
-| **Update Channel** | Distribution track (stable/canary) for application updates |
+| Term                     | Definition                                                                               |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
+| **Update Channel**       | Distribution track (stable/canary) for application updates                               |
 | **SSH Protocol Handler** | Application registration for `ssh://` URL scheme to launch terminal with SSH connections |
-| **npms.io API** | npm registry search API used for plugin discovery |
-| **Auto-Update Polling** | Periodic check (30-minute interval) for available application updates |
-| **Manifest** | JSON document describing available application updates and their metadata |
+| **npms.io API**          | npm registry search API used for plugin discovery                                        |
+| **Auto-Update Polling**  | Periodic check (30-minute interval) for available application updates                    |
+| **Manifest**             | JSON document describing available application updates and their metadata                |
 
 #### 9.2.9 Testing terms
 
-| Term | Definition |
-| ------ | ------------ |
-| **Bun test runner** | Bun's built-in Jest-compatible test runner |
-| **Playwright** | End-to-end testing framework with Electron automation support via Chrome DevTools Protocol |
-| **Bun `mock.module`** | Bun's module mocking API for dependency injection in tests |
-| **Smoke Test** | Basic test validating that the application launches and operates correctly |
-| **CodeQL** | GitHub's semantic code analysis engine for vulnerability detection |
-| **Dependabot** | Automated dependency update service integrated with GitHub |
-| **Xvfb** | X Virtual Frame Buffer for headless E2E testing on Linux |
-| **SARIF** | Static Analysis Results Interchange Format for security scan output |
+| Term                  | Definition                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| **Bun test runner**   | Bun's built-in Jest-compatible test runner                                                 |
+| **Playwright**        | End-to-end testing framework with Electron automation support via Chrome DevTools Protocol |
+| **Bun `mock.module`** | Bun's module mocking API for dependency injection in tests                                 |
+| **Smoke Test**        | Basic test validating that the application launches and operates correctly                 |
+| **CodeQL**            | GitHub's semantic code analysis engine for vulnerability detection                         |
+| **Dependabot**        | Automated dependency update service integrated with GitHub                                 |
+| **Xvfb**              | X Virtual Frame Buffer for headless E2E testing on Linux                                   |
+| **SARIF**             | Static Analysis Results Interchange Format for security scan output                        |
 
----
+______________________________________________________________________
 
 ### 9.3 Acronyms
 
@@ -11833,117 +11838,117 @@ Specification document.
 
 #### 9.3.1 Core technology acronyms
 
-| Acronym | Expanded Form | Context |
-| --------- | --------------- | --------- |
-| **ABI** | Application Binary Interface | Node.js native module compatibility |
-| **API** | Application Programming Interface | Plugin hooks, IPC contracts, function interfaces |
-| **ANSI** | American National Standards Institute | Terminal colour codes and escape sequences |
-| **CLI** | Command-Line Interface | `hyper` command tool for plugin management |
-| **CPU** | Central Processing Unit | Performance measurement context |
-| **CSS** | Cascading Style Sheets | UI styling via styled-jsx |
-| **DOM** | Document Object Model | Browser rendering structure |
-| **GPU** | Graphics Processing Unit | WebGL hardware acceleration |
-| **GUI** | Graphical User Interface | Application user interface |
-| **HTML** | HyperText Markup Language | Web content structure |
-| **HTTP** | HyperText Transfer Protocol | Network communication |
-| **HTTPS** | HTTP Secure | Encrypted network communication |
-| **IPC** | Inter-Process Communication | Electron main/renderer messaging |
-| **JIT** | Just-In-Time | V8 JavaScript compilation mode |
-| **JSON** | JavaScript Object Notation | Configuration format |
-| **JSON5** | JSON5 (Extended JSON) | JSON format with comments and trailing commas |
-| **JSX** | JavaScript XML | React component syntax |
-| **PTY** | Pseudo-Terminal | OS terminal emulation facility |
-| **RAM** | Random Access Memory | System memory |
-| **RPC** | Remote Procedure Call | Cross-process invocation pattern |
-| **SSH** | Secure Shell | Remote terminal protocol |
-| **TLS** | Transport Layer Security | Encryption protocol |
-| **UI** | User Interface | Visual application layer |
-| **URL** | Uniform Resource Locator | Web address format |
-| **UTF-8** | Unicode Transformation Format (8-bit) | Character encoding standard |
-| **UUID** | Universally Unique Identifier | 36-character identifier format |
-| **UX** | User Experience | Design and usability methodology |
+| Acronym   | Expanded Form                         | Context                                          |
+| --------- | ------------------------------------- | ------------------------------------------------ |
+| **ABI**   | Application Binary Interface          | Node.js native module compatibility              |
+| **API**   | Application Programming Interface     | Plugin hooks, IPC contracts, function interfaces |
+| **ANSI**  | American National Standards Institute | Terminal colour codes and escape sequences       |
+| **CLI**   | Command-Line Interface                | `hyper` command tool for plugin management       |
+| **CPU**   | Central Processing Unit               | Performance measurement context                  |
+| **CSS**   | Cascading Style Sheets                | UI styling via styled-jsx                        |
+| **DOM**   | Document Object Model                 | Browser rendering structure                      |
+| **GPU**   | Graphics Processing Unit              | WebGL hardware acceleration                      |
+| **GUI**   | Graphical User Interface              | Application user interface                       |
+| **HTML**  | HyperText Markup Language             | Web content structure                            |
+| **HTTP**  | HyperText Transfer Protocol           | Network communication                            |
+| **HTTPS** | HTTP Secure                           | Encrypted network communication                  |
+| **IPC**   | Inter-Process Communication           | Electron main/renderer messaging                 |
+| **JIT**   | Just-In-Time                          | V8 JavaScript compilation mode                   |
+| **JSON**  | JavaScript Object Notation            | Configuration format                             |
+| **JSON5** | JSON5 (Extended JSON)                 | JSON format with comments and trailing commas    |
+| **JSX**   | JavaScript XML                        | React component syntax                           |
+| **PTY**   | Pseudo-Terminal                       | OS terminal emulation facility                   |
+| **RAM**   | Random Access Memory                  | System memory                                    |
+| **RPC**   | Remote Procedure Call                 | Cross-process invocation pattern                 |
+| **SSH**   | Secure Shell                          | Remote terminal protocol                         |
+| **TLS**   | Transport Layer Security              | Encryption protocol                              |
+| **UI**    | User Interface                        | Visual application layer                         |
+| **URL**   | Uniform Resource Locator              | Web address format                               |
+| **UTF-8** | Unicode Transformation Format (8-bit) | Character encoding standard                      |
+| **UUID**  | Universally Unique Identifier         | 36-character identifier format                   |
+| **UX**    | User Experience                       | Design and usability methodology                 |
 
 #### 9.3.2 Framework and library acronyms
 
-| Acronym | Expanded Form | Context |
-| --------- | --------------- | --------- |
-| **CDP** | Chrome DevTools Protocol | Playwright Electron automation |
-| **CSP** | Content Security Policy | Browser security mechanism |
-| **HOC** | Higher-Order Component | React design pattern |
-| **IDE** | Integrated Development Environment | Development tools context |
-| **npm** | Node Package Manager | JavaScript package registry |
-| **TS** | TypeScript | Programming language |
-| **TSX** | TypeScript JSX | TypeScript React syntax |
-| **XDG** | X Desktop Group (freedesktop.org) | Linux desktop specification |
+| Acronym | Expanded Form                      | Context                        |
+| ------- | ---------------------------------- | ------------------------------ |
+| **CDP** | Chrome DevTools Protocol           | Playwright Electron automation |
+| **CSP** | Content Security Policy            | Browser security mechanism     |
+| **HOC** | Higher-Order Component             | React design pattern           |
+| **IDE** | Integrated Development Environment | Development tools context      |
+| **npm** | Node Package Manager               | JavaScript package registry    |
+| **TS**  | TypeScript                         | Programming language           |
+| **TSX** | TypeScript JSX                     | TypeScript React syntax        |
+| **XDG** | X Desktop Group (freedesktop.org)  | Linux desktop specification    |
 
 #### 9.3.3 Terminal and display acronyms
 
-| Acronym | Expanded Form | Context |
-| --------- | --------------- | --------- |
-| **ConPTY** | Console Pseudo-Terminal | Windows 10+ PTY implementation |
-| **CSI** | Control Sequence Introducer | Terminal escape sequence prefix |
-| **CWD** | Current Working Directory | Shell process context |
-| **ESC** | Escape | Terminal control character (ASCII 27) |
-| **LF** | Line Feed | Unix line ending character |
-| **RGB** | Red, Green, Blue | Colour specification format |
-| **SGR** | Select Graphic Rendition | Terminal text formatting escape sequence |
-| **VT100** | Video Terminal 100 | DEC terminal standard |
-| **WebGL** | Web Graphics Library | Browser 3D graphics API |
-| **WebGL2** | Web Graphics Library 2.0 | Updated WebGL specification |
-| **WinPTY** | Windows Pseudo-Terminal | Legacy Windows PTY implementation |
+| Acronym    | Expanded Form               | Context                                  |
+| ---------- | --------------------------- | ---------------------------------------- |
+| **ConPTY** | Console Pseudo-Terminal     | Windows 10+ PTY implementation           |
+| **CSI**    | Control Sequence Introducer | Terminal escape sequence prefix          |
+| **CWD**    | Current Working Directory   | Shell process context                    |
+| **ESC**    | Escape                      | Terminal control character (ASCII 27)    |
+| **LF**     | Line Feed                   | Unix line ending character               |
+| **RGB**    | Red, Green, Blue            | Colour specification format              |
+| **SGR**    | Select Graphic Rendition    | Terminal text formatting escape sequence |
+| **VT100**  | Video Terminal 100          | DEC terminal standard                    |
+| **WebGL**  | Web Graphics Library        | Browser 3D graphics API                  |
+| **WebGL2** | Web Graphics Library 2.0    | Updated WebGL specification              |
+| **WinPTY** | Windows Pseudo-Terminal     | Legacy Windows PTY implementation        |
 
 #### 9.3.4 Build and deployment acronyms
 
-| Acronym | Expanded Form | Context |
-| --------- | --------------- | --------- |
-| **CI** | Continuous Integration | Automated build and test pipeline |
-| **CD** | Continuous Deployment/Delivery | Automated release pipeline |
-| **CVE** | Common Vulnerabilities and Exposures | Security vulnerability identifiers |
-| **DMG** | Disk Image | macOS distribution format |
-| **EOL** | End-of-Life | Software support lifecycle status |
-| **LTS** | Long-Term Support | Node.js version channel |
-| **NSIS** | Nullsoft Scriptable Install System | Windows installer format |
-| **PR** | Pull Request | Git/GitHub workflow |
-| **SDK** | Software Development Kit | Development tools package |
+| Acronym  | Expanded Form                        | Context                            |
+| -------- | ------------------------------------ | ---------------------------------- |
+| **CI**   | Continuous Integration               | Automated build and test pipeline  |
+| **CD**   | Continuous Deployment/Delivery       | Automated release pipeline         |
+| **CVE**  | Common Vulnerabilities and Exposures | Security vulnerability identifiers |
+| **DMG**  | Disk Image                           | macOS distribution format          |
+| **EOL**  | End-of-Life                          | Software support lifecycle status  |
+| **LTS**  | Long-Term Support                    | Node.js version channel            |
+| **NSIS** | Nullsoft Scriptable Install System   | Windows installer format           |
+| **PR**   | Pull Request                         | Git/GitHub workflow                |
+| **SDK**  | Software Development Kit             | Development tools package          |
 
 #### 9.3.5 Standards and specifications acronyms
 
-| Acronym | Expanded Form | Context |
-| --------- | --------------- | --------- |
-| **ACL** | Access Control List | Windows file system permissions |
-| **ECMA** | European Computer Manufacturers Association | JavaScript/Terminal standards body |
-| **FIPS** | Federal Information Processing Standards | US government standards |
-| **IEEE** | Institute of Electrical and Electronics Engineers | Technology standards organization |
-| **ISO** | International Organization for Standardization | International standards body |
-| **MIT** | Massachusetts Institute of Technology | License type |
-| **POSIX** | Portable Operating System Interface | Unix API standard |
-| **RFC** | Request for Comments | Internet standards document format |
-| **SARIF** | Static Analysis Results Interchange Format | Security scan output format |
-| **UTC** | Coordinated Universal Time | Time zone reference |
-| **YAML** | YAML Ain't Markup Language | Configuration format (CI/CD) |
+| Acronym   | Expanded Form                                     | Context                            |
+| --------- | ------------------------------------------------- | ---------------------------------- |
+| **ACL**   | Access Control List                               | Windows file system permissions    |
+| **ECMA**  | European Computer Manufacturers Association       | JavaScript/Terminal standards body |
+| **FIPS**  | Federal Information Processing Standards          | US government standards            |
+| **IEEE**  | Institute of Electrical and Electronics Engineers | Technology standards organization  |
+| **ISO**   | International Organization for Standardization    | International standards body       |
+| **MIT**   | Massachusetts Institute of Technology             | License type                       |
+| **POSIX** | Portable Operating System Interface               | Unix API standard                  |
+| **RFC**   | Request for Comments                              | Internet standards document format |
+| **SARIF** | Static Analysis Results Interchange Format        | Security scan output format        |
+| **UTC**   | Coordinated Universal Time                        | Time zone reference                |
+| **YAML**  | YAML Ain't Markup Language                        | Configuration format (CI/CD)       |
 
 #### 9.3.6 Testing and quality acronyms
 
-| Acronym | Expanded Form | Context |
-| --------- | --------------- | --------- |
-| **E2E** | End-to-End | Testing methodology |
-| **KPI** | Key Performance Indicator | Success metrics |
-| **P95** | 95th Percentile | Performance metric |
-| **QA** | Quality Assurance | Testing and validation |
-| **SLA** | Service Level Agreement | Performance targets |
-| **Xvfb** | X Virtual Frame Buffer | Headless X11 server for CI |
+| Acronym  | Expanded Form             | Context                    |
+| -------- | ------------------------- | -------------------------- |
+| **E2E**  | End-to-End                | Testing methodology        |
+| **KPI**  | Key Performance Indicator | Success metrics            |
+| **P95**  | 95th Percentile           | Performance metric         |
+| **QA**   | Quality Assurance         | Testing and validation     |
+| **SLA**  | Service Level Agreement   | Performance targets        |
+| **Xvfb** | X Virtual Frame Buffer    | Headless X11 server for CI |
 
 #### 9.3.7 Measurement units
 
-| Acronym | Expanded Form | Context |
-| --------- | --------------- | --------- |
-| **fps** | Frames Per Second | Rendering performance metric |
-| **KB** | Kilobytes | Data size (batching threshold) |
-| **MB** | Megabytes | Memory consumption metric |
-| **ms** | Milliseconds | Time measurement |
-| **GB** | Gigabytes | Disk space measurement |
+| Acronym | Expanded Form     | Context                        |
+| ------- | ----------------- | ------------------------------ |
+| **fps** | Frames Per Second | Rendering performance metric   |
+| **KB**  | Kilobytes         | Data size (batching threshold) |
+| **MB**  | Megabytes         | Memory consumption metric      |
+| **ms**  | Milliseconds      | Time measurement               |
+| **GB**  | Gigabytes         | Disk space measurement         |
 
----
+______________________________________________________________________
 
 ### 9.4 References
 
@@ -11952,60 +11957,60 @@ Specification document.
 The following sections from this Technical Specification document were
 referenced in compiling this appendix:
 
-| Section | Content Used |
-| --------- | -------------- |
-| 1.1 EXECUTIVE SUMMARY | Project overview, value proposition |
-| 1.4 DOCUMENT CONVENTIONS | Terminology baseline, version information |
-| 3.2 FRAMEWORKS & LIBRARIES | Technology stack details |
-| 3.3 OPEN SOURCE DEPENDENCIES | Package versions, dependency policy |
-| 4.4 STATE MANAGEMENT FLOWS | Redux middleware pipeline, state slices |
-| 5.2 COMPONENT DETAILS | Component architecture, addon loading |
-| 6.4 Security Architecture | Security model, IPC contracts, plugin trust |
-| 6.6 Testing Strategy | Test frameworks, coverage strategy |
-| 7.8 PLUGIN EXTENSION POINTS | Extension hook catalogue |
-| 7.9 RENDERING CONSTRAINTS | WebGL limitations, renderer selection |
-| 8.2 BUILD INFRASTRUCTURE | Build tools, V8 snapshot configuration |
-| 8.6 AUTO-UPDATE INFRASTRUCTURE | Update channels, polling configuration |
+| Section                        | Content Used                                |
+| ------------------------------ | ------------------------------------------- |
+| 1.1 EXECUTIVE SUMMARY          | Project overview, value proposition         |
+| 1.4 DOCUMENT CONVENTIONS       | Terminology baseline, version information   |
+| 3.2 FRAMEWORKS & LIBRARIES     | Technology stack details                    |
+| 3.3 OPEN SOURCE DEPENDENCIES   | Package versions, dependency policy         |
+| 4.4 STATE MANAGEMENT FLOWS     | Redux middleware pipeline, state slices     |
+| 5.2 COMPONENT DETAILS          | Component architecture, addon loading       |
+| 6.4 Security Architecture      | Security model, IPC contracts, plugin trust |
+| 6.6 Testing Strategy           | Test frameworks, coverage strategy          |
+| 7.8 PLUGIN EXTENSION POINTS    | Extension hook catalogue                    |
+| 7.9 RENDERING CONSTRAINTS      | WebGL limitations, renderer selection       |
+| 8.2 BUILD INFRASTRUCTURE       | Build tools, V8 snapshot configuration      |
+| 8.6 AUTO-UPDATE INFRASTRUCTURE | Update channels, polling configuration      |
 
 #### 9.4.2 Repository files referenced
 
-| File Path | Relevance |
-| ----------- | ----------- |
-| `package.json` | Root package dependencies, scripts, versions |
-| `app/package.json` | Runtime dependencies, Electron version |
-| `app/session.ts` | PTY management, data batching configuration |
-| `app/rpc.ts` | IPC bridge implementation |
-| `app/config/paths.ts` | Platform-specific configuration paths |
-| `app/plugins/extensions.ts` | Extension hook definitions |
-| `lib/store/write-middleware.ts` | Performance optimization implementation |
-| `lib/components/term.tsx` | Terminal component, addon loading |
-| `electron-builder.json` | Packaging configuration |
-| `typings/common.d.ts` | IPC event type definitions |
-| `PLUGINS.md` | Plugin development documentation |
+| File Path                       | Relevance                                    |
+| ------------------------------- | -------------------------------------------- |
+| `package.json`                  | Root package dependencies, scripts, versions |
+| `app/package.json`              | Runtime dependencies, Electron version       |
+| `app/session.ts`                | PTY management, data batching configuration  |
+| `app/rpc.ts`                    | IPC bridge implementation                    |
+| `app/config/paths.ts`           | Platform-specific configuration paths        |
+| `app/plugins/extensions.ts`     | Extension hook definitions                   |
+| `lib/store/write-middleware.ts` | Performance optimization implementation      |
+| `lib/components/term.tsx`       | Terminal component, addon loading            |
+| `electron-builder.json`         | Packaging configuration                      |
+| `typings/common.d.ts`           | IPC event type definitions                   |
+| `PLUGINS.md`                    | Plugin development documentation             |
 
 #### 9.4.3 Repository folders referenced
 
-| Folder Path | Contents |
-| ------------- | ---------- |
-| `app/` | Main process implementation |
-| `app/config/` | Configuration system |
-| `app/plugins/` | Plugin hook definitions |
-| `lib/` | Renderer process implementation |
-| `lib/store/` | Redux store configuration |
-| `lib/reducers/` | State reducer implementations |
-| `cli/` | CLI tool implementation |
-| `test/` | Test suite |
-| `typings/` | TypeScript declaration files |
+| Folder Path     | Contents                        |
+| --------------- | ------------------------------- |
+| `app/`          | Main process implementation     |
+| `app/config/`   | Configuration system            |
+| `app/plugins/`  | Plugin hook definitions         |
+| `lib/`          | Renderer process implementation |
+| `lib/store/`    | Redux store configuration       |
+| `lib/reducers/` | State reducer implementations   |
+| `cli/`          | CLI tool implementation         |
+| `test/`         | Test suite                      |
+| `typings/`      | TypeScript declaration files    |
 
 #### 9.4.4 External technical references
 
-| Resource | URL | Purpose |
-| ---------- | ----- | --------- |
-| Electron Documentation | <https://www.electronjs.org/docs> | Application framework reference |
-| xterm.js Documentation | <https://xtermjs.org> | Terminal emulation library |
-| VT100 User Guide | <https://vt100.net/docs/vt100-ug> | Terminal standard reference |
-| ANSI Escape Codes (Wikipedia) | <https://en.wikipedia.org/wiki/ANSI_escape_code> | Escape sequence standards |
-| XDG Base Directory Specification | <https://specifications.freedesktop.org/basedir-spec> | Configuration path standards |
-| JSON Schema Specification | <https://json-schema.org/draft-07> | Configuration validation |
-| Redux Documentation | <https://redux.js.org> | State management patterns |
-| React Documentation | <https://react.dev> | UI framework reference |
+| Resource                         | URL                                                   | Purpose                         |
+| -------------------------------- | ----------------------------------------------------- | ------------------------------- |
+| Electron Documentation           | <https://www.electronjs.org/docs>                     | Application framework reference |
+| xterm.js Documentation           | <https://xtermjs.org>                                 | Terminal emulation library      |
+| VT100 User Guide                 | <https://vt100.net/docs/vt100-ug>                     | Terminal standard reference     |
+| ANSI Escape Codes (Wikipedia)    | <https://en.wikipedia.org/wiki/ANSI_escape_code>      | Escape sequence standards       |
+| XDG Base Directory Specification | <https://specifications.freedesktop.org/basedir-spec> | Configuration path standards    |
+| JSON Schema Specification        | <https://json-schema.org/draft-07>                    | Configuration validation        |
+| Redux Documentation              | <https://redux.js.org>                                | State management patterns       |
+| React Documentation              | <https://react.dev>                                   | UI framework reference          |

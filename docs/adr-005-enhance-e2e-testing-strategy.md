@@ -11,10 +11,10 @@ checks and deeper scheduled coverage).
 
 ## Context and problem statement
 
-The current end-to-end (E2E) suite is intentionally narrow. It validates that
-a packaged Electron binary can launch, and it can run in Playwright mode or
-spawn mode, but it does not assert enough renderer behaviour after startup. As
-a result, it is possible to pass E2E checks while still regressing critical
+The current end-to-end (E2E) suite is intentionally narrow. It validates that a
+packaged Electron binary can launch, and it can run in Playwright mode or spawn
+mode, but it does not assert enough renderer behaviour after startup. As a
+result, it is possible to pass E2E checks while still regressing critical
 user-visible flows in the user interface (UI) layer.[^1]
 
 Two competing needs must be balanced:
@@ -24,9 +24,9 @@ Two competing needs must be balanced:
 
 Bun is now the default test runtime for unit and integration testing in this
 repository, but deeper Playwright capabilities remain most reliable when run
-with Playwright's own runner under Node.js.[^2][^3]
-This ADR proposes a structured split that keeps pull request checks fast while
-raising behavioural confidence in scheduled and release-time E2E runs.
+with Playwright's own runner under Node.js.[^2][^3] This ADR proposes a
+structured split that keeps pull request checks fast while raising behavioural
+confidence in scheduled and release-time E2E runs.
 
 ## Decision drivers
 
@@ -79,13 +79,13 @@ Use two E2E lanes:
 For screen readers: The following table compares trade-offs between the three
 strategy options, including confidence, speed, and operational complexity.
 
-| Topic | Option A | Option B | Option C |
-| --- | --- | --- | --- |
-| Pull request speed | Fast | Medium | Fast |
-| Behavioural confidence | Low | Medium | High |
-| Playwright feature reliability | Low | Medium | High |
-| Operational complexity | Low | Medium | Medium |
-| Failure diagnostics quality | Low | Medium | High |
+| Topic                          | Option A | Option B | Option C |
+| ------------------------------ | -------- | -------- | -------- |
+| Pull request speed             | Fast     | Medium   | Fast     |
+| Behavioural confidence         | Low      | Medium   | High     |
+| Playwright feature reliability | Low      | Medium   | High     |
+| Operational complexity         | Low      | Medium   | Medium   |
+| Failure diagnostics quality    | Low      | Medium   | High     |
 
 _Table 1: Trade-offs across E2E strategy options._
 

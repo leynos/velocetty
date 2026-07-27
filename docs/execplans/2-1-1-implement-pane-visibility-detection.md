@@ -11,10 +11,9 @@
   `docs/velocetty-product-requirements-document.md`, and
   `docs/developers-guide.md`.
 
-This Execution Plan (ExecPlan) is a living document.
-The sections `Constraints`, `Tolerances`, `Risks`, `Progress`,
-`Surprises & discoveries`, `Decision log`, and
-`Outcomes & retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE (2026-02-25)
 
@@ -31,8 +30,8 @@ global cap enforcement.
 
 After this change, visible panes should request WebGL from a shared pool while
 hidden panes fall back to Canvas. Visibility must be derived from the active
-tab, layout bounds, and occlusion checks, matching design constraints.
-Success is observable when:
+tab, layout bounds, and occlusion checks, matching design constraints. Success
+is observable when:
 
 - hidden panes report Canvas renderer usage;
 - visible panes can obtain WebGL up to the configured maximum;
@@ -70,29 +69,22 @@ Success is observable when:
 ## Risks
 
 - Risk: dynamic addon switching can leak renderer addons or attach duplicates.
-  Severity: high
-  Likelihood: medium
-  Mitigation: centralize attach/detach logic, hold explicit addon references,
-  and dispose before replacement.
+  Severity: high Likelihood: medium Mitigation: centralize attach/detach logic,
+  hold explicit addon references, and dispose before replacement.
 
 - Risk: occlusion heuristics can misclassify panes as hidden.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: combine root-group active signal with bounds and
-  `elementFromPoint` checks rather than relying on one signal.
+  Severity: medium Likelihood: medium Mitigation: combine root-group active
+  signal with bounds and `elementFromPoint` checks rather than relying on one
+  signal.
 
 - Risk: introducing a new config option may drift between schema, runtime
-  reducer, and typings.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: update `shared/src/types/config.ts`, `app/config/schema.json`,
+  reducer, and typings. Severity: medium Likelihood: medium Mitigation: update
+  `shared/src/types/config.ts`, `app/config/schema.json`,
   `app/config/config-default.json`, reducer wiring, and typings in one pass.
 
 - Risk: pool eviction policy may violate max-cap under rapid visibility churn.
-  Severity: high
-  Likelihood: low
-  Mitigation: make pool state transitions atomic and cover with dedicated unit
-  tests for acquire/release/evict behaviour.
+  Severity: high Likelihood: low Mitigation: make pool state transitions atomic
+  and cover with dedicated unit tests for acquire/release/evict behaviour.
 
 ## Progress
 
@@ -115,57 +107,48 @@ Success is observable when:
 - [x] (2026-02-25 22:30Z) Marked roadmap item `2.1.1` complete in
   `docs/roadmap.md`.
 - [x] (2026-02-25 22:33Z) Ran required gates and confirmed success:
-  `bun install`, `make build`, `make check-fmt`, `make lint`, and
-  `make test`.
+  `bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`.
 
 ## Surprises & discoveries
 
 - Observation: `Terms` already moves inactive root groups offscreen using CSS
   (`left: -9999em`), but this is not represented in the renderer allocation
-  logic.
-  Evidence: `lib/components/terms.tsx`.
-  Impact: active-tab information must be propagated explicitly to the term-level
-  visibility model.
+  logic. Evidence: `lib/components/terms.tsx`. Impact: active-tab information
+  must be propagated explicitly to the term-level visibility model.
 
 - Observation: WebGL fallback on context loss exists, but there is no
-  centralized allocator.
-  Evidence: `lib/components/term.tsx` current direct `WebglAddon` use.
-  Impact: pool service is needed before visibility-based allocation can be
-  deterministic.
+  centralized allocator. Evidence: `lib/components/term.tsx` current direct
+  `WebglAddon` use. Impact: pool service is needed before visibility-based
+  allocation can be deterministic.
 
 - Observation: `bun install` can fail in this workspace when the symlinked
-  cache path (`/tmp/velocetty-ci-work/cache`) does not exist.
-  Evidence: failed installation with `OpenError` on `cache/LOCK`.
-  Impact: gate replay required creating cache/dist directories before rerunning
-  required commands.
+  cache path (`/tmp/velocetty-ci-work/cache`) does not exist. Evidence: failed
+  installation with `OpenError` on `cache/LOCK`. Impact: gate replay required
+  creating cache/dist directories before rerunning required commands.
 
 - Observation: `make build` emits untracked `shared/src/*.js` and
-  `shared/src/types/*.d.ts` files, and `make check-fmt` validates them when they
-  are present.
-  Evidence: `make check-fmt` failed with Biome format errors for generated
-  shared JS/d.ts outputs until they were formatted.
-  Impact: formatting normalization was required between build and check-fmt in
-  this workspace.
+  `shared/src/types/*.d.ts` files, and `make check-fmt` validates them when
+  they are present. Evidence: `make check-fmt` failed with Biome format errors
+  for generated shared JS/d.ts outputs until they were formatted. Impact:
+  formatting normalization was required between build and check-fmt in this
+  workspace.
 
 ## Decision log
 
 - Decision: add a new config option for maximum WebGL contexts rather than
-  hard-coding `16` only.
-  Rationale: roadmap success criteria references the configured maximum, and
-  design calls out a default with configurability.
+  hard-coding `16` only. Rationale: roadmap success criteria references the
+  configured maximum, and design calls out a default with configurability.
   Date/Author: 2026-02-25 / Codex.
 
 - Decision: model occlusion using viewport hit-testing
   (`document.elementFromPoint`) combined with active-tab and bounds checks.
   Rationale: this captures modal overlays without introducing new global UI
-  state contracts in this milestone.
-  Date/Author: 2026-02-25 / Codex.
+  state contracts in this milestone. Date/Author: 2026-02-25 / Codex.
 
 - Decision: treat `webGLRendererMaxContexts` as a positive integer and fall
-  back to default when invalid values are encountered.
-  Rationale: the pool requires an integer capacity and roadmap success criteria
-  depend on deterministic cap enforcement.
-  Date/Author: 2026-02-25 / Codex.
+  back to default when invalid values are encountered. Rationale: the pool
+  requires an integer capacity and roadmap success criteria depend on
+  deterministic cap enforcement. Date/Author: 2026-02-25 / Codex.
 
 ## Outcomes & retrospective
 

@@ -41,7 +41,8 @@ codebase structure and behaviour described in the technical specification
 
 - A host migration path from the current Electron split-brain architecture to a
 
-&nbsp; Tauri host, with a longer-term target of a remote-capable backend protocol
+&nbsp; Tauri host, with a longer-term target of a remote-capable backend
+protocol
 
 &nbsp; using protobuf over WebSocket.
 
@@ -77,13 +78,15 @@ The TS documents several constraints that directly influence this design:
 
 - WebGL contexts are limited (the TS references a maximum of 16 simultaneous
 
-&nbsp; contexts), and Velocetty should prioritize visible panes and fall back to a
+&nbsp; contexts), and Velocetty should prioritize visible panes and fall back
+to a
 
 &nbsp; Canvas renderer when needed.[^techspec]
 
 - The current plugin system is full-trust and decorates UI and behaviour via
 
-&nbsp; 40+ hooks, including keymap and tab decoration hooks; error handling relies
+&nbsp; 40+ hooks, including keymap and tab decoration hooks; error handling
+relies
 
 &nbsp; on try/catch isolation rather than sandboxing.[^techspec]
 
@@ -121,7 +124,8 @@ goals around Tauri and a remote frontend with a versioned protocol.[^prd]
 
 - Migrate configuration to JSON5 for human-friendly editing, and use it as the
 
-&nbsp; canonical source for app configuration, keybindings, and plugin settings.[^prd]
+&nbsp; canonical source for app configuration, keybindings, and plugin
+settings.[^prd]
 
 - Add a settings tab that supports:
 
@@ -131,7 +135,8 @@ goals around Tauri and a remote frontend with a versioned protocol.[^prd]
 
 &nbsp; \-Schema-driven plugin settings panels by default.
 
-&nbsp; \-Optional custom plugin settings panels with an explicit trust model.[^prd]
+&nbsp; \-Optional custom plugin settings panels with an explicit trust
+model.[^prd]
 
 - Implement vertical tabs with rich metadata and a stable tab decoration API
 
@@ -157,7 +162,8 @@ goals around Tauri and a remote frontend with a versioned protocol.[^prd]
 
 - Persisting terminal scrollback or full session state across restarts (the TS
 
-&nbsp; explicitly avoids this for security and behavioural consistency).[^techspec]
+&nbsp; explicitly avoids this for security and behavioural
+consistency).[^techspec]
 
 - Designing a public plugin registry, payment model, or marketplace UX (out of
 
@@ -181,11 +187,14 @@ The current system can be summarized as:
 
 - Renderer (`lib/`): React UI components, Redux store/reducers/actions, xterm.js
 
-&nbsp; terminal instances, and a command registry used by keymaps/menus.[^techspec]
+&nbsp; terminal instances, and a command registry used by
+keymaps/menus.[^techspec]
 
-- Transport: typed RPC over Electron IPC (`app/rpc.ts`, `lib/utils/rpc.ts`).[^techspec]
+- Transport: typed RPC over Electron IPC (`app/rpc.ts`,
+  `lib/utils/rpc.ts`).[^techspec]
 
-- Config: file-based JSON with schema validation and hot reload (`app/config/`).[^techspec]
+- Config: file-based JSON with schema validation and hot reload
+  (`app/config/`).[^techspec]
 
 - Plugins: full-trust, loaded from the config directory, supporting 40+ hooks,
 
@@ -286,13 +295,15 @@ flowchart TB
 
 - Plugin integration uses explicit, stable extension points and data models.
 
-&nbsp; Plugins contribute providers and schema, rather than overriding internal UI
+&nbsp; Plugins contribute providers and schema, rather than overriding internal
+UI
 
 &nbsp; components.[^prd]
 
 - The protocol surface is versioned, typed, and testable. Electron IPC remains
 
-&nbsp; an interim transport, but the system should converge on a protobuf-defined
+&nbsp; an interim transport, but the system should converge on a
+protobuf-defined
 
 &nbsp; protocol that can run locally and remotely.[^prd]
 
@@ -302,7 +313,8 @@ flowchart TB
 
 
 
-The PRD calls out an explicit `frontend/`, `backend/`, and `shared/` split.[^prd]
+The PRD calls out an explicit `frontend/`, `backend/`, and `shared/`
+split.[^prd]
 
 This approach maps the existing code during migration.
 
@@ -316,7 +328,8 @@ Proposed structure:
 
 
 
-&nbsp; \-React UI, state management, command palette, settings UI, vertical tabs,
+&nbsp; \-React UI, state management, command palette, settings UI, vertical
+tabs,
 
 &nbsp;   xterm.js integration, rendering scheduler, plugin runtime.
 
@@ -324,7 +337,8 @@ Proposed structure:
 
 
 
-&nbsp; \-Privileged services: PTY management, config I/O and watching, plugin store,
+&nbsp; \-Privileged services: PTY management, config I/O and watching, plugin
+store,
 
 &nbsp;   auth/authz, update integration, and backend command handlers.
 
@@ -332,7 +346,8 @@ Proposed structure:
 
 
 
-&nbsp; \-Types, JSON Schemas, command definitions, keybinding parser/types, protobuf
+&nbsp; \-Types, JSON Schemas, command definitions, keybinding parser/types,
+protobuf
 
 &nbsp;   definitions, and cross-cutting constants.
 
@@ -342,19 +357,19 @@ Migration mapping from the current codebase (illustrative):
 
 
 
-| Current location                 | Target location                          | Notes                                                                       |
+| Current location | Target location | Notes |
 
 | -------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------- |
 
-| `lib/`                           | `frontend/`                              | UI + Redux can be migrated incrementally.                                   |
+| `lib/` | `frontend/` | UI + Redux can be migrated incrementally. |
 
-| `app/session.ts`                 | `backend/pty/`                           | Re-implemented in Rust for Tauri, but keep semantics (batching).[^techspec] |
+| `app/session.ts` | `backend/pty/` | Re-implemented in Rust for Tauri, but keep semantics (batching).[^techspec] |
 
-| `app/config/`                    | `backend/config/` + `shared/schemas/`    | JSON5 parsing, schema validation, layered config.                           |
+| `app/config/` | `backend/config/` + `shared/schemas/` | JSON5 parsing, schema validation, layered config. |
 
-| `app/plugins.ts`                 | `backend/plugins/` + `frontend/plugins/` | Backend manages installation; frontend runs providers.                      |
+| `app/plugins.ts` | `backend/plugins/` + `frontend/plugins/` | Backend manages installation; frontend runs providers. |
 
-| `app/rpc.ts`, `lib/utils/rpc.ts` | `shared/proto/` + transport adapters     | Electron IPC adapter initially, WebSocket target.                           |
+| `app/rpc.ts`, `lib/utils/rpc.ts` | `shared/proto/` + transport adapters | Electron IPC adapter initially, WebSocket target. |
 
 
 
@@ -687,8 +702,8 @@ Interim Electron integration:
 ### URL context menus
 
 Recognized URL targets should expose a secondary-click context menu with only
-two entries: `Open` and `Copy URL`. This applies to xterm.js-detected web
-links and other renderer surfaces that present validated URLs.[^prd]
+two entries: `Open` and `Copy URL`. This applies to xterm.js-detected web links
+and other renderer surfaces that present validated URLs.[^prd]
 
 - `link.open` accepts a validated URL argument and forwards it to the external
 
@@ -716,7 +731,8 @@ links and other renderer surfaces that present validated URLs.[^prd]
 
 - Backend commands: include a cancellation token in the protobuf invocation and
 
-&nbsp; support cancellation for long-running operations (for example, plugin install
+&nbsp; support cancellation for long-running operations (for example, plugin
+install
 
 &nbsp; or filesystem search).
 
@@ -818,7 +834,8 @@ Deterministic resolution rules:
 
 &nbsp; \-Prefer more specific `when` expressions (heuristic: more AST nodes).
 
-&nbsp; \-Break ties by stable ordering (lexicographic by `sourceId:command:keys`).
+&nbsp; \-Break ties by stable ordering (lexicographic by
+`sourceId:command:keys`).
 
 
 
@@ -894,15 +911,15 @@ product name):
 
 
 
-| Platform | Config directory                                      | Files                                           |
+| Platform | Config directory | Files |
 
 | -------- | ----------------------------------------------------- | ----------------------------------------------- |
 
-| Linux    | `$XDG_CONFIG_HOME/Velocetty` or `~/.config/Velocetty` | `config.json5`, `keybindings.json5`, `plugins/` |
+| Linux | `$XDG_CONFIG_HOME/Velocetty` or `~/.config/Velocetty` | `config.json5`, `keybindings.json5`, `plugins/` |
 
-| macOS    | `~/.config/Velocetty`                                 | same                                            |
+| macOS | `~/.config/Velocetty` | same |
 
-| Windows  | `%APPDATA%\\\\Velocetty`                                | same                                            |
+| Windows | `%APPDATA%\\\\Velocetty` | same |
 
 
 
@@ -1047,7 +1064,8 @@ The settings UI should surface which settings require restart.
 
 
 The PRD requires a settings tab integrated with the command system.[^prd]
-Settings are implemented as a tab type (`tabType = "settings"`), not a modal, so it
+Settings are implemented as a tab type (`tabType = "settings"`), not a modal,
+so it
 
 can participate in navigation and state.
 
@@ -1173,7 +1191,8 @@ be explicit:
 
 - Custom panels: allowed only for plugins marked `trusted: true` and only in
 
-&nbsp; desktop-local mode (not in a remote browser UI), unless explicitly enabled
+&nbsp; desktop-local mode (not in a remote browser UI), unless explicitly
+enabled
 
 &nbsp; per-connection.
 
@@ -1387,7 +1406,8 @@ Plugin settings persist into `config.json5` under a namespace, for example:
 
 
 
-This aligns with the PRD requirement for namespaced plugin settings in JSON5.[^prd]
+This aligns with the PRD requirement for namespaced plugin settings in
+JSON5.[^prd]
 
 
 
@@ -1731,7 +1751,8 @@ Context loss recovery:
 
 - For PTY output bursts, continue using batching semantics akin to the TS data
 
-&nbsp; batcher (16 ms / 200 KB thresholds) to avoid overwhelming the UI thread.[^techspec]
+&nbsp; batcher (16 ms / 200 KB thresholds) to avoid overwhelming the UI
+thread.[^techspec]
 
 - Ensure pane resize operations coalesce via `ResizeObserver`.
 
@@ -1881,21 +1902,21 @@ to that same contract without changing the frontend-facing service layer.
 
 ### Migration follow-up concerns
 
-Current Electron transport work provides a functional command/event
-façade, but the architecture is not yet fully host-agnostic:
+Current Electron transport work provides a functional command/event façade, but
+the architecture is not yet fully host-agnostic:
 
 - `window.rpc` remains available for legacy renderer consumers
-  outside the command layer, so the migration map should treat
-  those consumers as follow-up work.
+  outside the command layer, so the migration map should treat those consumers
+  as follow-up work.
 - Renderer bootstrap still uses the Electron transport directly;
-  a host selection seam should be introduced once transport
-  composition is stabilized.
+  a host selection seam should be introduced once transport composition is
+  stabilized.
 - Continue to harden bootstrap event-path assertions (for
-  example: `ready`, `session add`, and `update available`) to
-  defend transport-swap regressions.
+  example: `ready`, `session add`, and `update available`) to defend
+  transport-swap regressions.
 - Keep bootstrap transport integration assertions focused on
-  injected bootstrap seams so transport event wiring can be
-  exercised without process-isolated module-mock quarantine.
+  injected bootstrap seams so transport event wiring can be exercised without
+  process-isolated module-mock quarantine.
 
 
 
@@ -2125,9 +2146,9 @@ Design:
 
 &nbsp; \-Keybinding capture integration with xterm focus.
 
-&nbsp; \-Plugin contribution loading and enable/disable flows.
-&nbsp; - Transport bootstrap event-path assertions should run in the shared unit
-&nbsp;   suite through dependency-injected bootstrap seams.
+&nbsp; \-Plugin contribution loading and enable/disable flows. &nbsp; -
+Transport bootstrap event-path assertions should run in the shared unit &nbsp;
+suite through dependency-injected bootstrap seams.
 
 - Performance tests:
 
@@ -2191,7 +2212,8 @@ This follows the PRD sequencing, expressed as roadmap-style tasks.[^prd]
 
 
 
-&nbsp; \-\[ ] Registers one command, one keybinding, one settings schema section, and
+&nbsp; \-\[ ] Registers one command, one keybinding, one settings schema
+section, and
 
 &nbsp;   one tab decoration provider.
 
@@ -2297,13 +2319,15 @@ This follows the PRD sequencing, expressed as roadmap-style tasks.[^prd]
 
 - Plugin trust and remote: default to schema-driven settings panels, restrict
 
-&nbsp; custom panels by trust and environment, and implement backend redaction for
+&nbsp; custom panels by trust and environment, and implement backend redaction
+for
 
 &nbsp; sensitive metadata.[^prd]
 
 - Migration cost: maintain an interim Electron transport adapter, and avoid
 
-&nbsp; shipping Electron-specific assumptions into the command and config layers.
+&nbsp; shipping Electron-specific assumptions into the command and config
+layers.
 
 
 
@@ -2313,7 +2337,8 @@ This follows the PRD sequencing, expressed as roadmap-style tasks.[^prd]
 
 - Final naming and location conventions for config and plugin directories (the
 
-&nbsp; TS uses `Hyper` paths today; this design proposes `Velocetty`).[^techspec]
+&nbsp; TS uses `Hyper` paths today; this design proposes
+`Velocetty`).[^techspec]
 
 - Whether to support workspace-level overrides in the initial release, or defer
 
@@ -2329,7 +2354,7 @@ This follows the PRD sequencing, expressed as roadmap-style tasks.[^prd]
 
 
 
-- --
+______________________________________________________________________
 
 
 

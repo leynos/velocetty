@@ -5,17 +5,16 @@
 - Purpose: deliver roadmap item `1.2.2` by implementing a typed context key
   service plus deterministic `when` expression parsing and evaluation.
 - Invariants: keep grammar intentionally small (`&&`, `||`, `!`,
-  `==`, `!=`, `<`, `<=`, `>`, `>=`, grouping), avoid new dependencies,
-  and keep behaviour deterministic across runs.
+  `==`, `!=`, `<`, `<=`, `>`, `>=`, grouping), avoid new dependencies, and keep
+  behaviour deterministic across runs.
 - Cross-links: `docs/roadmap.md`, `docs/velocetty-design.md`,
   `docs/velocetty-hyper-codebase.md`,
   `docs/velocetty-product-requirements-document.md`, and
   `docs/developers-guide.md`.
 
-This Execution Plan (ExecPlan) is a living document.
-The sections `Constraints`, `Tolerances`, `Risks`, `Progress`,
-`Surprises & discoveries`, `Decision log`, and
-`Outcomes & retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE (2026-02-19)
 
@@ -25,17 +24,17 @@ self-contained.
 ## Purpose / big picture
 
 Roadmap item `1.2.2` is the foundation for context-aware keybinding resolution
-and command enablement. The design requires explicit context keys,
-`when` expressions parsed into an abstract syntax tree (AST), and
-deterministic evaluation against a key/value map. Without this milestone,
-downstream roadmap items that depend on `when` semantics remain blocked.
+and command enablement. The design requires explicit context keys, `when`
+expressions parsed into an abstract syntax tree (AST), and deterministic
+evaluation against a key/value map. Without this milestone, downstream roadmap
+items that depend on `when` semantics remain blocked.
 
 After this work:
 
 - `when` expressions are parsed once into a typed AST with logical operators,
   comparisons, literals, and grouping.
-- Evaluations run against a typed context-key map (`boolean | string | number |
-  null`) with deterministic outcomes.
+- Evaluations run against a typed context-key map
+  (`boolean | string | number | null`) with deterministic outcomes.
 - Unit tests prove operator handling, precedence/grouping, comparison semantics,
   parse failures, and repeated-run determinism.
 
@@ -70,24 +69,17 @@ After this work:
 ## Risks
 
 - Risk: ambiguous truthiness rules for typed context values could create
-  surprises in downstream keybinding resolution.
-  Severity: high
-  Likelihood: medium
-  Mitigation: encode explicit evaluation rules in code and assert them via
-  unit tests.
+  surprises in downstream keybinding resolution. Severity: high Likelihood:
+  medium Mitigation: encode explicit evaluation rules in code and assert them
+  via unit tests.
 
 - Risk: parser precedence bugs could produce non-obvious mismatches from design
-  examples.
-  Severity: high
-  Likelihood: medium
-  Mitigation: include precedence/grouping tests and deterministic parse-shape
-  assertions.
+  examples. Severity: high Likelihood: medium Mitigation: include
+  precedence/grouping tests and deterministic parse-shape assertions.
 
 - Risk: parse errors could be too opaque for future keybinding diagnostics.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: return parse errors with stable index details and assert their
-  shape in tests.
+  Severity: medium Likelihood: medium Mitigation: return parse errors with
+  stable index details and assert their shape in tests.
 
 ## Progress
 
@@ -132,23 +124,20 @@ After this work:
 ## Decision log
 
 - Decision: implement a small recursive-descent parser in-repo instead of adding
-  an external parsing dependency.
-  Rationale: grammar is intentionally minimal and dependency-free parsing keeps
-  behaviour explicit and testable.
+  an external parsing dependency. Rationale: grammar is intentionally minimal
+  and dependency-free parsing keeps behaviour explicit and testable.
   Date/Author: 2026-02-19 / Codex
 
 - Decision: expose shared AST/value types under `shared/src/types/` and keep
-  runtime service logic in `lib/`.
-  Rationale: this preserves package-boundary direction and future reuse by both
-  frontend and backend command/keybinding engines.
-  Date/Author: 2026-02-19 / Codex
+  runtime service logic in `lib/`. Rationale: this preserves package-boundary
+  direction and future reuse by both frontend and backend command/keybinding
+  engines. Date/Author: 2026-02-19 / Codex
 
 - Decision: split parser and evaluator into `lib/context-key-parser.ts` and
   `lib/context-key-evaluator.ts`, keeping `lib/context-key-service.ts` as the
-  runtime service wrapper and public export surface.
-  Rationale: satisfies the repository guard that no single code file exceeds
-  400 lines while preserving readability and testability.
-  Date/Author: 2026-02-19 / Codex
+  runtime service wrapper and public export surface. Rationale: satisfies the
+  repository guard that no single code file exceeds 400 lines while preserving
+  readability and testability. Date/Author: 2026-02-19 / Codex
 
 ## Outcomes & retrospective
 

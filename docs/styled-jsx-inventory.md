@@ -8,20 +8,20 @@ Velocetty repository. It serves as a reference for the migration to CSS Modules
 
 The repository contains **13 styled-jsx blocks** across **12 files**:
 
-| File | Pattern | Block Count | Dynamic Values |
-| ---- | ------- | ----------- | -------------- |
-| `lib/components/terms.tsx` | A (local static) | 1 | None |
-| `lib/components/searchBox.tsx` | B (local dynamic) | 2 | `foregroundColor`, `selectionColor`, `backgroundColor`, `borderColor`, `font` |
-| `lib/components/header.tsx` | A (local static) | 1 | None (uses inline `style=` for `borderColor`) |
-| `lib/components/notifications.tsx` | A (local static) | 1 | None |
-| `lib/components/term.tsx` | C (global) | 1 | None |
-| `lib/components/split-pane.tsx` | A (local static) | 1 | None (uses inline `style=` for `borderColor`) |
-| `lib/components/notification.tsx` | A (local static) | 1 | None (uses inline `style=` for colours) |
-| `lib/components/tabs.tsx` | B (local dynamic) | 1 | `isMac` platform conditionals |
-| `lib/components/tab.tsx` | A (local static) | 1 | None (uses inline `style=` for `borderColor`) |
-| `lib/components/new-tab.tsx` | B (local dynamic) | 1 | `borderColor`, `isMac` |
-| `lib/components/style-sheet.tsx` | C (global) | 1 | `borderColor` |
-| `lib/containers/hyper.tsx` | A (local static) | 1 | None (uses inline `style=` for theme) |
+| File                               | Pattern           | Block Count | Dynamic Values                                                                |
+| ---------------------------------- | ----------------- | ----------- | ----------------------------------------------------------------------------- |
+| `lib/components/terms.tsx`         | A (local static)  | 1           | None                                                                          |
+| `lib/components/searchBox.tsx`     | B (local dynamic) | 2           | `foregroundColor`, `selectionColor`, `backgroundColor`, `borderColor`, `font` |
+| `lib/components/header.tsx`        | A (local static)  | 1           | None (uses inline `style=` for `borderColor`)                                 |
+| `lib/components/notifications.tsx` | A (local static)  | 1           | None                                                                          |
+| `lib/components/term.tsx`          | C (global)        | 1           | None                                                                          |
+| `lib/components/split-pane.tsx`    | A (local static)  | 1           | None (uses inline `style=` for `borderColor`)                                 |
+| `lib/components/notification.tsx`  | A (local static)  | 1           | None (uses inline `style=` for colours)                                       |
+| `lib/components/tabs.tsx`          | B (local dynamic) | 1           | `isMac` platform conditionals                                                 |
+| `lib/components/tab.tsx`           | A (local static)  | 1           | None (uses inline `style=` for `borderColor`)                                 |
+| `lib/components/new-tab.tsx`       | B (local dynamic) | 1           | `borderColor`, `isMac`                                                        |
+| `lib/components/style-sheet.tsx`   | C (global)        | 1           | `borderColor`                                                                 |
+| `lib/containers/hyper.tsx`         | A (local static)  | 1           | None (uses inline `style=` for theme)                                         |
 
 ## Pattern Classification
 
@@ -41,8 +41,8 @@ CSS rules with no dynamic interpolation. These are the simplest to migrate.
 
 ### Pattern B: Local Dynamic (4 blocks)
 
-CSS rules with `${...}` interpolation for theme values or platform conditionals.
-These require mapping dynamic values to CSS custom properties.
+CSS rules with `${...}` interpolation for theme values or platform
+conditionals. These require mapping dynamic values to CSS custom properties.
 
 **Files:**
 
@@ -66,17 +66,15 @@ Uses `<style jsx global>` for global selectors (pseudo-elements like
 
 ### `lib/components/terms.tsx`
 
-**Pattern:** A (local static)
-**Classes:** `.terms_terms`, `.terms_termsShifted`
-**Features:** Keyframe animation `@keyframes shift-down`
+**Pattern:** A (local static) **Classes:** `.terms_terms`,
+`.terms_termsShifted` **Features:** Keyframe animation `@keyframes shift-down`
 **Migration Notes:** Straightforward CSS Module migration; animations work
 identically.
 
 ### `lib/components/searchBox.tsx`
 
-**Pattern:** B (local dynamic)
-**Blocks:** 2 (SearchButton component + search container)
-**Dynamic Values:**
+**Pattern:** B (local dynamic) **Blocks:** 2 (SearchButton component + search
+container) **Dynamic Values:**
 
 - `foregroundColor` - text colour
 - `selectionColor` - focus outline, active state background
@@ -90,42 +88,37 @@ props.
 
 ### `lib/components/header.tsx`
 
-**Pattern:** A (local static)
-**Classes:** `.header_header`, `.header_windowHeader`
-**Migration Notes:** Uses inline `style={{borderColor}}` for dynamic border;
-static styles migrate directly to CSS Module.
+**Pattern:** A (local static) **Classes:** `.header_header`,
+`.header_windowHeader` **Migration Notes:** Uses inline `style={{borderColor}}`
+for dynamic border; static styles migrate directly to CSS Module.
 
 ### `lib/components/notifications.tsx`
 
-**Pattern:** A (local static)
-**Classes:** `.notifications`
-**Migration Notes:** Single class, no dynamic values.
+**Pattern:** A (local static) **Classes:** `.notifications` **Migration
+Notes:** Single class, no dynamic values.
 
 ### `lib/components/term.tsx`
 
-**Pattern:** C (global)
-**Classes:** `.term_fit`, `.term_wrapper`
-**Migration Notes:** Despite `global` attribute, these classes are only used
-within the `Term` component render output and can migrate to regular CSS Module
-classes without `:global()`.
+**Pattern:** C (global) **Classes:** `.term_fit`, `.term_wrapper` **Migration
+Notes:** Despite `global` attribute, these classes are only used within the
+`Term` component render output and can migrate to regular CSS Module classes
+without `:global()`.
 
 ### `lib/components/split-pane.tsx`
 
-**Pattern:** A (local static)
-**Classes:** `.splitpane`, `.splitpane_divider`
+**Pattern:** A (local static) **Classes:** `.splitpane`, `.splitpane_divider`
 **Migration Notes:** Uses inline `style={{borderColor}}` for divider colour.
 
 ### `lib/components/notification.tsx`
 
-**Pattern:** A (local static)
-**Classes:** `.notification`, `.notification_active`
-**Migration Notes:** Uses inline `style=` for background and text colours.
+**Pattern:** A (local static) **Classes:** `.notification`,
+`.notification_active` **Migration Notes:** Uses inline `style=` for background
+and text colours.
 
 ### `lib/components/tabs.tsx`
 
-**Pattern:** B (local dynamic)
-**Classes:** `.tabs_nav`, `.tabs_list`
-**Dynamic Values:** `isMac` conditional for:
+**Pattern:** B (local dynamic) **Classes:** `.tabs_nav`, `.tabs_list` **Dynamic
+Values:** `isMac` conditional for:
 
 - `-webkit-app-region: drag` (Mac only)
 - `top: 0px` (Mac) vs `top: 34px` (non-Mac)
@@ -136,31 +129,26 @@ classes without `:global()`.
 
 ### `lib/components/tab.tsx`
 
-**Pattern:** A (local static)
-**Classes:** `.tab_tab`, `.tab_text`, `.tab_icon`
+**Pattern:** A (local static) **Classes:** `.tab_tab`, `.tab_text`, `.tab_icon`
 **Migration Notes:** Uses inline `style={{borderColor}}` for active indicator.
 
 ### `lib/components/new-tab.tsx`
 
-**Pattern:** B (local dynamic)
-**Classes:** `.new-tab`
-**Dynamic Values:** `borderColor`, `isMac` (for different positioning)
-**Migration Notes:** Combine CSS custom property for colour with modifier class
-for platform conditional.
+**Pattern:** B (local dynamic) **Classes:** `.new-tab` **Dynamic Values:**
+`borderColor`, `isMac` (for different positioning) **Migration Notes:** Combine
+CSS custom property for colour with modifier class for platform conditional.
 
 ### `lib/components/style-sheet.tsx`
 
-**Pattern:** C (global)
-**Selectors:** `::-webkit-scrollbar`, `::-webkit-scrollbar-thumb`,
-`::-webkit-scrollbar-thumb:window-inactive`
-**Dynamic Values:** `borderColor` (scrollbar thumb background)
-**Migration Notes:** Only file requiring `:global()` wrapper. Use CSS custom
-property for dynamic thumb colour scoped to a container element.
+**Pattern:** C (global) **Selectors:** `::-webkit-scrollbar`,
+`::-webkit-scrollbar-thumb`, `::-webkit-scrollbar-thumb:window-inactive`
+**Dynamic Values:** `borderColor` (scrollbar thumb background) **Migration
+Notes:** Only file requiring `:global()` wrapper. Use CSS custom property for
+dynamic thumb colour scoped to a container element.
 
 ### `lib/containers/hyper.tsx`
 
-**Pattern:** A (local static)
-**Classes:** `.hyper_main`, `.hyper_mainRounded`
+**Pattern:** A (local static) **Classes:** `.hyper_main`, `.hyper_mainRounded`
 **Migration Notes:** Uses inline `style=` for theme values. Static border and
 border-radius styles migrate directly.
 

@@ -7,9 +7,8 @@
 - Invariants: Keep Makefile targets and validation steps aligned with
   Continuous Integration (CI) and tooling changes.
 - Cross-links: [Testing with Bun](testing-with-bun.md),
-  [ADR 001](adr-001-replace-ava-with-bun-test.md),
-  [ADR 002](adr-002-replace-webpack-babel-with-esbuild.md), and
-  [Roadmap](roadmap.md).
+  [ADR 001](adr-001-replace-ava-with-bun-test.md), [ADR 002](adr-002-replace-webpack-babel-with-esbuild.md),
+  and [Roadmap](roadmap.md).
 
 This guide captures the development practices specific to the Velocetty
 repository. It is intentionally concise and focused on the steps developers
@@ -41,8 +40,8 @@ cache remains usable offline.
 Do not edit `typos.toml` directly. Preserve public APIs, serialized schema
 keys, CSS syntax, upstream action inputs, dependency names and formal product
 terms through narrow local policy. Keep quoted identifiers in inline code or
-fenced blocks. The exact phrase gate rejects the hyphenated variant in favour
-of `handwritten`, including in hidden tracked source.
+fenced blocks. The exact phrase gate rejects the hyphenated variant in favour of
+`handwritten`, including in hidden tracked source.
 
 `make nixie` validates the repository's Mermaid diagrams. Continuous
 Integration installs Nixie 1.1.0 and its Merman 0.7.0 dependency on the Linux
@@ -68,8 +67,8 @@ build leg without changing the product's cross-platform toolchain matrix.
   them, such as `:global(.tabs_list)` in `tabs.module.css`; document every new
   compatibility class at usage site.
 - Centralize reusable token values in component-level custom properties
-  (for example `--search-*`, `--tab-*`, `--header-*`) and avoid magic literals in
-  `.module.css` declarations.
+  (for example `--search-*`, `--tab-*`, `--header-*`) and avoid magic literals
+  in `.module.css` declarations.
 - Keep `.module.css` scoped styles for component ownership, and use global CSS
   files only for app shell, base resets, and third-party plugin interop.
 
@@ -84,24 +83,22 @@ development:
 
 This split is currently an architectural boundary with incremental migration.
 Runtime modules still live primarily in `lib/` (frontend) and `app/` (backend).
-Treat those folders as the active implementation roots until follow-on migration
-work moves modules under `frontend/src` and `backend/src`.
+Treat those folders as the active implementation roots until follow-on
+migration work moves modules under `frontend/src` and `backend/src`.
 
 Dependency direction must remain one-way:
 
 - `frontend -> shared`
 - `backend -> shared`
 
-`frontend` must not import `backend`, and `backend` must not import
-`frontend`.
+`frontend` must not import `backend`, and `backend` must not import `frontend`.
 
 Approved exception:
 
 - `lib/components/term.tsx` may import
-  `../../app/utils/renderer-utils` to reuse
-  `createRuntimeLatencyMetrics` as the single latency-metrics factory.
-  This exception is explicitly allow-listed in
-  `scripts/check-package-boundaries.mjs`.
+  `../../app/utils/renderer-utils` to reuse `createRuntimeLatencyMetrics` as
+  the single latency-metrics factory. This exception is explicitly allow-listed
+  in `scripts/check-package-boundaries.mjs`.
 
 Use shared imports via TypeScript path aliases:
 
@@ -112,9 +109,9 @@ Use shared imports via TypeScript path aliases:
 For `app/` main-process runtime modules compiled into `dist/app/` via `tsgo`,
 TypeScript path aliases are type-checking conveniences only. Do not add bare
 runtime `@shared/*` value imports in `app/` modules unless the build pipeline
-also materializes runtime-resolvable modules under `dist/app/`. Use `import type`
-for shared contracts and prefer app-local runtime adapters/constants for
-main-process runtime dependencies.
+also materializes runtime-resolvable modules under `dist/app/`. Use
+`import type` for shared contracts and prefer app-local runtime
+adapters/constants for main-process runtime dependencies.
 
 Boundary validation is enforced by `bun run check:boundaries`, which runs as
 part of `bun run lint` and therefore `make lint`.
@@ -128,31 +125,29 @@ Follow-up hardening tracked in `docs/tracking-issues.md`:
 ## Transport abstraction practice
 
 - All internal Velocetty renderer code (command-layer modules **and**
-  component-level UI modules) must use `lib/transport/` adapters instead
-  of direct Electron inter-process communication (IPC) imports or
-  `window.rpc` calls.
+  component-level UI modules) must use `lib/transport/` adapters instead of
+  direct Electron inter-process communication (IPC) imports or `window.rpc`
+  calls.
 - `window.rpc` remains available as a global for backward-compatible
-  plugin API access only; internal Velocetty modules must not depend on
-  it.
+  plugin API access only; internal Velocetty modules must not depend on it.
 - For command execution and renderer event streams, use
-  `RendererCommandTransport` from `@shared/types/transport` and
-  `transport` from `lib/transport` (barrel module). Do not import the
-  Electron-specific adapter directly.
+  `RendererCommandTransport` from `@shared/types/transport` and `transport` from
+  `lib/transport` (barrel module). Do not import the Electron-specific adapter
+  directly.
 - Keep host-specific IPC details inside `lib/transport` adapters and
   keep command modules only concerned with transport contracts.
 - IPC responses are validated at the transport boundary via zod schemas
-  in `lib/transport/ipc-schemas.ts`. When adding a new `IpcCommands`
-  entry, add a corresponding schema to the registry so responses are
-  validated before reaching application code.
+  in `lib/transport/ipc-schemas.ts`. When adding a new `IpcCommands` entry, add
+  a corresponding schema to the registry so responses are validated before
+  reaching application code.
 - Add or update transport adapter tests when changing invocation or
-  subscription paths (for example,
-  `test/unit/electron-ipc-transport.test.ts`). For component-level
-  transport usage, mock `lib/transport/electron-ipc-transport` and
-  verify `on`/`off`/`emit` calls to confirm correct wiring without
-  coupling to internal component rendering behaviour.
+  subscription paths (for example, `test/unit/electron-ipc-transport.test.ts`).
+  For component-level transport usage, mock
+  `lib/transport/electron-ipc-transport` and verify `on`/`off`/`emit` calls to
+  confirm correct wiring without coupling to internal component rendering
+  behaviour.
 - Track progress against `lib/TRANSPORT_MIGRATION_MAP.md` and keep all
-  transport-facing command and bootstrap-path follow-ups visible before
-  any PR.
+  transport-facing command and bootstrap-path follow-ups visible before any PR.
 
 Package-local build checks are available via:
 
@@ -207,8 +202,8 @@ for active configuration files:
 
 ## Configuration layering and reloadability practice
 
-Roadmap item `3.1.2` defines configuration layering rules and hot-reload semantics.
-Follow these rules when adding or changing configuration settings:
+Roadmap item `3.1.2` defines configuration layering rules and hot-reload
+semantics. Follow these rules when adding or changing configuration settings:
 
 ### Layering rules
 
@@ -225,8 +220,8 @@ Merge semantics:
 - **Objects**: deep merge (nested properties recursively merged).
 - **Arrays**: replace (user array completely replaces default array).
 
-Use `resolveConfigLayers()` from `app/config/layering.ts` to resolve the effective
-configuration:
+Use `resolveConfigLayers()` from `app/config/layering.ts` to resolve the
+effective configuration:
 
 ```typescript
 import {resolveConfigLayers} from './config/layering';
@@ -243,8 +238,10 @@ const effectiveConfig = resolveConfigLayers(defaults, userConfig, runtimeOverrid
 
 Every configuration key must have a reloadability classification:
 
-- **`live`**: Changes apply immediately without restart (theme, fonts, keybindings).
-- **`restart`**: Changes require application restart (shell settings, update channel).
+- **`live`**: Changes apply immediately without restart (theme, fonts,
+  keybindings).
+- **`restart`**: Changes require application restart (shell settings, update
+  channel).
 
 Classify new settings in `shared/src/constants/config-reloadability.ts`:
 
@@ -258,18 +255,18 @@ newSetting: {
 
 Classification guidelines:
 
-| Live-reloadable | Restart-required |
-| --------------- | ---------------- |
-| Theme/UI appearance (colours, padding) | Backend transport (shell, shellArgs) |
-| Font settings (family, size, weight) | Update channel / auto-update settings |
-| Cursor appearance (shape, blink, colour) | Environment variables (env) |
-| Keybindings | WebGL renderer (deferred to CONFIG-001) |
-| Custom CSS (css, termCSS) | Process-level configuration |
+| Live-reloadable                          | Restart-required                        |
+| ---------------------------------------- | --------------------------------------- |
+| Theme/UI appearance (colours, padding)   | Backend transport (shell, shellArgs)    |
+| Font settings (family, size, weight)     | Update channel / auto-update settings   |
+| Cursor appearance (shape, blink, colour) | Environment variables (env)             |
+| Keybindings                              | WebGL renderer (deferred to CONFIG-001) |
+| Custom CSS (css, termCSS)                | Process-level configuration             |
 
 ### Detecting and handling config changes
 
-Use `createReloadHandler()` from `app/config/reload-handler.ts` to process config
-reloads with automatic classification:
+Use `createReloadHandler()` from `app/config/reload-handler.ts` to process
+config reloads with automatic classification:
 
 ```typescript
 import {createReloadHandler} from './config/reload-handler';
@@ -295,7 +292,8 @@ When building settings UI components:
 
 1. Use `useConfigReloadability({configKey})` to obtain `requiresRestart` and
    `classification` for a setting.
-2. Display restart-required indicators using `RestartRequiredIndicator` component,
+2. Display restart-required indicators using `RestartRequiredIndicator`
+   component,
    passing `requiresRestart` from the hook.
 3. Show inline warnings when users modify non-reloadable settings using
    `InlineRestartWarning` component, passing `classification` from the hook.
@@ -337,7 +335,8 @@ function ShellSetting() {
 
 Add unit tests when adding new configuration settings:
 
-- Verify reloadability classification via `test/unit/config-reloadability.test.ts`.
+- Verify reloadability classification via
+  `test/unit/config-reloadability.test.ts`.
 - Validate merge semantics in `test/unit/config-layering.test.ts`.
 - Test hot-reload detection in `test/unit/config-hot-reload.test.ts`.
 
@@ -345,7 +344,8 @@ Add unit tests when adding new configuration settings:
 
 The following features are explicitly deferred:
 
-- **WebGL renderer hot-reload**: Tracked under CONFIG-001 in `docs/tracking-issues.md`.
+- **WebGL renderer hot-reload**: Tracked under CONFIG-001 in
+  `docs/tracking-issues.md`.
 - **Workspace-level overrides**: Will be implemented in a future milestone.
 
 ## Visible-only WebGL rendering practice
@@ -354,8 +354,8 @@ Roadmap item `2.1.1` introduces visible-only WebGL allocation. Follow these
 rules when changing terminal rendering behaviour:
 
 - Use the pane visibility model in `lib/utils/pane-visibility.ts`, which treats
-  a pane as visible only when it is on the active tab, has non-zero bounds,
-  and is not occluded.
+  a pane as visible only when it is on the active tab, has non-zero bounds, and
+  is not occluded.
 - Use `lib/utils/webgl-context-pool.ts` for WebGL allocation bookkeeping. Do
   not add ad hoc per-component context counters.
 - Keep renderer switching in `lib/components/term.tsx` and continue reporting
@@ -419,9 +419,8 @@ evidence capture.
   `bun run benchmark:pty-frame-timing -- --evidence-path /tmp/<name>.json`.
 - The benchmark verifies the current runtime batching contract from
   `shared/src/constants/runtime-telemetry.ts` mirrored in
-  `app/constants/runtime-telemetry.ts`
-  (`PTY_BATCH_DURATION_MS = 16` and `PTY_BATCH_MAX_BYTES = 200 * 1024`) as used
-  by `app/session.ts`.
+  `app/constants/runtime-telemetry.ts` (`PTY_BATCH_DURATION_MS = 16` and
+  `PTY_BATCH_MAX_BYTES = 200 * 1024`) as used by `app/session.ts`.
 - Treat benchmark output as valid only when all checks are `true` and `passed`
   is `true`.
 - Runtime telemetry for this milestone is emitted through
@@ -502,8 +501,8 @@ ordering and milestone gates.
 
 ## Electron runtime alignment
 
-When upgrading Electron, keep runtime and native-module rebuild settings aligned
-in the same change:
+When upgrading Electron, keep runtime and native-module rebuild settings
+aligned in the same change:
 
 - Update `devDependencies.electron` in `package.json`.
 - Align `@types/node` in `package.json` to the bundled Node.js major for the
@@ -517,7 +516,8 @@ in the same change:
   same Node.js major family.
 - Run `bun install` to validate snapshot generation, `install-app-deps`, and
   `node-pty` rebuilding before running the remaining gates.
-- The installation pipeline intentionally invokes `node bin/copy-node-modules.mjs`
+- The installation pipeline intentionally invokes
+  `node bin/copy-node-modules.mjs`
   during postinstall. Bun remains the default runner elsewhere, but Node's
   native copy path is currently the stable option for mirroring large
   `node_modules` trees on Linux/Windows Subsystem for Linux (WSL) after
@@ -541,8 +541,7 @@ CI Python/node-gyp baseline after roadmap item `1.4.15` macOS scope:
   the same job, so Python and node-gyp resolution stay deterministic.
 - Run this isolated Python bootstrap before `bun install`; this keeps hosted
   macOS lanes compliant with Python Enhancement Proposal (PEP) 668
-  (`externally-managed-environment`) and
-  avoids host-level Python mutation.
+  (`externally-managed-environment`) and avoids host-level Python mutation.
 
 Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
 
@@ -554,8 +553,8 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   `.github/actions/install-linux-e2e-runtime-deps/action.yml` so fast-lane and
   deep-lane jobs stay in sync.
 - Before running `bun install` on Linux aarch64 CI lanes, provision
-  `qemu-x86_64-static`, add the `amd64` dpkg architecture, and install the required
-  x86_64 runtime libraries (`libc6`, `libstdc++6`, `libgcc-s1`,
+  `qemu-x86_64-static`, add the `amd64` dpkg architecture, and install the
+  required x86_64 runtime libraries (`libc6`, `libstdc++6`, `libgcc-s1`,
   `libglib2.0-0`, `libexpat1`, and `libpcre2-8-0`) so Electron's x64
   `mksnapshot` and `v8_context_snapshot_generator` binaries can run.
 - On Ubuntu arm runners that default to `ports.ubuntu.com`, use explicit apt
@@ -568,9 +567,8 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   `amd64` multiarch enabled.
 - The shared Linux dependency installation action resolves the
   Advanced Linux Sound Architecture (ALSA) runtime package by availability
-  (`libasound2t64` on newer Ubuntu releases,
-  `libasound2` on Ubuntu 22.04) so the same workflow configuration works across
-  Jammy and Noble runners.
+  (`libasound2t64` on newer Ubuntu releases, `libasound2` on Ubuntu 22.04) so
+  the same workflow configuration works across Jammy and Noble runners.
 - After provisioning amd64 runtime packages on Linux aarch64 CI lanes, export
   `QEMU_LD_PREFIX=/` so Quick Emulator (QEMU) resolves x86_64 shared libraries
   from the host multiarch rootfs.
@@ -591,8 +589,7 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   before other gates and keep `npm_config_node_gyp` pointed at the workspace
   `node-gyp` entrypoint in CI jobs that rebuild native modules.
 
-Windows runtime reliability baseline after roadmap item `1.4.15` Windows
-scope:
+Windows runtime reliability baseline after roadmap item `1.4.15` Windows scope:
 
 - Keep Windows CI on `windows-2022` (x64) in the shared build matrix and run
   Windows install in a dedicated workflow step. This retains Visual Studio 2022
@@ -603,8 +600,8 @@ scope:
   `npm_config_python`, and `npm_config_node_gyp` from step outputs for the
   install step.
 - Windows CI run `22405749378` (2026-02-25) exposed a native rebuild failure in
-  `Install (Windows)`: `bun install` can fail with `Executable not found in
-  $PATH: "node-gyp.cmd"`.
+  `Install (Windows)`: `bun install` can fail with
+  `Executable not found in $PATH: "node-gyp.cmd"`.
 - Mitigate this Windows-only failure mode by running
   `bun install --ignore-scripts` before the full `bun install`, then prepending
   `node_modules/.bin` to `PATH` so `node-gyp.cmd` is available during native
@@ -613,9 +610,8 @@ scope:
   early on the repository override graph (`Override without name`) before Bun
   install starts.
 - After the scriptless Bun bootstrap, ensure `node_modules/.bin/node-gyp.cmd`
-  exists.
-  Bun's Windows package shim can expose `node-gyp` without the `.cmd` wrapper;
-  create a minimal `node-gyp.cmd` launcher that delegates to
+  exists. Bun's Windows package shim can expose `node-gyp` without the `.cmd`
+  wrapper; create a minimal `node-gyp.cmd` launcher that delegates to
   `..\node-gyp\bin\node-gyp.js` before running `bun install`.
 - For Windows install, map `TMP`, `TEMP`, and `npm_config_tmp` to
   `${{ runner.temp }}` so `node-gyp` extraction uses a deterministic writable
@@ -628,18 +624,17 @@ scope:
   unstable network environments.
 - Keep `npm_config_node_gyp` in the forward-slash form used by the
   `Install (Windows)` step in `.github/workflows/nodejs.yml`:
-  `${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js`.
-  Preserve this forward-slash `npm_config_node_gyp` value to avoid introducing
+  `${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js`. Preserve
+  this forward-slash `npm_config_node_gyp` value to avoid introducing
   path-separator regressions.
 - Keep `bin/rebuild-node-pty.cjs` running node-gyp through the Node executable
   (`NODE` environment variable when present, otherwise `node` on `PATH`), not
   `process.execPath`. CI runs this script via Bun; invoking node-gyp with Bun
   can trigger Windows header-extraction `EINVAL` failures.
 - Keep repository script/config text files normalized to LF in
-  `.gitattributes` for extensions checked by Biome (`*.json`, `*.jsonc`,
-  `*.js`, `*.cjs`, `*.mjs`, `*.ts`, and `*.tsx`). Windows checkout can
-  otherwise convert those files to CRLF and trip `make lint`/Biome formatting
-  checks.
+  `.gitattributes` for extensions checked by Biome (`*.json`, `*.jsonc`, `*.js`,
+  `*.cjs`, `*.mjs`, `*.ts`, and `*.tsx`). Windows checkout can otherwise
+  convert those files to CRLF and trip `make lint`/Biome formatting checks.
 - Windows aarch64 CI is currently blocked by upstream Bun distribution support.
   Evidence (captured 2026-02-25): latest Bun release `bun-v1.3.9` (published
   2026-02-08) includes `bun-windows-x64*` assets and no Windows arm64 asset.
@@ -698,8 +693,8 @@ Run the standard gates before opening a pull request:
 - `make check-fmt`
 - `make lint`
 
-When changes affect command/transport runtime seams or dependency baselines, run
-the full release gate set in this order:
+When changes affect command/transport runtime seams or dependency baselines,
+run the full release gate set in this order:
 
 - `bun install`
 - `make build`
@@ -721,8 +716,9 @@ Supply-chain changes must include a vulnerability scan pass before merge:
 - Generate a human-readable advisory report with `bun audit`.
 - Verify there are no `critical`, `high`, or `moderate` advisories with
   `bun audit --audit-level=moderate`.
-- Produce machine-readable evidence with `bun audit --json
-  --audit-level=moderate` when logs or follow-up automation require it.
+- Produce machine-readable evidence with
+  `bun audit --json --audit-level=moderate` when logs or follow-up automation
+  require it.
 
 Roadmap item `1.4.2` is satisfied only when the moderate-threshold audit run is
 clean. If remediation requires dependency overrides, keep overrides in
@@ -730,10 +726,9 @@ clean. If remediation requires dependency overrides, keep overrides in
 For the current Electron 40 toolchain (`electron-builder@24.x`), keep `ajv`
 aligned with `@develar/schema-utils` and `ajv-keywords@3` by pinning it to
 `6.14.0`; moving back to Ajv 8 without upgrading that stack will break
-`bun install` during postinstall.
-Follow the [Electron runtime alignment](#electron-runtime-alignment) section
-above for the canonical packaged dependency mirror command:
-`node bin/copy-node-modules.mjs`.
+`bun install` during postinstall. Follow the
+[Electron runtime alignment](#electron-runtime-alignment) section above for the
+canonical packaged dependency mirror command: `node bin/copy-node-modules.mjs`.
 
 ## Type checking
 
@@ -743,8 +738,8 @@ Type checking runs via `tsgo` and the shared `tsconfig.typecheck.json` project:
 - `bun run check:types`
 
 `tsgo` 7.0.0-dev.20260128.1 supports `--build`, `--watch`, `--pretty`,
-`--preserveWatchOutput`, and `--project`; the `dev` and `build` scripts rely
-on those flags.
+`--preserveWatchOutput`, and `--project`; the `dev` and `build` scripts rely on
+those flags.
 
 ## Tests
 
@@ -755,8 +750,7 @@ Unit tests run under Bun's built-in test runner. Use one of the following:
 - `bun run test:unit`
 - `bun test test/unit`
 - `bun run test:coverage` (writes text output and an LCOV (line coverage)
-  report under
-  `coverage/`)
+  report under `coverage/`)
 - `make coverage`
 - For roadmap item `9.1.1`, run focused coverage with:
 
@@ -777,10 +771,10 @@ Unit tests run under Bun's built-in test runner. Use one of the following:
 `make test` executes the shared unit suite through `bun run test:unit:run`,
 which runs with `--concurrent` (maximum concurrency) as the default. Roadmap
 item `9.3.1` removed the dedicated bootstrap-process quarantine by moving
-renderer bootstrap assertions behind injected seams instead of file-scope module
-mocks; roadmap item `9.3.2` removed the serialized guardrail from the default
-local and CI unit gate; and roadmap items `9.3.3` through `9.3.7` hardened
-test-suite isolation so explicit concurrency can be the default.
+renderer bootstrap assertions behind injected seams instead of file-scope
+module mocks; roadmap item `9.3.2` removed the serialized guardrail from the
+default local and CI unit gate; and roadmap items `9.3.3` through `9.3.7`
+hardened test-suite isolation so explicit concurrency can be the default.
 
 When checking for order-dependent regressions, replay the unit suite with fixed
 seeds and explicit concurrency:
@@ -809,8 +803,8 @@ bun test --concurrent \
   test/unit/term-report-renderer.test.ts
 ```
 
-This command supplements the default `make test` path and the seeded
-randomized reruns above.
+This command supplements the default `make test` path and the seeded randomized
+reruns above.
 
 For roadmap item `9.3.4` and similar filesystem-fixture isolation work, use a
 focused explicit-concurrency stress run against the directory-bootstrap helper
@@ -825,9 +819,9 @@ directly in the test or via a helper that returns per-test cleanup, so
 ownership is not shared. Do not use a shared file-scope cleanup queue for
 temporary roots in suites that must survive explicit `--concurrent` runs.
 
-For roadmap item `9.3.5` and similar snapshot/bootstrap or CLI-config
-isolation work, use a focused explicit-concurrency stress run against the
-snapshot and CLI behaviour suites:
+For roadmap item `9.3.5` and similar snapshot/bootstrap or CLI-config isolation
+work, use a focused explicit-concurrency stress run against the snapshot and
+CLI behaviour suites:
 
 ```bash
 bun test --concurrent \
@@ -846,9 +840,9 @@ Prefer a per-test API factory with injected filesystem, registry, and
 environment state so explicit `--concurrent` runs keep request history,
 config-path resolution, and parsed-plugin state isolated per test instance.
 
-For roadmap item `9.3.6` and similar concurrency-hotspot cleanup, use a
-focused explicit-concurrency stress run against the remaining long-lived mock
-and global hotspots:
+For roadmap item `9.3.6` and similar concurrency-hotspot cleanup, use a focused
+explicit-concurrency stress run against the remaining long-lived mock and
+global hotspots:
 
 ```bash
 bun test --concurrent \
@@ -992,13 +986,13 @@ sequenceDiagram
 Figure 2: Deep-lane E2E sequence from Bun command orchestration to Playwright
 interaction and reporting.
 
-Before either lane, build packaged artefacts with `bun run dist` if they do
-not already exist.
+Before either lane, build packaged artefacts with `bun run dist` if they do not
+already exist.
 
 ## Default test gate
 
-`make test` runs linting plus the unit test suite. It intentionally omits
-E2E tests to keep the default loop fast.
+`make test` runs linting plus the unit test suite. It intentionally omits E2E
+tests to keep the default loop fast.
 
 ### Sub-component extraction
 
@@ -1013,12 +1007,14 @@ Example: `lib/components/searchBox.tsx` defines `SearchResultsCount` and
 
 ### Translation key conventions
 
-Translation keys live in `lib/hooks/use-translation.ts`. Every key must have
-an English default in `headerLabelDefaults`; partial locale dictionaries
-fall back to the default for any missing key. When adding new labels:
+Translation keys live in `lib/hooks/use-translation.ts`. Every key must have an
+English default in `headerLabelDefaults`; partial locale dictionaries fall back
+to the default for any missing key. When adding new labels:
 
-1. Add the key and its English value to `headerLabelDefaults` in `lib/hooks/use-translation.ts`.
-2. Add translations to each locale dictionary in `translationDictionaries` in `lib/hooks/use-translation.ts`.
+1. Add the key and its English value to `headerLabelDefaults` in
+   `lib/hooks/use-translation.ts`.
+2. Add translations to each locale dictionary in `translationDictionaries` in
+   `lib/hooks/use-translation.ts`.
 3. Add the prop to the presentational component's prop type.
 4. Wire the label into the logic hook (`useSearchBoxLabels`) and then into any
    wrapper that threads those hook-provided labels into the presentational
@@ -1085,6 +1081,6 @@ pattern has two layers:
    ```
 
    **Exception:** `TranslatedSearchBox` in `lib/components/term.tsx` is a
-   documented wrapper component that calls `useTranslation()` directly. This
-   is an intentional exception to the hook-based pattern for historical
+   documented wrapper component that calls `useTranslation()` directly. This is
+   an intentional exception to the hook-based pattern for historical
    compatibility; new code should prefer the `useSearchBoxLabels` approach.

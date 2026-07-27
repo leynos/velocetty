@@ -106,10 +106,9 @@ Scope notes:
 - [x] 1.4.11. Migrate to Electron 28 (see adr-004)
 - [x] 1.4.12. Migrate to Electron 34 (see adr-004)
 - [x] 1.4.13. Migrate to Electron 40 (see adr-004). See
-  [velocetty-design.md](velocetty-design.md) §Host migration: Electron to
-  Tauri and
-  [adr-004-update-electron-40.md](adr-004-update-electron-40.md)
-  §Phase 3: Electron 40 validation.
+  [velocetty-design.md](velocetty-design.md) §Host migration: Electron to Tauri
+  and [adr-004-update-electron-40.md](adr-004-update-electron-40.md) §Phase 3:
+  Electron 40 validation.
   - [x] Align runtime anchors (`electron`, `electron-mksnapshot`,
     `@types/node`, rebuild target, and CI Node baseline).
   - [x] Success criteria: `bun install`, `make build`, `make check-fmt`,
@@ -145,8 +144,8 @@ Scope notes:
     and Windows x64; armv7 lanes are removed; Windows aarch64 is either running
     in CI or explicitly tracked as blocked with a documented mitigation path.
 - [x] 1.4.16. Publish the styled-jsx-to-CSS-Modules migration approach and
-  inventory for Babel removal. Requires 1.4.14.
-  See [adr-002-replace-webpack-babel-with-esbuild.md](adr-002-replace-webpack-babel-with-esbuild.md)
+  inventory for Babel removal. Requires 1.4.14. See
+  [adr-002-replace-webpack-babel-with-esbuild.md](adr-002-replace-webpack-babel-with-esbuild.md)
   §Required plugin and bespoke-transform analysis, and
   [1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md](execplans/1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md).
   - [x] Document all `styled-jsx` callsites and classify by migration pattern
@@ -157,8 +156,8 @@ Scope notes:
   - [x] Success criteria: migration approach document is published with worked
     examples tied to repository files and an explicit decommission checklist.
 - [x] 1.4.17. Migrate renderer style blocks from styled-jsx to CSS Modules.
-  Requires 1.4.16.
-  See [velocetty-design.md](velocetty-design.md) §Renderer process and
+  Requires 1.4.16. See [velocetty-design.md](velocetty-design.md) §Renderer
+  process and
   [1-4-16-migrate-styled-jsx-to-css-modules-and-remove-babel.md](execplans/1-4-16-migrate-styled-jsx-to-css-modules-and-remove-babel.md).
   - [x] Add esbuild CSS Modules support (`.module.css` using `local-css`) and
     TypeScript module declarations for CSS imports.
@@ -167,8 +166,8 @@ Scope notes:
   - [x] Success criteria: no renderer source files contain `<style jsx` and
     style behaviour remains stable in unit and end-to-end checks.
 - [x] 1.4.18. Remove styled-jsx bridge tooling and bridge-only Babel
-  dependencies after migration parity is complete. Requires 1.4.17.
-  See [adr-002-replace-webpack-babel-with-esbuild.md](adr-002-replace-webpack-babel-with-esbuild.md)
+  dependencies after migration parity is complete. Requires 1.4.17. See
+  [adr-002-replace-webpack-babel-with-esbuild.md](adr-002-replace-webpack-babel-with-esbuild.md)
   §Validation gaps and required testing coverage.
   - [x] Remove bridge integration from `build/esbuild/run-esbuild.ts` and
     remove bridge implementation files/constants.
@@ -308,9 +307,8 @@ Scope notes:
   - [ ] Success criteria: no UI action bypasses the dispatcher.
 - [ ] 4.3.3. Add contextual URL menus with `Open` and `Copy URL`. Requires
   4.1.1 and 4.3.2. See [velocetty-design.md](velocetty-design.md) §URL context
-  menus and
-  [PRD](velocetty-product-requirements-document.md) §Command system and
-  keybinding management.
+  menus and [PRD](velocetty-product-requirements-document.md) §Command system
+  and keybinding management.
   - [ ] Detect recognized URLs in terminal and renderer surfaces that already
     expose validated link targets.
   - [ ] Route both menu entries through `link.open` and `link.copyUrl`
@@ -436,8 +434,7 @@ Scope notes:
 
 - [ ] 7.3.1. Implement host adapter modules that satisfy the backend service
   contract for Electron and Tauri. Requires 7.2.2. See
-  [velocetty-design.md](velocetty-design.md) §Host migration: Electron to
-  Tauri.
+  [velocetty-design.md](velocetty-design.md) §Host migration: Electron to Tauri.
   - [ ] Map command execution, PTY operations, config I/O, and plugin/storage
     operations to the contract for each host.
   - [ ] Ensure structured error propagation and teardown semantics remain
@@ -448,8 +445,8 @@ Scope notes:
 ### 7.4. Tauri PTY and packaging
 
 - [ ] 7.4.1. Implement Rust PTY manager and integrate with the command layer.
-  Requires 7.2.3 and 7.3.1. See
-  [velocetty-design.md](velocetty-design.md) §Target (Tauri) approach.
+  Requires 7.2.3 and 7.3.1. See [velocetty-design.md](velocetty-design.md)
+  §Target (Tauri) approach.
   - [ ] Match session semantics to the existing batcher model.
   - [ ] Support resize, close, and restart flows.
   - [ ] Success criteria: feature parity with the Electron PTY path.
@@ -470,15 +467,14 @@ changes remain in section 7 and are out of scope here.
 ### 8.1. Authentication, authorization, and redaction
 
 - [ ] 8.1.1. Implement auth and capability negotiation. Requires 7.2.2. See
-  [velocetty-design.md](velocetty-design.md) §Authentication and
-  authorization.
+  [velocetty-design.md](velocetty-design.md) §Authentication and authorization.
   - [ ] Issue and store local loopback tokens securely.
   - [ ] Bind capability sets to remote sessions.
   - [ ] Success criteria: unauthorized connections cannot invoke privileged
     commands.
 - [ ] 8.1.2. Implement redaction of sensitive metadata. Requires 6.2.1 and
-  8.1.1. See [velocetty-design.md](velocetty-design.md) §Redaction and sensitive
-  metadata.
+  8.1.1. See [velocetty-design.md](velocetty-design.md) §Redaction and
+  sensitive metadata.
   - [ ] Mark redacted fields on the backend.
   - [ ] Ensure plugins and UI respect `redacted` flags.
   - [ ] Success criteria: remote UI never displays paths or hostnames without
@@ -487,8 +483,7 @@ changes remain in section 7 and are out of scope here.
 ### 8.2. Remote browser UI
 
 - [ ] 8.2.1. Implement a remote-capable frontend shell. Requires 7.2.2 and
-  8.1.2. See
-  [velocetty-design.md](velocetty-design.md) §Remote frontend:
+  8.1.2. See [velocetty-design.md](velocetty-design.md) §Remote frontend:
   protobuf/WebSocket protocol.
   - [ ] Connect to the backend via WebSocket and perform handshake.
   - [ ] Support command invocation and PTY rendering.
@@ -500,8 +495,8 @@ changes remain in section 7 and are out of scope here.
 ### 9.1. Shared test coverage for core primitives
 
 - [x] 9.1.1. Add unit tests for the command system and `when` evaluator.
-  Requires 1.2.1 and 1.2.2. See
-  [velocetty-design.md](velocetty-design.md) §Testing.
+  Requires 1.2.1 and 1.2.2. See [velocetty-design.md](velocetty-design.md)
+  §Testing.
   - [x] Include parser edge cases and error handling.
   - [x] Include precedence and conflict detection tests.
   - [x] Success criteria: coverage for new shared modules meets the code
@@ -567,7 +562,8 @@ changes remain in section 7 and are out of scope here.
 - [x] 9.3.3. Isolate renderer event and renderer-metric tests for explicit
   `--concurrent` runs. Requires 9.3.2. See
   [velocetty-design.md](velocetty-design.md) §Testing.
-  - [x] Remove cross-test channel/listener bleed in `test/unit/rpc-client.test.ts`.
+  - [x] Remove cross-test channel/listener bleed in
+        `test/unit/rpc-client.test.ts`.
   - [x] Remove shared `Term.reportRenderer` transport-emission and metric-state
     bleed in `test/unit/term-report-renderer.test.ts`.
   - [x] Success criteria: targeted

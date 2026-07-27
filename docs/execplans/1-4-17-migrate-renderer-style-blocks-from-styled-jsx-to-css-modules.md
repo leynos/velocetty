@@ -1,9 +1,8 @@
 # Migrate renderer style blocks from styled-jsx to CSS Modules
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -52,34 +51,27 @@ files will contain `<style jsx>` tags.
 ## Risks
 
 - Risk: esbuild `local-css` loader behaviour differs from styled-jsx lexical
-  scoping for descendant selectors.
-  Severity: medium
-  Likelihood: medium
+  scoping for descendant selectors. Severity: medium Likelihood: medium
   Mitigation: prefer direct class selectors on intended elements; avoid broad
   descendants. Add snapshot tests for generated class names where scoping is
   non-trivial.
 
 - Risk: plugin or user custom CSS relies on legacy global class names.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: preserve compatibility classes during migration (for example,
-  `term_fit`, `term_wrapper`). Document any classes that are intentionally
-  retired.
+  Severity: medium Likelihood: medium Mitigation: preserve compatibility
+  classes during migration (for example, `term_fit`, `term_wrapper`). Document
+  any classes that are intentionally retired.
 
 - Risk: global scrollbar pseudo-element styles behave differently when moved
-  from `<style jsx global>` to a CSS Module with `:global()`.
-  Severity: low
-  Likelihood: medium
-  Mitigation: scope `:global()` selectors to a container class so they apply
-  within the component subtree. Validate with existing end-to-end (E2E) fast-lane
-  checks.
+  from `<style jsx global>` to a CSS Module with `:global()`. Severity: low
+  Likelihood: medium Mitigation: scope `:global()` selectors to a container
+  class so they apply within the component subtree. Validate with existing
+  end-to-end (E2E) fast-lane checks.
 
 - Risk: dynamic theme values interpolated into styled-jsx blocks lose
-  pseudo-class access when moved to inline `style=`.
-  Severity: medium
-  Likelihood: high
-  Mitigation: map all dynamic values to CSS custom properties passed via the
-  `style` attribute, preserving `:hover` and `:focus` access in the module.
+  pseudo-class access when moved to inline `style=`. Severity: medium
+  Likelihood: high Mitigation: map all dynamic values to CSS custom properties
+  passed via the `style` attribute, preserving `:hover` and `:focus` access in
+  the module.
 
 ## Progress
 
@@ -96,38 +88,32 @@ files will contain `<style jsx>` tags.
 ## Surprises & discoveries
 
 - Observation: Biome CSS parser requires `css.parser.cssModules: true` to handle
-  `:global()` pseudo-class syntax in CSS Modules.
-  Evidence: Lint failed with "`:local` and `:global` pseudo-classes are not
-  standard CSS features" until biome.json was updated.
-  Impact: biome.json configuration must be updated when using `:global()` in
-  CSS Modules.
+  `:global()` pseudo-class syntax in CSS Modules. Evidence: Lint failed with
+  "`:local` and `:global` pseudo-classes are not standard CSS features" until
+  biome.json was updated. Impact: biome.json configuration must be updated when
+  using `:global()` in CSS Modules.
 
 - Observation: The notification test relied on a specific class name
-  (`.notification_dismissLink`) that changed when using CSS Modules.
-  Evidence: Test failed with `querySelector('.notification_dismissLink')`
-  returning null after migration.
-  Impact: Updated test to use element selector (`button[type="button"]`) which
-  is more resilient to class name changes.
+  (`.notification_dismissLink`) that changed when using CSS Modules. Evidence:
+  Test failed with `querySelector('.notification_dismissLink')` returning null
+  after migration. Impact: Updated test to use element selector
+  (`button[type="button"]`) which is more resilient to class name changes.
 
 ## Decision log
 
 - Decision: Use CSS custom properties for all dynamic theme values in Pattern B
-  migration (searchBox, tabs, new-tab).
-  Rationale: Preserves pseudo-class access (`:hover`, `:focus`) and keeps
-  styles in CSS rather than inline styles.
+  migration (searchBox, tabs, new-tab). Rationale: Preserves pseudo-class access
+  (`:hover`, `:focus`) and keeps styles in CSS rather than inline styles.
   Date/Author: 2026-03-29
 
 - Decision: Preserve legacy class names (e.g., `term_fit`, `term_wrapper`) in
-  Pattern C migration for plugin compatibility.
-  Rationale: Plugin CSS and custom user CSS may target these class names;
-  breaking them would cause visual regressions for users.
-  Date/Author: 2026-03-29
+  Pattern C migration for plugin compatibility. Rationale: Plugin CSS and
+  custom user CSS may target these class names; breaking them would cause
+  visual regressions for users. Date/Author: 2026-03-29
 
 - Decision: Enable Biome CSS Modules parser in biome.json to support
-  `:global()` pseudo-class for WebKit scrollbar styles.
-  Rationale: Required for lint to pass with the style-sheet.module.css
-  pattern.
-  Date/Author: 2026-03-29
+  `:global()` pseudo-class for WebKit scrollbar styles. Rationale: Required for
+  lint to pass with the style-sheet.module.css pattern. Date/Author: 2026-03-29
 
 ## Outcomes & retrospective
 
@@ -154,20 +140,20 @@ files will contain `<style jsx>` tags.
 
 The renderer (`lib/`) contains 13 styled-jsx blocks across 12 files:
 
-| File | Pattern | Notes |
-| ---- | ------- | ----- |
-| `lib/components/terms.tsx` | A (local static) | Includes keyframe animations |
-| `lib/components/header.tsx` | A (local static) | Uses inline `style=` for dynamic border |
-| `lib/components/notifications.tsx` | A (local static) | Simple positioning |
-| `lib/components/notification.tsx` | A (local static) | Uses inline `style=` for colours |
-| `lib/components/split-pane.tsx` | A (local static) | Uses inline `style=` for divider colour |
-| `lib/components/tab.tsx` | A (local static) | Uses inline `style=` for active indicator |
-| `lib/containers/hyper.tsx` | A (local static) | Uses inline `style=` for theme; has custom CSS injection comment |
-| `lib/components/searchBox.tsx` | B (local dynamic) | Two blocks, multiple theme interpolations |
-| `lib/components/tabs.tsx` | B (local dynamic) | Platform conditionals (`isMac`) |
-| `lib/components/new-tab.tsx` | B (local dynamic) | Colour + platform conditional |
-| `lib/components/style-sheet.tsx` | C (global) | WebKit scrollbar pseudo-elements |
-| `lib/components/term.tsx` | C (global) | `.term_fit` and `.term_wrapper` marked global but used locally |
+| File                               | Pattern           | Notes                                                            |
+| ---------------------------------- | ----------------- | ---------------------------------------------------------------- |
+| `lib/components/terms.tsx`         | A (local static)  | Includes keyframe animations                                     |
+| `lib/components/header.tsx`        | A (local static)  | Uses inline `style=` for dynamic border                          |
+| `lib/components/notifications.tsx` | A (local static)  | Simple positioning                                               |
+| `lib/components/notification.tsx`  | A (local static)  | Uses inline `style=` for colours                                 |
+| `lib/components/split-pane.tsx`    | A (local static)  | Uses inline `style=` for divider colour                          |
+| `lib/components/tab.tsx`           | A (local static)  | Uses inline `style=` for active indicator                        |
+| `lib/containers/hyper.tsx`         | A (local static)  | Uses inline `style=` for theme; has custom CSS injection comment |
+| `lib/components/searchBox.tsx`     | B (local dynamic) | Two blocks, multiple theme interpolations                        |
+| `lib/components/tabs.tsx`          | B (local dynamic) | Platform conditionals (`isMac`)                                  |
+| `lib/components/new-tab.tsx`       | B (local dynamic) | Colour + platform conditional                                    |
+| `lib/components/style-sheet.tsx`   | C (global)        | WebKit scrollbar pseudo-elements                                 |
+| `lib/components/term.tsx`          | C (global)        | `.term_fit` and `.term_wrapper` marked global but used locally   |
 
 ### Build pipeline
 
@@ -184,8 +170,8 @@ The renderer is bundled by `build/esbuild/run-esbuild.ts`:
   bridge, packaging, and plugin behaviour. It must be updated to assert CSS
   Module bundling once components are migrated.
 - Component-level unit tests exist for `notification`, `hyper-transport`,
-  `hyper-effects`, `tabs-decoration-updates`, and `term-report-renderer`.
-  These must remain green.
+  `hyper-effects`, `tabs-decoration-updates`, and `term-report-renderer`. These
+  must remain green.
 
 ## Plan of work
 
@@ -205,8 +191,8 @@ The renderer is bundled by `build/esbuild/run-esbuild.ts`:
 
 ### Stage 2: Pattern A migration (local static styles)
 
-For each file in this group, create an adjacent `*.module.css`, move the
-static rules, replace string class names with module tokens, and remove the
+For each file in this group, create an adjacent `*.module.css`, move the static
+rules, replace string class names with module tokens, and remove the
 `<style jsx>` block.
 
 Files:

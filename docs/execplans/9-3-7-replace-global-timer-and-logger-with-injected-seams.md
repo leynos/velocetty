@@ -2,10 +2,9 @@
 # Replace process-global timer and logger overrides with injected seams in DOM-heavy unit tests
 <!-- markdownlint-enable MD013 -->
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -24,8 +23,8 @@ notification and updater suites to run safely in parallel with other tests,
 advancing roadmap item 9.3.7 and unblocking 9.3.8.
 
 Observable success: `bun test --concurrent test/unit/notification.test.ts` and
-`bun test --concurrent test/unit/updater.test.ts` pass without mutating
-global timer or logger functions.
+`bun test --concurrent test/unit/updater.test.ts` pass without mutating global
+timer or logger functions.
 
 ## Constraints
 
@@ -58,25 +57,18 @@ Thresholds that trigger escalation when breached:
 Known uncertainties that might affect the plan:
 
 - Risk: The notification component's timer usage is inside a React hook
-  (`useNotification`), which may complicate seam injection.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: Accept timer methods as optional hook parameters with global
-  fallbacks, or create a timer context/provider seam.
+  (`useNotification`), which may complicate seam injection. Severity: medium
+  Likelihood: medium Mitigation: Accept timer methods as optional hook
+  parameters with global fallbacks, or create a timer context/provider seam.
 
 - Risk: The updater module captures timers at module scope, requiring factory
-  pattern introduction.
-  Severity: medium
-  Likelihood: high
-  Mitigation: Introduce an optional `scheduler` parameter to the `updater`
-  function with global fallbacks.
+  pattern introduction. Severity: medium Likelihood: high Mitigation: Introduce
+  an optional `scheduler` parameter to the `updater` function with global
+  fallbacks.
 
 - Risk: Happy DOM may have timing quirks that affect transition events after
-  timer seam injection.
-  Severity: low
-  Likelihood: medium
-  Mitigation: Run notification tests with both real and fake timers to verify
-  behaviour parity.
+  timer seam injection. Severity: low Likelihood: medium Mitigation: Run
+  notification tests with both real and fake timers to verify behaviour parity.
 
 ## Progress
 
@@ -118,9 +110,9 @@ Unexpected findings during implementation that were not anticipated as risks.
 Document with evidence so future work benefits.
 
 - Observation: CodeScene flagged string-heavy function arguments in updater.ts
-  after the main refactoring was complete.
-  Evidence: 53.8% of function arguments were plain `string` types, exceeding
-  the 39% threshold. Required two follow-up refactorings:
+  after the main refactoring was complete. Evidence: 53.8% of function
+  arguments were plain `string` types, exceeding the 39% threshold. Required
+  two follow-up refactorings:
   1. Introduced `ReleaseInfo` interface and the helper function
      `isCanaryChannel(raw?: string)` to replace loose string parameters
   2. Removed redundant `currentVersion` parameter from `buildFeedUrl`
@@ -128,35 +120,33 @@ Document with evidence so future work benefits.
   coverage and backward compatibility.
 
 - Observation: The nullish coalescing operator (`??`) behaves differently from
-  logical OR (`||`) when handling empty strings.
-  Evidence: `emitUpdateAvailable` initially used `updateUrl ?? defaultUrl`,
-  causing test failures when `updateUrl` was an empty string `''`.
-  Impact: Changed to `updateUrl || defaultUrl` to treat empty strings as
-  falsy and trigger the fallback, matching original behaviour.
+  logical OR (`||`) when handling empty strings. Evidence:
+  `emitUpdateAvailable` initially used `updateUrl ?? defaultUrl`, causing test
+  failures when `updateUrl` was an empty string `''`. Impact: Changed to
+  `updateUrl || defaultUrl` to treat empty strings as falsy and trigger the
+  fallback, matching original behaviour.
 
 ## Decision log
 
 Record every significant decision made while working on the plan.
 
 - Decision: Use `useMemo` to memoize the default timer seam in
-  `useNotification` hook to prevent unnecessary effect re-runs.
-  Rationale: Without memoization, a new `{setTimeout, clearTimeout}` default object
-  is created on every render, causing effect dependencies to change and
-  triggering unnecessary re-runs of `setDismissTimer` and cleanup effects.
-  Date/Author: 2026-03-23
+  `useNotification` hook to prevent unnecessary effect re-runs. Rationale:
+  Without memoization, a new `{setTimeout, clearTimeout}` default object is
+  created on every render, causing effect dependencies to change and triggering
+  unnecessary re-runs of `setDismissTimer` and cleanup effects. Date/Author:
+  2026-03-23
 
 - Decision: Collapse `UpdateChannel` + `parseUpdateChannel` + `isCanary` into
-  a single `isCanaryChannel(raw?: string): boolean` helper.
-  Rationale: Reduces cognitive load and removes the need for callers to
-  handle type conversions. The single helper safely handles undefined and
-  non-'canary' values.
+  a single `isCanaryChannel(raw?: string): boolean` helper. Rationale: Reduces
+  cognitive load and removes the need for callers to handle type conversions.
+  The single helper safely handles undefined and non-'canary' values.
   Date/Author: 2026-03-23
 
 - Decision: Narrow `SchedulerSeam` to only expose `setTimeout` and
-  `setInterval` (remove `clearTimeout`/`clearInterval`).
-  Rationale: The updater module never calls the clear methods. Narrowing
-  the seam reduces surface area while preserving full testability.
-  Date/Author: 2026-03-23
+  `setInterval` (remove `clearTimeout`/`clearInterval`). Rationale: The updater
+  module never calls the clear methods. Narrowing the seam reduces surface area
+  while preserving full testability. Date/Author: 2026-03-23
 
 ## Outcomes & retrospective
 
@@ -192,12 +182,14 @@ Summarize outcomes, gaps, and lessons learned at completion.
 
 The codebase has two test files that mutate process-global functions:
 
-1. `test/unit/notification.test.ts` (lines 46-89): Originally defined `createFakeTimers()`
+1. `test/unit/notification.test.ts` (lines 46-89): Originally defined
+   `createFakeTimers()`
    that replaced `globalThis.setTimeout` and `globalThis.clearTimeout` during
    each test. The fake timers were installed before rendering and restored in
    `finally` blocks. This has been replaced with injected timer seams.
 
-2. `test/unit/updater.test.ts` (lines 42-105): Originally defined `createTimerCapture()`
+2. `test/unit/updater.test.ts` (lines 42-105): Originally defined
+   `createTimerCapture()`
    that replaced `globalThis.setTimeout`, `globalThis.clearTimeout`,
    `globalThis.setInterval`, and `globalThis.clearInterval`. Also defined
    `createConsoleErrorCapture()` that replaced `console.error`. These were
@@ -207,8 +199,8 @@ The codebase has two test files that mutate process-global functions:
 ### Target files
 
 1. `lib/components/notification.tsx`: React component that uses
-   `setTimeout`/`clearTimeout` for auto-dismiss timing. The timer
-   calls are inside the `useNotification` hook.
+   `setTimeout`/`clearTimeout` for auto-dismiss timing. The timer calls are
+   inside the `useNotification` hook.
 
 2. `app/updater.ts`: Module that uses `setTimeout`/`setInterval` for update
    checking (lines 77-84) and `console.error` for error logging (line 62).
@@ -246,8 +238,8 @@ Validation: `bun test --concurrent test/unit/notification.test.ts` passes.
 
 ### Stage C: Updater scheduler/logger seam implementation
 
-Modify the updater module to accept an optional `scheduler` parameter
-containing `setTimeout`, `clearTimeout`, `setInterval`, and `clearInterval`
+Modify the updater module to accept an optional `scheduler` parameter containing
+`setTimeout`, `clearTimeout`, `setInterval`, and `clearInterval`
 implementations, plus an optional `logger` parameter with `error` method.
 
 The `updater` function should use injected implementations when provided,
@@ -475,7 +467,8 @@ updater(winStub as unknown as Electron.BrowserWindow, {scheduler, logger});
 Note: The scheduler seam only exposes `setTimeout` and `setInterval` since the
 updater module does not call the clear methods.
 
-1. Remove all `timers.install()`, `timers.restore()`, `consoleCapture.install()`,
+1. Remove all `timers.install()`, `timers.restore()`,
+   `consoleCapture.install()`,
    and `consoleCapture.restore()` calls.
 
 ### Stage D: Documentation update

@@ -59,22 +59,22 @@ This approach can improve build speeds while keeping the Webpack ecosystem, but
 it retains a large dependency footprint and complex configuration surface. It
 also preserves Babel in some pipelines.
 
-| Topic | Webpack + Babel | esbuild |
-| --- | --- | --- |
-| Performance | Slower builds for large graphs | Designed for speed[^esbuild] |
-| Dependency footprint | High (loaders, plugins, Babel) | Lower (single tool) |
-| Loader ecosystem | Extensive[^webpack-loaders] | Plugins via JS API[^esbuild-plugins] |
-| CSS handling | Via loaders | Built-in CSS bundling[^esbuild-content] |
-| TypeScript | Via loader + Babel | Built-in[^esbuild] |
+| Topic                | Webpack + Babel                | esbuild                                 |
+| -------------------- | ------------------------------ | --------------------------------------- |
+| Performance          | Slower builds for large graphs | Designed for speed[^esbuild]            |
+| Dependency footprint | High (loaders, plugins, Babel) | Lower (single tool)                     |
+| Loader ecosystem     | Extensive[^webpack-loaders]    | Plugins via JS API[^esbuild-plugins]    |
+| CSS handling         | Via loaders                    | Built-in CSS bundling[^esbuild-content] |
+| TypeScript           | Via loader + Babel             | Built-in[^esbuild]                      |
 
 _Table 1: Trade-offs between Webpack/Babel and esbuild._
 
 ## Decision Outcome / Proposed Direction
 
-Adopt esbuild as the primary bundler, replacing Webpack and Babel where
-feature parity can be achieved. The recommended direction is a phased
-migration, starting with renderer builds and expanding to the full pipeline
-once plugin and asset handling are validated.
+Adopt esbuild as the primary bundler, replacing Webpack and Babel where feature
+parity can be achieved. The recommended direction is a phased migration,
+starting with renderer builds and expanding to the full pipeline once plugin
+and asset handling are validated.
 
 ## Goals and Non-Goals
 
@@ -115,21 +115,21 @@ The inventory below captures observed current-state behaviours and migration
 risks. It is intentionally descriptive rather than prescriptive so that
 implementation choices can evolve independently.
 
-| Current behaviour | Current implementation | esbuild-native replacement | Plugin or bespoke work |
-| --- | --- | --- | --- |
-| TypeScript + JSX compilation | `babel-loader` + `@babel/preset-typescript` + `@babel/preset-react` in `webpack.config.ts` and `babel.config.json` | esbuild parses and transforms TS/JSX natively[^esbuild][^esbuild-content] | No plugin expected |
-| `styled-jsx` scoping transform for `<style jsx>` and `<style jsx global>` | `styled-jsx/babel` plugin + JSX typings augmentation in `typings/styled-jsx.d.ts` | No first-party esbuild equivalent; `styled-jsx` documents Babel plugin integration[^styled-jsx-babel] | **Required**: targeted Babel bridge plugin for Phase 1; source rewrite is Phase 2+ |
-| Numeric separators, class properties, object rest/spread, optional chaining | Babel proposal plugins in `babel.config.json` | esbuild already supports these syntax features and can lower them by target[^esbuild-content] | No plugin expected |
-| CSS injection for renderer dependencies (xterm) | `style-loader` + `css-loader` in `webpack.config.ts` | esbuild CSS loader and bundling[^esbuild-content] | No plugin expected |
-| JSON module loading | `json-loader` in `webpack.config.ts` | esbuild JSON loader[^esbuild-content] | No plugin expected |
-| Copying app HTML/JSON/config/keymaps/static/patches/assets | `copy-webpack-plugin` in `webpack.config.ts` | esbuild only copies assets that are in the module graph; non-imported files need separate handling[^esbuild-content] | **Required**: dedicated copy step (script) or copy plugin |
-| "Copy-only" `hyper-app` bundle that discards entry code | `null-loader` on app entry in `webpack.config.ts` | No direct equivalent | **Required**: replace with explicit copy pipeline |
-| Shebang handling for CLI dependency edge case | `shebang-loader` for `node_modules/rc/index.js` | esbuild understands hashbang grammar[^esbuild-content] | **Likely bespoke**: verify output; add `banner` fallback if needed[^esbuild-api] |
-| Build-time constants | `DefinePlugin` (`process.env.NODE_ENV`) | esbuild `define` option[^esbuild-api] | No plugin expected |
-| Ignoring source map and `spawn-sync` imports | `IgnorePlugin` | esbuild `external` patterns and/or resolve filtering[^esbuild-api] | Possible small bespoke resolver plugin |
-| Renderer externals with explicit `require("./node_modules/...")` paths | Webpack `externals` object in `webpack.config.ts` | esbuild supports externals, but path mapping semantics must be reproduced carefully[^esbuild-api] | **Required**: bespoke import-path mapping (likely `onResolve`) |
-| Production minification/no comments | `TerserPlugin` + post-bundle Babel CLI minify in `package.json` | esbuild `minify` and `legalComments` options[^esbuild-api] | No plugin expected |
-| Webpack-specific runtime escape hatch | `__non_webpack_require__` in `lib/v8-snapshot-util.ts` | esbuild does not provide this identifier | **Required**: rewrite shim for bundler-agnostic runtime require |
+| Current behaviour                                                           | Current implementation                                                                                             | esbuild-native replacement                                                                                           | Plugin or bespoke work                                                             |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| TypeScript + JSX compilation                                                | `babel-loader` + `@babel/preset-typescript` + `@babel/preset-react` in `webpack.config.ts` and `babel.config.json` | esbuild parses and transforms TS/JSX natively[^esbuild][^esbuild-content]                                            | No plugin expected                                                                 |
+| `styled-jsx` scoping transform for `<style jsx>` and `<style jsx global>`   | `styled-jsx/babel` plugin + JSX typings augmentation in `typings/styled-jsx.d.ts`                                  | No first-party esbuild equivalent; `styled-jsx` documents Babel plugin integration[^styled-jsx-babel]                | **Required**: targeted Babel bridge plugin for Phase 1; source rewrite is Phase 2+ |
+| Numeric separators, class properties, object rest/spread, optional chaining | Babel proposal plugins in `babel.config.json`                                                                      | esbuild already supports these syntax features and can lower them by target[^esbuild-content]                        | No plugin expected                                                                 |
+| CSS injection for renderer dependencies (xterm)                             | `style-loader` + `css-loader` in `webpack.config.ts`                                                               | esbuild CSS loader and bundling[^esbuild-content]                                                                    | No plugin expected                                                                 |
+| JSON module loading                                                         | `json-loader` in `webpack.config.ts`                                                                               | esbuild JSON loader[^esbuild-content]                                                                                | No plugin expected                                                                 |
+| Copying app HTML/JSON/config/keymaps/static/patches/assets                  | `copy-webpack-plugin` in `webpack.config.ts`                                                                       | esbuild only copies assets that are in the module graph; non-imported files need separate handling[^esbuild-content] | **Required**: dedicated copy step (script) or copy plugin                          |
+| "Copy-only" `hyper-app` bundle that discards entry code                     | `null-loader` on app entry in `webpack.config.ts`                                                                  | No direct equivalent                                                                                                 | **Required**: replace with explicit copy pipeline                                  |
+| Shebang handling for CLI dependency edge case                               | `shebang-loader` for `node_modules/rc/index.js`                                                                    | esbuild understands hashbang grammar[^esbuild-content]                                                               | **Likely bespoke**: verify output; add `banner` fallback if needed[^esbuild-api]   |
+| Build-time constants                                                        | `DefinePlugin` (`process.env.NODE_ENV`)                                                                            | esbuild `define` option[^esbuild-api]                                                                                | No plugin expected                                                                 |
+| Ignoring source map and `spawn-sync` imports                                | `IgnorePlugin`                                                                                                     | esbuild `external` patterns and/or resolve filtering[^esbuild-api]                                                   | Possible small bespoke resolver plugin                                             |
+| Renderer externals with explicit `require("./node_modules/...")` paths      | Webpack `externals` object in `webpack.config.ts`                                                                  | esbuild supports externals, but path mapping semantics must be reproduced carefully[^esbuild-api]                    | **Required**: bespoke import-path mapping (likely `onResolve`)                     |
+| Production minification/no comments                                         | `TerserPlugin` + post-bundle Babel CLI minify in `package.json`                                                    | esbuild `minify` and `legalComments` options[^esbuild-api]                                                           | No plugin expected                                                                 |
+| Webpack-specific runtime escape hatch                                       | `__non_webpack_require__` in `lib/v8-snapshot-util.ts`                                                             | esbuild does not provide this identifier                                                                             | **Required**: rewrite shim for bundler-agnostic runtime require                    |
 
 Table 2: Loader/transform inventory - current Webpack/Babel behaviours,
 esbuild-native replacements, and required plugin or bespoke work.
@@ -239,14 +239,14 @@ loader/plugin transform outputs.
 The migration must not be considered complete until the following validation
 requirements are implemented and passing in CI.
 
-| Risk area | Current validation gap | Required test coverage |
-| --- | --- | --- |
-| `styled-jsx` transform parity | No assertions that `<style jsx>` and `<style jsx global>` compile to equivalent runtime styling under the new pipeline | Add renderer integration tests that build with esbuild and verify scoped and global style application in representative components |
-| Static copy and copy-only flow (`hyper-app`) | No contract tests for copied artefacts currently managed by `copy-webpack-plugin` and `null-loader` | Add build contract tests that assert required files and directory structure in `target/` after build |
-| Externals/ignore mapping | No tests that prove require path shape and ignored modules (`spawn-sync`, source map artefacts) remain correct | Add bundle inspection tests and runtime smoke tests for modules currently in Webpack `externals` and `IgnorePlugin` rules |
-| Snapshot bootstrap shim | No migration-era test for replacing `__non_webpack_require__` semantics | Add production-mode integration test that boots renderer snapshot path and confirms module loading succeeds |
-| CLI shebang behaviour | No assertion that bundled CLI output preserves executable shebang behaviour after removing `shebang-loader` | Add CLI artefact test that checks shebang presence/position and executes a basic command path |
-| Minification/source map expectations | No explicit contract test for production minification and development source map quality after switching off Terser/Babel post-pass | Add build mode tests that assert minified production output properties and development source map availability |
+| Risk area                                    | Current validation gap                                                                                                              | Required test coverage                                                                                                             |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `styled-jsx` transform parity                | No assertions that `<style jsx>` and `<style jsx global>` compile to equivalent runtime styling under the new pipeline              | Add renderer integration tests that build with esbuild and verify scoped and global style application in representative components |
+| Static copy and copy-only flow (`hyper-app`) | No contract tests for copied artefacts currently managed by `copy-webpack-plugin` and `null-loader`                                 | Add build contract tests that assert required files and directory structure in `target/` after build                               |
+| Externals/ignore mapping                     | No tests that prove require path shape and ignored modules (`spawn-sync`, source map artefacts) remain correct                      | Add bundle inspection tests and runtime smoke tests for modules currently in Webpack `externals` and `IgnorePlugin` rules          |
+| Snapshot bootstrap shim                      | No migration-era test for replacing `__non_webpack_require__` semantics                                                             | Add production-mode integration test that boots renderer snapshot path and confirms module loading succeeds                        |
+| CLI shebang behaviour                        | No assertion that bundled CLI output preserves executable shebang behaviour after removing `shebang-loader`                         | Add CLI artefact test that checks shebang presence/position and executes a basic command path                                      |
+| Minification/source map expectations         | No explicit contract test for production minification and development source map quality after switching off Terser/Babel post-pass | Add build mode tests that assert minified production output properties and development source map availability                     |
 
 Table 3: Validation gaps and required tests for the esbuild migration.
 

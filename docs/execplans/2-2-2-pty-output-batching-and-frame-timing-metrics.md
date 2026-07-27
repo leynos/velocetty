@@ -1,17 +1,16 @@
 # Add pseudo-terminal (PTY) output batching and frame timing metrics (Roadmap 2.2.2)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE (implemented and validated)
 
 ## Purpose / big picture
 
-Roadmap item `2.2.2` requires rendering instrumentation that proves the terminal
-path remains responsive under bursty PTY output. After this work, developers
-must be able to inspect and validate:
+Roadmap item `2.2.2` requires rendering instrumentation that proves the
+terminal path remains responsive under bursty PTY output. After this work,
+developers must be able to inspect and validate:
 
 - Input latency from keystroke ingress to terminal write.
 - Long-frame counts for renderer frame timing.
@@ -68,16 +67,14 @@ Source documents that define scope and acceptance:
 - Keep diagnostics output machine-comparable and testable.
 - Keep documentation in en-GB-oxendict spelling.
 - Do not mark roadmap `2.2.2` as done until:
-  all metrics are observable,
-  benchmark evidence is captured,
-  required gates pass,
-  and `docs/developers-guide.md` is updated where practice changes.
+  all metrics are observable, benchmark evidence is captured, required gates
+  pass, and `docs/developers-guide.md` is updated where practice changes.
 
 ## Tolerances (exception triggers)
 
 - Scope tolerance:
-  stop and escalate if implementation requires changes outside
-  `app/session.ts`, `lib/**`, `shared/src/types/common.ts`, `app/ui/window.ts`,
+  stop and escalate if implementation requires changes outside `app/session.ts`,
+  `lib/**`, `shared/src/types/common.ts`, `app/ui/window.ts`,
   `app/utils/renderer-utils.ts`, `app/menus/menu.ts`, `test/**`, and `docs/**`.
 - Interface tolerance:
   stop and escalate if an IPC contract change would require broad rewrites
@@ -94,37 +91,27 @@ Source documents that define scope and acceptance:
 ## Risks
 
 - Risk: input-latency timestamps capture the wrong boundaries and report numbers
-  that look plausible but are not actionable.
-  Severity: high
-  Likelihood: medium
+  that look plausible but are not actionable. Severity: high Likelihood: medium
   Mitigation: lock metric boundaries in code comments and tests before wiring
   diagnostics.
 
 - Risk: long-frame counting adds overhead that distorts the very metric being
-  measured.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: keep measurement cheap (`requestAnimationFrame` delta tracking)
-  and validate overhead with synthetic-load comparisons.
+  measured. Severity: medium Likelihood: medium Mitigation: keep measurement
+  cheap (`requestAnimationFrame` delta tracking) and validate overhead with
+  synthetic-load comparisons.
 
 - Risk: benchmark harness is flaky in continuous integration (CI) or
-  machine-dependent enough to be
-  misleading.
-  Severity: high
-  Likelihood: medium
+  machine-dependent enough to be misleading. Severity: high Likelihood: medium
   Mitigation: define deterministic synthetic workload, fixed run duration,
   explicit acceptance thresholds, and repeat-run variance checks.
 
 - Risk: telemetry shape drift between renderer and main process breaks
-  diagnostics silently.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: update shared types first and add contract-level tests.
+  diagnostics silently. Severity: medium Likelihood: medium Mitigation: update
+  shared types first and add contract-level tests.
 
 - Risk: roadmap/docs drift from implementation.
-  Severity: medium
-  Likelihood: high
-  Mitigation: make docs and roadmap closure a mandatory final milestone.
+  Severity: medium Likelihood: high Mitigation: make docs and roadmap closure a
+  mandatory final milestone.
 
 ## Explicit approval gate
 
@@ -138,14 +125,12 @@ Define exact measurement boundaries first, then add failing tests.
 1. Define metric semantics in code-adjacent documentation:
    input latency start/end, long-frame threshold, and batching parity checks.
 2. Add failing tests for:
-   batching threshold parity (`16ms` / `200KB`),
-   input-latency capture path,
-   long-frame count accumulation,
-   and diagnostics serialization of new metrics.
+   batching threshold parity (`16ms` / `200KB`), input-latency capture path,
+   long-frame count accumulation, and diagnostics serialization of new metrics.
 3. Capture pre-change failure evidence for touched suites.
 
-Expected result: at least one targeted test fails before implementation, proving
-coverage is sensitive to missing instrumentation.
+Expected result: at least one targeted test fails before implementation,
+proving coverage is sensitive to missing instrumentation.
 
 ## Milestone 2: Instrument PTY and frame-timing paths
 
@@ -158,18 +143,16 @@ Implement low-overhead metric collection at existing seams.
    long-frame counters.
 4. Extend shared IPC telemetry contracts as needed for metric transport.
 
-Expected result: runtime paths emit stable telemetry without behaviour regressions
-in batching or rendering.
+Expected result: runtime paths emit stable telemetry without behaviour
+regressions in batching or rendering.
 
 ## Milestone 3: Aggregate and expose diagnostics
 
 Reuse existing diagnostics surfaces to keep developer workflow consistent.
 
 1. Extend main-process telemetry aggregation (`app/utils/renderer-utils.ts` or
-   adjacent module) with:
-   input-latency summaries,
-   long-frame counts,
-   and batching-parity status.
+   adjacent module) with: input-latency summaries, long-frame counts, and
+   batching-parity status.
 2. Surface metrics in the About diagnostics output (`app/menus/menu.ts`) and/or
    equivalent existing developer diagnostics output.
 3. Ensure output formatting is deterministic for testing.
@@ -197,9 +180,8 @@ stable, explainable frame-timing behaviour.
 Update project documentation and roadmap state only after verified behaviour.
 
 1. Update `docs/developers-guide.md` with any new development practice for:
-   running the benchmark,
-   interpreting latency/frame metrics,
-   and preserving batching-parity checks.
+   running the benchmark, interpreting latency/frame metrics, and preserving
+   batching-parity checks.
 2. Mark roadmap `2.2.2` and its sub-items done in `docs/roadmap.md` after
    metrics and benchmark evidence are complete.
 3. Update this ExecPlan `Progress`, `Decision Log`, and
@@ -282,10 +264,9 @@ Do not infer success from truncated output.
 - [x] (2026-02-27 23:05 UTC) Updated docs (`developers-guide`, `roadmap`, and
   this plan) with benchmark evidence-path and partial closure status.
 - [x] (2026-02-28 00:02 UTC) Implemented runtime telemetry ingestion and
-  reporting across renderer and main-process paths:
-  `lib/components/term.tsx`, `lib/actions/sessions.ts`, `app/ui/window.ts`,
-  `app/utils/renderer-utils.ts`, `app/menus/menu.ts`, and
-  `shared/src/types/common.ts`.
+  reporting across renderer and main-process paths: `lib/components/term.tsx`,
+  `lib/actions/sessions.ts`, `app/ui/window.ts`, `app/utils/renderer-utils.ts`,
+  `app/menus/menu.ts`, and `shared/src/types/common.ts`.
 - [x] (2026-02-28 00:15 UTC) Added and wired shared telemetry constants in
   `shared/src/constants/runtime-telemetry.ts`, and updated PTY batching in
   `app/session.ts` to consume shared batching constants.
@@ -295,12 +276,7 @@ Do not infer success from truncated output.
 - [x] (2026-02-28 01:07 UTC) Fixed fallback regression assertion in
   `test/unit/term-report-renderer.test.ts` for `runtimeMetrics` payloads.
 - [x] (2026-02-28 01:23 UTC) Replayed required gates successfully with durable
-  logs:
-  `bun install`,
-  `make build`,
-  `make check-fmt`,
-  `make lint`,
-  `make test`.
+  logs: `bun install`, `make build`, `make check-fmt`, `make lint`, `make test`.
 - [x] (2026-02-28 01:26 UTC) Marked roadmap item `2.2.2` and sub-items done
   after implementation and green-gate evidence.
 
@@ -320,17 +296,16 @@ Do not infer success from truncated output.
 ## Decision Log
 
 - Decision: Initially kept plan status as `DRAFT` and included a hard approval
-  gate before implementation.
-  Rationale: User requirement stated implementation must not begin before
-  approval.
+  gate before implementation. Rationale: User requirement stated implementation
+  must not begin before approval.
 
 - Decision: Reuse existing telemetry/diagnostics seams (`info renderer`,
   renderer-utils aggregation, About dialog) unless milestone 1 proves they are
-  insufficient.
-  Rationale: Minimizes integration risk and aligns with prior roadmap `2.2.1`
-  practice.
+  insufficient. Rationale: Minimizes integration risk and aligns with prior
+  roadmap `2.2.1` practice.
 
-- Decision: Make synthetic-load benchmark evidence mandatory for roadmap closure.
+- Decision: Make synthetic-load benchmark evidence mandatory for roadmap
+  closure.
   Rationale: Roadmap `2.2.2` success criteria explicitly require stable
   frame-time demonstration under synthetic load.
 
@@ -340,9 +315,9 @@ Do not infer success from truncated output.
 
 - Decision: Standardize synthetic-load evidence output under
   `<tmpdir>/benchmark-<project>-<branch>-pty-frame-timing-synthetic-load.json`
-  (`tmpdir` resolved from `os.tmpdir()`).
-  Rationale: Branch-safe deterministic paths align with gate evidence workflows
-  and make multi-agent handoff predictable.
+  (`tmpdir` resolved from `os.tmpdir()`). Rationale: Branch-safe deterministic
+  paths align with gate evidence workflows and make multi-agent handoff
+  predictable.
 
 - Decision: Keep generated TypeScript intermediates ignored and cleaned from
   source trees after gate runs (`bun install`, `make build`) regenerate them.

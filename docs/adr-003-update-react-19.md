@@ -56,12 +56,12 @@ addressing warnings early.
 This is faster in calendar time, but it increases the chance of conflicts in
 build tooling, tests, and runtime behaviour during the migration.
 
-| Topic | React 18.2 | React 18.3 | React 19 |
-| --- | --- | --- | --- |
+| Topic         | React 18.2     | React 18.3     | React 19                                  |
+| ------------- | -------------- | -------------- | ----------------------------------------- |
 | JSX transform | Legacy allowed | Legacy allowed | New JSX transform required[^react-19-jsx] |
-| UMD builds | Available | Available | Removed[^react-19-upgrade] |
-| String refs | Supported | Supported | Removed[^react-19-upgrade] |
-| Test renderer | Available | Available | Deprecated[^react-19-upgrade] |
+| UMD builds    | Available      | Available      | Removed[^react-19-upgrade]                |
+| String refs   | Supported      | Supported      | Removed[^react-19-upgrade]                |
+| Test renderer | Available      | Available      | Deprecated[^react-19-upgrade]             |
 
 _Table 1: High-level upgrade impacts across React 18.2, 18.3, and 19._
 

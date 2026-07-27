@@ -1,9 +1,8 @@
 # Restore parallel unit-test execution (roadmap 9.3.2)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -17,9 +16,9 @@ not the target steady state described by `docs/roadmap.md`.
 
 After this work, a developer should be able to run the normal local and CI test
 gates and get the repository's intended Bun parallel unit-test behaviour
-without cross-file interference, timeout regressions, or a second hidden
-serial path in the default scripts. The first implementation task is to verify
-whether that target mode is Bun's no-flag default in `1.3.8` or an explicit
+without cross-file interference, timeout regressions, or a second hidden serial
+path in the default scripts. The first implementation task is to verify whether
+that target mode is Bun's no-flag default in `1.3.8` or an explicit
 `--concurrent` default without `--max-concurrency=1`. The observable success
 conditions are:
 
@@ -132,41 +131,32 @@ re-solving the earlier isolation problem.
 
 - Risk: helper-level global serialization may still hide races that only appear
   once multiple suites start together under Bun's default concurrency.
-  Severity: high
-  Likelihood: medium
-  Mitigation: establish a concurrency-focused baseline before script changes,
-  then rerun the suite under multiple seeds after enabling default
-  parallelism.
+  Severity: high Likelihood: medium Mitigation: establish a concurrency-focused
+  baseline before script changes, then rerun the suite under multiple seeds
+  after enabling default parallelism.
 
 - Risk: `test/testUtils/happy-dom.ts` serializes access to `window`,
   `document`, and `navigator`, which may keep correctness but still trigger
-  timeouts if too many DOM-heavy files queue behind the lease.
-  Severity: high
-  Likelihood: medium
-  Mitigation: include timeout-focused stress runs in the validation plan and
-  treat timeout regressions as defects to fix in helpers or suites, not as a
-  reason to restore default serialization.
+  timeouts if too many DOM-heavy files queue behind the lease. Severity: high
+  Likelihood: medium Mitigation: include timeout-focused stress runs in the
+  validation plan and treat timeout regressions as defects to fix in helpers or
+  suites, not as a reason to restore default serialization.
 
 - Risk: file-scope `mock.module(...)` use or incomplete `mock.restore()`
-  cleanup can still leak across files even after `9.3.1`.
-  Severity: high
-  Likelihood: medium
-  Mitigation: audit the remaining global-mutation suites before flipping the
-  default scripts and add same-file cleanup wherever concurrency runs expose
-  residual bleed.
+  cleanup can still leak across files even after `9.3.1`. Severity: high
+  Likelihood: medium Mitigation: audit the remaining global-mutation suites
+  before flipping the default scripts and add same-file cleanup wherever
+  concurrency runs expose residual bleed.
 
 - Risk: documentation drift can leave developers using the wrong reproduction
   commands or assuming that seeded serialized runs are still the default gates.
-  Severity: medium
-  Likelihood: high
-  Mitigation: update `docs/developers-guide.md` and any touched Bun-testing
-  guidance in the same change, and keep the roadmap checkbox open until the doc
-  text matches the shipped scripts.
+  Severity: medium Likelihood: high Mitigation: update
+  `docs/developers-guide.md` and any touched Bun-testing guidance in the same
+  change, and keep the roadmap checkbox open until the doc text matches the
+  shipped scripts.
 
 - Risk: CI may pass on one runner family while local Linux or macOS runs expose
-  timing-sensitive interference.
-  Severity: medium
-  Likelihood: medium
+  timing-sensitive interference. Severity: medium Likelihood: medium
   Mitigation: validate both the default gate and a small matrix of seeded
   shuffled runs locally before closing the roadmap item.
 
@@ -190,48 +180,46 @@ re-solving the earlier isolation problem.
   `package.json`, preserved explicit serialized diagnostic scripts, and updated
   developer-facing documentation plus stale test-module usage comments.
 - [x] (2026-03-10 00:35Z) Ran `bun install`, `make build`, `make check-fmt`,
-  `make lint`, `make test`, and the three no-pin seeded reruns
-  (`2444615283`, `1337`, `20260306`) with tee'd logs; all passed.
+  `make lint`, `make test`, and the three no-pin seeded reruns (`2444615283`,
+  `1337`, `20260306`) with tee'd logs; all passed.
 - [x] (2026-03-10 00:37Z) Updated `docs/roadmap.md` to mark `9.3.2` done after
   the required validation evidence was in hand.
 
 ## Surprises & discoveries
 
 - Observation: `9.3.1` already removed the old dedicated bootstrap-process
-  quarantine from the default `make test` path.
-  Evidence: `docs/execplans/9-3-1-global-state-leakage-in-unit-tests.md`
-  records the quarantine removal as complete, and the current scripts route the
-  full unit suite through one shared Bun invocation.
-  Impact: `9.3.2` is narrower than `9.3.1`; it should focus on default
-  concurrency restoration and any residual helper cleanup that the restored
-  concurrency reveals.
+  quarantine from the default `make test` path. Evidence:
+  `docs/execplans/9-3-1-global-state-leakage-in-unit-tests.md` records the
+  quarantine removal as complete, and the current scripts route the full unit
+  suite through one shared Bun invocation. Impact: `9.3.2` is narrower than
+  `9.3.1`; it should focus on default concurrency restoration and any residual
+  helper cleanup that the restored concurrency reveals.
 
 - Observation: the remaining default serialization now lives in scripts and
-  docs, not in the high-level CI workflow.
-  Evidence: `.github/workflows/nodejs.yml` calls `make test`, while
-  `Makefile` calls `bun run test:unit:run`, and `package.json` is the file that
-  still pins `--max-concurrency=1`.
-  Impact: one script change can correctly affect local and CI defaults, but it
-  also means validation must check both environments' expectations carefully.
+  docs, not in the high-level CI workflow. Evidence:
+  `.github/workflows/nodejs.yml` calls `make test`, while `Makefile` calls
+  `bun run test:unit:run`, and `package.json` is the file that still pins
+  `--max-concurrency=1`. Impact: one script change can correctly affect local
+  and CI defaults, but it also means validation must check both environments'
+  expectations carefully.
 
 - Observation: `test/testUtils/happy-dom.ts` already assumes Bun may execute
   test files in parallel and serializes its own setup/teardown with an internal
-  lease.
-  Evidence: the helper comment explicitly says Bun may execute files in
+  lease. Evidence: the helper comment explicitly says Bun may execute files in
   parallel, and the helper owns a shared promise-based lease for DOM globals.
   Impact: the plan should preserve this helper-level protection unless the
   restored default concurrency proves it is the bottleneck causing timeouts.
 
 - Observation: some remaining suites still hold process-global mutations longer
-  than ideal for parallel execution.
-  Evidence: `test/unit/runtime-tab-provider-registration.test.ts`,
+  than ideal for parallel execution. Evidence:
+  `test/unit/runtime-tab-provider-registration.test.ts`,
   `test/unit/command-registry-compat.test.ts`, and
   `test/unit/config-import-json5.test.ts` still rely on file-scope
   `mock.module(...)` plus `afterAll` cleanup, while
   `test/unit/notification.test.ts` and `test/unit/updater.test.ts` override
-  process-global timer functions during each test.
-  Impact: Stage C should prioritize these suites in the hotspot audit before
-  assuming the old DOM-heavy files are still the main blocker.
+  process-global timer functions during each test. Impact: Stage C should
+  prioritize these suites in the hotspot audit before assuming the old
+  DOM-heavy files are still the main blocker.
 
 - Observation: the repository's default no-flag Bun unit-test path is already
   sufficient for this roadmap item once `--max-concurrency=1` is removed, but
@@ -240,18 +228,17 @@ re-solving the earlier isolation problem.
   and after the script change, while
   `bun test --concurrent --randomize --seed 2444615283 test/unit` failed in
   `rpc-client`, `term-report-renderer`, `ensure-directory-path`,
-  `v8-snapshot-util`, and `cli-api-behaviour`.
-  Impact: `9.3.2` closes on the repository's default Bun concurrency path,
-  not on full `--concurrent` promotion of every test. The stricter mode remains
-  useful follow-up evidence, but fixing it would exceed this milestone's scope.
+  `v8-snapshot-util`, and `cli-api-behaviour`. Impact: `9.3.2` closes on the
+  repository's default Bun concurrency path, not on full `--concurrent`
+  promotion of every test. The stricter mode remains useful follow-up evidence,
+  but fixing it would exceed this milestone's scope.
 
 ## Decision log
 
 - Decision: treat this document as a draft only and do not implement until the
-  user explicitly approves it.
-  Rationale: the repository instructions and the execplans skill both require
-  an approval gate before execution.
-  Date/Author: 2026-03-09 / Codex.
+  user explicitly approves it. Rationale: the repository instructions and the
+  execplans skill both require an approval gate before execution. Date/Author:
+  2026-03-09 / Codex.
 
 - Decision: keep explicit serialized or seeded reproduction commands, but make
   them non-default diagnostics rather than the repository's default gate.
@@ -261,19 +248,18 @@ re-solving the earlier isolation problem.
 
 - Decision: validate concurrency restoration by first measuring the current
   serialized baseline, then changing scripts, then running both top-level gates
-  and focused stress runs.
-  Rationale: this sequence isolates whether failures come from the script flip
-  itself or from latent suite interference that the old guardrail masked.
-  Date/Author: 2026-03-09 / Codex.
+  and focused stress runs. Rationale: this sequence isolates whether failures
+  come from the script flip itself or from latent suite interference that the
+  old guardrail masked. Date/Author: 2026-03-09 / Codex.
 
 - Decision: remove `--max-concurrency=1` from the default unit-test scripts but
-  do not make `--concurrent` the new repository default.
-  Rationale: the roadmap item requires default Bun concurrency in local and CI
-  gates, and the no-flag runner passed all required validation runs once the
-  guardrail was removed. The stricter `--concurrent` mode still exposes
-  unrelated within-file/global-state issues that should be treated as follow-up
-  hardening rather than silently broadening this milestone.
-  Date/Author: 2026-03-10 / Codex.
+  do not make `--concurrent` the new repository default. Rationale: the roadmap
+  item requires default Bun concurrency in local and CI gates, and the no-flag
+  runner passed all required validation runs once the guardrail was removed.
+  The stricter `--concurrent` mode still exposes unrelated
+  within-file/global-state issues that should be treated as follow-up hardening
+  rather than silently broadening this milestone. Date/Author: 2026-03-10 /
+  Codex.
 
 ## Outcomes & retrospective
 

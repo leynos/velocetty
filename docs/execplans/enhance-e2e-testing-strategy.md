@@ -14,8 +14,8 @@ and release validation. The repository currently has only one Bun-driven
 packaged-app smoke test with limited renderer coverage.
 
 This change introduces a layered test strategy with explicit continuous
-integration (CI) policy,
-interaction-path coverage, and standard diagnostics so that:
+integration (CI) policy, interaction-path coverage, and standard diagnostics so
+that:
 
 - pull requests keep fast E2E feedback,
 - release branches get deeper confidence,
@@ -55,20 +55,17 @@ Success is observable when:
 ## Risks
 
 - Risk: renderer selectors in deep lane become brittle.
-  Severity: medium.
-  Likelihood: medium.
-  Mitigation: use stable mount and terminal selectors plus bounded polling.
+  Severity: medium. Likelihood: medium. Mitigation: use stable mount and
+  terminal selectors plus bounded polling.
 
 - Risk: console-error gating creates noise from benign messages.
-  Severity: medium.
-  Likelihood: low.
-  Mitigation: filter known low-signal messages and keep allowlist narrow.
+  Severity: medium. Likelihood: low. Mitigation: filter known low-signal
+  messages and keep allowlist narrow.
 
 - Risk: artefact retention increases CI storage usage.
-  Severity: low.
-  Likelihood: medium.
-  Mitigation: retain full artefacts on failure-only paths for screenshots and
-  traces, while still collecting textual diagnostics.
+  Severity: low. Likelihood: medium. Mitigation: retain full artefacts on
+  failure-only paths for screenshots and traces, while still collecting textual
+  diagnostics.
 
 ## Progress
 
@@ -88,7 +85,8 @@ Success is observable when:
 
 ## Surprises & discoveries
 
-- `grepai` indexing intermittently returned `unexpected EOF`; targeted file reads
+- `grepai` indexing intermittently returned `unexpected EOF`; targeted file
+  reads
   were used for affected exploration steps.
 - There was no existing Playwright Test configuration, so deep lane setup is
   entirely additive.
@@ -101,12 +99,12 @@ Success is observable when:
 ## Decision log
 
 - Decision: Use terminal input/output as the first deep-lane scenario.
-  Rationale: it validates renderer readiness and interactive behaviour with high
-  product value for minimal initial scope.
+  Rationale: it validates renderer readiness and interactive behaviour with
+  high product value for minimal initial scope.
 
 - Decision: Treat deep-lane failures on `master` and `canary` as
-  release-blocking.
-  Rationale: ADR intent is deeper confidence before release cut.
+  release-blocking. Rationale: ADR intent is deeper confidence before release
+  cut.
 
 - Decision: Start deep lane on Linux only.
   Rationale: balance deterministic coverage and CI cost; keep fast lane

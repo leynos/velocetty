@@ -1,9 +1,8 @@
 # Stabilize Windows x64 CI and resolve Windows aarch64 lane feasibility
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept current as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept current as work proceeds.
 
 Status: DONE (2026-02-25)
 
@@ -103,30 +102,22 @@ Primary files and why they matter:
 ## Risks
 
 - Risk: Windows x64 failures are intermittent (native rebuild, signing, or E2E)
-  and difficult to reproduce locally.
-  Severity: high
-  Likelihood: medium
+  and difficult to reproduce locally. Severity: high Likelihood: medium
   Mitigation: capture failing CI logs first, then implement narrow fixes and
   rerun targeted Windows workflows before broad changes.
 
 - Risk: Windows aarch64 hosted runner/toolchain support is unavailable in this
-  repository context.
-  Severity: high
-  Likelihood: high
-  Mitigation: run a feasibility probe, capture hard evidence, and document the
-  blocker with a tracked follow-up and explicit owner.
+  repository context. Severity: high Likelihood: high Mitigation: run a
+  feasibility probe, capture hard evidence, and document the blocker with a
+  tracked follow-up and explicit owner.
 
 - Risk: roadmap closure without ownership on blocker follow-up.
-  Severity: high
-  Likelihood: medium
-  Mitigation: require non-TBD owner in `docs/tracking-issues.md` before marking
-  blocker handling done.
+  Severity: high Likelihood: medium Mitigation: require non-TBD owner in
+  `docs/tracking-issues.md` before marking blocker handling done.
 
 - Risk: Windows lane changes regress Linux/macOS behaviour.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: keep edits scoped to Windows-specific conditions and rerun the
-  full required local gate stack.
+  Severity: medium Likelihood: medium Mitigation: keep edits scoped to
+  Windows-specific conditions and rerun the full required local gate stack.
 
 ## Plan of work
 
@@ -340,127 +331,114 @@ Dependencies and contracts to preserve:
 ## Surprises & discoveries
 
 - Observation: the current CI matrix includes `windows-latest` plus Linux/macOS,
-  and has a dedicated Linux aarch64 job, but no Windows aarch64 lane.
-  Evidence: `.github/workflows/nodejs.yml` matrix and jobs.
-  Impact: Windows aarch64 needs an explicit decision branch (enable or track
-  blocker), not just a routine matrix tweak.
+  and has a dedicated Linux aarch64 job, but no Windows aarch64 lane. Evidence:
+  `.github/workflows/nodejs.yml` matrix and jobs. Impact: Windows aarch64 needs
+  an explicit decision branch (enable or track blocker), not just a routine
+  matrix tweak.
 
 - Observation: packaging configuration already includes Windows `x64` and
-  `arm64` targets.
-  Evidence: `electron-builder.json` Windows target arch list.
-  Impact: packaging config is not the main blocker; runner/toolchain feasibility
-  is the critical gate.
+  `arm64` targets. Evidence: `electron-builder.json` Windows target arch list.
+  Impact: packaging config is not the main blocker; runner/toolchain
+  feasibility is the critical gate.
 
 - Observation: current Windows CI install reliability uses a dedicated Windows
-  temp directory and explicit node-gyp path wiring.
-  Evidence: `.github/workflows/nodejs.yml` Windows-only install preparation and
+  temp directory and explicit node-gyp path wiring. Evidence:
+  `.github/workflows/nodejs.yml` Windows-only install preparation and
   `npm_config_node_gyp`/`TMP`/`TEMP`/`npm_config_tmp` environment settings.
   Impact: these constraints must be documented as the Windows x64 baseline to
   prevent regression from shared cross-OS simplifications.
 
 - Observation: a new Windows x64 install failure mode appeared in CI run
-  `22405749378` on 2026-02-25.
-  Evidence: `Install (Windows)` failed in `bun install` with
-  `Executable not found in $PATH: "node-gyp.cmd"` during native rebuild.
-  Impact: Stage B needs an extra Windows-specific pre-install bootstrap that
-  installs a pinned workspace `node-gyp` package and prepends
+  `22405749378` on 2026-02-25. Evidence: `Install (Windows)` failed in
+  `bun install` with `Executable not found in $PATH: "node-gyp.cmd"` during
+  native rebuild. Impact: Stage B needs an extra Windows-specific pre-install
+  bootstrap that installs a pinned workspace `node-gyp` package and prepends
   `node_modules/.bin` so `node-gyp.cmd` resolves on `PATH`.
 
 - Observation: replacing the bootstrap with `npm install` regressed in CI run
-  `22406276433` on 2026-02-25.
-  Evidence: `Install (Windows)` failed before `bun install` with
-  `npm error Override without name: @electron/rebuild>node-gyp`.
-  Impact: Stage B must keep the bootstrap on Bun tooling (`bun add --no-save`)
-  to avoid npm override resolution failures in this repository.
+  `22406276433` on 2026-02-25. Evidence: `Install (Windows)` failed before
+  `bun install` with
+  `npm error Override without name: @electron/rebuild>node-gyp`. Impact: Stage
+  B must keep the bootstrap on Bun tooling (`bun add --no-save`) to avoid npm
+  override resolution failures in this repository.
 
 - Observation: Bun bootstrap alone still regressed in CI run `22406525103` on
-  2026-02-25.
-  Evidence: `bun add --no-save --ignore-scripts node-gyp@10.3.1` succeeded, but
-  `Install (Windows)` still failed before `bun install` because
-  `node_modules/.bin/node-gyp.cmd` was missing.
-  Impact: Stage B needs an explicit Windows `node-gyp.cmd` shim after Bun
-  bootstrap so native rebuild helpers that spawn `node-gyp.cmd` can resolve.
+  2026-02-25. Evidence: `bun add --no-save --ignore-scripts node-gyp@10.3.1`
+  succeeded, but `Install (Windows)` still failed before `bun install` because
+  `node_modules/.bin/node-gyp.cmd` was missing. Impact: Stage B needs an
+  explicit Windows `node-gyp.cmd` shim after Bun bootstrap so native rebuild
+  helpers that spawn `node-gyp.cmd` can resolve.
 
 - Observation: the first launcher-shim attempt regressed in CI run
-  `22407440178` on 2026-02-25.
-  Evidence: `Install (Windows)` failed with
+  `22407440178` on 2026-02-25. Evidence: `Install (Windows)` failed with
   `"printf: '~': invalid format character"` when writing `%~dp0` in the batch
-  file template.
-  Impact: Stage B needs literal-string `printf` arguments (or escaped `%`)
-  while generating `node-gyp.cmd`.
+  file template. Impact: Stage B needs literal-string `printf` arguments (or
+  escaped `%`) while generating `node-gyp.cmd`.
 
 - Observation: latest Bun upstream release does not provide a Windows arm64
-  runtime artefact.
-  Evidence: GitHub API query to `oven-sh/bun` latest release on 2026-02-25:
-  `bun-v1.3.9` (published 2026-02-08) lists `bun-windows-x64*` assets and no
-  Windows arm64 asset.
-  Impact: Windows aarch64 lane enablement remains blocked in this repository
-  until Bun publishes an arm64 Windows artefact and setup support.
+  runtime artefact. Evidence: GitHub API query to `oven-sh/bun` latest release
+  on 2026-02-25: `bun-v1.3.9` (published 2026-02-08) lists `bun-windows-x64*`
+  assets and no Windows arm64 asset. Impact: Windows aarch64 lane enablement
+  remains blocked in this repository until Bun publishes an arm64 Windows
+  artefact and setup support.
 
 - Observation: `bin/rebuild-node-pty.cjs` used Bun `process.execPath` to run
-  node-gyp whenever CI invoked the script with Bun.
-  Evidence: script implementation and Windows CI `node-gyp` header extraction
-  failures with tar `EINVAL` during Bun-driven rebuild execution.
-  Impact: Windows reliability requires launching node-gyp with a Node runtime
-  binary (`NODE` env override or `node` from `PATH`), while keeping existing
-  node-gyp arguments unchanged.
+  node-gyp whenever CI invoked the script with Bun. Evidence: script
+  implementation and Windows CI `node-gyp` header extraction failures with tar
+  `EINVAL` during Bun-driven rebuild execution. Impact: Windows reliability
+  requires launching node-gyp with a Node runtime binary (`NODE` env override or
+  `node` from `PATH`), while keeping existing node-gyp arguments unchanged.
 
 - Observation: CI rerun `22407832513` changed failure signatures before the
-  Node-runtime patch reached CI.
-  Evidence: Windows advanced past `install-app-deps` but failed in
-  `rebuild-node-pty` with node-gyp tar extraction `EINVAL`; Ubuntu failed in
-  `make test` with Electron import/environment errors.
-  Impact: this branch needed a deterministic node-gyp runtime fix and a fresh
-  post-push CI rerun for final Stage B verification evidence.
+  Node-runtime patch reached CI. Evidence: Windows advanced past
+  `install-app-deps` but failed in `rebuild-node-pty` with node-gyp tar
+  extraction `EINVAL`; Ubuntu failed in `make test` with Electron
+  import/environment errors. Impact: this branch needed a deterministic
+  node-gyp runtime fix and a fresh post-push CI rerun for final Stage B
+  verification evidence.
 
 - Observation: post-patch CI run `22408893713` still failed Windows in the lint
-  phase due JSON line-ending drift.
-  Evidence: `Run Makefile lint and unit-test gates` reported Biome formatter
-  diffs where repository JSON files were checked out with CRLF (`␍`) on
-  Windows.
-  Impact: Stage B also requires repository-level JSON EOL normalization so
-  Windows checkout line endings do not create formatting-only failures.
+  phase due JSON line-ending drift. Evidence:
+  `Run Makefile lint and unit-test gates` reported Biome formatter diffs where
+  repository JSON files were checked out with CRLF (`␍`) on Windows. Impact:
+  Stage B also requires repository-level JSON EOL normalization so Windows
+  checkout line endings do not create formatting-only failures.
 
 - Observation: CI run `22409492277` still failed the Windows lint phase after
-  JSON-only normalization.
-  Evidence: failed formatter files were `.markdownlint-cli2.jsonc`, multiple
-  `bin/*.cjs`, and `scripts/*.mjs`, all showing CRLF (`␍`) diffs.
-  Impact: Stage B needs LF normalization widened to the full script/config
-  extension set checked by Biome, not JSON alone.
+  JSON-only normalization. Evidence: failed formatter files were
+  `.markdownlint-cli2.jsonc`, multiple `bin/*.cjs`, and `scripts/*.mjs`, all
+  showing CRLF (`␍`) diffs. Impact: Stage B needs LF normalization widened to
+  the full script/config extension set checked by Biome, not JSON alone.
 
 - Observation: Ubuntu failures in run `22409492277` were test-order dependent,
-  not platform-native-module regressions.
-  Evidence: `runtime-plugin-settings.test.ts` fails when run alone with
+  not platform-native-module regressions. Evidence:
+  `runtime-plugin-settings.test.ts` fails when run alone with
   `TypeError: Not running in an Electron environment!`; full-suite runs can
-  pass when earlier files leave Electron mocks registered.
-  Impact: Stage B stabilization needs deterministic Electron mock registration
-  in unit tests so Linux CI does not depend on file ordering or prior mocks.
+  pass when earlier files leave Electron mocks registered. Impact: Stage B
+  stabilization needs deterministic Electron mock registration in unit tests so
+  Linux CI does not depend on file ordering or prior mocks.
 
 - Observation: `registerElectronMock()` used an internal `isRegistered` guard
-  that survived `mock.restore()` calls from other test files.
-  Evidence: Bun `mock.restore()` clears module mocks globally, but the helper's
-  guard prevented re-registering Electron later in the same process.
-  Impact: suites that call `registerElectronMock()` after a restore can fail
-  with `app`/`ipcMain` export errors unless the helper always re-registers.
+  that survived `mock.restore()` calls from other test files. Evidence: Bun
+  `mock.restore()` clears module mocks globally, but the helper's guard
+  prevented re-registering Electron later in the same process. Impact: suites
+  that call `registerElectronMock()` after a restore can fail with `app`/
+  `ipcMain` export errors unless the helper always re-registers.
 
 ## Decision log
 
 - Decision: move this ExecPlan to `Status: IN PROGRESS` and execute the
-  documentation path now.
-  Rationale: implementation for this branch is underway, scoped to docs updates
-  requested in-thread.
-  Date/Author: 2026-02-25 / Codex
+  documentation path now. Rationale: implementation for this branch is
+  underway, scoped to docs updates requested in-thread. Date/Author: 2026-02-25
+  / Codex
 
 - Decision: structure implementation as a two-path Windows aarch64 branch
-  (supported vs blocked).
-  Rationale: roadmap requires either operational lane or explicit blocker
-  tracking with ownership.
-  Date/Author: 2026-02-25 / Codex
+  (supported vs blocked). Rationale: roadmap requires either operational lane
+  or explicit blocker tracking with ownership. Date/Author: 2026-02-25 / Codex
 
 - Decision: require explicit non-TBD owner for blocker follow-up.
   Rationale: roadmap text requires explicit ownership for blocked Windows
-  aarch64.
-  Date/Author: 2026-02-25 / Codex
+  aarch64. Date/Author: 2026-02-25 / Codex
 
 - Decision: select Stage C Path B (blocked) for Windows aarch64 in this turn.
   Rationale: latest Bun release evidence confirms no Windows arm64 runtime
@@ -468,63 +446,58 @@ Dependencies and contracts to preserve:
   Date/Author: 2026-02-25 / Codex
 
 - Decision: defer local gates until workflow and documentation edits are
-  reconciled in one validation pass.
-  Rationale: running the full gate stack once at the end provides a single
-  evidence set aligned to the final diff.
+  reconciled in one validation pass. Rationale: running the full gate stack
+  once at the end provides a single evidence set aligned to the final diff.
   Date/Author: 2026-02-25 / Codex
 
 - Decision: remediate run `22405749378` by adding a Windows-only bootstrap step
   that installs a pinned workspace `node-gyp` package before `bun install`.
   Rationale: the failed `Install (Windows)` step shows `node-gyp.cmd` is not
-  guaranteed to exist on `PATH` during native rebuild.
-  Date/Author: 2026-02-25 / Codex
+  guaranteed to exist on `PATH` during native rebuild. Date/Author: 2026-02-25
+  / Codex
 
 - Decision: implement the Windows bootstrap with
   `bun add --no-save --ignore-scripts node-gyp@10.3.1`, not `npm install`.
   Rationale: CI run `22406276433` proves npm bootstrap fails on the repository
-  override graph before the install lane starts.
-  Date/Author: 2026-02-25 / Codex
+  override graph before the install lane starts. Date/Author: 2026-02-25 / Codex
 
 - Decision: after Bun bootstrap, generate `node_modules/.bin/node-gyp.cmd`
-  when it is absent and point it at `..\node-gyp\bin\node-gyp.js`.
-  Rationale: CI run `22406525103` shows Bun can install `node-gyp` without the
-  `.cmd` launcher expected by Windows native rebuild scripts.
-  Date/Author: 2026-02-25 / Codex
+  when it is absent and point it at `..\node-gyp\bin\node-gyp.js`. Rationale:
+  CI run `22406525103` shows Bun can install `node-gyp` without the `.cmd`
+  launcher expected by Windows native rebuild scripts. Date/Author: 2026-02-25
+  / Codex
 
 - Decision: generate the Windows launcher via
   `printf '%s\r\n' ...` literal lines instead of `%`-formatted templates.
   Rationale: CI run `22407440178` failed because `%~dp0` was parsed as a format
-  sequence by `printf`.
-  Date/Author: 2026-02-25 / Codex
+  sequence by `printf`. Date/Author: 2026-02-25 / Codex
 
 - Decision: in `bin/rebuild-node-pty.cjs`, run node-gyp through the Node
   executable (`process.env.NODE || 'node'`) instead of `process.execPath`.
   Rationale: CI invokes this script via Bun; Bun-driven node-gyp execution on
-  Windows can fail in header tar extraction with `EINVAL`.
-  Date/Author: 2026-02-25 / Codex
+  Windows can fail in header tar extraction with `EINVAL`. Date/Author:
+  2026-02-25 / Codex
 
 - Decision: enforce `*.json text eol=lf` in `.gitattributes`.
   Rationale: CI run `22408893713` shows Windows checkout line-ending conversion
-  can trigger formatting failures unrelated to functional changes.
-  Date/Author: 2026-02-25 / Codex
+  can trigger formatting failures unrelated to functional changes. Date/Author:
+  2026-02-25 / Codex
 
 - Decision: expand LF enforcement in `.gitattributes` to include
   `*.jsonc`, `*.cjs`, and `*.mjs` alongside existing JS/TS/JSON rules.
   Rationale: CI run `22409492277` shows Windows lint failures in those
-  extensions after JSON-only normalization.
-  Date/Author: 2026-02-25 / Codex
+  extensions after JSON-only normalization. Date/Author: 2026-02-25 / Codex
 
 - Decision: make `registerElectronMock()` always register mocks and remove the
-  stale in-memory registration guard.
-  Rationale: `mock.restore()` clears mocks process-wide; the prior guard made
-  later re-registration attempts no-op and caused order-dependent failures.
-  Date/Author: 2026-02-25 / Codex
+  stale in-memory registration guard. Rationale: `mock.restore()` clears mocks
+  process-wide; the prior guard made later re-registration attempts no-op and
+  caused order-dependent failures. Date/Author: 2026-02-25 / Codex
 
 - Decision: load `app/runtime/plugin-runtime` in
   `runtime-plugin-settings.test.ts` only after registering the Electron mock.
   Rationale: that module imports `app/config/paths` at module init time and can
-  fail outside Electron unless the mock is active first.
-  Date/Author: 2026-02-25 / Codex
+  fail outside Electron unless the mock is active first. Date/Author:
+  2026-02-25 / Codex
 
 ## Outcomes & retrospective
 
@@ -543,8 +516,7 @@ Current outcomes:
   Biome (`*.json`, `*.jsonc`, `*.js`, `*.cjs`, `*.mjs`, `*.ts`, `*.tsx`) and
   documented this as part of the Windows reliability baseline.
 - Updated `test/testUtils/electron-path.ts` so `registerElectronMock()` can
-  re-register Electron after any `mock.restore()` call in the same Bun
-  process.
+  re-register Electron after any `mock.restore()` call in the same Bun process.
 - Updated `test/unit/runtime-plugin-settings.test.ts` to register Electron
   mocks before importing `app/runtime/plugin-runtime`, removing test-order
   coupling in Linux CI.
@@ -579,8 +551,7 @@ Closure evidence:
   `node_modules/.bin` `PATH` override before Windows `bun install`.
 - 2026-02-25: Recorded CI run `22406276433` (`Install (Windows)` npm bootstrap
   failure: `Override without name: @electron/rebuild>node-gyp`) and switched
-  the bootstrap command to
-  `bun add --no-save --ignore-scripts node-gyp@10.3.1`.
+  the bootstrap command to `bun add --no-save --ignore-scripts node-gyp@10.3.1`.
 - 2026-02-25: Recorded CI run `22406525103` (Bun bootstrap succeeded but
   `node-gyp.cmd` missing), and added a Windows launcher shim step for
   `node_modules/.bin/node-gyp.cmd` before `bun install`.

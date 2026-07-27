@@ -1,4 +1,4 @@
-.PHONY: all check-fmt typecheck lint test coverage build build-fast clean \
+.PHONY: all fmt check-fmt typecheck lint test coverage build build-fast clean \
 	markdownlint nixie spelling spelling-config spelling-config-write \
 	spelling-phrase-check spelling-helper-test
 
@@ -22,6 +22,10 @@ SPELLING_HELPER_PYTEST = PYTHONPATH=scripts $(UV_ENV) $(UV) run --no-project \
 	--with pytest-cov==7.0.0 python -m pytest
 
 all: check-fmt typecheck lint test spelling
+
+fmt:
+	bun run fmt
+	mdformat-all
 
 check-fmt:
 	bun node_modules/@biomejs/biome/bin/biome check --linter-enabled=false --assist-enabled=false .

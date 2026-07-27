@@ -10,14 +10,13 @@
   roadmap/docs/test evidence synchronized.
 - Cross-links: `docs/roadmap.md`, `docs/velocetty-design.md`,
   `docs/velocetty-hyper-codebase.md`,
-  `docs/velocetty-product-requirements-document.md`,
-  `docs/developers-guide.md`, `app/config/import.ts`,
-  `app/config/json5-config.ts`, and `shared/schemas/schema.json`.
+  `docs/velocetty-product-requirements-document.md`, `docs/developers-guide.md`,
+  `app/config/import.ts`, `app/config/json5-config.ts`, and
+  `shared/schemas/schema.json`.
 
-This Execution Plan (ExecPlan) is a living document.
-The sections `Constraints`, `Tolerances`, `Risks`, `Progress`,
-`Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE (2026-03-02)
 
@@ -73,38 +72,31 @@ layering and hot-reload semantics tracked by `3.1.2`.
 ## Risks
 
 - Risk: roadmap/design refers to `config.json5`, while current runtime paths
-  still reference `hyper.json`.
-  Severity: high
-  Likelihood: medium
-  Mitigation: make filename alignment an explicit milestone decision and keep
-  roadmap scope evidence in `Decision Log`.
+  still reference `hyper.json`. Severity: high Likelihood: medium Mitigation:
+  make filename alignment an explicit milestone decision and keep roadmap scope
+  evidence in `Decision Log`.
 
 - Risk: schema descriptions exist, but schema default values may be incomplete,
-  which can limit schema-derived default messaging.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: use `app/config/config-default.json` as runtime source of truth
-  for defaults, and use schema `description` for documentation strings.
+  which can limit schema-derived default messaging. Severity: medium
+  Likelihood: medium Mitigation: use `app/config/config-default.json` as
+  runtime source of truth for defaults, and use schema `description` for
+  documentation strings.
 
 - Risk: JSON5 parse errors may not always provide stable location metadata for
-  line/column/snippet in all malformed cases.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: define graceful fallback for parse diagnostics when location is
-  missing while still emitting required `path`/`message`/`suggestedFix`.
+  line/column/snippet in all malformed cases. Severity: medium Likelihood:
+  medium Mitigation: define graceful fallback for parse diagnostics when
+  location is missing while still emitting required `path`/`message`/
+  `suggestedFix`.
 
 - Risk: duplicated helper logic can drift between config import and runtime
-  plugin persistence paths.
-  Severity: medium
-  Likelihood: low
-  Mitigation: centralize diagnostic result contract and reuse one helper API.
+  plugin persistence paths. Severity: medium Likelihood: low Mitigation:
+  centralize diagnostic result contract and reuse one helper API.
 
 - Risk: preserving comments and formatting during writes may conflict with the
-  current `sortKeys` plus full `JSON5.stringify` rewrite strategy.
-  Severity: high
-  Likelihood: high
-  Mitigation: replace full-file rewrite with token-aware or patch-based edits
-  that update only targeted nodes, and add strict roundtrip-retention tests.
+  current `sortKeys` plus full `JSON5.stringify` rewrite strategy. Severity:
+  high Likelihood: high Mitigation: replace full-file rewrite with token-aware
+  or patch-based edits that update only targeted nodes, and add strict
+  roundtrip-retention tests.
 
 ## Context and orientation
 
@@ -137,12 +129,12 @@ Roadmap/design anchors:
 
 ### Stage A: Scope lock and diagnostics contract (no runtime behaviour changes)
 
-Document and agree the diagnostics payload shape before code edits:
-`kind`, `source`, `path`, `message`, `suggestedFix`, and optional parse/schema
-metadata fields.
+Document and agree the diagnostics payload shape before code edits: `kind`,
+`source`, `path`, `message`, `suggestedFix`, and optional parse/schema metadata
+fields.
 
-Set an explicit handling policy for two classes of errors:
-parse failures and schema failures.
+Set an explicit handling policy for two classes of errors: parse failures and
+schema failures.
 
 Add or update tests first so expected diagnostics are concrete and measurable.
 Do not proceed to Stage B until red tests fail for current behaviour.
@@ -155,17 +147,17 @@ instead of silently collapsing to fallback values.
 Wire schema validation through pinned schema assets and normalize schema issues
 into deterministic diagnostics ordering.
 
-Use schema descriptions and default config context to produce
-schema-derived documentation strings and actionable suggested fixes.
+Use schema descriptions and default config context to produce schema-derived
+documentation strings and actionable suggested fixes.
 
 ### Stage C: Roundtrip retention implementation
 
 Replace full JSON5 re-stringify writes with a write path that preserves
 comments and formatting for unchanged regions.
 
-Define and enforce deterministic update rules:
-only modified keys change on disk, and unaffected sections retain user-authored
-comments, key ordering, and whitespace style.
+Define and enforce deterministic update rules: only modified keys change on
+disk, and unaffected sections retain user-authored comments, key ordering, and
+whitespace style.
 
 Add dedicated roundtrip tests that fail if unchanged sections are reformatted
 or comments are dropped.
@@ -183,8 +175,8 @@ keeping fallback to safe config behaviour explicit and test-covered.
 Update `docs/developers-guide.md` with any new development practice for config
 diagnostics and defaults/documentation-string behaviour.
 
-Run full required gates with tee logs.
-Only after all gates pass, mark roadmap item `3.1.1` and sub-bullets done.
+Run full required gates with tee logs. Only after all gates pass, mark roadmap
+item `3.1.1` and sub-bullets done.
 
 ## Concrete steps
 
@@ -296,7 +288,8 @@ Planned dependency posture:
 
 - Reuse existing JSON5 parser and existing schema assets in
   `shared/schemas/schema.json`.
-- Reuse existing runtime default config source in `app/config/config-default.json`.
+- Reuse existing runtime default config source in
+  `app/config/config-default.json`.
 - Prefer existing edit/parse capabilities for minimal in-place updates; only
   introduce a new dependency if retention cannot be achieved otherwise.
 - No new external dependencies planned.
@@ -343,8 +336,8 @@ Agent-team planning notes:
   `docs/execplans/3-1-1-json5-parsing-with-schema-validation.md`.
 - [x] (2026-03-02 00:32Z) Received explicit approval to begin implementation.
 - [x] (2026-03-02 00:52Z) Implemented structured JSON5 diagnostics in
-  `app/config/json5-config.ts` and `app/config/import.ts` with
-  `path`/`message`/`suggestedFix` payloads.
+  `app/config/json5-config.ts` and `app/config/import.ts` with `path`/`message`/
+  `suggestedFix` payloads.
 - [x] (2026-03-02 01:04Z) Implemented roundtrip-retention writer for runtime
   plugin settings with targeted JSON5 patching and strict retention tests.
 - [x] (2026-03-02 01:12Z) Aligned runtime config filename defaults to
@@ -378,9 +371,8 @@ Agent-team planning notes:
 - Observation: current config runtime still references `hyper.json` in active
   paths, while roadmap/design text for this phase targets `config.json5`.
   Evidence: current module references in `app/config/paths.ts` and roadmap text
-  in `docs/roadmap.md`.
-  Impact: filename alignment must be treated explicitly in implementation
-  milestones to avoid accidental scope drift.
+  in `docs/roadmap.md`. Impact: filename alignment must be treated explicitly
+  in implementation milestones to avoid accidental scope drift.
 
 - Observation: existing schema file includes many descriptions but appears to
   rely on default config file rather than schema defaults for runtime fallback.
@@ -391,25 +383,22 @@ Agent-team planning notes:
 ## Decision log
 
 - Decision: keep this plan in `DRAFT` status and block implementation until
-  explicit user approval.
-  Rationale: execplan workflow requires approval gate before execution.
-  Date/Author: 2026-03-01 / Codex.
+  explicit user approval. Rationale: execplan workflow requires approval gate
+  before execution. Date/Author: 2026-03-01 / Codex.
 
 - Decision: include both required release gates and documentation gates in this
   plan, while treating roadmap closure as contingent on required release gates.
   Rationale: user requested full release gate success and repository docs rules
-  require doc validation when docs change.
-  Date/Author: 2026-03-01 / Codex.
+  require doc validation when docs change. Date/Author: 2026-03-01 / Codex.
 
 - Decision: track `hyper.json` versus `config.json5` mismatch as an explicit
-  risk and tolerance trigger rather than silently choosing one path.
-  Rationale: ambiguity materially affects touched files and regression surface.
+  risk and tolerance trigger rather than silently choosing one path. Rationale:
+  ambiguity materially affects touched files and regression surface.
   Date/Author: 2026-03-01 / Codex.
 
 - Decision: include comment/format retention as a mandatory acceptance
-  criterion for this milestone.
-  Rationale: user explicitly required roundtripping retention as non-optional.
-  Date/Author: 2026-03-01 / Codex.
+  criterion for this milestone. Rationale: user explicitly required
+  roundtripping retention as non-optional. Date/Author: 2026-03-01 / Codex.
 
 ## Outcomes & retrospective
 
@@ -435,10 +424,9 @@ Gate results:
 
 ## Revision note
 
-Initial draft was created from roadmap/design/codebase evidence plus
-parallel agent-team synthesis via context pack `pk_qoh4ak36`.
-Revision 2026-03-01: scope tightened to make comment/format retention during
-config roundtrips mandatory, with explicit milestones, risks, and acceptance
-tests.
-Revision 2026-03-02: implementation completed, gates passed, roadmap updated,
-and status moved to `COMPLETE`.
+Initial draft was created from roadmap/design/codebase evidence plus parallel
+agent-team synthesis via context pack `pk_qoh4ak36`. Revision 2026-03-01: scope
+tightened to make comment/format retention during config roundtrips mandatory,
+with explicit milestones, risks, and acceptance tests. Revision 2026-03-02:
+implementation completed, gates passed, roadmap updated, and status moved to
+`COMPLETE`.

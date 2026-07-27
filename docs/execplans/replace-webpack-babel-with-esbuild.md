@@ -7,8 +7,8 @@
 - Invariants: Keep build outputs, packaging artefacts, and runtime behaviour
   equivalent while migration work is in flight.
 - Cross-links: `docs/adr-002-replace-webpack-babel-with-esbuild.md`,
-  `docs/developers-guide.md`, `docs/roadmap.md`,
-  `docs/velocetty-design.md`, `docs/velocetty-hyper-codebase.md`, and
+  `docs/developers-guide.md`, `docs/roadmap.md`, `docs/velocetty-design.md`,
+  `docs/velocetty-hyper-codebase.md`, and
   `docs/velocetty-product-requirements-document.md`.
 
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
@@ -71,37 +71,27 @@ Success must be observable in three ways:
 ## Risks
 
 - Risk: `styled-jsx` requires Babel plugin semantics not natively provided by
-  esbuild.
-  Severity: high.
-  Likelihood: high.
-  Mitigation: isolate a Babel bridge plugin, cover scoped/global style output
-  with integration tests, and keep rewrite work out of Phase 1.
+  esbuild. Severity: high. Likelihood: high. Mitigation: isolate a Babel bridge
+  plugin, cover scoped/global style output with integration tests, and keep
+  rewrite work out of Phase 1.
 
 - Risk: copy-only `hyper-app` behaviour is currently encoded via
-  `copy-webpack-plugin` + `null-loader`.
-  Severity: high.
-  Likelihood: medium.
+  `copy-webpack-plugin` + `null-loader`. Severity: high. Likelihood: medium.
   Mitigation: replace with manifest-driven copy logic and add artefact contract
   tests against `target/`.
 
 - Risk: renderer externals and ignore semantics rely on specific require-path
-  shape.
-  Severity: high.
-  Likelihood: medium.
-  Mitigation: add plugin-level tests plus bundle-inspection tests before
-  enabling esbuild as default.
+  shape. Severity: high. Likelihood: medium. Mitigation: add plugin-level tests
+  plus bundle-inspection tests before enabling esbuild as default.
 
 - Risk: `__non_webpack_require__` in `lib/v8-snapshot-util.ts` is
-  Webpack-specific.
-  Severity: high.
-  Likelihood: medium.
-  Mitigation: rewrite to a bundler-agnostic loader path and verify with
-  snapshot bootstrap integration tests.
+  Webpack-specific. Severity: high. Likelihood: medium. Mitigation: rewrite to
+  a bundler-agnostic loader path and verify with snapshot bootstrap integration
+  tests.
 
 - Risk: CLI shebang behaviour could break when removing `shebang-loader`.
-  Severity: medium.
-  Likelihood: medium.
-  Mitigation: add shebang artefact checks and CLI smoke execution tests.
+  Severity: medium. Likelihood: medium. Mitigation: add shebang artefact checks
+  and CLI smoke execution tests.
 
 ## Progress
 
@@ -136,23 +126,19 @@ Success must be observable in three ways:
 ## Decision log
 
 - Decision: Treat pre-migration test coverage as a hard gate rather than a
-  follow-up task.
-  Rationale: ADR 002 states current tests are insufficient and explicitly
-  requires build-equivalence and plugin-validation coverage before migration is
-  complete.
-  Date/Author: 2026-02-10 (assistant).
+  follow-up task. Rationale: ADR 002 states current tests are insufficient and
+  explicitly requires build-equivalence and plugin-validation coverage before
+  migration is complete. Date/Author: 2026-02-10 (assistant).
 
 - Decision: Keep this migration as a phased cut-over with shadow build support
-  first.
-  Rationale: parallel build outputs allow faster parity checks and lower risk
-  while plugin behaviour is still being validated.
-  Date/Author: 2026-02-10 (assistant).
+  first. Rationale: parallel build outputs allow faster parity checks and lower
+  risk while plugin behaviour is still being validated. Date/Author: 2026-02-10
+  (assistant).
 
 - Decision: Relocate esbuild plugin modules from `build/esbuild/plugins/` to
-  `build/esbuild/esbuild-plugins/`.
-  Rationale: `.gitignore` excluded the former path, which would have left the
-  repository missing required plugin source files.
-  Date/Author: 2026-02-10 (assistant).
+  `build/esbuild/esbuild-plugins/`. Rationale: `.gitignore` excluded the former
+  path, which would have left the repository missing required plugin source
+  files. Date/Author: 2026-02-10 (assistant).
 
 ## Outcomes & retrospective
 
@@ -324,5 +310,5 @@ stop and escalate with logs and fixture evidence.
 
 ## Revision note
 
-Initial draft created on 2026-02-10.
-Completed implementation and validation on 2026-02-10.
+Initial draft created on 2026-02-10. Completed implementation and validation on
+2026-02-10.

@@ -22,10 +22,10 @@ this plan must be updated to follow it.
 
 Upgrade the renderer stack from React 18.2 to React 18.3 (React and React DOM),
 keeping the incremental migration path towards React 19 described in
-Architecture Decision Record (ADR) 003.
-Success is observable when the repository installs with React 18.3 versions,
-all validation gates pass, documentation reflects the new versions, and the
-roadmap entry 1.4.9 is marked done.
+Architecture Decision Record (ADR) 003. Success is observable when the
+repository installs with React 18.3 versions, all validation gates pass,
+documentation reflects the new versions, and the roadmap entry 1.4.9 is marked
+done.
 
 ## Constraints
 
@@ -56,22 +56,16 @@ roadmap entry 1.4.9 is marked done.
 ## Risks
 
 - Risk: React 18.3 introduces warnings that require code updates before React
-  19.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: scan for deprecated patterns (`ReactDOM.render`, string refs) and
-  confirm the renderer already uses the `createRoot` path.
+  1. Severity: medium Likelihood: medium Mitigation: scan for deprecated
+  patterns (`ReactDOM.render`, string refs) and confirm the renderer already
+  uses the `createRoot` path.
 - Risk: version drift between `package.json` and `app/package.json` causes
-  duplicate React instances for plugins.
-  Severity: high
-  Likelihood: medium
+  duplicate React instances for plugins. Severity: high Likelihood: medium
   Mitigation: update both manifests and confirm `bun.lock` reflects a single
   React 18.3.x version.
 - Risk: documentation continues to cite React 18.2, creating confusion.
-  Severity: low
-  Likelihood: high
-  Mitigation: update every documented React version reference and re-run
-  Markdown validation.
+  Severity: low Likelihood: high Mitigation: update every documented React
+  version reference and re-run Markdown validation.
 
 ## Progress
 
@@ -100,17 +94,17 @@ roadmap entry 1.4.9 is marked done.
 ## Surprises & discoveries
 
 - Observation: `bun install` reported Bun 1.3.5 while the repo pins 1.3.7.
-  Evidence: `/tmp/install-velocetty-1-4-9-migrate-to-react-18-3.out`.
-  Impact: No functional change observed, but local tooling is older than the
-  pinned version.
+  Evidence: `/tmp/install-velocetty-1-4-9-migrate-to-react-18-3.out`. Impact:
+  No functional change observed, but local tooling is older than the pinned
+  version.
 - Observation: React 18.3 typings rejected the `jsx`/`global` attributes on
-  `styled-jsx` style tags.
-  Evidence: `make build` type errors before adding `typings/styled-jsx.d.ts`.
-  Impact: Added a local typings shim to preserve the existing styling model.
+  `styled-jsx` style tags. Evidence: `make build` type errors before adding
+  `typings/styled-jsx.d.ts`. Impact: Added a local typings shim to preserve the
+  existing styling model.
 - Observation: Unit test warnings were resolved after switching to `React.act`
-  and marking the act environment in Happy DOM.
-  Evidence: `/tmp/test-velocetty-1-4-9-migrate-to-react-18-3.out`.
-  Impact: Tests pass without the earlier act or `jsx` attribute warnings.
+  and marking the act environment in Happy DOM. Evidence:
+  `/tmp/test-velocetty-1-4-9-migrate-to-react-18-3.out`. Impact: Tests pass
+  without the earlier act or `jsx` attribute warnings.
 
 ## Decision log
 
@@ -118,13 +112,12 @@ roadmap entry 1.4.9 is marked done.
   Rationale: ADR 003 explicitly specifies an incremental upgrade path.
   Date/Author: 2026-02-03 (assistant)
 - Decision: Proceed with implementation after plan approval.
-  Rationale: User explicitly approved the ExecPlan draft.
-  Date/Author: 2026-02-03 (assistant)
+  Rationale: User explicitly approved the ExecPlan draft. Date/Author:
+  2026-02-03 (assistant)
 - Decision: Add a local `styled-jsx` typings shim and avoid
-  `forwardRef<T>` generics.
-  Rationale: Keeps React 18.3 type-checking and Babel parsing aligned without
-  changing runtime behaviour.
-  Date/Author: 2026-02-03 (assistant)
+  `forwardRef<T>` generics. Rationale: Keeps React 18.3 type-checking and Babel
+  parsing aligned without changing runtime behaviour. Date/Author: 2026-02-03
+  (assistant)
 
 ## Outcomes & retrospective
 
@@ -145,9 +138,9 @@ React and React DOM are declared in both the repository root `package.json`
 versions for critical runtime dependencies). The renderer entry point is
 `lib/index.tsx`, and shared React module patching is described in
 `docs/velocetty-hyper-codebase.md`. Documentation that records dependency
-versions and developer practices lives in `docs/velocetty-hyper-codebase.md`
-and `docs/developers-guide.md`. The roadmap entry 1.4.9 in `docs/roadmap.md`
-must be marked done after validation passes.
+versions and developer practices lives in `docs/velocetty-hyper-codebase.md` and
+`docs/developers-guide.md`. The roadmap entry 1.4.9 in `docs/roadmap.md` must
+be marked done after validation passes.
 
 ## Plan of work
 
@@ -187,8 +180,7 @@ its gates pass.
      grepai search "string ref" --json --compact
      rg -n "createRoot|hydrateRoot" lib
 
-   Capture findings in `Surprises & Discoveries` if anything unexpected
-   appears.
+   Capture findings in `Surprises & Discoveries` if anything unexpected appears.
 
 2. Update dependency manifests.
 

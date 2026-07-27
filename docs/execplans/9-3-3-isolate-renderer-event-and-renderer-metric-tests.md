@@ -1,9 +1,8 @@
 # Isolate renderer event and renderer-metric tests (roadmap 9.3.3)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -11,15 +10,15 @@ Status: COMPLETE
 
 Roadmap item `9.3.3` exists because roadmap item `9.3.2` restored the default
 parallel unit-test gate, but two renderer-sensitive suites still rely on
-mutable file-scope fixtures that are safe only when tests in those files do
-not overlap. The repository now expects shared-suite testing, not dedicated
+mutable file-scope fixtures that are safe only when tests in those files do not
+overlap. The repository now expects shared-suite testing, not dedicated
 quarantines or a return to serialized defaults.
 
 After this work, a developer should be able to run the focused renderer stress
 command
 `bun test --concurrent test/unit/rpc-client.test.ts test/unit/term-report-renderer.test.ts`
-repeatedly and see stable call counts, no leaked listeners, and no transport or
-metric assertions polluted by a neighbouring test. The observable success
+repeatedly and see stable call counts, no leaked listeners, and no transport
+or metric assertions polluted by a neighbouring test. The observable success
 conditions are:
 
 1. `test/unit/rpc-client.test.ts` no longer shares channel listener state,
@@ -76,11 +75,10 @@ through `Term.reportRenderer(…)`. That contract must remain intact because
 `docs/developers-guide.md` and `app/utils/renderer-utils.ts` treat it as the
 canonical source for renderer mode events and runtime-metric aggregation.
 
-`shared/src/constants/runtime-telemetry.ts` also owns a process-level
-timestamp map for runtime-metric correlation. The current
-`term-report-renderer` suite does not explicitly reset that state, so the
-implementation must verify whether focused concurrent isolation requires an
-explicit cleanup step there as well.
+`shared/src/constants/runtime-telemetry.ts` also owns a process-level timestamp
+map for runtime-metric correlation. The current `term-report-renderer` suite
+does not explicitly reset that state, so the implementation must verify whether
+focused concurrent isolation requires an explicit cleanup step there as well.
 
 The implementation will likely touch these files:
 
@@ -95,10 +93,9 @@ The implementation will likely touch these files:
 ## Constraints
 
 - Keep this milestone scoped to isolating
-  `test/unit/rpc-client.test.ts` and
-  `test/unit/term-report-renderer.test.ts` for explicit `--concurrent` runs.
-  Do not silently absorb unrelated hotspots from roadmap items `9.3.4` through
-  `9.3.7`.
+  `test/unit/rpc-client.test.ts` and `test/unit/term-report-renderer.test.ts`
+  for explicit `--concurrent` runs. Do not silently absorb unrelated hotspots
+  from roadmap items `9.3.4` through `9.3.7`.
 - Do not solve the problem by restoring serialized defaults, adding a new
   dedicated-process quarantine, or weakening the roadmap success criterion.
 - Preserve the renderer telemetry contract in `lib/components/term.tsx`.
@@ -135,44 +132,37 @@ The implementation will likely touch these files:
 ## Risks
 
 - Risk: `rpc-client.test.ts` may hide a production unsubscribe defect as well
-  as a test-harness defect.
-  Severity: high
-  Likelihood: medium
-  Mitigation: first isolate the test harness so each test owns its own
-  listener registry and `window` state, then rerun the focused concurrent
-  command. Only change `lib/utils/rpc.ts` if the production listener lifecycle
-  still bleeds after the harness is isolated.
+  as a test-harness defect. Severity: high Likelihood: medium Mitigation: first
+  isolate the test harness so each test owns its own listener registry and
+  `window` state, then rerun the focused concurrent command. Only change
+  `lib/utils/rpc.ts` if the production listener lifecycle still bleeds after
+  the harness is isolated.
 
 - Risk: `term-report-renderer.test.ts` may still share module-level state even
-  though it imports `Term` with a unique query-string suffix.
-  Severity: high
-  Likelihood: high
-  Mitigation: move `Term`, Happy DOM cleanup, transport mocks, and any module
-  instance counters behind a per-test harness that returns isolated handles to
-  the calling test rather than mutating file-scope variables in `beforeEach()`.
+  though it imports `Term` with a unique query-string suffix. Severity: high
+  Likelihood: high Mitigation: move `Term`, Happy DOM cleanup, transport mocks,
+  and any module instance counters behind a per-test harness that returns
+  isolated handles to the calling test rather than mutating file-scope
+  variables in `beforeEach()`.
 
 - Risk: the transport mock helper may accumulate listeners or mock call history
   in ways that only become visible under explicit concurrent scheduling.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: verify whether `test/testUtils/transport-mock.ts` should create a
-  fully isolated mock instance per test and whether it needs a stricter reset
-  or disposal contract.
+  Severity: medium Likelihood: medium Mitigation: verify whether
+  `test/testUtils/transport-mock.ts` should create a fully isolated mock
+  instance per test and whether it needs a stricter reset or disposal contract.
 
 - Risk: documentation could drift and incorrectly imply that explicit
-  `--concurrent` runs are now the default repository gate.
-  Severity: medium
-  Likelihood: high
-  Mitigation: update `docs/developers-guide.md` to describe the focused
-  concurrent stress command as a targeted renderer-isolation check layered on
-  top of the default `9.3.2` workflow, not a replacement for it.
+  `--concurrent` runs are now the default repository gate. Severity: medium
+  Likelihood: high Mitigation: update `docs/developers-guide.md` to describe
+  the focused concurrent stress command as a targeted renderer-isolation check
+  layered on top of the default `9.3.2` workflow, not a replacement for it.
 
 ## Implementation outline
 
 ### Stage A: capture the focused concurrent baseline
 
-Start by proving the current failure mode with durable logs. Use `set -o
-pipefail` and tee output to a branch-specific path under `/tmp/`.
+Start by proving the current failure mode with durable logs. Use
+`set -o pipefail` and tee output to a branch-specific path under `/tmp/`.
 
 ```bash
 set -o pipefail
@@ -193,7 +183,7 @@ Current probe evidence already shows the likely signatures to expect:
 - `rpc-client.test.ts` cached-id assertions can observe a later test's RPC id
   such as `per-event-rpc-id` instead of `cached-rpc-id`.
 - `term-report-renderer.test.ts` call-count assertions like
-  `toHaveBeenCalledTimes(1)` can climb in even increments (`2`, `4`, `6`, ...)
+  `toHaveBeenCalledTimes(1)` can climb in even increments (`2`, `4`, `6`, …)
   because concurrent tests are resetting and reusing the same shared transport
   mock.
 
@@ -336,9 +326,9 @@ The final implementation report should cite all of the following:
   `9-3-3-isolate-renderer-event-and-renderer-metric-tests` and matches the
   requested ExecPlan path.
 - [x] (2026-03-10 18:41Z) Audited roadmap item `9.3.3`,
-  `docs/velocetty-design.md`, `docs/developers-guide.md`, the previous
-  `9.3.1` and `9.3.2` execplans, the target test files, and the directly
-  relevant production files.
+  `docs/velocetty-design.md`, `docs/developers-guide.md`, the previous `9.3.1`
+  and `9.3.2` execplans, the target test files, and the directly relevant
+  production files.
 - [x] (2026-03-10 18:41Z) Used an agent team to inspect documentation context
   and the two target suites while drafting the plan.
 - [x] (2026-03-10 18:41Z) Drafted this ExecPlan.
@@ -362,8 +352,8 @@ The final implementation report should cite all of the following:
   renderer `--concurrent` stress command while preserving the `9.3.2` default
   gate description.
 - [x] (2026-03-10 19:10Z) Ran `bun install`, `make build`,
-  `make check-fmt`, `make lint`, and `make test` with tee'd logs under
-  `/tmp/`; all passed on the final tree.
+  `make check-fmt`, `make lint`, and `make test` with tee'd logs under `/tmp/`;
+  all passed on the final tree.
 - [x] (2026-03-10 19:16Z) Replayed the focused concurrent stress loop for
   10 runs at
   `/tmp/concurrent-focus-final-velocetty-9-3-3-isolate-renderer-event-and-renderer-metric-tests.out`;
@@ -395,10 +385,9 @@ The final implementation report should cite all of the following:
 
 - Observation: `test/unit/rpc-client.test.ts` does not merely share mocks; it
   shares the imported `Client` constructor, the channel listener registry, and
-  the mutable `window` fixture through file-scope variables.
-  Impact: resetting state in `beforeEach()` is not enough under explicit
-  concurrent scheduling because another test can still clear or replace the
-  shared fixture mid-run.
+  the mutable `window` fixture through file-scope variables. Impact: resetting
+  state in `beforeEach()` is not enough under explicit concurrent scheduling
+  because another test can still clear or replace the shared fixture mid-run.
 
 - Observation: `test/unit/term-report-renderer.test.ts` already tries to force
   fresh `Term` imports with a query-string suffix, but it still publishes the
@@ -407,99 +396,91 @@ The final implementation report should cite all of the following:
   storing per-test renderer harness state in shared `let` bindings.
 
 - Observation: renderer-metric paths may involve more than `Term.rendererTypes`
-  and the transport mock.
-  Evidence: `shared/src/constants/runtime-telemetry.ts` owns a global
-  timestamp map used by runtime-metric helpers, and the current suite does not
-  explicitly reset it.
-  Impact: Stage C must verify whether that map needs an explicit per-test reset
-  as part of the final hardening.
+  and the transport mock. Evidence: `shared/src/constants/runtime-telemetry.ts`
+  owns a global timestamp map used by runtime-metric helpers, and the current
+  suite does not explicitly reset it. Impact: Stage C must verify whether that
+  map needs an explicit per-test reset as part of the final hardening.
 
 - Observation: the RPC client cleanup path benefits from precise listener
-  removal instead of dropping an entire IPC channel.
-  Evidence: the current implementation now uses
-  `this.ipc.removeListener(this.id, this.ipcListener)` during `destroy()`.
-  Impact: the suite can assert instance-specific teardown without sharing or
-  deleting unrelated channel listeners.
+  removal instead of dropping an entire IPC channel. Evidence: the current
+  implementation now uses `this.ipc.removeListener(this.id, this.ipcListener)`
+  during `destroy()`. Impact: the suite can assert instance-specific teardown
+  without sharing or deleting unrelated channel listeners.
 
 - Observation: an unready RPC client still owns an active `'init'` IPC
-  subscription until the handshake arrives.
-  Evidence: before the latest follow-up, `destroy()` returned early when
-  `this.id` was unset and never removed the constructor-time init listener.
-  Impact: the client must detach the pending init listener both when the
-  handshake succeeds and when the client is destroyed before readiness, or a
-  later init event can revive a stale instance and duplicate channel listeners.
+  subscription until the handshake arrives. Evidence: before the latest
+  follow-up, `destroy()` returned early when `this.id` was unset and never
+  removed the constructor-time init listener. Impact: the client must detach
+  the pending init listener both when the handshake succeeds and when the
+  client is destroyed before readiness, or a later init event can revive a
+  stale instance and duplicate channel listeners.
 
 - Observation: `lib/utils/rpc.ts` was also hard to import safely in a unit test
-  because it pulled in Electron IPC at module load.
-  Evidence: once the suite stopped using `mock.module('../../lib/utils/ipc')`,
+  because it pulled in Electron IPC at module load. Evidence: once the suite
+  stopped using `mock.module('../../lib/utils/ipc')`,
   `bun test --concurrent test/unit/rpc-client.test.ts` failed before running
   assertions because importing the module tried to resolve Electron IPC
-  immediately.
-  Impact: Stage B needed a narrow production seam so the test could inject a
-  mock IPC bridge without any module-level mocking.
+  immediately. Impact: Stage B needed a narrow production seam so the test
+  could inject a mock IPC bridge without any module-level mocking.
 
 - Observation: `docs/developers-guide.md` already documents the `9.3.2`
   transition away from serialized defaults and keeps serialized scripts only as
-  diagnostic tools.
-  Impact: this milestone's documentation update must be framed as a focused
-  concurrent stress path, not as a change to the default gate.
+  diagnostic tools. Impact: this milestone's documentation update must be
+  framed as a focused concurrent stress path, not as a change to the default
+  gate.
 
 - Observation: the packaging gate depends on pre-generated V8 snapshot
-  artefacts in `cache/x64`.
-  Evidence: the first review-follow-up `make build` run failed in
-  `bin/cp-snapshot.js` with "Missing snapshot output" until
-  `bun run v8-snapshot` recreated the cache.
-  Impact: future build replays in a cleaned worktree should warm snapshots
-  before treating packaging failures as product regressions.
+  artefacts in `cache/x64`. Evidence: the first review-follow-up `make build`
+  run failed in `bin/cp-snapshot.js` with "Missing snapshot output" until
+  `bun run v8-snapshot` recreated the cache. Impact: future build replays in a
+  cleaned worktree should warm snapshots before treating packaging failures as
+  product regressions.
 
 ## Decision log
 
 - Decision: keep the plan tightly scoped to the two roadmap-named suites and
-  the developer guidance required to exercise them.
-  Rationale: roadmap item `9.3.3` is a focused follow-on from `9.3.2`, not a
-  general retest of every concurrency hotspot.
+  the developer guidance required to exercise them. Rationale: roadmap item
+  `9.3.3` is a focused follow-on from `9.3.2`, not a general retest of every
+  concurrency hotspot.
 
 - Decision: prefer per-test harness factories over global `beforeEach()` state
-  resets as the primary remediation pattern.
-  Rationale: explicit `--concurrent` failures are caused by overlapping access
-  to shared mutable bindings, and a factory per test removes that overlap
-  rather than trying to sequence it indirectly.
+  resets as the primary remediation pattern. Rationale: explicit `--concurrent`
+  failures are caused by overlapping access to shared mutable bindings, and a
+  factory per test removes that overlap rather than trying to sequence it
+  indirectly.
 
 - Decision: treat any production-code change in `lib/utils/rpc.ts` as
-  conditional rather than assumed.
-  Rationale: the current evidence proves the test harness is unsafe under
-  concurrency, but it does not yet prove that the production unsubscribe path
-  is wrong once the harness is isolated.
+  conditional rather than assumed. Rationale: the current evidence proves the
+  test harness is unsafe under concurrency, but it does not yet prove that the
+  production unsubscribe path is wrong once the harness is isolated.
 
 - Decision: add a narrow production seam to `lib/utils/rpc.ts` after the test
-  harness rewrite exposed module-load coupling to Electron IPC.
-  Rationale: injecting IPC, window state, and deferred ready registration lets
-  the unit suite avoid module mocks entirely, which is a stronger concurrency
-  fix than trying to coordinate shared mock state across overlapping tests.
+  harness rewrite exposed module-load coupling to Electron IPC. Rationale:
+  injecting IPC, window state, and deferred ready registration lets the unit
+  suite avoid module mocks entirely, which is a stronger concurrency fix than
+  trying to coordinate shared mock state across overlapping tests.
 
 - Decision: require durable tee'd logs for both the focused concurrent stress
-  loop and the standard repository gates.
-  Rationale: the user expects exact artefact paths and repeatable evidence for
-  any roadmap closure.
+  loop and the standard repository gates. Rationale: the user expects exact
+  artefact paths and repeatable evidence for any roadmap closure.
 
 - Decision: keep `test/unit/term-report-renderer.test.ts` concurrency-safe by
   serializing access to Happy DOM through a per-test harness, not by weakening
-  the tests with `test.serial()`.
-  Rationale: `setupHappyDom()` already owns the cross-file lease that protects
-  browser-like globals, so the missing piece was to stop sharing harness state
-  through file-scope variables.
+  the tests with `test.serial()`. Rationale: `setupHappyDom()` already owns the
+  cross-file lease that protects browser-like globals, so the missing piece was
+  to stop sharing harness state through file-scope variables.
 
 - Decision: resolve `ipcRenderer` lazily through `window.require('electron')`
-  only when constructor injection is absent.
-  Rationale: this preserves production runtime behaviour, keeps the test-only
-  injection seam, and avoids bundling the `createRequire(import.meta.url)` path
-  that produced an IIFE build warning.
+  only when constructor injection is absent. Rationale: this preserves
+  production runtime behaviour, keeps the test-only injection seam, and avoids
+  bundling the `createRequire(import.meta.url)` path that produced an IIFE
+  build warning.
 
 - Decision: keep injected `windowHost` and deferred-ready scheduling as
-  constructor-local closures rather than instance fields.
-  Rationale: the test seam still exists, but the ready path is easier to read
-  when constructor-only dependencies do not become extra instance state to
-  track later in the client lifecycle.
+  constructor-local closures rather than instance fields. Rationale: the test
+  seam still exists, but the ready path is easier to read when constructor-only
+  dependencies do not become extra instance state to track later in the client
+  lifecycle.
 
 ## Outcomes & retrospective
 

@@ -1,9 +1,8 @@
 # Restore Linux aarch64 Continuous Integration (CI) reliability
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept current as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept current as work proceeds.
 
 Status: COMPLETE
 
@@ -58,23 +57,17 @@ Success is observable when:
 ## Risks
 
 - Risk: current ARM emulation flow (`pguyot/arm-runner-action`) exhausts disk
-  while copying the repository into the image.
-  Severity: high
-  Likelihood: high
+  while copying the repository into the image. Severity: high Likelihood: high
   Mitigation: prefer native ARM runners (`ubuntu-22.04-arm`) so CI does not
   copy large `node_modules` trees into an emulated filesystem.
 - Risk: `node-pty` rebuild fails on Linux aarch64 due to Node/Electron ABI or
-  bootstrap mismatches.
-  Severity: high
-  Likelihood: medium
-  Mitigation: keep Node 24 runtime alignment, run `bun install` first, and
-  verify rebuild logs before running later gates.
+  bootstrap mismatches. Severity: high Likelihood: medium Mitigation: keep Node
+  24 runtime alignment, run `bun install` first, and verify rebuild logs before
+  running later gates.
 - Risk: arm7 artefact paths survive in workflow/archive steps and silently keep
-  stale release targets alive.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: remove `armv7l` matrix entries, remove `--armv7l` packaging paths,
-  and verify uploaded artefact names and formats.
+  stale release targets alive. Severity: medium Likelihood: medium Mitigation:
+  remove `armv7l` matrix entries, remove `--armv7l` packaging paths, and verify
+  uploaded artefact names and formats.
 
 ## Progress
 
@@ -103,8 +96,8 @@ Success is observable when:
   amd64 multiarch libraries after CI install failed in arm64 snapshot
   generation with missing `libglib-2.0.so.0`.
 - [x] (2026-02-23 00:00Z) Corrected apt source selection for mixed architectures
-  on Ubuntu arm runners by using explicit `arm64` `ports.ubuntu.com` entries
-  and `amd64` `archive.ubuntu.com`/`security.ubuntu.com` entries.
+  on Ubuntu arm runners by using explicit `arm64` `ports.ubuntu.com` entries and
+  `amd64` `archive.ubuntu.com`/`security.ubuntu.com` entries.
 - [x] (2026-02-23 00:00Z) Extended mixed-architecture apt source pinning into
   the shared `install-linux-e2e-runtime-deps` action so downstream package
   installation stays reliable after adding `amd64` on arm64 runners.
@@ -114,9 +107,9 @@ Success is observable when:
   Linux dependency action so Ubuntu Jammy runners install `libasound2` when
   `libasound2t64` is unavailable.
 - [x] (2026-02-24 12:00Z) Added dual mocks for `lib/utils/plugins` (with and
-  without the `.ts` suffix) in the affected unit suites so Bun's aarch64
-  loader always observes the fake `connect` export and the transport/decoration
-  tests pass locally.
+  without the `.ts` suffix) in the affected unit suites so Bun's aarch64 loader
+  always observes the fake `connect` export and the transport/decoration tests
+  pass locally.
 - [x] (2026-02-24 13:00Z) Addressed follow-up review comments by extracting
   mixed-arch apt source generation into a shared CI script and factoring plugin
   mock module setup into a shared unit-test helper.
@@ -130,142 +123,127 @@ Success is observable when:
 - Observation: the failure is not primarily a compile error in `node-pty`; the
   runner fails earlier while copying the repository into the ARM image.
   Evidence: CI log shows repeated `cp: ... No space left on device` in the
-  arm-runner mount path before rebuild completes.
-  Impact: replacing emulated copy-based runners with native ARM runners is the
-  lowest-risk first move.
+  arm-runner mount path before rebuild completes. Impact: replacing emulated
+  copy-based runners with native ARM runners is the lowest-risk first move.
 - Observation: native Linux aarch64 `bun install` still fails without the
-  documented x64 snapshot prerequisites.
-  Evidence: the install path runs `v8-snapshot` for x64 and arm64, and x64
-  snapshot execution on arm64 requires `qemu-x86_64-static` plus a sysroot
-  containing `ld-linux-x86-64.so.2`.
+  documented x64 snapshot prerequisites. Evidence: the install path runs
+  `v8-snapshot` for x64 and arm64, and x64 snapshot execution on arm64 requires
+  `qemu-x86_64-static` plus a sysroot containing `ld-linux-x86-64.so.2`.
   Impact: the Linux aarch64 lane must prepare `qemu-user-static` and export
   `QEMU_LD_PREFIX` before running install.
 - Observation: Linux aarch64 `Install` can remain in progress for hours because
   postinstall executes both x64 and arm64 snapshot passes, and x64 runs under
-  QEMU emulation.
-  Evidence: GitHub Actions run `22308987524` shows `build-linux-aarch64` stuck
-  in `Install` for multiple hours while pre-install sysroot prep completed in
-  under one minute.
-  Impact: arm64-only packaging lanes should skip x64 snapshot generation.
+  QEMU emulation. Evidence: GitHub Actions run `22308987524` shows
+  `build-linux-aarch64` stuck in `Install` for multiple hours while pre-install
+  sysroot prep completed in under one minute. Impact: arm64-only packaging
+  lanes should skip x64 snapshot generation.
 - Observation: after skipping x64 snapshots for arm64-only lanes, arm64
   snapshot generation still failed under QEMU because
-  `v8_context_snapshot_generator` could not load `libglib-2.0.so.0`.
-  Evidence: GitHub Actions run `22315578120` failed in `Install` with status
-  `127` while running `bun run mk-snapshot`.
-  Impact: Linux aarch64 lanes need amd64 multiarch runtime libraries available
-  in the QEMU loader path, not only a minimal glibc/libstdc++ package set.
+  `v8_context_snapshot_generator` could not load `libglib-2.0.so.0`. Evidence:
+  GitHub Actions run `22315578120` failed in `Install` with status `127` while
+  running `bun run mk-snapshot`. Impact: Linux aarch64 lanes need amd64
+  multiarch runtime libraries available in the QEMU loader path, not only a
+  minimal glibc/libstdc++ package set.
 - Observation: adding amd64 architecture on the runner triggered apt index
   fetches against `ports.ubuntu.com` for amd64, which return `404 Not Found`.
   Evidence: CI logs show repeated failures for
-  `http://ports.ubuntu.com/ubuntu-ports/.../binary-amd64/Packages`.
-  Impact: mixed-architecture bootstrap must pin apt sources by architecture,
-  not rely on default runner source lists.
+  `http://ports.ubuntu.com/ubuntu-ports/.../binary-amd64/Packages`. Impact:
+  mixed-architecture bootstrap must pin apt sources by architecture, not rely
+  on default runner source lists.
 - Observation: fixing only the pre-install bootstrap step was insufficient; the
   later shared Linux dependency action still ran `apt-get update` against the
-  runner defaults and failed on the same `ports` amd64 404s.
-  Evidence: GitHub Actions logs for `Install Linux build and E2E runtime deps`
-  failed with `E: Failed to fetch ... binary-amd64/Packages`.
-  Impact: all apt invocations after enabling foreign architectures must use the
-  same per-architecture source mapping.
+  runner defaults and failed on the same `ports` amd64 404s. Evidence: GitHub
+  Actions logs for `Install Linux build and E2E runtime deps` failed with
+  `E: Failed to fetch ... binary-amd64/Packages`. Impact: all apt invocations
+  after enabling foreign architectures must use the same per-architecture
+  source mapping.
 - Observation: even with x64 snapshots disabled, Linux aarch64 CI installs can
   stall for hours in `bun run v8-snapshot` while generating arm64 snapshots.
   Evidence: CI `Install` step remained stuck at
-  `bun bin/download-mksnapshot.js && bun bin/mk-snapshot.js` until the
-  six-hour job timeout.
-  Impact: arm64 snapshot generation is too expensive/unpredictable for the CI
-  install gate and needs an explicit skip path.
+  `bun bin/download-mksnapshot.js && bun bin/mk-snapshot.js` until the six-hour
+  job timeout. Impact: arm64 snapshot generation is too expensive/unpredictable
+  for the CI install gate and needs an explicit skip path.
 - Observation: Ubuntu 22.04 arm64 runners fail Linux dependency installation on
-  `libasound2t64` with `E: Unable to locate package libasound2t64`.
-  Evidence: CI logs from `Install Linux build and E2E runtime deps` show apt
-  update success followed by package resolution failure on `libasound2t64`.
-  Impact: runtime package naming differs across Ubuntu releases, so static
-  package names are not reliable for shared Linux dependency steps.
+  `libasound2t64` with `E: Unable to locate package libasound2t64`. Evidence:
+  CI logs from `Install Linux build and E2E runtime deps` show apt update
+  success followed by package resolution failure on `libasound2t64`. Impact:
+  runtime package naming differs across Ubuntu releases, so static package
+  names are not reliable for shared Linux dependency steps.
 - Observation: Bun's TypeScript resolver on Linux aarch64 canonicalizes the
   renderer `lib/utils/plugins` import as `lib/utils/plugins.ts`, so mocks that
   only matched the extensionless spec were skipped and the real plugin module
-  loaded, triggering the `connect` export failure reported in CI.
-  Evidence: the aarch64 job logged `SyntaxError: Export named 'connect' not found
-  in module lib/utils/plugins.ts` even though the stub exports `connect`.
-  Impact: register mocks for both path forms to guarantee the fake exports on
-  every architecture.
+  loaded, triggering the `connect` export failure reported in CI. Evidence: the
+  aarch64 job logged
+  `SyntaxError: Export named 'connect' not found in module lib/utils/plugins.ts`
+  even though the stub exports `connect`. Impact: register mocks for both path
+  forms to guarantee the fake exports on every architecture.
 
 ## Decision log
 
 - Decision: scope this plan to the Linux sub-items of roadmap `1.4.15` only.
   Rationale: user request is specifically Linux aarch64 support and arm7
-  retirement.
-  Date/Author: 2026-02-23 / Codex
+  retirement. Date/Author: 2026-02-23 / Codex
 - Decision: prefer `ubuntu-22.04-arm` runner over `pguyot/arm-runner-action`.
   Rationale: avoids copy-to-image disk exhaustion and simplifies
-  reproducibility.
-  Date/Author: 2026-02-23 / Codex
+  reproducibility. Date/Author: 2026-02-23 / Codex
 - Decision: keep this as a draft-only artefact until user approval.
-  Rationale: follows ExecPlan approval-gate requirements.
-  Date/Author: 2026-02-23 / Codex
+  Rationale: follows ExecPlan approval-gate requirements. Date/Author:
+  2026-02-23 / Codex
 - Decision: include explicit lint/test gates in the Linux aarch64 workflow lane
-  before packaging.
-  Rationale: roadmap scope requires Linux aarch64 reliability across install,
-  build, lint, and test, not just packaging.
-  Date/Author: 2026-02-23 / Codex
+  before packaging. Rationale: roadmap scope requires Linux aarch64 reliability
+  across install, build, lint, and test, not just packaging. Date/Author:
+  2026-02-23 / Codex
 - Decision: bootstrap x64 snapshot emulation in the Linux aarch64 lane before
   install by preparing `qemu-user-static`, enabling dpkg `amd64`, and
-  provisioning required `:amd64` runtime libraries.
-  Rationale: this matches documented aarch64 snapshot requirements and unblocks
-  the install gate on native ARM runners.
-  Date/Author: 2026-02-23 / Codex
+  provisioning required `:amd64` runtime libraries. Rationale: this matches
+  documented aarch64 snapshot requirements and unblocks the install gate on
+  native ARM runners. Date/Author: 2026-02-23 / Codex
 - Decision: add `SKIP_X64_V8_SNAPSHOT` handling to snapshot orchestration and
-  set it in the Linux aarch64 CI install environment.
-  Rationale: Linux aarch64 CI lane packages arm64 artefacts only, so generating
-  an additional x64 snapshot adds substantial install latency without affecting
-  arm64 packaging outcomes.
-  Date/Author: 2026-02-23 / Codex
+  set it in the Linux aarch64 CI install environment. Rationale: Linux aarch64
+  CI lane packages arm64 artefacts only, so generating an additional x64
+  snapshot adds substantial install latency without affecting arm64 packaging
+  outcomes. Date/Author: 2026-02-23 / Codex
 - Decision: provision x86_64 runtime libraries via dpkg multiarch (`amd64`) and
-  set `QEMU_LD_PREFIX=/` in the Linux aarch64 lane.
-  Rationale: `v8_context_snapshot_generator` dynamically links against glib and
-  related libraries, so the lane installs `libc6:amd64`, `libstdc++6:amd64`,
+  set `QEMU_LD_PREFIX=/` in the Linux aarch64 lane. Rationale:
+  `v8_context_snapshot_generator` dynamically links against glib and related
+  libraries, so the lane installs `libc6:amd64`, `libstdc++6:amd64`,
   `libgcc-s1:amd64`, `libglib2.0-0:amd64`, `libexpat1:amd64`, and
-  `libpcre2-8-0:amd64` with pinned per-architecture apt sources.
-  Date/Author: 2026-02-23 / Codex
+  `libpcre2-8-0:amd64` with pinned per-architecture apt sources. Date/Author:
+  2026-02-23 / Codex
 - Decision: use an explicit temporary apt source list in Linux aarch64
-  bootstrap with `ports.ubuntu.com` limited to `arm64` and
-  `archive.ubuntu.com`/`security.ubuntu.com` limited to `amd64`.
-  Rationale: avoids amd64 index lookups against `ports` mirrors and makes
-  package resolution deterministic on Ubuntu arm runners.
-  Date/Author: 2026-02-23 / Codex
+  bootstrap with `ports.ubuntu.com` limited to `arm64` and `archive.ubuntu.com`/
+  `security.ubuntu.com` limited to `amd64`. Rationale: avoids amd64 index
+  lookups against `ports` mirrors and makes package resolution deterministic on
+  Ubuntu arm runners. Date/Author: 2026-02-23 / Codex
 - Decision: add mixed-arch source auto-detection to the shared
-  `.github/actions/install-linux-e2e-runtime-deps` action.
-  Rationale: keeps fast/deep Linux dependency installation aligned with the
-  aarch64 bootstrap once `amd64` is enabled, without changing x64 lanes.
-  Date/Author: 2026-02-23 / Codex
+  `.github/actions/install-linux-e2e-runtime-deps` action. Rationale: keeps
+  fast/deep Linux dependency installation aligned with the aarch64 bootstrap
+  once `amd64` is enabled, without changing x64 lanes. Date/Author: 2026-02-23
+  / Codex
 - Decision: add `SKIP_V8_SNAPSHOT` support to `bin/run-v8-snapshot.js` and set
-  it in Linux aarch64 CI install.
-  Rationale: makes `bun install` deterministic on aarch64 lanes by bypassing
-  the long-running emulated snapshot phase, while retaining the snapshot flow
-  for non-CI and non-aarch64 contexts.
-  Date/Author: 2026-02-23 / Codex
+  it in Linux aarch64 CI install. Rationale: makes `bun install` deterministic
+  on aarch64 lanes by bypassing the long-running emulated snapshot phase, while
+  retaining the snapshot flow for non-CI and non-aarch64 contexts. Date/Author:
+  2026-02-23 / Codex
 - Decision: resolve ALSA dependency package names dynamically in the shared
   Linux dependency action by checking availability of `libasound2t64` then
-  falling back to `libasound2`.
-  Rationale: preserves one CI action implementation across Jammy and Noble
-  without per-runner forks.
-  Date/Author: 2026-02-23 / Codex
+  falling back to `libasound2`. Rationale: preserves one CI action
+  implementation across Jammy and Noble without per-runner forks. Date/Author:
+  2026-02-23 / Codex
 - Decision: register plugin mocks for both the extensionless and `.ts` spec
-  strings in the renderer unit suites.
-  Rationale: Bun's Linux aarch64 resolver canonicalizes the import as
-  `lib/utils/plugins.ts`, so the previous mock targets were skipped and the
-  real module triggered the `connect` export error.
-  Date/Author: 2026-02-24 / Codex
+  strings in the renderer unit suites. Rationale: Bun's Linux aarch64 resolver
+  canonicalizes the import as `lib/utils/plugins.ts`, so the previous mock
+  targets were skipped and the real module triggered the `connect` export
+  error. Date/Author: 2026-02-24 / Codex
 - Decision: centralize Ubuntu arm64 mixed-arch apt source list generation in
   `.github/scripts/configure-ubuntu-mixed-arch-apt-sources.sh` and call it from
-  both the workflow bootstrap and shared Linux dependency action.
-  Rationale: avoids drift between duplicated source-list blocks when mirrors or
-  codename handling change.
-  Date/Author: 2026-02-24 / Codex
+  both the workflow bootstrap and shared Linux dependency action. Rationale:
+  avoids drift between duplicated source-list blocks when mirrors or codename
+  handling change. Date/Author: 2026-02-24 / Codex
 - Decision: factor repeated plugin module mock wiring into
-  `test/testUtils/plugins-mock.ts`.
-  Rationale: keeps Bun path-mocking behaviour consistent across the Hyper and
-  renderer unit suites and reduces duplicated `createPluginExports` factories.
-  Date/Author: 2026-02-24 / Codex
+  `test/testUtils/plugins-mock.ts`. Rationale: keeps Bun path-mocking behaviour
+  consistent across the Hyper and renderer unit suites and reduces duplicated
+  `createPluginExports` factories. Date/Author: 2026-02-24 / Codex
 - Decision: keep `SKIP_V8_SNAPSHOT=1` for Linux aarch64 install speed, but add a
   dedicated arm64 snapshot generation step before `electron-builder` packaging.
   Rationale: `bin/cp-snapshot.js` validates `cache/arm64` snapshot outputs in
@@ -281,7 +259,8 @@ Observed outcomes:
 
 - arm7 (`armv7l`) Linux CI lane and arm7 Linux artefact targets were removed.
 - Linux ARM workflow now runs as Linux aarch64 on `ubuntu-22.04-arm`.
-- Linux aarch64 workflow now bootstraps `qemu-x86_64-static` and `QEMU_LD_PREFIX`
+- Linux aarch64 workflow now bootstraps `qemu-x86_64-static` and
+  `QEMU_LD_PREFIX`
   sysroot setup before `bun install`.
 - Linux aarch64 bootstrap now uses `:amd64` multiarch runtime packages
   (`libc6`, `libstdc++6`, `libgcc-s1`, `libglib2.0-0`, `libexpat1`, and

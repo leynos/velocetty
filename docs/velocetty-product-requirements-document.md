@@ -1,9 +1,9 @@
 # Velocetty product requirements document
 
-This document defines the current product stance and workstreams for
-Velocetty. It treats the command and shortcut system, and the tab-handle
-customization surface, as first-class requirements that shape the surrounding
-architecture and user experience.
+This document defines the current product stance and workstreams for Velocetty.
+It treats the command and shortcut system, and the tab-handle customization
+surface, as first-class requirements that shape the surrounding architecture
+and user experience.
 
 ## Product stance
 
@@ -143,8 +143,8 @@ Deliverables (plugin hooks):
 Security/architecture notes that matter later:
 
 - A command is the perfect choke-point for permissioning once a remote frontend
-  exists. If a backend-owned command implies privileged access (filesystem,
-  PTY spawning, credentials), the command invocation should traverse a
+  exists. If a backend-owned command implies privileged access (filesystem, PTY
+  spawning, credentials), the command invocation should traverse a
   permission-aware boundary even if it originated in the local UI.
 
 ### 4) Settings tab + plugin settings panels (with security posture explicit)
@@ -182,8 +182,8 @@ Deliverables:
 
 ### 6) Vertical tabs + rich tab content + clean tab-handle customization hooks (expanded)
 
-This revision treats tab handles themselves as an extensibility surface, without
-plugins mucking with layout internals.
+This revision treats tab handles themselves as an extensibility surface,
+without plugins mucking with layout internals.
 
 The key is to treat the tab handle as a composition of “slots” with
 well-defined data inputs and merge rules, rather than “here’s a React
@@ -327,15 +327,13 @@ auth/permissions defined.
 ## A couple of design “gotchas” worth nailing early
 
 The command “when” system should keep context keys explicit and testable, such
-as
-`terminalFocus`, `paneCount > 1`, `findOpen`, `settingsOpen`, or
+as `terminalFocus`, `paneCount > 1`, `findOpen`, `settingsOpen`, or
 `tabType == "terminal"`, instead of ad-hoc booleans scattered through
 components.
 
 Tab decoration merge rules should be defined up-front. For example, when two
 plugins provide icons, the rules should clarify whether priority wins, stacking
-(badge + icon) is permitted, or dual icons are disallowed to avoid ambiguous
-UX.
+(badge + icon) is permitted, or dual icons are disallowed to avoid ambiguous UX.
 
 The revised high-level plan remains high level, but it now surfaces the right
 pressure points so the PRD and tech design can lock decisions early instead of

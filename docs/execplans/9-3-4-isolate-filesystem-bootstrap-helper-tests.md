@@ -1,9 +1,8 @@
 # Isolate filesystem bootstrap helper tests (roadmap 9.3.4)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -54,8 +53,8 @@ not overlap. The current suite covers four behaviours:
 - creating the resolved target behind a symlinked directory path
 - rejecting a non-directory path with a stable error contract
 
-The symlink case is the most sensitive. It asserts both `lstat(symlinkPath)`
-and `lstat(targetDirectory)`. If another test removes the owning temporary root
+The symlink case is the most sensitive. It asserts both `lstat(symlinkPath)` and
+`lstat(targetDirectory)`. If another test removes the owning temporary root
 mid-flight, either of those `lstat(...)` calls can fail even when
 `ensureDirectoryPath(...)` itself behaved correctly.
 
@@ -72,7 +71,8 @@ Existing repository patterns already point toward the desired shape:
 - `test/unit/happy-dom.test.ts` uses `test.serial(...)` only to validate the
   Happy DOM harness contract itself; it is not a pattern for silencing
   unrelated races.
-- Recent roadmap work in `docs/execplans/9-3-3-isolate-renderer-event-and-renderer-metric-tests.md`
+- Recent roadmap work in
+  `docs/execplans/9-3-3-isolate-renderer-event-and-renderer-metric-tests.md`
   favours per-test harness ownership over mutable file-scope fixture state.
 
 The implementation will likely touch these files:
@@ -127,33 +127,27 @@ focused concurrent race remains after the test harness is isolated.
 ## Risks
 
 - Risk: the current race is obvious in teardown ownership, but there could be a
-  second, less visible helper-level race behind it.
-  Severity: high
-  Likelihood: low
-  Mitigation: first isolate the test harness, then rerun the focused
+  second, less visible helper-level race behind it. Severity: high Likelihood:
+  low Mitigation: first isolate the test harness, then rerun the focused
   concurrent loop enough times to determine whether any helper change is still
   required.
 
 - Risk: the symlink case may remain flaky if the refactor fixes teardown
-  ownership but leaves assertions coupled to shared helper state.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: keep each test's path construction entirely local and avoid any
-  shared mutable registry or shared cleanup callback.
+  ownership but leaves assertions coupled to shared helper state. Severity:
+  medium Likelihood: medium Mitigation: keep each test's path construction
+  entirely local and avoid any shared mutable registry or shared cleanup
+  callback.
 
 - Risk: future contributors may reintroduce shared temp-root cleanup patterns
-  elsewhere if the repository guidance is not updated.
-  Severity: medium
-  Likelihood: high
-  Mitigation: update `docs/developers-guide.md` with the concrete rule and the
-  focused concurrent reproduction command used for this roadmap item.
+  elsewhere if the repository guidance is not updated. Severity: medium
+  Likelihood: high Mitigation: update `docs/developers-guide.md` with the
+  concrete rule and the focused concurrent reproduction command used for this
+  roadmap item.
 
 - Risk: full repository gates may expose unrelated flakes after the targeted
-  fix lands.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: keep the roadmap item scoped, but do not mark it done unless the
-  full requested gate suite passes after the focused concurrency run.
+  fix lands. Severity: medium Likelihood: medium Mitigation: keep the roadmap
+  item scoped, but do not mark it done unless the full requested gate suite
+  passes after the focused concurrency run.
 
 ## Implementation outline
 
@@ -254,8 +248,8 @@ make lint | tee /tmp/lint-velocetty-$(git branch --show-current).out
 make test | tee /tmp/test-velocetty-$(git branch --show-current).out
 ```
 
-Only after those commands pass should `docs/roadmap.md` mark `9.3.4` done.
-The roadmap entry should reflect the targeted explicit-concurrency success
+Only after those commands pass should `docs/roadmap.md` mark `9.3.4` done. The
+roadmap entry should reflect the targeted explicit-concurrency success
 criterion, not merely the default `make test` gate.
 
 ## Validation
@@ -298,8 +292,7 @@ Implementation is not complete until the following checks have passed:
   `test/unit/ensure-directory-path.test.ts`, and
   `bin/shared/ensure-directory-path.js`.
 - [x] (2026-03-12 19:43Z) Created a shared context pack and used an agent team
-  to inspect prior `9.3.x` plan patterns and the filesystem helper test
-  surface.
+  to inspect prior `9.3.x` plan patterns and the filesystem helper test surface.
 - [x] (2026-03-12 19:43Z) Reproduced the current `ENOENT` race under
   `bun test --concurrent test/unit/ensure-directory-path.test.ts` and captured
   the failure signature in
@@ -307,8 +300,8 @@ Implementation is not complete until the following checks have passed:
 - [x] (2026-03-12 19:43Z) Drafted this ExecPlan.
 - [x] (2026-03-12 19:44Z) Received explicit approval to begin implementation.
 - [x] (2026-03-12 19:49Z) Refactored
-  `test/unit/ensure-directory-path.test.ts` to give each test sole ownership
-  of its temporary root and cleanup path via a per-test wrapper.
+  `test/unit/ensure-directory-path.test.ts` to give each test sole ownership of
+  its temporary root and cleanup path via a per-test wrapper.
 - [x] (2026-03-12 19:50Z) Replayed
   `bun test --concurrent test/unit/ensure-directory-path.test.ts` for 20
   iterations with a tee'd log; all iterations passed with no `ENOENT` races.
@@ -325,93 +318,84 @@ Implementation is not complete until the following checks have passed:
 ## Surprises & discoveries
 
 - Observation: the temporary-root naming is already unique per test because the
-  suite uses `mkdtemp(...)`.
-  Evidence: `test/unit/ensure-directory-path.test.ts` prefixes roots with
+  suite uses `mkdtemp(...)`. Evidence:
+  `test/unit/ensure-directory-path.test.ts` prefixes roots with
   `ensure-directory-path-` and receives a fresh path from the operating system.
   Impact: the race is not allocation collision. It is teardown ownership.
 
 - Observation: the current failure is caused by file-scope cleanup state, not
-  by obvious shared state in `bin/shared/ensure-directory-path.js`.
-  Evidence: the helper only performs `lstat`, `readlink`, and `mkdir`, while
-  the suite keeps `temporaryRoots` at file scope and removes
-  `temporaryRoots.splice(0)` inside `afterEach(...)`.
-  Impact: implementation should isolate the test harness first and only inspect
-  helper changes if the focused concurrent race remains after that refactor.
+  by obvious shared state in `bin/shared/ensure-directory-path.js`. Evidence:
+  the helper only performs `lstat`, `readlink`, and `mkdir`, while the suite
+  keeps `temporaryRoots` at file scope and removes `temporaryRoots.splice(0)`
+  inside `afterEach(...)`. Impact: implementation should isolate the test
+  harness first and only inspect helper changes if the focused concurrent race
+  remains after that refactor.
 
 - Observation: the symlink case is the easiest place to see the race because it
   performs two post-bootstrap filesystem checks under the same temporary root.
-  Evidence: concurrent probes have already failed on both
-  `/dist` and `/backing/dist` paths with `ENOENT`.
-  Impact: repeated explicit-concurrency runs should keep the symlink case in
-  view when judging whether the fix is complete.
+  Evidence: concurrent probes have already failed on both `/dist` and
+  `/backing/dist` paths with `ENOENT`. Impact: repeated explicit-concurrency
+  runs should keep the symlink case in view when judging whether the fix is
+  complete.
 
 - Observation: recent roadmap work in this repository has converged on
   per-test fixture ownership rather than shared mutable harness state.
   Evidence: roadmap `9.3.3` isolated renderer tests by moving state behind
   per-test harnesses, and other unit tests already use local `try/finally`
-  cleanup for temporary directories.
-  Impact: `9.3.4` should follow the same pattern instead of adding new global
-  coordination.
+  cleanup for temporary directories. Impact: `9.3.4` should follow the same
+  pattern instead of adding new global coordination.
 
 - Observation: removing the file-scope temporary-root queue was sufficient to
-  stabilize the focused explicit-concurrency command.
-  Evidence: 20 consecutive runs of
-  `bun test --concurrent test/unit/ensure-directory-path.test.ts` passed after
-  the test-harness refactor, with no helper-code change.
-  Impact: roadmap `9.3.4` does not currently require a production change in
+  stabilize the focused explicit-concurrency command. Evidence: 20 consecutive
+  runs of `bun test --concurrent test/unit/ensure-directory-path.test.ts`
+  passed after the test-harness refactor, with no helper-code change. Impact:
+  roadmap `9.3.4` does not currently require a production change in
   `bin/shared/ensure-directory-path.js`.
 
 - Observation: `bun install` was blocked by two independent generated-tree
   failures in this workspace: stale relink targets in `node_modules`, then
-  `ENOENT` failures inside the packaged dependency mirror step.
-  Evidence: initial installation attempts failed with `EEXIST` during dependency
+  `ENOENT` failures inside the packaged dependency mirror step. Evidence:
+  initial installation attempts failed with `EEXIST` during dependency
   relinking and then with `ENOENT` from `bin/copy-node-modules.js` while
-  copying into `app/node_modules`.
-  Impact: completing the requested gate suite required both a clean generated
-  dependency-tree reset and a small hardening change to the copy script plus
-  its `package.json` invocation.
+  copying into `app/node_modules`. Impact: completing the requested gate suite
+  required both a clean generated dependency-tree reset and a small hardening
+  change to the copy script plus its `package.json` invocation.
 
 ## Decision log
 
 - Decision: treat this document as a draft only and do not implement until the
-  user explicitly approves it.
-  Rationale: the repository instructions and the execplans skill both require
-  an approval gate before execution.
-  Date/Author: 2026-03-12 / Codex.
+  user explicitly approves it. Rationale: the repository instructions and the
+  execplans skill both require an approval gate before execution. Date/Author:
+  2026-03-12 / Codex.
 
 - Decision: prioritize test-harness isolation before any production helper
-  change.
-  Rationale: current evidence shows the race is caused by shared teardown state
-  in the test file, while the production helper appears stateless.
-  Date/Author: 2026-03-12 / Codex.
+  change. Rationale: current evidence shows the race is caused by shared
+  teardown state in the test file, while the production helper appears
+  stateless. Date/Author: 2026-03-12 / Codex.
 
 - Decision: begin execution by updating this plan before editing code so the
-  progress record matches the approved implementation phase.
-  Rationale: this ExecPlan must remain a usable living document if work is
-  interrupted mid-implementation.
-  Date/Author: 2026-03-12 / Codex.
+  progress record matches the approved implementation phase. Rationale: this
+  ExecPlan must remain a usable living document if work is interrupted
+  mid-implementation. Date/Author: 2026-03-12 / Codex.
 
 - Decision: keep the roadmap success criterion anchored to explicit
   `--concurrent` runs for this one suite, plus the repository's full gate
-  suite.
-  Rationale: roadmap `9.3.4` is narrower than a general unit-test scheduler
-  change and should close only when both the focused stress path and the
-  required repository gates succeed.
-  Date/Author: 2026-03-12 / Codex.
+  suite. Rationale: roadmap `9.3.4` is narrower than a general unit-test
+  scheduler change and should close only when both the focused stress path and
+  the required repository gates succeed. Date/Author: 2026-03-12 / Codex.
 
 - Decision: switch the packaged `node_modules` mirror step to native
-  `fs.cpSync` under Node.js during postinstall.
-  Rationale: the original generated-tree copy path was not reliable enough to
-  satisfy the required plain `bun install` gate on this machine, while the
-  Node.js/native-fs path completed successfully without changing the resulting
-  packaged dependency layout.
-  Date/Author: 2026-03-12 / Codex.
+  `fs.cpSync` under Node.js during postinstall. Rationale: the original
+  generated-tree copy path was not reliable enough to satisfy the required plain
+  `bun install` gate on this machine, while the Node.js/native-fs path
+  completed successfully without changing the resulting packaged dependency
+  layout. Date/Author: 2026-03-12 / Codex.
 
 ## Outcomes & retrospective
 
-`test/unit/ensure-directory-path.test.ts` now gives each test sole ownership
-of its temporary root by wrapping test bodies in a per-test cleanup helper.
-That removed the shared teardown queue that had been deleting sibling tests'
+`test/unit/ensure-directory-path.test.ts` now gives each test sole ownership of
+its temporary root by wrapping test bodies in a per-test cleanup helper. That
+removed the shared teardown queue that had been deleting sibling tests'
 directories under explicit `--concurrent` scheduling. No production change was
 required in `bin/shared/ensure-directory-path.js` for the roadmap behaviour
 itself.

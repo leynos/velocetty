@@ -1,9 +1,8 @@
 # Implement WebGL allocation and fallback metrics (Roadmap 2.2.1)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -42,9 +41,8 @@ The implementation is expected to concentrate in these areas:
   `app/ui/window.ts`, `app/utils/renderer-utils.ts`, and `app/menus/menu.ts`.
 - Existing test coverage to extend:
   `test/unit/webgl-context-pool.test.ts`,
-  `test/unit/term-report-renderer.test.ts`,
-  `test/unit/renderer-utils.test.ts`, and possibly new focused tests around
-  diagnostics output.
+  `test/unit/term-report-renderer.test.ts`, `test/unit/renderer-utils.test.ts`,
+  and possibly new focused tests around diagnostics output.
 
 Reference sources that define scope and acceptance:
 
@@ -97,36 +95,26 @@ Reference sources that define scope and acceptance:
 ## Risks
 
 - Risk: metric duplication due to repeated renderer reports from the same
-  terminal lifecycle.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: keep deduplication semantics aligned with existing
-  `reportRenderer` and validate with focused unit tests.
+  terminal lifecycle. Severity: medium Likelihood: medium Mitigation: keep
+  deduplication semantics aligned with existing `reportRenderer` and validate
+  with focused unit tests.
 
 - Risk: current and peak counts drift from actual pool state under eviction and
-  release edge cases.
-  Severity: high
-  Likelihood: medium
-  Mitigation: derive metrics from pool lifecycle methods and add transition
-  tests around `acquire`, `release`, and `clear`.
+  release edge cases. Severity: high Likelihood: medium Mitigation: derive
+  metrics from pool lifecycle methods and add transition tests around `acquire`,
+  `release`, and `clear`.
 
 - Risk: diagnostics visibility implemented only in logs and not discoverable by
-  developers.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: prefer existing diagnostics view surface first; use logs as
-  supplementary evidence.
+  developers. Severity: medium Likelihood: medium Mitigation: prefer existing
+  diagnostics view surface first; use logs as supplementary evidence.
 
 - Risk: roadmap and developers-guide drift from implementation details.
-  Severity: medium
-  Likelihood: high
-  Mitigation: make doc updates a mandatory milestone before roadmap checkbox
-  closure.
+  Severity: medium Likelihood: high Mitigation: make doc updates a mandatory
+  milestone before roadmap checkbox closure.
 
 - Risk: long gate output truncation hides true failures.
-  Severity: high
-  Likelihood: medium
-  Mitigation: use `set -o pipefail` with per-gate `tee` logs in `/tmp`.
+  Severity: high Likelihood: medium Mitigation: use `set -o pipefail` with
+  per-gate `tee` logs in `/tmp`.
 
 ## Milestone 1: Confirm instrumentation contract and failing tests
 
@@ -238,8 +226,8 @@ make test 2>&1 | tee "/tmp/test-${safe_project_name}-${safe_branch_name}.out"
 If any command fails, stop and record partial status with exact failing log
 path. Do not claim completion.
 
-Expected result: all required commands exit `0` with evidence captured in `/tmp`
-logs.
+Expected result: all required commands exit `0` with evidence captured in
+`/tmp` logs.
 
 ## Evidence capture and reporting format
 
@@ -259,7 +247,8 @@ User approval received on `2026-02-27` to proceed with implementation.
 
 ## Progress
 
-- [x] (2026-02-27 01:52 UTC) Drafted execplan with required sections, milestones,
+- [x] (2026-02-27 01:52 UTC) Drafted execplan with required sections,
+      milestones,
   and gate strategy.
 - [x] (2026-02-27 01:52 UTC) Integrated roadmap/design/PRD/hyper/developer-guide
   scope constraints.
@@ -270,8 +259,8 @@ User approval received on `2026-02-27` to proceed with implementation.
 - [x] (2026-02-27 02:11 UTC) Began implementation with an agent team and
   integrated code/test deltas for renderer metrics and diagnostics visibility.
 - [x] (2026-02-27 02:13 UTC) Implemented current/peak WebGL metrics in
-  `app/utils/renderer-utils.ts` and surfaced metrics in About dialog diagnostics
-  output via `app/menus/menu.ts`.
+  `app/utils/renderer-utils.ts` and surfaced metrics in About dialog
+  diagnostics output via `app/menus/menu.ts`.
 - [x] (2026-02-27 02:13 UTC) Updated
   `docs/developers-guide.md` WebGL guidance for roadmap `2.2.1`.
 - [x] (2026-02-27 02:13 UTC) Passed full required gates with durable logs:
@@ -300,34 +289,32 @@ User approval received on `2026-02-27` to proceed with implementation.
 ## Decision Log
 
 - Decision: Keep status as `DRAFT` and block implementation pending explicit
-  user approval.
-  Rationale: ExecPlans skill requires an approval gate before execution.
+  user approval. Rationale: ExecPlans skill requires an approval gate before
+  execution.
 
 - Decision: Proceed with a minimal instrumentation implementation by deriving
   current and peak WebGL counts from renderer-type state in
   `app/utils/renderer-utils.ts` and exposing the metrics in the existing About
-  dialog diagnostics output.
-  Rationale: Satisfies roadmap `2.2.1` observability requirements without
-  introducing new renderer allocation behaviour or additional IPC contracts.
+  dialog diagnostics output. Rationale: Satisfies roadmap `2.2.1` observability
+  requirements without introducing new renderer allocation behaviour or
+  additional IPC contracts.
 
 - Decision: Use current diagnostics surface as primary visibility path, with
-  logs as fallback path.
-  Rationale: Minimizes scope while satisfying roadmap wording and preserving
-  deterministic verification.
+  logs as fallback path. Rationale: Minimizes scope while satisfying roadmap
+  wording and preserving deterministic verification.
 
 - Decision: Require full gate stack even for documentation-adjacent work in the
-  final implementation change.
-  Rationale: User requirement explicitly names required commands.
+  final implementation change. Rationale: User requirement explicitly names
+  required commands.
 
 - Decision: Build this plan from a multi-agent synthesis using shared
-  `context_pack` references.
-  Rationale: Improves coverage of requirements, touchpoints, and rollout risk
-  while maintaining a single coherent execution document.
+  `context_pack` references. Rationale: Improves coverage of requirements,
+  touchpoints, and rollout risk while maintaining a single coherent execution
+  document.
 
 - Decision: Keep diagnostics verification in the existing About dialog instead
-  of introducing a new diagnostics panel.
-  Rationale: Meets roadmap success criteria with lower blast radius and no new
-  UI workflow.
+  of introducing a new diagnostics panel. Rationale: Meets roadmap success
+  criteria with lower blast radius and no new UI workflow.
 
 - Decision: Revert schema regeneration side effects after gate execution.
   Rationale: Regenerated schema diffs were unrelated to roadmap `2.2.1` and
@@ -335,8 +322,8 @@ User approval received on `2026-02-27` to proceed with implementation.
 
 - Decision: Normalize milestone phrasing in the roadmap `2.2.1` section by
   removing preposition-colon patterns and correcting progress wording.
-  Rationale: Keeps procedural text consistent with repo grammar expectations and
-  review guidance.
+  Rationale: Keeps procedural text consistent with repo grammar expectations
+  and review guidance.
 
 ## Outcomes & Retrospective
 
@@ -360,7 +347,8 @@ Gate outcomes:
 - `make build`: pass (exit 0)
   log: `/tmp/build-velocetty-2-2-1-web-gl-allocation-and-fallback-metrics.out`
 - `make check-fmt`: pass (exit 0)
-  log: `/tmp/check-fmt-velocetty-2-2-1-web-gl-allocation-and-fallback-metrics.out`
+  log:
+  `/tmp/check-fmt-velocetty-2-2-1-web-gl-allocation-and-fallback-metrics.out`
 - `make lint`: pass (exit 0)
   log: `/tmp/lint-velocetty-2-2-1-web-gl-allocation-and-fallback-metrics.out`
 - `make test`: pass (exit 0)

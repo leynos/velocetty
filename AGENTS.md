@@ -51,8 +51,8 @@
 ## Tooling Defaults
 
 - Use `bun` for JavaScript/TypeScript script invocations (including shebangs)
-  unless there is a known reason not to. Any exception must be explicitly
-  noted alongside the invocation or in this file.
+  unless there is a known reason not to. Any exception must be explicitly noted
+  alongside the invocation or in this file.
 - AVA does not run reliably under Bun (missing `node:v8` coverage hooks), so
   `test:unit` and the AVA bridge test intentionally invoke `node`.
 
@@ -467,10 +467,9 @@ The following tooling is available in this environment:
      `/tmp/playwright-mcp-output/`; inspect them before you commit.
   3. Repeat after making refinements so you can spot regressions early.
 - `a11y MCP` – Run fast accessibility sweeps on the same pages you test with
-  Playwright. After navigating, invoke `a11y.scan_page` to collect
-  automated issues. Review the findings, fix blockers, and rerun the
-  scan until it is clean. Pair this with manual keyboard checks before
-  shipping.
+  Playwright. After navigating, invoke `a11y.scan_page` to collect automated
+  issues. Review the findings, fix blockers, and rerun the scan until it is
+  clean. Pair this with manual keyboard checks before shipping.
 
 ## Spelling policy
 

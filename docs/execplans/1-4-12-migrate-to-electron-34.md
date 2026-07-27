@@ -1,9 +1,8 @@
 # Migrate runtime stack to Electron 34
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -45,8 +44,7 @@ And when tracking/developer documents are updated:
 - Dependencies: if a new third-party dependency is required, stop and
   escalate.
 - Interfaces: if user-facing runtime behaviour or command-line interface (CLI)
-  contracts must change,
-  stop and escalate.
+  contracts must change, stop and escalate.
 - Validation: if required gates fail after two focused remediation passes,
   stop and escalate with logs.
 - Ambiguity: if a migration decision materially affects Electron 40 readiness
@@ -55,21 +53,16 @@ And when tracking/developer documents are updated:
 ## Risks
 
 - Risk: `node-pty` may fail to compile against Electron 34 headers.
-  Severity: high
-  Likelihood: medium
-  Mitigation: validate `bun install` early and only adjust runtime dependencies
-  if failure evidence confirms incompatibility.
+  Severity: high Likelihood: medium Mitigation: validate `bun install` early
+  and only adjust runtime dependencies if failure evidence confirms
+  incompatibility.
 - Risk: V8 JavaScript engine snapshot generation may fail with Electron 34
-  runtime changes.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: validate during `make build` and adjust snapshot tooling only if
-  error evidence requires it.
+  runtime changes. Severity: medium Likelihood: medium Mitigation: validate
+  during `make build` and adjust snapshot tooling only if error evidence
+  requires it.
 - Risk: documentation drift can leave mixed Electron 28 and 34 baseline
-  references.
-  Severity: medium
-  Likelihood: high
-  Mitigation: sweep baseline references in `docs/velocetty-hyper-codebase.md`.
+  references. Severity: medium Likelihood: high Mitigation: sweep baseline
+  references in `docs/velocetty-hyper-codebase.md`.
 
 ## Progress
 
@@ -79,8 +72,8 @@ And when tracking/developer documents are updated:
 - [x] (2026-02-09) Updated runtime anchors in `package.json` and
   `bin/rebuild-node-pty.cjs` for Electron 34.
 - [x] (2026-02-09) Updated Continuous Integration (CI) Node.js baseline in
-  `.github/workflows/nodejs.yml`
-  to align with Electron 34's bundled Node.js family.
+  `.github/workflows/nodejs.yml` to align with Electron 34's bundled Node.js
+  family.
 - [x] (2026-02-09) Updated `docs/developers-guide.md`,
   `docs/velocetty-hyper-codebase.md`, and `docs/roadmap.md` for the new
   baseline and completion tracking.
@@ -92,10 +85,9 @@ And when tracking/developer documents are updated:
 
 - Observation: ADR-004 references Electron 34 runtime details but the previous
   completed milestone still left many architecture baseline references to
-  Electron 28 in `docs/velocetty-hyper-codebase.md`.
-  Evidence: targeted grep sweep before edits.
-  Impact: required a broader documentation baseline update than just roadmap and
-  developers' guide.
+  Electron 28 in `docs/velocetty-hyper-codebase.md`. Evidence: targeted grep
+  sweep before edits. Impact: required a broader documentation baseline update
+  than just roadmap and developers' guide.
 
 ## Decision log
 
@@ -104,12 +96,10 @@ And when tracking/developer documents are updated:
   Date/Author: 2026-02-09 / Codex
 - Decision: align `@types/node` to `^20.19.33`.
   Rationale: keep type baseline aligned with Electron 34's bundled Node.js
-  major.
-  Date/Author: 2026-02-09 / Codex
+  major. Date/Author: 2026-02-09 / Codex
 - Decision: align CI workflow Node.js baseline to 20.x and arm bootstrap to
-  Node.js 20.18.1.
-  Rationale: keep rebuild/runtime assumptions consistent with Electron 34.
-  Date/Author: 2026-02-09 / Codex
+  Node.js 20.18.1. Rationale: keep rebuild/runtime assumptions consistent with
+  Electron 34. Date/Author: 2026-02-09 / Codex
 
 ## Outcomes & retrospective
 

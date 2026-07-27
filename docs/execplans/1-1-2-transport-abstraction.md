@@ -4,8 +4,8 @@
 
 - Purpose: define and execute roadmap item `1.1.2` by introducing a transport
   abstraction for command invocation and event streams, with an interim
-  Electron inter-process communication (IPC) adapter built on existing
-  remote procedure call (RPC) wiring.
+  Electron inter-process communication (IPC) adapter built on existing remote
+  procedure call (RPC) wiring.
 - Invariants: preserve current runtime behaviour while removing direct
   Electron/RPC coupling from the command layer.
 - Cross-links: `docs/roadmap.md`, `docs/velocetty-design.md`,
@@ -13,10 +13,9 @@
   `docs/velocetty-product-requirements-document.md`, and
   `docs/developers-guide.md`.
 
-This Execution Plan (ExecPlan) is a living document.
-The sections `Constraints`, `Tolerances`, `Risks`, `Progress`,
-`Surprises & discoveries`, `Decision log`, and
-`Outcomes & retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: IN_PROGRESS (2026-02-12)
 
@@ -83,36 +82,28 @@ Done criteria for this roadmap item:
 ## Risks
 
 - Risk: transport abstraction is defined too narrowly and cannot support Tauri
-  or WebSocket transport later.
-  Severity: high
-  Likelihood: medium
-  Mitigation: define contract in `shared/` using host-agnostic terms
+  or WebSocket transport later. Severity: high Likelihood: medium Mitigation:
+  define contract in `shared/` using host-agnostic terms
   (invoke/subscribe/unsubscribe) and include event-stream methods from day one.
 
 - Risk: migration touches high-fan-out modules in `lib/index.tsx`, creating
-  regressions in renderer event wiring.
-  Severity: high
-  Likelihood: medium
+  regressions in renderer event wiring. Severity: high Likelihood: medium
   Mitigation: migrate in small steps, add adapter-focused unit tests first,
   then run fast E2E assertions after command-path migration.
 
 - Risk: command-layer direct imports of `rpc`/`ipcRenderer` remain hidden after
-  partial refactor.
-  Severity: medium
-  Likelihood: high
-  Mitigation: add explicit assertions (tests or static checks) that command
-  modules import transport modules, not Electron/RPC internals.
+  partial refactor. Severity: medium Likelihood: high Mitigation: add explicit
+  assertions (tests or static checks) that command modules import transport
+  modules, not Electron/RPC internals.
 
 - Risk: developers continue adding direct Electron calls in new command code.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: document rule and examples in `docs/developers-guide.md`.
+  Severity: medium Likelihood: medium Mitigation: document rule and examples in
+  `docs/developers-guide.md`.
 
 ## Progress
 
 - [x] (2026-02-12 00:00Z) Captured roadmap/design/product requirements
-  document (PRD) constraints for task
-  `1.1.2`.
+  document (PRD) constraints for task `1.1.2`.
 - [x] (2026-02-12 00:00Z) Mapped current command and IPC wiring in
   `lib/actions/ui.ts`, `lib/command-registry.ts`, `lib/utils/rpc.ts`,
   `lib/index.tsx`, `app/rpc.ts`, and `app/ui/window.ts`.
@@ -136,84 +127,76 @@ Done criteria for this roadmap item:
 ## Surprises & discoveries
 
 - Observation: runtime package boundaries are established, but active renderer
-  and main-process implementation still resides in `lib/` and `app/`.
-  Evidence: `frontend/src/index.ts` and `backend/src/index.ts` are boundary
-  markers, while command/RPC wiring remains in legacy roots.
-  Impact: this milestone should introduce transport seam without forcing a
-  full module relocation.
+  and main-process implementation still resides in `lib/` and `app/`. Evidence:
+  `frontend/src/index.ts` and `backend/src/index.ts` are boundary markers,
+  while command/RPC wiring remains in legacy roots. Impact: this milestone
+  should introduce transport seam without forcing a full module relocation.
 
 - Observation: command invocation currently spans two mechanisms in renderer
   code: `rpc.emit('command', ...)` and direct `ipcRenderer.invoke(...)` for
-  decorated keymaps.
-  Evidence: `lib/actions/ui.ts` and `lib/command-registry.ts`.
-  Impact: adapter design must support both fire-and-forget command dispatch and
-  request/response calls.
+  decorated keymaps. Evidence: `lib/actions/ui.ts` and
+  `lib/command-registry.ts`. Impact: adapter design must support both
+  fire-and-forget command dispatch and request/response calls.
 
 - Observation: there is currently no direct unit test coverage for
   `lib/utils/rpc.ts`, `app/rpc.ts`, or concrete behaviour in
   `lib/command-registry.ts`; existing coverage mocks the registry surface.
   Evidence: `test/unit/hyper-effects.test.ts` mocks
   `../../lib/command-registry`, and test searches show no direct unit tests
-  targeting `lib/utils/rpc.ts` or `app/rpc.ts`.
-  Impact: continuity risk is too high for a refactor unless the coverage-first
-  gate is implemented before transport changes.
+  targeting `lib/utils/rpc.ts` or `app/rpc.ts`. Impact: continuity risk is too
+  high for a refactor unless the coverage-first gate is implemented before
+  transport changes.
 
 - Additional discovery: full-suite stability required shared Electron mock
-  wiring in
-  `test/unit/rpc-server.test.ts` because `updater.test.ts` can register a
-  global Electron mock without `ipcMain`.
-  Impact: transport-related tests need a single reusable mock surface to avoid
-  stale IPC imports under Bun's module mock cache.
+  wiring in `test/unit/rpc-server.test.ts` because `updater.test.ts` can
+  register a global Electron mock without `ipcMain`. Impact: transport-related
+  tests need a single reusable mock surface to avoid stale IPC imports under
+  Bun's module mock cache.
 - Additional discovery: `make build` initially failed because two files
-  imported the
-  transport adapter from incorrect relative paths.
-  Impact: the transport boundary migration remains sensitive to module-location
-  assumptions and must be validated with `make build` before any partial refactor
-  merges.
+  imported the transport adapter from incorrect relative paths. Impact: the
+  transport boundary migration remains sensitive to module-location assumptions
+  and must be validated with `make build` before any partial refactor merges.
 
 ## Decision log
 
 - Decision: define transport contracts in `shared/` and implement the Electron
-  adapter in renderer-facing runtime modules.
-  Rationale: keeps contracts host-agnostic while limiting blast radius in the
-  current migration phase.
+  adapter in renderer-facing runtime modules. Rationale: keeps contracts
+  host-agnostic while limiting blast radius in the current migration phase.
   Date/Author: 2026-02-12 / Codex
 
 - Decision: prioritize command-layer decoupling first, then widen event-stream
   adoption in bootstrap wiring as a separate stage within this milestone.
-  Rationale: directly satisfies success criteria while reducing regression risk.
-  Date/Author: 2026-02-12 / Codex
+  Rationale: directly satisfies success criteria while reducing regression
+  risk. Date/Author: 2026-02-12 / Codex
 
 - Decision: keep existing RPC event names and payload contracts unchanged.
   Rationale: roadmap `1.1.2` targets abstraction, not protocol redesign.
   Date/Author: 2026-02-12 / Codex
 
 - Decision: enforce coverage-first sequencing so targeted IPC/registry tests are
-  added and committed before any transport refactor edits.
-  Rationale: user requirement and current coverage gap indicate continuity risk
-  if refactor work starts first.
-  Date/Author: 2026-02-12 / Codex
+  added and committed before any transport refactor edits. Rationale: user
+  requirement and current coverage gap indicate continuity risk if refactor
+  work starts first. Date/Author: 2026-02-12 / Codex
 
-- Decision: reuse `test/testUtils/electron-path.ts` in transport-related tests and
+- Decision: reuse `test/testUtils/electron-path.ts` in transport-related tests
+  and
   wire `ipcMain` spies onto its shared Electron mock before importing
-  `app/rpc.ts`.
-  Rationale: avoid brittle path-specific mock overrides that break under full-suite
-  import ordering.
-  Date/Author: 2026-02-12 / Codex
+  `app/rpc.ts`. Rationale: avoid brittle path-specific mock overrides that
+  break under full-suite import ordering. Date/Author: 2026-02-12 / Codex
 
-- Decision: expose transport contracts from shared and centralize host implementation
-  in `lib/transport/electron-ipc-transport.ts`.
-  Rationale: this keeps command-layer modules importable in future host swaps while
-  preserving current Electron IPC event and invoke semantics.
-  Date/Author: 2026-02-12 / Codex
+- Decision: expose transport contracts from shared and centralize host
+  implementation
+  in `lib/transport/electron-ipc-transport.ts`. Rationale: this keeps
+  command-layer modules importable in future host swaps while preserving
+  current Electron IPC event and invoke semantics. Date/Author: 2026-02-12 /
+  Codex
 
 ## Outcomes & retrospective
 
 Completed in this milestone:
 
 - Added shared transport contract in `shared/src/types/transport.ts` and
-  exported it
-  from `shared/src/index.ts`.
+  exported it from `shared/src/index.ts`.
 - Added `lib/transport/electron-ipc-transport.ts` backed by existing renderer
   `ipcRenderer.invoke` and `lib/utils/rpc` event transport.
 - Migrated `lib/command-registry.ts` `getDecoratedKeymaps` reads to use
@@ -221,7 +204,8 @@ Completed in this milestone:
 - Migrated `lib/actions/ui.ts` key command event dispatch and session handoff
   subscriptions from direct `rpc` usage to the transport adapter.
 - Added `test/unit/electron-ipc-transport.test.ts` for adapter delegation.
-- Updated `docs/developers-guide.md` and `docs/roadmap.md`; 1.1.2 is marked done.
+- Updated `docs/developers-guide.md` and `docs/roadmap.md`; 1.1.2 is marked
+  done.
 - Re-ran all mandatory gates and captured log output:
   - `bun install`
   - `make check-fmt`
@@ -238,8 +222,7 @@ Current command invocation path:
 - `lib/actions/ui.ts` uses `transport.emit('command', command)` when no local
   command handler exists.
 - Main process handles `window.rpc.on('command', ...)` in `app/ui/window.ts`
-  and then
-  executes `app/commands.ts::execCommand`.
+  and then executes `app/commands.ts::execCommand`.
 
 Current event-stream path:
 
@@ -250,8 +233,7 @@ Current event-stream path:
 Current direct Electron access in command-adjacent code:
 
 - `lib/command-registry.ts` calls `transport.invoke('getDecoratedKeymaps')`
-  and no
-  longer imports `lib/utils/ipc.ts` directly.
+  and no longer imports `lib/utils/ipc.ts` directly.
 - `lib/actions/*` now emit via `RendererCommandTransport`, including updater and
   session/group/header/shell action handlers.
 
@@ -294,8 +276,8 @@ unchanged in this milestone.
 Stage C: Shared contract scaffolding.
 
 Add transport interfaces to `shared/` with explicit typed methods that map to
-existing `MainEvents`, `RendererEvents`, and IPC command contracts. Export these
-contracts via `shared/src/index.ts`.
+existing `MainEvents`, `RendererEvents`, and IPC command contracts. Export
+these contracts via `shared/src/index.ts`.
 
 Stage D: Electron adapter implementation.
 
@@ -340,8 +322,8 @@ atomic.
    - ensure these modules no longer import `../rpc` or `./utils/ipc` directly.
 
 5. Migrate selected renderer bootstrap subscriptions in `lib/index.tsx` to use
-   adapter event-stream methods, keeping event names/payloads unchanged.
-   (Not required for this milestone because bootstrap flow is still coupled to
+   adapter event-stream methods, keeping event names/payloads unchanged. (Not
+   required for this milestone because bootstrap flow is still coupled to
    `window.rpc` in this implementation.)
 
 6. Update documentation:
@@ -396,14 +378,15 @@ Additional observable checks:
 
 - existing fast end-to-end (E2E) path remains green,
 - no regressions in session creation, split, or keybinding-triggered commands.
-- bootstrap stream coverage now includes transport listener assertions for ready,
+- bootstrap stream coverage now includes transport listener assertions for
+  ready,
   session add, and update available events.
 
 Open follow-up concerns:
 
 - ~~`lib/containers/hyper.tsx` and `lib/components/term.tsx` still use
-  `window.rpc` directly; migrate these paths in the next transport
-  cycle.~~ Completed in roadmap 1.1.2d (2026-02-14).
+  `window.rpc` directly; migrate these paths in the next transport cycle.~~
+  Completed in roadmap 1.1.2d (2026-02-14).
 - Add a transport composition seam for renderer bootstrap to avoid
   hard-coding the Electron adapter at entrypoint.
 - ~~Keep a follow-on assertion for sustained high-frequency bootstrap
@@ -411,8 +394,7 @@ Open follow-up concerns:
 
 ## Idempotence and recovery
 
-All implementation and validation steps are safe to rerun.
-If a gate fails:
+All implementation and validation steps are safe to rerun. If a gate fails:
 
 - inspect the corresponding `/tmp/*.out` log,
 - apply the smallest focused fix,
@@ -444,6 +426,6 @@ and record the deferred event migration in `Decision log`.
   `VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1` and recorded long-term
   de-quarantine follow-up under roadmap `9.3.1`.
 - 2026-02-14: Deferred follow-ups completed in roadmap 1.1.2d —
-  `hyper.tsx` and `term.tsx` migrated from `window.rpc` to transport;
-  bootstrap regression tests added for ordered sequence,
-  high-frequency throughput, and ready-prerequisite coverage.
+  `hyper.tsx` and `term.tsx` migrated from `window.rpc` to transport; bootstrap
+  regression tests added for ordered sequence, high-frequency throughput, and
+  ready-prerequisite coverage.

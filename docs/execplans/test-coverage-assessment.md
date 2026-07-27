@@ -46,22 +46,17 @@ Success is observable when:
 ## Risks
 
 - Risk: Coverage settings in Bun 1.3.8 may differ from the documentation.
-  Severity: medium.
-  Likelihood: medium.
-  Mitigation: validate with `bun test --help` and trial runs before finalizing
-  config.
+  Severity: medium. Likelihood: medium. Mitigation: validate with
+  `bun test --help` and trial runs before finalizing config.
 
 - Risk: Existing tests rely on module singleton state and can become order
-  sensitive.
-  Severity: medium.
-  Likelihood: medium.
-  Mitigation: prefer serial tests where needed and isolate mutable stubs.
+  sensitive. Severity: medium. Likelihood: medium. Mitigation: prefer serial
+  tests where needed and isolate mutable stubs.
 
 - Risk: E2E packaged-app tests are environment-dependent and expensive.
-  Severity: low.
-  Likelihood: high.
-  Mitigation: keep E2E smoke coverage in place, add testable helper-path checks
-  in unit tests, and explicitly document any remaining E2E gaps.
+  Severity: low. Likelihood: high. Mitigation: keep E2E smoke coverage in
+  place, add testable helper-path checks in unit tests, and explicitly document
+  any remaining E2E gaps.
 
 ## Progress
 
@@ -110,22 +105,21 @@ Success is observable when:
   Rationale: Coverage metrics are only meaningful once the suite is stable.
 
 - Decision: Target branch-heavy modules first (`cli/api.ts`, `app/updater.ts`,
-  `lib/containers/hyper.tsx`).
-  Rationale: These files currently account for most uncovered behavioural paths
-  and provide better risk reduction than adding shallow tests.
+  `lib/containers/hyper.tsx`). Rationale: These files currently account for
+  most uncovered behavioural paths and provide better risk reduction than
+  adding shallow tests.
 
 - Decision: Use Bun’s built-in `--coverage` support and wire it through project
-  scripts/docs.
-  Rationale: Aligns with repository direction and keeps coverage tooling simple.
+  scripts/docs. Rationale: Aligns with repository direction and keeps coverage
+  tooling simple.
 
 - Decision: Extract E2E helper logic into a shared module tested in unit tests.
   Rationale: Provides deterministic coverage for E2E branching logic without
   requiring packaged binaries for every branch path.
 
 - Decision: Fix pre-existing type errors in styled-jsx props while validating
-  requested gates.
-  Rationale: User-required quality gates include `make typecheck`, which could
-  not pass without these corrections.
+  requested gates. Rationale: User-required quality gates include
+  `make typecheck`, which could not pass without these corrections.
 
 ## Outcomes and retrospective
 

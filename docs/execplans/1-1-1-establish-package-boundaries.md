@@ -12,10 +12,9 @@
   `docs/velocetty-product-requirements-document.md`, and
   `docs/developers-guide.md`.
 
-This Execution Plan (ExecPlan) is a living document.
-The sections `Constraints`, `Tolerances`, `Risks`, `Progress`,
-`Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: DONE (2026-02-12)
 
@@ -27,10 +26,9 @@ Implementation approval received on 2026-02-11 and execution is underway.
 ## Purpose / Big picture
 
 Roadmap item `1.1.1` requires explicit package boundaries and one-way
-cross-package imports. The design and Product Requirements Document
-(PRD) both define the target split:
-`frontend/` for user interface (UI) code, `backend/` for privileged
-code, and `shared/` for contracts reused by both sides.
+cross-package imports. The design and Product Requirements Document (PRD) both
+define the target split: `frontend/` for user interface (UI) code, `backend/`
+for privileged code, and `shared/` for contracts reused by both sides.
 
 Success is observable when:
 
@@ -81,29 +79,23 @@ After all acceptance checks pass, roadmap entry `1.1.1` is marked done in
 ## Risks
 
 - Risk: current `typings/constants/*.d.ts` files are used as runtime modules in
-  parts of the renderer. Moving them blindly may break bundling.
-  Severity: high
-  Likelihood: medium
-  Mitigation: convert shared constants to `.ts` modules in `shared/` and keep
-  temporary compatibility re-exports while imports are migrated.
+  parts of the renderer. Moving them blindly may break bundling. Severity: high
+  Likelihood: medium Mitigation: convert shared constants to `.ts` modules in
+  `shared/` and keep temporary compatibility re-exports while imports are
+  migrated.
 
 - Risk: existing build and packaging pipeline assumes current entrypoint paths.
-  Severity: high
-  Likelihood: medium
-  Mitigation: keep existing runtime outputs stable and introduce package build
-  outputs as additive validation artefacts during this roadmap item.
+  Severity: high Likelihood: medium Mitigation: keep existing runtime outputs
+  stable and introduce package build outputs as additive validation artefacts
+  during this roadmap item.
 
 - Risk: hidden cross-boundary imports remain after migration.
-  Severity: medium
-  Likelihood: high
-  Mitigation: add an automated boundary check (script or lint rule) and run it
-  in `make lint` or `make test`.
+  Severity: medium Likelihood: high Mitigation: add an automated boundary check
+  (script or lint rule) and run it in `make lint` or `make test`.
 
 - Risk: developers continue using legacy import paths after migration.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: document import conventions and boundary rules in
-  `docs/developers-guide.md` and include examples.
+  Severity: medium Likelihood: medium Mitigation: document import conventions
+  and boundary rules in `docs/developers-guide.md` and include examples.
 
 ## Progress
 
@@ -127,87 +119,78 @@ After all acceptance checks pass, roadmap entry `1.1.1` is marked done in
 ## Surprises & Discoveries
 
 - Observation: the repository currently runs on `main` and has no
-  `frontend/`, `backend/`, or `shared/` directories yet.
-  Evidence: `git branch --show` and repository root listing on 2026-02-11.
-  Impact: migration starts from a legacy layout (`app/`, `lib/`, `typings/`)
-  and must be incremental.
+  `frontend/`, `backend/`, or `shared/` directories yet. Evidence:
+  `git branch --show` and repository root listing on 2026-02-11. Impact:
+  migration starts from a legacy layout (`app/`, `lib/`, `typings/`) and must
+  be incremental.
 
 - Observation: many renderer and main-process files import from `typings/`, and
-  at least one command-line interface (CLI) file imports `app/package.json` directly.
-  Evidence: import scans over `app/`, `lib/`, and `cli/`.
-  Impact: shared contract migration requires both path aliasing and import
-  cleanup to enforce one-way boundaries.
+  at least one command-line interface (CLI) file imports `app/package.json`
+  directly. Evidence: import scans over `app/`, `lib/`, and `cli/`. Impact:
+  shared contract migration requires both path aliasing and import cleanup to
+  enforce one-way boundaries.
 
 - Observation: `leta files | head` can terminate with a broken pipe panic when
-  piping output.
-  Evidence: `leta files` aborted with `failed printing to stdout: Broken pipe`.
-  Impact: use direct file reads and `grepai`/`rg` scans for long listings
-  instead of piping `leta files`.
+  piping output. Evidence: `leta files` aborted with
+  `failed printing to stdout: Broken pipe`. Impact: use direct file reads and
+  `grepai`/`rg` scans for long listings instead of piping `leta files`.
 
 - Observation: frontend code still had a direct dependency on backend code via
-  `lib/utils/remote-plugins.ts -> ../../app/plugins`.
-  Evidence: boundary check failure output from
-  `scripts/check-package-boundaries.mjs`.
-  Impact: replaced backend module type import with a shared interface contract
-  to preserve runtime behaviour without cross-layer imports.
+  `lib/utils/remote-plugins.ts -> ../../app/plugins`. Evidence: boundary check
+  failure output from `scripts/check-package-boundaries.mjs`. Impact: replaced
+  backend module type import with a shared interface contract to preserve
+  runtime behaviour without cross-layer imports.
 
 - Observation: `tsgo` 7 rejects `baseUrl` in this repository configuration and
-  requires explicit relative path entries for `paths`.
-  Evidence: `TS5102` and `TS5090` failures during the first `make build` run.
-  Impact: switched to `paths` with `./`-prefixed entries and removed
-  `baseUrl` from `tsconfig.base.json`.
+  requires explicit relative path entries for `paths`. Evidence: `TS5102` and
+  `TS5090` failures during the first `make build` run. Impact: switched to
+  `paths` with `./`-prefixed entries and removed `baseUrl` from
+  `tsconfig.base.json`.
 
 - Observation: electron-builder `afterPack` hook context can expose `arch` as a
-  string rather than a numeric enum key.
-  Evidence: `Arch[context.arch]` failure in `bin/cp-snapshot.js` during
-  `make build`.
-  Impact: hardened architecture resolution in `bin/cp-snapshot.js` to accept
-  both forms.
+  string rather than a numeric enum key. Evidence: `Arch[context.arch]` failure
+  in `bin/cp-snapshot.js` during `make build`. Impact: hardened architecture
+  resolution in `bin/cp-snapshot.js` to accept both forms.
 
 ## Decision Log
 
 - Decision: treat this roadmap item as a boundary-establishment migration, not
-  a full feature re-architecture.
-  Rationale: roadmap `1.1.1` is specifically about package boundaries and
-  shared contracts, while later roadmap items handle transport and command
-  architecture evolution.
-  Date/Author: 2026-02-11 / Codex
+  a full feature re-architecture. Rationale: roadmap `1.1.1` is specifically
+  about package boundaries and shared contracts, while later roadmap items
+  handle transport and command architecture evolution. Date/Author: 2026-02-11
+  / Codex
 
 - Decision: keep runtime packaging outputs stable while introducing package
-  build outputs for isolated verification.
-  Rationale: this minimizes blast radius and keeps compatibility with current
-  `make build` pipeline.
+  build outputs for isolated verification. Rationale: this minimizes blast
+  radius and keeps compatibility with current `make build` pipeline.
   Date/Author: 2026-02-11 / Codex
 
 - Decision: keep `app/config/schema.json` as a synced compatibility copy and
   treat `shared/schemas/schema.json` as the generated source of truth.
-  Rationale: runtime migration code and packaging currently expect a schema file
-  in `app/config/`, so a sync step avoids behavioural regressions while moving
-  shared schema ownership into `shared/`.
-  Date/Author: 2026-02-11 / Codex
+  Rationale: runtime migration code and packaging currently expect a schema
+  file in `app/config/`, so a sync step avoids behavioural regressions while
+  moving shared schema ownership into `shared/`. Date/Author: 2026-02-11 / Codex
 
 - Decision: enforce boundary checks over both new package roots and legacy
-  source roots (`lib` and `app`) during migration.
-  Rationale: runtime code is still housed in legacy directories, so checking
-  only `frontend/src` and `backend/src` would not enforce the architectural
-  constraint in practice.
+  source roots (`lib` and `app`) during migration. Rationale: runtime code is
+  still housed in legacy directories, so checking only `frontend/src` and
+  `backend/src` would not enforce the architectural constraint in practice.
   Date/Author: 2026-02-11 / Codex
 
 - Decision: keep package-isolation checks as package-local `tsgo --project`
   runs with `noEmit`, while the production build keeps app compilation focused
-  on `app/tsconfig.json`.
-  Rationale: this proves isolation without destabilizing the existing
-  application build pipeline.
-  Date/Author: 2026-02-11 / Codex
+  on `app/tsconfig.json`. Rationale: this proves isolation without
+  destabilizing the existing application build pipeline. Date/Author:
+  2026-02-11 / Codex
 
 ## Outcomes & Retrospective
 
 Implemented package-boundary scaffolding for `frontend/`, `backend/`, and
 `shared/`, migrated shared constants/types/schema ownership into `shared/`,
-repointed application imports to `@shared/*`, and added automated
-cross-layer boundary validation. The required gates (`bun install`,
-`make build`, `make check-fmt`, `make lint`, and `make test`) all pass, and
-roadmap item `1.1.1` is now marked done.
+repointed application imports to `@shared/*`, and added automated cross-layer
+boundary validation. The required gates (`bun install`, `make build`,
+`make check-fmt`, `make lint`, and `make test`) all pass, and roadmap item
+`1.1.1` is now marked done.
 
 ## Post-completion follow-up resolutions
 
@@ -217,10 +200,10 @@ post-implementation review:
 
 - `BOUNDARY-001`: extend `scripts/check-package-boundaries.mjs` so boundary
   checks parse both ECMAScript modules (ESM) imports and CommonJS
-  `require(...)` usage. Preferred approach: move from regex-only
-  parsing to a TypeScript Abstract Syntax Tree (AST) walk, then add
-  regression tests covering alias imports, relative imports, dynamic imports,
-  and `require` forms.
+  `require(...)` usage. Preferred approach: move from regex-only parsing to a
+  TypeScript Abstract Syntax Tree (AST) walk, then add regression tests
+  covering alias imports, relative imports, dynamic imports, and `require`
+  forms.
 - `CONTRACT-001`: make schema generation source directly from
   `shared/src/types/config.ts` and retain `typings/` re-exports as
   compatibility-only until all legacy consumers are removed. Success means
@@ -243,8 +226,9 @@ for types, protocol, and schemas.
 
 Current build behaviour uses esbuild plus `tsgo` and produces outputs such as
 `target/renderer/bundle.js`, `target/` copied app artefacts, and TypeScript
-outputs under existing temporary directories. This plan introduces package-level
-TypeScript outputs without breaking existing packaging assumptions.
+outputs under existing temporary directories. This plan introduces
+package-level TypeScript outputs without breaking existing packaging
+assumptions.
 
 ## Plan of work
 
@@ -272,8 +256,9 @@ can proceed incrementally without breaking runtime.
 Stage D: Import migration and boundary enforcement.
 
 Update frontend and backend imports to consume shared contracts via aliases.
-Remove direct frontend/backend cross-imports. Add an automated boundary check so
-future imports violating directionality fail continuous integration (CI)/local gates.
+Remove direct frontend/backend cross-imports. Add an automated boundary check
+so future imports violating directionality fail continuous integration
+(CI)/local gates.
 
 Stage E: Documentation and roadmap updates.
 

@@ -10,10 +10,9 @@
   `docs/developers-guide.md`, `lib/components/term.tsx`, and
   `lib/utils/webgl-context-pool.ts`.
 
-This Execution Plan (ExecPlan) is a living document.
-The sections `Constraints`, `Tolerances`, `Risks`, `Progress`,
-`Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE (2026-02-26)
 
@@ -77,22 +76,17 @@ Out of scope:
 ## Risks
 
 - Risk: docs overstate observability beyond implemented surfaces.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: anchor guidance to concrete behaviour in `term.tsx`,
-  `window.ts`, and renderer utility wiring.
+  Severity: medium Likelihood: medium Mitigation: anchor guidance to concrete
+  behaviour in `term.tsx`, `window.ts`, and renderer utility wiring.
 
 - Risk: roadmap marks `2.1.2` done while validation evidence is not captured in
-  this update pass.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: keep gate status explicitly pending in this ExecPlan.
+  this update pass. Severity: medium Likelihood: medium Mitigation: keep gate
+  status explicitly pending in this ExecPlan.
 
 - Risk: retry guidance drifts from runtime constants and thresholds.
-  Severity: medium
-  Likelihood: low
-  Mitigation: document current cooldown/threshold semantics and require docs
-  updates alongside future tuning changes.
+  Severity: medium Likelihood: low Mitigation: document current
+  cooldown/threshold semantics and require docs updates alongside future tuning
+  changes.
 
 ## Orientation
 
@@ -228,43 +222,37 @@ Gate validation (required for final closure):
 ## Surprises & discoveries
 
 - Observation: `docs/execplans/2-1-2-add-context-loss-recovery.md` did not
-  exist and needed creation for roadmap `2.1.2`.
-  Evidence: `nl` reported file-not-found during baseline inspection.
-  Impact: this pass includes first-version plan authoring.
+  exist and needed creation for roadmap `2.1.2`. Evidence: `nl` reported
+  file-not-found during baseline inspection. Impact: this pass includes
+  first-version plan authoring.
 
 - Observation: running `make build` produced generated files in `shared/src/`
   (`*.js`, `*.js.map`, and `common.d.ts`) that caused `make check-fmt` to fail.
   Evidence: initial `make check-fmt` failed with six Biome formatting errors in
   generated `shared/src` artefacts; cleaning those files restored format-gate
-  success.
-  Impact: gate replay now includes `git clean -f` for those generated files
-  before `make check-fmt`.
+  success. Impact: gate replay now includes `git clean -f` for those generated
+  files before `make check-fmt`.
 
 - Observation: renderer observability currently depends on renderer-type events
   and fallback warning logs rather than a dedicated fallback metrics sink.
   Evidence: `Term.reportRenderer(...)` emits `info renderer`; context-loss path
-  uses `console.warn(...)`.
-  Impact: developer guidance must describe this current instrumentation path
-  accurately.
+  uses `console.warn(...)`. Impact: developer guidance must describe this
+  current instrumentation path accurately.
 
 ## Decision log
 
 - Decision: mark plan status as `COMPLETE` after all required gate commands
-  succeeded with durable logs.
-  Rationale: roadmap/docs/code updates are in place and validation evidence is
-  present.
-  Date/Author: 2026-02-26 / Codex.
+  succeeded with durable logs. Rationale: roadmap/docs/code updates are in
+  place and validation evidence is present. Date/Author: 2026-02-26 / Codex.
 
 - Decision: document context-loss instrumentation using current renderer event
-  and warning-log surfaces only.
-  Rationale: this remains truthful to implemented behaviour and avoids claiming
-  unimplemented metrics.
-  Date/Author: 2026-02-26 / Codex.
+  and warning-log surfaces only. Rationale: this remains truthful to
+  implemented behaviour and avoids claiming unimplemented metrics. Date/Author:
+  2026-02-26 / Codex.
 
 - Decision: mark roadmap `2.1.2` and sub-bullets done after implementation and
-  carry explicit gate evidence in this plan.
-  Rationale: roadmap closure and gate evidence must stay synchronized to avoid
-  false completion signalling.
+  carry explicit gate evidence in this plan. Rationale: roadmap closure and
+  gate evidence must stay synchronized to avoid false completion signalling.
   Date/Author: 2026-02-26 / Codex.
 
 ## Outcomes & retrospective

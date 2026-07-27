@@ -10,16 +10,17 @@ Hyper can be run in dev mode by cloning this repository and following the
 In dev mode you'll get more output and access to React/Redux devtools in
 Electron.
 
-Prerequisites and steps are described in the ["Contributing" section of our
-README][hyper-contrib]. Be sure to use the `canary` branch.
+Prerequisites and steps are described in the
+["Contributing" section of our README][hyper-contrib]. Be sure to use the
+`canary` branch.
 
 ### Create a dev config file
 
 Copy your config file `hyper.json` to the root of your cloned repository.
 Hyper, in dev mode, will use this copied config file. That means that you can
 continue to use your main installation of Hyper with your day-to-day
-configuration. After the first run, Hyper, in dev mode, will have created a
-new `plugins` directory in your repository directory.
+configuration. After the first run, Hyper, in dev mode, will have created a new
+`plugins` directory in your repository directory.
 
 ### Set up your plugin
 
@@ -47,9 +48,9 @@ To load, your plugin should expose at least one API method. All possible
 methods are listed in the [extensions API list][extensions-api].
 
 After launching Hyper in dev mode, run `bun run app`. The app should log that
-the plugin has been correctly loaded: `Plugin hyper-awesome-plugin (0.1.0)
-loaded.` The name and version printed come from the plugin `package.json`
-file.
+the plugin has been correctly loaded:
+`Plugin hyper-awesome-plugin (0.1.0) loaded.` The name and version printed come
+from the plugin `package.json` file.
 
 A `console.log()` in plugin code appears in the Electron devtools only when it
 is located in a renderer method, such as component decorators. A
@@ -126,8 +127,8 @@ exports.decorateKeymaps = keymaps => {
 ```
 
 The command name can be whatever you want, but the following is better to
-respect the default naming convention: `<context>:<action>`.
-Hotkeys are composed by [Mousetrap supported keys][mousetrap-keys].
+respect the default naming convention: `<context>:<action>`. Hotkeys are
+composed by [Mousetrap supported keys][mousetrap-keys].
 
 **Bonus feature**: if your command ends with `:prefix`, it means you want to
 use this command with an additional digit. Hyper will create all your commands
@@ -151,9 +152,9 @@ handy if you have more than 9 items.
 
 ##### Renderer/Window
 
-Most of the time, you'll want to execute some sort of handler in context of
-the renderer, like dispatching a Redux action. To trigger these handlers,
-you'll have to register them with the `registerCommands` Terms method.
+Most of the time, you'll want to execute some sort of handler in context of the
+renderer, like dispatching a Redux action. To trigger these handlers, you'll
+have to register them with the `registerCommands` Terms method.
 
 ```js
 this.terms.registerCommands({
@@ -168,8 +169,8 @@ this.terms.registerCommands({
 ##### Main process
 
 If there is no handler in the renderer process for an existing command, an
-`rpc` message is emitted. If you want to execute a handler in the main
-process, you have to subscribe to a message; for example:
+`rpc` message is emitted. If you want to execute a handler in the main process,
+you have to subscribe to a message; for example:
 
 ```js
 rpc.on('command pane:snapshot', () => {
@@ -232,8 +233,8 @@ exports.decorateTerms = (Terms, { React }) => {
 ### Cursor
 
 If your plugin needs to know cursor position or size, it can decorate the Term
-component and pass a handler. This handler will be called with each cursor
-move while passing back all information about the cursor.
+component and pass a handler. This handler will be called with each cursor move
+while passing back all information about the cursor.
 
 ```js
 exports.decorateTerm = (Term, { React, notify }) => {
@@ -267,8 +268,8 @@ This is needed in order to allow show/hide to have proper return of focus.
 
 Hyper v2 uses `xterm.js` instead of `hterm`. It means that PTY output renders
 now in a canvas element, not with a hackable DOM structure. For example,
-plugins can't use TermCSS in order to modify text or link styles anymore. It
-is now required to use available configuration params that are passed down to
+plugins can't use TermCSS in order to modify text or link styles anymore. It is
+now required to use available configuration params that are passed down to
 `xterm.js`.
 
 If your plugin was deeply linked with the `hterm` API (even public methods), it

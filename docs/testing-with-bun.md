@@ -23,7 +23,7 @@ A key practical implication: treat Bun’s runner as the “unit + integration +
 component” workhorse; for serious cross-browser end-to-end testing, Playwright
 (and usually Node) remains the full-fidelity option—more on that below.[^2]
 
----
+______________________________________________________________________
 
 ## Mental model and file layout
 
@@ -48,10 +48,10 @@ By default:
 2. Within each file, tests run sequentially in definition order[^3]
 
 So: if global mutable state is relied upon, it may appear to “work” locally
-until concurrency or randomization is enabled, and the behaviour is exposed (the
-best kind of truth: reproducible).[^1]
+until concurrency or randomization is enabled, and the behaviour is exposed
+(the best kind of truth: reproducible).[^1]
 
----
+______________________________________________________________________
 
 ## Writing unit/integration tests with `bun:test`
 
@@ -103,15 +103,15 @@ test("fast operation", async () => {
 
 Bun’s timeout behaviour is intentionally forceful: it throws an *uncatchable*
 exception to stop the test, and it kills child processes spawned by the test to
-avoid zombie processes. Default per-test timeout is **5000ms** unless overridden
-(per-test, config, or CLI).[^4]
+avoid zombie processes. Default per-test timeout is **5000ms** unless
+overridden (per-test, config, or CLI).[^4]
 
 ### Retries (for flaky tests)
 
 Bun supports retrying failed tests via `test.retry` (useful for genuine
 flakiness—though the best outcome is still fixing the flake).[^4]
 
----
+______________________________________________________________________
 
 ## Test modifiers and conditional tests (the “control flow” toolkit)
 
@@ -154,7 +154,7 @@ The same pattern applies at suite level (`describe.if`, `describe.skipIf`,
 - passing test marked `.failing()` → treated as fail (so regressions are
   flagged and expectations can be updated)[^4]
 
----
+______________________________________________________________________
 
 ## Parameterized tests with `test.each` and `describe.each`
 
@@ -180,7 +180,7 @@ Argument passing rules:
 
 Title format specifiers include `%p %s %d %i %f %j %o %# %%`.[^4]
 
----
+______________________________________________________________________
 
 ## Assertions: counting and typing
 
@@ -206,7 +206,7 @@ expectTypeOf(Promise.resolve(42)).resolves.toBeNumber();
 
 This is especially useful for public APIs and generic-heavy libraries.[^4]
 
----
+______________________________________________________________________
 
 ## `expect` matchers: what is available in Bun
 
@@ -274,7 +274,7 @@ Here’s the supported set from the docs, grouped:
 
 One explicitly “not yet implemented” item: `.addSnapshotSerializer()`.[^4]
 
----
+______________________________________________________________________
 
 ## Running tests effectively (CLI patterns used most often)
 
@@ -357,12 +357,12 @@ bun test --seed 123456   # implies --randomize
 
 [^1]
 
----
+______________________________________________________________________
 
 ## Concurrency: speed vs determinism, made explicit
 
-By default, Bun runs tests sequentially within a file. Concurrent execution
-can be enabled for async tests.
+By default, Bun runs tests sequentially within a file. Concurrent execution can
+be enabled for async tests.
 
 ### Enable concurrency broadly
 
@@ -398,10 +398,10 @@ Concurrency can be enabled only for matching files via `bunfig.toml`:
 concurrentTestGlob = "**/concurrent-*.test.ts"
 ```
 
-Matching files behave as though `--concurrent` is set; `--concurrent` on the CLI
-still overrides and forces concurrency everywhere.[^5]
+Matching files behave as though `--concurrent` is set; `--concurrent` on the
+CLI still overrides and forces concurrency everywhere.[^5]
 
----
+______________________________________________________________________
 
 ## Test environment setup: preload scripts
 
@@ -426,7 +426,7 @@ preload = ["./test-setup.ts", "./global-mocks.ts"]
 The docs show common preload uses like global setup/teardown with hooks and
 global module mocks (example uses `mock.module(...)`).[^5]
 
----
+______________________________________________________________________
 
 ## `bunfig.toml` configuration for tests (the practical subset)
 
@@ -508,8 +508,8 @@ This complements `--reporter=junit` with `--reporter-outfile`.[^5]
 
 ### Environment variables for tests
 
-Bun loads `.env` from project root, and the docs recommend `.env.test` for test-
-specific variables, loaded via:
+Bun loads `.env` from project root, and the docs recommend `.env.test` for
+test- specific variables, loaded via:
 
 ```bash
 bun test --env-file=.env.test
@@ -539,15 +539,15 @@ bun test --verbose
 
 [^5]
 
----
+______________________________________________________________________
 
 ## CI integration and reporting
 
 ### GitHub Actions annotations
 
 `bun test` detects when it runs inside GitHub Actions and emits annotations
-automatically—no special configuration beyond installing Bun and running `bun
-test`.[^1]
+automatically—no special configuration beyond installing Bun and running
+`bun test`.[^1]
 
 ### JUnit XML output (GitLab, etc.)
 
@@ -558,7 +558,7 @@ bun test --reporter=junit --reporter-outfile=./bun.xml
 Bun still prints to stdout/stderr normally, and it writes the JUnit XML at the
 end.[^1]
 
----
+______________________________________________________________________
 
 ## Component/DOM testing with Testing Library + Happy DOM
 
@@ -628,7 +628,7 @@ test("Can use Testing Library", () => {
 
 [^6]
 
----
+______________________________________________________________________
 
 ## End-to-end tests: Bun + Playwright (and the sharp edges)
 
@@ -660,8 +660,8 @@ end-to-end (E2E) strategy:
 - Fast lane: `bun run test:e2e:fast` (or `bun run test:e2e`) keeps packaged-app
   smoke coverage and renderer-readiness assertions in the Bun runner.
 - Deep lane: `bun run test:e2e:deep` runs Playwright Test under Node.js via
-  `playwright.e2e.config.ts` for richer interaction checks and diagnostics.
-  The deep command installs Chromium when needed before executing the suite.
+  `playwright.e2e.config.ts` for richer interaction checks and diagnostics. The
+  deep command installs Chromium when needed before executing the suite.
 
 CI policy:
 
@@ -695,20 +695,21 @@ bun test example.spec.ts
 bun test
 ```
 
-and suggests passing environment variables inline, e.g. `ENV=staging bun
-test`.[^2]
+and suggests passing environment variables inline, e.g.
+`ENV=staging bun test`.[^2]
 
 Pragmatically, two interpretations can be adopted in real projects:
 
 1. **Bun runner + Playwright API**: write `bun:test` tests that call
-   Playwright’s browser automation API inside the test body (fast, simple, fewer
-   moving parts).
+   Playwright’s browser automation API inside the test body (fast, simple,
+   fewer moving parts).
 2. **Playwright runner**: run Playwright’s own test runner (more features),
    while using Bun for dependency management and other scripts—accepting that
    Bun-as-runtime might still encounter Node-compat friction.
 
-Given the BrowserStack warnings, option (1) tends to be the cleaner “Bun-native”
-approach, and option (2) tends to be the feature-complete approach.[^2]
+Given the BrowserStack warnings, option (1) tends to be the cleaner
+“Bun-native” approach, and option (2) tends to be the feature-complete
+approach.[^2]
 
 ### Cross-browser accuracy still matters (and Bun doesn’t magically grant it)
 
@@ -717,7 +718,7 @@ skew towards Chromium and that real cross-browser validation is still required
 to catch engine-specific bugs. It argues for cloud real-browser testing to
 prevent regressions from browser-specific behaviour.[^2]
 
----
+______________________________________________________________________
 
 ## High-value “gotchas” and habits (learned the fun way)
 
@@ -728,14 +729,15 @@ prevent regressions from browser-specific behaviour.[^2]
 - Default execution is sequential; concurrency (`--concurrent`,
   `test.concurrent`) surfaces hidden coupling fast and acts as a bug detector
   disguised as a performance knob.[^1]
-- `--randomize`/`--seed` make order-dependence reproducible instead of mystical.[^1]
+- `--randomize`/`--seed` make order-dependence reproducible instead of
+  mystical.[^1]
 - Preloads handle global setup, DOM registration, matcher extension, and global
   mocks while keeping per-test files focused.[^5]
 - When Playwright’s advanced features are required, Node remains necessary for
   full reliability; treat Bun as an optimization path, not a guaranteed
   replacement.[^2]
 
----
+______________________________________________________________________
 
 A single Markdown file suitable for a repo wiki (with a compact TOC and
 “copy/paste” config snippets) can be produced as a clean doc artefact in the

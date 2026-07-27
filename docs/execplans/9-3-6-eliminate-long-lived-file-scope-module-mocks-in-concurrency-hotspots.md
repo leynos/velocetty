@@ -1,9 +1,8 @@
 # Eliminate module-mock hotspot lifetimes (roadmap 9.3.6)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -65,20 +64,20 @@ mocked module graph immediately after the test. The risk is that
 maintains module caches, so this suite may need stronger harness teardown than
 simple mock call resets.
 
-`test/unit/command-registry-compat.test.ts` installs its transport mock at
-file scope, installs `window.focusActiveTerm` in `beforeAll(...)`, and restores
-the window only in `afterAll(...)`. This is a structural violation of the
-roadmap even though the current focused concurrent probe passes. The important
-detail is that `lib/command-registry.ts` binds the legacy
-`window.focusActiveTerm()` call during module evaluation, so the test window
-must exist before each dynamic import of that module.
+`test/unit/command-registry-compat.test.ts` installs its transport mock at file
+scope, installs `window.focusActiveTerm` in `beforeAll(...)`, and restores the
+window only in `afterAll(...)`. This is a structural violation of the roadmap
+even though the current focused concurrent probe passes. The important detail
+is that `lib/command-registry.ts` binds the legacy `window.focusActiveTerm()`
+call during module evaluation, so the test window must exist before each
+dynamic import of that module.
 
-`test/unit/config-import-json5.test.ts` is the highest-risk hotspot. It
-creates one shared temporary workspace root, one shared `mockPaths` object, and
-three top-level `mock.module(...)` registrations. The suite resets directories
-and `console.warn` in `beforeEach(...)`, but `mock.restore()` and final
-workspace deletion happen only in `afterAll(...)`. In parallel, the production
-module `app/config/import.ts` imports path constants at module scope and keeps
+`test/unit/config-import-json5.test.ts` is the highest-risk hotspot. It creates
+one shared temporary workspace root, one shared `mockPaths` object, and three
+top-level `mock.module(...)` registrations. The suite resets directories and
+`console.warn` in `beforeEach(...)`, but `mock.restore()` and final workspace
+deletion happen only in `afterAll(...)`. In parallel, the production module
+`app/config/import.ts` imports path constants at module scope and keeps
 module-level state such as `defaultConfig`, so isolating this suite may require
 either a stronger per-test harness or a very small production seam.
 
@@ -121,9 +120,10 @@ be isolated cleanly without them:
   when a named suite cannot be isolated without a small, behaviour-preserving
   seam.
 - Preserve existing user-visible and test-visible behaviour in
-  `lib/utils/plugins.ts`, `lib/command-registry.ts`, and `app/config/import.ts`.
-  This roadmap item is about isolation and cleanup lifetime, not about changing
-  renderer plugin, command-registry, or JSON5 config semantics.
+  `lib/utils/plugins.ts`, `lib/command-registry.ts`, and
+  `app/config/import.ts`. This roadmap item is about isolation and cleanup
+  lifetime, not about changing renderer plugin, command-registry, or JSON5
+  config semantics.
 - Keep the default `make test` workflow unchanged. Focused
   `bun test --concurrent ...` probes are supplemental stress checks, not a new
   default gate.
@@ -138,8 +138,7 @@ be isolated cleanly without them:
 ## Tolerances (exception triggers)
 
 - Scope: if isolating `9.3.6` requires touching more than roughly 8 files or
-  500 net new lines, stop and re-evaluate whether the milestone should be
-  split.
+  500 net new lines, stop and re-evaluate whether the milestone should be split.
 - Production impact: if any hotspot requires a broader redesign of renderer
   plugin registration, command-registry semantics, or config-loader ownership,
   stop and escalate with concrete options.
@@ -160,40 +159,30 @@ be isolated cleanly without them:
 ## Risks
 
 - Risk: the hotspot suites are structurally non-compliant with the roadmap even
-  when the focused concurrent probe happens to pass.
-  Severity: high
-  Likelihood: high
-  Mitigation: treat inspection findings as first-class evidence. Do not use a
-  green probe as justification to skip the cleanup lifetime refactor.
+  when the focused concurrent probe happens to pass. Severity: high Likelihood:
+  high Mitigation: treat inspection findings as first-class evidence. Do not
+  use a green probe as justification to skip the cleanup lifetime refactor.
 
 - Risk: `lib/utils/plugins.ts` performs import-time provider registration and
-  keeps caches that can outlive a single test import.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: isolate the runtime-tab-provider suite with a per-test import
-  harness first; touch production code only if teardown cannot be made
-  deterministic from the test side.
+  keeps caches that can outlive a single test import. Severity: medium
+  Likelihood: medium Mitigation: isolate the runtime-tab-provider suite with a
+  per-test import harness first; touch production code only if teardown cannot
+  be made deterministic from the test side.
 
 - Risk: `lib/command-registry.ts` captures `window.focusActiveTerm()` at module
   evaluation time, so a file-scope `window` lease can mask the real lifetime
-  problem.
-  Severity: medium
-  Likelihood: high
-  Mitigation: require the test-owned window install to happen before each
-  import and restore it after each test.
+  problem. Severity: medium Likelihood: high Mitigation: require the test-owned
+  window install to happen before each import and restore it after each test.
 
 - Risk: `app/config/import.ts` imports path constants at module scope and keeps
   module-level state, while the current suite also shares one workspace root.
-  Severity: high
-  Likelihood: high
-  Mitigation: give each test its own temporary workspace and module-mock
-  lifetime first; if that is still not enough, introduce the smallest possible
-  production seam and document why it was necessary.
+  Severity: high Likelihood: high Mitigation: give each test its own temporary
+  workspace and module-mock lifetime first; if that is still not enough,
+  introduce the smallest possible production seam and document why it was
+  necessary.
 
 - Risk: documentation drift could leave future contributors copying the
-  forbidden pattern back into new tests.
-  Severity: medium
-  Likelihood: high
+  forbidden pattern back into new tests. Severity: medium Likelihood: high
   Mitigation: update `docs/developers-guide.md` in the same change with a
   concrete rule and the exact focused stress command for `9.3.6`.
 
@@ -293,11 +282,10 @@ Do not keep one shared `workspaceRoot` for the whole file. Resetting a shared
 directory tree is weaker than test ownership because the tests still target the
 same paths and share the same imported dependency graph.
 
-If the suite still cannot be isolated after moving workspace ownership and
-mock lifetimes per test, inspect `app/config/import.ts`. The smallest
-acceptable production change would be a seam that allows the tests to avoid
-long-lived path capture or cached config state without changing runtime
-semantics.
+If the suite still cannot be isolated after moving workspace ownership and mock
+lifetimes per test, inspect `app/config/import.ts`. The smallest acceptable
+production change would be a seam that allows the tests to avoid long-lived
+path capture or cached config state without changing runtime semantics.
 
 ### Stage E: update documentation only after the behaviour is truly isolated
 
@@ -380,9 +368,9 @@ Do not mark `9.3.6` done until:
 - [x] 2026-03-22 11:49Z: Refactored the three hotspot suites so cleanup is
   test-owned. `runtime-tab-provider-registration` now uses a per-test module
   harness, `command-registry-compat` now uses an injected command-registry
-  factory instead of transport/window module mocks, and
-  `config-import-json5` now uses an injected config-import factory instead of
-  file-scope mocked paths/init/notify modules.
+  factory instead of transport/window module mocks, and `config-import-json5`
+  now uses an injected config-import factory instead of file-scope mocked
+  paths/init/notify modules.
 - [x] 2026-03-22 11:57Z: Updated `docs/developers-guide.md` with the `9.3.6`
   concurrency rule and focused probe command. Roadmap sync remains pending
   until validation is complete.
@@ -443,10 +431,10 @@ Do not mark `9.3.6` done until:
   process-global module-mock restoration still leaked across tests in the same
   hotspot files during explicit `--concurrent` runs.
 - 2026-03-22 11:43Z: Keep the production seam narrow by injecting only the
-  dependencies that were previously being mocked globally:
-  `command-registry` now accepts transport invocation and focus callbacks for
-  test-created instances, and `config/import` now exposes a factory for
-  paths/init/notify dependencies while leaving the default exports unchanged.
+  dependencies that were previously being mocked globally: `command-registry`
+  now accepts transport invocation and focus callbacks for test-created
+  instances, and `config/import` now exposes a factory for paths/init/notify
+  dependencies while leaving the default exports unchanged.
 
 ## Outcomes & retrospective
 

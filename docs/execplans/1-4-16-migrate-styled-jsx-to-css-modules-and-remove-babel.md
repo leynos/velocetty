@@ -3,8 +3,8 @@
 ## Module header
 
 - Purpose: Define a repository-specific approach for replacing `styled-jsx`
-  usage with CSS Modules (and explicit global CSS where needed) so the
-  renderer pipeline no longer depends on Babel transforms.
+  usage with CSS Modules (and explicit global CSS where needed) so the renderer
+  pipeline no longer depends on Babel transforms.
 - Invariants: Preserve renderer behaviour, style scoping, and packaging
   outputs while migration is in flight.
 - Cross-links: `docs/roadmap.md`,
@@ -137,8 +137,7 @@ recommended migration shape.
 
 ### Example 1: `searchBox.tsx` dynamic values and duplicated local blocks
 
-Source file:
-`lib/components/searchBox.tsx`
+Source file: `lib/components/searchBox.tsx`
 
 Current pattern (excerpt):
 
@@ -236,8 +235,7 @@ Why this mapping is safe:
 
 ### Example 2: `tabs.tsx` platform-dependent values in styled-jsx template
 
-Source file:
-`lib/components/tabs.tsx`
+Source file: `lib/components/tabs.tsx`
 
 Current pattern (excerpt):
 
@@ -308,8 +306,7 @@ Why this mapping is safe:
 
 ### Example 3: `style-sheet.tsx` global scrollbar selectors
 
-Source file:
-`lib/components/style-sheet.tsx`
+Source file: `lib/components/style-sheet.tsx`
 
 Current pattern:
 
@@ -355,8 +352,7 @@ Why this mapping is safe:
 
 ### Example 4: `term.tsx` global block that is actually local
 
-Source file:
-`lib/components/term.tsx`
+Source file: `lib/components/term.tsx`
 
 Current pattern:
 
@@ -380,8 +376,7 @@ Why this mapping is safe:
 
 ### Example 5: `hyper.tsx` local block plus scoped custom CSS injection
 
-Source file:
-`lib/containers/hyper.tsx`
+Source file: `lib/containers/hyper.tsx`
 
 Current pattern:
 

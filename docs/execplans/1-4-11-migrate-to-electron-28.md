@@ -19,8 +19,7 @@ and roadmap item `1.4.11` is marked done.
 ## Constraints
 
 - Follow Architecture Decision Record (ADR)-004 staged migration path from
-  `docs/adr-004-update-electron-40.md`:
-  Electron 22 → 28 → 34 → 40.
+  `docs/adr-004-update-electron-40.md`: Electron 22 → 28 → 34 → 40.
 - Preserve existing script and Make target names.
 - Maintain native module functionality (`node-pty`) after the upgrade.
 - Ensure documentation stays wrapped to 80 columns and code blocks to 120
@@ -44,28 +43,23 @@ and roadmap item `1.4.11` is marked done.
 ## Risks
 
 - Risk: `node-pty` may fail to compile against Electron 28 headers.
-  Severity: high
-  Likelihood: medium
-  Mitigation: validate `bun install` early and upgrade `node-pty` if required.
+  Severity: high Likelihood: medium Mitigation: validate `bun install` early
+  and upgrade `node-pty` if required.
 - Risk: stale patch artefacts in `target/` can break `patch-package` during
-  app dependency installation.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: ensure build step clears stale patch output before recopying.
+  app dependency installation. Severity: medium Likelihood: medium Mitigation:
+  ensure build step clears stale patch output before recopying.
 - Risk: documentation drift across large architecture documents can leave mixed
-  runtime baselines.
-  Severity: medium
-  Likelihood: high
-  Mitigation: sweep `docs/velocetty-hyper-codebase.md` for old Electron 22
-  values and normalize to Electron 28 baseline.
+  runtime baselines. Severity: medium Likelihood: high Mitigation: sweep
+  `docs/velocetty-hyper-codebase.md` for old Electron 22 values and normalize
+  to Electron 28 baseline.
 
 ## Progress
 
 - [x] (2026-02-08 21:42Z) Confirmed branch is
   `1-4-11-migrate-to-electron-28` and baseline gates pass pre-change.
 - [x] (2026-02-08 21:46Z) Updated runtime anchor versions:
-  `package.json` (`electron`, `@types/node`) and
-  `bin/rebuild-node-pty.cjs` fallback target.
+  `package.json` (`electron`, `@types/node`) and `bin/rebuild-node-pty.cjs`
+  fallback target.
 - [x] (2026-02-08 21:49Z) Diagnosed and resolved Electron 28 install failure by
   upgrading `app/package.json` `node-pty` to `1.1.0`.
 - [x] (2026-02-08 21:50Z) Fixed stale patch artefact issue by cleaning
@@ -78,8 +72,7 @@ and roadmap item `1.4.11` is marked done.
   updates.
 - [x] (2026-02-08 21:56Z) Finalized ExecPlan status and retrospective.
 - [x] (2026-02-09 00:06Z) Investigated Continuous Integration (CI) `bun install`
-  failure in
-  `install-app-deps` and reproduced patch-package mismatch for
+  failure in `install-app-deps` and reproduced patch-package mismatch for
   `node-pty+1.1.0.patch`.
 - [x] (2026-02-09 00:08Z) Removed obsolete node-pty patch and made
   `build:hyper-app` tolerate empty `app/patches/` copy inputs.
@@ -89,22 +82,19 @@ and roadmap item `1.4.11` is marked done.
 ## Surprises & discoveries
 
 - Observation: `node-pty@1.0.0` fails to compile against Electron 28 headers
-  with a V8/NAN type assertion error.
-  Evidence: `/tmp/install-velocetty-1-4-11-migrate-to-electron-28.out` from
-  the initial migration attempt.
-  Impact: upgraded app runtime dependency to `node-pty@1.1.0`.
+  with a V8/NAN type assertion error. Evidence:
+  `/tmp/install-velocetty-1-4-11-migrate-to-electron-28.out` from the initial
+  migration attempt. Impact: upgraded app runtime dependency to
+  `node-pty@1.1.0`.
 - Observation: `patch-package` failed in `target/` because old patch files were
-  retained between builds.
-  Evidence: `install-app-deps` attempted to apply stale
-  `node-pty+1.0.0.patch` after the repository moved to
-  `node-pty+1.1.0.patch`.
+  retained between builds. Evidence: `install-app-deps` attempted to apply stale
+  `node-pty+1.0.0.patch` after the repository moved to `node-pty+1.1.0.patch`.
   Impact: `build:hyper-app` now clears `target/patches` before copying.
 - Observation: `node-pty+1.1.0.patch` still targeted the old 1.0.0 NAN-era
   source and no longer applied to `node-pty@1.1.0` (N-API implementation).
   Evidence: deterministic repro via `npx patch-package` in a clean temporary
-  installation with `node-pty@1.1.0`.
-  Impact: removed the obsolete patch and updated the asset copy step to allow
-  empty `app/patches/` content.
+  installation with `node-pty@1.1.0`. Impact: removed the obsolete patch and
+  updated the asset copy step to allow empty `app/patches/` content.
 
 ## Decision log
 
@@ -115,24 +105,21 @@ and roadmap item `1.4.11` is marked done.
   Rationale: align type baseline with Electron 28 Node runtime family.
   Date/Author: 2026-02-08 / Codex
 - Decision: upgrade `app/package.json` `node-pty` from `1.0.0` to `1.1.0`.
-  Rationale: `1.0.0` failed to build against Electron 28 headers.
-  Date/Author: 2026-02-08 / Codex
+  Rationale: `1.0.0` failed to build against Electron 28 headers. Date/Author:
+  2026-02-08 / Codex
 - Decision: clean `target/patches` before `build:hyper-app` copy.
   Rationale: prevent stale patch files from breaking `patch-package`.
   Date/Author: 2026-02-08 / Codex
 - Decision: normalize Electron baseline references in
-  `docs/velocetty-hyper-codebase.md` to Electron 28 data.
-  Rationale: remove stale Electron 22 guidance and align docs with migrated
-  runtime baseline.
+  `docs/velocetty-hyper-codebase.md` to Electron 28 data. Rationale: remove
+  stale Electron 22 guidance and align docs with migrated runtime baseline.
   Date/Author: 2026-02-08 / Codex
 - Decision: remove `app/patches/node-pty+1.1.0.patch`.
   Rationale: patch was obsolete and inapplicable against upstream
-  `node-pty@1.1.0`, causing CI install failure.
-  Date/Author: 2026-02-09 / Codex
+  `node-pty@1.1.0`, causing CI install failure. Date/Author: 2026-02-09 / Codex
 - Decision: set `noErrorOnMissing: true` for the `app/patches` copy pattern in
-  `webpack.config.ts`.
-  Rationale: support zero-patch state without failing `build:hyper-app`.
-  Date/Author: 2026-02-09 / Codex
+  `webpack.config.ts`. Rationale: support zero-patch state without failing
+  `build:hyper-app`. Date/Author: 2026-02-09 / Codex
 
 ## Outcomes & retrospective
 

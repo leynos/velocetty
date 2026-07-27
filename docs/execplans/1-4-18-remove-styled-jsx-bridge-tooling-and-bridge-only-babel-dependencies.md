@@ -1,20 +1,18 @@
 # Remove styled-jsx bridge tooling and bridge-only Babel dependencies
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
 ## Purpose / big picture
 
 Roadmap item `1.4.18` is the cleanup step that finishes the renderer styling
-migration started in `1.4.16` and `1.4.17`. After this work, the renderer
-build must no longer rely on the targeted Babel bridge for `styled-jsx`, the
+migration started in `1.4.16` and `1.4.17`. After this work, the renderer build
+must no longer rely on the targeted Babel bridge for `styled-jsx`, the
 repository manifest must no longer carry the bridge-only Babel dependencies,
-and developers must have one styling path for renderer components: CSS
-Modules.
+and developers must have one styling path for renderer components: CSS Modules.
 
 Success is observable in three ways. First, source and build outputs no longer
 contain a direct styled-jsx bridge path:
@@ -23,9 +21,9 @@ contain a direct styled-jsx bridge path:
 `build/esbuild/run-esbuild.ts` no longer wires the bridge plugin. Second,
 `package.json` no longer lists `styled-jsx`, `@babel/core`,
 `@babel/preset-react`, or `@babel/preset-typescript` as direct dependencies.
-Third, the required gates all pass:
-`bun install`, `make build`, `make check-fmt`, `make lint`, `make test`,
-`make markdownlint`, and `make nixie`.
+Third, the required gates all pass: `bun install`, `make build`,
+`make check-fmt`, `make lint`, `make test`, `make markdownlint`, and
+`make nixie`.
 
 ## Constraints
 
@@ -51,8 +49,7 @@ Third, the required gates all pass:
   and escalate. One regenerated `bun.lock` update is expected and excluded from
   this threshold.
 - Interface: if any exported prop/type signature must change outside
-  `lib/components/restart-required-indicator.tsx` internals, stop and
-  escalate.
+  `lib/components/restart-required-indicator.tsx` internals, stop and escalate.
 - Dependencies: if removing the bridge requires replacing it with another
   package, stop and escalate.
 - Iterations: if targeted validation or full gates still fail after 3
@@ -67,35 +64,26 @@ Third, the required gates all pass:
 
 - Risk: roadmap item `1.4.17` is marked complete, but
   `lib/components/restart-required-indicator.tsx` still contains five
-  `<style jsx>` blocks.
-  Severity: high
-  Likelihood: high
-  Mitigation: treat this component migration as prerequisite cleanup inside
-  `1.4.18`, prove parity with focused tests, and record the discrepancy in the
-  Decision Log.
+  `<style jsx>` blocks. Severity: high Likelihood: high Mitigation: treat this
+  component migration as prerequisite cleanup inside `1.4.18`, prove parity
+  with focused tests, and record the discrepancy in the Decision Log.
 
 - Risk: `test/unit/esbuild-migration-contracts.test.ts` still encodes bridge
   behaviour by importing bridge helpers and asserting `styled-jsx/style`
-  output.
-  Severity: high
-  Likelihood: high
-  Mitigation: rewrite the contract suite to assert CSS Module outputs and the
-  absence of bridge/runtime imports.
+  output. Severity: high Likelihood: high Mitigation: rewrite the contract
+  suite to assert CSS Module outputs and the absence of bridge/runtime imports.
 
 - Risk: `lib/components/restart-required-indicator.tsx` has no focused unit
   coverage today, so CSS migration could regress output or accessibility.
-  Severity: medium
-  Likelihood: high
-  Mitigation: existing integration tests for settings UI provide coverage;
-  add a focused Bun/Happy DOM test file only if the waiver is revoked.
+  Severity: medium Likelihood: high Mitigation: existing integration tests for
+  settings UI provide coverage; add a focused Bun/Happy DOM test file only if
+  the waiver is revoked.
 
 - Risk: `bun.lock` may still contain transitive Babel packages after direct
-  dependency removal, which could look like incomplete cleanup.
-  Severity: low
-  Likelihood: medium
-  Mitigation: define success as removal of direct bridge-only dependencies and
-  direct bridge code paths, not total eradication of every transitive Babel
-  string from the lockfile.
+  dependency removal, which could look like incomplete cleanup. Severity: low
+  Likelihood: medium Mitigation: define success as removal of direct
+  bridge-only dependencies and direct bridge code paths, not total eradication
+  of every transitive Babel string from the lockfile.
 
 ## Progress
 
@@ -118,56 +106,53 @@ Third, the required gates all pass:
 
 - Observation: `lib/components/restart-required-indicator.tsx` still contains
   active `<style jsx>` blocks even though roadmap item `1.4.17` says no
-  renderer source files should contain `<style jsx>`.
-  Evidence: exact-text search returned five matches in that file on
-  2026-04-06.
-  Impact: bridge removal cannot be completed safely until this file is migrated.
+  renderer source files should contain `<style jsx>`. Evidence: exact-text
+  search returned five matches in that file on 2026-04-06. Impact: bridge
+  removal cannot be completed safely until this file is migrated.
 
 - Observation: there is no focused unit test file for
-  `restart-required-indicator`.
-  Evidence: searching `test/` for `RestartRequiredIndicator`,
-  `InlineRestartWarning`, `ConfigReloadBadge`, and `LiveReloadIndicator`
-  returned no matches on 2026-04-06.
-  Impact: waived per Decision Log entry 2026-04-06; existing integration
-  tests provide sufficient coverage.
+  `restart-required-indicator`. Evidence: searching `test/` for
+  `RestartRequiredIndicator`, `InlineRestartWarning`, `ConfigReloadBadge`, and
+  `LiveReloadIndicator` returned no matches on 2026-04-06. Impact: waived per
+  Decision Log entry 2026-04-06; existing integration tests provide sufficient
+  coverage.
 
 - Observation: the direct Babel packages in `package.json` are only referenced
   by `build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin.ts`.
-  Evidence: exact-text search for `@babel/core`,
-  `@babel/preset-react`, and `@babel/preset-typescript` found source usage only
-  in the bridge plugin and manifest/lockfile/docs.
-  Impact: direct dependency removal is in scope once the bridge file is gone.
+  Evidence: exact-text search for `@babel/core`, `@babel/preset-react`, and
+  `@babel/preset-typescript` found source usage only in the bridge plugin and
+  manifest/lockfile/docs. Impact: direct dependency removal is in scope once
+  the bridge file is gone.
 
 ## Decision log
 
 - Decision: treat migration of
   `lib/components/restart-required-indicator.tsx` as part of this work instead
-  of stopping at the roadmap discrepancy.
-  Rationale: roadmap item `1.4.18` explicitly requires migration parity to be
-  complete before bridge removal, and this is the only known live renderer
-  blocker.
-  Date/Author: 2026-04-06 / Droid
+  of stopping at the roadmap discrepancy. Rationale: roadmap item `1.4.18`
+  explicitly requires migration parity to be complete before bridge removal,
+  and this is the only known live renderer blocker. Date/Author: 2026-04-06 /
+  Droid
 
 - Decision: keep `stylis` out of the dependency-removal list for this item.
-  Rationale: it remains part of the custom CSS path in `lib/containers/hyper.tsx`
-  and is not bridge-only.
-  Date/Author: 2026-04-06 / Droid
+  Rationale: it remains part of the custom CSS path in
+  `lib/containers/hyper.tsx` and is not bridge-only. Date/Author: 2026-04-06 /
+  Droid
 
 - Decision: use the agent team for bounded audit and verification tasks, while
   keeping code edits and final validation centralized in the main agent.
   Rationale: this satisfies the user requirement to use an agent team without
-  fragmenting ownership of the implementation diff.
-  Date/Author: 2026-04-06 / Droid
+  fragmenting ownership of the implementation diff. Date/Author: 2026-04-06 /
+  Droid
 
-- Decision: waive the requirement for `test/unit/restart-required-indicator.test.tsx`
-  as a focused unit test file.
-  Rationale: the existing integration tests for settings UI (including
-  `test/unit/config-hot-reload.test.ts` and the renderer contract suite)
-  provide sufficient coverage to verify no regressions in component rendering
-  and accessibility. Adding a dedicated unit test would duplicate coverage
-  already exercised by the integration tests. The component migration was
-  validated through manual inspection and the existing test suite passes.
-  Date/Author: 2026-04-06 / Droid
+- Decision: waive the requirement for
+  `test/unit/restart-required-indicator.test.tsx`
+  as a focused unit test file. Rationale: the existing integration tests for
+  settings UI (including `test/unit/config-hot-reload.test.ts` and the renderer
+  contract suite) provide sufficient coverage to verify no regressions in
+  component rendering and accessibility. Adding a dedicated unit test would
+  duplicate coverage already exercised by the integration tests. The component
+  migration was validated through manual inspection and the existing test suite
+  passes. Date/Author: 2026-04-06 / Droid
 
 ## Outcomes & retrospective
 
@@ -218,8 +203,8 @@ all styles were static and self-contained. The component had no existing unit
 tests, but the existing integration tests for settings UI provided sufficient
 coverage to verify no regressions.
 
-The bridge removal was clean because the Babel packages were only referenced
-by the bridge plugin itself. No other code in the repository depended on them.
+The bridge removal was clean because the Babel packages were only referenced by
+the bridge plugin itself. No other code in the repository depended on them.
 
 Follow-up work for roadmap item `9.2.4` (integration and end-to-end regression
 coverage for styled-jsx removal) remains open and should verify no runtime
@@ -227,14 +212,13 @@ styled-jsx references appear in packaged builds.
 
 ## Context and orientation (historical baseline)
 
-The bridge path crossed code, tests, typings, and dependency metadata.
-The key files were:
+The bridge path crossed code, tests, typings, and dependency metadata. The key
+files were:
 
 - `build/esbuild/run-esbuild.ts`, which imported and registered
   `createStyledJsxBabelBridgePlugin()` in the renderer plugin list.
 - `build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin.ts`, which
-  imported `@babel/core`, `styled-jsx/babel`, and
-  `styledJsxBabelPluginOptions`.
+  imported `@babel/core`, `styled-jsx/babel`, and `styledJsxBabelPluginOptions`.
 - `build/esbuild/constants.ts`, which exported
   `styledJsxBabelPluginOptions`.
 - `lib/components/restart-required-indicator.tsx`, the only known remaining
@@ -279,14 +263,13 @@ Implementation should use the `worker` droid for bounded parallel audit work:
 
 ### Stage 1: Close the remaining renderer parity gap
 
-Migrate `lib/components/restart-required-indicator.tsx` away from
-`styled-jsx`. Create a co-located
-`lib/components/restart-required-indicator.module.css`, move the static styles
-into module classes, and replace the inline style tags in all four exported UI
-surfaces:
-`RestartRequiredIndicator`, `InlineRestartWarning`, `ConfigReloadBadge`, and
-`LiveReloadIndicator`. Keep DOM structure, `aria-*` attributes, titles, and
-button/output semantics unchanged.
+Migrate `lib/components/restart-required-indicator.tsx` away from `styled-jsx`.
+Create a co-located `lib/components/restart-required-indicator.module.css`,
+move the static styles into module classes, and replace the inline style tags
+in all four exported UI surfaces: `RestartRequiredIndicator`,
+`InlineRestartWarning`, `ConfigReloadBadge`, and `LiveReloadIndicator`. Keep
+DOM structure, `aria-*` attributes, titles, and button/output semantics
+unchanged.
 
 Validation gate for Stage 1:
 `rg "<style jsx" lib/components/restart-required-indicator.tsx` returns no
@@ -316,9 +299,9 @@ reference.
 
 ### Stage 3: Remove bridge-only manifest entries and refresh install artefacts
 
-Edit `package.json` to remove the direct bridge-only dependencies:
-`styled-jsx`, `@babel/core`, `@babel/preset-react`, and
-`@babel/preset-typescript`. Then run `bun install` to regenerate `bun.lock`.
+Edit `package.json` to remove the direct bridge-only dependencies: `styled-jsx`,
+`@babel/core`, `@babel/preset-react`, and `@babel/preset-typescript`. Then run
+`bun install` to regenerate `bun.lock`.
 
 Inspect the resulting lockfile diff. It is acceptable for unrelated or
 transitive Babel packages to remain if they are still required elsewhere; what
@@ -425,15 +408,15 @@ This item is done only when all of the following are true:
 ## Idempotence and recovery
 
 The implementation is safe to stage incrementally. Stage 1 can be retried by
-reverting only the restart-indicator component changes. Stage 2 can be
-retried by restoring the bridge plugin if the contract rewrite
-reveals a missing dependency. `bun install` is safe to rerun. Destructive steps
-are limited to deleting obsolete bridge files, and those deletions should occur
-only after their replacements are already in place.
+reverting only the restart-indicator component changes. Stage 2 can be retried
+by restoring the bridge plugin if the contract rewrite reveals a missing
+dependency. `bun install` is safe to rerun. Destructive steps are limited to
+deleting obsolete bridge files, and those deletions should occur only after
+their replacements are already in place.
 
-If final gates fail, do not mark the roadmap item done. Fix the failures,
-update `Progress` and `Decision Log`, and rerun the relevant command until the
-gate passes or a tolerance threshold is reached.
+If final gates fail, do not mark the roadmap item done. Fix the failures, update
+`Progress` and `Decision Log`, and rerun the relevant command until the gate
+passes or a tolerance threshold is reached.
 
 ## Artefacts and notes
 

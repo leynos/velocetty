@@ -4,8 +4,8 @@
 
 - Purpose: define and execute roadmap item `1.2.1` by introducing shared
   command definition contracts, metadata, schema-aware validation, and
-  deterministic registry create, read, update, and delete (CRUD) APIs that
-  can be reused by renderer and backend command dispatch paths.
+  deterministic registry create, read, update, and delete (CRUD) APIs that can
+  be reused by renderer and backend command dispatch paths.
 - Invariants: preserve current keyboard/menu command behaviour while replacing
   ad-hoc string-to-handler maps with typed, enumerable registry surfaces.
 - Cross-links: `docs/roadmap.md`, `docs/velocetty-design.md`,
@@ -13,10 +13,9 @@
   `docs/velocetty-product-requirements-document.md`, and
   `docs/developers-guide.md`.
 
-This Execution Plan (ExecPlan) is a living document.
-The sections `Constraints`, `Tolerances`, `Risks`, `Progress`,
-`Surprises & discoveries`, `Decision log`, and
-`Outcomes & retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE (2026-02-19)
 
@@ -86,33 +85,25 @@ after all required gates pass: `bun install`, `make build`, `make check-fmt`,
 ## Risks
 
 - Risk: replacing current ad-hoc maps could regress keyboard shortcut dispatch.
-  Severity: high
-  Likelihood: medium
-  Mitigation: preserve compatibility wrappers for `getCommandHandler` and
-  `registerCommandHandlers` during migration, and extend existing unit tests in
-  `test/unit/command-registry.test.ts`.
+  Severity: high Likelihood: medium Mitigation: preserve compatibility wrappers
+  for `getCommandHandler` and `registerCommandHandlers` during migration, and
+  extend existing unit tests in `test/unit/command-registry.test.ts`.
 
 - Risk: deterministic ordering choice may conflict with plugin assumptions
-  about insertion order.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: document ordering contract explicitly (stable sort strategy), add
-  tests for ordering invariants, and preserve current behaviour for existing
-  commands via compatibility helpers.
+  about insertion order. Severity: medium Likelihood: medium Mitigation:
+  document ordering contract explicitly (stable sort strategy), add tests for
+  ordering invariants, and preserve current behaviour for existing commands via
+  compatibility helpers.
 
 - Risk: schema validation errors could be too generic to satisfy success
-  criteria.
-  Severity: high
-  Likelihood: medium
-  Mitigation: define a typed structured error shape in shared contracts and
-  assert precise fields in unit tests.
+  criteria. Severity: high Likelihood: medium Mitigation: define a typed
+  structured error shape in shared contracts and assert precise fields in unit
+  tests.
 
 - Risk: this work overlaps upcoming dispatcher/context-key milestones, which can
-  cause interface churn if contracts are under-specified.
-  Severity: medium
-  Likelihood: high
-  Mitigation: include dispatcher-friendly fields from design now
-  (`defaultWhen`, `kind`, optional result schema), but keep runtime wiring
+  cause interface churn if contracts are under-specified. Severity: medium
+  Likelihood: high Mitigation: include dispatcher-friendly fields from design
+  now (`defaultWhen`, `kind`, optional result schema), but keep runtime wiring
   minimal for this milestone.
 
 ## Progress
@@ -144,59 +135,52 @@ after all required gates pass: `bun install`, `make build`, `make check-fmt`,
 ## Surprises & discoveries
 
 - Observation: current renderer registry only stores handlers and keymap
-  lookups, with no metadata or schema support.
-  Evidence: `lib/command-registry.ts` exports
+  lookups, with no metadata or schema support. Evidence:
+  `lib/command-registry.ts` exports
   `registerCommandHandlers/getCommandHandler/getRegisteredKeys` over mutable
-  records.
-  Impact: milestone `1.2.1` needs a new shared model and API rather than minor
-  type tweaks.
+  records. Impact: milestone `1.2.1` needs a new shared model and API rather
+  than minor type tweaks.
 
 - Observation: command execution currently bifurcates between renderer handlers
-  and `transport.emit('command', command)` fallback.
-  Evidence: `lib/actions/ui.ts::execCommand` and
-  `lib/containers/hyper.tsx::attachKeyListeners`.
-  Impact: registry introduction must preserve this split while exposing typed
-  command definitions for both sides.
+  and `transport.emit('command', command)` fallback. Evidence:
+  `lib/actions/ui.ts::execCommand` and
+  `lib/containers/hyper.tsx::attachKeyListeners`. Impact: registry introduction
+  must preserve this split while exposing typed command definitions for both
+  sides.
 
 - Observation: shared package already exports transport contracts and includes
-  `ajv` as an existing dependency in repository manifests.
-  Evidence: `shared/src/index.ts`, `shared/src/types/transport.ts`, and
-  `package.json` dependency list.
-  Impact: this milestone can add shared command contracts without adding new
-  packages.
+  `ajv` as an existing dependency in repository manifests. Evidence:
+  `shared/src/index.ts`, `shared/src/types/transport.ts`, and `package.json`
+  dependency list. Impact: this milestone can add shared command contracts
+  without adding new packages.
 
 - Observation: initial registry implementation duplicated command contract types
-  in `lib/command-registry.ts` instead of importing shared contracts.
-  Evidence: first implementation pass declared local `CommandDefinition` and
-  `CommandValidationError` interfaces in `lib/command-registry.ts`.
-  Impact: follow-up alignment was required to ensure runtime registry APIs
-  consume `@shared/types/commands`.
+  in `lib/command-registry.ts` instead of importing shared contracts. Evidence:
+  first implementation pass declared local `CommandDefinition` and
+  `CommandValidationError` interfaces in `lib/command-registry.ts`. Impact:
+  follow-up alignment was required to ensure runtime registry APIs consume
+  `@shared/types/commands`.
 
 ## Decision log
 
 - Decision: treat existing map-based command plumbing as replace-with-shim,
-  not extend-in-place.
-  Rationale: roadmap requires shared definition metadata and schema validation,
-  which do not fit the current `Record<string, fn>` shape cleanly.
-  Date/Author: 2026-02-19 / Codex
+  not extend-in-place. Rationale: roadmap requires shared definition metadata
+  and schema validation, which do not fit the current `Record<string, fn>`
+  shape cleanly. Date/Author: 2026-02-19 / Codex
 
 - Decision: design contracts in `shared/src/types/commands.ts` first, then
-  adapt renderer/main command modules to consume those contracts.
-  Rationale: shared contracts are required for future frontend/backend registry
-  and dispatcher milestones.
-  Date/Author: 2026-02-19 / Codex
+  adapt renderer/main command modules to consume those contracts. Rationale:
+  shared contracts are required for future frontend/backend registry and
+  dispatcher milestones. Date/Author: 2026-02-19 / Codex
 
 - Decision: keep implementation gated by explicit user approval because this
-  file is an ExecPlan draft.
-  Rationale: execplans skill approval gate requires confirmation before code
-  changes begin.
-  Date/Author: 2026-02-19 / Codex
+  file is an ExecPlan draft. Rationale: execplans skill approval gate requires
+  confirmation before code changes begin. Date/Author: 2026-02-19 / Codex
 
 - Decision: retain compatibility wrappers in `lib/command-registry.ts` while
-  introducing CRUD and validation APIs.
-  Rationale: preserves current plugin/runtime integration paths while enabling
-  new registry surfaces for follow-on dispatcher milestones.
-  Date/Author: 2026-02-19 / Codex
+  introducing CRUD and validation APIs. Rationale: preserves current
+  plugin/runtime integration paths while enabling new registry surfaces for
+  follow-on dispatcher milestones. Date/Author: 2026-02-19 / Codex
 
 ## Outcomes & retrospective
 
@@ -286,8 +270,8 @@ and invalid args tests return structured errors.
 Stage C: compatibility integration with existing command paths.
 
 Adapt `lib/command-registry.ts` and command call sites to read from the new
-registry surface while preserving current behaviour for shortcuts,
-menu fallback, and plugin registration hooks.
+registry surface while preserving current behaviour for shortcuts, menu
+fallback, and plugin registration hooks.
 
 If required, keep thin compatibility wrappers that map legacy helper calls to
 new registry APIs so plugin-facing behaviour remains stable within this
@@ -311,8 +295,8 @@ implemented workflow.
 
 ## Concrete steps
 
-Run all commands from repository root: `/data/leynos/Projects/velocetty`.
-Use log files so truncated terminal output can still be reviewed.
+Run all commands from repository root: `/data/leynos/Projects/velocetty`. Use
+log files so truncated terminal output can still be reviewed.
 
 Set reusable log variables:
 
@@ -476,6 +460,6 @@ Dependencies and rationale:
 
 ## Revision note
 
-Initial draft created on 2026-02-19.
-This revision marks the plan `COMPLETE`, records Stage D evidence, and captures
-final outcomes after all required gates passed.
+Initial draft created on 2026-02-19. This revision marks the plan `COMPLETE`,
+records Stage D evidence, and captures final outcomes after all required gates
+passed.

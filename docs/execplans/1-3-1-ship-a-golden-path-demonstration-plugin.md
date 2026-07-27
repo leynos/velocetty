@@ -13,10 +13,9 @@
   `docs/velocetty-product-requirements-document.md`,
   `docs/developers-guide.md`, and `PLUGINS.md`.
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`,
-`Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: IMPLEMENTED (2026-02-20, approved and executed)
 
@@ -35,8 +34,8 @@ It is not only a sample plugin file. It is the proof that the runtime can:
   event-driven decoration updates.
 
 Success is observable when a developer can enable and disable the example
-plugin, restart or live-reload, and see all three behaviours working with
-tests proving they do not regress:
+plugin, restart or live-reload, and see all three behaviours working with tests
+proving they do not regress:
 
 - the command is registered and invocable via keybinding,
 - settings persist under a plugin namespace in JSON5 config,
@@ -84,32 +83,26 @@ item `1.3.1` done in `docs/roadmap.md`, and passing required gates:
 
 - Risk: existing config import/migration paths use `JSON.parse` and
   `JSON.stringify`, so JSON5 syntax is currently unsupported and migration
-  removal can create a one-way format transition.
-  Severity: high
-  Likelihood: high
-  Mitigation: centralize parse/stringify helpers for config I/O, switch load and
-  write paths together, remove migration entry points in the same change, and
-  add tests that cover JSON5-specific syntax.
+  removal can create a one-way format transition. Severity: high Likelihood:
+  high Mitigation: centralize parse/stringify helpers for config I/O, switch
+  load and write paths together, remove migration entry points in the same
+  change, and add tests that cover JSON5-specific syntax.
 
 - Risk: runtime plugin APIs are still Hyper-style hook methods rather than the
-  design's explicit plugin context registration surface.
-  Severity: medium
-  Likelihood: high
-  Mitigation: introduce an additive bridge layer so the golden plugin can use
-  the new runtime shape without breaking current plugins.
+  design's explicit plugin context registration surface. Severity: medium
+  Likelihood: high Mitigation: introduce an additive bridge layer so the golden
+  plugin can use the new runtime shape without breaking current plugins.
 
 - Risk: tab decorations currently flow through `getTabProps`/`getTabsProps`
-  decorators and may not have a first-class provider registry yet.
-  Severity: high
-  Likelihood: medium
-  Mitigation: add a deterministic provider registry wrapper around existing tab
-  prop decoration flow, then test provider ordering and event-triggered refresh.
+  decorators and may not have a first-class provider registry yet. Severity:
+  high Likelihood: medium Mitigation: add a deterministic provider registry
+  wrapper around existing tab prop decoration flow, then test provider ordering
+  and event-triggered refresh.
 
 - Risk: no existing focused tests cover plugin manifest/settings/decorations.
-  Severity: medium
-  Likelihood: high
-  Mitigation: add targeted unit tests for runtime integration seams and update
-  existing command registry and config-related suites where contracts change.
+  Severity: medium Likelihood: high Mitigation: add targeted unit tests for
+  runtime integration seams and update existing command registry and
+  config-related suites where contracts change.
 
 ## Progress
 
@@ -144,67 +137,59 @@ item `1.3.1` done in `docs/roadmap.md`, and passing required gates:
 - Observation: current config import and migration are JSON-only.
   Evidence: `app/config/import.ts` parses defaults, keymaps, and user config
   with `JSON.parse`; `app/config/migrate.ts` writes migrated config with
-  `JSON.stringify`.
-  Impact: roadmap success criteria requiring JSON5 persistence are currently not
-  met and need implementation work in this milestone.
+  `JSON.stringify`. Impact: roadmap success criteria requiring JSON5
+  persistence are currently not met and need implementation work in this
+  milestone.
 
 - Observation: plugin runtime currently supports legacy decoration hooks and
   keymap decoration, but has no explicit plugin manifest/settings contract.
   Evidence: `app/plugins/extensions.ts`, `app/plugins.ts`, and
-  `lib/utils/plugins.ts` load and execute hook-based APIs.
-  Impact: an additive manifest/settings layer and one golden plugin are
-  required to exercise the runtime without breaking old hooks.
+  `lib/utils/plugins.ts` load and execute hook-based APIs. Impact: an additive
+  manifest/settings layer and one golden plugin are required to exercise the
+  runtime without breaking old hooks.
 
 - Observation: command registration is currently achieved via renderer-side
-  `registerCommands` plumbing and keymaps from `getDecoratedKeymaps`.
-  Evidence: `lib/components/terms.tsx`, `lib/command-registry.ts`,
-  `lib/containers/hyper.tsx`.
-  Impact: the golden-path command/keybinding path should integrate with these
-  seams, then be gradually aligned toward the design runtime contract.
+  `registerCommands` plumbing and keymaps from `getDecoratedKeymaps`. Evidence:
+  `lib/components/terms.tsx`, `lib/command-registry.ts`,
+  `lib/containers/hyper.tsx`. Impact: the golden-path command/keybinding path
+  should integrate with these seams, then be gradually aligned toward the
+  design runtime contract.
 
 - Observation: `make build` can generate transient compiled JS/`d.ts` artefacts
-  under `shared/src` that are not tracked source files.
-  Evidence: build run created untracked files such as
-  `shared/src/runtime/golden-path-demo.js` and `shared/src/types/common.d.ts`.
-  Impact: clean these generated artefacts before `make check-fmt` so formatter
-  gates run only on repository source files.
+  under `shared/src` that are not tracked source files. Evidence: build run
+  created untracked files such as `shared/src/runtime/golden-path-demo.js` and
+  `shared/src/types/common.d.ts`. Impact: clean these generated artefacts before
+  `make check-fmt` so formatter gates run only on repository source files.
 
 ## Decision Log
 
 - Decision: treat this as a planning-only turn and keep implementation blocked
-  until explicit user approval.
-  Rationale: ExecPlan workflow requires a draft and approval gate.
-  Date/Author: 2026-02-20 / Codex
+  until explicit user approval. Rationale: ExecPlan workflow requires a draft
+  and approval gate. Date/Author: 2026-02-20 / Codex
 
 - Decision: structure implementation as additive compatibility layers rather
-  than runtime replacement.
-  Rationale: minimizes blast radius and keeps existing plugin ecosystem
-  working.
-  Date/Author: 2026-02-20 / Codex
+  than runtime replacement. Rationale: minimizes blast radius and keeps
+  existing plugin ecosystem working. Date/Author: 2026-02-20 / Codex
 
 - Decision: run implementation with a small agent team and clearly owned
-  workstreams.
-  Rationale: the milestone crosses backend config I/O, plugin runtime, renderer
-  command/keybinding paths, decoration logic, tests, and docs.
-  Date/Author: 2026-02-20 / Codex
+  workstreams. Rationale: the milestone crosses backend config I/O, plugin
+  runtime, renderer command/keybinding paths, decoration logic, tests, and
+  docs. Date/Author: 2026-02-20 / Codex
 
 - Decision: intentionally drop legacy config-format backward compatibility and
-  remove migration logic.
-  Rationale: user direction states backward compatibility is not a goal for this
-  milestone.
-  Date/Author: 2026-02-20 / User/Codex
+  remove migration logic. Rationale: user direction states backward
+  compatibility is not a goal for this milestone. Date/Author: 2026-02-20 /
+  User/Codex
 
 - Decision: represent plugin enablement as `config.plugins.<pluginId>.enabled`
-  and gate runtime command/keybinding/decorations from that setting.
-  Rationale: this keeps enable/disable behaviour deterministic and directly
-  observable in JSON5 config persistence tests.
-  Date/Author: 2026-02-20 / Codex
+  and gate runtime command/keybinding/decorations from that setting. Rationale:
+  this keeps enable/disable behaviour deterministic and directly observable in
+  JSON5 config persistence tests. Date/Author: 2026-02-20 / Codex
 
 - Decision: keep tab-decoration updates event-driven through provider
-  subscriptions and config change events, with no polling fallback.
-  Rationale: this satisfies roadmap success criteria and aligns with design
-  guidance for explicit event-driven runtime behaviour.
-  Date/Author: 2026-02-20 / Codex
+  subscriptions and config change events, with no polling fallback. Rationale:
+  this satisfies roadmap success criteria and aligns with design guidance for
+  explicit event-driven runtime behaviour. Date/Author: 2026-02-20 / Codex
 
 ## Outcomes & Retrospective
 
@@ -249,8 +234,7 @@ Current repository state relevant to this milestone:
 - Design defines tab decoration provider contracts and deterministic merge rules
   in `docs/velocetty-design.md`.
 - PRD requires a golden path plugin as a deliverable under foundation
-  workstream `0` in
-  `docs/velocetty-product-requirements-document.md`.
+  workstream `0` in `docs/velocetty-product-requirements-document.md`.
 - Existing plugin loader and decorator orchestration live in `app/plugins.ts`
   and `lib/utils/plugins.ts`.
 - Existing command/keybinding execution seam lives in
@@ -311,7 +295,8 @@ Implementation outline:
 
 Observable check:
 
-- tests prove deterministic ordering and defaults pass before runtime integration
+- tests prove deterministic ordering and defaults pass before runtime
+  integration
   begins.
 
 ### Stage B: JSON5 config and plugin settings persistence
@@ -328,10 +313,9 @@ Implementation outline:
 4. Add runtime helpers that allow getting and setting plugin settings while
    preserving existing config merge/default behaviour.
 5. Add tests covering:
-   comments/trailing commas in config,
-   namespaced plugin defaults,
-   plugin enable/disable persistence path,
-   and startup behaviour without migration fallback.
+   comments/trailing commas in config, namespaced plugin defaults, plugin
+   enable/disable persistence path, and startup behaviour without migration
+   fallback.
 
 Observable check:
 
@@ -369,9 +353,8 @@ Implementation outline:
 3. Trigger decoration recomputation from explicit tab/session events (for
    example session activity, title updates, active tab changes), not polling.
 4. Add tests proving:
-   deterministic output ordering,
-   event-triggered update execution,
-   no updates when no relevant events occur.
+   deterministic output ordering, event-triggered update execution, no updates
+   when no relevant events occur.
 
 Observable check:
 

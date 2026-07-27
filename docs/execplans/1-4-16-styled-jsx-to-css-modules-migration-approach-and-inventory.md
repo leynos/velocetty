@@ -1,9 +1,8 @@
 # Publish the styled-jsx-to-CSS-Modules migration approach and inventory
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -14,8 +13,8 @@ renderer process. This creates a hard dependency on Babel transforms, which
 blocks the full removal of Babel from the build pipeline (see Architectural
 Decision Record ADR-002).
 
-This ExecPlan documents the migration approach for roadmap item 1.4.16. It is
-a **planning and documentation task only** - no source files are modified. The
+This ExecPlan documents the migration approach for roadmap item 1.4.16. It is a
+**planning and documentation task only** - no source files are modified. The
 deliverable is a self-contained reference document that will guide subsequent
 implementation work in roadmap items 1.4.17 (component migration) and 1.4.18
 (Babel bridge removal).
@@ -26,13 +25,14 @@ This document provides:
 2. Classification of each callsite by migration pattern (local static, local
    dynamic, global selectors).
 3. Definition of the target renderer styling model (CSS Modules for local scope,
-   CSS custom properties for dynamic values, `:global()` for app-wide selectors).
+   CSS custom properties for dynamic values, `:global()` for app-wide
+   selectors).
 4. Worked examples tied to actual repository files.
 5. An explicit decommission checklist for removing Babel bridge and styled-jsx
    dependencies after component migration is complete.
 
-Success is measured by the completeness and clarity of this documentation,
-not by code changes. Implementation is explicitly out of scope for this task.
+Success is measured by the completeness and clarity of this documentation, not
+by code changes. Implementation is explicitly out of scope for this task.
 
 ## Constraints
 
@@ -98,8 +98,8 @@ Known uncertainties that might affect the plan:
 
 ## Progress
 
-This section tracks completion of the planning task (1.4.16). Implementation
-is deferred to roadmap items 1.4.17 and 1.4.18.
+This section tracks completion of the planning task (1.4.16). Implementation is
+deferred to roadmap items 1.4.17 and 1.4.18.
 
 - [x] (2026-03-27 19:50Z) Inventory all `styled-jsx` callsites in repository.
 - [x] (2026-03-27 20:00Z) Classify callsites by migration pattern
@@ -108,15 +108,17 @@ is deferred to roadmap items 1.4.17 and 1.4.18.
 - [x] (2026-03-27 20:15Z) Create worked examples for each pattern type.
 - [x] (2026-03-27 20:20Z) Draft decommission checklist for 1.4.18.
 - [x] Await user approval of this plan.
-- [x] Upon approval: Update `docs/developers-guide.md` with CSS Modules conventions.
+- [x] Upon approval: Update `docs/developers-guide.md` with CSS Modules
+      conventions.
 - [x] Upon approval: Mark roadmap item 1.4.16 as "done".
 
 ## Surprises & Discoveries
 
 - Observation: The inventory revealed that most styled-jsx blocks (7 of 13) are
-  already static with no dynamic interpolation, making migration straightforward.
-  Evidence: Agent team analysis of all 12 files with styled-jsx usage.
-  Impact: Pattern A migrations can proceed in parallel with minimal risk.
+  already static with no dynamic interpolation, making migration
+  straightforward. Evidence: Agent team analysis of all 12 files with
+  styled-jsx usage. Impact: Pattern A migrations can proceed in parallel with
+  minimal risk.
 
 - Observation: Two files (`searchBox.tsx` and `new-tab.tsx`) have multiple
   styled-jsx blocks, but they follow the same pattern within each file.
@@ -126,8 +128,8 @@ is deferred to roadmap items 1.4.17 and 1.4.18.
 - Observation: The "global" blocks in `term.tsx` are actually component-local
   in practice and can migrate to regular CSS Modules without `:global()`.
   Evidence: The `.term_fit` and `.term_wrapper` classes are only used within
-  `Term` component render output.
-  Impact: Only `style-sheet.tsx` truly needs the `:global()` wrapper.
+  `Term` component render output. Impact: Only `style-sheet.tsx` truly needs the
+  `:global()` wrapper.
 
 ## Decision Log
 
@@ -171,9 +173,9 @@ files. The subsequent implementation tasks are:
 
 The Velocetty renderer uses `styled-jsx` for component-scoped CSS. The build
 pipeline includes a Babel bridge plugin
-(`build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin.ts`) that
-invokes `@babel/core` with `styled-jsx/babel` to transform `<style jsx>` blocks
-at build time. This adds complexity and prevents full Babel removal.
+(`build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin.ts`) that invokes
+`@babel/core` with `styled-jsx/babel` to transform `<style jsx>` blocks at
+build time. This adds complexity and prevents full Babel removal.
 
 Key files involved:
 
@@ -189,22 +191,23 @@ Key files involved:
 
 The repository contains **13 styled-jsx blocks** across **12 files**:
 
-| File | Pattern | Block Count | Dynamic Values |
-| ---- | ------- | ----------- | ---------------- |
-| `lib/components/terms.tsx` | A (local static) | 1 | None |
-| `lib/components/searchBox.tsx` | B (local dynamic) | 2 | `foregroundColor`, `selectionColor`, `backgroundColor`, `borderColor`, `font` |
-| `lib/components/header.tsx` | A (local static) | 1 | None (uses inline `style=` for `borderColor`) |
-| `lib/components/notifications.tsx` | A (local static) | 1 | None |
-| `lib/components/term.tsx` | C (global) | 1 | None |
-| `lib/components/split-pane.tsx` | A (local static) | 1 | None (uses inline `style=` for `borderColor`) |
-| `lib/components/notification.tsx` | A (local static) | 1 | None (uses inline `style=` for colours) |
-| `lib/components/tabs.tsx` | B (local dynamic) | 1 | `isMac` platform conditionals |
-| `lib/components/tab.tsx` | A (local static) | 1 | None (uses inline `style=` for `borderColor`) |
-| `lib/components/new-tab.tsx` | B (local dynamic) | 1 | `borderColor`, `isMac` |
-| `lib/components/style-sheet.tsx` | C (global) | 1 | `borderColor` |
-| `lib/containers/hyper.tsx` | A (local static) | 1 | None (uses inline `style=` for theme) |
+| File                               | Pattern           | Block Count | Dynamic Values                                                                |
+| ---------------------------------- | ----------------- | ----------- | ----------------------------------------------------------------------------- |
+| `lib/components/terms.tsx`         | A (local static)  | 1           | None                                                                          |
+| `lib/components/searchBox.tsx`     | B (local dynamic) | 2           | `foregroundColor`, `selectionColor`, `backgroundColor`, `borderColor`, `font` |
+| `lib/components/header.tsx`        | A (local static)  | 1           | None (uses inline `style=` for `borderColor`)                                 |
+| `lib/components/notifications.tsx` | A (local static)  | 1           | None                                                                          |
+| `lib/components/term.tsx`          | C (global)        | 1           | None                                                                          |
+| `lib/components/split-pane.tsx`    | A (local static)  | 1           | None (uses inline `style=` for `borderColor`)                                 |
+| `lib/components/notification.tsx`  | A (local static)  | 1           | None (uses inline `style=` for colours)                                       |
+| `lib/components/tabs.tsx`          | B (local dynamic) | 1           | `isMac` platform conditionals                                                 |
+| `lib/components/tab.tsx`           | A (local static)  | 1           | None (uses inline `style=` for `borderColor`)                                 |
+| `lib/components/new-tab.tsx`       | B (local dynamic) | 1           | `borderColor`, `isMac`                                                        |
+| `lib/components/style-sheet.tsx`   | C (global)        | 1           | `borderColor`                                                                 |
+| `lib/containers/hyper.tsx`         | A (local static)  | 1           | None (uses inline `style=` for theme)                                         |
 
-**Pattern A (local static):** 7 blocks - CSS rules with no dynamic interpolation.
+**Pattern A (local static):** 7 blocks - CSS rules with no dynamic
+interpolation.
 
 **Pattern B (local dynamic):** 4 blocks - CSS rules with `${...}` interpolation
 for theme values or platform conditionals.
@@ -639,8 +642,8 @@ import clsx from 'clsx';
 
 **Migration:**
 
-Create `lib/components/terms.module.css` (scrollbar rules applied to the
-terms container):
+Create `lib/components/terms.module.css` (scrollbar rules applied to the terms
+container):
 
 ```css
 .terms {
@@ -658,8 +661,8 @@ terms container):
 }
 ```
 
-Update `lib/components/terms.tsx` to apply the host class and CSS variable
-to the actual content ancestor:
+Update `lib/components/terms.tsx` to apply the host class and CSS variable to
+the actual content ancestor:
 
 ```tsx
 import styles from './terms.module.css';
@@ -673,8 +676,8 @@ import styles from './terms.module.css';
 </div>
 ```
 
-Remove the `StyleSheet` component or have it render `null` after migration,
-as its styling responsibility moves to the terms container.
+Remove the `StyleSheet` component or have it render `null` after migration, as
+its styling responsibility moves to the terms container.
 
 **Why this is safe:**
 
@@ -787,8 +790,8 @@ specific validation commands.
 
 ## Idempotence and recovery
 
-This plan is read-only documentation. It can be revised and re-published without
-side effects. If the plan needs changes:
+This plan is read-only documentation. It can be revised and re-published
+without side effects. If the plan needs changes:
 
 1. Edit the plan document.
 2. Update the `Decision Log` section with rationale.
@@ -815,7 +818,8 @@ to remove the Babel bridge and styled-jsx dependencies:
 - [ ] Run `bun install` to update `bun.lock`.
 - [ ] Update `test/unit/esbuild-migration-contracts.test.ts` to validate CSS
   Module outputs instead of styled-jsx transforms.
-- [ ] Run full gates: `bun install`, `make build`, `make check-fmt`, `make lint`,
+- [ ] Run full gates: `bun install`, `make build`, `make check-fmt`,
+      `make lint`,
   `make test`.
 - [ ] Update `docs/roadmap.md` to mark 1.4.18 as done.
 - [ ] Update `docs/velocetty-hyper-codebase.md` dependency and build sections.

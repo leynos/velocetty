@@ -1,9 +1,8 @@
 # Resolve macOS aarch64 Continuous Integration (CI) install/build/lint/test failures
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept current as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept current as work proceeds.
 
 Status: IN PROGRESS (2026-02-24)
 
@@ -14,14 +13,14 @@ Implementation is in progress as of 2026-02-24.
 ## Purpose / big picture
 
 Roadmap item `1.4.15` requires reliable cross-architecture Continuous
-Integration (CI) on host platforms.
-The Linux aarch64 scope is already complete, and this plan tracks the macOS
-aarch64 closure work recorded in `docs/roadmap.md`.
+Integration (CI) on host platforms. The Linux aarch64 scope is already
+complete, and this plan tracks the macOS aarch64 closure work recorded in
+`docs/roadmap.md`.
 
 The current macOS failure happens before install/build/lint/test gates run:
-`.github/workflows/nodejs.yml` executes `python3 -m pip install packaging
-setuptools`, and `macos-latest` now rejects this with Python Enhancement
-Proposal (PEP) 668
+`.github/workflows/nodejs.yml` executes
+`python3 -m pip install packaging setuptools`, and `macos-latest` now rejects
+this with Python Enhancement Proposal (PEP) 668
 (`externally-managed-environment`).
 
 After this plan is implemented, success is observable when:
@@ -72,13 +71,13 @@ Use a three-agent implementation team, then consolidate in the main branch
 workspace:
 
 1. CI workflow agent (owner: `.github/workflows/nodejs.yml` and any helper
-   scripts/actions it introduces).
-   Deliverable: PEP 668-safe Python bootstrap and preserved node-gyp reliability
-   across matrix hosts.
+   scripts/actions it introduces). Deliverable: PEP 668-safe Python bootstrap
+   and preserved node-gyp reliability across matrix hosts.
 2. Documentation agent (owner: `docs/developers-guide.md`, `docs/roadmap.md`).
    Deliverable: updated developer practice and roadmap checkbox state.
 3. Validation agent (owner: gate evidence logs under `/tmp`).
-   Deliverable: reproducible local gate results and CI run links/results summary.
+   Deliverable: reproducible local gate results and CI run links/results
+   summary.
 
 If parallel edits conflict, rebase and keep all valid intent. Do not drop any
 requested checklist item.
@@ -111,28 +110,24 @@ requested checklist item.
 
 ## Risks
 
-- Risk: a macOS-only fix diverges from Linux/Windows and introduces future drift.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: apply one policy-based bootstrap pattern (virtual environment)
-  that is reusable across jobs and documents host-specific path handling.
+- Risk: a macOS-only fix diverges from Linux/Windows and introduces future
+  drift.
+  Severity: medium Likelihood: medium Mitigation: apply one policy-based
+  bootstrap pattern (virtual environment) that is reusable across jobs and
+  documents host-specific path handling.
 
 - Risk: node-gyp selects the wrong Python executable after venv creation.
-  Severity: high
-  Likelihood: medium
-  Mitigation: export `npm_config_python` explicitly through `GITHUB_ENV` and
-  verify install logs include the expected interpreter path.
+  Severity: high Likelihood: medium Mitigation: export `npm_config_python`
+  explicitly through `GITHUB_ENV` and verify install logs include the expected
+  interpreter path.
 
 - Risk: roadmap gets marked complete without CI evidence.
-  Severity: high
-  Likelihood: low
-  Mitigation: require CI run evidence before editing checklist state.
+  Severity: high Likelihood: low Mitigation: require CI run evidence before
+  editing checklist state.
 
 - Risk: documentation and workflow drift.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: land workflow and developer-guide updates in the same change,
-  then run full gate stack.
+  Severity: medium Likelihood: medium Mitigation: land workflow and
+  developer-guide updates in the same change, then run full gate stack.
 
 ## Milestones
 
@@ -144,8 +139,8 @@ Confirm branch and gather pre-change evidence:
     git status --short --branch
     nl -ba .github/workflows/nodejs.yml | sed -n '1,170p'
 
-Record the failing macOS log snippet (PEP 668 externally-managed-environment)
-in `Surprises & discoveries` and keep it linked to the exact failing step.
+Record the failing macOS log snippet (PEP 668 externally-managed-environment) in
+`Surprises & discoveries` and keep it linked to the exact failing step.
 
 ### Milestone 1 - Make Python bootstrap PEP 668-safe in CI
 
@@ -169,8 +164,8 @@ Implementation notes:
 
 ### Milestone 2 - Keep documentation aligned with CI practice
 
-Update `docs/developers-guide.md` in the `Electron runtime alignment` section to
-state the new CI rule:
+Update `docs/developers-guide.md` in the `Electron runtime alignment` section
+to state the new CI rule:
 
 - CI must provision Python packaging tools through a virtual environment (or
   equivalent isolated interpreter), not system-level `pip install`.
@@ -267,11 +262,12 @@ Local command validation:
   outputs instead of exporting them job-wide through `GITHUB_ENV`.
 - [x] (2026-02-24 20:00Z) Addressed remaining macOS fast-lane packaged-launch
   regression by restoring spawn as the default fast-lane driver and adding a
-  macOS CI packaged-launch fallback stability wait when
-  `[e2e] renderer-ready` markers are absent, but the process remains alive.
+  macOS CI packaged-launch fallback stability wait when `[e2e] renderer-ready`
+  markers are absent, but the process remains alive.
 - [x] (2026-02-24 21:10Z) Addressed macOS dangling-process timeout regression by
-  bounding packaged-launch fallback stability wait to the remaining test-timeout
-  budget, so the test can complete cleanup before Bun's 45-second CI deadline.
+  bounding packaged-launch fallback stability wait to the remaining
+  test-timeout budget, so the test can complete cleanup before Bun's 45-second
+  CI deadline.
 - [x] (2026-02-24 22:10Z) Addressed Linux aarch64 CI freeze in
   `bun run v8-snapshot` by removing the dedicated arm64 snapshot-generation
   step and setting `SKIP_V8_SNAPSHOT_COPY=1` for Linux aarch64 packaging.
@@ -290,132 +286,118 @@ Local command validation:
   lint/test failures are downstream symptoms of the Python bootstrap failure.
   Evidence: workflow step `Fix node-gyp and Python` runs
   `python3 -m pip install packaging setuptools` and fails with
-  `externally-managed-environment` on `macos-latest`.
-  Impact: fix must target interpreter isolation first, not downstream gates.
+  `externally-managed-environment` on `macos-latest`. Impact: fix must target
+  interpreter isolation first, not downstream gates.
 
 - Observation: the same pip pattern appears in both `build` and
-  `e2e-deep-linux` jobs.
-  Evidence: `.github/workflows/nodejs.yml` contains two `Fix node-gyp and
-  Python` steps.
-  Impact: prefer one consistent bootstrap approach to avoid policy drift.
+  `e2e-deep-linux` jobs. Evidence: `.github/workflows/nodejs.yml` contains two
+  `Fix node-gyp and Python` steps. Impact: prefer one consistent bootstrap
+  approach to avoid policy drift.
 
 - Observation: roadmap `1.4.15` is a composite item.
-  Evidence: macOS and Windows bullets are separate checklist entries.
-  Impact: mark only the macOS bullet done for this task; leave Windows bullets
+  Evidence: macOS and Windows bullets are separate checklist entries. Impact:
+  mark only the macOS bullet done for this task; leave Windows bullets
   unchanged.
 - Observation: creating the virtual environment under the repository root caused
   Biome lint failures on `ubuntu-latest` because workflow-generated Python
-  package files were scanned as format violations.
-  Evidence: CI lint output reported format diffs under
-  `.node-gyp-python/lib/python3.12/site-packages/setuptools/...`.
-  Impact: CI bootstrap artefacts must be placed outside the workspace or ignored
-  by lint tooling.
+  package files were scanned as format violations. Evidence: CI lint output
+  reported format diffs under
+  `.node-gyp-python/lib/python3.12/site-packages/setuptools/...`. Impact: CI
+  bootstrap artefacts must be placed outside the workspace or ignored by lint
+  tooling.
 - Observation: exporting `PYTHON` and `npm_config_python` through `GITHUB_ENV`
   made those variables job-global and they were inherited by macOS fast-lane
-  E2E packaged-app runs.
-  Evidence: failing E2E step environment included
+  E2E packaged-app runs. Evidence: failing E2E step environment included
   `PYTHON=/Users/runner/work/_temp/node-gyp-python/bin/python` and
   `npm_config_python=...`, with packaged launch markers missing before timeout.
   Impact: node-gyp Python environment variables should be scoped to install/
   rebuild steps only, not retained for runtime/E2E steps.
 - Observation: defaulting the macOS CI fast lane to Playwright driver mode
   introduced 30-second launch timeouts during `_electron.launch`, and both
-  packaged and development tests failed in that mode.
-  Evidence: CI failure reported `TimeoutError: Timeout 30000ms exceeded` from
+  packaged and development tests failed in that mode. Evidence: CI failure
+  reported `TimeoutError: Timeout 30000ms exceeded` from
   `playwright-core/lib/server/progress.js` during `bun run test:e2e:fast`.
   Impact: macOS CI fast-lane driver selection must remain spawn-default, with
   Playwright only as an explicit override and targeted fallback handling for
   packaged-launch marker gaps.
 - Observation: fixed-duration fallback waits could consume the entire 45-second
   CI test timeout budget and cause Bun to kill a dangling packaged Electron
-  process before cleanup finished.
-  Evidence: CI reported `killed 1 dangling process` and
-  `this test timed out after 45000ms` for the packaged fast-lane test.
-  Impact: fallback waits must be budget-aware and leave explicit headroom for
-  final stability checks and process cleanup.
+  process before cleanup finished. Evidence: CI reported
+  `killed 1 dangling process` and `this test timed out after 45000ms` for the
+  packaged fast-lane test. Impact: fallback waits must be budget-aware and
+  leave explicit headroom for final stability checks and process cleanup.
 - Observation: Linux aarch64 CI can freeze for hours in
   `bun run v8-snapshot` at `bun bin/mk-snapshot.js` even after skipping x64
-  snapshots.
-  Evidence: CI logs stalled after
-  `Generating V8 snapshots for arm64...` with no completion output.
-  Impact: Linux aarch64 packaging should avoid custom snapshot generation in CI
-  and use Electron's default snapshot artefacts instead.
+  snapshots. Evidence: CI logs stalled after
+  `Generating V8 snapshots for arm64...` with no completion output. Impact:
+  Linux aarch64 packaging should avoid custom snapshot generation in CI and use
+  Electron's default snapshot artefacts instead.
 - Observation: Linux aarch64 CI can also stall in the standalone
-  `bun run rebuild-node-pty` step while node-gyp downloads and extracts Electron
-  headers with verbose logging.
-  Evidence: CI logs remained in `gyp verb extracted file from tarball ...`
-  output during the dedicated rebuild step.
-  Impact: rebuilding `node-pty` in the install step keeps Python/node-gyp
-  environment alignment consistent and removes an extra long-running stage.
+  `bun run rebuild-node-pty` step while node-gyp downloads and extracts
+  Electron headers with verbose logging. Evidence: CI logs remained in
+  `gyp verb extracted file from tarball ...` output during the dedicated
+  rebuild step. Impact: rebuilding `node-pty` in the install step keeps
+  Python/node-gyp environment alignment consistent and removes an extra
+  long-running stage.
 - Observation: Linux aarch64 CI can still stall when `bun install` triggers
-  postinstall `bun run rebuild-node-pty` in the same lane.
-  Evidence: CI logs were killed after 360 minutes in
-  `gyp verb extracted file from tarball ...` output while running
-  `bun run rebuild-node-pty`.
-  Impact: Linux aarch64 install steps should set
-  `SKIP_NODE_PTY_REBUILD=1` to bypass this non-deterministic rebuild path.
+  postinstall `bun run rebuild-node-pty` in the same lane. Evidence: CI logs
+  were killed after 360 minutes in `gyp verb extracted file from tarball ...`
+  output while running `bun run rebuild-node-pty`. Impact: Linux aarch64
+  install steps should set `SKIP_NODE_PTY_REBUILD=1` to bypass this
+  non-deterministic rebuild path.
 
 ## Decision log
 
 - Decision: move this ExecPlan to `Status: IN PROGRESS` and keep the living
-  sections current during implementation.
-  Rationale: implementation work is now authorized and underway for this branch.
-  Date/author: 2026-02-24 / Codex
+  sections current during implementation. Rationale: implementation work is now
+  authorized and underway for this branch. Date/author: 2026-02-24 / Codex
 
 - Decision: target the Python bootstrap step instead of introducing broad build
-  system changes.
-  Rationale: failure happens before install/build/lint/test and is directly
-  attributable to PEP 668 policy.
-  Date/author: 2026-02-24 / Codex
+  system changes. Rationale: failure happens before install/build/lint/test and
+  is directly attributable to PEP 668 policy. Date/author: 2026-02-24 / Codex
 
 - Decision: use isolated Python environments rather than
-  `--break-system-packages`.
-  Rationale: aligns with supply-chain hygiene and avoids mutating system Python
-  on hosted runners.
-  Date/author: 2026-02-24 / Codex
+  `--break-system-packages`. Rationale: aligns with supply-chain hygiene and
+  avoids mutating system Python on hosted runners. Date/author: 2026-02-24 /
+  Codex
 
 - Decision: use a three-agent execution model (CI workflow, docs, validation).
-  Rationale: keeps ownership clear and shortens feedback cycles while preserving
-  focused diffs.
-  Date/author: 2026-02-24 / Codex
+  Rationale: keeps ownership clear and shortens feedback cycles while
+  preserving focused diffs. Date/author: 2026-02-24 / Codex
 
 - Decision: revert macOS CI fast-lane default driver from Playwright back to
-  spawn and retain `E2E_DRIVER` as an explicit override only.
-  Rationale: Playwright defaulting regressed CI reliability with deterministic
-  30-second launch timeouts and failed both E2E smoke tests.
-  Date/author: 2026-02-24 / Codex
+  spawn and retain `E2E_DRIVER` as an explicit override only. Rationale:
+  Playwright defaulting regressed CI reliability with deterministic 30-second
+  launch timeouts and failed both E2E smoke tests. Date/author: 2026-02-24 /
+  Codex
 
 - Decision: add a macOS CI packaged-launch fallback stability window when
-  spawn markers are missing, but the process is still alive.
-  Rationale: packaged macOS launches can remain healthy without emitting
-  stdout markers in CI; the fallback reduces false negatives while preserving
-  early-exit and critical-renderer-error checks.
-  Date/author: 2026-02-24 / Codex
+  spawn markers are missing, but the process is still alive. Rationale:
+  packaged macOS launches can remain healthy without emitting stdout markers in
+  CI; the fallback reduces false negatives while preserving early-exit and
+  critical-renderer-error checks. Date/author: 2026-02-24 / Codex
 
 - Decision: bound macOS packaged-launch fallback waits to the remaining
-  per-test timeout budget with fixed safety headroom.
-  Rationale: prevents fallback logic from exhausting Bun's 45-second CI timeout
-  and avoids dangling-process termination before cleanup can run.
-  Date/author: 2026-02-24 / Codex
+  per-test timeout budget with fixed safety headroom. Rationale: prevents
+  fallback logic from exhausting Bun's 45-second CI timeout and avoids
+  dangling-process termination before cleanup can run. Date/author: 2026-02-24
+  / Codex
 
 - Decision: skip V8 snapshot copy in Linux aarch64 packaging CI by setting
   `SKIP_V8_SNAPSHOT_COPY=1` and removing the dedicated arm64 snapshot step.
   Rationale: snapshot generation under QEMU is non-deterministic and can freeze
   lane execution; default Electron snapshots are sufficient for CI packaging
-  reliability gates.
-  Date/author: 2026-02-24 / Codex
+  reliability gates. Date/author: 2026-02-24 / Codex
 
 - Decision: remove the dedicated Linux aarch64 `rebuild-node-pty` step and run
-  rebuild during `bun install` instead.
-  Rationale: avoids repeated long-running native-rebuild phases and keeps
-  node-gyp/Python environment wiring in one deterministic install step.
-  Date/author: 2026-02-24 / Codex
+  rebuild during `bun install` instead. Rationale: avoids repeated long-running
+  native-rebuild phases and keeps node-gyp/Python environment wiring in one
+  deterministic install step. Date/author: 2026-02-24 / Codex
 
 - Decision: skip `rebuild-node-pty` during Linux aarch64 CI install by setting
-  `SKIP_NODE_PTY_REBUILD=1`.
-  Rationale: postinstall rebuild still hangs in node-gyp header extraction for
-  this lane; skipping restores deterministic CI completion.
-  Date/author: 2026-02-25 / Codex
+  `SKIP_NODE_PTY_REBUILD=1`. Rationale: postinstall rebuild still hangs in
+  node-gyp header extraction for this lane; skipping restores deterministic CI
+  completion. Date/author: 2026-02-25 / Codex
 
 ## Outcomes & retrospective
 

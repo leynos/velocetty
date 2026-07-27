@@ -1,9 +1,8 @@
 # Eliminate cross-suite global state leakage in unit tests (roadmap 9.3.1)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -13,9 +12,8 @@ Roadmap item `9.3.1` exists because the repository still relies on
 process-level isolation to keep one transport bootstrap test from polluting the
 rest of the unit suite. Today `make test` runs two stages: the general unit
 suite and then `test/unit/bootstrap-transport-integration.test.ts` in its own
-Bun process behind
-`VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1`. That is a containment shim,
-not the final architecture.
+Bun process behind `VELOCETTY_RUN_BOOTSTRAP_TRANSPORT_INTEGRATION=1`. That is a
+containment shim, not the final architecture.
 
 After this work, a developer should be able to run the unit suite without the
 dedicated bootstrap quarantine, randomize file order across multiple seeds, and
@@ -119,37 +117,29 @@ inline mocks:
 
 - Risk: `lib/index.tsx` may be more tightly coupled than it first appears, so a
   dependency-injection seam could accidentally change initialization order.
-  Severity: high
-  Likelihood: medium
-  Mitigation: extract helpers that preserve the existing call order exactly,
-  keep `lib/index.tsx` as the thin composition entrypoint, and add or update
-  tests that assert the current `ready -> init -> session add -> session data`
-  bootstrap flow.
+  Severity: high Likelihood: medium Mitigation: extract helpers that preserve
+  the existing call order exactly, keep `lib/index.tsx` as the thin composition
+  entrypoint, and add or update tests that assert the current
+  `ready -> init -> session add -> session data` bootstrap flow.
 
 - Risk: Bun module mocks can leak even when DOM cleanup is correct, especially
   in suites that register file-scope `mock.module(...)` and never call
-  `mock.restore()`.
-  Severity: high
-  Likelihood: high
-  Mitigation: audit every DOM-heavy or renderer-runtime suite named in this
-  plan, add same-file restoration, and prefer imports that happen after
-  suite-local mock registration when a module must be mocked.
+  `mock.restore()`. Severity: high Likelihood: high Mitigation: audit every
+  DOM-heavy or renderer-runtime suite named in this plan, add same-file
+  restoration, and prefer imports that happen after suite-local mock
+  registration when a module must be mocked.
 
 - Risk: randomized runs may not fail on the first seed even though the design is
-  still fragile, which can create false confidence.
-  Severity: medium
-  Likelihood: high
-  Mitigation: use at least three fixed seeds, capture the exact commands and
-  logs, and treat the three-seed pass requirement as mandatory rather than
-  anecdotal.
+  still fragile, which can create false confidence. Severity: medium
+  Likelihood: high Mitigation: use at least three fixed seeds, capture the
+  exact commands and logs, and treat the three-seed pass requirement as
+  mandatory rather than anecdotal.
 
 - Risk: changing package scripts or `Makefile` too early can hide regressions by
-  removing the quarantine before the new bootstrap seam is ready.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: keep the dedicated bootstrap stage in place until the new
-  bootstrap tests pass in the general suite, then remove the quarantine and
-  rerun the full gate sequence.
+  removing the quarantine before the new bootstrap seam is ready. Severity:
+  medium Likelihood: medium Mitigation: keep the dedicated bootstrap stage in
+  place until the new bootstrap tests pass in the general suite, then remove
+  the quarantine and rerun the full gate sequence.
 
 ## Progress
 
@@ -176,10 +166,9 @@ inline mocks:
   previously reassigned directly, and the original failing randomized seed
   (`2444615283`) now passes across `test/unit` in one Bun process.
 - [x] (2026-03-07 00:35Z) Stage D complete: removed the dedicated bootstrap
-  quarantine from `package.json` and `Makefile`, and
-  `docs/developers-guide.md`, `docs/velocetty-design.md`, and
-  `docs/roadmap.md` now describe the shared unit-suite workflow and retire the
-  bootstrap quarantine note.
+  quarantine from `package.json` and `Makefile`, and `docs/developers-guide.md`,
+  `docs/velocetty-design.md`, and `docs/roadmap.md` now describe the shared
+  unit-suite workflow and retire the bootstrap quarantine note.
 - [x] (2026-03-07 00:42Z) Stage E complete: `bun install`, `make build`,
   `make check-fmt`, `make lint`, `make test`, and randomized seeded runs for
   `1337`, `20260306`, and `2444615283` all passed on the final tree.
@@ -194,19 +183,17 @@ inline mocks:
 - Observation: part of roadmap item `9.3.1` is already complete.
   Evidence: `package.json` defines `test:unit:bootstrap-transport`, `Makefile`
   runs it as a second `make test` stage, and `docs/developers-guide.md`
-  documents that quarantine explicitly.
-  Impact: the implementation must preserve the current shim until the new
-  bootstrap seam is proven, then remove it deliberately rather than treating it
-  as dead code from the start.
+  documents that quarantine explicitly. Impact: the implementation must
+  preserve the current shim until the new bootstrap seam is proven, then remove
+  it deliberately rather than treating it as dead code from the start.
 
 - Observation: `test/unit/bootstrap-transport-integration.test.ts` already owns
   Happy DOM cleanup and `mock.restore()` locally, but its file-scope mock graph
-  is still far broader than the roadmap intends.
-  Evidence: the suite mocks transport, Electron, React DOM, store creation,
-  action modules, config/file helpers, plugins, and the `Hyper` container
-  before dynamically importing `../../lib/index.tsx`.
-  Impact: the real fix is not a smaller cleanup block inside the test; it is an
-  injectable bootstrap seam in production code.
+  is still far broader than the roadmap intends. Evidence: the suite mocks
+  transport, Electron, React DOM, store creation, action modules, config/file
+  helpers, plugins, and the `Hyper` container before dynamically importing
+  `../../lib/index.tsx`. Impact: the real fix is not a smaller cleanup block
+  inside the test; it is an injectable bootstrap seam in production code.
 
 - Observation: `test/unit/hyper-transport.test.ts`,
   `test/unit/hyper-effects.test.ts`, and
@@ -215,84 +202,72 @@ inline mocks:
   Evidence: these files call `setupHappyDom()` and register mocks via
   `mock.module(...)` or helper wrappers, while only
   `test/unit/term-report-renderer.test.ts` and the bootstrap integration suite
-  currently call `mock.restore()`.
-  Impact: Stage C must normalize same-file lifecycle ownership before claiming
-  the randomized-order success criteria.
+  currently call `mock.restore()`. Impact: Stage C must normalize same-file
+  lifecycle ownership before claiming the randomized-order success criteria.
 
 - Observation: the shared-process baseline reveals that leakage currently
-  extends beyond the originally targeted hotspot list.
-  Evidence: the first seeded same-process run failed in
+  extends beyond the originally targeted hotspot list. Evidence: the first
+  seeded same-process run failed in
   `test/unit/bootstrap-transport-integration.test.ts`,
   `test/unit/hyper-effects.test.ts`,
   `test/unit/command-registry-validation.test.ts`,
-  `test/unit/rpc-client.test.ts`,
-  `test/unit/electron-ipc-transport.test.ts`,
-  `test/unit/notification.test.ts`,
-  `test/unit/tabs-decoration-updates.test.ts`,
-  `test/unit/happy-dom.test.ts`, and
-  `test/unit/electron-e2e-helpers.test.ts`.
+  `test/unit/rpc-client.test.ts`, `test/unit/electron-ipc-transport.test.ts`,
+  `test/unit/notification.test.ts`, `test/unit/tabs-decoration-updates.test.ts`,
+  `test/unit/happy-dom.test.ts`, and `test/unit/electron-e2e-helpers.test.ts`.
   Impact: the implementation should remove the bootstrap blast radius first,
   then rerun focused randomized checks before deciding whether additional
   teardown normalization is still required outside the renderer-heavy suites.
 
 - Observation: once the bootstrap import-time side effects were replaced with
   injected helpers, the original failing seed passed across the full unit suite
-  without the dedicated bootstrap process.
-  Evidence: `bun test --max-concurrency=1 --randomize --seed 2444615283
-  test/unit` completed successfully after the `lib/bootstrap/renderer-bootstrap.ts`
-  extraction and test rewrites.
-  Impact: the remaining work is hardening and documentation, not a second large
-  production refactor.
+  without the dedicated bootstrap process. Evidence:
+  `bun test --max-concurrency=1 --randomize --seed 2444615283 test/unit`
+  completed successfully after the `lib/bootstrap/renderer-bootstrap.ts`
+  extraction and test rewrites. Impact: the remaining work is hardening and
+  documentation, not a second large production refactor.
 
 - Observation: the extracted bootstrap helper and the thin entrypoint drifted
-  briefly during implementation.
-  Evidence: `make build` failed when `lib/index.tsx` still called
-  `startRendererBootstrap(...)` with the old flat dependency shape while
-  `lib/bootstrap/renderer-bootstrap.ts` exported
+  briefly during implementation. Evidence: `make build` failed when
+  `lib/index.tsx` still called `startRendererBootstrap(...)` with the old flat
+  dependency shape while `lib/bootstrap/renderer-bootstrap.ts` exported
   `startRendererApplication(...)` with nested `actions`, `configureStore`, and
-  `mountApp` seams.
-  Impact: keeping `lib/index.tsx` as a thin composition layer is correct, but
-  the helper API and entrypoint must be updated together or the refactor fails
-  at build time before tests can protect it.
+  `mountApp` seams. Impact: keeping `lib/index.tsx` as a thin composition layer
+  is correct, but the helper API and entrypoint must be updated together or the
+  refactor fails at build time before tests can protect it.
 
 ## Decision log
 
 - Decision: keep this plan focused on a narrow bootstrap-extraction and
-  test-isolation refactor, not a full renderer bootstrap redesign.
-  Rationale: roadmap `9.3.1` is about leakage and deterministic teardown, and
-  the production code already has a natural decomposition boundary at
-  `lib/index.tsx`.
-  Date/Author: 2026-03-06 / Codex
+  test-isolation refactor, not a full renderer bootstrap redesign. Rationale:
+  roadmap `9.3.1` is about leakage and deterministic teardown, and the
+  production code already has a natural decomposition boundary at
+  `lib/index.tsx`. Date/Author: 2026-03-06 / Codex
 
 - Decision: treat the bootstrap quarantine as a temporary guardrail that remains
-  in place until the refactored same-process tests pass.
-  Rationale: deleting the guardrail early would make the repository less safe
-  during the implementation instead of safer.
-  Date/Author: 2026-03-06 / Codex
+  in place until the refactored same-process tests pass. Rationale: deleting
+  the guardrail early would make the repository less safe during the
+  implementation instead of safer. Date/Author: 2026-03-06 / Codex
 
 - Decision: the extracted bootstrap seams should separate transport listener
   registration, config initialization/subscription, and React mounting.
   Rationale: those three responsibilities are currently tangled in
   `lib/index.tsx` and map directly to the test blast radius observed in the
-  bootstrap integration suite.
-  Date/Author: 2026-03-06 / Codex
+  bootstrap integration suite. Date/Author: 2026-03-06 / Codex
 
 - Decision: after the first same-process seed passed, keep additional cleanup
   focused on deterministic teardown and docs rather than widening production
-  scope again.
-  Rationale: roadmap `9.3.1` closes on shared-process stability and teardown
-  hygiene; once the injected bootstrap seam removed the dominant leak vector,
-  the remaining work became bounded and test-facing.
-  Date/Author: 2026-03-07 / Codex
+  scope again. Rationale: roadmap `9.3.1` closes on shared-process stability
+  and teardown hygiene; once the injected bootstrap seam removed the dominant
+  leak vector, the remaining work became bounded and test-facing. Date/Author:
+  2026-03-07 / Codex
 
 - Decision: use a dedicated test helper to replace `globalThis.window` in
   readonly-hosted suites instead of continuing direct assignment or broad
-  module-level globals.
-  Rationale: several remaining failures were not transport-specific; they came
-  from suites mutating `window` in ways that were difficult to restore
-  deterministically once Bun randomized file order. A small helper in
-  `test/testUtils/global-window.ts` made the ownership boundary explicit.
-  Date/Author: 2026-03-07 / Codex
+  module-level globals. Rationale: several remaining failures were not
+  transport-specific; they came from suites mutating `window` in ways that were
+  difficult to restore deterministically once Bun randomized file order. A
+  small helper in `test/testUtils/global-window.ts` made the ownership boundary
+  explicit. Date/Author: 2026-03-07 / Codex
 
 ## Implementation plan
 
@@ -325,9 +300,9 @@ this plan expects are:
    dependencies.
 
 The extraction is successful when the bootstrap transport test can exercise the
-transport-listener wiring without mocking unrelated renderer modules such as the
-real React root, file I/O helpers, or plugin globals unless that dependency is
-directly under test.
+transport-listener wiring without mocking unrelated renderer modules such as
+the real React root, file I/O helpers, or plugin globals unless that dependency
+is directly under test.
 
 Stage C rewrites the highest-risk suites to own lifecycle state cleanly. Start
 with `test/unit/bootstrap-transport-integration.test.ts`, replacing the

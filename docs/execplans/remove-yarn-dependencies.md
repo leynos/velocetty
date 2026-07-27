@@ -1,11 +1,9 @@
-<!--
-@file docs/execplans/remove-yarn-dependencies.md
-Purpose: Track the execution plan for replacing Yarn with Bun across scripts,
-continuous integration (CI), and runtime integration.
-Invariants: Keep constraints, tolerances, risks, progress, surprises &
-discoveries, decision log, and outcomes updated as work proceeds.
-Cross-links: docs/documentation-style-guide.md, README.md, PLUGINS.md
--->
+<!-- @file docs/execplans/remove-yarn-dependencies.md Purpose: Track the
+execution plan for replacing Yarn with Bun across scripts, continuous
+integration (CI), and runtime integration. Invariants: Keep constraints,
+tolerances, risks, progress, surprises & discoveries, decision log, and
+outcomes updated as work proceeds. Cross-links:
+docs/documentation-style-guide.md, README.md, PLUGINS.md -->
 
 # Replace Yarn Usage With Bun
 
@@ -156,31 +154,30 @@ Key locations affected by the Yarn removal:
 
 ## Plan of Work
 
-Stage A: confirm scope and inventory.
-Run `rg -n "yarn"` across scripts, CI, and runtime code. Use Leta to trace
-where `paths.yarn` is referenced so all call sites can be updated. If runtime
-usage depends on a bundled package manager, decide whether to bundle Bun or
-require a system install; if this is unclear, escalate.
+Stage A: confirm scope and inventory. Run `rg -n "yarn"` across scripts, CI,
+and runtime code. Use Leta to trace where `paths.yarn` is referenced so all
+call sites can be updated. If runtime usage depends on a bundled package
+manager, decide whether to bundle Bun or require a system install; if this is
+unclear, escalate.
 
-Stage B: remove Yarn runtime assets.
-Delete `bin/yarn-standalone.js` and remove references in configs such as
-`electron-builder.json` and `biome.json`. Update any build steps that copy
-`app/yarn.lock` to either use `bun.lock` or remove the copy entirely if no
-longer required.
+Stage B: remove Yarn runtime assets. Delete `bin/yarn-standalone.js` and remove
+references in configs such as `electron-builder.json` and `biome.json`. Update
+any build steps that copy `app/yarn.lock` to either use `bun.lock` or remove
+the copy entirely if no longer required.
 
-Stage C: replace runtime Yarn usage with Bun.
-Update `app/config/paths.ts` to expose a Bun path and update all usages that
-previously consumed `paths.yarn` to call Bun with equivalent arguments. Ensure
-command arguments are preserved (e.g. install flags, cwd, timeout handling).
+Stage C: replace runtime Yarn usage with Bun. Update `app/config/paths.ts` to
+expose a Bun path and update all usages that previously consumed `paths.yarn`
+to call Bun with equivalent arguments. Ensure command arguments are preserved
+(e.g. install flags, cwd, timeout handling).
 
-Stage D: update CI and local docs.
-Remove Yarn Corepack steps and Yarn cache logic in CI, replacing `yarn run ...`
-with `bun run ...` while keeping Bun setup via `oven-sh/setup-bun@v2`. Update
-`README.md` and `PLUGINS.md` to use Bun commands.
+Stage D: update CI and local docs. Remove Yarn Corepack steps and Yarn cache
+logic in CI, replacing `yarn run ...` with `bun run ...` while keeping Bun
+setup via `oven-sh/setup-bun@v2`. Update `README.md` and `PLUGINS.md` to use
+Bun commands.
 
-Stage E: validation and cleanup.
-Run formatting, linting, type checks, and tests using the project’s standard
-Bun commands. Ensure documentation linting passes if Markdown files change.
+Stage E: validation and cleanup. Run formatting, linting, type checks, and
+tests using the project’s standard Bun commands. Ensure documentation linting
+passes if Markdown files change.
 
 ## Concrete Steps
 
@@ -271,6 +268,6 @@ review and future debugging.
 2026-01-30: Updated status/progress, refreshed context to match completed
 removals, and recorded Bun install decisions; remaining work is validation.
 2026-01-30: Logged validation results and the typecheck fallback used when the
-`check:types` script was missing.
-2026-01-30: Marked plan complete and summarized outcomes after validation.
-2026-01-30: Added Bun binary bundling and updated runtime paths and outcomes.
+`check:types` script was missing. 2026-01-30: Marked plan complete and
+summarized outcomes after validation. 2026-01-30: Added Bun binary bundling and
+updated runtime paths and outcomes.

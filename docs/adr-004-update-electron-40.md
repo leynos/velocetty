@@ -54,12 +54,12 @@ This accelerates access to the newest runtime, but it increases the risk of
 breaking changes landing at once, especially for native modules and build
 pipelines.
 
-| Topic | Electron 22 | Electron 28 | Electron 34 | Electron 40 |
-| --- | --- | --- | --- | --- |
-| Chromium | Older release | Chromium 120.0.6099.56[^electron-28-release] | Chromium 132.0.6834.83[^electron-34-release] | Chromium 144.0.7559.60[^electron-40-blog] |
-| Node.js | Older release | Node 18.18.2[^electron-28-release] | Node 20.18.1[^electron-34-release] | Node 24.11.1[^electron-40-blog] |
-| V8 | Older release | V8 12.0.267.8[^electron-28-release] | V8 13.2.152.27[^electron-34-release] | V8 14.4[^electron-40-blog] |
-| API changes | Stable legacy APIs | See release notes[^electron-28-release] | See release notes[^electron-34-release] | Renderer clipboard API deprecated[^electron-40-blog] |
+| Topic       | Electron 22        | Electron 28                                  | Electron 34                                  | Electron 40                                          |
+| ----------- | ------------------ | -------------------------------------------- | -------------------------------------------- | ---------------------------------------------------- |
+| Chromium    | Older release      | Chromium 120.0.6099.56[^electron-28-release] | Chromium 132.0.6834.83[^electron-34-release] | Chromium 144.0.7559.60[^electron-40-blog]            |
+| Node.js     | Older release      | Node 18.18.2[^electron-28-release]           | Node 20.18.1[^electron-34-release]           | Node 24.11.1[^electron-40-blog]                      |
+| V8          | Older release      | V8 12.0.267.8[^electron-28-release]          | V8 13.2.152.27[^electron-34-release]         | V8 14.4[^electron-40-blog]                           |
+| API changes | Stable legacy APIs | See release notes[^electron-28-release]      | See release notes[^electron-34-release]      | Renderer clipboard API deprecated[^electron-40-blog] |
 
 _Table 1: High-level runtime changes between Electron 22, 28, 34, and 40._
 

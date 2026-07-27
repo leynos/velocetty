@@ -1,9 +1,8 @@
 # Migrate runtime stack to Electron 40
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
-proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -13,11 +12,10 @@ No `PLANS.md` exists in this repository, so this plan stands alone.
 
 Deliver roadmap item `1.4.13` by migrating the runtime from Electron 34 to
 Electron 40 in line with Architecture Decision Record (ADR) 004's staged path.
-Success is observable when
-`bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`
-all succeed on this branch, `docs/developers-guide.md` captures any updated
-development practice for Electron 40, and `docs/roadmap.md` marks `1.4.13`
-done.
+Success is observable when `bun install`, `make build`, `make check-fmt`,
+`make lint`, and `make test` all succeed on this branch,
+`docs/developers-guide.md` captures any updated development practice for
+Electron 40, and `docs/roadmap.md` marks `1.4.13` done.
 
 ## Constraints
 
@@ -50,23 +48,18 @@ done.
 ## Risks
 
 - Risk: `node-pty` may fail against Electron 40/Node 24 Application Binary
-  Interface (ABI) changes.
-  Severity: high
-  Likelihood: medium
-  Mitigation: run `bun install` first, inspect rebuild failures, and only
-  adjust runtime dependency versions with concrete build evidence.
+  Interface (ABI) changes. Severity: high Likelihood: medium Mitigation: run
+  `bun install` first, inspect rebuild failures, and only adjust runtime
+  dependency versions with concrete build evidence.
 - Risk: snapshot/build tooling can fail when moving from Electron 34 to 40.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: validate with `make build` immediately after runtime anchor
-  updates; capture failing step logs and apply minimal targeted fixes.
+  Severity: medium Likelihood: medium Mitigation: validate with `make build`
+  immediately after runtime anchor updates; capture failing step logs and apply
+  minimal targeted fixes.
 - Risk: version drift in architecture and developer docs can leave mixed 34/40
-  guidance.
-  Severity: medium
-  Likelihood: high
-  Mitigation: perform a focused doc sweep for Electron and bundled Node
-  baseline references, prioritizing `docs/developers-guide.md`,
-  `docs/velocetty-hyper-codebase.md`, and roadmap status.
+  guidance. Severity: medium Likelihood: high Mitigation: perform a focused doc
+  sweep for Electron and bundled Node baseline references, prioritizing
+  `docs/developers-guide.md`, `docs/velocetty-hyper-codebase.md`, and roadmap
+  status.
 
 ## Progress
 
@@ -98,66 +91,57 @@ done.
 ## Surprises & discoveries
 
 - Observation: `grepai` semantic search is intermittently unavailable in this
-  environment due to local embedding service timeouts.
-  Evidence: repeated `grepai search ... --json --compact` errors reporting
-  timeout while awaiting Ollama embedding responses.
-  Impact: context gathering falls back to direct file reads for this task.
+  environment due to local embedding service timeouts. Evidence: repeated
+  `grepai search ... --json --compact` errors reporting timeout while awaiting
+  Ollama embedding responses. Impact: context gathering falls back to direct
+  file reads for this task.
 - Observation: the hyper codebase document currently embeds extensive Electron
-  34 baseline references.
-  Evidence: targeted `rg` sweep across
+  34 baseline references. Evidence: targeted `rg` sweep across
   `docs/velocetty-hyper-codebase.md` for `Electron 34`, `34.5.8`, and Node
-  runtime baselines.
-  Impact: migration likely requires broader documentation baseline updates than
-  roadmap and developers' guide alone.
+  runtime baselines. Impact: migration likely requires broader documentation
+  baseline updates than roadmap and developers' guide alone.
 - Observation: `node-pty@1.1.0` rebuilt successfully against Electron 40
   headers, so no runtime dependency bump was required for this milestone.
   Evidence: `bun install` postinstall and explicit rebuild path both completed
-  with `--target=40.2.1` and `gyp info ok`.
-  Impact: migration remained focused on runtime anchors and documentation
-  baselines with no app runtime dependency churn.
+  with `--target=40.2.1` and `gyp info ok`. Impact: migration remained focused
+  on runtime anchors and documentation baselines with no app runtime dependency
+  churn.
 
 ## Decision log
 
 - Decision: treat this document as a draft execution plan only until explicit
-  implementation approval.
-  Rationale: aligns with ExecPlan process and keeps implementation changes
-  gated behind reviewed scope.
-  Date/Author: 2026-02-09 / Codex.
+  implementation approval. Rationale: aligns with ExecPlan process and keeps
+  implementation changes gated behind reviewed scope. Date/Author: 2026-02-09 /
+  Codex.
 - Decision: keep required gate commands in the exact sequence requested by the
-  roadmap task (`bun install` then Make gates).
-  Rationale: `bun install` exercises native rebuild and snapshot generation
-  before higher-level checks, reducing diagnosis ambiguity.
-  Date/Author: 2026-02-09 / Codex.
+  roadmap task (`bun install` then Make gates). Rationale: `bun install`
+  exercises native rebuild and snapshot generation before higher-level checks,
+  reducing diagnosis ambiguity. Date/Author: 2026-02-09 / Codex.
 - Decision: target Electron `40.2.1` and align `electron-mksnapshot` to the
-  same patch.
-  Rationale: latest available Electron 40 patch release at implementation time
-  with matching snapshot tooling.
-  Date/Author: 2026-02-10 / Codex.
+  same patch. Rationale: latest available Electron 40 patch release at
+  implementation time with matching snapshot tooling. Date/Author: 2026-02-10 /
+  Codex.
 - Decision: align TypeScript Node typings to `@types/node ^24.10.12` and CI
-  `NODE_VERSION` to `24.11.1`.
-  Rationale: keep development and native rebuild tooling aligned with Electron
-  40's bundled Node.js major/minor baseline.
+  `NODE_VERSION` to `24.11.1`. Rationale: keep development and native rebuild
+  tooling aligned with Electron 40's bundled Node.js major/minor baseline.
   Date/Author: 2026-02-10 / Codex.
 - Decision: retain `node-pty` at `1.1.0`.
   Rationale: no stable upstream version newer than `1.1.0` and rebuild/test
   evidence shows compatibility with Electron 40 in this repository.
   Date/Author: 2026-02-10 / Codex.
 - Decision: apply a targeted follow-up documentation correction for the CI
-  feature table Node.js version value.
-  Rationale: reviewer feedback identified a stale `20.x` row inconsistent with
-  the Electron 40/Node 24 baseline.
+  feature table Node.js version value. Rationale: reviewer feedback identified
+  a stale `20.x` row inconsistent with the Electron 40/Node 24 baseline.
   Date/Author: 2026-02-10 / Codex.
 - Decision: remove the hardcoded Electron fallback from
   `bin/rebuild-node-pty.cjs` and derive the fallback target from
-  `package.json`.
-  Rationale: avoids version drift between runtime dependency updates and native
-  rebuild target selection during future Electron upgrades.
+  `package.json`. Rationale: avoids version drift between runtime dependency
+  updates and native rebuild target selection during future Electron upgrades.
   Date/Author: 2026-02-10 / Codex.
 - Decision: use Chromium `144.0.7559.111` as the Electron `40.2.1` baseline in
-  `docs/velocetty-hyper-codebase.md`.
-  Rationale: align documentation with Electron 40.2.1 release metadata and
-  eliminate stale patch-level version references.
-  Date/Author: 2026-02-10 / Codex.
+  `docs/velocetty-hyper-codebase.md`. Rationale: align documentation with
+  Electron 40.2.1 release metadata and eliminate stale patch-level version
+  references. Date/Author: 2026-02-10 / Codex.
 
 ## Outcomes & retrospective
 
@@ -182,10 +166,9 @@ Additional documentation-quality gates run and passed after markdown edits:
 
 This milestone closes roadmap workstream `1.4.13` and follows completed
 milestones `1.4.11` (Electron 28) and `1.4.12` (Electron 34). Current runtime
-anchors are Electron `^40.2.1` and `@types/node` `^24.10.12` in
-`package.json`, with fallback rebuild target `40.2.1` in
-`bin/rebuild-node-pty.cjs`, and CI Node baseline `24.11.1` in
-`.github/workflows/nodejs.yml`.
+anchors are Electron `^40.2.1` and `@types/node` `^24.10.12` in `package.json`,
+with fallback rebuild target `40.2.1` in `bin/rebuild-node-pty.cjs`, and CI
+Node baseline `24.11.1` in `.github/workflows/nodejs.yml`.
 
 Relevant source-of-truth documents for this implementation:
 
@@ -214,8 +197,8 @@ with Electron 40's bundled Node family (`.github/workflows/nodejs.yml` and any
 other Node-version anchors used for rebuild flows).
 
 Stage D: Run requested quality gates in order with captured logs and address
-any migration regressions:
-`bun install`, `make build`, `make check-fmt`, `make lint`, `make test`.
+any migration regressions: `bun install`, `make build`, `make check-fmt`,
+`make lint`, `make test`.
 
 Stage E: Update developer and architecture documentation to reflect final
 development practice changes and runtime baselines; then mark roadmap item
@@ -227,8 +210,8 @@ ExecPlan to `COMPLETE`, and record outcome evidence in this file.
 ## Concrete steps
 
 1. Capture pre-change runtime anchors:
-   `package.json`, `bin/rebuild-node-pty.cjs`,
-   `.github/workflows/nodejs.yml`, and any Electron-version-locked tooling.
+   `package.json`, `bin/rebuild-node-pty.cjs`, `.github/workflows/nodejs.yml`,
+   and any Electron-version-locked tooling.
 2. Apply Electron 40 migration edits:
    - bump `devDependencies.electron`,
    - align `@types/node` with Electron 40 bundled Node major,
@@ -242,9 +225,8 @@ ExecPlan to `COMPLETE`, and record outcome evidence in this file.
    - `make lint |& tee /tmp/lint-velocetty-1-4-13-migrate-to-electron-40.out`
    - `make test |& tee /tmp/test-velocetty-1-4-13-migrate-to-electron-40.out`
 4. Update documentation with the validated Electron 40 baseline and development
-   practice deltas:
-   `docs/developers-guide.md`, `docs/velocetty-hyper-codebase.md`, and
-   `docs/roadmap.md`.
+   practice deltas: `docs/developers-guide.md`,
+   `docs/velocetty-hyper-codebase.md`, and `docs/roadmap.md`.
 5. Re-run the same gate sequence after doc edits and record success evidence in
    `Progress` and `Outcomes & retrospective`.
 
@@ -273,8 +255,7 @@ Done criteria for roadmap item `1.4.13`:
 - If `bun install` fails during postinstall/rebuild, apply a focused fix and
   rerun `bun install` before moving on.
 - If generated artefacts cause stale-state issues, clean affected build output,
-  rerun the failing command, and record the action in `Surprises &
-  discoveries`.
+  rerun the failing command, and record the action in `Surprises & discoveries`.
 
 ## Interfaces and dependencies
 

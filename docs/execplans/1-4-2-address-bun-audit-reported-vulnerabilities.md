@@ -1,9 +1,8 @@
 # Address bun audit-reported vulnerabilities for roadmap item 1.4.2
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`,
-`Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -14,11 +13,11 @@ operating contract for this task.
 
 Deliver roadmap task `1.4.2` in `docs/roadmap.md` by ensuring `bun audit`
 reports no `critical`, `high`, or `moderate` vulnerabilities, then proving the
-repository still passes the requested quality gates:
-`bun install`, `make build`, `make check-fmt`, `make lint`, and `make test`.
-Success is observable when those commands pass, `docs/developers-guide.md`
-documents any development-practice changes introduced by this remediation, and
-roadmap item `1.4.2` is marked done (`[x]`).
+repository still passes the requested quality gates: `bun install`,
+`make build`, `make check-fmt`, `make lint`, and `make test`. Success is
+observable when those commands pass, `docs/developers-guide.md` documents any
+development-practice changes introduced by this remediation, and roadmap item
+`1.4.2` is marked done (`[x]`).
 
 ## Context and orientation
 
@@ -74,29 +73,21 @@ Current command wiring:
 ## Risks
 
 - Risk: transitive vulnerabilities may require direct dependency upgrades with
-  cascading API changes.
-  Severity: high
-  Likelihood: medium
-  Mitigation: remediate in small batches, run gates after each batch, and keep
-  version changes minimal.
+  cascading API changes. Severity: high Likelihood: medium Mitigation:
+  remediate in small batches, run gates after each batch, and keep version
+  changes minimal.
 
 - Risk: a vulnerable package may be unmaintained, forcing replacement.
-  Severity: high
-  Likelihood: medium
-  Mitigation: prioritize drop-in replacements, preserve interfaces, and record
-  rationale in `Decision Log`.
+  Severity: high Likelihood: medium Mitigation: prioritize drop-in
+  replacements, preserve interfaces, and record rationale in `Decision Log`.
 
 - Risk: audit output may differ between lockfile states and CI/local platforms.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: pin to branch lockfile state, run `bun install` first, and log
-  exact commands and output files.
+  Severity: medium Likelihood: medium Mitigation: pin to branch lockfile state,
+  run `bun install` first, and log exact commands and output files.
 
 - Risk: new developer obligations may be undocumented, causing regression.
-  Severity: medium
-  Likelihood: high
-  Mitigation: update `docs/developers-guide.md` in the same change set as the
-  remediation.
+  Severity: medium Likelihood: high Mitigation: update
+  `docs/developers-guide.md` in the same change set as the remediation.
 
 ## Agent team model
 
@@ -143,69 +134,64 @@ Implementation will use a small agent team with explicit ownership:
   Impact: this plan is built from repository context and the task request.
 
 - Observation: `package.json` already includes `scripts.audit`, but roadmap
-  completion wording is tied to direct `bun audit` results.
-  Impact: implementation will treat `bun audit` as the source-of-truth command
-  and may keep `scripts.audit` as supplementary automation.
+  completion wording is tied to direct `bun audit` results. Impact:
+  implementation will treat `bun audit` as the source-of-truth command and may
+  keep `scripts.audit` as supplementary automation.
 
 - Observation: moving directly to `electron-builder` `26.8.1` introduced a
   build regression in the Linux packaging step (`fpm` spawn `ENOENT`) and a
-  schema shift for Windows timestamp configuration.
-  Impact: kept the repository on the known-stable `electron-builder` major
-  line and applied targeted security overrides instead of forcing a toolchain
-  migration inside this roadmap task.
+  schema shift for Windows timestamp configuration. Impact: kept the repository
+  on the known-stable `electron-builder` major line and applied targeted
+  security overrides instead of forcing a toolchain migration inside this
+  roadmap task.
 
 ## Decision Log
 
 - Decision: treat this as plan drafting only until explicit user approval.
   Rationale: ExecPlan approval gate requires user confirmation before code or
-  dependency changes.
-  Date/Author: 2026-02-22 / Codex.
+  dependency changes. Date/Author: 2026-02-22 / Codex.
 
 - Decision: define an explicit multi-agent implementation model in the plan.
   Rationale: user requested an agent team for planning and implementation.
   Date/Author: 2026-02-22 / Codex.
 
 - Decision: switch script invocations from
-  `node_modules/cross-env/src/bin/cross-env.js` to `bunx cross-env`.
-  Rationale: dependency updates surfaced path fragility in `cross-env`; `bunx`
-  keeps invocation stable across package layout changes.
-  Date/Author: 2026-02-22 / Codex.
+  `node_modules/cross-env/src/bin/cross-env.js` to `bunx cross-env`. Rationale:
+  dependency updates surfaced path fragility in `cross-env`; `bunx` keeps
+  invocation stable across package layout changes. Date/Author: 2026-02-22 /
+  Codex.
 
 - Decision: satisfy vulnerability goals using direct version bumps plus
-  explicit transitive overrides.
-  Rationale: this cleared all audit findings while preserving the existing
-  build and packaging behaviour expected by current release automation.
-  Date/Author: 2026-02-22 / Codex.
+  explicit transitive overrides. Rationale: this cleared all audit findings
+  while preserving the existing build and packaging behaviour expected by
+  current release automation. Date/Author: 2026-02-22 / Codex.
 
 - Decision: revert `electron-builder` and rebuild tooling to stable majors
-  after validating that the newer major line broke `make build`.
-  Rationale: roadmap task `1.4.2` targets vulnerability remediation, not a
-  packaging stack migration; stability took precedence once security goals were
-  met.
+  after validating that the newer major line broke `make build`. Rationale:
+  roadmap task `1.4.2` targets vulnerability remediation, not a packaging stack
+  migration; stability took precedence once security goals were met.
   Date/Author: 2026-02-22 / Codex.
 
 ## Plan of work
 
-Stage A: Baseline and audit inventory.
-Run `bun install` first to establish a consistent lockfile/install state, then
-run `bun audit` in both human-readable and machine-friendly form to capture
-exact affected packages and advisory identifiers.
+Stage A: Baseline and audit inventory. Run `bun install` first to establish a
+consistent lockfile/install state, then run `bun audit` in both human-readable
+and machine-friendly form to capture exact affected packages and advisory
+identifiers.
 
-Stage B: Remediation strategy and execution.
-Resolve vulnerabilities from highest severity to lowest within the required
-threshold (`critical`, `high`, `moderate`). Prefer smallest viable version
-updates. Where no patch exists, attempt package replacement or safe removal.
-If neither is possible, trigger escalation under tolerances.
+Stage B: Remediation strategy and execution. Resolve vulnerabilities from
+highest severity to lowest within the required threshold (`critical`, `high`,
+`moderate`). Prefer smallest viable version updates. Where no patch exists,
+attempt package replacement or safe removal. If neither is possible, trigger
+escalation under tolerances.
 
-Stage C: Developer-practice documentation.
-Update `docs/developers-guide.md` with any new lasting practice introduced by
-this work (for example, when to run audit commands, accepted invocation path,
-and any new pre-merge expectation).
+Stage C: Developer-practice documentation. Update `docs/developers-guide.md`
+with any new lasting practice introduced by this work (for example, when to run
+audit commands, accepted invocation path, and any new pre-merge expectation).
 
-Stage D: Full gate validation and roadmap completion.
-Run requested gates in required order, ensure all pass, then update
-`docs/roadmap.md` item `1.4.2` from `[ ]` to `[x]` and mark this ExecPlan
-`COMPLETE`.
+Stage D: Full gate validation and roadmap completion. Run requested gates in
+required order, ensure all pass, then update `docs/roadmap.md` item `1.4.2` from
+`[ ]` to `[x]` and mark this ExecPlan `COMPLETE`.
 
 ## Concrete implementation steps
 
@@ -301,5 +287,4 @@ Key implementation outcomes:
 
 ## Revision note
 
-Initial draft created on 2026-02-22.
-Implementation completed on 2026-02-22.
+Initial draft created on 2026-02-22. Implementation completed on 2026-02-22.

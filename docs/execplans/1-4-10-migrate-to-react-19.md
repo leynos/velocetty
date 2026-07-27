@@ -1,9 +1,8 @@
 # Migrate renderer stack to React 19
 
-This execution plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprises & discoveries`, `Decision log`, and
-`Outcomes & retrospective` must be kept up to date as work proceeds.
+This execution plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: Complete
 
@@ -14,8 +13,8 @@ No `PLANS.md` exists in this repository, so this plan stands alone.
 Upgrade the renderer React stack from 18.3 to React 19 in line with
 `docs/adr-003-update-react-19.md`. Success means the Electron renderer builds
 and tests pass with React 19, React 19-compatible dependencies, and updated
-project documentation. A developer should be able to run the standard gates
-and see all required commands complete successfully.
+project documentation. A developer should be able to run the standard gates and
+see all required commands complete successfully.
 
 ## Constraints
 
@@ -49,26 +48,18 @@ and see all required commands complete successfully.
 ## Risks
 
 - Risk: React 19 peer dependency mismatches for `react-redux`, `react-use`, or
-  `styled-jsx`.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: verify peer dependency ranges before upgrading, and upgrade to
-  the smallest compatible versions.
+  `styled-jsx`. Severity: medium Likelihood: medium Mitigation: verify peer
+  dependency ranges before upgrading, and upgrade to the smallest compatible
+  versions.
 - Risk: latent string refs or legacy APIs remain in renderer components.
-  Severity: medium
-  Likelihood: low
-  Mitigation: search for string ref patterns and replace with `useRef` or
-  `createRef` where necessary.
+  Severity: medium Likelihood: low Mitigation: search for string ref patterns
+  and replace with `useRef` or `createRef` where necessary.
 - Risk: plugin runtime relies on React Universal Module Definition (UMD)
-  globals or bundled copies.
-  Severity: medium
-  Likelihood: low
-  Mitigation: verify no UMD imports or global React usage remain; keep the
-  shared module patch aligned across renderer and main.
+  globals or bundled copies. Severity: medium Likelihood: low Mitigation:
+  verify no UMD imports or global React usage remain; keep the shared module
+  patch aligned across renderer and main.
 - Risk: documentation drift leaves React 18 references in
-  `docs/velocetty-hyper-codebase.md`.
-  Severity: low
-  Likelihood: high
+  `docs/velocetty-hyper-codebase.md`. Severity: low Likelihood: high
   Mitigation: update all React version references and rerun Markdown checks.
 
 ## Progress
@@ -87,35 +78,31 @@ and see all required commands complete successfully.
 
 - Observation: `bun install` failed during V8 snapshot generation because
   `electron-link` could not parse the React Redux 9.2.0 production bundle.
-  Evidence: `mk-snapshot` error referencing
-  `react-redux.production.min.cjs` in the install log.
-  Impact: Updated `bin/mk-snapshot.js` to exclude `react-redux` from snapshot
-  linking so the install pipeline can complete.
+  Evidence: `mk-snapshot` error referencing `react-redux.production.min.cjs` in
+  the install log. Impact: Updated `bin/mk-snapshot.js` to exclude
+  `react-redux` from snapshot linking so the install pipeline can complete.
 - Observation: Redux 5 middleware typing switched to `unknown` actions, and
-  React Redux 9 removed internal `es/components/connect` paths.
-  Evidence: Continuous Integration (CI) type errors for middleware signatures
-  and missing module `react-redux/es/components/connect`.
-  Impact: Added middleware type guards, updated the React Redux type import,
-  and extended the JSX typing augmentation to include `JSX.Element`.
+  React Redux 9 removed internal `es/components/connect` paths. Evidence:
+  Continuous Integration (CI) type errors for middleware signatures and missing
+  module `react-redux/es/components/connect`. Impact: Added middleware type
+  guards, updated the React Redux type import, and extended the JSX typing
+  augmentation to include `JSX.Element`.
 
 ## Decision log
 
 - Decision: Draft the ExecPlan before implementation, per `execplans` rules.
   Rationale: The upgrade may require dependency alignment decisions and should
-  not proceed without review.
-  Date/Author: 2026-02-05 / Codex
+  not proceed without review. Date/Author: 2026-02-05 / Codex
 - Decision: Proceed with implementation after approval.
   Rationale: User approved the ExecPlan; no blocking constraints identified.
   Date/Author: 2026-02-05 / Codex
 - Decision: Exclude `react-redux` from V8 snapshot linking.
   Rationale: `electron-link` fails to parse the React Redux production bundle,
-  blocking `bun install` and the build pipeline.
-  Date/Author: 2026-02-05 / Codex
+  blocking `bun install` and the build pipeline. Date/Author: 2026-02-05 / Codex
 - Decision: Update Redux middleware typing and React Redux imports for Redux 5
-  and React Redux 9 compatibility, and bump Bun to 1.3.8 in CI.
-  Rationale: CI build failures surfaced type and tooling mismatches after the
-  React 19 upgrade.
-  Date/Author: 2026-02-05 / Codex.
+  and React Redux 9 compatibility, and bump Bun to 1.3.8 in CI. Rationale: CI
+  build failures surfaced type and tooling mismatches after the React 19
+  upgrade. Date/Author: 2026-02-05 / Codex.
 
 ## Outcomes & retrospective
 
@@ -150,8 +137,8 @@ packages need upgrades for compatibility, update them in the same change. Keep
 Babel and TypeScript JSX settings aligned with React 19.
 
 Stage C: Code remediation. Replace any string refs or other removed APIs, and
-ensure plugin shared module behaviour remains intact. Re-run TypeScript
-checks and fix any type errors surfaced by updated `@types/react` or
+ensure plugin shared module behaviour remains intact. Re-run TypeScript checks
+and fix any type errors surfaced by updated `@types/react` or
 `@types/react-dom`.
 
 Stage D: Documentation updates. Update `docs/developers-guide.md` with any new

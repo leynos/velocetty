@@ -27,8 +27,7 @@
 ## Risk and follow-up checklist
 
 - [x] High-frequency event throughput verification should include the
-  full bootstrap path (`ready -> init -> session add`) in automated
-  coverage.
+  full bootstrap path (`ready -> init -> session add`) in automated coverage.
 - [x] `window.rpc` contract consumers should be migrated once transport
   consumer APIs are stabilized for all UI entry points.
 - [ ] Keep `removeAllListeners()` return chaining semantics tested when

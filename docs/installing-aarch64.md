@@ -1,9 +1,9 @@
 # Installing on aarch64 Linux
 
 This guide covers the extra steps needed to build V8 snapshots on aarch64
-Linux. The main build is supported, but Electron only ships x86_64
-`mksnapshot` binaries for Linux. To run those binaries on aarch64, the build
-requires QEMU user emulation plus an x86_64 sysroot.
+Linux. The main build is supported, but Electron only ships x86_64 `mksnapshot`
+binaries for Linux. To run those binaries on aarch64, the build requires QEMU
+user emulation plus an x86_64 sysroot.
 
 ## Prerequisites
 
@@ -15,8 +15,8 @@ packages, so a sysroot must be supplied separately.
 
 ## Option A: package-backed sysroot (recommended for Continuous Integration)
 
-On Ubuntu 22.04 (Jammy) hosts, install amd64 runtime libraries directly into the
-multiarch rootfs:
+On Ubuntu 22.04 (Jammy) hosts, install amd64 runtime libraries directly into
+the multiarch rootfs:
 
 ```bash
 sudo dpkg --add-architecture amd64
@@ -84,9 +84,9 @@ For the full postinstall chain, run:
 bun run postinstall
 ```
 
-For Linux aarch64 Continuous Integration (CI) lanes, set
-`SKIP_V8_SNAPSHOT=1` during `bun install` to
-skip snapshot generation entirely and avoid long-running snapshot emulation:
+For Linux aarch64 Continuous Integration (CI) lanes, set `SKIP_V8_SNAPSHOT=1`
+during `bun install` to skip snapshot generation entirely and avoid
+long-running snapshot emulation:
 
 ```bash
 SKIP_V8_SNAPSHOT=1 bun install
@@ -100,23 +100,22 @@ duplicating the native rebuild in postinstall:
 SKIP_V8_SNAPSHOT=1 SKIP_NODE_PTY_REBUILD=1 bun install
 ```
 
-For local Linux aarch64 validation where arm64 snapshots are still required,
-set `SKIP_X64_V8_SNAPSHOT=1` so only the arm64 snapshot pass runs:
+For local Linux aarch64 validation where arm64 snapshots are still required, set
+`SKIP_X64_V8_SNAPSHOT=1` so only the arm64 snapshot pass runs:
 
 ```bash
 SKIP_X64_V8_SNAPSHOT=1 bun install
 ```
 
 This project uses `bun ./build/esbuild/build.ts` inside scripts for bundling.
-Similarly, the rebuild step runs `bun bin/rebuild-node-pty.cjs`, which
-executes `node-gyp` from the module directory; avoid calling
-`electron-rebuild` directly. The copy step uses
-`node bin/copy-node-modules.mjs`.
-Electron-builder is invoked via `bun bin/run-electron-builder.cjs` to avoid
-its package-manager detection spawning Bun through Node.
-Schema generation uses `bunx typescript-json-schema --ignoreErrors`.
-Development scripts also rely on local `electronmon` and `concurrently`
-binaries. If either command is not found, run the local entry points:
+Similarly, the rebuild step runs `bun bin/rebuild-node-pty.cjs`, which executes
+`node-gyp` from the module directory; avoid calling `electron-rebuild`
+directly. The copy step uses `node bin/copy-node-modules.mjs`. Electron-builder
+is invoked via `bun bin/run-electron-builder.cjs` to avoid its package-manager
+detection spawning Bun through Node. Schema generation uses
+`bunx typescript-json-schema --ignoreErrors`. Development scripts also rely on
+local `electronmon` and `concurrently` binaries. If either command is not
+found, run the local entry points:
 
 ```bash
 bun node_modules/electronmon/bin/cli.js target
@@ -181,8 +180,8 @@ bun run build:hyper-app
 ### TypeScript errors inside `node_modules`
 
 If `tsgo --build --watch` reports errors from `@types/node` or other
-dependencies, ensure the dependencies are up to date and that `skipLibCheck`
-is enabled in `tsconfig.base.json`.
+dependencies, ensure the dependencies are up to date and that `skipLibCheck` is
+enabled in `tsconfig.base.json`.
 
 ### `Invalid header: Does not start with Cr24`
 

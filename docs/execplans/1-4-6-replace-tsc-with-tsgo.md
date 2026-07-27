@@ -23,9 +23,9 @@ this plan must be updated to follow it.
 Switch the repository from the JavaScript-based `tsc` compiler to the native
 preview `tsgo` compiler (provided by `@typescript/native-preview`) for both
 TypeScript compilation and type checking in local scripts and continuous
-integration (CI). Success is observable when `bun run dev` and
-`bun run build` invoke `tsgo`, `make typecheck` uses `tsgo`, CI builds complete
-without calling `tsc`, and the roadmap entry 1.4.6 is marked done.
+integration (CI). Success is observable when `bun run dev` and `bun run build`
+invoke `tsgo`, `make typecheck` uses `tsgo`, CI builds complete without calling
+`tsc`, and the roadmap entry 1.4.6 is marked done.
 
 ## Constraints
 
@@ -58,21 +58,16 @@ without calling `tsc`, and the roadmap entry 1.4.6 is marked done.
 ## Risks
 
 - Risk: `tsgo` does not support some `tsc` command-line interface (CLI) flags
-  currently used in scripts.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: check `tsgo --help`, drop unsupported flags, and document any
-  behaviour changes in `docs/developers-guide.md`.
+  currently used in scripts. Severity: medium Likelihood: medium Mitigation:
+  check `tsgo --help`, drop unsupported flags, and document any behaviour
+  changes in `docs/developers-guide.md`.
 - Risk: build output diverges when using `tsgo` in `bun run build`.
-  Severity: medium
-  Likelihood: low
-  Mitigation: run `bun run build` locally if feasible and verify CI output on
-  the next run.
+  Severity: medium Likelihood: low Mitigation: run `bun run build` locally if
+  feasible and verify CI output on the next run.
 - Risk: documentation references to `tsc` remain, causing confusion.
-  Severity: low
-  Likelihood: high
-  Mitigation: update `docs/developers-guide.md`, `docs/velocetty-hyper-codebase.md`,
-  and `docs/installing-aarch64.md`, then re-scan for `tsc` references.
+  Severity: low Likelihood: high Mitigation: update `docs/developers-guide.md`,
+  `docs/velocetty-hyper-codebase.md`, and `docs/installing-aarch64.md`, then
+  re-scan for `tsc` references.
 
 ## Progress
 
@@ -92,27 +87,25 @@ without calling `tsc`, and the roadmap entry 1.4.6 is marked done.
 ## Surprises & Discoveries
 
 - Observation: the Markdownlint make target initially failed due to legacy
-  Markdown formatting patterns.
-  Evidence: `/tmp/markdownlint-velocetty-1-4-6-replace-tsc-with-tsgo.out`
-  Impact: Updated Markdownlint configuration and templates to restore a clean
-  validation run.
+  Markdown formatting patterns. Evidence:
+  `/tmp/markdownlint-velocetty-1-4-6-replace-tsc-with-tsgo.out` Impact: Updated
+  Markdownlint configuration and templates to restore a clean validation run.
 
 ## Decision Log
 
 - Decision: Proceed with implementation following plan approval.
-  Rationale: User explicitly approved the draft ExecPlan.
-  Date/Author: 2026-02-02 (assistant)
+  Rationale: User explicitly approved the draft ExecPlan. Date/Author:
+  2026-02-02 (assistant)
 - Decision: Do not attempt repo-wide Markdownlint remediation.
-  Rationale: The errors predate this change and resolving them would exceed
-  the task scope and tolerances.
-  Date/Author: 2026-02-02 (assistant)
+  Rationale: The errors predate this change and resolving them would exceed the
+  task scope and tolerances. Date/Author: 2026-02-02 (assistant)
 
 ## Outcomes & Retrospective
 
 The repository now uses `tsgo` for TypeScript builds and type checks in the
-`dev`, `build`, and `check:types` workflows, with documentation and the
-roadmap updated accordingly. Markdownlint validation now passes after reflow
-updates and inline Markdownlint directives for legacy documents.
+`dev`, `build`, and `check:types` workflows, with documentation and the roadmap
+updated accordingly. Markdownlint validation now passes after reflow updates
+and inline Markdownlint directives for legacy documents.
 
 ## Context and Orientation
 
@@ -121,16 +114,17 @@ TypeScript build and type checking are driven by `package.json` commands. The
 `typecheck`, `check-fmt`, `lint`, and `test` gates used by both local
 development and CI. CI runs the build via `bun run dist` (which invokes
 `bun run build`). Documentation describing the build, tooling, or TypeScript
-compiler lives in `docs/velocetty-hyper-codebase.md`, `docs/developers-guide.md`,
-`docs/installing-aarch64.md`, and the roadmap in `docs/roadmap.md`.
+compiler lives in `docs/velocetty-hyper-codebase.md`,
+`docs/developers-guide.md`, `docs/installing-aarch64.md`, and the roadmap in
+`docs/roadmap.md`.
 
 ## Plan of Work
 
 Stage A: confirm current usage and `tsgo` command-line interface (CLI)
-compatibility. Identify every
-`tsc` reference in scripts, CI configuration, and docs. Verify which `tsc`
-flags (`--build`, `--watch`, `--pretty`, `--preserveWatchOutput`, `--project`)
-are supported by `tsgo` so replacements are accurate.
+compatibility. Identify every `tsc` reference in scripts, CI configuration, and
+docs. Verify which `tsc` flags (`--build`, `--watch`, `--pretty`,
+`--preserveWatchOutput`, `--project`) are supported by `tsgo` so replacements
+are accurate.
 
 Stage B: update build and development scripts. Replace `tsc` invocations in
 `package.json` with `tsgo` equivalents, ensuring `dev` uses `tsgo` watch mode
@@ -215,10 +209,10 @@ is marked done.
 
 ## Idempotence and Recovery
 
-All steps are safe to rerun. If a validation step fails, fix the reported
-issue and rerun the failing command before proceeding. If `tsgo` does not
-support required flags, stop after documenting the issue in the Decision Log
-and ask for guidance.
+All steps are safe to rerun. If a validation step fails, fix the reported issue
+and rerun the failing command before proceeding. If `tsgo` does not support
+required flags, stop after documenting the issue in the Decision Log and ask
+for guidance.
 
 ## Artefacts and Notes
 
@@ -236,11 +230,9 @@ Decision Log before retrying.
 
 ## Revision note
 
-Initial draft created on 2026-02-02.
-2026-02-02: Marked plan as IN PROGRESS, logged approval, and recorded the
-inventory step as complete.
-2026-02-02: Recorded completion of script and documentation updates and
-aligned the context section with the new `tsgo` usage.
-2026-02-02: Logged Markdownlint failure due to pre-existing violations and
-recorded the validation status.
-2026-02-02: Marked the plan complete and documented the validation outcomes.
+Initial draft created on 2026-02-02. 2026-02-02: Marked plan as IN PROGRESS,
+logged approval, and recorded the inventory step as complete. 2026-02-02:
+Recorded completion of script and documentation updates and aligned the context
+section with the new `tsgo` usage. 2026-02-02: Logged Markdownlint failure due
+to pre-existing violations and recorded the validation status. 2026-02-02:
+Marked the plan complete and documented the validation outcomes.

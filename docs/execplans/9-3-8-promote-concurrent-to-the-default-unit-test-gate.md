@@ -1,9 +1,8 @@
 # Promote `--concurrent` to the default unit-test gate
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -12,10 +11,9 @@ Status: COMPLETE
 This change promotes explicit Bun `--concurrent` execution from an opt-in
 stress-test flag to the default for all unit-test gates (local and CI). After
 completion, running `make test` or `bun run test:unit` will execute the full
-unit-test suite with concurrent test execution enabled
-(subject to Bun's scheduler limit), reducing local feedback loop
-times and ensuring the hardening work from roadmap items 9.3.3 through 9.3.7
-remains effective.
+unit-test suite with concurrent test execution enabled (subject to Bun's
+scheduler limit), reducing local feedback loop times and ensuring the hardening
+work from roadmap items 9.3.3 through 9.3.7 remains effective.
 
 Observable success: the three seeded concurrent stress runs pass, and the
 standard quality gates (`bun install`, `make build`, `make check-fmt`,
@@ -57,35 +55,28 @@ Thresholds that trigger escalation when breached:
 - **Time**: If any single seeded stress run takes longer than 10 minutes,
   stop and escalate.
 - **Ambiguity**: If multiple valid interpretations exist for what
-  "default gate" means and the choice materially affects CI behaviour,
-  stop and present options with trade-offs.
+  "default gate" means and the choice materially affects CI behaviour, stop and
+  present options with trade-offs.
 
 ## Risks
 
 Known uncertainties that might affect the plan:
 
 - **Risk**: One of the three seeded concurrent runs fails intermittently due
-  to a previously undiscovered race condition.
-  Severity: high
-  Likelihood: low
-  Mitigation: Run each seeded test 3 times before proceeding. If flakiness
-  is detected, revert the change and create a tracking issue for the
-  specific race.
+  to a previously undiscovered race condition. Severity: high Likelihood: low
+  Mitigation: Run each seeded test 3 times before proceeding. If flakiness is
+  detected, revert the change and create a tracking issue for the specific race.
 
 - **Risk**: CI environment has different timing characteristics than local
-  runs, exposing concurrency issues not seen locally.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: Run full CI matrix on a draft PR before merging. The CI
-  workflow runs `make test`, so validate that path explicitly.
+  runs, exposing concurrency issues not seen locally. Severity: medium
+  Likelihood: medium Mitigation: Run full CI matrix on a draft PR before
+  merging. The CI workflow runs `make test`, so validate that path explicitly.
 
 - **Risk**: A test that passes under default Bun concurrency fails under
-  explicit `--concurrent` due to subtle timing differences.
-  Severity: medium
-  Likelihood: low
-  Mitigation: The prerequisite items (9.3.3-9.3.7) were specifically designed
-  to address this. Validate with the three seeded runs before flipping the
-  default.
+  explicit `--concurrent` due to subtle timing differences. Severity: medium
+  Likelihood: low Mitigation: The prerequisite items (9.3.3-9.3.7) were
+  specifically designed to address this. Validate with the three seeded runs
+  before flipping the default.
 
 ## Progress
 
@@ -97,12 +88,12 @@ Use a list with checkboxes to summarize granular steps:
   path (`test:unit:run`).
 - [x] Stage B: Add new `test:unit:concurrent:shuffled` script for explicit
   concurrent stress testing.
-- [x] Stage C: Run validation - `bun test --concurrent --randomize
-  --seed 2444615283 test/unit` must pass.
-- [x] Stage C: Run validation - `bun test --concurrent --randomize
-  --seed 1337 test/unit` must pass.
-- [x] Stage C: Run validation - `bun test --concurrent --randomize
-  --seed 20260306 test/unit` must pass.
+- [x] Stage C: Run validation -
+      `bun test --concurrent --randomize --seed 2444615283 test/unit` must pass.
+- [x] Stage C: Run validation -
+      `bun test --concurrent --randomize --seed 1337 test/unit` must pass.
+- [x] Stage C: Run validation -
+      `bun test --concurrent --randomize --seed 20260306 test/unit` must pass.
 - [x] Stage D: Update `docs/developers-guide.md` to reflect new default
   behaviour.
 - [x] Stage D: Mark roadmap item 9.3.8 as done in `docs/roadmap.md`.
@@ -140,8 +131,8 @@ Summarize outcomes, gaps, and lessons learned:
 - **Documentation**: Updated `docs/developers-guide.md` and `docs/roadmap.md`
   to reflect the new default behaviour and mark 9.3.8 as complete.
 - **Preservation**: Diagnostic commands (`test:unit:serialized`,
-  `test:unit:serialized:shuffled`, `test:unit:shuffled`) remain available
-  for triage as required by constraints.
+  `test:unit:serialized:shuffled`, `test:unit:shuffled`) remain available for
+  triage as required by constraints.
 
 ## Context and orientation
 
@@ -201,8 +192,8 @@ them safe for explicit concurrent execution:
 ### Stage A: Verify prerequisites
 
 Before making any changes, confirm that roadmap items 9.3.3 through 9.3.7 are
-all marked as done in `docs/roadmap.md`. If any are incomplete, escalate
-before proceeding.
+all marked as done in `docs/roadmap.md`. If any are incomplete, escalate before
+proceeding.
 
 Go/no-go: All prerequisite items show `[x]` in roadmap.md.
 
@@ -229,8 +220,8 @@ Modify `package.json` to add `--concurrent` to the default unit-test path:
    ```
 
 This preserves the existing `test:unit:serialized` and
-`test:unit:serialized:shuffled` commands for triage while making concurrent
-the default.
+`test:unit:serialized:shuffled` commands for triage while making concurrent the
+default.
 
 Go/no-go: `package.json` validates with `bun install` without errors.
 
@@ -416,8 +407,8 @@ Quality criteria (what "done" means):
 
 Quality method (how we check):
 
-Run the complete validation sequence from Stage E. Capture the terminal
-output showing all five gates passing.
+Run the complete validation sequence from Stage E. Capture the terminal output
+showing all five gates passing.
 
 ## Idempotence and recovery
 
@@ -464,7 +455,7 @@ and documentation files, which are version-controlled and can be reverted with
 - Roadmap items 9.3.3, 9.3.4, 9.3.5, 9.3.6, and 9.3.7 must be complete.
 - All unit test files under `test/unit/` must be present and functional.
 
----
+______________________________________________________________________
 
 ## Revision note
 

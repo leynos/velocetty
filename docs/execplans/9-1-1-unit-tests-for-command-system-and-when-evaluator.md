@@ -1,9 +1,8 @@
 # Add unit tests for the command system and `when` evaluator (roadmap 9.1.1)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE (2026-03-05)
 
@@ -65,8 +64,8 @@ Success is observable when:
   context-key TypeScript interfaces in `shared/src/types/`, stop and escalate.
 - Semantics: if conflict-detection coverage requires inventing new runtime
   precedence behaviour that is not already implied by
-  `docs/velocetty-design.md` or `docs/velocetty-product-requirements-document.md`,
-  stop and escalate.
+  `docs/velocetty-design.md` or
+  `docs/velocetty-product-requirements-document.md`, stop and escalate.
 - Threshold: if no active coverage threshold can be verified from current repo
   state, stop before marking the roadmap item complete and document the
   ambiguity in `Decision Log`.
@@ -78,38 +77,29 @@ Success is observable when:
 
 - Risk: the roadmap asks for coverage to meet the "project threshold", but the
   live repository may document coverage examples more clearly than it enforces
-  thresholds.
-  Severity: high
-  Likelihood: medium
-  Mitigation: treat threshold discovery as the first implementation step, use
-  `bunfig.toml`, `package.json`, `docs/testing-with-bun.md`, and current CI/test
-  scripts as the source of truth, and update `docs/developers-guide.md` if the
-  effective workflow needs to be spelled out more clearly.
+  thresholds. Severity: high Likelihood: medium Mitigation: treat threshold
+  discovery as the first implementation step, use `bunfig.toml`, `package.json`,
+  `docs/testing-with-bun.md`, and current CI/test scripts as the source of
+  truth, and update `docs/developers-guide.md` if the effective workflow needs
+  to be spelled out more clearly.
 
 - Risk: current command tests exercise registry CRUD and validation, but the
   roadmap's "conflict detection" language likely refers to keybinding
-  precedence rather than the registry alone.
-  Severity: medium
-  Likelihood: high
+  precedence rather than the registry alone. Severity: medium Likelihood: high
   Mitigation: audit `app/runtime/plugin-runtime.ts` and existing keybinding
-  tests first; extract only a minimal pure helper if an existing behaviour needs
-  a test seam.
+  tests first; extract only a minimal pure helper if an existing behaviour
+  needs a test seam.
 
 - Risk: parser edge-case coverage can become noisy if low-level tokenizer cases
-  are duplicated through several higher-level service tests.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: keep service-level behavioural assertions in
+  are duplicated through several higher-level service tests. Severity: medium
+  Likelihood: medium Mitigation: keep service-level behavioural assertions in
   `test/unit/context-key-service.test.ts`, and add a focused tokenizer/parser
   suite only if it closes coverage gaps more clearly than extending the
   existing service suite.
 
 - Risk: module-singleton state in `lib/command-registry.ts` can make unit tests
-  order-sensitive.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: continue the current import isolation pattern and clean registry
-  state in `beforeEach`.
+  order-sensitive. Severity: medium Likelihood: medium Mitigation: continue the
+  current import isolation pattern and clean registry state in `beforeEach`.
 
 ## Progress
 
@@ -122,9 +112,8 @@ Success is observable when:
   `test/unit/context-key-service.test.ts`.
 - [x] (2026-03-05 20:36Z) Audited design, PRD, roadmap, coverage, and developer
   guidance in `docs/velocetty-design.md`,
-  `docs/velocetty-product-requirements-document.md`,
-  `docs/developers-guide.md`, `docs/testing-with-bun.md`, and
-  `docs/roadmap.md`.
+  `docs/velocetty-product-requirements-document.md`, `docs/developers-guide.md`,
+  `docs/testing-with-bun.md`, and `docs/roadmap.md`.
 - [x] (2026-03-05 20:36Z) Drafted this ExecPlan.
 - [x] (2026-03-05 20:40Z) Received explicit approval to begin implementation.
 - [x] (2026-03-05 21:15Z) Stage A complete: confirmed the active local coverage
@@ -137,8 +126,7 @@ Success is observable when:
   `test/unit/command-registry-validation.test.ts`, and
   `test/unit/runtime-plugin-settings.test.ts`.
 - [x] (2026-03-05 21:15Z) Stage C complete: added `when` parser/evaluator edge
-  cases and error-handling coverage in
-  `test/unit/context-key-service.test.ts`.
+  cases and error-handling coverage in `test/unit/context-key-service.test.ts`.
 - [x] (2026-03-05 21:15Z) Stage D complete: updated docs, marked roadmap item
   `9.1.1` done, and passed `bun install`, `make build`, `make check-fmt`,
   `make lint`, and `make test`.
@@ -146,41 +134,36 @@ Success is observable when:
 ## Surprises & Discoveries
 
 - Observation: the current repository already has substantial unit coverage for
-  these modules.
-  Evidence: `test/unit/command-registry.test.ts` already covers CRUD,
-  deterministic ordering, defensive cloning, unknown-command validation, and
-  structured validation errors; `test/unit/context-key-service.test.ts` already
-  covers precedence/grouping, comparisons, deterministic snapshots, and parse
-  failure indices.
-  Impact: implementation should extend existing suites rather than replacing
-  them.
+  these modules. Evidence: `test/unit/command-registry.test.ts` already covers
+  CRUD, deterministic ordering, defensive cloning, unknown-command validation,
+  and structured validation errors; `test/unit/context-key-service.test.ts`
+  already covers precedence/grouping, comparisons, deterministic snapshots, and
+  parse failure indices. Impact: implementation should extend existing suites
+  rather than replacing them.
 
 - Observation: some important command-registry failure-path branches still
-  appear untested.
-  Evidence: `lib/command-registry.ts` invalidates cached validators on
-  `update(...)` and `remove(...)`, and returns `INVALID_COMMAND_SCHEMA` when Ajv
-  compilation fails, but the current command-registry suite does not assert
-  those branches directly.
-  Impact: Stage B should add focused tests for schema-compilation failure and
-  validator-cache invalidation so the suite covers real failure paths, not only
-  successful validation and unknown-command handling.
+  appear untested. Evidence: `lib/command-registry.ts` invalidates cached
+  validators on `update(...)` and `remove(...)`, and returns
+  `INVALID_COMMAND_SCHEMA` when Ajv compilation fails, but the current
+  command-registry suite does not assert those branches directly. Impact: Stage
+  B should add focused tests for schema-compilation failure and validator-cache
+  invalidation so the suite covers real failure paths, not only successful
+  validation and unknown-command handling.
 
 - Observation: precedence semantics already exist for runtime plugin
   keybindings, but only as a merge contract rather than a dedicated conflict
-  helper.
-  Evidence: `app/runtime/plugin-runtime.ts` exports
+  helper. Evidence: `app/runtime/plugin-runtime.ts` exports
   `mergeRuntimePluginKeybindings(...)`, and
   `test/unit/runtime-plugin-settings.test.ts` currently verifies only that
-  resolved keymaps override runtime defaults.
-  Impact: conflict-detection coverage likely needs either additional assertions
-  around the existing seam or a very small helper extraction.
+  resolved keymaps override runtime defaults. Impact: conflict-detection
+  coverage likely needs either additional assertions around the existing seam
+  or a very small helper extraction.
 
 - Observation: the repository ships coverage tooling (`bun run test:coverage`,
   `make coverage`) and an example threshold in `docs/testing-with-bun.md`, but
-  threshold enforcement may not be fully wired in the active config.
-  Evidence: `bunfig.toml` enables coverage reporters and output directories,
-  while `docs/testing-with-bun.md` documents an example `coverageThreshold`
-  block.
+  threshold enforcement may not be fully wired in the active config. Evidence:
+  `bunfig.toml` enables coverage reporters and output directories, while
+  `docs/testing-with-bun.md` documents an example `coverageThreshold` block.
   Impact: the implementation must verify the effective threshold before using
   it as a completion claim.
 
@@ -189,42 +172,37 @@ Success is observable when:
   their backing targets rather than through the symlink paths themselves.
   Evidence: initial gate runs failed with missing `cache/LOCK` and
   `dist/app`-creation errors while `cache` and `dist` were symlinks into
-  `/tmp/velocetty-ci-work/`.
-  Impact: the implementation now hardens `bin/mk-snapshot.js` and
-  `build/esbuild/run-esbuild.ts` so the required gate sequence works in
-  symlinked workspaces.
+  `/tmp/velocetty-ci-work/`. Impact: the implementation now hardens
+  `bin/mk-snapshot.js` and `build/esbuild/run-esbuild.ts` so the required gate
+  sequence works in symlinked workspaces.
 
 ## Decision Log
 
 - Decision: keep this plan focused on unit tests and minimal pure helper
-  extraction, not broader command-dispatch or integration flows.
-  Rationale: roadmap item `9.1.1` explicitly targets shared primitives, while
-  `9.2.1` owns end-to-end command invocation.
-  Date/Author: 2026-03-05 / Codex
+  extraction, not broader command-dispatch or integration flows. Rationale:
+  roadmap item `9.1.1` explicitly targets shared primitives, while `9.2.1` owns
+  end-to-end command invocation. Date/Author: 2026-03-05 / Codex
 
 - Decision: treat coverage-threshold discovery as a mandatory early step rather
-  than assuming a number from older documentation.
-  Rationale: the roadmap requires threshold compliance, but current repository
-  practice must win over stale or illustrative docs.
-  Date/Author: 2026-03-05 / Codex
+  than assuming a number from older documentation. Rationale: the roadmap
+  requires threshold compliance, but current repository practice must win over
+  stale or illustrative docs. Date/Author: 2026-03-05 / Codex
 
 - Decision: plan for the precedence/conflict work to start from
   `app/runtime/plugin-runtime.ts` and
   `test/unit/runtime-plugin-settings.test.ts`, with a new helper/file only if
-  the existing seam is too weak.
-  Rationale: this is the narrowest path that still respects the design/PRD
-  wording about precedence and conflicts.
+  the existing seam is too weak. Rationale: this is the narrowest path that
+  still respects the design/PRD wording about precedence and conflicts.
   Date/Author: 2026-03-05 / Codex
 
 - Decision: use the current codebase target from
   `docs/velocetty-hyper-codebase.md` §6.6.7.2 as the threshold basis for
   roadmap item `9.1.1`, with Bun function coverage serving as the practical
   proxy for the documented branch target until branch-threshold enforcement is
-  wired into the repository.
-  Rationale: the active repository tooling collects line/function coverage but
-  does not enforce a numeric branch threshold globally; this keeps the closure
-  honest and actionable.
-  Date/Author: 2026-03-05 / Codex
+  wired into the repository. Rationale: the active repository tooling collects
+  line/function coverage but does not enforce a numeric branch threshold
+  globally; this keeps the closure honest and actionable. Date/Author:
+  2026-03-05 / Codex
 
 ## Outcomes & Retrospective
 
@@ -385,8 +363,8 @@ the narrowest existing seam first:
 3. If conflict detection is impossible to observe without a small extraction,
    extract a pure helper next to `app/runtime/plugin-runtime.ts` that computes
    deterministic keybinding conflicts from already-existing data. Keep this
-   helper free of side effects and do not change runtime behaviour beyond making
-   existing precedence/conflict rules testable.
+   helper free of side effects and do not change runtime behaviour beyond
+   making existing precedence/conflict rules testable.
 
 Stage B exit criteria:
 

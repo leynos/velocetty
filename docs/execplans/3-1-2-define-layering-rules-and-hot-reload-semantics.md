@@ -4,21 +4,20 @@
 
 - Purpose: define an implementation-ready execution plan for roadmap item
   `3.1.2` to establish config layering rules (defaults → user config → runtime
-  overrides) and hot-reload semantics (which settings reload live versus require
-  restart), with clear user-facing warnings for non-reloadable changes.
+  overrides) and hot-reload semantics (which settings reload live versus
+  require restart), with clear user-facing warnings for non-reloadable changes.
 - Invariants: preserve existing startup behaviour, maintain non-fatal fallback
   for invalid config, and ensure UI surfaces restart requirements clearly.
 - Cross-links: `docs/roadmap.md`, `docs/velocetty-design.md`,
   `docs/velocetty-hyper-codebase.md`,
-  `docs/velocetty-product-requirements-document.md`,
-  `docs/developers-guide.md`, `docs/tracking-issues.md`,
-  `shared/src/types/config.ts`, `shared/src/constants/config.ts`,
-  `app/config/json5-config.ts`, and `app/config/import.ts`.
+  `docs/velocetty-product-requirements-document.md`, `docs/developers-guide.md`,
+  `docs/tracking-issues.md`, `shared/src/types/config.ts`,
+  `shared/src/constants/config.ts`, `app/config/json5-config.ts`, and
+  `app/config/import.ts`.
 
-This Execution Plan (ExecPlan) is a living document.
-The sections `Constraints`, `Tolerances`, `Risks`, `Progress`,
-`Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETED
 
@@ -77,42 +76,32 @@ keybindings layering tracked by `3.2.1` or plugin settings storage tracked by
 ## Risks
 
 - Risk: reloadable setting implementation may require component rearchitecture
-  to receive config updates reactively.
-  Severity: medium
-  Likelihood: medium
+  to receive config updates reactively. Severity: medium Likelihood: medium
   Mitigation: classify borderline settings as non-reloadable initially;
   implement live-reload only where update paths already exist (theme, font,
   keybindings).
 
 - Risk: current config loading happens primarily at startup; runtime override
-  persistence may conflict with comment/format retention from 3.1.1.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: reuse existing roundtrip-retention writer from 3.1.1;
-  runtime overrides are ephemeral by default and do not write to disk unless
-  explicitly persisted.
+  persistence may conflict with comment/format retention from 3.1.1. Severity:
+  medium Likelihood: medium Mitigation: reuse existing roundtrip-retention
+  writer from 3.1.1; runtime overrides are ephemeral by default and do not
+  write to disk unless explicitly persisted.
 
 - Risk: tracking issue CONFIG-001 already documents WebGL renderer hot-reload
-  as an open item; overlap with this work must be managed.
-  Severity: low
-  Likelihood: high
-  Mitigation: explicitly defer WebGL renderer hot-reload to CONFIG-001;
-  classify `webGLRenderer` as non-reloadable in this milestone.
+  as an open item; overlap with this work must be managed. Severity: low
+  Likelihood: high Mitigation: explicitly defer WebGL renderer hot-reload to
+  CONFIG-001; classify `webGLRenderer` as non-reloadable in this milestone.
 
 - Risk: workspace-level overrides may not have a clear resolution path in the
-  current codebase.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: treat workspace overrides as a deferred feature;
-  implement only built-in defaults → user config → runtime overrides in this
-  milestone, with explicit extension point for workspace layer.
+  current codebase. Severity: medium Likelihood: medium Mitigation: treat
+  workspace overrides as a deferred feature; implement only built-in defaults →
+  user config → runtime overrides in this milestone, with explicit extension
+  point for workspace layer.
 
 - Risk: UI warning surfaces for non-reloadable settings may require new
-  components or translation strings.
-  Severity: low
-  Likelihood: low
-  Mitigation: reuse existing notification and settings UI components;
-  add simple restart-required indicator icons/labels.
+  components or translation strings. Severity: low Likelihood: low Mitigation:
+  reuse existing notification and settings UI components; add simple
+  restart-required indicator icons/labels.
 
 ## Context and orientation
 
@@ -152,13 +141,13 @@ Roadmap/design anchors:
 
 ### Stage A: Scope lock and reload classification (no runtime behaviour changes)
 
-Audit all `configOptions` fields and classify each as `live` or
-`restart`, using design document guidance as primary source.
+Audit all `configOptions` fields and classify each as `live` or `restart`,
+using design document guidance as primary source.
 
 Create a source-of-truth registry in
 `shared/src/constants/config-reloadability.ts` that maps config keys to their
-`'live' | 'restart'` reload capability, with explicit classification
-rationale in comments.
+`'live' | 'restart'` reload capability, with explicit classification rationale
+in comments.
 
 Add unit tests that verify the classification registry is complete (every
 config key has a classification) and consistent (no key appears in both
@@ -175,8 +164,8 @@ Implement explicit layering in the config loading path:
 2. User config (`config.json5` parsed with 3.1.1 infrastructure).
 3. Runtime overrides (ephemeral, in-memory only, not persisted).
 
-Implement deep merge for objects, replace for arrays as per design spec.
-Merge should produce a single resolved `configOptions` shape for consumption.
+Implement deep merge for objects, replace for arrays as per design spec. Merge
+should produce a single resolved `configOptions` shape for consumption.
 
 Add unit tests verifying merge behaviour:
 
@@ -213,7 +202,8 @@ Add unit tests:
 
 Update settings UI to display restart-required indicators:
 
-- UI consults the reloadability registry (`shared/src/constants/config-reloadability.ts`)
+- UI consults the reloadability registry
+  (`shared/src/constants/config-reloadability.ts`)
   to determine registry-derived reloadability for each setting.
 - UI renders warning icon or label next to non-reloadable settings.
 - When a user modifies a non-reloadable setting, an inline warning appears
@@ -235,8 +225,8 @@ Update `docs/tracking-issues.md`:
 - Reference CONFIG-001 for WebGL renderer hot-reload deferral.
 - Add any new tracking items for deferred workspace-level overrides.
 
-Run full required gates with tee logs.
-Only after all gates pass, mark roadmap item `3.1.2` and sub-bullets done.
+Run full required gates with tee logs. Only after all gates pass, mark roadmap
+item `3.1.2` and sub-bullets done.
 
 ## Concrete steps
 
@@ -267,7 +257,8 @@ bun test --max-concurrency=1 test/unit/config-reloadability.test.ts 2>&1 | tee "
 
 4. Implement layering and merge semantics:
 
-- Implement merge helpers and layering orchestration in `app/config/layering.ts`.
+- Implement merge helpers and layering orchestration in
+  `app/config/layering.ts`.
 - Target files:
   - `app/config/layering.ts` (merge implementation and layering orchestration)
 
@@ -376,7 +367,8 @@ Planned interface additions/updates:
 Planned dependency posture:
 
 - Reuse existing JSON5 parsing and roundtrip-retention from 3.1.1.
-- Build on existing Redux action infrastructure (`CONFIG_LOAD`, `CONFIG_RELOAD`).
+- Build on existing Redux action infrastructure (`CONFIG_LOAD`,
+  `CONFIG_RELOAD`).
 - Leverage the existing notification system for warning surfaces.
 - No new external dependencies planned.
 
@@ -453,55 +445,50 @@ Deferred to CONFIG-001:
 
 - Observation: `processReload` had to guard external callback invocations
   (`applyLiveConfig`, `emitRestartWarning`) with try/catch to avoid aborting
-  the reload result and leaving state inconsistent.
-  Evidence: PR review feedback on `app/config/reload-handler.ts`.
-  Impact: Added error-handling paths and deterministic state updates.
+  the reload result and leaving state inconsistent. Evidence: PR review
+  feedback on `app/config/reload-handler.ts`. Impact: Added error-handling
+  paths and deterministic state updates.
 
-- Observation: Presentational components in `lib/components/restart-required-indicator.tsx`
+- Observation: Presentational components in
+  `lib/components/restart-required-indicator.tsx`
   originally performed registry lookups during render, coupling view code to
-  classification logic.
-  Evidence: PR review feedback requested pure components fed by
-  `useConfigReloadability`.
-  Impact: Components now accept `requiresRestart` and `classification` props,
-  making them testable without the registry.
+  classification logic. Evidence: PR review feedback requested pure components
+  fed by `useConfigReloadability`. Impact: Components now accept
+  `requiresRestart` and `classification` props, making them testable without
+  the registry.
 
 ## Decision log
 
 - Decision: keep this plan in `DRAFT` status and block implementation until
-  explicit user approval.
-  Rationale: execplan workflow requires approval gate before execution.
-  Date/Author: 2026-03-27 / Codex.
+  explicit user approval. Rationale: execplan workflow requires approval gate
+  before execution. Date/Author: 2026-03-27 / Codex.
 
 - Decision: explicitly defer WebGL renderer hot-reload to CONFIG-001 rather
-  than attempting in this milestone.
-  Rationale: CONFIG-001 is already an open tracking item with distinct
-  technical challenges (requires terminal session restart handling).
-  Date/Author: 2026-03-27 / Codex.
+  than attempting in this milestone. Rationale: CONFIG-001 is already an open
+  tracking item with distinct technical challenges (requires terminal session
+  restart handling). Date/Author: 2026-03-27 / Codex.
 
 - Decision: treat workspace-level overrides as a deferred feature, implementing
-  only three layers (defaults → user → runtime) in this milestone.
-  Rationale: workspace override resolution paths are not yet defined in the
-  codebase; design document lists them as optional; deferral reduces risk.
-  Date/Author: 2026-03-27 / Codex.
+  only three layers (defaults → user → runtime) in this milestone. Rationale:
+  workspace override resolution paths are not yet defined in the codebase;
+  design document lists them as optional; deferral reduces risk. Date/Author:
+  2026-03-27 / Codex.
 
 - Decision: include both required release gates and documentation gates in this
   plan, while treating roadmap closure as contingent on required release gates.
   Rationale: user requested full release gate success and repository docs rules
-  require doc validation when docs change.
-  Date/Author: 2026-03-27 / Codex.
+  require doc validation when docs change. Date/Author: 2026-03-27 / Codex.
 
 - Decision: guard all external callback calls in `processReload` with try/catch
   and use an injected logger (with debug gated by `DEBUG_CONFIG_RELOAD`).
   Rationale: avoid aborting reload on caller exceptions and eliminate direct
-  `console.*` usage in production paths.
-  Date/Author: 2026-04-01 / Codex.
+  `console.*` usage in production paths. Date/Author: 2026-04-01 / Codex.
 
 - Decision: refactor `restart-required-indicator.tsx` components to pure
   presentational props (`requiresRestart`, `classification`) and push registry
-  lookups to `useConfigReloadability` callers.
-  Rationale: separates view concerns from classification logic and aligns with
-  the hook already provided for reactive checks.
-  Date/Author: 2026-04-01 / Codex.
+  lookups to `useConfigReloadability` callers. Rationale: separates view
+  concerns from classification logic and aligns with the hook already provided
+  for reactive checks. Date/Author: 2026-04-01 / Codex.
 
 ## Outcomes & retrospective
 
@@ -510,14 +497,14 @@ Implementation is complete and merged. All acceptance criteria were met:
 - Every `configOptions` field has a documented `'live'` or `'restart'`
   classification in `shared/src/constants/config-reloadability.ts`.
 - Layering merges correctly via `app/config/layering.ts`:
-  defaults → user config → runtime overrides; deep merge for objects,
-  replace for arrays.
+  defaults → user config → runtime overrides; deep merge for objects, replace
+  for arrays.
 - `app/config/reload-handler.ts` detects live versus restart-required changes,
   applies live changes safely, and queues restart warnings with structured
   diagnostics.
 - Settings UI components (`RestartRequiredIndicator`,
-  `InlineRestartWarning`, `LiveReloadIndicator`) are presentational and
-  consume `useConfigReloadability` output.
+  `InlineRestartWarning`, `LiveReloadIndicator`) are presentational and consume
+  `useConfigReloadability` output.
 - Unit tests cover classification completeness (`config-reloadability.test.ts`),
   merge semantics (`config-layering.test.ts`), hot-reload behaviour
   (`config-hot-reload.test.ts`), and component rendering
@@ -540,6 +527,6 @@ Deferred work (documented in `docs/tracking-issues.md`):
 
 ## Revision note
 
-Initial draft created from roadmap/design/codebase evidence.
-Updates through 2026-04-01 reflect completed implementation, review
-feedback resolution, and gate evidence.
+Initial draft created from roadmap/design/codebase evidence. Updates through
+2026-04-01 reflect completed implementation, review feedback resolution, and
+gate evidence.

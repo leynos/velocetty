@@ -1,9 +1,8 @@
 # Isolate snapshot and CLI configuration tests (roadmap 9.3.5)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`,
-`Decision log`, and `Outcomes & retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -18,8 +17,8 @@ depends on a top-level module side effect that patches `Module._load`.
 uses file-scope mutable mock state, and imports `cli/api.ts`, which captures
 config-path and memoized plugin state at module evaluation time.
 
-After this work, a developer should be able to run the roadmap's focused
-stress command repeatedly and see stable snapshot and CLI assertions with no
+After this work, a developer should be able to run the roadmap's focused stress
+command repeatedly and see stable snapshot and CLI assertions with no
 cross-test bleed, no stale config-path capture, and no inherited loader state:
 
 ```bash
@@ -50,9 +49,9 @@ production modules.
 `lib/v8-snapshot-util.ts` is now a top-level bootstrap shim that routes its
 import-time side effect through the explicit `bootstrapSnapshotRuntime(...)`
 seam. That seam resolves the runtime `require`, patches `Module._load`,
-registers snapshot globals, and returns a restoration handle so tests can
-prove loader cleanup deterministically. `test/unit/v8-snapshot-util.test.ts`
-now uses explicit runtime-host fixtures instead of mutating `globalThis`.
+registers snapshot globals, and returns a restoration handle so tests can prove
+loader cleanup deterministically. `test/unit/v8-snapshot-util.test.ts` now uses
+explicit runtime-host fixtures instead of mutating `globalThis`.
 
 `cli/api.ts` is now built around `createCliApi(...)`, which resolves config
 path, memoized config readers, and registry access per API instance instead of
@@ -101,8 +100,7 @@ adjustment materially reduces duplication in the CLI suite.
 - Prefer explicit seams over hidden mutable state. For snapshot code, that
   means a way to bootstrap and restore the loader deterministically. For CLI
   config code, that means resolving config-path and parsed-config state from a
-  runtime context or test-controlled factory rather than from module
-  evaluation.
+  runtime context or test-controlled factory rather than from module evaluation.
 - Keep the snapshot tests proving both behaviours: virtual modules must resolve
   through `customRequire`, and native modules must still fall back to the
   original loader.
@@ -142,41 +140,32 @@ adjustment materially reduces duplication in the CLI suite.
 ## Risks
 
 - Risk: the snapshot suite's visible failure is caused by both global cleanup
-  gaps and by a top-level loader patch that outlives the test import.
-  Severity: high
-  Likelihood: high
-  Mitigation: first capture the current failing signatures, then refactor the
-  bootstrap logic to return or expose a restoration path that the tests can
-  assert directly.
+  gaps and by a top-level loader patch that outlives the test import. Severity:
+  high Likelihood: high Mitigation: first capture the current failing
+  signatures, then refactor the bootstrap logic to return or expose a
+  restoration path that the tests can assert directly.
 
 - Risk: `cli/api.ts` may have more consumers than the target behaviour suite,
   and moving from module-evaluation state to runtime-resolved state could
-  affect neighbouring tests.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: keep the refactor narrow, prefer an internal factory or resolver
-  seam, and reverify `test/unit/cli-api.test.ts` if `cli/api.ts` changes.
+  affect neighbouring tests. Severity: medium Likelihood: medium Mitigation:
+  keep the refactor narrow, prefer an internal factory or resolver seam, and
+  reverify `test/unit/cli-api.test.ts` if `cli/api.ts` changes.
 
 - Risk: file-scope `mock.module(...)` registrations and shared mutable bindings
   inside `test/unit/cli-api-behaviour.test.ts` can still race even if
-  `cli/api.ts` is partially improved.
-  Severity: high
-  Likelihood: high
+  `cli/api.ts` is partially improved. Severity: high Likelihood: high
   Mitigation: make each test own its mocked state and environment, and restore
   module mocks after each test rather than only at file end or never.
 
 - Risk: the explicit-concurrency command may pass once and still be flaky.
-  Severity: high
-  Likelihood: medium
-  Mitigation: require a repeated focused loop, not a single passing run, before
-  calling the roadmap item done.
+  Severity: high Likelihood: medium Mitigation: require a repeated focused
+  loop, not a single passing run, before calling the roadmap item done.
 
 - Risk: documentation drift can leave future contributors reintroducing
   file-scope mutable mock state or module-evaluation capture in new tests.
-  Severity: medium
-  Likelihood: high
-  Mitigation: update `docs/developers-guide.md` with concrete repository rules
-  tied to the exact stress command and failure class for `9.3.5`.
+  Severity: medium Likelihood: high Mitigation: update
+  `docs/developers-guide.md` with concrete repository rules tied to the exact
+  stress command and failure class for `9.3.5`.
 
 ## Implementation outline
 
@@ -272,8 +261,7 @@ per-test harness that creates:
 - module mocks tied to that harness only
 
 The critical rule is that a mock closure must read only from that test's
-private state, never from a file-scope mutable binding shared with other
-tests.
+private state, never from a file-scope mutable binding shared with other tests.
 
 Restore `mock.module(...)` state and environment variables after each test.
 Query-string cache busting can remain useful, but it becomes a secondary guard,
@@ -384,9 +372,8 @@ The implementation is complete only when all of the following are true:
   `9.3.5` stress command and the new snapshot/bootstrap and CLI-config test
   isolation rules.
 - [x] (2026-03-14 16:48Z) Ran `bun install`, `make build`, `make check-fmt`,
-  `make lint`, `make test`, `bun test test/unit/cli-api.test.ts`, and a
-  ten-run focused `bun test --concurrent` verification loop with tee'd logs;
-  all passed.
+  `make lint`, `make test`, `bun test test/unit/cli-api.test.ts`, and a ten-run
+  focused `bun test --concurrent` verification loop with tee'd logs; all passed.
 - [x] (2026-03-14 16:50Z) Updated `docs/roadmap.md` to mark `9.3.5` done
   after the validation evidence was in hand.
 - [x] (2026-03-19 23:05Z) Addressed follow-up review comments by extending the
@@ -402,94 +389,86 @@ The implementation is complete only when all of the following are true:
 ## Surprises & discoveries
 
 - Observation: the two target suites do not merely interfere with each other;
-  each suite can also fail under `--concurrent` on its own.
-  Evidence: agent-team probes and the focused baseline both showed intra-suite
-  races, including snapshot missing-require false positives and CLI timeout
-  cascades.
+  each suite can also fail under `--concurrent` on its own. Evidence:
+  agent-team probes and the focused baseline both showed intra-suite races,
+  including snapshot missing-require false positives and CLI timeout cascades.
   Impact: the fix must isolate per-test state inside each file, not only avoid
   cross-file collisions.
 
 - Observation: `lib/v8-snapshot-util.ts` currently patches `Module._load`
-  during module evaluation and never restores it.
-  Evidence: the module captures `originalLoad`, replaces `_load`, and only
-  calls `snapshotResult.setGlobals(...)`; there is no restoration path.
-  Impact: snapshot test isolation likely requires a production-code seam, not
-  just more aggressive test cleanup.
+  during module evaluation and never restores it. Evidence: the module captures
+  `originalLoad`, replaces `_load`, and only calls
+  `snapshotResult.setGlobals(...)`; there is no restoration path. Impact:
+  snapshot test isolation likely requires a production-code seam, not just more
+  aggressive test cleanup.
 
 - Observation: `cli/api.ts` freezes config-path and memoized config readers at
-  import time.
-  Evidence: `applicationDirectory`, `fileName`, and the exported `configPath`
-  are derived at module scope, and `memoize(...)` backs `getFileContents`,
-  `getParsedFile`, `getPlugins`, and `getLocalPlugins`.
+  import time. Evidence: `applicationDirectory`, `fileName`, and the exported
+  `configPath` are derived at module scope, and `memoize(...)` backs
+  `getFileContents`, `getParsedFile`, `getPlugins`, and `getLocalPlugins`.
   Impact: cache-busting imports help, but they are not sufficient while tests
   still race on shared env and mock state.
 
 - Observation: the existing developers-guide section already establishes the
-  pattern for hotspot-specific concurrency probes.
-  Evidence: `docs/developers-guide.md` already documents the `9.3.3` and
-  `9.3.4` focused `bun test --concurrent` commands.
-  Impact: `9.3.5` should extend that section with a concrete new rule rather
-  than adding disconnected prose elsewhere.
+  pattern for hotspot-specific concurrency probes. Evidence:
+  `docs/developers-guide.md` already documents the `9.3.3` and `9.3.4` focused
+  `bun test --concurrent` commands. Impact: `9.3.5` should extend that section
+  with a concrete new rule rather than adding disconnected prose elsewhere.
 
 - Observation: the snapshot seam could stay production-safe while still
   becoming testable by returning a restoration handle from the same code path
-  the import-time bootstrap uses.
-  Evidence: `bootstrapSnapshotRuntime(...)` now powers both the top-level
-  import path and the focused unit tests without duplicating loader-patching
-  logic.
-  Impact: the test no longer needs query-string import busting or
-  `globalThis` mutation to validate the snapshot contract.
+  the import-time bootstrap uses. Evidence: `bootstrapSnapshotRuntime(...)` now
+  powers both the top-level import path and the focused unit tests without
+  duplicating loader-patching logic. Impact: the test no longer needs
+  query-string import busting or `globalThis` mutation to validate the snapshot
+  contract.
 
 - Observation: the CLI hotspot did not need per-test `mock.module(...)`
   registration once the production module exposed a per-instance factory.
   Evidence: `createCliApi(...)` now accepts injected filesystem, registry, and
   environment dependencies, and the rewritten behaviour suite passes under
-  repeated `--concurrent` runs without any module mocking.
-  Impact: the suite is simpler, faster, and no longer depends on Bun's
-  process-global mock lifetime rules.
+  repeated `--concurrent` runs without any module mocking. Impact: the suite is
+  simpler, faster, and no longer depends on Bun's process-global mock lifetime
+  rules.
 
 - Observation: the initial snapshot restore guard was still too weak for
-  review-driven overlapping-bootstrap scenarios.
-  Evidence: an earlier handle could restore out of order, then the later
-  handle would restore back to the stale intermediate wrapper instead of the
-  real base loader.
-  Impact: the loader patch now rebuilds the active wrapper chain from the true
-  base load and leaves externally replaced loaders untouched.
+  review-driven overlapping-bootstrap scenarios. Evidence: an earlier handle
+  could restore out of order, then the later handle would restore back to the
+  stale intermediate wrapper instead of the real base loader. Impact: the
+  loader patch now rebuilds the active wrapper chain from the true base load
+  and leaves externally replaced loaders untouched.
 
 ## Decision log
 
 - Decision: keep this document as a draft and stop after planning.
   Rationale: the user explicitly requested a plan first and said the plan must
-  be approved before implementation.
-  Date/Author: 2026-03-14 / Codex.
+  be approved before implementation. Date/Author: 2026-03-14 / Codex.
 
 - Decision: plan around explicit seams in production modules rather than trying
-  to force the tests to tiptoe around module-evaluation state.
-  Rationale: both hotspot suites are failing because production modules freeze
-  process-global state too early. Purely test-side workarounds would be brittle
-  and would likely leave the roadmap success command flaky.
-  Date/Author: 2026-03-14 / Codex.
+  to force the tests to tiptoe around module-evaluation state. Rationale: both
+  hotspot suites are failing because production modules freeze process-global
+  state too early. Purely test-side workarounds would be brittle and would
+  likely leave the roadmap success command flaky. Date/Author: 2026-03-14 /
+  Codex.
 
 - Decision: require repeated focused stress runs, not a single pass.
   Rationale: the current failure mode is race-sensitive, and single-run success
-  would not be credible evidence for roadmap closure.
-  Date/Author: 2026-03-14 / Codex.
+  would not be credible evidence for roadmap closure. Date/Author: 2026-03-14 /
+  Codex.
 
 - Decision: use a per-instance CLI factory instead of trying to make the
   existing module-scope exports test-local through more elaborate mock
-  orchestration.
-  Rationale: the bug was caused by hidden module-evaluation capture. A factory
-  removes that capture directly and keeps the public default exports intact for
-  existing consumers.
-  Date/Author: 2026-03-14 / Codex.
+  orchestration. Rationale: the bug was caused by hidden module-evaluation
+  capture. A factory removes that capture directly and keeps the public default
+  exports intact for existing consumers. Date/Author: 2026-03-14 / Codex.
 
 - Decision: keep the review follow-up scoped to clearer dependency surfaces and
   stronger behavioural coverage instead of widening production semantics.
   Rationale: the remaining review comments were about missing branches,
   overlapping restore correctness, and readability. Splitting CLI dependency
   resolution from runtime config and rebuilding snapshot wrapper chains closes
-  those gaps without changing the external APIs.
-  Date/Author: 2026-03-19 / Codex.
+  those gaps without changing the external APIs. Date/Author: 2026-03-19 /
+  Codex.
 
 ## Outcomes & retrospective
 
@@ -497,8 +476,8 @@ Roadmap item `9.3.5` is complete. The snapshot bootstrap path now exposes a
 deterministic restore handle through `bootstrapSnapshotRuntime(...)`, the CLI
 behaviour path now runs through isolated `createCliApi(...)` instances, the
 developers guide documents the new concurrency-safe testing rules, and the
-focused `--concurrent` hotspot command passed ten consecutive verification
-runs after the required top-level gates succeeded.
+focused `--concurrent` hotspot command passed ten consecutive verification runs
+after the required top-level gates succeeded.
 
 The review follow-up kept that completion intact while strengthening the proof
 surface. The CLI behaviour suite now locks in development-path and Windows-path

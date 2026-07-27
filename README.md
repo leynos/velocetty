@@ -5,9 +5,9 @@ https://deepwiki.com/leynos/velocetty)
 
 A modern, extensible terminal built on open web standards.
 
-Velocetty is a fork of [Hyper][hyper] by Vercel, extending the original
-vision with a command-driven architecture, improved rendering performance,
-and a robust plugin system.
+Velocetty is a fork of [Hyper][hyper] by Vercel, extending the original vision
+with a command-driven architecture, improved rendering performance, and a
+robust plugin system.
 
 ## Project status
 
@@ -100,9 +100,9 @@ Binaries will appear in the `./dist` folder.
 
 ## Acknowledgements
 
-Velocetty is a fork of [Hyper][hyper], originally created by
-[Vercel][vercel]. We are grateful for their work in building a beautiful,
-extensible terminal experience.
+Velocetty is a fork of [Hyper][hyper], originally created by [Vercel][vercel].
+We are grateful for their work in building a beautiful, extensible terminal
+experience.
 
 ## Licence
 
