@@ -124,7 +124,7 @@
     "electron-mksnapshot": "^40.2.1",
     "electronmon": "^2.0.4",
     "esbuild": "^0.25.12",
-    "happy-dom": "^20.3.9",
+    "happy-dom": "^20.11.1",
     "husky": "^9.0.11",
     "inquirer": "^13.3.0",
     "node-addon-api": "^8.0.0",
