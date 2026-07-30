@@ -49,7 +49,7 @@
         "@biomejs/biome": "^2.3.13",
         "@chialab/esbuild-plugin-postcss": "^1.0.1",
         "@electron/rebuild": "^3.6.0",
-        "@types/args": "^5.0.3",
+        "@types/args": "^5.0.4",
         "@types/async-retry": "^1.4.3",
         "@types/color": "^3.0.6",
         "@types/columnify": "^1.5.4",
@@ -427,7 +427,7 @@
 
     "@tsconfig/node16": ["@tsconfig/node16@1.0.2", "", {}, "sha512-eZxlbI8GZscaGS7kkc/trHTT5xgrjH3/1n2JDwusC9iahPKWMRvRjJSAN5mCXviuTGQ/lHnhvv8Q1YTpnfz9gA=="],
 
-    "@types/args": ["@types/args@5.0.3", "", {}, "sha512-7dNWhsptvu0ZgJPAqXlG3DtK5/YHWCtaixBPunNBDRyY9Scy2jQfIb2s7rWIN4Mx9bRnbVM72lEnQd3X8UxJTA=="],
+    "@types/args": ["@types/args@5.0.4", "", {}, "sha512-TGJkOiKE2Veo++SYqV9JYV61KuqQ3lhdeYJ9jDozBYeAG78lwaEg6jcvvZ08JzjlDJFe0VBHJ0MxISATT6GJYQ=="],
 
     "@types/async-retry": ["@types/async-retry@1.4.3", "", { "dependencies": { "@types/retry": "*" } }, "sha512-B3C9QmmNULVPL2uSJQ088eGWTNPIeUk35hca6CV8rRDJ8GXuQJP5CCVWA1ZUCrb9xYP7Js/RkLqnNNwKhe+Zsw=="],
 
