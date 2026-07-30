@@ -133,7 +133,7 @@
     "parse-url": "^8.1.0",
     "playwright": "^1.58.2",
     "plist": "^3.1.0",
-    "postcss": "^8.5.8",
+    "postcss": "^8.5.22",
     "prettier": "^3.2.5",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.4.5"
