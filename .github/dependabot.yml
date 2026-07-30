@@ -1,43 +1,47 @@
 version: 2
 updates:
 # Root package.json uses a bun.lock, so the bun ecosystem manages it.
-- package-ecosystem: bun
-  directory: "/"
-  schedule:
-    interval: weekly
-    time: '11:00'
-  open-pull-requests-limit: 30
-  labels:
-    - "dependencies"
-    - "bun"
-  cooldown:
-    default-days: 7
-    semver-major-days: 14
-- package-ecosystem: npm
-  directories:
-    - "/app"
-    - "/backend"
-    - "/frontend"
-    - "/shared"
-  schedule:
-    interval: weekly
-    time: '11:00'
-  open-pull-requests-limit: 30
-  versioning-strategy: increase
-  labels:
-    - "dependencies"
-    - "npm"
-  cooldown:
-    default-days: 7
-    semver-major-days: 14
-- package-ecosystem: github-actions
-  directory: "/"
-  schedule:
-    interval: weekly
-    time: '11:00'
-  open-pull-requests-limit: 30
-  labels:
-    - "dependencies"
-    - "github-actions"
-  cooldown:
-    default-days: 7
+  - package-ecosystem: bun
+    directory: "/"
+    schedule:
+      interval: weekly
+      time: '11:00'
+    open-pull-requests-limit: 30
+    labels:
+      - "dependencies"
+      - "bun"
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+  - package-ecosystem: npm
+    directories:
+      - "/app"
+      - "/backend"
+      - "/frontend"
+      - "/shared"
+    schedule:
+      interval: weekly
+      time: '11:00'
+    open-pull-requests-limit: 30
+    versioning-strategy: increase
+    labels:
+      - "dependencies"
+      - "npm"
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+  - package-ecosystem: github-actions
+    groups:
+      github-actions:
+        patterns:
+          - '*'
+    directory: "/"
+    schedule:
+      interval: weekly
+      time: '11:00'
+    open-pull-requests-limit: 30
+    labels:
+      - "dependencies"
+      - "github-actions"
+    cooldown:
+      default-days: 7
