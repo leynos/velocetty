@@ -10,7 +10,7 @@
         "@redux-devtools/extension": "^3.3.0",
         "args": "^5.0.3",
         "chalk": "^5.3.0",
-        "clsx": "^2.1.0",
+        "clsx": "^2.1.1",
         "color": "^4.2.3",
         "columnify": "^1.6.0",
         "got": "^12.4.1",
@@ -629,7 +629,7 @@
 
     "clone-response": ["clone-response@1.0.2", "", { "dependencies": { "mimic-response": "^1.0.0" } }, "sha1-0dyXOSAxTfZ/vrlCI7TuNQI56Ws="],
 
-    "clsx": ["clsx@2.1.0", "", {}, "sha512-m3iNNWpd9rl3jvvcBnu70ylMdrXt8Vlq4HYadnU5fwcOtvkSQWPmj7amUcDT2qYI7risszBjI5AUIUox9D16pg=="],
+    "clsx": ["clsx@2.1.1", "", {}, "sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA=="],
 
     "color": ["color@4.2.3", "", { "dependencies": { "color-convert": "^2.0.1", "color-string": "^1.9.0" } }, "sha512-1rXeuUUiGGrykh+CeBdu5Ie7OJwinCgQY0bc7GCRxy5xVHy+moaqkpL/jqQq0MtQOeYcrqEz4abc5f0KtU7W4A=="],
 
