@@ -165,3 +165,46 @@ test('closes the dropdown when focus leaves the component boundary', async () =>
     cleanup();
   }
 });
+
+test('exposes CSS custom properties and CSS Module classes for the trigger and dropdown', async () => {
+  const {cleanup, container, root} = await renderNewTab();
+
+  try {
+    const button = container.querySelector('button');
+    const wrapper = button?.parentElement as HTMLDivElement | null;
+    expect(button).toBeTruthy();
+    expect(wrapper).toBeTruthy();
+
+    if (!button || !wrapper) {
+      throw new Error('Expected new-tab trigger and wrapper to be present');
+    }
+
+    expect(button.className).toContain('newTab');
+    expect(button.className).not.toContain('  ');
+    expect(wrapper.style.getPropertyValue('--new-tab-border')).toBe('#333');
+    expect(wrapper.style.getPropertyValue('--new-tab-bg')).toBe('#000');
+
+    await act(async () => {
+      button.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
+      await waitFor(0);
+    });
+
+    const dropdown = container.querySelector<HTMLElement>('[role="menu"]');
+    const menuItem = container.querySelector<HTMLButtonElement>('button[role="menuitem"]');
+    expect(dropdown).toBeTruthy();
+    expect(menuItem).toBeTruthy();
+
+    if (!dropdown || !menuItem) {
+      throw new Error('Expected new-tab dropdown and menu item to be present');
+    }
+
+    expect(dropdown.className).toContain('profileDropdown');
+    expect(menuItem.className).toContain('profileDropdownItem');
+  } finally {
+    await act(async () => {
+      root.unmount();
+      await waitFor(0);
+    });
+    cleanup();
+  }
+});

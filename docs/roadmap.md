@@ -527,13 +527,13 @@ changes remain in section 7 and are out of scope here.
     pushes to `master` and `canary`.
   - [x] Retain deep-lane failure artefacts (stdout/stderr, renderer console,
     screenshots, and traces).
-- [ ] 9.2.4. Add integration and end-to-end regression coverage for styled-jsx
+- [x] 9.2.4. Add integration and end-to-end regression coverage for styled-jsx
   removal and CSS Modules parity. Requires 1.4.17 and 9.2.3.
-  - [ ] Add assertions that renderer startup and bundled output contain no
+  - [x] Add assertions that renderer startup and bundled output contain no
     unresolved styled-jsx runtime imports.
-  - [ ] Add migration-focused parity checks for local styles, global selectors,
+  - [x] Add migration-focused parity checks for local styles, global selectors,
     and dynamic theme values.
-  - [ ] Success criteria: fast and deep end-to-end lanes pass without style
+  - [x] Success criteria: fast and deep end-to-end lanes pass without style
     regressions after the bridge is removed.
 
 ### 9.3. Unit-test isolation and concurrency safety

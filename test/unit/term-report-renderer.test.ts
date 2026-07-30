@@ -1,6 +1,7 @@
 /** @file Verifies Term.reportRenderer emits via transport with deduplication. */
 import {randomUUID} from 'node:crypto';
 
+import {Children, isValidElement} from 'react';
 import {describe, expect, mock, spyOn, test} from 'bun:test';
 import {
   LONG_FRAME_THRESHOLD_MS,
@@ -218,6 +219,30 @@ describe('Term.reportRenderer transport emit', () => {
         type: 'Canvas',
         runtimeMetrics
       });
+    }));
+
+  test('render keeps legacy term_fit and term_wrapper classes on renderer nodes', () =>
+    withTermTestHarness(({createTermInstanceForWebGLFallbackTest}) => {
+      const term = createTermInstanceForWebGLFallbackTest('uid-render-classes');
+      const rendered = term.render();
+
+      if (!isValidElement(rendered)) {
+        throw new Error('Expected Term.render() to return a React element');
+      }
+
+      expect(rendered.props.className).toContain('term_fit');
+
+      const children = Children.toArray(rendered.props.children);
+      const termWrapper = children.find(
+        (child) => isValidElement(child) && child.props.className?.includes('term_wrapper')
+      );
+
+      if (!termWrapper || !isValidElement(termWrapper)) {
+        throw new Error('Expected rendered Term output to include the term wrapper node');
+      }
+
+      expect(termWrapper.props.className).toContain('term_fit');
+      expect(termWrapper.props.className).toContain('term_wrapper');
     }));
 });
 

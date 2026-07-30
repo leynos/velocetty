@@ -13,6 +13,7 @@ import fs from 'fs-extra';
 import {_electron} from 'playwright';
 import type {ElectronApplication} from 'playwright';
 
+import {assertPackagedRendererOutputHasNoStyledJsxResidue} from './renderer-artifact-contracts';
 import {
   createIsolatedE2EEnvironment,
   extractRendererErrorMessage,
@@ -460,6 +461,7 @@ e2eTest(
     const context = await setupTestContext();
     try {
       await assertTargetHasNoUnresolvedSharedRuntimeImports();
+      await assertPackagedRendererOutputHasNoStyledJsxResidue();
       const {pathToBinary, launchArgs} = resolveLaunchConfig();
       if (!(await fs.pathExists(pathToBinary))) {
         throw new Error(`Expected packaged app binary at ${pathToBinary}. Run bun run dist first.`);
@@ -499,6 +501,7 @@ e2eTest(
     const context = await setupTestContext();
     try {
       await assertTargetHasNoUnresolvedSharedRuntimeImports();
+      await assertPackagedRendererOutputHasNoStyledJsxResidue();
       context.spawned = spawn(process.execPath, developmentAppLaunchArgs, {
         cwd: process.cwd(),
         env: {

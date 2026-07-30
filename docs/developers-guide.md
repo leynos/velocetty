@@ -1039,6 +1039,33 @@ elements. Apply both the CSS Module token and the legacy string:
 Document intentionally retired legacy class names in the migration ExecPlan
 under `Decision log`.
 
+### Styled-jsx removal regression checklist
+
+After touching renderer styles that previously relied on `styled-jsx`, replay
+the regression contract introduced by roadmap item `9.2.4`:
+
+1. Run the focused unit/build coverage:
+   `test/unit/esbuild-migration-contracts.test.ts`,
+   `test/unit/search-box-css-modules.test.tsx`,
+   `test/unit/new-tab.test.tsx`, and
+   `test/unit/term-report-renderer.test.ts`.
+2. Keep the packaged-output residue scan green. The fast lane now checks
+   `dist/app/renderer/bundle.js` and `dist/app/renderer/bundle.css` for
+   forbidden `styled-jsx/style`, `styled-jsx`, and raw `<style jsx` residue
+   before Electron startup assertions continue.
+3. Keep parity coverage anchored to the representative migration surfaces:
+   `SearchBox` for `--search-*` custom properties, `DropdownButton` in
+   `new-tab.tsx` for `--new-tab-*` styling and local CSS Module rules,
+   `term.tsx` for DOM-attached `term_fit` / `term_wrapper` compatibility
+   classes, and `tabs.module.css` for the preserved `:global(.tabs_list)`
+   selector contract.
+4. Run both E2E lanes after build output changes. `bun run test:e2e:fast`
+   guards packaged renderer cleanliness and startup, while
+   `bun run test:e2e:deep` validates the terminal interaction path plus live
+   style parity for themed new-tab UI and legacy terminal classes.
+5. On WSL2, follow `docs/testing-wsl2.md` and run the E2E commands under
+   `xvfb-run --auto-servernum` unless a working X server is already available.
+
 ### Label-threading with translation wrappers
 
 Accessibility labels that vary by locale are threaded via a narrow prop
