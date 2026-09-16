@@ -111,8 +111,7 @@ requested checklist item.
 ## Risks
 
 - Risk: a macOS-only fix diverges from Linux/Windows and introduces future
-  drift.
-  Severity: medium Likelihood: medium Mitigation: apply one policy-based
+  drift. Severity: medium Likelihood: medium Mitigation: apply one policy-based
   bootstrap pattern (virtual environment) that is reusable across jobs and
   documents host-specific path handling.
 

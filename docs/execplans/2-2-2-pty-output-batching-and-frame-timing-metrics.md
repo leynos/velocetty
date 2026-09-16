@@ -305,9 +305,8 @@ Do not infer success from truncated output.
   roadmap `2.2.1` practice.
 
 - Decision: Make synthetic-load benchmark evidence mandatory for roadmap
-  closure.
-  Rationale: Roadmap `2.2.2` success criteria explicitly require stable
-  frame-time demonstration under synthetic load.
+  closure. Rationale: Roadmap `2.2.2` success criteria explicitly require
+  stable frame-time demonstration under synthetic load.
 
 - Decision: Implement validation/docs-only scope before runtime instrumentation.
   Rationale: Current user assignment explicitly limits ownership to tests,

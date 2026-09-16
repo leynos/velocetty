@@ -293,8 +293,7 @@ When building settings UI components:
 1. Use `useConfigReloadability({configKey})` to obtain `requiresRestart` and
    `classification` for a setting.
 2. Display restart-required indicators using `RestartRequiredIndicator`
-   component,
-   passing `requiresRestart` from the hook.
+   component, passing `requiresRestart` from the hook.
 3. Show inline warnings when users modify non-reloadable settings using
    `InlineRestartWarning` component, passing `classification` from the hook.
 4. Use `keyRequiresRestart(key)` for imperative checks outside React render.
@@ -517,11 +516,10 @@ aligned in the same change:
 - Run `bun install` to validate snapshot generation, `install-app-deps`, and
   `node-pty` rebuilding before running the remaining gates.
 - The installation pipeline intentionally invokes
-  `node bin/copy-node-modules.mjs`
-  during postinstall. Bun remains the default runner elsewhere, but Node's
-  native copy path is currently the stable option for mirroring large
-  `node_modules` trees on Linux/Windows Subsystem for Linux (WSL) after
-  `install-app-deps`.
+  `node bin/copy-node-modules.mjs` during postinstall. Bun remains the default
+  runner elsewhere, but Node's native copy path is currently the stable option
+  for mirroring large `node_modules` trees on Linux/Windows Subsystem for Linux
+  (WSL) after `install-app-deps`.
 
 Current repository runtime baseline after roadmap item `1.4.13`:
 

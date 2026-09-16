@@ -96,6 +96,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libarchive-tools
+      - name: Install mdtablefix
+        if: runner.os == 'Linux'
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@c5a54701c8603a0fa756a6b34c49bc2af75a6c11
+        with:
+          version: "0.6.0"
+      - name: Format
+        if: runner.os == 'Linux'
+        run: make check-fmt
+      - name: Lint Markdown
+        if: runner.os == 'Linux'
+        uses: DavidAnson/markdownlint-cli2-action@4580e1612f6407034edd6c0e4e316d725920867b  # v24.2.0
+        with:
+          globs: '**/*.md'
       - name: Run Makefile lint and unit-test gates
         run: |
           make lint

@@ -260,8 +260,7 @@ Observed outcomes:
 - arm7 (`armv7l`) Linux CI lane and arm7 Linux artefact targets were removed.
 - Linux ARM workflow now runs as Linux aarch64 on `ubuntu-22.04-arm`.
 - Linux aarch64 workflow now bootstraps `qemu-x86_64-static` and
-  `QEMU_LD_PREFIX`
-  sysroot setup before `bun install`.
+  `QEMU_LD_PREFIX` sysroot setup before `bun install`.
 - Linux aarch64 bootstrap now uses `:amd64` multiarch runtime packages
   (`libc6`, `libstdc++6`, `libgcc-s1`, `libglib2.0-0`, `libexpat1`, and
   `libpcre2-8-0`) plus pinned per-architecture apt sources rather than
