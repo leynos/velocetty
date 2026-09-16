@@ -686,6 +686,12 @@ avoid duplicate React instances in plugins. React 19 requires aligning
 
 ## Formatting and linting
 
+`make fmt` and `make check-fmt` run `mdtablefix` (version 0.6.0, the same
+release CI installs); `bun install` does not provide it, so install it once with
+`cargo install --locked mdtablefix --version 0.6.0`. `make fmt` also runs
+`markdownlint-cli2`, which CI provides through its GitHub action; locally,
+install it with `bun install -g markdownlint-cli2` so it is on `PATH`.
+
 Run the standard gates before opening a pull request:
 
 - `make check-fmt`

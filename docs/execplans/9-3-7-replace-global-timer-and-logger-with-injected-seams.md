@@ -239,8 +239,8 @@ Validation: `bun test --concurrent test/unit/notification.test.ts` passes.
 ### Stage C: Updater scheduler/logger seam implementation
 
 Modify the updater module to accept an optional `scheduler` parameter containing
-`setTimeout`, `clearTimeout`, `setInterval`, and `clearInterval`
-implementations, plus an optional `logger` parameter with `error` method.
+`setTimeout` and `setInterval` implementations (the updater never calls the
+clear methods), plus an optional `logger` parameter with `error` method.
 
 The `updater` function should use injected implementations when provided,
 falling back to globals otherwise. The `init` function should receive the
