@@ -296,8 +296,7 @@ Implementation outline:
 Observable check:
 
 - tests prove deterministic ordering and defaults pass before runtime
-  integration
-  begins.
+  integration begins.
 
 ### Stage B: JSON5 config and plugin settings persistence
 

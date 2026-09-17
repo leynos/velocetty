@@ -86,8 +86,7 @@ Success is observable when:
 ## Surprises & discoveries
 
 - `grepai` indexing intermittently returned `unexpected EOF`; targeted file
-  reads
-  were used for affected exploration steps.
+  reads were used for affected exploration steps.
 - There was no existing Playwright Test configuration, so deep lane setup is
   entirely additive.
 - Existing CI workflow did not permit manual trigger; `workflow_dispatch` needed

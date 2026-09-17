@@ -183,18 +183,18 @@ Summarize outcomes, gaps, and lessons learned at completion.
 The codebase has two test files that mutate process-global functions:
 
 1. `test/unit/notification.test.ts` (lines 46-89): Originally defined
-   `createFakeTimers()`
-   that replaced `globalThis.setTimeout` and `globalThis.clearTimeout` during
-   each test. The fake timers were installed before rendering and restored in
-   `finally` blocks. This has been replaced with injected timer seams.
+   `createFakeTimers()` that replaced `globalThis.setTimeout` and
+   `globalThis.clearTimeout` during each test. The fake timers were installed
+   before rendering and restored in `finally` blocks. This has been replaced
+   with injected timer seams.
 
 2. `test/unit/updater.test.ts` (lines 42-105): Originally defined
-   `createTimerCapture()`
-   that replaced `globalThis.setTimeout`, `globalThis.clearTimeout`,
-   `globalThis.setInterval`, and `globalThis.clearInterval`. Also defined
-   `createConsoleErrorCapture()` that replaced `console.error`. These were
-   installed at test start and restored in `finally` blocks. This has been
-   replaced with injected scheduler and logger seams.
+   `createTimerCapture()` that replaced `globalThis.setTimeout`,
+   `globalThis.clearTimeout`, `globalThis.setInterval`, and
+   `globalThis.clearInterval`. Also defined `createConsoleErrorCapture()` that
+   replaced `console.error`. These were installed at test start and restored in
+   `finally` blocks. This has been replaced with injected scheduler and logger
+   seams.
 
 ### Target files
 
@@ -239,8 +239,8 @@ Validation: `bun test --concurrent test/unit/notification.test.ts` passes.
 ### Stage C: Updater scheduler/logger seam implementation
 
 Modify the updater module to accept an optional `scheduler` parameter containing
-`setTimeout`, `clearTimeout`, `setInterval`, and `clearInterval`
-implementations, plus an optional `logger` parameter with `error` method.
+`setTimeout` and `setInterval` implementations (the updater never calls the
+clear methods), plus an optional `logger` parameter with `error` method.
 
 The `updater` function should use injected implementations when provided,
 falling back to globals otherwise. The `init` function should receive the
@@ -277,35 +277,35 @@ In `lib/components/notification.tsx`:
 
 1. Define a `TimerSeam` interface:
 
-```typescript
-interface TimerSeam {
-  setTimeout: typeof globalThis.setTimeout;
-  clearTimeout: typeof globalThis.clearTimeout;
-}
-```
+   ```typescript
+   interface TimerSeam {
+     setTimeout: typeof globalThis.setTimeout;
+     clearTimeout: typeof globalThis.clearTimeout;
+   }
+   ```
 
-1. Extend `NotificationProps` to accept optional `timer?: TimerSeam`.
+2. Extend `NotificationProps` to accept optional `timer?: TimerSeam`.
 
-2. Update `useNotification` to accept optional timer parameter and use it
+3. Update `useNotification` to accept optional timer parameter and use it
    instead of globals:
 
-```typescript
-const useNotification = (
-  props: NotificationProps,
-  ref: React.ForwardedRef<HTMLDivElement>,
-  timer?: TimerSeam
-) => {
-  // Memoize the default to prevent effect re-runs
-  const timerSeam = useMemo(
-    () => timer ?? {setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout},
-    [timer]
-  );
-  const {setTimeout, clearTimeout} = timerSeam;
-  // ... use setTimeout/clearTimeout from destructured timer
-};
-```
+   ```typescript
+   const useNotification = (
+     props: NotificationProps,
+     ref: React.ForwardedRef<HTMLDivElement>,
+     timer?: TimerSeam
+   ) => {
+     // Memoize the default to prevent effect re-runs
+     const timerSeam = useMemo(
+       () => timer ?? {setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout},
+       [timer]
+     );
+     const {setTimeout, clearTimeout} = timerSeam;
+     // ... use setTimeout/clearTimeout from destructured timer
+   };
+   ```
 
-1. Pass timer from props through to `useNotification` in the component.
+4. Pass timer from props through to `useNotification` in the component.
 
 In `test/unit/notification.test.ts`:
 
@@ -313,50 +313,50 @@ In `test/unit/notification.test.ts`:
 
 2. Create a test-double factory that returns a TimerSeam:
 
-```typescript
-const createFakeTimerSeam = () => {
-  let now = 0;
-  let nextId = 1;
-  const scheduled: Array<{id: number; runAt: number; callback: () => void}> = [];
+   ```typescript
+   const createFakeTimerSeam = () => {
+     let now = 0;
+     let nextId = 1;
+     const scheduled: Array<{id: number; runAt: number; callback: () => void}> = [];
 
-  return {
-    advanceTimersByTime: (ms: number) => {
-      const target = now + ms;
-      while (scheduled.length > 0 && scheduled[0].runAt <= target) {
-        const [nextTimer] = scheduled;
-        scheduled.shift();
-        now = nextTimer.runAt;
-        nextTimer.callback();
-        scheduled.sort((a, b) => a.runAt - b.runAt);
-      }
-      now = target;
-    },
-    timerSeam: {
-      setTimeout: (callback: () => void, delay = 0) => {
-        const id = nextId++;
-        scheduled.push({id, runAt: now + delay, callback});
-        scheduled.sort((a, b) => a.runAt - b.runAt);
-        return id as unknown as NodeJS.Timeout;
-      },
-      clearTimeout: (handle?: NodeJS.Timeout) => {
-        const id = Number(handle);
-        const index = scheduled.findIndex((t) => t.id === id);
-        if (index !== -1) scheduled.splice(index, 1);
-      }
-    }
-  };
-};
-```
+     return {
+       advanceTimersByTime: (ms: number) => {
+         const target = now + ms;
+         while (scheduled.length > 0 && scheduled[0].runAt <= target) {
+           const [nextTimer] = scheduled;
+           scheduled.shift();
+           now = nextTimer.runAt;
+           nextTimer.callback();
+           scheduled.sort((a, b) => a.runAt - b.runAt);
+         }
+         now = target;
+       },
+       timerSeam: {
+         setTimeout: (callback: () => void, delay = 0) => {
+           const id = nextId++;
+           scheduled.push({id, runAt: now + delay, callback});
+           scheduled.sort((a, b) => a.runAt - b.runAt);
+           return id as unknown as NodeJS.Timeout;
+         },
+         clearTimeout: (handle?: NodeJS.Timeout) => {
+           const id = Number(handle);
+           const index = scheduled.findIndex((t) => t.id === id);
+           if (index !== -1) scheduled.splice(index, 1);
+         }
+       }
+     };
+   };
+   ```
 
-1. Update each test to pass `timerSeam` through props:
+3. Update each test to pass `timerSeam` through props:
 
-```typescript
-const {advanceTimersByTime, timerSeam} = createFakeTimerSeam();
-// ... render with timer={timerSeam} prop
-// ... use advanceTimersByTime instead of timers.advanceTimersByTime
-```
+   ```typescript
+   const {advanceTimersByTime, timerSeam} = createFakeTimerSeam();
+   // ... render with timer={timerSeam} prop
+   // ... use advanceTimersByTime instead of timers.advanceTimersByTime
+   ```
 
-1. Remove all `timers.install()` and `timers.restore()` calls.
+4. Remove all `timers.install()` and `timers.restore()` calls.
 
 ### Stage C: Updater changes
 
@@ -364,36 +364,36 @@ In `app/updater.ts`:
 
 1. Define `SchedulerSeam` and `LoggerSeam` interfaces:
 
-```typescript
-interface SchedulerSeam {
-  setTimeout: typeof globalThis.setTimeout;
-  setInterval: typeof globalThis.setInterval;
-}
+   ```typescript
+   interface SchedulerSeam {
+     setTimeout: typeof globalThis.setTimeout;
+     setInterval: typeof globalThis.setInterval;
+   }
 
-interface LoggerSeam {
-  error: (...args: unknown[]) => void;
-}
-```
+   interface LoggerSeam {
+     error: (...args: unknown[]) => void;
+   }
+   ```
 
-1. Update `updater` function signature to accept optional seams:
+2. Update `updater` function signature to accept optional seams:
 
-```typescript
-export interface UpdaterOptions {
-  scheduler?: SchedulerSeam;
-  logger?: LoggerSeam;
-}
+   ```typescript
+   export interface UpdaterOptions {
+     scheduler?: SchedulerSeam;
+     logger?: LoggerSeam;
+   }
 
-const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
-  const scheduler = options?.scheduler ?? {
-    setTimeout: globalThis.setTimeout,
-    setInterval: globalThis.setInterval
-  };
-  const logger = options?.logger ?? console;
-  // ... pass scheduler/logger through to init or use directly
-};
-```
+   const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
+     const scheduler = options?.scheduler ?? {
+       setTimeout: globalThis.setTimeout,
+       setInterval: globalThis.setInterval
+     };
+     const logger = options?.logger ?? console;
+     // ... pass scheduler/logger through to init or use directly
+   };
+   ```
 
-1. Update `init` to accept and use scheduler/logger with concurrency guard:
+3. Update `init` to accept and use scheduler/logger with concurrency guard:
 
 ```typescript
 async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
@@ -418,44 +418,44 @@ In `test/unit/updater.test.ts`:
 
 2. Create test-double seam factories:
 
-```typescript
-const createSchedulerSeam = () => {
-  const timeoutCallbacks: Array<() => void> = [];
-  const intervalCallbacks: Array<() => void> = [];
-  let nextTimerId = 0;
+   ```typescript
+   const createSchedulerSeam = () => {
+     const timeoutCallbacks: Array<() => void> = [];
+     const intervalCallbacks: Array<() => void> = [];
+     let nextTimerId = 0;
 
-  return {
-    timeoutCallbacks,
-    intervalCallbacks,
-    scheduler: {
-      setTimeout: (callback: () => void) => {
-        nextTimerId += 1;
-        timeoutCallbacks.push(callback);
-        return nextTimerId as unknown as NodeJS.Timeout;
-      },
-      setInterval: (callback: () => void) => {
-        nextTimerId += 1;
-        intervalCallbacks.push(callback);
-        return nextTimerId as unknown as NodeJS.Timeout;
-      }
-    }
-  };
-};
+     return {
+       timeoutCallbacks,
+       intervalCallbacks,
+       scheduler: {
+         setTimeout: (callback: () => void) => {
+           nextTimerId += 1;
+           timeoutCallbacks.push(callback);
+           return nextTimerId as unknown as NodeJS.Timeout;
+         },
+         setInterval: (callback: () => void) => {
+           nextTimerId += 1;
+           intervalCallbacks.push(callback);
+           return nextTimerId as unknown as NodeJS.Timeout;
+         }
+       }
+     };
+   };
 
-const createLoggerSeam = () => {
-  const errorCalls: unknown[][] = [];
-  return {
-    errorCalls,
-    logger: {
-      error: (...args: unknown[]) => {
-        errorCalls.push(args);
-      }
-    }
-  };
-};
-```
+   const createLoggerSeam = () => {
+     const errorCalls: unknown[][] = [];
+     return {
+       errorCalls,
+       logger: {
+         error: (...args: unknown[]) => {
+           errorCalls.push(args);
+         }
+       }
+     };
+   };
+   ```
 
-1. Update tests to pass seams through `updater(win, {scheduler, logger})`:
+3. Update tests to pass seams through `updater(win, {scheduler, logger})`:
 
 ```typescript
 const {scheduler, timeoutCallbacks, intervalCallbacks} = createSchedulerSeam();
@@ -468,8 +468,7 @@ Note: The scheduler seam only exposes `setTimeout` and `setInterval` since the
 updater module does not call the clear methods.
 
 1. Remove all `timers.install()`, `timers.restore()`,
-   `consoleCapture.install()`,
-   and `consoleCapture.restore()` calls.
+   `consoleCapture.install()`, and `consoleCapture.restore()` calls.
 
 ### Stage D: Documentation update
 

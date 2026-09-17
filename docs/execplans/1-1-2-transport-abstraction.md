@@ -179,15 +179,13 @@ Done criteria for this roadmap item:
   work starts first. Date/Author: 2026-02-12 / Codex
 
 - Decision: reuse `test/testUtils/electron-path.ts` in transport-related tests
-  and
-  wire `ipcMain` spies onto its shared Electron mock before importing
+  and wire `ipcMain` spies onto its shared Electron mock before importing
   `app/rpc.ts`. Rationale: avoid brittle path-specific mock overrides that
   break under full-suite import ordering. Date/Author: 2026-02-12 / Codex
 
 - Decision: expose transport contracts from shared and centralize host
-  implementation
-  in `lib/transport/electron-ipc-transport.ts`. Rationale: this keeps
-  command-layer modules importable in future host swaps while preserving
+  implementation in `lib/transport/electron-ipc-transport.ts`. Rationale: this
+  keeps command-layer modules importable in future host swaps while preserving
   current Electron IPC event and invoke semantics. Date/Author: 2026-02-12 /
   Codex
 
@@ -379,8 +377,7 @@ Additional observable checks:
 - existing fast end-to-end (E2E) path remains green,
 - no regressions in session creation, split, or keybinding-triggered commands.
 - bootstrap stream coverage now includes transport listener assertions for
-  ready,
-  session add, and update available events.
+  ready, session add, and update available events.
 
 Open follow-up concerns:
 

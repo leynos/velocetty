@@ -203,8 +203,8 @@ Add unit tests:
 Update settings UI to display restart-required indicators:
 
 - UI consults the reloadability registry
-  (`shared/src/constants/config-reloadability.ts`)
-  to determine registry-derived reloadability for each setting.
+  (`shared/src/constants/config-reloadability.ts`) to determine
+  registry-derived reloadability for each setting.
 - UI renders warning icon or label next to non-reloadable settings.
 - When a user modifies a non-reloadable setting, an inline warning appears
   explaining the restart requirement.
@@ -450,12 +450,11 @@ Deferred to CONFIG-001:
   paths and deterministic state updates.
 
 - Observation: Presentational components in
-  `lib/components/restart-required-indicator.tsx`
-  originally performed registry lookups during render, coupling view code to
-  classification logic. Evidence: PR review feedback requested pure components
-  fed by `useConfigReloadability`. Impact: Components now accept
-  `requiresRestart` and `classification` props, making them testable without
-  the registry.
+  `lib/components/restart-required-indicator.tsx` originally performed registry
+  lookups during render, coupling view code to classification logic. Evidence:
+  PR review feedback requested pure components fed by `useConfigReloadability`.
+  Impact: Components now accept `requiresRestart` and `classification` props,
+  making them testable without the registry.
 
 ## Decision log
 

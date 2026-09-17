@@ -97,8 +97,7 @@ Last updated: 2026-03-27
 ### CONFIG-002 summary
 
 - Implement workspace-level configuration overrides (e.g.,
-  `.velocetty/config.json5`
-  in a project root).
+  `.velocetty/config.json5` in a project root).
 - Extend the layering system to support: defaults → user → workspace → runtime.
 - Define workspace discovery and resolution rules.
 - Coordinate with reloadability semantics when workspace settings change.
