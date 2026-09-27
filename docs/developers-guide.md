@@ -27,15 +27,16 @@ must follow locally.
 ## Spelling gate
 
 Run `make spelling` to enforce en-GB-oxendict spelling in tracked Markdown and
-the shared phrase policy across eligible tracked text. The gate uses Typos
-1.48.0 and the repository's generated `typos.toml`.
+the shared phrase policy across eligible tracked text. It runs the pinned
+`typos-config-builder gate`, whose own pinned Typos release checks against the
+regenerated `typos.toml`. Bump the pin by changing
+`TYPOS_CONFIG_BUILDER_VERSION` in the `Makefile`.
 
 The tracked configuration is built from the shared estate dictionary and the
-narrow `typos.local.toml` overlay. Run `make spelling-config-write` after an
-intentional policy change, and run `make spelling-config` to verify that the
-tracked output is current. The pinned builder refreshes the untracked local
-cache only when the authoritative dictionary is newer, so an already populated
-cache remains usable offline.
+narrow `typos.local.toml` overlay; `make spelling` regenerates it on every run,
+so commit the result after an intentional policy change. The pinned builder
+refreshes the untracked local cache only when the authoritative dictionary is
+newer, so an already populated cache remains usable offline.
 
 Do not edit `typos.toml` directly. Preserve public APIs, serialized schema
 keys, CSS syntax, upstream action inputs, dependency names and formal product

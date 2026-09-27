@@ -471,22 +471,21 @@ The following tooling is available in this environment:
   issues. Review the findings, fix blockers, and rerun the scan until it is
   clean. Pair this with manual keyboard checks before shipping.
 
-## Spelling policy
+<!-- typos-config-builder:agents-md:start -->
 
-- `make markdownlint` also enforces en-GB-oxendict spelling with the pinned
-  `typos` release.
-- `typos.toml` is generated. Edit `typos.local.toml` for narrow repository
-  terminology, then run `make spelling-config-write`; never edit generated
-  entries by hand.
-- The configuration builder refreshes the untracked shared dictionary cache
-  only when the authoritative copy is newer. `make spelling-config` verifies
-  the tracked output without replacing it.
-- The standalone Python 3.13-compatible phrase checker is an explicit
-  exception to the Bun-default script policy. Keep other JavaScript and
-  TypeScript automation on Bun.
-- Preserve external APIs, identifiers, fixtures, snapshots, formal names and
-  serialized values. Put quoted prose and identifiers in backticks or fenced
-  blocks where possible rather than weakening the shared policy.
+## Spelling
+
+- `make spelling` runs the pinned `typos-config-builder gate`, which
+  regenerates `typos.toml` from the shared en-GB-oxendict dictionary and
+  `typos.local.toml`, then checks spelling and the shared phrase corrections.
+- `typos.toml` is generated: never edit it by hand. Put narrow
+  repository-specific exceptions in `typos.local.toml`, as exact or full-line
+  patterns rather than bare accepted words.
+- When `make spelling` changes `typos.toml`, commit the regenerated file. If
+  the change is unrelated to your work, commit it in a separate base pull
+  request and stack your branch on it, so each review diff stays focused.
+
+<!-- typos-config-builder:agents-md:end -->
 
 ## Key Takeaway
 
