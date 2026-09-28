@@ -38,7 +38,7 @@ jobs:
           bun-version: 1.3.11
       - name: Setup uv for spelling
         if: runner.os == 'Linux'
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
         with:
           enable-cache: false
       - name: Spelling
@@ -98,7 +98,7 @@ jobs:
           sudo apt-get install -y libarchive-tools
       - name: Install mdtablefix
         if: runner.os == 'Linux'
-        uses: leynos/shared-actions/.github/actions/install-mdtablefix@45bef492e355d6b586bce00d2249a4038a2a7363
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@a42e2569fe1fc09f2e966c52dcad5ff285081017
         with:
           version: "0.6.0"
       - name: Format
