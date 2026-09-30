@@ -64,7 +64,7 @@
         "@types/seamless-immutable": "^7.1.19",
         "@types/uuid": "^9.0.8",
         "@typescript/native-preview": "^7.0.0-dev.20260128.1",
-        "ajv": "6.14.0",
+        "ajv": "8.20.0",
         "concurrently": "^10.0.5",
         "cpy-cli": "^7.0.0",
         "cross-env": "^10.1.0",
