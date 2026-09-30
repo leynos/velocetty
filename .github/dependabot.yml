@@ -3,8 +3,15 @@ updates:
 # Root package.json uses a bun.lock, so the bun ecosystem manages it.
   - package-ecosystem: bun
     directory: "/"
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
     schedule:
-      interval: weekly
+      interval: daily
       time: '11:00'
     open-pull-requests-limit: 30
     labels:
@@ -19,8 +26,15 @@ updates:
       - "/backend"
       - "/frontend"
       - "/shared"
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
     schedule:
-      interval: weekly
+      interval: daily
       time: '11:00'
     open-pull-requests-limit: 30
     versioning-strategy: increase
@@ -35,9 +49,14 @@ updates:
       github-actions:
         patterns:
           - '*'
-    directory: "/"
+        update-types:
+          - 'minor'
+          - 'patch'
+    directories:
+      - "/"
+      - "/.github/actions/*"
     schedule:
-      interval: weekly
+      interval: daily
       time: '11:00'
     open-pull-requests-limit: 30
     labels:
