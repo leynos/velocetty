@@ -57,7 +57,7 @@
   "dependencies": {
     "@electron/remote": "^2.1.2",
     "@react-icons/all-files": "^4.1.0",
-    "@redux-devtools/extension": "^3.3.0",
+    "@redux-devtools/extension": "^4.0.0",
     "args": "^5.0.3",
     "chalk": "^5.3.0",
     "clsx": "^2.1.0",
