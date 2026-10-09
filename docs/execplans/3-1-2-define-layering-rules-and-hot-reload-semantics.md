@@ -234,91 +234,91 @@ item `3.1.2` and sub-bullets done.
 
 1. Baseline and scope verification:
 
-```bash
-git branch --show
-nl -ba docs/roadmap.md | sed -n '234,240p'
-nl -ba docs/velocetty-design.md | sed -n '1042,1080p'
-```
+   ```bash
+   git branch --show
+   nl -ba docs/roadmap.md | sed -n '234,240p'
+   nl -ba docs/velocetty-design.md | sed -n '1042,1080p'
+   ```
 
 2. Classification audit and registry creation:
 
-- Audit `shared/src/types/config.ts` `configOptions` fields.
-- Create `shared/src/constants/config-reloadability.ts` with reloadability
-  registry as the single source of truth.
-- Document rationale for each classification in source comments.
+   - Audit `shared/src/types/config.ts` `configOptions` fields.
+   - Create `shared/src/constants/config-reloadability.ts` with reloadability
+     registry as the single source of truth.
+   - Document rationale for each classification in source comments.
 
 3. Add classification completeness tests:
 
-```bash
-set -o pipefail
-TEST_LOG="/tmp/test-config-reloadability-$(get-project)-$(git branch --show).out"
-bun test --max-concurrency=1 test/unit/config-reloadability.test.ts 2>&1 | tee "$TEST_LOG"
-```
+   ```bash
+   set -o pipefail
+   TEST_LOG="/tmp/test-config-reloadability-$(get-project)-$(git branch --show).out"
+   bun test --max-concurrency=1 test/unit/config-reloadability.test.ts 2>&1 | tee "$TEST_LOG"
+   ```
 
 4. Implement layering and merge semantics:
 
-- Implement merge helpers and layering orchestration in
-  `app/config/layering.ts`.
-- Target files:
-  - `app/config/layering.ts` (merge implementation and layering orchestration)
+   - Implement merge helpers and layering orchestration in
+     `app/config/layering.ts`.
+   - Target files:
+     - `app/config/layering.ts` (merge implementation and layering orchestration)
 
 5. Add layering merge tests:
 
-- `test/unit/config-layering.test.ts` (new file)
+   - `test/unit/config-layering.test.ts` (new file)
 
 6. Implement hot-reload detection:
 
-- Extend config reload action handling in `app/config/` or Redux layer.
-- Add diff detection comparing old versus new config.
-- Route changes through live-apply or warning-queue paths.
-- Target files:
-  - `app/config/reload-handler.ts` (new file).
-  - Redux reducer handling `CONFIG_RELOAD`.
+   - Extend config reload action handling in `app/config/` or Redux layer.
+   - Add diff detection comparing old versus new config.
+   - Route changes through live-apply or warning-queue paths.
+   - Target files:
+     - `app/config/reload-handler.ts` (new file).
+     - Redux reducer handling `CONFIG_RELOAD`.
 
 7. Add hot-reload detection tests:
 
-- `test/unit/config-hot-reload.test.ts` (new file)
+   - `test/unit/config-hot-reload.test.ts` (new file)
 
 8. Implement warning system:
 
-- Extend diagnostic types if needed in `shared/src/types/config.ts`.
-- Add notification emission for restart-required changes.
+   - Extend diagnostic types if needed in `shared/src/types/config.ts`.
+   - Add notification emission for restart-required changes.
 
 9. Settings UI integration:
 
-- Update settings UI components to consume reloadability metadata.
-- Add restart-required indicators (icons, labels, inline warnings).
-- Target files:
-  - Settings UI components in `lib/components/` or `frontend/`.
+   - Update settings UI components to consume reloadability metadata.
+   - Add restart-required indicators (icons, labels, inline warnings).
+   - Target files:
+     - Settings UI components in `lib/components/` or `frontend/`.
 
 10. Update developer guidance:
 
-- `docs/developers-guide.md` (layering and reloadability practice)
-- `docs/tracking-issues.md` (CONFIG-001 reference, deferral documentation)
+    - `docs/developers-guide.md` (layering and reloadability practice)
+    - `docs/tracking-issues.md` (CONFIG-001 reference, deferral documentation)
 
 11. Run required full gates with durable logs:
 
-```bash
-set -o pipefail
-bun install 2>&1 | tee "/tmp/bun-install-$(get-project)-$(git branch --show).out"
-make build 2>&1 | tee "/tmp/build-$(get-project)-$(git branch --show).out"
-make check-fmt 2>&1 | tee "/tmp/check-fmt-$(get-project)-$(git branch --show).out"
-make lint 2>&1 | tee "/tmp/lint-$(get-project)-$(git branch --show).out"
-make test 2>&1 | tee "/tmp/test-$(get-project)-$(git branch --show).out"
-```
+    ```bash
+    set -o pipefail
+    bun install 2>&1 | tee "/tmp/bun-install-$(get-project)-$(git branch --show).out"
+    make build 2>&1 | tee "/tmp/build-$(get-project)-$(git branch --show).out"
+    make check-fmt 2>&1 | tee "/tmp/check-fmt-$(get-project)-$(git branch --show).out"
+    make lint 2>&1 | tee "/tmp/lint-$(get-project)-$(git branch --show).out"
+    make test 2>&1 | tee "/tmp/test-$(get-project)-$(git branch --show).out"
+    ```
 
 12. If docs changed, run docs gates too:
 
-```bash
-set -o pipefail
-bunx markdownlint-cli2 "docs/**/*.md" 2>&1 | tee "/tmp/markdownlint-$(get-project)-$(git branch --show).out"
-nixie --no-sandbox 2>&1 | tee "/tmp/nixie-$(get-project)-$(git branch --show).out"
-```
+    ```bash
+    set -o pipefail
+    bunx markdownlint-cli2 "docs/**/*.md" 2>&1 | tee "/tmp/markdownlint-$(get-project)-$(git branch --show).out"
+    nixie --no-sandbox 2>&1 | tee "/tmp/nixie-$(get-project)-$(git branch --show).out"
+    ```
 
 13. Roadmap closure (only after successful gates):
 
-- Mark `docs/roadmap.md` item `3.1.2` and all child bullets complete.
-- Record gate evidence paths in this ExecPlan.
+    - Mark `docs/roadmap.md` item `3.1.2` and all child bullets complete.
+    - Record gate evidence paths in this ExecPlan.
 
 <!-- markdownlint-enable MD029 -->
 
