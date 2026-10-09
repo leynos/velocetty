@@ -260,7 +260,8 @@ item `3.1.2` and sub-bullets done.
    - Implement merge helpers and layering orchestration in
      `app/config/layering.ts`.
    - Target files:
-     - `app/config/layering.ts` (merge implementation and layering orchestration)
+     - `app/config/layering.ts` (merge implementation and layering
+       orchestration)
 
 5. Add layering merge tests:
 
