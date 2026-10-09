@@ -202,7 +202,8 @@ item `3.1.1` and sub-bullets done.
    preserved during write operations:
 
    - `test/unit/config-import-json5.test.ts` (extend with retention assertions)
-   - `test/unit/runtime-plugin-settings.test.ts` (extend with retention assertions
+   - `test/unit/runtime-plugin-settings.test.ts` (extend with retention
+     assertions
      for plugin settings writes)
 
 4. Implement parser/schema/import changes guided by failing tests in:
