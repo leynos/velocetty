@@ -184,63 +184,64 @@ item `3.1.1` and sub-bullets done.
 
 1. Baseline and scope verification:
 
-```bash
-git branch --show
-nl -ba docs/roadmap.md | sed -n '223,236p'
-nl -ba docs/velocetty-design.md | sed -n '912,1025p'
-```
+   ```bash
+   git branch --show
+   nl -ba docs/roadmap.md | sed -n '223,236p'
+   nl -ba docs/velocetty-design.md | sed -n '912,1025p'
+   ```
 
 2. Add/extend diagnostics-focused tests before implementation:
 
-```bash
-set -o pipefail
-TEST_LOG="/tmp/test-config-import-json5-$(get-project)-$(git branch --show).out"
-bun test --max-concurrency=1 test/unit/config-import-json5.test.ts 2>&1 | tee "$TEST_LOG"
-```
+   ```bash
+   set -o pipefail
+   TEST_LOG="/tmp/test-config-import-json5-$(get-project)-$(git branch --show).out"
+   bun test --max-concurrency=1 test/unit/config-import-json5.test.ts 2>&1 | tee "$TEST_LOG"
+   ```
 
 3. Add roundtrip-retention tests that verify unchanged comments/formatting are
    preserved during write operations:
 
-- `test/unit/config-import-json5.test.ts` (extend with retention assertions)
-- `test/unit/runtime-plugin-settings.test.ts` (extend with retention assertions
-  for plugin settings writes)
+   - `test/unit/config-import-json5.test.ts` (extend with retention assertions)
+   - `test/unit/runtime-plugin-settings.test.ts` (extend with retention
+     assertions
+     for plugin settings writes)
 
 4. Implement parser/schema/import changes guided by failing tests in:
 
-- `app/config/json5-config.ts`
-- `app/config/import.ts`
-- `app/config/paths.ts` (only if required to satisfy `config.json5` scope)
-- `test/unit/config-import-json5.test.ts`
-- `test/unit/runtime-plugin-settings.test.ts` (if config filename or
-  persistence contract changes)
+   - `app/config/json5-config.ts`
+   - `app/config/import.ts`
+   - `app/config/paths.ts` (only if required to satisfy `config.json5` scope)
+   - `test/unit/config-import-json5.test.ts`
+   - `test/unit/runtime-plugin-settings.test.ts` (if config filename or
+     persistence contract changes)
 
 5. Update developer guidance:
 
-- `docs/developers-guide.md` (configuration format and diagnostics practice)
+   - `docs/developers-guide.md` (configuration format and diagnostics practice)
 
 6. Run required full gates with durable logs:
 
-```bash
-set -o pipefail
-bun install 2>&1 | tee "/tmp/bun-install-$(get-project)-$(git branch --show).out"
-make build 2>&1 | tee "/tmp/build-$(get-project)-$(git branch --show).out"
-make check-fmt 2>&1 | tee "/tmp/check-fmt-$(get-project)-$(git branch --show).out"
-make lint 2>&1 | tee "/tmp/lint-$(get-project)-$(git branch --show).out"
-make test 2>&1 | tee "/tmp/test-$(get-project)-$(git branch --show).out"
-```
+   ```bash
+   set -o pipefail
+   bun install 2>&1 | tee "/tmp/bun-install-$(get-project)-$(git branch --show).out"
+   make build 2>&1 | tee "/tmp/build-$(get-project)-$(git branch --show).out"
+   make check-fmt 2>&1 | tee "/tmp/check-fmt-$(get-project)-$(git branch --show).out"
+   make lint 2>&1 | tee "/tmp/lint-$(get-project)-$(git branch --show).out"
+   make test 2>&1 | tee "/tmp/test-$(get-project)-$(git branch --show).out"
+   ```
 
 7. If docs changed, run docs gates too:
 
-```bash
-set -o pipefail
-bunx markdownlint-cli2 "docs/**/*.md" 2>&1 | tee "/tmp/markdownlint-$(get-project)-$(git branch --show).out"
-nixie --no-sandbox 2>&1 | tee "/tmp/nixie-$(get-project)-$(git branch --show).out"
-```
+   ```bash
+   set -o pipefail
+   bunx markdownlint-cli2 "docs/**/*.md" 2>&1 | tee "/tmp/markdownlint-$(get-project)-$(git branch --show).out"
+   nixie --no-sandbox 2>&1 | tee "/tmp/nixie-$(get-project)-$(git branch --show).out"
+   ```
 
 8. Roadmap closure (only after successful gates):
 
-- Mark `docs/roadmap.md` item `3.1.1` and all child bullets complete.
-- Record gate evidence paths in this ExecPlan.
+   - Mark `docs/roadmap.md` item `3.1.1` and all child bullets complete.
+   - Record gate evidence paths in this ExecPlan.
 
 <!-- markdownlint-enable MD029 -->
 
