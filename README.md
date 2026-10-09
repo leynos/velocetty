@@ -75,7 +75,7 @@ Bun is required for local development. Install it from [Bun][bun].
 2. Fork and clone the repository.
 3. Install dependencies: `bun install`.
 4. Install the Markdown formatter used by `make check-fmt`:
-   `cargo install --locked mdtablefix --version 0.6.0` (needs a Rust toolchain;
+   `cargo install --locked mdtablefix --version 0.6.1` (needs a Rust toolchain;
    CI installs the same version).
 5. Build and watch for changes: `bun run dev`.
 6. Run the app: `bun run app` (from another terminal).
