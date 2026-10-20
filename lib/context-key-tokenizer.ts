@@ -3,12 +3,25 @@ import type {ContextKeyValue, WhenComparisonOperator} from '@shared/types/contex
 
 import {WhenExpressionSyntaxError} from './context-key-syntax-error';
 
-export type TokenKind = 'identifier' | 'literal' | 'operator' | 'lparen' | 'rparen' | 'eof';
-export type Token = {kind: TokenKind; lexeme: string; index: number; literal?: ContextKeyValue};
+export type Token =
+  | {kind: 'identifier'; lexeme: string; index: number}
+  | {kind: 'literal'; lexeme: string; index: number; literal: ContextKeyValue}
+  | {kind: 'operator'; lexeme: WhenComparisonOperator | '&&' | '||' | '!'; index: number}
+  | {kind: 'lparen' | 'rparen' | 'eof'; lexeme: string; index: number};
+export type TokenKind = Token['kind'];
 
 export const COMPARISON_OPERATORS: readonly WhenComparisonOperator[] = ['==', '!=', '<', '<=', '>', '>='];
 const TWO_CHAR_OPERATORS = ['&&', '||', ...COMPARISON_OPERATORS] as const;
 const SINGLE_CHAR_OPERATORS = ['!', '<', '>'] as const;
+
+const isComparisonOperator = (value: string): value is WhenComparisonOperator =>
+  value === '==' || value === '!=' || value === '<' || value === '<=' || value === '>' || value === '>=';
+
+const isTwoCharOperator = (value: string): value is (typeof TWO_CHAR_OPERATORS)[number] =>
+  value === '&&' || value === '||' || isComparisonOperator(value);
+
+const isSingleCharOperator = (value: string): value is (typeof SINGLE_CHAR_OPERATORS)[number] =>
+  value === '!' || value === '<' || value === '>';
 
 class SourceReader {
   constructor(
@@ -72,11 +85,24 @@ const isNumberStart = (reader: SourceReader, pos: Position): boolean => {
 };
 
 const mapEscapeSequence = (escaped: string): string => {
-  return escaped === 'n' ? '\n' : escaped === 'r' ? '\r' : escaped === 't' ? '\t' : escaped;
+  switch (escaped) {
+    case 'n': {
+      return '\n';
+    }
+    case 'r': {
+      return '\r';
+    }
+    case 't': {
+      return '\t';
+    }
+    default: {
+      return escaped;
+    }
+  }
 };
 
-const processEscapeSequence = (reader: SourceReader, pos: Position): {value: string; nextPosition: Position} => {
-  const escaped = reader.source[pos.value + 1];
+const processEscapeSequence = (reader: SourceReader, pos: Position) => {
+  const escaped = reader.source.at(pos.value + 1);
   if (escaped === undefined) {
     throw new WhenExpressionSyntaxError('Unterminated string literal', reader.source, pos.value);
   }
@@ -212,7 +238,24 @@ const readIdentifier = (reader: SourceReader, startPos: Position): ReadResult =>
   }
 
   const lexeme = source.slice(startPos.value, cursor.value);
-  const literal = lexeme === 'true' ? true : lexeme === 'false' ? false : lexeme === 'null' ? null : undefined;
+  let literal: boolean | null | undefined;
+  switch (lexeme) {
+    case 'true': {
+      literal = true;
+      break;
+    }
+    case 'false': {
+      literal = false;
+      break;
+    }
+    case 'null': {
+      literal = null;
+      break;
+    }
+    default: {
+      literal = undefined;
+    }
+  }
   if (literal !== undefined) {
     return {
       token: {kind: 'literal', lexeme, index: startPos.value, literal},
@@ -244,7 +287,7 @@ const tryTokenizeParenthesis = (reader: SourceReader, pos: Position): TokenizeRe
 
 const tryTokenizeTwoCharOperator = (reader: SourceReader, pos: Position): TokenizeResult => {
   const twoChar = reader.source.slice(pos.value, pos.value + 2);
-  if (!TWO_CHAR_OPERATORS.includes(twoChar as (typeof TWO_CHAR_OPERATORS)[number])) {
+  if (!isTwoCharOperator(twoChar)) {
     return null;
   }
 
@@ -256,7 +299,7 @@ const tryTokenizeTwoCharOperator = (reader: SourceReader, pos: Position): Tokeni
 
 const tryTokenizeSingleCharOperator = (reader: SourceReader, pos: Position): TokenizeResult => {
   const char = reader.source[pos.value];
-  if (!SINGLE_CHAR_OPERATORS.includes(char as (typeof SINGLE_CHAR_OPERATORS)[number])) {
+  if (!isSingleCharOperator(char)) {
     return null;
   }
 

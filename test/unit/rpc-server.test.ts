@@ -5,7 +5,9 @@ import {afterEach, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
 import {getElectronMock, registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
 
-type IpcMainListener = (event: unknown, payload: {ev: string; data?: unknown}) => void;
+type IpcMainListener = (event: Electron.IpcMainEvent, payload: {ev: string; data?: unknown}) => void;
+// SAFETY: Server.ipcListener ignores the event object in this harness; the test exercises only its payload routing.
+const unusedIpcMainEvent = {} as Electron.IpcMainEvent;
 
 const ipcMainOnMock = mock((_channel: string, _listener: IpcMainListener) => {});
 const ipcMainRemoveListenerMock = mock((_channel: string, _listener: IpcMainListener) => {});
@@ -14,8 +16,9 @@ mock.module('uuid', () => ({
   v4: () => 'test-rpc-id'
 }));
 
+// eslint-disable-next-line unicorn/prefer-event-target -- The Electron WebContents fixture must preserve EventEmitter's `emit` behavior.
 class FakeWebContents extends EventEmitter {
-  send = mock((_channel: string, _payload: unknown, _profileName?: string) => {});
+  send = mock((..._args: unknown[]) => {});
   removeAllListeners = mock(() => super.removeAllListeners());
 }
 
@@ -60,7 +63,7 @@ afterEach(() => {
 
 test('registers IPC channel and emits init after renderer loads', () => {
   const {win, webContents} = createWindowStub();
-  const server = new Server(win as any);
+  const server = new Server(win);
 
   expect(ipcMainOnMock).toHaveBeenCalledWith(server.id, expect.any(Function));
 
@@ -73,12 +76,12 @@ test('registers IPC channel and emits init after renderer loads', () => {
 
 test('routes renderer-to-main events through typed listeners', () => {
   const {win} = createWindowStub();
-  const server = new Server(win as any);
+  const server = new Server(win);
 
   const commandListener = mock((_command: string) => {});
   server.on('command', commandListener);
 
-  server.ipcListener({} as any, {ev: 'command', data: 'tab:new'});
+  server.ipcListener(unusedIpcMainEvent, {ev: 'command', data: 'tab:new'});
 
   expect(commandListener).toHaveBeenCalledWith('tab:new');
 
@@ -87,7 +90,7 @@ test('routes renderer-to-main events through typed listeners', () => {
 
 test('emits events to renderer only while window is alive', () => {
   const {win, webContents, setDestroyed} = createWindowStub();
-  const server = new Server(win as any);
+  const server = new Server(win);
 
   expect(server.emit('reload')).toBe(true);
   expect(webContents.send).toHaveBeenCalledWith(server.id, {ch: 'reload', data: undefined});
@@ -100,7 +103,7 @@ test('emits events to renderer only while window is alive', () => {
 
 test('destroy removes listeners from emitter, webContents, and ipcMain', () => {
   const {win, webContents} = createWindowStub();
-  const server = new Server(win as any);
+  const server = new Server(win);
 
   const listener = mock(() => {});
   server.on('close', listener);

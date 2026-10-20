@@ -7,9 +7,6 @@ export * from './config-reloadability';
 export const INIT = 'INIT';
 
 /** Action contract for initialization events. */
-export interface InitAction {
+export interface InitActions {
   readonly type: typeof INIT;
 }
-
-/** Union type for bootstrap actions. */
-export type InitActions = InitAction;

@@ -1,16 +1,16 @@
 /** @file Provides the shell/file menu template for tab and pane actions. */
 import type {MenuItemConstructorOptions} from 'electron';
-import type {CommandId} from '@shared/types/commands';
+import {asCommandId} from '@shared/types/commands';
 
 import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
 
-const asCommandId = (command: string): CommandId => command as CommandId;
+type ShellMenuTemplate = MenuItemConstructorOptions & {submenu: MenuItemConstructorOptions[]};
 
 const shellMenu = (
   commandKeys: Record<string, string>,
   execCommand: MenuCommandRunner,
   profiles: string[]
-): MenuItemConstructorOptions => {
+): ShellMenuTemplate => {
   const isMac = process.platform === 'darwin';
   const execWithBrowserWindow = makeMenuCommandExecutor(execCommand);
 

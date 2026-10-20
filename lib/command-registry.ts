@@ -1,17 +1,22 @@
 /** @file Command registry and validation helpers for renderer command dispatch. */
 import type {RendererCommandTransport} from '@shared/types/transport';
 import type {HyperDispatch, HyperState} from '../typings/hyper';
-import type {
-  CommandDefinition,
-  CommandId,
-  CommandOrderingComparator,
-  CommandRegistry,
-  CommandValidationError,
-  CommandValidationIssue,
-  CommandValidationResult
+import type {IpcCommands} from '@shared/types/common';
+import {
+  asCommandId,
+  type CommandDefinition,
+  type CommandId,
+  type CommandOrderingComparator,
+  type CommandRegistry,
+  type CommandValidationError,
+  type CommandValidationIssue,
+  type CommandValidationResult
 } from '@shared/types/commands';
 import {SESSION_SEARCH} from '@shared/constants/sessions';
+import {asSessionId} from '@shared/types/common';
 import Ajv, {type ErrorObject, type ValidateFunction} from 'ajv';
+import {isBoolean, isObject} from '@shared/types/guards';
+import {isJsonObject} from '@shared/types/json';
 
 export type CommandHandler = (event: unknown, dispatch: HyperDispatch) => void;
 
@@ -28,15 +33,21 @@ type CommandRegistryDependencies = {
   transport: Pick<RendererCommandTransport, 'invoke'>;
 };
 
-const compareByCommandId: CommandOrderingComparator = (left, right) =>
-  left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
-const asCommandId = (value: string | CommandId): CommandId => value as CommandId;
+const compareByCommandId: CommandOrderingComparator = (left, right) => {
+  if (left.id < right.id) {
+    return -1;
+  }
+  if (left.id > right.id) {
+    return 1;
+  }
+  return 0;
+};
 const cloneSchema = <TSchema>(schema: TSchema | undefined): TSchema | undefined => {
   if (!schema) {
     return schema;
   }
 
-  return JSON.parse(JSON.stringify(schema)) as TSchema;
+  return structuredClone(schema);
 };
 
 const createLegacyDefinition = (id: CommandId): CommandDefinition => ({
@@ -61,9 +72,9 @@ export const closeSearchAction = (uid?: string, keyEvent?: {catched?: boolean}) 
     if (getState().sessions.sessions[targetUid]?.search) {
       dispatch({
         type: SESSION_SEARCH,
-        uid: targetUid,
+        uid: asSessionId(targetUid),
         value: false
-      } as never);
+      });
       return;
     }
 
@@ -85,31 +96,22 @@ const cloneCommandDefinition = (command: RegisteredCommand): CommandDefinition =
   resultSchema: cloneSchema(command.resultSchema)
 });
 
-/** Extends Ajv ErrorObject with legacy v6 path fields for instance/data paths. */
-type AjvErrorWithLegacyPath = ErrorObject & {
-  instancePath?: string;
-  dataPath?: string;
-};
-
 /** Accepts an optional path string and normalizes it to a guaranteed string. */
-const asIssuePath = (value: string | undefined): string => (typeof value === 'string' ? value : '');
-/** Coerces unknown params into a Record<string, unknown> or an empty object. */
-const asIssueParams = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+const asIssuePath = (value: string | undefined): string => value ?? '';
 
 const serializeAjvErrors = (errors: ErrorObject[] | null | undefined): CommandValidationIssue[] =>
   (errors ?? []).map((error) => {
-    const maybeLegacyError = error as AjvErrorWithLegacyPath;
-    const instancePath = asIssuePath(maybeLegacyError.instancePath) || asIssuePath(maybeLegacyError.dataPath);
-
     return {
-      instancePath,
+      instancePath: asIssuePath(error.dataPath),
       schemaPath: asIssuePath(error.schemaPath),
       keyword: error.keyword,
       message: error.message ?? 'Schema validation failed',
-      params: asIssueParams(error.params)
+      params: isJsonObject(error.params) ? error.params : {}
     };
   });
+
+const isSearchKeyEvent = (candidate: unknown): candidate is {catched?: boolean} =>
+  isObject(candidate) && (!('catched' in candidate) || isBoolean(candidate.catched));
 
 export const createCommandRegistryModule = (dependencies: CommandRegistryDependencies) => {
   const ajv = new Ajv({allErrors: true});
@@ -229,7 +231,7 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
   };
 
   const list = () => {
-    return Array.from(registry.values()).map(cloneCommandDefinition).sort(compareByCommandId);
+    return [...registry.values()].map((definition) => cloneCommandDefinition(definition)).toSorted(compareByCommandId);
   };
 
   const has = (commandId: CommandId | string) => {
@@ -240,7 +242,7 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
     return registry.get(asCommandId(command))?.handler;
   };
 
-  const registerCommandHandlers = (cmds: Record<string, CommandHandler> | undefined) => {
+  const registerCommandHandlers = (cmds: Partial<Record<string, CommandHandler>> | undefined) => {
     if (!cmds) {
       return;
     }
@@ -259,17 +261,18 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
     syncRuntimePluginCommands(runtimeCommands);
     const keymaps = await dependencies.transport.invoke('getDecoratedKeymaps');
 
-    return Object.keys(keymaps).reduce((result: Record<string, string>, actionName) => {
+    const result: Record<string, string> = {};
+    for (const actionName of Object.keys(keymaps)) {
       const commandKeys = keymaps[actionName];
       commandKeys.forEach((shortcut) => {
         result[shortcut] = actionName;
       });
-      return result;
-    }, {});
+    }
+    return result;
   };
 
   assignLegacyHandler(asCommandId('editor:search-close'), (e, dispatch) => {
-    dispatch(dependencies.closeSearch(undefined, e as {catched?: boolean}) as never);
+    dispatch(dependencies.closeSearch(undefined, isSearchKeyEvent(e) ? e : undefined));
     dependencies.focusActiveTerm();
   });
 
@@ -332,16 +335,16 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
 const commandRegistryModule = createCommandRegistryModule({
   closeSearch: closeSearchAction,
   focusActiveTerm: () => {
-    if (typeof window !== 'undefined' && typeof window.focusActiveTerm === 'function') {
-      window.focusActiveTerm();
+    if (globalThis.focusActiveTerm) {
+      globalThis.focusActiveTerm();
     }
   },
   transport: {
-    invoke: (async (channel: string, ...args: unknown[]) => {
+    invoke: async <Command extends keyof IpcCommands>(channel: Command, ...args: Parameters<IpcCommands[Command]>) => {
       const {transport} = await import('./transport');
       // Forward all args to avoid silently dropping IpcCommands payload args.
-      return (transport.invoke as (c: string, ...a: unknown[]) => Promise<unknown>)(channel, ...args);
-    }) as RendererCommandTransport['invoke']
+      return transport.invoke(channel, ...args);
+    }
   }
 });
 
@@ -374,7 +377,7 @@ export const {
 
 // Some commands are directly executed by Electron menuItem role.
 // They should not be prevented to reach Electron.
-const roleCommands = [
+const roleCommands = new Set([
   'window:close',
   'editor:undo',
   'editor:redo',
@@ -385,6 +388,6 @@ const roleCommands = [
   'window:minimize',
   'window:zoom',
   'window:toggleFullScreen'
-];
+]);
 
-export const shouldPreventDefault = (command: string) => !roleCommands.includes(command);
+export const shouldPreventDefault = (command: string) => !roleCommands.has(command);

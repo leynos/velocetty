@@ -3,6 +3,7 @@ import React from 'react';
 
 import {connect} from 'react-redux';
 
+import {CURSOR_STYLE_CONFIG_KEY} from '@shared/types/config';
 import type {HyperState, HyperDispatch, TermGroupProps, TermGroupOwnProps} from '../../typings/hyper';
 import {resizeTermGroup} from '../actions/term-groups';
 import {decorate, getTermProps, getTermGroupProps} from '../utils/plugins';
@@ -14,7 +15,7 @@ const Term = decorate(Term_, 'Term');
 const SplitPane = decorate(SplitPane_, 'SplitPane');
 
 class TermGroup_ extends React.PureComponent<TermGroupProps> {
-  bound: WeakMap<(uid: string, ...args: any[]) => any, Record<string, (...args: any[]) => any>>;
+  bound: WeakMap<(uid: string, ...args: any[]) => any, Partial<Record<string, (...args: any[]) => any>>>;
   term?: Term_ | null;
   constructor(props: TermGroupProps, context: any) {
     super(props, context);
@@ -74,7 +75,7 @@ class TermGroup_ extends React.PureComponent<TermGroupProps> {
       foregroundColor: this.props.foregroundColor,
       colors: this.props.colors,
       cursorBlink: this.props.cursorBlink,
-      cursorShape: this.props.cursorShape,
+      [CURSOR_STYLE_CONFIG_KEY]: this.props.cursorShape,
       cursorColor: this.props.cursorColor,
       cursorAccentColor: this.props.cursorAccentColor,
       fontSize: this.props.fontSize,

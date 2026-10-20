@@ -1,24 +1,29 @@
 /** @file Shared JSON5 parsing and serialization helpers with optional schema validation. */
 import JSON5 from 'json5';
 import {z} from 'zod';
+import type {JsonObject, JsonValue} from '../types/json';
 
 export type ParseSuccess<T> = {success: true; data: T};
 export type ParseFailure = {success: false; error: Error};
 export type ParseResult<T> = ParseSuccess<T> | ParseFailure;
 export type ParseSchema<T> = {
-  readonly safeParse: (value: unknown) => ParseResult<T>;
+  readonly safeParse: (value: JsonValue) => ParseResult<T>;
 };
 
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
+export const isRecord = (value: JsonValue): value is JsonObject =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-export const isStringArray = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((item) => typeof item === 'string');
+const isString = (value: JsonValue): value is string => typeof value === 'string';
 
-export const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
-  isRecord(value) && Object.values(value).every((entry) => typeof entry === 'string' || isStringArray(entry));
+export const isStringArray = (value: JsonValue): value is string[] =>
+  Array.isArray(value) && value.every((item) => isString(item));
 
-type FieldValidator = (value: Record<string, unknown>, field: string) => Error | null;
+const isKeymapBinding = (value: JsonValue): value is string | string[] => isString(value) || isStringArray(value);
+
+export const isKeymapConfig = (value: JsonValue): value is Record<string, string | string[]> =>
+  isRecord(value) && Object.values(value).every((entry) => isKeymapBinding(entry));
+
+type FieldValidator = (value: JsonObject, field: string) => Error | null;
 
 const validateRecordField: FieldValidator = (value, field) => {
   if (value[field] !== undefined && !isRecord(value[field])) {
@@ -41,16 +46,17 @@ const validateKeymapField: FieldValidator = (value, field) => {
   return null;
 };
 
+const keymapValueSchema = z.union([z.string(), z.array(z.string())]);
 const rawConfigSchema = z
   .object({
-    config: z.record(z.string(), z.unknown()).optional(),
+    config: z.record(z.string(), z.json()).optional(),
     plugins: z.array(z.string()).optional(),
     localPlugins: z.array(z.string()).optional(),
-    keymaps: z.record(z.string(), z.union([z.string(), z.array(z.string())])).optional()
+    keymaps: z.record(z.string(), keymapValueSchema).optional()
   })
-  .passthrough();
+  .loose();
 
-const validateFields = (value: Record<string, unknown>): Error | null => {
+const validateFields = (value: JsonObject): Error | null => {
   const validators: Array<[string, FieldValidator]> = [
     ['config', validateRecordField],
     ['plugins', validateStringArrayField],
@@ -68,10 +74,12 @@ const validateFields = (value: Record<string, unknown>): Error | null => {
   return null;
 };
 
-export const validateRawConfig = (value: unknown): ParseResult<Record<string, unknown>> => {
+export const validateRawConfig = (value: JsonValue): ParseResult<JsonObject> => {
   const parsed = rawConfigSchema.safeParse(value);
   if (parsed.success) {
-    return {success: true, data: parsed.data as Record<string, unknown>};
+    return isRecord(value)
+      ? {success: true, data: value}
+      : {success: false, error: new Error('Expected config payload to be an object.')};
   }
 
   if (!isRecord(value)) {
@@ -86,15 +94,15 @@ export const validateRawConfig = (value: unknown): ParseResult<Record<string, un
   return {success: false, error: parsed.error};
 };
 
-export const sortKeys = (value: unknown): unknown => {
+export const sortKeys = (value: JsonValue): JsonValue => {
   if (Array.isArray(value)) {
     return value.map((item) => sortKeys(item));
   }
 
   if (isRecord(value)) {
-    const sortedObject: Record<string, unknown> = {};
+    const sortedObject: JsonObject = {};
     Object.keys(value)
-      .sort()
+      .toSorted()
       .forEach((key) => {
         sortedObject[key] = sortKeys(value[key]);
       });
@@ -112,12 +120,11 @@ export interface ParseJson5Options<T> {
   readonly itemType?: string;
 }
 
-export type ParseOptions<T> = ParseJson5Options<T>;
-
 export const parseJson5WithSchema = <T>(options: ParseJson5Options<T>): T => {
   const {raw, source, schema, fallback, itemType = 'config'} = options;
   try {
-    const parsed = JSON5.parse(raw) as unknown;
+    // SAFETY: JSON5.parse can only produce JSON5 primitives, arrays, and objects.
+    const parsed = JSON5.parse(raw) as JsonValue;
     const validated = schema.safeParse(parsed);
     if (validated.success === false) {
       console.warn(`Invalid JSON5 ${itemType} shape from ${source}.`, validated.error);
@@ -131,7 +138,7 @@ export const parseJson5WithSchema = <T>(options: ParseJson5Options<T>): T => {
 };
 
 export const parseJson5StrictWithSchema = <T>(raw: string, schema: z.ZodType<T>): T => {
-  return schema.parse(JSON5.parse(raw) as unknown);
+  return schema.parse(JSON5.parse(raw));
 };
 
-export const stringifyJson5 = (value: unknown): string => `${JSON5.stringify(sortKeys(value), null, 2)}\n`;
+export const stringifyJson5 = (value: JsonValue): string => `${JSON5.stringify(sortKeys(value), null, 2)}\n`;

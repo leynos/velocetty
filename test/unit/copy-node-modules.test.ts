@@ -19,6 +19,7 @@
  * Cross-link: `../../bin/copy-node-modules.mjs`.
  */
 import {expect, test} from 'bun:test';
+import type {RmOptions} from 'node:fs';
 import path from 'node:path';
 
 import {copyNodeModules} from '../../bin/copy-node-modules.mjs';
@@ -93,13 +94,13 @@ interface CopyFixture {
   fsModule: {
     cpSync: (sourceDir: string, destinationDir: string, options: CopyFixture['cpSyncCalls'][number]['options']) => void;
     existsSync: (targetPath: string) => boolean;
-    rmSync: (targetPath: string, options?: Record<string, unknown>) => void;
+    rmSync: (targetPath: string, options?: RmOptions) => void;
   };
   logger: (message: string) => void;
   loggerMessages: string[];
   operations: string[];
   rmSyncCalls: Array<{
-    options: Record<string, unknown> | undefined;
+    options: RmOptions | undefined;
     targetPath: string;
   }>;
   sourceDir: string;
@@ -121,7 +122,7 @@ const makeCopyFixture = (): CopyFixture => {
     existsSync: (targetPath: string) => {
       return targetPath === sourceDir;
     },
-    rmSync: (targetPath: string, options?: Record<string, unknown>) => {
+    rmSync: (targetPath: string, options?: RmOptions) => {
       operations.push('rmSync');
       rmSyncCalls.push({targetPath, options});
     }
@@ -162,9 +163,9 @@ test('copies with Node-supported cpSync options', () => {
   expect(cpSyncCalls).toHaveLength(1);
   const copyCall = cpSyncCalls[0];
   expect(copyCall).toBeDefined();
-  expect(copyCall?.sourceDir).toBe(sourceDir);
-  expect(copyCall?.destinationDir).toBe(destinationDir);
-  expect(copyCall?.options).toMatchObject({
+  expect(copyCall.sourceDir).toBe(sourceDir);
+  expect(copyCall.destinationDir).toBe(destinationDir);
+  expect(copyCall.options).toMatchObject({
     recursive: true,
     force: true,
     dereference: false
@@ -189,6 +190,6 @@ test('copies with Node-supported cpSync options', () => {
       filter
     }
   });
-  expect(copyCall?.options).not.toHaveProperty('errorOnExist');
+  expect(copyCall.options).not.toHaveProperty('errorOnExist');
   expect(loggerMessages).toEqual([`Copying node_modules from ${sourceDir} to ${destinationDir}`]);
 });

@@ -1,7 +1,9 @@
 import {EventEmitter} from 'node:events';
-import {dirname} from 'node:path';
+import {createRequire} from 'node:module';
+import path from 'node:path';
 import {StringDecoder} from 'node:string_decoder';
 
+import {app} from 'electron';
 import defaultShell from 'default-shell';
 import type {IPty, IWindowsPtyForkOptions, spawn as npSpawn} from 'node-pty';
 import osLocale from 'os-locale';
@@ -21,9 +23,8 @@ const createNodePtyError = () =>
 
 let spawn: typeof npSpawn;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  spawn = require('node-pty').spawn;
-} catch (_err) {
+  spawn = createRequire(path.resolve(app.getAppPath(), 'session.js'))('node-pty').spawn;
+} catch {
   throw createNodePtyError();
 }
 
@@ -34,15 +35,16 @@ const useConpty = config.getConfig().useConpty;
 // IPC calls. It also reduces GC pressure and CPU cost: each chunk is prefixed
 // with the window ID which is then stripped on the renderer process and this
 // overhead is reduced with batching.
-class DataBatcher extends EventEmitter {
+class DataBatcher {
   uid: string;
+  onFlush: (data: string) => void;
   decoder: StringDecoder;
   data!: string;
   dataBytes!: number;
   timeout!: NodeJS.Timeout | null;
-  constructor(uid: string) {
-    super();
+  constructor(uid: string, onFlush: (data: string) => void) {
     this.uid = uid;
+    this.onFlush = onFlush;
     this.decoder = new StringDecoder('utf8');
 
     this.reset();
@@ -55,7 +57,7 @@ class DataBatcher extends EventEmitter {
   }
 
   write(chunk: Buffer | string) {
-    const chunkBytes = typeof chunk === 'string' ? Buffer.byteLength(chunk, 'utf8') : chunk.length;
+    const chunkBytes = Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(chunk, 'utf8');
     if (this.dataBytes + chunkBytes >= PTY_BATCH_MAX_BYTES) {
       // We've reached the max batch size. Flush it and start another one
       if (this.timeout) {
@@ -65,7 +67,7 @@ class DataBatcher extends EventEmitter {
       this.flush();
     }
 
-    this.data += typeof chunk === 'string' ? chunk : this.decoder.write(chunk);
+    this.data += Buffer.isBuffer(chunk) ? this.decoder.write(chunk) : chunk;
     this.dataBytes += chunkBytes;
 
     if (!this.timeout) {
@@ -78,7 +80,7 @@ class DataBatcher extends EventEmitter {
     const data = this.data;
     this.reset();
 
-    this.emit('flush', data);
+    this.onFlush(data);
   }
 }
 
@@ -91,6 +93,7 @@ interface SessionOptions {
   shellArgs?: string[];
   profile: string;
 }
+// eslint-disable-next-line unicorn/prefer-event-target -- `decorateSessionClass` plugins receive the EventEmitter-compatible session API.
 export default class Session extends EventEmitter {
   pty: IPty | null;
   batcher: DataBatcher | null;
@@ -110,14 +113,14 @@ export default class Session extends EventEmitter {
 
   init({uid, rows, cols, cwd, shell: _shell, shellArgs: _shellArgs, profile}: SessionOptions) {
     this.profile = profile;
-    const envFromConfig = config.getProfileConfig(profile).env || {};
+    const envFromConfig = config.getProfileConfig(profile).env;
     const defaultShellArgs = ['--login'];
 
     const shell = _shell || defaultShell;
     const shellArgs = _shellArgs || defaultShellArgs;
 
     const cleanEnv = process.env.APPIMAGE && process.env.APPDIR ? shellEnv.sync(_shell || defaultShell) : process.env;
-    const baseEnv: Record<string, string> = {
+    const baseEnv: NodeJS.ProcessEnv = {
       ...cleanEnv,
       LANG: `${osLocale.sync().replace(/-/, '_')}.UTF-8`,
       TERM: 'xterm-256color',
@@ -129,9 +132,10 @@ export default class Session extends EventEmitter {
     // path to AppImage mount point is added to PATH environment variable automatically
     // which conflicts with the cli
     if (baseEnv.APPIMAGE && baseEnv.APPDIR) {
-      baseEnv.PATH = [dirname(cliScriptPath)]
-        .concat((baseEnv.PATH || '').split(':').filter((val) => !val.startsWith(baseEnv.APPDIR)))
-        .join(':');
+      baseEnv.PATH = [
+        path.dirname(cliScriptPath),
+        ...(baseEnv.PATH || '').split(':').filter((val) => !val.startsWith(baseEnv.APPDIR))
+      ].join(':');
     }
 
     // Electron has a default value for process.env.GOOGLE_API_KEY
@@ -149,31 +153,23 @@ export default class Session extends EventEmitter {
     };
 
     // if config do not set the useConpty, it will be judged by the node-pty
-    if (typeof useConpty === 'boolean') {
+    if (useConpty !== undefined) {
       options.useConpty = useConpty;
     }
 
     try {
       this.pty = spawn(shell, shellArgs, options);
-    } catch (_err) {
-      const err = _err as {message: string};
-      if (/is not a function/.test(err.message)) {
-        throw createNodePtyError();
-      } else {
-        throw err;
-      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw /is not a function/.test(message) ? createNodePtyError() : error;
     }
 
-    this.batcher = new DataBatcher(uid);
+    this.batcher = new DataBatcher(uid, (data) => this.emit('data', data));
     this.pty.onData((chunk) => {
       if (this.ended) {
         return;
       }
       this.batcher?.write(chunk);
-    });
-
-    this.batcher.on('flush', (data: string) => {
-      this.emit('data', data);
     });
 
     this.pty.onExit((e) => {
@@ -190,7 +186,7 @@ please check the shell config: ${JSON.stringify({shell, shellArgs}, undefined, 2
 using fallback shell config: ${JSON.stringify(fallBackShellConfig, undefined, 2)}
 `;
             console.warn(msg);
-            this.batcher?.write(msg.replace(/\n/g, '\r\n'));
+            this.batcher?.write(msg.replaceAll('\n', '\r\n'));
             this.init({
               uid,
               rows,
@@ -206,7 +202,7 @@ shell exited in ${runDuration} ms with exit code ${e.exitCode}
 No fallback available, please check the shell config.
 `;
             console.warn(msg);
-            this.batcher?.write(msg.replace(/\n/g, '\r\n'));
+            this.batcher?.write(msg.replaceAll('\n', '\r\n'));
           }
         } else {
           this.ended = true;
@@ -234,9 +230,8 @@ No fallback available, please check the shell config.
     if (this.pty) {
       try {
         this.pty.resize(cols, rows);
-      } catch (_err) {
-        const err = _err as {stack: any};
-        console.error(err.stack);
+      } catch (error) {
+        console.error(error instanceof Error ? error.stack : error);
       }
     } else {
       console.warn('Warning: Attempted to resize a session with no pty');
@@ -247,9 +242,8 @@ No fallback available, please check the shell config.
     if (this.pty) {
       try {
         this.pty.kill();
-      } catch (_err) {
-        const err = _err as {stack: any};
-        console.error('exit error', err.stack);
+      } catch (error) {
+        console.error('exit error', error instanceof Error ? error.stack : error);
       }
     } else {
       console.warn('Warning: Attempted to destroy a session with no pty');

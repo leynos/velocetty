@@ -3,7 +3,7 @@
 import {spawn, exec} from 'node:child_process';
 import type {SpawnOptions} from 'node:child_process';
 import {existsSync} from 'node:fs';
-import {isAbsolute, resolve} from 'node:path';
+import path from 'node:path';
 import {promisify} from 'node:util';
 
 import args from 'args';
@@ -12,6 +12,7 @@ import _columnify from 'columnify';
 import got from 'got';
 import open from 'open';
 import ora from 'ora';
+import {z} from 'zod';
 
 import {version} from '../app/package.json';
 
@@ -22,8 +23,7 @@ let commandPromise: Promise<void> | undefined;
 const assertPluginName = (pluginName: string): string => {
   const normalizedPluginName = pluginName.trim();
   if (!normalizedPluginName) {
-    console.error(chalk.red('Plugin name is required'));
-    process.exit(1);
+    throw new Error(chalk.red('Plugin name is required'));
   }
   return normalizedPluginName;
 };
@@ -32,10 +32,7 @@ const checkConfig = () => {
   if (api.exists()) {
     return true;
   }
-  let msg = chalk.red(`Error! Config file not found: ${api.configPath}\n`);
-  msg += 'Please launch Hyper and retry.';
-  console.error(msg);
-  process.exit(1);
+  throw new Error(chalk.red(`Error! Config file not found: ${api.configPath}\nPlease launch Hyper and retry.`));
 };
 
 const columnify = (data: {name: string; description: string}[]) => {
@@ -51,7 +48,22 @@ const columnify = (data: {name: string; description: string}[]) => {
         dataTransform: (nameValue) => chalk.green(nameValue)
       }
     }
-  }).replace(/\s+$/gm, ''); // remove padding from the end of all lines
+  }).replaceAll(/\s+$/gm, ''); // remove padding from the end of all lines
+};
+
+const npmPackageSchema = z.object({
+  name: z.string(),
+  description: z.string().optional().default('')
+});
+const npmSearchEntrySchema = z.object({package: npmPackageSchema});
+const npmSearchResponseSchema = z.object({results: z.array(npmSearchEntrySchema)});
+
+const parseNpmSearchResults = (body: string) => {
+  const response = npmSearchResponseSchema.parse(JSON.parse(body));
+  return response.results.map(({package: npmPackage}) => ({
+    name: npmPackage.name,
+    description: npmPackage.description
+  }));
 };
 
 args.command(
@@ -64,7 +76,7 @@ args.command(
     commandPromise = api
       .install(specifier)
       .then(() => console.log(chalk.green(`${pluginName} installed successfully!`)))
-      .catch((err) => console.error(chalk.red(err)));
+      .catch((error) => console.error(chalk.red(error)));
   },
   ['i']
 );
@@ -79,7 +91,7 @@ args.command(
     commandPromise = api
       .uninstall(specifier)
       .then(() => console.log(chalk.green(`${pluginName} uninstalled successfully!`)))
-      .catch((err) => console.error(chalk.red(err)));
+      .catch((error) => console.error(chalk.red(error)));
   },
   ['u', 'rm', 'remove']
 );
@@ -96,7 +108,6 @@ args.command(
     } else {
       console.log(chalk.red(`No plugins installed yet.`));
     }
-    process.exit(0);
   },
   ['ls']
 );
@@ -106,15 +117,7 @@ const lsRemote = (pattern?: string) => {
   const URL = `https://api.npms.io/v2/search?q=${
     (pattern && `${pattern}+`) || ''
   }keywords:hyper-plugin,hyper-theme&size=250`;
-  type npmResult = {package: {name: string; description: string}};
-  return got(URL)
-    .then((response) => JSON.parse(response.body).results as npmResult[])
-    .then((entries) => entries.map((entry) => entry.package))
-    .then((entries) =>
-      entries.map(({name, description}) => {
-        return {name, description};
-      })
-    );
+  return got(URL).then(({body}) => parseNpmSearchResults(body));
 };
 
 args.command(
@@ -130,16 +133,17 @@ args.command(
           spinner.fail();
           console.error(chalk.red(`Your search '${query}' did not match any plugins`));
           console.error(`${chalk.red('Try')} ${chalk.green('hyper ls-remote')}`);
-          process.exit(1);
+          throw new Error(`Your search '${query}' did not match any plugins`);
         } else {
           const msg = columnify(entries);
           spinner.succeed();
           console.log(msg);
         }
       })
-      .catch((err) => {
+      .catch((error) => {
         spinner.fail();
-        console.error(chalk.red(err)); // TODO
+        console.error(chalk.red(error)); // TODO
+        process.exitCode = 1;
       });
   },
   ['s']
@@ -157,9 +161,10 @@ args.command(
         spinner.succeed();
         console.log(msg);
       })
-      .catch((err) => {
+      .catch((error) => {
         spinner.fail();
-        console.error(chalk.red(err)); // TODO
+        console.error(chalk.red(error)); // TODO
+        process.exitCode = 1;
       });
   },
   ['lsr', 'ls-remote']
@@ -170,8 +175,7 @@ args.command(
   'Open the npm page of a plugin',
   (_name, args_) => {
     const pluginName = assertPluginName(String(args_[0] ?? ''));
-    void open(`http://ghub.io/${pluginName}`, {wait: false});
-    process.exit(0);
+    commandPromise = open(`http://ghub.io/${pluginName}`, {wait: false}).then(() => {});
   },
   ['d', 'h', 'home']
 );
@@ -181,7 +185,6 @@ args.command(
   'Show the version of hyper',
   () => {
     console.log(version);
-    process.exit(0);
   },
   []
 );
@@ -223,10 +226,10 @@ const main = (argv: string[]) => {
   };
 
   const args_ = args.sub.map((arg) => {
-    const cwd = isAbsolute(arg) ? arg : resolve(process.cwd(), arg);
+    const cwd = path.isAbsolute(arg) ? arg : path.resolve(process.cwd(), arg);
     if (!existsSync(cwd)) {
       console.error(chalk.red(`Error! Directory or file does not exist: ${cwd}`));
-      process.exit(1);
+      throw new Error(`Directory or file does not exist: ${cwd}`);
     }
     return cwd;
   });
@@ -258,13 +261,10 @@ const main = (argv: string[]) => {
   return Promise.resolve();
 };
 
-function eventuallyExit(code: number) {
-  setTimeout(() => process.exit(code), 100);
+try {
+  await main(process.argv);
+  process.exitCode ??= 0;
+} catch (error) {
+  console.error(error instanceof Error ? error.stack || error : error);
+  process.exitCode = 1;
 }
-
-main(process.argv)
-  .then(() => eventuallyExit(0))
-  .catch((err) => {
-    console.error(err.stack ? err.stack : err);
-    eventuallyExit(1);
-  });

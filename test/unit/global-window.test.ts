@@ -3,25 +3,22 @@ import {afterEach, beforeEach, expect, test} from 'bun:test';
 
 import {installTestWindow} from '../testUtils/global-window';
 
-type WindowHost = typeof globalThis & {
-  window?: unknown;
-};
-
-const windowHost = globalThis as WindowHost;
+type WindowTestHost = {window?: unknown};
+const windowTestHost: WindowTestHost = globalThis;
 
 let originalWindowDescriptor: PropertyDescriptor | undefined;
 
 const restoreOriginalWindowDescriptor = () => {
   if (originalWindowDescriptor) {
-    Object.defineProperty(windowHost, 'window', originalWindowDescriptor);
+    Object.defineProperty(globalThis, 'window', originalWindowDescriptor);
     return;
   }
 
-  delete windowHost.window;
+  Reflect.deleteProperty(globalThis, 'window');
 };
 
 beforeEach(() => {
-  originalWindowDescriptor = Object.getOwnPropertyDescriptor(windowHost, 'window');
+  originalWindowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
 });
 
 afterEach(() => {
@@ -29,41 +26,38 @@ afterEach(() => {
 });
 
 test('installTestWindow removes window again when it was initially absent', () => {
-  delete windowHost.window;
+  Reflect.deleteProperty(globalThis, 'window');
 
   const restoreWindow = installTestWindow({testWindow: true});
 
-  expect(Object.hasOwn(windowHost, 'window')).toBe(true);
-  expect(windowHost.window).toEqual({testWindow: true});
+  expect(Object.hasOwn(globalThis, 'window')).toBe(true);
+  expect(windowTestHost.window).toEqual({testWindow: true});
 
   restoreWindow();
 
-  expect(Object.hasOwn(windowHost, 'window')).toBe(false);
-  expect(windowHost.window).toBeUndefined();
+  expect(Object.hasOwn(globalThis, 'window')).toBe(false);
+  expect(windowTestHost.window).toBeUndefined();
 });
 
 test('installTestWindow restores the prior window value when one existed', () => {
   const originalWindow = {originalWindow: true};
-  let currentWindow = originalWindow;
-  Object.defineProperty(windowHost, 'window', {
+  const currentWindow = originalWindow;
+  Object.defineProperty(globalThis, 'window', {
     configurable: true,
     enumerable: false,
-    get: () => currentWindow,
-    set: (value: unknown) => {
-      currentWindow = value as typeof originalWindow;
-    }
+    get: () => currentWindow
   });
-  const expectedWindowDescriptor = Object.getOwnPropertyDescriptor(windowHost, 'window');
+  const expectedWindowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
   const replacementWindow = {replacementWindow: true};
   const restoreWindow = installTestWindow(replacementWindow);
 
-  expect(windowHost.window).toBe(replacementWindow);
+  expect(windowTestHost.window).toBe(replacementWindow);
 
   restoreWindow();
 
-  expect(windowHost.window).toBe(originalWindow);
-  expect(Object.getOwnPropertyDescriptor(windowHost, 'window')).toStrictEqual(expectedWindowDescriptor);
+  expect(windowTestHost.window).toBe(originalWindow);
+  expect(Object.getOwnPropertyDescriptor(globalThis, 'window')).toStrictEqual(expectedWindowDescriptor);
 });
 
 test('installTestWindow keeps the descriptor configurable for later overwrites', () => {
@@ -72,12 +66,12 @@ test('installTestWindow keeps the descriptor configurable for later overwrites',
 
   restoreWindow();
 
-  Object.defineProperty(windowHost, 'window', {
+  Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: laterWindow
   });
-  const expectedWindowDescriptor = Object.getOwnPropertyDescriptor(windowHost, 'window');
+  const expectedWindowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
-  expect(windowHost.window).toBe(laterWindow);
-  expect(Object.getOwnPropertyDescriptor(windowHost, 'window')).toStrictEqual(expectedWindowDescriptor);
+  expect(windowTestHost.window).toBe(laterWindow);
+  expect(Object.getOwnPropertyDescriptor(globalThis, 'window')).toStrictEqual(expectedWindowDescriptor);
 });

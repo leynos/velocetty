@@ -7,6 +7,7 @@ import fs from 'node:fs/promises';
 
 import {_electron} from 'playwright';
 import {expect, test} from 'playwright/test';
+import {isFunction} from '@shared/types/guards';
 
 import {
   createIsolatedE2EEnvironment,
@@ -21,7 +22,7 @@ const launchTimeoutMs = 20_000;
 const windowTimeoutMs = 10_000;
 const rendererReadyTimeoutMs = 12_000;
 const commandOutputTimeoutMs = 12_000;
-const closeTimeoutMs = 5_000;
+const closeTimeoutMs = 5000;
 
 test('renders command output after terminal input', async ({page: _page}, testInfo) => {
   const {pathToBinary, launchArgs} = resolveLaunchConfig();
@@ -42,10 +43,10 @@ test('renders command output after terminal input', async ({page: _page}, testIn
   let stdoutLog = '';
   let stderrLog = '';
   const rendererConsoleLog: string[] = [];
-  process?.stdout?.on('data', (chunk) => {
+  process.stdout?.on('data', (chunk) => {
     stdoutLog += chunk.toString();
   });
-  process?.stderr?.on('data', (chunk) => {
+  process.stderr?.on('data', (chunk) => {
     stderrLog += chunk.toString();
   });
 
@@ -61,8 +62,8 @@ test('renders command output after terminal input', async ({page: _page}, testIn
 
     await waitForRendererReady(mainWindow, rendererReadyTimeoutMs);
     await mainWindow.evaluate(() => {
-      if (typeof window.focusActiveTerm === 'function') {
-        window.focusActiveTerm();
+      if (isFunction(globalThis.focusActiveTerm)) {
+        globalThis.focusActiveTerm();
       }
     });
     await mainWindow.locator('.xterm-helper-textarea').first().focus();
@@ -72,9 +73,15 @@ test('renders command output after terminal input', async ({page: _page}, testIn
     await mainWindow.keyboard.press('Enter');
 
     await expect
-      .poll(async () => (await readActiveTerminalBuffer(mainWindow)).join('\n'), {
-        timeout: commandOutputTimeoutMs
-      })
+      .poll(
+        async () => {
+          const activeTerminalBuffer = await readActiveTerminalBuffer(mainWindow);
+          return activeTerminalBuffer.join('\n');
+        },
+        {
+          timeout: commandOutputTimeoutMs
+        }
+      )
       .toContain(sentinel);
 
     expect(monitor.criticalErrors).toHaveLength(0);
@@ -105,7 +112,7 @@ test('renders command output after terminal input', async ({page: _page}, testIn
     try {
       await withTimeout(app.close(), closeTimeoutMs);
     } catch {
-      process?.kill('SIGKILL');
+      process.kill('SIGKILL');
     }
     await isolatedEnvironment.cleanup();
   }

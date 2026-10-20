@@ -24,52 +24,107 @@ beforeEach(() => {
   resetRendererTracking();
 });
 
-describe('renderer-utils', () => {
-  const createRuntimeMetrics = ({
-    inputSampleCount = 0,
-    inputTotalMs = 0,
-    inputMaxMs = 0,
-    inputLastMs = 0,
-    frameSampleCount = 0,
-    frameTotalMs = 0,
-    frameMaxMs = 0,
-    frameLastMs = 0,
-    longFrameCount = 0,
-    longFrameThresholdMs = 16,
-    reportIntervalMs = 1000,
-    updatedAtMs = 0
-  }: {
-    inputSampleCount?: number;
-    inputTotalMs?: number;
-    inputMaxMs?: number;
-    inputLastMs?: number;
-    frameSampleCount?: number;
-    frameTotalMs?: number;
-    frameMaxMs?: number;
-    frameLastMs?: number;
-    longFrameCount?: number;
-    longFrameThresholdMs?: number;
-    reportIntervalMs?: number;
-    updatedAtMs?: number;
-  } = {}): RendererRuntimeMetrics => ({
-    inputKeydownToSend: {
-      sampleCount: inputSampleCount,
-      totalMs: inputTotalMs,
-      maxMs: inputMaxMs,
-      lastMs: inputLastMs
-    },
-    frameTiming: {
-      sampleCount: frameSampleCount,
-      totalMs: frameTotalMs,
-      maxMs: frameMaxMs,
-      lastMs: frameLastMs,
-      longFrameCount,
-      longFrameThresholdMs
-    },
-    reportIntervalMs,
-    updatedAtMs
-  });
+const createRuntimeMetrics = ({
+  inputSampleCount = 0,
+  inputTotalMs = 0,
+  inputMaxMs = 0,
+  inputLastMs = 0,
+  frameSampleCount = 0,
+  frameTotalMs = 0,
+  frameMaxMs = 0,
+  frameLastMs = 0,
+  longFrameCount = 0,
+  longFrameThresholdMs = 16,
+  reportIntervalMs = 1000,
+  updatedAtMs = 0
+}: {
+  inputSampleCount?: number;
+  inputTotalMs?: number;
+  inputMaxMs?: number;
+  inputLastMs?: number;
+  frameSampleCount?: number;
+  frameTotalMs?: number;
+  frameMaxMs?: number;
+  frameLastMs?: number;
+  longFrameCount?: number;
+  longFrameThresholdMs?: number;
+  reportIntervalMs?: number;
+  updatedAtMs?: number;
+} = {}): RendererRuntimeMetrics => ({
+  inputKeydownToSend: {
+    sampleCount: inputSampleCount,
+    totalMs: inputTotalMs,
+    maxMs: inputMaxMs,
+    lastMs: inputLastMs
+  },
+  frameTiming: {
+    sampleCount: frameSampleCount,
+    totalMs: frameTotalMs,
+    maxMs: frameMaxMs,
+    lastMs: frameLastMs,
+    longFrameCount,
+    longFrameThresholdMs
+  },
+  reportIntervalMs,
+  updatedAtMs
+});
 
+const verifyRendererTypesAndFallbacks = (survivingUid: ReturnType<typeof asRendererUid>) => {
+  expect(getRendererTypes()).toEqual({[survivingUid]: 'Canvas'});
+  expect(getRendererFallbackReasonCounts()).toEqual({
+    'webgl-init-failed': 1
+  });
+};
+
+const verifyPerUidMetrics = (survivingUid: ReturnType<typeof asRendererUid>) => {
+  expect(getRendererRuntimeMetricsByUid()).toEqual({
+    [survivingUid]: createRuntimeMetrics({
+      inputSampleCount: 1,
+      inputTotalMs: 4,
+      inputMaxMs: 4,
+      inputLastMs: 4,
+      frameSampleCount: 2,
+      frameTotalMs: 28,
+      frameMaxMs: 16,
+      frameLastMs: 14,
+      longFrameCount: 0,
+      reportIntervalMs: 500,
+      updatedAtMs: 50
+    })
+  });
+  expect(getInputSendToWriteLatencyByUid()).toEqual({
+    [survivingUid]: {
+      sampleCount: 1,
+      totalMs: 7,
+      maxMs: 7,
+      lastMs: 7
+    }
+  });
+};
+
+const verifyAggregatedMetrics = (_survivingUid: ReturnType<typeof asRendererUid>) => {
+  expect(getAggregatedRendererRuntimeMetrics()).toEqual({
+    inputKeydownToSend: {sampleCount: 1, totalMs: 4, maxMs: 4, lastMs: 4},
+    frameTiming: {
+      sampleCount: 2,
+      totalMs: 28,
+      maxMs: 16,
+      lastMs: 14,
+      longFrameCount: 0,
+      longFrameThresholdMs: 16
+    },
+    reportIntervalMs: 500,
+    updatedAtMs: 50
+  });
+  expect(getAggregatedInputSendToWriteLatencyMetrics()).toEqual({
+    sampleCount: 1,
+    totalMs: 7,
+    maxMs: 7,
+    lastMs: 7
+  });
+};
+
+describe('renderer-utils', () => {
   describe('resetRendererTracking', () => {
     test('clears all tracked renderer metrics', () => {
       const uid = asRendererUid('uid-1');
@@ -223,61 +278,6 @@ describe('renderer-utils', () => {
     recordInputSendToWriteLatency(survivingUid, 7);
 
     return {removedUid, survivingUid};
-  };
-
-  const verifyRendererTypesAndFallbacks = (survivingUid: ReturnType<typeof asRendererUid>) => {
-    expect(getRendererTypes()).toEqual({[survivingUid]: 'Canvas'});
-    expect(getRendererFallbackReasonCounts()).toEqual({
-      'webgl-init-failed': 1
-    });
-  };
-
-  const verifyPerUidMetrics = (survivingUid: ReturnType<typeof asRendererUid>) => {
-    expect(getRendererRuntimeMetricsByUid()).toEqual({
-      [survivingUid]: createRuntimeMetrics({
-        inputSampleCount: 1,
-        inputTotalMs: 4,
-        inputMaxMs: 4,
-        inputLastMs: 4,
-        frameSampleCount: 2,
-        frameTotalMs: 28,
-        frameMaxMs: 16,
-        frameLastMs: 14,
-        longFrameCount: 0,
-        reportIntervalMs: 500,
-        updatedAtMs: 50
-      })
-    });
-    expect(getInputSendToWriteLatencyByUid()).toEqual({
-      [survivingUid]: {
-        sampleCount: 1,
-        totalMs: 7,
-        maxMs: 7,
-        lastMs: 7
-      }
-    });
-  };
-
-  const verifyAggregatedMetrics = (_survivingUid: ReturnType<typeof asRendererUid>) => {
-    expect(getAggregatedRendererRuntimeMetrics()).toEqual({
-      inputKeydownToSend: {sampleCount: 1, totalMs: 4, maxMs: 4, lastMs: 4},
-      frameTiming: {
-        sampleCount: 2,
-        totalMs: 28,
-        maxMs: 16,
-        lastMs: 14,
-        longFrameCount: 0,
-        longFrameThresholdMs: 16
-      },
-      reportIntervalMs: 500,
-      updatedAtMs: 50
-    });
-    expect(getAggregatedInputSendToWriteLatencyMetrics()).toEqual({
-      sampleCount: 1,
-      totalMs: 7,
-      maxMs: 7,
-      lastMs: 7
-    });
   };
 
   test('does not decrement fallback counters when sessions are unset', () => {

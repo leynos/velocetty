@@ -1,10 +1,8 @@
 /** @file Defines the View menu template for window and zoom commands. */
 import type {MenuItemConstructorOptions} from 'electron';
-import type {CommandId} from '@shared/types/commands';
+import {asCommandId} from '@shared/types/commands';
 
 import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
-
-const asCommandId = (command: string): CommandId => command as CommandId;
 
 const viewMenu = (commandKeys: Record<string, string>, execCommand: MenuCommandRunner): MenuItemConstructorOptions => {
   const execWithBrowserWindow = makeMenuCommandExecutor(execCommand);

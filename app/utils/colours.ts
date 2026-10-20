@@ -1,3 +1,5 @@
+import type {ColorMap} from '@shared/types/config';
+
 const colorList = [
   'black',
   'red',
@@ -19,16 +21,19 @@ const colorList = [
   'grayscale'
 ];
 
-export const getColorMap: <T>(colors: T) => T extends (infer U)[] ? {[k: string]: U} : T = (colors) => {
-  if (!Array.isArray(colors)) {
+export function getColorMap(colors: ColorMap): ColorMap;
+export function getColorMap(colors: readonly string[]): Record<string, string>;
+export function getColorMap(colors: ColorMap | readonly string[]): ColorMap | Record<string, string> {
+  if (isColorMap(colors)) {
     return colors;
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-  return colors.reduce((result, color, index) => {
+  const result: Record<string, string> = {};
+  for (const [index, color] of colors.entries()) {
     if (index < colorList.length) {
       result[colorList[index]] = color;
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return result;
-  }, {});
-};
+  }
+  return result;
+}
+
+const isColorMap = (colors: ColorMap | readonly string[]): colors is ColorMap => !Array.isArray(colors);

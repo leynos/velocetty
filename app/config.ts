@@ -3,22 +3,38 @@ import {app} from 'electron';
 import chokidar from 'chokidar';
 
 import type {parsedConfig, configOptions} from '@shared/types/config';
+import {isJsonObject} from '@shared/types/json';
 
-import {_import, getDefaultConfig} from './config/import';
+import {createConfigImportModule} from './config/import';
+import {_init} from './config/init';
 import _openConfig from './config/open';
-import {cfgPath, cfgDir} from './config/paths';
+import {cfgPath, cfgDir, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath} from './config/paths';
 import notify from './notify';
 import {getColorMap} from './utils/colours';
 
+const {_import, getDefaultConfig} = createConfigImportModule({
+  _init,
+  notify,
+  paths: {cfgDir, cfgPath, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath}
+});
+
 const watchers: Function[] = [];
-let cfg: parsedConfig = {} as any;
-let _watcher: chokidar.FSWatcher;
+let cfg: parsedConfig | undefined;
+let _watcher: chokidar.FSWatcher | undefined;
+
+const getCurrentConfig = (): parsedConfig => {
+  if (cfg === undefined) {
+    throw new Error('Configuration has not been initialized');
+  }
+
+  return cfg;
+};
 
 export const getDeprecatedCSS = (config: configOptions) => {
   const deprecated: string[] = [];
   const deprecatedCSS = ['x-screen', 'x-row', 'cursor-node', '::selection'];
   deprecatedCSS.forEach((css) => {
-    if (config.css?.includes(css) || config.termCSS?.includes(css)) {
+    if (config.css.includes(css) || config.termCSS.includes(css)) {
       deprecated.push(css);
     }
   });
@@ -26,7 +42,7 @@ export const getDeprecatedCSS = (config: configOptions) => {
 };
 
 const checkDeprecatedConfig = () => {
-  if (!cfg.config) {
+  if (cfg === undefined) {
     return;
   }
   const deprecated = getDeprecatedCSS(cfg.config);
@@ -38,7 +54,7 @@ const checkDeprecatedConfig = () => {
 };
 
 const _watch = () => {
-  if (_watcher) {
+  if (_watcher !== undefined) {
     return;
   }
 
@@ -61,9 +77,10 @@ const _watch = () => {
   });
 
   app.on('before-quit', () => {
-    if (Object.keys(_watcher.getWatched()).length > 0) {
-      _watcher.close().catch((err) => {
-        console.warn(err);
+    const watcher = _watcher;
+    if (watcher && Object.keys(watcher.getWatched()).length > 0) {
+      watcher.close().catch((error) => {
+        console.warn(error);
       });
     }
   });
@@ -82,7 +99,8 @@ export const getConfigDir = () => {
 };
 
 export const getDefaultProfile = () => {
-  return cfg.config.defaultProfile || cfg.config.profiles[0]?.name || 'default';
+  const {config} = getCurrentConfig();
+  return config.defaultProfile || config.profiles[0]?.name || 'default';
 };
 
 // get config for the default profile, keeping it for backward compatibility
@@ -91,18 +109,14 @@ export const getConfig = () => {
 };
 
 export const getProfiles = () => {
-  return cfg.config.profiles;
+  return getCurrentConfig().config.profiles;
 };
 
 export const getProfileConfig = (profileName: string): configOptions => {
-  const {profiles, defaultProfile, ...baseConfig} = cfg.config;
+  const {profiles, defaultProfile, ...baseConfig} = getCurrentConfig().config;
   const profileConfig = profiles.find((p) => p.name === profileName)?.config || {};
   for (const key in profileConfig) {
-    if (typeof baseConfig[key] === 'object' && !Array.isArray(baseConfig[key])) {
-      baseConfig[key] = {...baseConfig[key], ...profileConfig[key]};
-    } else {
-      baseConfig[key] = profileConfig[key];
-    }
+    baseConfig[key] = isJsonObject(baseConfig[key]) ? {...baseConfig[key], ...profileConfig[key]} : profileConfig[key];
   }
   return {...baseConfig, defaultProfile, profiles};
 };
@@ -111,15 +125,16 @@ export const openConfig = () => {
   return _openConfig();
 };
 
-export const getPlugins = (): {plugins: string[]; localPlugins: string[]} => {
+export const getPlugins = () => {
+  const currentConfig = getCurrentConfig();
   return {
-    plugins: cfg.plugins,
-    localPlugins: cfg.localPlugins
+    plugins: currentConfig.plugins,
+    localPlugins: currentConfig.localPlugins
   };
 };
 
 export const getKeymaps = () => {
-  return cfg.keymaps;
+  return getCurrentConfig().keymaps;
 };
 
 export const setup = () => {
@@ -134,23 +149,22 @@ export const fixConfigDefaults = (decoratedConfig: configOptions) => {
   const defaultConfig = getDefaultConfig().config!;
   const colorOverrides = getColorMap(decoratedConfig.colors);
   // We must have default colours for xterm css.
-  decoratedConfig.colors = {...defaultConfig.colors, ...(colorOverrides ?? {})};
+  decoratedConfig.colors = {...defaultConfig.colors, ...colorOverrides};
   return decoratedConfig;
 };
 
 export const htermConfigTranslate = (config: configOptions) => {
-  const cssReplacements: Record<string, string> = {
+  const cssReplacements = {
     'x-screen x-row([ {.[])': '.xterm-rows > div$1',
     '.cursor-node([ {.[])': '.terminal-cursor$1',
     '::selection([ {.[])': '.terminal .xterm-selection div$1',
     'x-screen a([ {.[])': '.terminal a$1',
     'x-row a([ {.[])': '.terminal a$1'
   };
-  Object.keys(cssReplacements).forEach((pattern) => {
+  Object.entries(cssReplacements).forEach(([pattern, newvalue]) => {
     const searchvalue = new RegExp(pattern, 'g');
-    const newvalue = cssReplacements[pattern];
-    config.css = config.css?.replace(searchvalue, newvalue);
-    config.termCSS = config.termCSS?.replace(searchvalue, newvalue);
+    config.css = config.css.replace(searchvalue, newvalue);
+    config.termCSS = config.termCSS.replace(searchvalue, newvalue);
   });
   return config;
 };

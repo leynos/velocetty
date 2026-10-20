@@ -18,6 +18,7 @@
  * - `const parser = new Json5Parser(raw); parser.findRootObjectRange();`
  */
 import JSON5 from 'json5';
+import {isString} from '@shared/types/guards';
 import {
   type ParsingState,
   processBlockComment,
@@ -72,8 +73,11 @@ export type PropertyKey = {
  * @param value String key value to wrap.
  * @returns A `PropertyKey` wrapper object containing the provided `value`.
  */
-export const propertyKey = (value: string): PropertyKey => ({value}) as PropertyKey;
-const toKeyString = (key: PropertyKey | string): string => (typeof key === 'string' ? key : key.value);
+export const propertyKey = (value: string): PropertyKey => {
+  // SAFETY: The branded wrapper contains the validated string key unchanged.
+  return {value} as PropertyKey;
+};
+const toKeyString = (key: PropertyKey | string): string => (isString(key) ? key : key.value);
 
 type ParsedObjectKey = {key: string; startIndex: number; endIndex: number};
 type PropertyListState = {
@@ -291,8 +295,12 @@ export class Json5Parser {
     const endIndex = this.parseQuotedStringEnd(range);
     if (endIndex === -1) return null;
     try {
+      const parsedKey: unknown = JSON5.parse(this.raw.slice(range.startIndex, endIndex));
+      if (!isString(parsedKey)) {
+        return null;
+      }
       return {
-        key: JSON5.parse(this.raw.slice(range.startIndex, endIndex)) as string,
+        key: parsedKey,
         startIndex: range.startIndex,
         endIndex
       };
@@ -320,7 +328,7 @@ export class Json5Parser {
         return null;
       }
       const codePoint = Number.parseInt(codePointHex, 16);
-      if (codePoint > 0x10ffff) {
+      if (codePoint > 0x10_ff_ff) {
         return null;
       }
       return {
@@ -375,10 +383,7 @@ export class Json5Parser {
     return first === '"' || first === "'" ? this.parseQuotedKey(range) : this.parseUnquotedKey(range);
   }
 
-  private applyBlockCommentResult(
-    result: {state: ParsingState; skipNext: boolean},
-    cursor: IndexCursor
-  ): {state: ParsingState; nextIndex: number} {
+  private applyBlockCommentResult(result: {state: ParsingState; skipNext: boolean}, cursor: IndexCursor) {
     return {
       state: result.state,
       nextIndex: cursor.index + (result.skipNext ? 1 : 0)
@@ -388,7 +393,7 @@ export class Json5Parser {
   private applyDelimiterResult(
     result: {state: ParsingState; skipNext: boolean; foundClose: boolean},
     cursor: IndexCursor
-  ): {state: ParsingState; nextIndex: number; shouldReturn: boolean; returnValue: number} {
+  ) {
     return {
       state: result.state,
       nextIndex: cursor.index + (result.skipNext ? 1 : 0),
@@ -457,10 +462,7 @@ export class Json5Parser {
     return bracketDepth;
   }
 
-  private updateBracketDepthWithValidation(
-    current: string,
-    currentDepth: number
-  ): {newDepth: number; isInvalid: boolean} {
+  private updateBracketDepthWithValidation(current: string, currentDepth: number) {
     const newDepth = this.updateBracketDepth(current, currentDepth);
     return {
       newDepth,

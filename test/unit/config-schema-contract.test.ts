@@ -2,25 +2,28 @@
 import {expect, test} from 'bun:test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {isJsonObject, isJsonValue, type JsonObject, type JsonValue} from '@shared/types/json';
 
-type JsonObject = Record<string, unknown>;
-
-const readJsonFile = async (workspaceRelativePath: string): Promise<unknown> => {
+const readJsonFile = async (workspaceRelativePath: string): Promise<JsonValue> => {
   const filePath = path.join(process.cwd(), workspaceRelativePath);
   const raw = await fs.readFile(filePath, 'utf8');
-  return JSON.parse(raw) as unknown;
+  const parsed: unknown = JSON.parse(raw);
+  if (!isJsonValue(parsed)) {
+    throw new Error(`Expected JSON-compatible content in ${workspaceRelativePath}.`);
+  }
+  return parsed;
 };
 
-const processArrayNode = (current: unknown[], stack: unknown[]): void => {
+const processArrayNode = (current: JsonValue[], stack: JsonValue[]): void => {
   for (const entry of current) {
     stack.push(entry);
   }
 };
 
-const isContextCapSchema = (key: string, value: unknown): value is JsonObject =>
-  key === 'webGLRendererMaxContexts' && value != null && typeof value === 'object';
+const isContextCapSchema = (key: string, value: JsonValue): value is JsonObject =>
+  key === 'webGLRendererMaxContexts' && isJsonObject(value);
 
-const processObjectNode = (current: JsonObject, stack: unknown[], matches: JsonObject[]): void => {
+const processObjectNode = (current: JsonObject, stack: JsonValue[], matches: JsonObject[]): void => {
   for (const [key, value] of Object.entries(current)) {
     if (isContextCapSchema(key, value)) {
       matches.push(value);
@@ -29,9 +32,9 @@ const processObjectNode = (current: JsonObject, stack: unknown[], matches: JsonO
   }
 };
 
-const collectContextCapSchemas = (node: unknown): JsonObject[] => {
+const collectContextCapSchemas = (node: JsonValue): JsonObject[] => {
   const matches: JsonObject[] = [];
-  const stack: unknown[] = [node];
+  const stack: JsonValue[] = [node];
 
   while (stack.length > 0) {
     const current = stack.pop();
@@ -40,11 +43,11 @@ const collectContextCapSchemas = (node: unknown): JsonObject[] => {
       continue;
     }
 
-    if (!current || typeof current !== 'object') {
+    if (!isJsonObject(current)) {
       continue;
     }
 
-    processObjectNode(current as JsonObject, stack, matches);
+    processObjectNode(current, stack, matches);
   }
 
   return matches;

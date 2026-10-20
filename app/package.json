@@ -1,5 +1,6 @@
 {
   "name": "hyper",
+  "main": "index.mjs",
   "productName": "Hyper",
   "description": "A terminal built on web technologies",
   "version": "4.0.0-canary.5",

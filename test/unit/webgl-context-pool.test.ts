@@ -167,7 +167,7 @@ describe('WebGLContextPool', () => {
     expect(pool.has('pane-a')).toBe(false);
     expect(pool.has('pane-b')).toBe(false);
     expect(pool.has('pane-c')).toBe(false);
-    expect(disposedPairs.sort()).toEqual(['pane-a:ctx-1', 'pane-b:ctx-2', 'pane-c:ctx-3']);
+    expect(disposedPairs.toSorted()).toEqual(['pane-a:ctx-1', 'pane-b:ctx-2', 'pane-c:ctx-3']);
   });
 
   test('release returns undefined for unknown panes without invoking disposer', () => {

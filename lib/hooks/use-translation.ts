@@ -18,7 +18,7 @@ const headerLabelDefaults = {
 
 type TranslationKey = keyof typeof headerLabelDefaults;
 
-const translationDictionaries: Partial<Record<string, Partial<Record<TranslationKey, string>>>> = {
+const translationDictionaries = {
   en: headerLabelDefaults,
   'en-gb': {
     openMenu: 'Open menu (UK)',
@@ -44,14 +44,14 @@ const translationDictionaries: Partial<Record<string, Partial<Record<Translation
     nextMatch: 'Résultat suivant',
     close: 'Fermer'
   }
-};
+} satisfies Partial<Record<string, Partial<Record<TranslationKey, string>>>>;
 
 const getPreferredLocale = () => {
   if (typeof navigator === 'undefined') {
     return 'en';
   }
 
-  return navigator.languages?.[0] ?? navigator.language ?? 'en';
+  return navigator.languages.at(0) ?? (navigator.language || 'en');
 };
 
 const getTranslationDictionary = (locale: string) => {

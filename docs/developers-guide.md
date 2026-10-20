@@ -507,7 +507,7 @@ aligned in the same change:
 - Update `devDependencies.electron` in `package.json`.
 - Align `@types/node` in `package.json` to the bundled Node.js major for the
   target Electron release.
-- Bump the fallback target version in `bin/rebuild-node-pty.cjs`.
+- Bump the fallback target version in `bin/rebuild-node-pty.mjs`.
 - Adjust `app/package.json` if runtime dependencies (for example, `node-pty`)
   need a compatibility bump for the new Electron Application Binary Interface
   (ABI).
@@ -626,7 +626,7 @@ Windows runtime reliability baseline after roadmap item `1.4.15` Windows scope:
   `${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js`. Preserve
   this forward-slash `npm_config_node_gyp` value to avoid introducing
   path-separator regressions.
-- Keep `bin/rebuild-node-pty.cjs` running node-gyp through the Node executable
+- Keep `bin/rebuild-node-pty.mjs` running node-gyp through the Node executable
   (`NODE` environment variable when present, otherwise `node` on `PATH`), not
   `process.execPath`. CI runs this script via Bun; invoking node-gyp with Bun
   can trigger Windows header-extraction `EINVAL` failures.
@@ -692,6 +692,11 @@ release CI installs); `bun install` does not provide it, so install it once with
 `cargo install --locked mdtablefix --version 0.6.1`. `make fmt` also runs
 `markdownlint-cli2`, which CI provides through its GitHub action; locally,
 install it with `bun install -g markdownlint-cli2` so it is on `PATH`.
+
+Biome owns formatting and general lint rules. Oxlint adds the recommended
+Unicorn and `ai-deslop` rule sets; `make lint` runs both linters and the
+package boundary check. The exact rule list, pins, and the documented `null`
+exception are recorded in [ADR 006](adr-006-oxlint-plugin-strategy.md).
 
 Run the standard gates before opening a pull request:
 
@@ -996,7 +1001,8 @@ already exist.
 
 ## Default test gate
 
-`make test` runs linting plus the unit test suite. It intentionally omits E2E
+`make test` runs the unit test suite. Run `make lint` separately for the Biome,
+Oxlint, and package-boundary checks. The test target intentionally omits E2E
 tests to keep the default loop fast.
 
 ### Sub-component extraction

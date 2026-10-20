@@ -43,13 +43,13 @@ function isElfX86_64(binaryPath) {
 
     const machine = header.readUInt16LE(18);
     return machine === 0x3e;
-  } catch (_error) {
+  } catch {
     return false;
   } finally {
     if (fd !== undefined) {
       try {
         fs.closeSync(fd);
-      } catch (_closeError) {
+      } catch {
         // Ignore close errors for best-effort detection.
       }
     }
@@ -64,7 +64,7 @@ function findExecutableInPath(names) {
       try {
         fs.accessSync(candidate, fs.constants.X_OK);
         return candidate;
-      } catch (_error) {}
+      } catch {}
     }
   }
 
@@ -145,12 +145,12 @@ if (args.length === 0 || args.includes('--help')) {
 const outDirIdx = args.indexOf('--output_dir');
 let outputDir = process.cwd();
 let mksnapshotArgs = args;
-if (outDirIdx > -1) {
+if (outDirIdx !== -1) {
   mksnapshotArgs = args.slice(0, outDirIdx);
   if (args.length >= outDirIdx + 2) {
     outputDir = args[outDirIdx + 1];
     if (args.length > outDirIdx + 2) {
-      mksnapshotArgs = mksnapshotArgs.concat(args.slice(outDirIdx + 2));
+      mksnapshotArgs = [...mksnapshotArgs, ...args.slice(outDirIdx + 2)];
     }
   } else {
     console.log('Error! Output directory argument given but directory not specified.');
@@ -175,16 +175,14 @@ if (fs.existsSync(argsFile)) {
   const builtinsRegEx = /.*builtins-pgo.*/g;
   const mksnapshotArgsFromFile = mksnapshotArgsFile
     .split(newlineRegEx)
-    .filter(
-      (arg) => !arg.match(newlineRegEx) && !arg.match(turboProfileRegEx) && !arg.match(builtinsRegEx) && arg !== ''
-    );
+    .filter((arg) => !newlineRegEx.test(arg) && !turboProfileRegEx.test(arg) && !builtinsRegEx.test(arg) && arg !== '');
   const mksnapshotBinaryPath = path.parse(mksnapshotArgsFromFile[0]);
   if (mksnapshotBinaryPath.dir) {
     mksnapshotBinaryDir = path.join(workingDir, mksnapshotBinaryPath.dir);
   }
-  mksnapshotArgs = mksnapshotArgs.concat(mksnapshotArgsFromFile.slice(1));
+  mksnapshotArgs = [...mksnapshotArgs, ...mksnapshotArgsFromFile.slice(1)];
 } else {
-  mksnapshotArgs = mksnapshotArgs.concat(['--startup_blob', 'snapshot_blob.bin']);
+  mksnapshotArgs = [...mksnapshotArgs, '--startup_blob', 'snapshot_blob.bin'];
   if (!mksnapshotArgs.includes('--turbo_instruction_scheduling')) {
     mksnapshotArgs.push('--turbo_instruction_scheduling');
   }

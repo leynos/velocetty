@@ -19,7 +19,7 @@ const helpMenu = (_commands: Record<string, string>, showAbout: () => void): Men
     },
     {
       label: 'Report Issue',
-      click(_menuItem, focusedWindow) {
+      async click(_menuItem, focusedWindow) {
         const body = `<!--
   Hi there! Thank you for discovering and submitting an issue.
   Before you submit this; let's make sure of a few things.
@@ -63,9 +63,9 @@ ${JSON.stringify(getPlugins(), null, 2)}
 </details>`;
 
         const issueURL = `https://github.com/vercel/hyper/issues/new?body=${encodeURIComponent(body)}`;
-        const copyAndSend = () => {
-          clipboard.writeText(body);
-          void shell.openExternal(
+        const copyAndSend = async () => {
+          await clipboard.writeText(body);
+          await shell.openExternal(
             `https://github.com/vercel/hyper/issues/new?body=${encodeURIComponent(
               '<!-- We have written the needed data into your clipboard because it was too large to send. ' +
                 'Please paste. -->\n'
@@ -73,23 +73,18 @@ ${JSON.stringify(getPlugins(), null, 2)}
           );
         };
         if (!focusedWindow) {
-          copyAndSend();
+          await copyAndSend();
         } else if (issueURL.length > 6144) {
-          void dialog
-            .showMessageBox(focusedWindow, {
-              message:
-                'There is too much data to send to GitHub directly. The data will be copied to the clipboard, ' +
-                'please paste it into the GitHub issue page that will open.',
-              type: 'warning',
-              buttons: ['OK', 'Cancel']
-            })
-            .then((result) => {
-              if (result.response === 0) {
-                copyAndSend();
-              }
-            });
+          const result = await dialog.showMessageBox(focusedWindow, {
+            message:
+              'There is too much data to send to GitHub directly. The data will be copied to the clipboard, ' +
+              'please paste it into the GitHub issue page that will open.',
+            type: 'warning',
+            buttons: ['OK', 'Cancel']
+          });
+          if (result.response === 0) await copyAndSend();
         } else {
-          void shell.openExternal(issueURL);
+          await shell.openExternal(issueURL);
         }
       }
     }

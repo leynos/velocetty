@@ -14,7 +14,7 @@ import {act} from 'react';
 import {expect, test} from 'bun:test';
 
 import {renderControlledSplitPane, runDragTest} from '../testUtils/split-pane';
-import {waitFor} from '../testUtils/waitFor';
+import {waitFor} from '../testUtils/wait-for';
 
 test('applies drag deltas from the pointer-anchored drag-start snapshot instead of compounding them', async () => {
   await runDragTest({
@@ -23,7 +23,7 @@ test('applies drag deltas from the pointer-anchored drag-start snapshot instead 
     geometry: {
       paneLeft: 0,
       paneTop: 0,
-      paneWidth: 1_000,
+      paneWidth: 1000,
       paneHeight: 400,
       dividerLeft: 300,
       dividerTop: 0,
@@ -52,11 +52,11 @@ test('applies drag deltas from the pointer-anchored drag-start snapshot for hori
     geometry: {
       paneLeft: 0,
       paneTop: 0,
-      paneWidth: 1_000,
+      paneWidth: 1000,
       paneHeight: 400,
       dividerLeft: 0,
       dividerTop: 120,
-      dividerWidth: 1_000,
+      dividerWidth: 1000,
       dividerHeight: 4
     },
     mousedownEvent: {clientX: 0, clientY: 122},
@@ -83,9 +83,15 @@ test('supports keyboard resizing and separator semantics', async () => {
   try {
     await act(async () => {
       divider.focus();
-      divider.dispatchEvent(new window.KeyboardEvent('keydown', {bubbles: true, cancelable: true, key: 'ArrowRight'}));
-      divider.dispatchEvent(new window.KeyboardEvent('keydown', {bubbles: true, cancelable: true, key: 'End'}));
-      divider.dispatchEvent(new window.KeyboardEvent('keydown', {bubbles: true, cancelable: true, key: 'Home'}));
+      divider.dispatchEvent(
+        new globalThis.window.KeyboardEvent('keydown', {bubbles: true, cancelable: true, key: 'ArrowRight'})
+      );
+      divider.dispatchEvent(
+        new globalThis.window.KeyboardEvent('keydown', {bubbles: true, cancelable: true, key: 'End'})
+      );
+      divider.dispatchEvent(
+        new globalThis.window.KeyboardEvent('keydown', {bubbles: true, cancelable: true, key: 'Home'})
+      );
       await waitFor(0);
     });
 
@@ -105,7 +111,7 @@ test.each([
     {
       paneLeft: 0,
       paneTop: 0,
-      paneWidth: 1_000,
+      paneWidth: 1000,
       paneHeight: 400,
       dividerLeft: 950,
       dividerTop: 0,
@@ -113,18 +119,18 @@ test.each([
       dividerHeight: 400
     },
     {clientX: 952, clientY: 0},
-    [{clientX: 1_200, clientY: 0}]
+    [{clientX: 1200, clientY: 0}]
   ],
   [
     'horizontal',
     {
       paneLeft: 0,
       paneTop: 0,
-      paneWidth: 1_000,
+      paneWidth: 1000,
       paneHeight: 400,
       dividerLeft: 0,
       dividerTop: 380,
-      dividerWidth: 1_000,
+      dividerWidth: 1000,
       dividerHeight: 4
     },
     {clientX: 0, clientY: 382},
@@ -150,17 +156,17 @@ test.each([
     {
       paneLeft: 0,
       paneTop: 0,
-      paneWidth: 1_000,
+      paneWidth: 1000,
       paneHeight: 400,
-      dividerLeft: 1_000,
+      dividerLeft: 1000,
       dividerTop: 0,
       dividerWidth: 4,
       dividerHeight: 400
     },
-    {clientX: 1_002, clientY: 0},
+    {clientX: 1002, clientY: 0},
     [
-      {clientX: 1_100, clientY: 0},
-      {clientX: 1_120, clientY: 0}
+      {clientX: 1100, clientY: 0},
+      {clientX: 1120, clientY: 0}
     ]
   ],
   [
@@ -168,11 +174,11 @@ test.each([
     {
       paneLeft: 0,
       paneTop: 0,
-      paneWidth: 1_000,
+      paneWidth: 1000,
       paneHeight: 400,
       dividerLeft: 0,
       dividerTop: 400,
-      dividerWidth: 1_000,
+      dividerWidth: 1000,
       dividerHeight: 4
     },
     {clientX: 0, clientY: 402},

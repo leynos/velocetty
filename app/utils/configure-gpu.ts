@@ -24,12 +24,12 @@ export const configureGpuMode = (
   };
   const shouldSuppressChromiumErrorLogs = env.VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS !== '0';
 
-  if (!shouldSuppressChromiumErrorLogs) {
-    logGpuDiagnostics('VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS=0 detected, keeping Chromium error logs enabled');
-  } else {
+  if (shouldSuppressChromiumErrorLogs) {
     const logLevel = env.VELOCETTY_CHROMIUM_LOG_LEVEL?.trim() || DEFAULT_CHROMIUM_LOG_LEVEL;
     logGpuDiagnostics(`Applying Chromium log-level=${logLevel} to reduce known startup log noise`);
     electronApp.commandLine.appendSwitch('log-level', logLevel);
+  } else {
+    logGpuDiagnostics('VELOCETTY_SUPPRESS_CHROMIUM_ERROR_LOGS=0 detected, keeping Chromium error logs enabled');
   }
 
   if (env.VELOCETTY_DISABLE_GPU === '1') {

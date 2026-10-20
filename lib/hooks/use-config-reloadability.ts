@@ -81,7 +81,7 @@ export const filterKeysByClassification = (keys: string[], classification: Reloa
  * @param keys - Array of configuration keys to partition.
  * @returns Object with live and restart arrays.
  */
-export const partitionKeys = (keys: string[]): {live: string[]; restart: string[]} => {
+export const partitionKeys = (keys: string[]) => {
   const live: string[] = [];
   const restart: string[] = [];
 

@@ -1,15 +1,18 @@
 /** @file Provides Happy DOM setup helpers for unit tests. */
 
+import {isFunction} from '@shared/types/guards';
+
 /** Happy DOM module type for runtime import. */
 type HappyDomModule = typeof import('happy-dom');
+type HappyDomWindow = InstanceType<HappyDomModule['Window']>;
 
 type Cleanup = () => void;
-type RpcStub = {
-  off: (..._args: unknown[]) => void;
-  on: (..._args: unknown[]) => void;
-  removeListener: (..._args: unknown[]) => void;
+type HappyDomGlobalHost = {
+  window?: unknown;
+  document?: unknown;
+  navigator?: unknown;
+  IS_REACT_ACT_ENVIRONMENT?: unknown;
 };
-
 let happyDomModule: Promise<HappyDomModule> | null = null;
 /** Serializes concurrent Happy DOM setup/teardown cycles across test files. */
 let happyDomLease: Promise<void> = Promise.resolve();
@@ -43,13 +46,8 @@ const loadHappyDom = (): Promise<HappyDomModule> => {
 export const setupHappyDom = async (): Promise<Cleanup> => {
   const releaseLease = await acquireHappyDomLease();
   let cleanupComplete = false;
-  let windowToClose: {close: () => void} | null = null;
-  const globalHost = globalThis as typeof globalThis & {
-    window?: Window & typeof globalThis.window;
-    document?: Document;
-    navigator?: Navigator;
-    IS_REACT_ACT_ENVIRONMENT?: boolean;
-  };
+  let windowToClose: Pick<HappyDomWindow, 'close'> | null = null;
+  const globalHost: HappyDomGlobalHost = globalThis;
   const hadWindow = Object.hasOwn(globalHost, 'window');
   const hadDocument = Object.hasOwn(globalHost, 'document');
   const hadNavigator = Object.hasOwn(globalHost, 'navigator');
@@ -58,7 +56,7 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
   const previousNavigator = globalHost.navigator;
   const actEnvironmentHost = globalHost;
   const hadActEnvironment = Object.hasOwn(actEnvironmentHost, 'IS_REACT_ACT_ENVIRONMENT');
-  const previousActEnvironment = actEnvironmentHost.IS_REACT_ACT_ENVIRONMENT;
+  const previousActEnvironment = globalHost.IS_REACT_ACT_ENVIRONMENT;
 
   const finalizeSetup = () => {
     if (cleanupComplete) {
@@ -74,7 +72,7 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
           value: previousWindow
         });
       } else {
-        delete globalHost.window;
+        Reflect.deleteProperty(globalHost, 'window');
       }
       if (hadDocument) {
         Object.defineProperty(globalHost, 'document', {
@@ -82,7 +80,7 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
           value: previousDocument
         });
       } else {
-        delete globalHost.document;
+        Reflect.deleteProperty(globalHost, 'document');
       }
       if (hadNavigator) {
         Object.defineProperty(globalHost, 'navigator', {
@@ -90,7 +88,7 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
           value: previousNavigator
         });
       } else {
-        delete globalHost.navigator;
+        Reflect.deleteProperty(globalHost, 'navigator');
       }
       if (hadActEnvironment) {
         Object.defineProperty(actEnvironmentHost, 'IS_REACT_ACT_ENVIRONMENT', {
@@ -98,7 +96,7 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
           value: previousActEnvironment
         });
       } else {
-        delete actEnvironmentHost.IS_REACT_ACT_ENVIRONMENT;
+        Reflect.deleteProperty(actEnvironmentHost, 'IS_REACT_ACT_ENVIRONMENT');
       }
     } catch (error) {
       finalizeError = error;
@@ -122,11 +120,11 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
   try {
     const {Window} = await loadHappyDom();
     const window = new Window();
-    windowToClose = window as unknown as {close: () => void};
+    windowToClose = window;
 
     Object.defineProperty(globalHost, 'window', {
       configurable: true,
-      value: window as unknown as Window & typeof globalThis.window
+      value: window
     });
     Object.defineProperty(globalHost, 'document', {
       configurable: true,
@@ -141,23 +139,22 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
       value: true
     });
 
-    if (!window.requestAnimationFrame) {
-      window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
-        return window.setTimeout(() => callback(window.performance.now()), 0);
-      }) as unknown as typeof window.requestAnimationFrame;
+    if (!isFunction(window.requestAnimationFrame)) {
+      window.requestAnimationFrame = (callback) => window.setTimeout(() => callback(window.performance.now()), 0);
     }
 
-    if (!window.cancelAnimationFrame) {
-      window.cancelAnimationFrame = ((handle: ReturnType<typeof window.setTimeout>) => {
-        window.clearTimeout(handle);
-      }) as unknown as typeof window.cancelAnimationFrame;
+    if (!isFunction(window.cancelAnimationFrame)) {
+      window.cancelAnimationFrame = (handle) => window.clearTimeout(handle);
     }
 
-    (window as unknown as {rpc: RpcStub}).rpc = {
-      off: (..._args: unknown[]) => {},
-      on: (..._args: unknown[]) => {},
-      removeListener: (..._args: unknown[]) => {}
-    };
+    Object.defineProperty(window, 'rpc', {
+      configurable: true,
+      value: {
+        off: (..._args: unknown[]) => {},
+        on: (..._args: unknown[]) => {},
+        removeListener: (..._args: unknown[]) => {}
+      }
+    });
 
     return () => finalizeSetup();
   } catch (error) {

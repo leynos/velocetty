@@ -11,6 +11,7 @@
 // eslint-disable-next-line eslint-comments/disable-enable-pair
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import ChildProcess from 'node:child_process';
+import nodeModule, {createRequire} from 'node:module';
 import pathModule from 'node:path';
 
 import React, {PureComponent} from 'react';
@@ -26,6 +27,7 @@ import type {
   RuntimeTabDecorationProvider,
   RuntimeTabDecoration as RuntimePluginTabDecoration
 } from '@shared/runtime/golden-path-demo';
+import {isFunction, isNumber, isObject, isString} from '@shared/types/guards';
 import {runtimePluginManifests} from '@shared/runtime/golden-path-demo';
 import type {
   hyperPlugin,
@@ -65,27 +67,45 @@ import {
 
 type ConnectOptions = NonNullable<Parameters<typeof reduxConnect>[3]>;
 type LoadedPluginVersion = ReturnType<RemotePluginsModule['getLoadedPluginVersions']>[number];
-type PluginHook = ((...args: unknown[]) => unknown) & {
+type PluginConnector = {state: any[]; dispatch: any[]};
+type PluginConnectorRegistry = Record<'Terms' | 'Header' | 'Hyper' | 'Notifications', PluginConnector>;
+type PluginPropsDecoratorRegistry = {
+  getTermProps: any[];
+  getTabProps: any[];
+  getTabsProps: any[];
+  getTermGroupProps: any[];
+};
+type PluginReducerDecoratorRegistry = {
+  reduceUI: IUiReducer[];
+  reduceSessions: ISessionReducer[];
+  reduceTermGroups: ITermGroupReducer[];
+};
+type PluginHookResult = object | string | number | boolean | bigint | symbol | null | undefined;
+type DecorateReducer = {
+  (name: 'reduceUI', fn: IUiReducer): IUiReducer;
+  (name: 'reduceSessions', fn: ISessionReducer): ISessionReducer;
+  (name: 'reduceTermGroups', fn: ITermGroupReducer): ITermGroupReducer;
+};
+type PluginHook = ((...args: unknown[]) => PluginHookResult) & {
   _pluginName?: string;
   _pluginVersion?: string | null;
 };
 
 // remote interface to `../plugins`
-const plugins = loadRemotePluginsModule();
+let remotePlugins: RemotePluginsModule | undefined;
+const getRemotePlugins = (): RemotePluginsModule => {
+  remotePlugins ??= loadRemotePluginsModule();
+  return remotePlugins;
+};
 
 // `require`d modules
-let modules: hyperPlugin[];
+let modules: hyperPlugin[] = [];
 
 // cache of decorated components
-let decorated: Record<string, React.ComponentClass<any>> = {};
+let decorated: Partial<Record<string, React.ComponentClass<any>>> = {};
 
 // various caches extracted of the plugin methods
-let connectors: {
-  Terms: {state: any[]; dispatch: any[]};
-  Header: {state: any[]; dispatch: any[]};
-  Hyper: {state: any[]; dispatch: any[]};
-  Notifications: {state: any[]; dispatch: any[]};
-};
+let connectors: PluginConnectorRegistry;
 let middlewares: Middleware[];
 let uiReducers: IUiReducer[];
 let sessionsReducers: ISessionReducer[];
@@ -94,33 +114,19 @@ let tabPropsDecorators: any[];
 let tabsPropsDecorators: any[];
 let termPropsDecorators: any[];
 let termGroupPropsDecorators: any[];
-let propsDecorators: {
-  getTermProps: any[];
-  getTabProps: any[];
-  getTabsProps: any[];
-  getTermGroupProps: any[];
-};
-let reducersDecorators: {
-  reduceUI: IUiReducer[];
-  reduceSessions: ISessionReducer[];
-  reduceTermGroups: ITermGroupReducer[];
-};
+let propsDecorators: PluginPropsDecoratorRegistry;
+let reducersDecorators: PluginReducerDecoratorRegistry;
 
 const buildProviderId = (pluginName: string, providerId: string): TabDecorationProviderId =>
   asTabDecorationProviderId(`${pluginName}.${providerId}`);
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 const isPluginHook = (value: unknown): value is PluginHook => typeof value === 'function';
 
-const resolveRuntimePluginSettings = (manifest: RuntimePluginManifest): Record<string, unknown> => {
+const resolveRuntimePluginSettings = (manifest: RuntimePluginManifest) => {
   const config = getRendererConfig();
-  const pluginNamespace = isRecord(config.plugins) ? config.plugins : {};
+  const pluginNamespace = config.plugins ?? {};
   const candidate = pluginNamespace[manifest.id];
-  if (isRecord(candidate)) {
-    return {...manifest.settingsDefaults, ...candidate};
-  }
-  return {...manifest.settingsDefaults};
+  return {...manifest.settingsDefaults, ...candidate};
 };
 
 const mapRuntimeToTabDecoration = (
@@ -167,7 +173,7 @@ const registerRuntimeProvider = (
     provideDecoration: (context) => {
       const runtimeSettings = resolveRuntimePluginSettings(manifest);
       if (runtimeSettings.enabled === false) {
-        return undefined;
+        return;
       }
 
       return mapRuntimeToTabDecoration(provider.provideDecoration(context, runtimeSettings));
@@ -185,16 +191,21 @@ const registerRuntimeTabDecorationProviders = () => {
   });
 };
 
+const isProviderDecoration = (candidate: unknown): candidate is TabDecorationProvider['provideDecoration'] =>
+  typeof candidate === 'function';
+
+const isProviderSubscription = (candidate: unknown): candidate is NonNullable<TabDecorationProvider['subscribe']> =>
+  typeof candidate === 'function';
+
 const isValidProviderCandidate = (candidate: unknown): candidate is Partial<TabDecorationProvider> => {
-  if (!candidate || typeof candidate !== 'object') {
+  if (!isObject(candidate) || !('provideDecoration' in candidate)) {
     return false;
   }
-  const provider = candidate as Partial<TabDecorationProvider>;
-  return typeof provider.provideDecoration === 'function';
+  return isProviderDecoration(candidate.provideDecoration);
 };
 
 const normalizeProviderId = (provider: Partial<TabDecorationProvider>, providerIndex: number): string => {
-  if (typeof provider.id === 'string' && provider.id.trim().length > 0) {
+  if (isString(provider.id) && provider.id.trim().length > 0) {
     return provider.id.trim();
   }
   return `provider-${providerIndex + 1}`;
@@ -203,14 +214,14 @@ const normalizeProviderId = (provider: Partial<TabDecorationProvider>, providerI
 const normalizeSubscribe = (
   provider: Partial<TabDecorationProvider>
 ): TabDecorationProvider['subscribe'] | undefined => {
-  if (typeof provider.subscribe === 'function') {
-    return provider.subscribe as TabDecorationProvider['subscribe'];
+  if (isProviderSubscription(provider.subscribe)) {
+    return provider.subscribe;
   }
   return undefined;
 };
 
 const normalizePriority = (provider: Partial<TabDecorationProvider>): number => {
-  return typeof provider.priority === 'number' ? provider.priority : 0;
+  return isNumber(provider.priority) ? provider.priority : 0;
 };
 
 const registerProvidersFromPlugin = (pluginName: string, providerList: unknown) => {
@@ -240,15 +251,15 @@ type TabLike = {
   title?: string;
 };
 
-type ParentPropsLike = Record<string, unknown>;
+type ParentPropsLike = Partial<TabsProps>;
 
 const getTabDecorationContext = (tab: TabLike): TabDecorationContext => {
   return {
     tabId: asTabId(String(tab.uid)),
-    tabIndex: typeof tab.tabIndex === 'number' ? tab.tabIndex : 0,
+    tabIndex: tab.tabIndex,
     active: Boolean(tab.isActive),
     hasActivity: Boolean(tab.hasActivity),
-    title: typeof tab.title === 'string' ? tab.title : undefined
+    title: tab.title
   };
 };
 
@@ -262,8 +273,8 @@ function exposeDecorated<P extends Record<string, any>>(
         try {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call
           this.props.onDecorated(decorated_);
-        } catch (e) {
-          notify('Plugin error', `Error occurred. Check Developer Tools for details`, {error: e});
+        } catch (error) {
+          notify('Plugin error', `Error occurred. Check Developer Tools for details`, {error: error});
         }
       }
     };
@@ -279,11 +290,11 @@ function getDecorated<P extends Record<string, any>>(
 ): React.ComponentClass<P> {
   if (!decorated[name]) {
     let class_ = exposeDecorated(parent);
-    (class_ as any).displayName = `_exposeDecorated(${name})`;
+    class_.displayName = `_exposeDecorated(${name})`;
 
     modules.forEach((mod: any) => {
       const method = `decorate${name}`;
-      const fn: Function & {_pluginName: string} = mod[method];
+      const fn: (Function & {_pluginName: string}) | undefined = mod[method];
 
       if (fn) {
         let class__;
@@ -291,16 +302,16 @@ function getDecorated<P extends Record<string, any>>(
         try {
           class__ = fn(class_, {React, PureComponent, Notification, notify});
           class__.displayName = `${fn._pluginName}(${name})`;
-        } catch (err) {
+        } catch (error) {
           notify(
             'Plugin error',
             `${fn._pluginName}: Error occurred in \`${method}\`. Check Developer Tools for details`,
-            {error: err}
+            {error: error}
           );
           return;
         }
 
-        if (!class__ || typeof class__.prototype.render !== 'function') {
+        if (!class__ || !isFunction(class__.prototype.render)) {
           notify(
             'Plugin error',
             `${fn._pluginName}: Invalid return value of \`${method}\`. No \`render\` method found. Please return a \`React.Component\`.`
@@ -348,55 +359,76 @@ export function decorate<P extends Record<string, any>>(
 // patching Module._load
 // so plugins can `require` them without needing their own version
 // https://github.com/vercel/hyper/issues/619
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const Module = require('node:module') as typeof import('module') & {_load: Function};
-const originalLoad = Module._load;
-Module._load = function _load(path: string) {
+type ModuleLoader = (request: string, parent?: NodeJS.Module | null, isMain?: boolean) => ReturnType<NodeJS.Require>;
+type ModuleWithLoader = typeof nodeModule & {_load: ModuleLoader};
+type RuntimeGlobalScope = Omit<typeof globalThis, 'window'> & {window?: Window};
+const moduleRequire = createRequire(import.meta.url);
+
+const isRuntimeRequire = (candidate: unknown): candidate is NodeJS.Require => typeof candidate === 'function';
+// SAFETY: Renderer modules are also imported in Node tests, where `window` is absent.
+const runtimeGlobal = globalThis as RuntimeGlobalScope;
+const getRuntimeRequire = (): NodeJS.Require => {
+  const rendererRequire = runtimeGlobal.window?.require;
+  return isRuntimeRequire(rendererRequire) ? rendererRequire : moduleRequire;
+};
+
+// SAFETY: Node exposes the internal loader on `node:module`; this wrapper preserves its call signature.
+const nodeModuleWithLoader = nodeModule as ModuleWithLoader;
+const originalLoad = nodeModuleWithLoader._load;
+nodeModuleWithLoader._load = function _load(path: string, parent?: NodeJS.Module | null, isMain?: boolean) {
   // PLEASE NOTE: Code changes here, also need to be changed in
   // app/plugins.js
   switch (path) {
-    case 'react':
+    case 'react': {
       console.warn('DEPRECATED: If your plugin requires `react`, it must bundle it as a dependency');
       return React;
-    case 'react-dom':
+    }
+    case 'react-dom': {
       console.warn('DEPRECATED: If your plugin requires `react-dom`, it must bundle it as a dependency');
       return ReactDOM;
-    case 'hyper/component':
+    }
+    case 'hyper/component': {
       console.warn(
         'DEPRECATED: If your plugin requires `hyper/component`, it must requires `react.PureComponent` instead and bundle `react` as a dependency'
       );
       return PureComponent;
-    case 'hyper/notify':
+    }
+    case 'hyper/notify': {
       return notify;
-    case 'hyper/Notification':
+    }
+    case 'hyper/Notification': {
       return Notification;
-    case 'hyper/decorate':
+    }
+    case 'hyper/decorate': {
       return decorate;
-    case 'child_process':
+    }
+    case 'child_process': {
       return process.platform === 'darwin' ? IPCChildProcess : ChildProcess;
-    default:
-      // eslint-disable-next-line prefer-rest-params
-      return originalLoad.apply(this, arguments);
+    }
+    default: {
+      return originalLoad.call(this, path, parent, isMain);
+    }
   }
 };
 
 const clearModulesCache = () => {
   // the fs locations where user plugins are stored
-  const {path, localPath} = plugins.getBasePaths();
+  const {path, localPath} = getRemotePlugins().getBasePaths();
 
   // trigger unload hooks
   modules.forEach((mod) => {
     if (mod.onRendererUnload) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      mod.onRendererUnload(window);
+      mod.onRendererUnload(runtimeGlobal.window ?? globalThis);
     }
   });
 
   // clear require cache
-  for (const entry in window.require.cache) {
+  const pluginRequire = getRuntimeRequire();
+  for (const entry in pluginRequire.cache) {
     if (entry.indexOf(path) === 0 || entry.indexOf(localPath) === 0) {
       // `window.require` resolves the Electron runtime module cache.
-      delete window.require.cache[entry];
+      delete pluginRequire.cache[entry];
     }
   }
 };
@@ -406,8 +438,12 @@ const getPluginName = (path: string) => pathModule.basename(path);
 const getPluginVersion = (path: string): string | null => {
   let version: string | null = null;
   try {
-    version = window.require(pathModule.resolve(path, 'package.json')).version as string;
-  } catch (_err) {
+    const packageMetadata: unknown = getRuntimeRequire()(pathModule.resolve(path, 'package.json'));
+    version =
+      isObject(packageMetadata) && 'version' in packageMetadata && isString(packageMetadata.version)
+        ? packageMetadata.version
+        : null;
+  } catch {
     console.warn(`No package.json found in ${path}`);
   }
   return version;
@@ -525,19 +561,19 @@ const registerPluginHooks = (mod: hyperPlugin, pluginName: string, pluginVersion
 
   if (mod.onRendererWindow) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    mod.onRendererWindow(window);
+    mod.onRendererWindow(globalThis);
   }
 
-  if (typeof mod.getTabDecorationProviders === 'function') {
+  if (isFunction(mod.getTabDecorationProviders)) {
     try {
       const providerList = mod.getTabDecorationProviders();
       registerProvidersFromPlugin(pluginName, providerList);
-    } catch (err) {
+    } catch (error) {
       notify(
         'Plugin error',
         `${pluginName}: Error occurred in \`getTabDecorationProviders\`. Check Developer Tools for details.`,
         {
-          error: err
+          error: error
         }
       );
     }
@@ -558,13 +594,13 @@ const loadPluginModule = (pluginPath: string, loadedPlugins: string[]): hyperPlu
   // window.require allows us to ensure this doesn't get
   // in the way of our build
   try {
-    mod = window.require(pluginPath);
-  } catch (err) {
+    mod = getRuntimeRequire()(pluginPath);
+  } catch (error) {
     notify(
       'Plugin load error',
       `"${pluginName}" failed to load in the renderer process. Check Developer Tools for details.`,
       {
-        error: err
+        error: error
       }
     );
     return undefined;
@@ -576,19 +612,21 @@ const loadPluginModule = (pluginPath: string, loadedPlugins: string[]): hyperPlu
 
 const loadModules = () => {
   console.log('(re)loading renderer plugins');
-  const paths = plugins.getPaths();
+  const paths = getRemotePlugins().getPaths();
   tabDecorationProviders.clear();
   registerRuntimeTabDecorationProviders();
 
   initializePluginCaches();
 
-  const loadedPlugins = plugins.getLoadedPluginVersions().map((plugin: LoadedPluginVersion) => plugin.name);
-  modules = paths.plugins
-    .concat(paths.localPlugins)
-    .map((pluginPath: string) => loadPluginModule(pluginPath, loadedPlugins))
-    .filter((mod: hyperPlugin | undefined): mod is hyperPlugin => Boolean(mod));
+  const loadedPlugins = getRemotePlugins()
+    .getLoadedPluginVersions()
+    .map((plugin: LoadedPluginVersion) => plugin.name);
+  modules = [...paths.plugins, ...paths.localPlugins].flatMap((pluginPath: string) => {
+    const mod = loadPluginModule(pluginPath, loadedPlugins);
+    return mod ? [mod] : [];
+  });
 
-  const deprecatedPlugins = plugins.getDeprecatedConfig();
+  const deprecatedPlugins = getRemotePlugins().getDeprecatedConfig();
   Object.keys(deprecatedPlugins).forEach((name) => {
     const {css} = deprecatedPlugins[name];
     if (css.length > 0) {
@@ -597,8 +635,15 @@ const loadModules = () => {
   });
 };
 
-// load modules for initial decoration
-loadModules();
+// Electron exposes `window.require` in the renderer. Keep importing reducers
+// safe in Node tooling that has no renderer plugin runtime.
+if (isFunction(runtimeGlobal.window?.require)) {
+  loadModules();
+} else {
+  initializePluginCaches();
+  tabDecorationProviders.clear();
+  registerRuntimeTabDecorationProviders();
+}
 
 export function reload() {
   clearModulesCache();
@@ -626,14 +671,14 @@ function getProps(name: keyof typeof propsDecorators, props: any, ...fnArgs: any
     try {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       ret_ = fn(...fnArgs, props_);
-    } catch (err) {
+    } catch (error) {
       notify('Plugin error', `${fn._pluginName}: Error occurred in \`${name}\`. Check Developer Tools for details.`, {
-        error: err
+        error: error
       });
       return;
     }
 
-    if (!ret_ || typeof ret_ !== 'object') {
+    if (!isObject(ret_)) {
       notify('Plugin error', `${fn._pluginName}: Invalid return value of \`${name}\` (object expected).`);
       return;
     }
@@ -700,21 +745,23 @@ export function connect<StateProps extends Record<string, unknown>, DispatchProp
           try {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-call
             ret_ = fn(state, ret);
-          } catch (err) {
+          } catch (error) {
             notify(
               'Plugin error',
               `${fn._pluginName}: Error occurred in \`map${name}State\`. Check Developer Tools for details.`,
-              {error: err}
+              {error: error}
             );
             return;
           }
 
-          if (!ret_ || typeof ret_ !== 'object') {
+          if (!isObject(ret_)) {
             notify('Plugin error', `${fn._pluginName}: Invalid return value of \`map${name}State\` (object expected).`);
             return;
           }
 
-          ret = ret_;
+          // SAFETY: Plugin connector hooks follow the map-state props contract
+          // declared by the public Hyper plug-in API.
+          ret = ret_ as StateProps;
         });
         return ret;
       },
@@ -726,16 +773,16 @@ export function connect<StateProps extends Record<string, unknown>, DispatchProp
           try {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-call
             ret_ = fn(dispatch, ret);
-          } catch (err) {
+          } catch (error) {
             notify(
               'Plugin error',
               `${fn._pluginName}: Error occurred in \`map${name}Dispatch\`. Check Developer Tools for details.`,
-              {error: err}
+              {error: error}
             );
             return;
           }
 
-          if (!ret_ || typeof ret_ !== 'object') {
+          if (!isObject(ret_)) {
             notify(
               'Plugin error',
               `${fn._pluginName}: Invalid return value of \`map${name}Dispatch\` (object expected).`
@@ -743,7 +790,9 @@ export function connect<StateProps extends Record<string, unknown>, DispatchProp
             return;
           }
 
-          ret = ret_;
+          // SAFETY: Plugin connector hooks follow the map-dispatch props
+          // contract declared by the public Hyper plug-in API.
+          ret = ret_ as DispatchProps;
         });
         return ret;
       },
@@ -756,11 +805,7 @@ export function connect<StateProps extends Record<string, unknown>, DispatchProp
   };
 }
 
-const decorateReducer: {
-  (name: 'reduceUI', fn: IUiReducer): IUiReducer;
-  (name: 'reduceSessions', fn: ISessionReducer): ISessionReducer;
-  (name: 'reduceTermGroups', fn: ITermGroupReducer): ITermGroupReducer;
-} = <T extends keyof typeof reducersDecorators>(name: T, fn: any) => {
+const decorateReducer: DecorateReducer = <T extends keyof typeof reducersDecorators>(name: T, fn: any) => {
   const reducers = reducersDecorators[name];
   return (state: any, action: any) => {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
@@ -772,14 +817,14 @@ const decorateReducer: {
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         state__ = pluginReducer(state_, action);
-      } catch (err) {
+      } catch (error) {
         notify('Plugin error', `${fn._pluginName}: Error occurred in \`${name}\`. Check Developer Tools for details.`, {
-          error: err
+          error: error
         });
         return;
       }
 
-      if (!state__ || typeof state__ !== 'object') {
+      if (!isObject(state__)) {
         notify('Plugin error', `${fn._pluginName}: Invalid return value of \`${name}\`.`);
         return;
       }
@@ -806,6 +851,6 @@ export function decorateSessionsReducer(fn: ISessionReducer) {
 // redux middleware generator
 export const middleware: Middleware<{}, HyperState, Dispatch<HyperActions>> = (store) => (next) => (action) => {
   const nextMiddleware = (remaining: Middleware[]) => (action_: any) =>
-    remaining.length ? remaining[0](store)(nextMiddleware(remaining.slice(1)))(action_) : next(action_);
+    remaining.length > 0 ? remaining[0](store)(nextMiddleware(remaining.slice(1)))(action_) : next(action_);
   return nextMiddleware(middlewares)(action);
 };

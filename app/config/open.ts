@@ -4,6 +4,7 @@ import {exec} from 'node:child_process';
 import {shell} from 'electron';
 
 import * as Registry from 'native-reg';
+import {isString} from '@shared/types/guards';
 
 import {cfgPath} from './paths';
 
@@ -12,7 +13,7 @@ const getUserChoiceKey = () => {
     // Load FileExts keys for .json5 files
     const fileExtsKeys = Registry.openKey(
       Registry.HKCU,
-      'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\.json5',
+      String.raw`Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.json5`,
       Registry.Access.READ
     );
     const keys = fileExtsKeys ? Registry.enumKeyNames(fileExtsKeys) : [];
@@ -41,7 +42,8 @@ const hasDefaultSet = () => {
 
     let progId = '';
     try {
-      progId = (Registry.queryValue(userChoiceKey, 'ProgId') as string) || '';
+      const registryValue = Registry.queryValue(userChoiceKey, 'ProgId');
+      progId = isString(registryValue) ? registryValue : '';
     } finally {
       Registry.closeKey(userChoiceKey);
     }
@@ -71,8 +73,8 @@ const openConfig = () => {
         return shell.openPath(cfgPath).then((error) => error === '');
       }
       console.warn('No default app set for .json5 files, using notepad.exe fallback');
-    } catch (err) {
-      console.error('Open config with default app error:', err);
+    } catch (error) {
+      console.error('Open config with default app error:', error);
     }
     return openNotepad(cfgPath);
   }

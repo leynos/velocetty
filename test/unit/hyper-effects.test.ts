@@ -10,7 +10,7 @@ import {createCommandRegistryModuleStub} from '../testUtils/command-registry-moc
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
-import {waitFor} from '../testUtils/waitFor';
+import {waitFor} from '../testUtils/wait-for';
 
 /**
  * Terms ref used by Hyper to resolve focus and selection targets.
@@ -29,11 +29,22 @@ type RpcWindow = Window & {
   focusActiveTerm?: (uid?: string) => void;
 };
 
+const noOpCommandHandler = () => {};
+
 let registerCalls = 0;
 let bindCalls = 0;
 let resetCalls = 0;
-let registeredKeys: Record<string, string> = {};
-let commandHandlers: Record<string, ((event: unknown, dispatch: unknown) => void) | undefined> = {};
+type RegisteredKeyMap = {
+  demo?: string;
+  localShortcut?: string;
+  remoteShortcut?: string;
+};
+type CommandHandlerMap = {
+  'editor:search-close'?: (event: unknown, dispatch: unknown) => void;
+};
+
+let registeredKeys: RegisteredKeyMap = {};
+let commandHandlers: CommandHandlerMap = {};
 let shouldPreventDefaultResult = false;
 let boundKeyHandlers: KeyHandler[] = [];
 let termsRef: TermsRef = {
@@ -47,16 +58,15 @@ let moduleInstanceCounter = 0;
 /**
  * Mousetrap test double that captures bind and reset activity.
  */
-class MousetrapMock {
+const MousetrapMock = () => ({
   bind(_keys: string, handler: KeyHandler) {
     bindCalls += 1;
     boundKeyHandlers.push(handler);
-  }
-
+  },
   reset() {
     resetCalls += 1;
   }
-}
+});
 
 const buildHyperProps = (overrides: Partial<HyperProps> = {}): HyperProps => ({
   isMac: false,
@@ -87,7 +97,7 @@ const {transportMock, state: transportMockState, resetTransportMock} = createTra
 const transportRemovedListeners = transportMockState.removedEvents;
 
 const buildRpcWindowStub = () => {
-  const rpcWindow = window as RpcWindow;
+  const rpcWindow: typeof globalThis & RpcWindow = globalThis;
   rpcWindow.rpc = {
     on: () => {},
     off: () => {},
@@ -159,15 +169,13 @@ afterEach(() => {
 
 test.serial('Hyper attaches key listeners on mount and config updates', async () => {
   const container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   const root = createRoot(container);
 
-  registeredKeys = {demo: 'demo:command'};
-
-  const execCommand = () => {};
+  registeredKeys = {demo: 'demo:command'} satisfies RegisteredKeyMap;
 
   await act(async () => {
-    renderHyper(Hyper, root, {execCommand});
+    renderHyper(Hyper, root, {execCommand: noOpCommandHandler});
     await waitFor(0);
   });
 
@@ -176,14 +184,14 @@ test.serial('Hyper attaches key listeners on mount and config updates', async ()
   expect(resetCalls).toBe(0);
 
   await act(async () => {
-    renderHyper(Hyper, root, {backgroundColor: '#111', execCommand});
+    renderHyper(Hyper, root, {backgroundColor: '#111', execCommand: noOpCommandHandler});
     await waitFor(0);
   });
 
   expect(registerCalls).toBe(1);
 
   await act(async () => {
-    renderHyper(Hyper, root, {backgroundColor: '#111', lastConfigUpdate: 2, execCommand});
+    renderHyper(Hyper, root, {backgroundColor: '#111', lastConfigUpdate: 2, execCommand: noOpCommandHandler});
     await waitFor(0);
   });
 
@@ -196,7 +204,7 @@ test.serial('Hyper attaches key listeners on mount and config updates', async ()
 
 test.serial('Hyper focuses the active session when it changes', async () => {
   const container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   const root = createRoot(container);
 
   let focusCalls = 0;
@@ -232,7 +240,7 @@ test.serial('Hyper focuses the active session when it changes', async () => {
 
 test.serial('Hyper routes key handlers and select-all callbacks through terms', async () => {
   const container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   const root = createRoot(container);
 
   const {rpcWindow} = buildRpcWindowStub();
@@ -241,7 +249,7 @@ test.serial('Hyper routes key handlers and select-all callbacks through terms', 
   let preventedDefaultCalls = 0;
   let selectAllCalls = 0;
   let activeFocusCalls = 0;
-  registeredKeys = {demo: 'demo:command'};
+  registeredKeys = {demo: 'demo:command'} satisfies RegisteredKeyMap;
   shouldPreventDefaultResult = true;
   const activeTerm = {
     focus: () => {
@@ -285,7 +293,7 @@ test.serial('Hyper routes key handlers and select-all callbacks through terms', 
   }
   expect(selectAllCalls).toBe(1);
 
-  rpcWindow.focusActiveTerm?.();
+  rpcWindow.focusActiveTerm();
   expect(activeFocusCalls).toBe(1);
 
   await act(async () => {
@@ -297,7 +305,7 @@ test.serial('Hyper routes key handlers and select-all callbacks through terms', 
 
 test.serial('Hyper does not call preventDefault when key handlers allow default behaviour', async () => {
   const container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   const root = createRoot(container);
 
   buildRpcWindowStub();
@@ -305,7 +313,7 @@ test.serial('Hyper does not call preventDefault when key handlers allow default 
   let commandCalls = 0;
   let preventedDefaultCalls = 0;
   shouldPreventDefaultResult = false;
-  registeredKeys = {demo: 'demo:command'};
+  registeredKeys = {demo: 'demo:command'} satisfies RegisteredKeyMap;
 
   await act(async () => {
     renderHyper(Hyper, root, {
@@ -333,7 +341,7 @@ test.serial('Hyper does not call preventDefault when key handlers allow default 
 
 test.serial('Hyper forwards local handlers and fallback commands to execCommand', async () => {
   const container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   const root = createRoot(container);
 
   buildRpcWindowStub();
@@ -342,10 +350,10 @@ test.serial('Hyper forwards local handlers and fallback commands to execCommand'
   registeredKeys = {
     localShortcut: 'editor:search-close',
     remoteShortcut: 'tab:new'
-  };
+  } satisfies RegisteredKeyMap;
   commandHandlers = {
     'editor:search-close': localHandler
-  };
+  } satisfies CommandHandlerMap;
 
   const execCommandCalls: Array<{command: string; handler: unknown; event: unknown}> = [];
 

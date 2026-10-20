@@ -108,10 +108,10 @@ SKIP_X64_V8_SNAPSHOT=1 bun install
 ```
 
 This project uses `bun ./build/esbuild/build.ts` inside scripts for bundling.
-Similarly, the rebuild step runs `bun bin/rebuild-node-pty.cjs`, which executes
+Similarly, the rebuild step runs `bun bin/rebuild-node-pty.mjs`, which executes
 `node-gyp` from the module directory; avoid calling `electron-rebuild`
 directly. The copy step uses `node bin/copy-node-modules.mjs`. Electron-builder
-is invoked via `bun bin/run-electron-builder.cjs` to avoid its package-manager
+is invoked via `bun bin/run-electron-builder.mjs` to avoid its package-manager
 detection spawning Bun through Node. Schema generation uses
 `bunx typescript-json-schema --ignoreErrors`. Development scripts also rely on
 local `electronmon` and `concurrently` binaries. If either command is not
@@ -190,5 +190,5 @@ This usually indicates a stale `target/node_modules` tree still using an old
 
 ```bash
 bun run build:hyper-app
-bun bin/run-electron-builder.cjs install-app-deps
+bun bin/run-electron-builder.mjs install-app-deps
 ```

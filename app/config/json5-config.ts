@@ -1,7 +1,12 @@
 /** @file Runtime-safe JSON5 helpers for app-process config parsing and persistence. */
 import JSON5 from 'json5';
+import Ajv from 'ajv';
+import {ZodError} from 'zod';
 
-import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
+import type {configOptions, configValidationDiagnostic, rawConfig} from '@shared/types/config';
+import {isObject, isString} from '@shared/types/guards';
+import {isJsonObject, type JsonObject, type JsonValue} from '@shared/types/json';
+import configJsonSchema from './schema.json';
 
 export type ParseSuccess<T> = {success: true; data: T};
 export type ParseFailure = {success: false; error: Error};
@@ -36,7 +41,27 @@ export type ParseWithDiagnosticsResult<T> = {
 };
 
 type DiagnosticError = Error & {diagnostic: configValidationDiagnostic};
-type FieldValidator = (value: Record<string, unknown>, field: string) => DiagnosticError | null;
+type SchemaIssue = ZodError['issues'][number];
+type FieldValidator = (value: JsonObject, field: string) => DiagnosticError | null;
+
+const partialConfigSchema = structuredClone(configJsonSchema);
+for (const section of partialConfigSchema.definitions.configOptions.allOf) {
+  delete section.required;
+}
+const makeConfigOptionsSchema = (definitions: typeof configJsonSchema.definitions) => ({
+  allOf: definitions.configOptions.allOf,
+  definitions
+});
+const configOptionsValidator = new Ajv({allErrors: true, allowUnionTypes: true}).compile(
+  makeConfigOptionsSchema(partialConfigSchema.definitions)
+);
+const completeConfigOptionsValidator = new Ajv({allErrors: true, allowUnionTypes: true}).compile(
+  makeConfigOptionsSchema(configJsonSchema.definitions)
+);
+
+/** Checks that resolved config has every required option from the bundled schema. */
+export const isCompleteConfigOptions = (value: unknown): value is configOptions =>
+  completeConfigOptionsValidator(value);
 
 const rootPath = '/';
 const schemaFallbackFix = 'Update the JSON structure to match the expected config schema.';
@@ -47,14 +72,19 @@ const createDiagnosticError = (diagnostic: configValidationDiagnostic): Diagnost
 
 const getPathForField = (field: string): string => `/${field}`;
 
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+export function isRecord(value: JsonValue): value is JsonObject;
+export function isRecord(value: unknown): value is JsonObject;
+export function isRecord(value: unknown): value is JsonObject {
+  return isJsonObject(value);
+}
 
 export const isStringArray = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((item) => typeof item === 'string');
+  Array.isArray(value) && value.every((entry) => isString(entry));
+
+const isKeymapBinding = (value: unknown): value is string | string[] => isString(value) || isStringArray(value);
 
 export const isKeymapConfig = (value: unknown): value is Record<string, string | string[]> =>
-  isRecord(value) && Object.values(value).every((entry) => typeof entry === 'string' || isStringArray(entry));
+  isRecord(value) && Object.values(value).every((entry) => isKeymapBinding(entry));
 
 const makeFieldValidator =
   (
@@ -63,7 +93,7 @@ const makeFieldValidator =
     suggestedFix: (field: string) => string
   ): FieldValidator =>
   (value, field) => {
-    if (value[field] !== undefined && !guard(value[field])) {
+    if (Object.hasOwn(value, field) && !guard(value[field])) {
       return createDiagnosticError({
         path: getPathForField(field),
         message: message(field),
@@ -91,7 +121,7 @@ const validateKeymapField: FieldValidator = makeFieldValidator(
   (field) => `Set \`${field}\` entries to keybinding strings or string arrays.`
 );
 
-export const validateRawConfig = (value: unknown): ParseResult<Record<string, unknown>> => {
+export const validateRawConfig = (value: unknown): ParseResult<JsonObject> => {
   if (!isRecord(value)) {
     return {
       success: false,
@@ -117,6 +147,19 @@ export const validateRawConfig = (value: unknown): ParseResult<Record<string, un
     }
   }
 
+  if (Object.hasOwn(value, 'config') && !configOptionsValidator(value.config)) {
+    const issue = configOptionsValidator.errors?.at(0);
+    const issuePath = issue?.instancePath ?? '';
+    return {
+      success: false,
+      error: createDiagnosticError({
+        path: `/config${issuePath}`,
+        message: issue?.message ?? 'Configuration options do not match the supported schema.',
+        suggestedFix: 'Set configuration option values to match the documented types.'
+      })
+    };
+  }
+
   return {success: true, data: value};
 };
 
@@ -125,11 +168,19 @@ export const safeParseRawConfig = (value: unknown): ParseResult<rawConfig> => {
   if (!parsed.success) {
     return parsed;
   }
+  // SAFETY: validateRawConfig checks all rawConfig fields and validates present config options against the generated schema.
   return {success: true, data: parsed.data as rawConfig};
 };
 
-const hasDiagnostic = (error: unknown): error is DiagnosticError => {
-  return isRecord(error) && isRecord(error.diagnostic);
+const hasDiagnostic = (error: Error): error is DiagnosticError => {
+  return (
+    error instanceof Error &&
+    'diagnostic' in error &&
+    isJsonObject(error.diagnostic) &&
+    isString(error.diagnostic.path) &&
+    isString(error.diagnostic.message) &&
+    isString(error.diagnostic.suggestedFix)
+  );
 };
 
 const getIssuePath = (path: unknown): string => {
@@ -140,7 +191,7 @@ const getIssuePath = (path: unknown): string => {
   if (segments.length === 0) {
     return rootPath;
   }
-  return `/${segments.map((segment) => String(segment)).join('/')}`;
+  return `/${segments.map((segment) => `${segment}`).join('/')}`;
 };
 
 const withHints = (
@@ -157,24 +208,13 @@ const withHints = (
   };
 };
 
-const extractFirstIssue = (error: Error): Record<string, unknown> | undefined => {
-  const issues = (error as {issues?: unknown}).issues;
-  if (!Array.isArray(issues) || issues.length === 0) {
-    return undefined;
-  }
-  const firstIssue = issues[0];
-  return isRecord(firstIssue) ? firstIssue : undefined;
-};
+const extractFirstIssue = (error: Error): SchemaIssue | undefined =>
+  error instanceof ZodError ? error.issues.at(0) : undefined;
 
-const buildIssueDiagnostic = (
-  issue: Record<string, unknown>,
-  context: SchemaDiagnosticContext
-): configValidationDiagnostic => {
-  const issuePath = 'path' in issue ? issue.path : undefined;
-  const issueMessage = 'message' in issue ? issue.message : undefined;
+const buildIssueDiagnostic = (issue: SchemaIssue, context: SchemaDiagnosticContext): configValidationDiagnostic => {
   return {
-    path: getIssuePath(issuePath),
-    message: typeof issueMessage === 'string' ? issueMessage : `Invalid ${context.itemType} schema shape.`,
+    path: getIssuePath(issue.path),
+    message: issue.message || `Invalid ${context.itemType} schema shape.`,
     suggestedFix: schemaFallbackFix
   };
 };
@@ -207,23 +247,25 @@ const extractErrorMessage = (error: unknown, context: ErrorMessageContext): stri
 
 const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
-const getFiniteNumberProperty = (record: Record<string, unknown>, property: string): number | null => {
-  const value = record[property];
-  return isFiniteNumber(value) ? value : null;
-};
+type ParseLocation = {lineNumber?: number; columnNumber?: number};
+
+const isParseLocation = (value: unknown): value is ParseLocation =>
+  isObject(value) &&
+  (!('lineNumber' in value) || isFiniteNumber(value.lineNumber)) &&
+  (!('columnNumber' in value) || isFiniteNumber(value.columnNumber));
 
 const extractLineNumber = (error: unknown): number | null => {
-  if (!isRecord(error)) {
+  if (!isParseLocation(error)) {
     return null;
   }
-  return getFiniteNumberProperty(error, 'lineNumber');
+  return error.lineNumber ?? null;
 };
 
 const extractColumnNumber = (error: unknown): number | null => {
-  if (!isRecord(error)) {
+  if (!isParseLocation(error)) {
     return null;
   }
-  return getFiniteNumberProperty(error, 'columnNumber');
+  return error.columnNumber ?? null;
 };
 
 const buildDiagnosticPath = (source: string, lineNumber: number | null, columnNumber: number | null): string => {
@@ -252,7 +294,7 @@ const toParseDiagnostic = (error: unknown, context: ParseDiagnosticContext): con
 export const parseJson5WithSchemaDiagnostics = <T>(options: ParseOptions<T>): ParseWithDiagnosticsResult<T> => {
   const {raw, source, schema, fallback, itemType = 'config', diagnosticHints} = options;
   try {
-    const parsed = JSON5.parse(raw) as unknown;
+    const parsed: unknown = JSON5.parse(raw);
     const validated = schema.safeParse(parsed);
     if (validated.success === false) {
       return {
@@ -284,7 +326,7 @@ export const parseJson5WithSchema = <T>(options: ParseOptions<T>): T => {
   return result.value;
 };
 
-export const sortKeys = (value: unknown): unknown => {
+export const sortKeys = (value: JsonValue): JsonValue => {
   if (Array.isArray(value)) {
     return value.map((item) => sortKeys(item));
   }
@@ -292,7 +334,7 @@ export const sortKeys = (value: unknown): unknown => {
   if (isRecord(value)) {
     return Object.fromEntries(
       Object.entries(value)
-        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+        .toSorted(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
         .map(([key, item]) => [key, sortKeys(item)])
     );
   }
@@ -300,4 +342,4 @@ export const sortKeys = (value: unknown): unknown => {
   return value;
 };
 
-export const stringifyJson5 = (value: unknown): string => `${JSON5.stringify(sortKeys(value), null, 2)}\n`;
+export const stringifyJson5 = (value: JsonValue): string => `${JSON5.stringify(sortKeys(value), null, 2)}\n`;

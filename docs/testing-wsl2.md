@@ -11,7 +11,7 @@ virtual framebuffer) unless a separate X server is already configured.
 - A successful build output in `dist/`, produced by:
 
 ```bash
-bun run build && bun bin/run-electron-builder.cjs
+bun run build && bun bin/run-electron-builder.mjs
 ```
 
 ## End-to-end (E2E) dependencies on Fedora (WSL2)

@@ -9,9 +9,7 @@ import {createRoot} from 'react-dom/client';
 import {expect, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
-import {waitFor} from '../testUtils/waitFor';
-
-type NewTabComponent = typeof import('../../lib/components/new-tab').default;
+import {waitFor} from '../testUtils/wait-for';
 
 const renderNewTab = async () => {
   const cleanup = await setupHappyDom();
@@ -19,11 +17,9 @@ const renderNewTab = async () => {
   // query string is appended here to force a fresh module evaluation for each
   // test run; keep in mind this pattern is Bun-specific and may need adjustment
   // for other runners.
-  const {default: NewTab} = (await import(`../../lib/components/new-tab.tsx?new_tab_test=${Date.now()}`)) as {
-    default: NewTabComponent;
-  };
+  const {default: NewTab} = await import(`../../lib/components/new-tab.tsx?new_tab_test=${Date.now()}`);
   const container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   const root = createRoot(container);
 
   await act(async () => {
@@ -57,11 +53,11 @@ test('filters empty class name segments for the button and menu items', async ()
     expect(button?.className.includes('  ')).toBe(false);
 
     await act(async () => {
-      button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
+      button?.dispatchEvent(new globalThis.window.MouseEvent('click', {bubbles: true}));
       await waitFor(0);
     });
 
-    const menuItems = Array.from(container.querySelectorAll('button[role="menuitem"]'));
+    const menuItems = [...container.querySelectorAll('button[role="menuitem"]')];
     expect(menuItems.length).toBe(2);
     expect(menuItems.every((item) => !item.className.includes('  '))).toBe(true);
   } finally {
@@ -81,14 +77,14 @@ test('closes the dropdown when Escape is pressed', async () => {
     expect(button).toBeTruthy();
 
     await act(async () => {
-      button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
+      button?.dispatchEvent(new globalThis.window.MouseEvent('click', {bubbles: true}));
       await waitFor(0);
     });
 
     expect(container.querySelector('[role="menu"]')).toBeTruthy();
 
     await act(async () => {
-      button?.dispatchEvent(new window.KeyboardEvent('keydown', {bubbles: true, key: 'Escape'}));
+      button?.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', {bubbles: true, key: 'Escape'}));
       await waitFor(0);
     });
 
@@ -110,11 +106,15 @@ test('prevents the default Escape key action when closing the dropdown', async (
     expect(button).toBeTruthy();
 
     await act(async () => {
-      button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
+      button?.dispatchEvent(new globalThis.window.MouseEvent('click', {bubbles: true}));
       await waitFor(0);
     });
 
-    const escapeEvent = new window.KeyboardEvent('keydown', {bubbles: true, cancelable: true, key: 'Escape'});
+    const escapeEvent = new globalThis.window.KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Escape'
+    });
 
     await act(async () => {
       button?.dispatchEvent(escapeEvent);
@@ -141,17 +141,19 @@ test('closes the dropdown when focus leaves the component boundary', async () =>
     expect(button).toBeTruthy();
 
     await act(async () => {
-      button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
+      button?.dispatchEvent(new globalThis.window.MouseEvent('click', {bubbles: true}));
       await waitFor(0);
     });
 
     const dropdown = container.querySelector('[role="menu"]');
     outsideButton = document.createElement('button');
-    document.body.appendChild(outsideButton);
+    document.body.append(outsideButton);
     expect(dropdown).toBeTruthy();
 
     await act(async () => {
-      dropdown?.dispatchEvent(new window.FocusEvent('focusout', {bubbles: true, relatedTarget: outsideButton}));
+      dropdown?.dispatchEvent(
+        new globalThis.window.FocusEvent('focusout', {bubbles: true, relatedTarget: outsideButton})
+      );
       await waitFor(0);
     });
 

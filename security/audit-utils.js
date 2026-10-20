@@ -12,16 +12,22 @@ import {spawnSync} from 'node:child_process';
 
 const GHSA_PATTERN = /GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}/i;
 
+/** @param {unknown} value @returns {value is object} */
+const isObject = (value) => value !== null && Object(value) === value;
+
+/** @param {unknown} value @returns {value is string} */
+const isString = (value) => String(value) === value;
+
 function extractGithubAdvisoryId(advisory) {
-  if (!advisory || typeof advisory !== 'object') {
+  if (!isObject(advisory)) {
     return null;
   }
 
-  if (typeof advisory.github_advisory_id === 'string') {
+  if (isString(advisory.github_advisory_id)) {
     return advisory.github_advisory_id;
   }
 
-  if (typeof advisory.url === 'string') {
+  if (isString(advisory.url)) {
     const match = advisory.url.match(GHSA_PATTERN);
     if (match) {
       return match[0];
@@ -80,10 +86,7 @@ export function runAuditJson() {
  * console.log(advisories[0].github_advisory_id); // GHSA-1
  */
 export function collectAdvisories(auditJson) {
-  const rawEntries =
-    auditJson && typeof auditJson === 'object' && auditJson.advisories
-      ? Object.entries(auditJson.advisories)
-      : Object.entries(auditJson ?? {});
+  const rawEntries = auditJson.advisories ? Object.entries(auditJson.advisories) : Object.entries(auditJson);
 
   const advisories = [];
 

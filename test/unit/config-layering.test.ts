@@ -20,7 +20,9 @@
  * @see {@link ../../app/config/layering.ts} - Implementation module
  */
 import {describe, it, expect} from 'bun:test';
+import defaultConfig from '../../app/config/config-default.json';
 import type {configOptions} from '@shared/types/config';
+import type {JsonObject} from '@shared/types/json';
 import {
   deepMerge,
   mergeLayers,
@@ -35,13 +37,7 @@ import {
 
 /** Creates a defaults layer config with required fields and optional overrides. */
 const makeDefaults = (overrides: Partial<configOptions> = {}): configOptions =>
-  ({
-    defaultProfile: 'default',
-    profiles: [],
-    fontSize: 12,
-    backgroundColor: '#000',
-    ...overrides
-  }) as configOptions;
+  ({...defaultConfig.config, ...overrides}) satisfies configOptions;
 
 /** Creates a user config layer with optional overrides. */
 const makeUserConfig = (overrides: Partial<configOptions> = {}): Partial<configOptions> => ({
@@ -123,9 +119,9 @@ describe('config-layering', () => {
     });
 
     it('should handle null values in source', () => {
-      const target = {a: 1, b: {c: 2}};
-      const source = {b: null};
-      const result = deepMerge(target, source as Record<string, unknown>);
+      const target: JsonObject = {a: 1, b: {c: 2}};
+      const source: JsonObject = {b: null};
+      const result = deepMerge(target, source);
 
       expect(result).toEqual({a: 1, b: null});
     });
@@ -286,7 +282,7 @@ describe('config-layering', () => {
 
     it('should return false for non-objects', () => {
       expect(isConfigLayer(null)).toBe(false);
-      expect(isConfigLayer(undefined)).toBe(false);
+      expect(isConfigLayer()).toBe(false);
       expect(isConfigLayer('string')).toBe(false);
       expect(isConfigLayer(123)).toBe(false);
     });
@@ -308,7 +304,7 @@ describe('config-layering', () => {
   describe('createRuntimeOverrideLayer', () => {
     it('should create a runtime layer with the given overrides', () => {
       const overrides = {fontSize: 16, cursorBlink: true};
-      const layer = createRuntimeOverrideLayer(overrides as Partial<configOptions>);
+      const layer = createRuntimeOverrideLayer(overrides);
 
       expect(layer.type).toBe('runtime');
       expect(layer.config).toEqual(overrides);
@@ -316,7 +312,7 @@ describe('config-layering', () => {
 
     it('should create independent layer objects', () => {
       const overrides = {fontSize: 16};
-      const layer = createRuntimeOverrideLayer(overrides as Partial<configOptions>);
+      const layer = createRuntimeOverrideLayer(overrides);
 
       // Modify original
       overrides.fontSize = 20;

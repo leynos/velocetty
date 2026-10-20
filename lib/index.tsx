@@ -21,7 +21,7 @@ import * as config from './utils/config';
 import {getBase64FileData} from './utils/file';
 import * as plugins from './utils/plugins';
 
-const mountElement = document.getElementById('mount');
+const mountElement = document.querySelector('#mount');
 if (!mountElement) {
   throw new Error('Expected renderer mount element with id "mount".');
 }
@@ -43,7 +43,7 @@ startRendererApplication({
   mountApp: (store) => {
     const root = createRoot(mountElement);
     root.render(
-      <Provider store={store as ReturnType<typeof configureStore>}>
+      <Provider store={store}>
         <HyperContainer />
       </Provider>
     );
@@ -55,5 +55,5 @@ startRendererApplication({
   rpc,
   transport,
   webFrame,
-  windowObject: window
+  windowObject: globalThis
 });

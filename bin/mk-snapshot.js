@@ -9,8 +9,11 @@ import electronLink from 'electron-link';
 import {normalizeArch} from './shared/arch.js';
 import {ensureDirectoryPath} from './shared/ensure-directory-path.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const scriptFilePath = fileURLToPath(import.meta.url);
+const scriptDirectory = path.dirname(scriptFilePath);
+
+/** @param {unknown} value @returns {value is string} */
+const isString = (value) => String(value) === value;
 
 // Exclude modules that electron-link cannot parse in production builds.
 // Match as a real path segment to avoid substring false positives.
@@ -19,21 +22,31 @@ const excludedModuleMatchers = [/\/node_modules\/react-redux(?:\/|$)/];
 const crossArchDirs = ['clang_x86_v8_arm', 'clang_x64_v8_arm64', 'win_clang_x64'];
 
 async function main() {
-  const baseDirPath = path.resolve(__dirname, '..');
+  const baseDirPath = path.resolve(scriptDirectory, '..');
   const cachePath = `${baseDirPath}/cache`;
+  const snapshotEntryPath = path.join(cachePath, 'snapshot-libs-entry.cjs');
 
   await ensureDirectoryPath(cachePath);
+  const {snapshotOptionalModules, snapshotRuntimeModules} = await import('./snapshot-modules.mjs');
+  const snapshotEntry = [
+    ...snapshotRuntimeModules.map((moduleName) => `require(${JSON.stringify(moduleName)});`),
+    'if (false) {',
+    ...snapshotOptionalModules.map((moduleName) => `  require(${JSON.stringify(moduleName)});`),
+    '}',
+    ''
+  ].join('\n');
+  fs.writeFileSync(snapshotEntryPath, snapshotEntry);
 
   console.log('Creating a linked script..');
   const result = await electronLink({
     baseDirPath: baseDirPath,
-    mainPath: `${__dirname}/snapshot-libs.js`,
+    mainPath: snapshotEntryPath,
     cachePath,
     shouldExcludeModule: ({requiredModulePath}) => {
-      if (typeof requiredModulePath !== 'string') {
+      if (!isString(requiredModulePath)) {
         return false;
       }
-      const normalizedPath = requiredModulePath.replace(/\\/g, '/');
+      const normalizedPath = requiredModulePath.replaceAll('\\', '/');
       return excludedModuleMatchers.some((matcher) => matcher.test(normalizedPath));
     }
   });
@@ -51,7 +64,10 @@ async function main() {
   if (process.platform !== 'darwin') {
     const mksnapshotBinPath = `${baseDirPath}/node_modules/electron-mksnapshot/bin`;
     const embeddedSPath = `${mksnapshotBinPath}/gen/v8/embedded.S`;
-    const matchingDirs = crossArchDirs.map((dir) => `${mksnapshotBinPath}/${dir}`).filter((dir) => fs.existsSync(dir));
+    const matchingDirs = crossArchDirs.flatMap((dir) => {
+      const matchingDirectory = `${mksnapshotBinPath}/${dir}`;
+      return fs.existsSync(matchingDirectory) ? [matchingDirectory] : [];
+    });
     if (fs.existsSync(embeddedSPath)) {
       await Promise.all(
         matchingDirs.map(async (dir) => {
@@ -65,12 +81,14 @@ async function main() {
   console.log(`Generating startup blob in "${outputBlobPath}"`);
   childProcess.execFileSync(
     process.execPath,
-    [path.resolve(__dirname, 'mksnapshot-wrapper.js'), snapshotScriptPath, '--output_dir', outputBlobPath],
+    [path.resolve(scriptDirectory, 'mksnapshot-wrapper.js'), snapshotScriptPath, '--output_dir', outputBlobPath],
     {stdio: 'inherit'}
   );
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+try {
+  await main();
+} catch (error) {
+  console.error(error);
+  process.exitCode = 1;
+}

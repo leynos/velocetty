@@ -1,7 +1,11 @@
-const fs = require('node:fs');
-const path = require('node:path');
+import fs from 'node:fs';
+import path from 'node:path';
 
-const localBinDir = path.resolve(__dirname, '..', 'node_modules', '.bin');
+import {fileURLToPath} from 'node:url';
+
+const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
+
+const localBinDir = path.resolve(scriptDirectory, '..', 'node_modules', '.bin');
 
 const unixShim = `#!/usr/bin/env bun
 const path = require('node:path');
@@ -35,8 +39,8 @@ const windowsShim = [
   'set CANDIDATES=%CD%;%~dp0..',
   'if not "%INIT_CWD%"=="" set CANDIDATES=%CANDIDATES%;%INIT_CWD%',
   'for %%G in ("%CANDIDATES:;=" "%") do (',
-  '  if exist "%%~G\\node_modules\\node-gyp-build\\bin.js" (',
-  '    bun "%%~G\\node_modules\\node-gyp-build\\bin.js" %*',
+  String.raw`  if exist "%%~G\node_modules\node-gyp-build\bin.js" (`,
+  String.raw`    bun "%%~G\node_modules\node-gyp-build\bin.js" %*`,
   '    exit /b %errorlevel%',
   '  )',
   ')',

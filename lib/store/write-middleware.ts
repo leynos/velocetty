@@ -12,18 +12,21 @@ import type {Dispatch, Middleware} from 'redux';
 
 import type {SessionPtyDataAction} from '@shared/constants/sessions';
 import type {HyperActions, HyperState} from '../../typings/hyper';
+import {isObject} from '@shared/types/guards';
 import terms from '../terms';
 
 const isSessionPtyDataAction = (action: unknown): action is SessionPtyDataAction => {
-  if (typeof action !== 'object' || action === null) {
+  if (!isObject(action)) {
     return false;
   }
-  const maybeAction = action as Partial<SessionPtyDataAction>;
+  if (!('type' in action) || !('uid' in action) || !('data' in action) || !('now' in action)) {
+    return false;
+  }
   return (
-    maybeAction.type === 'SESSION_PTY_DATA' &&
-    typeof maybeAction.uid === 'string' &&
-    typeof maybeAction.data === 'string' &&
-    typeof maybeAction.now === 'number'
+    action.type === 'SESSION_PTY_DATA' &&
+    typeof action.uid === 'string' &&
+    typeof action.data === 'string' &&
+    typeof action.now === 'number'
   );
 };
 

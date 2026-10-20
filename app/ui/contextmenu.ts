@@ -9,12 +9,16 @@ import {getDecoratedKeymaps} from '../plugins';
 
 const separator: MenuItemConstructorOptions = {type: 'separator'};
 
-const getCommandKeys = (keymaps: Record<string, string[]>): Record<string, string> =>
-  Object.keys(keymaps).reduce((commandKeys: Record<string, string>, command) => {
-    return Object.assign(commandKeys, {
-      [command]: keymaps[command][0]
-    });
-  }, {});
+const getCommandKeys = (keymaps: Record<string, string[]>) => {
+  const commandKeys: Record<string, string> = {};
+  for (const [command, keys] of Object.entries(keymaps)) {
+    const firstKey = keys.at(0);
+    if (firstKey !== undefined) {
+      commandKeys[command] = firstKey;
+    }
+  }
+  return commandKeys;
+};
 
 // only display cut/copy when there's a cursor selection
 const filterCutCopy = (selection: string, menuItem: MenuItemConstructorOptions) => {
@@ -30,9 +34,9 @@ const contextMenuTemplate = (selection: string) => {
     commandKeys,
     execCommand,
     getProfiles().map((p) => p.name)
-  ).submenu as MenuItemConstructorOptions[];
+  ).submenu;
   const _edit = editMenu(commandKeys, execCommand).submenu.filter(filterCutCopy.bind(null, selection));
-  return _edit.concat(separator, _shell).filter((menuItem) => !Object.hasOwn(menuItem, 'enabled') || menuItem.enabled);
+  return [..._edit, separator, ..._shell].filter((menuItem) => !Object.hasOwn(menuItem, 'enabled') || menuItem.enabled);
 };
 
 export default contextMenuTemplate;

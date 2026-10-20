@@ -9,6 +9,7 @@ import {mkdirpSync} from 'fs-extra';
 import * as Registry from 'native-reg';
 import type {ValueType} from 'native-reg';
 import sudoPrompt from 'sudo-prompt';
+import {isObject, isString} from '@shared/types/guards';
 
 import {cliScriptPath, cliLinkPath} from '../config/paths';
 import notify from '../notify';
@@ -20,11 +21,11 @@ const sudoExec = promisify(sudoPrompt.exec);
 const checkInstall = () => {
   return readLink(cliLinkPath)
     .then((link) => link === cliScriptPath)
-    .catch((err) => {
-      if (err.code === 'ENOENT') {
+    .catch((error) => {
+      if (isObject(error) && 'code' in error && error.code === 'ENOENT') {
         return false;
       }
-      throw err;
+      throw error;
     });
 };
 
@@ -39,21 +40,23 @@ const addSymlink = async (silent: boolean) => {
     if (!existsSync(path.dirname(cliLinkPath))) {
       try {
         mkdirpSync(path.dirname(cliLinkPath));
-      } catch (err) {
-        throw `Failed to create directory ${path.dirname(cliLinkPath)} - ${err}`;
+      } catch (error) {
+        throw `Failed to create directory ${path.dirname(cliLinkPath)} - ${error}`;
       }
     }
     await symLink(cliScriptPath, cliLinkPath);
-  } catch (_err) {
-    const err = _err as {code?: string; message?: string};
+  } catch (caughtError) {
+    const errorCode =
+      isObject(caughtError) && 'code' in caughtError && isString(caughtError.code) ? caughtError.code : undefined;
+    const errorMessage = caughtError instanceof Error ? caughtError.message : undefined;
     // 'EINVAL' is returned by readlink,
     // 'EEXIST' is returned by symlink
     let error =
-      err.code === 'EEXIST' || err.code === 'EINVAL'
+      errorCode === 'EEXIST' || errorCode === 'EINVAL'
         ? `File already exists: ${cliLinkPath}`
-        : `Symlink creation failed: ${err.code ?? 'Unknown error'}${err.message ? ` (${err.message})` : ''}`;
+        : `Symlink creation failed: ${errorCode ?? 'Unknown error'}${errorMessage ? ` (${errorMessage})` : ''}`;
     // Need sudo access to create symlink
-    if (err.code === 'EACCES' && !silent) {
+    if (errorCode === 'EACCES' && !silent) {
       const result = await dialog.showMessageBox({
         message: `You need to grant elevated privileges to add Hyper CLI to PATH
 Or you can run
@@ -67,10 +70,10 @@ sudo ln -sf "${cliScriptPath}" "${cliLinkPath}"`,
           return;
         } catch (_error) {
           const sudoError = Array.isArray(_error) ? _error[0] : _error;
-          error = typeof sudoError === 'string' ? sudoError : `Symlink creation failed: ${String(sudoError)}`;
+          error = isString(sudoError) ? sudoError : `Symlink creation failed: ${String(sudoError)}`;
         }
       } else if (result.response === 1) {
-        clipboard.writeText(`sudo ln -sf "${cliScriptPath}" "${cliLinkPath}"`);
+        await clipboard.writeText(`sudo ln -sf "${cliScriptPath}" "${cliLinkPath}"`);
       }
     }
     throw error;
@@ -99,7 +102,12 @@ const addBinToUserPath = () => {
           reject(`Registry key type is ${type}`);
           return;
         }
-        const value = Registry.queryValue(envKey, pathItem) as string;
+        const registryValue = Registry.queryValue(envKey, pathItem);
+        if (!isString(registryValue)) {
+          reject('Registry PATH value is not a string');
+          return;
+        }
+        const value = registryValue;
         let pathParts = value.split(';');
         const existingPath = pathParts.includes(binPath);
         const existingOldPath = pathParts.some((pathPart) => pathPart.startsWith(oldPath));
@@ -140,8 +148,12 @@ export const installCLI = async (withNotification: boolean) => {
         'Hyper CLI installed',
         'You may need to restart your computer to complete this installation process.'
       );
-    } catch (err) {
-      logNotify(withNotification, 'Hyper CLI installation failed', `Failed to add Hyper CLI path to user PATH ${err}`);
+    } catch (error) {
+      logNotify(
+        withNotification,
+        'Hyper CLI installation failed',
+        `Failed to add Hyper CLI path to user PATH ${error}`
+      );
     }
   } else if (process.platform === 'darwin' || process.platform === 'linux') {
     // AppImages are mounted on run at a temporary path, don't create symlink

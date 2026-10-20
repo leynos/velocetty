@@ -1,7 +1,8 @@
 /** @file Manages plugin lifecycle and exposes plugin APIs to the app. */
 import {exec, execFile} from 'node:child_process';
 import {writeFileSync} from 'node:fs';
-import {resolve, basename} from 'node:path';
+import {createRequire} from 'node:module';
+import path from 'node:path';
 import {promisify} from 'node:util';
 
 import {app, dialog, ipcMain as _ipcMain} from 'electron';
@@ -14,8 +15,10 @@ import ReactDom from 'react-dom';
 
 import type {IpcMainWithCommands} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
+import type {hyperPlugin} from '../typings/hyper';
 
 import * as config from './config';
+import {isFunction, isObject, isString} from '@shared/types/guards';
 import {plugs} from './config/paths';
 import notify from './notify';
 import {availableExtensions} from './plugins/extensions';
@@ -30,8 +33,23 @@ import mapKeys from './utils/map-keys';
 
 // local storage
 const cache = new Config();
+const pluginRequire = createRequire(path.resolve(app.getAppPath(), 'plugins.js'));
 
-const path = plugs.base;
+type ModuleLoader = (request: string, parent?: NodeJS.Module | null, isMain?: boolean) => ReturnType<NodeJS.Require>;
+type ModuleWithLoader = typeof import('node:module') & {_load: ModuleLoader};
+
+type AppPluginModule = Partial<hyperPlugin> & {
+  _name?: string;
+  _version?: string;
+  decorateConfig?: (config: configOptions) => configOptions;
+  extendKeymaps?: unknown;
+  onApp?: (app: App) => void;
+  onUnload?: (app: App) => void;
+  onWindow?: (window: BrowserWindow) => void;
+  onWindowClass?: (windowClass: typeof import('electron').BrowserWindow) => void;
+};
+
+const pluginPath = plugs.base;
 const localPath = plugs.local;
 
 patchModuleLoad();
@@ -82,30 +100,35 @@ config.subscribe(() => {
 // https://github.com/vercel/hyper/issues/619
 function patchModuleLoad() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const Module = require('node:module');
+  // SAFETY: Node exposes the internal loader on `node:module`; this wrapper preserves its call signature.
+  const Module = pluginRequire('node:module') as ModuleWithLoader;
   const originalLoad = Module._load;
-  Module._load = function _load(modulePath: string) {
+  Module._load = function _load(modulePath: string, parent?: NodeJS.Module | null, isMain?: boolean) {
     // PLEASE NOTE: Code changes here, also need to be changed in
     // lib/utils/plugins.js
     switch (modulePath) {
-      case 'react':
+      case 'react': {
         // DEPRECATED
         return React;
-      case 'react-dom':
+      }
+      case 'react-dom': {
         // DEPRECATED
         return ReactDom;
-      case 'hyper/component':
+      }
+      case 'hyper/component': {
         // DEPRECATED
         return React.PureComponent;
+      }
       // These return Object, since they work differently on the backend, than on the frontend.
       // Still needs to be here, to prevent errors, while loading plugins.
       case 'hyper/Notification':
       case 'hyper/notify':
-      case 'hyper/decorate':
+      case 'hyper/decorate': {
         return Object;
-      default:
-        // eslint-disable-next-line prefer-rest-params
-        return originalLoad.apply(this, arguments);
+      }
+      default: {
+        return originalLoad.call(this, modulePath, parent, isMain);
+      }
     }
   };
 }
@@ -170,15 +193,15 @@ function updatePlugins({force = false} = {}) {
 }
 
 function getPluginVersions() {
-  const paths_ = paths.plugins.concat(paths.localPlugins);
+  const paths_ = [...paths.plugins, ...paths.localPlugins];
   return paths_.map((path_) => {
     let version: string | null = null;
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      version = require(resolve(path_, 'package.json')).version;
+      version = pluginRequire(path.resolve(path_, 'package.json')).version;
       //eslint-disable-next-line no-empty
-    } catch (_err) {}
-    return [basename(path_), version];
+    } catch {}
+    return [path.basename(path_), version];
   });
 }
 
@@ -191,9 +214,9 @@ function clearCache() {
   });
 
   // clear require cache
-  for (const entry in require.cache) {
-    if (entry.indexOf(path) === 0 || entry.indexOf(localPath) === 0) {
-      delete require.cache[entry];
+  for (const entry in pluginRequire.cache) {
+    if (entry.indexOf(pluginPath) === 0 || entry.indexOf(localPath) === 0) {
+      delete pluginRequire.cache[entry];
     }
   }
 }
@@ -236,11 +259,11 @@ function syncPackageJSON() {
     dependencies
   };
 
-  const file = resolve(path, 'package.json');
+  const file = path.resolve(pluginPath, 'package.json');
   try {
     writeFileSync(file, JSON.stringify(pkg, null, 2));
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
     alert(`An error occurred writing to ${file}: ${reason}`);
   }
 }
@@ -262,8 +285,8 @@ function toDependencies(plugins_: {plugins: string[]}) {
       const index = match.index + 1;
       const pieces: string[] = [];
 
-      pieces[0] = plugin.substring(0, index);
-      pieces[1] = plugin.substring(index + 1, plugin.length);
+      pieces[0] = plugin.slice(0, index);
+      pieces[1] = plugin.slice(index + 1);
       obj[pieces[0]] = pieces[1];
     } else {
       obj[plugin] = 'latest';
@@ -282,10 +305,10 @@ export const subscribe = (fn: Function) => {
 function getPaths() {
   return {
     plugins: plugins.plugins.map((name) => {
-      return resolve(path, 'node_modules', name.split('#')[0]);
+      return path.resolve(pluginPath, 'node_modules', name.split('#')[0]);
     }),
     localPlugins: plugins.localPlugins.map((name) => {
-      return resolve(localPath, name);
+      return path.resolve(localPath, name);
     })
   };
 }
@@ -295,44 +318,51 @@ export {getPaths};
 
 // get paths from renderer
 export const getBasePaths = () => {
-  return {path, localPath};
+  return {path: pluginPath, localPath};
 };
 
 function requirePlugins(): any[] {
   const {plugins: plugins_, localPlugins} = paths;
 
   const load = (path_: string) => {
-    let mod: Record<string, any>;
+    let mod: AppPluginModule;
     try {
-      mod = require(path_);
-      const exposed = mod && Object.keys(mod).some((key) => availableExtensions.has(key));
+      mod = pluginRequire(path_);
+      const exposed = Object.keys(mod).some((key) => availableExtensions.has(key));
       if (!exposed) {
-        notify('Plugin error!', `${`Plugin "${basename(path_)}" does not expose any `}Hyper extension API methods`);
+        notify(
+          'Plugin error!',
+          `${`Plugin "${path.basename(path_)}" does not expose any `}Hyper extension API methods`
+        );
         return;
       }
 
       // populate the name for internal errors here
-      mod._name = basename(path_);
+      mod._name = path.basename(path_);
       try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        mod._version = require(resolve(path_, 'package.json')).version;
-      } catch (_err) {
+        mod._version = pluginRequire(path.resolve(path_, 'package.json')).version;
+      } catch {
         console.warn(`No package.json found in ${path_}`);
       }
       console.log(`Plugin ${mod._name} (${mod._version}) loaded.`);
 
       return mod;
-    } catch (_err) {
-      const err = _err as {code: string; message: string};
-      if (err.code === 'MODULE_NOT_FOUND') {
-        console.warn(`Plugin error while loading "${basename(path_)}" (${path_}): ${err.message}`);
+    } catch (error) {
+      const errorCode = isObject(error) && 'code' in error && isString(error.code) ? error.code : undefined;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorCode === 'MODULE_NOT_FOUND') {
+        console.warn(`Plugin error while loading "${path.basename(path_)}" (${path_}): ${errorMessage}`);
       } else {
-        notify('Plugin error!', `Plugin "${basename(path_)}" failed to load (${err.message})`, {error: err});
+        notify('Plugin error!', `Plugin "${path.basename(path_)}" failed to load (${errorMessage})`, {error});
       }
     }
   };
 
-  return [...plugins_, ...localPlugins].map(load).filter((v): v is Record<string, any> => Boolean(v));
+  return [...plugins_, ...localPlugins].flatMap((pluginPath) => {
+    const value = load(pluginPath);
+    return value ? [value] : [];
+  });
 }
 
 export const onApp = (app_: App) => {
@@ -340,9 +370,9 @@ export const onApp = (app_: App) => {
     if (plugin.onApp) {
       try {
         plugin.onApp(app_);
-      } catch (e) {
+      } catch (error) {
         notify('Plugin error!', `"${plugin._name}" has encountered an error. Check Developer Tools for details.`, {
-          error: e
+          error: error
         });
       }
     }
@@ -354,9 +384,9 @@ export const onWindowClass = (win: BrowserWindow) => {
     if (plugin.onWindowClass) {
       try {
         plugin.onWindowClass(win);
-      } catch (e) {
+      } catch (error) {
         notify('Plugin error!', `"${plugin._name}" has encountered an error. Check Developer Tools for details.`, {
-          error: e
+          error: error
         });
       }
     }
@@ -368,9 +398,9 @@ export const onWindow = (win: BrowserWindow) => {
     if (plugin.onWindow) {
       try {
         plugin.onWindow(win);
-      } catch (e) {
+      } catch (error) {
         notify('Plugin error!', `"${plugin._name}" has encountered an error. Check Developer Tools for details.`, {
-          error: e
+          error: error
         });
       }
     }
@@ -386,11 +416,12 @@ function decorateEntity(base: any, key: string, type: 'object' | 'function') {
       let res;
       try {
         res = plugin[key](decorated);
-      } catch (e) {
-        notify('Plugin error!', `"${plugin._name}" when decorating ${key}`, {error: e});
+      } catch (error) {
+        notify('Plugin error!', `"${plugin._name}" when decorating ${key}`, {error: error});
         return;
       }
-      if (res && (!type || typeof res === type)) {
+      const matchesExpectedType = type === 'object' ? isObject(res) : isFunction(res);
+      if (res && matchesExpectedType) {
         decorated = res;
       } else {
         notify('Plugin error!', `"${plugin._name}": invalid return type for \`${key}\``);
@@ -419,10 +450,10 @@ export const getDeprecatedConfig = () => {
     // We need to clone config in case of plugin modifies config directly.
     let configTmp: configOptions;
     try {
-      configTmp = plugin.decorateConfig(JSON.parse(JSON.stringify(baseConfig)));
-    } catch (e) {
+      configTmp = plugin.decorateConfig(structuredClone(baseConfig));
+    } catch (error) {
       notify('Plugin error!', `"${plugin._name}" has encountered an error. Check Developer Tools for details.`, {
-        error: e
+        error: error
       });
       return;
     }
@@ -485,6 +516,7 @@ export const decorateSessionClass = <T>(Session: T): T => {
 
 export {toDependencies as _toDependencies};
 
+// SAFETY: Electron's ipcMain implements the native handle API; this type adds the repository's command map.
 const ipcMain = _ipcMain as IpcMainWithCommands;
 
 ipcMain.handle('child_process.exec', (_event, command, options) => {

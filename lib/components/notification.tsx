@@ -5,12 +5,13 @@
  */
 // biome-ignore lint/style/useImportType: React value is required for the current JSX runtime.
 import React, {forwardRef, useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {isFunction, isNumber} from '@shared/types/guards';
 
 import type {NotificationProps, TimerSeam} from '../../typings/hyper';
 
 const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLDivElement>, timer?: TimerSeam) => {
   const {backgroundColor, dismissAfter, onDismiss, text} = props;
-  const dismissTimer = useRef<NodeJS.Timeout | undefined>(undefined);
+  const dismissTimer = useRef<ReturnType<TimerSeam['setTimeout']> | null>(null);
   const dismissingRef = useRef(false);
   const transitionHandler = useRef<((event: TransitionEvent) => void) | null>(null);
   const transitionNode = useRef<HTMLDivElement | null>(null);
@@ -52,11 +53,11 @@ const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLD
         }
 
         if (ref) {
-          if (typeof ref === 'function') ref(el);
+          if (isFunction(ref)) ref(el);
           else ref.current = el;
         }
       } else if (ref) {
-        if (typeof ref === 'function') ref(null);
+        if (isFunction(ref)) ref(null);
         else ref.current = null;
       }
     },
@@ -64,7 +65,7 @@ const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLD
   );
 
   const setDismissTimer = useCallback(() => {
-    if (typeof dismissAfter === 'number') {
+    if (isNumber(dismissAfter)) {
       dismissTimer.current = setTimeout(() => {
         handleDismiss();
       }, dismissAfter);
@@ -72,7 +73,9 @@ const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLD
   }, [dismissAfter, handleDismiss, setTimeout]);
 
   const resetDismissTimer = useCallback(() => {
-    clearTimeout(dismissTimer.current);
+    if (dismissTimer.current !== null) {
+      clearTimeout(dismissTimer.current);
+    }
     setDismissTimer();
   }, [clearTimeout, setDismissTimer]);
 
@@ -86,7 +89,9 @@ const useNotification = (props: NotificationProps, ref: React.ForwardedRef<HTMLD
 
   useEffect(() => {
     return () => {
-      clearTimeout(dismissTimer.current);
+      if (dismissTimer.current !== null) {
+        clearTimeout(dismissTimer.current);
+      }
       if (transitionNode.current && transitionHandler.current) {
         transitionNode.current.removeEventListener('transitionend', transitionHandler.current);
       }

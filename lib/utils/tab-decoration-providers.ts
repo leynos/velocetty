@@ -12,6 +12,7 @@
  */
 
 import type {CommandId} from '@shared/types/commands';
+import {isFunction, isNumber, isObject, isString} from '@shared/types/guards';
 
 declare const tabIdBrand: unique symbol;
 declare const tabDecorationProviderIdBrand: unique symbol;
@@ -21,9 +22,11 @@ export type TabId = string & {[tabIdBrand]: 'TabId'};
 /** Branded identifier for tab-decoration providers. */
 export type TabDecorationProviderId = string & {[tabDecorationProviderIdBrand]: 'TabDecorationProviderId'};
 
-/** Cast a raw tab identifier into the branded tab ID type. */
+/** Brands a tab identifier without changing its runtime string value. */
+// SAFETY: Tab identifiers remain strings at runtime; this constructor centralizes the provider API brand.
 export const asTabId = (value: string): TabId => value as TabId;
-/** Cast a raw provider identifier into the branded provider ID type. */
+/** Brands a provider identifier without changing its runtime string value. */
+// SAFETY: Provider IDs remain strings at runtime; this constructor centralizes the provider API brand.
 export const asTabDecorationProviderId = (value: string): TabDecorationProviderId => value as TabDecorationProviderId;
 
 /** Badge contribution shown alongside a tab label. */
@@ -85,6 +88,24 @@ const defaultRegistryLogger: RegistryLogger = {
   error: (message, error) => console.error(message, error)
 };
 
+const isTabDecorationProvider = (candidate: unknown): candidate is TabDecorationProvider => {
+  if (
+    !isObject(candidate) ||
+    !('id' in candidate) ||
+    !('priority' in candidate) ||
+    !('provideDecoration' in candidate)
+  ) {
+    return false;
+  }
+
+  return (
+    isString(candidate.id) &&
+    isNumber(candidate.priority) &&
+    isFunction(candidate.provideDecoration) &&
+    (!('subscribe' in candidate) || candidate.subscribe === undefined || isFunction(candidate.subscribe))
+  );
+};
+
 const badgeKey = (badge: TabDecorationBadge) =>
   JSON.stringify([badge.icon ?? null, badge.text ?? null, badge.tooltip ?? null, badge.kind ?? null]);
 
@@ -107,19 +128,15 @@ const compareProviders = (a: RegisteredProvider, b: RegisteredProvider) => {
 
 type DecorationItemKey<T> = (item: T) => string;
 type DecorationCollectionOptions<T> = {
-  propertyKey: 'badges' | 'widgets';
   itemKey: DecorationItemKey<T>;
   maxItems: number;
 };
 
-const collectDecorationItems = <T>(decorations: TabDecoration[], options: DecorationCollectionOptions<T>): T[] => {
-  const {propertyKey, itemKey, maxItems} = options;
+const collectDecorationItems = <T>(collections: T[][], options: DecorationCollectionOptions<T>): T[] => {
+  const {itemKey, maxItems} = options;
   const items: T[] = [];
   const seenKeys = new Set<string>();
-  const allItems = decorations.flatMap((decoration) => {
-    const decorationItems = decoration[propertyKey];
-    return Array.isArray(decorationItems) ? (decorationItems as T[]) : [];
-  });
+  const allItems = collections.flat();
 
   for (const item of allItems) {
     if (items.length >= maxItems) {
@@ -139,19 +156,23 @@ const collectDecorationItems = <T>(decorations: TabDecoration[], options: Decora
 };
 
 const collectBadges = (decorations: TabDecoration[]): TabDecorationBadge[] => {
-  return collectDecorationItems<TabDecorationBadge>(decorations, {
-    propertyKey: 'badges',
-    itemKey: badgeKey,
-    maxItems: MAX_BADGES
-  });
+  return collectDecorationItems(
+    decorations.map(({badges}) => badges ?? []),
+    {
+      itemKey: badgeKey,
+      maxItems: MAX_BADGES
+    }
+  );
 };
 
 const collectWidgets = (decorations: TabDecoration[]): TabDecorationWidget[] => {
-  return collectDecorationItems<TabDecorationWidget>(decorations, {
-    propertyKey: 'widgets',
-    itemKey: widgetKey,
-    maxItems: MAX_WIDGETS
-  });
+  return collectDecorationItems(
+    decorations.map(({widgets}) => widgets ?? []),
+    {
+      itemKey: widgetKey,
+      maxItems: MAX_WIDGETS
+    }
+  );
 };
 
 const mergeSimpleProperty = <K extends 'icon' | 'title' | 'subtitle'>(
@@ -215,7 +236,7 @@ const setupProviderSubscription = (
       onDidChange();
     });
 
-    if (typeof dispose === 'function') {
+    if (isFunction(dispose)) {
       registered.disposeChangeListener = dispose;
     }
   } catch (error) {
@@ -238,9 +259,11 @@ export class TabDecorationProviderRegistry {
    * Invalid provider identifiers are ignored to prevent plugin errors from
    * breaking renderer decoration updates.
    */
-  register(provider: TabDecorationProvider): () => void {
-    if (typeof provider.id !== 'string') {
-      this.logger.warn('Ignoring tab decoration provider registration with non-string id.');
+  register(provider: TabDecorationProvider): () => void;
+  register(provider: unknown): () => void;
+  register(provider: unknown): () => void {
+    if (!isTabDecorationProvider(provider)) {
+      this.logger.warn('Ignoring invalid tab decoration provider registration.');
       return () => {};
     }
 
@@ -272,10 +295,7 @@ export class TabDecorationProviderRegistry {
 
   /** Return providers sorted by deterministic priority and id ordering. */
   listProviders(): TabDecorationProvider[] {
-    return this.providers
-      .slice()
-      .sort(compareProviders)
-      .map((registered) => registered.provider);
+    return [...this.providers].toSorted(compareProviders).map((registered) => registered.provider);
   }
 
   /** Resolve the final merged decoration for the provided tab context. */

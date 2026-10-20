@@ -12,7 +12,7 @@
  *   a correctly annotated search widget for every supported locale.
  *
  * Cross-links:
- * - Component: `lib/components/searchBox.tsx`
+ * - Component: `lib/components/search-box.tsx`
  * - Translation wrapper: `lib/components/term.tsx` (TranslatedSearchBox)
  * - Translation hook: `lib/hooks/use-translation.ts`
  */
@@ -23,8 +23,8 @@ import {createRoot} from 'react-dom/client';
 import {expect, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
-import {pollForElement} from '../testUtils/pollFor';
-import {waitFor} from '../testUtils/waitFor';
+import {pollForElement} from '../testUtils/poll-for';
+import {waitFor} from '../testUtils/wait-for';
 
 import type {SearchBoxProps} from '../../typings/hyper';
 type SearchBoxComponent = React.ComponentType<SearchBoxProps>;
@@ -41,9 +41,9 @@ let searchBoxModuleInstanceCounter = 0;
  */
 const loadSearchBoxComponent = async (): Promise<SearchBoxComponent> => {
   searchBoxModuleInstanceCounter += 1;
-  const {default: SearchBoxComponent} = (await import(
-    `../../lib/components/searchBox.tsx?search_box_css_modules=${searchBoxModuleInstanceCounter}`
-  )) as {default: SearchBoxComponent};
+  const {default: SearchBoxComponent} = await import(
+    `../../lib/components/search-box.tsx?search_box_css_modules=${searchBoxModuleInstanceCounter}`
+  );
   return SearchBoxComponent;
 };
 
@@ -103,12 +103,9 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
 
   try {
     container = document.createElement('div');
-    document.body.appendChild(container);
+    document.body.append(container);
     root = createRoot(container);
 
-    if (!root) {
-      throw new Error('Failed to create React root');
-    }
     await act(async () => {
       flushSync(() => {
         root.render(React.createElement(SearchBoxComponent, makeProps(overrides)));
@@ -137,16 +134,12 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
   }
 
   const teardown = async () => {
-    if (root) {
-      // Explicitly swallow errors from unmount - cleanup continues regardless
-      await act(async () => {
-        root.unmount();
-        await waitFor(0);
-      });
-    }
-    if (container) {
-      container.remove();
-    }
+    // Explicitly swallow errors from unmount - cleanup continues regardless.
+    await act(async () => {
+      root.unmount();
+      await waitFor(0);
+    });
+    container.remove();
     cleanup();
   };
 
@@ -173,7 +166,7 @@ for (const [description, overrides, expectedTextContent] of searchResultsCountCa
     const {container, teardown} = await renderSearchBox(overrides);
     try {
       const output = await pollForElement(container, 'output');
-      expect(output.textContent?.trim()).toBe(expectedTextContent);
+      expect(output.textContent.trim()).toBe(expectedTextContent);
     } finally {
       await teardown();
     }
@@ -184,7 +177,9 @@ for (const [description, overrides, expectedTextContent] of searchResultsCountCa
 // SearchNavigation – button labels
 // ---------------------------------------------------------------------------
 
-const searchNavigationLabelCases: Array<[keyof SearchBoxProps, string]> = [
+type SearchNavigationLabel = 'previousMatchLabel' | 'nextMatchLabel' | 'closeLabel';
+
+const searchNavigationLabelCases: Array<[SearchNavigationLabel, string]> = [
   ['previousMatchLabel', 'Custom Prev Label'],
   ['nextMatchLabel', 'Custom Next Label'],
   ['closeLabel', 'Custom Close Label']
@@ -192,7 +187,7 @@ const searchNavigationLabelCases: Array<[keyof SearchBoxProps, string]> = [
 
 for (const [prop, expectedTitle] of searchNavigationLabelCases) {
   test.serial(`SearchNavigation applies ${prop} as a navigation button title`, async () => {
-    const {container, teardown} = await renderSearchBox({[prop]: expectedTitle} as Partial<SearchBoxProps>);
+    const {container, teardown} = await renderSearchBox({[prop]: expectedTitle} satisfies Partial<SearchBoxProps>);
     try {
       const button = await pollForElement(container, `button[title="${expectedTitle}"]`);
       expect(button).toBeTruthy();
@@ -210,7 +205,9 @@ for (const [prop, expectedTitle] of searchNavigationLabelCases) {
 // The prev/next cases are marked as failing because Happy DOM does not reliably
 // propagate React synthetic event values. When the environment is upgraded to
 // support proper event propagation, remove the .failing() modifier.
-const navTermCallbackCases: Array<[keyof SearchBoxProps, keyof SearchBoxProps, string]> = [
+type SearchNavigationCallback = 'prev' | 'next';
+
+const navTermCallbackCases: Array<[SearchNavigationCallback, Exclude<SearchNavigationLabel, 'closeLabel'>, string]> = [
   ['prev', 'previousMatchLabel', 'Custom Prev Callback'],
   ['next', 'nextMatchLabel', 'Custom Next Callback']
 ];
@@ -228,10 +225,18 @@ for (const [callbackProp, labelProp, buttonTitle] of navTermCallbackCases) {
       }
     };
 
-    const {container, teardown} = await renderSearchBox({
-      [callbackProp]: callback,
-      [labelProp]: buttonTitle
-    } as Partial<SearchBoxProps>);
+    const overrides: Partial<SearchBoxProps> = {};
+    if (callbackProp === 'prev') {
+      overrides.prev = callback;
+    } else {
+      overrides.next = callback;
+    }
+    if (labelProp === 'previousMatchLabel') {
+      overrides.previousMatchLabel = buttonTitle;
+    } else {
+      overrides.nextMatchLabel = buttonTitle;
+    }
+    const {container, teardown} = await renderSearchBox(overrides);
 
     try {
       const input = container.querySelector<HTMLInputElement>('input[type="text"]');
@@ -256,7 +261,7 @@ for (const [callbackProp, labelProp, buttonTitle] of navTermCallbackCases) {
       const button = container.querySelector<HTMLButtonElement>(`button[title="${buttonTitle}"]`);
       expect(button).toBeTruthy();
       await act(async () => {
-        button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
+        button?.dispatchEvent(new globalThis.window.MouseEvent('click', {bubbles: true}));
         await waitFor(0);
       });
 
@@ -280,10 +285,13 @@ test.serial('SearchNavigation invokes the close callback when its button is clic
   });
 
   try {
-    const button = (await pollForElement(container, 'button[title="Custom Close Callback"]')) as HTMLButtonElement;
+    const button = await pollForElement(container, 'button[title="Custom Close Callback"]');
+    if (button.tagName !== 'BUTTON') {
+      throw new TypeError('Expected the close callback control to be a button.');
+    }
     expect(button).toBeTruthy();
     await act(async () => {
-      button?.dispatchEvent(new window.MouseEvent('click', {bubbles: true}));
+      button.dispatchEvent(new globalThis.window.MouseEvent('click', {bubbles: true}));
       await waitFor(0);
     });
 
@@ -305,7 +313,10 @@ test.serial('SearchNavigation invokes the close callback when its button is clic
 test.serial('SearchBox wires searchLabel to the input aria-label and placeholder', async () => {
   const {container, teardown} = await renderSearchBox({searchLabel: 'Find in terminal'});
   try {
-    const input = (await pollForElement(container, 'input[type="text"]')) as HTMLInputElement;
+    const input = await pollForElement(container, 'input[type="text"]');
+    if (input.tagName !== 'INPUT') {
+      throw new TypeError('Expected the search control to be an input.');
+    }
     expect(input.getAttribute('aria-label')).toBe('Find in terminal');
     expect(input.getAttribute('placeholder')).toBe('Find in terminal');
   } finally {
@@ -313,7 +324,9 @@ test.serial('SearchBox wires searchLabel to the input aria-label and placeholder
   }
 });
 
-const searchBoxToggleLabelCases: Array<[keyof SearchBoxProps, string]> = [
+type SearchBoxToggleLabel = 'matchCaseLabel' | 'matchWholeWordLabel' | 'useRegexLabel';
+
+const searchBoxToggleLabelCases: Array<[SearchBoxToggleLabel, string]> = [
   ['matchCaseLabel', 'Custom Match Case Label'],
   ['matchWholeWordLabel', 'Custom Whole Word Label'],
   ['useRegexLabel', 'Custom Regex Label']
@@ -321,7 +334,7 @@ const searchBoxToggleLabelCases: Array<[keyof SearchBoxProps, string]> = [
 
 for (const [prop, expectedTitle] of searchBoxToggleLabelCases) {
   test.serial(`SearchBox wires ${prop} to its toggle button title`, async () => {
-    const {container, teardown} = await renderSearchBox({[prop]: expectedTitle} as Partial<SearchBoxProps>);
+    const {container, teardown} = await renderSearchBox({[prop]: expectedTitle} satisfies Partial<SearchBoxProps>);
     try {
       const button = await pollForElement(container, `button[title="${expectedTitle}"]`);
       expect(button).toBeTruthy();

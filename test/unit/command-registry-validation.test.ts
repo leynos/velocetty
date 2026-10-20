@@ -1,6 +1,7 @@
 /** @file Covers command-registry validation edge cases and cache invalidation. */
 import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
-import type {CommandDefinition, CommandId} from '@shared/types/commands';
+import {asCommandId, type CommandDefinition} from '@shared/types/commands';
+import type {JsonObject} from '@shared/types/json';
 
 import {installTestWindow} from '../testUtils/global-window';
 
@@ -29,10 +30,9 @@ let list: typeof import('../../lib/command-registry').list;
 let validateArgs: typeof import('../../lib/command-registry').validateArgs;
 
 const TEST_COMMAND_PREFIX = 'test:command-registry:validation';
-const asCommandId = (value: string): CommandId => value as CommandId;
 let restoreWindow = () => {};
 
-const createCommandDefinition = (commandId: string, argsSchema?: Record<string, unknown>): CommandDefinition => ({
+const createCommandDefinition = (commandId: string, argsSchema?: JsonObject): CommandDefinition => ({
   id: asCommandId(commandId),
   kind: 'frontend',
   metadata: {
@@ -109,16 +109,16 @@ test('validateArgs returns all actionable issues for invalid payloads', () => {
     throw new Error('Expected invalid payload to fail validation');
   }
 
-  const issueKeywords = (result.error.issues ?? []).map((issue) => issue.keyword).sort();
+  const issueKeywords = (result.error.issues ?? []).map((issue) => issue.keyword).toSorted();
   expect(issueKeywords).toEqual(['additionalProperties', 'minimum', 'required']);
 });
 
 interface SchemaChangeScenario {
   commandId: string;
-  initialSchema: Record<string, unknown>;
-  initialValidPayload: Record<string, unknown>;
+  initialSchema: JsonObject;
+  initialValidPayload: JsonObject;
   mutate: () => void;
-  updatedValidPayload: Record<string, unknown>;
+  updatedValidPayload: JsonObject;
 }
 
 const assertCacheIsInvalidatedAfterSchemaChange = (scenario: SchemaChangeScenario): void => {

@@ -45,7 +45,7 @@ function deleteSession(state: sessionState, uid: string) {
 
 const reducer: ISessionReducer = (state = initialState, action) => {
   switch (action.type) {
-    case SESSION_ADD:
+    case SESSION_ADD: {
       return state.set('activeUid', action.uid).setIn(
         ['sessions', action.uid],
         Session({
@@ -57,14 +57,17 @@ const reducer: ISessionReducer = (state = initialState, action) => {
           profile: action.profile
         })
       );
+    }
 
-    case SESSION_SET_ACTIVE:
+    case SESSION_SET_ACTIVE: {
       return state.set('activeUid', action.uid);
+    }
 
-    case SESSION_SEARCH:
+    case SESSION_SEARCH: {
       return state.setIn(['sessions', action.uid, 'search'], action.value);
+    }
 
-    case SESSION_CLEAR_ACTIVE:
+    case SESSION_CLEAR_ACTIVE: {
       return state.merge(
         {
           sessions: {
@@ -75,8 +78,9 @@ const reducer: ISessionReducer = (state = initialState, action) => {
         },
         {deep: true}
       );
+    }
 
-    case SESSION_PTY_DATA:
+    case SESSION_PTY_DATA: {
       // we avoid a direct merge for perf reasons
       // as this is the most common action
       if (state.sessions[action.uid]?.cleared) {
@@ -92,26 +96,30 @@ const reducer: ISessionReducer = (state = initialState, action) => {
         );
       }
       return state;
+    }
 
-    case SESSION_PTY_EXIT:
+    case SESSION_PTY_EXIT: {
       if (state.sessions[action.uid]) {
         return deleteSession(state, action.uid);
       }
       console.log('ignore pty exit: session removed by user');
       return state;
+    }
 
-    case SESSION_USER_EXIT:
+    case SESSION_USER_EXIT: {
       return deleteSession(state, action.uid);
+    }
 
-    case SESSION_SET_XTERM_TITLE:
+    case SESSION_SET_XTERM_TITLE: {
       return state.setIn(
         ['sessions', action.uid, 'title'],
         // we need to trim the title because `cmd.exe`
         // likes to report ' ' as the title
         action.title.trim()
       );
+    }
 
-    case SESSION_RESIZE:
+    case SESSION_RESIZE: {
       return state.setIn(
         ['sessions', action.uid],
         state.sessions[action.uid].merge({
@@ -120,15 +128,18 @@ const reducer: ISessionReducer = (state = initialState, action) => {
           resizeAt: action.now
         })
       );
+    }
 
-    case SESSION_SET_CWD:
+    case SESSION_SET_CWD: {
       if (state.activeUid) {
         return state.setIn(['sessions', state.activeUid, 'cwd'], action.cwd);
       }
       return state;
+    }
 
-    default:
+    default: {
       return state;
+    }
   }
 };
 

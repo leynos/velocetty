@@ -23,7 +23,7 @@ const RETRIABLE_DOWNLOAD_ERROR_CODES = new Set([
 const RETRIABLE_DOWNLOAD_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504, 521, 522, 524]);
 
 function parsePositiveInteger(value, fallback) {
-  const parsed = Number.parseInt(value || '', 10);
+  const parsed = Math.trunc(Number(value || ''));
   if (Number.isInteger(parsed) && parsed > 0) {
     return parsed;
   }
@@ -58,8 +58,8 @@ function describeDownloadError(error) {
   const code = getErrorCode(error);
   const statusCode = getStatusCode(error);
   const message = error instanceof Error ? error.message : String(error);
-  const statusPart = statusCode !== undefined ? `status=${statusCode}` : undefined;
-  const codePart = code !== undefined ? `code=${code}` : undefined;
+  const statusPart = statusCode === undefined ? undefined : `status=${statusCode}`;
+  const codePart = code === undefined ? undefined : `code=${code}`;
   return [statusPart, codePart, message].filter(Boolean).join(' ');
 }
 
@@ -109,7 +109,7 @@ function resolveElectronVersion() {
 
   const electronVersion = packageJson.devDependencies?.electron;
   if (!electronVersion) {
-    return undefined;
+    return;
   }
 
   return electronVersion.replace(/^[~^]/, '');
@@ -172,7 +172,9 @@ async function main() {
   makeExecutable(targetFolder, platform);
 }
 
-main().catch((error) => {
+try {
+  await main();
+} catch (error) {
   console.error(error);
-  process.exit(1);
-});
+  process.exitCode = 1;
+}

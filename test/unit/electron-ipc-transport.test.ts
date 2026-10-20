@@ -12,14 +12,16 @@ const offMock = mock(() => null);
 const removeAllListenersMock = mock(() => null);
 const destroyMock = mock(() => null);
 
-const transportOwner: {
+type TransportOwner = {
   emit: typeof emitMock;
   on: typeof onMock;
   once: typeof onceMock;
   off: typeof offMock;
   removeAllListeners: typeof removeAllListenersMock;
   destroy: typeof destroyMock;
-} = {
+};
+
+const transportOwner: TransportOwner = {
   emit: emitMock,
   on: onMock,
   once: onceMock,

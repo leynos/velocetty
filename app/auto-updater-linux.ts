@@ -1,7 +1,9 @@
 import {EventEmitter} from 'node:events';
 
 import fetch from 'electron-fetch';
+import {isString} from '@shared/types/guards';
 
+// eslint-disable-next-line unicorn/prefer-event-target -- Electron.AutoUpdater requires Node EventEmitter methods.
 class AutoUpdater extends EventEmitter implements Electron.AutoUpdater {
   updateURL!: string;
   quitAndInstall() {
@@ -40,7 +42,7 @@ class AutoUpdater extends EventEmitter implements Electron.AutoUpdater {
   }
 
   emitError(error: string | Error) {
-    if (typeof error === 'string') {
+    if (isString(error)) {
       error = new Error(error);
     }
     this.emit('error', error);

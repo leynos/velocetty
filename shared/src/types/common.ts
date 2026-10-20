@@ -10,22 +10,30 @@ import type {configOptions} from './config';
 
 /** Branded identifier for session entities. */
 export type SessionId = string & {readonly brand: 'SessionId'};
+
 /** Branded identifier for terminal profile names. */
 export type ProfileId = string & {readonly brand: 'ProfileId'};
+
 /** Branded identifier for terminal group entities. */
 export type TermGroupId = string & {readonly brand: 'TermGroupId'};
+
 /** Branded identifier for renderer telemetry subjects. */
 export type RendererUid = string & {readonly brand: 'RendererUid'};
+
 /** Renderer backends supported by runtime telemetry reporting. */
 export type RendererType = 'WebGL' | 'Canvas' | 'DOM';
 
-/** Casts a raw session identifier into the shared branded type. */
+/** Brands a session identifier without changing its runtime string value. */
+// SAFETY: Session identifiers remain strings at runtime; this constructor centralizes the shared brand.
 export const asSessionId = (value: string): SessionId => value as SessionId;
-/** Casts a raw profile name into the shared branded type. */
+/** Brands a profile name without changing its runtime string value. */
+// SAFETY: Profile names remain strings at runtime; this constructor centralizes the shared brand.
 export const asProfileId = (value: string): ProfileId => value as ProfileId;
-/** Casts a raw terminal-group identifier into the shared branded type. */
+/** Brands a terminal-group identifier without changing its runtime string value. */
+// SAFETY: Terminal-group identifiers remain strings at runtime; this constructor centralizes the shared brand.
 export const asTermGroupId = (value: string): TermGroupId => value as TermGroupId;
-/** Casts a raw renderer identifier into the shared branded type. */
+/** Brands a renderer identifier without changing its runtime string value. */
+// SAFETY: Renderer identifiers remain strings at runtime; this constructor centralizes the shared brand.
 export const asRendererUid = (uid: string): RendererUid => uid as RendererUid;
 
 /** Session state synchronized between backend and renderer layers. */

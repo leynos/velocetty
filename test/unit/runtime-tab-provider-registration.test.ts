@@ -4,9 +4,10 @@ import {randomUUID} from 'node:crypto';
 import {expect, mock, test} from 'bun:test';
 
 import {GOLDEN_PATH_PLUGIN_ID} from '@shared/runtime/golden-path-demo';
+import type {JsonObject} from '@shared/types/json';
 
 type RendererConfig = {
-  plugins?: Record<string, Record<string, unknown>>;
+  plugins?: Record<string, JsonObject>;
 };
 
 type RuntimeTabProviderHarness = {
@@ -89,7 +90,8 @@ const createRuntimeTabProviderHarness = async (): Promise<RuntimeTabProviderHarn
   }
 };
 
-test('registers runtime tab providers for live enablement toggles', async () => {
+// Bun module mocks replace imports in the shared test runtime during setup.
+test.serial('registers runtime tab providers for live enablement toggles', async () => {
   const harness = await createRuntimeTabProviderHarness();
   try {
     harness.setRendererConfig({

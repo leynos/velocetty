@@ -1,5 +1,6 @@
 /** @file Verifies CLI API registry URL construction. */
 import {beforeEach, expect, test} from 'bun:test';
+import type {JsonObject} from '@shared/types/json';
 
 import {createCliApi} from '../../cli/api';
 
@@ -12,7 +13,7 @@ let getOptions: {
   };
 } | null = null;
 
-const buildRegistryResponse = (versions: Record<string, unknown> = {}) => ({
+const buildRegistryResponse = (versions: JsonObject = {}) => ({
   body: {
     versions
   }
@@ -72,6 +73,6 @@ test('existsOnNpm() forwards AbortSignal and timeout options to the registry cli
   expect(getOptions).toMatchObject({
     responseType: 'json',
     signal: controller.signal,
-    timeout: {request: 10000}
+    timeout: {request: 10_000}
   });
 });

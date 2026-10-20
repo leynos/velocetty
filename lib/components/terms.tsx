@@ -2,6 +2,7 @@
 
 import React from 'react';
 
+import {CURSOR_STYLE_CONFIG_KEY} from '@shared/types/config';
 import type {TermsProps, HyperDispatch} from '../../typings/hyper';
 import {registerCommandHandlers} from '../command-registry';
 import {ObjectTypedKeys} from '../utils/object';
@@ -51,8 +52,8 @@ export default class Terms extends React.Component<React.PropsWithChildren<Terms
   }
 
   componentDidMount() {
-    window.addEventListener('contextmenu', () => {
-      const selection = window.getSelection()?.toString() ?? '';
+    globalThis.addEventListener('contextmenu', () => {
+      const selection = globalThis.getSelection()?.toString() ?? '';
       const {
         props: {uid}
       } = this.getActiveTerm();
@@ -75,10 +76,13 @@ export default class Terms extends React.Component<React.PropsWithChildren<Terms
 
   render() {
     const shift = !isMac && this.props.termGroups.length > 1;
+    const scrollbarStyle: React.CSSProperties & {'--scrollbar-thumb': string} = {
+      '--scrollbar-thumb': this.props.borderColor
+    };
     return (
       <div
         className={`${styles.termsTerms} ${shift ? styles.termsTermsShifted : styles.termsTermsNotShifted}`}
-        style={{'--scrollbar-thumb': this.props.borderColor} as React.CSSProperties}
+        style={scrollbarStyle}
       >
         {this.props.customChildrenBefore}
         {this.props.termGroups.map((termGroup) => {
@@ -95,7 +99,7 @@ export default class Terms extends React.Component<React.PropsWithChildren<Terms
             borderColor: this.props.borderColor,
             selectionColor: this.props.selectionColor,
             colors: this.props.colors,
-            cursorShape: this.props.cursorShape,
+            [CURSOR_STYLE_CONFIG_KEY]: this.props.cursorShape,
             cursorBlink: this.props.cursorBlink,
             cursorColor: this.props.cursorColor,
             cursorAccentColor: this.props.cursorAccentColor,

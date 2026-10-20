@@ -12,7 +12,7 @@ import Mousetrap from 'mousetrap';
 import type {MousetrapInstance} from 'mousetrap';
 import stylis from 'stylis';
 
-import type {CommandId} from '@shared/types/commands';
+import {asCommandId, type CommandId} from '@shared/types/commands';
 import type {HyperState, HyperProps, HyperDispatch} from '../../typings/hyper';
 import * as uiActions from '../actions/ui';
 import {getRegisteredKeys, getCommandHandler, shouldPreventDefault} from '../command-registry';
@@ -53,15 +53,15 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
   };
 
   const attachKeyListeners = async () => {
-    if (!mousetrap.current) {
+    if (mousetrap.current) {
+      mousetrap.current.reset();
+    } else {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      mousetrap.current = new (Mousetrap as any)(window, true);
+      mousetrap.current = Mousetrap(document.body);
       mousetrap.current!.stopCallback = () => {
         // All events should be intercepted even if focus is in an input/textarea
         return false;
       };
-    } else {
-      mousetrap.current.reset();
     }
 
     const keys = await getRegisteredKeys();
@@ -69,10 +69,10 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
       mousetrap.current?.bind(
         commandKeys,
         (e) => {
-          const command = keys[commandKeys] as CommandId;
+          const command = asCommandId(keys[commandKeys]);
           // We should tell xterm to ignore this event.
-          (e as any).catched = true;
-          props.execCommand(command, getCommandHandler(command), e);
+          const caughtEvent = Object.assign(e, {catched: true});
+          props.execCommand(command, getCommandHandler(command), caughtEvent);
           shouldPreventDefault(command) && e.preventDefault();
         },
         'keydown'
@@ -90,11 +90,11 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
 
   const onTermsRef = (_terms: Terms | null) => {
     terms.current = _terms;
-    window.focusActiveTerm = (uid?: string) => {
+    globalThis.focusActiveTerm = (uid?: string) => {
       if (uid) {
         handleFocusActive(uid);
       } else {
-        terms.current?.getActiveTerm()?.focus();
+        terms.current?.getActiveTerm().focus();
       }
     };
   };

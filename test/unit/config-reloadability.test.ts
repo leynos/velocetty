@@ -137,7 +137,7 @@ describe('config-reloadability', () => {
 
       for (const entry of allEntries) {
         expect(entry.classification === 'live' || entry.classification === 'restart').toBe(true);
-        expect(typeof entry.rationale).toBe('string');
+        expect(entry.rationale).toEqual(expect.any(String));
         expect(entry.rationale.length).toBeGreaterThan(10); // Ensure meaningful rationale
       }
     });

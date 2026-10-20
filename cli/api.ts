@@ -20,6 +20,8 @@ import {fileURLToPath} from 'node:url';
 import got from 'got';
 import registryUrlModule from 'registry-url';
 import {z} from 'zod';
+import {isNumber, isObject, isString} from '@shared/types/guards';
+import type {JsonValue} from '@shared/types/json';
 import {parseJson5StrictWithSchema, stringifyJson5} from '@shared/config/json5-config';
 
 /** Branded type for plugin specifiers (e.g., 'hyper-plugin', '@scope/plugin@1.0.0') */
@@ -66,6 +68,13 @@ type CliRuntimeConfig = {
 
 type CliApiContext = CliApiDependencies & CliRuntimeConfig;
 
+const npmRegistryResponseSchema = z.object({
+  name: z.string().optional(),
+  versions: z.record(z.string(), z.json())
+});
+
+type NpmRegistryResponse = z.infer<typeof npmRegistryResponseSchema>;
+
 type ApplicationDirectoryInput = {
   readonly appData: string | undefined;
   readonly env: Pick<CliApiEnvironment, 'XDG_CONFIG_HOME'>;
@@ -94,9 +103,9 @@ export type CliApi = {
    *
    * @param plugin Plugin specifier string validated at runtime.
    * @param signal Optional `AbortSignal` used to cancel the registry request.
-   * @returns A promise that resolves with the raw registry response body wrapper.
+   * @returns A promise that resolves with the schema-validated registry body.
    */
-  existsOnNpm: (plugin: string, signal?: AbortSignal) => Promise<unknown>;
+  existsOnNpm: (plugin: string, signal?: AbortSignal) => Promise<NpmRegistryResponse>;
   /**
    * Installs a plugin entry into the persisted config.
    *
@@ -130,11 +139,15 @@ const pluginSpecifier = (value: string): PluginSpecifier => {
   if (!trimmedValue) {
     throw new Error('Plugin specifier cannot be empty');
   }
+  // SAFETY: This constructor is reached only after the empty-input check above.
   return trimmedValue as PluginSpecifier;
 };
 
 /** Smart constructor for PackageName (output of normalization) */
-const packageName = (value: string): PackageName => value as PackageName;
+const packageName = (value: string): PackageName => {
+  // SAFETY: getPackageName derives this value from a validated plugin specifier.
+  return value as PackageName;
+};
 
 const configFileName = 'config.json5';
 const legacyConfigFileName = 'hyper.json';
@@ -185,7 +198,7 @@ const resolveCliApiContext = (options: CliApiOptions = {}): CliApiContext => {
 };
 
 const normalizeConfiguredAppData = (appData: string | undefined): string | undefined => {
-  if (typeof appData !== 'string') {
+  if (!isString(appData)) {
     return undefined;
   }
 
@@ -261,14 +274,14 @@ const cliConfigReadSchema = z
     plugins: z.preprocess((value) => (Array.isArray(value) ? value : []), z.array(pluginNameSchema)).default([]),
     localPlugins: z.preprocess((value) => (Array.isArray(value) ? value : []), z.array(pluginNameSchema)).default([])
   })
-  .passthrough();
+  .catchall(z.json());
 
 const cliConfigSchema = z
   .object({
     plugins: z.array(pluginNameSchema).default([]),
     localPlugins: z.array(pluginNameSchema).default([])
   })
-  .passthrough();
+  .catchall(z.json());
 
 type ParsedCliConfig = z.infer<typeof cliConfigReadSchema>;
 
@@ -307,26 +320,21 @@ const getBasePluginSpecifier = (plugin: PluginSpecifier): PluginSpecifier => {
   );
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const npmRegistryResponseSchema = z.object({
-  name: z.string().optional(),
-  versions: z.record(z.string(), z.unknown())
-});
+const hasStatusCode = (value: unknown): value is {statusCode: number} =>
+  isObject(value) && 'statusCode' in value && isNumber(value.statusCode);
 
 const getErrorMessage = (value: unknown): string => {
   if (value instanceof Error) {
     return value.message;
   }
-  if (isRecord(value) && typeof value.message === 'string') {
+  if (isObject(value) && 'message' in value && isString(value.message)) {
     return value.message;
   }
   return String(value);
 };
 
 const handleNpmCheckError = (err: unknown, plugin: PluginSpecifier): Promise<never> => {
-  const statusCode = isRecord(err) && typeof err.statusCode === 'number' ? err.statusCode : undefined;
+  const statusCode = hasStatusCode(err) ? err.statusCode : undefined;
   if (statusCode === 404) {
     return Promise.reject(`${plugin} not found on npm`);
   }
@@ -407,7 +415,7 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
     return installedPlugins.includes(validatedPlugin);
   };
 
-  const save = (config: unknown) => {
+  const save = (config: JsonValue) => {
     return context.fsModule.writeFileSync(configPath, stringifyJson5(config), 'utf8');
   };
 
@@ -418,16 +426,16 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
       const requestUrl = resolveRegistryPackageUrl(context.registryUrl, getPackageName(validatedPlugin));
       return context.gotClient
         .get<unknown>(requestUrl, {
-          timeout: {request: 10000},
+          timeout: {request: 10_000},
           responseType: 'json',
           signal: validatedSignal
         })
         .then((res) => {
           const validated = npmRegistryResponseSchema.safeParse(res.body);
           if (!validated.success) {
-            return Promise.reject(res);
+            throw res;
           }
-          return res;
+          return validated.data;
         });
     });
   };
@@ -441,7 +449,7 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
       })
       .then(({locally, signal, validatedPlugin}) =>
         existsOnNpm(validatedPlugin, signal)
-          .catch((err: unknown) => handleNpmCheckError(err, validatedPlugin))
+          .catch((error: unknown) => handleNpmCheckError(error, validatedPlugin))
           .then(() => {
             const config = getValidatedMutableFile();
             const pluginKey = locally ? 'localPlugins' : 'plugins';
@@ -449,7 +457,7 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
               getBasePluginSpecifier(installedPlugin)
             );
             if (installedPlugins.includes(validatedPlugin)) {
-              return Promise.reject(`${validatedPlugin} is already installed`);
+              throw `${validatedPlugin} is already installed`;
             }
 
             config[pluginKey] = [...config[pluginKey], validatedPlugin];

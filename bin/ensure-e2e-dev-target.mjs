@@ -6,13 +6,15 @@
  * Electron CLI launches used by development-lane E2E tests.
  */
 
-const {cpSync, existsSync, rmSync, symlinkSync} = require('node:fs');
-const path = require('node:path');
-const {spawnSync} = require('node:child_process');
+import {spawnSync} from 'node:child_process';
+import {cpSync, existsSync, rmSync, symlinkSync} from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 
-const repositoryRoot = path.resolve(__dirname, '..');
+const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
+const repositoryRoot = path.resolve(scriptDirectory, '..');
 const requiredTargetFiles = [
-  'dist/app/index.js',
+  'dist/app/index.mjs',
   'dist/app/index.html',
   'dist/app/package.json',
   'dist/app/renderer/bundle.js'

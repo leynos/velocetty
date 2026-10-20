@@ -1,12 +1,7 @@
 /** @file Parser and compiler for deterministic `when` expressions. */
-import type {
-  CompiledWhenExpression,
-  ContextKeyValue,
-  WhenComparisonOperator,
-  WhenExpressionNode
-} from '@shared/types/context-keys';
+import type {CompiledWhenExpression, WhenComparisonOperator, WhenExpressionNode} from '@shared/types/context-keys';
 
-import {COMPARISON_OPERATORS, tokenize, type Token, type TokenKind} from './context-key-tokenizer';
+import {tokenize, type Token, type TokenKind} from './context-key-tokenizer';
 import {WhenExpressionSyntaxError} from './context-key-syntax-error';
 
 class Parser {
@@ -41,13 +36,14 @@ class Parser {
 
   private parseComparison(): WhenExpressionNode {
     const left = this.parseUnary();
-    if (!this.matchComparisonOperator()) {
+    const operator = this.matchComparisonOperator();
+    if (!operator) {
       return left;
     }
 
     return {
       kind: 'comparison',
-      operator: this.previous().lexeme as WhenComparisonOperator,
+      operator,
       left,
       right: this.parseUnary()
     };
@@ -58,25 +54,26 @@ class Parser {
   }
 
   private parsePrimary(): WhenExpressionNode {
-    if (this.match('lparen')) {
+    if (this.consume('lparen')) {
       const expression = this.parseOr();
       this.expect('rparen');
       return expression;
     }
 
-    if (this.match('identifier')) {
+    if (this.consume('identifier')) {
       return {kind: 'identifier', key: this.previous().lexeme};
     }
 
-    if (this.match('literal')) {
-      return {kind: 'literal', value: this.previous().literal as ContextKeyValue};
+    const token = this.peek();
+    if (token.kind === 'literal') {
+      this.cursor += 1;
+      return {kind: 'literal', value: token.literal};
     }
 
-    const token = this.peek();
     throw new WhenExpressionSyntaxError(`Unexpected token '${token.lexeme}'`, this.source, token.index);
   }
 
-  private match(kind: TokenKind): boolean {
+  private consume(kind: TokenKind): boolean {
     if (!this.check(kind)) {
       return false;
     }
@@ -95,18 +92,26 @@ class Parser {
     return true;
   }
 
-  private matchComparisonOperator(): boolean {
+  private matchComparisonOperator(): WhenComparisonOperator | null {
     const token = this.peek();
-    if (token.kind !== 'operator' || !COMPARISON_OPERATORS.includes(token.lexeme as WhenComparisonOperator)) {
-      return false;
+    if (
+      token.kind !== 'operator' ||
+      (token.lexeme !== '==' &&
+        token.lexeme !== '!=' &&
+        token.lexeme !== '<' &&
+        token.lexeme !== '<=' &&
+        token.lexeme !== '>' &&
+        token.lexeme !== '>=')
+    ) {
+      return null;
     }
 
     this.cursor += 1;
-    return true;
+    return token.lexeme;
   }
 
   private expect(kind: TokenKind): void {
-    if (this.match(kind)) {
+    if (this.consume(kind)) {
       return;
     }
 

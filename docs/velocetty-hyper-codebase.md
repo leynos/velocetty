@@ -154,7 +154,7 @@ Velocetty integrates with development environments through:
 | Integration Point  | Mechanism                                    | Evidence              |
 | ------------------ | -------------------------------------------- | --------------------- |
 | Shell Environments | PTY session spawning via node-pty            | `app/session.ts`      |
-| SSH Connections    | Default client for `ssh://` protocol handler | `app/index.ts`        |
+| SSH Connections    | Default client for `ssh://` protocol handler | `app/index.mts`       |
 | Configuration      | JSON file with XDG compliance                | `app/config/paths.ts` |
 | Plugin Ecosystem   | NPM-based plugin distribution                | `cli/` tooling        |
 
@@ -190,7 +190,7 @@ Velocetty integrates with development environments through:
 ```mermaid
 flowchart LR
     subgraph EntryPoints["Entry Points"]
-        MainEntry["app/index.ts"]
+        MainEntry["app/index.mts"]
         CLIEntry["cli/index.ts"]
     end
     
@@ -228,7 +228,7 @@ flowchart LR
 
 | Component            | Location                                 | Responsibility                                           |
 | -------------------- | ---------------------------------------- | -------------------------------------------------------- |
-| Main Process Entry   | `app/index.ts`                           | Electron initialization, window management, auto-updates |
+| Main Process Entry   | `app/index.mts`                          | Electron initialization, window management, auto-updates |
 | Configuration System | `app/config/`                            | JSON config loading, validation, migration, defaults     |
 | Plugin Manager       | `app/plugins.ts`, `lib/utils/plugins.ts` | Extension loading, decoration, lifecycle hooks           |
 | Session Manager      | `app/session.ts`                         | PTY creation, data batching, session lifecycle           |
@@ -568,7 +568,7 @@ ______________________________________________________________________
 | `README.md`                      | Project overview, installation, contribution guidelines |
 | `package.json`                   | Dependencies, scripts, project metadata                 |
 | `PLUGINS.md`                     | Plugin development workflow and API documentation       |
-| `app/index.ts`                   | Main process entry point and window management          |
+| `app/index.mts`                  | Main process entry point and window management          |
 | `app/session.ts`                 | PTY session implementation with data batching           |
 | `app/plugins.ts`                 | Main process plugin loading and management              |
 | `app/config/config-default.json` | Default configuration values                            |
@@ -1622,7 +1622,7 @@ optimized for terminal emulation across desktop platforms.
 | Attribute         | Value                                         |
 | ----------------- | --------------------------------------------- |
 | **Version**       | 5.4.5                                         |
-| **Target**        | ES2022                                        |
+| **Target**        | ES2023                                        |
 | **Module System** | CommonJS                                      |
 | **Configuration** | `tsconfig.base.json` with strict mode enabled |
 
@@ -1661,7 +1661,7 @@ following architectural reasons:
 
 ```plaintext
 Base Configuration (tsconfig.base.json):
-├── Target: ES2022 (modern JavaScript features)
+├── Target: ES2023 (modern JavaScript features)
 ├── Module: CommonJS (Node.js compatibility)
 ├── Strict Mode: Enabled (maximum type safety)
 ├── JSX: React (component compilation)
@@ -2344,11 +2344,11 @@ flowchart LR
 
 ##### Code signing
 
-| Platform    | Mechanism                                                                          |
-| ----------- | ---------------------------------------------------------------------------------- |
-| **macOS**   | Notarization via `bin/notarize.js`, entitlements in `build/mac/entitlements.plist` |
-| **Windows** | RFC3161 timestamping via Comodo                                                    |
-| **Linux**   | No code signing (user trust model)                                                 |
+| Platform    | Mechanism                                                                           |
+| ----------- | ----------------------------------------------------------------------------------- |
+| **macOS**   | Notarization via `bin/notarize.mjs`, entitlements in `build/mac/entitlements.plist` |
+| **Windows** | RFC3161 timestamping via Comodo                                                     |
+| **Linux**   | No code signing (user trust model)                                                  |
 
 #### 3.6.9 V8 snapshot optimization
 
@@ -3873,7 +3873,7 @@ sequenceDiagram
 
 #### Files examined (4.9 References)
 
-- `app/index.ts` - Main process entry point, application initialization
+- `app/index.mts` - Main process entry point, application initialization
 
 - `app/session.ts` - PTY session management, DataBatcher implementation
 
@@ -4071,7 +4071,7 @@ flowchart TB
 
 | Component Name                                            | Primary Responsibility                                     | Key Dependencies                                  | Integration Points                        |
 | --------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------- |
-| Main Process Entry (`app/index.ts`)                       | Electron initialization, window lifecycle, event routing   | `@electron/remote`, config module, plugins module | IPC bridge, OS event handlers             |
+| Main Process Entry (`app/index.mts`)                      | Electron initialization, window lifecycle, event routing   | `@electron/remote`, config module, plugins module | IPC bridge, OS event handlers             |
 | Configuration System (`app/config/`)                      | JSON config loading, schema validation, hot-reload         | chokidar, electron-store, fs-extra                | Plugin decoration, renderer bridge        |
 | Session Manager (`app/session.ts`)                        | PTY lifecycle, data batching, shell spawning               | node-pty 1.1.0, DataBatcher class                 | RPC to renderer, plugin env hooks         |
 | RPC Bridge (`app/rpc.ts`, `lib/utils/rpc.ts`)             | Typed bidirectional IPC communication                      | Electron ipcMain/ipcRenderer, uuid                | All cross-process communication           |
@@ -4203,7 +4203,7 @@ ______________________________________________________________________
 
 #### 5.2.1 Main process components
 
-##### Application entry (`app/index.ts`)
+##### Application entry (`app/index.mts`)
 
 **Purpose and Responsibilities**:
 
@@ -4936,7 +4936,7 @@ ______________________________________________________________________
 
 **Main Process Core**:
 
-- `app/index.ts` - Main entry point, window management, event routing
+- `app/index.mts` - Main entry point, window management, event routing
 
 - `app/rpc.ts` - RPC server implementation with typed events
 
@@ -5117,7 +5117,7 @@ Communication (IPC).
 flowchart TB
     subgraph DesktopApplication["Velocetty Desktop Application"]
         subgraph MainProcess["Main Process (Node.js Runtime)"]
-            AppInit["App Initialization<br/>app/index.ts"]
+            AppInit["App Initialization<br/>app/index.mts"]
             ConfigMgr["Configuration Manager<br/>app/config/"]
             SessionMgr["Session Manager<br/>app/session.ts"]
             PluginMgr["Plugin Manager<br/>app/plugins.ts"]
@@ -5159,7 +5159,7 @@ integration, native APIs, and privileged operations.
 
 | Component                | File Location          | Responsibilities                                                                                      |
 | ------------------------ | ---------------------- | ----------------------------------------------------------------------------------------------------- |
-| **Application Entry**    | `app/index.ts`         | Electron initialization, CLI argument processing, window lifecycle, SSH protocol handler registration |
+| **Application Entry**    | `app/index.mts`        | Electron initialization, CLI argument processing, window lifecycle, SSH protocol handler registration |
 | **Session Manager**      | `app/session.ts`       | PTY lifecycle management, data batching (16ms/200KB thresholds), shell spawning with fallback         |
 | **Configuration System** | `app/config/`          | JSON config loading, schema validation, hot-reload via chokidar, XDG path compliance                  |
 | **Plugin Manager**       | `app/plugins.ts`       | Extension loading, decoration orchestration, lifecycle hooks (`onApp`, `onWindow`, `onUnload`)        |
@@ -5520,7 +5520,7 @@ Velocetty's architecture instead focuses on:
 
 The following sources were examined to compile this architectural documentation:
 
-- `app/index.ts` - Main process entry point, Electron initialization, window
+- `app/index.mts` - Main process entry point, Electron initialization, window
 
   management
 
@@ -7180,7 +7180,7 @@ process communication for the plugin architecture:
 
 **Initialization Points**:
 
-- Main process: `app/index.ts` (lines 16-17) - `initialize()`
+- Main process: `app/index.mts` (lines 16-17) - `initialize()`
 
 - Per-window: `app/ui/window.ts` (line 62) -
 
@@ -7478,7 +7478,7 @@ Velocetty implements comprehensive macOS code signing and notarization:
 | `com.apple.security.device.audio-input`                  | Microphone access        | Terminal accessibility        |
 | `com.apple.security.device.camera`                       | Camera access            | Terminal accessibility        |
 
-**Notarization** (`bin/notarize.js`):
+**Notarization** (`bin/notarize.mjs`):
 
 - Uses `@electron/notarize` package
 
@@ -7614,15 +7614,15 @@ ______________________________________________________________________
 
 ##### 6.4.8.1 Critical security issues
 
-| Concern            | Current State             | Risk Level   | Evidence                           |
-| ------------------ | ------------------------- | ------------ | ---------------------------------- |
-| Electron Version   | 40.2.1 (current baseline) | **Critical** | `app/package.json`                 |
-| Chromium Version   | 144.0.7559.111            | **Critical** | Bundled with Electron 40           |
-| Node.js Version    | 24.11.1 (bundled)         | **High**     | Bundled with Electron 40           |
-| Plugin Trust Model | Full trust, no sandboxing | **High**     | Architectural decision             |
-| `@electron/remote` | Enabled (deprecated)      | **Medium**   | `app/index.ts`, `app/ui/window.ts` |
-| Node Integration   | Enabled in renderer       | **Medium**   | `app/ui/window.ts`                 |
-| Context Isolation  | Disabled                  | **Medium**   | `app/ui/window.ts`                 |
+| Concern            | Current State             | Risk Level   | Evidence                            |
+| ------------------ | ------------------------- | ------------ | ----------------------------------- |
+| Electron Version   | 40.2.1 (current baseline) | **Critical** | `app/package.json`                  |
+| Chromium Version   | 144.0.7559.111            | **Critical** | Bundled with Electron 40            |
+| Node.js Version    | 24.11.1 (bundled)         | **High**     | Bundled with Electron 40            |
+| Plugin Trust Model | Full trust, no sandboxing | **High**     | Architectural decision              |
+| `@electron/remote` | Enabled (deprecated)      | **Medium**   | `app/index.mts`, `app/ui/window.ts` |
+| Node Integration   | Enabled in renderer       | **Medium**   | `app/ui/window.ts`                  |
+| Context Isolation  | Disabled                  | **Medium**   | `app/ui/window.ts`                  |
 
 ##### 6.4.8.2 Electron 40 baseline risk profile
 
@@ -7704,7 +7704,7 @@ ______________________________________________________________________
 
 - `app/index.html` - Content Security Policy meta tag
 
-- `app/index.ts` - @electron/remote initialization
+- `app/index.mts` - @electron/remote initialization
 
 - `app/session.ts` - PTY spawning, environment sanitization
 
@@ -7728,7 +7728,7 @@ ______________________________________________________________________
 
 - `electron-builder.json` - Packaging and signing configuration
 
-- `bin/notarize.js` - macOS notarization script
+- `bin/notarize.mjs` - macOS notarization script
 
 - `.github/workflows/codeql-analysis.yml` - CodeQL security scanning
 
@@ -10757,7 +10757,7 @@ flowchart TB
     end
     
     subgraph SnapshotDeployment["Snapshot Deployment"]
-        CPSnapshot["bin/cp-snapshot.js"]
+        CPSnapshot["bin/cp-snapshot.mjs"]
         ElectronResources["Electron Resources<br/>Directory"]
         RuntimeLoad["Runtime<br/>Fast Load"]
     end
@@ -10858,7 +10858,7 @@ flowchart TB
 | `hardenedRuntime`  | `true`                                | macOS security requirement           |
 | `gatekeeperAssess` | `false`                               | Skip notarization check during build |
 | `entitlements`     | `build/mac/entitlements.plist`        | Security entitlements                |
-| `afterSign`        | `bin/notarize.js`                     | Post-sign notarization hook          |
+| `afterSign`        | `bin/notarize.mjs`                    | Post-sign notarization hook          |
 
 ##### Windows-specific settings
 
@@ -11130,7 +11130,7 @@ satisfy Gatekeeper requirements.
 | `com.apple.security.device.audio-input`                  | Microphone access       | Accessibility features         |
 | `com.apple.security.device.camera`                       | Camera access           | Accessibility features         |
 
-##### Notarization hook (`bin/notarize.js`)
+##### Notarization hook (`bin/notarize.mjs`)
 
 | Configuration      | Value                                              |
 | ------------------ | -------------------------------------------------- |
@@ -11490,13 +11490,13 @@ ______________________________________________________________________
 
 - `app/auto-updater-linux.ts` - Linux-specific update implementation
 
-- `bin/notarize.js` - macOS notarization script (lines 1-16)
+- `bin/notarize.mjs` - macOS notarization script (lines 1-16)
 
 - `bin/mk-snapshot.js` - V8 snapshot generation script
 
-- `bin/cp-snapshot.js` - V8 snapshot deployment script
+- `bin/cp-snapshot.mjs` - V8 snapshot deployment script
 
-- `bin/snapshot-libs.js` - Dependencies for V8 snapshots
+- `bin/snapshot-modules.mjs` - Dependencies for V8 snapshots
 
 - `build/mac/entitlements.plist` - macOS security entitlements (lines 1-26)
 

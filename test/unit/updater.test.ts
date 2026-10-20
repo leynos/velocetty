@@ -1,5 +1,8 @@
 /** @file Verifies updater wiring across event, timer, and config branches. */
 import {expect, mock, test} from 'bun:test';
+import type {JsonObject} from '@shared/types/json';
+import type {configOptions} from '@shared/types/config';
+import type {UpdaterWindow} from '../../app/updater';
 
 import {
   configureElectronMock,
@@ -51,12 +54,12 @@ const createSchedulerSeam = () => {
       setTimeout: (callback: () => void) => {
         nextTimerId += 1;
         timeoutCallbacks.push(callback);
-        return nextTimerId as unknown as NodeJS.Timeout;
+        return nextTimerId;
       },
       setInterval: (callback: () => void) => {
         nextTimerId += 1;
         intervalCallbacks.push(callback);
-        return nextTimerId as unknown as NodeJS.Timeout;
+        return nextTimerId;
       }
     }
   };
@@ -105,23 +108,30 @@ const buildAutoUpdaterStub = () => {
   return {
     autoUpdater,
     getUpdateEvent: () => (process.platform === 'linux' ? 'update-available' : 'update-downloaded'),
-    getUpdateHandler: () =>
-      handlers[process.platform === 'linux' ? 'update-available' : 'update-downloaded'] as UpdateHandler | undefined,
+    getUpdateHandler: () => {
+      const event = process.platform === 'linux' ? 'update-available' : 'update-downloaded';
+      // SAFETY: The updater registers UpdateHandler values for these two event names; the error slot is separate.
+      return handlers[event] as UpdateHandler | undefined;
+    },
     getFeedUrlCalls: () => feedUrlCalls,
     getRemovedListeners: () => removedListeners,
     getCheckForUpdatesCalls: () => checkForUpdatesCalls,
     getQuitAndInstallCalls: () => quitAndInstallCalls,
-    getErrorHandler: () => handlers.error as ErrorHandler | undefined
+    getErrorHandler: () => {
+      // SAFETY: The updater registers only ErrorHandler values under the dedicated error event name.
+      return handlers.error as ErrorHandler | undefined;
+    }
   };
 };
 
-const buildRpcStub = (emitCalls: Array<[string, Record<string, unknown>]>) => {
+const buildRpcStub = (emitCalls: Array<[string, JsonObject]>) => {
   const onceHandlers: Record<string, () => void> = {};
   return {
-    emit: (event: string, payload: Record<string, unknown>) => {
+    emit: (event: 'update available', payload: Parameters<UpdaterWindow['rpc']['emit']>[1]) => {
       emitCalls.push([event, payload]);
+      return true;
     },
-    once: (event: string, callback: () => void) => {
+    once: (event: 'quit and install', callback: () => void) => {
       onceHandlers[event] = callback;
     },
     triggerOnce: (event: string) => {
@@ -143,7 +153,10 @@ const buildWindowStub = (rpcStub: ReturnType<typeof buildRpcStub>) => {
   };
 };
 
-const registerUpdaterMocks = (autoUpdater: AutoUpdaterStub, getDecoratedConfig: () => unknown) => {
+const registerUpdaterMocks = (
+  autoUpdater: AutoUpdaterStub,
+  getDecoratedConfig: () => Pick<configOptions, 'disableAutoUpdates' | 'updateChannel'>
+) => {
   mock.module('../../app/auto-updater-linux', () => ({default: autoUpdater}));
   mock.module('../../app/config', () => ({getDefaultProfile: () => 'default'}));
   mock.module('../../app/plugins', () => ({
@@ -151,7 +164,7 @@ const registerUpdaterMocks = (autoUpdater: AutoUpdaterStub, getDecoratedConfig: 
   }));
   mock.module('../../app/package.json', () => ({version: '0.0.0-test'}));
   mock.module('async-retry', () => ({
-    default: async (fn: () => unknown) => await fn()
+    default: async <Result>(fn: () => Result | Promise<Result>): Promise<Result> => await fn()
   }));
 };
 
@@ -168,7 +181,7 @@ test.serial('updater wires lifecycle handlers, timers, and channel updates', asy
   process.env.NODE_ENV = 'production';
 
   try {
-    const emitCalls: Array<[string, Record<string, unknown>]> = [];
+    const emitCalls: Array<[string, JsonObject]> = [];
     const {
       autoUpdater,
       getFeedUrlCalls,
@@ -201,7 +214,7 @@ test.serial('updater wires lifecycle handlers, timers, and channel updates', asy
     registerUpdaterMocks(autoUpdater, () => configState);
 
     const {default: updater} = await loadUpdater();
-    updater(winStub as unknown as Electron.BrowserWindow, {scheduler});
+    updater(winStub, {scheduler});
     await settle();
 
     const updateHandler = getUpdateHandler();
@@ -234,9 +247,6 @@ test.serial('updater wires lifecycle handlers, timers, and channel updates', asy
     expect(getQuitAndInstallCalls()).toBe(1);
 
     expect(configSubscriber).toBeDefined();
-    if (!configSubscriber) {
-      throw new Error('Expected config subscriber callback to be registered.');
-    }
 
     configState.updateChannel = 'canary';
     await configSubscriber();
@@ -258,7 +268,7 @@ test.serial('updater honours disableAutoUpdates and handles updater error events
   process.env.NODE_ENV = 'production';
 
   try {
-    const emitCalls: Array<[string, Record<string, unknown>]> = [];
+    const emitCalls: Array<[string, JsonObject]> = [];
     const {autoUpdater, getCheckForUpdatesCalls, getErrorHandler} = buildAutoUpdaterStub();
     const rpcStub = buildRpcStub(emitCalls);
     const winStub = buildWindowStub(rpcStub);
@@ -280,7 +290,7 @@ test.serial('updater honours disableAutoUpdates and handles updater error events
 
     registerUpdaterMocks(autoUpdater, () => configState);
     const {default: updater} = await loadUpdater();
-    updater(winStub as unknown as Electron.BrowserWindow, {scheduler, logger});
+    updater(winStub, {scheduler, logger});
     await settle();
 
     expect(timeoutCallbacks).toHaveLength(1);

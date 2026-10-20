@@ -11,7 +11,13 @@
  */
 
 import type {configOptions, rawConfig} from '@shared/types/config';
-import {isRecord} from './json5-config';
+import {isObject} from '@shared/types/guards';
+
+const objectKeys = <T extends object>(value: T): Array<keyof T> => {
+  // SAFETY: The typed inputs to these merge and comparison helpers own the
+  // enumerable keys returned here; callers pass config objects, not proxies.
+  return Object.keys(value) as Array<keyof T>;
+};
 
 /** Configuration layer types in order of precedence (lowest to highest). */
 export type ConfigLayerType = 'defaults' | 'user' | 'workspace' | 'runtime';
@@ -55,38 +61,38 @@ const defaultMergeOptions: DeepMergeOptions = {
  * // {a: 1, b: {c: 2, d: 3}}
  * ```
  */
-export const deepMerge = <T extends Record<string, unknown>>(
+export const deepMerge = <T extends object>(
   target: T,
   source: Partial<T>,
   options: DeepMergeOptions = defaultMergeOptions,
   currentDepth = 0
 ): T => {
-  const maxDepth = (options.maxDepth ?? defaultMergeOptions.maxDepth) as number;
+  const maxDepth = options.maxDepth ?? defaultMergeOptions.maxDepth;
 
   if (currentDepth >= maxDepth) {
-    return {...target, ...source} as T;
+    return Object.assign({...target}, source);
   }
 
-  const result = {...target} as Record<string, unknown>;
+  const result = {...target};
 
-  for (const [key, sourceValue] of Object.entries(source)) {
+  for (const key of objectKeys(source)) {
+    const sourceValue = source[key];
     // Skip undefined values to allow defaults to persist
     if (sourceValue === undefined) {
       continue;
     }
 
-    const targetValue = result[key];
+    const targetValue = target[key];
 
     // Deep merge objects (but not arrays)
-    if (isRecord(sourceValue) && isRecord(targetValue)) {
-      result[key] = deepMerge(targetValue, sourceValue, options, currentDepth + 1);
-    } else {
-      // For arrays and primitives, source replaces target
-      result[key] = sourceValue;
-    }
+    const mergedValue =
+      isObject(sourceValue) && !Array.isArray(sourceValue) && isObject(targetValue) && !Array.isArray(targetValue)
+        ? deepMerge(targetValue, sourceValue, options, currentDepth + 1)
+        : sourceValue;
+    Object.assign(result, {[key]: mergedValue});
   }
 
-  return result as T;
+  return result;
 };
 
 /**
@@ -108,9 +114,9 @@ export const deepMerge = <T extends Record<string, unknown>>(
  * // {fontSize: 14, colors: {red: '#ff0000', blue: '#0000ff'}}
  * ```
  */
-export const mergeLayers = (layers: ConfigLayer[]): configOptions => {
+export const mergeLayers = (layers: ConfigLayer[]): Partial<configOptions> => {
   // Start with empty object and merge each layer in sequence
-  let result = {} as Record<string, unknown>;
+  let result: Partial<configOptions> = {};
 
   for (const layer of layers) {
     result = deepMerge(result, layer.config);
@@ -123,7 +129,7 @@ export const mergeLayers = (layers: ConfigLayer[]): configOptions => {
     }
   }
 
-  return result as configOptions;
+  return result;
 };
 
 /**
@@ -152,7 +158,10 @@ export const resolveConfigLayers = (
     {type: 'runtime', config: runtimeOverrides}
   ];
 
-  return mergeLayers(layers);
+  const merged = mergeLayers(layers);
+  // SAFETY: `defaults` supplies every required config field; deepMerge skips
+  // undefined overrides, so each required field remains present.
+  return merged as configOptions;
 };
 
 /**
@@ -175,15 +184,15 @@ export const extractConfigOptions = (raw: rawConfig): Partial<configOptions> | n
  * @returns True if the value is a valid ConfigLayer.
  */
 export const isConfigLayer = (value: unknown): value is ConfigLayer => {
-  if (!isRecord(value)) {
+  if (!isObject(value) || Array.isArray(value) || !('type' in value) || !('config' in value)) {
     return false;
   }
 
-  const validTypes: ConfigLayerType[] = ['defaults', 'user', 'workspace', 'runtime'];
+  const validTypes = ['defaults', 'user', 'workspace', 'runtime'] as const;
   const type = value.type;
   const config = value.config;
 
-  return typeof type === 'string' && validTypes.includes(type as ConfigLayerType) && isRecord(config);
+  return validTypes.some((validType) => validType === type) && isObject(config) && !Array.isArray(config);
 };
 
 /**
@@ -223,7 +232,9 @@ const deepEqual = (left: unknown, right: unknown): boolean => {
   if (left === right) return true;
   if (left == null || right == null) return left === right;
   if (isArray(left) && isArray(right)) return arraysEqual(left, right);
-  if (isRecord(left) && isRecord(right)) return recordsEqual(left, right);
+  if (isObject(left) && !Array.isArray(left) && isObject(right) && !Array.isArray(right)) {
+    return recordsEqual(left, right);
+  }
   return false;
 };
 
@@ -240,9 +251,9 @@ function arraysEqual(left: unknown[], right: unknown[]): boolean {
 /**
  * Compares two plain record objects for deep equality.
  */
-function recordsEqual(left: Record<string, unknown>, right: Record<string, unknown>): boolean {
-  const leftKeys = Object.keys(left);
-  if (leftKeys.length !== Object.keys(right).length) {
+function recordsEqual<T extends object>(left: T, right: T): boolean {
+  const leftKeys = objectKeys(left);
+  if (leftKeys.length !== objectKeys(right).length) {
     return false;
   }
   return leftKeys.every((key) => Object.hasOwn(right, key) && deepEqual(left[key], right[key]));
@@ -258,7 +269,7 @@ function recordsEqual(left: Record<string, unknown>, right: Record<string, unkno
  * @param key - The key to compare.
  * @returns True if the values differ.
  */
-export const configValueDiffers = <T extends Record<string, unknown>>(left: T, right: T, key: keyof T): boolean => {
+export const configValueDiffers = <T extends object>(left: T, right: T, key: keyof T): boolean => {
   const leftValue = left[key];
   const rightValue = right[key];
 
@@ -280,8 +291,8 @@ export const configValueDiffers = <T extends Record<string, unknown>>(left: T, r
  * @param newConfig - The new configuration state.
  * @returns Array of keys that have different values.
  */
-export const getChangedKeys = <T extends Record<string, unknown>>(oldConfig: T, newConfig: T): Array<keyof T> => {
-  const allKeys = new Set([...Object.keys(oldConfig), ...Object.keys(newConfig)]);
+export const getChangedKeys = <T extends object>(oldConfig: T, newConfig: T): Array<keyof T> => {
+  const allKeys = new Set([...objectKeys(oldConfig), ...objectKeys(newConfig)]);
   const changed: Array<keyof T> = [];
 
   for (const key of allKeys) {

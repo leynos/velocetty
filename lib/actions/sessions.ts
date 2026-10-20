@@ -18,7 +18,6 @@ import {
 import type {HyperState, HyperDispatch, HyperActions} from '../../typings/hyper';
 import type {AddSessionDataParams, SendSessionDataParams} from '../bootstrap/renderer-bootstrap';
 import {transport} from '../transport';
-import {keys} from '../utils/object';
 import findBySession from '../utils/term-groups';
 
 /** Add a session to state and emit initial metadata. */
@@ -34,7 +33,7 @@ export function addSession({uid, shell, pid, cols = null, rows = null, splitDire
       cols,
       rows,
       splitDirection,
-      activeUid: activeUid ? activeUid : asSessionId(sessions.activeUid),
+      activeUid: activeUid || asSessionId(sessions.activeUid),
       now,
       profile
     });
@@ -42,7 +41,7 @@ export function addSession({uid, shell, pid, cols = null, rows = null, splitDire
 }
 
 /** Request a new session and forward decorated profile context to RPC. */
-export function requestSession(profile: string | undefined) {
+export function requestSession(profile?: string) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     dispatch({
       type: SESSION_REQUEST,
@@ -86,12 +85,12 @@ function createExitAction(type: typeof SESSION_USER_EXIT | typeof SESSION_PTY_EX
         }
         clearInputSendTimestamps(asRendererUid(uid));
 
-        const sessions = keys(getState().sessions.sessions);
+        const sessions = Object.keys(getState().sessions.sessions);
         if (sessions.length === 0) {
           window.close();
         }
       }
-    } as HyperActions);
+    });
   };
 }
 
@@ -133,7 +132,7 @@ export function resizeSession(uid: string, cols: number, rows: number) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
     const {termGroups} = getState();
     const group = findBySession(termGroups, uid)!;
-    const isStandaloneTerm = !group.parentUid && !group.children.length;
+    const isStandaloneTerm = !group.parentUid && group.children.length === 0;
     const now = Date.now();
     const sessionUid = asSessionId(uid);
     dispatch({

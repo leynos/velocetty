@@ -1,6 +1,5 @@
 /** @file Connects terminal state and actions to the Terms component. */
-import type React from 'react';
-
+import {CURSOR_STYLE_CONFIG_KEY} from '@shared/types/config';
 import type {HyperState, HyperDispatch} from '../../typings/hyper';
 import {
   resizeSession,
@@ -27,7 +26,7 @@ const mapStateToProps = (state: HyperState) => {
     activeSession: state.sessions.activeUid,
     customCSS: state.ui.termCSS,
     write: state.sessions.write,
-    fontSize: state.ui.fontSizeOverride ? state.ui.fontSizeOverride : state.ui.fontSize,
+    fontSize: state.ui.fontSizeOverride || state.ui.fontSize,
     fontFamily: state.ui.fontFamily,
     fontWeight: state.ui.fontWeight,
     fontWeightBold: state.ui.fontWeightBold,
@@ -38,7 +37,7 @@ const mapStateToProps = (state: HyperState) => {
     padding: state.ui.padding,
     cursorColor: state.ui.cursorColor,
     cursorAccentColor: state.ui.cursorAccentColor,
-    cursorShape: state.ui.cursorShape,
+    [CURSOR_STYLE_CONFIG_KEY]: state.ui.cursorShape,
     cursorBlink: state.ui.cursorBlink,
     borderColor: state.ui.borderColor,
     selectionColor: state.ui.selectionColor,
@@ -95,12 +94,6 @@ const mapDispatchToProps = (dispatch: HyperDispatch) => {
   };
 };
 
-export type TermsConnectedProps = ReturnType<typeof mapStateToProps> & ReturnType<typeof mapDispatchToProps>;
-type TermsContainerProps = Omit<React.ComponentProps<typeof Terms>, keyof TermsConnectedProps>;
-
-const TermsContainer = connect(mapStateToProps, mapDispatchToProps, null, {forwardRef: true})(
-  Terms,
-  'Terms'
-) as React.ComponentType<TermsContainerProps>;
+const TermsContainer = connect(mapStateToProps, mapDispatchToProps, null, {forwardRef: true})(Terms, 'Terms');
 
 export default TermsContainer;

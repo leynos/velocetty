@@ -8,6 +8,7 @@
  */
 import {describe, it, expect} from 'bun:test';
 import type {configOptions, ConfigReloadDiagnostic} from '@shared/types/config';
+import defaultConfig from '../../app/config/config-default.json';
 import {
   classifyConfigChange,
   detectConfigChanges,
@@ -17,12 +18,29 @@ import {
   formatRestartWarning,
   keyRequiresRestart,
   keyIsLiveReloadable,
-  getKeyReloadClassification
+  getKeyReloadClassification,
+  type LiveConfigPatch
 } from '../../app/config/reload-handler';
+
+const defaultConfigOptions = defaultConfig.config satisfies configOptions;
+const makeConfig = (overrides: Partial<configOptions>): configOptions => {
+  const config = {...defaultConfigOptions, ...overrides};
+  if (overrides.colors) {
+    config.colors = {...defaultConfigOptions.colors, ...overrides.colors};
+  }
+  return config;
+};
 
 function makeLiveDiagnostic(path: string): ConfigReloadDiagnostic {
   return {path, message: '', classification: 'live', rationale: ''};
 }
+
+const createMockDependencies = () => ({
+  getCurrentConfig: () => makeConfig({fontSize: 12, backgroundColor: '#000'}),
+  applyLiveConfig: () => {},
+  emitRestartWarning: () => {},
+  logger: {warn: () => {}, debug: () => {}}
+});
 
 describe('config-hot-reload', () => {
   describe('classifyConfigChange', () => {
@@ -62,15 +80,15 @@ describe('config-hot-reload', () => {
 
   describe('detectConfigChanges', () => {
     it('should detect no changes for identical configs', () => {
-      const config = {fontSize: 12, backgroundColor: '#000'} as configOptions;
+      const config = makeConfig({fontSize: 12, backgroundColor: '#000'});
       const result = detectConfigChanges(config, config);
 
       expect(result).toEqual([]);
     });
 
     it('should detect single changes', () => {
-      const oldConfig = {fontSize: 12, backgroundColor: '#000'} as configOptions;
-      const newConfig = {fontSize: 14, backgroundColor: '#000'} as configOptions;
+      const oldConfig = makeConfig({fontSize: 12, backgroundColor: '#000'});
+      const newConfig = makeConfig({fontSize: 14, backgroundColor: '#000'});
 
       const result = detectConfigChanges(oldConfig, newConfig);
 
@@ -79,8 +97,8 @@ describe('config-hot-reload', () => {
     });
 
     it('should detect multiple changes', () => {
-      const oldConfig = {fontSize: 12, backgroundColor: '#000'} as configOptions;
-      const newConfig = {fontSize: 14, backgroundColor: '#fff'} as configOptions;
+      const oldConfig = makeConfig({fontSize: 12, backgroundColor: '#000'});
+      const newConfig = makeConfig({fontSize: 14, backgroundColor: '#fff'});
 
       const result = detectConfigChanges(oldConfig, newConfig);
       const paths = result.map((r) => r.path);
@@ -91,8 +109,8 @@ describe('config-hot-reload', () => {
     });
 
     it('should correctly classify each detected change', () => {
-      const oldConfig = {fontSize: 12, shell: '/bin/bash'} as configOptions;
-      const newConfig = {fontSize: 14, shell: '/bin/zsh'} as configOptions;
+      const oldConfig = makeConfig({fontSize: 12, shell: '/bin/bash'});
+      const newConfig = makeConfig({fontSize: 14, shell: '/bin/zsh'});
 
       const result = detectConfigChanges(oldConfig, newConfig);
       const fontResult = result.find((r) => r.path === 'fontSize');
@@ -103,8 +121,8 @@ describe('config-hot-reload', () => {
     });
 
     it('should handle added keys', () => {
-      const oldConfig = {fontSize: 12} as configOptions;
-      const newConfig = {fontSize: 12, cursorBlink: true} as configOptions;
+      const oldConfig = makeConfig({fontSize: 12});
+      const newConfig = makeConfig({fontSize: 12, cursorBlink: true});
 
       const result = detectConfigChanges(oldConfig, newConfig);
 
@@ -113,8 +131,8 @@ describe('config-hot-reload', () => {
     });
 
     it('should handle removed keys', () => {
-      const oldConfig = {fontSize: 12, cursorBlink: true} as configOptions;
-      const newConfig = {fontSize: 12} as configOptions;
+      const oldConfig = makeConfig({fontSize: 12, cursorBlink: true});
+      const newConfig = makeConfig({fontSize: 12});
 
       const result = detectConfigChanges(oldConfig, newConfig);
 
@@ -164,30 +182,29 @@ describe('config-hot-reload', () => {
 
       const result = partitionChanges(diagnostics);
 
+      const liveChangePaths = result.liveChanges.map((diagnostic) => diagnostic.path);
       expect(result.liveChanges.length).toBe(2);
       expect(result.restartChanges.length).toBe(1);
-      expect(result.liveChanges.map((d) => d.path)).toContain('fontSize');
-      expect(result.liveChanges.map((d) => d.path)).toContain('backgroundColor');
+      expect(liveChangePaths).toContain('fontSize');
+      expect(liveChangePaths).toContain('backgroundColor');
       expect(result.restartChanges[0].path).toBe('shell');
     });
   });
 
   describe('extractLiveConfigChanges', () => {
     it('should extract only live-reloadable changes', () => {
-      const oldConfig = {fontSize: 12, shell: '/bin/bash'} as configOptions;
-      const newConfig = {fontSize: 14, shell: '/bin/zsh'} as configOptions;
+      const oldConfig = makeConfig({fontSize: 12, shell: '/bin/bash'});
+      const newConfig = makeConfig({fontSize: 14, shell: '/bin/zsh'});
 
-      const result = extractLiveConfigChanges(oldConfig, newConfig, [
-        makeLiveDiagnostic('fontSize')
-      ]) as Partial<configOptions>;
+      const result = extractLiveConfigChanges(oldConfig, newConfig, [makeLiveDiagnostic('fontSize')]);
 
       expect(result.fontSize).toBe(14);
       expect(result.shell).toBeUndefined();
     });
 
     it('should return empty object when no live changes', () => {
-      const oldConfig = {shell: '/bin/bash'} as configOptions;
-      const newConfig = {shell: '/bin/zsh'} as configOptions;
+      const oldConfig = makeConfig({shell: '/bin/bash'});
+      const newConfig = makeConfig({shell: '/bin/zsh'});
       const liveDiagnostics: ConfigReloadDiagnostic[] = [];
 
       const result = extractLiveConfigChanges(oldConfig, newConfig, liveDiagnostics);
@@ -196,31 +213,22 @@ describe('config-hot-reload', () => {
     });
 
     it('should handle nested config objects', () => {
-      const oldConfig = {colors: {red: '#ff0000'}, fontSize: 12} as configOptions;
-      const newConfig = {colors: {red: '#cc0000'}, fontSize: 14} as configOptions;
+      const oldConfig = makeConfig({colors: {red: '#ff0000'}});
+      const newConfig = makeConfig({colors: {red: '#cc0000'}, fontSize: 14});
 
-      const result = extractLiveConfigChanges(oldConfig, newConfig, [
-        makeLiveDiagnostic('colors')
-      ]) as Partial<configOptions>;
+      const result = extractLiveConfigChanges(oldConfig, newConfig, [makeLiveDiagnostic('colors')]);
 
-      expect(result.colors).toEqual({red: '#cc0000'});
+      expect(result.colors).toEqual(newConfig.colors);
       expect(result.fontSize).toBeUndefined();
     });
   });
 
   describe('createReloadHandler', () => {
-    const createMockDependencies = () => ({
-      getCurrentConfig: () => ({fontSize: 12, backgroundColor: '#000'}) as configOptions,
-      applyLiveConfig: () => {},
-      emitRestartWarning: () => {},
-      logger: {warn: () => {}, debug: () => {}}
-    });
-
     function createShellChangeDeps() {
       const warnings: ConfigReloadDiagnostic[][] = [];
       const deps = {
         ...createMockDependencies(),
-        getCurrentConfig: () => ({shell: '/bin/bash'}) as configOptions,
+        getCurrentConfig: () => makeConfig({shell: '/bin/bash'}),
         emitRestartWarning: (diagnostics: ConfigReloadDiagnostic[]) => warnings.push(diagnostics)
       };
       return {deps, warnings};
@@ -229,22 +237,22 @@ describe('config-hot-reload', () => {
     it('should return handler functions', () => {
       const handler = createReloadHandler(createMockDependencies());
 
-      expect(typeof handler.processReload).toBe('function');
-      expect(typeof handler.clearPendingChanges).toBe('function');
-      expect(typeof handler.getState).toBe('function');
-      expect(typeof handler.isRestartRequired).toBe('function');
-      expect(typeof handler.getPendingRestartDiagnostics).toBe('function');
+      expect(handler.processReload).toEqual(expect.any(Function));
+      expect(handler.clearPendingChanges).toEqual(expect.any(Function));
+      expect(handler.getState).toEqual(expect.any(Function));
+      expect(handler.isRestartRequired).toEqual(expect.any(Function));
+      expect(handler.getPendingRestartDiagnostics).toEqual(expect.any(Function));
     });
 
     it('should apply live changes and return success result', () => {
       const applied: Partial<configOptions>[] = [];
       const deps = {
         ...createMockDependencies(),
-        applyLiveConfig: (config: unknown) => applied.push(config as Partial<configOptions>)
+        applyLiveConfig: (config: LiveConfigPatch) => applied.push(config)
       };
       const handler = createReloadHandler(deps);
 
-      const newConfig = {fontSize: 14, backgroundColor: '#000'} as configOptions;
+      const newConfig = makeConfig({fontSize: 14, backgroundColor: '#000'});
       const result = handler.processReload(newConfig);
 
       expect(result.success).toBe(true);
@@ -257,7 +265,7 @@ describe('config-hot-reload', () => {
       const {deps, warnings} = createShellChangeDeps();
       const handler = createReloadHandler(deps);
 
-      const result = handler.processReload({shell: '/bin/zsh'} as configOptions);
+      const result = handler.processReload(makeConfig({shell: '/bin/zsh'}));
 
       expect(result.restartRequired.length).toBe(1);
       expect(result.restartRequired[0].path).toBe('shell');
@@ -268,15 +276,15 @@ describe('config-hot-reload', () => {
     it('should handle mixed live and restart changes', () => {
       const deps = {
         ...createMockDependencies(),
-        getCurrentConfig: () => ({fontSize: 12, shell: '/bin/bash', backgroundColor: '#000'}) as configOptions
+        getCurrentConfig: () => makeConfig({fontSize: 12, shell: '/bin/bash', backgroundColor: '#000'})
       };
       const handler = createReloadHandler(deps);
 
-      const newConfig = {
+      const newConfig = makeConfig({
         fontSize: 14,
         shell: '/bin/zsh',
         backgroundColor: '#fff'
-      } as configOptions;
+      });
       const result = handler.processReload(newConfig);
 
       // Live changes applied
@@ -292,11 +300,11 @@ describe('config-hot-reload', () => {
       const applied: Partial<configOptions>[] = [];
       const deps = {
         ...createMockDependencies(),
-        applyLiveConfig: (config: unknown) => applied.push(config as Partial<configOptions>)
+        applyLiveConfig: (config: LiveConfigPatch) => applied.push(config)
       };
       const handler = createReloadHandler(deps);
 
-      const newConfig = {fontSize: 14, backgroundColor: '#000'} as configOptions;
+      const newConfig = makeConfig({fontSize: 14, backgroundColor: '#000'});
       handler.processReload(newConfig, {autoApplyLive: false});
 
       expect(applied.length).toBe(0);
@@ -306,7 +314,7 @@ describe('config-hot-reload', () => {
       const {deps, warnings} = createShellChangeDeps();
       const handler = createReloadHandler(deps);
 
-      handler.processReload({shell: '/bin/zsh'} as configOptions, {emitWarnings: false});
+      handler.processReload(makeConfig({shell: '/bin/zsh'}), {emitWarnings: false});
 
       // Warnings should not be emitted, but restart state should still be tracked
       expect(warnings.length).toBe(0);
@@ -316,11 +324,11 @@ describe('config-hot-reload', () => {
     it('should clear pending changes on clearPendingChanges call', () => {
       const deps = {
         ...createMockDependencies(),
-        getCurrentConfig: () => ({shell: '/bin/bash'}) as configOptions
+        getCurrentConfig: () => makeConfig({shell: '/bin/bash'})
       };
       const handler = createReloadHandler(deps);
 
-      handler.processReload({shell: '/bin/zsh'} as configOptions);
+      handler.processReload(makeConfig({shell: '/bin/zsh'}));
       expect(handler.isRestartRequired()).toBe(true);
 
       handler.clearPendingChanges();
@@ -331,40 +339,41 @@ describe('config-hot-reload', () => {
     it('should accumulate pending restart changes across multiple reloads', () => {
       const deps = {
         ...createMockDependencies(),
-        getCurrentConfig: () => ({shell: '/bin/bash', updateChannel: 'stable'}) as configOptions
+        getCurrentConfig: () => makeConfig({shell: '/bin/bash', updateChannel: 'stable'})
       };
       const handler = createReloadHandler(deps);
 
       // First reload - change shell
-      handler.processReload({shell: '/bin/zsh', updateChannel: 'stable'} as configOptions);
+      handler.processReload(makeConfig({shell: '/bin/zsh', updateChannel: 'stable'}));
       expect(handler.getPendingRestartDiagnostics().length).toBe(1);
       expect(handler.getPendingRestartDiagnostics()[0].path).toBe('shell');
 
       // Second reload - change updateChannel (shell change still pending)
       // Note: updateChannel will be detected as changed from original baseline
-      handler.processReload({shell: '/bin/zsh', updateChannel: 'canary'} as configOptions);
+      handler.processReload(makeConfig({shell: '/bin/zsh', updateChannel: 'canary'}));
 
       // Both changes should be pending
       const pending = handler.getPendingRestartDiagnostics();
-      expect(pending.map((d) => d.path)).toContain('shell');
-      expect(pending.map((d) => d.path)).toContain('updateChannel');
+      const pendingPaths = pending.map((diagnostic) => diagnostic.path);
+      expect(pendingPaths).toContain('shell');
+      expect(pendingPaths).toContain('updateChannel');
     });
 
     it('should deduplicate pending restart changes for the same key', () => {
       const deps = {
         ...createMockDependencies(),
-        getCurrentConfig: () => ({shell: '/bin/bash'}) as configOptions
+        getCurrentConfig: () => makeConfig({shell: '/bin/bash'})
       };
       const handler = createReloadHandler(deps);
 
       // First reload - change shell to zsh
-      handler.processReload({shell: '/bin/zsh'} as configOptions);
+      handler.processReload(makeConfig({shell: '/bin/zsh'}));
       expect(handler.getPendingRestartDiagnostics().length).toBe(1);
       expect(handler.getPendingRestartDiagnostics()[0].path).toBe('shell');
 
       // Second reload - change shell again to fish
       // The diagnostic should be updated, not duplicated
-      handler.processReload({shell: '/bin/fish'} as configOptions);
+      handler.processReload(makeConfig({shell: '/bin/fish'}));
       const pending = handler.getPendingRestartDiagnostics();
 
       // Should still only have 1 pending change (not 2)
@@ -383,7 +392,7 @@ describe('config-hot-reload', () => {
       };
       const handler = createReloadHandler(deps);
 
-      const newConfig = {fontSize: 14, backgroundColor: '#000'} as configOptions;
+      const newConfig = makeConfig({fontSize: 14, backgroundColor: '#000'});
       const result = handler.processReload(newConfig);
 
       expect(result.success).toBe(false);
@@ -395,14 +404,14 @@ describe('config-hot-reload', () => {
     it('should return success false when emitRestartWarning throws', () => {
       const deps = {
         ...createMockDependencies(),
-        getCurrentConfig: () => ({shell: '/bin/bash'}) as configOptions,
+        getCurrentConfig: () => makeConfig({shell: '/bin/bash'}),
         emitRestartWarning: () => {
           throw new Error('Emit failed');
         }
       };
       const handler = createReloadHandler(deps);
 
-      const result = handler.processReload({shell: '/bin/zsh'} as configOptions);
+      const result = handler.processReload(makeConfig({shell: '/bin/zsh'}));
 
       expect(result.success).toBe(false);
       expect(handler.isRestartRequired()).toBe(false);

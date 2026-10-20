@@ -5,6 +5,9 @@ const ARCH_ALIASES = new Map([
 ]);
 const SUPPORTED_SNAPSHOT_ARCHITECTURES = new Set(['x64', 'arm64']);
 
+/** @param {unknown} value @returns {value is string} */
+const isString = (value) => String(value) === value;
+
 /**
  * Normalizes architecture aliases to Electron-supported values.
  * Supports the mappings aarch64 → arm64 and amd64 → x64.
@@ -26,7 +29,7 @@ function normalizeArch(arch) {
  * @returns {string} The validated snapshot architecture.
  */
 function normalizeSnapshotArch(arch, sourceLabel) {
-  if (typeof arch !== 'string' || arch.length === 0) {
+  if (!isString(arch) || arch.length === 0) {
     throw new Error(`Expected a string architecture from ${sourceLabel}, received "${String(arch)}".`);
   }
 
@@ -41,7 +44,7 @@ function normalizeSnapshotArch(arch, sourceLabel) {
 
   throw new Error(
     `Unsupported architecture "${arch}" from ${sourceLabel}. ` +
-      `Supported values: ${Array.from(SUPPORTED_SNAPSHOT_ARCHITECTURES).join(', ')}.`
+      `Supported values: ${[...SUPPORTED_SNAPSHOT_ARCHITECTURES].join(', ')}.`
   );
 }
 

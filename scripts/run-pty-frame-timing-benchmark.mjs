@@ -22,8 +22,11 @@ const DEFAULT_FRAME_COUNT = 1200;
 const DEFAULT_INPUT_SAMPLE_COUNT = 1200;
 const BENCHMARK_NAME = 'pty-output-batching-and-frame-timing-synthetic-load';
 
+/** @param {unknown} value @returns {value is string} */
+const isString = (value) => String(value) === value;
+
 const asRoundedNumber = (value, digits = 3) => Number(value.toFixed(digits));
-const toPosixPath = (filePath) => filePath.replace(/\\/g, '/');
+const toPosixPath = (filePath) => filePath.replaceAll('\\', '/');
 
 /**
  * Converts arbitrary identifiers into filesystem-safe tokens.
@@ -33,7 +36,7 @@ const toPosixPath = (filePath) => filePath.replace(/\\/g, '/');
  */
 export const sanitizeToken = (value) => {
   const trimmed = value.trim();
-  const sanitized = trimmed.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-+/g, '-');
+  const sanitized = trimmed.replaceAll(/[^A-Za-z0-9._-]+/g, '-').replaceAll(/-+/g, '-');
   return sanitized.length > 0 ? sanitized : 'unknown';
 };
 
@@ -47,11 +50,11 @@ const parseBatchSizeExpression = (expression, label) => {
   const multiplyMatch = expression.match(/^(\d+)\s*\*\s*(\d+)$/);
   const literalMatch = expression.match(/^(\d+)$/);
   if (multiplyMatch) {
-    return Number.parseInt(multiplyMatch[1], 10) * Number.parseInt(multiplyMatch[2], 10);
+    return Math.trunc(Number(multiplyMatch[1])) * Math.trunc(Number(multiplyMatch[2]));
   }
 
   if (literalMatch) {
-    return Number.parseInt(literalMatch[1], 10);
+    return Math.trunc(Number(literalMatch[1]));
   }
 
   throw new Error(`Unsupported ${label} expression "${expression}". Expected numeric literal or "<a> * <b>".`);
@@ -68,7 +71,7 @@ const readBatchingContractFromRuntimeTelemetrySource = (runtimeTelemetrySource) 
   }
 
   return {
-    batchDurationMs: Number.parseInt(durationMatch[1], 10),
+    batchDurationMs: Math.trunc(Number(durationMatch[1])),
     batchMaxSizeBytes: parseBatchSizeExpression(maxSizeMatch[1].trim(), 'PTY_BATCH_MAX_BYTES')
   };
 };
@@ -79,7 +82,7 @@ export const readBatchingContractFromSessionSource = (sessionSource, runtimeTele
 
   if (durationMatch && maxSizeMatch) {
     return {
-      batchDurationMs: Number.parseInt(durationMatch[1], 10),
+      batchDurationMs: Math.trunc(Number(durationMatch[1])),
       batchMaxSizeBytes: parseBatchSizeExpression(maxSizeMatch[1].trim(), 'BATCH_MAX_SIZE')
     };
   }
@@ -87,8 +90,8 @@ export const readBatchingContractFromSessionSource = (sessionSource, runtimeTele
   const usesSharedRuntimeConstants =
     sessionSource.includes('PTY_BATCH_DURATION_MS') && sessionSource.includes('PTY_BATCH_MAX_BYTES');
   if (usesSharedRuntimeConstants) {
-    if (typeof runtimeTelemetrySource !== 'string') {
-      throw new Error(
+    if (!isString(runtimeTelemetrySource)) {
+      throw new TypeError(
         'app/session.ts references PTY_BATCH_* constants, but shared runtime telemetry source was not provided.'
       );
     }
@@ -103,7 +106,7 @@ const toPercentile = (values, percentile) => {
     return 0;
   }
 
-  const sorted = [...values].sort((left, right) => left - right);
+  const sorted = values.toSorted((left, right) => left - right);
   const rank = (percentile / 100) * (sorted.length - 1);
   const lowerIndex = Math.floor(rank);
   const upperIndex = Math.ceil(rank);
@@ -171,7 +174,7 @@ const getInputLatencyMetrics = (inputLatenciesMs) => {
  * `resolveBenchmarkEvidencePath({projectName: "velocetty", branchName: "feature/2-2-2"})`
  */
 export const resolveBenchmarkEvidencePath = ({evidencePath, projectName, branchName}) => {
-  if (typeof evidencePath === 'string' && evidencePath.length > 0) {
+  if (isString(evidencePath) && evidencePath.length > 0) {
     return path.resolve(evidencePath);
   }
 
@@ -223,7 +226,7 @@ const parsePositiveIntegerOption = (value, optionName, fallbackValue) => {
     return fallbackValue;
   }
 
-  const parsed = Number.parseInt(value, 10);
+  const parsed = Math.trunc(Number(value));
   if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new Error(`Expected --${optionName} to be a positive integer. Received "${value}".`);
   }
@@ -282,8 +285,9 @@ export const runPtyFrameTimingSyntheticBenchmark = async ({
     evidencePath: resolvedEvidencePath,
     runtimeContract: {
       sessionSourcePath: toPosixPath(SESSION_SOURCE_RELATIVE_PATH),
-      runtimeTelemetrySourcePath:
-        typeof runtimeTelemetrySource === 'string' ? toPosixPath(RUNTIME_TELEMETRY_SOURCE_RELATIVE_PATH) : undefined,
+      runtimeTelemetrySourcePath: isString(runtimeTelemetrySource)
+        ? toPosixPath(RUNTIME_TELEMETRY_SOURCE_RELATIVE_PATH)
+        : undefined,
       batchDurationMs: batchingContract.batchDurationMs,
       batchMaxSizeBytes: batchingContract.batchMaxSizeBytes
     },
@@ -303,7 +307,7 @@ export const runPtyFrameTimingSyntheticBenchmark = async ({
       maxP95InputLatencyMs: MAX_P95_INPUT_LATENCY_MS
     },
     checks,
-    passed: Object.values(checks).every((value) => value)
+    passed: Object.values(checks).every(Boolean)
   };
 
   await mkdir(path.dirname(resolvedEvidencePath), {recursive: true});

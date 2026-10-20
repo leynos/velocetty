@@ -12,9 +12,10 @@ const generatePrefixedCommand = (command: string, shortcuts: string[]) => {
 };
 
 const mapKeys = (config: Record<string, string[] | string>) => {
-  return Object.keys(config).reduce((keymap: Record<string, string[]>, command: string) => {
+  const keymap: Record<string, string[]> = {};
+  for (const command of Object.keys(config)) {
     if (!command) {
-      return keymap;
+      continue;
     }
     // We can have different keys for a same command.
     const _shortcuts = config[command];
@@ -22,7 +23,7 @@ const mapKeys = (config: Record<string, string[] | string>) => {
     const fixedShortcuts: string[] = [];
     shortcuts.forEach((shortcut) => {
       let newShortcut = shortcut;
-      if (newShortcut.indexOf('cmd') !== -1) {
+      if (newShortcut.includes('cmd')) {
         // Mousetrap use `command` and not `cmd`
         console.warn('Your config use deprecated `cmd` in key combination. Please use `command` instead.');
         newShortcut = newShortcut.replace('cmd', 'command');
@@ -31,13 +32,13 @@ const mapKeys = (config: Record<string, string[] | string>) => {
     });
 
     if (command.endsWith(':prefix')) {
-      return Object.assign(keymap, generatePrefixedCommand(command, fixedShortcuts));
+      Object.assign(keymap, generatePrefixedCommand(command, fixedShortcuts));
+      continue;
     }
 
     keymap[command] = fixedShortcuts;
-
-    return keymap;
-  }, {});
+  }
+  return keymap;
 };
 
 export default mapKeys;

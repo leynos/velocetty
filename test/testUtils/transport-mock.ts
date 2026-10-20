@@ -3,18 +3,8 @@ import {mock} from 'bun:test';
 
 type Listener = (...args: unknown[]) => void;
 
-type TransportMock = {
-  invoke: ReturnType<typeof mock>;
-  emit: ReturnType<typeof mock>;
-  on: ReturnType<typeof mock>;
-  once: ReturnType<typeof mock>;
-  off: ReturnType<typeof mock>;
-  removeAllListeners: ReturnType<typeof mock>;
-  destroy: ReturnType<typeof mock>;
-};
-
 type TransportMockState = {
-  listenersByEvent: Record<string, Listener[]>;
+  listenersByEvent: Partial<Record<string, Listener[]>>;
   removedEvents: string[];
 };
 
@@ -22,11 +12,7 @@ type TransportMockState = {
  * Creates a reusable transport mock and helpers for tests that need to assert
  * subscription lifecycle or event emissions.
  */
-export const createTransportMock = (): {
-  resetTransportMock: () => void;
-  state: TransportMockState;
-  transportMock: TransportMock;
-} => {
+export const createTransportMock = () => {
   const state: TransportMockState = {
     listenersByEvent: {},
     removedEvents: []
@@ -41,7 +27,7 @@ export const createTransportMock = (): {
       return false;
     }
 
-    for (const listener of [...listeners]) {
+    for (const listener of listeners) {
       listener(...payload);
     }
     return true;
@@ -58,7 +44,7 @@ export const createTransportMock = (): {
     }
 
     const listenerIndex = listeners.indexOf(listener);
-    if (listenerIndex < 0) {
+    if (listenerIndex === -1) {
       return;
     }
 

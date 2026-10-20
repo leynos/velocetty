@@ -3,47 +3,61 @@ import {expect, mock, test} from 'bun:test';
 
 import {mkdtempSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import path from 'node:path';
 
 import {existsSync, mkdirpSync, readFileSync, removeSync, writeFileSync} from 'fs-extra';
 import JSON5 from 'json5';
+import {isJsonObject, type JsonObject, type JsonValue} from '@shared/types/json';
+import {isString} from '@shared/types/guards';
 
 import {createConfigImportModule, type ConfigImportPaths} from '../../app/config/import';
+import {_init} from '../../app/config/init';
+import type {configValidationDiagnostic} from '@shared/types/config';
 
 type ConfigInit = Parameters<typeof createConfigImportModule>[0]['_init'];
+type ConfigNotify = Parameters<typeof createConfigImportModule>[0]['notify'];
 
 type ConfigImportHarness = {
   _import: ReturnType<typeof createConfigImportModule>['_import'];
   getDefaultConfig: ReturnType<typeof createConfigImportModule>['getDefaultConfig'];
   cleanup: () => void;
-  initMock: ReturnType<typeof mock<(userCfg: unknown, defaultCfg: unknown) => {userCfg: unknown; defaultCfg: unknown}>>;
+  initMock: ReturnType<typeof mock<ConfigInit>>;
   mockPaths: ConfigImportPaths;
-  notifyMock: ReturnType<typeof mock<(_message: string) => void>>;
-  warnMock: ReturnType<typeof mock<(_message?: unknown, ..._rest: unknown[]) => void>>;
+  notifyMock: ReturnType<typeof mock<ConfigNotify>>;
+  warnMock: ReturnType<typeof mock<(_message?: string, ..._rest: Error[]) => void>>;
   workspaceRoot: string;
 };
 
-const ensureObject = (value: unknown): Record<string, unknown> => {
-  if (typeof value !== 'object' || value === null) {
+const ensureObject = (value: unknown): JsonObject => {
+  if (!isJsonObject(value)) {
     throw new Error('Expected object value.');
   }
-  return value as Record<string, unknown>;
+  return value;
 };
 
 type ParsedDiagnosticsPayload = Readonly<{
-  diagnostics: ReadonlyArray<Record<string, unknown>>;
+  diagnostics: ReadonlyArray<configValidationDiagnostic>;
 }>;
 
-const isValidObject = (entry: unknown): entry is Record<string, unknown> => typeof entry === 'object' && entry !== null;
+const isValidObject = isJsonObject;
 
-const extractDiagnostics = (entry: Record<string, unknown>): unknown =>
-  'diagnostics' in entry ? entry.diagnostics : null;
+const extractDiagnostics = (entry: JsonObject) => ('diagnostics' in entry ? entry.diagnostics : null);
 
-const isValidDiagnosticsArray = (diagnostics: unknown): diagnostics is Array<Record<string, unknown>> =>
-  Array.isArray(diagnostics) && diagnostics.length > 0;
+const isConfigValidationDiagnostic = (value: JsonValue): value is JsonObject & configValidationDiagnostic =>
+  isJsonObject(value) &&
+  isString(value.path) &&
+  isString(value.message) &&
+  isString(value.suggestedFix) &&
+  (value.docHint === undefined || isString(value.docHint)) &&
+  (value.defaultHint === undefined || isString(value.defaultHint));
+
+const isValidDiagnosticsArray = (diagnostics: JsonValue): diagnostics is configValidationDiagnostic[] =>
+  Array.isArray(diagnostics) &&
+  diagnostics.length > 0 &&
+  diagnostics.every((entry) => isConfigValidationDiagnostic(entry));
 
 const findDiagnosticsPayloadFromWarnMock = (
-  warnMock: ReturnType<typeof mock<(_message?: unknown, ..._rest: unknown[]) => void>>
+  warnMock: ReturnType<typeof mock<(_message?: string, ..._rest: Error[]) => void>>
 ): ParsedDiagnosticsPayload => {
   for (const call of warnMock.mock.calls) {
     for (const entry of call) {
@@ -62,24 +76,24 @@ const findDiagnosticsPayloadFromWarnMock = (
 };
 
 const createMockPaths = (workspaceRoot: string): ConfigImportPaths => ({
-  cfgDir: join(workspaceRoot, 'user-config'),
-  cfgPath: join(workspaceRoot, 'user-config', 'config.json5'),
-  defaultCfg: join(workspaceRoot, 'defaults', 'config-default.json'),
-  defaultPlatformKeyPath: () => join(workspaceRoot, 'defaults', 'linux.json'),
+  cfgDir: path.join(workspaceRoot, 'user-config'),
+  cfgPath: path.join(workspaceRoot, 'user-config', 'config.json5'),
+  defaultCfg: path.join(workspaceRoot, 'defaults', 'config-default.json'),
+  defaultPlatformKeyPath: () => path.join(workspaceRoot, 'defaults', 'linux.json'),
   plugs: {
-    base: join(workspaceRoot, 'user-config', 'plugins'),
-    local: join(workspaceRoot, 'user-config', 'plugins', 'local')
+    base: path.join(workspaceRoot, 'user-config', 'plugins'),
+    local: path.join(workspaceRoot, 'user-config', 'plugins', 'local')
   },
   schemaFile: 'schema.json',
-  schemaPath: join(workspaceRoot, 'defaults', 'schema.json')
+  schemaPath: path.join(workspaceRoot, 'defaults', 'schema.json')
 });
 
 const createConfigImportHarness = async (): Promise<ConfigImportHarness> => {
-  const workspaceRoot = mkdtempSync(join(tmpdir(), 'velocetty-config-import-'));
+  const workspaceRoot = mkdtempSync(path.join(tmpdir(), 'velocetty-config-import-'));
   const mockPaths = createMockPaths(workspaceRoot);
-  const notifyMock = mock((_message: string) => {});
-  const initMock = mock((userCfg: unknown, defaultCfg: unknown) => ({userCfg, defaultCfg}));
-  const warnMock = mock((_message?: unknown, ..._rest: unknown[]) => {});
+  const notifyMock = mock<ConfigNotify>(() => {});
+  const initMock = mock<ConfigInit>((userCfg, defaultCfg, notify) => _init(userCfg, defaultCfg, notify));
+  const warnMock = mock((_message?: string, ..._rest: Error[]) => {});
   let cleanupCalled = false;
 
   const cleanup = () => {
@@ -94,10 +108,10 @@ const createConfigImportHarness = async (): Promise<ConfigImportHarness> => {
   };
 
   try {
-    mkdirpSync(join(workspaceRoot, 'defaults'));
+    mkdirpSync(path.join(workspaceRoot, 'defaults'));
     const configModule = createConfigImportModule({
-      _init: initMock as ConfigInit,
-      notify: notifyMock as typeof import('../../app/notify').default,
+      _init: initMock,
+      notify: notifyMock,
       paths: mockPaths,
       warn: warnMock
     });
@@ -128,7 +142,7 @@ const sharedDefaultConfigFixture = `{
 type DiagnosticFallbackTestOptions = {
   userConfigContent: string;
   assertNotification: (message: string, mockPaths: ConfigImportPaths) => void;
-  assertPrimaryDiagnostic: (diagnostics: Array<Record<string, unknown>>, mockPaths: ConfigImportPaths) => void;
+  assertPrimaryDiagnostic: (diagnostics: configValidationDiagnostic[], mockPaths: ConfigImportPaths) => void;
 };
 
 const runDiagnosticFallbackTest = async (options: DiagnosticFallbackTestOptions): Promise<void> => {
@@ -140,19 +154,23 @@ const runDiagnosticFallbackTest = async (options: DiagnosticFallbackTestOptions)
     writeFileSync(harness.mockPaths.cfgPath, options.userConfigContent, 'utf8');
     writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
 
-    const importedConfig = harness._import();
+    harness._import();
 
     expect(harness.notifyMock).toHaveBeenCalledTimes(1);
-    options.assertNotification(harness.notifyMock.mock.calls[0]?.[0] as string, harness.mockPaths);
+    const notificationMessage = harness.notifyMock.mock.calls[0]?.[0];
+    if (notificationMessage === undefined) {
+      throw new Error('Expected a configuration notification.');
+    }
+    options.assertNotification(notificationMessage, harness.mockPaths);
     expect(harness.notifyMock.mock.calls[0]?.[0]).toContain('Suggested fix:');
 
     const diagnosticsPayload = findDiagnosticsPayloadFromWarnMock(harness.warnMock);
-    const diagnostics = diagnosticsPayload.diagnostics.map((d) => ensureObject(d));
+    const diagnostics = diagnosticsPayload.diagnostics;
     options.assertPrimaryDiagnostic(diagnostics, harness.mockPaths);
 
-    const expectedFallbackConfig = JSON5.parse(sharedDefaultConfigFixture) as Record<string, unknown>;
+    const expectedFallbackConfig = ensureObject(JSON5.parse(sharedDefaultConfigFixture));
     expectedFallbackConfig.keymaps = {'window:new': ['ctrl+n']};
-    expect(importedConfig.userCfg).toEqual(expectedFallbackConfig);
+    expect(harness.initMock.mock.calls[0]?.[0]).toEqual(expectedFallbackConfig);
   } finally {
     harness.cleanup();
   }
@@ -169,12 +187,12 @@ test('notifies and falls back to default config on invalid JSON5 user config', a
     },
     assertPrimaryDiagnostic: (diagnostics, mockPaths) => {
       const primaryDiagnostic = diagnostics.find((d) => {
-        const path = typeof d.path === 'string' ? d.path : '';
-        const message = typeof d.message === 'string' ? d.message : '';
+        const path = isString(d.path) ? d.path : '';
+        const message = isString(d.message) ? d.message : '';
         return path.includes(mockPaths.cfgPath) && message.includes('JSON5');
       });
       if (!primaryDiagnostic) {
-        throw new Error('Expected parse diagnostic for config file path.');
+        throw new TypeError('Expected parse diagnostic for config file path.');
       }
       expect(primaryDiagnostic.path).toContain(mockPaths.cfgPath);
       expect(primaryDiagnostic.message).toContain('JSON5');
@@ -204,6 +222,28 @@ test('reports schema validation diagnostics with doc and default hints', async (
       expect(primaryDiagnostic.suggestedFix).toContain('array of plugin');
       expect(primaryDiagnostic.defaultHint).toBe('[]');
       expect(primaryDiagnostic.docHint).toContain('plugins');
+    }
+  });
+});
+
+test('rejects invalid values nested in config options', async () => {
+  await runDiagnosticFallbackTest({
+    userConfigContent: `{
+      config: { defaultProfile: 'broken', profiles: [{ name: 'broken', config: { fontSize: 'large' } }] },
+      plugins: [],
+      localPlugins: [],
+      keymaps: {}
+    }`,
+    assertNotification: (message) => {
+      expect(message).toContain('/config/profiles/0/config/fontSize');
+    },
+    assertPrimaryDiagnostic: (diagnostics) => {
+      const primaryDiagnostic = diagnostics.find((d) => d.path === '/config/profiles/0/config/fontSize');
+      if (!primaryDiagnostic) {
+        throw new Error('Expected schema diagnostic for nested profile fontSize.');
+      }
+      expect(primaryDiagnostic.message).toContain('number');
+      expect(primaryDiagnostic.suggestedFix).toContain('documented types');
     }
   });
 });
@@ -242,22 +282,23 @@ test('imports user config with JSON5 comments and trailing commas', async () => 
     const importedConfig = harness._import();
 
     expect(harness.initMock).toHaveBeenCalledTimes(1);
-    expect(importedConfig).toEqual({
-      userCfg: harness.initMock.mock.calls[0]?.[0],
-      defaultCfg: harness.initMock.mock.calls[0]?.[1]
-    });
+    expect(importedConfig.config.defaultProfile).toBe('work');
 
     const calledUserCfg = ensureObject(harness.initMock.mock.calls[0]?.[0]);
     const userConfigSection = ensureObject(calledUserCfg.config);
-    const userProfiles = userConfigSection.profiles as Array<Record<string, unknown>>;
-    const firstUserProfileConfig = ensureObject(userProfiles[0]?.config);
+    const userProfiles = userConfigSection.profiles;
+    if (!Array.isArray(userProfiles)) {
+      throw new TypeError('Expected user profiles to be an array.');
+    }
+    const firstUserProfile = ensureObject(userProfiles[0]);
+    const firstUserProfileConfig = ensureObject(firstUserProfile.config);
     expect(firstUserProfileConfig.fontSize).toBe(17);
     expect(calledUserCfg.plugins).toEqual(['plugin-alpha']);
     expect(calledUserCfg.localPlugins).toEqual(['plugin-local']);
 
     const calledDefaultCfg = ensureObject(harness.initMock.mock.calls[0]?.[1]);
     expect(calledDefaultCfg.keymaps).toEqual({'window:new': ['ctrl+n']});
-    expect(existsSync(join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(true);
+    expect(existsSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(true);
     expect(existsSync(harness.mockPaths.plugs.base)).toBe(true);
     expect(existsSync(harness.mockPaths.plugs.local)).toBe(true);
     expect(harness.notifyMock).not.toHaveBeenCalled();
@@ -278,12 +319,16 @@ test('bootstraps missing config with JSON5 output without legacy migration paths
     writeFileSync(harness.mockPaths.defaultCfg, defaultConfigFixture, 'utf8');
     writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), `{"window:new": ["ctrl+n"]}`, 'utf8');
     writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
-    writeFileSync(join(harness.workspaceRoot, '.hyper.js'), 'module.exports = {plugins: ["legacy-plugin"]};', 'utf8');
+    writeFileSync(
+      path.join(harness.workspaceRoot, '.hyper.js'),
+      'module.exports = {plugins: ["legacy-plugin"]};',
+      'utf8'
+    );
 
     harness._import();
 
     expect(existsSync(harness.mockPaths.cfgPath)).toBe(true);
-    expect(existsSync(join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(true);
+    expect(existsSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(true);
     expect(existsSync(harness.mockPaths.plugs.base)).toBe(true);
     expect(existsSync(harness.mockPaths.plugs.local)).toBe(true);
     expect(harness.notifyMock).not.toHaveBeenCalled();
@@ -315,10 +360,10 @@ test('getDefaultConfig lazily loads and caches the default config', async () => 
 
     const result = harness.getDefaultConfig();
 
-    expect(typeof result).toBe('object');
+    expect(result).toEqual(expect.any(Object));
     expect(existsSync(harness.mockPaths.plugs.base)).toBe(true);
     expect(existsSync(harness.mockPaths.plugs.local)).toBe(true);
-    expect(existsSync(join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(true);
+    expect(existsSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(true);
     expect(harness.initMock).not.toHaveBeenCalled();
     expect(harness.notifyMock).not.toHaveBeenCalled();
 

@@ -5,43 +5,43 @@
 import {expect, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
-import {pollForElement} from '../testUtils/pollFor';
+import {pollForElement} from '../testUtils/poll-for';
 
 type PropertySnapshot = {
   descriptor?: PropertyDescriptor;
   hadOwn: boolean;
-  key: PropertyKey;
-  target: object;
+  target: PropertySnapshotTarget;
 };
 
-const snapshotProperty = (target: object, key: PropertyKey): PropertySnapshot => ({
-  descriptor: Object.getOwnPropertyDescriptor(target, key),
-  hadOwn: Object.hasOwn(target, key),
-  key,
+type PropertySnapshotTarget = typeof globalThis | Window;
+
+const snapshotProperty = (target: PropertySnapshotTarget): PropertySnapshot => ({
+  descriptor: Object.getOwnPropertyDescriptor(target, 'MutationObserver'),
+  hadOwn: Object.hasOwn(target, 'MutationObserver'),
   target
 });
 
-const restoreProperty = ({target, key, hadOwn, descriptor}: PropertySnapshot) => {
+const restoreProperty = ({target, hadOwn, descriptor}: PropertySnapshot) => {
   if (hadOwn && descriptor) {
-    Object.defineProperty(target, key, descriptor);
+    Object.defineProperty(target, 'MutationObserver', descriptor);
     return;
   }
 
-  delete (target as Record<PropertyKey, unknown>)[key];
+  Reflect.deleteProperty(target, 'MutationObserver');
 };
 
 test('pollForElement uses the container window MutationObserver when globalThis lacks one', async () => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
-  const globalMutationObserver = snapshotProperty(globalThis, 'MutationObserver');
+  const globalMutationObserver = snapshotProperty(globalThis);
 
   try {
-    document.body.appendChild(container);
-    delete (globalThis as typeof globalThis & {MutationObserver?: typeof MutationObserver}).MutationObserver;
+    document.body.append(container);
+    Reflect.deleteProperty(globalThis, 'MutationObserver');
 
     const waiter = pollForElement(container, 'span', 250);
-    window.setTimeout(() => {
-      container.appendChild(document.createElement('span'));
+    globalThis.setTimeout(() => {
+      container.append(document.createElement('span'));
     }, 0);
 
     const element = await waiter;
@@ -56,22 +56,23 @@ test('pollForElement uses the container window MutationObserver when globalThis 
 test('pollForElement falls back to active polling when no MutationObserver is available', async () => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
-  const globalMutationObserver = snapshotProperty(globalThis, 'MutationObserver');
-  const windowMutationObserver = snapshotProperty(window, 'MutationObserver');
+  const globalMutationObserver = snapshotProperty(globalThis);
+  const windowApi = globalThis.window;
+  const windowMutationObserver = snapshotProperty(windowApi);
 
   try {
-    document.body.appendChild(container);
-    delete (globalThis as typeof globalThis & {MutationObserver?: typeof MutationObserver}).MutationObserver;
-    Object.defineProperty(window, 'MutationObserver', {
+    document.body.append(container);
+    Reflect.deleteProperty(globalThis, 'MutationObserver');
+    Object.defineProperty(windowApi, 'MutationObserver', {
       configurable: true,
       value: undefined
     });
 
     const waiter = pollForElement(container, 'button[title="delayed"]', 250);
-    window.setTimeout(() => {
+    globalThis.setTimeout(() => {
       const button = document.createElement('button');
       button.title = 'delayed';
-      container.appendChild(button);
+      container.append(button);
     }, 0);
 
     const element = await waiter;

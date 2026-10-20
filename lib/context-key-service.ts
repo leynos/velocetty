@@ -6,19 +6,27 @@ import type {
   ContextKeyValue
 } from '@shared/types/context-keys';
 
-import {
+import {compileWhenExpression, evaluateWhenExpressionAst, parseWhenExpression} from './context-key-expression';
+export {
   compileWhenExpression,
   evaluateWhenExpression,
   evaluateWhenExpressionAst,
   parseWhenExpression,
   WhenExpressionSyntaxError
 } from './context-key-expression';
-
-const compareLexical = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+const compareLexical = (a: string, b: string): number => {
+  if (a < b) {
+    return -1;
+  }
+  if (a > b) {
+    return 1;
+  }
+  return 0;
+};
 
 const toSnapshot = (values: ReadonlyMap<string, ContextKeyValue>): ContextKeyMap => {
   const snapshot: Record<string, ContextKeyValue> = {};
-  for (const [key, value] of Array.from(values.entries()).sort(([left], [right]) => compareLexical(left, right))) {
+  for (const [key, value] of [...values.entries()].toSorted(([left], [right]) => compareLexical(left, right))) {
     snapshot[key] = value;
   }
 
@@ -30,7 +38,7 @@ export const createContextKeyService = (initialContext: ContextKeyMap = {}): Con
   const values = new Map<string, ContextKeyValue>();
   const compiledBySource = new Map<string, CompiledWhenExpression>();
 
-  for (const key of Object.keys(initialContext).sort(compareLexical)) {
+  for (const key of Object.keys(initialContext).toSorted(compareLexical)) {
     values.set(key, initialContext[key]);
   }
 
@@ -60,12 +68,4 @@ export const createContextKeyService = (initialContext: ContextKeyMap = {}): Con
     evaluateAst: (ast) => evaluateWhenExpressionAst(ast, values),
     evaluateCompiled: (compiled) => evaluateWhenExpressionAst(compiled.ast, values)
   };
-};
-
-export {
-  compileWhenExpression,
-  evaluateWhenExpression,
-  evaluateWhenExpressionAst,
-  parseWhenExpression,
-  WhenExpressionSyntaxError
 };

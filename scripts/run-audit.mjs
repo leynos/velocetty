@@ -4,7 +4,7 @@
  * Any vulnerabilities without explicit ledger entries are considered fatal.
  */
 import {realpathSync} from 'node:fs';
-import {resolve} from 'node:path';
+import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 import auditExceptions from '../security/audit-exceptions.json' with {type: 'json'};
@@ -16,8 +16,7 @@ import {
 } from '../security/audit-utils.js';
 import packageJson from '../package.json' with {type: 'json'};
 
-const normalize = (path) =>
-  typeof realpathSync.native === 'function' ? realpathSync.native(path) : realpathSync(path);
+const normalize = (path) => realpathSync.native(path);
 
 const workspacePackageName = packageJson.name;
 const workspaceKeys = new Set([
@@ -131,14 +130,14 @@ function reportAllowedAdvisories(expected) {
  * }
  */
 function isExecutedDirectly(meta) {
-  const invokedPath = process.argv?.[1];
+  const invokedPath = process.argv[1];
   if (!invokedPath) {
     return false;
   }
 
   try {
     const scriptPath = fileURLToPath(meta.url);
-    const absoluteInvokedPath = resolve(invokedPath);
+    const absoluteInvokedPath = path.resolve(invokedPath);
     return normalize(scriptPath) === normalize(absoluteInvokedPath);
   } catch {
     // Treat resolution failures as "not invoked directly".
@@ -199,9 +198,9 @@ export function main() {
 if (isExecutedDirectly(import.meta)) {
   try {
     const exitCode = main();
-    process.exit(exitCode);
+    process.exitCode = exitCode;
   } catch (error) {
     console.error(error);
-    process.exit(1);
+    process.exitCode = 1;
   }
 }

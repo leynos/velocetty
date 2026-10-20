@@ -6,29 +6,23 @@ import {useTranslation} from '../../lib/hooks/use-translation';
 type MutableNavigator = Pick<Navigator, 'languages' | 'language' | 'userAgent'>;
 
 const restoreNavigator = (previous: PropertyDescriptor | undefined) => {
-  const host = globalThis as {navigator?: Navigator};
   if (previous) {
-    Object.defineProperty(host, 'navigator', previous);
+    Object.defineProperty(globalThis, 'navigator', previous);
     return;
   }
 
-  delete (host as {navigator?: Navigator}).navigator;
+  Reflect.deleteProperty(globalThis, 'navigator');
 };
 
 const withNavigator = <T>(value: MutableNavigator | null, fn: () => T) => {
-  const host = globalThis as {navigator?: Navigator};
-  const previousDescriptor = Object.getOwnPropertyDescriptor(host, 'navigator');
+  const previousDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
 
   if (value === null) {
-    Object.defineProperty(host, 'navigator', {configurable: true, value: undefined});
+    Object.defineProperty(globalThis, 'navigator', {configurable: true, value: undefined});
   } else {
-    const nextNavigator: Navigator = {
-      ...(host.navigator || {}),
-      ...value
-    } as Navigator;
-    Object.defineProperty(host, 'navigator', {
+    Object.defineProperty(globalThis, 'navigator', {
       configurable: true,
-      value: nextNavigator
+      value
     });
   }
 

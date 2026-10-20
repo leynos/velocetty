@@ -6,9 +6,9 @@ export const PTY_BATCH_DURATION_MS = 16;
 /** PTY output batching ceiling in bytes (200KB). */
 export const PTY_BATCH_MAX_BYTES = 200 * 1024;
 /** Canonical PTY batching interval expected by roadmap 2.2.2. */
-export const PTY_BATCH_EXPECTED_DURATION_MS = 16;
+export const PTY_BATCH_EXPECTED_DURATION_MS: number = 16;
 /** Canonical PTY batching ceiling expected by roadmap 2.2.2. */
-export const PTY_BATCH_EXPECTED_MAX_BYTES = 200 * 1024;
+export const PTY_BATCH_EXPECTED_MAX_BYTES: number = 200 * 1024;
 
 /** Long-frame threshold used by renderer frame-timing instrumentation. */
 export const LONG_FRAME_THRESHOLD_MS = 16;
@@ -51,7 +51,7 @@ export const enqueueInputSendTimestamp = (uid: RendererUid, timestampMs: number)
 export const dequeueInputSendTimestamp = (uid: RendererUid) => {
   const queue = inputSendTimestampsByUid.get(uid);
   if (!queue || queue.length === 0) {
-    return undefined;
+    return;
   }
 
   const timestamp = queue.shift();

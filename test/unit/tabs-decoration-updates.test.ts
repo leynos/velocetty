@@ -5,45 +5,37 @@ import {createRoot} from 'react-dom/client';
 
 import {afterEach, beforeEach, expect, mock, test} from 'bun:test';
 
+import {createTabsComponent} from '../../lib/components/tabs-component';
 import {setupHappyDom} from '../testUtils/happy-dom';
-import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
-import {waitFor} from '../testUtils/waitFor';
+import {waitFor} from '../testUtils/wait-for';
+import type {TabsProps, TabProps} from '../../typings/hyper';
 
-type MockTabProps = {
-  text?: string;
-  tabDecoration?: unknown;
-};
-
-const getTabPropsMock = mock((_: unknown, __: unknown, props: MockTabProps) => props);
+type DecoratedTabProps = TabProps & {tabIndex: number};
+type DecoratedTab = TabsProps['tabs'][number] & {tabIndex: number};
+const getTabPropsMock = mock(<Props extends DecoratedTabProps>(_: DecoratedTab, __: TabsProps, props: Props) => props);
 const unsubscribeDecorationUpdates = mock(() => {
   decorationListener = null;
 });
 let decorationListener: (() => void) | null = null;
 
-const registerTabsModuleMocks = () => {
-  registerPluginsModuleMocks({
-    getTabProps: (tab: unknown, parentProps: unknown, props: unknown) => getTabPropsMock(tab, parentProps, props),
-    subscribeTabDecorationUpdates: (listener: () => void) => {
-      decorationListener = listener;
-      return unsubscribeDecorationUpdates;
-    }
-  });
-
-  mock.module('../../lib/components/new-tab', () => ({
-    default: () => null
-  }));
-};
-
-type TabsComponent = typeof import('../../lib/components/tabs').default;
+type TabsComponent = ReturnType<typeof createTabsComponent>;
 
 let Tabs: TabsComponent;
 let cleanupHappyDom: (() => void) | null = null;
-let moduleInstanceCounter = 0;
 const loadTabsComponent = async () => {
   cleanupHappyDom = await setupHappyDom();
-  registerTabsModuleMocks();
-  moduleInstanceCounter += 1;
-  ({default: Tabs} = await import(`../../lib/components/tabs.tsx?tabs_decoration_updates=${moduleInstanceCounter}`));
+  Tabs = createTabsComponent({
+    decorate: (Component) => Component,
+    getTabProps: <Props extends DecoratedTabProps>(tab: DecoratedTab, parentProps: TabsProps, props: Props) => {
+      getTabPropsMock(tab, parentProps, props);
+      return props;
+    },
+    subscribeTabDecorationUpdates: (listener: () => void) => {
+      decorationListener = listener;
+      return unsubscribeDecorationUpdates;
+    },
+    DropdownButton: () => null
+  });
 };
 
 beforeEach(async () => {
@@ -88,14 +80,14 @@ const mountTabs = async (root: ReturnType<typeof createRoot>) => {
 
 test('re-renders tabs when provider update callback fires', async () => {
   const container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   const root = createRoot(container);
 
   await mountTabs(root);
-  expect(typeof decorationListener).toBe('function');
+  expect(decorationListener).toEqual(expect.any(Function));
   expect(getTabPropsMock).toHaveBeenCalledTimes(2);
-  expect((getTabPropsMock.mock.calls[0]?.[0] as {tabIndex?: number}).tabIndex).toBe(0);
-  expect((getTabPropsMock.mock.calls[1]?.[0] as {tabIndex?: number}).tabIndex).toBe(1);
+  expect(getTabPropsMock.mock.calls[0]?.[0].tabIndex).toBe(0);
+  expect(getTabPropsMock.mock.calls[1]?.[0].tabIndex).toBe(1);
 
   await act(async () => {
     flushSync(() => {
@@ -105,8 +97,8 @@ test('re-renders tabs when provider update callback fires', async () => {
   });
 
   expect(getTabPropsMock).toHaveBeenCalledTimes(4);
-  expect((getTabPropsMock.mock.calls[2]?.[0] as {tabIndex?: number}).tabIndex).toBe(0);
-  expect((getTabPropsMock.mock.calls[3]?.[0] as {tabIndex?: number}).tabIndex).toBe(1);
+  expect(getTabPropsMock.mock.calls[2]?.[0].tabIndex).toBe(0);
+  expect(getTabPropsMock.mock.calls[3]?.[0].tabIndex).toBe(1);
 
   await act(async () => {
     root.unmount();

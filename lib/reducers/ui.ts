@@ -17,7 +17,11 @@ import Immutable from 'seamless-immutable';
 import type {Immutable as ImmutableType} from 'seamless-immutable';
 
 import {CONFIG_LOAD, CONFIG_RELOAD} from '@shared/constants/config';
+import type {ConfigActions} from '@shared/constants/config';
+import {CURSOR_STYLE_CONFIG_KEY} from '@shared/types/config';
+import {isBoolean, isNumber} from '@shared/types/guards';
 import {NOTIFICATION_MESSAGE, NOTIFICATION_DISMISS} from '@shared/constants/notifications';
+import type {NotificationActions} from '@shared/constants/notifications';
 import {
   SESSION_ADD,
   SESSION_RESIZE,
@@ -37,12 +41,13 @@ import {
   UI_LEAVE_FULLSCREEN
 } from '@shared/constants/ui';
 import {UPDATE_AVAILABLE} from '@shared/constants/updater';
+import type {UpdateAvailableAction} from '@shared/constants/updater';
 import type {uiState, Mutable, IUiReducer} from '../../typings/hyper';
 import {decorateUIReducer} from '../utils/plugins';
 
 const isWindows = ['Windows', 'Win16', 'Win32', 'WinCE'].includes(navigator.platform) || process.platform === 'win32';
 
-const allowedCursorShapes = new Set(['BEAM', 'BLOCK', 'UNDERLINE']);
+const allowedCursorStyles = new Set(['BEAM', 'BLOCK', 'UNDERLINE']);
 const allowedCursorBlinkValues = new Set([true, false]);
 const allowedBells = new Set(['SOUND', 'false', false]);
 const allowedHamburgerMenuValues = new Set([true, false, ''] as const);
@@ -56,7 +61,7 @@ const initial: uiState = Immutable<Mutable<uiState>>({
   activeUid: null,
   cursorColor: '#F81CE5',
   cursorAccentColor: '#000',
-  cursorShape: 'BLOCK',
+  [CURSOR_STYLE_CONFIG_KEY]: 'BLOCK',
   cursorBlink: false,
   borderColor: '#333',
   selectionColor: 'rgba(248,28,229,0.3)',
@@ -135,9 +140,13 @@ const initial: uiState = Immutable<Mutable<uiState>>({
 });
 
 type UiStatePartial = Immutable.DeepPartial<Mutable<uiState>>;
-type UiConfig = Omit<Partial<Mutable<uiState>>, 'bell'> & {
+type UiConfig = Omit<Partial<Mutable<uiState>>, 'bell' | 'quickEdit' | 'padding' | 'copyOnSelect' | 'termCSS'> & {
   useConpty?: boolean;
   bell?: uiState['bell'] | 'false';
+  quickEdit?: boolean | null;
+  padding?: string | null;
+  copyOnSelect?: boolean | null;
+  termCSS?: string | null;
 };
 
 const processFontSize = (config: UiConfig, state: uiState): UiStatePartial => {
@@ -202,7 +211,7 @@ const processCursorConfig = (config: UiConfig): UiStatePartial => {
     ret.cursorAccentColor = config.cursorAccentColor;
   }
 
-  if (allowedCursorShapes.has(config.cursorShape)) {
+  if (allowedCursorStyles.has(config.cursorShape)) {
     ret.cursorShape = config.cursorShape;
   }
 
@@ -312,7 +321,7 @@ const processQuickEditConfig = (config: UiConfig): UiStatePartial => {
 
   if (process.platform === 'win32' && (config.quickEdit === undefined || config.quickEdit === null)) {
     ret.quickEdit = true;
-  } else if (typeof config.quickEdit !== 'undefined' && config.quickEdit !== null) {
+  } else if (config.quickEdit !== undefined && config.quickEdit !== null) {
     ret.quickEdit = config.quickEdit;
   }
 
@@ -336,12 +345,12 @@ const processWindowsPtyConfig = (config: UiConfig): UiStatePartial => {
     return ret;
   }
 
-  const buildNumber = parseInt(release().split('.').at(-1) || '0', 10);
+  const buildNumber = Math.trunc(Number(release().split('.').at(-1) || '0'));
   if (Number.isNaN(buildNumber) || buildNumber <= 0) {
     return ret;
   }
 
-  const useConpty = typeof config.useConpty === 'boolean' ? config.useConpty : buildNumber >= 18309;
+  const useConpty = isBoolean(config.useConpty) ? config.useConpty : buildNumber >= 18_309;
   ret.windowsPty = {
     backend: useConpty ? 'conpty' : 'winpty',
     buildNumber
@@ -361,11 +370,11 @@ const processPlatformSpecificConfig = (config: UiConfig): UiStatePartial => {
 const processScrollAndPaddingConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
-  if (typeof config.scrollback === 'number') {
+  if (isNumber(config.scrollback)) {
     ret.scrollback = config.scrollback;
   }
 
-  if (typeof config.padding !== 'undefined' && config.padding !== null) {
+  if (config.padding !== undefined && config.padding !== null) {
     ret.padding = config.padding;
   }
 
@@ -375,7 +384,7 @@ const processScrollAndPaddingConfig = (config: UiConfig): UiStatePartial => {
 const processInputBehaviourConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
-  if (typeof config.copyOnSelect !== 'undefined' && config.copyOnSelect !== null) {
+  if (config.copyOnSelect !== undefined && config.copyOnSelect !== null) {
     ret.copyOnSelect = config.copyOnSelect;
   }
 
@@ -455,12 +464,6 @@ const mergeConfigIntoState = (config: UiConfig, state: uiState, now: number): Ui
     _lastUpdate: now
   };
 };
-
-type ConfigLoadAction = Readonly<{
-  type: typeof CONFIG_LOAD | typeof CONFIG_RELOAD;
-  config: UiConfig;
-  now: number;
-}>;
 
 type SessionAddAction = Readonly<{
   type: typeof SESSION_ADD;
@@ -542,41 +545,11 @@ type UIDisplayAction =
   | UIEnterFullscreenAction
   | UILeaveFullscreenAction;
 
-type NotificationDismissAction = Readonly<{
-  type: typeof NOTIFICATION_DISMISS;
-  id: keyof uiState['notifications'];
-}>;
+type NotificationAction = NotificationActions | UpdateAvailableAction;
 
-type NotificationMessageAction = Readonly<{
-  type: typeof NOTIFICATION_MESSAGE;
-  text: uiState['messageText'];
-  url: uiState['messageURL'];
-  dismissable: boolean;
-}>;
-
-type UpdateAvailableAction = Readonly<{
-  type: typeof UPDATE_AVAILABLE;
-  version: uiState['updateVersion'];
-  notes: uiState['updateNotes'];
-  releaseUrl: uiState['updateReleaseUrl'];
-  canInstall: uiState['updateCanInstall'];
-}>;
-
-type NotificationAction = NotificationDismissAction | NotificationMessageAction | UpdateAvailableAction;
-
-type UiReducerAction =
-  | ConfigLoadAction
-  | SessionAddAction
-  | SessionResizeAction
-  | SessionPtyExitAction
-  | SessionSetActiveAction
-  | SessionPtyDataAction
-  | SessionSetCwdAction
-  | UIDisplayAction
-  | NotificationAction;
-
-const handleConfigLoad = (state: uiState, action: ConfigLoadAction): uiState => {
-  const {config, now} = action;
+const handleConfigLoad = (state: uiState, action: ConfigActions): uiState => {
+  const {config} = action;
+  const now = action.now ?? Date.now();
   // unset the user font size override if the
   // font size changed from the config
   return state.merge(mergeConfigIntoState(config, state, now));
@@ -584,46 +557,57 @@ const handleConfigLoad = (state: uiState, action: ConfigLoadAction): uiState => 
 
 const handleFontActions = (state: uiState, action: UIDisplayAction): uiState => {
   switch (action.type) {
-    case UI_FONT_SIZE_SET:
+    case UI_FONT_SIZE_SET: {
       return state.set('fontSizeOverride', action.value);
+    }
 
-    case UI_FONT_SIZE_RESET:
+    case UI_FONT_SIZE_RESET: {
       return state.set('fontSizeOverride', null);
+    }
 
-    case UI_FONT_SMOOTHING_SET:
+    case UI_FONT_SMOOTHING_SET: {
       return state.set('fontSmoothingOverride', action.fontSmoothing);
+    }
 
-    default:
+    default: {
       return state;
+    }
   }
 };
 
 const handleWindowActions = (state: uiState, action: UIDisplayAction): uiState => {
   switch (action.type) {
-    case UI_WINDOW_MAXIMIZE:
+    case UI_WINDOW_MAXIMIZE: {
       return state.set('maximized', true);
+    }
 
-    case UI_WINDOW_UNMAXIMIZE:
+    case UI_WINDOW_UNMAXIMIZE: {
       return state.set('maximized', false);
+    }
 
-    case UI_WINDOW_GEOMETRY_CHANGED:
-      return state.maximized !== action.isMaximized ? state.set('maximized', action.isMaximized) : state;
+    case UI_WINDOW_GEOMETRY_CHANGED: {
+      return state.maximized === action.isMaximized ? state : state.set('maximized', action.isMaximized);
+    }
 
-    default:
+    default: {
       return state;
+    }
   }
 };
 
 const handleFullscreenActions = (state: uiState, action: UIDisplayAction): uiState => {
   switch (action.type) {
-    case UI_ENTER_FULLSCREEN:
+    case UI_ENTER_FULLSCREEN: {
       return state.set('fullScreen', true);
+    }
 
-    case UI_LEAVE_FULLSCREEN:
+    case UI_LEAVE_FULLSCREEN: {
       return state.set('fullScreen', false);
+    }
 
-    default:
+    default: {
       return state;
+    }
   }
 };
 
@@ -643,7 +627,10 @@ const handleUIActions = (state: uiState, action: UIDisplayAction): uiState => {
 
 const handleNotifications = (state: uiState, action: NotificationAction): uiState => {
   switch (action.type) {
-    case NOTIFICATION_DISMISS:
+    case NOTIFICATION_DISMISS: {
+      if (!isNotificationId(action.id)) {
+        return state;
+      }
       return state.merge(
         {
           notifications: {
@@ -652,26 +639,33 @@ const handleNotifications = (state: uiState, action: NotificationAction): uiStat
         },
         {deep: true}
       );
+    }
 
-    case NOTIFICATION_MESSAGE:
+    case NOTIFICATION_MESSAGE: {
       return state.merge({
         messageText: action.text,
         messageURL: action.url,
         messageDismissable: action.dismissable === true
       });
+    }
 
-    case UPDATE_AVAILABLE:
+    case UPDATE_AVAILABLE: {
       return state.merge({
         updateVersion: action.version,
         updateNotes: action.notes || '',
         updateReleaseUrl: action.releaseUrl,
         updateCanInstall: !!action.canInstall
       });
+    }
 
-    default:
+    default: {
       return state;
+    }
   }
 };
+
+const isNotificationId = (value: string): value is keyof uiState['notifications'] =>
+  Object.hasOwn(initial.notifications, value);
 
 const handleSessionResize = (state: uiState, action: SessionResizeAction): uiState => {
   // only care about the sizes
@@ -816,38 +810,42 @@ const handleSessionSetCwd = (state: uiState, action: SessionSetCwdAction): uiSta
 
 const reducer: IUiReducer = (state = initial, action) => {
   let state_ = state;
-  // In `reducer` (typed as `IUiReducer`) we cast the broader Hyper action union
-  // to the `UiReducerAction` subset handled here; non-matching actions fall through unchanged.
-  const typedAction = action as UiReducerAction;
-  switch (typedAction.type) {
+  switch (action.type) {
     case CONFIG_LOAD:
-    case CONFIG_RELOAD:
-      state_ = handleConfigLoad(state, typedAction);
+    case CONFIG_RELOAD: {
+      state_ = handleConfigLoad(state, action);
       break;
+    }
 
-    case SESSION_ADD:
-      state_ = handleSessionAdd(state, typedAction);
+    case SESSION_ADD: {
+      state_ = handleSessionAdd(state, action);
       break;
+    }
 
-    case SESSION_RESIZE:
-      state_ = handleSessionResize(state, typedAction);
+    case SESSION_RESIZE: {
+      state_ = handleSessionResize(state, action);
       break;
+    }
 
-    case SESSION_PTY_EXIT:
-      state_ = handleSessionPtyExit(state, typedAction);
+    case SESSION_PTY_EXIT: {
+      state_ = handleSessionPtyExit(state, action);
       break;
+    }
 
-    case SESSION_SET_ACTIVE:
-      state_ = handleSessionSetActive(state, typedAction);
+    case SESSION_SET_ACTIVE: {
+      state_ = handleSessionSetActive(state, action);
       break;
+    }
 
-    case SESSION_PTY_DATA:
-      state_ = handleSessionPtyData(state, typedAction);
+    case SESSION_PTY_DATA: {
+      state_ = handleSessionPtyData(state, action);
       break;
+    }
 
-    case SESSION_SET_CWD:
-      state_ = handleSessionSetCwd(state, typedAction);
+    case SESSION_SET_CWD: {
+      state_ = handleSessionSetCwd(state, action);
       break;
+    }
 
     case UI_FONT_SIZE_SET:
     case UI_FONT_SIZE_RESET:
@@ -856,18 +854,20 @@ const reducer: IUiReducer = (state = initial, action) => {
     case UI_WINDOW_UNMAXIMIZE:
     case UI_WINDOW_GEOMETRY_CHANGED:
     case UI_ENTER_FULLSCREEN:
-    case UI_LEAVE_FULLSCREEN:
-      state_ = handleUIActions(state, typedAction);
+    case UI_LEAVE_FULLSCREEN: {
+      state_ = handleUIActions(state, action);
       break;
+    }
 
     case NOTIFICATION_DISMISS:
     case NOTIFICATION_MESSAGE:
-    case UPDATE_AVAILABLE:
-      state_ = handleNotifications(state, typedAction);
+    case UPDATE_AVAILABLE: {
+      state_ = handleNotifications(state, action);
       break;
+    }
   }
 
-  state_ = updateNotifications(state, state_, typedAction.type);
+  state_ = updateNotifications(state, state_, action.type);
 
   return state_;
 };

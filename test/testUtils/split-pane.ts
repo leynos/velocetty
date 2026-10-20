@@ -25,7 +25,7 @@ import Immutable from 'seamless-immutable';
 
 import SplitPane from '../../lib/components/split-pane';
 import {setupHappyDom} from './happy-dom';
-import {waitFor} from './waitFor';
+import {waitFor} from './wait-for';
 
 export type SplitPaneDirection = 'horizontal' | 'vertical';
 
@@ -79,19 +79,24 @@ export async function runDragTest({
   });
 
   try {
+    const domWindow = divider.ownerDocument.defaultView;
+    if (!domWindow) {
+      throw new TypeError('Expected the split pane to belong to a browser window.');
+    }
+
     if (geometry) {
       setSplitPaneGeometry({panes, divider, ...geometry});
     }
 
     await act(async () => {
-      divider.dispatchEvent(new window.MouseEvent('mousedown', {bubbles: true, ...mousedownEvent}));
+      divider.dispatchEvent(new domWindow.MouseEvent('mousedown', {bubbles: true, ...mousedownEvent}));
       await waitFor(0);
     });
 
     for (const batch of mousemoveBatches) {
       await act(async () => {
         for (const coords of batch) {
-          window.dispatchEvent(new window.MouseEvent('mousemove', {bubbles: true, ...coords}));
+          domWindow.dispatchEvent(new domWindow.MouseEvent('mousemove', {bubbles: true, ...coords}));
         }
         await waitFor(0);
       });
@@ -100,7 +105,7 @@ export async function runDragTest({
     assertResizeCalls(resizeCalls);
 
     await act(async () => {
-      window.dispatchEvent(new window.MouseEvent('mouseup', {bubbles: true}));
+      domWindow.dispatchEvent(new domWindow.MouseEvent('mouseup', {bubbles: true}));
       await waitFor(0);
     });
 
@@ -127,25 +132,18 @@ export const buildRect = ({
   top: number;
   width: number;
   height: number;
-}): DOMRect =>
-  ({
-    x: left,
-    y: top,
-    left,
-    top,
-    width,
-    height,
-    right: left + width,
-    bottom: top + height,
-    toJSON: () => ({})
-  }) as DOMRect;
+}): DOMRect => globalThis.window.DOMRect.fromRect({x: left, y: top, width, height});
 
 export const waitForRenderedPanes = async (container: HTMLDivElement) =>
   await new Promise<HTMLDivElement>((resolve, reject) => {
     let settled = false;
-    const PaneMutationObserver = window.MutationObserver;
+    const PaneMutationObserver = container.ownerDocument.defaultView?.MutationObserver;
+    if (!PaneMutationObserver) {
+      reject(new TypeError('The split pane document does not provide MutationObserver.'));
+      return;
+    }
     let observer: MutationObserver | null = null;
-    const timeoutId = window.setTimeout(() => {
+    const timeoutId = globalThis.setTimeout(() => {
       if (settled) {
         return;
       }
@@ -153,25 +151,25 @@ export const waitForRenderedPanes = async (container: HTMLDivElement) =>
       settled = true;
       observer?.disconnect();
       reject(new Error('Timed out waiting for the split pane root to render.'));
-    }, 1_000);
+    }, 1000);
 
     observer = new PaneMutationObserver(() => {
-      const element = container.firstElementChild as Element | undefined;
+      const element = container.firstElementChild;
       if (settled || !isHtmlElementWithTag(element, 'DIV')) {
         return;
       }
 
       settled = true;
-      window.clearTimeout(timeoutId);
+      globalThis.clearTimeout(timeoutId);
       observer?.disconnect();
-      resolve(element as HTMLDivElement);
+      resolve(element);
     });
 
-    const element = container.firstElementChild as Element | undefined;
+    const element = container.firstElementChild;
     if (isHtmlElementWithTag(element, 'DIV')) {
       settled = true;
-      window.clearTimeout(timeoutId);
-      resolve(element as HTMLDivElement);
+      globalThis.clearTimeout(timeoutId);
+      resolve(element);
       return;
     }
 
@@ -204,7 +202,7 @@ export const renderControlledSplitPane = async ({
 }) => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   const root = createRoot(container);
   const resizeCalls: number[][] = [];
   const dispose = async () => {
@@ -245,12 +243,12 @@ export const renderControlledSplitPane = async ({
     });
 
     const panes = await waitForRenderedPanes(container);
-    const divider = panes.children[1] as Element | undefined;
+    const divider = panes.children[1];
     if (!isHtmlElementWithTag(divider, 'HR')) {
       throw new Error('Expected split pane divider to be rendered.');
     }
 
-    return {dispose, resizeCalls, panes, divider: divider as HTMLElement};
+    return {dispose, resizeCalls, panes, divider};
   } catch (error) {
     try {
       await dispose();

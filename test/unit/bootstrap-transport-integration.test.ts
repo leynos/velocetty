@@ -14,16 +14,23 @@
  */
 import {beforeEach, describe, expect, mock, spyOn, test} from 'bun:test';
 
-import type {Session} from '@shared/types/common';
+import {asProfileId, asSessionId, type Session} from '@shared/types/common';
+import {isObject, isString} from '@shared/types/guards';
 import type {SplitRequestParams} from '../../lib/types/request-shapes';
 
-const createMockSession = (overrides: Partial<Session> & {uid: string}): Session =>
-  ({
+const createMockSession = (overrides: Partial<Omit<Session, 'uid'>> & {uid: string}): Session => {
+  const {uid, ...sessionOverrides} = overrides;
+  return {
     shell: '/bin/bash',
     pid: 0,
-    profile: 'default',
-    ...overrides
-  }) as Session;
+    profile: asProfileId('default'),
+    ...sessionOverrides,
+    uid: asSessionId(uid)
+  };
+};
+
+const getActionType = (action: unknown): string | undefined =>
+  isObject(action) && 'type' in action && isString(action.type) ? action.type : undefined;
 
 import {
   registerTransportListeners,
@@ -114,7 +121,7 @@ const ActionType = {
 } as const;
 
 const dispatchMock = mock((_action: unknown) => {});
-const transportOnCalls: Record<string, Array<(...args: unknown[]) => void>> = {};
+const transportOnCalls: Partial<Record<string, Array<(...args: unknown[]) => void>>> = {};
 
 type Listener = (payload: unknown) => void;
 
@@ -235,9 +242,11 @@ const updaterActions = {
     canInstall
   })
 };
-const pluginsReloadMock = mock(() => {});
+let pluginReloadCount = 0;
 const plugins = {
-  reload: pluginsReloadMock
+  reload: () => {
+    pluginReloadCount += 1;
+  }
 };
 
 const createBootstrapActions = () => ({
@@ -256,12 +265,12 @@ const getListener = (event: string): Listener => {
   if (!handlers || handlers.length === 0) {
     throw new Error(`Expected transport listener for ${event}`);
   }
-  return handlers[handlers.length - 1];
+  return handlers.at(-1);
 };
 
 const resetTransportListenersFixture = () => {
   dispatchMock.mockClear();
-  pluginsReloadMock.mockClear();
+  pluginReloadCount = 0;
   transport.invoke.mockClear();
   transport.emit.mockClear();
   transport.off.mockClear();
@@ -341,7 +350,7 @@ describe('bootstrap transport event wiring', () => {
     const registeredEvents = transport.on.mock.calls.map(([name]: [string, ...unknown[]]) => name);
 
     expect(registeredEvents).toHaveLength(expectedEvents.length);
-    expect([...registeredEvents].sort()).toEqual([...expectedEvents].sort());
+    expect([...registeredEvents].toSorted()).toEqual([...expectedEvents].toSorted());
 
     for (const event of expectedEvents) {
       expect(transport.on.mock.calls).toContainEqual([event, expect.any(Function)]);
@@ -400,7 +409,7 @@ describe('bootstrap transport event wiring', () => {
 
     expect(successfulRegistrations).toHaveLength(failingCallNumber);
     expect(transport.off.mock.calls).toHaveLength(failingCallNumber);
-    expect(transport.off.mock.calls).toEqual(successfulRegistrations.slice().reverse());
+    expect(transport.off.mock.calls).toEqual([...successfulRegistrations].toReversed());
 
     for (const [event, listener] of successfulRegistrations) {
       expect(transport.off.mock.calls).toContainEqual([event, listener]);
@@ -490,9 +499,9 @@ describe('bootstrap transport event wiring', () => {
   });
 
   test('reload invokes plugins.reload', () => {
-    pluginsReloadMock.mockClear();
+    pluginReloadCount = 0;
     getListener(TransportEvent.Reload)(null);
-    expect(pluginsReloadMock).toHaveBeenCalledTimes(1);
+    expect(pluginReloadCount).toBe(1);
   });
 
   test('update available dispatches UPDATE_AVAILABLE', () => {
@@ -525,17 +534,17 @@ describe('bootstrap transport event wiring', () => {
   test('session shortcut events dispatch sendSessionData with escape sequences', () => {
     clearDispatch();
     const cases: Array<{event: (typeof TransportEvent)[keyof typeof TransportEvent]; data: string}> = [
-      {event: TransportEvent.SessionMoveWordLeftReq, data: '\x1bb'},
-      {event: TransportEvent.SessionMoveWordRightReq, data: '\x1bf'},
-      {event: TransportEvent.SessionMoveLineBeginReq, data: '\x1bOH'},
-      {event: TransportEvent.SessionMoveLineEndReq, data: '\x1bOF'},
-      {event: TransportEvent.SessionDelWordLeftReq, data: '\x1b\x7f'},
-      {event: TransportEvent.SessionDelWordRightReq, data: '\x1bd'},
-      {event: TransportEvent.SessionDelLineBeginReq, data: '\x1bw'},
+      {event: TransportEvent.SessionMoveWordLeftReq, data: '\x1Bb'},
+      {event: TransportEvent.SessionMoveWordRightReq, data: '\x1Bf'},
+      {event: TransportEvent.SessionMoveLineBeginReq, data: '\x1BOH'},
+      {event: TransportEvent.SessionMoveLineEndReq, data: '\x1BOF'},
+      {event: TransportEvent.SessionDelWordLeftReq, data: '\x1B\x7F'},
+      {event: TransportEvent.SessionDelWordRightReq, data: '\x1Bd'},
+      {event: TransportEvent.SessionDelLineBeginReq, data: '\x1Bw'},
       {event: TransportEvent.SessionDelLineEndReq, data: '\x10B'},
       {event: TransportEvent.SessionBreakReq, data: '\x03'},
-      {event: TransportEvent.SessionStopReq, data: '\x1a'},
-      {event: TransportEvent.SessionQuitReq, data: '\x1c'},
+      {event: TransportEvent.SessionStopReq, data: '\x1A'},
+      {event: TransportEvent.SessionQuitReq, data: '\x1C'},
       {event: TransportEvent.SessionTmuxReq, data: '\x02'}
     ];
     for (const {event, data} of cases) {
@@ -624,7 +633,7 @@ describe('bootstrap transport event wiring', () => {
       canInstall: false
     });
 
-    const types = dispatchMock.mock.calls.map((call) => call[0]?.type as string);
+    const types = dispatchMock.mock.calls.map((call) => getActionType(call[0]));
     const initIdx = types.indexOf(ActionType.InitAction);
     const fontIdx = types.indexOf(ActionType.UiSetFontSmoothing);
     const addIdx = types.indexOf(ActionType.SessionAdd);
@@ -678,7 +687,7 @@ describe('bootstrap transport event wiring', () => {
     ]);
     expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.SessionData, uid, data: 'post-ready output'}]);
 
-    const types = dispatchMock.mock.calls.map((call) => call[0]?.type as string);
+    const types = dispatchMock.mock.calls.map((call) => getActionType(call[0]));
     const initIdx = types.indexOf(ActionType.InitAction);
     const addIdx = types.indexOf(ActionType.SessionAdd);
     const dataIdx = types.indexOf(ActionType.SessionData);

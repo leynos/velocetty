@@ -2,6 +2,7 @@
 import {app, Menu} from 'electron';
 import type {BrowserWindow} from 'electron';
 import type {CommandId} from '@shared/types/commands';
+import {isString} from '@shared/types/guards';
 
 import {openConfig, getConfig} from './config';
 import {asProfileId} from './utils/shared-ids';
@@ -14,13 +15,13 @@ import * as systemContextMenu from './utils/system-context-menu';
 const getGoldenPathNotificationMessage = () => {
   const runtimeSettings = getRuntimePluginSettings(getConfig(), GOLDEN_PATH_PLUGIN_ID);
   const configuredMessage = runtimeSettings.message;
-  if (typeof configuredMessage === 'string' && configuredMessage.trim().length > 0) {
+  if (isString(configuredMessage) && configuredMessage.trim().length > 0) {
     return configuredMessage;
   }
   return goldenPathSettingsDefaults.message;
 };
 
-const commands: Record<string, (focusedWindow?: BrowserWindow) => void> = {
+const commands = {
   'window:new': () => {
     // If window is created on the same tick, it will consume event too
     setTimeout(app.createWindow, 0);
@@ -161,7 +162,7 @@ const commands: Record<string, (focusedWindow?: BrowserWindow) => void> = {
       dismissable: true
     });
   }
-};
+} satisfies Partial<Record<string, (focusedWindow?: BrowserWindow) => void>>;
 
 //Special numeric command
 ([1, 2, 3, 4, 5, 6, 7, 8, 'last'] as const).forEach((cmdIndex) => {
@@ -189,8 +190,5 @@ getConfig().profiles.forEach((profile) => {
 
 /** Execute a named command against the focused window when available. */
 export const execCommand = (command: CommandId, focusedWindow?: BrowserWindow) => {
-  const fn = commands[command];
-  if (fn) {
-    fn(focusedWindow);
-  }
+  commands[command]?.(focusedWindow);
 };

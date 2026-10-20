@@ -4,14 +4,14 @@
     "allowJs": false,
     "declarationDir": "../dist/tmp/appdts/",
     "exactOptionalPropertyTypes": false,
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "Node16",
+    "moduleResolution": "Node16",
     "noImplicitOverride": false,
     "noPropertyAccessFromIndexSignature": false,
     "noUncheckedIndexedAccess": false,
     "outDir": "../dist/app",
     "paths": {
-      "@shared/*": ["../dist/shared/*"]
+      "@shared/*": ["./../dist/shared/*"]
     },
     "noImplicitAny": false,
     "useUnknownInCatchVariables": false,

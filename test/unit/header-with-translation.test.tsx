@@ -14,6 +14,7 @@
  */
 import React from 'react';
 import type {HeaderConnectedProps} from '../../typings/hyper';
+import type {JsonObject} from '@shared/types/json';
 import {createRoot} from 'react-dom/client';
 import {act} from 'react';
 
@@ -21,7 +22,7 @@ import {afterEach, beforeEach, expect, mock, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
-import {waitFor} from '../testUtils/waitFor';
+import {waitFor} from '../testUtils/wait-for';
 
 type HeaderWithTranslationComponent = typeof import('../../lib/containers/header.ts').HeaderWithTranslation;
 
@@ -35,7 +36,7 @@ const translatedLabels = {
 
 type MockProfileCollection = {
   name: string;
-  config: Record<string, unknown>;
+  config: JsonObject;
 }[] & {asMutable: () => MockProfileCollection};
 
 const makeProfiles = (): MockProfileCollection => {
@@ -79,10 +80,10 @@ let hadWindowRequireMock = false;
 let moduleInstanceCounter = 0;
 
 const restoreWindowRequire = () => {
-  const windowApi = globalThis.window as (Window & {require?: (moduleId: string) => unknown}) | undefined;
-  if (!windowApi) {
+  if (!Object.hasOwn(globalThis, 'window')) {
     return;
   }
+  const windowApi = globalThis.window;
 
   if (windowRequireDescriptor) {
     Object.defineProperty(windowApi, 'require', windowRequireDescriptor);
@@ -92,13 +93,13 @@ const restoreWindowRequire = () => {
   }
 
   if (hadWindowRequireMock) {
-    delete (windowApi as {require?: (moduleId: string) => unknown}).require;
+    Reflect.deleteProperty(windowApi, 'require');
     hadWindowRequireMock = false;
   }
 };
 
 const registerHeaderWithTranslationMocks = () => {
-  const windowApi = globalThis.window as Window & {require?: (moduleId: string) => unknown};
+  const windowApi = globalThis.window;
   const mockedIpcRenderer = {
     invoke: mock(async () => ({})),
     on: mock(() => {}),
@@ -107,7 +108,7 @@ const registerHeaderWithTranslationMocks = () => {
     removeListener: mock(() => {})
   };
 
-  if (windowApi) {
+  if (Object.hasOwn(globalThis, 'window')) {
     windowRequireDescriptor = Object.getOwnPropertyDescriptor(windowApi, 'require');
     Object.defineProperty(windowApi, 'require', {
       configurable: true,

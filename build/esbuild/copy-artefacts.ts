@@ -1,6 +1,7 @@
 /** @file Copies non-module assets required for app and renderer bundles. */
 import {cp, mkdir, readdir, rm} from 'node:fs/promises';
 import path from 'node:path';
+import {isObject, isString} from '@shared/types/guards';
 
 /** Paths used by copy operations, rooted at the repository directory by default. */
 type CopyOptions = {
@@ -19,9 +20,7 @@ type RendererCopyOptions = CopyOptions & {
 };
 
 /** Returns true when a filesystem error indicates a missing file or directory. */
-const isNotFoundError = (error: unknown): error is NodeJS.ErrnoException => {
-  return (error as NodeJS.ErrnoException).code === 'ENOENT';
-};
+const isNotFoundError = (error: unknown): boolean => isObject(error) && isString(error.code) && error.code === 'ENOENT';
 
 /** Lists files with the requested extension in deterministic lexical order. */
 const sortedFileNames = async (directoryPath: string, extension: string) => {
@@ -29,7 +28,7 @@ const sortedFileNames = async (directoryPath: string, extension: string) => {
   return entries
     .filter((entry) => entry.isFile() && entry.name.endsWith(extension))
     .map((entry) => entry.name)
-    .sort((left, right) => left.localeCompare(right));
+    .toSorted((left, right) => left.localeCompare(right));
 };
 
 /** Copies a single file and optionally tolerates missing source paths. */

@@ -6,7 +6,7 @@
     "exactOptionalPropertyTypes": true,
     "esModuleInterop": true,
     "jsx": "react-jsx",
-    "module": "es2022",
+    "module": "esnext",
     "moduleResolution": "bundler",
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
@@ -23,7 +23,7 @@
     "sourceMap": true,
     "skipLibCheck": true,
     "strict": true,
-    "target": "ES2022",
+    "target": "ES2023",
     "typeRoots": ["./node_modules/@types"],
     "useUnknownInCatchVariables": true,
     "verbatimModuleSyntax": true

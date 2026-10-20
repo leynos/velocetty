@@ -1,15 +1,12 @@
 /** @file Covers deterministic tab-decoration provider ordering and update events. */
 import {beforeEach, describe, expect, mock, test} from 'bun:test';
 
-import type {CommandId} from '@shared/types/commands';
+import {asCommandId} from '@shared/types/commands';
 import {
   asTabDecorationProviderId,
   asTabId,
-  type TabDecorationProviderId,
   TabDecorationProviderRegistry
 } from '../../lib/utils/tab-decoration-providers';
-
-const asCommandId = (value: string): CommandId => value as CommandId;
 
 /** Silent logger that prevents expected warning noise from polluting test output. */
 const silentLogger = {warn: () => {}, error: () => {}};
@@ -196,11 +193,11 @@ describe('TabDecorationProviderRegistry', () => {
     test.each([
       {
         description: 'empty ids',
-        invalidId: '   ' as unknown as TabDecorationProviderId
+        invalidId: '   '
       },
       {
         description: 'non-string ids',
-        invalidId: 123 as unknown as TabDecorationProviderId
+        invalidId: 123
       }
     ])('ignores provider registrations with $description', ({invalidId}) => {
       const unregister = registry.register({
@@ -209,7 +206,7 @@ describe('TabDecorationProviderRegistry', () => {
         provideDecoration: () => ({title: 'ignored'})
       });
 
-      expect(typeof unregister).toBe('function');
+      expect(unregister).toEqual(expect.any(Function));
       expect(registry.listProviders()).toEqual([]);
     });
   });

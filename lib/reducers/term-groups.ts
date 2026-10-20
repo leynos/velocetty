@@ -189,7 +189,7 @@ const removeGroup = (state: ITermState, uid: string) => {
 
 const resizeGroup = (state: ITermState, uid: string, sizes: number[]) => {
   // Make sure none of the sizes fall below MIN_SIZE:
-  if (sizes.find((size) => size < MIN_SIZE)) {
+  if (sizes.some((size) => size < MIN_SIZE)) {
     return state;
   }
 
@@ -215,14 +215,18 @@ const reducer: ITermGroupReducer = (state = initialState, action) => {
         .setIn(['activeSessions', uid], action.uid)
         .set('activeRootGroup', uid);
     }
-    case SESSION_SET_ACTIVE:
+    case SESSION_SET_ACTIVE: {
       return setActiveGroup(state, action);
-    case TERM_GROUP_RESIZE:
+    }
+    case TERM_GROUP_RESIZE: {
       return resizeGroup(state, action.uid, action.sizes);
-    case TERM_GROUP_EXIT:
+    }
+    case TERM_GROUP_EXIT: {
       return removeGroup(state, action.uid);
-    default:
+    }
+    default: {
       return state;
+    }
   }
 };
 

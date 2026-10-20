@@ -1,18 +1,18 @@
 /** @file Shared command contracts for metadata, schemas, and validation outcomes. */
+import type {JsonObject} from './json';
 
 /** Stable identifier used across keymaps, menus, dispatchers, and handlers. */
 declare const commandIdBrand: unique symbol;
 export type CommandId = string & {[commandIdBrand]: 'CommandId'};
+// SAFETY: Command IDs retain their string representation; the brand documents the shared command boundary.
+export const asCommandId = (value: string | CommandId): CommandId => value as CommandId;
 /** Execution location for a command handler. */
 export type CommandKind = 'frontend' | 'backend';
 
 declare const commandSchemaPayload: unique symbol;
 
 /** JSON Schema payload used to validate command arguments and results. */
-export type CommandSchema<TPayload = unknown> = {
-  [key: string]: unknown;
-  [commandSchemaPayload]?: TPayload;
-};
+export type CommandSchema<TPayload = unknown> = JsonObject & {[commandSchemaPayload]?: TPayload};
 
 /** UI-facing metadata that makes commands discoverable and explainable. */
 export interface CommandMetadata {
@@ -39,7 +39,7 @@ export interface CommandValidationIssue {
   schemaPath: string;
   keyword: string;
   message?: string;
-  params?: Record<string, unknown>;
+  params?: JsonObject;
 }
 
 /** Structured validation error used by registry validation APIs. */

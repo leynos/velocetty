@@ -4,26 +4,28 @@ import {installUpdate} from '../actions/updater';
 import Notifications from '../components/notifications';
 import {connect} from '../utils/plugins';
 
+type NotificationPropsState = Partial<{
+  fontShowing: boolean;
+  fontSize: number;
+  fontText: string;
+  resizeShowing: boolean;
+  cols: number | null;
+  rows: number | null;
+  updateShowing: boolean;
+  updateVersion: string | null;
+  updateNote: string | null;
+  updateReleaseUrl: string | null;
+  updateCanInstall: boolean | null;
+  messageShowing: boolean;
+  messageText: string | null;
+  messageURL: string | null;
+  messageDismissable: boolean | null;
+}>;
+
 const mapStateToProps = (state: HyperState) => {
   const {ui} = state;
   const {notifications} = ui;
-  let state_: Partial<{
-    fontShowing: boolean;
-    fontSize: number;
-    fontText: string;
-    resizeShowing: boolean;
-    cols: number | null;
-    rows: number | null;
-    updateShowing: boolean;
-    updateVersion: string | null;
-    updateNote: string | null;
-    updateReleaseUrl: string | null;
-    updateCanInstall: boolean | null;
-    messageShowing: boolean;
-    messageText: string | null;
-    messageURL: string | null;
-    messageDismissable: boolean | null;
-  }> = {};
+  let state_: NotificationPropsState = {};
 
   if (notifications.font) {
     const fontSize = ui.fontSizeOverride || ui.fontSize;
