@@ -1929,7 +1929,6 @@ configuration.
 | **URL Parsing**        | `parse-url`      | 8.1.0                               | SSH URL handling                  |
 | **Colour Utilities**   | `color`          | 4.2.3                               | Colour manipulation               |
 | **Class Names**        | `clsx`           | 2.1.0                               | Conditional className composition |
-| **Plist Parsing**      | `plist`          | 3.1.0                               | macOS plist file support          |
 | **Keyboard Shortcuts** | `mousetrap`      | Fork: `chabou/mousetrap#useCapture` | Keyboard shortcut handling        |
 
 ### 3.3 Open source dependencies

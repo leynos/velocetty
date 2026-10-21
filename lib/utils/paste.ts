@@ -1,30 +1,37 @@
-import * as electron from 'electron';
+/** @file Formats clipboard file lists into shell-safe text for terminal paste. */
 
-import plist from 'plist';
+/**
+ * Platforms whose clipboard exposes copied files as a native file list that
+ * the renderer cannot read directly, so paste must be resolved in the main
+ * process. Linux already pastes the file paths as plain text.
+ */
+const FILE_LIST_PLATFORMS = new Set(['darwin', 'win32']);
 
-const {clipboard} = electron;
+/** Whether a paste event should be intercepted to resolve a copied file list. */
+export const shouldInterceptFilePaste = (platform: string = process.platform): boolean =>
+  FILE_LIST_PLATFORMS.has(platform);
 
-const getPath = (platform: string) => {
-  switch (platform) {
-    case 'darwin': {
-      if (clipboard.has('NSFilenamesPboardType')) {
-        // Parse plist file containing the path list of copied files
-        const list = plist.parse(clipboard.read('NSFilenamesPboardType')) as plist.PlistArray;
-        return `'${list.join("' '")}'`;
-      } else {
-        return null;
-      }
-    }
-    case 'win32': {
-      const filepath = clipboard.read('FileNameW');
-      return filepath.replace(new RegExp(String.fromCharCode(0), 'g'), '');
-    }
-    // Linux already pastes full path
-    default:
-      return null;
-  }
-};
+/**
+ * Wraps each path in single quotes, escaping embedded quotes so the result is
+ * safe to insert into a POSIX shell command line.
+ *
+ * Example:
+ * - `quoteShellPaths(['/tmp/a b.txt'])` returns `'/tmp/a b.txt'`.
+ */
+export const quoteShellPaths = (paths: readonly string[]): string =>
+  paths.map((path) => `'${path.replaceAll("'", "'\\''")}'`).join(' ');
 
-export default function processClipboard() {
-  return getPath(process.platform);
+/**
+ * Formats copied file paths for the terminal, or returns `null` when the
+ * clipboard holds no file list.
+ *
+ * The clipboard reader is injected so this module stays free of transport
+ * wiring and can be unit tested without an Electron environment.
+ *
+ * Example:
+ * - `processClipboard(async () => ['/tmp/a.txt'])` resolves to `'/tmp/a.txt'`.
+ */
+export default async function processClipboard(readFilePaths: () => Promise<string[]>): Promise<string | null> {
+  const paths = await readFilePaths();
+  return paths.length > 0 ? quoteShellPaths(paths) : null;
 }

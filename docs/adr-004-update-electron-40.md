@@ -99,7 +99,11 @@ packaging changes.[^electron-40-blog]
 ### Phase 3: Electron 40 validation
 
 - Address Electron 40 breaking changes such as the renderer clipboard API
-  deprecations.[^electron-40-blog]
+  deprecations.[^electron-40-blog] The renderer `clipboard` module is now
+  removed entirely (RFC 0019), so terminal paste and quick-edit copy route
+  through `clipboard.readFilePaths`, `clipboard.readText`, and
+  `clipboard.writeText` commands registered in `app/clipboard.ts` and invoked
+  with `lib/transport`.
 - Validate macOS packaging outputs after the dSYM archive format change.
   [^electron-40-blog]
 

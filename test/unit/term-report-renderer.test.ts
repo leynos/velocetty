@@ -13,6 +13,7 @@ import {setupHappyDom} from '../testUtils/happy-dom';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
 import {clock} from '../../lib/utils/clock';
+import * as realPaste from '../../lib/utils/paste';
 
 /** Type guard to identify WebGL addons by their onContextLoss method. */
 function isWebGLAddon(addon: unknown): addon is {onContextLoss: () => void} {
@@ -26,7 +27,6 @@ const registerTermModuleMocks = (transportMock: ReturnType<typeof createTranspor
 
   // Stub heavy renderer dependencies that Term pulls in transitively.
   mock.module('electron', () => ({
-    clipboard: {writeText: mock(() => {}), readText: mock(() => '')},
     shell: {openExternal: mock(async () => {})},
     ipcRenderer: {
       invoke: mock(async () => ({})),
@@ -62,7 +62,9 @@ const registerTermModuleMocks = (transportMock: ReturnType<typeof createTranspor
   }));
   mock.module('xterm/css/xterm.css', () => ({}));
   mock.module('../../lib/terms', () => ({default: {}}));
-  mock.module('../../lib/utils/paste', () => ({default: () => null}));
+  // Force the file-list interception path on every test platform; the real
+  // formatting helpers still run so the assertions cover their output.
+  mock.module('../../lib/utils/paste', () => ({...realPaste, shouldInterceptFilePaste: () => true}));
   registerPluginsModuleMocks();
   mock.module('../../lib/components/searchBox', () => ({default: () => null}));
 };
@@ -338,5 +340,155 @@ describe('Term runtime metrics flush behaviour', () => {
           updatedAtMs: expect.any(Number)
         }
       });
+    }));
+});
+
+describe('Term clipboard paste routing', () => {
+  type PasteCapableTerm = {
+    props: {isTermActive: boolean};
+    term: {paste: (data: string) => void};
+    termWrapperRef: HTMLElement | null;
+    onWindowPaste: (e: Event) => void;
+  };
+
+  const createPasteEvent = (target: EventTarget) => {
+    const event = new window.Event('paste', {bubbles: true, cancelable: true});
+    Object.defineProperty(event, 'target', {value: target});
+    return event;
+  };
+
+  const createPasteHarness = (createTermInstance: (uid: string) => PasteCapableTerm, isTermActive: boolean) => {
+    const termWrapperRef = document.createElement('div');
+    const terminal = document.createElement('span');
+    termWrapperRef.appendChild(terminal);
+    document.body.appendChild(termWrapperRef);
+
+    const termInstance = createTermInstance('uid-paste');
+    termInstance.props = {isTermActive};
+    termInstance.termWrapperRef = termWrapperRef;
+    const term = {paste: mock(() => {})};
+    termInstance.term = term;
+    return {term, termInstance, terminal, termWrapperRef};
+  };
+
+  /** Lets the awaited clipboard reads settle before assertions run. */
+  const flushClipboardReads = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  };
+
+  test('leaves paste untouched when the term is inactive', () =>
+    withTermTestHarness(async ({createTermInstanceForWebGLFallbackTest, transportMock}) => {
+      const {termInstance, terminal} = createPasteHarness(
+        createTermInstanceForWebGLFallbackTest as unknown as (uid: string) => PasteCapableTerm,
+        false
+      );
+      const event = createPasteEvent(terminal);
+
+      termInstance.onWindowPaste(event);
+      await flushClipboardReads();
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(transportMock.invoke).not.toHaveBeenCalled();
+    }));
+
+  test('leaves paste untouched for events outside the terminal wrapper', () =>
+    withTermTestHarness(async ({createTermInstanceForWebGLFallbackTest, transportMock}) => {
+      const {termInstance} = createPasteHarness(
+        createTermInstanceForWebGLFallbackTest as unknown as (uid: string) => PasteCapableTerm,
+        true
+      );
+      const event = createPasteEvent(document.createElement('div'));
+
+      termInstance.onWindowPaste(event);
+      await flushClipboardReads();
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(transportMock.invoke).not.toHaveBeenCalled();
+    }));
+
+  test('prevents the native paste and writes clipboard text into the terminal', () =>
+    withTermTestHarness(async ({createTermInstanceForWebGLFallbackTest, transportMock}) => {
+      const {term, termInstance, terminal} = createPasteHarness(
+        createTermInstanceForWebGLFallbackTest as unknown as (uid: string) => PasteCapableTerm,
+        true
+      );
+      transportMock.invoke.mockImplementation(async (channel: string) =>
+        channel === 'clipboard.readFilePaths' ? [] : 'plain text'
+      );
+      const event = createPasteEvent(terminal);
+
+      termInstance.onWindowPaste(event);
+      await flushClipboardReads();
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(transportMock.invoke).toHaveBeenCalledWith('clipboard.readFilePaths');
+      expect(transportMock.invoke).toHaveBeenCalledWith('clipboard.readText');
+      expect(term.paste).toHaveBeenCalledWith('plain text');
+    }));
+
+  test('pastes copied file paths without asking for clipboard text', () =>
+    withTermTestHarness(async ({createTermInstanceForWebGLFallbackTest, transportMock}) => {
+      const {term, termInstance, terminal} = createPasteHarness(
+        createTermInstanceForWebGLFallbackTest as unknown as (uid: string) => PasteCapableTerm,
+        true
+      );
+      transportMock.invoke.mockImplementation(async (channel: string) =>
+        channel === 'clipboard.readFilePaths' ? ['/tmp/a.txt'] : 'unused'
+      );
+      const event = createPasteEvent(terminal);
+
+      termInstance.onWindowPaste(event);
+      await flushClipboardReads();
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(transportMock.invoke).not.toHaveBeenCalledWith('clipboard.readText');
+      expect(term.paste).toHaveBeenCalledWith("'/tmp/a.txt'");
+    }));
+});
+
+describe('Term quick-edit clipboard routing', () => {
+  type QuickEditTerm = {
+    props: {quickEdit: boolean; copyOnSelect: boolean};
+    term: {hasSelection: () => boolean; getSelection: () => string; clearSelection: () => void};
+    onMouseUp: (e: React.MouseEvent) => void;
+  };
+
+  const createQuickEditInstance = (createTermInstance: (uid: string) => unknown, hasSelection: boolean) => {
+    const termInstance = createTermInstance('uid-quick-edit') as QuickEditTerm & {
+      pasteClipboardText: () => Promise<void>;
+    };
+    termInstance.props = {quickEdit: true, copyOnSelect: false};
+    termInstance.term = {
+      hasSelection: () => hasSelection,
+      getSelection: () => 'selected text',
+      clearSelection: mock(() => {})
+    };
+    return termInstance;
+  };
+
+  const rightClick = () => ({button: 2}) as React.MouseEvent;
+
+  test('copies the selection through the main process when one exists', () =>
+    withTermTestHarness(({createTermInstanceForWebGLFallbackTest, transportMock}) => {
+      const termInstance = createQuickEditInstance(createTermInstanceForWebGLFallbackTest, true);
+
+      termInstance.onMouseUp(rightClick());
+
+      expect(transportMock.invoke).toHaveBeenCalledWith('clipboard.writeText', 'selected text');
+      expect(termInstance.term.clearSelection).toHaveBeenCalledTimes(1);
+    }));
+
+  test('pastes clipboard text when quick edit finds no selection', () =>
+    withTermTestHarness(async ({createTermInstanceForWebGLFallbackTest, transportMock}) => {
+      const termInstance = createQuickEditInstance(createTermInstanceForWebGLFallbackTest, false);
+      transportMock.invoke.mockImplementation(async () => 'clipboard text');
+      const pasteSpy = mock(() => {});
+      (termInstance as unknown as {term: {paste: typeof pasteSpy}}).term.paste = pasteSpy;
+
+      termInstance.onMouseUp(rightClick());
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(transportMock.invoke).toHaveBeenCalledWith('clipboard.readText');
+      expect(pasteSpy).toHaveBeenCalledWith('clipboard text');
     }));
 });

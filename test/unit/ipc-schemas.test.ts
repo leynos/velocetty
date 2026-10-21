@@ -44,3 +44,21 @@ describe('child_process stdio schema', () => {
     expect(() => schema.parse({stdout: '', stderr: {type: 'Buffer', data: []}})).toThrow(ZodError);
   });
 });
+
+describe('clipboard command schemas', () => {
+  test('accepts a list of file paths', () => {
+    expect(ipcResponseSchemas['clipboard.readFilePaths'].parse(['/tmp/a.txt'])).toEqual(['/tmp/a.txt']);
+  });
+
+  test('rejects non-string file paths', () => {
+    expect(() => ipcResponseSchemas['clipboard.readFilePaths'].parse([42])).toThrow(ZodError);
+  });
+
+  test('accepts clipboard text', () => {
+    expect(ipcResponseSchemas['clipboard.readText'].parse('hello')).toBe('hello');
+  });
+
+  test('accepts an undefined payload for void commands', () => {
+    expect(ipcResponseSchemas['clipboard.writeText'].parse(undefined)).toBeUndefined();
+  });
+});

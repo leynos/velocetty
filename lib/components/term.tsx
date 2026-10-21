@@ -32,7 +32,7 @@ import {transport} from '../transport';
 import {useTranslation} from '../hooks/use-translation';
 import {clock} from '../utils/clock';
 import {isPaneVisible} from '../utils/pane-visibility';
-import processClipboard from '../utils/paste';
+import processClipboard, {shouldInterceptFilePaste} from '../utils/paste';
 import {decorate} from '../utils/plugins';
 import {WebGLContextPool} from '../utils/webgl-context-pool';
 
@@ -41,7 +41,7 @@ import * as styles from './term.module.css';
 
 import 'xterm/css/xterm.css';
 
-const {clipboard, shell} = electron;
+const {shell} = electron;
 
 type ViewportDimensions = Readonly<{width: number; height: number}>;
 type TerminalSize = Readonly<{cols: number; rows: number}>;
@@ -510,31 +510,65 @@ export default class Term extends React.PureComponent<
     return document;
   }
 
-  // intercepting paste event for any necessary processing of
-  // clipboard data, if result is falsy, paste event continues
+  // Intercepts paste only when the clipboard may hold a file list that the
+  // renderer cannot read itself. Electron 44 removed the renderer clipboard
+  // module (RFC 0019), so the paths come from the main process over IPC.
   onWindowPaste = (e: Event) => {
-    if (!this.props.isTermActive) return;
+    if (!this.props.isTermActive || !this.hasPasteTarget(e)) return;
 
-    const processed = processClipboard();
-    if (processed) {
-      e.preventDefault();
-      e.stopPropagation();
-      this.term.paste(processed);
-    }
+    // `preventDefault` only has an effect during the synchronous part of the
+    // event, so it must run before awaiting the main process.
+    if (!shouldInterceptFilePaste()) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    void this.pasteClipboardFilePaths();
   };
+
+  private hasPasteTarget(e: Event): boolean {
+    const target = e.target;
+    // Duck-typed rather than `instanceof Node`: xterm can be opened in another
+    // document, and the check must survive DOM implementations without a
+    // shared global Node constructor.
+    return (
+      typeof (target as Node | null)?.nodeType === 'number' &&
+      this.termWrapperRef !== null &&
+      this.termWrapperRef.contains(target as Node)
+    );
+  }
+
+  private async pasteClipboardFilePaths() {
+    try {
+      const processed = await processClipboard(() => transport.invoke('clipboard.readFilePaths'));
+      // Ask the main process for the text when no file list was found: the
+      // renderer cannot read the clipboard itself, and re-triggering the DOM
+      // paste event would loop back into this handler.
+      this.term.paste(processed ?? (await transport.invoke('clipboard.readText')));
+    } catch (error) {
+      console.warn('Failed to paste copied files from the clipboard.', error);
+    }
+  }
 
   onMouseUp = (e: React.MouseEvent) => {
     if (this.props.quickEdit && e.button === 2) {
       if (this.term.hasSelection()) {
-        clipboard.writeText(this.term.getSelection());
+        void transport.invoke('clipboard.writeText', this.term.getSelection());
         this.term.clearSelection();
       } else {
-        document.execCommand('paste');
+        void this.pasteClipboardText();
       }
     } else if (this.props.copyOnSelect && this.term.hasSelection()) {
-      clipboard.writeText(this.term.getSelection());
+      void transport.invoke('clipboard.writeText', this.term.getSelection());
     }
   };
+
+  private async pasteClipboardText() {
+    try {
+      this.term.paste(await transport.invoke('clipboard.readText'));
+    } catch (error) {
+      console.warn('Failed to paste text from the clipboard.', error);
+    }
+  }
 
   write(data: string | Uint8Array) {
     this.term.write(data);

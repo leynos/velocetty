@@ -9,7 +9,6 @@ export const rendererExternalRequireMap = {
   'normalize-url': './node_modules/normalize-url/index.js',
   'parse-url': './node_modules/parse-url/dist/index.js',
   'php-escape-shell': './node_modules/php-escape-shell/php-escape-shell.js',
-  plist: './node_modules/plist/index.js',
   'react-dom': 'react-dom',
   'react-dom/client': 'react-dom/client',
   'react-redux': 'react-redux',

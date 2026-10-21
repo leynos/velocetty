@@ -45,4 +45,6 @@
 - `lib/containers/hyper.tsx`: component-level transport migration
   complete (select-all subscription).
 - `lib/components/term.tsx`: component-level transport migration
-  complete (renderer info emit).
+  complete (renderer info emit, clipboard paste and quick-edit copy).
+- `app/clipboard.ts`: main-process handlers for the clipboard commands the
+  renderer invokes; registered from `app/index.ts`.
