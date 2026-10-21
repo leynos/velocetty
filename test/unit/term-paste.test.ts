@@ -120,6 +120,46 @@ describe('Term clipboard paste routing', () => {
       expect(term.paste).toHaveBeenCalledWith("'/tmp/a.txt'");
     }));
 
+  test('pastes concurrent clipboard reads in the order they were requested', () =>
+    withTermTestHarness(async ({createTermInstance, transportMock}) => {
+      const termInstance = createTermInstance('uid-paste') as unknown as PasteCapableTerm;
+      const {term, terminal} = buildPasteHarness(termInstance, true);
+      const pasted: string[] = [];
+      term.paste = mock((data: string) => {
+        pasted.push(data);
+      });
+
+      // Text reads stay pending until released, so the test controls when each
+      // paste observes its clipboard contents.
+      const pendingTextReads: Array<(text: string) => void> = [];
+      transportMock.invoke.mockImplementation(async (channel: string) => {
+        if (channel === 'clipboard.readFilePaths') return [];
+        return new Promise<string>((resolve) => {
+          pendingTextReads.push(resolve);
+        });
+      });
+
+      const first = createPasteEvent(terminal);
+      const second = createPasteEvent(terminal);
+      termInstance.onWindowPaste(first);
+      termInstance.onWindowPaste(second);
+      await flushClipboardReads();
+
+      // The queue must hold the second paste back while the first is reading.
+      expect(pendingTextReads).toHaveLength(1);
+      pendingTextReads[0]?.('first');
+      await flushClipboardReads();
+      expect(pasted).toEqual(['first']);
+
+      // The queued paste runs now and opens its own text read.
+      expect(pendingTextReads).toHaveLength(2);
+      pendingTextReads[1]?.('second');
+      await flushClipboardReads();
+      expect(pasted).toEqual(['first', 'second']);
+      expect(first.defaultPrevented).toBe(true);
+      expect(second.defaultPrevented).toBe(true);
+    }));
+
   test('falls back to clipboard text when the file-list read rejects', () =>
     withTermTestHarness(async ({createTermInstance, transportMock}) => {
       const termInstance = createTermInstance('uid-paste') as unknown as PasteCapableTerm;

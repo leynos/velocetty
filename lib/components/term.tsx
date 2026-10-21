@@ -30,9 +30,10 @@ import type {RendererFallbackReason, RendererRuntimeMetrics, RendererType, Rende
 import terms from '../terms';
 import {transport} from '../transport';
 import {useTranslation} from '../hooks/use-translation';
+import {copyText, readPastePayload} from '../utils/clipboard-routing';
 import {clock} from '../utils/clock';
 import {isPaneVisible} from '../utils/pane-visibility';
-import processClipboard, {shouldInterceptFilePaste as platformNeedsFileListPaste} from '../utils/paste';
+import {shouldInterceptFilePaste as platformNeedsFileListPaste} from '../utils/paste';
 import {decorate} from '../utils/plugins';
 import {WebGLContextPool} from '../utils/webgl-context-pool';
 
@@ -513,6 +514,16 @@ export default class Term extends React.PureComponent<
   // Intercepts paste only when the clipboard may hold a file list that the
   // renderer cannot read itself. Electron 44 removed the renderer clipboard
   // module (RFC 0019), so the paths come from the main process over IPC.
+  /**
+   * Tail of the intercepted-paste chain.
+   *
+   * Two quick pastes would otherwise race their clipboard reads and insert
+   * their text in whichever order the IPC replies happened to arrive. The
+   * chain is never rejected, because `pasteClipboardFilePaths` handles its own
+   * failures, so appending to the tail can neither stall nor poison it.
+   */
+  private pasteQueue: Promise<void> = Promise.resolve();
+
   onWindowPaste = (e: Event) => {
     if (!this.props.isTermActive || !this.hasPasteTarget(e)) return;
 
@@ -522,7 +533,7 @@ export default class Term extends React.PureComponent<
     e.preventDefault();
     e.stopPropagation();
 
-    void this.pasteClipboardFilePaths();
+    this.pasteQueue = this.pasteQueue.then(() => this.pasteClipboardFilePaths());
   };
 
   /**
@@ -564,23 +575,27 @@ export default class Term extends React.PureComponent<
   }
 
   private async pasteClipboardFilePaths() {
-    let processed: string | null = null;
-    try {
-      processed = await processClipboard(() => transport.invoke('clipboard.readFilePaths'), this.pastePlatform());
-    } catch (error) {
-      // Native paste was already cancelled, so a failed file-list read must
-      // still fall through to the text read below rather than lose the paste.
-      console.warn('Failed to read copied files from the clipboard.', error);
-    }
-
     try {
       // Ask the main process for the text when no file list was found: the
       // renderer cannot read the clipboard itself, and re-triggering the DOM
       // paste event would loop back into this handler.
-      this.term.paste(processed ?? (await transport.invoke('clipboard.readText')));
+      this.term.paste(await readPastePayload(this.clipboardPorts(), this.pastePlatform()));
     } catch (error) {
       console.warn('Failed to paste clipboard contents.', error);
     }
+  }
+
+  /**
+   * Main-process clipboard operations, read through the typed IPC seam.
+   *
+   * Passed to the routing helpers so their tests can supply ports directly
+   * instead of intercepting this component's transport.
+   */
+  private clipboardPorts() {
+    return {
+      readFilePaths: () => transport.invoke('clipboard.readFilePaths'),
+      readText: () => transport.invoke('clipboard.readText')
+    };
   }
 
   /**
@@ -591,11 +606,7 @@ export default class Term extends React.PureComponent<
    */
   private async copySelectionToClipboard() {
     const selection = this.term.getSelection();
-    try {
-      await transport.invoke('clipboard.writeText', selection);
-    } catch (error) {
-      console.warn('Failed to copy the selection to the clipboard.', error);
-    }
+    await copyText((text) => transport.invoke('clipboard.writeText', text), selection);
   }
 
   onMouseUp = (e: React.MouseEvent) => {
