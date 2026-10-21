@@ -185,6 +185,9 @@ export type IpcCommands = {
   getDecoratedConfig: (profile: string) => configOptions;
   getDecoratedKeymaps: () => Record<string, string[]>;
   getRuntimePluginCommands: () => CommandDefinition[];
+  'clipboard.readFilePaths': () => string[];
+  'clipboard.readText': () => string;
+  'clipboard.writeText': (text: string) => void;
 };
 
 /** Type-safe wrapper around Electron IpcMain.handle for shared command contracts. */

@@ -178,5 +178,8 @@ export const ipcResponseSchemas = {
   getDeprecatedConfig: z.record(z.string(), z.object({css: z.array(z.string())}).passthrough()),
   getDecoratedConfig: configOptionsSchema,
   getDecoratedKeymaps: z.record(z.string(), z.array(z.string())),
-  getRuntimePluginCommands: z.array(commandDefinitionSchema)
+  getRuntimePluginCommands: z.array(commandDefinitionSchema),
+  'clipboard.readFilePaths': z.array(z.string()),
+  'clipboard.readText': z.string(),
+  'clipboard.writeText': z.void()
 } satisfies Record<keyof IpcCommands, ZodType>;

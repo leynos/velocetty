@@ -1,17 +1,9 @@
 /** @file Verifies Term.reportRenderer emits via transport with deduplication. */
-import {randomUUID} from 'node:crypto';
-
 import {describe, expect, mock, spyOn, test} from 'bun:test';
-import {
-  LONG_FRAME_THRESHOLD_MS,
-  resetInputSendTimestamps,
-  RUNTIME_METRICS_REPORT_INTERVAL_MS
-} from '@shared/constants/runtime-telemetry';
+import {LONG_FRAME_THRESHOLD_MS, RUNTIME_METRICS_REPORT_INTERVAL_MS} from '@shared/constants/runtime-telemetry';
 import {asRendererUid} from '@shared/types/common';
 
-import {setupHappyDom} from '../testUtils/happy-dom';
-import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
-import {createTransportMock} from '../testUtils/transport-mock';
+import {withTermTestHarness} from '../testUtils/term-harness';
 import {clock} from '../../lib/utils/clock';
 
 /** Type guard to identify WebGL addons by their onContextLoss method. */
@@ -20,111 +12,6 @@ function isWebGLAddon(addon: unknown): addon is {onContextLoss: () => void} {
     addon !== null && typeof addon === 'object' && 'onContextLoss' in addon && typeof addon.onContextLoss === 'function'
   );
 }
-
-const registerTermModuleMocks = (transportMock: ReturnType<typeof createTransportMock>['transportMock']) => {
-  mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
-
-  // Stub heavy renderer dependencies that Term pulls in transitively.
-  mock.module('electron', () => ({
-    clipboard: {writeText: mock(() => {}), readText: mock(() => '')},
-    shell: {openExternal: mock(async () => {})},
-    ipcRenderer: {
-      invoke: mock(async () => ({})),
-      on: mock(() => {}),
-      send: mock(() => {}),
-      removeAllListeners: mock(() => {}),
-      removeListener: mock(() => {})
-    }
-  }));
-  mock.module('color', () => ({
-    default: () => ({
-      alpha() {
-        return 1;
-      },
-      hex() {
-        return '#000000';
-      }
-    })
-  }));
-  mock.module('xterm', () => ({Terminal: class {}}));
-  mock.module('xterm-addon-canvas', () => ({CanvasAddon: class {}}));
-  mock.module('xterm-addon-fit', () => ({FitAddon: class {}}));
-  mock.module('xterm-addon-image', () => ({ImageAddon: class {}}));
-  mock.module('xterm-addon-ligatures', () => ({LigaturesAddon: class {}}));
-  mock.module('xterm-addon-search', () => ({SearchAddon: class {}}));
-  mock.module('xterm-addon-unicode11', () => ({Unicode11Addon: class {}}));
-  mock.module('xterm-addon-web-links', () => ({WebLinksAddon: class {}}));
-  mock.module('xterm-addon-webgl', () => ({
-    WebglAddon: class {
-      onContextLoss() {}
-      dispose() {}
-    }
-  }));
-  mock.module('xterm/css/xterm.css', () => ({}));
-  mock.module('../../lib/terms', () => ({default: {}}));
-  mock.module('../../lib/utils/paste', () => ({default: () => null}));
-  registerPluginsModuleMocks();
-  mock.module('../../lib/components/searchBox', () => ({default: () => null}));
-};
-
-type TermModule = typeof import('../../lib/components/term').default;
-
-type TermTestHarness = {
-  Term: TermModule;
-  cleanup: () => void;
-  createTermInstanceForWebGLFallbackTest: (uid: string) => InstanceType<TermModule>;
-  transportMock: ReturnType<typeof createTransportMock>['transportMock'];
-};
-
-const createTermTestHarness = async (): Promise<TermTestHarness> => {
-  const cleanupHappyDom = await setupHappyDom();
-  const {transportMock} = createTransportMock();
-  let cleanupCalled = false;
-
-  const cleanup = () => {
-    if (cleanupCalled) {
-      return;
-    }
-    cleanupCalled = true;
-    try {
-      mock.restore();
-      resetInputSendTimestamps();
-    } finally {
-      cleanupHappyDom();
-    }
-  };
-
-  try {
-    registerTermModuleMocks(transportMock);
-    const {default: Term} = await import(`../../lib/components/term.tsx?term_report_renderer=${randomUUID()}`);
-    Term.rendererTypes = {} as typeof Term.rendererTypes;
-    resetInputSendTimestamps();
-
-    const createTermInstanceForWebGLFallbackTest = (uid: string) => {
-      // @ts-expect-error Test constructor setup intentionally uses a minimal prop subset.
-      return new Term({
-        uid,
-        ref_: mock(() => {}),
-        cursorColor: '#ffffff',
-        borderColor: '#000000'
-      });
-    };
-
-    return {Term, cleanup, createTermInstanceForWebGLFallbackTest, transportMock};
-  } catch (error) {
-    cleanup();
-    throw error;
-  }
-};
-
-const withTermTestHarness = async (run: (harness: TermTestHarness) => Promise<void> | void) => {
-  const harness = await createTermTestHarness();
-  try {
-    await run(harness);
-  } finally {
-    harness.cleanup();
-  }
-};
 
 describe('Term.reportRenderer transport emit', () => {
   test('emits info renderer via transport on first call', () =>
@@ -223,9 +110,9 @@ describe('Term.reportRenderer transport emit', () => {
 
 describe('Term.ensureWebGLRenderer fallback handling', () => {
   test('does not throw when WebGL addon attach fails', () =>
-    withTermTestHarness(({createTermInstanceForWebGLFallbackTest, transportMock}) => {
+    withTermTestHarness(({createTermInstance, transportMock}) => {
       const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
-      const termInstance = createTermInstanceForWebGLFallbackTest('uid-webgl-failure');
+      const termInstance = createTermInstance('uid-webgl-failure');
       // @ts-expect-error Test double only needs loadAddon for this focused path.
       termInstance.term = {
         loadAddon: mock((addon: unknown) => {
@@ -254,9 +141,9 @@ describe('Term.ensureWebGLRenderer fallback handling', () => {
 
 describe('Term WebGL context-loss and eviction handlers', () => {
   test('onWebGLContextLoss emits context-loss fallback and schedules retry', () =>
-    withTermTestHarness(({createTermInstanceForWebGLFallbackTest}) => {
+    withTermTestHarness(({createTermInstance}) => {
       const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
-      const termInstance = createTermInstanceForWebGLFallbackTest('uid-context-loss');
+      const termInstance = createTermInstance('uid-context-loss');
       termInstance.detachWebGLRenderer = mock(() => {});
       termInstance.ensureCanvasRenderer = mock(() => {});
       termInstance.scheduleRendererVisibilitySync = mock(() => {});
@@ -274,8 +161,8 @@ describe('Term WebGL context-loss and eviction handlers', () => {
     }));
 
   test('onWebGLEvicted emits pool-evicted fallback and uses delayed retry path only', () =>
-    withTermTestHarness(({createTermInstanceForWebGLFallbackTest}) => {
-      const termInstance = createTermInstanceForWebGLFallbackTest('uid-evicted');
+    withTermTestHarness(({createTermInstance}) => {
+      const termInstance = createTermInstance('uid-evicted');
       termInstance.detachWebGLRenderer = mock(() => {});
       termInstance.ensureCanvasRenderer = mock(() => {});
       termInstance.scheduleRendererVisibilitySync = mock(() => {});
@@ -293,9 +180,9 @@ describe('Term WebGL context-loss and eviction handlers', () => {
 
 describe('Term runtime metrics flush behaviour', () => {
   test('forces runtimeMetrics emission during teardown so pending metrics are not lost', () =>
-    withTermTestHarness(({createTermInstanceForWebGLFallbackTest, transportMock}) => {
+    withTermTestHarness(({createTermInstance, transportMock}) => {
       const uid = 'uid-force-flush';
-      const termInstance = createTermInstanceForWebGLFallbackTest(uid);
+      const termInstance = createTermInstance(uid);
       // @ts-expect-error The teardown path only checks for a truthy terminal reference.
       termInstance.term = {};
       termInstance.runtimeInputLatencyMetrics = {

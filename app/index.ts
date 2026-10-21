@@ -32,6 +32,7 @@ import {gitDescribe} from 'git-describe';
 import parseUrl from 'parse-url';
 import type {VelocettyRuntimeGlobals} from '../typings/runtime-globals';
 
+import {registerClipboardIpcHandlers} from './clipboard';
 import * as AppMenu from './menus/menu';
 import * as plugins from './plugins';
 import {newWindow} from './ui/window';
@@ -45,6 +46,9 @@ type VelocettyRuntimeGlobal = typeof globalThis & VelocettyRuntimeGlobals;
 // Expose app root so renderer remote module lookups can resolve app-side
 // modules without depending on renderer bundle location.
 (global as VelocettyRuntimeGlobal).__velocettyAppRoot = isDev ? __dirname : app.getAppPath();
+
+// Register before any window loads so renderers can paste from first paint.
+registerClipboardIpcHandlers();
 
 // expose to plugins
 app.config = config;
