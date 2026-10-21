@@ -535,40 +535,79 @@ export default class Term extends React.PureComponent<
     return platformNeedsFileListPaste();
   }
 
+  /**
+   * Whether the paste event landed inside this terminal's wrapper element.
+   *
+   * `target` is only an `EventTarget`, so it must be narrowed before
+   * `contains` can accept it. The `Node` constructor is taken from the
+   * wrapper's own document because xterm may be opened in a separate DOM
+   * realm, whose nodes are not instances of this realm's `Node`.
+   */
   private hasPasteTarget(e: Event): boolean {
+    const wrapper = this.termWrapperRef;
+    if (wrapper === null) return false;
+
+    const nodeConstructor = wrapper.ownerDocument.defaultView?.Node;
     const target = e.target;
-    // Duck-typed rather than `instanceof Node`: xterm can be opened in another
-    // document, and the check must survive DOM implementations without a
-    // shared global Node constructor.
-    return (
-      typeof (target as Node | null)?.nodeType === 'number' &&
-      this.termWrapperRef !== null &&
-      this.termWrapperRef.contains(target as Node)
-    );
+    return nodeConstructor !== undefined && target instanceof nodeConstructor && wrapper.contains(target);
+  }
+
+  /**
+   * The platform whose shell quoting applies to pasted file paths.
+   *
+   * Overridable per instance for the same reason as `shouldInterceptFilePaste`:
+   * a test that asserts a specific quoting style must not depend on the host
+   * platform running the suite.
+   */
+  pastePlatform(): string {
+    return process.platform;
   }
 
   private async pasteClipboardFilePaths() {
+    let processed: string | null = null;
     try {
-      const processed = await processClipboard(() => transport.invoke('clipboard.readFilePaths'));
+      processed = await processClipboard(() => transport.invoke('clipboard.readFilePaths'), this.pastePlatform());
+    } catch (error) {
+      // Native paste was already cancelled, so a failed file-list read must
+      // still fall through to the text read below rather than lose the paste.
+      console.warn('Failed to read copied files from the clipboard.', error);
+    }
+
+    try {
       // Ask the main process for the text when no file list was found: the
       // renderer cannot read the clipboard itself, and re-triggering the DOM
       // paste event would loop back into this handler.
       this.term.paste(processed ?? (await transport.invoke('clipboard.readText')));
     } catch (error) {
-      console.warn('Failed to paste copied files from the clipboard.', error);
+      console.warn('Failed to paste clipboard contents.', error);
+    }
+  }
+
+  /**
+   * Copies the current selection through the main process.
+   *
+   * The selection is read before the first `await` so a caller that clears it
+   * immediately afterwards still copies the text the user selected.
+   */
+  private async copySelectionToClipboard() {
+    const selection = this.term.getSelection();
+    try {
+      await transport.invoke('clipboard.writeText', selection);
+    } catch (error) {
+      console.warn('Failed to copy the selection to the clipboard.', error);
     }
   }
 
   onMouseUp = (e: React.MouseEvent) => {
     if (this.props.quickEdit && e.button === 2) {
       if (this.term.hasSelection()) {
-        void transport.invoke('clipboard.writeText', this.term.getSelection());
+        void this.copySelectionToClipboard();
         this.term.clearSelection();
       } else {
         void this.pasteClipboardText();
       }
     } else if (this.props.copyOnSelect && this.term.hasSelection()) {
-      void transport.invoke('clipboard.writeText', this.term.getSelection());
+      void this.copySelectionToClipboard();
     }
   };
 

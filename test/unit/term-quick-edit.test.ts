@@ -9,7 +9,7 @@
  * - Component: `lib/components/term.tsx`
  * - Harness: `test/testUtils/term-harness.ts`
  */
-import {describe, expect, mock, test} from 'bun:test';
+import {describe, expect, mock, spyOn, test} from 'bun:test';
 
 import {withTermTestHarness} from '../testUtils/term-harness';
 
@@ -71,5 +71,27 @@ describe('Term quick-edit clipboard routing', () => {
 
       expect(transportMock.invoke).toHaveBeenCalledWith('clipboard.readText');
       expect(termInstance.term.paste).toHaveBeenCalledWith('clipboard text');
+    }));
+
+  test('logs rather than rethrows when the copy write rejects', () =>
+    withTermTestHarness(async ({createTermInstance, transportMock}) => {
+      const termInstance = buildQuickEditHarness(
+        createTermInstance('uid-quick-edit') as unknown as QuickEditTerm,
+        true
+      );
+      const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+      transportMock.invoke.mockImplementation(async () => {
+        throw new Error('ipc unavailable');
+      });
+
+      try {
+        termInstance.onMouseUp(rightClick());
+        await flushClipboardReads();
+
+        expect(warnSpy).toHaveBeenCalledWith('Failed to copy the selection to the clipboard.', expect.any(Error));
+        expect(termInstance.term.clearSelection).toHaveBeenCalledTimes(1);
+      } finally {
+        warnSpy.mockRestore();
+      }
     }));
 });
