@@ -32,7 +32,7 @@ import {transport} from '../transport';
 import {useTranslation} from '../hooks/use-translation';
 import {clock} from '../utils/clock';
 import {isPaneVisible} from '../utils/pane-visibility';
-import processClipboard, {shouldInterceptFilePaste} from '../utils/paste';
+import processClipboard, {shouldInterceptFilePaste as platformNeedsFileListPaste} from '../utils/paste';
 import {decorate} from '../utils/plugins';
 import {WebGLContextPool} from '../utils/webgl-context-pool';
 
@@ -518,12 +518,22 @@ export default class Term extends React.PureComponent<
 
     // `preventDefault` only has an effect during the synchronous part of the
     // event, so it must run before awaiting the main process.
-    if (!shouldInterceptFilePaste()) return;
+    if (!this.shouldInterceptFilePaste()) return;
     e.preventDefault();
     e.stopPropagation();
 
     void this.pasteClipboardFilePaths();
   };
+
+  /**
+   * Whether a paste may carry a file list that only the main process can read.
+   *
+   * Overridable per instance so tests can exercise the main-process path on any
+   * host platform without replacing this module in the process-wide registry.
+   */
+  shouldInterceptFilePaste(): boolean {
+    return platformNeedsFileListPaste();
+  }
 
   private hasPasteTarget(e: Event): boolean {
     const target = e.target;
