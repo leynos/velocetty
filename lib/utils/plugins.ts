@@ -362,11 +362,26 @@ export function decorate<P extends Record<string, any>>(
 type ModuleLoader = (request: string, parent?: NodeJS.Module | null, isMain?: boolean) => ReturnType<NodeJS.Require>;
 type ModuleWithLoader = typeof nodeModule & {_load: ModuleLoader};
 type RuntimeGlobalScope = Omit<typeof globalThis, 'window'> & {window?: Window};
-const moduleRequire = createRequire(import.meta.url);
 
 const isRuntimeRequire = (candidate: unknown): candidate is NodeJS.Require => typeof candidate === 'function';
 // SAFETY: Renderer modules are also imported in Node tests, where `window` is absent.
 const runtimeGlobal = globalThis as RuntimeGlobalScope;
+
+/**
+ * Builds the fallback loader used when no renderer `require` is present.
+ *
+ * Electron always provides `window.require`, so this path exists for Node
+ * tooling (tests, SSGs) that imports renderer modules directly. The base is a
+ * pathspec rather than `import.meta.url` because the renderer bundle is an
+ * IIFE, where `import.meta` is empty and `createRequire` rejects it: reading it
+ * at module scope would throw while the bundle loads, before any plugin runs.
+ *
+ * @returns A `require` rooted at the process working directory.
+ */
+const createFallbackRequire = (): NodeJS.Require => createRequire(pathModule.resolve('package.json'));
+
+const moduleRequire = createFallbackRequire();
+
 const getRuntimeRequire = (): NodeJS.Require => {
   const rendererRequire = runtimeGlobal.window?.require;
   return isRuntimeRequire(rendererRequire) ? rendererRequire : moduleRequire;
