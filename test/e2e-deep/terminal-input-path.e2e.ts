@@ -7,7 +7,6 @@ import fs from 'node:fs/promises';
 
 import {_electron} from 'playwright';
 import {expect, test} from 'playwright/test';
-import {isFunction} from '@shared/types/guards';
 
 import {
   createIsolatedE2EEnvironment,
@@ -62,9 +61,9 @@ test('renders command output after terminal input', async ({page: _page}, testIn
 
     await waitForRendererReady(mainWindow, rendererReadyTimeoutMs);
     await mainWindow.evaluate(() => {
-      if (isFunction(globalThis.focusActiveTerm)) {
-        globalThis.focusActiveTerm();
-      }
+      // This callback is serialized and evaluated in the renderer, so it can
+      // only reference globals. A module import here would not exist there.
+      globalThis.focusActiveTerm?.();
     });
     await mainWindow.locator('.xterm-helper-textarea').first().focus();
 

@@ -19,7 +19,8 @@ export const createTransportMock = () => {
   };
 
   /**
-   * Emits an event payload to all listeners currently registered for the event.
+   * Emits an event payload to the listeners registered for the event when
+   * emission begins.
    */
   const handleEmit = (event: string, ...payload: unknown[]): boolean => {
     const listeners = state.listenersByEvent[event];
@@ -27,7 +28,13 @@ export const createTransportMock = () => {
       return false;
     }
 
-    for (const listener of listeners) {
+    // Snapshot before dispatch, as Node's EventEmitter does. The `once`
+    // wrapper removes itself while it runs, which splices the live array and
+    // would otherwise skip whichever listener shifted into the vacated slot.
+    // The copy is hoisted into its own binding because spreading directly in
+    // the `for…of` header is reported as a redundant conversion.
+    const listenersToNotify = [...listeners];
+    for (const listener of listenersToNotify) {
       listener(...payload);
     }
     return true;
