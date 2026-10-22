@@ -4,7 +4,6 @@ import React from 'react';
 
 import Color from 'color';
 import isEqual from 'lodash/isEqual';
-import pickBy from 'lodash/pickBy';
 import {Terminal} from 'xterm';
 import type {ITerminalOptions, IDisposable} from 'xterm';
 import {CanvasAddon} from 'xterm-addon-canvas';
@@ -27,17 +26,19 @@ import {
 } from '@shared/constants/runtime-telemetry';
 import {asRendererUid, asSessionId} from '@shared/types/common';
 import type {RendererFallbackReason, RendererRuntimeMetrics, RendererType, RendererUid} from '@shared/types/common';
+import {isNumber} from '@shared/types/guards';
 import terms from '../terms';
 import {transport} from '../transport';
 import {useTranslation} from '../hooks/use-translation';
 import {copyText, readPastePayload} from '../utils/clipboard-routing';
 import {clock} from '../utils/clock';
+import {ObjectTypedKeys} from '../utils/object';
 import {isPaneVisible} from '../utils/pane-visibility';
 import {shouldInterceptFilePaste as platformNeedsFileListPaste} from '../utils/paste';
 import {decorate} from '../utils/plugins';
 import {WebGLContextPool} from '../utils/webgl-context-pool';
 
-import _SearchBox from './searchBox';
+import _SearchBox from './search-box';
 import * as styles from './term.module.css';
 
 import 'xterm/css/xterm.css';
@@ -54,7 +55,11 @@ type RendererReportPayload = Readonly<{
   runtimeMetrics?: RendererRuntimeMetrics;
 }>;
 
+// SAFETY: This constructor is used only for durations already measured in milliseconds.
 const asTimeMs = (value: number): TimeMs => value as TimeMs;
+type TerminalRenderDimensions = {
+  _core: {_renderService: {dimensions: {actualCellWidth: number; actualCellHeight: number}}};
+};
 
 const SearchBox = decorate(_SearchBox, 'SearchBox');
 
@@ -98,12 +103,12 @@ const CURSOR_STYLES = {
 } as const;
 
 const isWebgl2Supported = (() => {
-  let isSupported = window.WebGL2RenderingContext ? undefined : false;
+  let isSupported: boolean | undefined;
   return () => {
     if (isSupported === undefined) {
       const canvas = document.createElement('canvas');
       const gl = canvas.getContext('webgl2', {depth: false, antialias: false});
-      isSupported = gl instanceof window.WebGL2RenderingContext;
+      isSupported = gl !== null;
     }
     return isSupported;
   };
@@ -155,7 +160,7 @@ const getWebGLContextPool = (maxContexts: number) => {
     sharedWebGLContextPool = new WebGLContextPool<WebGLPoolSlot>({maxContexts: resolvedMaxContexts});
     sharedWebGLContextPoolMax = resolvedMaxContexts;
 
-    for (const releaseHandler of [...webGLPoolReleaseHandlers.values()]) {
+    for (const releaseHandler of webGLPoolReleaseHandlers.values()) {
       releaseHandler();
     }
   }
@@ -181,7 +186,6 @@ const getTermOptions = (props: TermProps): ITerminalOptions => {
     letterSpacing: props.letterSpacing,
     allowTransparency: needTransparency,
     macOptionClickForcesSelection: props.macOptionSelectionMode === 'force',
-    windowsMode: isWindows,
     ...(isWindows && props.windowsPty && {windowsPty: props.windowsPty}),
     theme: {
       foreground: props.foregroundColor,
@@ -249,7 +253,7 @@ export default class Term extends React.PureComponent<
   canvasAddon: CanvasAddon | null;
   webglAddon: WebglAddon | null;
   ligaturesAddon: LigaturesAddon | null;
-  static rendererTypes: Record<RendererUid, RendererType> = {};
+  static rendererTypes: Partial<Record<RendererUid, RendererType>> = {};
   term!: Terminal;
   resizeObserver?: ResizeObserver;
   resizeTimeout?: NodeJS.Timeout;
@@ -340,13 +344,15 @@ export default class Term extends React.PureComponent<
     this.termRef = props.term?.element?.parentElement ?? document.createElement('div');
     this.termRef.className = `${styles.termFit} term_fit term_term`;
 
-    this.termWrapperRef?.appendChild(this.termRef);
+    this.termWrapperRef?.append(this.termRef);
 
-    if (!props.term) {
-      const shallActivateWebLink = (event: MouseEvent): boolean => {
-        if (!event) return false;
-        return props.webLinksActivationKey ? event[`${props.webLinksActivationKey}Key`] : true;
-      };
+    if (props.term) {
+      // get the cached plugins
+      this.fitAddon = props.fitAddon!;
+      this.searchAddon = props.searchAddon!;
+    } else {
+      const shallActivateWebLink = (event: MouseEvent): boolean =>
+        props.webLinksActivationKey ? event[`${props.webLinksActivationKey}Key`] : true;
 
       this.term.attachCustomKeyEventHandler(this.keyboardHandler);
       this.term.loadAddon(this.fitAddon);
@@ -364,10 +370,6 @@ export default class Term extends React.PureComponent<
       if (props.imageSupport) {
         this.term.loadAddon(new ImageAddon());
       }
-    } else {
-      // get the cached plugins
-      this.fitAddon = props.fitAddon!;
-      this.searchAddon = props.searchAddon!;
     }
 
     if (this.term.element) {
@@ -393,9 +395,6 @@ export default class Term extends React.PureComponent<
 
   private setupDataHandler() {
     const {onData} = this.props;
-    if (!onData) {
-      return;
-    }
 
     this.disposableListeners.push(
       this.term.onData((data) => {
@@ -412,16 +411,12 @@ export default class Term extends React.PureComponent<
   private setupTerminalEventListeners() {
     const {props} = this;
 
-    if (props.onTitle) {
-      this.disposableListeners.push(this.term.onTitleChange(props.onTitle));
-    }
+    this.disposableListeners.push(this.term.onTitleChange(props.onTitle));
 
-    if (props.onActive) {
-      this.term.textarea?.addEventListener('focus', props.onActive);
-      this.disposableListeners.push({
-        dispose: () => this.term.textarea?.removeEventListener('focus', this.props.onActive)
-      });
-    }
+    this.term.textarea?.addEventListener('focus', props.onActive);
+    this.disposableListeners.push({
+      dispose: () => this.term.textarea?.removeEventListener('focus', this.props.onActive)
+    });
 
     this.setupDataHandler();
 
@@ -429,25 +424,26 @@ export default class Term extends React.PureComponent<
       this.ringBell();
     });
 
-    if (props.onResize) {
-      this.disposableListeners.push(
-        this.term.onResize(({cols, rows}) => {
-          props.onResize(cols, rows);
-        })
-      );
+    this.disposableListeners.push(
+      this.term.onResize(({cols, rows}) => {
+        props.onResize(cols, rows);
+      })
+    );
 
-      // the row and col of init session is null, so reize the node-pty
-      props.onResize(this.term.cols, this.term.rows);
-    }
+    // The row and column of the initial session are null, so resize node-pty.
+    props.onResize(this.term.cols, this.term.rows);
 
     if (props.onCursorMove) {
       this.disposableListeners.push(
         this.term.onCursorMove(() => {
+          // SAFETY: Cursor geometry uses private cell dimensions exposed by the active xterm renderer.
+          const {actualCellWidth, actualCellHeight} = (this.term as typeof this.term & TerminalRenderDimensions)._core
+            ._renderService.dimensions;
           const cursorFrame = {
-            x: this.term.buffer.active.cursorX * (this.term as any)._core._renderService.dimensions.actualCellWidth,
-            y: this.term.buffer.active.cursorY * (this.term as any)._core._renderService.dimensions.actualCellHeight,
-            width: (this.term as any)._core._renderService.dimensions.actualCellWidth,
-            height: (this.term as any)._core._renderService.dimensions.actualCellHeight,
+            x: this.term.buffer.active.cursorX * actualCellWidth,
+            y: this.term.buffer.active.cursorY * actualCellHeight,
+            width: actualCellWidth,
+            height: actualCellHeight,
             col: this.term.buffer.active.cursorX,
             row: this.term.buffer.active.cursorY
           };
@@ -467,11 +463,11 @@ export default class Term extends React.PureComponent<
   }
 
   private setupWindowEventListeners() {
-    window.addEventListener('paste', this.onWindowPaste, {
+    globalThis.addEventListener('paste', this.onWindowPaste, {
       capture: true
     });
-    window.addEventListener('resize', this.scheduleRendererVisibilitySync, {passive: true});
-    window.addEventListener('scroll', this.scheduleRendererVisibilitySync, true);
+    globalThis.addEventListener('resize', this.scheduleRendererVisibilitySync, {passive: true});
+    globalThis.addEventListener('scroll', this.scheduleRendererVisibilitySync, true);
   }
 
   private finalizeTerminalMount() {
@@ -722,7 +718,7 @@ export default class Term extends React.PureComponent<
     while (this.keydownTimestamps.length > 0) {
       const timestamp = this.keydownTimestamps.shift();
       if (timestamp === undefined) {
-        return undefined;
+        return;
       }
 
       if (nowMs - timestamp <= KEYDOWN_TIMESTAMP_MAX_AGE_MS) {
@@ -730,7 +726,7 @@ export default class Term extends React.PureComponent<
       }
     }
 
-    return undefined;
+    return;
   }
 
   private recordLatencySample(metrics: ReturnType<typeof createRuntimeLatencyMetrics>, sampleMs: number) {
@@ -763,7 +759,7 @@ export default class Term extends React.PureComponent<
   }
 
   private getCurrentRendererType(): RendererType {
-    return Term.rendererTypes[asRendererUid(this.props.uid)] || 'Canvas';
+    return Term.rendererTypes[asRendererUid(this.props.uid)] ?? 'Canvas';
   }
 
   private createRuntimeMetricsSnapshot(): RendererRuntimeMetrics {
@@ -776,10 +772,6 @@ export default class Term extends React.PureComponent<
   }
 
   private maybeReportRuntimeMetrics(force = false) {
-    if (!this.term) {
-      return;
-    }
-
     if (!force && !this.hasUnreportedRuntimeMetrics) {
       return;
     }
@@ -804,7 +796,7 @@ export default class Term extends React.PureComponent<
     }
 
     const onFrame = (timestamp: number) => {
-      this.frameTimingRaf = asTimeMs(window.requestAnimationFrame(onFrame));
+      this.frameTimingRaf = asTimeMs(globalThis.requestAnimationFrame(onFrame));
       const currentTimestamp = asTimeMs(timestamp);
       const shouldTrackFrame = document.visibilityState === 'visible';
       if (!shouldTrackFrame) {
@@ -824,12 +816,12 @@ export default class Term extends React.PureComponent<
       this.maybeReportRuntimeMetrics();
     };
 
-    this.frameTimingRaf = asTimeMs(window.requestAnimationFrame(onFrame));
+    this.frameTimingRaf = asTimeMs(globalThis.requestAnimationFrame(onFrame));
   }
 
   private stopFrameTimingLoop() {
     if (this.frameTimingRaf !== null) {
-      window.cancelAnimationFrame(this.frameTimingRaf);
+      globalThis.cancelAnimationFrame(this.frameTimingRaf);
       this.frameTimingRaf = null;
     }
     this.lastFrameTimestamp = null;
@@ -894,7 +886,7 @@ export default class Term extends React.PureComponent<
       return;
     }
 
-    this.webglRetryTimer = window.setTimeout(() => {
+    this.webglRetryTimer = globalThis.setTimeout(() => {
       this.webglRetryTimer = null;
       this.syncRendererForVisibility();
     }, this.getWebGLRetryDelayMs());
@@ -905,7 +897,7 @@ export default class Term extends React.PureComponent<
       return;
     }
 
-    this.visibilityFrame = window.requestAnimationFrame(() => {
+    this.visibilityFrame = globalThis.requestAnimationFrame(() => {
       this.visibilityFrame = null;
       this.syncRendererForVisibility();
     });
@@ -1139,10 +1131,14 @@ export default class Term extends React.PureComponent<
     const nextTermOptions = getTermOptions(this.props);
 
     // Update only options that have changed.
-    this.term.options = pickBy(
-      nextTermOptions,
-      (value, key) => !isEqual(this.termOptions[key as keyof ITerminalOptions], value)
-    );
+    const changedOptions: Partial<ITerminalOptions> = {};
+    for (const key of ObjectTypedKeys(nextTermOptions)) {
+      const value = nextTermOptions[key];
+      if (!isEqual(this.termOptions[key], value)) {
+        Object.assign(changedOptions, {[key]: value});
+      }
+    }
+    this.term.options = changedOptions;
 
     this.termOptions = nextTermOptions;
   }
@@ -1159,7 +1155,7 @@ export default class Term extends React.PureComponent<
       this.fitResize();
     }
 
-    const hasTerminalSize = typeof this.props.cols === 'number' && typeof this.props.rows === 'number';
+    const hasTerminalSize = isNumber(this.props.cols) && isNumber(this.props.rows);
     const hasTerminalSizeChanged =
       hasTerminalSize && (prevProps.rows !== this.props.rows || prevProps.cols !== this.props.cols);
     if (hasTerminalSizeChanged) {
@@ -1210,10 +1206,9 @@ export default class Term extends React.PureComponent<
 
   componentWillUnmount() {
     terms[this.props.uid] = null;
-    const termWrapper = this.termWrapperRef;
     const termElement = this.termRef;
-    if (termWrapper && termElement) {
-      termWrapper.removeChild(termElement);
+    if (termElement) {
+      termElement.remove();
     }
     this.props.ref_(this.props.uid, null);
 
@@ -1231,7 +1226,7 @@ export default class Term extends React.PureComponent<
     this.ligaturesAddon?.dispose();
     this.ligaturesAddon = null;
     if (this.visibilityFrame !== null) {
-      window.cancelAnimationFrame(this.visibilityFrame);
+      globalThis.cancelAnimationFrame(this.visibilityFrame);
       this.visibilityFrame = null;
     }
     this.clearRendererRetryTimer();
@@ -1240,10 +1235,10 @@ export default class Term extends React.PureComponent<
     this.keydownTimestamps.length = 0;
     this.resizeObserver?.disconnect();
     clearTimeout(this.resizeTimeout);
-    window.removeEventListener('resize', this.scheduleRendererVisibilitySync);
-    window.removeEventListener('scroll', this.scheduleRendererVisibilitySync, true);
+    globalThis.removeEventListener('resize', this.scheduleRendererVisibilitySync);
+    globalThis.removeEventListener('scroll', this.scheduleRendererVisibilitySync, true);
 
-    window.removeEventListener('paste', this.onWindowPaste, {
+    globalThis.removeEventListener('paste', this.onWindowPaste, {
       capture: true
     });
   }

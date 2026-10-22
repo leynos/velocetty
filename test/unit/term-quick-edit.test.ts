@@ -13,6 +13,9 @@ import {describe, expect, mock, spyOn, test} from 'bun:test';
 
 import {withTermTestHarness} from '../testUtils/term-harness';
 
+/** The slice of a React mouse event the quick-edit path reads. */
+type QuickEditMouseEvent = Pick<React.MouseEvent, 'button'>;
+
 type QuickEditTerm = {
   props: {quickEdit: boolean; copyOnSelect: boolean};
   term: {
@@ -21,10 +24,16 @@ type QuickEditTerm = {
     clearSelection: () => void;
     paste: (data: string) => void;
   };
-  onMouseUp: (e: React.MouseEvent) => void;
+  onMouseUp: (e: QuickEditMouseEvent) => void;
 };
 
-const rightClick = () => ({button: 2}) as React.MouseEvent;
+/**
+ * Minimal right-click event for the quick-edit mouse-up path.
+ *
+ * Quick edit reads only `button`, so the double supplies that single field
+ * rather than a full React synthetic event with a live DOM target.
+ */
+const rightClick = (): QuickEditMouseEvent => ({button: 2});
 
 /** Builds a Term instance whose terminal reports `hasSelection`. */
 const buildQuickEditHarness = (termInstance: QuickEditTerm, hasSelection: boolean) => {
@@ -46,10 +55,7 @@ const flushClipboardReads = async () => {
 describe('Term quick-edit clipboard routing', () => {
   test('copies the selection through the main process when one exists', () =>
     withTermTestHarness(({createTermInstance, transportMock}) => {
-      const termInstance = buildQuickEditHarness(
-        createTermInstance('uid-quick-edit') as unknown as QuickEditTerm,
-        true
-      );
+      const termInstance = buildQuickEditHarness(createTermInstance<QuickEditTerm>('uid-quick-edit'), true);
 
       termInstance.onMouseUp(rightClick());
 
@@ -60,10 +66,7 @@ describe('Term quick-edit clipboard routing', () => {
 
   test('pastes clipboard text when quick edit finds no selection', () =>
     withTermTestHarness(async ({createTermInstance, transportMock}) => {
-      const termInstance = buildQuickEditHarness(
-        createTermInstance('uid-quick-edit') as unknown as QuickEditTerm,
-        false
-      );
+      const termInstance = buildQuickEditHarness(createTermInstance<QuickEditTerm>('uid-quick-edit'), false);
       transportMock.invoke.mockImplementation(async () => 'clipboard text');
 
       termInstance.onMouseUp(rightClick());
@@ -75,10 +78,7 @@ describe('Term quick-edit clipboard routing', () => {
 
   test('logs rather than rethrows when the copy write rejects', () =>
     withTermTestHarness(async ({createTermInstance, transportMock}) => {
-      const termInstance = buildQuickEditHarness(
-        createTermInstance('uid-quick-edit') as unknown as QuickEditTerm,
-        true
-      );
+      const termInstance = buildQuickEditHarness(createTermInstance<QuickEditTerm>('uid-quick-edit'), true);
       const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
       transportMock.invoke.mockImplementation(async () => {
         throw new Error('ipc unavailable');

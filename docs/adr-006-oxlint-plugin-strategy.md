@@ -73,8 +73,8 @@ Three rules are disabled globally for documented contract or plug-in conflicts:
   `null` resets a value, and the public session and configuration types include
   nullable values. Replacing these values with `undefined` would change
   configuration merging or serialized messages. See the
-  [layering contract](../shared/src/config/layering.ts#L44), [session types](../shared/src/types/common.ts#L34),
-  and [configuration types](../shared/src/types/config.ts#L54).
+  [layering contract](../app/config/layering.ts#L48), [session types](../shared/src/types/common.ts#L40),
+  and [configuration types](../shared/src/types/config.ts#L56).
 - `deslop/no-unknown-parameters`: the transport guidance requires untrusted IPC
   responses to enter the transport boundary as `unknown` and be validated with
   Zod before reaching application code. This rule rejects that required

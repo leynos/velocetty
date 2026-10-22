@@ -20,15 +20,17 @@ describe('quoteShellPaths', () => {
   });
 
   test('escapes embedded single quotes for POSIX shells', () => {
-    expect(quoteShellPaths(["/tmp/it's.txt"], 'darwin')).toBe("'/tmp/it'\\''s.txt'");
+    expect(quoteShellPaths(["/tmp/it's.txt"], 'darwin')).toBe(String.raw`'/tmp/it'\''s.txt'`);
   });
 
   test('uses double quotes on win32, where single quotes are literal', () => {
-    expect(quoteShellPaths(['C:\\a b.txt', 'C:\\c.txt'], 'win32')).toBe('"C:\\a b.txt" "C:\\c.txt"');
+    expect(quoteShellPaths([String.raw`C:\a b.txt`, String.raw`C:\c.txt`], 'win32')).toBe(
+      String.raw`"C:\a b.txt" "C:\c.txt"`
+    );
   });
 
   test('keeps an embedded single quote literal on win32', () => {
-    expect(quoteShellPaths(["C:\\it's.txt"], 'win32')).toBe('"C:\\it\'s.txt"');
+    expect(quoteShellPaths([String.raw`C:\it's.txt`], 'win32')).toBe(String.raw`"C:\it's.txt"`);
   });
 
   test('returns an empty string when there are no paths', () => {
@@ -44,7 +46,9 @@ describe('processClipboard', () => {
   });
 
   test('formats Windows paths with Windows quoting', async () => {
-    await expect(processClipboard(async () => ['C:\\a b.txt'], 'win32')).resolves.toBe('"C:\\a b.txt"');
+    await expect(processClipboard(async () => [String.raw`C:\a b.txt`], 'win32')).resolves.toBe(
+      String.raw`"C:\a b.txt"`
+    );
   });
 
   test('returns null when the clipboard holds no file list', async () => {

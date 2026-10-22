@@ -27,7 +27,11 @@ describe('Term.reportRenderer transport emit', () => {
       Term.reportRenderer({uid: asRendererUid('uid-2'), type: 'WebGL'});
       Term.reportRenderer({uid: asRendererUid('uid-2'), type: 'WebGL'});
 
+      // The first report establishes the renderer type; the second is
+      // suppressed because nothing changed, so exactly one emission survives
+      // and it carries the first report's payload.
       expect(transportMock.emit).toHaveBeenCalledTimes(1);
+      expect(transportMock.emit).toHaveBeenCalledWith('info renderer', {uid: 'uid-2', type: 'WebGL'});
     }));
 
   test('emits again when the renderer type changes for the same uid', () =>

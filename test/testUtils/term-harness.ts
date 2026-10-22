@@ -69,7 +69,7 @@ const registerTermModuleMocks = (transportMock: TransportMock) => {
   mock.module('xterm/css/xterm.css', () => ({}));
   mock.module('../../lib/terms', () => ({default: {}}));
   registerPluginsModuleMocks();
-  mock.module('../../lib/components/searchBox', () => ({default: () => null}));
+  mock.module('../../lib/components/search-box', () => ({default: () => null}));
 };
 
 type TermModule = typeof import('../../lib/components/term').default;
@@ -77,7 +77,13 @@ type TermModule = typeof import('../../lib/components/term').default;
 export type TermTestHarness = {
   Term: TermModule;
   cleanup: () => void;
-  createTermInstance: (uid: string) => InstanceType<TermModule>;
+  /**
+   * Builds a `Term` from the minimal prop subset the constructor needs.
+   *
+   * `T` defaults to the full class; suites that exercise a private or
+   * partially arranged surface name the narrower shape they have set up.
+   */
+  createTermInstance: <T = InstanceType<TermModule>>(uid: string) => T;
   transportMock: TransportMock;
 };
 
@@ -109,10 +115,12 @@ export const createTermTestHarness = async (cacheKey = 'term_harness'): Promise<
   try {
     registerTermModuleMocks(transportMock);
     const {default: Term} = await import(`../../lib/components/term.tsx?${cacheKey}=${randomUUID()}`);
-    Term.rendererTypes = {} as typeof Term.rendererTypes;
+    // Each harness loads its own cache-busted module, so the shared renderer
+    // registry must start empty or deduplication would leak across suites.
+    Term.rendererTypes = {};
     resetInputSendTimestamps();
 
-    const createTermInstance = (uid: string) => {
+    const createTermInstance = <T = InstanceType<TermModule>>(uid: string): T => {
       // @ts-expect-error Test constructor setup intentionally uses a minimal prop subset.
       return new Term({
         uid,
