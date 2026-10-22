@@ -120,24 +120,27 @@ describe('config-hot-reload', () => {
       expect(shellResult?.classification).toBe('restart');
     });
 
+    // `makeConfig` spreads the defaults, so a key is genuinely absent only if
+    // it is optional and the defaults omit it. `windowSize` is both, unlike
+    // `cursorBlink`, which the defaults always supply.
     it('should handle added keys', () => {
       const oldConfig = makeConfig({fontSize: 12});
-      const newConfig = makeConfig({fontSize: 12, cursorBlink: true});
+      const newConfig = makeConfig({fontSize: 12, windowSize: [800, 600]});
 
       const result = detectConfigChanges(oldConfig, newConfig);
 
       expect(result.length).toBe(1);
-      expect(result[0].path).toBe('cursorBlink');
+      expect(result[0].path).toBe('windowSize');
     });
 
     it('should handle removed keys', () => {
-      const oldConfig = makeConfig({fontSize: 12, cursorBlink: true});
+      const oldConfig = makeConfig({fontSize: 12, windowSize: [800, 600]});
       const newConfig = makeConfig({fontSize: 12});
 
       const result = detectConfigChanges(oldConfig, newConfig);
 
       expect(result.length).toBe(1);
-      expect(result[0].path).toBe('cursorBlink');
+      expect(result[0].path).toBe('windowSize');
     });
   });
 
