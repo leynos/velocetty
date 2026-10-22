@@ -18,6 +18,10 @@ const legacyCfgFile = 'hyper.json';
 const defaultCfgFile = 'config-default.json';
 const schemaFile = 'schema.json';
 const homeDirectory = homedir();
+// `app.getAppPath()` resolves to the app root: `dist/app` during development
+// and in the unpacked build, and the packaged archive once shipped. Compiled
+// assets sit below that root rather than beside this module, so every asset
+// path is anchored to it instead of to the emitted file's directory.
 const appDirectory = app.getAppPath();
 
 // If the user defines XDG_CONFIG_HOME they definitely want their config there,
@@ -33,12 +37,12 @@ if (process.env.XDG_CONFIG_HOME) {
 
 let cfgPath = path.join(cfgDir, cfgFile);
 const legacyCfgPath = path.join(cfgDir, legacyCfgFile);
-const schemaPath = path.resolve(appDirectory, schemaFile);
+const schemaPath = path.join(appDirectory, 'config', schemaFile);
 
-const devDir = path.resolve(appDirectory, '../..');
+const devDir = path.resolve(appDirectory, '..');
 const devCfg = path.join(devDir, cfgFile);
 const devLegacyCfg = path.join(devDir, legacyCfgFile);
-const defaultCfg = path.resolve(appDirectory, defaultCfgFile);
+const defaultCfg = path.join(appDirectory, 'config', defaultCfgFile);
 
 const fileExists = (path: string): boolean => {
   try {
@@ -77,7 +81,7 @@ const plugs = {
 /** The Bun executable name for the current platform. */
 const bunExecutable = process.platform === 'win32' ? 'bun.exe' : 'bun';
 /** The Bun binary bundled alongside packaged app assets. */
-const bundledBun = path.resolve(appDirectory, '../../bin', bunExecutable);
+const bundledBun = path.resolve(appDirectory, '../bin', bunExecutable);
 /** Resolved Bun binary used for plugin installs. */
 const bun = (() => {
   const bunCandidate = process.env.BUN_PATH ?? bundledBun;
@@ -97,12 +101,12 @@ const bun = (() => {
     return bunExecutable;
   }
 })();
-const cliScriptPath = path.resolve(appDirectory, '../../bin/hyper');
+const cliScriptPath = path.resolve(appDirectory, '../bin/hyper');
 const cliLinkPath = '/usr/local/bin/hyper';
 
-const icon = path.resolve(appDirectory, '../static/icon96x96.png');
+const icon = path.join(appDirectory, 'static/icon96x96.png');
 
-const keymapPath = path.resolve(appDirectory, '../keymaps');
+const keymapPath = path.join(appDirectory, 'keymaps');
 const darwinKeys = path.join(keymapPath, 'darwin.json');
 const win32Keys = path.join(keymapPath, 'win32.json');
 const linuxKeys = path.join(keymapPath, 'linux.json');
