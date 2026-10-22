@@ -57,4 +57,14 @@ describe('named command dispatch', () => {
     expect(result.status).toBe(1);
     expect(result.stderr.match(/does not exist/g)).toHaveLength(1);
   });
+
+  test('reports an expected failure without a stack trace', () => {
+    const result = runCli([path.join(repositoryRoot, 'no-such-directory')]);
+
+    // A user-caused failure is reported as the message alone. Its stack would
+    // frame the report in this file's own internals, which says nothing about
+    // the directory the user mistyped.
+    expect(result.stderr).not.toContain('ExpectedFailureError');
+    expect(result.stderr).not.toMatch(/^\s+at /m);
+  });
 });

@@ -21,6 +21,23 @@ import * as api from './api';
 let commandPromise: Promise<void> | undefined;
 
 /**
+ * A failure the user is expected to cause and can act on, such as a missing
+ * plugin name or an unlaunched Hyper.
+ *
+ * The distinction exists for the reporting path: an expected failure's message
+ * is written for the user and stands alone, while an unexpected one is a
+ * defect whose stack is the only useful part. Every message constructed here
+ * is therefore already complete, with no placeholder waiting to be interpolated
+ * by the reporter.
+ */
+class ExpectedFailureError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ExpectedFailureError';
+  }
+}
+
+/**
  * Records that a command has handled this invocation.
  *
  * `main` returns as soon as any handler has recorded one, so a command that
@@ -35,7 +52,7 @@ const completeCommand = (): void => {
 const assertPluginName = (pluginName: string): string => {
   const normalizedPluginName = pluginName.trim();
   if (!normalizedPluginName) {
-    throw new Error(chalk.red('Plugin name is required'));
+    throw new ExpectedFailureError(chalk.red('Plugin name is required'));
   }
   return normalizedPluginName;
 };
@@ -44,7 +61,9 @@ const checkConfig = () => {
   if (api.exists()) {
     return true;
   }
-  throw new Error(chalk.red(`Error! Config file not found: ${api.configPath}\nPlease launch Hyper and retry.`));
+  throw new ExpectedFailureError(
+    chalk.red(`Error! Config file not found: ${api.configPath}\nPlease launch Hyper and retry.`)
+  );
 };
 
 const columnify = (data: {name: string; description: string}[]) => {
@@ -248,7 +267,7 @@ const main = (argv: string[]) => {
     if (!existsSync(cwd)) {
       // Throwing hands the message to the top-level handler, which already
       // prints it. Logging here as well would report the same failure twice.
-      throw new Error(chalk.red(`Error! Directory or file does not exist: ${cwd}`));
+      throw new ExpectedFailureError(chalk.red(`Error! Directory or file does not exist: ${cwd}`));
     }
     return cwd;
   });
@@ -280,8 +299,25 @@ const main = (argv: string[]) => {
   return Promise.resolve();
 };
 
+/**
+ * Reports an invocation failure and records a failing exit code.
+ *
+ * An `ExpectedFailureError` carries a message written for the user, so only
+ * that message is printed; its stack would frame the report in the CLI's own
+ * internals. Anything else is an unexpected defect, where the stack is the
+ * part worth reading. Non-`Error` rejections have neither and are printed as
+ * they are.
+ *
+ * @param error - The value a command rejected or threw with.
+ */
 const reportFailure = (error: unknown): void => {
-  console.error(error instanceof Error ? error.stack || error : error);
+  if (error instanceof ExpectedFailureError) {
+    console.error(error.message);
+  } else if (error instanceof Error) {
+    console.error(error.stack || error);
+  } else {
+    console.error(error);
+  }
   process.exitCode = 1;
 };
 
