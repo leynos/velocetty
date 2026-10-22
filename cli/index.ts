@@ -20,6 +20,18 @@ import * as api from './api';
 
 let commandPromise: Promise<void> | undefined;
 
+/**
+ * Records that a command has handled this invocation.
+ *
+ * `main` returns as soon as any handler has recorded one, so a command that
+ * finishes synchronously must still call this. Otherwise control falls through
+ * to the default action, which treats the command name as a path to launch and
+ * fails with it reported as a missing directory.
+ */
+const completeCommand = (): void => {
+  commandPromise = Promise.resolve();
+};
+
 const assertPluginName = (pluginName: string): string => {
   const normalizedPluginName = pluginName.trim();
   if (!normalizedPluginName) {
@@ -108,6 +120,7 @@ args.command(
     } else {
       console.log(chalk.red(`No plugins installed yet.`));
     }
+    completeCommand();
   },
   ['ls']
 );
@@ -133,7 +146,11 @@ args.command(
           spinner.fail();
           console.error(chalk.red(`Your search '${query}' did not match any plugins`));
           console.error(`${chalk.red('Try')} ${chalk.green('hyper ls-remote')}`);
-          throw new Error(`Your search '${query}' did not match any plugins`);
+          // Recorded here rather than thrown: the message above is the whole
+          // report, and throwing would hand it to the `catch` below to print a
+          // second time.
+          process.exitCode = 1;
+          return;
         } else {
           const msg = columnify(entries);
           spinner.succeed();
@@ -185,6 +202,7 @@ args.command(
   'Show the version of hyper',
   () => {
     console.log(version);
+    completeCommand();
   },
   []
 );
@@ -228,8 +246,9 @@ const main = (argv: string[]) => {
   const args_ = args.sub.map((arg) => {
     const cwd = path.isAbsolute(arg) ? arg : path.resolve(process.cwd(), arg);
     if (!existsSync(cwd)) {
-      console.error(chalk.red(`Error! Directory or file does not exist: ${cwd}`));
-      throw new Error(`Directory or file does not exist: ${cwd}`);
+      // Throwing hands the message to the top-level handler, which already
+      // prints it. Logging here as well would report the same failure twice.
+      throw new Error(chalk.red(`Error! Directory or file does not exist: ${cwd}`));
     }
     return cwd;
   });
@@ -261,10 +280,25 @@ const main = (argv: string[]) => {
   return Promise.resolve();
 };
 
-try {
-  await main(process.argv);
-  process.exitCode ??= 0;
-} catch (error) {
+const reportFailure = (error: unknown): void => {
   console.error(error instanceof Error ? error.stack || error : error);
   process.exitCode = 1;
-}
+};
+
+// esbuild emits this entrypoint as CommonJS, which cannot express top-level
+// `await`, while the lint profile requires top-level promise chains to be
+// awaited. A synchronous wrapper satisfies both. The `??=` preserves an exit
+// code a command handler already recorded, such as a failed `search`.
+const run = (): void => {
+  try {
+    main(process.argv).then(() => {
+      process.exitCode ??= 0;
+    }, reportFailure);
+  } catch (error) {
+    // `main` checks its positional paths before it yields, so a missing
+    // directory throws here instead of rejecting the returned promise.
+    reportFailure(error);
+  }
+};
+
+run();
