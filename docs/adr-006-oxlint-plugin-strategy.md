@@ -45,6 +45,21 @@ Table 1: exact versions in `package.json` and `bun.lock`.
 Bun is pinned to `1.4.3` in `package.json`, following the requested 1.4.x
 toolchain. The lockfile was regenerated with that version.
 
+The CI workflows no longer repeat that version as a literal. Each
+`oven-sh/setup-bun` step reads `bun-version-file: package.json`, so the runner
+and the repository cannot disagree about which Bun wrote `bun.lock`. The two
+failures this avoids are worth recording, because both are silent.
+
+A Bun older than `1.4.3` cannot parse the regenerated lockfile. It reports
+`Unknown lockfile version`, then warns `Ignoring lockfile` and re-resolves the
+entire dependency tree from the ranges in `package.json`. Bun 1.3.11 resolved
+`normalize-url` to the ESM-only 7.x release, which `electron-link` then bundled
+into the V8 startup snapshot as raw `export` syntax and failed to parse. The
+lockfile on disk had pinned the CommonJS 6.1.0 that the snapshot is written
+against, so the pinned tree was correct and only the unpinned runner broke.
+Repetition also let the pin drift: `bun.lock` and `package.json` moved to
+`1.4.3` while the workflow literals stayed at `1.3.11`.
+
 Every supported rule in Oxlint's Unicorn recommended profile and every rule in
 the `ai-deslop` recommended profile is listed explicitly in
 [`.oxlintrc.json](../.oxlintrc.json). Oxlint's accumulating-spread rule is also
@@ -120,6 +135,9 @@ from both Biome and Oxlint. Its source is maintained by the `rimraf` package.
 - The recommended rules may expose existing code that needs a real correction.
   New global disables require a documented conflict with project guidance,
   Biome, TypeDoc, or the other plug-in.
+- The Bun pin is a single source of truth only while every workflow derives its
+  version from `package.json`. Reintroducing a literal `bun-version` there
+  restores the drift this record describes.
 
 ## References
 
