@@ -96,6 +96,20 @@ export const createCliBuildOptions = (mode: BuildMode, rootDir: string): BuildOp
     // contexts that load it via require semantics without ESM package mode.
     format: 'cjs',
     target: ['node24'],
+    // Under `format: 'cjs'` esbuild cannot express `import.meta.url` and
+    // substitutes an empty object, so `fileURLToPath(import.meta.url)` would
+    // receive `undefined` and throw while the bundle loads. ES modules are the
+    // house idiom for resolving a module's own location, so rather than
+    // rewriting the source to a CommonJS global, the banner below derives an
+    // equivalent URL from `__filename` and `define` points `import.meta.url` at
+    // it. Both source and bundle then agree on the CLI's real directory.
+    banner: {
+      js: 'const __importMetaUrl = require("node:url").pathToFileURL(__filename).href;'
+    },
+    define: {
+      ...baseBuildOptions.define,
+      'import.meta.url': '__importMetaUrl'
+    },
     sourcemap: isProductionMode(mode) ? false : 'linked',
     plugins: [createNodeBuiltinsPlugin(), createIgnoreImportsPlugin()]
   };
