@@ -767,6 +767,46 @@ Type checking runs via `tsgo` and the shared `tsconfig.typecheck.json` project:
 `--preserveWatchOutput`, and `--project`; the `dev` and `build` scripts rely on
 those flags.
 
+### Local gates do not cover the whole build surface
+
+`make typecheck` and `make lint` both compile `tsconfig.typecheck.json`, which
+relaxes `tsconfig.base.json` with `strict: false`,
+`noUncheckedIndexedAccess: false`, `noPropertyAccessFromIndexSignature: false`,
+`exactOptionalPropertyTypes: false`, `noImplicitOverride: false`,
+`useUnknownInCatchVariables: false`, and `verbatimModuleSyntax: false`. It
+includes `app/`, `lib/`, `cli/`, `typings/`, and `shared/src/` only.
+
+Four production projects therefore fall outside every local gate:
+
+| Project        | Command                                | Strictness           |
+| -------------- | -------------------------------------- | -------------------- |
+| `shared/`      | `bun run build:shared`                 | `tsconfig.base.json` |
+| `frontend/`    | `bun run build:frontend`               | `tsconfig.base.json` |
+| `backend/`     | `bun run build:backend`                | `tsconfig.base.json` |
+| `app/` (build) | `bunx tsgo -p app/tsconfig.build.json` | `tsconfig.base.json` |
+
+Table 2: production projects that the local typecheck gate omits.
+
+The esbuild bundle (`build/esbuild/`), the `test/` tree, and the emitted
+`CommonJS` interop are also unchecked locally. A change can pass every local
+gate and still fail CI, which is what strict mode catches: a `satisfies`
+registry that loses its literal key type rejects a dynamic index, an optional
+property read through a `Record` index needs the guard that
+`noUncheckedIndexedAccess` demands, and a `verbatimModuleSyntax` import needs
+the `type` modifier.
+
+Run the omitted projects before pushing a change that touches `shared/`,
+`frontend/`, `backend/`, or `app/`:
+
+- `bun run build:packages`
+- `bunx tsgo --project app/tsconfig.build.json`
+
+Two accepted costs follow from this arrangement. `tsconfig.typecheck.json`
+disables `strictNullChecks`, so `zod` cannot infer a required nullable field as
+required, and the affected schemas widen the field by hand. `shared/src/` is
+nonetheless typechecked twice, once relaxed and once strict, so a fix that
+satisfies the strict project stays valid under the relaxed one.
+
 ## Tests
 
 ### Unit tests (Bun)

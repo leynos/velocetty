@@ -143,6 +143,65 @@ precedence. `deslop/no-reflect-apply` is the current mutually exclusive pair.
 `bin/rimraf-standalone.js` is a generated vendored script and remains excluded
 from both Biome and Oxlint. Its source is maintained by the `rimraf` package.
 
+## Addendum: what the new rules revealed about the gates
+
+Enabling the profiles surfaced a gap between the gates that run locally and the
+projects those gates actually compile. The first push of this change was green
+on `make check-fmt`, `make lint`, `make typecheck`, and `make test`, and red in
+CI on `bun run build:shared`.
+
+The four local gates run `tsconfig.typecheck.json`. That project includes
+`app/`, `lib/`, `cli/`, `typings/`, and `shared/src/`, and relaxes
+`tsconfig.base.json` with `strict: false`, `noUncheckedIndexedAccess: false`,
+`noPropertyAccessFromIndexSignature: false`,
+`exactOptionalPropertyTypes: false`, `noImplicitOverride: false`,
+`useUnknownInCatchVariables: false`, and `verbatimModuleSyntax: false`. The
+`shared/`, `frontend/`, `backend/`, and `app/tsconfig.build.json` projects each
+compile against the strict base and sit outside every gate, as do the
+`build/esbuild/` bundle and the `test/` tree. CI runs them; the local gate set
+does not.
+
+That gap is why the three findings below are recorded here rather than in the
+commit that fixed them. All three are the same class of defect: code that a
+relaxed compile accepts and a strict one rejects.
+
+- A registry declared with `satisfies` keeps its literal key type, so a
+  dynamic `string` key cannot index it.
+  `shared/src/constants/config-reloadability.ts` now narrows through a small
+  lookup helper instead of indexing the registry directly.
+- `shared/src/config/json5-config.ts` reconstructed a sorted object by
+  mutating an accumulator, which the new rules report and which
+  `noUncheckedIndexedAccess` compounds. It now sorts entries and rebuilds with
+  `Object.fromEntries`, keeping the key comparator a named predicate.
+- `shared/src/runtime/golden-path-demo.ts` read an optional settings field
+  through an index signature, which `noPropertyAccessFromIndexSignature`
+  rejects.
+
+Two regressions the type checker could not see came from the same commit and
+are recorded with their fixes. Anchoring every asset path in
+`app/config/paths.ts` to `app.getAppPath()` dropped a `config` path segment, so
+four paths pointed outside the build output; the paths are restored and
+`test/unit/config-paths.test.ts` pins them against the layout the build copies.
+`lib/containers/hyper.tsx` lost an optional call on `getActiveTerm()`, which
+can miss while a session's term group is still mounting; the accessor now
+returns `Term | undefined` so the compiler enforces the guard at every caller.
+
+The lint profiles also changed how the CLI reports a failure. The rules
+replaced the CLI's `process.exit(1)` calls with throws, and every throw now
+reaches a single top-level reporter; that reporter printed `error.stack`, so
+failures a user causes and can act on — a missing plugin name, an unlaunched
+Hyper, a mistyped directory — gained a stack trace framing the report in the
+CLI's own internals. `cli/index.ts` now throws an `ExpectedFailureError` for
+those three and prints only its message, keeping the stack for unexpected
+defects. The named subclass, discriminated with `instanceof`, follows the
+[`InvalidSessionExtraOptionsError`](../app/ui/window.ts#L33) that separates the
+same two cases for the renderer.
+
+The general lesson is that a green local gate set is evidence about the
+projects it compiles and nothing more. The
+[developers' guide](developers-guide.md#local-gates-do-not-cover-the-whole-build-surface)
+lists the omitted projects and the commands that cover them.
+
 ## Known risks and limitations
 
 - Oxlint's JavaScript plug-in interface is alpha. The exact pins keep the
@@ -156,6 +215,10 @@ from both Biome and Oxlint. Its source is maintained by the `rimraf` package.
 - The Bun pin is a single source of truth only while every workflow derives its
   version from `package.json`. Reintroducing a literal `bun-version` there
   restores the drift this record describes.
+- The local gate set compiles only `tsconfig.typecheck.json`'s projects. A
+  change to `shared/`, `frontend/`, `backend/`, or the app build config must
+  also run `bun run build:packages` and
+  `bunx tsgo --project app/tsconfig.build.json` before it is pushed.
 
 ## References
 
