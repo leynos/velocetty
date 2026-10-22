@@ -349,7 +349,7 @@ jobs:
       - name: Run build gate
         run: bun run build
       - name: Build
-        run: bun bin/run-electron-builder.cjs -l deb rpm AppImage pacman --arm64 -c electron-builder-linux-ci.json
+        run: bun bin/run-electron-builder.mjs -l deb rpm AppImage pacman --arm64 -c electron-builder-linux-ci.json
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_V8_SNAPSHOT_COPY: '1'
