@@ -119,6 +119,9 @@ const appendToExistingObject = (
   const memberIndent = parser.getLineIndent({index: firstProperty.keyStartIndex});
   const formattedProperty = `${memberIndent}${formatObjectKey(key)}: ${formatJson5ValueForProperty(value, memberIndent)}`;
   const lastProperty = properties.at(-1);
+  if (!lastProperty) {
+    return null;
+  }
   const closeLineStartIndex = parser.getLineStartIndex({index: objectRange.closeBraceIndex});
   const closeLinePrefix = doc.slice(closeLineStartIndex, objectRange.closeBraceIndex);
   const closeLineIsIndentOnly = /^[ \t]*$/.test(closeLinePrefix);
