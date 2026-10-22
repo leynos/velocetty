@@ -94,7 +94,7 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
       if (uid) {
         handleFocusActive(uid);
       } else {
-        terms.current?.getActiveTerm().focus();
+        terms.current?.getActiveTerm()?.focus();
       }
     };
   };

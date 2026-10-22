@@ -39,12 +39,16 @@ export default class Terms extends React.Component<React.PropsWithChildren<Terms
     }
   };
 
-  getTermByUid(uid: string) {
+  // A session is registered only once its `TermGroup` mounts and reports its
+  // `Term` through `onRef`, so both lookups can miss: the active session may
+  // have no rendered term yet, and an unknown uid may never have one at all.
+  // Callers are expected to handle the absence rather than assume a hit.
+  getTermByUid(uid: string): Term | undefined {
     return this.terms[uid];
   }
 
-  getActiveTerm() {
-    return this.getTermByUid(this.props.activeSession!);
+  getActiveTerm(): Term | undefined {
+    return this.props.activeSession ? this.getTermByUid(this.props.activeSession) : undefined;
   }
 
   onTerminal(uid: string, term: Term) {
@@ -54,10 +58,11 @@ export default class Terms extends React.Component<React.PropsWithChildren<Terms
   componentDidMount() {
     globalThis.addEventListener('contextmenu', () => {
       const selection = globalThis.getSelection()?.toString() ?? '';
-      const {
-        props: {uid}
-      } = this.getActiveTerm();
-      this.props.onContextMenu(uid, selection);
+      const activeTerm = this.getActiveTerm();
+      if (!activeTerm) {
+        return;
+      }
+      this.props.onContextMenu(activeTerm.props.uid, selection);
     });
   }
 
