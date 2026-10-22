@@ -94,19 +94,39 @@ export const validateRawConfig = (value: JsonValue): ParseResult<JsonObject> => 
   return {success: false, error: parsed.error};
 };
 
+/**
+ * Orders two keys by their UTF-16 code units, matching the default ordering
+ * `Array.prototype.sort` applies without a comparator.
+ *
+ * @example
+ * ```ts
+ * compareKeys('a', 'b'); // -1
+ * compareKeys('b', 'a'); // 1
+ * compareKeys('a', 'a'); // 0
+ * ```
+ */
+const compareKeys = (left: string, right: string): number => {
+  if (left === right) {
+    return 0;
+  }
+  return left < right ? -1 : 1;
+};
+
 export const sortKeys = (value: JsonValue): JsonValue => {
   if (Array.isArray(value)) {
     return value.map((item) => sortKeys(item));
   }
 
   if (isRecord(value)) {
-    const sortedObject: JsonObject = {};
-    Object.keys(value)
-      .toSorted()
-      .forEach((key) => {
-        sortedObject[key] = sortKeys(value[key]);
-      });
-    return sortedObject;
+    // Iterate entries rather than re-indexing the source object: `JsonObject`
+    // is an index signature, so a key from `Object.keys` narrows to
+    // `JsonValue | undefined` and the lookup would need a non-null assertion.
+    // Sorting the entries keeps the round-trip deterministic either way.
+    return Object.fromEntries(
+      Object.entries(value)
+        .toSorted(([left], [right]) => compareKeys(left, right))
+        .map(([key, entry]) => [key, sortKeys(entry)])
+    );
   }
 
   return value;

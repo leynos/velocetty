@@ -15,7 +15,6 @@ import ReactDom from 'react-dom';
 
 import type {IpcMainWithCommands} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
-import type {hyperPlugin} from '../typings/hyper';
 
 import * as config from './config';
 import {isFunction, isObject, isString} from '@shared/types/guards';
@@ -38,15 +37,36 @@ const pluginRequire = createRequire(path.resolve(app.getAppPath(), 'plugins.js')
 type ModuleLoader = (request: string, parent?: NodeJS.Module | null, isMain?: boolean) => ReturnType<NodeJS.Require>;
 type ModuleWithLoader = typeof import('node:module') & {_load: ModuleLoader};
 
-type AppPluginModule = Partial<hyperPlugin> & {
+/**
+ * Keymap shape passed through the plugin decoration hooks.
+ *
+ * Each command maps to one shortcut or a list of them, matching the accepted
+ * `keymaps` config shape. `getDecoratedKeymaps` then normalizes every entry to
+ * a list via `mapKeys`.
+ */
+type KeymapConfig = Record<string, string | string[]>;
+
+// The app process only ever invokes the main-process half of the plugin API,
+// so it declares that half here rather than borrowing `hyperPlugin`. That type
+// lives in `typings/hyper.d.ts` alongside the renderer contract and imports
+// renderer modules; reaching for it from this file pulls the whole renderer
+// tree into the main-process build program, which `app/tsconfig.build.json`
+// does not list, so every such import fails to resolve.
+type AppPluginModule = {
   _name?: string;
   _version?: string;
   decorateConfig?: (config: configOptions) => configOptions;
-  extendKeymaps?: unknown;
+  decorateMenu?: (menu: MenuItemConstructorOptions[]) => MenuItemConstructorOptions[];
+  decorateEnv?: (env: Record<string, string>) => Record<string, string>;
+  decorateKeymaps?: (keymaps: KeymapConfig) => KeymapConfig;
+  extendKeymaps?: KeymapConfig;
   onApp?: (app: App) => void;
   onUnload?: (app: App) => void;
   onWindow?: (window: BrowserWindow) => void;
   onWindowClass?: (windowClass: typeof import('electron').BrowserWindow) => void;
+  decorateWindowClass?: (
+    windowClass: typeof import('electron').BrowserWindow
+  ) => typeof import('electron').BrowserWindow;
 };
 
 const pluginPath = plugs.base;
@@ -470,7 +490,7 @@ export const decorateMenu = (tpl: MenuItemConstructorOptions[]) => {
   return decorateObject(tpl, 'decorateMenu');
 };
 
-export const getDecoratedEnv = (baseEnv: Record<string, string>) => {
+export const getDecoratedEnv = (baseEnv: NodeJS.ProcessEnv) => {
   return decorateObject(baseEnv, 'decorateEnv');
 };
 

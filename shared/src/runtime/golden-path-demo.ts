@@ -129,7 +129,10 @@ export const goldenPathPluginManifest: RuntimePluginManifest = {
       id: 'title-prefix',
       priority: 100,
       provideDecoration: (context, settings) => {
-        const tabPrefix = settings.tabPrefix;
+        // `settings` is a JsonObject index signature, so the key must be
+        // accessed by subscript; dotted access is only legal for declared
+        // properties.
+        const tabPrefix = settings['tabPrefix'];
         const prefix =
           isString(tabPrefix) && tabPrefix.trim().length > 0 ? tabPrefix : goldenPathSettingsDefaults.tabPrefix;
         const baseTitle = context.title && context.title.length > 0 ? context.title : 'Shell';

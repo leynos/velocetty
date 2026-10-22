@@ -28,6 +28,28 @@ export type ConfigReloadabilityRegistry = {
 };
 
 /**
+ * Reads a registry entry by key through the open registry contract.
+ *
+ * Each registry below is declared with `satisfies`, so its binding keeps the
+ * literal type of the keys it actually contains. That is what lets
+ * `Object.keys` and `for…of` enumerate them precisely, but it also means a
+ * dynamic key cannot index the binding directly. Widening the parameter here,
+ * rather than the binding, keeps both properties: callers get a typed lookup,
+ * and the registries retain their known-key evidence.
+ *
+ * @param registry - The registry to read from.
+ * @param key - The configuration key to look up.
+ * @returns The matching entry, or undefined when the key is absent.
+ *
+ * @example
+ * ```ts
+ * lookupReloadability(rootConfigReloadability, 'fontSize'); // ReloadabilityEntry | undefined
+ * ```
+ */
+const lookupReloadability = (registry: ConfigReloadabilityRegistry, key: string): ReloadabilityEntry | undefined =>
+  registry[key];
+
+/**
  * Reloadability registry for root-level config options (non-profile settings).
  *
  * These settings affect application-level behaviour and are generally
@@ -281,16 +303,16 @@ export const pluginReloadability = {
 export const getReloadability = (key: string, scope: ConfigScope): ReloadabilityEntry | undefined => {
   switch (scope) {
     case 'root': {
-      return rootConfigReloadability[key];
+      return lookupReloadability(rootConfigReloadability, key);
     }
     case 'profile': {
-      return profileConfigReloadability[key];
+      return lookupReloadability(profileConfigReloadability, key);
     }
     case 'keymap': {
-      return keymapReloadability[key] ?? keymapReloadability['*'];
+      return lookupReloadability(keymapReloadability, key) ?? lookupReloadability(keymapReloadability, '*');
     }
     case 'plugin': {
-      return pluginReloadability[key];
+      return lookupReloadability(pluginReloadability, key);
     }
     default: {
       return undefined;

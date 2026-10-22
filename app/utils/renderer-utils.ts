@@ -20,7 +20,7 @@ const rendererTypes: Record<string, RendererType> = Object.create(null);
 const rendererFallbackReasonCounts: Partial<Record<RendererFallbackReason, number>> = {};
 const rendererWebGLContextCounts = {current: 0, peak: 0};
 const rendererRuntimeMetricsByUid: Record<string, RendererRuntimeMetrics> = Object.create(null);
-const inputSendToWriteLatencyByUid: Partial<Record<string, RuntimeLatencyMetrics>> = Object.create(null);
+const inputSendToWriteLatencyByUid: Record<string, RuntimeLatencyMetrics> = Object.create(null);
 const isWebGLRenderer = (type: RendererType | undefined): type is 'WebGL' => type === 'WebGL';
 const isRendererFallbackReason = (value: string): value is RendererFallbackReason =>
   value === 'context-loss' || value === 'pool-evicted' || value === 'webgl-init-failed';

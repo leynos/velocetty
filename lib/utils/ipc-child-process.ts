@@ -3,14 +3,18 @@ import {isFunction} from '@shared/types/guards';
 
 import {ipcRenderer} from './ipc';
 
-export function exec(command: string, options: ExecOptions, callback: (..._args: any) => void) {
+// The callback stays optional because this module stands in for Node's
+// `child_process`: a plug-in written against the upstream module may call
+// `exec(command)` and never pass one. The optional call below is therefore
+// load-bearing and must not be "simplified" away.
+export function exec(command: string, options: ExecOptions, callback?: (..._args: any) => void) {
   if (isFunction(options)) {
     callback = options;
     options = {};
   }
   ipcRenderer.invoke('child_process.exec', command, options).then(
-    ({stdout, stderr}) => callback(null, stdout, stderr),
-    (error) => callback(error, '', '')
+    ({stdout, stderr}) => callback?.(null, stdout, stderr),
+    (error) => callback?.(error, '', '')
   );
 }
 
@@ -18,7 +22,7 @@ export function execSync() {
   console.error('Calling execSync from renderer is disabled');
 }
 
-export function execFile(file: string, args: string[], options: ExecFileOptions, callback: (..._args: any) => void) {
+export function execFile(file: string, args: string[], options: ExecFileOptions, callback?: (..._args: any) => void) {
   if (isFunction(options)) {
     callback = options;
     options = {};
@@ -29,8 +33,8 @@ export function execFile(file: string, args: string[], options: ExecFileOptions,
     options = {};
   }
   ipcRenderer.invoke('child_process.execFile', file, args, options).then(
-    ({stdout, stderr}) => callback(null, stdout, stderr),
-    (error) => callback(error, '', '')
+    ({stdout, stderr}) => callback?.(null, stdout, stderr),
+    (error) => callback?.(error, '', '')
   );
 }
 

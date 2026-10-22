@@ -120,6 +120,9 @@ export default class Session extends EventEmitter {
     const shellArgs = _shellArgs || defaultShellArgs;
 
     const cleanEnv = process.env.APPIMAGE && process.env.APPDIR ? shellEnv.sync(_shell || defaultShell) : process.env;
+    // `NodeJS.ProcessEnv` is the owner contract for a process environment: it
+    // already permits absent variables, so the annotation documents the shape
+    // without asserting that every variable is present.
     const baseEnv: NodeJS.ProcessEnv = {
       ...cleanEnv,
       LANG: `${osLocale.sync().replace(/-/, '_')}.UTF-8`,
@@ -132,9 +135,10 @@ export default class Session extends EventEmitter {
     // path to AppImage mount point is added to PATH environment variable automatically
     // which conflicts with the cli
     if (baseEnv.APPIMAGE && baseEnv.APPDIR) {
+      const appDir = baseEnv.APPDIR;
       baseEnv.PATH = [
         path.dirname(cliScriptPath),
-        ...(baseEnv.PATH || '').split(':').filter((val) => !val.startsWith(baseEnv.APPDIR))
+        ...(baseEnv.PATH || '').split(':').filter((val) => !val.startsWith(appDir))
       ].join(':');
     }
 
