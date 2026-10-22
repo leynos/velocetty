@@ -1,4 +1,5 @@
 /** @file Starts the Electron main process after command-line diagnostics. */
+import {createRequire} from 'node:module';
 import path from 'node:path';
 
 import {initialize as remoteInitialize} from '@electron/remote/main';
@@ -81,9 +82,18 @@ async function installDevExtensions(isDev_: boolean) {
     return [];
   }
   const {REACT_DEVELOPER_TOOLS, REDUX_DEVTOOLS} = await import('electron-devtools-installer');
-  // electron-devtools-installer 3.x does not expose this helper from its
-  // public API; keep the dependency pinned to 3.x when using this path.
-  const {default: downloadChromeExtension} = await import('electron-devtools-installer/dist/downloadChromeExtension');
+  // electron-devtools-installer 3.x does not re-export this helper from its
+  // public API, so it is reached through the package's `dist` subpath. That
+  // package is CommonJS and its `.d.ts` describes the shape `require()` returns,
+  // but `module: NodeNext` preserves a real dynamic `import()` in the emitted
+  // CommonJS, which Node routes through the ESM loader and so nests the callable
+  // one level deeper under `default.default`. Loading it with `createRequire`,
+  // as this app does for its other CommonJS-only dependencies, keeps the
+  // declared and actual shapes in agreement.
+  const downloadChromeExtension: typeof import('electron-devtools-installer/dist/downloadChromeExtension.js')['default'] =
+    createRequire(path.resolve(app.getAppPath(), 'start.js'))(
+      'electron-devtools-installer/dist/downloadChromeExtension.js'
+    ).default;
 
   const extensions = [REACT_DEVELOPER_TOOLS, REDUX_DEVTOOLS];
   const forceDownload = Boolean(process.env.UPGRADE_EXTENSIONS);
