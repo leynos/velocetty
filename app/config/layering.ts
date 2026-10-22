@@ -36,8 +36,17 @@ export type DeepMergeOptions = {
   readonly maxDepth?: number;
 };
 
+/**
+ * Depth at which merging stops recursing.
+ *
+ * Declared separately from `defaultMergeOptions` so it is read as a literal
+ * `number`: the options type makes `maxDepth` optional, so reading the default
+ * back out of it would reintroduce `undefined` at every call site.
+ */
+const DEFAULT_MAX_MERGE_DEPTH = 10;
+
 const defaultMergeOptions: DeepMergeOptions = {
-  maxDepth: 10
+  maxDepth: DEFAULT_MAX_MERGE_DEPTH
 };
 
 /**
@@ -67,7 +76,7 @@ export const deepMerge = <T extends object>(
   options: DeepMergeOptions = defaultMergeOptions,
   currentDepth = 0
 ): T => {
-  const maxDepth = options.maxDepth ?? defaultMergeOptions.maxDepth;
+  const maxDepth = options.maxDepth ?? DEFAULT_MAX_MERGE_DEPTH;
 
   if (currentDepth >= maxDepth) {
     return Object.assign({...target}, source);
