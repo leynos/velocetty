@@ -201,6 +201,17 @@ for active configuration files:
   `config.json5`; avoid full-file canonical rewrites for targeted runtime
   settings updates.
 
+`shared/schemas/schema.json` and `app/config/schema.json` are generated, but
+tracked. `bun run generate-schema` derives them from the types in
+`typings/config.d.ts`; `bun install` regenerates them from `postinstall`. Keep
+the committed copies in step with the source types, because CI regenerates on
+checkout: a stale file passes locally and then changes under the build.
+`typescript-json-schema` names each definition after the TypeScript type it
+came from, so renaming a type in `typings/` or `shared/src/types/` rewrites the
+generated `$ref` keys. Read those names from the schema rather than hardcoding
+them, and confirm `bun run generate-schema` leaves the working tree clean
+before committing a type change.
+
 ## Configuration layering and reloadability practice
 
 Roadmap item `3.1.2` defines configuration layering rules and hot-reload
@@ -631,9 +642,14 @@ Windows runtime reliability baseline after roadmap item `1.4.15` Windows scope:
   `process.execPath`. CI runs this script via Bun; invoking node-gyp with Bun
   can trigger Windows header-extraction `EINVAL` failures.
 - Keep repository script/config text files normalized to LF in
-  `.gitattributes` for extensions checked by Biome (`*.json`, `*.jsonc`, `*.js`,
-  `*.cjs`, `*.mjs`, `*.ts`, and `*.tsx`). Windows checkout can otherwise
-  convert those files to CRLF and trip `make lint`/Biome formatting checks.
+  `.gitattributes` for every extension checked by Biome (`*.json`, `*.jsonc`,
+  `*.js`, `*.cjs`, `*.mjs`, `*.mts`, `*.ts`, `*.tsx`, and `*.css`). Windows
+  checkout can otherwise convert those files to CRLF and trip `make lint`/Biome
+  formatting checks. Windows CI run `39834593952` (2026-10-22) failed this way
+  on `app\index.mts`: the rules covered `*.mjs` but not `*.mts`, so the only
+  `.mts` file in the repository checked out as CRLF even though its committed
+  blob was LF-clean. When adding a file with an extension absent from
+  `.gitattributes`, add the rule in the same change.
 - Windows aarch64 CI is currently blocked by upstream Bun distribution support.
   Evidence (captured 2026-02-25): latest Bun release `bun-v1.3.9` (published
   2026-02-08) includes `bun-windows-x64*` assets and no Windows arm64 asset.

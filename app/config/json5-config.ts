@@ -3,7 +3,7 @@ import JSON5 from 'json5';
 import Ajv from 'ajv';
 import {ZodError} from 'zod';
 
-import type {configOptions, configValidationDiagnostic, rawConfig} from '@shared/types/config';
+import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
 import {isObject, isString} from '@shared/types/guards';
 import {isJsonObject, type JsonObject, type JsonValue} from '@shared/types/json';
 import configJsonSchema from './schema.json';
@@ -44,24 +44,64 @@ type DiagnosticError = Error & {diagnostic: configValidationDiagnostic};
 type SchemaIssue = ZodError['issues'][number];
 type FieldValidator = (value: JsonObject, field: string) => DiagnosticError | null;
 
-const partialConfigSchema = structuredClone(configJsonSchema);
-for (const section of partialConfigSchema.definitions.configOptions.allOf) {
-  delete section.required;
-}
-const makeConfigOptionsSchema = (definitions: typeof configJsonSchema.definitions) => ({
-  allOf: definitions.configOptions.allOf,
-  definitions
-});
-const configOptionsValidator = new Ajv({allErrors: true, allowUnionTypes: true}).compile(
-  makeConfigOptionsSchema(partialConfigSchema.definitions)
-);
-const completeConfigOptionsValidator = new Ajv({allErrors: true, allowUnionTypes: true}).compile(
-  makeConfigOptionsSchema(configJsonSchema.definitions)
-);
+/**
+ * Decodes a `$ref` path segment into the definition name it addresses.
+ *
+ * The generator percent-encodes characters that a JSON Pointer token cannot
+ * carry, so `Partial<configOptions>` arrives as `Partial%3CconfigOptions%3E`.
+ * The `~1` and `~0` replacements cover the two escapes JSON Pointer itself
+ * defines, and must be undone after percent-decoding.
+ */
+const decodeRefSegment = (segment: string): string =>
+  decodeURIComponent(segment).replaceAll('~1', '/').replaceAll('~0', '~');
 
-/** Checks that resolved config has every required option from the bundled schema. */
-export const isCompleteConfigOptions = (value: unknown): value is configOptions =>
-  completeConfigOptionsValidator(value);
+/**
+ * Resolves the generated definition name that describes the `config` property.
+ *
+ * The generator names each definition after the TypeScript type it was derived
+ * from, so changing that type renames the definition and rewrites the `$ref`
+ * that points at it. Reading the name back out of the schema keeps this module
+ * bound to the schema's shape rather than to one spelling of it; a hardcoded
+ * name would fail whenever the type changed, taking every config load with it.
+ *
+ * @throws If the generated schema does not carry the definition it references.
+ */
+const resolveConfigOptionsDefinitionName = (): string => {
+  const ref: string = configJsonSchema.properties.config.$ref;
+  const name = decodeRefSegment(ref.slice(ref.lastIndexOf('/') + 1));
+  if (!(name in configJsonSchema.definitions)) {
+    throw new Error(`The generated config schema has no "${name}" definition for config options.`);
+  }
+  return name;
+};
+
+/**
+ * Collects the schema sections that constrain individual config options.
+ *
+ * A raw user config is a partial override of the resolved defaults, so any
+ * `required` list is dropped however the generator spelled the source type.
+ * That keeps the contract the same whether the type is written as complete or
+ * already partial, and whichever way the generator expresses the constraint:
+ * as an `allOf` of sections, or as a single inline object.
+ */
+const configOptionsSections = (): JsonValue[] => {
+  const name = resolveConfigOptionsDefinitionName();
+  const definition = structuredClone(configJsonSchema.definitions[name]);
+  const sections = Array.isArray(definition.allOf) ? definition.allOf : [definition];
+  for (const section of sections) {
+    // SAFETY: every generated definition section is a JSON object; only the
+    // object form carries the `required` keyword this drops.
+    if (isJsonObject(section)) {
+      delete section.required;
+    }
+  }
+  return sections;
+};
+
+const configOptionsValidator = new Ajv({allErrors: true, allowUnionTypes: true}).compile({
+  allOf: configOptionsSections(),
+  definitions: configJsonSchema.definitions
+});
 
 const rootPath = '/';
 const schemaFallbackFix = 'Update the JSON structure to match the expected config schema.';
