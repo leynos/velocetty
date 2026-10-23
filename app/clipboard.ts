@@ -3,7 +3,7 @@ import {clipboard, ipcMain as _ipcMain} from 'electron';
 import type {ClipboardItem} from 'electron';
 
 import type {IpcMainWithCommands} from '@shared/types/common';
-import {isString} from '@shared/types/guards';
+import {isString} from './utils/runtime-guards';
 
 import {readClipboardFilePaths} from './utils/clipboard-paths';
 import type {ClipboardItemPort, ClipboardPort, ClipboardPayload} from './utils/clipboard-paths';

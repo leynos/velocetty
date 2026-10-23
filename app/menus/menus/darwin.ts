@@ -2,7 +2,8 @@
 // The label is set to appName here so it matches actual behaviour
 import {app} from 'electron';
 import type {BrowserWindow, MenuItemConstructorOptions} from 'electron';
-import {asCommandId, type CommandId} from '@shared/types/commands';
+import type {CommandId} from '@shared/types/commands';
+import {asCommandId} from '../../utils/shared-ids';
 
 const darwinMenu = (
   commandKeys: Record<string, string>,

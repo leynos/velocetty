@@ -9,7 +9,7 @@ import {mkdirpSync} from 'fs-extra';
 import * as Registry from 'native-reg';
 import type {ValueType} from 'native-reg';
 import sudoPrompt from 'sudo-prompt';
-import {isObject, isString} from '@shared/types/guards';
+import {isObject, isString} from './runtime-guards';
 
 import {cliScriptPath, cliLinkPath} from '../config/paths';
 import notify from '../notify';

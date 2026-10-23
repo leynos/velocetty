@@ -4,7 +4,7 @@ import path from 'node:path';
 import {z} from 'zod';
 
 import type {configValidationDiagnostic, parsedConfig, rawConfig} from '@shared/types/config';
-import {isJsonValue} from '@shared/types/json';
+import {isJsonValue} from '../utils/runtime-guards';
 import {parseJson5WithSchemaDiagnostics, safeParseRawConfig, stringifyJson5, type ParseSchema} from './json5-config';
 
 type LoadedConfig = {

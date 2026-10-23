@@ -14,9 +14,9 @@ import type {
   ConfigReloadDiagnostic,
   ConfigReloadResult
 } from '@shared/types/config';
-import {isBoolean, isNumber, isString} from '@shared/types/guards';
-import {getKeyScope, getReloadability} from '@shared/constants/config-reloadability';
+import {getKeyScope, getReloadability} from './reloadability-registry';
 import {getChangedKeys} from './layering';
+import {isBoolean, isNumber, isString} from '../utils/runtime-guards';
 
 type OptionalConfigKey = {
   [Key in keyof configOptions]-?: undefined extends configOptions[Key] ? Key : never;

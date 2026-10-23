@@ -1,6 +1,7 @@
 /** @file Shared helpers for menu command execution. */
 import {BrowserWindow} from 'electron';
-import {asCommandId, type CommandId} from '@shared/types/commands';
+import type {CommandId} from '@shared/types/commands';
+import {asCommandId} from '../../utils/shared-ids';
 
 export type MenuCommandRunner = (command: CommandId, focusedWindow?: BrowserWindow) => void;
 

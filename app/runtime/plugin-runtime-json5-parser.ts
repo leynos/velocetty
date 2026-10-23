@@ -18,7 +18,7 @@
  * - `const parser = new Json5Parser(raw); parser.findRootObjectRange();`
  */
 import JSON5 from 'json5';
-import {isString} from '@shared/types/guards';
+import {isString} from '../utils/runtime-guards';
 import {
   type ParsingState,
   processBlockComment,

@@ -4,8 +4,8 @@ import {readFileSync, writeFileSync} from 'node:fs';
 import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
 import {cfgPath} from '../config/paths';
-import {isBoolean} from '@shared/types/guards';
-import {isJsonObject, type JsonObject} from '@shared/types/json';
+import type {JsonObject} from '@shared/types/json';
+import {isBoolean, isJsonObject} from '../utils/runtime-guards';
 import {
   applyPluginSettingsPatches,
   json5Document,

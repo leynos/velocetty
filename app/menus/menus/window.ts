@@ -1,8 +1,8 @@
 /** @file Builds the Window menu template for tab and pane navigation. */
 import type {MenuItemConstructorOptions} from 'electron';
-import {asCommandId} from '@shared/types/commands';
 
 import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
+import {asCommandId} from '../../utils/shared-ids';
 
 const windowMenu = (
   commandKeys: Record<string, string>,

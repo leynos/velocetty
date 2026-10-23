@@ -4,7 +4,7 @@ import {exec} from 'node:child_process';
 import {shell} from 'electron';
 
 import * as Registry from 'native-reg';
-import {isString} from '@shared/types/guards';
+import {isString} from '../utils/runtime-guards';
 
 import {cfgPath} from './paths';
 

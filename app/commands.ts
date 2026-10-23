@@ -2,7 +2,7 @@
 import {app, Menu} from 'electron';
 import type {BrowserWindow} from 'electron';
 import type {CommandId} from '@shared/types/commands';
-import {isString} from '@shared/types/guards';
+import {isString} from './utils/runtime-guards';
 
 import {openConfig, getConfig} from './config';
 import {asProfileId} from './utils/shared-ids';

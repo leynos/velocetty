@@ -3,7 +3,7 @@ import {app} from 'electron';
 import chokidar from 'chokidar';
 
 import type {parsedConfig, configOptions} from '@shared/types/config';
-import {isJsonObject} from '@shared/types/json';
+import {isJsonObject} from './utils/runtime-guards';
 
 import {createConfigImportModule} from './config/import';
 import {_init} from './config/init';

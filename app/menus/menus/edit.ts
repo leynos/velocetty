@@ -1,8 +1,8 @@
 /** @file Defines the Edit menu template and command bindings. */
 import type {MenuItemConstructorOptions} from 'electron';
-import {asCommandId} from '@shared/types/commands';
 
 import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
+import {asCommandId} from '../../utils/shared-ids';
 
 const editMenu = (commandKeys: Record<string, string>, execCommand: MenuCommandRunner) => {
   const execWithBrowserWindow = makeMenuCommandExecutor(execCommand);

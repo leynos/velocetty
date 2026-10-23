@@ -1,7 +1,7 @@
 import {EventEmitter} from 'node:events';
 
 import fetch from 'electron-fetch';
-import {isString} from '@shared/types/guards';
+import {isString} from './utils/runtime-guards';
 
 // eslint-disable-next-line unicorn/prefer-event-target -- Electron.AutoUpdater requires Node EventEmitter methods.
 class AutoUpdater extends EventEmitter implements Electron.AutoUpdater {

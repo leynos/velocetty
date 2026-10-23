@@ -11,7 +11,7 @@
  */
 
 import type {configOptions, rawConfig} from '@shared/types/config';
-import {isObject} from '@shared/types/guards';
+import {isObject} from '../utils/runtime-guards';
 
 const objectKeys = <T extends object>(value: T): Array<keyof T> => {
   // SAFETY: The typed inputs to these merge and comparison helpers own the

@@ -17,7 +17,7 @@ import type {IpcMainWithCommands} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
 
 import * as config from './config';
-import {isFunction, isObject, isString} from '@shared/types/guards';
+import {isFunction, isObject, isString} from './utils/runtime-guards';
 import {plugs} from './config/paths';
 import notify from './notify';
 import {availableExtensions} from './plugins/extensions';

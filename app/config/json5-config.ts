@@ -4,8 +4,8 @@ import Ajv from 'ajv';
 import {ZodError} from 'zod';
 
 import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
-import {isObject, isString} from '@shared/types/guards';
-import {isJsonObject, type JsonObject, type JsonValue} from '@shared/types/json';
+import type {JsonObject, JsonValue} from '@shared/types/json';
+import {isJsonObject, isObject, isString} from '../utils/runtime-guards';
 import configJsonSchema from './schema.json';
 
 export type ParseSuccess<T> = {success: true; data: T};

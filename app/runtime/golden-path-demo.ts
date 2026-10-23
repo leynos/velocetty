@@ -1,7 +1,9 @@
 /** @file App-runtime golden path plugin manifest and static contributions. */
-import {asCommandId, type CommandDefinition, type CommandId} from '@shared/types/commands';
+import type {CommandDefinition, CommandId} from '@shared/types/commands';
 import type {JsonObject} from '@shared/types/json';
-import {isString} from '@shared/types/guards';
+
+import {isString} from '../utils/runtime-guards';
+import {asCommandId} from '../utils/shared-ids';
 
 /** Stable plugin identifier used for namespaced settings persistence. */
 export const GOLDEN_PATH_PLUGIN_ID = 'velocetty.golden-path-demo';

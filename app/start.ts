@@ -7,7 +7,7 @@ import {app, BrowserWindow, Menu, screen, session} from 'electron';
 import isDev from 'electron-is-dev';
 import {gitDescribe} from 'git-describe';
 import parseUrl from 'parse-url';
-import {isString} from '@shared/types/guards';
+import {isString} from './utils/runtime-guards';
 import type {VelocettyRuntimeGlobals} from '../typings/runtime-globals';
 
 import * as config from './config';

@@ -1,8 +1,8 @@
 /** @file Provides the shell/file menu template for tab and pane actions. */
 import type {MenuItemConstructorOptions} from 'electron';
-import {asCommandId} from '@shared/types/commands';
 
 import {makeMenuCommandExecutor, type MenuCommandRunner} from './utils';
+import {asCommandId} from '../../utils/shared-ids';
 
 type ShellMenuTemplate = MenuItemConstructorOptions & {submenu: MenuItemConstructorOptions[]};
 
