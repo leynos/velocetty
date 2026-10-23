@@ -1,5 +1,5 @@
 /** @file Initializes snapshot module loading hooks for renderer runtime execution. */
-import {isFunction} from '@shared/types/guards';
+import {isFunction, isObject} from '@shared/types/guards';
 
 export type SnapshotModuleExport =
   | SnapshotModuleObject
@@ -63,8 +63,24 @@ type SnapshotRuntimeEnvironment = {
 
 const isSnapshotRequire = (candidate: unknown): candidate is SnapshotModuleRequire => isFunction(candidate);
 
-const isSnapshotModuleLoader = (candidate: unknown): candidate is SnapshotModuleLoader =>
-  typeof candidate === 'object' && candidate !== null && '_load' in candidate && typeof candidate._load === 'function';
+/**
+ * Recognizes the module loader returned by `require('module')`.
+ *
+ * That value is the `Module` constructor with `_load` attached to it, so
+ * `typeof` reports `'function'` rather than `'object'`. Admitting only objects
+ * rejects the real loader while still accepting the object literals that test
+ * doubles tend to use, which is the combination that let this fault reach the
+ * renderer. Callables are therefore accepted alongside objects.
+ */
+const isSnapshotModuleLoader = (candidate: unknown): candidate is SnapshotModuleLoader => {
+  if (!isObject(candidate) && !isFunction(candidate)) {
+    return false;
+  }
+  // SAFETY: the guards above already rejected non-null objects and functions, so
+  // `candidate` is safe to read from; the assertion only names the shape probed,
+  // and `isFunction` accepts `undefined` in case the property is absent.
+  return isFunction((candidate as {_load?: unknown})._load);
+};
 
 export type SnapshotBootstrapHandle = {
   restore(): void;

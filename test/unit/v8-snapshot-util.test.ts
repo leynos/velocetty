@@ -56,6 +56,26 @@ const createModuleContainer = (): ModuleContainer => {
   };
 };
 
+type CallableModuleContainer = ModuleContainer & ((moduleName: string) => SnapshotModuleExport);
+
+/**
+ * Builds a loader shaped like the value `require('module')` actually returns.
+ *
+ * Node hands back the `Module` constructor with `_load` attached to it, so the
+ * loader is callable and `typeof` reports `'function'`. The plain object
+ * literal above is the more convenient double, but it is not the real shape,
+ * which is how a guard that rejected callables once shipped unnoticed.
+ */
+const loadNativeModule = (moduleName: string): SnapshotModuleExport => ({toString: () => `native:${moduleName}`});
+
+const createCallableModuleContainer = (): CallableModuleContainer => {
+  // A distinct callable per call, rather than the shared module-scope one:
+  // bootstrap swaps `_load` on the value it is handed, so a single shared
+  // instance would let one test's wrapper leak into the next.
+  const load = (moduleName: string): SnapshotModuleExport => loadNativeModule(moduleName);
+  return Object.assign(load, {_load: load});
+};
+
 const createRuntimeRequire = (moduleContainer: ModuleContainer) => {
   return (moduleName: string) => {
     if (moduleName === 'module') {
@@ -300,6 +320,33 @@ test('restore removes stale wrappers when snapshot bootstraps overlap', () => {
   expect(moduleContainer._load('native:module')).toEqual({native: 'native:module'});
 
   secondHandle.restore();
+  expect(moduleContainer._load).toBe(originalLoad);
+});
+
+test('accepts the callable module loader that `require("module")` returns', () => {
+  // Regression: `require('module')` is the `Module` constructor with `_load`
+  // attached, so it is a function, not an object literal. A guard that admitted
+  // only object literals rejected the real loader and threw at renderer module
+  // scope, which surfaced as a single critical renderer error in every E2E lane.
+  const moduleContainer = createCallableModuleContainer();
+  const originalLoad = moduleContainer._load;
+  const runtimeRequire = createRuntimeRequire(moduleContainer);
+
+  const bootstrapHandle = bootstrapSnapshotRuntime({
+    document: documentStub,
+    require: runtimeRequire,
+    snapshotResult: createSnapshotResult({'virtual:callable': () => {}}, []),
+    window: {}
+  });
+
+  if (!bootstrapHandle) {
+    throw new Error('Expected snapshot bootstrap to install a runtime handle.');
+  }
+
+  expect(moduleContainer._load).not.toBe(originalLoad);
+  expect(moduleContainer._load('virtual:callable')).toBe('custom:virtual:callable');
+
+  bootstrapHandle.restore();
   expect(moduleContainer._load).toBe(originalLoad);
 });
 
