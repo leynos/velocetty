@@ -353,6 +353,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_V8_SNAPSHOT_COPY: '1'
+          # electron-builder otherwise downloads a 32-bit x86 fpm build, which
+          # cannot run on this arm64 runner: the i386 loader is absent, so the
+          # deb/rpm/pacman targets fail with "Could not open
+          # '/lib/ld-linux.so.2'". app-builder reads this flag and uses `fpm`
+          # from PATH instead, which the step above installs as a Ruby binstub.
+          USE_SYSTEM_FPM: '1'
       - name: Archive Build Artefacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
