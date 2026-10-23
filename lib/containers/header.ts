@@ -35,13 +35,16 @@ const getTabs = createSelector(
   [getSessions, getRootGroups, getActiveSessions, getActiveRootGroup, getActivityMarkers],
   (sessions, rootGroups, activeSessions, activeRootGroup, activityMarkers) =>
     rootGroups.map((t): ITab => {
-      const activeSessionUid = activeSessions[t.uid];
-      const session = sessions[activeSessionUid];
+      // A freshly added root group can render once before its first session
+      // arrives, so the tab falls back to untitled and inactive. `activeSessions`
+      // records a uid per live root group; the lookup into `sessions` is what
+      // can still miss.
+      const session = sessions[activeSessions[t.uid]];
       return {
         uid: t.uid,
-        title: session.title,
+        title: session?.title ?? '',
         isActive: t.uid === activeRootGroup,
-        hasActivity: activityMarkers[session.uid]
+        hasActivity: session ? (activityMarkers[session.uid] ?? false) : false
       };
     })
 );

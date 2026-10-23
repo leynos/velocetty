@@ -33,7 +33,9 @@ export function addSession({uid, shell, pid, cols = null, rows = null, splitDire
       cols,
       rows,
       splitDirection,
-      activeUid: activeUid || asSessionId(sessions.activeUid),
+      // An explicit target wins; otherwise follow whichever session the
+      // renderer currently has active, which may legitimately be none.
+      activeUid: activeUid ?? (sessions.activeUid ? asSessionId(sessions.activeUid) : null),
       now,
       profile
     });

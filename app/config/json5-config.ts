@@ -56,7 +56,7 @@ const decodeRefSegment = (segment: string): string =>
   decodeURIComponent(segment).replaceAll('~1', '/').replaceAll('~0', '~');
 
 /**
- * Resolves the generated definition name that describes the `config` property.
+ * Resolves the generated definition that describes the `config` property.
  *
  * The generator names each definition after the TypeScript type it was derived
  * from, so changing that type renames the definition and rewrites the `$ref`
@@ -64,15 +64,24 @@ const decodeRefSegment = (segment: string): string =>
  * bound to the schema's shape rather than to one spelling of it; a hardcoded
  * name would fail whenever the type changed, taking every config load with it.
  *
+ * The name is only known at run time, so the import's literal key set cannot
+ * index the definitions. The lookup is therefore a JSON record, and the result
+ * is what the schema declares it to be.
+ *
  * @throws If the generated schema does not carry the definition it references.
  */
-const resolveConfigOptionsDefinitionName = (): string => {
+const resolveConfigOptionsDefinition = (): JsonObject => {
   const ref: string = configJsonSchema.properties.config.$ref;
   const name = decodeRefSegment(ref.slice(ref.lastIndexOf('/') + 1));
-  if (!(name in configJsonSchema.definitions)) {
-    throw new Error(`The generated config schema has no "${name}" definition for config options.`);
+  // `schema.json` is JSON by construction. Narrowing the definitions to a JSON
+  // object is what makes a run-time definition name indexable without widening
+  // the schema's own type, which spells absent keywords as optional properties.
+  const definitions = configJsonSchema.definitions;
+  const definition = isJsonObject(definitions) ? definitions[name] : undefined;
+  if (!isJsonObject(definition)) {
+    throw new Error(`The generated config schema has no "${name}" object definition for config options.`);
   }
-  return name;
+  return definition;
 };
 
 /**
@@ -85,9 +94,11 @@ const resolveConfigOptionsDefinitionName = (): string => {
  * as an `allOf` of sections, or as a single inline object.
  */
 const configOptionsSections = (): JsonValue[] => {
-  const name = resolveConfigOptionsDefinitionName();
-  const definition = structuredClone(configJsonSchema.definitions[name]);
-  const sections = Array.isArray(definition.allOf) ? definition.allOf : [definition];
+  // Clone before stripping `required`: the definitions object is the imported
+  // schema module, shared with every other reader of it.
+  const definition: JsonObject = structuredClone(resolveConfigOptionsDefinition());
+  const allOf = definition.allOf;
+  const sections = Array.isArray(allOf) ? allOf : [definition];
   for (const section of sections) {
     // SAFETY: every generated definition section is a JSON object; only the
     // object form carries the `required` keyword this drops.

@@ -152,14 +152,14 @@ CI on `bun run build:shared`.
 
 The four local gates run `tsconfig.typecheck.json`. That project includes
 `app/`, `lib/`, `cli/`, `typings/`, and `shared/src/`, and relaxes
-`tsconfig.base.json` with `strict: false`, `noUncheckedIndexedAccess: false`,
+`tsconfig.base.json` with `noUncheckedIndexedAccess: false`,
 `noPropertyAccessFromIndexSignature: false`,
-`exactOptionalPropertyTypes: false`, `noImplicitOverride: false`,
-`useUnknownInCatchVariables: false`, and `verbatimModuleSyntax: false`. The
-`shared/`, `frontend/`, `backend/`, and `app/tsconfig.build.json` projects each
-compile against the strict base and sit outside every gate, as do the
-`build/esbuild/` bundle and the `test/` tree. CI runs them; the local gate set
-does not.
+`exactOptionalPropertyTypes: false`, `noImplicitOverride: false`, and
+`verbatimModuleSyntax: false`. It inherits `strict` and
+`useUnknownInCatchVariables` from the base. The `shared/`, `frontend/`,
+`backend/`, and `app/tsconfig.build.json` projects each compile against the
+strict base and sit outside every gate, as do the `build/esbuild/` bundle and
+the `test/` tree. CI runs them; the local gate set does not.
 
 That gap is why the three findings below are recorded here rather than in the
 commit that fixed them. All three are the same class of defect: code that a
@@ -346,10 +346,10 @@ was evidence about the lane, not about the app.
 - Mirrored app-local modules are a deliberate duplication. Each one is pinned
   by a parity test, and a change to a shared implementation must carry the
   mirror and its parity test in the same commit.
-- `cli/index.ts`, `lib/components/terms.tsx`, and `lib/containers/hyper.tsx`
-  sit outside every strict project, so they are type-checked only at
-  `strict: false`. This is a pre-existing gap that the lint profiles surfaced
-  rather than introduced.
+- `tsconfig.typecheck.json` inherits `strict` from the base. `cli/index.ts`,
+  `lib/components/terms.tsx`, and `lib/containers/hyper.tsx` — previously
+  checked only at `strict: false`, a gap the lint profiles surfaced — now
+  compile under strict nullability like the rest of `cli/` and `lib/`.
 
 ## References
 

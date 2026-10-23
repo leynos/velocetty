@@ -12,7 +12,7 @@ import type {ITermState, ITermGroup, HyperState, HyperDispatch, HyperActions} fr
 import type {SplitRequestParams} from '../types/request-shapes';
 import {transport} from '../transport';
 import {getRootGroups} from '../selectors';
-import findBySession from '../utils/term-groups';
+import findBySession, {getTermGroup} from '../utils/term-groups';
 
 import {ptyExitSession, setActiveSession, userExitSession} from './sessions';
 
@@ -23,8 +23,10 @@ function resolveSplitContext(
   getState: () => HyperState
 ): ResolvedSplitContext {
   const {sessions} = getState();
-  const activeUid = requestedActiveUid ?? sessions.activeUid;
+  const activeUid = requestedActiveUid ?? sessions.activeUid ?? undefined;
   const activeSession = activeUid ? sessions.sessions[activeUid] : undefined;
+  // `session.profile` is nullable in state, so only a real name may reach the
+  // emitted request; the window's profile is the last resort.
   const profile = requestedProfile ?? activeSession?.profile ?? globalThis.profileName;
   return {activeUid, profile};
 }
@@ -102,35 +104,40 @@ const findFirstSession = (state: ITermState, group: ITermGroup): string | undefi
   }
 
   for (const childUid of group.children.asMutable()) {
-    const child = state.termGroups[childUid];
     // We want to find the *leftmost* session,
     // even if it's nested deep down:
-    const sessionUid = findFirstSession(state, child);
+    const sessionUid = findFirstSession(state, getTermGroup(state.termGroups, childUid));
     if (sessionUid) {
       return sessionUid;
     }
   }
+
+  return undefined;
 };
 
-const findPrevious = <T>(list: T[], old: T) => {
+const findPrevious = <T>(list: T[], old: T): T | undefined => {
   const index = list.indexOf(old);
   // If `old` was the first item in the list,
   // choose the other item available:
   return index ? list[index - 1] : list[1];
 };
 
-const findNextSessionUid = (state: ITermState, group: ITermGroup) => {
+const findNextSessionUid = (state: ITermState, group: ITermGroup): string | undefined => {
   // If we're closing a root group (i.e. a whole tab),
   // the next group needs to be a root group as well:
   if (state.activeRootGroup === group.uid) {
     const rootGroups = getRootGroups({termGroups: state});
     const nextGroup = findPrevious(rootGroups, group);
-    return findFirstSession(state, nextGroup);
+    return nextGroup ? findFirstSession(state, nextGroup) : undefined;
   }
 
-  const {children} = state.termGroups[group.parentUid!];
-  const nextUid = findPrevious(children.asMutable(), group.uid);
-  return findFirstSession(state, state.termGroups[nextUid]);
+  const parent = group.parentUid ? getTermGroup(state.termGroups, group.parentUid) : undefined;
+  if (!parent) {
+    return undefined;
+  }
+  const nextUid = findPrevious(parent.children.asMutable(), group.uid);
+  const nextGroup = nextUid ? state.termGroups[nextUid] : undefined;
+  return nextGroup ? findFirstSession(state, nextGroup) : undefined;
 };
 
 export function ptyExitTermGroup(sessionUid: string) {
@@ -166,16 +173,24 @@ export function userExitTermGroup(uid: string) {
       uid: asTermGroupId(uid),
       effect: () => {
         const group = termGroups.termGroups[uid];
+        // A group can already be gone when a queued exit runs; there is then
+        // nothing left to close.
+        if (!group) {
+          return;
+        }
+
         if (Object.keys(termGroups.termGroups).length <= 1) {
           // No need to attempt finding a new active session
           // if this is the last one we've got:
-          return dispatch(userExitSession(group.sessionUid!));
+          return group.sessionUid ? dispatch(userExitSession(group.sessionUid)) : undefined;
         }
 
         const activeSessionUid = termGroups.activeSessions[termGroups.activeRootGroup!];
         if (termGroups.activeRootGroup === uid || activeSessionUid === group.sessionUid) {
           const nextSessionUid = findNextSessionUid(termGroups, group);
-          dispatch(setActiveSession(nextSessionUid!));
+          if (nextSessionUid) {
+            dispatch(setActiveSession(nextSessionUid));
+          }
         }
 
         if (group.sessionUid) {

@@ -54,11 +54,32 @@ const getPreferredLocale = () => {
   return navigator.languages.at(0) ?? (navigator.language || 'en');
 };
 
-const getTranslationDictionary = (locale: string) => {
+type TranslationDictionaries = typeof translationDictionaries;
+type TranslationDictionary = Partial<Record<TranslationKey, string>>;
+
+/**
+ * Narrows a locale tag to a key of the bundled dictionaries.
+ *
+ * Navigator locales are arbitrary strings; a miss falls through to the
+ * language subtag and then to the default dictionary.
+ */
+const asKnownLocale = (locale: string): keyof TranslationDictionaries | undefined => {
+  if (!Object.hasOwn(translationDictionaries, locale)) {
+    return undefined;
+  }
+  // SAFETY: `hasOwn` just proved the property exists on the dictionaries
+  // object, whose keys are exactly the locales it was built from.
+  return locale as keyof TranslationDictionaries;
+};
+
+const getTranslationDictionary = (locale: string): TranslationDictionary => {
   const normalizedLocale = locale.toLowerCase();
   const language = normalizedLocale.split('-')[0];
 
-  return translationDictionaries[normalizedLocale] ?? translationDictionaries[language] ?? headerLabelDefaults;
+  const localeKey = asKnownLocale(normalizedLocale);
+  const languageKey = asKnownLocale(language);
+  const dictionary = localeKey ?? languageKey;
+  return dictionary ? translationDictionaries[dictionary] : headerLabelDefaults;
 };
 
 export const useTranslation = () => {

@@ -43,6 +43,14 @@ const resizeAdjacentPanes = (sizes: number[], index: number, nextLeadingPaneSize
  * size. Returns `null` when the key does not apply for the current
  * orientation.
  */
+type KeyResizeAction = (isVertical: boolean, current: number, total: number) => number | null;
+
+/**
+ * The keys with a resize meaning, keyed by `KeyboardEvent.key`.
+ *
+ * `satisfies` keeps the literal keys available to `isResizeKey` below while
+ * still checking every action against the shared signature.
+ */
 const KEY_RESIZE_ACTIONS = {
   ArrowLeft: (v, c) => (v ? c - KEYBOARD_RESIZE_STEP : null),
   ArrowRight: (v, c) => (v ? c + KEYBOARD_RESIZE_STEP : null),
@@ -52,7 +60,10 @@ const KEY_RESIZE_ACTIONS = {
   PageDown: (_v, c) => c + KEYBOARD_PAGE_RESIZE_STEP,
   Home: () => 0,
   End: (_v: boolean, _c: number, total: number) => total
-} satisfies Record<string, (isVertical: boolean, current: number, total: number) => number | null>;
+} satisfies Record<string, KeyResizeAction>;
+
+/** Narrows an arbitrary `KeyboardEvent.key` to one this component handles. */
+const isResizeKey = (key: string): key is keyof typeof KEY_RESIZE_ACTIONS => Object.hasOwn(KEY_RESIZE_ACTIONS, key);
 
 /**
  * Returns the next leading-pane size for a keyboard resize event, or `null`
@@ -64,8 +75,11 @@ function computeKeyResizeTarget(
   currentSize: number,
   pairTotal: number
 ): number | null {
-  const action = KEY_RESIZE_ACTIONS[key];
-  return action ? action(isVertical, currentSize, pairTotal) : null;
+  if (!isResizeKey(key)) {
+    return null;
+  }
+
+  return KEY_RESIZE_ACTIONS[key](isVertical, currentSize, pairTotal);
 }
 
 const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: React.ForwardedRef<HTMLDivElement>) {

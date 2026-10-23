@@ -29,7 +29,7 @@ import type {HyperState, HyperDispatch, HyperActions, ITermGroups} from '../../t
 import {getRootGroups} from '../selectors';
 import {isExecutable} from '../utils/file';
 import notify from '../utils/notify';
-import findBySession from '../utils/term-groups';
+import findBySession, {getTermGroup} from '../utils/term-groups';
 import {transport} from '../transport';
 
 import {requestSession, sendSessionData, setActiveSession} from './sessions';
@@ -116,7 +116,7 @@ export function windowGeometryUpdated({isMaximized}: {isMaximized: boolean}): Hy
 // Find all sessions that are below the given
 // termGroup uid in the hierarchy:
 const findChildSessions = (termGroups: ITermGroups, uid: string): string[] => {
-  const group = termGroups[uid];
+  const group = getTermGroup(termGroups, uid);
   if (group.sessionUid) {
     return [uid];
   }
@@ -150,8 +150,13 @@ function moveToNeighbourPane(type: typeof UI_MOVE_NEXT_PANE | typeof UI_MOVE_PRE
           console.log('ignoring move for single group');
         } else {
           const index = getNeighbourIndex(childGroups, uid, type);
-          const {sessionUid} = termGroups.termGroups[childGroups[index]];
-          dispatch(setActiveSession(sessionUid!));
+          const nextGroupUid = childGroups[index];
+          if (nextGroupUid) {
+            const {sessionUid} = getTermGroup(termGroups.termGroups, nextGroupUid);
+            if (sessionUid) {
+              dispatch(setActiveSession(sessionUid));
+            }
+          }
         }
       }
     });

@@ -112,13 +112,29 @@ export const getProfiles = () => {
   return getCurrentConfig().config.profiles;
 };
 
+/** The settings a profile is allowed to override in the root configuration. */
+type ProfileOverrideKey = keyof configOptions['profiles'][number]['config'];
+
 export const getProfileConfig = (profileName: string): configOptions => {
   const {profiles, defaultProfile, ...baseConfig} = getCurrentConfig().config;
-  const profileConfig = profiles.find((p) => p.name === profileName)?.config || {};
-  for (const key in profileConfig) {
-    baseConfig[key] = isJsonObject(baseConfig[key]) ? {...baseConfig[key], ...profileConfig[key]} : profileConfig[key];
+  const profileConfig = profiles.find((candidate) => candidate.name === profileName)?.config ?? {};
+  const merged: configOptions = {...baseConfig, defaultProfile, profiles};
+
+  // A profile overrides only the settings it names. Object-valued settings
+  // (`colors`, `env`, `modifierKeys`) merge with the base so a profile can
+  // recolour one entry; every other setting replaces the base value outright.
+  // SAFETY: `profileConfig` is a `Partial<profileConfigOptions>`, so every
+  // enumerable key it carries is a profile setting; `Object.keys` only loses
+  // that fact because it widens the key type to `string`.
+  for (const key of Object.keys(profileConfig) as ProfileOverrideKey[]) {
+    const baseValue = merged[key];
+    const overrideValue = profileConfig[key];
+    const mergedValue =
+      isJsonObject(baseValue) && isJsonObject(overrideValue) ? {...baseValue, ...overrideValue} : overrideValue;
+    Object.assign(merged, {[key]: mergedValue});
   }
-  return {...baseConfig, defaultProfile, profiles};
+
+  return merged;
 };
 
 export const openConfig = () => {

@@ -197,7 +197,17 @@ const isProviderDecoration = (candidate: unknown): candidate is TabDecorationPro
 const isProviderSubscription = (candidate: unknown): candidate is NonNullable<TabDecorationProvider['subscribe']> =>
   typeof candidate === 'function';
 
-const isValidProviderCandidate = (candidate: unknown): candidate is Partial<TabDecorationProvider> => {
+/**
+ * A plugin-supplied provider that has passed validation.
+ *
+ * `provideDecoration` is required here rather than left optional as it is on
+ * `Partial<TabDecorationProvider>`: the validating guard is what establishes
+ * it, and saying so in the type is what keeps the registration site free of a
+ * second check or an assertion.
+ */
+type ValidProviderCandidate = Partial<TabDecorationProvider> & Pick<TabDecorationProvider, 'provideDecoration'>;
+
+const isValidProviderCandidate = (candidate: unknown): candidate is ValidProviderCandidate => {
   if (!isObject(candidate) || !('provideDecoration' in candidate)) {
     return false;
   }

@@ -120,9 +120,16 @@ const reducer: ISessionReducer = (state = initialState, action) => {
     }
 
     case SESSION_RESIZE: {
+      const session = state.sessions[action.uid];
+      // A resize can be queued before the session is added, or arrive after
+      // the user has already closed it. There is nothing to resize in that
+      // window, and the next resize for a live session applies normally.
+      if (!session) {
+        return state;
+      }
       return state.setIn(
         ['sessions', action.uid],
-        state.sessions[action.uid].merge({
+        session.merge({
           rows: action.rows,
           cols: action.cols,
           resizeAt: action.now

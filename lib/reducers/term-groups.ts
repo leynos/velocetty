@@ -7,7 +7,7 @@ import type {SessionAddAction} from '@shared/constants/sessions';
 import {TERM_GROUP_EXIT, TERM_GROUP_RESIZE} from '@shared/constants/term-groups';
 import type {ITermGroup, ITermState, ITermGroups, ITermGroupReducer, Mutable} from '../../typings/hyper';
 import {decorateTermGroupsReducer} from '../utils/plugins';
-import findBySession from '../utils/term-groups';
+import findBySession, {getTermGroup} from '../utils/term-groups';
 
 const MIN_SIZE = 0.05;
 const initialState: ITermState = Immutable<Mutable<ITermState>>({
@@ -30,7 +30,7 @@ function TermGroup(obj: Immutable.DeepPartial<Mutable<ITermGroup>>) {
 
 // Recurse upwards until we find a root term group (no parent).
 const findRootGroup = (termGroups: ITermGroups, uid: string): ITermGroup => {
-  const current = termGroups[uid];
+  const current = getTermGroup(termGroups, uid);
   if (!current.parentUid) {
     return current;
   }
@@ -71,11 +71,20 @@ const removalRebalance = (oldSizes: ImmutableType<number[]>, index: number) => {
 
 const splitGroup = (state: ITermState, action: SessionAddAction) => {
   const {splitDirection, uid, activeUid} = action;
-  const activeGroup = findBySession(state, activeUid!)!;
+  // The action names the session being split; fall back to the session active
+  // in the current root group when it does not, so a split with no explicit
+  // target still lands on the pane the user is looking at.
+  const activeRootGroup = state.activeRootGroup;
+  const splitTargetUid =
+    activeUid ?? (activeRootGroup === null ? null : (state.activeSessions[activeRootGroup] ?? null));
+  const activeGroup = splitTargetUid === null ? undefined : findBySession(state, splitTargetUid);
+  if (!activeGroup) {
+    throw new Error(`Cannot split: no terminal group for session ${String(splitTargetUid)}`);
+  }
   // If we're splitting in the same direction as the current active
   // group's parent - or if it's the first split for that group -
   // we want the parent to get another child:
-  let parentGroup = activeGroup.parentUid ? state.termGroups[activeGroup.parentUid] : activeGroup;
+  let parentGroup = activeGroup.parentUid ? getTermGroup(state.termGroups, activeGroup.parentUid) : activeGroup;
   // If we're splitting in a different direction, we want the current
   // active group to become a new parent instead:
   if (parentGroup.direction && parentGroup.direction !== splitDirection) {
@@ -137,7 +146,7 @@ const splitGroup = (state: ITermState, action: SessionAddAction) => {
 // with a one-to-one mapping between parent and child.
 const replaceParent = (state: ITermState, parent: ITermGroup, child: ITermGroup) => {
   if (parent.parentUid) {
-    const parentParent = state.termGroups[parent.parentUid];
+    const parentParent = getTermGroup(state.termGroups, parent.parentUid);
     // If the parent we're replacing has a parent,
     // we need to change the uid in its children array
     // with `child`:
@@ -162,22 +171,24 @@ const replaceParent = (state: ITermState, parent: ITermGroup, child: ITermGroup)
 
 const removeGroup = (state: ITermState, uid: string) => {
   const group = state.termGroups[uid];
-  // when close tab with multiple panes, it remove group from parent to child. so maybe the parentUid exists but parent group have removed.
-  // it's safe to remove the group.
-  if (group.parentUid && state.termGroups[group.parentUid]) {
-    const parent = state.termGroups[group.parentUid];
+  // Closing a tab with several panes removes groups parent-first, so a child
+  // can be visited after its parent has already gone. That is safe: the
+  // detach below is skipped, and the trailing `without` prunes what is left.
+  const parentUid = group?.parentUid;
+  const parent = parentUid ? state.termGroups[parentUid] : undefined;
+  if (group && parent && parentUid) {
     const newChildren = parent.children.filter((childUid) => childUid !== uid);
     if (newChildren.length === 1) {
       // Since we only have one child left,
       // we can merge the parent and child into one group:
-      const child = state.termGroups[newChildren[0]];
+      const child = getTermGroup(state.termGroups, newChildren[0]);
       state = replaceParent(state, parent, child);
     } else {
-      state = state.setIn(['termGroups', group.parentUid, 'children'], newChildren);
+      state = state.setIn(['termGroups', parentUid, 'children'], newChildren);
       if (parent.sizes) {
         const childIndex = parent.children.indexOf(uid);
         const newSizes = removalRebalance(parent.sizes, childIndex);
-        state = state.setIn(['termGroups', group.parentUid, 'sizes'], newSizes);
+        state = state.setIn(['termGroups', parentUid, 'sizes'], newSizes);
       }
     }
   }

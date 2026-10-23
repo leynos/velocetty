@@ -789,11 +789,20 @@ those flags.
 ### Local gates do not cover the whole build surface
 
 `make typecheck` and `make lint` both compile `tsconfig.typecheck.json`, which
-relaxes `tsconfig.base.json` with `strict: false`,
-`noUncheckedIndexedAccess: false`, `noPropertyAccessFromIndexSignature: false`,
-`exactOptionalPropertyTypes: false`, `noImplicitOverride: false`,
-`useUnknownInCatchVariables: false`, and `verbatimModuleSyntax: false`. It
-includes `app/`, `lib/`, `cli/`, `typings/`, and `shared/src/` only.
+inherits `strict: true` and `useUnknownInCatchVariables: true` from
+`tsconfig.base.json` and relaxes only `noUncheckedIndexedAccess`,
+`noPropertyAccessFromIndexSignature`, `exactOptionalPropertyTypes`,
+`noImplicitOverride`, and `verbatimModuleSyntax`. It includes `app/`, `lib/`,
+`cli/`, `typings/`, and `shared/src/` only.
+
+Those remaining relaxations are a measured ratchet, not an oversight. Turning
+every base flag on was tried against the same tree and reported 408 errors
+across 69 files; `noUncheckedIndexedAccess` alone accounts for most of them,
+because `seamless-immutable` maps an immutable record to an index access that
+yields `T | undefined`. Strict nullability, which is now on, is what catches
+the defects that matter: a lookup that can miss, a callback that can be absent,
+and a `catch` binding that is `unknown`. The optional-property and index-access
+flags are the next step on the ratchet, one directory at a time.
 
 Four production projects therefore fall outside every local gate:
 
@@ -809,10 +818,9 @@ Table 2: production projects that the local typecheck gate omits.
 The esbuild bundle (`build/esbuild/`), the `test/` tree, and the emitted
 `CommonJS` interop are also unchecked locally. A change can pass every local
 gate and still fail CI, which is what strict mode catches: a `satisfies`
-registry that loses its literal key type rejects a dynamic index, an optional
-property read through a `Record` index needs the guard that
-`noUncheckedIndexedAccess` demands, and a `verbatimModuleSyntax` import needs
-the `type` modifier.
+registry that loses its literal key type rejects a dynamic index, a lookup that
+can miss needs the guard strict nullability demands, and a
+`verbatimModuleSyntax` import needs the `type` modifier.
 
 Run the omitted projects before pushing a change that touches `shared/`,
 `frontend/`, `backend/`, or `app/`:
@@ -820,11 +828,9 @@ Run the omitted projects before pushing a change that touches `shared/`,
 - `bun run build:packages`
 - `bunx tsgo --project app/tsconfig.build.json`
 
-Two accepted costs follow from this arrangement. `tsconfig.typecheck.json`
-disables `strictNullChecks`, so `zod` cannot infer a required nullable field as
-required, and the affected schemas widen the field by hand. `shared/src/` is
-nonetheless typechecked twice, once relaxed and once strict, so a fix that
-satisfies the strict project stays valid under the relaxed one.
+One accepted cost follows from this arrangement. `shared/src/` is typechecked
+twice, once relaxed and once strict, so a fix that satisfies the strict project
+stays valid under the relaxed one.
 
 ## Tests
 

@@ -16,12 +16,18 @@ const isBoolean = (value: ContextKeyValue): value is boolean => typeof value ===
 const isNumber = (value: ContextKeyValue): value is number => typeof value === 'number';
 const isString = (value: ContextKeyValue): value is string => typeof value === 'string';
 
+const isContextKeyMap = (context: ContextKeyMap | ReadonlyMap<string, ContextKeyValue>): context is ContextKeyMap =>
+  !(context instanceof Map);
+
 const getLookup = (context: ContextKeyMap | ReadonlyMap<string, ContextKeyValue>): ContextLookup => {
-  if (context instanceof Map) {
-    return (key) => context.get(key);
+  // A plain lookup object has no `get`, but `instanceof Map` alone does not
+  // narrow the interface away; the guard states the shape rather than the
+  // negative of the check.
+  if (isContextKeyMap(context)) {
+    return (key) => (hasOwn.call(context, key) ? context[key] : undefined);
   }
 
-  return (key) => (hasOwn.call(context, key) ? context[key] : undefined);
+  return (key) => context.get(key);
 };
 
 const toBoolean = (value: ContextKeyValue): boolean => {

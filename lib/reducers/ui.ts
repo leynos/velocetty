@@ -47,11 +47,14 @@ import {decorateUIReducer} from '../utils/plugins';
 
 const isWindows = ['Windows', 'Win16', 'Win32', 'WinCE'].includes(navigator.platform) || process.platform === 'win32';
 
-const allowedCursorStyles = new Set(['BEAM', 'BLOCK', 'UNDERLINE']);
-const allowedCursorBlinkValues = new Set([true, false]);
-const allowedBells = new Set(['SOUND', 'false', false]);
-const allowedHamburgerMenuValues = new Set([true, false, ''] as const);
-const allowedWindowControlsValues = new Set([true, false, 'left', ''] as const);
+// Config values arrive as arbitrary JSON, so every membership test is against
+// `unknown`. Typing the sets by their members would make `.has` reject the
+// `undefined` that a partial config legitimately supplies.
+const allowedCursorStyles: ReadonlySet<unknown> = new Set(['BEAM', 'BLOCK', 'UNDERLINE']);
+const allowedCursorBlinkValues: ReadonlySet<unknown> = new Set([true, false]);
+const allowedBells: ReadonlySet<unknown> = new Set(['SOUND', 'false', false]);
+const allowedHamburgerMenuValues: ReadonlySet<unknown> = new Set([true, false, '']);
+const allowedWindowControlsValues: ReadonlySet<unknown> = new Set([true, false, 'left', '']);
 
 // Populate `config-default.js` from this :)
 const initial: uiState = Immutable<Mutable<uiState>>({
@@ -272,8 +275,9 @@ const processRendererConfig = (config: UiConfig): UiStatePartial => {
     ret.webGLRenderer = config.webGLRenderer;
   }
 
-  if (Number.isInteger(config.webGLRendererMaxContexts) && config.webGLRendererMaxContexts > 0) {
-    ret.webGLRendererMaxContexts = config.webGLRendererMaxContexts;
+  const maxContexts = config.webGLRendererMaxContexts;
+  if (maxContexts !== undefined && Number.isInteger(maxContexts) && maxContexts > 0) {
+    ret.webGLRendererMaxContexts = maxContexts;
   }
 
   return ret;
