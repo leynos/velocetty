@@ -20,7 +20,11 @@ import * as windowUtils from './utils/window-utils';
 
 remoteInitialize();
 
-config.setup();
+// Configuration is already initialized by the entry point, `index.mts`, which
+// runs `config.setup()` before importing this module. It cannot be done here:
+// the import above of `./plugins` evaluates that module's body, and its body
+// reads the plugin lists from the configuration. `remoteInitialize()` stays
+// ahead of it because it registers the remote module before any window loads.
 
 import {registerClipboardIpcHandlers} from './clipboard';
 

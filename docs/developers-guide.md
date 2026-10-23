@@ -510,6 +510,25 @@ Required coverage categories:
 Follow `docs/execplans/replace-webpack-babel-with-esbuild.md` for migration
 ordering and milestone gates.
 
+### Main-process evaluation order
+
+The app build emits CommonJS, so Node evaluates a `require` as soon as it is
+reached, and the importing module's own body resumes only afterwards. A module
+that reads the configuration while its body runs therefore observes whatever
+`config.setup()` has done so far, and every import of it inherits that timing.
+
+Two modules read the configuration at module scope: `app/plugins.ts` resolves
+the plugin and local-plugin lists, and `app/session.ts` reads `useConpty`. The
+entry point, `app/index.mts`, calls `config.setup()` before importing
+`./start.js` so both see an initialized configuration.
+
+Keep it that way. Moving the setup call into `app/start.ts` cannot work: every
+statement in that file runs after its own import block, which reaches both
+modules. A module that needs configuration at load time should instead read it
+inside the function that uses it, which removes the dependence on import order
+altogether and is the preferred shape for new code.
+`test/unit/app-startup-order.test.ts` guards the entry-point ordering.
+
 ## Electron runtime alignment
 
 When upgrading Electron, keep runtime and native-module rebuild settings

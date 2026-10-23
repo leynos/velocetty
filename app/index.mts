@@ -14,6 +14,16 @@ if (requestedArgument && informationalArguments.includes(requestedArgument)) {
   app.quit();
 } else {
   try {
+    // Configuration must be initialized before `./start.js` is imported.
+    // Node evaluates a required module as soon as it is required, and several
+    // modules in the tree below read the configuration while their own module
+    // body runs: `./plugins` resolves the plugin and local-plugin lists, and
+    // `./session` reads `useConpty`. Doing it here, at the entry point, keeps
+    // that ordering explicit instead of depending on where an import happens
+    // to sit relative to a statement in a lower module.
+    const config = await import('./config.js');
+    config.setup();
+
     await import('./start.js');
   } catch (error) {
     console.error('Failed to start Hyper.', error);

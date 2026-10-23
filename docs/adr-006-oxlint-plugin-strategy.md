@@ -280,6 +280,52 @@ handled the same way; a partially written cache directory stays a hard error,
 because that is a failed generation rather than an unsupported host.
 `test/unit/cp-snapshot.test.ts` covers all three cases.
 
+## Addendum: the entry-point split and the load-order contract
+
+Splitting `app/index.ts` into `app/index.mts` and `app/start.ts` in the commit
+that introduced the lint profiles also reordered module evaluation, and the
+reordering broke the development app on every platform.
+
+The two files depend on each other in a way the type checker cannot see. Two
+modules read the configuration while their own module bodies run:
+`app/plugins.ts` resolves the plugin and local-plugin lists, and
+`app/session.ts` reads `useConpty`. Node evaluates a required module as soon as
+it is required, so whichever statement in `app/start.ts` reaches those modules
+runs before any later statement in that file — including the `config.setup()`
+call that used to sit among them. On `main` the ordering held by accident:
+`config.setup()` sat textually above `import * as plugins from './plugins'` in
+a single entry file, because an import there was free to sit below a statement
+that had to run first. The split collected every import into one block at the
+top of `app/start.ts`, and the plugin-list read moved ahead of setup with it.
+
+What made the reordering visible was a separate, deliberate improvement. The
+same commit replaced `let cfg: parsedConfig = {} as any` with
+`let cfg: parsedConfig | undefined` and a `getCurrentConfig()` accessor that
+throws `Configuration has not been initialized`. On `main` the unsafe
+placeholder made the early read return `{plugins: [], localPlugins: []}` and
+the app started; on this branch the same read throws, and the entry point
+surfaced it as
+`Failed to start Hyper. Error: Configuration has not been initialized` with a
+`getPlugins` frame in `dist/app/plugins.js`.
+
+The fix moves the initialization to the entry point. `app/index.mts` imports
+`./config.js`, calls `config.setup()`, and only then imports `./start.js`, so
+the order is stated once, where the process starts, rather than depending on
+where a statement sits relative to an import several modules down.
+`test/unit/app-startup-order.test.ts` pins both halves: the setup call precedes
+the `./start.js` import, and `app/start.ts` does not reintroduce it below its
+own imports.
+
+Two properties of this failure are worth recording beyond the fix. It is
+invisible to every local gate, because `tsconfig.typecheck.json` type-checks a
+program whose module graph is a compile-time notion; evaluation order is a
+runtime property of the emitted CommonJS. And the packaged lane's E2E test
+passed on macOS throughout, because its CI fallback tolerates an absent
+`[e2e] renderer-ready` marker when the exit code is still null, which is the
+state an `app.quit()` before ready leaves behind. Only the development lane,
+which requires the marker, reported the truth. A green lane next to a red one
+was evidence about the lane, not about the app.
+
 ## Known risks and limitations
 
 - Oxlint's JavaScript plug-in interface is alpha. The exact pins keep the
