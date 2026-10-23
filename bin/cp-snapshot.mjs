@@ -35,7 +35,21 @@ function normalizeArch(value, sourceLabel) {
   );
 }
 
-function resolveContextArch(context) {
+/**
+ * Reads the architecture being packed out of an `afterPack` context.
+ *
+ * Returns `undefined` when the context does not say which architecture is
+ * being packed. The host architecture is deliberately not used as a
+ * substitute: a runner that packs more than one architecture carries artefacts
+ * for its own, so guessing the host would copy a snapshot built for different
+ * hardware into the bundle. The caller treats an unknown architecture the same
+ * way it treats absent artefacts, which is a supported outcome.
+ *
+ * @param context - The `afterPack` context supplied by electron-builder.
+ * @returns The normalized target architecture, or `undefined` if undetermined.
+ * @throws If the context gives an architecture that is present but unusable.
+ */
+export function resolveContextArch(context) {
   const stringArch = architectureSchema.safeParse(context.arch);
   if (stringArch.success) {
     return normalizeArch(stringArch.data, 'afterPack context.arch');
@@ -45,35 +59,67 @@ function resolveContextArch(context) {
   if (enumArch.success) {
     const enumValue = architectureSchema.safeParse(Arch[enumArch.data]);
     if (enumValue.success) return normalizeArch(enumValue.data, 'electron-builder Arch enum');
-    return normalizeArch(process.arch, 'process.arch fallback for unknown context.arch enum');
+    return;
   }
 
-  if (context.arch === undefined) return normalizeArch(process.arch, 'process.arch fallback');
+  if (context.arch === undefined || context.arch === null) return;
   throw new Error(`Unsupported context.arch value "${String(context.arch)}".`);
 }
 
-function getSnapshotPaths(archToCopy) {
+const defaultCacheRoot = () => path.resolve(scriptDirectory, '..', 'cache');
+
+export function getSnapshotPaths(archToCopy, cacheRoot = defaultCacheRoot()) {
   const snapshotFileName = 'snapshot_blob.bin';
   const v8ContextFileName = getV8ContextFileName(archToCopy);
-  const pathToBlob = path.resolve(scriptDirectory, '..', 'cache', archToCopy, snapshotFileName);
-  const pathToBlobV8 = path.resolve(scriptDirectory, '..', 'cache', archToCopy, v8ContextFileName);
+  const pathToBlob = path.resolve(cacheRoot, archToCopy, snapshotFileName);
+  const pathToBlobV8 = path.resolve(cacheRoot, archToCopy, v8ContextFileName);
 
   return {snapshotFileName, v8ContextFileName, pathToBlob, pathToBlobV8};
 }
 
-function validateSnapshotFiles(snapshotPaths) {
-  const {snapshotFileName, v8ContextFileName, pathToBlob, pathToBlobV8} = snapshotPaths;
-  if (!fs.existsSync(pathToBlob) || !fs.existsSync(pathToBlobV8)) {
+/**
+ * Reports which of an architecture's snapshot artefacts are present.
+ *
+ * The whole cache directory is absent for an architecture this host cannot
+ * snapshot, whereas a half-written directory means generation itself failed
+ * partway. The two cases need different answers, so they are distinguished
+ * rather than collapsed into one existence check.
+ *
+ * @param snapshotPaths - Paths returned by `getSnapshotPaths`.
+ * @returns Whether each expected artefact exists.
+ */
+const inspectSnapshotFiles = (snapshotPaths) => ({
+  hasBlob: fs.existsSync(snapshotPaths.pathToBlob),
+  hasV8Context: fs.existsSync(snapshotPaths.pathToBlobV8)
+});
+
+export function copySnapshot(pathToElectron, archToCopy, cacheRoot = defaultCacheRoot()) {
+  const snapshotPaths = getSnapshotPaths(archToCopy, cacheRoot);
+  const {hasBlob, hasV8Context} = inspectSnapshotFiles(snapshotPaths);
+
+  if (!hasBlob && !hasV8Context) {
+    // Absent is the expected state for an architecture the host cannot
+    // snapshot: `run-v8-snapshot.js` generates only arm64 on an arm64 macOS
+    // runner, while the macOS targets still pack x64. Electron ships its own
+    // default snapshot, which is the supported fallback, as it is for the
+    // Linux aarch64 lane. Copying another architecture's artefacts instead
+    // would embed a snapshot built for different hardware, which Electron
+    // cannot load.
+    console.log(
+      `No V8 snapshot artefacts for ${archToCopy} in ${path.dirname(snapshotPaths.pathToBlob)}, ` +
+        "keeping Electron's bundled default snapshot."
+    );
+    return;
+  }
+
+  if (!hasBlob || !hasV8Context) {
+    const missingFile = hasBlob ? snapshotPaths.v8ContextFileName : snapshotPaths.snapshotFileName;
     throw new Error(
-      `Missing snapshot output. Expected ${snapshotFileName} and ${v8ContextFileName} in ${path.dirname(pathToBlob)}`
+      `Incomplete snapshot output: ${missingFile} is missing from ${path.dirname(snapshotPaths.pathToBlob)}.`
     );
   }
-}
 
-function copySnapshot(pathToElectron, archToCopy) {
-  const snapshotPaths = getSnapshotPaths(archToCopy);
   console.log('Copying v8 snapshots from', snapshotPaths.pathToBlob, 'to', pathToElectron);
-  validateSnapshotFiles(snapshotPaths);
   fs.copyFileSync(snapshotPaths.pathToBlob, path.join(pathToElectron, snapshotPaths.snapshotFileName));
   fs.copyFileSync(snapshotPaths.pathToBlobV8, path.join(pathToElectron, snapshotPaths.v8ContextFileName));
 }
@@ -167,6 +213,14 @@ export default async function copySnapshotHook(context) {
   }
 
   const archToCopy = resolveContextArch(context);
+  if (archToCopy === undefined) {
+    // Electron's bundled default snapshot is a working fallback, and a wrong
+    // architecture's snapshot is not, so an undetermined target keeps the
+    // default rather than guessing.
+    console.log('Could not determine the architecture being packed, keeping the bundled default V8 snapshot.');
+    return;
+  }
+
   const pathToElectron = process.platform === 'darwin' ? getDarwinAppPath(context) : context.appOutDir;
   copySnapshot(pathToElectron, archToCopy);
 }
