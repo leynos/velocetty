@@ -41,6 +41,15 @@ export type SnapshotRuntimeResult = {
   setGlobals: (...args: unknown[]) => void;
 };
 
+// Declared beside the type it holds so the shared typings file stays free of
+// imports. `app/tsconfig.build.json` includes `typings/runtime-globals.d.ts`,
+// and a type import from there reaches into this project, which the compiler
+// then emits in place instead of into `dist/app`. See the alias rule in
+// `docs/developers-guide.md`.
+declare global {
+  var snapshotResult: SnapshotRuntimeResult | undefined;
+}
+
 type SnapshotModuleLoader = {
   _load: (moduleName: string, ...args: unknown[]) => SnapshotModuleExport;
 };
