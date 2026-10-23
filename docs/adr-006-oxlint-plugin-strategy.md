@@ -202,6 +202,84 @@ projects it compiles and nothing more. The
 [developers' guide](developers-guide.md#local-gates-do-not-cover-the-whole-build-surface)
 lists the omitted projects and the commands that cover them.
 
+## Addendum: the emitted-file leak and the mirrored rules
+
+Two further consequences of this change were found only in CI, and both are
+recorded here because neither is visible to any local gate.
+
+### A type import in a shared typings file emits the imported project
+
+`app/tsconfig.build.json` lists `../typings/runtime-globals.d.ts` in its
+`include`. That listing is the whole build surface: a project's included files
+decide its program. Adding
+`import type {SnapshotRuntimeResult} from '../lib/v8-snapshot-util'` to that
+typings file pulled a `lib/` source file into the app build program. The
+compiler then computed that file's output path from the source file rather than
+from `outDir`, and emitted `lib/v8-snapshot-util.js`, `.d.ts`, and `.js.map`
+**in place**, beside the sources. The emitted JavaScript was not runnable: it
+carried the bare specifier `require('@shared/types/guards')`, which nothing
+resolves under `dist/app`.
+
+`bunx tsgo --project app/tsconfig.build.json --outDir /tmp/probe --listEmittedFiles`
+is the diagnostic. `--listEmittedFiles` without an `--outDir` override emits
+nothing at all and reports nothing, so the override is what makes the check
+meaningful. Of 165 emitted files, exactly three landed outside the two output
+trees, and all three were that one source file.
+
+The declaration now lives in `lib/v8-snapshot-util.ts`, beside the type it
+holds, so the shared typings file imports nothing. The rule that follows is
+narrower than "avoid imports in `.d.ts` files": a `../`-relative file in an
+`include` list may reach only files already inside that project, because only
+those have an output path the compiler derives from `outDir`.
+
+### The rules are satisfied by mirrored modules, not by suppressions
+
+The alias rule above leaves `app/` modules compiled into `dist/app/` unable to
+import shared runtime values. The new rules then required guards, identifiers,
+and reloadability constants in those same modules, and the honest way to
+satisfy both was to mirror the shared implementations app-locally rather than
+to disable the rules at each site:
+
+- `app/utils/runtime-guards.ts` mirrors the shared type guards.
+- `app/config/reloadability-registry.ts` mirrors the shared reloadability
+  registry. `CURSOR_STYLE_KEY` is spelled out as a local constant because the
+  shared name is a runtime value, and the entry uses it as a computed key so the
+  `no-shape-in-symbol-names` rule accepts the name.
+- `app/utils/shared-ids.ts` carries app-local identifier constructors.
+- `app/config/json5-config.ts` reads its Ajv definition name back out of the
+  generated schema rather than importing it.
+
+A mirror can drift from its original, so each is pinned by a parity test that
+compares the two decision tables value by value rather than restating the
+expected results. `test/unit/app-runtime-guards-parity.test.ts` and
+`test/unit/app-reloadability-parity.test.ts` assert whole-object equality
+against the shared registries over a fixed probe set.
+
+The mirrored guards recurse where the inline checks they replaced were shallow.
+Every config value reaching them has already been through a JSON5 parse and an
+Ajv schema validation, or was written as a literal `{}`, so no non-JSON value
+can arrive. The recursion matches what `stringifyConfig` and `sortKeys` already
+require. The related changes in the same commit are equally
+behaviour-preserving: `Object.entries(...).sort()` became `.toSorted()` on an
+array that was already a fresh copy, and `issues[0]` became `issues.at(0)`.
+
+### An undetermined pack architecture keeps the default snapshot
+
+The macOS job packs both `x64` and `arm64` on an arm64 runner, but
+`bin/run-v8-snapshot.js` generates only `arm64` artefacts there. The copy hook
+resolved the architecture from the `afterPack` context and fell back to
+`process.arch` when that context did not carry one. On that runner the fallback
+returned the host's architecture, so the `x64` bundle silently received the
+`arm64` snapshot. That is a wrong-architecture copy, which Electron cannot
+load, and it is indistinguishable from success in the log.
+
+`resolveContextArch` now returns `undefined` rather than the host architecture,
+and the hook logs and keeps Electron's bundled default snapshot, which is the
+supported fallback. Absent artefacts and an undetermined architecture are
+handled the same way; a partially written cache directory stays a hard error,
+because that is a failed generation rather than an unsupported host.
+`test/unit/cp-snapshot.test.ts` covers all three cases.
+
 ## Known risks and limitations
 
 - Oxlint's JavaScript plug-in interface is alpha. The exact pins keep the
@@ -219,6 +297,13 @@ lists the omitted projects and the commands that cover them.
   change to `shared/`, `frontend/`, `backend/`, or the app build config must
   also run `bun run build:packages` and
   `bunx tsgo --project app/tsconfig.build.json` before it is pushed.
+- Mirrored app-local modules are a deliberate duplication. Each one is pinned
+  by a parity test, and a change to a shared implementation must carry the
+  mirror and its parity test in the same commit.
+- `cli/index.ts`, `lib/components/terms.tsx`, and `lib/containers/hyper.tsx`
+  sit outside every strict project, so they are type-checked only at
+  `strict: false`. This is a pre-existing gap that the lint profiles surfaced
+  rather than introduced.
 
 ## References
 
