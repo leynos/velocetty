@@ -1,12 +1,14 @@
 /** @file Ensures runtime tab providers are registered even when initially disabled. */
 import {randomUUID} from 'node:crypto';
 
-import {expect, mock, test} from 'bun:test';
+import {expect, mock, test, type Mock} from 'bun:test';
+import {registerModuleMock} from '../testUtils/mock-module';
 
 import {GOLDEN_PATH_PLUGIN_ID} from '@shared/runtime/golden-path-demo';
+import type {JsonObject} from '@shared/types/json';
 
 type RendererConfig = {
-  plugins?: Record<string, Record<string, unknown>>;
+  plugins?: Record<string, JsonObject>;
 };
 
 type RuntimeTabProviderHarness = {
@@ -14,23 +16,26 @@ type RuntimeTabProviderHarness = {
   notifyRendererConfigSubscribers: () => void;
   plugins: typeof import('../../lib/utils/plugins');
   setRendererConfig: (nextConfig: RendererConfig) => void;
-  subscribeRendererConfigMock: typeof mock<(_: () => void) => () => void>;
+  // `Mock<…>` rather than `typeof mock<…>`: the latter is the type of the
+  // `mock` factory itself, complete with `module`, `restore`, and
+  // `clearAllMocks`, which no individual mock carries.
+  subscribeRendererConfigMock: Mock<(_: () => void) => () => void>;
 };
 
 const registerPluginsModuleMocks = (
   getRendererConfig: () => RendererConfig,
   subscribeRendererConfigMock: RuntimeTabProviderHarness['subscribeRendererConfigMock']
 ) => {
-  mock.module('../../lib/utils/config', () => ({
+  registerModuleMock('../../lib/utils/config', () => ({
     getConfig: () => getRendererConfig(),
     subscribe: subscribeRendererConfigMock
   }));
 
-  mock.module('../../lib/utils/notify', () => ({
+  registerModuleMock('../../lib/utils/notify', () => ({
     default: () => {}
   }));
 
-  mock.module('../../lib/utils/remote-plugins', () => ({
+  registerModuleMock('../../lib/utils/remote-plugins', () => ({
     loadRemotePluginsModule: () => ({
       getPaths: () => ({
         plugins: [],
@@ -41,7 +46,7 @@ const registerPluginsModuleMocks = (
     })
   }));
 
-  mock.module('../../lib/utils/ipc-child-process', () => ({
+  registerModuleMock('../../lib/utils/ipc-child-process', () => ({
     default: {
       exec: () => {},
       execFile: () => {}
@@ -89,7 +94,8 @@ const createRuntimeTabProviderHarness = async (): Promise<RuntimeTabProviderHarn
   }
 };
 
-test('registers runtime tab providers for live enablement toggles', async () => {
+// Bun module mocks replace imports in the shared test runtime during setup.
+test.serial('registers runtime tab providers for live enablement toggles', async () => {
   const harness = await createRuntimeTabProviderHarness();
   try {
     harness.setRendererConfig({

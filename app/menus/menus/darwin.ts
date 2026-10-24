@@ -3,6 +3,7 @@
 import {app} from 'electron';
 import type {BrowserWindow, MenuItemConstructorOptions} from 'electron';
 import type {CommandId} from '@shared/types/commands';
+import {asCommandId} from '../../utils/shared-ids';
 
 const darwinMenu = (
   commandKeys: Record<string, string>,
@@ -25,7 +26,7 @@ const darwinMenu = (
         label: 'Preferences...',
         accelerator: commandKeys['window:preferences'],
         click() {
-          execCommand('window:preferences' as CommandId);
+          execCommand(asCommandId('window:preferences'));
         }
       },
       {

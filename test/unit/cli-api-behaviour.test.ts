@@ -1,5 +1,6 @@
 /** @file Covers install, uninstall, and listing branches in CLI plugin APIs. */
 import {expect, test} from 'bun:test';
+import {isObject, isString} from '@shared/types/guards';
 
 import JSON5 from 'json5';
 import path from 'node:path';
@@ -17,12 +18,17 @@ type GotError = {
   message: string;
 };
 
+/**
+ * Registry request options as `cli/api.ts` sends them.
+ *
+ * Matches the production client surface exactly, because a double's parameter
+ * types are contravariant: anything wider would leave the recorded options
+ * unable to stand in for the real request.
+ */
 type GotRequestOptions = {
-  readonly responseType?: string;
-  readonly signal?: AbortSignal;
-  readonly timeout?: {
-    readonly request?: number;
-  };
+  readonly responseType: 'json';
+  readonly signal: AbortSignal | undefined;
+  readonly timeout: {readonly request: number};
 };
 
 type CliHarnessOptions = {
@@ -67,30 +73,52 @@ type CliHarness = {
 const TEST_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const CLI_DIRECTORY = path.join(TEST_DIRECTORY, '..', '..', 'cli');
 
+/** Narrows a parsed value to a config payload declaring both plugin lists. */
+const isConfigPayload = (value: unknown): value is {plugins: unknown; localPlugins: unknown} =>
+  isObject(value) && 'plugins' in value && 'localPlugins' in value;
+
+const parseConfigData = (contents: string): ConfigData => {
+  const value = JSON5.parse(contents);
+  if (!isConfigPayload(value)) {
+    throw new TypeError('Expected persisted config to contain plugins and localPlugins.');
+  }
+  return {plugins: value.plugins, localPlugins: value.localPlugins};
+};
+
+/**
+ * Filesystem double backed by the harness state.
+ *
+ * The read result is asserted to be a string here rather than typed as one
+ * upstream: `fsReadFileSyncValue` exists so a test can supply JSON5 containing
+ * comments, and a non-string would be a broken fixture rather than a valid
+ * case.
+ */
 const buildFsModule = (state: CliHarnessState) => ({
-  existsSync: (candidatePath: unknown) => {
+  existsSync: (candidatePath: string) => {
     if (state.existingPaths) {
-      return typeof candidatePath === 'string' && state.existingPaths.has(candidatePath);
+      return state.existingPaths.has(candidatePath);
     }
     return state.fsExistsSyncResult;
   },
-  readFileSync: () => {
+  readFileSync: (_target: string, _encoding: 'utf8') => {
     state.fsReadFileSyncCallCount += 1;
-    return state.hasReadFileSyncOverride ? state.fsReadFileSyncValue : JSON.stringify(state.configData);
+    const contents = state.hasReadFileSyncOverride ? state.fsReadFileSyncValue : JSON.stringify(state.configData);
+    if (!isString(contents)) {
+      throw new TypeError('Expected the read-file override to be a string.');
+    }
+    return contents;
   },
-  writeFileSync: (_path: unknown, contents: string) => {
-    const parsed = JSON5.parse(contents) as ConfigData;
+  writeFileSync: (_target: string, contents: string, _encoding: 'utf8') => {
+    const parsed = parseConfigData(contents);
     state.savedConfigs.push(parsed);
     state.configData = parsed;
   }
 });
 
 const buildGotClient = (state: CliHarnessState) => ({
-  get: (url: string, requestOptions?: GotRequestOptions) => {
+  get: (url: string, requestOptions: GotRequestOptions) => {
     state.requestedUrls.push(url);
-    if (requestOptions) {
-      state.gotOptions.push(requestOptions);
-    }
+    state.gotOptions.push(requestOptions);
     if (state.gotError) {
       return Promise.reject(state.gotError);
     }
@@ -172,7 +200,7 @@ test('install() persists plugin entries from npm checks', async () => {
   expect(state.requestedUrls).toEqual(['https://registry.npmjs.org/plugin-alpha']);
   expect(state.gotOptions[0]).toMatchObject({
     signal: controller.signal,
-    timeout: {request: 10000}
+    timeout: {request: 10_000}
   });
   expect(state.savedConfigs.at(-1)).toEqual({
     plugins: ['plugin-alpha'],
@@ -217,16 +245,18 @@ test('install() maps npm and transport errors to stable user-facing messages', a
 test('public plugin methods validate runtime plugin inputs', async () => {
   const {api} = createCliHarness();
 
-  await expect(api.existsOnNpm('   ' as never)).rejects.toThrow('Plugin specifier cannot be empty');
-  await expect(api.install('   ' as never)).rejects.toThrow('Plugin specifier cannot be empty');
-  expect(() => api.isInstalled('   ' as never)).toThrow('Plugin specifier cannot be empty');
-  await expect(api.uninstall('   ' as never)).rejects.toThrow('Plugin specifier cannot be empty');
+  await expect(api.existsOnNpm('   ')).rejects.toThrow('Plugin specifier cannot be empty');
+  await expect(api.install('   ')).rejects.toThrow('Plugin specifier cannot be empty');
+  expect(() => api.isInstalled('   ')).toThrow('Plugin specifier cannot be empty');
+  await expect(api.uninstall('   ')).rejects.toThrow('Plugin specifier cannot be empty');
 });
 
 test('install() validates runtime option inputs', async () => {
   const {api} = createCliHarness();
 
+  // SAFETY: These values deliberately violate the static option contract to test runtime validation.
   await expect(api.install('plugin-alpha', {locally: 'yes' as never})).rejects.toThrow();
+  // SAFETY: This value deliberately violates the AbortSignal contract to test runtime validation.
   await expect(api.install('plugin-alpha', {signal: 'not-a-signal' as never})).rejects.toThrow();
 });
 
@@ -353,7 +383,7 @@ test.each([
 });
 
 test('configPath uses APPDATA for Windows production resolution when provided', () => {
-  const appData = 'C:\\Users\\alice\\AppData\\Roaming';
+  const appData = String.raw`C:\Users\alice\AppData\Roaming`;
   const expectedPath = path.win32.join(appData, 'Hyper', 'config.json5');
   const {api} = createCliHarness({
     appData,
@@ -378,7 +408,7 @@ test.each([
   },
   {
     label: 'treats blank APPDATA as unset on Windows',
-    appData: '   ' as string | undefined,
+    appData: '   ',
     filename: 'config.json5',
     homeDirectory: 'C:\\Users\\carol'
   }

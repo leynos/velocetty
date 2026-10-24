@@ -43,10 +43,10 @@ coverage:
 	bun run test:coverage
 
 build:
-	bun run build && bun bin/run-electron-builder.cjs
+	bun run build && bun bin/run-electron-builder.mjs
 
 build-fast:
-	bun run build && bun bin/run-electron-builder.cjs --dir
+	bun run build && bun bin/run-electron-builder.mjs --dir
 
 clean:
 	bun run clean

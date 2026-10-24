@@ -8,13 +8,25 @@
  * - Restart-required changes: queued with structured diagnostics for UI warning
  */
 
-import type {configOptions, ConfigReloadDiagnostic, ConfigReloadResult} from '@shared/types/config';
-import type {Reloadability} from '@shared/constants/config-reloadability';
-import {getKeyScope, getReloadability} from '@shared/constants/config-reloadability';
+import type {
+  configOptions,
+  ConfigReloadClassification,
+  ConfigReloadDiagnostic,
+  ConfigReloadResult
+} from '@shared/types/config';
+import {getKeyScope, getReloadability} from './reloadability-registry';
 import {getChangedKeys} from './layering';
+import {isBoolean, isNumber, isString} from '../utils/runtime-guards';
 
-/** Explicit live-patch type that models deletion by setting keys to `undefined`. */
-export type LiveConfigPatch = Record<string, unknown>;
+type OptionalConfigKey = {
+  [Key in keyof configOptions]-?: undefined extends configOptions[Key] ? Key : never;
+}[keyof configOptions];
+
+/** Live patches may clear optional config fields by setting them to `undefined`. */
+export type LiveConfigPatch = {
+  [Key in keyof configOptions]?: Key extends OptionalConfigKey ? configOptions[Key] | undefined : configOptions[Key];
+};
+type ReloadOperationResult = {success: boolean; error?: unknown};
 
 /**
  * Merges live config changes into current config, treating undefined as deletion.
@@ -27,17 +39,20 @@ export type LiveConfigPatch = Record<string, unknown>;
  * @returns A new configuration with live changes applied.
  */
 const mergeLiveConfig = (currentConfig: configOptions, liveConfig: LiveConfigPatch): configOptions => {
-  const result: LiveConfigPatch = {...currentConfig};
+  const result = {...currentConfig};
 
-  for (const [key, value] of Object.entries(liveConfig)) {
+  // SAFETY: Live patches are constructed from keys of a resolved config object.
+  for (const key of Object.keys(liveConfig) as Array<keyof configOptions>) {
+    const value = liveConfig[key];
     if (value === undefined) {
-      delete result[key];
+      // SAFETY: LiveConfigPatch permits undefined only for optional config fields.
+      delete result[key as OptionalConfigKey];
     } else {
-      result[key] = value;
+      Object.assign(result, {[key]: value});
     }
   }
 
-  return result as configOptions;
+  return result;
 };
 
 /** Minimal logger interface for reload handler diagnostics. */
@@ -88,8 +103,8 @@ const SENSITIVE_KEYS = ['env', 'plugins', 'bellSound'] as const;
 const isReloadDebugEnabled = () => process.env.DEBUG_CONFIG_RELOAD === '1';
 
 /** Returns true when the key is in the sensitive-keys list. */
-const isSensitiveKey = (key?: unknown): key is (typeof SENSITIVE_KEYS)[number] =>
-  typeof key === 'string' && SENSITIVE_KEYS.includes(key as (typeof SENSITIVE_KEYS)[number]);
+const isSensitiveKey = (key?: string): key is (typeof SENSITIVE_KEYS)[number] =>
+  key !== undefined && SENSITIVE_KEYS.some((sensitiveKey) => sensitiveKey === key);
 
 /** Truncates a string to `maxLength` characters, appending `...` when cut. */
 const truncateString = (value: string, maxLength: number): string =>
@@ -100,7 +115,7 @@ const truncateString = (value: string, maxLength: number): string =>
  * Returns `null` for all other types.
  */
 const formatPrimitive = (value: unknown): string | null => {
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (isNumber(value) || isBoolean(value)) return String(value);
   return null;
 };
 
@@ -117,7 +132,7 @@ const truncateValue = (value: unknown, key?: string, maxLength = 50): string => 
   if (isSensitiveKey(key)) return '[redacted]';
   if (value === undefined) return 'undefined';
   if (value === null) return 'null';
-  if (typeof value === 'string') return truncateString(value, maxLength);
+  if (isString(value)) return truncateString(value, maxLength);
   return formatPrimitive(value) ?? '[object]';
 };
 
@@ -186,26 +201,24 @@ export const classifyConfigChange = (key: string, oldValue: unknown, newValue: u
   }
 
   const classification = entry.classification;
-  const isSensitive = SENSITIVE_KEYS.includes(key as (typeof SENSITIVE_KEYS)[number]);
+  const isSensitive = isSensitiveKey(key);
   const changeDescription = isSensitive
     ? `${key}: ${truncateValue(oldValue, key)}`
     : `${key}: ${truncateValue(oldValue, key)} \u2192 ${truncateValue(newValue, key)}`;
 
-  if (classification === 'live') {
-    return {
-      path: key,
-      message: `Configuration change applied live: ${changeDescription}`,
-      classification: 'live',
-      rationale: entry.rationale
-    };
-  } else {
-    return {
-      path: key,
-      message: `Configuration change requires restart: ${changeDescription}. ${entry.rationale}`,
-      classification: 'restart',
-      rationale: entry.rationale
-    };
-  }
+  return classification === 'live'
+    ? {
+        path: key,
+        message: `Configuration change applied live: ${changeDescription}`,
+        classification: 'live',
+        rationale: entry.rationale
+      }
+    : {
+        path: key,
+        message: `Configuration change requires restart: ${changeDescription}. ${entry.rationale}`,
+        classification: 'restart',
+        rationale: entry.rationale
+      };
 };
 
 /**
@@ -216,11 +229,9 @@ export const classifyConfigChange = (key: string, oldValue: unknown, newValue: u
  * @returns Array of reload diagnostics for all changed keys.
  */
 export const detectConfigChanges = (oldConfig: configOptions, newConfig: configOptions): ConfigReloadDiagnostic[] => {
-  const changedKeys = getChangedKeys(oldConfig as Record<string, unknown>, newConfig as Record<string, unknown>);
+  const changedKeys = getChangedKeys(oldConfig, newConfig);
 
-  return changedKeys.map((key) =>
-    classifyConfigChange(key, (oldConfig as Record<string, unknown>)[key], (newConfig as Record<string, unknown>)[key])
-  );
+  return changedKeys.map((key) => classifyConfigChange(String(key), oldConfig[key], newConfig[key]));
 };
 
 /**
@@ -255,7 +266,7 @@ export const partitionChanges = (diagnostics: ConfigReloadDiagnostic[]) => {
  * @returns Partial config with only live-reloadable changes.
  */
 export const extractLiveConfigChanges = (
-  _oldConfig: configOptions,
+  oldConfig: configOptions,
   newConfig: configOptions,
   liveDiagnostics: ConfigReloadDiagnostic[]
 ): LiveConfigPatch => {
@@ -264,11 +275,15 @@ export const extractLiveConfigChanges = (
   // Iterate live diagnostics and extract values from newConfig
   // Including undefined values to properly handle key removals
   for (const {path: key} of liveDiagnostics) {
-    result[key] = (newConfig as LiveConfigPatch)[key];
+    if (hasConfigKey(oldConfig, key) || hasConfigKey(newConfig, key)) {
+      Object.assign(result, {[key]: newConfig[key]});
+    }
   }
 
   return result;
 };
+
+const hasConfigKey = (config: configOptions, key: string): key is keyof configOptions => Object.hasOwn(config, key);
 
 /**
  * Creates a reload handler with the given dependencies.
@@ -295,7 +310,7 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
     newConfig: configOptions,
     liveChanges: ConfigReloadDiagnostic[],
     autoApplyLive: boolean
-  ): {success: boolean; error?: unknown} => {
+  ): ReloadOperationResult => {
     if (!autoApplyLive || liveChanges.length === 0) return {success: true};
     const liveConfig = extractLiveConfigChanges(currentConfig, newConfig, liveChanges);
     try {
@@ -308,16 +323,16 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
         lastAppliedConfig: mergeLiveConfig(currentConfig, liveConfig)
       };
       return {success: true};
-    } catch (err) {
-      log.warn('[reload-handler] Failed to apply live config changes:', err);
-      return {success: false, error: err};
+    } catch (error) {
+      log.warn('[reload-handler] Failed to apply live config changes:', error);
+      return {success: false, error: error};
     }
   };
 
   const updatePendingRestartState = (
     restartChanges: ConfigReloadDiagnostic[],
     emitWarnings: boolean
-  ): {success: boolean; error?: unknown} => {
+  ): ReloadOperationResult => {
     if (restartChanges.length === 0) return {success: true};
     const pendingMap = new Map<string, ConfigReloadDiagnostic>();
     for (const change of restartChanges) {
@@ -326,14 +341,14 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
     if (emitWarnings) {
       try {
         emitRestartWarning(restartChanges);
-      } catch (err) {
-        log.warn('[reload-handler] Failed to emit restart warning:', err);
-        return {success: false, error: err};
+      } catch (error) {
+        log.warn('[reload-handler] Failed to emit restart warning:', error);
+        return {success: false, error: error};
       }
     }
     state = {
       ...state,
-      pendingRestartChanges: Array.from(pendingMap.values()),
+      pendingRestartChanges: [...pendingMap.values()],
       hasPendingRestartChanges: pendingMap.size > 0
     };
     log.warn('[reload-handler] Queued restart-required config changes:', {
@@ -373,7 +388,6 @@ export const createReloadHandler = (dependencies: ReloadHandlerDependencies) => 
       config: state.lastAppliedConfig,
       appliedLive: opts.autoApplyLive && liveResult.success ? liveChanges.map((d) => d.path) : [],
       restartRequired: restartResult.success ? restartChanges : [],
-      validationErrors: [],
       errors: errors.length > 0 ? errors : undefined
     };
   };
@@ -471,7 +485,7 @@ export const keyIsLiveReloadable = (key: string): boolean => {
  * @param key - The configuration key.
  * @returns The classification or undefined if unknown.
  */
-export const getKeyReloadClassification = (key: string): Reloadability | undefined => {
+export const getKeyReloadClassification = (key: string): ConfigReloadClassification | undefined => {
   const scope = getKeyScope(key);
   const entry = getReloadability(key, scope);
   return entry?.classification;

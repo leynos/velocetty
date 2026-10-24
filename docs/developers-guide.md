@@ -201,6 +201,17 @@ for active configuration files:
   `config.json5`; avoid full-file canonical rewrites for targeted runtime
   settings updates.
 
+`shared/schemas/schema.json` and `app/config/schema.json` are generated, but
+tracked. `bun run generate-schema` derives them from the types in
+`typings/config.d.ts`; `bun install` regenerates them from `postinstall`. Keep
+the committed copies in step with the source types, because CI regenerates on
+checkout: a stale file passes locally and then changes under the build.
+`typescript-json-schema` names each definition after the TypeScript type it
+came from, so renaming a type in `typings/` or `shared/src/types/` rewrites the
+generated `$ref` keys. Read those names from the schema rather than hardcoding
+them, and confirm `bun run generate-schema` leaves the working tree clean
+before committing a type change.
+
 ## Configuration layering and reloadability practice
 
 Roadmap item `3.1.2` defines configuration layering rules and hot-reload
@@ -499,6 +510,25 @@ Required coverage categories:
 Follow `docs/execplans/replace-webpack-babel-with-esbuild.md` for migration
 ordering and milestone gates.
 
+### Main-process evaluation order
+
+The app build emits CommonJS, so Node evaluates a `require` as soon as it is
+reached, and the importing module's own body resumes only afterwards. A module
+that reads the configuration while its body runs therefore observes whatever
+`config.setup()` has done so far, and every import of it inherits that timing.
+
+Two modules read the configuration at module scope: `app/plugins.ts` resolves
+the plugin and local-plugin lists, and `app/session.ts` reads `useConpty`. The
+entry point, `app/index.mts`, calls `config.setup()` before importing
+`./start.js` so both see an initialized configuration.
+
+Keep it that way. Moving the setup call into `app/start.ts` cannot work: every
+statement in that file runs after its own import block, which reaches both
+modules. A module that needs configuration at load time should instead read it
+inside the function that uses it, which removes the dependence on import order
+altogether and is the preferred shape for new code.
+`test/unit/app-startup-order.test.ts` guards the entry-point ordering.
+
 ## Electron runtime alignment
 
 When upgrading Electron, keep runtime and native-module rebuild settings
@@ -507,7 +537,7 @@ aligned in the same change:
 - Update `devDependencies.electron` in `package.json`.
 - Align `@types/node` in `package.json` to the bundled Node.js major for the
   target Electron release.
-- Bump the fallback target version in `bin/rebuild-node-pty.cjs`.
+- Bump the fallback target version in `bin/rebuild-node-pty.mjs`.
 - Adjust `app/package.json` if runtime dependencies (for example, `node-pty`)
   need a compatibility bump for the new Electron Application Binary Interface
   (ABI).
@@ -626,14 +656,19 @@ Windows runtime reliability baseline after roadmap item `1.4.15` Windows scope:
   `${{ github.workspace }}/node_modules/node-gyp/bin/node-gyp.js`. Preserve
   this forward-slash `npm_config_node_gyp` value to avoid introducing
   path-separator regressions.
-- Keep `bin/rebuild-node-pty.cjs` running node-gyp through the Node executable
+- Keep `bin/rebuild-node-pty.mjs` running node-gyp through the Node executable
   (`NODE` environment variable when present, otherwise `node` on `PATH`), not
   `process.execPath`. CI runs this script via Bun; invoking node-gyp with Bun
   can trigger Windows header-extraction `EINVAL` failures.
 - Keep repository script/config text files normalized to LF in
-  `.gitattributes` for extensions checked by Biome (`*.json`, `*.jsonc`, `*.js`,
-  `*.cjs`, `*.mjs`, `*.ts`, and `*.tsx`). Windows checkout can otherwise
-  convert those files to CRLF and trip `make lint`/Biome formatting checks.
+  `.gitattributes` for every extension checked by Biome (`*.json`, `*.jsonc`,
+  `*.js`, `*.cjs`, `*.mjs`, `*.mts`, `*.ts`, `*.tsx`, and `*.css`). Windows
+  checkout can otherwise convert those files to CRLF and trip `make lint`/Biome
+  formatting checks. Windows CI run `39834593952` (2026-10-22) failed this way
+  on `app\index.mts`: the rules covered `*.mjs` but not `*.mts`, so the only
+  `.mts` file in the repository checked out as CRLF even though its committed
+  blob was LF-clean. When adding a file with an extension absent from
+  `.gitattributes`, add the rule in the same change.
 - Windows aarch64 CI is currently blocked by upstream Bun distribution support.
   Evidence (captured 2026-02-25): latest Bun release `bun-v1.3.9` (published
   2026-02-08) includes `bun-windows-x64*` assets and no Windows arm64 asset.
@@ -693,6 +728,11 @@ release CI installs); `bun install` does not provide it, so install it once with
 `markdownlint-cli2`, which CI provides through its GitHub action; locally,
 install it with `bun install -g markdownlint-cli2` so it is on `PATH`.
 
+Biome owns formatting and general lint rules. Oxlint adds the recommended
+Unicorn and `ai-deslop` rule sets; `make lint` runs both linters and the
+package boundary check. The exact rule list, pins, and the documented `null`
+exception are recorded in [ADR 006](adr-006-oxlint-plugin-strategy.md).
+
 Run the standard gates before opening a pull request:
 
 - `make check-fmt`
@@ -745,6 +785,57 @@ Type checking runs via `tsgo` and the shared `tsconfig.typecheck.json` project:
 `tsgo` 7.0.0-dev.20260128.1 supports `--build`, `--watch`, `--pretty`,
 `--preserveWatchOutput`, and `--project`; the `dev` and `build` scripts rely on
 those flags.
+
+### Local gates do not cover the whole build surface
+
+`make typecheck` and `make lint` both compile `tsconfig.typecheck.json`, which
+inherits `strict: true` and `useUnknownInCatchVariables: true` from
+`tsconfig.base.json` and relaxes only `noUncheckedIndexedAccess`,
+`noPropertyAccessFromIndexSignature`, `exactOptionalPropertyTypes`,
+`noImplicitOverride`, and `verbatimModuleSyntax`. It includes `app/`, `lib/`,
+`cli/`, `typings/`, `shared/src/`, and `test/`.
+
+Those remaining relaxations are a measured ratchet, not an oversight. Turning
+every base flag on was tried against the same tree and reported 408 errors
+across 69 files; `noUncheckedIndexedAccess` alone accounts for most of them,
+because `seamless-immutable` maps an immutable record to an index access that
+yields `T | undefined`. Strict nullability, which is now on, is what catches
+the defects that matter: a lookup that can miss, a callback that can be absent,
+and a `catch` binding that is `unknown`. The optional-property and index-access
+flags are the next step on the ratchet, one directory at a time.
+
+Four production projects therefore fall outside every local gate:
+
+| Project        | Command                                | Strictness           |
+| -------------- | -------------------------------------- | -------------------- |
+| `shared/`      | `bun run build:shared`                 | `tsconfig.base.json` |
+| `frontend/`    | `bun run build:frontend`               | `tsconfig.base.json` |
+| `backend/`     | `bun run build:backend`                | `tsconfig.base.json` |
+| `app/` (build) | `bunx tsgo -p app/tsconfig.build.json` | `tsconfig.base.json` |
+
+Table 2: production projects that the local typecheck gate omits.
+
+The esbuild bundle (`build/esbuild/`) and the emitted `CommonJS` interop are
+also unchecked locally. A change can pass every local gate and still fail CI,
+which is what strict mode catches: a `satisfies` registry that loses its
+literal key type rejects a dynamic index, a lookup that can miss needs the
+guard strict nullability demands, and a `verbatimModuleSyntax` import needs the
+`type` modifier.
+
+The `test/` tree *is* checked, by the typecheck project above. It joined that
+project because the unit runner strips types instead of checking them, so the
+tree had been compiled by nothing at all — a gap that had already allowed a
+test double whose shape did not match the contract it stood in for.
+
+Run the omitted projects before pushing a change that touches `shared/`,
+`frontend/`, `backend/`, or `app/`:
+
+- `bun run build:packages`
+- `bunx tsgo --project app/tsconfig.build.json`
+
+One accepted cost follows from this arrangement. `shared/src/` is typechecked
+twice, once relaxed and once strict, so a fix that satisfies the strict project
+stays valid under the relaxed one.
 
 ## Tests
 
@@ -863,6 +954,26 @@ cleanup callback or accept injected dependencies directly. When a module under
 test captures transport, config, or filesystem state at module scope, add the
 smallest behaviour-preserving factory seam needed, so tests can provide
 test-owned dependencies without long-lived module mocks.
+
+`mock.module(...)` is scoped to the whole test process, not to the file that
+called it. A registration therefore stays in force for every file that runs
+after it, and a later registration for the same specifier replaces it. Two
+consequences follow:
+
+- **A double must be faithful.** Answer every export the real module has, not
+  only the ones this suite reads, because another suite may import the module
+  next. An `app/package.json` stub carrying only `{version}` breaks
+  `app/index.mts`, which default-imports the metadata object; an `app/config`
+  stub carrying only `{setup}` breaks any importer that reads
+  `getDefaultProfile`.
+- **File order must not matter.** Claim the modules a suite depends on at
+  module scope so an earlier suite's registration cannot decide its behaviour.
+
+`test:unit:run` passes `--isolate` for this reason: Bun then gives each file a
+fresh global object and mock registry, so the hazard cannot recur, at a cost of
+a few seconds across the full suite. Without it, whether a leak bites depends
+on the interleaving Bun chooses, which differed between the Windows build and
+the Linux and macOS builds of the same commit.
 
 For roadmap item 9.3.7 and similar timer/logger-dependent module work, use
 injected seams instead of process-global mutations:
@@ -996,7 +1107,8 @@ already exist.
 
 ## Default test gate
 
-`make test` runs linting plus the unit test suite. It intentionally omits E2E
+`make test` runs the unit test suite. Run `make lint` separately for the Biome,
+Oxlint, and package-boundary checks. The test target intentionally omits E2E
 tests to keep the default loop fast.
 
 ### Sub-component extraction

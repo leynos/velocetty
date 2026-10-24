@@ -12,20 +12,28 @@ import type {Dispatch, Middleware} from 'redux';
 
 import type {SessionPtyDataAction} from '@shared/constants/sessions';
 import type {HyperActions, HyperState} from '../../typings/hyper';
+import {isNumber, isObject, isString} from '@shared/types/guards';
 import terms from '../terms';
 
-const isSessionPtyDataAction = (action: unknown): action is SessionPtyDataAction => {
-  if (typeof action !== 'object' || action === null) {
-    return false;
-  }
-  const maybeAction = action as Partial<SessionPtyDataAction>;
-  return (
-    maybeAction.type === 'SESSION_PTY_DATA' &&
-    typeof maybeAction.uid === 'string' &&
-    typeof maybeAction.data === 'string' &&
-    typeof maybeAction.now === 'number'
-  );
-};
+/**
+ * Narrows an action to one carrying PTY output for a session.
+ *
+ * Each `in` check is load-bearing: `isObject` narrows to `object`, which has no
+ * index signature, and only the check for a field lets the read that follows be
+ * an ordinary property access. The field values are decoded by the shared
+ * boundary guards, so this predicate is the single place the action's shape
+ * contract is established.
+ */
+const isSessionPtyDataAction = (action: unknown): action is SessionPtyDataAction =>
+  isObject(action) &&
+  'type' in action &&
+  action.type === 'SESSION_PTY_DATA' &&
+  'uid' in action &&
+  isString(action.uid) &&
+  'data' in action &&
+  isString(action.data) &&
+  'now' in action &&
+  isNumber(action.now);
 
 const writeMiddleware: Middleware<{}, HyperState, Dispatch<HyperActions>> = () => (next) => (action) => {
   if (isSessionPtyDataAction(action)) {

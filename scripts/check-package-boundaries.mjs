@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /** @file Enforces one-way imports across frontend, backend, and shared layers. */
 import {readdirSync, readFileSync, statSync} from 'node:fs';
-import {dirname, extname, relative, resolve} from 'node:path';
+import path from 'node:path';
 import ts from 'typescript';
 
 const rootDir = process.cwd();
@@ -30,12 +30,12 @@ const layerRules = {
 
 const allowedImportExceptions = new Set(['lib/components/term.tsx|../../app/utils/renderer-utils']);
 
-const toNormalizedRelativePath = (filePath) => relative(rootDir, filePath).replace(/\\/g, '/');
+const toNormalizedRelativePath = (filePath) => path.relative(rootDir, filePath).replaceAll('\\', '/');
 
 const isAllowedImportException = (filePath, importSpecifier) =>
   allowedImportExceptions.has(`${toNormalizedRelativePath(filePath)}|${importSpecifier}`);
 
-const isSourceFile = (filePath) => sourceExtensions.has(extname(filePath));
+const isSourceFile = (filePath) => sourceExtensions.has(path.extname(filePath));
 
 const getScriptKind = (filePath) => {
   if (filePath.endsWith('.tsx')) {
@@ -130,7 +130,7 @@ const collectFiles = (directoryPath, output = []) => {
   }
 
   for (const entry of readdirSync(directoryPath)) {
-    const fullPath = resolve(directoryPath, entry);
+    const fullPath = path.resolve(directoryPath, entry);
     const entryStats = statSync(fullPath, {throwIfNoEntry: false});
     if (!entryStats) {
       continue;
@@ -150,7 +150,7 @@ const collectFiles = (directoryPath, output = []) => {
 };
 
 const getLayerForFile = (filePath) => {
-  const relativePath = relative(rootDir, filePath).replace(/\\/g, '/');
+  const relativePath = path.relative(rootDir, filePath).replaceAll('\\', '/');
 
   for (const [layerName, roots] of Object.entries(layerDefinitions)) {
     if (roots.some((root) => relativePath.startsWith(`${root}/`))) {
@@ -166,8 +166,8 @@ const resolvesToDisallowedRoot = (fromFile, importSpecifier, disallowedRoots) =>
     return false;
   }
 
-  const candidate = resolve(dirname(fromFile), importSpecifier).replace(/\\/g, '/');
-  const relativeCandidate = relative(rootDir, candidate).replace(/\\/g, '/');
+  const candidate = path.resolve(path.dirname(fromFile), importSpecifier).replaceAll('\\', '/');
+  const relativeCandidate = path.relative(rootDir, candidate).replaceAll('\\', '/');
 
   return disallowedRoots.some((root) => relativeCandidate.startsWith(`${root}/`) || relativeCandidate === root);
 };
@@ -198,7 +198,7 @@ const violations = [];
 
 for (const roots of Object.values(layerDefinitions)) {
   for (const root of roots) {
-    for (const filePath of collectFiles(resolve(rootDir, root))) {
+    for (const filePath of collectFiles(path.resolve(rootDir, root))) {
       const layer = getLayerForFile(filePath);
       if (!layer) {
         continue;
@@ -216,7 +216,7 @@ for (const roots of Object.values(layerDefinitions)) {
 
         if (aliasViolation || relativeViolation || bareRootViolation) {
           violations.push({
-            file: relative(rootDir, filePath),
+            file: path.relative(rootDir, filePath),
             importSpecifier,
             layer
           });

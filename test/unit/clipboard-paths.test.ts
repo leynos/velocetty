@@ -9,8 +9,8 @@
  * Cross-links:
  * - Source: `app/utils/clipboard-paths.ts`
  */
+import path from 'node:path';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 import {describe, expect, test} from 'bun:test';
@@ -19,7 +19,7 @@ import {CLIPBOARD_URI_LIST_MIME, parseUriList, readClipboardFilePaths} from '../
 import type {ClipboardItemPort} from '../../app/utils/clipboard-paths';
 
 /** Absolute path in the platform temp directory. */
-const tempPath = (name: string): string => join(tmpdir(), name);
+const tempPath = (name: string): string => path.join(tmpdir(), name);
 
 /** `file:` URL whose decoded path is `tempPath(name)`. */
 const tempUri = (name: string): URL => pathToFileURL(tempPath(name));
@@ -71,7 +71,8 @@ describe('readClipboardFilePaths', () => {
   const expectedPaths = [tempPath('a.txt')];
 
   test('reads the URI list payload as a Blob', async () => {
-    const clipboard = createClipboard([createItem([CLIPBOARD_URI_LIST_MIME], new Blob([tempUri('a.txt').href]))]);
+    const payload = new Blob([tempUri('a.txt').href]);
+    const clipboard = createClipboard([createItem([CLIPBOARD_URI_LIST_MIME], payload)]);
 
     await expect(readClipboardFilePaths(clipboard)).resolves.toEqual(expectedPaths);
   });

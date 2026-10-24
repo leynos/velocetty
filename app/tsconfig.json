@@ -2,17 +2,16 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "allowJs": false,
-    "baseUrl": ".",
     "declarationDir": "../dist/tmp/appdts/",
     "exactOptionalPropertyTypes": false,
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "noImplicitOverride": false,
     "noPropertyAccessFromIndexSignature": false,
     "noUncheckedIndexedAccess": false,
     "outDir": "../dist/app",
     "paths": {
-      "@shared/*": ["../shared/src/*"]
+      "@shared/*": ["./../shared/src/*"]
     },
     "noImplicitAny": false,
     "useUnknownInCatchVariables": false,

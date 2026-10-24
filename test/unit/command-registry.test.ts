@@ -1,12 +1,16 @@
 /** @file Verifies command-registry keymap and handler behaviour. */
 import {expect, mock, test} from 'bun:test';
-import type {CommandDefinition, CommandId} from '@shared/types/commands';
+import {asCommandId, type CommandDefinition} from '@shared/types/commands';
+import type {IpcResult} from '@shared/types/common';
+import {isString} from '@shared/types/guards';
+import {isJsonObject, type JsonObject} from '@shared/types/json';
 import {goldenPathCommandDefinition, GOLDEN_PATH_COMMAND_ID} from '@shared/runtime/golden-path-demo';
+import {asCommandInvoker} from '../testUtils/command-transport';
 
-const asCommandId = (value: string): CommandId => value as CommandId;
 const TEST_COMMAND_PREFIX = 'test:command-registry';
 
 let moduleInstanceCounter = 0;
+const noopCommandHandler = () => {};
 
 /** Type alias for the command-registry module to enable precise typing of dynamic imports. */
 type CommandRegistryModule = typeof import('../../lib/command-registry.ts');
@@ -20,7 +24,7 @@ type CommandRegistryModule = typeof import('../../lib/command-registry.ts');
  */
 type CommandRegistryTestHarness = {
   cleanup: () => void;
-  invokeMock: ReturnType<typeof mock<(channel: string, ...args: unknown[]) => Promise<unknown>>>;
+  invokeMock: ReturnType<typeof mock<(channel: string, ...args: unknown[]) => Promise<IpcResult>>>;
   setDecoratedKeymaps: (keymaps: Record<string, string[]>) => void;
   setRuntimeCommands: (commands: CommandDefinition[]) => void;
   shouldPreventDefault: CommandRegistryModule['shouldPreventDefault'];
@@ -37,8 +41,19 @@ type CommandRegistryTestHarness = {
 async function importFreshCommandRegistryModule(): Promise<CommandRegistryModule> {
   moduleInstanceCounter += 1;
   const mod = await import(`../../lib/command-registry.ts?${moduleInstanceCounter}`);
-  return mod as CommandRegistryModule;
+  return mod;
 }
+
+const setObjectSchemaPropertyType = (schema: JsonObject | undefined, property: string, value: string) => {
+  if (!schema || !isJsonObject(schema.properties)) {
+    throw new Error(`Expected an object schema with properties before mutating ${property}.`);
+  }
+  const propertySchema = schema.properties[property];
+  if (!isJsonObject(propertySchema) || !isString(propertySchema.type)) {
+    throw new Error(`Expected ${property} to have a string schema type.`);
+  }
+  propertySchema.type = value;
+};
 
 /**
  * Creates an isolated test harness with mock IPC and fixture state management.
@@ -53,7 +68,7 @@ const createCommandRegistryTestHarness = async (): Promise<CommandRegistryTestHa
   let decoratedKeymaps: Record<string, string[]> = {};
   let runtimeCommands: CommandDefinition[] = [];
 
-  const invokeMock = mock(async (channel: string, ...args: unknown[]) => {
+  const invokeMock = mock(async (channel: string, ...args: unknown[]): Promise<IpcResult> => {
     if (args.length > 0) {
       throw new Error(`Unexpected IPC args for channel "${channel}"`);
     }
@@ -72,7 +87,7 @@ const createCommandRegistryTestHarness = async (): Promise<CommandRegistryTestHa
     closeSearch: () => () => {},
     focusActiveTerm: () => {},
     transport: {
-      invoke: invokeMock
+      invoke: asCommandInvoker(invokeMock)
     }
   });
 
@@ -162,13 +177,12 @@ test('registerCommandHandlers merges new handlers into registry', async () => {
   const harness = await createCommandRegistryTestHarness();
   try {
     const commandName = `test:command:${Date.now()}`;
-    const handler = () => {};
+    const commandHandlers = {
+      [commandName]: noopCommandHandler
+    };
+    harness.registerCommandHandlers(commandHandlers);
 
-    harness.registerCommandHandlers({
-      [commandName]: handler
-    } as Record<string, (event: unknown, dispatch: unknown) => void>);
-
-    expect(harness.getCommandHandler(commandName)).toBe(handler);
+    expect(harness.getCommandHandler(commandName)).toBe(noopCommandHandler);
     expect(harness.getCommandHandler('editor:search-close')).toBeFunction();
   } finally {
     harness.cleanup();
@@ -178,9 +192,11 @@ test('registerCommandHandlers merges new handlers into registry', async () => {
 test('registry CRUD supports deterministic command enumeration', async () => {
   const harness = await createCommandRegistryTestHarness();
   try {
-    const commandA = `${TEST_COMMAND_PREFIX}:a`;
-    const commandB = `${TEST_COMMAND_PREFIX}:b`;
-    const commandC = `${TEST_COMMAND_PREFIX}:c`;
+    // The registry takes branded IDs, so the fixtures are branded once here
+    // rather than at every call that compares against a listed ID.
+    const commandA = asCommandId(`${TEST_COMMAND_PREFIX}:a`);
+    const commandB = asCommandId(`${TEST_COMMAND_PREFIX}:b`);
+    const commandC = asCommandId(`${TEST_COMMAND_PREFIX}:c`);
 
     harness.register(createCommandDefinition(commandB, 'Command B'));
     harness.register(createCommandDefinition(commandA, 'Command A'));
@@ -220,7 +236,7 @@ test('registry CRUD supports deterministic command enumeration', async () => {
 test('registry CRUD supports create/get/update/has/remove semantics', async () => {
   const harness = await createCommandRegistryTestHarness();
   try {
-    const commandId = `${TEST_COMMAND_PREFIX}:crud:${Date.now()}`;
+    const commandId = asCommandId(`${TEST_COMMAND_PREFIX}:crud:${Date.now()}`);
     const definition = createCommandDefinition(commandId, 'Initial Title');
 
     expect(harness.has(commandId)).toBe(false);
@@ -247,8 +263,10 @@ test('registry CRUD supports create/get/update/has/remove semantics', async () =
     expect(harness.get(commandId)).toEqual(updatedDefinition);
     expect(harness.list().find((command) => command.id === commandId)).toEqual(updatedDefinition);
 
-    expect(harness.remove(commandId)).toBe(true);
-    expect(harness.remove(commandId)).toBe(false);
+    const wasRemoved = harness.remove(commandId);
+    const wasAlreadyRemoved = harness.remove(commandId);
+    expect(wasRemoved).toBe(true);
+    expect(wasAlreadyRemoved).toBe(false);
     expect(harness.has(commandId)).toBe(false);
     expect(harness.get(commandId)).toBeUndefined();
     expect(harness.list().some((command) => command.id === commandId)).toBe(false);
@@ -260,7 +278,7 @@ test('registry CRUD supports create/get/update/has/remove semantics', async () =
 test('commandRegistry facade mirrors top-level CRUD behaviour', async () => {
   const harness = await createCommandRegistryTestHarness();
   try {
-    const commandId = `${TEST_COMMAND_PREFIX}:facade:${Date.now()}`;
+    const commandId = asCommandId(`${TEST_COMMAND_PREFIX}:facade:${Date.now()}`);
     const definition = createCommandDefinition(commandId, 'Facade Command');
 
     expect(harness.has(commandId)).toBe(false);
@@ -351,10 +369,8 @@ test('get/list defensively clone schema and metadata definitions', async () => {
     fromGet.defaultWhen = 'mutatedExpression > 0';
     fromGet.metadata.title = 'Mutated Title';
     fromGet.metadata.keywords?.push('mutated');
-    const argsSchemaFromGet = fromGet.argsSchema as {properties: {enabled: {type: string}}};
-    const resultSchemaFromGet = fromGet.resultSchema as {properties: {ok: {type: string}}};
-    argsSchemaFromGet.properties.enabled.type = 'string';
-    resultSchemaFromGet.properties.ok.type = 'string';
+    setObjectSchemaPropertyType(fromGet.argsSchema, 'enabled', 'string');
+    setObjectSchemaPropertyType(fromGet.resultSchema, 'ok', 'string');
 
     const afterMutationGet = harness.get(commandId);
     const afterMutationListEntry = harness.list().find((command) => command.id === commandId);
@@ -368,8 +384,7 @@ test('get/list defensively clone schema and metadata definitions', async () => {
     }
 
     firstListEntry.metadata.title = 'Mutated List Title';
-    const argsSchemaFromList = firstListEntry.argsSchema as {properties: {enabled: {type: string}}};
-    argsSchemaFromList.properties.enabled.type = 'number';
+    setObjectSchemaPropertyType(firstListEntry.argsSchema, 'enabled', 'number');
     expect(secondListEntry).toEqual(expectedDefinition);
     expect(harness.get(commandId)).toEqual(expectedDefinition);
   } finally {
@@ -380,7 +395,7 @@ test('get/list defensively clone schema and metadata definitions', async () => {
 test('validateArgs returns structured errors for invalid command arguments', async () => {
   const harness = await createCommandRegistryTestHarness();
   try {
-    const commandId = `${TEST_COMMAND_PREFIX}:validate:${Date.now()}`;
+    const commandId = asCommandId(`${TEST_COMMAND_PREFIX}:validate:${Date.now()}`);
     harness.register({
       ...createCommandDefinition(commandId, 'Validate Args'),
       argsSchema: {
@@ -422,7 +437,7 @@ test('validateArgs returns structured errors for invalid command arguments', asy
 test('validateArgs returns structured errors for unknown commands', async () => {
   const harness = await createCommandRegistryTestHarness();
   try {
-    const commandId = `${TEST_COMMAND_PREFIX}:unknown:${Date.now()}`;
+    const commandId = asCommandId(`${TEST_COMMAND_PREFIX}:unknown:${Date.now()}`);
 
     const result = harness.validateArgs(commandId, {name: 'alpha'});
     expect(result.ok).toBe(false);

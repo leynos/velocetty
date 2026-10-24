@@ -4,7 +4,7 @@
  */
 // Packages
 import electron, {app} from 'electron';
-import type {BrowserWindow, AutoUpdater} from 'electron';
+import type {AutoUpdater} from 'electron';
 
 import retry from 'async-retry';
 import ms from 'ms';
@@ -14,6 +14,7 @@ import autoUpdaterLinux from './auto-updater-linux';
 import {getDefaultProfile} from './config';
 import {version} from './package.json';
 import {getDecoratedConfig} from './plugins';
+import type {RendererEvents} from '@shared/types/common';
 
 const {platform} = process;
 const isLinux = platform === 'linux';
@@ -29,13 +30,7 @@ type LinuxUpdateAvailableArgs = [
 const autoUpdater: AutoUpdater = isLinux ? autoUpdaterLinux : electron.autoUpdater;
 
 const getDecoratedConfigWithRetry = async () => {
-  return await retry(() => {
-    const content = getDecoratedConfig(getDefaultProfile());
-    if (!content) {
-      throw new Error('No config content loaded');
-    }
-    return content;
-  });
+  return retry(() => getDecoratedConfig(getDefaultProfile()));
 };
 
 const checkForUpdates = async () => {
@@ -69,9 +64,18 @@ const isCanaryChannel = (raw?: string): boolean => raw === 'canary';
  * Allows injection of test doubles in unit tests.
  */
 interface SchedulerSeam {
-  setTimeout: typeof globalThis.setTimeout;
-  setInterval: typeof globalThis.setInterval;
+  setTimeout: (callback: () => void, delay?: number) => ReturnType<typeof globalThis.setTimeout> | number;
+  setInterval: (callback: () => void, delay?: number) => ReturnType<typeof globalThis.setInterval> | number;
 }
+
+type UpdateAvailablePayload = RendererEvents['update available'];
+export type UpdaterWindow = {
+  rpc: {
+    emit: (event: 'update available', payload: UpdateAvailablePayload) => void;
+    once: (event: 'quit and install', callback: () => void) => void;
+  };
+  on: (event: 'close', callback: () => void) => void;
+};
 
 /**
  * Logger seam for error logging.
@@ -120,14 +124,14 @@ async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
 
     if (process.env.NODE_ENV !== 'test') {
       scheduler.setTimeout(() => {
-        void checkForUpdates().catch((err: unknown) => {
-          logger.error('Error checking for updates', err);
+        void checkForUpdates().catch((error: unknown) => {
+          logger.error('Error checking for updates', error);
         });
       }, ms('10s'));
 
       scheduler.setInterval(() => {
-        void checkForUpdates().catch((err: unknown) => {
-          logger.error('Error checking for updates', err);
+        void checkForUpdates().catch((error: unknown) => {
+          logger.error('Error checking for updates', error);
         });
       }, ms('30m'));
     }
@@ -140,7 +144,7 @@ async function init(scheduler: SchedulerSeam, logger: LoggerSeam) {
   }
 }
 
-const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
+const updater = (win: UpdaterWindow, options?: UpdaterOptions) => {
   const scheduler = options?.scheduler ?? {
     setTimeout: globalThis.setTimeout,
     setInterval: globalThis.setInterval
@@ -148,8 +152,8 @@ const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
   const logger = options?.logger ?? console;
 
   if (!isInit && !isInitializing) {
-    void init(scheduler, logger).catch((err: unknown) => {
-      logger.error('Error starting updater', err);
+    void init(scheduler, logger).catch((error: unknown) => {
+      logger.error('Error starting updater', error);
     });
   }
 
@@ -202,14 +206,14 @@ const updater = (win: BrowserWindow, options?: UpdaterOptions) => {
         const feedURL = buildFeedUrl(newUpdateIsCanary);
 
         autoUpdater.setFeedURL({url: feedURL});
-        void checkForUpdates().catch((err: unknown) => {
-          logger.error('Error checking for updates after channel change', err);
+        void checkForUpdates().catch((error: unknown) => {
+          logger.error('Error checking for updates after channel change', error);
         });
 
         canaryUpdates = newUpdateIsCanary;
       }
-    })().catch((err: unknown) => {
-      logger.error('Error handling config change in updater', err);
+    })().catch((error: unknown) => {
+      logger.error('Error handling config change in updater', error);
     });
   });
 

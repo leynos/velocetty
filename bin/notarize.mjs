@@ -1,10 +1,9 @@
-const {notarize} = require('@electron/notarize');
+/** @file Electron-builder afterSign hook for macOS notarization. */
+import {notarize} from '@electron/notarize';
 
-exports.default = async function notarizing(context) {
+export default async function notarizing(context) {
   const {electronPlatformName, appOutDir} = context;
-  if (electronPlatformName !== 'darwin' || !process.env.APPLE_ID || !process.env.APPLE_PASSWORD) {
-    return;
-  }
+  if (electronPlatformName !== 'darwin' || !process.env.APPLE_ID || !process.env.APPLE_PASSWORD) return;
 
   const appName = context.packager.appInfo.productFilename;
   return await notarize({
@@ -13,4 +12,4 @@ exports.default = async function notarizing(context) {
     appleId: process.env.APPLE_ID,
     appleIdPassword: process.env.APPLE_PASSWORD
   });
-};
+}

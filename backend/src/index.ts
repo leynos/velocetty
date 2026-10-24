@@ -1,2 +1,3 @@
 /** @file Backend package boundary marker. */
-export {};
+
+export const backendPackageBoundary = 'backend';

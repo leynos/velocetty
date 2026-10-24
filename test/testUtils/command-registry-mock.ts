@@ -12,7 +12,7 @@ export const createCommandRegistryModuleStub = () => ({
   register: () => {},
   update: () => {},
   remove: () => false,
-  get: () => undefined,
+  get: () => {},
   list: () => [],
   has: () => false,
   validateArgs: () => ({ok: true, value: undefined}),
@@ -22,8 +22,8 @@ export const createCommandRegistryModuleStub = () => ({
   replaceCommand: () => {},
   removeCommand: () => false,
   deleteCommand: () => false,
-  getCommand: () => undefined,
-  getCommandDefinition: () => undefined,
+  getCommand: () => {},
+  getCommandDefinition: () => {},
   listCommands: () => [],
   enumerateCommands: () => [],
   hasCommand: () => false,
@@ -34,12 +34,12 @@ export const createCommandRegistryModuleStub = () => ({
     register: () => {},
     update: () => {},
     remove: () => false,
-    get: () => undefined,
+    get: () => {},
     list: () => [],
     has: () => false,
     validateArgs: () => ({ok: true, value: undefined})
   },
   getRegisteredKeys: async () => ({}),
   registerCommandHandlers: () => {},
-  getCommandHandler: () => undefined
+  getCommandHandler: () => {}
 });

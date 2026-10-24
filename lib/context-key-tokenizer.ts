@@ -3,12 +3,32 @@ import type {ContextKeyValue, WhenComparisonOperator} from '@shared/types/contex
 
 import {WhenExpressionSyntaxError} from './context-key-syntax-error';
 
-export type TokenKind = 'identifier' | 'literal' | 'operator' | 'lparen' | 'rparen' | 'eof';
-export type Token = {kind: TokenKind; lexeme: string; index: number; literal?: ContextKeyValue};
+export type Token =
+  | {kind: 'identifier'; lexeme: string; index: number}
+  | {kind: 'literal'; lexeme: string; index: number; literal: ContextKeyValue}
+  | {kind: 'operator'; lexeme: WhenComparisonOperator | '&&' | '||' | '!'; index: number}
+  | {kind: 'lparen' | 'rparen' | 'eof'; lexeme: string; index: number};
+export type TokenKind = Token['kind'];
 
 export const COMPARISON_OPERATORS: readonly WhenComparisonOperator[] = ['==', '!=', '<', '<=', '>', '>='];
 const TWO_CHAR_OPERATORS = ['&&', '||', ...COMPARISON_OPERATORS] as const;
 const SINGLE_CHAR_OPERATORS = ['!', '<', '>'] as const;
+
+/**
+ * Narrows a lexeme to a comparison operator.
+ *
+ * Exported because the parser asks the same question of a token it has already
+ * read; keeping one list means the two can never disagree about which lexemes
+ * are comparisons.
+ */
+export const isComparisonOperator = (value: string): value is WhenComparisonOperator =>
+  value === '==' || value === '!=' || value === '<' || value === '<=' || value === '>' || value === '>=';
+
+const isTwoCharOperator = (value: string): value is (typeof TWO_CHAR_OPERATORS)[number] =>
+  value === '&&' || value === '||' || isComparisonOperator(value);
+
+const isSingleCharOperator = (value: string): value is (typeof SINGLE_CHAR_OPERATORS)[number] =>
+  value === '!' || value === '<' || value === '>';
 
 class SourceReader {
   constructor(
@@ -72,11 +92,24 @@ const isNumberStart = (reader: SourceReader, pos: Position): boolean => {
 };
 
 const mapEscapeSequence = (escaped: string): string => {
-  return escaped === 'n' ? '\n' : escaped === 'r' ? '\r' : escaped === 't' ? '\t' : escaped;
+  switch (escaped) {
+    case 'n': {
+      return '\n';
+    }
+    case 'r': {
+      return '\r';
+    }
+    case 't': {
+      return '\t';
+    }
+    default: {
+      return escaped;
+    }
+  }
 };
 
-const processEscapeSequence = (reader: SourceReader, pos: Position): {value: string; nextPosition: Position} => {
-  const escaped = reader.source[pos.value + 1];
+const processEscapeSequence = (reader: SourceReader, pos: Position) => {
+  const escaped = reader.source.at(pos.value + 1);
   if (escaped === undefined) {
     throw new WhenExpressionSyntaxError('Unterminated string literal', reader.source, pos.value);
   }
@@ -212,7 +245,24 @@ const readIdentifier = (reader: SourceReader, startPos: Position): ReadResult =>
   }
 
   const lexeme = source.slice(startPos.value, cursor.value);
-  const literal = lexeme === 'true' ? true : lexeme === 'false' ? false : lexeme === 'null' ? null : undefined;
+  let literal: boolean | null | undefined;
+  switch (lexeme) {
+    case 'true': {
+      literal = true;
+      break;
+    }
+    case 'false': {
+      literal = false;
+      break;
+    }
+    case 'null': {
+      literal = null;
+      break;
+    }
+    default: {
+      literal = undefined;
+    }
+  }
   if (literal !== undefined) {
     return {
       token: {kind: 'literal', lexeme, index: startPos.value, literal},
@@ -230,41 +280,42 @@ const tryTokenizeWhitespace = (reader: SourceReader, pos: Position): number | nu
   return isWhitespace(reader.source[pos.value]) ? pos.value + 1 : null;
 };
 
-const tryTokenizeParenthesis = (reader: SourceReader, pos: Position): TokenizeResult => {
-  const char = reader.source[pos.value];
-  if (char !== '(' && char !== ')') {
-    return null;
-  }
+/**
+ * Wraps a token as a successful read, or passes `null` through as a miss.
+ *
+ * Each mapper below decides the token's kind and lexeme; this only decides that
+ * a successful read consumes the lexeme it matched, which is what keeps the
+ * three tokenizers' cursor arithmetic identical.
+ */
+const emitToken = (token: Token | null, pos: Position): TokenizeResult =>
+  token && {token, next: pos.value + token.lexeme.length};
 
-  return {
-    token: {kind: char === '(' ? 'lparen' : 'rparen', lexeme: char, index: pos.value},
-    next: pos.value + 1
-  };
+const parenthesisToken = (char: string, pos: Position): Token | null => {
+  if (char === '(') {
+    return {kind: 'lparen', lexeme: char, index: pos.value};
+  }
+  return char === ')' ? {kind: 'rparen', lexeme: char, index: pos.value} : null;
 };
 
-const tryTokenizeTwoCharOperator = (reader: SourceReader, pos: Position): TokenizeResult => {
-  const twoChar = reader.source.slice(pos.value, pos.value + 2);
-  if (!TWO_CHAR_OPERATORS.includes(twoChar as (typeof TWO_CHAR_OPERATORS)[number])) {
-    return null;
-  }
+/**
+ * The two operator mappers stay separate on purpose: sharing one predicate
+ * would let the two-character reader accept a lone `!`, then consume a
+ * character it never matched.
+ */
+const twoCharOperatorToken = (lexeme: string, pos: Position): Token | null =>
+  isTwoCharOperator(lexeme) ? {kind: 'operator', lexeme, index: pos.value} : null;
 
-  return {
-    token: {kind: 'operator', lexeme: twoChar, index: pos.value},
-    next: pos.value + 2
-  };
-};
+const singleCharOperatorToken = (lexeme: string, pos: Position): Token | null =>
+  isSingleCharOperator(lexeme) ? {kind: 'operator', lexeme, index: pos.value} : null;
 
-const tryTokenizeSingleCharOperator = (reader: SourceReader, pos: Position): TokenizeResult => {
-  const char = reader.source[pos.value];
-  if (!SINGLE_CHAR_OPERATORS.includes(char as (typeof SINGLE_CHAR_OPERATORS)[number])) {
-    return null;
-  }
+const tryTokenizeParenthesis = (reader: SourceReader, pos: Position): TokenizeResult =>
+  emitToken(parenthesisToken(reader.source[pos.value], pos), pos);
 
-  return {
-    token: {kind: 'operator', lexeme: char, index: pos.value},
-    next: pos.value + 1
-  };
-};
+const tryTokenizeTwoCharOperator = (reader: SourceReader, pos: Position): TokenizeResult =>
+  emitToken(twoCharOperatorToken(reader.source.slice(pos.value, pos.value + 2), pos), pos);
+
+const tryTokenizeSingleCharOperator = (reader: SourceReader, pos: Position): TokenizeResult =>
+  emitToken(singleCharOperatorToken(reader.source[pos.value], pos), pos);
 
 const tryTokenizeString = (reader: SourceReader, pos: Position): TokenizeResult => {
   const char = reader.source[pos.value];

@@ -23,16 +23,17 @@ import {mock} from 'bun:test';
 import {resetInputSendTimestamps} from '@shared/constants/runtime-telemetry';
 
 import {setupHappyDom} from './happy-dom';
+import {registerModuleMock} from './mock-module';
 import {registerPluginsModuleMocks} from './plugins-mock';
 import {createTransportMock} from './transport-mock';
 
 type TransportMock = ReturnType<typeof createTransportMock>['transportMock'];
 
 const registerTermModuleMocks = (transportMock: TransportMock) => {
-  mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
+  registerModuleMock('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
 
   // Stub heavy renderer dependencies that Term pulls in transitively.
-  mock.module('electron', () => ({
+  registerModuleMock('electron', () => ({
     shell: {openExternal: mock(async () => {})},
     ipcRenderer: {
       invoke: mock(async () => ({})),
@@ -42,7 +43,7 @@ const registerTermModuleMocks = (transportMock: TransportMock) => {
       removeListener: mock(() => {})
     }
   }));
-  mock.module('color', () => ({
+  registerModuleMock('color', () => ({
     default: () => ({
       alpha() {
         return 1;
@@ -52,24 +53,24 @@ const registerTermModuleMocks = (transportMock: TransportMock) => {
       }
     })
   }));
-  mock.module('xterm', () => ({Terminal: class {}}));
-  mock.module('xterm-addon-canvas', () => ({CanvasAddon: class {}}));
-  mock.module('xterm-addon-fit', () => ({FitAddon: class {}}));
-  mock.module('xterm-addon-image', () => ({ImageAddon: class {}}));
-  mock.module('xterm-addon-ligatures', () => ({LigaturesAddon: class {}}));
-  mock.module('xterm-addon-search', () => ({SearchAddon: class {}}));
-  mock.module('xterm-addon-unicode11', () => ({Unicode11Addon: class {}}));
-  mock.module('xterm-addon-web-links', () => ({WebLinksAddon: class {}}));
-  mock.module('xterm-addon-webgl', () => ({
+  registerModuleMock('xterm', () => ({Terminal: class {}}));
+  registerModuleMock('xterm-addon-canvas', () => ({CanvasAddon: class {}}));
+  registerModuleMock('xterm-addon-fit', () => ({FitAddon: class {}}));
+  registerModuleMock('xterm-addon-image', () => ({ImageAddon: class {}}));
+  registerModuleMock('xterm-addon-ligatures', () => ({LigaturesAddon: class {}}));
+  registerModuleMock('xterm-addon-search', () => ({SearchAddon: class {}}));
+  registerModuleMock('xterm-addon-unicode11', () => ({Unicode11Addon: class {}}));
+  registerModuleMock('xterm-addon-web-links', () => ({WebLinksAddon: class {}}));
+  registerModuleMock('xterm-addon-webgl', () => ({
     WebglAddon: class {
       onContextLoss() {}
       dispose() {}
     }
   }));
-  mock.module('xterm/css/xterm.css', () => ({}));
-  mock.module('../../lib/terms', () => ({default: {}}));
+  registerModuleMock('xterm/css/xterm.css', () => ({}));
+  registerModuleMock('../../lib/terms', () => ({default: {}}));
   registerPluginsModuleMocks();
-  mock.module('../../lib/components/searchBox', () => ({default: () => null}));
+  registerModuleMock('../../lib/components/search-box', () => ({default: () => null}));
 };
 
 type TermModule = typeof import('../../lib/components/term').default;
@@ -77,7 +78,13 @@ type TermModule = typeof import('../../lib/components/term').default;
 export type TermTestHarness = {
   Term: TermModule;
   cleanup: () => void;
-  createTermInstance: (uid: string) => InstanceType<TermModule>;
+  /**
+   * Builds a `Term` from the minimal prop subset the constructor needs.
+   *
+   * `T` defaults to the full class; suites that exercise a private or
+   * partially arranged surface name the narrower shape they have set up.
+   */
+  createTermInstance: <T = InstanceType<TermModule>>(uid: string) => T;
   transportMock: TransportMock;
 };
 
@@ -109,11 +116,13 @@ export const createTermTestHarness = async (cacheKey = 'term_harness'): Promise<
   try {
     registerTermModuleMocks(transportMock);
     const {default: Term} = await import(`../../lib/components/term.tsx?${cacheKey}=${randomUUID()}`);
-    Term.rendererTypes = {} as typeof Term.rendererTypes;
+    // Each harness loads its own cache-busted module, so the shared renderer
+    // registry must start empty or deduplication would leak across suites.
+    Term.rendererTypes = {};
     resetInputSendTimestamps();
 
-    const createTermInstance = (uid: string) => {
-      // @ts-expect-error Test constructor setup intentionally uses a minimal prop subset.
+    const createTermInstance = <T = InstanceType<TermModule>>(uid: string): T => {
+      // The constructor accepts the partial prop set the tests actually read.
       return new Term({
         uid,
         ref_: mock(() => {}),

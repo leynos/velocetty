@@ -1,10 +1,14 @@
 /** @file App-runtime golden path plugin manifest and static contributions. */
 import type {CommandDefinition, CommandId} from '@shared/types/commands';
+import type {JsonObject} from '@shared/types/json';
+
+import {isString} from '../utils/runtime-guards';
+import {asCommandId} from '../utils/shared-ids';
 
 /** Stable plugin identifier used for namespaced settings persistence. */
 export const GOLDEN_PATH_PLUGIN_ID = 'velocetty.golden-path-demo';
 /** Stable command identifier registered by the golden path plugin. */
-export const GOLDEN_PATH_COMMAND_ID = 'plugins:golden-path-demo:announce' as CommandId;
+export const GOLDEN_PATH_COMMAND_ID = asCommandId('plugins:golden-path-demo:announce');
 /** Default keybinding shipped by the golden path plugin. */
 export const GOLDEN_PATH_KEYBINDING = 'ctrl+alt+shift+g';
 
@@ -43,7 +47,7 @@ export const goldenPathSettingsSchema = {
     }
   },
   required: ['enabled', 'message', 'tabPrefix']
-} as const;
+} satisfies JsonObject;
 
 /** Command registered by the golden path plugin when enabled. */
 export const goldenPathCommandDefinition: CommandDefinition = {
@@ -93,7 +97,7 @@ export type RuntimeTabDecorationProvider = {
   readonly priority: number;
   readonly provideDecoration: (
     context: RuntimeTabDecorationContext,
-    settings: Record<string, unknown>
+    settings: JsonObject
   ) => RuntimeTabDecoration | null | undefined;
 };
 
@@ -103,8 +107,8 @@ export type RuntimePluginManifest = {
   readonly version: string;
   readonly displayName: string;
   readonly description: string;
-  readonly settingsSchema: Readonly<Record<string, unknown>>;
-  readonly settingsDefaults: Readonly<Record<string, unknown>>;
+  readonly settingsSchema: Readonly<JsonObject>;
+  readonly settingsDefaults: Readonly<JsonObject>;
   readonly commands: readonly CommandDefinition[];
   readonly keybindings: Readonly<Record<string, readonly string[]>>;
   readonly tabDecorationProviders: readonly RuntimeTabDecorationProvider[];
@@ -116,7 +120,7 @@ export const goldenPathPluginManifest: RuntimePluginManifest = {
   version: '1.0.0',
   displayName: 'Golden Path Demonstration Plugin',
   description: 'Built-in runtime plugin that demonstrates manifest, settings, command, and keybinding flow.',
-  settingsSchema: goldenPathSettingsSchema as Record<string, unknown>,
+  settingsSchema: goldenPathSettingsSchema,
   settingsDefaults: {...goldenPathSettingsDefaults},
   commands: [{...goldenPathCommandDefinition}],
   keybindings: {
@@ -127,9 +131,8 @@ export const goldenPathPluginManifest: RuntimePluginManifest = {
       id: 'title-prefix',
       priority: 100,
       provideDecoration: (context, settings) => {
-        const prefix =
-          typeof settings.tabPrefix === 'string' && settings.tabPrefix.trim().length > 0 ? settings.tabPrefix : 'GP';
-        const baseTitle = typeof context.title === 'string' && context.title.length > 0 ? context.title : 'Shell';
+        const prefix = isString(settings.tabPrefix) && settings.tabPrefix.trim().length > 0 ? settings.tabPrefix : 'GP';
+        const baseTitle = context.title && context.title.length > 0 ? context.title : 'Shell';
         const activitySuffix = context.hasActivity ? '!' : '';
         return {
           title: `[${prefix}${activitySuffix}] ${baseTitle}`

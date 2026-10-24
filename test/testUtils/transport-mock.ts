@@ -1,20 +1,12 @@
 /** @file Shared renderer transport mock factory for unit tests. */
 import {mock} from 'bun:test';
 
+import type {IpcResult} from '@shared/types/common';
+
 type Listener = (...args: unknown[]) => void;
 
-type TransportMock = {
-  invoke: ReturnType<typeof mock>;
-  emit: ReturnType<typeof mock>;
-  on: ReturnType<typeof mock>;
-  once: ReturnType<typeof mock>;
-  off: ReturnType<typeof mock>;
-  removeAllListeners: ReturnType<typeof mock>;
-  destroy: ReturnType<typeof mock>;
-};
-
 type TransportMockState = {
-  listenersByEvent: Record<string, Listener[]>;
+  listenersByEvent: Partial<Record<string, Listener[]>>;
   removedEvents: string[];
 };
 
@@ -22,18 +14,15 @@ type TransportMockState = {
  * Creates a reusable transport mock and helpers for tests that need to assert
  * subscription lifecycle or event emissions.
  */
-export const createTransportMock = (): {
-  resetTransportMock: () => void;
-  state: TransportMockState;
-  transportMock: TransportMock;
-} => {
+export const createTransportMock = () => {
   const state: TransportMockState = {
     listenersByEvent: {},
     removedEvents: []
   };
 
   /**
-   * Emits an event payload to all listeners currently registered for the event.
+   * Emits an event payload to the listeners registered for the event when
+   * emission begins.
    */
   const handleEmit = (event: string, ...payload: unknown[]): boolean => {
     const listeners = state.listenersByEvent[event];
@@ -41,7 +30,13 @@ export const createTransportMock = (): {
       return false;
     }
 
-    for (const listener of [...listeners]) {
+    // Snapshot before dispatch, as Node's EventEmitter does. The `once`
+    // wrapper removes itself while it runs, which splices the live array and
+    // would otherwise skip whichever listener shifted into the vacated slot.
+    // The copy is hoisted into its own binding because spreading directly in
+    // the `for…of` header is reported as a redundant conversion.
+    const listenersToNotify = [...listeners];
+    for (const listener of listenersToNotify) {
       listener(...payload);
     }
     return true;
@@ -58,7 +53,7 @@ export const createTransportMock = (): {
     }
 
     const listenerIndex = listeners.indexOf(listener);
-    if (listenerIndex < 0) {
+    if (listenerIndex === -1) {
       return;
     }
 
@@ -80,7 +75,10 @@ export const createTransportMock = (): {
   };
 
   const transportMock = {
-    invoke: mock(async () => ({})),
+    // The channel is declared even though the default answer ignores it: a
+    // parameterless double rejects every `mockImplementation` that reads the
+    // channel, which is how the paste tests choose their reply.
+    invoke: mock(async (_channel: string, ..._args: unknown[]): Promise<IpcResult> => ({})),
     emit: mock((event: string, ...payload: unknown[]) => handleEmit(event, ...payload)),
     on: mock((event: string, listener: Listener) => {
       registerListener(event, listener);

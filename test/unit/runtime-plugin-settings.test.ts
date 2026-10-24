@@ -1,6 +1,7 @@
 /** @file Covers runtime plugin settings persistence and enable/disable evaluation. */
 import {beforeAll, expect, spyOn, test} from 'bun:test';
 import JSON5 from 'json5';
+import {isJsonObject} from '@shared/types/json';
 
 import {
   GOLDEN_PATH_COMMAND_ID,
@@ -8,7 +9,6 @@ import {
   goldenPathSettingsDefaults,
   runtimePluginManifests
 } from '@shared/runtime/golden-path-demo';
-import type {configOptions} from '@shared/types/config';
 import type {
   detectKeybindingConflicts as detectKeybindingConflictsType,
   ensureRuntimePluginSettingsPersisted as ensureRuntimePluginSettingsPersistedType,
@@ -18,6 +18,7 @@ import type {
   setRuntimePluginEnabledPersisted as setRuntimePluginEnabledPersistedType
 } from '../../app/runtime/plugin-runtime';
 import {registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
+import {importFresh} from '../testUtils/import-fresh';
 
 type ReadTextFile = (path: string, encoding: BufferEncoding) => string;
 type WriteTextFile = (path: string, content: string, encoding: BufferEncoding) => void;
@@ -42,12 +43,13 @@ beforeAll(async () => {
     getRuntimePluginKeybindings,
     mergeRuntimePluginKeybindings,
     setRuntimePluginEnabledPersisted
-  } = await import('../../app/runtime/plugin-runtime.ts?runtime_plugin_settings_unit'));
+  } = await importFresh<typeof import('../../app/runtime/plugin-runtime')>(
+    '../../app/runtime/plugin-runtime',
+    'runtime_plugin_settings_unit'
+  ));
 });
 
-const createReadWritePair = (
-  initialContent: string
-): {readFile: ReadTextFile; writeFile: WriteTextFile; getContent: () => string; getWrites: () => string[]} => {
+const createReadWritePair = (initialContent: string) => {
   let currentContent = initialContent;
   const writes: string[] = [];
 
@@ -60,6 +62,13 @@ const createReadWritePair = (
     getContent: () => currentContent,
     getWrites: () => writes
   };
+};
+
+const ensureJsonObject = (value: unknown) => {
+  if (!isJsonObject(value)) {
+    throw new Error('Expected persisted JSON object.');
+  }
+  return value;
 };
 
 const assertParseErrorBehaviour = <T>(
@@ -125,8 +134,10 @@ test('ensureRuntimePluginSettingsPersisted writes missing defaults to config.plu
   expect(getWrites()).toHaveLength(1);
   expect(namespace[GOLDEN_PATH_PLUGIN_ID]).toEqual(goldenPathSettingsDefaults);
 
-  const persisted = JSON5.parse(getContent()) as {config: {plugins: Record<string, unknown>}};
-  expect(persisted.config.plugins[GOLDEN_PATH_PLUGIN_ID]).toEqual(goldenPathSettingsDefaults);
+  const persisted = ensureJsonObject(JSON5.parse(getContent()));
+  const config = ensureJsonObject(persisted.config);
+  const plugins = ensureJsonObject(config.plugins);
+  expect(plugins[GOLDEN_PATH_PLUGIN_ID]).toEqual(goldenPathSettingsDefaults);
 });
 
 test('runtime plugin settings import remains safe on Windows when config paths resolve via Electron userData', async () => {
@@ -134,8 +145,9 @@ test('runtime plugin settings import remains safe on Windows when config paths r
     resetElectronMock();
     registerElectronMock();
 
-    const runtimePluginModule = await import(
-      '../../app/runtime/plugin-runtime.ts?runtime_plugin_settings_windows_user_data'
+    const runtimePluginModule = await importFresh<typeof import('../../app/runtime/plugin-runtime')>(
+      '../../app/runtime/plugin-runtime',
+      'runtime_plugin_settings_windows_user_data'
     );
     const {readFile, writeFile} = createReadWritePair(`{
       config: {},
@@ -202,8 +214,11 @@ test('setRuntimePluginEnabledPersisted updates enabled flag in JSON5 namespace',
   expect(updated.enabled).toBe(false);
   expect(getWrites()).toHaveLength(1);
 
-  const persisted = JSON5.parse(getContent()) as {config: {plugins: Record<string, {enabled: boolean}>}};
-  expect(persisted.config.plugins[GOLDEN_PATH_PLUGIN_ID]?.enabled).toBe(false);
+  const persisted = ensureJsonObject(JSON5.parse(getContent()));
+  const config = ensureJsonObject(persisted.config);
+  const plugins = ensureJsonObject(config.plugins);
+  const pluginSettings = ensureJsonObject(plugins[GOLDEN_PATH_PLUGIN_ID]);
+  expect(pluginSettings.enabled).toBe(false);
 });
 
 test('ensureRuntimePluginSettingsPersisted preserves unchanged comments and formatting', () => {
@@ -312,14 +327,14 @@ test('runtime command and keybinding contributions follow enabled setting', () =
         enabled: true
       }
     }
-  } as unknown as configOptions;
+  };
   const disabledConfig = {
     plugins: {
       [GOLDEN_PATH_PLUGIN_ID]: {
         enabled: false
       }
     }
-  } as unknown as configOptions;
+  };
 
   expect(getRuntimePluginCommandDefinitions(enabledConfig).map((command) => command.id)).toContain(
     GOLDEN_PATH_COMMAND_ID

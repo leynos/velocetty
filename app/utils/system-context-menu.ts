@@ -21,13 +21,13 @@ function addValues(hyperKey: HKEY, commandKey: HKEY) {
   }
   try {
     Registry.setValueSZ(hyperKey, regParts[2].name, regParts[2].value);
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error(error);
   }
   try {
     Registry.setValueSZ(commandKey, regParts[0].name, regParts[0].value);
-  } catch (err_) {
-    console.error(err_);
+  } catch (error) {
+    console.error(error);
   }
 }
 
@@ -53,8 +53,8 @@ export const remove = () => {
   regKeys.forEach((regKey) => {
     try {
       Registry.deleteTree(Registry.HKCU, regKey);
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     }
   });
 };

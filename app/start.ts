@@ -1,38 +1,16 @@
-// eslint-disable-next-line import/order
-import {cfgPath} from './config/paths';
+/** @file Starts the Electron main process after command-line diagnostics. */
+import {createRequire} from 'node:module';
+import path from 'node:path';
 
-// Print diagnostic information for a few arguments instead of running Hyper.
-if (['--help', '-v', '--version'].includes(process.argv[1])) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const {version} = require('./package');
-  console.log(`Hyper version ${version}`);
-  console.log('Hyper does not accept any command line arguments. Please modify the config file instead.');
-  console.log(`Hyper configuration file located at: ${cfgPath}`);
-  process.exit();
-}
-
-// Enable remote module
-// eslint-disable-next-line import/order
 import {initialize as remoteInitialize} from '@electron/remote/main';
-remoteInitialize();
-
-// set up config
-// eslint-disable-next-line import/order
-import * as config from './config';
-config.setup();
-
-// Native
-import {resolve} from 'node:path';
-
-// Packages
 import {app, BrowserWindow, Menu, screen, session} from 'electron';
-
 import isDev from 'electron-is-dev';
 import {gitDescribe} from 'git-describe';
 import parseUrl from 'parse-url';
+import {isString} from './utils/runtime-guards';
 import type {VelocettyRuntimeGlobals} from '../typings/runtime-globals';
 
-import {registerClipboardIpcHandlers} from './clipboard';
+import * as config from './config';
 import * as AppMenu from './menus/menu';
 import * as plugins from './plugins';
 import {newWindow} from './ui/window';
@@ -40,12 +18,23 @@ import {installCLI} from './utils/cli-install';
 import {configureGpuMode} from './utils/configure-gpu';
 import * as windowUtils from './utils/window-utils';
 
-const windowSet = new Set<BrowserWindow>([]);
+remoteInitialize();
+
+// Configuration is already initialized by the entry point, `index.mts`, which
+// runs `config.setup()` before importing this module. It cannot be done here:
+// the import above of `./plugins` evaluates that module's body, and its body
+// reads the plugin lists from the configuration. `remoteInitialize()` stays
+// ahead of it because it registers the remote module before any window loads.
+
+import {registerClipboardIpcHandlers} from './clipboard';
+
+const windowSet = new Set<BrowserWindow>();
 type VelocettyRuntimeGlobal = typeof globalThis & VelocettyRuntimeGlobals;
 
 // Expose app root so renderer remote module lookups can resolve app-side
 // modules without depending on renderer bundle location.
-(global as VelocettyRuntimeGlobal).__velocettyAppRoot = isDev ? __dirname : app.getAppPath();
+// SAFETY: This global is extended by `VelocettyRuntimeGlobals` for the Electron main process.
+(globalThis as VelocettyRuntimeGlobal).__velocettyAppRoot = app.getAppPath();
 
 // Register before any window loads so renderers can paste from first paint.
 registerClipboardIpcHandlers();
@@ -53,17 +42,25 @@ registerClipboardIpcHandlers();
 // expose to plugins
 app.config = config;
 app.plugins = plugins;
-app.getWindows = () => new Set([...windowSet]); // return a clone
+app.getWindows = () => new Set(windowSet); // return a clone
 
 // function to retrieve the last focused window in windowSet;
 // added to app object in order to expose it to plugins.
 app.getLastFocusedWindow = () => {
-  if (!windowSet.size) {
+  if (windowSet.size === 0) {
     return null;
   }
-  return Array.from(windowSet).reduce((lastWindow, win) => {
-    return win.focusTime > lastWindow.focusTime ? win : lastWindow;
-  });
+  const firstWindow = windowSet.values().next().value;
+  if (!firstWindow) {
+    return null;
+  }
+  let lastWindow = firstWindow;
+  for (const win of windowSet) {
+    if (win.focusTime > lastWindow.focusTime) {
+      lastWindow = win;
+    }
+  }
+  return lastWindow;
 };
 
 configureGpuMode(app);
@@ -81,7 +78,7 @@ if (isDev) {
   console.log('running in prod mode');
 }
 
-const url = `file://${resolve(isDev ? __dirname : app.getAppPath(), 'index.html')}`;
+const url = `file://${path.resolve(app.getAppPath(), 'index.html')}`;
 console.log('electron will open', url);
 
 async function installDevExtensions(isDev_: boolean) {
@@ -89,16 +86,25 @@ async function installDevExtensions(isDev_: boolean) {
     return [];
   }
   const {REACT_DEVELOPER_TOOLS, REDUX_DEVTOOLS} = await import('electron-devtools-installer');
-  // electron-devtools-installer 3.x does not expose this helper from its
-  // public API; keep the dependency pinned to 3.x when using this path.
-  const {default: downloadChromeExtension} = await import('electron-devtools-installer/dist/downloadChromeExtension');
+  // electron-devtools-installer 3.x does not re-export this helper from its
+  // public API, so it is reached through the package's `dist` subpath. That
+  // package is CommonJS and its `.d.ts` describes the shape `require()` returns,
+  // but `module: NodeNext` preserves a real dynamic `import()` in the emitted
+  // CommonJS, which Node routes through the ESM loader and so nests the callable
+  // one level deeper under `default.default`. Loading it with `createRequire`,
+  // as this app does for its other CommonJS-only dependencies, keeps the
+  // declared and actual shapes in agreement.
+  const downloadChromeExtension: typeof import('electron-devtools-installer/dist/downloadChromeExtension.js')['default'] =
+    createRequire(path.resolve(app.getAppPath(), 'start.js'))(
+      'electron-devtools-installer/dist/downloadChromeExtension.js'
+    ).default;
 
   const extensions = [REACT_DEVELOPER_TOOLS, REDUX_DEVTOOLS];
   const forceDownload = Boolean(process.env.UPGRADE_EXTENSIONS);
 
   const results = await Promise.allSettled(
     extensions.map(async (extensionReference) => {
-      const extensionId = typeof extensionReference === 'string' ? extensionReference : extensionReference.id;
+      const extensionId = isString(extensionReference) ? extensionReference : extensionReference.id;
       const extensionFolder = await downloadChromeExtension(extensionId, forceDownload);
       const installedExtension = session.defaultSession.extensions.getExtension(extensionId);
       if (installedExtension) {
@@ -135,7 +141,7 @@ app.on('ready', () =>
         const winSet = config.getWin();
         let [startX, startY] = winSet.position;
 
-        const [width, height] = options.size ? options.size : cfg.windowSize || winSet.size;
+        const [width, height] = options.size ?? cfg.windowSize ?? winSet.size;
 
         const winPos = options.position;
 
@@ -156,16 +162,8 @@ app.on('ready', () =>
           const biggestX = points[0] + 100 + width - currentScreen.bounds.x;
           const biggestY = points[1] + 100 + height - currentScreen.bounds.y;
 
-          if (biggestX > currentScreen.size.width) {
-            startX = 50;
-          } else {
-            startX = points[0] + 34;
-          }
-          if (biggestY > currentScreen.size.height) {
-            startY = 50;
-          } else {
-            startY = points[1] + 34;
-          }
+          startX = biggestX > currentScreen.size.width ? 50 : points[0] + 34;
+          startY = biggestY > currentScreen.size.height ? 50 : points[1] + 34;
         }
 
         if (!windowUtils.positionIsValid([startX, startY])) {
@@ -195,7 +193,7 @@ app.on('ready', () =>
       // and we don't have any active windows open,
       // we open one
       app.on('activate', () => {
-        if (!windowSet.size) {
+        if (windowSet.size === 0) {
           createWindow();
         }
       });
@@ -241,8 +239,8 @@ app.on('ready', () =>
         void installCLI(false);
       }
     })
-    .catch((err) => {
-      console.error('Error while loading devtools extensions', err);
+    .catch((error) => {
+      console.error('Error while loading devtools extensions', error);
     })
 );
 
@@ -254,7 +252,7 @@ function GetWindow(callback: (win: BrowserWindow) => void) {
   const lastWindow = app.getLastFocusedWindow();
   if (lastWindow) {
     callback(lastWindow);
-  } else if (!lastWindow && Object.hasOwn(app, 'createWindow')) {
+  } else if (Object.hasOwn(app, 'createWindow')) {
     app.createWindow(callback);
   } else {
     // If createWindow doesn't exist yet ('ready' event was not fired),

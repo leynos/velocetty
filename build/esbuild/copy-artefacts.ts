@@ -1,6 +1,7 @@
 /** @file Copies non-module assets required for app and renderer bundles. */
 import {cp, mkdir, readdir, rm} from 'node:fs/promises';
 import path from 'node:path';
+import {isObject} from '@shared/types/guards';
 
 /** Paths used by copy operations, rooted at the repository directory by default. */
 type CopyOptions = {
@@ -18,10 +19,13 @@ type RendererCopyOptions = CopyOptions & {
   allowMissingAssets?: boolean;
 };
 
-/** Returns true when a filesystem error indicates a missing file or directory. */
-const isNotFoundError = (error: unknown): error is NodeJS.ErrnoException => {
-  return (error as NodeJS.ErrnoException).code === 'ENOENT';
-};
+/**
+ * Returns true when a filesystem error indicates a missing file or directory.
+ *
+ * `isObject` narrows to `object`, which declares no properties; the `in` check
+ * is what gives the narrowed value a `code` to read.
+ */
+const isNotFoundError = (error: unknown): boolean => isObject(error) && 'code' in error && error.code === 'ENOENT';
 
 /** Lists files with the requested extension in deterministic lexical order. */
 const sortedFileNames = async (directoryPath: string, extension: string) => {
@@ -29,7 +33,7 @@ const sortedFileNames = async (directoryPath: string, extension: string) => {
   return entries
     .filter((entry) => entry.isFile() && entry.name.endsWith(extension))
     .map((entry) => entry.name)
-    .sort((left, right) => left.localeCompare(right));
+    .toSorted((left, right) => left.localeCompare(right));
 };
 
 /** Copies a single file and optionally tolerates missing source paths. */

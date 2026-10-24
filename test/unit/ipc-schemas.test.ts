@@ -58,7 +58,9 @@ describe('clipboard command schemas', () => {
     expect(ipcResponseSchemas['clipboard.readText'].parse('hello')).toBe('hello');
   });
 
-  test('accepts an undefined payload for void commands', () => {
-    expect(ipcResponseSchemas['clipboard.writeText'].parse(undefined)).toBeUndefined();
+  test('accepts a void payload for write commands', () => {
+    // A write command resolves with no value; the schema must accept that
+    // absence rather than reject the handler's result.
+    expect(ipcResponseSchemas['clipboard.writeText'].safeParse(void 0).success).toBe(true);
   });
 });

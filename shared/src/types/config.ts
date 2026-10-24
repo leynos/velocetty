@@ -1,5 +1,8 @@
 /** @file Shared configuration schema and runtime configuration type contracts. */
 import type {FontWeight} from 'xterm';
+import type {JsonValue} from './json';
+
+export const CURSOR_STYLE_CONFIG_KEY = 'cursorShape' as const;
 
 /** Terminal colour palette model used by profile configuration. */
 export type ColorMap = {
@@ -79,7 +82,7 @@ type profileConfigOptions = {
   /** terminal cursor background colour and opacity (hex, rgb, hsl, hsv, hwb or cmyk) */
   cursorColor: string;
   /** `'BEAM'` for |, `'UNDERLINE'` for _, `'BLOCK'` for █ */
-  cursorShape: 'BEAM' | 'UNDERLINE' | 'BLOCK';
+  [CURSOR_STYLE_CONFIG_KEY]: 'BEAM' | 'UNDERLINE' | 'BLOCK';
   /** if `false` Hyper will use ligatures provided by some fonts */
   disableLigatures: boolean;
   /** for environment variables */
@@ -207,7 +210,7 @@ type profileConfigOptions = {
 /** Namespaced plugin settings persisted under `config.plugins`. */
 export type pluginSettingsNamespace = {
   [pluginId: string]: {
-    [settingKey: string]: unknown;
+    [settingKey: string]: JsonValue;
   };
 };
 
@@ -235,7 +238,7 @@ export type configOptions = rootConfigOptions &
 
 /** Raw user configuration payload as stored in config files. */
 export type rawConfig = {
-  config?: configOptions;
+  config?: Partial<configOptions>;
   /**
    * a list of plugins to fetch and install from npm
    * format: [@org/]project[#version]
@@ -305,14 +308,6 @@ export type ConfigReloadResult = {
   appliedLive: string[];
   /** Diagnostics for settings that require restart to take effect. */
   restartRequired: ConfigReloadDiagnostic[];
-  /**
-   * Any validation errors that occurred during reload.
-   * @deprecated This field is currently unused and always empty. It is reserved
-   * for future implementation of validation error reporting during config reload.
-   * TODO: Implement validation error population in reload-handler.ts processReload()
-   *       when adding schema validation for live-reloadable changes.
-   */
-  validationErrors: configValidationDiagnostic[];
   /** Callback or internal errors that occurred during reload. */
   errors?: unknown[];
 };

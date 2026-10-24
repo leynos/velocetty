@@ -12,7 +12,7 @@ export const shouldInterceptFilePaste = (platform: string = process.platform): b
   FILE_LIST_PLATFORMS.has(platform);
 
 /** Wraps a path in single quotes, escaping embedded quotes for a POSIX shell. */
-const quotePosixPath = (path: string): string => `'${path.replaceAll("'", "'\\''")}'`;
+const quotePosixPath = (path: string): string => `'${path.replaceAll("'", String.raw`'\''`)}'`;
 
 /**
  * Wraps a Windows path in double quotes.
@@ -36,7 +36,7 @@ const quoteWindowsPath = (path: string): string => `"${path}"`;
  * - `quoteShellPaths(['C:\\a b.txt'], 'win32')` returns `"C:\\a b.txt"`.
  */
 export const quoteShellPaths = (paths: readonly string[], platform: string = process.platform): string =>
-  paths.map(platform === 'win32' ? quoteWindowsPath : quotePosixPath).join(' ');
+  paths.map((path) => (platform === 'win32' ? quoteWindowsPath(path) : quotePosixPath(path))).join(' ');
 
 /**
  * Formats copied file paths for the terminal, or returns `null` when the

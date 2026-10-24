@@ -70,7 +70,11 @@ function profileItemClass(name: string, defaultProfile: string, profileCount: nu
  * Used to decide whether a blur event should close the dropdown.
  */
 function isFocusWithinDropdown(target: EventTarget | null, container: Node | null): boolean {
-  return target !== null && 'nodeType' in target && (container?.contains(target as Node) ?? false);
+  return isDomNode(target) && (container?.contains(target) ?? false);
+}
+
+function isDomNode(target: EventTarget | null): target is Node {
+  return target !== null && 'nodeType' in target;
 }
 
 const DropdownButton = ({defaultProfile, profiles, openNewTab, backgroundColor, borderColor, tabsVisible}: Props) => {

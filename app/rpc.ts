@@ -2,21 +2,47 @@
 import {EventEmitter} from 'node:events';
 
 import {ipcMain} from 'electron';
-import type {BrowserWindow, IpcMainEvent} from 'electron';
+import type {BrowserWindow} from 'electron';
 
 import {v4 as uuidv4} from 'uuid';
 
 import type {FilterNever, MainEvents, RendererEvents, TypedEmitter} from '@shared/types/common';
 
+type RpcServerWindow = {
+  readonly profileName: string;
+  readonly isDestroyed: () => boolean;
+  /**
+   * Full-screen transitions the server forwards to the renderer.
+   *
+   * Narrowed from `BrowserWindow['on']` to the two events
+   * `app/ui/window.ts` subscribes to: the inherited `this`-returning overloads
+   * demand a whole `BrowserWindow` from every window double, which no test can
+   * honestly supply.
+   */
+  on(event: 'enter-full-screen' | 'leave-full-screen', listener: () => void): void;
+  readonly webContents: {
+    on(event: 'did-finish-load', listener: () => void): void;
+    on(
+      event: 'console-message',
+      listener: (_event: Electron.Event, level: number, message: string, line: number, sourceId: string) => void
+    ): void;
+    send(channel: string, ...args: unknown[]): void;
+    removeAllListeners(): void;
+  };
+};
+
 /** Main-process RPC server that routes renderer events over IPC. */
 export class Server {
   emitter: TypedEmitter<MainEvents>;
+  private readonly rawEmitter: EventEmitter;
   destroyed = false;
-  win: BrowserWindow;
+  win: RpcServerWindow;
   id!: string;
 
-  constructor(win: BrowserWindow) {
-    this.emitter = new EventEmitter();
+  constructor(win: RpcServerWindow) {
+    // eslint-disable-next-line unicorn/prefer-event-target -- `TypedEmitter` exposes EventEmitter's typed `on`, `once`, and removal contract.
+    this.rawEmitter = new EventEmitter();
+    this.emitter = this.rawEmitter;
     this.win = win;
     this.emit = this.emit.bind(this);
 
@@ -56,14 +82,16 @@ export class Server {
 
   private emitMainEvent<U extends keyof MainEvents>(ev: U, data: MainEvents[U] | undefined) {
     if (data === undefined) {
-      return this.emitter.emit(ev as Exclude<keyof MainEvents, FilterNever<MainEvents>>);
+      return this.rawEmitter.emit(ev);
     }
 
-    return this.emitter.emit(ev as FilterNever<MainEvents>, data as MainEvents[FilterNever<MainEvents>]);
+    return this.rawEmitter.emit(ev, data);
   }
 
-  ipcListener = <U extends keyof MainEvents>(_event: IpcMainEvent, {ev, data}: {ev: U; data?: MainEvents[U]}) =>
-    this.emitMainEvent(ev, data);
+  ipcListener = <U extends keyof MainEvents>(
+    _event: Electron.IpcMainEvent,
+    {ev, data}: {ev: U; data?: MainEvents[U]}
+  ) => this.emitMainEvent(ev, data);
 
   on = <U extends keyof MainEvents>(ev: U, fn: (arg0: MainEvents[U]) => void) => {
     this.emitter.on(ev, fn);

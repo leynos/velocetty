@@ -1,20 +1,13 @@
 /** @file Helpers for safely replacing and restoring the global `window` in tests. */
 
-type WindowHost = typeof globalThis & {
-  window?: Window & typeof globalThis.window;
-};
-
-type WindowValue = Record<string, unknown> | (Window & typeof globalThis.window);
-
 /**
  * Replaces `globalThis.window` with a configurable test double and returns a
  * restore callback that reinstates the prior presence state.
  */
-export const installTestWindow = (value: WindowValue = {}): (() => void) => {
-  const windowHost = globalThis as WindowHost;
-  const previousDescriptor = Object.getOwnPropertyDescriptor(windowHost, 'window');
+export const installTestWindow = (value: unknown = {}): (() => void) => {
+  const previousDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
-  Object.defineProperty(windowHost, 'window', {
+  Object.defineProperty(globalThis, 'window', {
     configurable: true,
     enumerable: previousDescriptor?.enumerable ?? true,
     value
@@ -22,10 +15,10 @@ export const installTestWindow = (value: WindowValue = {}): (() => void) => {
 
   return () => {
     if (!previousDescriptor) {
-      delete windowHost.window;
+      Reflect.deleteProperty(globalThis, 'window');
       return;
     }
 
-    Object.defineProperty(windowHost, 'window', previousDescriptor);
+    Object.defineProperty(globalThis, 'window', previousDescriptor);
   };
 };

@@ -4,14 +4,14 @@
     "allowJs": false,
     "declarationDir": "../dist/tmp/appdts/",
     "exactOptionalPropertyTypes": false,
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "noImplicitOverride": false,
     "noPropertyAccessFromIndexSignature": false,
     "noUncheckedIndexedAccess": false,
     "outDir": "../dist/app",
     "paths": {
-      "@shared/*": ["../dist/shared/*"]
+      "@shared/*": ["./../dist/shared/*"]
     },
     "noImplicitAny": false,
     "useUnknownInCatchVariables": false,
@@ -20,6 +20,7 @@
   "include": [
     "./**/*",
     "./package.json",
+    "./config/schema.json",
     "../typings/extend-electron.d.ts",
     "../typings/ext-modules.d.ts",
     "../typings/runtime-globals.d.ts"

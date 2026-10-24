@@ -3,32 +3,40 @@ import {expect, test} from 'bun:test';
 
 import {useTranslation} from '../../lib/hooks/use-translation';
 
-type MutableNavigator = Pick<Navigator, 'languages' | 'language' | 'userAgent'>;
+/**
+ * The navigator surface these tests supply.
+ *
+ * `Pick` rather than a handwritten shape keeps the locale fields exactly as
+ * the DOM declares them. `userAgent` is deliberately absent: the hook never
+ * reads it, and demanding it here would make every case carry a value the test
+ * would then have to invent.
+ */
+type MutableNavigator = Pick<Navigator, 'languages' | 'language'>;
+
+/** The eight search-UI labels the hook is expected to resolve. */
+type SearchUiLabels = Record<
+  'search' | 'noResults' | 'matchCase' | 'matchWholeWord' | 'useRegex' | 'previousMatch' | 'nextMatch' | 'close',
+  string
+>;
 
 const restoreNavigator = (previous: PropertyDescriptor | undefined) => {
-  const host = globalThis as {navigator?: Navigator};
   if (previous) {
-    Object.defineProperty(host, 'navigator', previous);
+    Object.defineProperty(globalThis, 'navigator', previous);
     return;
   }
 
-  delete (host as {navigator?: Navigator}).navigator;
+  Reflect.deleteProperty(globalThis, 'navigator');
 };
 
 const withNavigator = <T>(value: MutableNavigator | null, fn: () => T) => {
-  const host = globalThis as {navigator?: Navigator};
-  const previousDescriptor = Object.getOwnPropertyDescriptor(host, 'navigator');
+  const previousDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
 
   if (value === null) {
-    Object.defineProperty(host, 'navigator', {configurable: true, value: undefined});
+    Object.defineProperty(globalThis, 'navigator', {configurable: true, value: undefined});
   } else {
-    const nextNavigator: Navigator = {
-      ...(host.navigator || {}),
-      ...value
-    } as Navigator;
-    Object.defineProperty(host, 'navigator', {
+    Object.defineProperty(globalThis, 'navigator', {
       configurable: true,
-      value: nextNavigator
+      value
     });
   }
 
@@ -84,7 +92,7 @@ test('returns the translated search label for renderer search UI', () => {
   expect(translation).toBe('Rechercher');
 });
 
-const searchUiCases: Array<[string, MutableNavigator, Record<string, string>]> = [
+const searchUiCases: Array<[string, MutableNavigator, SearchUiLabels]> = [
   [
     'English',
     {languages: ['en'], language: 'en'},

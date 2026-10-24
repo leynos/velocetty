@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import {expect, test} from 'bun:test';
+import type {ConsoleMessage} from 'playwright';
 
 import {
   createIsolatedE2EEnvironment,
@@ -123,7 +124,7 @@ test.each([
 test('resolveLaunchConfig() rejects unsupported platforms', () => {
   expect(() =>
     resolveLaunchConfig({
-      platform: 'freebsd' as NodeJS.Platform,
+      platform: 'freebsd',
       baseDir
     })
   ).toThrow('Path to the built binary needs to be defined for this platform');
@@ -140,7 +141,7 @@ test('waitForRendererReady() waits for mount and terminal selectors', async () =
     }
   };
 
-  await expect(waitForRendererReady(mockPage as never, 500)).resolves.toBeUndefined();
+  await expect(waitForRendererReady(mockPage, 500)).resolves.toBeUndefined();
   expect(capturedSelectors).toEqual([
     ['.xterm', '.term_term', '.tabs_list'],
     ['.xterm', '.term_term', '.tabs_list']
@@ -148,7 +149,11 @@ test('waitForRendererReady() waits for mount and terminal selectors', async () =
 });
 
 test('startRendererConsoleMonitor() captures only critical renderer errors', () => {
-  type ConsoleListener = (message: {type: () => string; text: () => string}) => void;
+  // Taken from Playwright's own type rather than respelled: the monitor accepts
+  // `Pick<ConsoleMessage, 'type' | 'text'>`, and `ConsoleMessage['type']` is
+  // itself the method, so writing `() => ConsoleMessage['type']` would declare a
+  // function returning a function.
+  type ConsoleListener = (message: Pick<ConsoleMessage, 'type' | 'text'>) => void;
   const listeners: ConsoleListener[] = [];
   const mockPage = {
     on: (_event: string, listener: ConsoleListener) => {
@@ -156,13 +161,13 @@ test('startRendererConsoleMonitor() captures only critical renderer errors', () 
     },
     off: (_event: string, listener: ConsoleListener) => {
       const listenerIndex = listeners.indexOf(listener);
-      if (listenerIndex >= 0) {
+      if (listenerIndex !== -1) {
         listeners.splice(listenerIndex, 1);
       }
     }
   };
 
-  const monitor = startRendererConsoleMonitor(mockPage as never);
+  const monitor = startRendererConsoleMonitor(mockPage);
   const listener = listeners.at(0);
   if (!listener) {
     throw new Error('Expected startRendererConsoleMonitor() to register a listener');
@@ -207,7 +212,7 @@ test('readActiveTerminalBuffer() passes default line limit to page evaluation', 
     }
   };
 
-  await expect(readActiveTerminalBuffer(mockPage as never)).resolves.toEqual(['line one']);
+  await expect(readActiveTerminalBuffer(mockPage)).resolves.toEqual(['line one']);
   expect(capturedLineLimit).toBe(40);
 });
 
@@ -217,7 +222,7 @@ test('readActiveTerminalBuffer() surfaces clear failures when renderer document 
       Promise.resolve().then(() => pageFunction(lineLimit))
   };
 
-  await expect(readActiveTerminalBuffer(mockPage as never)).rejects.toThrow(
+  await expect(readActiveTerminalBuffer(mockPage)).rejects.toThrow(
     '[e2e] unable to read active terminal buffer: renderer document is unavailable'
   );
 });

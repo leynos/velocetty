@@ -129,7 +129,7 @@ const Header = forwardRef(function Header(props: HeaderProps, ref: React.Forward
     <header
       className={`${styles.headerHeader} ${isMac ? styles.headerHeaderRounded : ''}`}
       onMouseDown={handleHeaderMouseDown}
-      onMouseUp={() => window.focusActiveTerm()}
+      onMouseUp={() => globalThis.focusActiveTerm?.()}
       onDoubleClick={handleMaximizeClick}
       ref={ref}
     >

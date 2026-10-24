@@ -1,11 +1,10 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
-      "@shared/*": ["shared/src/*"],
-      "@app/*": ["app/*"],
-      "@lib/*": ["lib/*"]
+      "@shared/*": ["./shared/src/*"],
+      "@app/*": ["./app/*"],
+      "@lib/*": ["./lib/*"]
     },
     "exactOptionalPropertyTypes": false,
     "noImplicitOverride": false,
@@ -14,6 +13,7 @@
     "noPropertyAccessFromIndexSignature": false,
     "noUncheckedIndexedAccess": false,
     "strict": false,
+    "strictNullChecks": true,
     "useUnknownInCatchVariables": false,
     "verbatimModuleSyntax": false
   },

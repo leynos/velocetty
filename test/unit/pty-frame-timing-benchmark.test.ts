@@ -5,6 +5,7 @@ import path from 'node:path';
 
 import {expect, test} from 'bun:test';
 import {LONG_FRAME_THRESHOLD_MS} from '@shared/constants/runtime-telemetry';
+import {z} from 'zod';
 
 import {
   readBatchingContractFromSessionSource,
@@ -12,6 +13,25 @@ import {
   runPtyFrameTimingSyntheticBenchmark,
   sanitizeToken
 } from '../../scripts/run-pty-frame-timing-benchmark.mjs';
+
+const reportSchema = z.object({
+  benchmark: z.string(),
+  runtimeContract: z.object({
+    sessionSourcePath: z.string(),
+    runtimeTelemetrySourcePath: z.string().optional(),
+    batchDurationMs: z.number(),
+    batchMaxSizeBytes: z.number()
+  }),
+  workload: z.object({frameCount: z.number(), inputSampleCount: z.number()}),
+  checks: z.object({
+    batchDurationMatchesRuntimeContract: z.boolean(),
+    batchMaxSizeMatchesRuntimeContract: z.boolean(),
+    p95InputLatencyWithinBudget: z.boolean(),
+    longFrameRatioWithinBudget: z.boolean()
+  }),
+  thresholds: z.object({longFrameThresholdMs: z.number()}),
+  passed: z.boolean()
+});
 
 test('sanitizeToken normalizes unsafe path characters', () => {
   expect(sanitizeToken('feature/2-2-2 pty')).toBe('feature-2-2-2-pty');
@@ -66,29 +86,7 @@ test('runPtyFrameTimingSyntheticBenchmark writes deterministic evidence JSON', a
     expect(result.passed).toBe(true);
     expect(result.evidencePath).toBe(evidencePath);
 
-    const report = JSON.parse(await readFile(evidencePath, 'utf8')) as {
-      benchmark: string;
-      runtimeContract: {
-        sessionSourcePath: string;
-        runtimeTelemetrySourcePath?: string;
-        batchDurationMs: number;
-        batchMaxSizeBytes: number;
-      };
-      workload: {
-        frameCount: number;
-        inputSampleCount: number;
-      };
-      checks: {
-        batchDurationMatchesRuntimeContract: boolean;
-        batchMaxSizeMatchesRuntimeContract: boolean;
-        p95InputLatencyWithinBudget: boolean;
-        longFrameRatioWithinBudget: boolean;
-      };
-      thresholds: {
-        longFrameThresholdMs: number;
-      };
-      passed: boolean;
-    };
+    const report = reportSchema.parse(JSON.parse(await readFile(evidencePath, 'utf8')));
 
     expect(report.benchmark).toBe('pty-output-batching-and-frame-timing-synthetic-load');
     expect(report.runtimeContract).toEqual({

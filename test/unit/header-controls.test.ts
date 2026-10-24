@@ -16,9 +16,13 @@ test('preserves minimize, maximize, then close order for right-aligned controls'
 });
 
 test('stops button double-click propagation before the title bar handler sees it', () => {
-  const stopPropagation = mock(() => {});
+  let propagationStopped = false;
+  const stopPropagation = mock(() => {
+    propagationStopped = true;
+  });
 
   stopDoubleClickPropagation({stopPropagation});
 
   expect(stopPropagation).toHaveBeenCalledTimes(1);
+  expect(propagationStopped).toBe(true);
 });

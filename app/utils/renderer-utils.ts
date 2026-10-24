@@ -12,6 +12,7 @@ import type {
   RendererRuntimeMetrics,
   RendererType,
   RendererUid,
+  RuntimeFrameTimingMetrics,
   RuntimeLatencyMetrics
 } from '@shared/types/common';
 
@@ -21,6 +22,8 @@ const rendererWebGLContextCounts = {current: 0, peak: 0};
 const rendererRuntimeMetricsByUid: Record<string, RendererRuntimeMetrics> = Object.create(null);
 const inputSendToWriteLatencyByUid: Record<string, RuntimeLatencyMetrics> = Object.create(null);
 const isWebGLRenderer = (type: RendererType | undefined): type is 'WebGL' => type === 'WebGL';
+const isRendererFallbackReason = (value: string): value is RendererFallbackReason =>
+  value === 'context-loss' || value === 'pool-evicted' || value === 'webgl-init-failed';
 const toKilobytes = (bytes: number) => Math.round((bytes / 1024) * 100) / 100;
 
 const createRuntimeLatencyMetrics = (): RuntimeLatencyMetrics => ({
@@ -55,43 +58,39 @@ function getInputSendToWriteLatencyByUid() {
 
 function getAggregatedRendererRuntimeMetrics() {
   const metricsByUid = Object.values(rendererRuntimeMetricsByUid);
-  const aggregatedInputKeydownToSend = metricsByUid.reduce<RuntimeLatencyMetrics>(
-    (aggregate, metrics) => ({
-      sampleCount: aggregate.sampleCount + metrics.inputKeydownToSend.sampleCount,
-      totalMs: aggregate.totalMs + metrics.inputKeydownToSend.totalMs,
-      maxMs: Math.max(aggregate.maxMs, metrics.inputKeydownToSend.maxMs),
-      lastMs: metrics.inputKeydownToSend.lastMs ?? aggregate.lastMs
-    }),
-    createRuntimeLatencyMetrics()
-  );
+  const aggregatedInputKeydownToSend = createRuntimeLatencyMetrics();
+  const aggregatedFrameTiming: RuntimeFrameTimingMetrics = {
+    sampleCount: 0,
+    totalMs: 0,
+    maxMs: 0,
+    lastMs: 0,
+    longFrameCount: 0,
+    longFrameThresholdMs: LONG_FRAME_THRESHOLD_MS
+  };
+  let latestUpdateAtMs = 0;
+  let reportIntervalMs = 0;
 
-  const aggregatedFrameTiming = metricsByUid.reduce(
-    (aggregate, metrics) => ({
-      sampleCount: aggregate.sampleCount + metrics.frameTiming.sampleCount,
-      totalMs: aggregate.totalMs + metrics.frameTiming.totalMs,
-      maxMs: Math.max(aggregate.maxMs, metrics.frameTiming.maxMs),
-      lastMs: metrics.frameTiming.lastMs ?? aggregate.lastMs,
-      longFrameCount: aggregate.longFrameCount + metrics.frameTiming.longFrameCount,
-      longFrameThresholdMs: Math.max(aggregate.longFrameThresholdMs, metrics.frameTiming.longFrameThresholdMs)
-    }),
-    {
-      sampleCount: 0,
-      totalMs: 0,
-      maxMs: 0,
-      lastMs: 0,
-      longFrameCount: 0,
-      longFrameThresholdMs: LONG_FRAME_THRESHOLD_MS
-    }
-  );
+  for (const metrics of metricsByUid) {
+    const inputMetrics = metrics.inputKeydownToSend;
+    aggregatedInputKeydownToSend.sampleCount += inputMetrics.sampleCount;
+    aggregatedInputKeydownToSend.totalMs += inputMetrics.totalMs;
+    aggregatedInputKeydownToSend.maxMs = Math.max(aggregatedInputKeydownToSend.maxMs, inputMetrics.maxMs);
+    aggregatedInputKeydownToSend.lastMs = inputMetrics.lastMs;
 
-  const latestUpdateAtMs = metricsByUid.reduce(
-    (latestTimestamp, metrics) => Math.max(latestTimestamp, metrics.updatedAtMs),
-    0
-  );
-  const reportIntervalMs = metricsByUid.reduce(
-    (latestInterval, metrics) => Math.max(latestInterval, metrics.reportIntervalMs),
-    0
-  );
+    const frameMetrics = metrics.frameTiming;
+    aggregatedFrameTiming.sampleCount += frameMetrics.sampleCount;
+    aggregatedFrameTiming.totalMs += frameMetrics.totalMs;
+    aggregatedFrameTiming.maxMs = Math.max(aggregatedFrameTiming.maxMs, frameMetrics.maxMs);
+    aggregatedFrameTiming.lastMs = frameMetrics.lastMs;
+    aggregatedFrameTiming.longFrameCount += frameMetrics.longFrameCount;
+    aggregatedFrameTiming.longFrameThresholdMs = Math.max(
+      aggregatedFrameTiming.longFrameThresholdMs,
+      frameMetrics.longFrameThresholdMs
+    );
+
+    latestUpdateAtMs = Math.max(latestUpdateAtMs, metrics.updatedAtMs);
+    reportIntervalMs = Math.max(reportIntervalMs, metrics.reportIntervalMs);
+  }
 
   return {
     inputKeydownToSend: aggregatedInputKeydownToSend,
@@ -102,15 +101,14 @@ function getAggregatedRendererRuntimeMetrics() {
 }
 
 function getAggregatedInputSendToWriteLatencyMetrics() {
-  return Object.values(inputSendToWriteLatencyByUid).reduce<RuntimeLatencyMetrics>(
-    (aggregate, metrics) => ({
-      sampleCount: aggregate.sampleCount + metrics.sampleCount,
-      totalMs: aggregate.totalMs + metrics.totalMs,
-      maxMs: Math.max(aggregate.maxMs, metrics.maxMs),
-      lastMs: metrics.lastMs ?? aggregate.lastMs
-    }),
-    createRuntimeLatencyMetrics()
-  );
+  const aggregate = createRuntimeLatencyMetrics();
+  for (const metrics of Object.values(inputSendToWriteLatencyByUid)) {
+    aggregate.sampleCount += metrics.sampleCount;
+    aggregate.totalMs += metrics.totalMs;
+    aggregate.maxMs = Math.max(aggregate.maxMs, metrics.maxMs);
+    aggregate.lastMs = metrics.lastMs;
+  }
+  return aggregate;
 }
 
 function setRendererRuntimeMetrics(uid: RendererUid, runtimeMetrics: RendererRuntimeMetrics) {
@@ -122,7 +120,7 @@ function recordInputSendToWriteLatency(uid: RendererUid, sampleMs: number) {
     return;
   }
 
-  const metrics = inputSendToWriteLatencyByUid[uid] || createRuntimeLatencyMetrics();
+  const metrics = inputSendToWriteLatencyByUid[uid] ?? createRuntimeLatencyMetrics();
   const sanitizedSampleMs = Math.max(0, sampleMs);
   metrics.sampleCount += 1;
   metrics.totalMs += sanitizedSampleMs;
@@ -191,7 +189,9 @@ function resetRendererTracking() {
   }
 
   for (const reason of Object.keys(rendererFallbackReasonCounts)) {
-    delete rendererFallbackReasonCounts[reason as RendererFallbackReason];
+    if (isRendererFallbackReason(reason)) {
+      delete rendererFallbackReasonCounts[reason];
+    }
   }
 
   rendererWebGLContextCounts.current = 0;

@@ -32,13 +32,13 @@ const launchTimeoutMs = isCiEnvironment ? 30_000 : 20_000;
 // macOS CI builds frequently skip the optional "running in prod mode"/"electron will open"
 // markers, so keep the wait short there to leave room for the renderer-ready fallback and
 // avoid hitting the overall e2e timeout.
-const windowTimeoutMs = isCiEnvironment ? (process.platform === 'darwin' ? 7_000 : 15_000) : 10_000;
+const windowTimeoutMs = isCiEnvironment ? (process.platform === 'darwin' ? 7000 : 15_000) : 10_000;
 const rendererReadyTimeoutMs = isCiEnvironment ? 25_000 : 12_000;
 const developmentRendererReadyTimeoutMs = isCiEnvironment ? 30_000 : 20_000;
-const closeTimeoutMs = 5_000;
-const spawnStabilityTimeoutMs = 1_000;
-const macCiFallbackStabilityTimeoutMs = 5_000;
-const e2eTimeoutHeadroomMs = 1_500;
+const closeTimeoutMs = 5000;
+const spawnStabilityTimeoutMs = 1000;
+const macCiFallbackStabilityTimeoutMs = 5000;
+const e2eTimeoutHeadroomMs = 1500;
 const developmentAppLaunchArgs =
   process.platform === 'linux' && (process.env.CI === 'true' || process.env.ELECTRON_DISABLE_SANDBOX === '1')
     ? ['node_modules/electron/cli.js', '--no-sandbox', '--disable-setuid-sandbox', 'dist/app']
@@ -99,7 +99,7 @@ const throwIfUnresolvedImportsFound = (unresolvedImports: string[]) => {
 
 const assertTargetHasNoUnresolvedSharedRuntimeImports = async () => {
   const inspections = await Promise.allSettled(
-    targetFilesRequiringResolvableRuntimeImports.map(validateFileAndCheckImport)
+    targetFilesRequiringResolvableRuntimeImports.map((relativePath) => validateFileAndCheckImport(relativePath))
   );
   const unresolvedImports = extractUnresolvedImportsFromInspections(inspections);
   throwIfUnresolvedImportsFound(unresolvedImports);
@@ -328,7 +328,9 @@ const launchWithPlaywright = async (
   const app = await withTimeout(
     _electron.launch({
       executablePath: pathToBinary,
-      args: launchArgs,
+      // The helper keeps its launch arguments read-only; Playwright's option
+      // is declared mutable, so hand it a copy rather than widening the helper.
+      args: [...launchArgs],
       env: isolatedEnvironment.env,
       timeout: launchTimeoutMs
     }),
@@ -405,7 +407,7 @@ const captureE2EScreenshot = async (app: ElectronApplication) => {
         const image = await focusedWindow.capturePage();
         return image.toPNG().toString('base64');
       }),
-      2_000
+      2000
     );
     if (encodedImage) {
       await fs.outputFile(`dist/tmp/${process.platform}_test.png`, Buffer.from(encodedImage, 'base64'));
@@ -428,7 +430,7 @@ const cleanupElectronApp = async (app: ElectronApplication | null, log: (message
     log('Electron closed.');
   } catch (error) {
     const process = app.process();
-    if (process && !process.killed) {
+    if (!process.killed) {
       process.kill('SIGKILL');
     }
     console.warn('E2E cleanup timed out; force-killed Electron.', error);

@@ -54,7 +54,7 @@ const Notifications = forwardRef(function Notifications(
               <a
                 style={{color: '#fff'}}
                 onClick={(ev) => {
-                  void window.require('electron').shell.openExternal(ev.currentTarget.href);
+                  void globalThis.require('electron').shell.openExternal(ev.currentTarget.href);
                   ev.preventDefault();
                 }}
                 href={props.messageURL}
@@ -81,7 +81,7 @@ const Notifications = forwardRef(function Notifications(
           <a
             style={{color: '#000'}}
             onClick={(ev) => {
-              void window.require('electron').shell.openExternal(ev.currentTarget.href);
+              void globalThis.require('electron').shell.openExternal(ev.currentTarget.href);
               ev.preventDefault();
             }}
             href={`https://github.com/vercel/hyper/releases/tag/${props.updateVersion}`}
@@ -109,7 +109,7 @@ const Notifications = forwardRef(function Notifications(
                 fontWeight: 'bold'
               }}
               onClick={(ev) => {
-                void window.require('electron').shell.openExternal(ev.currentTarget.href);
+                void globalThis.require('electron').shell.openExternal(ev.currentTarget.href);
                 ev.preventDefault();
               }}
               href={props.updateReleaseUrl!}

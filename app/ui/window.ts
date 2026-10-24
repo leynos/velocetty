@@ -1,6 +1,6 @@
 /** @file Creates and manages the main application window. */
 import {existsSync} from 'node:fs';
-import {isAbsolute, normalize, sep} from 'node:path';
+import path from 'node:path';
 import {URL, fileURLToPath} from 'node:url';
 
 import {app, BrowserWindow, shell, Menu} from 'electron';
@@ -10,6 +10,7 @@ import {enable as remoteEnable} from '@electron/remote/main';
 import isDev from 'electron-is-dev';
 import {getWorkingDirectoryFromPID} from 'native-process-working-directory';
 import {v4 as uuidv4} from 'uuid';
+import {z} from 'zod';
 
 import type {sessionExtraOptions} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
@@ -29,8 +30,6 @@ import toElectronBackgroundColor from '../utils/to-electron-background-colour';
 
 import contextMenuTemplate from './contextmenu';
 
-const SESSION_SPLIT_DIRECTIONS = new Set(['HORIZONTAL', 'VERTICAL']);
-
 class InvalidSessionExtraOptionsError extends Error {
   readonly code = 'INVALID_SESSION_EXTRA_OPTIONS';
 
@@ -40,124 +39,45 @@ class InvalidSessionExtraOptionsError extends Error {
   }
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+const sessionExtraOptionsSchema: z.ZodType<sessionExtraOptions> = z
+  .object({
+    cwd: z.string().optional(),
+    splitDirection: z.enum(['HORIZONTAL', 'VERTICAL']).optional(),
+    activeUid: z.string().transform(asSessionId).nullable().optional(),
+    isNewGroup: z.boolean().optional(),
+    rows: z.number().optional(),
+    cols: z.number().optional(),
+    shell: z.string().optional(),
+    shellArgs: z.array(z.string()).optional(),
+    profile: z.string().transform(asProfileId).optional()
+  })
+  .strict();
 
-const validateCwd = (value: unknown): string => {
-  if (typeof value !== 'string') {
-    throw new InvalidSessionExtraOptionsError('Session option "cwd" must be a string.');
+const parseSessionExtraOptions = (payload: sessionExtraOptions = {}): sessionExtraOptions => {
+  const parsed = sessionExtraOptionsSchema.safeParse(payload);
+  if (parsed.success) return parsed.data;
+
+  const [issue] = parsed.error.issues;
+  if (issue.code === 'unrecognized_keys') {
+    throw new InvalidSessionExtraOptionsError(`Session option "${issue.keys.join(', ')}" is not supported.`);
   }
 
-  return value;
+  if (issue.path.length > 0) {
+    throw new InvalidSessionExtraOptionsError(`Session option "${String(issue.path[0])}" is invalid: ${issue.message}`);
+  }
+
+  throw new InvalidSessionExtraOptionsError('Session options payload must be an object.');
 };
 
-const validateSplitDirection = (value: unknown): 'HORIZONTAL' | 'VERTICAL' => {
-  if (typeof value !== 'string' || !SESSION_SPLIT_DIRECTIONS.has(value)) {
-    throw new InvalidSessionExtraOptionsError(
-      'Session option "splitDirection" must be either "HORIZONTAL" or "VERTICAL".'
-    );
+const handleDroppedURL = (url: string) => {
+  const protocol = new URL(url).protocol;
+  if (protocol === 'file:') {
+    const path = fileURLToPath(url);
+    return {uid: null, data: path, escaped: true};
   }
-
-  return value as 'HORIZONTAL' | 'VERTICAL';
-};
-
-const validateActiveUid = (value: unknown): string | null => {
-  if (value === null) {
-    return null;
+  if (protocol === 'http:' || protocol === 'https:') {
+    return {uid: null, data: url};
   }
-
-  if (typeof value !== 'string') {
-    throw new InvalidSessionExtraOptionsError('Session option "activeUid" must be a string or null.');
-  }
-
-  return asSessionId(value);
-};
-
-const validateIsNewGroup = (value: unknown): boolean => {
-  if (typeof value !== 'boolean') {
-    throw new InvalidSessionExtraOptionsError('Session option "isNewGroup" must be a boolean.');
-  }
-
-  return value;
-};
-
-const validateRows = (value: unknown): number => {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new InvalidSessionExtraOptionsError('Session option "rows" must be a finite number.');
-  }
-
-  return value;
-};
-
-const validateCols = (value: unknown): number => {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new InvalidSessionExtraOptionsError('Session option "cols" must be a finite number.');
-  }
-
-  return value;
-};
-
-const validateShell = (value: unknown): string => {
-  if (typeof value !== 'string') {
-    throw new InvalidSessionExtraOptionsError('Session option "shell" must be a string.');
-  }
-
-  return value;
-};
-
-const validateShellArgs = (value: unknown): string[] => {
-  if (!Array.isArray(value) || value.some((arg) => typeof arg !== 'string')) {
-    throw new InvalidSessionExtraOptionsError('Session option "shellArgs" must be an array of strings.');
-  }
-
-  return [...value];
-};
-
-const validateProfile = (value: unknown): string => {
-  if (typeof value !== 'string') {
-    throw new InvalidSessionExtraOptionsError('Session option "profile" must be a string.');
-  }
-
-  return asProfileId(value);
-};
-
-type OptionValidator = (value: unknown) => unknown;
-
-const OPTION_VALIDATORS: Record<string, OptionValidator> = {
-  cwd: validateCwd,
-  splitDirection: validateSplitDirection,
-  activeUid: validateActiveUid,
-  isNewGroup: validateIsNewGroup,
-  rows: validateRows,
-  cols: validateCols,
-  shell: validateShell,
-  shellArgs: validateShellArgs,
-  profile: validateProfile
-};
-const parseSessionExtraOptions = (payload: unknown): sessionExtraOptions => {
-  if (payload === undefined) {
-    return {};
-  }
-
-  if (!isRecord(payload)) {
-    throw new InvalidSessionExtraOptionsError('Session options payload must be an object.');
-  }
-
-  const parsedOptions: sessionExtraOptions = {};
-  for (const [key, value] of Object.entries(payload)) {
-    if (value === undefined) {
-      continue;
-    }
-
-    const validator = OPTION_VALIDATORS[key];
-    if (!validator) {
-      throw new InvalidSessionExtraOptionsError(`Session option "${key}" is not supported.`);
-    }
-
-    (parsedOptions as Record<string, unknown>)[key] = validator(value);
-  }
-
-  return parsedOptions;
 };
 
 export function newWindow(
@@ -246,14 +166,14 @@ export function newWindow(
     app.windowCallback = undefined;
     fetchNotifications(window);
     // auto updates
-    if (!isDev) {
-      updater(window);
-    } else {
+    if (isDev) {
       console.log('ignoring auto updates during dev');
+    } else {
+      updater(window);
     }
   });
 
-  function createSession(extraOptions: unknown = {}) {
+  function createSession(extraOptions: sessionExtraOptions = {}) {
     const uid = uuidv4();
     const extraOptionsFiltered = parseSessionExtraOptions(extraOptions);
 
@@ -269,7 +189,7 @@ export function newWindow(
           console.error(error);
         }
       }
-      cwd = cwd && isAbsolute(cwd) && existsSync(cwd) ? cwd : '';
+      cwd = cwd && path.isAbsolute(cwd) && existsSync(cwd) ? cwd : '';
     }
 
     const profileCfg = app.plugins.getDecoratedConfig(profile);
@@ -278,14 +198,14 @@ export function newWindow(
     let argPath = process.argv[1];
     if (argPath && process.platform === 'win32') {
       if (/[a-zA-Z]:"/.test(argPath)) {
-        argPath = argPath.replace('"', sep);
+        argPath = argPath.replace('"', path.sep);
       }
-      argPath = normalize(argPath + sep);
+      argPath = path.normalize(argPath + path.sep);
     }
     let workingDirectory = homeDirectory;
-    if (argPath && isAbsolute(argPath)) {
+    if (argPath && path.isAbsolute(argPath)) {
       workingDirectory = argPath;
-    } else if (profileCfg.workingDirectory && isAbsolute(profileCfg.workingDirectory)) {
+    } else if (profileCfg.workingDirectory && path.isAbsolute(profileCfg.workingDirectory)) {
       workingDirectory = profileCfg.workingDirectory;
     }
 
@@ -295,7 +215,7 @@ export function newWindow(
         cwd: cwd || workingDirectory,
         splitDirection: undefined,
         shell: profileCfg.shell,
-        shellArgs: profileCfg.shellArgs && Array.from(profileCfg.shellArgs)
+        shellArgs: [...profileCfg.shellArgs]
       },
       extraOptionsFiltered,
       {
@@ -377,15 +297,16 @@ export function newWindow(
 
     const session = sessions.get(uid);
     if (session) {
-      const payload = escaped
-        ? session.shell?.endsWith('cmd.exe')
+      let payload = data;
+      if (escaped) {
+        payload = session.shell?.endsWith('cmd.exe')
           ? `"${data}"` // This is how cmd.exe does it
-          : `'${data.replace(/'/g, `'\\''`)}'` // Inside a single-quoted string nothing is interpreted
-        : data;
+          : `'${data.replaceAll("'", `'\\''`)}'`; // Inside a single-quoted string nothing is interpreted
+      }
       const writeTimestampMs = clock.now();
 
       session.write(payload);
-      if (typeof inputSentAtMs === 'number') {
+      if (inputSentAtMs !== undefined) {
         recordInputSendToWriteLatency(asRendererUid(uid), writeTimestampMs - inputSentAtMs);
       }
     }
@@ -445,16 +366,6 @@ export function newWindow(
       deleteSessions();
     }
   });
-
-  const handleDroppedURL = (url: string) => {
-    const protocol = typeof url === 'string' && new URL(url).protocol;
-    if (protocol === 'file:') {
-      const path = fileURLToPath(url);
-      return {uid: null, data: path, escaped: true};
-    } else if (protocol === 'http:' || protocol === 'https:') {
-      return {uid: null, data: url};
-    }
-  };
 
   // If file is dropped onto the terminal window, navigate and new-window events are prevented
   // and it's path is added to active session.

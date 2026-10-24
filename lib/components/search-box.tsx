@@ -13,6 +13,15 @@ import clsx from 'clsx';
 import type {SearchBoxProps} from '../../typings/hyper';
 import * as styles from './searchBox.module.css';
 
+type SearchCssProperties = React.CSSProperties & {
+  '--search-fg'?: string;
+  '--search-selection'?: string;
+  '--search-hover-bg'?: string;
+  '--search-bg'?: string;
+  '--search-border'?: string;
+  '--search-font'?: string;
+};
+
 type SearchButtonColors = {
   foregroundColor: string;
   selectionColor: string;
@@ -40,10 +49,10 @@ const SearchButton = ({
   selectionColor,
   children
 }: SearchButtonProps) => {
-  const buttonVars: React.CSSProperties = {
-    ['--search-fg' as string]: foregroundColor,
-    ['--search-selection' as string]: selectionColor,
-    ['--search-hover-bg' as string]: backgroundColor
+  const buttonVars: SearchCssProperties = {
+    '--search-fg': foregroundColor,
+    '--search-selection': selectionColor,
+    '--search-hover-bg': backgroundColor
   };
 
   return (
@@ -66,13 +75,19 @@ type SearchResultsCountProps = {
   noResultsLabel: string;
 };
 
-const SearchResultsCount = ({results, noResultsLabel}: SearchResultsCountProps) => (
+const getSearchResultsLabel = ({results, noResultsLabel}: SearchResultsCountProps): string => {
+  if (results === undefined) {
+    return '';
+  }
+  if (results.resultCount === 0) {
+    return noResultsLabel;
+  }
+  return `${results.resultIndex + 1} of ${results.resultCount}`;
+};
+
+const SearchResultsCount = (props: SearchResultsCountProps) => (
   <output style={{minWidth: '60px', marginLeft: '4px'}} aria-live="polite" aria-atomic="true">
-    {results === undefined
-      ? ''
-      : results.resultCount === 0
-        ? noResultsLabel
-        : `${results.resultIndex + 1} of ${results.resultCount}`}
+    {getSearchResultsLabel(props)}
   </output>
 );
 
@@ -189,13 +204,13 @@ const SearchBox = forwardRef(function SearchBox(props: SearchBoxProps, ref: Reac
     foregroundColor
   };
 
-  const searchVars: React.CSSProperties = {
-    ['--search-fg' as string]: foregroundColor,
-    ['--search-selection' as string]: selectionColor,
-    ['--search-hover-bg' as string]: borderColor,
-    ['--search-bg' as string]: backgroundColor,
-    ['--search-border' as string]: borderColor,
-    ['--search-font' as string]: font
+  const searchVars: SearchCssProperties = {
+    '--search-fg': foregroundColor,
+    '--search-selection': selectionColor,
+    '--search-hover-bg': borderColor,
+    '--search-bg': backgroundColor,
+    '--search-border': borderColor,
+    '--search-font': font
   };
 
   return (

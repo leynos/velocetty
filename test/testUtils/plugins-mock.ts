@@ -1,13 +1,21 @@
 /** @file Shared module mock helpers for `lib/utils/plugins` in unit tests. */
-import {mock} from 'bun:test';
+import {registerModuleMock} from './mock-module';
+import type {IUiReducer, ISessionReducer, ITermGroupReducer, TabsProps} from '../../typings/hyper';
 
-type PluginDecorator = (Component: unknown) => unknown;
+type PluginDecorator = <Component extends object>(Component: Component) => Component;
 
 export type PluginsMockExports = {
   connect: () => PluginDecorator;
   decorate: PluginDecorator;
-  getTabProps: (tab: unknown, parentProps: unknown, props: unknown) => unknown;
-  getTabsProps: (parentProps: unknown, props: unknown) => unknown;
+  decorateSessionsReducer: (reducer: ISessionReducer) => ISessionReducer;
+  decorateTermGroupsReducer: (reducer: ITermGroupReducer) => ITermGroupReducer;
+  decorateUIReducer: (reducer: IUiReducer) => IUiReducer;
+  getTabProps: <Props extends object>(
+    tab: TabsProps['tabs'][number] & {tabIndex: number},
+    parentProps: TabsProps,
+    props: Props
+  ) => Props;
+  getTabsProps: <Props extends object>(parentProps: unknown, props: Props) => Props;
   subscribeTabDecorationUpdates: (listener: () => void) => () => void;
 };
 
@@ -16,10 +24,20 @@ type PluginsModuleFactoryOptions = {
 };
 
 const createDefaultPluginsMockExports = (): PluginsMockExports => ({
-  connect: () => (Component: unknown) => Component,
-  decorate: (Component: unknown) => Component,
-  getTabProps: (_tab: unknown, _parentProps: unknown, props: unknown) => props,
-  getTabsProps: (_parentProps: unknown, props: unknown) => props,
+  connect:
+    () =>
+    <Component extends object>(Component: Component) =>
+      Component,
+  decorate: <Component extends object>(Component: Component) => Component,
+  decorateSessionsReducer: (reducer: ISessionReducer) => reducer,
+  decorateTermGroupsReducer: (reducer: ITermGroupReducer) => reducer,
+  decorateUIReducer: (reducer: IUiReducer) => reducer,
+  getTabProps: <Props extends object>(
+    _tab: TabsProps['tabs'][number] & {tabIndex: number},
+    _parentProps: TabsProps,
+    props: Props
+  ) => props,
+  getTabsProps: <Props extends object>(_parentProps: unknown, props: Props) => props,
   subscribeTabDecorationUpdates: () => () => {}
 });
 
@@ -48,6 +66,6 @@ export const registerPluginsModuleMocks = (
   options: PluginsModuleFactoryOptions = {}
 ) => {
   const pluginModuleFactory = createPluginsModuleFactory(overrides, options);
-  mock.module('../../lib/utils/plugins', pluginModuleFactory);
-  mock.module('../../lib/utils/plugins.ts', pluginModuleFactory);
+  registerModuleMock('../../lib/utils/plugins', pluginModuleFactory);
+  registerModuleMock('../../lib/utils/plugins.ts', pluginModuleFactory);
 };

@@ -29,26 +29,26 @@ function runSnapshotForArch(arch) {
   });
 
   if (result.error) {
-    console.error(result.error);
-    process.exit(1);
+    throw result.error;
   }
 
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
+  return result.status ?? 1;
+}
+
+const main = () => {
+  if (shouldSkipAllSnapshots()) {
+    console.log('Skipping V8 snapshot generation because SKIP_V8_SNAPSHOT=1.');
+    return;
   }
-}
 
-if (shouldSkipAllSnapshots()) {
-  console.log('Skipping V8 snapshot generation because SKIP_V8_SNAPSHOT=1.');
-  process.exit(0);
-}
+  const targetArchitectures = resolveTargetArchitectures();
+  for (const arch of targetArchitectures) {
+    const exitCode = runSnapshotForArch(arch);
+    if (exitCode !== 0) {
+      process.exitCode = exitCode;
+      return;
+    }
+  }
+};
 
-const targetArchitectures = resolveTargetArchitectures();
-if (targetArchitectures.length === 0) {
-  console.log('Skipping V8 snapshot generation because no target architecture is enabled.');
-  process.exit(0);
-}
-
-for (const arch of targetArchitectures) {
-  runSnapshotForArch(arch);
-}
+main();

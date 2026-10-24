@@ -1,11 +1,10 @@
 /** @file Imports and normalizes user and default configuration files. */
-import {createRequire} from 'node:module';
-import {resolve} from 'node:path';
-
 import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
+import path from 'node:path';
 import {z} from 'zod';
 
 import type {configValidationDiagnostic, parsedConfig, rawConfig} from '@shared/types/config';
+import {isJsonValue} from '../utils/runtime-guards';
 import {parseJson5WithSchemaDiagnostics, safeParseRawConfig, stringifyJson5, type ParseSchema} from './json5-config';
 
 type LoadedConfig = {
@@ -13,7 +12,8 @@ type LoadedConfig = {
   diagnostics: configValidationDiagnostic[];
 };
 
-type ConfigInit = (userCfg: rawConfig, defaultCfg: rawConfig) => parsedConfig;
+type ConfigImportNotify = (title: string, body?: string, details?: {error?: unknown}) => void;
+type ConfigInit = (userCfg: rawConfig, defaultCfg: rawConfig, notify: ConfigImportNotify) => parsedConfig;
 
 export type ConfigImportPaths = {
   cfgDir: string;
@@ -99,8 +99,6 @@ const rawConfigDiagnosticHints = {
   }
 } as const;
 
-const requireFromHere = createRequire(__filename);
-
 const keymapDiagnosticHints = {
   '/': {
     docHint: 'Keymap entries map command ids to keybinding strings or arrays.',
@@ -164,7 +162,14 @@ const parseKeymapConfig = (source: ConfigSource) =>
   });
 
 /** Serializes config using deterministic JSON5 formatting for stable snapshots. */
-const stringifyConfig = (config: rawConfig): string => stringifyJson5(config);
+const stringifyConfig = (config: rawConfig): string => {
+  if (!isJsonValue(config)) {
+    throw new TypeError('Config values must be JSON-compatible before serialization.');
+  }
+  return stringifyJson5(config);
+};
+
+const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPORT === '1';
 
 /**
  * Copies the bundled JSON schema into the user config directory.
@@ -179,7 +184,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
   let defaultConfig: rawConfig | undefined;
 
   const notifyWithPrimaryDiagnostic = (baseMessage: string, diagnostics: configValidationDiagnostic[]) => {
-    const primaryDiagnostic = diagnostics[0];
+    const primaryDiagnostic = diagnostics.at(0);
     if (!primaryDiagnostic) {
       notifyFn(baseMessage);
       return;
@@ -193,13 +198,13 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
   };
 
   const ensureSchemaFile = () => {
-    const destinationPath = resolve(pathDeps.cfgDir, pathDeps.schemaFile);
+    const destinationPath = path.resolve(pathDeps.cfgDir, pathDeps.schemaFile);
     try {
       copySync(pathDeps.schemaPath, destinationPath, {overwrite: true});
-    } catch (err) {
+    } catch (error) {
       console.error(
         `[config-import] Failed to copy schema file from "${pathDeps.schemaPath}" to "${destinationPath}".`,
-        err
+        error
       );
       notifyFn("Couldn't update config schema metadata. Config editor validation may be stale.");
     }
@@ -226,14 +231,12 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
     }
   };
 
-  const isConfigImportDebugEnabled = () => process.env.DEBUG_CONFIG_IMPORT === '1';
-
   const loadDefaultConfig = (): LoadedConfig => {
     let defaultCfgRaw = '{}';
     try {
       defaultCfgRaw = readFileSync(pathDeps.defaultCfg, 'utf8');
-    } catch (err) {
-      console.error(`[config-import] Failed to read bundled default config at "${pathDeps.defaultCfg}".`, err);
+    } catch (error) {
+      console.error(`[config-import] Failed to read bundled default config at "${pathDeps.defaultCfg}".`, error);
     }
 
     const filePath: ConfigFilePath = {path: pathDeps.defaultCfg};
@@ -268,8 +271,8 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
     let content = '{}';
     try {
       content = readFileSync(platformKeyPath, 'utf8');
-    } catch (err) {
-      console.error(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`, err);
+    } catch (error) {
+      console.error(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`, error);
     }
 
     const keymapResult = parseKeymapConfig({filePath, rawContent: content});
@@ -304,8 +307,8 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
         config: cloneRawConfig(defaultConfigFallback),
         diagnostics: userCfgResult.diagnostics
       };
-    } catch (err) {
-      console.error(`[config-import] Failed to read or parse user config at "${pathDeps.cfgPath}".`, err);
+    } catch (error) {
+      console.error(`[config-import] Failed to read or parse user config at "${pathDeps.cfgPath}".`, error);
       warnFn(
         `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
       );
@@ -340,7 +343,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
   const _import = () => {
     const imported = _importConf();
     defaultConfig = imported.defaultCfg;
-    const result = initConfig(imported.userCfg, imported.defaultCfg);
+    const result = initConfig(imported.userCfg, imported.defaultCfg, notifyFn);
     return result;
   };
 
@@ -363,53 +366,3 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
 
   return {_import, getDefaultConfig};
 };
-
-// Lazy loaders keep `paths`, `init`, and `notify` out of the static import
-// graph so tests running outside Electron are not forced to load the Electron
-// IPC stack at module initialization.
-const lazyInit = (...args: Parameters<ConfigInit>): ReturnType<ConfigInit> => {
-  const initModule = requireFromHere('./init');
-  return (initModule._init as ConfigInit)(...args);
-};
-
-const lazyNotify = (...args: Parameters<ConfigImportDependencies['notify']>): void => {
-  const notifyModule = requireFromHere('../notify');
-  (notifyModule.default as ConfigImportDependencies['notify'])(...args);
-};
-
-let cachedPathsModule: ReturnType<typeof requireFromHere> | undefined;
-const getPathsModule = () => {
-  cachedPathsModule ??= requireFromHere('./paths');
-  return cachedPathsModule;
-};
-
-const lazyPaths: ConfigImportPaths = {
-  get cfgDir() {
-    return getPathsModule().cfgDir as string;
-  },
-  get cfgPath() {
-    return getPathsModule().cfgPath as string;
-  },
-  get defaultCfg() {
-    return getPathsModule().defaultCfg as string;
-  },
-  defaultPlatformKeyPath: () => getPathsModule().defaultPlatformKeyPath() as string,
-  get plugs() {
-    return getPathsModule().plugs as ConfigImportPaths['plugs'];
-  },
-  get schemaFile() {
-    return getPathsModule().schemaFile as string;
-  },
-  get schemaPath() {
-    return getPathsModule().schemaPath as string;
-  }
-};
-
-const configImportModule = createConfigImportModule({
-  _init: lazyInit,
-  notify: lazyNotify,
-  paths: lazyPaths
-});
-
-export const _import = configImportModule._import;
-export const getDefaultConfig = configImportModule.getDefaultConfig;

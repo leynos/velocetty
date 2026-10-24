@@ -51,7 +51,12 @@ const cssModulesPlugin: BunPlugin = {
   }
 };
 
-// Register the plugin with Bun
-plugin(cssModulesPlugin);
+// Register the plugin with Bun. `plugin` reports whatever `setup` returned,
+// and Bun's declaration admits a promise, so the result is checked rather than
+// discarded: this suite's preload cannot continue on a half-registered plugin.
+const registration: void | Promise<void> = plugin(cssModulesPlugin);
+if (registration) {
+  throw new Error('The CSS modules test plugin must register synchronously.');
+}
 
 export default cssModulesPlugin;

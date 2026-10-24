@@ -21,6 +21,8 @@
  */
 import {describe, it, expect} from 'bun:test';
 import type {configOptions} from '@shared/types/config';
+import type {JsonObject} from '@shared/types/json';
+import {defaultConfigOptions} from '../testUtils/default-config';
 import {
   deepMerge,
   mergeLayers,
@@ -30,27 +32,44 @@ import {
   createRuntimeOverrideLayer,
   configValueDiffers,
   getChangedKeys,
-  type ConfigLayer
+  type ConfigLayer,
+  type ConfigOverrides
 } from '../../app/config/layering';
 
-/** Creates a defaults layer config with required fields and optional overrides. */
-const makeDefaults = (overrides: Partial<configOptions> = {}): configOptions =>
-  ({
-    defaultProfile: 'default',
-    profiles: [],
-    fontSize: 12,
-    backgroundColor: '#000',
-    ...overrides
-  }) as configOptions;
+/**
+ * Creates a defaults layer config with required fields and optional overrides.
+ *
+ * A shallow spread, not `deepMerge`: this helper builds a *defaults* layer, and
+ * a defaults layer states each section in full. Deep-merging here would splice
+ * the bundled palette into a test that deliberately supplies a two-colour one,
+ * so the merge under test would see a complete palette where the case intends a
+ * partial section.
+ */
+const makeDefaults = (overrides: ConfigOverrides = {}): configOptions =>
+  // SAFETY: `ConfigOverrides` spread over a complete `configOptions` leaves
+  // every omitted key with its bundled value, so the result is complete. The
+  // compiler cannot see that because an optional property's type carries
+  // `undefined` through the spread.
+  ({...defaultConfigOptions, ...overrides}) as configOptions;
 
 /** Creates a user config layer with optional overrides. */
-const makeUserConfig = (overrides: Partial<configOptions> = {}): Partial<configOptions> => ({
+const makeUserConfig = (overrides: ConfigOverrides = {}): ConfigOverrides => ({
   fontSize: 14,
   ...overrides
 });
 
 /** Creates runtime overrides with optional additional properties. */
-const makeRuntimeOverrides = (overrides: Partial<configOptions> = {}): Partial<configOptions> => overrides;
+const makeRuntimeOverrides = (overrides: ConfigOverrides = {}): ConfigOverrides => overrides;
+
+/**
+ * An object that declares one optional key and supplies none of it.
+ *
+ * Named rather than written inline at the assertion below: the comparison
+ * under test is about an absent key, and an inline `{a?: number}` would state
+ * the same fact while discarding the evidence that the object genuinely lacks
+ * it.
+ */
+type OptionalKey = {a?: number};
 
 describe('config-layering', () => {
   describe('deepMerge', () => {
@@ -123,9 +142,9 @@ describe('config-layering', () => {
     });
 
     it('should handle null values in source', () => {
-      const target = {a: 1, b: {c: 2}};
-      const source = {b: null};
-      const result = deepMerge(target, source as Record<string, unknown>);
+      const target: JsonObject = {a: 1, b: {c: 2}};
+      const source: JsonObject = {b: null};
+      const result = deepMerge(target, source);
 
       expect(result).toEqual({a: 1, b: null});
     });
@@ -285,8 +304,13 @@ describe('config-layering', () => {
     });
 
     it('should return false for non-objects', () => {
+      // Bound to a variable rather than passed as a literal: the guard's job is
+      // to reject an absent value that reached it from elsewhere, and a literal
+      // `undefined` describes a call no caller makes.
+      const absent: unknown = undefined;
+
       expect(isConfigLayer(null)).toBe(false);
-      expect(isConfigLayer(undefined)).toBe(false);
+      expect(isConfigLayer(absent)).toBe(false);
       expect(isConfigLayer('string')).toBe(false);
       expect(isConfigLayer(123)).toBe(false);
     });
@@ -308,7 +332,7 @@ describe('config-layering', () => {
   describe('createRuntimeOverrideLayer', () => {
     it('should create a runtime layer with the given overrides', () => {
       const overrides = {fontSize: 16, cursorBlink: true};
-      const layer = createRuntimeOverrideLayer(overrides as Partial<configOptions>);
+      const layer = createRuntimeOverrideLayer(overrides);
 
       expect(layer.type).toBe('runtime');
       expect(layer.config).toEqual(overrides);
@@ -316,7 +340,7 @@ describe('config-layering', () => {
 
     it('should create independent layer objects', () => {
       const overrides = {fontSize: 16};
-      const layer = createRuntimeOverrideLayer(overrides as Partial<configOptions>);
+      const layer = createRuntimeOverrideLayer(overrides);
 
       // Modify original
       overrides.fontSize = 20;
@@ -344,7 +368,8 @@ describe('config-layering', () => {
     });
 
     it('should return false when both values are undefined', () => {
-      expect(configValueDiffers({}, {}, 'a')).toBe(false);
+      const empty: OptionalKey = {};
+      expect(configValueDiffers(empty, empty, 'a')).toBe(false);
     });
 
     it('should deeply compare objects', () => {

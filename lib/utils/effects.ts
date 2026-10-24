@@ -11,6 +11,7 @@
 import type {Dispatch, Middleware} from 'redux';
 
 import type {HyperActions, HyperState} from '../../typings/hyper';
+import {isFunction} from '@shared/types/guards';
 
 const executedEffects = new WeakSet<object>();
 
@@ -23,12 +24,9 @@ const hasEffect = (action: unknown): action is HyperActions => {
 
 const effectsMiddleware: Middleware<{}, HyperState, Dispatch<HyperActions>> = () => (next) => (action) => {
   const ret = next(action);
-  if (hasEffect(action) && typeof action.effect === 'function') {
-    const actionObject = action as object;
-    if (!executedEffects.has(actionObject)) {
-      executedEffects.add(actionObject);
-      action.effect();
-    }
+  if (hasEffect(action) && isFunction(action.effect) && !executedEffects.has(action)) {
+    executedEffects.add(action);
+    action.effect();
   }
   return ret;
 };

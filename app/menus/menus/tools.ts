@@ -1,5 +1,6 @@
 import type {BrowserWindow, MenuItemConstructorOptions} from 'electron';
 import type {CommandId} from '@shared/types/commands';
+import {asCommandId} from '../../utils/shared-ids';
 
 const toolsMenu = (
   commands: Record<string, string>,
@@ -12,36 +13,36 @@ const toolsMenu = (
         label: 'Update plugins',
         accelerator: commands['plugins:update'],
         click() {
-          execCommand('plugins:update' as CommandId);
+          execCommand(asCommandId('plugins:update'));
         }
       },
       {
         label: 'Install Hyper CLI command in PATH',
         click() {
-          execCommand('cli:install' as CommandId);
+          execCommand(asCommandId('cli:install'));
         }
       },
       {
         type: 'separator'
       },
       ...(process.platform === 'win32'
-        ? <MenuItemConstructorOptions[]>[
+        ? ([
             {
               label: 'Add Hyper to system context menu',
               click() {
-                execCommand('systemContextMenu:add' as CommandId);
+                execCommand(asCommandId('systemContextMenu:add'));
               }
             },
             {
               label: 'Remove Hyper from system context menu',
               click() {
-                execCommand('systemContextMenu:remove' as CommandId);
+                execCommand(asCommandId('systemContextMenu:remove'));
               }
             },
             {
               type: 'separator'
             }
-          ]
+          ] satisfies MenuItemConstructorOptions[])
         : [])
     ]
   };

@@ -3,9 +3,11 @@ import React from 'react';
 
 import {connect} from 'react-redux';
 
+import {CURSOR_STYLE_CONFIG_KEY} from '@shared/types/config';
 import type {HyperState, HyperDispatch, TermGroupProps, TermGroupOwnProps} from '../../typings/hyper';
 import {resizeTermGroup} from '../actions/term-groups';
 import {decorate, getTermProps, getTermGroupProps} from '../utils/plugins';
+import {getTermGroup} from '../utils/term-groups';
 
 import SplitPane_ from './split-pane';
 import Term_ from './term';
@@ -14,7 +16,7 @@ const Term = decorate(Term_, 'Term');
 const SplitPane = decorate(SplitPane_, 'SplitPane');
 
 class TermGroup_ extends React.PureComponent<TermGroupProps> {
-  bound: WeakMap<(uid: string, ...args: any[]) => any, Record<string, (...args: any[]) => any>>;
+  bound: WeakMap<(uid: string, ...args: any[]) => any, Partial<Record<string, (...args: any[]) => any>>>;
   term?: Term_ | null;
   constructor(props: TermGroupProps, context: any) {
     super(props, context);
@@ -26,14 +28,23 @@ class TermGroup_ extends React.PureComponent<TermGroupProps> {
     thisObj: any,
     uid: string
   ): (...args: T extends (uid: string, ..._args: infer I) => any ? I : never) => ReturnType<T> {
-    if (!this.bound.has(fn)) {
-      this.bound.set(fn, {});
+    let map = this.bound.get(fn);
+    if (!map) {
+      map = {};
+      this.bound.set(fn, map);
     }
-    const map = this.bound.get(fn)!;
-    if (!map[uid]) {
-      map[uid] = fn.bind(thisObj, uid);
+
+    // The first call for a uid creates its bound copy; later calls must reuse
+    // it, since a stable identity is what keeps the child props unchanged.
+    let bound = map[uid];
+    if (!bound) {
+      bound = fn.bind(thisObj, uid);
+      map[uid] = bound;
     }
-    return map[uid];
+    // SAFETY: `bind` fixes `uid` and leaves the remaining parameters and the
+    // return type untouched, which is exactly the mapped signature above. The
+    // cache widens them to `any[]`, so only the read back needs restating.
+    return bound as (...args: T extends (uid: string, ..._args: infer I) => any ? I : never) => ReturnType<T>;
   }
 
   renderSplit(groups: React.JSX.Element[]) {
@@ -63,6 +74,11 @@ class TermGroup_ extends React.PureComponent<TermGroupProps> {
 
   renderTerm(uid: string) {
     const session = this.props.sessions[uid];
+    // The group can outlive its session by a render while an exit is queued,
+    // and there is nothing to show in that gap.
+    if (!session) {
+      return null;
+    }
     const termRef = this.props.terms[uid];
     const props = getTermProps(uid, this.props, {
       isTermActive: uid === this.props.activeSession,
@@ -74,7 +90,7 @@ class TermGroup_ extends React.PureComponent<TermGroupProps> {
       foregroundColor: this.props.foregroundColor,
       colors: this.props.colors,
       cursorBlink: this.props.cursorBlink,
-      cursorShape: this.props.cursorShape,
+      [CURSOR_STYLE_CONFIG_KEY]: this.props.cursorShape,
       cursorColor: this.props.cursorColor,
       cursorAccentColor: this.props.cursorAccentColor,
       fontSize: this.props.fontSize,
@@ -144,7 +160,7 @@ class TermGroup_ extends React.PureComponent<TermGroupProps> {
 }
 
 const mapStateToProps = (state: HyperState, ownProps: TermGroupOwnProps) => ({
-  childGroups: ownProps.termGroup.children.map((uid) => state.termGroups.termGroups[uid])
+  childGroups: ownProps.termGroup.children.map((uid) => getTermGroup(state.termGroups.termGroups, uid))
 });
 
 const mapDispatchToProps = (dispatch: HyperDispatch, ownProps: TermGroupOwnProps) => ({

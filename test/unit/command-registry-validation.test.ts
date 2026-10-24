@@ -1,8 +1,11 @@
 /** @file Covers command-registry validation edge cases and cache invalidation. */
 import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
-import type {CommandDefinition, CommandId} from '@shared/types/commands';
+import {asCommandId, type CommandDefinition} from '@shared/types/commands';
+import type {JsonObject} from '@shared/types/json';
 
 import {installTestWindow} from '../testUtils/global-window';
+import {importFresh} from '../testUtils/import-fresh';
+import {registerModuleMock} from '../testUtils/mock-module';
 
 let decoratedKeymaps: Record<string, string[]> = {};
 let runtimeCommands: CommandDefinition[] = [];
@@ -16,7 +19,7 @@ const invokeMock = mock(async (channel: string) => {
   return {};
 });
 
-mock.module('../../lib/transport/electron-ipc-transport', () => ({
+registerModuleMock('../../lib/transport/electron-ipc-transport', () => ({
   transport: {
     invoke: invokeMock
   }
@@ -29,10 +32,9 @@ let list: typeof import('../../lib/command-registry').list;
 let validateArgs: typeof import('../../lib/command-registry').validateArgs;
 
 const TEST_COMMAND_PREFIX = 'test:command-registry:validation';
-const asCommandId = (value: string): CommandId => value as CommandId;
 let restoreWindow = () => {};
 
-const createCommandDefinition = (commandId: string, argsSchema?: Record<string, unknown>): CommandDefinition => ({
+const createCommandDefinition = (commandId: string, argsSchema?: JsonObject): CommandDefinition => ({
   id: asCommandId(commandId),
   kind: 'frontend',
   metadata: {
@@ -44,8 +46,9 @@ const createCommandDefinition = (commandId: string, argsSchema?: Record<string, 
 beforeAll(async () => {
   restoreWindow = installTestWindow();
 
-  ({register, update, remove, list, validateArgs} = await import(
-    '../../lib/command-registry.ts?command_registry_validation_unit'
+  ({register, update, remove, list, validateArgs} = await importFresh<typeof import('../../lib/command-registry')>(
+    '../../lib/command-registry',
+    'command_registry_validation_unit'
   ));
 });
 
@@ -66,7 +69,7 @@ beforeEach(() => {
 });
 
 test('validateArgs reports invalid command schemas clearly', () => {
-  const commandId = `${TEST_COMMAND_PREFIX}:invalid-schema`;
+  const commandId = asCommandId(`${TEST_COMMAND_PREFIX}:invalid-schema`);
   register(
     createCommandDefinition(commandId, {
       type: 'object',
@@ -89,7 +92,7 @@ test('validateArgs reports invalid command schemas clearly', () => {
 });
 
 test('validateArgs returns all actionable issues for invalid payloads', () => {
-  const commandId = `${TEST_COMMAND_PREFIX}:multi-issue`;
+  const commandId = asCommandId(`${TEST_COMMAND_PREFIX}:multi-issue`);
   register(
     createCommandDefinition(commandId, {
       type: 'object',
@@ -109,16 +112,16 @@ test('validateArgs returns all actionable issues for invalid payloads', () => {
     throw new Error('Expected invalid payload to fail validation');
   }
 
-  const issueKeywords = (result.error.issues ?? []).map((issue) => issue.keyword).sort();
+  const issueKeywords = (result.error.issues ?? []).map((issue) => issue.keyword).toSorted();
   expect(issueKeywords).toEqual(['additionalProperties', 'minimum', 'required']);
 });
 
 interface SchemaChangeScenario {
   commandId: string;
-  initialSchema: Record<string, unknown>;
-  initialValidPayload: Record<string, unknown>;
+  initialSchema: JsonObject;
+  initialValidPayload: JsonObject;
   mutate: () => void;
-  updatedValidPayload: Record<string, unknown>;
+  updatedValidPayload: JsonObject;
 }
 
 const assertCacheIsInvalidatedAfterSchemaChange = (scenario: SchemaChangeScenario): void => {
@@ -132,7 +135,7 @@ const assertCacheIsInvalidatedAfterSchemaChange = (scenario: SchemaChangeScenari
 };
 
 test('update invalidates cached validators when schemas change', () => {
-  const commandId = `${TEST_COMMAND_PREFIX}:update-cache`;
+  const commandId = asCommandId(`${TEST_COMMAND_PREFIX}:update-cache`);
   const updatedSchema = {
     type: 'object',
     properties: {
@@ -159,7 +162,7 @@ test('update invalidates cached validators when schemas change', () => {
 });
 
 test('remove clears cached validators before re-registering a command id', () => {
-  const commandId = `${TEST_COMMAND_PREFIX}:remove-cache`;
+  const commandId = asCommandId(`${TEST_COMMAND_PREFIX}:remove-cache`);
   const updatedSchema = {
     type: 'object',
     properties: {

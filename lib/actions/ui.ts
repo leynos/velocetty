@@ -29,7 +29,7 @@ import type {HyperState, HyperDispatch, HyperActions, ITermGroups} from '../../t
 import {getRootGroups} from '../selectors';
 import {isExecutable} from '../utils/file';
 import notify from '../utils/notify';
-import findBySession from '../utils/term-groups';
+import findBySession, {getTermGroup} from '../utils/term-groups';
 import {transport} from '../transport';
 
 import {requestSession, sendSessionData, setActiveSession} from './sessions';
@@ -116,14 +116,16 @@ export function windowGeometryUpdated({isMaximized}: {isMaximized: boolean}): Hy
 // Find all sessions that are below the given
 // termGroup uid in the hierarchy:
 const findChildSessions = (termGroups: ITermGroups, uid: string): string[] => {
-  const group = termGroups[uid];
+  const group = getTermGroup(termGroups, uid);
   if (group.sessionUid) {
     return [uid];
   }
 
-  return group.children
-    .asMutable()
-    .reduce((total: string[], childUid: string) => total.concat(findChildSessions(termGroups, childUid)), []);
+  const childSessions: string[] = [];
+  for (const childUid of group.children) {
+    childSessions.push(...findChildSessions(termGroups, childUid));
+  }
+  return childSessions;
 };
 
 // Get the index of the next or previous group,
@@ -148,11 +150,16 @@ function moveToNeighbourPane(type: typeof UI_MOVE_NEXT_PANE | typeof UI_MOVE_PRE
           console.log('ignoring move for single group');
         } else {
           const index = getNeighbourIndex(childGroups, uid, type);
-          const {sessionUid} = termGroups.termGroups[childGroups[index]];
-          dispatch(setActiveSession(sessionUid!));
+          const nextGroupUid = childGroups[index];
+          if (nextGroupUid) {
+            const {sessionUid} = getTermGroup(termGroups.termGroups, nextGroupUid);
+            if (sessionUid) {
+              dispatch(setActiveSession(sessionUid));
+            }
+          }
         }
       }
-    } as HyperActions);
+    });
   };
 }
 
@@ -173,7 +180,7 @@ export function moveLeft() {
         const uid = state.termGroups.activeRootGroup!;
         const groupUids = getGroupUids(state);
         const index = groupUids.indexOf(uid);
-        const next = groupUids[index - 1] || groupUids[groupUids.length - 1];
+        const next = groupUids[index - 1] || groupUids.at(-1);
         if (!next || uid === next) {
           console.log('ignoring left move action');
         } else {
@@ -204,29 +211,31 @@ export function moveRight() {
   };
 }
 
+const getLastGroupIndex = (state: HyperState): number => {
+  const {termGroups} = state.termGroups;
+  const rootGroupCount = Object.keys(termGroups).filter((uid) => {
+    const group = termGroups[uid];
+    return group !== undefined && !group.parentUid;
+  }).length;
+  return rootGroupCount - 1;
+};
+
 export function moveTo(i: number | 'last') {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
-    if (i === 'last') {
-      // Finding last tab index
-      const {termGroups} = getState().termGroups;
-      i =
-        Object.keys(termGroups)
-          .map((uid) => termGroups[uid])
-          .filter(({parentUid}) => !parentUid).length - 1;
-    }
+    const targetIndex = i === 'last' ? getLastGroupIndex(getState()) : i;
     dispatch({
       type: UI_MOVE_TO,
-      index: i,
+      index: targetIndex,
       effect() {
         const state = getState();
         const groupUids = getGroupUids(state);
         const uid = state.termGroups.activeRootGroup;
-        if (uid === groupUids[i as number]) {
+        if (uid === groupUids[targetIndex]) {
           console.log('ignoring same uid');
-        } else if (groupUids[i as number]) {
-          dispatch(setActiveGroup(groupUids[i as number]));
+        } else if (groupUids[targetIndex]) {
+          dispatch(setActiveGroup(groupUids[targetIndex]));
         } else {
-          console.log('ignoring inexistent index', i);
+          console.log('ignoring inexistent index', targetIndex);
         }
       }
     });
@@ -265,7 +274,7 @@ export function openFile(path: string) {
           if (err) {
             notify('Unable to open path', `"${path}" doesn't exist.`, {error: err});
           } else {
-            let command = escapeShellCmd(path).replace(/ /g, '\\ ');
+            let command = escapeShellCmd(path).replaceAll(' ', String.raw`\ `);
             if (stats.isDirectory()) {
               command = `cd ${command}\n`;
             } else if (stats.isFile() && isExecutable(stats)) {
@@ -277,7 +286,7 @@ export function openFile(path: string) {
               });
             });
           }
-          dispatch(requestSession(undefined));
+          dispatch(requestSession());
         });
       }
     });
@@ -313,7 +322,7 @@ export function openSSH(parsedUrl: ReturnType<typeof parseUrl>) {
           });
         });
 
-        dispatch(requestSession(undefined));
+        dispatch(requestSession());
       }
     });
   };

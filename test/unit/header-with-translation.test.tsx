@@ -13,15 +13,18 @@
  * - Translation hook usage: `lib/hooks/use-translation.ts`
  */
 import React from 'react';
-import type {HeaderConnectedProps} from '../../typings/hyper';
+import type {HeaderConnectedProps} from '../../lib/containers/header';
 import {createRoot} from 'react-dom/client';
 import {act} from 'react';
+
+import Immutable from 'seamless-immutable';
 
 import {afterEach, beforeEach, expect, mock, test} from 'bun:test';
 
 import {setupHappyDom} from '../testUtils/happy-dom';
+import {registerModuleMock} from '../testUtils/mock-module';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
-import {waitFor} from '../testUtils/waitFor';
+import {waitFor} from '../testUtils/wait-for';
 
 type HeaderWithTranslationComponent = typeof import('../../lib/containers/header.ts').HeaderWithTranslation;
 
@@ -33,17 +36,15 @@ const translatedLabels = {
   closeWindowAria: 'Close window'
 };
 
-type MockProfileCollection = {
-  name: string;
-  config: Record<string, unknown>;
-}[] & {asMutable: () => MockProfileCollection};
-
-const makeProfiles = (): MockProfileCollection => {
-  const profiles = [{name: 'default', config: {}}];
-  return Object.assign(profiles, {
-    asMutable: () => profiles
-  });
-};
+/**
+ * Builds the profile collection the header receives from the store.
+ *
+ * `seamless-immutable` rather than a hand-rolled `asMutable`: the component
+ * renders `props.profiles.asMutable({deep: true})`, and the store value really
+ * is an `Immutable` array. Faking the method on a plain array would model the
+ * call site, not the value it is given.
+ */
+const makeProfiles = () => Immutable([{name: 'default', config: {}}]);
 
 const TabsMock = React.forwardRef<unknown, React.ComponentProps<'div'>>((_props, _ref) => {
   return null;
@@ -52,7 +53,10 @@ const TabsMock = React.forwardRef<unknown, React.ComponentProps<'div'>>((_props,
 const makeHeaderProps = (overrides: Partial<HeaderConnectedProps> = {}): HeaderConnectedProps => ({
   isMac: false,
   tabs: [{uid: 'tab-1', title: 'Shell', isActive: true, hasActivity: false}],
-  activeMarkers: {},
+  // The store keeps activity markers as an immutable record, so an empty one
+  // has to be built the same way the reducer builds it. The annotation keeps
+  // the empty-literal type from collapsing to `Record<never, boolean>`.
+  activeMarkers: Immutable<Record<string, boolean>>({}),
   borderColor: '#555',
   backgroundColor: '#111',
   maximized: false,
@@ -79,10 +83,10 @@ let hadWindowRequireMock = false;
 let moduleInstanceCounter = 0;
 
 const restoreWindowRequire = () => {
-  const windowApi = globalThis.window as (Window & {require?: (moduleId: string) => unknown}) | undefined;
-  if (!windowApi) {
+  if (!Object.hasOwn(globalThis, 'window')) {
     return;
   }
+  const windowApi = globalThis.window;
 
   if (windowRequireDescriptor) {
     Object.defineProperty(windowApi, 'require', windowRequireDescriptor);
@@ -92,13 +96,13 @@ const restoreWindowRequire = () => {
   }
 
   if (hadWindowRequireMock) {
-    delete (windowApi as {require?: (moduleId: string) => unknown}).require;
+    Reflect.deleteProperty(windowApi, 'require');
     hadWindowRequireMock = false;
   }
 };
 
 const registerHeaderWithTranslationMocks = () => {
-  const windowApi = globalThis.window as Window & {require?: (moduleId: string) => unknown};
+  const windowApi = globalThis.window;
   const mockedIpcRenderer = {
     invoke: mock(async () => ({})),
     on: mock(() => {}),
@@ -107,7 +111,7 @@ const registerHeaderWithTranslationMocks = () => {
     removeListener: mock(() => {})
   };
 
-  if (windowApi) {
+  if (Object.hasOwn(globalThis, 'window')) {
     windowRequireDescriptor = Object.getOwnPropertyDescriptor(windowApi, 'require');
     Object.defineProperty(windowApi, 'require', {
       configurable: true,
@@ -123,7 +127,7 @@ const registerHeaderWithTranslationMocks = () => {
     hadWindowRequireMock = true;
   }
 
-  mock.module('electron', () => ({
+  registerModuleMock('electron', () => ({
     ipcRenderer: mockedIpcRenderer
   }));
 
@@ -131,8 +135,8 @@ const registerHeaderWithTranslationMocks = () => {
 
   // Bun may resolve this import with or without the `.tsx` suffix, so both
   // module IDs must be mocked to keep the tabs component consistently stubbed.
-  mock.module('../../lib/components/tabs', () => ({default: TabsMock}));
-  mock.module('../../lib/components/tabs.tsx', () => ({default: TabsMock}));
+  registerModuleMock('../../lib/components/tabs', () => ({default: TabsMock}));
+  registerModuleMock('../../lib/components/tabs.tsx', () => ({default: TabsMock}));
 };
 
 const loadHeaderWithTranslation = async () => {

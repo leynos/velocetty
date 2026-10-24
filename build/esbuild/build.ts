@@ -5,7 +5,7 @@ import {runEsbuild, type BuildMode, type BuildTarget} from './run-esbuild';
 const allowedTargets = ['hyper-app', 'renderer', 'cli'] as const;
 
 const isBuildTarget = (value: string): value is BuildTarget => {
-  return (allowedTargets as readonly string[]).includes(value);
+  return allowedTargets.some((target) => target === value);
 };
 
 const parseMode = (value: string | undefined): BuildMode => {
@@ -28,7 +28,7 @@ const parseTargets = (value: string | undefined): BuildTarget[] => {
     .map((target) => target.trim())
     .filter(Boolean);
 
-  if (!values.length) {
+  if (values.length === 0) {
     throw new Error('Expected at least one target for --target.');
   }
 

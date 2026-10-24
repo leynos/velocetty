@@ -28,7 +28,7 @@ const dispatchOpacityTransition = (indicator: Element) => {
 
 const buildTransitionEvent = (target: Element, propertyName: string) => {
   // Happy DOM does not fully populate TransitionEvent fields.
-  const event = new Event('transitionend') as TransitionEvent;
+  const event = new Event('transitionend');
   Object.defineProperty(event, 'propertyName', {value: propertyName});
   Object.defineProperty(event, 'target', {value: target});
   return event;
@@ -68,9 +68,9 @@ const createFakeTimerSeam = () => {
       const id = nextId++;
       scheduled.push({id, runAt: now + delay, callback});
       scheduled.sort((a, b) => a.runAt - b.runAt);
-      return id as unknown as NodeJS.Timeout;
+      return id;
     },
-    clearTimeout: (handle?: NodeJS.Timeout) => {
+    clearTimeout: (handle?: ReturnType<typeof globalThis.setTimeout> | number) => {
       const id = Number(handle);
       const index = scheduled.findIndex((t) => t.id === id);
       if (index !== -1) scheduled.splice(index, 1);
@@ -91,7 +91,7 @@ const requireIndicator = (container: HTMLElement) => {
 
 const requireDismissButton = (container: HTMLElement) => {
   const indicator = requireIndicator(container);
-  const button = indicator.querySelector('button[type="button"]');
+  const button = indicator.querySelector<HTMLButtonElement>('button[type="button"]');
   expect(button).toBeTruthy();
   if (!button) {
     throw new Error('Expected dismiss button to be present.');
@@ -102,7 +102,7 @@ const requireDismissButton = (container: HTMLElement) => {
 test('Notification auto-dismisses after the timeout on mount', async () => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   const root = createRoot(container);
 
   const {advanceTimersByTime, timerSeam} = createFakeTimerSeam();
@@ -148,7 +148,7 @@ test('Notification auto-dismisses after the timeout on mount', async () => {
 test('Notification resets the timer when text changes', async () => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   const root = createRoot(container);
 
   const {advanceTimersByTime, timerSeam} = createFakeTimerSeam();
@@ -212,7 +212,7 @@ test('Notification resets the timer when text changes', async () => {
 test('Notification handles manual dismiss transition for user-dismissable notices', async () => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   const root = createRoot(container);
 
   const {timerSeam} = createFakeTimerSeam();
@@ -225,7 +225,7 @@ test('Notification handles manual dismiss transition for user-dismissable notice
           React.createElement(
             Notification,
             buildNotificationProps(
-              1_000,
+              1000,
               () => {
                 dismissCount += 1;
               },
@@ -236,7 +236,7 @@ test('Notification handles manual dismiss transition for user-dismissable notice
       });
     });
 
-    const dismissButton = requireDismissButton(container) as HTMLButtonElement;
+    const dismissButton = requireDismissButton(container);
     await act(async () => {
       dismissButton.click();
     });
@@ -263,7 +263,7 @@ test('Notification handles manual dismiss transition for user-dismissable notice
 test('Notification forwards and clears function refs on mount lifecycle', async () => {
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   const root = createRoot(container);
 
   const refValues: Array<HTMLDivElement | null> = [];
@@ -301,7 +301,7 @@ test('Notification auto-dismisses using global timers when no timer prop is prov
   // This test exercises the default global timer fallback path.
   const cleanup = await setupHappyDom();
   const container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   const root = createRoot(container);
 
   let dismissCount = 0;

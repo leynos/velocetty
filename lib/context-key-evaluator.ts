@@ -12,12 +12,22 @@ const hasOwn = Object.prototype.hasOwnProperty;
 
 type ContextLookup = (key: string) => ContextKeyValue | undefined;
 
+const isBoolean = (value: ContextKeyValue): value is boolean => typeof value === 'boolean';
+const isNumber = (value: ContextKeyValue): value is number => typeof value === 'number';
+const isString = (value: ContextKeyValue): value is string => typeof value === 'string';
+
+const isContextKeyMap = (context: ContextKeyMap | ReadonlyMap<string, ContextKeyValue>): context is ContextKeyMap =>
+  !(context instanceof Map);
+
 const getLookup = (context: ContextKeyMap | ReadonlyMap<string, ContextKeyValue>): ContextLookup => {
-  if (context instanceof Map) {
-    return (key) => context.get(key);
+  // A plain lookup object has no `get`, but `instanceof Map` alone does not
+  // narrow the interface away; the guard states the shape rather than the
+  // negative of the check.
+  if (isContextKeyMap(context)) {
+    return (key) => (hasOwn.call(context, key) ? context[key] : undefined);
   }
 
-  return (key) => (hasOwn.call(context, key) ? context[key] : undefined);
+  return (key) => context.get(key);
 };
 
 const toBoolean = (value: ContextKeyValue): boolean => {
@@ -25,18 +35,26 @@ const toBoolean = (value: ContextKeyValue): boolean => {
     return false;
   }
 
-  if (typeof value === 'boolean') {
+  if (isBoolean(value)) {
     return value;
   }
 
-  if (typeof value === 'number') {
+  if (isNumber(value)) {
     return Boolean(value);
   }
 
   return value.length > 0;
 };
 
-const typeTag = (value: ContextKeyValue) => (value === null ? 'null' : typeof value);
+const typeTag = (value: ContextKeyValue) => {
+  if (value === null) {
+    return 'null';
+  }
+  if (isBoolean(value)) {
+    return 'boolean';
+  }
+  return isNumber(value) ? 'number' : 'string';
+};
 
 const evaluateEquality = (operator: '==' | '!=', left: ContextKeyValue, right: ContextKeyValue): boolean => {
   const sameType = typeTag(left) === typeTag(right);
@@ -51,14 +69,18 @@ const performOrderedComparison = (
   right: number | string
 ): boolean => {
   switch (operator) {
-    case '<':
+    case '<': {
       return left < right;
-    case '<=':
+    }
+    case '<=': {
       return left <= right;
-    case '>':
+    }
+    case '>': {
       return left > right;
-    case '>=':
+    }
+    case '>=': {
       return left >= right;
+    }
   }
 };
 
@@ -67,11 +89,11 @@ const evaluateOrderedComparison = (
   left: ContextKeyValue,
   right: ContextKeyValue
 ): boolean => {
-  if (typeof left === 'number' && typeof right === 'number') {
+  if (isNumber(left) && isNumber(right)) {
     return performOrderedComparison(operator, left, right);
   }
 
-  if (typeof left === 'string' && typeof right === 'string') {
+  if (isString(left) && isString(right)) {
     return performOrderedComparison(operator, left, right);
   }
 
@@ -85,13 +107,15 @@ const evaluateComparison = (
 ): boolean => {
   switch (operator) {
     case '==':
-    case '!=':
+    case '!=': {
       return evaluateEquality(operator, left, right);
+    }
     case '<':
     case '<=':
     case '>':
-    case '>=':
+    case '>=': {
       return evaluateOrderedComparison(operator, left, right);
+    }
   }
 };
 

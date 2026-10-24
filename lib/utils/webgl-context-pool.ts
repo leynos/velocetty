@@ -105,7 +105,7 @@ export class WebGLContextPool<TContext> {
   release(paneId: string, disposeContext?: WebGLContextDisposer<TContext>) {
     const entry = this.#entries.get(paneId);
     if (!entry) {
-      return undefined;
+      return;
     }
 
     this.#entries.delete(paneId);

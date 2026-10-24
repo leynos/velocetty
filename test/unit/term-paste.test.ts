@@ -25,7 +25,7 @@ type PasteCapableTerm = {
 };
 
 const createPasteEvent = (target: EventTarget) => {
-  const event = new window.Event('paste', {bubbles: true, cancelable: true});
+  const event = new globalThis.Event('paste', {bubbles: true, cancelable: true});
   Object.defineProperty(event, 'target', {value: target});
   return event;
 };
@@ -41,14 +41,14 @@ const createPasteEvent = (target: EventTarget) => {
 const buildPasteHarness = (termInstance: PasteCapableTerm, isTermActive: boolean) => {
   const termWrapperRef = document.createElement('div');
   const terminal = document.createElement('span');
-  termWrapperRef.appendChild(terminal);
-  document.body.appendChild(termWrapperRef);
+  termWrapperRef.append(terminal);
+  document.body.append(termWrapperRef);
 
   termInstance.props = {isTermActive};
   termInstance.termWrapperRef = termWrapperRef;
   termInstance.shouldInterceptFilePaste = () => true;
   termInstance.pastePlatform = () => 'darwin';
-  const term = {paste: mock(() => {})};
+  const term = {paste: mock((_data: string) => {})};
   termInstance.term = term;
   return {term, termInstance, terminal, termWrapperRef};
 };
@@ -61,7 +61,7 @@ const flushClipboardReads = async () => {
 describe('Term clipboard paste routing', () => {
   test('leaves paste untouched when the term is inactive', () =>
     withTermTestHarness(async ({createTermInstance, transportMock}) => {
-      const termInstance = createTermInstance('uid-paste') as unknown as PasteCapableTerm;
+      const termInstance = createTermInstance<PasteCapableTerm>('uid-paste');
       const {terminal} = buildPasteHarness(termInstance, false);
       const event = createPasteEvent(terminal);
 
@@ -74,7 +74,7 @@ describe('Term clipboard paste routing', () => {
 
   test('leaves paste untouched for events outside the terminal wrapper', () =>
     withTermTestHarness(async ({createTermInstance, transportMock}) => {
-      const termInstance = createTermInstance('uid-paste') as unknown as PasteCapableTerm;
+      const termInstance = createTermInstance<PasteCapableTerm>('uid-paste');
       buildPasteHarness(termInstance, true);
       const event = createPasteEvent(document.createElement('div'));
 
@@ -87,7 +87,7 @@ describe('Term clipboard paste routing', () => {
 
   test('prevents the native paste and writes clipboard text into the terminal', () =>
     withTermTestHarness(async ({createTermInstance, transportMock}) => {
-      const termInstance = createTermInstance('uid-paste') as unknown as PasteCapableTerm;
+      const termInstance = createTermInstance<PasteCapableTerm>('uid-paste');
       const {term, terminal} = buildPasteHarness(termInstance, true);
       transportMock.invoke.mockImplementation(async (channel: string) =>
         channel === 'clipboard.readFilePaths' ? [] : 'plain text'
@@ -105,7 +105,7 @@ describe('Term clipboard paste routing', () => {
 
   test('pastes copied file paths without asking for clipboard text', () =>
     withTermTestHarness(async ({createTermInstance, transportMock}) => {
-      const termInstance = createTermInstance('uid-paste') as unknown as PasteCapableTerm;
+      const termInstance = createTermInstance<PasteCapableTerm>('uid-paste');
       const {term, terminal} = buildPasteHarness(termInstance, true);
       transportMock.invoke.mockImplementation(async (channel: string) =>
         channel === 'clipboard.readFilePaths' ? ['/tmp/a.txt'] : 'unused'
@@ -122,7 +122,7 @@ describe('Term clipboard paste routing', () => {
 
   test('pastes concurrent clipboard reads in the order they were requested', () =>
     withTermTestHarness(async ({createTermInstance, transportMock}) => {
-      const termInstance = createTermInstance('uid-paste') as unknown as PasteCapableTerm;
+      const termInstance = createTermInstance<PasteCapableTerm>('uid-paste');
       const {term, terminal} = buildPasteHarness(termInstance, true);
       const pasted: string[] = [];
       term.paste = mock((data: string) => {
@@ -162,7 +162,7 @@ describe('Term clipboard paste routing', () => {
 
   test('falls back to clipboard text when the file-list read rejects', () =>
     withTermTestHarness(async ({createTermInstance, transportMock}) => {
-      const termInstance = createTermInstance('uid-paste') as unknown as PasteCapableTerm;
+      const termInstance = createTermInstance<PasteCapableTerm>('uid-paste');
       const {term, terminal} = buildPasteHarness(termInstance, true);
       const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
       transportMock.invoke.mockImplementation(async (channel: string) => {

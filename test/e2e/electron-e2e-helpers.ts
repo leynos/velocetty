@@ -2,7 +2,9 @@
 import fs from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import type {ConsoleMessage, Page} from 'playwright';
+import {fileURLToPath} from 'node:url';
+import type {ConsoleMessage} from 'playwright';
+import {isObject, isString} from '@shared/types/guards';
 
 type ResolveLaunchConfigOptions = Readonly<{
   platform?: NodeJS.Platform;
@@ -12,9 +14,17 @@ type ResolveLaunchConfigOptions = Readonly<{
 }>;
 
 type IsolatedE2EEnvironment = Readonly<{
-  env: NodeJS.ProcessEnv;
+  /**
+   * Launch environment handed straight to Playwright.
+   *
+   * A plain string map rather than `NodeJS.ProcessEnv`: Playwright rejects
+   * variables whose value is `undefined`, and `process.env` may contain them.
+   */
+  env: Record<string, string>;
   cleanup: () => Promise<void>;
 }>;
+
+const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
 
 type RemoveDirectoryWithRetryOptions = Readonly<{
   maxAttempts?: number;
@@ -29,6 +39,16 @@ type ReadActiveTerminalBufferOptions = Readonly<{
 }>;
 
 type SupportedPlatform = 'linux' | 'darwin' | 'win32';
+type ActiveTerminalBufferPage = {
+  evaluate: (callback: (lineLimit: number) => string[], lineLimit: number) => Promise<string[]>;
+};
+type RendererReadyPage = {
+  evaluate: (callback: (selectors: string[]) => boolean, selectors: string[]) => Promise<boolean>;
+};
+type RendererConsolePage = {
+  on: (event: 'console', listener: (message: Pick<ConsoleMessage, 'type' | 'text'>) => void) => void;
+  off: (event: 'console', listener: (message: Pick<ConsoleMessage, 'type' | 'text'>) => void) => void;
+};
 
 export const nowMs = (): number => performance.now();
 
@@ -53,8 +73,11 @@ const isRetriableCleanupError = (error: unknown, isWindows: boolean) => {
     return false;
   }
 
-  const code = (error as {code?: unknown})?.code;
-  return typeof code === 'string' && windowsRetriableCleanupErrorCodes.has(code);
+  if (!isObject(error) || !('code' in error)) {
+    return false;
+  }
+  const code = error.code;
+  return isString(code) && windowsRetriableCleanupErrorCodes.has(code);
 };
 
 export const removeDirectoryWithRetry = async (directory: string, options: RemoveDirectoryWithRetryOptions = {}) => {
@@ -99,7 +122,7 @@ export const isNonCriticalRendererError = (
 export const extractRendererErrorMessage = (line: string) => {
   const marker = '[e2e][renderer-error]';
   const markerIndex = line.indexOf(marker);
-  if (markerIndex < 0) {
+  if (markerIndex === -1) {
     return line.trim();
   }
 
@@ -118,14 +141,20 @@ export const createIsolatedE2EEnvironment = async (): Promise<IsolatedE2EEnviron
   await fs.mkdir(appData, {recursive: true});
   await fs.mkdir(localAppData, {recursive: true});
 
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
+  const parentEnvironment: Record<string, string> = Object.fromEntries(
+    Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)
+  );
+  // `satisfies` rather than an annotation: the literal already has the exact
+  // map type Playwright wants, and stating it keeps the overridden keys visible
+  // as the string values the environment contract requires.
+  const env = {
+    ...parentEnvironment,
     HOME: tempHome,
     XDG_CONFIG_HOME: tempHome,
     USERPROFILE: tempHome,
     APPDATA: appData,
     LOCALAPPDATA: localAppData
-  };
+  } satisfies Record<string, string>;
   return {
     env,
     cleanup: async () => {
@@ -138,111 +167,121 @@ export const createIsolatedE2EEnvironment = async (): Promise<IsolatedE2EEnviron
  * Returns a promise that rejects when the timeout elapses.
  */
 export const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  let didTimeout = false;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      didTimeout = true;
-      reject(new Error(`Timed out after ${ms}ms`));
-    }, ms);
-  });
+  const timeoutState = {didTimeout: false};
+  const timeout = Promise.withResolvers<never>();
+  const timeoutId = setTimeout(() => {
+    timeoutState.didTimeout = true;
+    timeout.reject(new Error(`Timed out after ${ms}ms`));
+  }, ms);
   try {
-    return await Promise.race([promise, timeoutPromise]);
+    return await Promise.race([promise, timeout.promise]);
   } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    if (didTimeout) {
+    clearTimeout(timeoutId);
+    if (timeoutState.didTimeout) {
       void promise.catch(() => {});
     }
   }
+};
+
+/** One line of xterm's scrollback, as much of it as this helper reads. */
+type TerminalBufferLine = {translateToString?: (trimRight?: boolean) => string};
+
+/** The scrollback collection a terminal buffer exposes. */
+type TerminalBufferLines = {length: number; get: (index: number) => TerminalBufferLine | undefined};
+
+/** The React fiber fields the chain walk follows. */
+type FiberNode = {stateNode?: unknown; return?: unknown};
+
+/** The xterm state hung off a fiber's `stateNode`. */
+type FiberTermState = {term?: {buffer?: {active?: {_buffer?: {lines?: unknown}}}}};
+
+/**
+ * Reads the active terminal buffer inside the renderer.
+ *
+ * Defined at module scope, and kept self-contained, because Playwright
+ * serialises the callback as source text: it may reference only its argument
+ * and the browser globals, so every helper it needs is declared inside it.
+ */
+const readActiveTerminalBufferInPage = (resolvedLineLimit: number): string[] => {
+  const failurePrefix = '[e2e] unable to read active terminal buffer';
+  const fail: (message: string) => never = (message) => {
+    throw new Error(`${failurePrefix}: ${message}`);
+  };
+  const requirePresent = <T>(value: T | null | undefined, message: string): T => value ?? fail(message);
+
+  if (typeof document === 'undefined') {
+    fail('renderer document is unavailable');
+  }
+  const termWrapper = requirePresent(
+    document.querySelector('.term_wrapper'),
+    'missing `.term_wrapper` element in renderer DOM'
+  );
+  const fiberKey = requirePresent(
+    Object.getOwnPropertyNames(termWrapper).find((key) => key.startsWith('__reactFiber$')),
+    'React fiber metadata not found on `.term_wrapper`'
+  );
+
+  const isRendererObject = (value: unknown): value is object =>
+    value !== termWrapper && typeof value === 'object' && value !== null;
+  const isFiberNode = (value: unknown): value is FiberNode =>
+    isRendererObject(value) && ('stateNode' in value || 'return' in value);
+  const isBufferLines = (value: unknown): value is TerminalBufferLines =>
+    isRendererObject(value) && 'length' in value && 'get' in value;
+
+  /**
+   * Reads the scrollback collection a single fiber carries, if it has one.
+   *
+   * xterm nests the buffer behind optional fields that only exist once the
+   * terminal has mounted, so each hop is read defensively.
+   */
+  const readFiberLines = (fiber: FiberNode): TerminalBufferLines | null => {
+    // SAFETY: `stateNode` is opaque to the renderer's typings. The traversal
+    // only follows nodes carrying fiber fields, and the result is checked by
+    // `isBufferLines` before anything is read from it.
+    const candidate = (fiber.stateNode as FiberTermState | undefined)?.term?.buffer?.active?._buffer?.lines;
+    return isBufferLines(candidate) ? candidate : null;
+  };
+
+  /** Walks the fiber chain upward to the xterm scrollback collection. */
+  const findBufferLines = (wrapper: Element): TerminalBufferLines => {
+    const initialNode = Object.getOwnPropertyDescriptor(wrapper, fiberKey)?.value;
+    if (!isFiberNode(initialNode)) {
+      fail('React fiber metadata on `.term_wrapper` is not traversable');
+    }
+    let node: FiberNode | undefined = initialNode;
+    for (let depth = 0; depth < 80 && node; depth += 1) {
+      const lines = readFiberLines(node);
+      if (lines) {
+        return lines;
+      }
+      node = isFiberNode(node.return) ? node.return : undefined;
+    }
+    return fail('terminal buffer lines collection is unavailable');
+  };
+
+  const lines = findBufferLines(termWrapper);
+  const start = Math.max(0, lines.length - Math.max(1, resolvedLineLimit));
+  const output: string[] = [];
+  for (let index = start; index < lines.length; index += 1) {
+    output.push(lines.get(index)?.translateToString?.(true) ?? '');
+  }
+  return output;
 };
 
 /**
  * Reads recent lines from the active terminal buffer in the renderer window.
  * Throws clear errors when the expected renderer wiring is unavailable.
  */
-export const readActiveTerminalBuffer = async (windowPage: Page, options: ReadActiveTerminalBufferOptions = {}) => {
-  const lineLimit = options.lineLimit ?? 40;
-  return await windowPage.evaluate((resolvedLineLimit) => {
-    const fail = (message: string): never => {
-      throw new Error(`[e2e] unable to read active terminal buffer: ${message}`);
-    };
-
-    if (typeof document === 'undefined') {
-      fail('renderer document is unavailable');
-    }
-
-    const termWrapper = document.querySelector('.term_wrapper');
-    if (!termWrapper) {
-      fail('missing `.term_wrapper` element in renderer DOM');
-    }
-
-    const fiberKey = Object.getOwnPropertyNames(termWrapper).find((key) => key.startsWith('__reactFiber$'));
-    if (!fiberKey) {
-      fail('React fiber metadata not found on `.term_wrapper`');
-    }
-
-    const initialNode = (termWrapper as Record<string, unknown>)[fiberKey];
-    if (!initialNode || typeof initialNode !== 'object') {
-      fail('React fiber metadata on `.term_wrapper` is not traversable');
-    }
-
-    type MaybeFiberNode = {stateNode?: unknown; return?: unknown};
-    type MaybeTermState = {
-      term?: {buffer?: {active?: {_buffer?: {lines?: {length?: number; get?: (index: number) => unknown}}}}};
-    };
-
-    let node: unknown = initialNode;
-    let termStateNode: MaybeTermState | null = null;
-    for (let i = 0; i < 80 && node; i += 1) {
-      if (typeof node !== 'object') {
-        break;
-      }
-      const currentNode = node as MaybeFiberNode;
-      if (
-        currentNode.stateNode &&
-        typeof currentNode.stateNode === 'object' &&
-        'term' in currentNode.stateNode &&
-        (currentNode.stateNode as {term?: unknown}).term
-      ) {
-        termStateNode = currentNode.stateNode as MaybeTermState;
-        break;
-      }
-      node = currentNode.return;
-    }
-
-    if (!termStateNode) {
-      fail('terminal React state node was not found in fiber chain');
-    }
-
-    const lines = termStateNode.term?.buffer?.active?._buffer?.lines;
-    if (!lines) {
-      fail('terminal buffer lines collection is unavailable');
-    }
-    if (typeof lines.length !== 'number') {
-      fail('terminal buffer lines collection has non-numeric length');
-    }
-    if (typeof lines.get !== 'function') {
-      fail('terminal buffer lines collection is missing get(index)');
-    }
-
-    const output: string[] = [];
-    const boundedLineLimit = Math.max(1, resolvedLineLimit);
-    const start = Math.max(0, lines.length - boundedLineLimit);
-    for (let index = start; index < lines.length; index += 1) {
-      const line = lines.get(index) as {translateToString?: (trimRight?: boolean) => string} | undefined;
-      output.push(line?.translateToString?.(true) ?? '');
-    }
-    return output;
-  }, lineLimit);
-};
+export const readActiveTerminalBuffer = async (
+  windowPage: ActiveTerminalBufferPage,
+  options: ReadActiveTerminalBufferOptions = {}
+) => windowPage.evaluate(readActiveTerminalBufferInPage, options.lineLimit ?? 40);
 
 /**
  * Waits until the renderer has mounted and at least one terminal-related
  * element is present in the document.
  */
-export const waitForRendererReady = async (page: Page, timeoutMs: number) => {
+export const waitForRendererReady = async (page: RendererReadyPage, timeoutMs: number) => {
   const terminalSelectors = ['.xterm', '.term_term', '.tabs_list'];
   const startTime = Date.now();
   while (Date.now() - startTime <= timeoutMs) {
@@ -270,11 +309,14 @@ type RendererConsoleMonitor = Readonly<{
  * Tracks renderer console error events and filters known low-signal messages.
  */
 export const startRendererConsoleMonitor = (
-  page: Page,
+  page: RendererConsolePage,
   nonCriticalErrorPatterns = defaultNonCriticalRendererErrorPatterns
 ): RendererConsoleMonitor => {
   const criticalErrors: string[] = [];
-  const onConsole = (message: ConsoleMessage) => {
+  // Only the type and text are read, and the page's own listener signature is
+  // this same `Pick`, so a narrower parameter would be rejected as
+  // contravariant.
+  const onConsole = (message: Pick<ConsoleMessage, 'type' | 'text'>) => {
     if (message.type() !== 'error') {
       return;
     }
@@ -303,23 +345,26 @@ export const resolveLaunchConfig = (options: ResolveLaunchConfigOptions = {}) =>
   }
   const ci = options.ci ?? process.env.CI;
   const electronDisableSandbox = options.electronDisableSandbox ?? process.env.ELECTRON_DISABLE_SANDBOX;
-  // Bun provides __dirname in .ts modules used by this test helper.
-  const baseDir = options.baseDir ?? __dirname;
+  const baseDir = options.baseDir ?? moduleDirectory;
 
   let pathToBinary: string;
 
   switch (platform) {
-    case 'linux':
+    case 'linux': {
       pathToBinary = path.join(baseDir, '../../dist/linux-unpacked/hyper');
       break;
-    case 'darwin':
+    }
+    case 'darwin': {
       pathToBinary = path.join(baseDir, '../../dist/mac/Hyper.app/Contents/MacOS/Hyper');
       break;
-    case 'win32':
+    }
+    case 'win32': {
       pathToBinary = path.join(baseDir, '../../dist/win-unpacked/Hyper.exe');
       break;
-    default:
+    }
+    default: {
       return assertNever(platform);
+    }
   }
 
   const launchArgs: readonly string[] =

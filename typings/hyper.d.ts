@@ -6,23 +6,17 @@
 /* eslint-disable import/order */
 import type {Immutable} from 'seamless-immutable';
 import type Client from '../lib/utils/rpc';
+import type {ThunkDispatch} from 'redux-thunk';
+import {CURSOR_STYLE_CONFIG_KEY} from '../shared/src/types/config';
 
 declare global {
   interface Window {
     __rpcId: string;
     rpc: Client;
-    focusActiveTerm: (uid?: string) => void;
+    focusActiveTerm?: (uid?: string) => void;
     profileName: string;
+    require?: NodeJS.Require;
   }
-
-  const snapshotResult: {
-    customRequire: {
-      (module: string): unknown;
-      cache: Record<string, {exports: unknown}>;
-      definitions: Record<string, unknown>;
-    };
-    setGlobals(global: any, process: any, window: any, document: any, console: any, require: any): void;
-  };
 }
 
 export type ITermGroup = Immutable<{
@@ -34,7 +28,7 @@ export type ITermGroup = Immutable<{
   children: string[];
 }>;
 
-export type ITermGroups = Immutable<Record<string, ITermGroup>>;
+export type ITermGroups = Immutable<Partial<Record<string, ITermGroup>>>;
 
 export type ITermState = Immutable<{
   termGroups: Mutable<ITermGroups>;
@@ -42,7 +36,7 @@ export type ITermState = Immutable<{
   activeRootGroup: string | null;
 }>;
 
-export type cursorShapes = 'BEAM' | 'UNDERLINE' | 'BLOCK';
+export type CursorStyle = 'BEAM' | 'UNDERLINE' | 'BLOCK';
 import type {FontWeight, IWindowsPty, Terminal} from 'xterm';
 import type {ColorMap, configOptions} from './config';
 import type {TabDecorationProvider} from '../lib/utils/tab-decoration-providers';
@@ -63,7 +57,7 @@ export type uiState = Immutable<{
   cursorAccentColor: string;
   cursorBlink: boolean;
   cursorColor: string;
-  cursorShape: cursorShapes;
+  [CURSOR_STYLE_CONFIG_KEY]: CursorStyle;
   cwd?: string;
   disableLigatures: boolean;
   fontFamily: string;
@@ -92,7 +86,7 @@ export type uiState = Immutable<{
     resize: boolean;
     updates: boolean;
   };
-  openAt: Record<string, number>;
+  openAt: Partial<Record<string, number>>;
   padding: string;
   quickEdit: boolean;
   resizeAt: number;
@@ -132,7 +126,7 @@ export type session = {
 };
 
 export type sessionState = Immutable<{
-  sessions: Record<string, session>;
+  sessions: Partial<Record<string, session>>;
   activeUid: string | null;
   write?: any;
 }>;
@@ -194,8 +188,7 @@ export type HyperActions = (
   | TabActions
 ) & {effect?: () => void};
 
-import type configureStore from '../lib/store/configure-store';
-export type HyperDispatch = ReturnType<typeof configureStore>['dispatch'];
+export type HyperDispatch = ThunkDispatch<HyperState, undefined, HyperActions>;
 
 import type {ReactChild, ReactNode} from 'react';
 type extensionProps = Partial<{
@@ -263,8 +256,8 @@ export type TabsProps = {
 } & extensionProps;
 
 export type TimerSeam = {
-  setTimeout: typeof globalThis.setTimeout;
-  clearTimeout: typeof globalThis.clearTimeout;
+  setTimeout: (callback: () => void, delay?: number) => ReturnType<typeof globalThis.setTimeout> | number;
+  clearTimeout: (handle?: ReturnType<typeof globalThis.setTimeout> | number) => void;
 };
 
 export type NotificationProps = {
@@ -384,7 +377,7 @@ export type TermProps = {
   cursorAccentColor?: string;
   cursorBlink: boolean;
   cursorColor: string;
-  cursorShape: cursorShapes;
+  [CURSOR_STYLE_CONFIG_KEY]: CursorStyle;
   disableLigatures: boolean;
   fitAddon: FitAddon | null;
   fontFamily: string;

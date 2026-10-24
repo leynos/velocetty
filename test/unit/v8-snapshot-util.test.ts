@@ -20,33 +20,35 @@
 import {expect, test} from 'bun:test';
 
 import {bootstrapSnapshotRuntime} from '../../lib/v8-snapshot-util';
-
-type SnapshotResultShape = {
-  customRequire: {
-    (moduleName: string): unknown;
-    cache: Record<string, {exports: unknown}>;
-    definitions: Record<string, unknown>;
-  };
-  setGlobals: (...args: unknown[]) => void;
-};
+import type {SnapshotModuleExport, SnapshotModuleRequire, SnapshotRuntimeResult} from '../../lib/v8-snapshot-util';
 
 type ModuleContainer = {
-  _load: (moduleName: string) => unknown;
+  _load: (moduleName: string) => SnapshotModuleExport;
 };
 
 type SnapshotHarness = {
   moduleContainer: ModuleContainer;
   restoreBootstrap: () => void;
-  runtimeRequire: NodeRequire;
+  runtimeRequire: SnapshotModuleRequire;
   setGlobalsCalls: unknown[][];
-  snapshotResult: SnapshotResultShape;
+  snapshotResult: SnapshotRuntimeResult;
+};
+
+type SnapshotWindow = {require?: SnapshotModuleRequire};
+
+const overriddenModuleLoad = (_moduleName: string) => 'overridden';
+const failIfRuntimeRequireCalled = (moduleName: string): never => {
+  throw new Error(`runtime require should not be called without snapshotResult: ${moduleName}`);
 };
 
 type BootstrapFixture = {
   moduleContainer: ModuleContainer;
-  originalLoad: (moduleName: string) => unknown;
+  originalLoad: (moduleName: string) => SnapshotModuleExport;
   bootstrapHandle: {restore: () => void};
 };
+
+// SAFETY: Bootstrap only checks this sentinel's presence; these tests never call DOM methods.
+const documentStub = {} as Document;
 
 const createModuleContainer = (): ModuleContainer => {
   return {
@@ -54,26 +56,47 @@ const createModuleContainer = (): ModuleContainer => {
   };
 };
 
-const createRuntimeRequire = (moduleContainer: ModuleContainer): NodeRequire => {
-  return ((moduleName: string) => {
+type CallableModuleContainer = ModuleContainer & ((moduleName: string) => SnapshotModuleExport);
+
+/**
+ * Builds a loader shaped like the value `require('module')` actually returns.
+ *
+ * Node hands back the `Module` constructor with `_load` attached to it, so the
+ * loader is callable and `typeof` reports `'function'`. The plain object
+ * literal above is the more convenient double, but it is not the real shape,
+ * which is how a guard that rejected callables once shipped unnoticed.
+ */
+const loadNativeModule = (moduleName: string): SnapshotModuleExport => ({toString: () => `native:${moduleName}`});
+
+const createCallableModuleContainer = (): CallableModuleContainer => {
+  // A distinct callable per call, rather than the shared module-scope one:
+  // bootstrap swaps `_load` on the value it is handed, so a single shared
+  // instance would let one test's wrapper leak into the next.
+  const load = (moduleName: string): SnapshotModuleExport => loadNativeModule(moduleName);
+  return Object.assign(load, {_load: load});
+};
+
+const createRuntimeRequire = (moduleContainer: ModuleContainer) => {
+  return (moduleName: string) => {
     if (moduleName === 'module') {
       return moduleContainer;
     }
     throw new Error(`Unexpected module request: ${moduleName}`);
-  }) as NodeRequire;
+  };
 };
 
 const createSnapshotResult = (
-  definitions: Record<string, unknown>,
+  definitions: SnapshotRuntimeResult['customRequire']['definitions'],
   setGlobalsCalls: unknown[][]
-): SnapshotResultShape => {
+): SnapshotRuntimeResult => {
+  const cache: SnapshotRuntimeResult['customRequire']['cache'] = {};
   return {
     customRequire: Object.assign(
       (moduleName: string) => {
         return `custom:${moduleName}`;
       },
       {
-        cache: {} as Record<string, {exports: unknown}>,
+        cache,
         definitions
       }
     ),
@@ -87,16 +110,12 @@ const createSnapshotHarness = (virtualModuleName: string, requireLocation: 'glob
   const moduleContainer = createModuleContainer();
   const originalLoad = moduleContainer._load;
   const runtimeRequire = createRuntimeRequire(moduleContainer);
-  const runtimeWindow = {} as Window & {require?: NodeRequire};
-
-  if (requireLocation === 'window') {
-    runtimeWindow.require = runtimeRequire;
-  }
+  const runtimeWindow: SnapshotWindow = requireLocation === 'window' ? {require: runtimeRequire} : {};
 
   const setGlobalsCalls: unknown[][] = [];
-  const snapshotResult = createSnapshotResult({[virtualModuleName]: {}}, setGlobalsCalls);
+  const snapshotResult = createSnapshotResult({[virtualModuleName]: () => {}}, setGlobalsCalls);
   const bootstrapHandle = bootstrapSnapshotRuntime({
-    document: {} as Document,
+    document: documentStub,
     require: requireLocation === 'global' ? runtimeRequire : undefined,
     snapshotResult,
     window: runtimeWindow
@@ -151,10 +170,10 @@ const createBootstrapFixture = (): BootstrapFixture => {
   const originalLoad = moduleContainer._load;
   const runtimeRequire = createRuntimeRequire(moduleContainer);
   const bootstrapHandle = bootstrapSnapshotRuntime({
-    document: {} as Document,
+    document: documentStub,
     require: runtimeRequire,
-    snapshotResult: createSnapshotResult({'virtual:plugin': {}}, []),
-    window: {} as Window & {require?: NodeRequire}
+    snapshotResult: createSnapshotResult({'virtual:plugin': () => {}}, []),
+    window: {}
   });
 
   if (!bootstrapHandle) {
@@ -202,7 +221,7 @@ test('restores the original module loader after bootstrap cleanup', () => {
 test('throws when snapshot bootstrap cannot find runtime require', () => {
   expect(() =>
     bootstrapSnapshotRuntime({
-      document: {} as Document,
+      document: documentStub,
       snapshotResult: {
         customRequire: Object.assign(
           (_moduleName: string) => {
@@ -215,7 +234,7 @@ test('throws when snapshot bootstrap cannot find runtime require', () => {
         ),
         setGlobals: () => {}
       },
-      window: {} as Window & {require?: NodeRequire}
+      window: {}
     })
   ).toThrow('Expected a Node-compatible require function for snapshot initialization.');
 });
@@ -234,24 +253,24 @@ test('throws when snapshot bootstrap cannot find window or document globals', ()
 
   expect(() =>
     bootstrapSnapshotRuntime({
-      document: {} as Document,
+      document: documentStub,
       require: runtimeRequire,
       snapshotResult: {
         customRequire: validRequire,
         setGlobals: () => {}
       },
-      window: undefined as unknown as Window & {require?: NodeRequire}
+      window: undefined
     })
   ).toThrow('Expected window and document globals for snapshot initialization.');
 
   expect(() =>
     bootstrapSnapshotRuntime({
-      document: undefined as unknown as Document,
+      document: undefined,
       snapshotResult: {
         customRequire: validRequire,
         setGlobals: () => {}
       },
-      window: {} as Window & {require?: NodeRequire},
+      window: {},
       require: runtimeRequire
     })
   ).toThrow('Expected window and document globals for snapshot initialization.');
@@ -260,9 +279,7 @@ test('throws when snapshot bootstrap cannot find window or document globals', ()
 test('restore is idempotent when the module loader has changed', () => {
   const {moduleContainer, originalLoad, bootstrapHandle} = createBootstrapFixture();
 
-  const overriddenLoad = ((_moduleName: string) => {
-    return 'overridden';
-  }) as typeof moduleContainer._load;
+  const overriddenLoad = overriddenModuleLoad;
   moduleContainer._load = overriddenLoad;
 
   bootstrapHandle.restore();
@@ -276,10 +293,10 @@ test('restore removes stale wrappers when snapshot bootstraps overlap', () => {
   const originalLoad = moduleContainer._load;
   const runtimeRequire = createRuntimeRequire(moduleContainer);
   const firstHandle = bootstrapSnapshotRuntime({
-    document: {} as Document,
+    document: documentStub,
     require: runtimeRequire,
-    snapshotResult: createSnapshotResult({'virtual:first': {}}, []),
-    window: {} as Window & {require?: NodeRequire}
+    snapshotResult: createSnapshotResult({'virtual:first': () => {}}, []),
+    window: {}
   });
 
   if (!firstHandle) {
@@ -287,10 +304,10 @@ test('restore removes stale wrappers when snapshot bootstraps overlap', () => {
   }
 
   const secondHandle = bootstrapSnapshotRuntime({
-    document: {} as Document,
+    document: documentStub,
     require: runtimeRequire,
-    snapshotResult: createSnapshotResult({'virtual:second': {}}, []),
-    window: {} as Window & {require?: NodeRequire}
+    snapshotResult: createSnapshotResult({'virtual:second': () => {}}, []),
+    window: {}
   });
 
   if (!secondHandle) {
@@ -306,15 +323,40 @@ test('restore removes stale wrappers when snapshot bootstraps overlap', () => {
   expect(moduleContainer._load).toBe(originalLoad);
 });
 
+test('accepts the callable module loader that `require("module")` returns', () => {
+  // Regression: `require('module')` is the `Module` constructor with `_load`
+  // attached, so it is a function, not an object literal. A guard that admitted
+  // only object literals rejected the real loader and threw at renderer module
+  // scope, which surfaced as a single critical renderer error in every E2E lane.
+  const moduleContainer = createCallableModuleContainer();
+  const originalLoad = moduleContainer._load;
+  const runtimeRequire = createRuntimeRequire(moduleContainer);
+
+  const bootstrapHandle = bootstrapSnapshotRuntime({
+    document: documentStub,
+    require: runtimeRequire,
+    snapshotResult: createSnapshotResult({'virtual:callable': () => {}}, []),
+    window: {}
+  });
+
+  if (!bootstrapHandle) {
+    throw new Error('Expected snapshot bootstrap to install a runtime handle.');
+  }
+
+  expect(moduleContainer._load).not.toBe(originalLoad);
+  expect(moduleContainer._load('virtual:callable')).toBe('custom:virtual:callable');
+
+  bootstrapHandle.restore();
+  expect(moduleContainer._load).toBe(originalLoad);
+});
+
 test('no-ops when snapshotResult is unavailable', () => {
-  const runtimeRequire = ((moduleName: string) => {
-    throw new Error(`runtime require should not be called without snapshotResult: ${moduleName}`);
-  }) as NodeRequire;
+  const runtimeRequire = failIfRuntimeRequireCalled;
 
   expect(
     bootstrapSnapshotRuntime({
       require: runtimeRequire,
-      window: {} as Window & {require?: NodeRequire}
+      window: {}
     })
   ).toBeNull();
 });

@@ -6,21 +6,34 @@
 import {EventEmitter} from 'node:events';
 
 import type {IpcRendererEvent} from 'electron';
+import type {MainEvents, RendererEvents, TypedEmitter} from '@shared/types/common';
 
-import type {
-  FilterNever,
-  IpcRendererWithCommands,
-  MainEvents,
-  RendererEvents,
-  TypedEmitter
-} from '@shared/types/common';
-
-export type RpcClientIpc = Pick<IpcRendererWithCommands, 'on' | 'removeListener' | 'send'>;
+/**
+ * The slice of `ipcRenderer` this client depends on.
+ *
+ * Written out rather than derived with `Pick<IpcRendererWithCommands, …>`:
+ * Electron declares `on` and `removeListener` as returning `this`, so picking
+ * them demands the whole renderer object from every stand-in. The client
+ * ignores those return values, and a test double has no `this` to return.
+ */
+export type RpcClientIpc = {
+  // `any[]` rather than `unknown[]` for the listener tail, matching Electron's
+  // own declaration: listeners here take concrete payload types, and a
+  // contravariant `unknown` tail rejects every one of them.
+  //
+  // The returns are `void` because the client discards them. Electron's own
+  // declarations return `this` so calls can be chained; naming that here would
+  // force every double to hand back a renderer object it does not have.
+  on(channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void): void;
+  removeListener(channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void): void;
+  send(channel: string, ...args: unknown[]): void;
+};
 
 type RpcWindowState = {
   __rpcId?: string;
-  require?: (moduleId: string) => unknown;
 };
+
+type RuntimeGlobalScope = Omit<typeof globalThis, 'window'> & {window?: Window};
 
 type ClientOptions = {
   deferReadyRegistration?: (callback: () => void) => void;
@@ -28,23 +41,29 @@ type ClientOptions = {
   windowHost?: RpcWindowState;
 };
 
-type InitListener = (event: IpcRendererEvent, uid: string, profileName: string) => void;
+type InitListener = (event: Electron.IpcRendererEvent, uid: string, profileName: string) => void;
+
+// SAFETY: Renderer modules are also imported in Node tests, where `window` is absent.
+const runtimeGlobal = globalThis as RuntimeGlobalScope;
+const globalRpcWindowState: RpcWindowState = runtimeGlobal.window ?? {};
 
 const defaultDeferReadyRegistration = (callback: () => void) => {
   setTimeout(callback, 0);
 };
+const isRuntimeRequire = (candidate: unknown): candidate is NodeJS.Require => typeof candidate === 'function';
 const resolveIpcRenderer = (): RpcClientIpc => {
-  if (typeof window.require !== 'function') {
-    throw new Error('Electron ipcRenderer is unavailable');
+  const rendererRequire = runtimeGlobal.window?.require;
+  if (!isRuntimeRequire(rendererRequire)) {
+    throw new TypeError('Electron ipcRenderer is unavailable');
   }
 
-  const electronModule = window.require('electron') as {ipcRenderer: IpcRendererWithCommands};
-  return electronModule.ipcRenderer;
+  return rendererRequire('electron').ipcRenderer;
 };
 
 /** Renderer-side RPC client that forwards typed events over IPC. */
 export default class Client {
   emitter: TypedEmitter<RendererEvents>;
+  private readonly rawEmitter: EventEmitter;
   ipc: RpcClientIpc;
   id!: string;
   private initListener?: InitListener;
@@ -52,10 +71,12 @@ export default class Client {
   constructor(options: ClientOptions = {}) {
     const {
       ipc = resolveIpcRenderer(),
-      windowHost = window as RpcWindowState,
+      windowHost = globalRpcWindowState,
       deferReadyRegistration = defaultDeferReadyRegistration
     } = options;
-    this.emitter = new EventEmitter();
+    // eslint-disable-next-line unicorn/prefer-event-target -- `TypedEmitter` exposes EventEmitter's typed `on`, `once`, and removal contract.
+    this.rawEmitter = new EventEmitter();
+    this.emitter = this.rawEmitter;
     this.ipc = ipc;
     this.emit = this.emit.bind(this);
     if (windowHost.__rpcId) {
@@ -66,7 +87,7 @@ export default class Client {
         }
         this.id = cachedRpcId;
         this.ipc.on(this.id, this.ipcListener);
-        this.emitter.emit('ready');
+        this.rawEmitter.emit('ready');
       });
     } else {
       this.initListener = (_ev: IpcRendererEvent, uid: string, _profileName: string) => {
@@ -78,7 +99,7 @@ export default class Client {
         // window.profileName = profileName;
         this.id = uid;
         this.ipc.on(uid, this.ipcListener);
-        this.emitter.emit('ready');
+        this.rawEmitter.emit('ready');
       };
       this.ipc.on('init', this.initListener);
     }
@@ -95,14 +116,14 @@ export default class Client {
 
   private emitRendererEvent<U extends keyof RendererEvents>(ch: U, data: RendererEvents[U] | undefined) {
     if (data === undefined) {
-      return this.emitter.emit(ch as Exclude<keyof RendererEvents, FilterNever<RendererEvents>>);
+      return this.rawEmitter.emit(ch);
     }
 
-    return this.emitter.emit(ch as FilterNever<RendererEvents>, data as RendererEvents[FilterNever<RendererEvents>]);
+    return this.rawEmitter.emit(ch, data);
   }
 
   ipcListener = <U extends keyof RendererEvents>(
-    _event: IpcRendererEvent,
+    _event: Electron.IpcRendererEvent,
     {ch, data}: {ch: U; data?: RendererEvents[U]}
   ) => this.emitRendererEvent(ch, data);
 
@@ -120,13 +141,14 @@ export default class Client {
     return this;
   };
 
-  emit<U extends Exclude<keyof MainEvents, FilterNever<MainEvents>>>(ev: U): boolean;
-  emit<U extends FilterNever<MainEvents>>(ev: U, data: MainEvents[U]): boolean;
-  emit<U extends keyof MainEvents>(ev: U, data?: MainEvents[U]) {
+  emit<U extends keyof MainEvents>(
+    ev: U,
+    ...payload: [MainEvents[U]] extends [never] ? [] : [data: MainEvents[U]]
+  ): boolean {
     if (!this.id) {
       throw new Error('Not ready');
     }
-    this.ipc.send(this.id, {ev, data});
+    this.ipc.send(this.id, {ev, data: payload[0]});
     return true;
   }
 

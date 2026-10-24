@@ -1,8 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+/** @param {unknown} value @returns {value is object} */
+const isObject = (value) => value !== null && Object(value) === value;
+
 function isEnoentError(error) {
-  return error != null && typeof error === 'object' && 'code' in error && error.code === 'ENOENT';
+  return isObject(error) && 'code' in error && error.code === 'ENOENT';
 }
 
 async function ensureExistingPath(dirPath, stat) {

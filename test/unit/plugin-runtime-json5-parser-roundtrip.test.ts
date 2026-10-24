@@ -2,10 +2,10 @@
 import {expect, test} from 'bun:test';
 import JSON5 from 'json5';
 
-import {type Json5ObjectRange, Json5Parser} from '../../app/runtime/plugin-runtime-json5-parser';
+import {Json5Parser} from '../../app/runtime/plugin-runtime-json5-parser';
 import {applyPluginSettingsPatches, json5Document, pluginId} from '../../app/runtime/plugin-runtime-json5-roundtrip';
 
-const rootOf = (raw: string): {parser: Json5Parser; root: Json5ObjectRange} => {
+const rootOf = (raw: string) => {
   const parser = new Json5Parser(raw);
   const root = parser.findRootObjectRange();
 

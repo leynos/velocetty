@@ -3,8 +3,19 @@
  */
 import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 import {ZodError} from 'zod';
+import {asCommandId} from '@shared/types/commands';
 
-const invokeMock = mock(async (_channel: string) => ({'editor:break': ['ctrl+c']}));
+import type {IpcResult} from '@shared/types/common';
+
+import {importFresh} from '../testUtils/import-fresh';
+import {registerModuleMock} from '../testUtils/mock-module';
+
+// The reply is left as `IpcResult`: the transport validates every answer with a
+// schema, and the rejection test resolves a string where the schema declares a
+// record. Both are values the declared command map can produce, so the double
+// stays honest about the transport under test rather than widening to
+// `unknown` to admit the mismatched case.
+const invokeMock = mock(async (_channel: string): Promise<IpcResult> => ({'editor:break': ['ctrl+c']}));
 const emitMock = mock(() => true);
 const onMock = mock(() => null);
 const onceMock = mock(() => null);
@@ -12,14 +23,16 @@ const offMock = mock(() => null);
 const removeAllListenersMock = mock(() => null);
 const destroyMock = mock(() => null);
 
-const transportOwner: {
+type TransportOwner = {
   emit: typeof emitMock;
   on: typeof onMock;
   once: typeof onceMock;
   off: typeof offMock;
   removeAllListeners: typeof removeAllListenersMock;
   destroy: typeof destroyMock;
-} = {
+};
+
+const transportOwner: TransportOwner = {
   emit: emitMock,
   on: onMock,
   once: onceMock,
@@ -28,20 +41,23 @@ const transportOwner: {
   destroy: destroyMock
 };
 
-mock.module('../../lib/utils/ipc', () => ({
+registerModuleMock('../../lib/utils/ipc', () => ({
   ipcRenderer: {
     invoke: invokeMock
   }
 }));
 
-mock.module('../../lib/rpc', () => ({
+registerModuleMock('../../lib/rpc', () => ({
   default: transportOwner
 }));
 
 let transport: typeof import('../../lib/transport/electron-ipc-transport').transport;
 
 beforeAll(async () => {
-  ({transport} = await import('../../lib/transport/electron-ipc-transport.ts?transport_unit'));
+  ({transport} = await importFresh<typeof import('../../lib/transport/electron-ipc-transport')>(
+    '../../lib/transport/electron-ipc-transport',
+    'transport_unit'
+  ));
 });
 
 beforeEach(() => {
@@ -68,10 +84,10 @@ test('rejects with ZodError when IPC response fails schema validation', async ()
 });
 
 test('delegates host-command emits to rpc transport', () => {
-  transport.emit('command', 'session:search');
+  transport.emit('command', asCommandId('session:search'));
   transport.emit('open context menu', 'selection');
 
-  expect(emitMock).toHaveBeenCalledWith('command', 'session:search');
+  expect(emitMock).toHaveBeenCalledWith('command', asCommandId('session:search'));
   expect(emitMock).toHaveBeenCalledWith('open context menu', 'selection');
 });
 

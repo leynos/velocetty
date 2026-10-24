@@ -10,15 +10,14 @@
  * - Restart required: backend transport settings, update channel, process-level
  *   configuration, WebGL renderer (deferred to CONFIG-001)
  */
-import type {ConfigReloadClassification} from '../types/config';
+import {CURSOR_STYLE_CONFIG_KEY, type ConfigReloadClassification as Reloadability} from '../types/config';
 
-/** Re-export for convenience. */
-export type Reloadability = ConfigReloadClassification;
+export type {ConfigReloadClassification as Reloadability} from '../types/config';
 
 /** Entry in the reloadability registry with classification and rationale. */
 export type ReloadabilityEntry = {
   /** The reload capability classification for this setting. */
-  readonly classification: ConfigReloadClassification;
+  readonly classification: Reloadability;
   /** Human-readable explanation of why this classification was chosen. */
   readonly rationale: string;
 };
@@ -29,12 +28,34 @@ export type ConfigReloadabilityRegistry = {
 };
 
 /**
+ * Reads a registry entry by key through the open registry contract.
+ *
+ * Each registry below is declared with `satisfies`, so its binding keeps the
+ * literal type of the keys it actually contains. That is what lets
+ * `Object.keys` and `for…of` enumerate them precisely, but it also means a
+ * dynamic key cannot index the binding directly. Widening the parameter here,
+ * rather than the binding, keeps both properties: callers get a typed lookup,
+ * and the registries retain their known-key evidence.
+ *
+ * @param registry - The registry to read from.
+ * @param key - The configuration key to look up.
+ * @returns The matching entry, or undefined when the key is absent.
+ *
+ * @example
+ * ```ts
+ * lookupReloadability(rootConfigReloadability, 'fontSize'); // ReloadabilityEntry | undefined
+ * ```
+ */
+const lookupReloadability = (registry: ConfigReloadabilityRegistry, key: string): ReloadabilityEntry | undefined =>
+  registry[key];
+
+/**
  * Reloadability registry for root-level config options (non-profile settings).
  *
  * These settings affect application-level behaviour and are generally
  * restart-required when they affect process-level configuration.
  */
-export const rootConfigReloadability: ConfigReloadabilityRegistry = {
+export const rootConfigReloadability = {
   autoUpdatePlugins: {
     classification: 'restart',
     rationale: 'Affects background plugin update scheduling; requires process-level timer reconfiguration'
@@ -63,7 +84,7 @@ export const rootConfigReloadability: ConfigReloadabilityRegistry = {
     classification: 'restart',
     rationale: 'Affects PTY backend selection; requires new session creation'
   }
-};
+} satisfies ConfigReloadabilityRegistry;
 
 /**
  * Reloadability registry for profile-level config options (terminal appearance and behaviour).
@@ -71,7 +92,7 @@ export const rootConfigReloadability: ConfigReloadabilityRegistry = {
  * These settings primarily affect terminal presentation and can generally be
  * hot-reloaded, with the exception of WebGL renderer which is deferred to CONFIG-001.
  */
-export const profileConfigReloadability: ConfigReloadabilityRegistry = {
+export const profileConfigReloadability = {
   backgroundColor: {
     classification: 'live',
     rationale: 'Theme/UI appearance setting; can be applied via xterm reconfigure'
@@ -116,7 +137,7 @@ export const profileConfigReloadability: ConfigReloadabilityRegistry = {
     classification: 'live',
     rationale: 'Cursor appearance setting; can be applied via xterm reconfigure'
   },
-  cursorShape: {
+  [CURSOR_STYLE_CONFIG_KEY]: {
     classification: 'live',
     rationale: 'Cursor appearance setting; can be applied via xterm reconfigure'
   },
@@ -236,26 +257,26 @@ export const profileConfigReloadability: ConfigReloadabilityRegistry = {
     classification: 'live',
     rationale: 'Startup directory; affects future session creation only'
   }
-};
+} satisfies ConfigReloadabilityRegistry;
 
 /**
  * Reloadability registry for keymap settings.
  *
  * Keybindings are always live-reloadable as they only affect input event routing.
  */
-export const keymapReloadability: ConfigReloadabilityRegistry = {
+export const keymapReloadability = {
   '*': {
     classification: 'live',
     rationale: 'All keymap entries are live-reloadable; they only affect input event routing'
   }
-};
+} satisfies ConfigReloadabilityRegistry;
 
 /**
  * Reloadability registry for plugin configuration.
  *
  * Plugin enable/disable is generally live-reloadable subject to safe unload.
  */
-export const pluginReloadability: ConfigReloadabilityRegistry = {
+export const pluginReloadability = {
   plugins: {
     classification: 'live',
     rationale: 'Plugin list changes are live-reloadable subject to safe unload/load'
@@ -264,7 +285,7 @@ export const pluginReloadability: ConfigReloadabilityRegistry = {
     classification: 'live',
     rationale: 'Local plugin changes are live-reloadable subject to safe unload/load'
   }
-};
+} satisfies ConfigReloadabilityRegistry;
 
 /**
  * Gets the reloadability classification for a given config key.
@@ -281,16 +302,21 @@ export const pluginReloadability: ConfigReloadabilityRegistry = {
  */
 export const getReloadability = (key: string, scope: ConfigScope): ReloadabilityEntry | undefined => {
   switch (scope) {
-    case 'root':
-      return rootConfigReloadability[key];
-    case 'profile':
-      return profileConfigReloadability[key];
-    case 'keymap':
-      return keymapReloadability[key] ?? keymapReloadability['*'];
-    case 'plugin':
-      return pluginReloadability[key];
-    default:
+    case 'root': {
+      return lookupReloadability(rootConfigReloadability, key);
+    }
+    case 'profile': {
+      return lookupReloadability(profileConfigReloadability, key);
+    }
+    case 'keymap': {
+      return lookupReloadability(keymapReloadability, key) ?? lookupReloadability(keymapReloadability, '*');
+    }
+    case 'plugin': {
+      return lookupReloadability(pluginReloadability, key);
+    }
+    default: {
       return undefined;
+    }
   }
 };
 
@@ -327,16 +353,21 @@ export const isLiveReloadable = (key: string, scope: ConfigScope): boolean => {
  */
 export const getConfigKeys = (scope: ConfigScope): string[] => {
   switch (scope) {
-    case 'root':
+    case 'root': {
       return Object.keys(rootConfigReloadability);
-    case 'profile':
+    }
+    case 'profile': {
       return Object.keys(profileConfigReloadability);
-    case 'keymap':
+    }
+    case 'keymap': {
       return ['*'];
-    case 'plugin':
+    }
+    case 'plugin': {
       return Object.keys(pluginReloadability);
-    default:
+    }
+    default: {
       return [];
+    }
   }
 };
 

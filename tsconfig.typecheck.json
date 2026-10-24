@@ -7,10 +7,14 @@
     "noImplicitOverride": false,
     "noPropertyAccessFromIndexSignature": false,
     "noUncheckedIndexedAccess": false,
-    "strict": false,
-    "useUnknownInCatchVariables": false,
+    "paths": {
+      "native-process-working-directory": ["./typings/native-process-working-directory.d.ts"],
+      "@shared/*": ["./shared/src/*"],
+      "@app/*": ["./app/*"],
+      "@lib/*": ["./lib/*"]
+    },
     "verbatimModuleSyntax": false
   },
-  "include": ["./app/", "./lib/", "./cli/", "./typings/", "./shared/src/"],
+  "include": ["./app/", "./lib/", "./cli/", "./typings/", "./shared/src/", "./test/"],
   "exclude": ["./dist/", "./node_modules/", "./target/"]
 }

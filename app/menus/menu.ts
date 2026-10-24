@@ -1,5 +1,5 @@
 // Packages
-import {app, dialog, Menu} from 'electron';
+import {app, dialog, Menu, nativeImage} from 'electron';
 
 // Utilities
 import {execCommand} from '../commands';
@@ -44,14 +44,14 @@ export const createMenu = (getLoadedPluginVersions: () => {name: string; version
   const config = getConfig();
   // We take only first shortcut in array for each command
   const allCommandKeys = getDecoratedKeymaps();
-  const commandKeys = Object.keys(allCommandKeys).reduce((result: Record<string, string>, command) => {
-    result[command] = allCommandKeys[command][0];
-    return result;
-  }, {});
+  const commandKeys: Record<string, string> = {};
+  for (const command of Object.keys(allCommandKeys)) {
+    commandKeys[command] = allCommandKeys[command][0];
+  }
 
   let updateChannel = 'stable';
 
-  if (config?.updateChannel && config.updateChannel === 'canary') {
+  if (config.updateChannel === 'canary') {
     updateChannel = 'canary';
   }
 
@@ -60,10 +60,10 @@ export const createMenu = (getLoadedPluginVersions: () => {name: string; version
     const pluginList =
       loadedPlugins.length === 0 ? 'none' : loadedPlugins.map((plugin) => `\n  ${plugin.name} (${plugin.version})`);
 
-    const rendererCounts = Object.values(getRendererTypes()).reduce((acc: Record<string, number>, type) => {
-      acc[type] = acc[type] ? acc[type] + 1 : 1;
-      return acc;
-    }, {});
+    const rendererCounts: Record<string, number> = {};
+    for (const type of Object.values(getRendererTypes())) {
+      rendererCounts[type] = (rendererCounts[type] ?? 0) + 1;
+    }
     const renderers = Object.entries(rendererCounts)
       .map(([type, count]) => type + (count > 1 ? ` (${count})` : ''))
       .join(', ');
@@ -103,7 +103,7 @@ export const createMenu = (getLoadedPluginVersions: () => {name: string; version
         `Plugins: ${pluginList}\n\n` +
         'Created by Guillermo Rauch\nCopyright © 2022 Vercel, Inc.',
       buttons: [],
-      icon: icon as any
+      icon: nativeImage.createFromPath(icon)
     });
   };
   const menu = [

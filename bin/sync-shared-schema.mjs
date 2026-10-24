@@ -2,10 +2,10 @@
 /** @file Syncs shared schema artefacts into the legacy app config location. */
 
 import {copyFileSync, mkdirSync} from 'node:fs';
-import {dirname, resolve} from 'node:path';
+import path from 'node:path';
 
-const sourcePath = resolve(import.meta.dirname, '../shared/schemas/schema.json');
-const targetPath = resolve(import.meta.dirname, '../app/config/schema.json');
+const sourcePath = path.resolve(import.meta.dirname, '../shared/schemas/schema.json');
+const targetPath = path.resolve(import.meta.dirname, '../app/config/schema.json');
 
-mkdirSync(dirname(targetPath), {recursive: true});
+mkdirSync(path.dirname(targetPath), {recursive: true});
 copyFileSync(sourcePath, targetPath);

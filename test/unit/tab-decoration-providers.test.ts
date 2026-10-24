@@ -1,18 +1,18 @@
 /** @file Covers deterministic tab-decoration provider ordering and update events. */
 import {beforeEach, describe, expect, mock, test} from 'bun:test';
 
-import type {CommandId} from '@shared/types/commands';
+import {asCommandId} from '@shared/types/commands';
 import {
   asTabDecorationProviderId,
   asTabId,
-  type TabDecorationProviderId,
   TabDecorationProviderRegistry
 } from '../../lib/utils/tab-decoration-providers';
 
-const asCommandId = (value: string): CommandId => value as CommandId;
-
 /** Silent logger that prevents expected warning noise from polluting test output. */
 const silentLogger = {warn: () => {}, error: () => {}};
+
+/** Holds the callback a provider publishes from inside `subscribe`. */
+type ProviderChangeSink = {emit?: () => void};
 
 const buildContext = () => ({
   tabId: asTabId('tab-1'),
@@ -47,7 +47,11 @@ describe('TabDecorationProviderRegistry', () => {
     });
 
     const providerIds = registry.listProviders().map((provider) => provider.id);
-    expect(providerIds).toEqual(['middle', 'alpha', 'zeta']);
+    expect(providerIds).toEqual([
+      asTabDecorationProviderId('middle'),
+      asTabDecorationProviderId('alpha'),
+      asTabDecorationProviderId('zeta')
+    ]);
   });
 
   test('uses deterministic singleton tie-breaks and bounded list merges', () => {
@@ -116,7 +120,10 @@ describe('TabDecorationProviderRegistry', () => {
 
   test('emits updates only from explicit provider-change events', async () => {
     const updateReasons: string[] = [];
-    let emitProviderChange: (() => void) | null = null;
+    // Held on an object rather than in a `let`: the provider only publishes the
+    // callback from inside `subscribe`, which control-flow analysis does not
+    // follow, so a local would stay narrowed to `null` at the call below.
+    const providerChange: ProviderChangeSink = {};
 
     registry.subscribe(() => {
       updateReasons.push('changed');
@@ -126,8 +133,8 @@ describe('TabDecorationProviderRegistry', () => {
       id: asTabDecorationProviderId('provider'),
       priority: 1,
       provideDecoration: () => ({title: 'stable'}),
-      subscribe: (onDidChange) => {
-        emitProviderChange = onDidChange;
+      subscribe: (onDidChange: () => void) => {
+        providerChange.emit = onDidChange;
       }
     });
 
@@ -138,7 +145,7 @@ describe('TabDecorationProviderRegistry', () => {
     // No polling should fire additional events without provider callbacks.
     expect(updateReasons).toHaveLength(1);
 
-    emitProviderChange?.();
+    providerChange.emit?.();
     expect(updateReasons).toHaveLength(2);
 
     unregister();
@@ -196,11 +203,11 @@ describe('TabDecorationProviderRegistry', () => {
     test.each([
       {
         description: 'empty ids',
-        invalidId: '   ' as unknown as TabDecorationProviderId
+        invalidId: '   '
       },
       {
         description: 'non-string ids',
-        invalidId: 123 as unknown as TabDecorationProviderId
+        invalidId: 123
       }
     ])('ignores provider registrations with $description', ({invalidId}) => {
       const unregister = registry.register({
@@ -209,7 +216,7 @@ describe('TabDecorationProviderRegistry', () => {
         provideDecoration: () => ({title: 'ignored'})
       });
 
-      expect(typeof unregister).toBe('function');
+      expect(unregister).toEqual(expect.any(Function));
       expect(registry.listProviders()).toEqual([]);
     });
   });

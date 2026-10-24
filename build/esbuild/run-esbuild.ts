@@ -1,6 +1,7 @@
 /** @file Builds renderer/CLI bundles with esbuild and handles watch mode. */
 import {copyFile, mkdir} from 'node:fs/promises';
 import path from 'node:path';
+import {isObject, isString} from '@shared/types/guards';
 
 import {build, context, type BuildContext, type BuildOptions, type Plugin, type PluginBuild} from 'esbuild';
 
@@ -65,12 +66,12 @@ export const createRendererBuildOptions = (mode: BuildMode, rootDir: string): Bu
     outfile: path.join(rootDir, 'dist', 'app', 'renderer', 'bundle.js'),
     platform: 'browser',
     format: 'iife',
-    target: ['es2022'],
+    target: ['es2023'],
     // Enable 'style' and 'module' conditions for Tailwind CSS v4 package exports
     conditions: ['style', 'module'],
     sourcemap: isProductionMode(mode) ? 'external' : 'linked',
     loader: {
-      ...(baseBuildOptions.loader ?? {}),
+      ...baseBuildOptions.loader,
       '.css': 'css',
       '.module.css': 'local-css'
     },
@@ -95,6 +96,20 @@ export const createCliBuildOptions = (mode: BuildMode, rootDir: string): BuildOp
     // contexts that load it via require semantics without ESM package mode.
     format: 'cjs',
     target: ['node24'],
+    // Under `format: 'cjs'` esbuild cannot express `import.meta.url` and
+    // substitutes an empty object, so `fileURLToPath(import.meta.url)` would
+    // receive `undefined` and throw while the bundle loads. ES modules are the
+    // house idiom for resolving a module's own location, so rather than
+    // rewriting the source to a CommonJS global, the banner below derives an
+    // equivalent URL from `__filename` and `define` points `import.meta.url` at
+    // it. Both source and bundle then agree on the CLI's real directory.
+    banner: {
+      js: 'const __importMetaUrl = require("node:url").pathToFileURL(__filename).href;'
+    },
+    define: {
+      ...baseBuildOptions.define,
+      'import.meta.url': '__importMetaUrl'
+    },
     sourcemap: isProductionMode(mode) ? false : 'linked',
     plugins: [createNodeBuiltinsPlugin(), createIgnoreImportsPlugin()]
   };
@@ -120,7 +135,9 @@ const mirrorRendererBundleToDistLib = async (rootDir: string) => {
       try {
         await copyFile(path.join(rendererOutputDir, fileName), path.join(distLibDir, fileName));
       } catch (error) {
-        const errorCode = (error as NodeJS.ErrnoException).code;
+        // `isObject` narrows to `object`, which declares no properties; the
+        // `in` check is what gives the narrowed value a `code` to read.
+        const errorCode = isObject(error) && 'code' in error && isString(error.code) ? error.code : undefined;
         if (errorCode === 'ENOENT' && optionalRendererBundleFiles.has(fileName)) {
           return;
         }
@@ -171,9 +188,9 @@ const runTargets = async (options: RunEsbuildOptions) => {
   const descriptors = createTargetDescriptors();
 
   if (!options.watch) {
-    const oneShotBuilds = targetExecutionOrder
-      .filter((target) => targetSet.has(target))
-      .map((target) => descriptors[target].runOneShot({mode: options.mode, rootDir}));
+    const oneShotBuilds = targetExecutionOrder.flatMap((target) =>
+      targetSet.has(target) ? [descriptors[target].runOneShot({mode: options.mode, rootDir})] : []
+    );
     await Promise.all(oneShotBuilds);
     return;
   }
@@ -194,10 +211,14 @@ const runTargets = async (options: RunEsbuildOptions) => {
   };
 
   process.on('SIGINT', () => {
-    void closeAllContexts().finally(() => process.exit(0));
+    void closeAllContexts().finally(() => {
+      process.exitCode = 0;
+    });
   });
   process.on('SIGTERM', () => {
-    void closeAllContexts().finally(() => process.exit(0));
+    void closeAllContexts().finally(() => {
+      process.exitCode = 0;
+    });
   });
 
   await new Promise<void>(() => {
@@ -234,7 +255,7 @@ const createPostcssPluginWithoutModules = (): Plugin => {
 
       try {
         // Call base plugin setup
-        basePlugin.setup(build);
+        void basePlugin.setup(build);
       } finally {
         // Always restore original onLoad, even if an exception occurred
         build.onLoad = originalOnLoad;

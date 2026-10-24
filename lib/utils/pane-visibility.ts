@@ -11,7 +11,14 @@ export type PaneVisibilityInput = Readonly<{
   isOccluded: boolean;
 }>;
 
-export const hasRenderablePaneBounds = (bounds: PaneLayoutBounds | null | undefined) => {
+/**
+ * Reports whether `bounds` describe a pane with area worth rendering.
+ *
+ * `bounds` is optional because the function answers `false` for absence: an
+ * unmeasured pane has no renderable area, and making every caller spell out
+ * that fact would only repeat the branch inside.
+ */
+export const hasRenderablePaneBounds = (bounds?: PaneLayoutBounds | null) => {
   if (!bounds) {
     return false;
   }

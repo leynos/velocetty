@@ -8,9 +8,10 @@ import {afterEach, beforeEach, describe, expect, mock, test} from 'bun:test';
 import type {HyperProps} from '../../typings/hyper';
 import {createCommandRegistryModuleStub} from '../testUtils/command-registry-mock';
 import {setupHappyDom} from '../testUtils/happy-dom';
+import {registerModuleMock} from '../testUtils/mock-module';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
-import {waitFor} from '../testUtils/waitFor';
+import {waitFor} from '../testUtils/wait-for';
 
 const {transportMock, resetTransportMock} = createTransportMock();
 
@@ -22,15 +23,15 @@ type HyperComponent = React.ComponentType<HyperProps>;
 const registerHyperModuleMocks = () => {
   // Re-register before importing Hyper to keep this suite stable if another
   // file calls mock.restore() earlier in the same Bun process.
-  mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
-  mock.module('../../lib/actions/ui', () => ({
+  registerModuleMock('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
+  registerModuleMock('../../lib/actions/ui', () => ({
     execCommand: () => ({type: 'exec'}),
     setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'})
   }));
   registerPluginsModuleMocks({}, {defaultExportMode: 'self'});
-  mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));
-  mock.module('../../lib/containers/notifications', () => ({default: () => null}));
-  mock.module('../../lib/containers/terms', () => ({
+  registerModuleMock('../../lib/containers/header', () => ({HeaderContainer: () => null}));
+  registerModuleMock('../../lib/containers/notifications', () => ({default: () => null}));
+  registerModuleMock('../../lib/containers/terms', () => ({
     default: (props: {ref_: (terms: unknown) => void}) => {
       props.ref_({
         getTermByUid: () => null,
@@ -39,17 +40,17 @@ const registerHyperModuleMocks = () => {
       return null;
     }
   }));
-  mock.module('mousetrap', () => ({
-    default: class {
-      stopCallback = () => false;
-      bind() {}
+  registerModuleMock('mousetrap', () => ({
+    default: () => ({
+      stopCallback: () => false,
+      bind() {},
       reset() {}
-    }
+    })
   }));
-  mock.module('../../lib/command-registry', () => ({
+  registerModuleMock('../../lib/command-registry', () => ({
     createCommandRegistryModule: () => createCommandRegistryModuleStub(),
     getRegisteredKeys: async () => ({}),
-    getCommandHandler: () => undefined,
+    getCommandHandler: () => {},
     shouldPreventDefault: () => false
   }));
 };
@@ -62,11 +63,13 @@ const loadHyperComponent = async () => {
   registerHyperModuleMocks();
   cleanupHappyDom = await setupHappyDom();
   // Provide window.rpc stub for any residual plugin-API references.
-  (window as unknown as {rpc: Record<string, () => void>}).rpc = {
-    on: () => {},
-    off: () => {},
-    removeListener: () => {}
-  };
+  Object.assign(globalThis, {
+    rpc: {
+      on: () => {},
+      off: () => {},
+      removeListener: () => {}
+    }
+  });
   moduleInstanceCounter += 1;
   ({default: Hyper} = await import(`../../lib/containers/hyper.tsx?hyper_transport=${moduleInstanceCounter}`));
 };
@@ -74,7 +77,7 @@ const loadHyperComponent = async () => {
 beforeEach(async () => {
   resetTransportMock();
   await loadHyperComponent();
-}, 15000);
+}, 15_000);
 
 afterEach(() => {
   cleanupHappyDom?.();
@@ -98,7 +101,7 @@ const buildHyperProps = (overrides: Partial<HyperProps> = {}): HyperProps => ({
 
 const setupHyperContainer = () => {
   const container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   return createRoot(container);
 };
 
@@ -126,7 +129,7 @@ describe('Hyper transport subscription lifecycle', () => {
     const onCall = transportMock.on.mock.calls.find((call) => call[0] === 'term selectAll');
 
     expect(onCall).toBeDefined();
-    expect(typeof onCall?.[1]).toBe('function');
+    expect(onCall?.[1]).toEqual(expect.any(Function));
 
     await unmountHyper(root);
   });
@@ -139,7 +142,7 @@ describe('Hyper transport subscription lifecycle', () => {
     const offCall = transportMock.off.mock.calls.find((call) => call[0] === 'term selectAll');
 
     expect(offCall).toBeDefined();
-    expect(typeof offCall?.[1]).toBe('function');
+    expect(offCall?.[1]).toEqual(expect.any(Function));
   });
 
   test.serial('uses the same listener reference for on and off', async () => {

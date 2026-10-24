@@ -1,10 +1,23 @@
 /** @file Parses file paths from the OS "copied files" clipboard format. */
 import {fileURLToPath} from 'node:url';
 
+/**
+ * Payload shapes this module can read from a clipboard entry.
+ *
+ * Electron resolves `ClipboardItem.getType` to a `Blob` for the URI-list MIME
+ * type; the `string` arm covers test doubles and platforms that hand the list
+ * over as text.
+ */
+export type ClipboardPayload = string | Blob;
+
 /** A single clipboard entry exposes its MIME types and payload getter. */
 export type ClipboardItemPort = {
   readonly types: readonly string[];
-  getType(type: string): Promise<unknown>;
+  /**
+   * Resolves to the payload for `type`, or `null` when the platform supplies
+   * it in a shape that is not readable text.
+   */
+  getType(type: string): Promise<ClipboardPayload | null>;
 };
 
 /** The subset of Electron's clipboard API needed to read copied files. */
@@ -44,17 +57,14 @@ export const parseUriList = (uriList: string): string[] =>
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0 && !line.startsWith('#'))
-    .map(toFilePath)
+    .map((line) => toFilePath(line))
     .filter((path): path is string => path !== null);
 
-const readPayloadText = async (payload: unknown): Promise<string | null> => {
-  if (typeof payload === 'string') {
-    return payload;
+const readPayloadText = async (payload: ClipboardPayload | null): Promise<string | null> => {
+  if (payload === null) {
+    return null;
   }
-  if (payload instanceof Blob) {
-    return payload.text();
-  }
-  return null;
+  return payload instanceof Blob ? payload.text() : payload;
 };
 
 /**

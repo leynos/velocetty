@@ -24,7 +24,10 @@ const assertSyntaxError = (expression: string, index: number, messagePart: strin
     throw new Error('Expected parse failure');
   } catch (error) {
     expect(error).toBeInstanceOf(WhenExpressionSyntaxError);
-    const parseError = error as WhenExpressionSyntaxError;
+    if (!(error instanceof WhenExpressionSyntaxError)) {
+      throw new TypeError('Expected a context-key syntax error.');
+    }
+    const parseError = error;
     expect(parseError.index).toBe(index);
     expect(parseError.source).toBe(expression);
     expect(parseError.message).toContain(messagePart);
@@ -93,7 +96,7 @@ test('parses literals and escape sequences into stable AST values', () => {
     value: "foo'bar\n"
   } satisfies WhenExpressionNode);
 
-  expect(parseWhenExpression('"foo\\"bar\\t"')).toEqual({
+  expect(parseWhenExpression(String.raw`"foo\"bar\t"`)).toEqual({
     kind: 'literal',
     value: 'foo"bar\t'
   } satisfies WhenExpressionNode);
@@ -258,9 +261,13 @@ test('service snapshots are deterministic and independent of insertion order', (
   expect(resultSeriesA).toEqual([true, true, true, true, true, true, true, true]);
   expect(resultSeriesB).toEqual(resultSeriesA);
 
-  const frozenSnapshot = serviceA.snapshot() as Record<string, ContextKeyValue>;
+  const frozenSnapshot = serviceA.snapshot();
   expect(() => {
-    frozenSnapshot.paneCount = 99;
+    // `Object.assign` rather than a direct assignment: the snapshot type is
+    // read-only, so the compiler rejects a plain write before the runtime
+    // freeze ever gets a chance to throw. This reaches past the type to the
+    // same property write a caller could only perform from untyped code.
+    Object.assign(frozenSnapshot, {paneCount: 99});
   }).toThrow();
   expect(serviceA.evaluateCompiled(serviceA.compile(expression))).toBe(true);
 });
@@ -339,10 +346,13 @@ test('evaluateWhenExpressionAst respects missing keys as null and supports repea
 test('evaluateWhenExpressionAst is deterministic for object and map contexts and ignores prototype keys', () => {
   const ast = parseWhenExpression('count > 1 && ownFlag && inheritedFlag == null');
   const prototypeContext = {inheritedFlag: true};
-  const objectContext = Object.assign(Object.create(prototypeContext), {
-    count: 2,
-    ownFlag: true
-  }) as ContextKeyMap;
+  const objectContext = Object.setPrototypeOf(
+    Object.fromEntries([
+      ['count', 2],
+      ['ownFlag', true]
+    ]),
+    prototypeContext
+  );
   const mapContext = new Map<string, ContextKeyValue>([
     ['count', 2],
     ['ownFlag', true]

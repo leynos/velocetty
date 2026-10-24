@@ -43,9 +43,15 @@ const resizeAdjacentPanes = (sizes: number[], index: number, nextLeadingPaneSize
  * size. Returns `null` when the key does not apply for the current
  * orientation.
  */
-const KEY_RESIZE_ACTIONS: Partial<
-  Record<string, (isVertical: boolean, current: number, total: number) => number | null>
-> = {
+type KeyResizeAction = (isVertical: boolean, current: number, total: number) => number | null;
+
+/**
+ * The keys with a resize meaning, keyed by `KeyboardEvent.key`.
+ *
+ * `satisfies` keeps the literal keys available to `isResizeKey` below while
+ * still checking every action against the shared signature.
+ */
+const KEY_RESIZE_ACTIONS = {
   ArrowLeft: (v, c) => (v ? c - KEYBOARD_RESIZE_STEP : null),
   ArrowRight: (v, c) => (v ? c + KEYBOARD_RESIZE_STEP : null),
   ArrowUp: (v, c) => (v ? null : c - KEYBOARD_RESIZE_STEP),
@@ -53,8 +59,11 @@ const KEY_RESIZE_ACTIONS: Partial<
   PageUp: (_v, c) => c - KEYBOARD_PAGE_RESIZE_STEP,
   PageDown: (_v, c) => c + KEYBOARD_PAGE_RESIZE_STEP,
   Home: () => 0,
-  End: (_v, _c, total) => total
-};
+  End: (_v: boolean, _c: number, total: number) => total
+} satisfies Record<string, KeyResizeAction>;
+
+/** Narrows an arbitrary `KeyboardEvent.key` to one this component handles. */
+const isResizeKey = (key: string): key is keyof typeof KEY_RESIZE_ACTIONS => Object.hasOwn(KEY_RESIZE_ACTIONS, key);
 
 /**
  * Returns the next leading-pane size for a keyboard resize event, or `null`
@@ -66,13 +75,17 @@ function computeKeyResizeTarget(
   currentSize: number,
   pairTotal: number
 ): number | null {
-  const action = KEY_RESIZE_ACTIONS[key];
-  return action ? action(isVertical, currentSize, pairTotal) : null;
+  if (!isResizeKey(key)) {
+    return null;
+  }
+
+  return KEY_RESIZE_ACTIONS[key](isVertical, currentSize, pairTotal);
 }
 
 const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const dragPanePosition = useRef<number>(0);
   const dragOffset = useRef<number>(0);
+  const dragWindow = useRef<Window | null>(null);
   const dragTarget = useRef<HTMLElement | null>(null);
   const paneIndex = useRef<number>(0);
   const dragPointerAxisRef = useRef<'clientX' | 'clientY'>(props.direction === 'horizontal' ? 'clientY' : 'clientX');
@@ -110,12 +123,14 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
     ev.preventDefault();
     const target = ev.currentTarget;
     const parent = target.parentElement;
-    if (!parent) {
+    const dragWindow_ = target.ownerDocument.defaultView;
+    if (!parent || !dragWindow_) {
       return;
     }
     setDragging(true);
-    window.addEventListener('mousemove', onDrag);
-    window.addEventListener('mouseup', onDragEnd);
+    dragWindow.current = dragWindow_;
+    dragWindow_.addEventListener('mousemove', onDrag);
+    dragWindow_.addEventListener('mouseup', onDragEnd);
     dragTarget.current = target;
     dragPointerAxisRef.current = propsRef.current.direction === 'horizontal' ? 'clientY' : 'clientX';
     dragD1Ref.current = propsRef.current.direction === 'horizontal' ? 'height' : 'width';
@@ -138,7 +153,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
       sizes_ = [...sizes.asMutable()];
     } else {
       const total = propsRef.current.children.length;
-      const count = new Array<number>(total).fill(1 / total);
+      const count = Array.from({length: total}, () => 1 / total);
 
       sizes_ = count;
     }
@@ -188,8 +203,9 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
   }, []);
 
   const onDragEnd = useCallback(() => {
-    window.removeEventListener('mousemove', onDrag);
-    window.removeEventListener('mouseup', onDragEnd);
+    dragWindow.current?.removeEventListener('mousemove', onDrag);
+    dragWindow.current?.removeEventListener('mouseup', onDragEnd);
+    dragWindow.current = null;
     dragTarget.current?.style.removeProperty('left');
     dragTarget.current?.style.removeProperty('top');
     dragTarget.current = null;
@@ -231,7 +247,7 @@ const SplitPane = forwardRef(function SplitPane(props: SplitPaneProps, ref: Reac
   // workaround for the fact that if we don't specify
   // sizes, sometimes flex fails to calculate the
   // right height for the horizontal panes
-  const sizes = props.sizes || new Array<number>(children.length).fill(1 / children.length);
+  const sizes = props.sizes || Array.from({length: children.length}, () => 1 / children.length);
   return (
     <div
       className={`${styles.splitpanePanes} ${direction === 'vertical' ? styles.splitpanePanesVertical : styles.splitpanePanesHorizontal}`}

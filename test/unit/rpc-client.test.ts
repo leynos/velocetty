@@ -1,11 +1,14 @@
 /** @file Verifies renderer RPC client lifecycle and event forwarding. */
 import {expect, mock, test} from 'bun:test';
 
-import type {IpcRendererEvent} from 'electron';
+import {asCommandId} from '@shared/types/commands';
 
 import Client, {type RpcClientIpc} from '../../lib/utils/rpc';
 
-type IpcListener = (event: IpcRendererEvent, ...args: unknown[]) => void;
+type IpcListener = (event: Electron.IpcRendererEvent, ...args: unknown[]) => void;
+type RpcWindowHost = {__rpcId?: string};
+// SAFETY: The RPC client ignores the event object in this harness; the test observes only IPC payloads.
+const unusedIpcRendererEvent = {} as Electron.IpcRendererEvent;
 
 type RpcClientHarness = {
   createClient: () => Client;
@@ -15,15 +18,13 @@ type RpcClientHarness = {
   onMock: ReturnType<typeof mock>;
   removeListenerMock: ReturnType<typeof mock>;
   sendMock: ReturnType<typeof mock>;
-  windowHost: {
-    __rpcId?: string;
-  };
+  windowHost: RpcWindowHost;
 };
 
 const createRpcClientHarness = (): RpcClientHarness => {
   const channelListeners = new Map<string, IpcListener[]>();
   const deferredReadyRegistrations: Array<() => void> = [];
-  const windowHost: {__rpcId?: string} = {};
+  const windowHost: RpcWindowHost = {};
 
   const onMock = mock((channel: string, listener: IpcListener) => {
     const listeners = channelListeners.get(channel) ?? [];
@@ -51,8 +52,9 @@ const createRpcClientHarness = (): RpcClientHarness => {
 
   const emitChannel = (channel: string, ...args: unknown[]) => {
     const listeners = channelListeners.get(channel) ?? [];
-    for (const listener of [...listeners]) {
-      listener({} as IpcRendererEvent, ...args);
+    const listenersAtStart = [...listeners];
+    for (const listener of listenersAtStart) {
+      listener(unusedIpcRendererEvent, ...args);
     }
   };
 
@@ -98,7 +100,7 @@ test('subscribes to init channel and becomes ready when init event arrives', () 
   expect(harness.onMock).toHaveBeenCalledWith('rpc-uid', expect.any(Function));
   expect(readyListener).toHaveBeenCalledTimes(1);
 
-  client.emit('command', 'tab:new');
+  client.emit('command', asCommandId('tab:new'));
   expect(harness.sendMock).toHaveBeenCalledWith('rpc-uid', {
     data: 'tab:new',
     ev: 'command'
@@ -133,13 +135,14 @@ test('does not register ready handler if cached rpc id is cleared before deferre
 
   expect(harness.onMock).not.toHaveBeenCalled();
   expect(readyListener).not.toHaveBeenCalled();
+  expect(() => client.emit('command', asCommandId('tab:new'))).toThrow('Not ready');
 });
 
 test('throws when emitting commands before the rpc channel is ready', () => {
   const harness = createRpcClientHarness();
   const client = harness.createClient();
 
-  expect(() => client.emit('command', 'tab:new')).toThrow('Not ready');
+  expect(() => client.emit('command', asCommandId('tab:new'))).toThrow('Not ready');
 });
 
 test('destroy removes the pending init listener when client is destroyed before ready', () => {
@@ -191,7 +194,7 @@ test('removeAllListeners forwards event argument to emitter', () => {
   const listener = mock(() => {});
   client.on('session data', listener);
 
-  client.removeAllListeners('session data');
+  expect(client.removeAllListeners('session data')).toBe(client);
 
   harness.emitChannel('per-event-rpc-id', {ch: 'session data', data: 'late'});
   expect(listener).not.toHaveBeenCalled();

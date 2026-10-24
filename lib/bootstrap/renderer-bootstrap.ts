@@ -3,7 +3,9 @@ import type {configOptions} from '@shared/types/config';
 import type {RendererEvents} from '@shared/types/common';
 import type {RendererCommandTransport} from '@shared/types/transport';
 import {z} from 'zod';
-import type {SplitRequestParams} from '../types/request-shapes';
+import type {HyperDispatch} from '../../typings/hyper';
+
+const noop = () => {};
 
 export type AddSessionDataParams = {uid: string; data: string};
 export type SendSessionDataParams = {uid: string | null; data: string; escaped?: boolean};
@@ -23,7 +25,7 @@ type StoreState = {
 };
 
 type StoreLike = {
-  dispatch: (action: unknown) => unknown;
+  dispatch: HyperDispatch;
   getState: () => StoreState;
 };
 
@@ -49,54 +51,38 @@ type MountResult =
     }
   | undefined;
 
-type SessionActionModule = {
-  addSession: (session: unknown) => unknown;
-  addSessionData: (params: AddSessionDataParams) => unknown;
-  sendSessionData: (params: SendSessionDataParams) => unknown;
-  openSearch: () => unknown;
-  closeSearch: () => unknown;
-  clearActiveSession: () => unknown;
-};
-
-type TermGroupActionModule = {
-  requestTermGroup: (params?: SplitRequestParams) => unknown;
-  requestHorizontalSplit: (params?: SplitRequestParams) => unknown;
-  requestVerticalSplit: (params?: SplitRequestParams) => unknown;
-  exitActiveTermGroup: () => unknown;
-  ptyExitTermGroup: (uid: string) => unknown;
-};
-
-type UiActionModule = {
-  setFontSmoothing: () => unknown;
-  resetFontSize: () => unknown;
-  increaseFontSize: () => unknown;
-  decreaseFontSize: () => unknown;
-  moveLeft: () => unknown;
-  moveRight: () => unknown;
-  moveTo: (index: number | 'last') => unknown;
-  moveToNextPane: () => unknown;
-  moveToPreviousPane: () => unknown;
-  openFile: (path: string) => unknown;
-  openSSH: (parsedUrl: unknown) => unknown;
-  windowGeometryUpdated: (data: {isMaximized: boolean}) => unknown;
-  windowMove: (window: {bounds: {x: number; y: number}}) => unknown;
-  enterFullScreen: () => unknown;
-  leaveFullScreen: () => unknown;
-};
-
-type UpdaterActionModule = {
-  updateAvailable: (params: UpdateAvailableParams) => unknown;
-};
-
 type BootstrapActionModules = {
-  addNotificationMessage: (params: AddNotificationParams) => unknown;
-  init: () => unknown;
-  loadConfig: (config: configOptions) => unknown;
-  reloadConfig: (config: configOptions) => unknown;
-  sessionActions: SessionActionModule;
-  termGroupActions: TermGroupActionModule;
-  uiActions: UiActionModule;
-  updaterActions: UpdaterActionModule;
+  addNotificationMessage: typeof import('../actions/notifications').addNotificationMessage;
+  init: typeof import('../actions/index').default;
+  loadConfig: typeof import('../actions/config').loadConfig;
+  reloadConfig: typeof import('../actions/config').reloadConfig;
+  sessionActions: Pick<
+    typeof import('../actions/sessions'),
+    'addSession' | 'addSessionData' | 'sendSessionData' | 'openSearch' | 'closeSearch' | 'clearActiveSession'
+  >;
+  termGroupActions: Pick<
+    typeof import('../actions/term-groups'),
+    'requestTermGroup' | 'requestHorizontalSplit' | 'requestVerticalSplit' | 'exitActiveTermGroup' | 'ptyExitTermGroup'
+  >;
+  uiActions: Pick<
+    typeof import('../actions/ui'),
+    | 'setFontSmoothing'
+    | 'resetFontSize'
+    | 'increaseFontSize'
+    | 'decreaseFontSize'
+    | 'moveLeft'
+    | 'moveRight'
+    | 'moveTo'
+    | 'moveToNextPane'
+    | 'moveToPreviousPane'
+    | 'openFile'
+    | 'openSSH'
+    | 'windowGeometryUpdated'
+    | 'windowMove'
+    | 'enterFullScreen'
+    | 'leaveFullScreen'
+  >;
+  updaterActions: Pick<typeof import('../actions/updater'), 'updateAvailable'>;
 };
 
 type WindowLike = WindowGlobalsLike &
@@ -104,12 +90,12 @@ type WindowLike = WindowGlobalsLike &
     document: Document;
   };
 
-export type RendererBootstrapDependencies = {
+export type RendererBootstrapDependencies<Store extends StoreLike = StoreLike> = {
   actions: BootstrapActionModules;
   config: ConfigModuleLike;
-  configureStore: () => StoreLike;
+  configureStore: () => Store;
   getBase64FileData: (path: string) => Promise<string | null>;
-  mountApp: (store: StoreLike) => MountResult;
+  mountApp: (store: Store) => MountResult;
   platform: NodeJS.Platform;
   plugins: PluginModuleLike;
   rpc: unknown;
@@ -130,18 +116,32 @@ type PayloadRendererEvent = {
 }[keyof RendererEvents];
 
 const sessionIdSchema = z.custom<NonNullable<RendererEvents['session exit']['uid']>>(
-  (value) => typeof value === 'string' && value.length > 0,
+  (value): value is NonNullable<RendererEvents['session exit']['uid']> => z.string().min(1).safeParse(value).success,
   'Expected a non-empty session id string.'
 );
 const profileIdSchema = z.custom<RendererEvents['session add']['profile']>(
-  (value) => typeof value === 'string' && value.length > 0,
+  (value): value is RendererEvents['session add']['profile'] => z.string().min(1).safeParse(value).success,
   'Expected a non-empty profile id string.'
 );
 const splitRequestParamsSchema = z.object({
   activeUid: sessionIdSchema.optional(),
   profile: profileIdSchema.optional()
 });
-const rendererEventSchemas: Partial<Record<PayloadRendererEvent, z.ZodType<unknown>>> = {
+type RendererEventSchemaMap = {
+  [Event in PayloadRendererEvent]?: z.ZodType<RendererEvents[Event]>;
+};
+
+const asRendererEventSchema = <Event extends PayloadRendererEvent>(
+  schema: z.ZodType<unknown>
+): z.ZodType<RendererEvents[Event]> =>
+  schema.transform((value) => {
+    // SAFETY: The schema validates this event's runtime shape. The repository's
+    // typecheck config disables strictNullChecks, which prevents Zod from
+    // inferring required nullable fields as required properties.
+    return value as RendererEvents[Event];
+  });
+
+const rendererEventSchemas: RendererEventSchemaMap = {
   'add notification': z.object({
     text: z.string(),
     url: z.string().nullable().default(null),
@@ -154,7 +154,7 @@ const rendererEventSchemas: Partial<Record<PayloadRendererEvent, z.ZodType<unkno
     canInstall: z.boolean()
   }),
   'open ssh': z.custom<RendererEvents['open ssh']>(
-    (value) => typeof value === 'object' && value !== null,
+    (value): value is RendererEvents['open ssh'] => z.record(z.string(), z.json()).safeParse(value).success,
     'Expected a parsed SSH URL payload object.'
   ),
   'open file': z.object({path: z.string()}),
@@ -162,16 +162,18 @@ const rendererEventSchemas: Partial<Record<PayloadRendererEvent, z.ZodType<unkno
   'split request horizontal': splitRequestParamsSchema,
   'split request vertical': splitRequestParamsSchema,
   'termgroup add req': splitRequestParamsSchema,
-  'session add': z.object({
-    uid: sessionIdSchema,
-    rows: z.number().nullable().optional(),
-    cols: z.number().nullable().optional(),
-    splitDirection: z.enum(['HORIZONTAL', 'VERTICAL']).optional(),
-    shell: z.string().nullable(),
-    pid: z.number().nullable(),
-    activeUid: sessionIdSchema.optional(),
-    profile: profileIdSchema
-  }),
+  'session add': asRendererEventSchema<'session add'>(
+    z.object({
+      uid: sessionIdSchema,
+      rows: z.number().nullable().optional(),
+      cols: z.number().nullable().optional(),
+      splitDirection: z.enum(['HORIZONTAL', 'VERTICAL']).optional(),
+      shell: z.string().nullable(),
+      pid: z.number().nullable(),
+      activeUid: sessionIdSchema.optional(),
+      profile: profileIdSchema
+    })
+  ),
   'session data': z.string().min(36, {error: 'Expected session data to include a 36-character uid prefix.'}),
   'session exit': z.object({uid: sessionIdSchema}),
   'windowGeometry change': z.object({isMaximized: z.boolean()}),
@@ -181,12 +183,18 @@ const rendererEventSchemas: Partial<Record<PayloadRendererEvent, z.ZodType<unkno
       y: z.number()
     })
   }),
-  'session data send': z.object({
-    uid: sessionIdSchema.nullable(),
-    data: z.string(),
-    escaped: z.boolean().optional()
-  })
+  'session data send': asRendererEventSchema<'session data send'>(
+    z.object({
+      uid: sessionIdSchema.nullable(),
+      data: z.string(),
+      escaped: z.boolean().optional()
+    })
+  )
 };
+
+const hasRendererEventSchema = <Event extends keyof RendererEvents>(
+  event: Event
+): event is Event & PayloadRendererEvent => Object.hasOwn(rendererEventSchemas, event);
 
 const safeInvoke = (label: string, cleanup: () => void, errors: unknown[]): void => {
   try {
@@ -202,7 +210,7 @@ const cleanupTransportListenerRemovers = (
   label: 'transport listener removal' | 'transport listener removal (rollback)'
 ): unknown[] => {
   const cleanupErrors: unknown[] = [];
-  for (const remove of [...removers].reverse()) {
+  for (const remove of [...removers].toReversed()) {
     safeInvoke(label, remove, cleanupErrors);
   }
   return cleanupErrors;
@@ -245,25 +253,25 @@ const registerRendererTransportEventHandlers = (
     store.dispatch(actions.sessionActions.clearActiveSession());
   });
   register('session move word left req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bb'}));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1Bb'}));
   });
   register('session move word right req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bf'}));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1Bf'}));
   });
   register('session move line beginning req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bOH'}));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1BOH'}));
   });
   register('session move line end req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bOF'}));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1BOF'}));
   });
   register('session del word left req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1b\x7f'}));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1B\x7F'}));
   });
   register('session del word right req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bd'}));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1Bd'}));
   });
   register('session del line beginning req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1bw'}));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1Bw'}));
   });
   register('session del line end req', () => {
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x10B'}));
@@ -272,10 +280,10 @@ const registerRendererTransportEventHandlers = (
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x03'}));
   });
   register('session stop req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1a'}));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1A'}));
   });
   register('session quit req', () => {
-    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1c'}));
+    store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1C'}));
   });
   register('session tmux req', () => {
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x02'}));
@@ -380,10 +388,11 @@ export const exposeRendererGlobals = ({
 }): (() => void) => {
   const values = {store, rpc, config, plugins};
   const keys = ['store', 'rpc', 'config', 'plugins'] as const;
-  const previousDescriptors = Object.fromEntries(
-    keys.map((key) => [key, Object.getOwnPropertyDescriptor(windowObject, key)])
-  ) as {
-    [Key in (typeof keys)[number]]: PropertyDescriptor | undefined;
+  const previousDescriptors = {
+    store: Object.getOwnPropertyDescriptor(windowObject, 'store'),
+    rpc: Object.getOwnPropertyDescriptor(windowObject, 'rpc'),
+    config: Object.getOwnPropertyDescriptor(windowObject, 'config'),
+    plugins: Object.getOwnPropertyDescriptor(windowObject, 'plugins')
   };
 
   const restoreProperties = () => {
@@ -392,7 +401,7 @@ export const exposeRendererGlobals = ({
       if (previousDescriptor) {
         Object.defineProperty(windowObject, key, previousDescriptor);
       } else {
-        delete (windowObject as Record<string, unknown>)[key];
+        delete windowObject[key];
       }
     }
   };
@@ -501,7 +510,9 @@ export const registerRendererTransportListeners = ({
     event: Event,
     listener: (payload: RendererEvents[Event]) => void
   ) => {
-    const schema = rendererEventSchemas[event as PayloadRendererEvent] as z.ZodType<RendererEvents[Event]> | undefined;
+    const schema: z.ZodType<RendererEvents[Event]> | undefined = hasRendererEventSchema(event)
+      ? rendererEventSchemas[event]
+      : undefined;
     const wrappedListener = (payload: RendererEvents[Event]) => {
       if (!schema) {
         listener(payload);
@@ -514,7 +525,7 @@ export const registerRendererTransportListeners = ({
         return;
       }
 
-      listener(parsedPayload.data as RendererEvents[Event]);
+      listener(parsedPayload.data);
     };
 
     const remove = () => {
@@ -554,13 +565,15 @@ export const registerTransportListeners = registerRendererTransportListeners;
  * Starts the renderer bootstrap flow with injectable dependencies so tests can
  * exercise the wiring without module-scope mocks.
  */
-export const startRendererApplication = (dependencies: RendererBootstrapDependencies): RendererBootstrapHandle => {
+export const startRendererApplication = <Store extends StoreLike>(
+  dependencies: RendererBootstrapDependencies<Store>
+): RendererBootstrapHandle => {
   configureRendererZoom(dependencies);
 
   const store = dependencies.configureStore();
-  let restoreWindowGlobals = () => {};
-  let unsubscribeConfig = () => {};
-  let removeTransportListeners = () => {};
+  let restoreWindowGlobals = noop;
+  let unsubscribeConfig = noop;
+  let removeTransportListeners = noop;
   let mountedApp: MountResult;
 
   try {

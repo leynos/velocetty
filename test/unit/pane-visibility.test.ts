@@ -68,6 +68,6 @@ describe('pane visibility helper', () => {
     expect(hasRenderablePaneBounds({width: 1, height: -1})).toBe(false);
     expect(hasRenderablePaneBounds({width: Number.NaN, height: 1})).toBe(false);
     expect(hasRenderablePaneBounds({width: 1, height: Number.POSITIVE_INFINITY})).toBe(false);
-    expect(hasRenderablePaneBounds(undefined)).toBe(false);
+    expect(hasRenderablePaneBounds()).toBe(false);
   });
 });

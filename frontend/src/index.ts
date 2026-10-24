@@ -1,2 +1,3 @@
 /** @file Frontend package boundary marker. */
-export {};
+
+export const frontendPackageBoundary = 'frontend';
