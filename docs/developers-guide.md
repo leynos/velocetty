@@ -955,6 +955,26 @@ test captures transport, config, or filesystem state at module scope, add the
 smallest behaviour-preserving factory seam needed, so tests can provide
 test-owned dependencies without long-lived module mocks.
 
+`mock.module(...)` is scoped to the whole test process, not to the file that
+called it. A registration therefore stays in force for every file that runs
+after it, and a later registration for the same specifier replaces it. Two
+consequences follow:
+
+- **A double must be faithful.** Answer every export the real module has, not
+  only the ones this suite reads, because another suite may import the module
+  next. An `app/package.json` stub carrying only `{version}` breaks
+  `app/index.mts`, which default-imports the metadata object; an `app/config`
+  stub carrying only `{setup}` breaks any importer that reads
+  `getDefaultProfile`.
+- **File order must not matter.** Claim the modules a suite depends on at
+  module scope so an earlier suite's registration cannot decide its behaviour.
+
+`test:unit:run` passes `--isolate` for this reason: Bun then gives each file a
+fresh global object and mock registry, so the hazard cannot recur, at a cost of
+a few seconds across the full suite. Without it, whether a leak bites depends
+on the interleaving Bun chooses, which differed between the Windows build and
+the Linux and macOS builds of the same commit.
+
 For roadmap item 9.3.7 and similar timer/logger-dependent module work, use
 injected seams instead of process-global mutations:
 
