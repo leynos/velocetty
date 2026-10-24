@@ -103,7 +103,7 @@ jobs:
           sudo apt-get install -y libarchive-tools
       - name: Install mdtablefix
         if: runner.os == 'Linux'
-        uses: leynos/shared-actions/.github/actions/install-mdtablefix@d26e53630893c942af44eb3db7efd4fcbe0c8093
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@d5fded1107ee6822fdbf9539d81ff18ce6ce073a
         with:
           version: "0.6.1"
       - name: Format
