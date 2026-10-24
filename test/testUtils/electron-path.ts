@@ -55,6 +55,7 @@ type ElectronMock = {
   app: {
     getAppPath: () => string;
     getPath: (name: string) => string;
+    quit: () => void;
     runningUnderARM64Translation?: boolean;
     config: {
       subscribe: (callback: ConfigSubscriber) => void;
@@ -108,6 +109,7 @@ const electronMock: ElectronMock = {
   app: {
     getAppPath: () => '/tmp/velocetty-app',
     getPath: (_name: string) => '/tmp/velocetty-electron-user-data',
+    quit: () => {},
     runningUnderARM64Translation: false,
     config: {subscribe: () => {}}
   },
@@ -148,6 +150,7 @@ export const resetElectronMock = () => {
   electronMock.default.screen.getAllDisplays = () => [];
   electronMock.app.getAppPath = () => '/tmp/velocetty-app';
   electronMock.app.getPath = (_name: string) => '/tmp/velocetty-electron-user-data';
+  electronMock.app.quit = () => {};
   electronMock.app.runningUnderARM64Translation = false;
   electronMock.app.config = {subscribe: () => {}};
   electronMock.ipcMain.on = () => {};
