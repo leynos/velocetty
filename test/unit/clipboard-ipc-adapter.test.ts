@@ -1,5 +1,8 @@
 /** @file Guards the Electron clipboard adapter and the IPC handlers it feeds. */
 import {beforeAll, beforeEach, expect, test} from 'bun:test';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 
 import type {ClipboardTypePayload, IpcHandleListener} from '../testUtils/electron-path';
 import {getElectronMock, registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
@@ -7,6 +10,18 @@ import {importFresh} from '../testUtils/import-fresh';
 
 /** A file URI list, the payload type Electron supplies as a `Blob`. */
 const uriListType = 'text/uri-list';
+
+/**
+ * A real platform path, and the `file:` URI that decodes back to it.
+ *
+ * The adapter hands the payload to `fileURLToPath`, which rejects a POSIX-shaped
+ * `file:///tmp/...` on Windows because that URI carries no drive letter. Building
+ * both sides from one `node:path` path keeps the fixture valid wherever it runs;
+ * `clipboard-paths.test.ts` owns the URI-to-path behaviour itself, so these tests
+ * only need a payload the parser will accept.
+ */
+const tempPath = (name: string): string => path.join(tmpdir(), name);
+const tempUri = (name: string): string => pathToFileURL(tempPath(name)).href;
 
 /**
  * The event argument the handlers ignore.
@@ -107,19 +122,17 @@ test('reads file paths from a Blob payload', async () => {
   // A real `Blob` rather than a shaped object: `isClipboardPayload` narrows on
   // `instanceof Blob`, so a plain object would take the rejection branch and
   // this test would pass for the wrong reason.
-  stubClipboardEntries([
-    {types: [uriListType], getType: async () => new Blob([`file://${encodeURI('/tmp/a b.txt')}`])}
-  ]);
+  stubClipboardEntries([{types: [uriListType], getType: async () => new Blob([tempUri('a b.txt')])}]);
   registerClipboardIpcHandlers();
 
-  expect(await handlerFor('clipboard.readFilePaths')(unusedIpcEvent)).toEqual(['/tmp/a b.txt']);
+  expect(await handlerFor('clipboard.readFilePaths')(unusedIpcEvent)).toEqual([tempPath('a b.txt')]);
 });
 
 test('reads file paths from a string payload', async () => {
-  stubClipboardEntries([{types: [uriListType], getType: async () => 'file:///tmp/plain.txt'}]);
+  stubClipboardEntries([{types: [uriListType], getType: async () => tempUri('plain.txt')}]);
   registerClipboardIpcHandlers();
 
-  expect(await handlerFor('clipboard.readFilePaths')(unusedIpcEvent)).toEqual(['/tmp/plain.txt']);
+  expect(await handlerFor('clipboard.readFilePaths')(unusedIpcEvent)).toEqual([tempPath('plain.txt')]);
 });
 
 test('drops an unreadable payload instead of passing it on', async () => {
