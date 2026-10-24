@@ -46,9 +46,13 @@ export const isFunction = (value: unknown): value is (...args: never[]) => void 
  */
 export const isObject = (value: unknown): value is object => typeof value === 'object' && value !== null;
 
+/** Narrows a value to a JSON primitive: a string, number, boolean, or `null`. */
+const isJsonPrimitive = (value: unknown): boolean =>
+  value === null || isString(value) || isNumber(value) || isBoolean(value);
+
 /** Narrows a value to a JSON value, recursing through arrays and objects. */
 export const isJsonValue = (value: unknown): value is JsonValue => {
-  if (value === null || isString(value) || isNumber(value) || isBoolean(value)) {
+  if (isJsonPrimitive(value)) {
     return true;
   }
   if (Array.isArray(value)) {

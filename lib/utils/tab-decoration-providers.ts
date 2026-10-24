@@ -88,23 +88,41 @@ const defaultRegistryLogger: RegistryLogger = {
   error: (message, error) => console.error(message, error)
 };
 
-const isTabDecorationProvider = (candidate: unknown): candidate is TabDecorationProvider => {
-  if (
-    !isObject(candidate) ||
-    !('id' in candidate) ||
-    !('priority' in candidate) ||
-    !('provideDecoration' in candidate)
-  ) {
-    return false;
-  }
+/** The fields every tab-decoration provider must declare. */
+const REQUIRED_PROVIDER_FIELDS = ['id', 'priority', 'provideDecoration'] as const;
 
-  return (
-    isString(candidate.id) &&
-    isNumber(candidate.priority) &&
-    isFunction(candidate.provideDecoration) &&
-    (!('subscribe' in candidate) || candidate.subscribe === undefined || isFunction(candidate.subscribe))
-  );
+/**
+ * The fields a candidate carries once presence is established.
+ *
+ * Declared as named members rather than an open record: an index signature
+ * would promise every key exists, while this only promises the three checked
+ * below. The extra `subscribe` key is established by `isOptionalSubscription`.
+ */
+type ProviderFields = {
+  id: unknown;
+  priority: unknown;
+  provideDecoration: unknown;
 };
+
+/** Narrows a value to an object carrying every required provider field. */
+const hasProviderFields = (value: unknown): value is ProviderFields =>
+  isObject(value) && REQUIRED_PROVIDER_FIELDS.every((field) => field in value);
+
+/**
+ * Reports whether an optional `subscribe` field is either absent or callable.
+ *
+ * An explicit `undefined` counts as absent: a provider object built from a
+ * spread commonly carries the key with no value behind it.
+ */
+const isOptionalSubscription = (fields: ProviderFields): boolean =>
+  !('subscribe' in fields) || fields.subscribe === undefined || isFunction(fields.subscribe);
+
+const isTabDecorationProvider = (candidate: unknown): candidate is TabDecorationProvider =>
+  hasProviderFields(candidate) &&
+  isString(candidate.id) &&
+  isNumber(candidate.priority) &&
+  isFunction(candidate.provideDecoration) &&
+  isOptionalSubscription(candidate);
 
 const badgeKey = (badge: TabDecorationBadge) =>
   JSON.stringify([badge.icon ?? null, badge.text ?? null, badge.tooltip ?? null, badge.kind ?? null]);

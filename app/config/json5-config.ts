@@ -172,6 +172,41 @@ const validateKeymapField: FieldValidator = makeFieldValidator(
   (field) => `Set \`${field}\` entries to keybinding strings or string arrays.`
 );
 
+/** The top-level fields `validateRawConfig` checks, each with its validator. */
+const RAW_CONFIG_FIELDS: ReadonlyArray<readonly [string, FieldValidator]> = [
+  ['config', validateRecordField],
+  ['plugins', validateStringArrayField],
+  ['localPlugins', validateStringArrayField],
+  ['keymaps', validateKeymapField]
+];
+
+/** Returns the first field validation failure, or `null` when all fields pass. */
+const findFieldError = (value: JsonObject): DiagnosticError | null => {
+  for (const [field, validator] of RAW_CONFIG_FIELDS) {
+    const error = validator(value, field);
+    if (error) {
+      return error;
+    }
+  }
+  return null;
+};
+
+/**
+ * Describes the first schema violation in the `config` section.
+ *
+ * The JSON schema reports its issues as an array of paths; only the first is
+ * surfaced because a single diagnostic is what the caller can act on.
+ */
+const describeConfigOptionsIssue = (config: unknown): DiagnosticError => {
+  const issue = configOptionsValidator(config) ? undefined : configOptionsValidator.errors?.at(0);
+  const issuePath = issue?.instancePath ?? '';
+  return createDiagnosticError({
+    path: `/config${issuePath}`,
+    message: issue?.message ?? 'Configuration options do not match the supported schema.',
+    suggestedFix: 'Set configuration option values to match the documented types.'
+  });
+};
+
 export const validateRawConfig = (value: unknown): ParseResult<JsonObject> => {
   if (!isRecord(value)) {
     return {
@@ -184,31 +219,13 @@ export const validateRawConfig = (value: unknown): ParseResult<JsonObject> => {
     };
   }
 
-  const validators: Array<[string, FieldValidator]> = [
-    ['config', validateRecordField],
-    ['plugins', validateStringArrayField],
-    ['localPlugins', validateStringArrayField],
-    ['keymaps', validateKeymapField]
-  ];
-
-  for (const [field, validator] of validators) {
-    const error = validator(value, field);
-    if (error) {
-      return {success: false, error};
-    }
+  const fieldError = findFieldError(value);
+  if (fieldError) {
+    return {success: false, error: fieldError};
   }
 
   if (Object.hasOwn(value, 'config') && !configOptionsValidator(value.config)) {
-    const issue = configOptionsValidator.errors?.at(0);
-    const issuePath = issue?.instancePath ?? '';
-    return {
-      success: false,
-      error: createDiagnosticError({
-        path: `/config${issuePath}`,
-        message: issue?.message ?? 'Configuration options do not match the supported schema.',
-        suggestedFix: 'Set configuration option values to match the documented types.'
-      })
-    };
+    return {success: false, error: describeConfigOptionsIssue(value.config)};
   }
 
   return {success: true, data: value};

@@ -151,35 +151,73 @@ test('compatibility aliases mirror the primary command-registry APIs', async () 
   }
 });
 
-test('legacy search-close handler dispatches closeSearch and focuses the active terminal', async () => {
-  const harness = await createCommandRegistryCompatHarness();
-  try {
-    const dispatch = mock<HyperDispatch>(() => {});
-    const innerDispatch = mock<HyperDispatch>(() => {});
+/**
+ * Runs the legacy search-close handler and hands back the thunk it dispatched.
+ *
+ * Every case below starts the same way — invoke the handler, then recover the
+ * thunk — so the assertion that exactly one dispatch happened lives here
+ * instead of being repeated per case.
+ */
+const dispatchSearchClose = async (harness: CommandRegistryCompatHarness) => {
+  const dispatch = mock<HyperDispatch>(() => {});
+  harness.getCommandHandler('editor:search-close')?.('event-payload', dispatch);
 
-    harness.getCommandHandler('editor:search-close')?.('event-payload', dispatch);
-
-    expect(dispatch).toHaveBeenCalledTimes(1);
-    const dispatchedThunk = dispatch.mock.calls[0]?.[0];
-    expect(dispatchedThunk).toBeFunction();
-    if (!isSearchCloseThunk(dispatchedThunk)) {
-      throw new TypeError('Expected the legacy search-close handler to dispatch a thunk');
-    }
-
-    dispatchedThunk(innerDispatch, () => createSearchState(true));
-
-    expect(innerDispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: SESSION_SEARCH,
-        uid: 'active-session',
-        value: false
-      })
-    );
-    expect(harness.focusActiveTermMock).toHaveBeenCalledTimes(1);
-  } finally {
-    harness.cleanup();
+  expect(dispatch).toHaveBeenCalledTimes(1);
+  const dispatchedThunk = dispatch.mock.calls[0]?.[0];
+  if (!isSearchCloseThunk(dispatchedThunk)) {
+    throw new TypeError('Expected the legacy search-close handler to dispatch a thunk');
   }
-});
+  return dispatchedThunk;
+};
+
+type SearchCloseCase = {
+  /** Label used in the generated test name. */
+  description: string;
+  /** Whether the active session is mid-search when the thunk runs. */
+  isSearching: boolean;
+  /** Session uid the state reports, so the hardcoded-value case is covered. */
+  sessionUid: string;
+  /** Search uid the thunk is expected to target. */
+  expectedUid: string;
+};
+
+const searchCloseCases: SearchCloseCase[] = [
+  {
+    description: 'dispatches closeSearch and focuses the active terminal',
+    isSearching: true,
+    sessionUid: 'active-session',
+    expectedUid: 'active-session'
+  },
+  {
+    description: 'targets the uid provided by state rather than a hardcoded value',
+    isSearching: true,
+    sessionUid: 'other-uid',
+    expectedUid: 'other-uid'
+  }
+];
+
+for (const {description, isSearching, sessionUid, expectedUid} of searchCloseCases) {
+  test(`legacy search-close handler ${description}`, async () => {
+    const harness = await createCommandRegistryCompatHarness();
+    try {
+      const innerDispatch = mock<HyperDispatch>(() => {});
+      const dispatchedThunk = await dispatchSearchClose(harness);
+
+      dispatchedThunk(innerDispatch, () => createSearchState(isSearching, sessionUid));
+
+      expect(innerDispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: SESSION_SEARCH,
+          uid: expectedUid,
+          value: false
+        })
+      );
+      expect(harness.focusActiveTermMock).toHaveBeenCalledTimes(1);
+    } finally {
+      harness.cleanup();
+    }
+  });
+}
 
 test('legacy search-close handler does not dispatch when session search is inactive', async () => {
   const harness = await createCommandRegistryCompatHarness();
@@ -202,37 +240,6 @@ test('legacy search-close handler does not dispatch when session search is inact
 
     expect(innerDispatch).not.toHaveBeenCalled();
     expect(keyEvent.catched).toBe(false);
-    expect(harness.focusActiveTermMock).toHaveBeenCalledTimes(1);
-  } finally {
-    harness.cleanup();
-  }
-});
-
-test('legacy search-close handler targets the uid provided by state rather than a hardcoded value', async () => {
-  const harness = await createCommandRegistryCompatHarness();
-  try {
-    const dispatch = mock<HyperDispatch>(() => {});
-    const innerDispatch = mock<HyperDispatch>(() => {});
-
-    harness.getCommandHandler('editor:search-close')?.('event-payload', dispatch);
-
-    expect(dispatch).toHaveBeenCalledTimes(1);
-    const dispatchedThunk = dispatch.mock.calls[0]?.[0];
-    if (!isSearchCloseThunk(dispatchedThunk)) {
-      throw new TypeError('Expected the legacy search-close handler to dispatch a thunk');
-    }
-
-    // Use a different active uid with search: true to confirm the thunk
-    // reads activeUid from state rather than using any hardcoded value.
-    dispatchedThunk(innerDispatch, () => createSearchState(true, 'other-uid'));
-
-    expect(innerDispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: SESSION_SEARCH,
-        uid: 'other-uid',
-        value: false
-      })
-    );
     expect(harness.focusActiveTermMock).toHaveBeenCalledTimes(1);
   } finally {
     harness.cleanup();

@@ -7,6 +7,7 @@ import fs from 'node:fs/promises';
 
 import {_electron} from 'playwright';
 import {expect, test} from 'playwright/test';
+import type {TestInfo} from 'playwright/test';
 
 import {
   createIsolatedE2EEnvironment,
@@ -23,12 +24,18 @@ const rendererReadyTimeoutMs = 12_000;
 const commandOutputTimeoutMs = 12_000;
 const closeTimeoutMs = 5000;
 
-test('renders command output after terminal input', async ({page: _page}, testInfo) => {
+/** Streamed Electron output, accumulated for failure artefacts. */
+type RunLogs = {
+  stdout: string;
+  stderr: string;
+  rendererConsole: string[];
+};
+
+/** Launches the packaged binary against an isolated config environment. */
+const launchPackagedApp = async (isolatedEnvironment: Awaited<ReturnType<typeof createIsolatedE2EEnvironment>>) => {
   const {pathToBinary, launchArgs} = resolveLaunchConfig();
   await fs.access(pathToBinary);
-  const isolatedEnvironment = await createIsolatedE2EEnvironment();
-
-  const app = await withTimeout(
+  return withTimeout(
     _electron.launch({
       executablePath: pathToBinary,
       args: [...launchArgs],
@@ -37,17 +44,46 @@ test('renders command output after terminal input', async ({page: _page}, testIn
     }),
     launchTimeoutMs
   );
+};
 
-  const process = app.process();
-  let stdoutLog = '';
-  let stderrLog = '';
-  const rendererConsoleLog: string[] = [];
-  process.stdout?.on('data', (chunk) => {
-    stdoutLog += chunk.toString();
+/**
+ * Starts collecting process and renderer output.
+ *
+ * The listeners are attached before anything can fail so that a launch-time
+ * crash still leaves a readable log to attach.
+ */
+const startRunLogCapture = (app: Awaited<ReturnType<typeof _electron.launch>>): RunLogs => {
+  const logs: RunLogs = {stdout: '', stderr: '', rendererConsole: []};
+  const electronProcess = app.process();
+  electronProcess.stdout?.on('data', (chunk) => {
+    logs.stdout += chunk.toString();
   });
-  process.stderr?.on('data', (chunk) => {
-    stderrLog += chunk.toString();
+  electronProcess.stderr?.on('data', (chunk) => {
+    logs.stderr += chunk.toString();
   });
+  return logs;
+};
+
+const attachRunArtefacts = async (testInfo: TestInfo, logs: RunLogs): Promise<void> => {
+  await testInfo.attach('electron-stdout.log', {
+    body: logs.stdout || 'No stdout output captured.',
+    contentType: 'text/plain'
+  });
+  await testInfo.attach('electron-stderr.log', {
+    body: logs.stderr || 'No stderr output captured.',
+    contentType: 'text/plain'
+  });
+  await testInfo.attach('renderer-console.log', {
+    body: logs.rendererConsole.join('\n') || 'No renderer console output captured.',
+    contentType: 'text/plain'
+  });
+};
+
+test('renders command output after terminal input', async ({page: _page}, testInfo) => {
+  const isolatedEnvironment = await createIsolatedE2EEnvironment();
+  const app = await launchPackagedApp(isolatedEnvironment);
+  const logs = startRunLogCapture(app);
+  const electronProcess = app.process();
 
   let monitor: ReturnType<typeof startRendererConsoleMonitor> | null = null;
   let mainWindow: Awaited<ReturnType<typeof app.firstWindow>> | null = null;
@@ -59,7 +95,7 @@ test('renders command output after terminal input', async ({page: _page}, testIn
     mainWindow = window;
     monitor = startRendererConsoleMonitor(window);
     window.on('console', (message) => {
-      rendererConsoleLog.push(`[${message.type()}] ${message.text()}`);
+      logs.rendererConsole.push(`[${message.type()}] ${message.text()}`);
     });
 
     await waitForRendererReady(window, rendererReadyTimeoutMs);
@@ -90,18 +126,7 @@ test('renders command output after terminal input', async ({page: _page}, testIn
   } finally {
     monitor?.stop();
 
-    await testInfo.attach('electron-stdout.log', {
-      body: stdoutLog || 'No stdout output captured.',
-      contentType: 'text/plain'
-    });
-    await testInfo.attach('electron-stderr.log', {
-      body: stderrLog || 'No stderr output captured.',
-      contentType: 'text/plain'
-    });
-    await testInfo.attach('renderer-console.log', {
-      body: rendererConsoleLog.join('\n') || 'No renderer console output captured.',
-      contentType: 'text/plain'
-    });
+    await attachRunArtefacts(testInfo, logs);
 
     if (mainWindow && testInfo.status !== testInfo.expectedStatus) {
       const screenshot = await mainWindow.screenshot({fullPage: true});
@@ -114,7 +139,7 @@ test('renders command output after terminal input', async ({page: _page}, testIn
     try {
       await withTimeout(app.close(), closeTimeoutMs);
     } catch {
-      process.kill('SIGKILL');
+      electronProcess.kill('SIGKILL');
     }
     await isolatedEnvironment.cleanup();
   }

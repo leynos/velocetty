@@ -1,11 +1,24 @@
 /** @file JSON value contracts for persisted and transported payloads. */
+import {isBoolean, isNumber, isObject, isString} from './guards';
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
 
 export type JsonObject = {[key: string]: JsonValue};
 
+/** The primitive members of `JsonValue`; `null` is one of them. */
+type JsonPrimitive = string | number | boolean | null;
+
+/**
+ * Narrows a value to a JSON primitive: a string, number, boolean, or `null`.
+ *
+ * The shared boundary guards carry the primitive contracts, so this module
+ * never inspects a representation itself.
+ */
+const isJsonPrimitive = (value: unknown): value is JsonPrimitive =>
+  value === null || isString(value) || isNumber(value) || isBoolean(value);
+
 export const isJsonValue = (value: unknown): value is JsonValue => {
-  if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+  if (isJsonPrimitive(value)) {
     return true;
   }
   if (Array.isArray(value)) {
@@ -15,8 +28,8 @@ export const isJsonValue = (value: unknown): value is JsonValue => {
 };
 
 export const isJsonObject = (value: unknown): value is JsonObject => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+  if (!isObject(value) || Array.isArray(value)) {
     return false;
   }
-  return Object.values(value).every((item) => isJsonValue(item));
+  return Object.values(value).every((item: unknown) => isJsonValue(item));
 };

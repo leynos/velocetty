@@ -1,7 +1,7 @@
 /** @file Parser and compiler for deterministic `when` expressions. */
 import type {CompiledWhenExpression, WhenComparisonOperator, WhenExpressionNode} from '@shared/types/context-keys';
 
-import {tokenize, type Token, type TokenKind} from './context-key-tokenizer';
+import {isComparisonOperator, tokenize, type Token, type TokenKind} from './context-key-tokenizer';
 import {WhenExpressionSyntaxError} from './context-key-syntax-error';
 
 class Parser {
@@ -94,15 +94,7 @@ class Parser {
 
   private matchComparisonOperator(): WhenComparisonOperator | null {
     const token = this.peek();
-    if (
-      token.kind !== 'operator' ||
-      (token.lexeme !== '==' &&
-        token.lexeme !== '!=' &&
-        token.lexeme !== '<' &&
-        token.lexeme !== '<=' &&
-        token.lexeme !== '>' &&
-        token.lexeme !== '>=')
-    ) {
+    if (token.kind !== 'operator' || !isComparisonOperator(token.lexeme)) {
       return null;
     }
 

@@ -69,34 +69,74 @@ const removalRebalance = (oldSizes: ImmutableType<number[]>, index: number) => {
   );
 };
 
-const splitGroup = (state: ITermState, action: SessionAddAction) => {
-  const {splitDirection, uid, activeUid} = action;
-  // The action names the session being split; fall back to the session active
-  // in the current root group when it does not, so a split with no explicit
-  // target still lands on the pane the user is looking at.
+/**
+ * Resolves the group a split should attach to.
+ *
+ * The action names the session being split; fall back to the session active in
+ * the current root group when it does not, so a split with no explicit target
+ * still lands on the pane the user is looking at.
+ */
+const resolveSplitTarget = (state: ITermState, action: SessionAddAction): ITermGroup => {
   const activeRootGroup = state.activeRootGroup;
   const splitTargetUid =
-    activeUid ?? (activeRootGroup === null ? null : (state.activeSessions[activeRootGroup] ?? null));
+    action.activeUid ?? (activeRootGroup === null ? null : (state.activeSessions[activeRootGroup] ?? null));
   const activeGroup = splitTargetUid === null ? undefined : findBySession(state, splitTargetUid);
   if (!activeGroup) {
     throw new Error(`Cannot split: no terminal group for session ${String(splitTargetUid)}`);
   }
-  // If we're splitting in the same direction as the current active
-  // group's parent - or if it's the first split for that group -
-  // we want the parent to get another child:
-  let parentGroup = activeGroup.parentUid ? getTermGroup(state.termGroups, activeGroup.parentUid) : activeGroup;
-  // If we're splitting in a different direction, we want the current
-  // active group to become a new parent instead:
-  if (parentGroup.direction && parentGroup.direction !== splitDirection) {
-    parentGroup = activeGroup;
-  }
+  return activeGroup;
+};
 
-  // If the group has a session (i.e. we're creating a new parent)
-  // we need to create two new groups,
-  // one for the existing session and one for the new split:
-  //                          P
-  //      P      ->         /   \
-  //                       G     G
+/**
+ * Picks the group that will become the split's parent.
+ *
+ * Splitting in the same direction as the current parent — or the first split
+ * for that group — gives the parent another child. Splitting in a different
+ * direction makes the active group a new parent instead, so panes stay
+ * grouped by orientation.
+ */
+const resolveParentGroup = (
+  state: ITermState,
+  activeGroup: ITermGroup,
+  splitDirection: SessionAddAction['splitDirection']
+) => {
+  const parentGroup = activeGroup.parentUid ? getTermGroup(state.termGroups, activeGroup.parentUid) : activeGroup;
+  const isSameDirection = !parentGroup.direction || parentGroup.direction === splitDirection;
+  return isSameDirection ? parentGroup : activeGroup;
+};
+
+/**
+ * Turns an existing session into a new parent of two leaf groups.
+ *
+ * The layout goes from `P` to `P` with children `G G`: the original session
+ * keeps its place as the first child and the new session takes the second.
+ */
+const splitExistingSession = (
+  state: ITermState,
+  parentGroup: ITermGroup,
+  newSession: ITermGroup,
+  splitDirection: SessionAddAction['splitDirection']
+) => {
+  const existingSession = TermGroup({
+    uid: uuidv4(),
+    sessionUid: parentGroup.sessionUid,
+    parentUid: parentGroup.uid
+  });
+
+  return state.setIn(['termGroups', existingSession.uid], existingSession).setIn(
+    ['termGroups', parentGroup.uid],
+    parentGroup.merge({
+      sessionUid: '',
+      direction: splitDirection,
+      children: [existingSession.uid, newSession.uid]
+    })
+  );
+};
+
+const splitGroup = (state: ITermState, action: SessionAddAction) => {
+  const {splitDirection, uid} = action;
+  const activeGroup = resolveSplitTarget(state, action);
+  const parentGroup = resolveParentGroup(state, activeGroup, splitDirection);
   const newSession = TermGroup({
     uid: uuidv4(),
     sessionUid: uid,
@@ -105,20 +145,7 @@ const splitGroup = (state: ITermState, action: SessionAddAction) => {
 
   state = state.setIn(['termGroups', newSession.uid], newSession);
   if (parentGroup.sessionUid) {
-    const existingSession = TermGroup({
-      uid: uuidv4(),
-      sessionUid: parentGroup.sessionUid,
-      parentUid: parentGroup.uid
-    });
-
-    return state.setIn(['termGroups', existingSession.uid], existingSession).setIn(
-      ['termGroups', parentGroup.uid],
-      parentGroup.merge({
-        sessionUid: '',
-        direction: splitDirection,
-        children: [existingSession.uid, newSession.uid]
-      })
-    );
+    return splitExistingSession(state, parentGroup, newSession, splitDirection);
   }
 
   const {children} = parentGroup;
@@ -169,28 +196,40 @@ const replaceParent = (state: ITermState, parent: ITermGroup, child: ITermGroup)
     .setIn(['termGroups', child.uid, 'parentUid'], parent.parentUid);
 };
 
+/** A group's parent, looked up only when both the group and its link exist. */
+const findLinkedParent = (state: ITermState, group: ITermGroup | undefined) => {
+  const parentUid = group?.parentUid;
+  const parent = parentUid ? state.termGroups[parentUid] : undefined;
+  return parent && parentUid ? {parent, parentUid} : null;
+};
+
+/** Removes a child from its parent, collapsing the parent when one child is left. */
+const detachFromParent = (state: ITermState, parent: ITermGroup, parentUid: string, uid: string): ITermState => {
+  const newChildren = parent.children.filter((childUid) => childUid !== uid);
+  if (newChildren.length === 1) {
+    // Since we only have one child left,
+    // we can merge the parent and child into one group:
+    const child = getTermGroup(state.termGroups, newChildren[0]);
+    return replaceParent(state, parent, child);
+  }
+
+  state = state.setIn(['termGroups', parentUid, 'children'], newChildren);
+  if (parent.sizes) {
+    const childIndex = parent.children.indexOf(uid);
+    const newSizes = removalRebalance(parent.sizes, childIndex);
+    state = state.setIn(['termGroups', parentUid, 'sizes'], newSizes);
+  }
+  return state;
+};
+
 const removeGroup = (state: ITermState, uid: string) => {
   const group = state.termGroups[uid];
   // Closing a tab with several panes removes groups parent-first, so a child
   // can be visited after its parent has already gone. That is safe: the
   // detach below is skipped, and the trailing `without` prunes what is left.
-  const parentUid = group?.parentUid;
-  const parent = parentUid ? state.termGroups[parentUid] : undefined;
-  if (group && parent && parentUid) {
-    const newChildren = parent.children.filter((childUid) => childUid !== uid);
-    if (newChildren.length === 1) {
-      // Since we only have one child left,
-      // we can merge the parent and child into one group:
-      const child = getTermGroup(state.termGroups, newChildren[0]);
-      state = replaceParent(state, parent, child);
-    } else {
-      state = state.setIn(['termGroups', parentUid, 'children'], newChildren);
-      if (parent.sizes) {
-        const childIndex = parent.children.indexOf(uid);
-        const newSizes = removalRebalance(parent.sizes, childIndex);
-        state = state.setIn(['termGroups', parentUid, 'sizes'], newSizes);
-      }
-    }
+  const link = findLinkedParent(state, group);
+  if (link) {
+    state = detachFromParent(state, link.parent, link.parentUid, uid);
   }
 
   return state

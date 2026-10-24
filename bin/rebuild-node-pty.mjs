@@ -41,23 +41,29 @@ const readElectronTargetFromPackageJson = () => {
 const electronTarget =
   normalizeVersion(process.env.npm_package_devDependencies_electron) || readElectronTargetFromPackageJson();
 
+/** Fails with a remedy when a path the rebuild needs is missing. */
+const requirePath = (target, description) => {
+  if (!fs.existsSync(target)) {
+    throw new Error(`${description} not found at ${target}. Run bun install first.`);
+  }
+};
+
+/** Fails when the Electron version could not be read from either source. */
+const requireElectronTarget = () => {
+  if (!electronTarget) {
+    throw new Error(`Unable to determine Electron target version from npm env or ${packageJsonPath}.`);
+  }
+};
+
 const main = () => {
   if (process.env.SKIP_NODE_PTY_REBUILD === '1') {
     console.log('Skipping node-pty rebuild because SKIP_NODE_PTY_REBUILD=1.');
     return;
   }
 
-  if (!fs.existsSync(moduleRoot)) {
-    throw new Error(`node-pty module not found at ${moduleRoot}. Run bun install first.`);
-  }
-
-  if (!fs.existsSync(nodeGypPath)) {
-    throw new Error(`node-gyp binary not found at ${nodeGypPath}. Run bun install first.`);
-  }
-
-  if (!electronTarget) {
-    throw new Error(`Unable to determine Electron target version from npm env or ${packageJsonPath}.`);
-  }
+  requirePath(moduleRoot, 'node-pty module');
+  requirePath(nodeGypPath, 'node-gyp binary');
+  requireElectronTarget();
 
   const result = spawnSync(
     nodeExecutable,

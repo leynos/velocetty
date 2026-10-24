@@ -268,6 +268,16 @@ const processColorConfig = (config: UiConfig, state: uiState): UiStatePartial =>
   };
 };
 
+/**
+ * Reports whether a configured context count can actually be applied.
+ *
+ * Zero and negatives would describe a renderer with no usable contexts, so
+ * they are rejected alongside absent and non-integer values rather than being
+ * copied into state.
+ */
+const isUsableContextCount = (value: number | undefined): value is number =>
+  value !== undefined && Number.isInteger(value) && value > 0;
+
 const processRendererConfig = (config: UiConfig): UiStatePartial => {
   const ret: UiStatePartial = {};
 
@@ -276,7 +286,7 @@ const processRendererConfig = (config: UiConfig): UiStatePartial => {
   }
 
   const maxContexts = config.webGLRendererMaxContexts;
-  if (maxContexts !== undefined && Number.isInteger(maxContexts) && maxContexts > 0) {
+  if (isUsableContextCount(maxContexts)) {
     ret.webGLRendererMaxContexts = maxContexts;
   }
 

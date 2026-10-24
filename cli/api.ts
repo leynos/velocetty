@@ -355,11 +355,15 @@ const getBasePluginSpecifier = (plugin: PluginSpecifier): PluginSpecifier => {
 const hasStatusCode = (value: unknown): value is {statusCode: number} =>
   isObject(value) && 'statusCode' in value && isNumber(value.statusCode);
 
+/** Narrows a value to an object carrying a string `message` field. */
+const hasMessage = (value: unknown): value is {message: string} =>
+  isObject(value) && 'message' in value && isString(value.message);
+
 const getErrorMessage = (value: unknown): string => {
   if (value instanceof Error) {
     return value.message;
   }
-  if (isObject(value) && 'message' in value && isString(value.message)) {
+  if (hasMessage(value)) {
     return value.message;
   }
   return String(value);

@@ -1,7 +1,7 @@
 // This is a CLI tool, using console is OK
 /* eslint no-console: 0 */
 import {spawn, exec} from 'node:child_process';
-import type {SpawnOptions} from 'node:child_process';
+import type {ChildProcess, SpawnOptions} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import path from 'node:path';
 import {promisify} from 'node:util';
@@ -230,21 +230,8 @@ args.command('<default>', 'Launch Hyper');
 
 args.option(['v', 'verbose'], 'Verbose mode', false);
 
-const main = (argv: string[]) => {
-  const flags = args.parse(argv, {
-    name: 'hyper',
-    version: false,
-    mri: {
-      boolean: ['v', 'verbose']
-    },
-    mainColor: 'yellow',
-    subColor: 'dim'
-  });
-
-  if (commandPromise) {
-    return commandPromise;
-  }
-
+/** Builds the environment the launched app should inherit. */
+const buildLaunchEnv = (isVerbose: boolean): NodeJS.ProcessEnv => {
   const env = Object.assign({}, process.env, {
     // this will signal Hyper that it was spawned from this module
     HYPER_CLI: '1',
@@ -253,50 +240,94 @@ const main = (argv: string[]) => {
 
   delete env.ELECTRON_RUN_AS_NODE;
 
-  if (flags.verbose) {
+  if (isVerbose) {
     env.ELECTRON_ENABLE_LOGGING = '1';
   }
+  return env;
+};
 
-  const options: SpawnOptions = {
-    detached: true,
-    env
-  };
-
-  const args_ = args.sub.map((arg) => {
+/**
+ * Resolves positional arguments to directories that exist.
+ *
+ * @throws {ExpectedFailureError} When a directory or file does not exist. The
+ * message is thrown rather than logged because the top-level handler already
+ * prints it; logging here as well would report the same failure twice.
+ */
+const resolveExistingPaths = (positional: string[]): string[] =>
+  positional.map((arg) => {
     const cwd = path.isAbsolute(arg) ? arg : path.resolve(process.cwd(), arg);
     if (!existsSync(cwd)) {
-      // Throwing hands the message to the top-level handler, which already
-      // prints it. Logging here as well would report the same failure twice.
       throw new ExpectedFailureError(chalk.red(`Error! Directory or file does not exist: ${cwd}`));
     }
     return cwd;
   });
 
+/** Launches through `open` on macOS so a second Hyper process is not started. */
+const launchViaOpen = (args_: string[], env: NodeJS.ProcessEnv) => {
+  const cmd = `open -b co.zeit.hyper ${args_}`;
+  return promisify(exec)(cmd, {env});
+};
+
+/** Streams a verbose child's output and resolves when it exits. */
+const waitForVerboseChild = (child: ChildProcess): Promise<null> => {
+  child.stdout?.on('data', (data: Buffer) => console.log(data.toString('utf8')));
+  child.stderr?.on('data', (data: Buffer) => console.error(data.toString('utf8')));
+  return new Promise((c) => child.once('exit', () => c(null)));
+};
+
+/** The parsed flags `args` supplies; only `verbose` affects launching. */
+type LaunchFlags = {verbose: boolean};
+
+const launchApp = (flags: LaunchFlags, env: NodeJS.ProcessEnv) => {
+  const options: SpawnOptions = {
+    detached: true,
+    env
+  };
+  const args_ = resolveExistingPaths(args.sub);
+
   if (!flags.verbose) {
     options.stdio = 'ignore';
     if (process.platform === 'darwin') {
-      //Use `open` to prevent multiple Hyper process
-      const cmd = `open -b co.zeit.hyper ${args_}`;
-      const opts = {
-        env
-      };
-      return promisify(exec)(cmd, opts);
+      return launchViaOpen(args_, env);
     }
   }
 
   const child = spawn(process.execPath, args_, options);
-
   if (flags.verbose) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    child.stdout?.on('data', (data) => console.log(data.toString('utf8')));
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    child.stderr?.on('data', (data) => console.error(data.toString('utf8')));
-  }
-  if (flags.verbose) {
-    return new Promise((c) => child.once('exit', () => c(null)));
+    return waitForVerboseChild(child);
   }
   child.unref();
   return Promise.resolve();
+};
+
+/**
+ * Parses the launcher's flags.
+ *
+ * `args` types every option as `any`, so the result is narrowed to the one
+ * option this module reads. The parser is configured to make `verbose`
+ * boolean, so anything other than `true` means it was not passed.
+ */
+const parseLaunchFlags = (argv: string[]): LaunchFlags => {
+  const parsed = args.parse(argv, {
+    name: 'hyper',
+    version: false,
+    mri: {
+      boolean: ['v', 'verbose']
+    },
+    mainColor: 'yellow',
+    subColor: 'dim'
+  });
+  return {verbose: parsed.verbose === true};
+};
+
+const main = (argv: string[]) => {
+  const flags: LaunchFlags = parseLaunchFlags(argv);
+
+  if (commandPromise) {
+    return commandPromise;
+  }
+
+  return launchApp(flags, buildLaunchEnv(flags.verbose));
 };
 
 /**

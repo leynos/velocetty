@@ -92,6 +92,15 @@ type DefinedSourceKeys<S> = {[K in keyof S]-?: S[K] extends undefined ? never : 
 type MergeResult<T, S> = T & Pick<S, DefinedSourceKeys<S>>;
 
 /**
+ * Reports whether two values are objects that merge key by key.
+ *
+ * Arrays are excluded even though they are objects: merging them element by
+ * element would splice positions together, where a layer that supplies an
+ * array means to replace it whole.
+ */
+const isMergeableRecord = (value: unknown): value is object => isObject(value) && !Array.isArray(value);
+
+/**
  * Deep merges two objects, with the source taking precedence over the target.
  *
  * - Nested objects are recursively merged
@@ -142,9 +151,8 @@ export const deepMerge = <T extends object, S extends object>(
     // says that plainly instead of pretending the two key sets match.
     const targetValue: unknown = isOwnKey(target, key) ? target[key] : undefined;
 
-    // Deep merge objects (but not arrays)
     const mergedValue =
-      isObject(sourceValue) && !Array.isArray(sourceValue) && isObject(targetValue) && !Array.isArray(targetValue)
+      isMergeableRecord(sourceValue) && isMergeableRecord(targetValue)
         ? deepMerge(targetValue, sourceValue, options, currentDepth + 1)
         : sourceValue;
     Object.assign(result, {[key]: mergedValue});
@@ -239,22 +247,22 @@ export const extractConfigOptions = (raw: rawConfig): ConfigOverrides | null => 
 };
 
 /**
- * Type guard to check if a value is a valid ConfigLayer.
+ * The layer names `mergeLayers` recognises, in precedence order.
  *
- * @param value - The value to check.
- * @returns True if the value is a valid ConfigLayer.
+ * Typed over `unknown` because its one caller asks whether an arbitrary input
+ * is a member; that question is a set lookup, not a narrowing of the input.
  */
-export const isConfigLayer = (value: unknown): value is ConfigLayer => {
-  if (!isObject(value) || Array.isArray(value) || !('type' in value) || !('config' in value)) {
-    return false;
-  }
+const CONFIG_LAYER_TYPES: ReadonlySet<unknown> = new Set<ConfigLayerType>(['defaults', 'user', 'workspace', 'runtime']);
 
-  const validTypes = ['defaults', 'user', 'workspace', 'runtime'] as const;
-  const type = value.type;
-  const config = value.config;
+/** Narrows a value to a configuration layer type name. */
+const isConfigLayerType = (value: unknown): value is ConfigLayerType => CONFIG_LAYER_TYPES.has(value);
 
-  return validTypes.some((validType) => validType === type) && isObject(config) && !Array.isArray(config);
-};
+/** Narrows a value to a record carrying the two fields a layer must have. */
+const hasLayerFields = (value: unknown): value is {type: unknown; config: unknown} =>
+  isMergeableRecord(value) && 'type' in value && 'config' in value;
+
+export const isConfigLayer = (value: unknown): value is ConfigLayer =>
+  hasLayerFields(value) && isConfigLayerType(value.type) && isMergeableRecord(value.config);
 
 /**
  * Creates a runtime override layer for ephemeral configuration changes.
@@ -291,11 +299,11 @@ const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
  */
 const deepEqual = (left: unknown, right: unknown): boolean => {
   if (left === right) return true;
-  if (left == null || right == null) return left === right;
+  // Past this point the two differ, so a missing side cannot be equal to a
+  // present one and the comparison can stop before recursing.
+  if (left == null || right == null) return false;
   if (isArray(left) && isArray(right)) return arraysEqual(left, right);
-  if (isObject(left) && !Array.isArray(left) && isObject(right) && !Array.isArray(right)) {
-    return recordsEqual(left, right);
-  }
+  if (isMergeableRecord(left) && isMergeableRecord(right)) return recordsEqual(left, right);
   return false;
 };
 

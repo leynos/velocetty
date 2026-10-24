@@ -73,9 +73,13 @@ type CliHarness = {
 const TEST_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const CLI_DIRECTORY = path.join(TEST_DIRECTORY, '..', '..', 'cli');
 
+/** Narrows a parsed value to a config payload declaring both plugin lists. */
+const isConfigPayload = (value: unknown): value is {plugins: unknown; localPlugins: unknown} =>
+  isObject(value) && 'plugins' in value && 'localPlugins' in value;
+
 const parseConfigData = (contents: string): ConfigData => {
   const value = JSON5.parse(contents);
-  if (!isObject(value) || !('plugins' in value) || !('localPlugins' in value)) {
+  if (!isConfigPayload(value)) {
     throw new TypeError('Expected persisted config to contain plugins and localPlugins.');
   }
   return {plugins: value.plugins, localPlugins: value.localPlugins};

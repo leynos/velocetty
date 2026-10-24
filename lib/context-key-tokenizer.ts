@@ -14,7 +14,14 @@ export const COMPARISON_OPERATORS: readonly WhenComparisonOperator[] = ['==', '!
 const TWO_CHAR_OPERATORS = ['&&', '||', ...COMPARISON_OPERATORS] as const;
 const SINGLE_CHAR_OPERATORS = ['!', '<', '>'] as const;
 
-const isComparisonOperator = (value: string): value is WhenComparisonOperator =>
+/**
+ * Narrows a lexeme to a comparison operator.
+ *
+ * Exported because the parser asks the same question of a token it has already
+ * read; keeping one list means the two can never disagree about which lexemes
+ * are comparisons.
+ */
+export const isComparisonOperator = (value: string): value is WhenComparisonOperator =>
   value === '==' || value === '!=' || value === '<' || value === '<=' || value === '>' || value === '>=';
 
 const isTwoCharOperator = (value: string): value is (typeof TWO_CHAR_OPERATORS)[number] =>
@@ -273,41 +280,42 @@ const tryTokenizeWhitespace = (reader: SourceReader, pos: Position): number | nu
   return isWhitespace(reader.source[pos.value]) ? pos.value + 1 : null;
 };
 
-const tryTokenizeParenthesis = (reader: SourceReader, pos: Position): TokenizeResult => {
-  const char = reader.source[pos.value];
-  if (char !== '(' && char !== ')') {
-    return null;
-  }
+/**
+ * Wraps a token as a successful read, or passes `null` through as a miss.
+ *
+ * Each mapper below decides the token's kind and lexeme; this only decides that
+ * a successful read consumes the lexeme it matched, which is what keeps the
+ * three tokenizers' cursor arithmetic identical.
+ */
+const emitToken = (token: Token | null, pos: Position): TokenizeResult =>
+  token && {token, next: pos.value + token.lexeme.length};
 
-  return {
-    token: {kind: char === '(' ? 'lparen' : 'rparen', lexeme: char, index: pos.value},
-    next: pos.value + 1
-  };
+const parenthesisToken = (char: string, pos: Position): Token | null => {
+  if (char === '(') {
+    return {kind: 'lparen', lexeme: char, index: pos.value};
+  }
+  return char === ')' ? {kind: 'rparen', lexeme: char, index: pos.value} : null;
 };
 
-const tryTokenizeTwoCharOperator = (reader: SourceReader, pos: Position): TokenizeResult => {
-  const twoChar = reader.source.slice(pos.value, pos.value + 2);
-  if (!isTwoCharOperator(twoChar)) {
-    return null;
-  }
+/**
+ * The two operator mappers stay separate on purpose: sharing one predicate
+ * would let the two-character reader accept a lone `!`, then consume a
+ * character it never matched.
+ */
+const twoCharOperatorToken = (lexeme: string, pos: Position): Token | null =>
+  isTwoCharOperator(lexeme) ? {kind: 'operator', lexeme, index: pos.value} : null;
 
-  return {
-    token: {kind: 'operator', lexeme: twoChar, index: pos.value},
-    next: pos.value + 2
-  };
-};
+const singleCharOperatorToken = (lexeme: string, pos: Position): Token | null =>
+  isSingleCharOperator(lexeme) ? {kind: 'operator', lexeme, index: pos.value} : null;
 
-const tryTokenizeSingleCharOperator = (reader: SourceReader, pos: Position): TokenizeResult => {
-  const char = reader.source[pos.value];
-  if (!isSingleCharOperator(char)) {
-    return null;
-  }
+const tryTokenizeParenthesis = (reader: SourceReader, pos: Position): TokenizeResult =>
+  emitToken(parenthesisToken(reader.source[pos.value], pos), pos);
 
-  return {
-    token: {kind: 'operator', lexeme: char, index: pos.value},
-    next: pos.value + 1
-  };
-};
+const tryTokenizeTwoCharOperator = (reader: SourceReader, pos: Position): TokenizeResult =>
+  emitToken(twoCharOperatorToken(reader.source.slice(pos.value, pos.value + 2), pos), pos);
+
+const tryTokenizeSingleCharOperator = (reader: SourceReader, pos: Position): TokenizeResult =>
+  emitToken(singleCharOperatorToken(reader.source[pos.value], pos), pos);
 
 const tryTokenizeString = (reader: SourceReader, pos: Position): TokenizeResult => {
   const char = reader.source[pos.value];

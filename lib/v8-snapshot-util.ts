@@ -153,6 +153,43 @@ const rebuildSnapshotLoaderChain = (
   return nextLoad;
 };
 
+/**
+ * Finds the `require` the snapshot runtime should use.
+ *
+ * The host's own require wins when it is Node-compatible; a window-scoped one
+ * is the fallback because some hosts expose it only there.
+ */
+const resolveSnapshotRequire = (
+  runtimeHost: SnapshotRuntimeEnvironment,
+  runtimeWindow: SnapshotRuntimeEnvironment['window']
+): SnapshotModuleRequire | null => {
+  if (isSnapshotRequire(runtimeHost.require)) {
+    return runtimeHost.require;
+  }
+  return isSnapshotRequire(runtimeWindow?.require) ? runtimeWindow.require : null;
+};
+
+/** Returns the host's usable `require`, or throws explaining what was missing. */
+const requireSnapshotRequire = (
+  runtimeHost: SnapshotRuntimeEnvironment,
+  runtimeWindow: SnapshotRuntimeEnvironment['window']
+): SnapshotModuleRequire => {
+  const runtimeRequire = resolveSnapshotRequire(runtimeHost, runtimeWindow);
+  if (!runtimeRequire) {
+    throw new Error('Expected a Node-compatible require function for snapshot initialization.');
+  }
+  return runtimeRequire;
+};
+
+/** Loads the `module` builtin and checks it exposes the loader hook. */
+const loadSnapshotModuleLoader = (runtimeRequire: SnapshotModuleRequire): SnapshotModuleLoader => {
+  const loadedModule = runtimeRequire('module');
+  if (!isSnapshotModuleLoader(loadedModule)) {
+    throw new TypeError('Expected the runtime module loader to expose `_load`.');
+  }
+  return loadedModule;
+};
+
 export const bootstrapSnapshotRuntime = (
   // SAFETY: The runtime host is globalThis, whose window and document are optional at bootstrap time.
   runtimeHost: SnapshotRuntimeEnvironment = globalThis
@@ -164,26 +201,13 @@ export const bootstrapSnapshotRuntime = (
 
   const runtimeWindow = runtimeHost.window;
   const runtimeDocument = runtimeHost.document;
-  let runtimeRequire: SnapshotModuleRequire | null = null;
-  if (isSnapshotRequire(runtimeHost.require)) {
-    runtimeRequire = runtimeHost.require;
-  } else if (isSnapshotRequire(runtimeWindow?.require)) {
-    runtimeRequire = runtimeWindow.require;
-  }
-
-  if (!runtimeRequire) {
-    throw new Error('Expected a Node-compatible require function for snapshot initialization.');
-  }
+  const runtimeRequire = requireSnapshotRequire(runtimeHost, runtimeWindow);
 
   if (!runtimeWindow || !runtimeDocument) {
     throw new Error('Expected window and document globals for snapshot initialization.');
   }
 
-  const loadedModule = runtimeRequire('module');
-  if (!isSnapshotModuleLoader(loadedModule)) {
-    throw new TypeError('Expected the runtime module loader to expose `_load`.');
-  }
-  const moduleLoader = loadedModule;
+  const moduleLoader = loadSnapshotModuleLoader(runtimeRequire);
   const loaderState = getOrCreateLoaderState(moduleLoader);
   let fallbackLoad = moduleLoader._load;
 
