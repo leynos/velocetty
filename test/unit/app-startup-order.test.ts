@@ -28,6 +28,43 @@ test('the entry point initializes the configuration before loading the app', asy
   expect(setupIndex).toBeLessThan(startImportIndex);
 });
 
+test('the entry point answers every informational argument the same way', async () => {
+  // These arguments must short-circuit before `config.setup()` and before
+  // `./start.js`. If one ever fell through to the startup path it would launch a
+  // window instead of printing diagnostics, so the list is pinned as a whole.
+  const entrySource = await readSource('app/index.mts');
+
+  expect(entrySource).toContain("const informationalArguments = ['--help', '-v', '--version'];");
+  expect(entrySource).toContain('informationalArguments.includes(requestedArgument)');
+  expect(entrySource).toContain('app.quit();');
+});
+
+test('the informational branch reports the version, the argument contract and the config path', async () => {
+  // The three lines are the entire user-visible output of `--help`. Losing one
+  // is silent at runtime: the process still exits 0 with partial guidance.
+  const entrySource = await readSource('app/index.mts');
+
+  // Matched as patterns rather than as templates: these are the literal
+  // interpolations the entry point prints, and evaluating them here would test
+  // this file's own variables instead.
+  expect(entrySource).toMatch(/Hyper version \$\{packageMetadata\.version\}/);
+  expect(entrySource).toContain('Hyper does not accept any command line arguments.');
+  expect(entrySource).toMatch(/Hyper configuration file located at: \$\{cfgPath\}/);
+});
+
+test('a startup failure is reported and turns into a failing exit code', async () => {
+  // The catch block is the only thing standing between a broken `config.setup()`
+  // and an Electron process that exits 0 with no window, so both halves of the
+  // contract are pinned: the diagnostic and the non-zero status.
+  const entrySource = await readSource('app/index.mts');
+  const catchIndex = indexOfOrThrow(entrySource, '} catch (error) {');
+  const catchBlock = entrySource.slice(catchIndex);
+
+  expect(catchBlock).toContain("console.error('Failed to start Hyper.', error);");
+  expect(catchBlock).toContain('process.exitCode = 1;');
+  expect(catchBlock).toContain('app.quit();');
+});
+
 test('the app module does not re-run configuration setup below its imports', async () => {
   // Re-adding the call here would silently reintroduce the ordering fault: the
   // import block at the top of `app/start.ts` reaches `./plugins` and
