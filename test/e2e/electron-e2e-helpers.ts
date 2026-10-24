@@ -183,6 +183,91 @@ export const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
   }
 };
 
+/** One line of xterm's scrollback, as much of it as this helper reads. */
+type TerminalBufferLine = {translateToString?: (trimRight?: boolean) => string};
+
+/** The scrollback collection a terminal buffer exposes. */
+type TerminalBufferLines = {length: number; get: (index: number) => TerminalBufferLine | undefined};
+
+/** The React fiber fields the chain walk follows. */
+type FiberNode = {stateNode?: unknown; return?: unknown};
+
+/** The xterm state hung off a fiber's `stateNode`. */
+type FiberTermState = {term?: {buffer?: {active?: {_buffer?: {lines?: unknown}}}}};
+
+/**
+ * Reads the active terminal buffer inside the renderer.
+ *
+ * Defined at module scope, and kept self-contained, because Playwright
+ * serialises the callback as source text: it may reference only its argument
+ * and the browser globals, so every helper it needs is declared inside it.
+ */
+const readActiveTerminalBufferInPage = (resolvedLineLimit: number): string[] => {
+  const failurePrefix = '[e2e] unable to read active terminal buffer';
+  const fail: (message: string) => never = (message) => {
+    throw new Error(`${failurePrefix}: ${message}`);
+  };
+  const requirePresent = <T>(value: T | null | undefined, message: string): T => value ?? fail(message);
+
+  if (typeof document === 'undefined') {
+    fail('renderer document is unavailable');
+  }
+  const termWrapper = requirePresent(
+    document.querySelector('.term_wrapper'),
+    'missing `.term_wrapper` element in renderer DOM'
+  );
+  const fiberKey = requirePresent(
+    Object.getOwnPropertyNames(termWrapper).find((key) => key.startsWith('__reactFiber$')),
+    'React fiber metadata not found on `.term_wrapper`'
+  );
+
+  const isRendererObject = (value: unknown): value is object =>
+    value !== termWrapper && typeof value === 'object' && value !== null;
+  const isFiberNode = (value: unknown): value is FiberNode =>
+    isRendererObject(value) && ('stateNode' in value || 'return' in value);
+  const isBufferLines = (value: unknown): value is TerminalBufferLines =>
+    isRendererObject(value) && 'length' in value && 'get' in value;
+
+  /**
+   * Reads the scrollback collection a single fiber carries, if it has one.
+   *
+   * xterm nests the buffer behind optional fields that only exist once the
+   * terminal has mounted, so each hop is read defensively.
+   */
+  const readFiberLines = (fiber: FiberNode): TerminalBufferLines | null => {
+    // SAFETY: `stateNode` is opaque to the renderer's typings. The traversal
+    // only follows nodes carrying fiber fields, and the result is checked by
+    // `isBufferLines` before anything is read from it.
+    const candidate = (fiber.stateNode as FiberTermState | undefined)?.term?.buffer?.active?._buffer?.lines;
+    return isBufferLines(candidate) ? candidate : null;
+  };
+
+  /** Walks the fiber chain upward to the xterm scrollback collection. */
+  const findBufferLines = (wrapper: Element): TerminalBufferLines => {
+    const initialNode = Object.getOwnPropertyDescriptor(wrapper, fiberKey)?.value;
+    if (!isFiberNode(initialNode)) {
+      fail('React fiber metadata on `.term_wrapper` is not traversable');
+    }
+    let node: FiberNode | undefined = initialNode;
+    for (let depth = 0; depth < 80 && node; depth += 1) {
+      const lines = readFiberLines(node);
+      if (lines) {
+        return lines;
+      }
+      node = isFiberNode(node.return) ? node.return : undefined;
+    }
+    return fail('terminal buffer lines collection is unavailable');
+  };
+
+  const lines = findBufferLines(termWrapper);
+  const start = Math.max(0, lines.length - Math.max(1, resolvedLineLimit));
+  const output: string[] = [];
+  for (let index = start; index < lines.length; index += 1) {
+    output.push(lines.get(index)?.translateToString?.(true) ?? '');
+  }
+  return output;
+};
+
 /**
  * Reads recent lines from the active terminal buffer in the renderer window.
  * Throws clear errors when the expected renderer wiring is unavailable.
@@ -190,105 +275,7 @@ export const withTimeout = async <T>(promise: Promise<T>, ms: number) => {
 export const readActiveTerminalBuffer = async (
   windowPage: ActiveTerminalBufferPage,
   options: ReadActiveTerminalBufferOptions = {}
-) => {
-  const lineLimit = options.lineLimit ?? 40;
-  return await windowPage.evaluate((resolvedLineLimit) => {
-    if (typeof document === 'undefined') {
-      throw new TypeError('[e2e] unable to read active terminal buffer: renderer document is unavailable');
-    }
-
-    const termWrapper = document.querySelector('.term_wrapper');
-    if (!termWrapper) {
-      throw new Error('[e2e] unable to read active terminal buffer: missing `.term_wrapper` element in renderer DOM');
-    }
-
-    const fiberKey = Object.getOwnPropertyNames(termWrapper).find((key) => key.startsWith('__reactFiber$'));
-    if (!fiberKey) {
-      throw new Error('[e2e] unable to read active terminal buffer: React fiber metadata not found on `.term_wrapper`');
-    }
-
-    type MaybeFiberNode = {stateNode?: unknown; return?: unknown};
-    type TerminalBufferLine = {translateToString?: (trimRight?: boolean) => string};
-    type MaybeTermState = {
-      term?: {
-        buffer?: {
-          active?: {_buffer?: {lines?: {length?: number; get?: (index: number) => TerminalBufferLine | undefined}}};
-        };
-      };
-    };
-    const fiberStateNodeProperty = 'stateNode' as const;
-    const fiberReturnProperty = 'return' as const;
-    const terminalProperty = 'term' as const;
-    const lineReaderProperty = 'get' as const;
-    const isRendererMetadataObject = (candidate: unknown): candidate is object =>
-      candidate !== termWrapper && candidate !== null && typeof candidate === 'object';
-    const isFiberNode = (candidate: unknown): candidate is MaybeFiberNode =>
-      isRendererMetadataObject(candidate) && (fiberStateNodeProperty in candidate || fiberReturnProperty in candidate);
-    const isMaybeTermState = (candidate: unknown): candidate is MaybeTermState =>
-      isRendererMetadataObject(candidate) &&
-      terminalProperty in candidate &&
-      isRendererMetadataObject(candidate[terminalProperty]);
-    const initialNode = Object.getOwnPropertyDescriptor(termWrapper, fiberKey)?.value;
-    if (!isFiberNode(initialNode)) {
-      throw new Error(
-        '[e2e] unable to read active terminal buffer: React fiber metadata on `.term_wrapper` is not traversable'
-      );
-    }
-
-    let node: unknown = initialNode;
-    let termStateNode: MaybeTermState | null = null;
-    for (let i = 0; i < 80 && node; i += 1) {
-      if (!isFiberNode(node)) {
-        break;
-      }
-      const currentNode = node;
-      if (isMaybeTermState(currentNode.stateNode)) {
-        termStateNode = currentNode.stateNode;
-        break;
-      }
-      node = currentNode.return;
-    }
-
-    if (!termStateNode) {
-      throw new Error(
-        '[e2e] unable to read active terminal buffer: terminal React state node was not found in fiber chain'
-      );
-    }
-
-    const lines = termStateNode.term?.buffer?.active?._buffer?.lines;
-    if (!lines) {
-      throw new Error('[e2e] unable to read active terminal buffer: terminal buffer lines collection is unavailable');
-    }
-    const maximumSafeLineCount = Number.MAX_SAFE_INTEGER;
-    const isLineCount = (candidate: unknown): candidate is number =>
-      typeof candidate === 'number' &&
-      Number.isSafeInteger(candidate) &&
-      candidate >= 0 &&
-      candidate <= maximumSafeLineCount;
-    const isLineReader = (candidate: unknown): candidate is (index: number) => TerminalBufferLine | undefined =>
-      typeof candidate === 'function' && candidate === lines[lineReaderProperty];
-
-    if (!isLineCount(lines.length)) {
-      throw new Error(
-        '[e2e] unable to read active terminal buffer: terminal buffer lines collection has an invalid length'
-      );
-    }
-    if (!isLineReader(lines[lineReaderProperty])) {
-      throw new Error(
-        '[e2e] unable to read active terminal buffer: terminal buffer lines collection is missing get(index)'
-      );
-    }
-
-    const output: string[] = [];
-    const boundedLineLimit = Math.max(1, resolvedLineLimit);
-    const start = Math.max(0, lines.length - boundedLineLimit);
-    for (let index = start; index < lines.length; index += 1) {
-      const line = lines[lineReaderProperty](index);
-      output.push(line?.translateToString?.(true) ?? '');
-    }
-    return output;
-  }, lineLimit);
-};
+) => windowPage.evaluate(readActiveTerminalBufferInPage, options.lineLimit ?? 40);
 
 /**
  * Waits until the renderer has mounted and at least one terminal-related
