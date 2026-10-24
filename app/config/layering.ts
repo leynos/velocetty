@@ -19,15 +19,46 @@ const objectKeys = <T extends object>(value: T): Array<keyof T> => {
   return Object.keys(value) as Array<keyof T>;
 };
 
+/**
+ * Narrows a key to one the owner actually carries.
+ *
+ * The two sides of a comparison are frequently different types, so a key that
+ * is valid for one object need not exist on the other. Stating the check as a
+ * predicate lets the read below stay an ordinary property access while still
+ * reporting an absent key as `undefined` rather than inventing a value.
+ */
+const isOwnKey = <TObject extends object>(owner: TObject, key: PropertyKey): key is keyof TObject =>
+  Object.hasOwn(owner, key);
+
 /** Configuration layer types in order of precedence (lowest to highest). */
 export type ConfigLayerType = 'defaults' | 'user' | 'workspace' | 'runtime';
+
+/**
+ * Makes every property of a configuration object optional, at every depth.
+ *
+ * Arrays are left whole because merging replaces them wholesale rather than
+ * element by element, so a partial array would describe a merge that never
+ * happens.
+ */
+type DeepOverrides<T> = {
+  [K in keyof T]?: T[K] extends readonly unknown[] ? T[K] : T[K] extends object ? DeepOverrides<T[K]> : T[K];
+};
+
+/**
+ * A recursively optional `configOptions`, describing what one layer may supply.
+ *
+ * A layer is an override, not a configuration: `mergeLayers` deep-merges nested
+ * objects, so a user layer that sets a single terminal colour is valid even
+ * though `configOptions` declares `colors` as a complete palette.
+ */
+export type ConfigOverrides = DeepOverrides<configOptions>;
 
 /** A configuration layer with its type and content. */
 export type ConfigLayer = {
   /** The type of this configuration layer. */
   readonly type: ConfigLayerType;
   /** The configuration content for this layer. */
-  readonly config: Partial<configOptions>;
+  readonly config: ConfigOverrides;
 };
 
 /** Deep merge options for customization. */
@@ -50,6 +81,17 @@ const defaultMergeOptions: DeepMergeOptions = {
 };
 
 /**
+ * Source keys whose value is not statically `undefined`.
+ *
+ * `deepMerge` skips `undefined` source values, so a key that can only ever be
+ * `undefined` contributes nothing to the result and must not narrow it.
+ */
+type DefinedSourceKeys<S> = {[K in keyof S]-?: S[K] extends undefined ? never : K}[keyof S];
+
+/** The shape produced by merging `S` over `T`. */
+type MergeResult<T, S> = T & Pick<S, DefinedSourceKeys<S>>;
+
+/**
  * Deep merges two objects, with the source taking precedence over the target.
  *
  * - Nested objects are recursively merged
@@ -57,6 +99,11 @@ const defaultMergeOptions: DeepMergeOptions = {
  * - Primitive values are replaced
  * - undefined in source does not overwrite target (allows defaults to persist)
  * - null in source overwrites target (explicit null is a deliberate reset)
+ *
+ * The source is not a `Partial<T>`. `Partial` only makes the top level
+ * optional, so it would reject a nested object that adds keys the target does
+ * not have — precisely the case the merge exists to handle. The result is
+ * therefore the target's shape plus every source key that can carry a value.
  *
  * @param target - The base object (lower precedence).
  * @param source - The override object (higher precedence).
@@ -70,19 +117,19 @@ const defaultMergeOptions: DeepMergeOptions = {
  * // {a: 1, b: {c: 2, d: 3}}
  * ```
  */
-export const deepMerge = <T extends object>(
+export const deepMerge = <T extends object, S extends object>(
   target: T,
-  source: Partial<T>,
+  source: S,
   options: DeepMergeOptions = defaultMergeOptions,
   currentDepth = 0
-): T => {
+): MergeResult<T, S> => {
   const maxDepth = options.maxDepth ?? DEFAULT_MAX_MERGE_DEPTH;
 
   if (currentDepth >= maxDepth) {
     return Object.assign({...target}, source);
   }
 
-  const result = {...target};
+  const result: T = {...target};
 
   for (const key of objectKeys(source)) {
     const sourceValue = source[key];
@@ -91,7 +138,9 @@ export const deepMerge = <T extends object>(
       continue;
     }
 
-    const targetValue = target[key];
+    // `key` belongs to `S`, so it need not exist on `T`. The ownership check
+    // says that plainly instead of pretending the two key sets match.
+    const targetValue: unknown = isOwnKey(target, key) ? target[key] : undefined;
 
     // Deep merge objects (but not arrays)
     const mergedValue =
@@ -101,7 +150,9 @@ export const deepMerge = <T extends object>(
     Object.assign(result, {[key]: mergedValue});
   }
 
-  return result;
+  // SAFETY: `result` starts as a copy of `target` and receives every defined
+  // key of `source`; the skipped keys are exactly the ones `MergeResult` omits.
+  return result as MergeResult<T, S>;
 };
 
 /**
@@ -123,9 +174,10 @@ export const deepMerge = <T extends object>(
  * // {fontSize: 14, colors: {red: '#ff0000', blue: '#0000ff'}}
  * ```
  */
-export const mergeLayers = (layers: ConfigLayer[]): Partial<configOptions> => {
-  // Start with empty object and merge each layer in sequence
-  let result: Partial<configOptions> = {};
+export const mergeLayers = (layers: ConfigLayer[]): ConfigOverrides => {
+  // Start with an empty override and merge each layer in sequence. Each layer is
+  // already a `ConfigOverrides`, so the accumulation keeps that type.
+  let result: ConfigOverrides = {};
 
   for (const layer of layers) {
     result = deepMerge(result, layer.config);
@@ -158,8 +210,8 @@ export const mergeLayers = (layers: ConfigLayer[]): Partial<configOptions> => {
  */
 export const resolveConfigLayers = (
   defaults: configOptions,
-  userConfig: Partial<configOptions>,
-  runtimeOverrides: Partial<configOptions> = {}
+  userConfig: ConfigOverrides,
+  runtimeOverrides: ConfigOverrides = {}
 ): configOptions => {
   const layers: ConfigLayer[] = [
     {type: 'defaults', config: defaults},
@@ -182,7 +234,7 @@ export const resolveConfigLayers = (
  * @param raw - The raw configuration payload.
  * @returns The configOptions portion, or null if none.
  */
-export const extractConfigOptions = (raw: rawConfig): Partial<configOptions> | null => {
+export const extractConfigOptions = (raw: rawConfig): ConfigOverrides | null => {
   return raw.config ?? null;
 };
 
@@ -213,7 +265,7 @@ export const isConfigLayer = (value: unknown): value is ConfigLayer => {
  * @param overrides - The configuration overrides to apply.
  * @returns A runtime configuration layer.
  */
-export const createRuntimeOverrideLayer = (overrides: Partial<configOptions>): ConfigLayer => ({
+export const createRuntimeOverrideLayer = (overrides: ConfigOverrides): ConfigLayer => ({
   type: 'runtime',
   config: {...overrides}
 });
@@ -268,19 +320,33 @@ function recordsEqual<T extends object>(left: T, right: T): boolean {
   return leftKeys.every((key) => Object.hasOwn(right, key) && deepEqual(left[key], right[key]));
 }
 
+/** A key that appears in either of two compared objects. */
+type SharedKey<TLeft extends object, TRight extends object> = keyof TLeft | keyof TRight;
+
 /**
  * Checks if a configuration value differs between two config objects.
  *
  * Performs deep comparison for objects and arrays, strict equality for primitives.
  *
+ * The two sides are inferred separately. They are frequently different types —
+ * a default configuration against a partial user override is the whole point of
+ * the layering — and inferring one type for both would narrow `key` to the keys
+ * they happen to share.
+ *
  * @param left - The first configuration object.
  * @param right - The second configuration object.
- * @param key - The key to compare.
+ * @param key - The key to compare, present on either side.
  * @returns True if the values differ.
  */
-export const configValueDiffers = <T extends object>(left: T, right: T, key: keyof T): boolean => {
-  const leftValue = left[key];
-  const rightValue = right[key];
+export const configValueDiffers = <TLeft extends object, TRight extends object>(
+  left: TLeft,
+  right: TRight,
+  key: SharedKey<TLeft, TRight>
+): boolean => {
+  // A key may exist on only one side; the ownership check reports the missing
+  // side as `undefined` without claiming both objects have the key.
+  const leftValue: unknown = isOwnKey(left, key) ? left[key] : undefined;
+  const rightValue: unknown = isOwnKey(right, key) ? right[key] : undefined;
 
   // Handle undefined vs null vs value
   if (leftValue === undefined && rightValue === undefined) {
@@ -298,11 +364,15 @@ export const configValueDiffers = <T extends object>(left: T, right: T, key: key
  *
  * @param oldConfig - The previous configuration state.
  * @param newConfig - The new configuration state.
- * @returns Array of keys that have different values.
+ * @returns Array of keys that have different values, including keys present on
+ * only one side.
  */
-export const getChangedKeys = <T extends object>(oldConfig: T, newConfig: T): Array<keyof T> => {
-  const allKeys = new Set([...objectKeys(oldConfig), ...objectKeys(newConfig)]);
-  const changed: Array<keyof T> = [];
+export const getChangedKeys = <TLeft extends object, TRight extends object>(
+  oldConfig: TLeft,
+  newConfig: TRight
+): Array<SharedKey<TLeft, TRight>> => {
+  const allKeys = new Set<SharedKey<TLeft, TRight>>([...objectKeys(oldConfig), ...objectKeys(newConfig)]);
+  const changed: Array<SharedKey<TLeft, TRight>> = [];
 
   for (const key of allKeys) {
     if (configValueDiffers(oldConfig, newConfig, key)) {

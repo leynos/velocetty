@@ -1,6 +1,8 @@
 /** @file Shared renderer transport mock factory for unit tests. */
 import {mock} from 'bun:test';
 
+import type {IpcResult} from '@shared/types/common';
+
 type Listener = (...args: unknown[]) => void;
 
 type TransportMockState = {
@@ -73,7 +75,10 @@ export const createTransportMock = () => {
   };
 
   const transportMock = {
-    invoke: mock(async () => ({})),
+    // The channel is declared even though the default answer ignores it: a
+    // parameterless double rejects every `mockImplementation` that reads the
+    // channel, which is how the paste tests choose their reply.
+    invoke: mock(async (_channel: string, ..._args: unknown[]): Promise<IpcResult> => ({})),
     emit: mock((event: string, ...payload: unknown[]) => handleEmit(event, ...payload)),
     on: mock((event: string, listener: Listener) => {
       registerListener(event, listener);

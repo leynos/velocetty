@@ -170,6 +170,18 @@ const getInputLatencyMetrics = (inputLatenciesMs) => {
 /**
  * Resolves the benchmark evidence path for synthetic-load output.
  *
+ * Annotated because this file is JavaScript in a project with `checkJs` off:
+ * without the annotations the compiler synthesises a declaration from the
+ * inferred usage, which makes every option look required and rejects the
+ * `{projectName, branchName}` call the CLI path actually makes.
+ *
+ * @param {{
+ *   evidencePath?: string,
+ *   projectName?: string,
+ *   branchName?: string
+ * }} [options]
+ * @returns {string} Absolute path to the evidence JSON file.
+ *
  * Example:
  * `resolveBenchmarkEvidencePath({projectName: "velocetty", branchName: "feature/2-2-2"})`
  */
@@ -235,6 +247,21 @@ const parsePositiveIntegerOption = (value, optionName, fallbackValue) => {
 
 /**
  * Runs the synthetic benchmark and writes a JSON evidence file.
+ *
+ * Annotated for the same reason as `resolveBenchmarkEvidencePath` above: with
+ * `checkJs` off, the synthesised declaration would take its option shape from
+ * this function's own destructuring defaults, which would in turn reject the
+ * `evidencePath` option the tests pass.
+ *
+ * @param {{
+ *   repoRoot?: string,
+ *   evidencePath?: string,
+ *   projectName?: string,
+ *   branchName?: string,
+ *   frameCount?: number,
+ *   inputSampleCount?: number
+ * }} [options]
+ * @returns {Promise<{evidencePath: string, passed: boolean, report: object}>}
  *
  * Example:
  * `await runPtyFrameTimingSyntheticBenchmark({evidencePath: "/tmp/benchmark.json"})`

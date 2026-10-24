@@ -6,7 +6,7 @@
  * - Classification helpers work correctly
  */
 import {describe, it, expect} from 'bun:test';
-import type {configOptions} from '@shared/types/config';
+import type {configOptions, rawConfig} from '@shared/types/config';
 import {
   rootConfigReloadability,
   profileConfigReloadability,
@@ -37,8 +37,11 @@ describe('config-reloadability', () => {
     });
 
     it('should have reloadability entries for all profileConfigOptions keys', () => {
-      // Comprehensive list of profile config keys from the type definition
-      const expectedProfileKeys = [
+      // Comprehensive list of profile config keys from the type definition.
+      // Annotated so each entry is checked against `keyof configOptions`; a
+      // typo or a key the registry stopped covering fails the typecheck, not
+      // just the assertion below.
+      const expectedProfileKeys: Array<keyof configOptions> = [
         'backgroundColor',
         'bell',
         'bellSound',
@@ -82,20 +85,27 @@ describe('config-reloadability', () => {
         'workingDirectory'
       ];
 
+      // The registries are declared with `satisfies`, which keeps their literal
+      // key sets and therefore refuses a `string` index. `getReloadability` is
+      // the accessor that accepts one, and it reads the same registry.
       for (const key of expectedProfileKeys) {
-        expect(profileConfigReloadability[key]).toBeDefined();
-        expect(profileConfigReloadability[key].classification).toMatch(/^(live|restart)$/);
-        expect(profileConfigReloadability[key].rationale.length).toBeGreaterThan(0);
+        const entry = getReloadability(key, 'profile');
+        expect(entry).toBeDefined();
+        expect(entry?.classification).toMatch(/^(live|restart)$/);
+        expect(entry?.rationale.length).toBeGreaterThan(0);
       }
     });
 
     it('should have reloadability entries for plugin configuration keys', () => {
-      const expectedPluginKeys = ['plugins', 'localPlugins'];
+      // `localPlugins` lives on `rawConfig`, beside `plugins`, rather than under
+      // `config`, so this list is checked against the raw payload.
+      const expectedPluginKeys: Array<keyof rawConfig> = ['plugins', 'localPlugins'];
 
       for (const key of expectedPluginKeys) {
-        expect(pluginReloadability[key]).toBeDefined();
-        expect(pluginReloadability[key].classification).toBe('live');
-        expect(pluginReloadability[key].rationale.length).toBeGreaterThan(0);
+        const entry = getReloadability(key, 'plugin');
+        expect(entry).toBeDefined();
+        expect(entry?.classification).toBe('live');
+        expect(entry?.rationale.length).toBeGreaterThan(0);
       }
     });
 

@@ -242,7 +242,10 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
     return registry.get(asCommandId(command))?.handler;
   };
 
-  const registerCommandHandlers = (cmds: Partial<Record<string, CommandHandler>> | undefined) => {
+  // Optional, not merely `| undefined`: callers legitimately reach this with no
+  // argument when a plugin set has not been assembled, and the guard below is
+  // what makes that a no-op. Declaring the parameter required contradicted it.
+  const registerCommandHandlers = (cmds?: Partial<Record<string, CommandHandler>>) => {
     if (!cmds) {
       return;
     }

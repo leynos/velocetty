@@ -135,7 +135,9 @@ const mirrorRendererBundleToDistLib = async (rootDir: string) => {
       try {
         await copyFile(path.join(rendererOutputDir, fileName), path.join(distLibDir, fileName));
       } catch (error) {
-        const errorCode = isObject(error) && isString(error.code) ? error.code : undefined;
+        // `isObject` narrows to `object`, which declares no properties; the
+        // `in` check is what gives the narrowed value a `code` to read.
+        const errorCode = isObject(error) && 'code' in error && isString(error.code) ? error.code : undefined;
         if (errorCode === 'ENOENT' && optionalRendererBundleFiles.has(fileName)) {
           return;
         }

@@ -3,7 +3,21 @@ import {expect, test} from 'bun:test';
 
 import {useTranslation} from '../../lib/hooks/use-translation';
 
-type MutableNavigator = Pick<Navigator, 'languages' | 'language' | 'userAgent'>;
+/**
+ * The navigator surface these tests supply.
+ *
+ * `Pick` rather than a handwritten shape keeps the locale fields exactly as
+ * the DOM declares them. `userAgent` is deliberately absent: the hook never
+ * reads it, and demanding it here would make every case carry a value the test
+ * would then have to invent.
+ */
+type MutableNavigator = Pick<Navigator, 'languages' | 'language'>;
+
+/** The eight search-UI labels the hook is expected to resolve. */
+type SearchUiLabels = Record<
+  'search' | 'noResults' | 'matchCase' | 'matchWholeWord' | 'useRegex' | 'previousMatch' | 'nextMatch' | 'close',
+  string
+>;
 
 const restoreNavigator = (previous: PropertyDescriptor | undefined) => {
   if (previous) {
@@ -78,7 +92,7 @@ test('returns the translated search label for renderer search UI', () => {
   expect(translation).toBe('Rechercher');
 });
 
-const searchUiCases: Array<[string, MutableNavigator, Record<string, string>]> = [
+const searchUiCases: Array<[string, MutableNavigator, SearchUiLabels]> = [
   [
     'English',
     {languages: ['en'], language: 'en'},

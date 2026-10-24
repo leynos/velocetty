@@ -151,15 +151,21 @@ on `make check-fmt`, `make lint`, `make typecheck`, and `make test`, and red in
 CI on `bun run build:shared`.
 
 The four local gates run `tsconfig.typecheck.json`. That project includes
-`app/`, `lib/`, `cli/`, `typings/`, and `shared/src/`, and relaxes
-`tsconfig.base.json` with `noUncheckedIndexedAccess: false`,
-`noPropertyAccessFromIndexSignature: false`,
+`app/`, `lib/`, `cli/`, `typings/`, `shared/src/`, and — since this record was
+written — `test/`, and relaxes `tsconfig.base.json` with
+`noUncheckedIndexedAccess: false`, `noPropertyAccessFromIndexSignature: false`,
 `exactOptionalPropertyTypes: false`, `noImplicitOverride: false`, and
 `verbatimModuleSyntax: false`. It inherits `strict` and
 `useUnknownInCatchVariables` from the base. The `shared/`, `frontend/`,
 `backend/`, and `app/tsconfig.build.json` projects each compile against the
-strict base and sit outside every gate, as do the `build/esbuild/` bundle and
-the `test/` tree. CI runs them; the local gate set does not.
+strict base and sit outside every gate, as does the `build/esbuild/` bundle. CI
+runs them; the local gate set does not.
+
+`test/` joined the project after the first pass over the tree. It had been
+compiled by nothing: the production projects exclude it, and the unit runner
+strips types rather than checking them. That gap had already let a test double
+ship whose shape did not match the contract it stood in for, so the tree is now
+type-checked under the same flags as the code it exercises.
 
 That gap is why the three findings below are recorded here rather than in the
 commit that fixed them. All three are the same class of defect: code that a
@@ -343,6 +349,10 @@ was evidence about the lane, not about the app.
   change to `shared/`, `frontend/`, `backend/`, or the app build config must
   also run `bun run build:packages` and
   `bunx tsgo --project app/tsconfig.build.json` before it is pushed.
+- The `test/` tree is checked under the typecheck project's relaxed flags, not
+  the strict base. A double that satisfies the gate can still be narrower than
+  a strict consumer would demand, so the production contract remains the
+  reference when writing one.
 - Mirrored app-local modules are a deliberate duplication. Each one is pinned
   by a parity test, and a change to a shared implementation must carry the
   mirror and its parity test in the same commit.

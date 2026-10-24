@@ -11,7 +11,15 @@ import type {FilterNever, MainEvents, RendererEvents, TypedEmitter} from '@share
 type RpcServerWindow = {
   readonly profileName: string;
   readonly isDestroyed: () => boolean;
-  on: BrowserWindow['on'];
+  /**
+   * Full-screen transitions the server forwards to the renderer.
+   *
+   * Narrowed from `BrowserWindow['on']` to the two events
+   * `app/ui/window.ts` subscribes to: the inherited `this`-returning overloads
+   * demand a whole `BrowserWindow` from every window double, which no test can
+   * honestly supply.
+   */
+  on(event: 'enter-full-screen' | 'leave-full-screen', listener: () => void): void;
   readonly webContents: {
     on(event: 'did-finish-load', listener: () => void): void;
     on(

@@ -3,7 +3,11 @@ import {EventEmitter} from 'node:events';
 
 import {afterEach, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
+import {asCommandId} from '@shared/types/commands';
+
 import {getElectronMock, registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
+import {importFresh} from '../testUtils/import-fresh';
+import {registerModuleMock} from '../testUtils/mock-module';
 
 type IpcMainListener = (event: Electron.IpcMainEvent, payload: {ev: string; data?: unknown}) => void;
 // SAFETY: Server.ipcListener ignores the event object in this harness; the test exercises only its payload routing.
@@ -12,7 +16,7 @@ const unusedIpcMainEvent = {} as Electron.IpcMainEvent;
 const ipcMainOnMock = mock((_channel: string, _listener: IpcMainListener) => {});
 const ipcMainRemoveListenerMock = mock((_channel: string, _listener: IpcMainListener) => {});
 
-mock.module('uuid', () => ({
+registerModuleMock('uuid', () => ({
   v4: () => 'test-rpc-id'
 }));
 
@@ -29,7 +33,10 @@ const createWindowStub = () => {
   const win = {
     profileName: 'default-profile',
     webContents,
-    isDestroyed: () => isDestroyed
+    isDestroyed: () => isDestroyed,
+    // The server only forwards the two full-screen transitions; no test drives
+    // them here, so the registration itself is all this stub has to support.
+    on: (_event: 'enter-full-screen' | 'leave-full-screen', _listener: () => void) => {}
   };
 
   return {
@@ -49,7 +56,7 @@ beforeAll(async () => {
   const electronMock = getElectronMock();
   electronMock.ipcMain.on = ipcMainOnMock;
   electronMock.ipcMain.removeListener = ipcMainRemoveListenerMock;
-  ({Server} = await import('../../app/rpc.ts?rpc_server_unit'));
+  ({Server} = await importFresh<typeof import('../../app/rpc')>('../../app/rpc', 'rpc_server_unit'));
 });
 
 beforeEach(() => {
@@ -81,7 +88,7 @@ test('routes renderer-to-main events through typed listeners', () => {
   const commandListener = mock((_command: string) => {});
   server.on('command', commandListener);
 
-  server.ipcListener(unusedIpcMainEvent, {ev: 'command', data: 'tab:new'});
+  server.ipcListener(unusedIpcMainEvent, {ev: 'command', data: asCommandId('tab:new')});
 
   expect(commandListener).toHaveBeenCalledWith('tab:new');
 

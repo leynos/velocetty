@@ -3,20 +3,34 @@
  *
  * Exercises `registerTransportListeners` from
  * `lib/bootstrap/renderer-bootstrap.ts` with in-test transport, store,
- * plugins, and action-creator stubs.
+ * plugins, and action-creator doubles supplied by
+ * `test/testUtils/bootstrap-transport-fixture.ts`.
  *
- * Invariants: listener registration order is deterministic; transport mocks
- * and dispatch spies are reset before each test via
- * `resetTransportListenersFixture`; and the returned cleanup removes every
- * registered listener with one-to-one `on`/`off` correspondence.
+ * Invariants: listener registration order is deterministic; the doubles are
+ * reset before each test via `resetFixture`; the returned cleanup removes
+ * every registered listener with one-to-one `on`/`off` correspondence; and
+ * each event forwards its payload to the creator the production handler names.
  *
  * @see lib/bootstrap/renderer-bootstrap.ts
  */
-import {beforeEach, describe, expect, mock, spyOn, test} from 'bun:test';
+import {beforeEach, describe, expect, spyOn, test} from 'bun:test';
 
 import {asProfileId, asSessionId, type Session} from '@shared/types/common';
-import {isObject, isString} from '@shared/types/guards';
-import type {SplitRequestParams} from '../../lib/types/request-shapes';
+import {NOTIFICATION_MESSAGE} from '@shared/constants/notifications';
+import {
+  createBootstrapActions,
+  dispatchMock,
+  getListener,
+  getPluginReloadCount,
+  plugins,
+  recordedCalls,
+  resetFixture,
+  store,
+  transport,
+  transportOnCalls,
+  type Listener
+} from '../testUtils/bootstrap-transport-fixture';
+import {registerTransportListeners} from '../../lib/bootstrap/renderer-bootstrap';
 
 const createMockSession = (overrides: Partial<Omit<Session, 'uid'>> & {uid: string}): Session => {
   const {uid, ...sessionOverrides} = overrides;
@@ -28,17 +42,6 @@ const createMockSession = (overrides: Partial<Omit<Session, 'uid'>> & {uid: stri
     uid: asSessionId(uid)
   };
 };
-
-const getActionType = (action: unknown): string | undefined =>
-  isObject(action) && 'type' in action && isString(action.type) ? action.type : undefined;
-
-import {
-  registerTransportListeners,
-  type AddNotificationParams,
-  type AddSessionDataParams,
-  type SendSessionDataParams,
-  type UpdateAvailableParams
-} from '../../lib/bootstrap/renderer-bootstrap';
 
 const TransportEvent = {
   Ready: 'ready',
@@ -84,208 +87,8 @@ const TransportEvent = {
   WindowGeometryChange: 'windowGeometry change'
 } as const;
 
-const ActionType = {
-  InitAction: 'INIT_ACTION',
-  LoadConfig: 'LOAD_CONFIG',
-  ReloadConfig: 'RELOAD_CONFIG',
-  AddNotification: 'ADD_NOTIFICATION',
-  UpdateAvailable: 'UPDATE_AVAILABLE',
-  SessionAdd: 'SESSION_ADD',
-  SessionData: 'SESSION_DATA',
-  SessionDataSend: 'SESSION_DATA_SEND',
-  SessionSearch: 'SESSION_SEARCH',
-  SessionSearchClose: 'SESSION_SEARCH_CLOSE',
-  SessionClearActive: 'SESSION_CLEAR_ACTIVE',
-  UserExitSession: 'USER_EXIT_SESSION',
-  CreateExitAction: 'CREATE_EXIT_ACTION',
-  PtyExitTermGroup: 'PTY_EXIT_TERM_GROUP',
-  TermGroupRequest: 'TERM_GROUP_REQUEST',
-  TermGroupSplitHoriz: 'TERM_GROUP_SPLIT_HORIZONTAL',
-  TermGroupSplitVert: 'TERM_GROUP_SPLIT_VERTICAL',
-  TermGroupExitActive: 'TERM_GROUP_EXIT_ACTIVE',
-  UiSetFontSmoothing: 'UI_SET_FONT_SMOOTHING',
-  UiResetFontSize: 'UI_RESET_FONT_SIZE',
-  UiIncreaseFontSize: 'UI_INCREASE_FONT_SIZE',
-  UiDecreaseFontSize: 'UI_DECREASE_FONT_SIZE',
-  UiMoveLeft: 'UI_MOVE_LEFT',
-  UiMoveRight: 'UI_MOVE_RIGHT',
-  UiMoveTo: 'UI_MOVE_TO',
-  UiMoveNextPane: 'UI_MOVE_NEXT_PANE',
-  UiMovePreviousPane: 'UI_MOVE_PREVIOUS_PANE',
-  UiOpenFile: 'UI_OPEN_FILE',
-  UiOpenSsh: 'UI_OPEN_SSH',
-  UiWindowMove: 'UI_WINDOW_MOVE',
-  UiWindowGeometryUpdated: 'UI_WINDOW_GEOMETRY_UPDATED',
-  UiEnterFullScreen: 'UI_ENTER_FULL_SCREEN',
-  UiLeaveFullScreen: 'UI_LEAVE_FULL_SCREEN'
-} as const;
-
-const dispatchMock = mock((_action: unknown) => {});
-const transportOnCalls: Partial<Record<string, Array<(...args: unknown[]) => void>>> = {};
-
-type Listener = (payload: unknown) => void;
-
-const registerTransportListener = (event: string, listener: Listener) => {
-  transportOnCalls[event] = transportOnCalls[event] ? [...transportOnCalls[event], listener] : [listener];
-  return transport;
-};
-
-const transport = {
-  invoke: mock(async () => ({})),
-  emit: mock(() => true),
-  off: mock((event: string, listener: Listener) => {
-    const handlers = transportOnCalls[event];
-    if (!handlers) {
-      return transport;
-    }
-
-    const remainingHandlers = handlers.filter((registeredListener) => registeredListener !== listener);
-    if (remainingHandlers.length === 0) {
-      delete transportOnCalls[event];
-    } else {
-      transportOnCalls[event] = remainingHandlers;
-    }
-
-    return transport;
-  }),
-  once: mock((_event: string, _listener: Listener) => transport),
-  removeAllListeners: mock((event?: string) => {
-    if (event) {
-      delete transportOnCalls[event];
-      return transport;
-    }
-
-    Object.keys(transportOnCalls).forEach((key) => {
-      delete transportOnCalls[key];
-    });
-
-    return transport;
-  }),
-  destroy: mock(() => {}),
-  on: mock(registerTransportListener)
-};
-
-const store = {
-  dispatch: dispatchMock,
-  getState: () => ({
-    ui: {bellSoundURL: 'sound.wav', bellSound: 'abc', bell: 'SOUND'},
-    sessions: {activeUid: 'session-0', sessions: {}},
-    termGroups: {termGroups: {}, activeSessions: {}, activeRootGroup: null}
-  })
-};
-
-const init = () => ({type: ActionType.InitAction});
-const addNotificationMessage = ({text, url = null, dismissable = true}: AddNotificationParams) => ({
-  type: ActionType.AddNotification,
-  text,
-  url,
-  dismissable
-});
-const sessionActions = {
-  addSession: (session: unknown) => ({type: ActionType.SessionAdd, session}),
-  addSessionData: ({uid, data}: AddSessionDataParams) => ({type: ActionType.SessionData, uid, data}),
-  sendSessionData: ({uid, data, escaped}: SendSessionDataParams) => ({
-    type: ActionType.SessionDataSend,
-    uid,
-    data,
-    ...(escaped !== undefined && {escaped})
-  }),
-  openSearch: () => ({type: ActionType.SessionSearch}),
-  closeSearch: () => ({type: ActionType.SessionSearchClose}),
-  clearActiveSession: () => ({type: ActionType.SessionClearActive}),
-  ptyExitTermGroup: (uid: string) => ({type: ActionType.PtyExitTermGroup, uid}),
-  userExitSession: (uid: string) => ({type: ActionType.UserExitSession, uid}),
-  createExitAction: () => () => ({type: ActionType.CreateExitAction})
-};
-const termGroupActions = {
-  requestTermGroup: ({activeUid, profile}: SplitRequestParams = {}) => ({
-    type: ActionType.TermGroupRequest,
-    activeUid,
-    profile
-  }),
-  requestHorizontalSplit: ({activeUid, profile}: SplitRequestParams = {}) => ({
-    type: ActionType.TermGroupSplitHoriz,
-    activeUid,
-    profile
-  }),
-  requestVerticalSplit: ({activeUid, profile}: SplitRequestParams = {}) => ({
-    type: ActionType.TermGroupSplitVert,
-    activeUid,
-    profile
-  }),
-  exitActiveTermGroup: () => ({type: ActionType.TermGroupExitActive}),
-  ptyExitTermGroup: (uid: string) => ({type: ActionType.PtyExitTermGroup, uid})
-};
-const uiActions = {
-  setFontSmoothing: () => ({type: ActionType.UiSetFontSmoothing}),
-  resetFontSize: () => ({type: ActionType.UiResetFontSize}),
-  increaseFontSize: () => ({type: ActionType.UiIncreaseFontSize}),
-  decreaseFontSize: () => ({type: ActionType.UiDecreaseFontSize}),
-  moveLeft: () => ({type: ActionType.UiMoveLeft}),
-  moveRight: () => ({type: ActionType.UiMoveRight}),
-  moveTo: (index: number | 'last') => ({type: ActionType.UiMoveTo, index}),
-  moveToNextPane: () => ({type: ActionType.UiMoveNextPane}),
-  moveToPreviousPane: () => ({type: ActionType.UiMovePreviousPane}),
-  openFile: (path: string) => ({type: ActionType.UiOpenFile, path}),
-  openSSH: (parsedUrl: unknown) => ({type: ActionType.UiOpenSsh, parsedUrl}),
-  windowGeometryUpdated: (data: {isMaximized: boolean}) => ({type: ActionType.UiWindowGeometryUpdated, data}),
-  windowMove: (windowState: {bounds: {x: number; y: number}}) => ({type: ActionType.UiWindowMove, window: windowState}),
-  enterFullScreen: () => ({type: ActionType.UiEnterFullScreen}),
-  leaveFullScreen: () => ({type: ActionType.UiLeaveFullScreen})
-};
-const updaterActions = {
-  updateAvailable: ({releaseName, notes, releaseUrl, canInstall}: UpdateAvailableParams) => ({
-    type: ActionType.UpdateAvailable,
-    releaseName,
-    notes,
-    releaseUrl,
-    canInstall
-  })
-};
-let pluginReloadCount = 0;
-const plugins = {
-  reload: () => {
-    pluginReloadCount += 1;
-  }
-};
-
-const createBootstrapActions = () => ({
-  addNotificationMessage,
-  init,
-  loadConfig: mock((_config: unknown) => ({type: ActionType.LoadConfig})),
-  reloadConfig: mock((_config: unknown) => ({type: ActionType.ReloadConfig})),
-  sessionActions,
-  termGroupActions,
-  uiActions,
-  updaterActions
-});
-
-const getListener = (event: string): Listener => {
-  const handlers = transportOnCalls[event];
-  if (!handlers || handlers.length === 0) {
-    throw new Error(`Expected transport listener for ${event}`);
-  }
-  return handlers.at(-1);
-};
-
-const resetTransportListenersFixture = () => {
-  dispatchMock.mockClear();
-  pluginReloadCount = 0;
-  transport.invoke.mockClear();
-  transport.emit.mockClear();
-  transport.off.mockClear();
-  transport.once.mockClear();
-  transport.removeAllListeners.mockClear();
-  transport.destroy.mockClear();
-  transport.on.mockClear();
-  transport.on.mockImplementation(registerTransportListener);
-  Object.keys(transportOnCalls).forEach((key) => {
-    transportOnCalls[key] = [];
-  });
-};
-
 const registerBootstrapTransportListeners = () => {
-  resetTransportListenersFixture();
+  resetFixture();
 
   return registerTransportListeners({
     actions: createBootstrapActions(),
@@ -295,12 +98,16 @@ const registerBootstrapTransportListeners = () => {
   });
 };
 
+/** Clears the dispatch double and the recorded creator invocations together. */
+const clearDispatch = () => {
+  dispatchMock.mockClear();
+  recordedCalls.length = 0;
+};
+
 describe('bootstrap transport event wiring', () => {
   beforeEach(() => {
     registerBootstrapTransportListeners();
   });
-
-  const clearDispatch = () => dispatchMock.mockClear();
 
   test('registers all expected transport listeners', () => {
     const expectedEvents = [
@@ -358,7 +165,7 @@ describe('bootstrap transport event wiring', () => {
   });
 
   test('cleanup removes every registered transport listener', () => {
-    resetTransportListenersFixture();
+    resetFixture();
 
     const cleanup = registerTransportListeners({
       actions: createBootstrapActions(),
@@ -382,7 +189,7 @@ describe('bootstrap transport event wiring', () => {
   });
 
   test('registration failure removes listeners registered before the throw', () => {
-    resetTransportListenersFixture();
+    resetFixture();
 
     const registrationError = new Error('transport.on failed mid-registration');
     const failingCallNumber = 5;
@@ -391,7 +198,7 @@ describe('bootstrap transport event wiring', () => {
     transport.on.mockImplementation((event: string, listener: Listener) => {
       callCount += 1;
       successfulRegistrations.push([event, listener]);
-      registerTransportListener(event, listener);
+      transportOnCalls[event] = transportOnCalls[event] ? [...transportOnCalls[event], listener] : [listener];
       if (callCount === failingCallNumber) {
         throw registrationError;
       }
@@ -421,7 +228,7 @@ describe('bootstrap transport event wiring', () => {
   test('registration failure preserves the original error when rollback cleanup also throws', () => {
     const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
     try {
-      resetTransportListenersFixture();
+      resetFixture();
 
       const registrationError = new Error('transport.on failed mid-registration');
       const rollbackError = new Error('transport.off failed during rollback');
@@ -429,7 +236,7 @@ describe('bootstrap transport event wiring', () => {
       let callCount = 0;
       transport.on.mockImplementation((event: string, listener: Listener) => {
         callCount += 1;
-        registerTransportListener(event, listener);
+        transportOnCalls[event] = transportOnCalls[event] ? [...transportOnCalls[event], listener] : [listener];
         if (callCount === failingCallNumber) {
           throw registrationError;
         }
@@ -465,8 +272,7 @@ describe('bootstrap transport event wiring', () => {
     clearDispatch();
     getListener(TransportEvent.Ready)(null);
 
-    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.InitAction}]);
-    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.UiSetFontSmoothing}]);
+    expect(recordedCalls.map(({creator}) => creator)).toEqual(['init', 'setFontSmoothing']);
   });
 
   test('session add event dispatches SESSION_ADD actions', () => {
@@ -474,34 +280,34 @@ describe('bootstrap transport event wiring', () => {
 
     getListener(TransportEvent.SessionAdd)(createMockSession({uid: 's-1', pid: 100}));
     getListener(TransportEvent.SessionAdd)(createMockSession({uid: 's-2', pid: 101}));
-    expect(dispatchMock.mock.calls).toContainEqual([
-      {type: ActionType.SessionAdd, session: {uid: 's-1', shell: '/bin/bash', pid: 100, profile: 'default'}}
+
+    const sessionAdds = recordedCalls.filter(({creator}) => creator === 'addSession');
+    expect(sessionAdds).toHaveLength(2);
+    expect(sessionAdds.map(({args}) => args[0])).toEqual([
+      {uid: 's-1', shell: '/bin/bash', pid: 100, profile: 'default'},
+      {uid: 's-2', shell: '/bin/bash', pid: 101, profile: 'default'}
     ]);
-    expect(dispatchMock.mock.calls).toContainEqual([
-      {type: ActionType.SessionAdd, session: {uid: 's-2', shell: '/bin/bash', pid: 101, profile: 'default'}}
-    ]);
-    expect(dispatchMock.mock.calls.filter((call) => call[0]?.type === ActionType.SessionAdd)).toHaveLength(2);
   });
 
-  test('session data event dispatches SESSION_DATA action', () => {
+  test('session data event splits the uid prefix from the payload', () => {
     clearDispatch();
 
     const uid = '01234567-89ab-cdef-0123-456789abcdef';
     getListener(TransportEvent.SessionData)(`${uid}hello world`);
-    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.SessionData, uid, data: 'hello world'}]);
+
+    expect(recordedCalls).toContainEqual({creator: 'addSessionData', args: [{uid, data: 'hello world'}]});
   });
 
   test('session exit event dispatches PTY_EXIT_TERM_GROUP action', () => {
     clearDispatch();
 
     getListener(TransportEvent.SessionExit)({uid: 's-1'});
-    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.PtyExitTermGroup, uid: 's-1'}]);
+    expect(recordedCalls).toContainEqual({creator: 'ptyExitTermGroup', args: ['s-1']});
   });
 
   test('reload invokes plugins.reload', () => {
-    pluginReloadCount = 0;
     getListener(TransportEvent.Reload)(null);
-    expect(pluginReloadCount).toBe(1);
+    expect(getPluginReloadCount()).toBe(1);
   });
 
   test('update available dispatches UPDATE_AVAILABLE', () => {
@@ -514,8 +320,8 @@ describe('bootstrap transport event wiring', () => {
     });
     expect(dispatchMock.mock.calls).toContainEqual([
       {
-        type: ActionType.UpdateAvailable,
-        releaseName: 'v0.0.1',
+        type: 'UPDATE_AVAILABLE',
+        version: 'v0.0.1',
         notes: 'notes',
         releaseUrl: 'https://example.org',
         canInstall: true
@@ -523,12 +329,13 @@ describe('bootstrap transport event wiring', () => {
     ]);
   });
 
-  test('session data send dispatches SESSION_DATA_SEND with escaped flag', () => {
+  test('session data send forwards the escaped flag', () => {
     clearDispatch();
     getListener(TransportEvent.SessionDataSend)({uid: 's-1', data: 'input', escaped: true});
-    expect(dispatchMock.mock.calls).toContainEqual([
-      {type: ActionType.SessionDataSend, uid: 's-1', data: 'input', escaped: true}
-    ]);
+    expect(recordedCalls).toContainEqual({
+      creator: 'sendSessionData',
+      args: [{uid: 's-1', data: 'input', escaped: true}]
+    });
   });
 
   test('session shortcut events dispatch sendSessionData with escape sequences', () => {
@@ -549,74 +356,74 @@ describe('bootstrap transport event wiring', () => {
     ];
     for (const {event, data} of cases) {
       getListener(event)(null);
-      expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.SessionDataSend, uid: null, data}]);
+      expect(recordedCalls).toContainEqual({creator: 'sendSessionData', args: [{uid: null, data}]});
     }
   });
 
-  test('parameterless events dispatch correct actions', () => {
+  test('parameterless events dispatch the creator each event names', () => {
     clearDispatch();
     const cases: Array<{
       event: (typeof TransportEvent)[keyof typeof TransportEvent];
-      actionType: (typeof ActionType)[keyof typeof ActionType];
+      creator: string;
     }> = [
-      {event: TransportEvent.SessionClearReq, actionType: ActionType.SessionClearActive},
-      {event: TransportEvent.SessionSearch, actionType: ActionType.SessionSearch},
-      {event: TransportEvent.SessionSearchClose, actionType: ActionType.SessionSearchClose},
-      {event: TransportEvent.TermGroupCloseReq, actionType: ActionType.TermGroupExitActive},
-      {event: TransportEvent.ResetFontSizeReq, actionType: ActionType.UiResetFontSize},
-      {event: TransportEvent.IncreaseFontSizeReq, actionType: ActionType.UiIncreaseFontSize},
-      {event: TransportEvent.DecreaseFontSizeReq, actionType: ActionType.UiDecreaseFontSize},
-      {event: TransportEvent.MoveLeftReq, actionType: ActionType.UiMoveLeft},
-      {event: TransportEvent.MoveRightReq, actionType: ActionType.UiMoveRight},
-      {event: TransportEvent.NextPaneReq, actionType: ActionType.UiMoveNextPane},
-      {event: TransportEvent.PrevPaneReq, actionType: ActionType.UiMovePreviousPane},
-      {event: TransportEvent.EnterFullScreen, actionType: ActionType.UiEnterFullScreen},
-      {event: TransportEvent.LeaveFullScreen, actionType: ActionType.UiLeaveFullScreen}
+      {event: TransportEvent.SessionClearReq, creator: 'clearActiveSession'},
+      {event: TransportEvent.SessionSearch, creator: 'openSearch'},
+      {event: TransportEvent.SessionSearchClose, creator: 'closeSearch'},
+      {event: TransportEvent.TermGroupCloseReq, creator: 'exitActiveTermGroup'},
+      {event: TransportEvent.ResetFontSizeReq, creator: 'resetFontSize'},
+      {event: TransportEvent.IncreaseFontSizeReq, creator: 'increaseFontSize'},
+      {event: TransportEvent.DecreaseFontSizeReq, creator: 'decreaseFontSize'},
+      {event: TransportEvent.MoveLeftReq, creator: 'moveLeft'},
+      {event: TransportEvent.MoveRightReq, creator: 'moveRight'},
+      {event: TransportEvent.NextPaneReq, creator: 'moveToNextPane'},
+      {event: TransportEvent.PrevPaneReq, creator: 'moveToPreviousPane'},
+      {event: TransportEvent.EnterFullScreen, creator: 'enterFullScreen'},
+      {event: TransportEvent.LeaveFullScreen, creator: 'leaveFullScreen'}
     ];
-    for (const {event, actionType} of cases) {
+    for (const {event, creator} of cases) {
+      clearDispatch();
       getListener(event)(null);
-      expect(dispatchMock.mock.calls).toContainEqual([{type: actionType}]);
+      expect(recordedCalls.map((recorded) => recorded.creator)).toEqual([creator]);
     }
   });
 
-  test('payload-bearing events dispatch correct actions', () => {
+  test('payload-bearing events forward their payloads', () => {
     clearDispatch();
 
     getListener(TransportEvent.TermGroupAddReq)({activeUid: 's-1', profile: 'default'});
-    expect(dispatchMock.mock.calls).toContainEqual([
-      {type: ActionType.TermGroupRequest, activeUid: 's-1', profile: 'default'}
-    ]);
+    expect(recordedCalls).toContainEqual({
+      creator: 'requestTermGroup',
+      args: [{activeUid: 's-1', profile: 'default'}]
+    });
 
     getListener(TransportEvent.SplitHorizontal)({activeUid: 's-1', profile: 'default'});
-    expect(dispatchMock.mock.calls).toContainEqual([
-      {type: ActionType.TermGroupSplitHoriz, activeUid: 's-1', profile: 'default'}
-    ]);
+    expect(recordedCalls).toContainEqual({
+      creator: 'requestHorizontalSplit',
+      args: [{activeUid: 's-1', profile: 'default'}]
+    });
 
     getListener(TransportEvent.SplitVertical)({activeUid: 's-1', profile: 'default'});
-    expect(dispatchMock.mock.calls).toContainEqual([
-      {type: ActionType.TermGroupSplitVert, activeUid: 's-1', profile: 'default'}
-    ]);
+    expect(recordedCalls).toContainEqual({
+      creator: 'requestVerticalSplit',
+      args: [{activeUid: 's-1', profile: 'default'}]
+    });
 
     getListener(TransportEvent.MoveJumpReq)(3);
-    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.UiMoveTo, index: 3}]);
+    expect(recordedCalls).toContainEqual({creator: 'moveTo', args: [3]});
 
     getListener(TransportEvent.OpenFile)({path: '/tmp/test.txt'});
-    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.UiOpenFile, path: '/tmp/test.txt'}]);
+    expect(recordedCalls).toContainEqual({creator: 'openFile', args: ['/tmp/test.txt']});
 
     getListener(TransportEvent.AddNotification)({text: 'hello', url: 'https://example.org', dismissable: true});
     expect(dispatchMock.mock.calls).toContainEqual([
-      {type: ActionType.AddNotification, text: 'hello', url: 'https://example.org', dismissable: true}
+      {type: NOTIFICATION_MESSAGE, text: 'hello', url: 'https://example.org', dismissable: true}
     ]);
 
     getListener(TransportEvent.Move)({bounds: {x: 100, y: 200}});
-    expect(dispatchMock.mock.calls).toContainEqual([
-      {type: ActionType.UiWindowMove, window: {bounds: {x: 100, y: 200}}}
-    ]);
+    expect(recordedCalls).toContainEqual({creator: 'windowMove', args: [{bounds: {x: 100, y: 200}}]});
 
     getListener(TransportEvent.WindowGeometryChange)({isMaximized: false});
-    expect(dispatchMock.mock.calls).toContainEqual([
-      {type: ActionType.UiWindowGeometryUpdated, data: {isMaximized: false}}
-    ]);
+    expect(dispatchMock.mock.calls).toContainEqual([{type: 'UI_WINDOW_GEOMETRY_CHANGED', isMaximized: false}]);
   });
 
   test('ordered bootstrap sequence: ready → session add → session data', () => {
@@ -633,12 +440,12 @@ describe('bootstrap transport event wiring', () => {
       canInstall: false
     });
 
-    const types = dispatchMock.mock.calls.map((call) => getActionType(call[0]));
-    const initIdx = types.indexOf(ActionType.InitAction);
-    const fontIdx = types.indexOf(ActionType.UiSetFontSmoothing);
-    const addIdx = types.indexOf(ActionType.SessionAdd);
-    const dataIdx = types.indexOf(ActionType.SessionData);
-    const updateIdx = types.indexOf(ActionType.UpdateAvailable);
+    const creators = recordedCalls.map((recorded) => recorded.creator);
+    const initIdx = creators.indexOf('init');
+    const fontIdx = creators.indexOf('setFontSmoothing');
+    const addIdx = creators.indexOf('addSession');
+    const dataIdx = creators.indexOf('addSessionData');
+    const updateIdx = creators.indexOf('updateAvailable');
 
     expect(initIdx).toBeGreaterThanOrEqual(0);
     expect(fontIdx).toBeGreaterThan(initIdx);
@@ -657,16 +464,12 @@ describe('bootstrap transport event wiring', () => {
       getListener(TransportEvent.SessionData)(`${uid}chunk-${index}`);
     }
 
-    const dataActions = dispatchMock.mock.calls.filter((call) => call[0]?.type === ActionType.SessionData);
+    const dataCalls = recordedCalls.filter(({creator}) => creator === 'addSessionData');
 
-    expect(dataActions).toHaveLength(count);
+    expect(dataCalls).toHaveLength(count);
 
     for (let index = 0; index < count; index += 1) {
-      expect(dataActions[index][0]).toEqual({
-        type: ActionType.SessionData,
-        uid,
-        data: `chunk-${index}`
-      });
+      expect(dataCalls[index].args).toEqual([{uid, data: `chunk-${index}`}]);
     }
   });
 
@@ -678,20 +481,21 @@ describe('bootstrap transport event wiring', () => {
     const uid = '01234567-89ab-cdef-0123-456789abcdef';
     getListener(TransportEvent.SessionData)(`${uid}post-ready output`);
 
-    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.InitAction}]);
-    expect(dispatchMock.mock.calls).toContainEqual([
-      {
-        type: ActionType.SessionAdd,
-        session: {uid: 'prereq-1', shell: '/bin/zsh', pid: 300, profile: 'default'}
-      }
+    expect(recordedCalls.map(({creator}) => creator)).toEqual([
+      'init',
+      'setFontSmoothing',
+      'addSession',
+      'addSessionData'
     ]);
-    expect(dispatchMock.mock.calls).toContainEqual([{type: ActionType.SessionData, uid, data: 'post-ready output'}]);
+    expect(recordedCalls).toContainEqual({
+      creator: 'addSession',
+      args: [{uid: 'prereq-1', shell: '/bin/zsh', pid: 300, profile: 'default'}]
+    });
+    expect(recordedCalls).toContainEqual({creator: 'addSessionData', args: [{uid, data: 'post-ready output'}]});
 
-    const types = dispatchMock.mock.calls.map((call) => getActionType(call[0]));
-    const initIdx = types.indexOf(ActionType.InitAction);
-    const addIdx = types.indexOf(ActionType.SessionAdd);
-    const dataIdx = types.indexOf(ActionType.SessionData);
-    expect(addIdx).toBeGreaterThan(initIdx);
-    expect(dataIdx).toBeGreaterThan(initIdx);
+    const creators = recordedCalls.map((recorded) => recorded.creator);
+    const initIdx = creators.indexOf('init');
+    expect(creators.indexOf('addSession')).toBeGreaterThan(initIdx);
+    expect(creators.indexOf('addSessionData')).toBeGreaterThan(initIdx);
   });
 });

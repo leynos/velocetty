@@ -328,7 +328,9 @@ const launchWithPlaywright = async (
   const app = await withTimeout(
     _electron.launch({
       executablePath: pathToBinary,
-      args: launchArgs,
+      // The helper keeps its launch arguments read-only; Playwright's option
+      // is declared mutable, so hand it a copy rather than widening the helper.
+      args: [...launchArgs],
       env: isolatedEnvironment.env,
       timeout: launchTimeoutMs
     }),

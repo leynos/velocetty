@@ -1,5 +1,5 @@
 /** @file Shared module mock helpers for `lib/utils/plugins` in unit tests. */
-import {mock} from 'bun:test';
+import {registerModuleMock} from './mock-module';
 import type {IUiReducer, ISessionReducer, ITermGroupReducer, TabsProps} from '../../typings/hyper';
 
 type PluginDecorator = <Component extends object>(Component: Component) => Component;
@@ -66,6 +66,6 @@ export const registerPluginsModuleMocks = (
   options: PluginsModuleFactoryOptions = {}
 ) => {
   const pluginModuleFactory = createPluginsModuleFactory(overrides, options);
-  mock.module('../../lib/utils/plugins', pluginModuleFactory);
-  mock.module('../../lib/utils/plugins.ts', pluginModuleFactory);
+  registerModuleMock('../../lib/utils/plugins', pluginModuleFactory);
+  registerModuleMock('../../lib/utils/plugins.ts', pluginModuleFactory);
 };

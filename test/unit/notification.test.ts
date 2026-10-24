@@ -70,7 +70,7 @@ const createFakeTimerSeam = () => {
       scheduled.sort((a, b) => a.runAt - b.runAt);
       return id;
     },
-    clearTimeout: (handle?: NodeJS.Timeout) => {
+    clearTimeout: (handle?: ReturnType<typeof globalThis.setTimeout> | number) => {
       const id = Number(handle);
       const index = scheduled.findIndex((t) => t.id === id);
       if (index !== -1) scheduled.splice(index, 1);

@@ -8,6 +8,7 @@ import {afterEach, beforeEach, describe, expect, mock, test} from 'bun:test';
 import type {HyperProps} from '../../typings/hyper';
 import {createCommandRegistryModuleStub} from '../testUtils/command-registry-mock';
 import {setupHappyDom} from '../testUtils/happy-dom';
+import {registerModuleMock} from '../testUtils/mock-module';
 import {registerPluginsModuleMocks} from '../testUtils/plugins-mock';
 import {createTransportMock} from '../testUtils/transport-mock';
 import {waitFor} from '../testUtils/wait-for';
@@ -22,15 +23,15 @@ type HyperComponent = React.ComponentType<HyperProps>;
 const registerHyperModuleMocks = () => {
   // Re-register before importing Hyper to keep this suite stable if another
   // file calls mock.restore() earlier in the same Bun process.
-  mock.module('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
-  mock.module('../../lib/actions/ui', () => ({
+  registerModuleMock('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
+  registerModuleMock('../../lib/actions/ui', () => ({
     execCommand: () => ({type: 'exec'}),
     setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'})
   }));
   registerPluginsModuleMocks({}, {defaultExportMode: 'self'});
-  mock.module('../../lib/containers/header', () => ({HeaderContainer: () => null}));
-  mock.module('../../lib/containers/notifications', () => ({default: () => null}));
-  mock.module('../../lib/containers/terms', () => ({
+  registerModuleMock('../../lib/containers/header', () => ({HeaderContainer: () => null}));
+  registerModuleMock('../../lib/containers/notifications', () => ({default: () => null}));
+  registerModuleMock('../../lib/containers/terms', () => ({
     default: (props: {ref_: (terms: unknown) => void}) => {
       props.ref_({
         getTermByUid: () => null,
@@ -39,14 +40,14 @@ const registerHyperModuleMocks = () => {
       return null;
     }
   }));
-  mock.module('mousetrap', () => ({
+  registerModuleMock('mousetrap', () => ({
     default: () => ({
       stopCallback: () => false,
       bind() {},
       reset() {}
     })
   }));
-  mock.module('../../lib/command-registry', () => ({
+  registerModuleMock('../../lib/command-registry', () => ({
     createCommandRegistryModule: () => createCommandRegistryModuleStub(),
     getRegisteredKeys: async () => ({}),
     getCommandHandler: () => {},

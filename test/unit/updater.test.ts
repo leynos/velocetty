@@ -1,5 +1,5 @@
 /** @file Verifies updater wiring across event, timer, and config branches. */
-import {expect, mock, test} from 'bun:test';
+import {expect, test} from 'bun:test';
 import type {JsonObject} from '@shared/types/json';
 import type {configOptions} from '@shared/types/config';
 import type {UpdaterWindow} from '../../app/updater';
@@ -10,6 +10,7 @@ import {
   registerElectronMock,
   resetElectronMock
 } from '../testUtils/electron-path';
+import {registerModuleMock} from '../testUtils/mock-module';
 
 type UpdateEvent = 'update-available' | 'update-downloaded';
 type UpdateEventPayload = Pick<Electron.Event, 'preventDefault'>;
@@ -157,13 +158,13 @@ const registerUpdaterMocks = (
   autoUpdater: AutoUpdaterStub,
   getDecoratedConfig: () => Pick<configOptions, 'disableAutoUpdates' | 'updateChannel'>
 ) => {
-  mock.module('../../app/auto-updater-linux', () => ({default: autoUpdater}));
-  mock.module('../../app/config', () => ({getDefaultProfile: () => 'default'}));
-  mock.module('../../app/plugins', () => ({
+  registerModuleMock('../../app/auto-updater-linux', () => ({default: autoUpdater}));
+  registerModuleMock('../../app/config', () => ({getDefaultProfile: () => 'default'}));
+  registerModuleMock('../../app/plugins', () => ({
     getDecoratedConfig: () => getDecoratedConfig()
   }));
-  mock.module('../../app/package.json', () => ({version: '0.0.0-test'}));
-  mock.module('async-retry', () => ({
+  registerModuleMock('../../app/package.json', () => ({version: '0.0.0-test'}));
+  registerModuleMock('async-retry', () => ({
     default: async <Result>(fn: () => Result | Promise<Result>): Promise<Result> => await fn()
   }));
 };
@@ -192,8 +193,13 @@ test.serial('updater wires lifecycle handlers, timers, and channel updates', asy
     } = buildAutoUpdaterStub();
     const rpcStub = buildRpcStub(emitCalls);
     const winStub = buildWindowStub(rpcStub);
-    let configSubscriber: ConfigSubscriber | null = null;
-    const configState = {
+    // `subscribe` runs inside the updater, so the callback is captured into a
+    // list rather than a local: control-flow narrowing would otherwise keep
+    // the local at its `null` initializer.
+    const configSubscribers: ConfigSubscriber[] = [];
+    // Typed as the slice the updater reads so assigning `'canary'` below stays
+    // inside the `updateChannel` union instead of widening to `string`.
+    const configState: Pick<configOptions, 'disableAutoUpdates' | 'updateChannel'> = {
       disableAutoUpdates: false,
       updateChannel: 'stable'
     };
@@ -207,7 +213,7 @@ test.serial('updater wires lifecycle handlers, timers, and channel updates', asy
     electronMock.app.runningUnderARM64Translation = false;
     electronMock.app.config = {
       subscribe: (callback: ConfigSubscriber) => {
-        configSubscriber = callback;
+        configSubscribers.push(callback);
       }
     };
 
@@ -246,7 +252,11 @@ test.serial('updater wires lifecycle handlers, timers, and channel updates', asy
     rpcStub.triggerOnce('quit and install');
     expect(getQuitAndInstallCalls()).toBe(1);
 
-    expect(configSubscriber).toBeDefined();
+    // The updater registers exactly one config listener; the length assertion
+    // states that, and the destructure below then reads it without a guard the
+    // compiler would already call dead.
+    expect(configSubscribers).toHaveLength(1);
+    const [configSubscriber] = configSubscribers;
 
     configState.updateChannel = 'canary';
     await configSubscriber();
@@ -272,7 +282,7 @@ test.serial('updater honours disableAutoUpdates and handles updater error events
     const {autoUpdater, getCheckForUpdatesCalls, getErrorHandler} = buildAutoUpdaterStub();
     const rpcStub = buildRpcStub(emitCalls);
     const winStub = buildWindowStub(rpcStub);
-    const configState = {
+    const configState: Pick<configOptions, 'disableAutoUpdates' | 'updateChannel'> = {
       disableAutoUpdates: true,
       updateChannel: 'stable'
     };

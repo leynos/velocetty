@@ -9,13 +9,27 @@ import {realpathSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 
-import {mock} from 'bun:test';
+import {registerModuleMock} from './mock-module';
+import type {IpcMainEvent} from 'electron';
 
 // Resolve Electron relative to app code; updater.ts is a stable entry used by
 // multiple tests and mirrors runtime dependency resolution.
 const appEntryPath = fileURLToPath(new URL('../../app/updater.ts', import.meta.url));
 const appRequire = createRequire(appEntryPath);
 const appElectronPath = realpathSync(appRequire.resolve('electron'));
+
+/** Callback shape the app registers with `app.config.subscribe`. */
+type ConfigSubscriber = () => void | Promise<void>;
+
+/**
+ * Listener shape Electron's `ipcMain` accepts.
+ *
+ * Declared with Electron's own event type and an `any[]` tail rather than an
+ * `unknown[]` one: `unknown` parameters are contravariant here, so a mock whose
+ * listener takes `IpcMainEvent` would be rejected by a slot that could call it
+ * with anything.
+ */
+type IpcMainEventListener = (event: IpcMainEvent, ...args: any[]) => void;
 
 /**
  * Minimal Electron module surface used by tests.
@@ -31,11 +45,13 @@ type ElectronMock = {
     getAppPath: () => string;
     getPath: (name: string) => string;
     runningUnderARM64Translation?: boolean;
-    config?: {subscribe?: () => void};
+    config: {
+      subscribe: (callback: ConfigSubscriber) => void;
+    };
   };
   ipcMain: {
-    on: (..._args: unknown[]) => void;
-    removeListener: (..._args: unknown[]) => void;
+    on: (channel: string, listener: IpcMainEventListener) => void;
+    removeListener: (channel: string, listener: IpcMainEventListener) => void;
   };
 };
 
@@ -137,6 +153,6 @@ export const configureElectronMock = (overrides: ElectronMockOverrides) => {
  * ```
  */
 export const registerElectronMock = () => {
-  mock.module('electron', () => electronMock);
-  mock.module(appElectronPath, () => electronMock);
+  registerModuleMock('electron', () => electronMock);
+  registerModuleMock(appElectronPath, () => electronMock);
 };

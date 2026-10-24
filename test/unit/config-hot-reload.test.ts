@@ -8,7 +8,7 @@
  */
 import {describe, it, expect} from 'bun:test';
 import type {configOptions, ConfigReloadDiagnostic} from '@shared/types/config';
-import defaultConfig from '../../app/config/config-default.json';
+import {defaultConfigOptions} from '../testUtils/default-config';
 import {
   classifyConfigChange,
   detectConfigChanges,
@@ -22,7 +22,6 @@ import {
   type LiveConfigPatch
 } from '../../app/config/reload-handler';
 
-const defaultConfigOptions = defaultConfig.config satisfies configOptions;
 const makeConfig = (overrides: Partial<configOptions>): configOptions => {
   const config = {...defaultConfigOptions, ...overrides};
   if (overrides.colors) {
@@ -216,8 +215,8 @@ describe('config-hot-reload', () => {
     });
 
     it('should handle nested config objects', () => {
-      const oldConfig = makeConfig({colors: {red: '#ff0000'}});
-      const newConfig = makeConfig({colors: {red: '#cc0000'}, fontSize: 14});
+      const oldConfig = makeConfig({colors: {...defaultConfigOptions.colors, red: '#ff0000'}});
+      const newConfig = makeConfig({colors: {...defaultConfigOptions.colors, red: '#cc0000'}, fontSize: 14});
 
       const result = extractLiveConfigChanges(oldConfig, newConfig, [makeLiveDiagnostic('colors')]);
 

@@ -98,14 +98,14 @@ const makeProps = (overrides: Partial<SearchBoxProps> = {}): SearchBoxProps => (
 const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
   const cleanup = await setupHappyDom();
   const SearchBoxComponent = await loadSearchBoxComponent();
-  let container: HTMLDivElement | null = null;
-  let root: ReturnType<typeof createRoot> | null = null;
+  // Both are bound before the `try` so the catch block and the returned
+  // teardown see a definite root. Declaring them nullable only invited the
+  // compiler to widen the reads inside the async callbacks back to `null`.
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
 
   try {
-    container = document.createElement('div');
-    document.body.append(container);
-    root = createRoot(container);
-
     await act(async () => {
       flushSync(() => {
         root.render(React.createElement(SearchBoxComponent, makeProps(overrides)));
@@ -115,19 +115,15 @@ const renderSearchBox = async (overrides: Partial<SearchBoxProps> = {}) => {
   } catch (error) {
     // Ensure cleanup on setup failure to prevent global DOM state leakage
     try {
-      if (root) {
-        // Explicitly swallow errors from unmount - cleanup continues regardless
-        await act(async () => {
-          root.unmount();
-          await waitFor(0);
-        });
-      }
+      // Explicitly swallow errors from unmount - cleanup continues regardless
+      await act(async () => {
+        root.unmount();
+        await waitFor(0);
+      });
     } catch {
       // Swallow unmount errors to ensure cleanup proceeds
     } finally {
-      if (container) {
-        container.remove();
-      }
+      container.remove();
       cleanup();
     }
     throw error;
@@ -207,6 +203,9 @@ for (const [prop, expectedTitle] of searchNavigationLabelCases) {
 // support proper event propagation, remove the .failing() modifier.
 type SearchNavigationCallback = 'prev' | 'next';
 
+/** Callback result the navigation assertions read after the component fires. */
+type ReceivedSearchTerm = {term?: string};
+
 const navTermCallbackCases: Array<[SearchNavigationCallback, Exclude<SearchNavigationLabel, 'closeLabel'>, string]> = [
   ['prev', 'previousMatchLabel', 'Custom Prev Callback'],
   ['next', 'nextMatchLabel', 'Custom Next Callback']
@@ -216,12 +215,15 @@ for (const [callbackProp, labelProp, buttonTitle] of navTermCallbackCases) {
   test.serial.failing(`SearchNavigation invokes the ${callbackProp} callback with the search term`, async () => {
     const searchTerm = 'test-query';
     let called = false;
-    let receivedTerm: string | null = null;
+    // Held on an object rather than in a `let`: the callback is only invoked
+    // from the component's own event handling, so control-flow analysis would
+    // leave a local narrowed to its initial `null` at the assertion below.
+    const received: ReceivedSearchTerm = {};
 
     const callback = (term?: string) => {
       called = true;
       if (term !== undefined) {
-        receivedTerm = term;
+        received.term = term;
       }
     };
 
@@ -266,7 +268,7 @@ for (const [callbackProp, labelProp, buttonTitle] of navTermCallbackCases) {
       });
 
       expect(called).toBe(true);
-      expect(receivedTerm).toBe(searchTerm);
+      expect(received.term).toBe(searchTerm);
     } finally {
       await teardown();
     }

@@ -14,7 +14,13 @@ type ResolveLaunchConfigOptions = Readonly<{
 }>;
 
 type IsolatedE2EEnvironment = Readonly<{
-  env: NodeJS.ProcessEnv;
+  /**
+   * Launch environment handed straight to Playwright.
+   *
+   * A plain string map rather than `NodeJS.ProcessEnv`: Playwright rejects
+   * variables whose value is `undefined`, and `process.env` may contain them.
+   */
+  env: Record<string, string>;
   cleanup: () => Promise<void>;
 }>;
 
@@ -135,14 +141,20 @@ export const createIsolatedE2EEnvironment = async (): Promise<IsolatedE2EEnviron
   await fs.mkdir(appData, {recursive: true});
   await fs.mkdir(localAppData, {recursive: true});
 
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
+  const parentEnvironment: Record<string, string> = Object.fromEntries(
+    Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)
+  );
+  // `satisfies` rather than an annotation: the literal already has the exact
+  // map type Playwright wants, and stating it keeps the overridden keys visible
+  // as the string values the environment contract requires.
+  const env = {
+    ...parentEnvironment,
     HOME: tempHome,
     XDG_CONFIG_HOME: tempHome,
     USERPROFILE: tempHome,
     APPDATA: appData,
     LOCALAPPDATA: localAppData
-  };
+  } satisfies Record<string, string>;
   return {
     env,
     cleanup: async () => {
@@ -314,7 +326,10 @@ export const startRendererConsoleMonitor = (
   nonCriticalErrorPatterns = defaultNonCriticalRendererErrorPatterns
 ): RendererConsoleMonitor => {
   const criticalErrors: string[] = [];
-  const onConsole = (message: ConsoleMessage) => {
+  // Only the type and text are read, and the page's own listener signature is
+  // this same `Pick`, so a narrower parameter would be rejected as
+  // contravariant.
+  const onConsole = (message: Pick<ConsoleMessage, 'type' | 'text'>) => {
     if (message.type() !== 'error') {
       return;
     }

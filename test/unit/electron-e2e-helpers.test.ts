@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import {expect, test} from 'bun:test';
+import type {ConsoleMessage} from 'playwright';
 
 import {
   createIsolatedE2EEnvironment,
@@ -148,7 +149,11 @@ test('waitForRendererReady() waits for mount and terminal selectors', async () =
 });
 
 test('startRendererConsoleMonitor() captures only critical renderer errors', () => {
-  type ConsoleListener = (message: {type: () => string; text: () => string}) => void;
+  // Taken from Playwright's own type rather than respelled: the monitor accepts
+  // `Pick<ConsoleMessage, 'type' | 'text'>`, and `ConsoleMessage['type']` is
+  // itself the method, so writing `() => ConsoleMessage['type']` would declare a
+  // function returning a function.
+  type ConsoleListener = (message: Pick<ConsoleMessage, 'type' | 'text'>) => void;
   const listeners: ConsoleListener[] = [];
   const mockPage = {
     on: (_event: string, listener: ConsoleListener) => {

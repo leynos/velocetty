@@ -31,7 +31,7 @@ test('renders command output after terminal input', async ({page: _page}, testIn
   const app = await withTimeout(
     _electron.launch({
       executablePath: pathToBinary,
-      args: launchArgs,
+      args: [...launchArgs],
       env: isolatedEnvironment.env,
       timeout: launchTimeoutMs
     }),
@@ -53,28 +53,31 @@ test('renders command output after terminal input', async ({page: _page}, testIn
   let mainWindow: Awaited<ReturnType<typeof app.firstWindow>> | null = null;
 
   try {
-    mainWindow = await withTimeout(app.firstWindow(), windowTimeoutMs);
-    monitor = startRendererConsoleMonitor(mainWindow);
-    mainWindow.on('console', (message) => {
+    // Bound once to a `const`: the `finally` block still needs the nullable
+    // `mainWindow`, while the body below wants the narrowed window.
+    const window = await withTimeout(app.firstWindow(), windowTimeoutMs);
+    mainWindow = window;
+    monitor = startRendererConsoleMonitor(window);
+    window.on('console', (message) => {
       rendererConsoleLog.push(`[${message.type()}] ${message.text()}`);
     });
 
-    await waitForRendererReady(mainWindow, rendererReadyTimeoutMs);
-    await mainWindow.evaluate(() => {
+    await waitForRendererReady(window, rendererReadyTimeoutMs);
+    await window.evaluate(() => {
       // This callback is serialized and evaluated in the renderer, so it can
       // only reference globals. A module import here would not exist there.
       globalThis.focusActiveTerm?.();
     });
-    await mainWindow.locator('.xterm-helper-textarea').first().focus();
+    await window.locator('.xterm-helper-textarea').first().focus();
 
     const sentinel = `E2E_SENTINEL_${Date.now()}`;
-    await mainWindow.keyboard.type(`echo ${sentinel}`);
-    await mainWindow.keyboard.press('Enter');
+    await window.keyboard.type(`echo ${sentinel}`);
+    await window.keyboard.press('Enter');
 
     await expect
       .poll(
         async () => {
-          const activeTerminalBuffer = await readActiveTerminalBuffer(mainWindow);
+          const activeTerminalBuffer = await readActiveTerminalBuffer(window);
           return activeTerminalBuffer.join('\n');
         },
         {

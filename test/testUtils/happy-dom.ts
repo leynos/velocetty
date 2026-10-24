@@ -6,6 +6,15 @@ import {isFunction} from '@shared/types/guards';
 type HappyDomModule = typeof import('happy-dom');
 type HappyDomWindow = InstanceType<HappyDomModule['Window']>;
 
+/**
+ * Checks that a window provides both animation-frame methods.
+ *
+ * The pair is checked together because they only make sense as a pair: a
+ * handle from one is what the other is given back.
+ */
+const hasAnimationFrames = (window: HappyDomWindow): boolean =>
+  isFunction(window.requestAnimationFrame) && isFunction(window.cancelAnimationFrame);
+
 type Cleanup = () => void;
 type HappyDomGlobalHost = {
   window?: unknown;
@@ -139,12 +148,13 @@ export const setupHappyDom = async (): Promise<Cleanup> => {
       value: true
     });
 
-    if (!isFunction(window.requestAnimationFrame)) {
-      window.requestAnimationFrame = (callback) => window.setTimeout(() => callback(window.performance.now()), 0);
-    }
-
-    if (!isFunction(window.cancelAnimationFrame)) {
-      window.cancelAnimationFrame = (handle) => window.clearTimeout(handle);
+    // Happy DOM implements both animation-frame methods itself, scheduling
+    // frames as immediates and ignoring handles it did not issue. A
+    // `setTimeout`-backed substitute would therefore look right and never
+    // cancel, so a window that lacks them is a broken installation rather than
+    // something to paper over here.
+    if (!hasAnimationFrames(window)) {
+      throw new TypeError('Happy DOM did not provide requestAnimationFrame and cancelAnimationFrame.');
     }
 
     Object.defineProperty(window, 'rpc', {

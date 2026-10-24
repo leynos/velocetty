@@ -30,9 +30,41 @@ type PluginSpecifier = string & {readonly __brand: 'PluginSpecifier'};
 /** Branded type for normalized npm package names (e.g., 'hyper-plugin', '@scope%2fplugin') */
 type PackageName = string & {readonly __brand: 'PackageName'};
 
-type CliApiFsModule = Pick<typeof fs, 'existsSync' | 'readFileSync' | 'writeFileSync'>;
+/**
+ * The slice of the filesystem this module depends on.
+ *
+ * Written out rather than derived with `Pick<typeof fs, …>`: the picked
+ * overloads are the full Node ones, which couple `readFileSync`'s return type
+ * to the encoding argument. A test double that always answers text cannot
+ * satisfy that, and the narrowing keeps the two in step.
+ */
+type CliApiFsModule = {
+  existsSync(target: string): boolean;
+  readFileSync(target: string, encoding: 'utf8'): string;
+  writeFileSync(target: string, contents: string, encoding: 'utf8'): void;
+};
 
-type CliApiGotClient = Pick<typeof got, 'get'>;
+/**
+ * The slice of the HTTP client this module depends on.
+ *
+ * `Pick<typeof got, 'get'>` drags in got's whole generic overload set, whose
+ * `url` parameter is `string | URL` and whose options type is far wider than
+ * the fields sent below. Naming the surface keeps a focused double admissible
+ * without loosening the call.
+ *
+ * The body stays `unknown`: the only caller hands it to a Zod schema, so a
+ * generic type argument would add a claim the client cannot verify.
+ */
+type CliApiGotClient = {
+  get(
+    url: string,
+    options: {
+      readonly timeout: {readonly request: number};
+      readonly responseType: 'json';
+      readonly signal: AbortSignal | undefined;
+    }
+  ): Promise<{body: unknown}>;
+};
 
 type CliApiEnvironment = {
   readonly APPDATA?: string;
@@ -425,7 +457,7 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
       const validatedSignal = validateOptionalSignalInput(signal);
       const requestUrl = resolveRegistryPackageUrl(context.registryUrl, getPackageName(validatedPlugin));
       return context.gotClient
-        .get<unknown>(requestUrl, {
+        .get(requestUrl, {
           timeout: {request: 10_000},
           responseType: 'json',
           signal: validatedSignal

@@ -6,9 +6,28 @@
 import {EventEmitter} from 'node:events';
 
 import type {IpcRendererEvent} from 'electron';
-import type {IpcRendererWithCommands, MainEvents, RendererEvents, TypedEmitter} from '@shared/types/common';
+import type {MainEvents, RendererEvents, TypedEmitter} from '@shared/types/common';
 
-export type RpcClientIpc = Pick<IpcRendererWithCommands, 'on' | 'removeListener' | 'send'>;
+/**
+ * The slice of `ipcRenderer` this client depends on.
+ *
+ * Written out rather than derived with `Pick<IpcRendererWithCommands, …>`:
+ * Electron declares `on` and `removeListener` as returning `this`, so picking
+ * them demands the whole renderer object from every stand-in. The client
+ * ignores those return values, and a test double has no `this` to return.
+ */
+export type RpcClientIpc = {
+  // `any[]` rather than `unknown[]` for the listener tail, matching Electron's
+  // own declaration: listeners here take concrete payload types, and a
+  // contravariant `unknown` tail rejects every one of them.
+  //
+  // The returns are `void` because the client discards them. Electron's own
+  // declarations return `this` so calls can be chained; naming that here would
+  // force every double to hand back a renderer object it does not have.
+  on(channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void): void;
+  removeListener(channel: string, listener: (event: IpcRendererEvent, ...args: any[]) => void): void;
+  send(channel: string, ...args: unknown[]): void;
+};
 
 type RpcWindowState = {
   __rpcId?: string;

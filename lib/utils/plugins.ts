@@ -730,11 +730,18 @@ export function getTabsProps<T extends Assignable<TabsProps, T>>(parentProps: an
   return getProps('getTabsProps', props, parentProps);
 }
 
+/**
+ * Decorates a tab's props with its resolved decoration and strip position.
+ *
+ * The return type names the two fields this function adds rather than
+ * returning `T` alone: callers and tests read `tabIndex` straight off the
+ * result, and an honest return type is what lets them do so without a cast.
+ */
 export function getTabProps<T extends Assignable<TabProps, T>>(
   tab: TabLike,
   parentProps: ParentPropsLike,
   props: T
-): T {
+): T & {tabDecoration: TabDecoration; tabIndex: number} {
   const decoration = resolveTabDecoration(getTabDecorationContext(tab));
   const decoratedProps = {
     ...props,

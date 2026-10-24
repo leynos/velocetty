@@ -142,7 +142,14 @@ const sharedDefaultConfigFixture = `{
 type DiagnosticFallbackTestOptions = {
   userConfigContent: string;
   assertNotification: (message: string, mockPaths: ConfigImportPaths) => void;
-  assertPrimaryDiagnostic: (diagnostics: configValidationDiagnostic[], mockPaths: ConfigImportPaths) => void;
+  /**
+   * Called with the diagnostics the import reported.
+   *
+   * Read-only, because the warning payload is frozen by the time it reaches a
+   * caller: an assertion helper has no business writing to it, and declaring
+   * it mutable would reject the payload actually passed in.
+   */
+  assertPrimaryDiagnostic: (diagnostics: readonly configValidationDiagnostic[], mockPaths: ConfigImportPaths) => void;
 };
 
 const runDiagnosticFallbackTest = async (options: DiagnosticFallbackTestOptions): Promise<void> => {
@@ -157,10 +164,9 @@ const runDiagnosticFallbackTest = async (options: DiagnosticFallbackTestOptions)
     harness._import();
 
     expect(harness.notifyMock).toHaveBeenCalledTimes(1);
-    const notificationMessage = harness.notifyMock.mock.calls[0]?.[0];
-    if (notificationMessage === undefined) {
-      throw new Error('Expected a configuration notification.');
-    }
+    // The call-count assertion above is what establishes the call exists, so
+    // the message is read directly rather than checked for absence twice.
+    const [notificationMessage] = harness.notifyMock.mock.calls[0];
     options.assertNotification(notificationMessage, harness.mockPaths);
     expect(harness.notifyMock.mock.calls[0]?.[0]).toContain('Suggested fix:');
 

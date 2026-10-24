@@ -793,7 +793,7 @@ inherits `strict: true` and `useUnknownInCatchVariables: true` from
 `tsconfig.base.json` and relaxes only `noUncheckedIndexedAccess`,
 `noPropertyAccessFromIndexSignature`, `exactOptionalPropertyTypes`,
 `noImplicitOverride`, and `verbatimModuleSyntax`. It includes `app/`, `lib/`,
-`cli/`, `typings/`, and `shared/src/` only.
+`cli/`, `typings/`, `shared/src/`, and `test/`.
 
 Those remaining relaxations are a measured ratchet, not an oversight. Turning
 every base flag on was tried against the same tree and reported 408 errors
@@ -815,12 +815,17 @@ Four production projects therefore fall outside every local gate:
 
 Table 2: production projects that the local typecheck gate omits.
 
-The esbuild bundle (`build/esbuild/`), the `test/` tree, and the emitted
-`CommonJS` interop are also unchecked locally. A change can pass every local
-gate and still fail CI, which is what strict mode catches: a `satisfies`
-registry that loses its literal key type rejects a dynamic index, a lookup that
-can miss needs the guard strict nullability demands, and a
-`verbatimModuleSyntax` import needs the `type` modifier.
+The esbuild bundle (`build/esbuild/`) and the emitted `CommonJS` interop are
+also unchecked locally. A change can pass every local gate and still fail CI,
+which is what strict mode catches: a `satisfies` registry that loses its
+literal key type rejects a dynamic index, a lookup that can miss needs the
+guard strict nullability demands, and a `verbatimModuleSyntax` import needs the
+`type` modifier.
+
+The `test/` tree *is* checked, by the typecheck project above. It joined that
+project because the unit runner strips types instead of checking them, so the
+tree had been compiled by nothing at all — a gap that had already allowed a
+test double whose shape did not match the contract it stood in for.
 
 Run the omitted projects before pushing a change that touches `shared/`,
 `frontend/`, `backend/`, or `app/`:

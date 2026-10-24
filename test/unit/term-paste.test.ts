@@ -48,7 +48,7 @@ const buildPasteHarness = (termInstance: PasteCapableTerm, isTermActive: boolean
   termInstance.termWrapperRef = termWrapperRef;
   termInstance.shouldInterceptFilePaste = () => true;
   termInstance.pastePlatform = () => 'darwin';
-  const term = {paste: mock(() => {})};
+  const term = {paste: mock((_data: string) => {})};
   termInstance.term = term;
   return {term, termInstance, terminal, termWrapperRef};
 };

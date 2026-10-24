@@ -263,7 +263,11 @@ test('service snapshots are deterministic and independent of insertion order', (
 
   const frozenSnapshot = serviceA.snapshot();
   expect(() => {
-    frozenSnapshot.paneCount = 99;
+    // `Object.assign` rather than a direct assignment: the snapshot type is
+    // read-only, so the compiler rejects a plain write before the runtime
+    // freeze ever gets a chance to throw. This reaches past the type to the
+    // same property write a caller could only perform from untyped code.
+    Object.assign(frozenSnapshot, {paneCount: 99});
   }).toThrow();
   expect(serviceA.evaluateCompiled(serviceA.compile(expression))).toBe(true);
 });

@@ -18,12 +18,17 @@ type GotError = {
   message: string;
 };
 
+/**
+ * Registry request options as `cli/api.ts` sends them.
+ *
+ * Matches the production client surface exactly, because a double's parameter
+ * types are contravariant: anything wider would leave the recorded options
+ * unable to stand in for the real request.
+ */
 type GotRequestOptions = {
-  readonly responseType?: string;
-  readonly signal?: AbortSignal;
-  readonly timeout?: {
-    readonly request?: number;
-  };
+  readonly responseType: 'json';
+  readonly signal: AbortSignal | undefined;
+  readonly timeout: {readonly request: number};
 };
 
 type CliHarnessOptions = {
@@ -76,18 +81,30 @@ const parseConfigData = (contents: string): ConfigData => {
   return {plugins: value.plugins, localPlugins: value.localPlugins};
 };
 
+/**
+ * Filesystem double backed by the harness state.
+ *
+ * The read result is asserted to be a string here rather than typed as one
+ * upstream: `fsReadFileSyncValue` exists so a test can supply JSON5 containing
+ * comments, and a non-string would be a broken fixture rather than a valid
+ * case.
+ */
 const buildFsModule = (state: CliHarnessState) => ({
-  existsSync: (candidatePath: unknown) => {
+  existsSync: (candidatePath: string) => {
     if (state.existingPaths) {
-      return isString(candidatePath) && state.existingPaths.has(candidatePath);
+      return state.existingPaths.has(candidatePath);
     }
     return state.fsExistsSyncResult;
   },
-  readFileSync: () => {
+  readFileSync: (_target: string, _encoding: 'utf8') => {
     state.fsReadFileSyncCallCount += 1;
-    return state.hasReadFileSyncOverride ? state.fsReadFileSyncValue : JSON.stringify(state.configData);
+    const contents = state.hasReadFileSyncOverride ? state.fsReadFileSyncValue : JSON.stringify(state.configData);
+    if (!isString(contents)) {
+      throw new TypeError('Expected the read-file override to be a string.');
+    }
+    return contents;
   },
-  writeFileSync: (_path: unknown, contents: string) => {
+  writeFileSync: (_target: string, contents: string, _encoding: 'utf8') => {
     const parsed = parseConfigData(contents);
     state.savedConfigs.push(parsed);
     state.configData = parsed;
@@ -95,11 +112,9 @@ const buildFsModule = (state: CliHarnessState) => ({
 });
 
 const buildGotClient = (state: CliHarnessState) => ({
-  get: (url: string, requestOptions?: GotRequestOptions) => {
+  get: (url: string, requestOptions: GotRequestOptions) => {
     state.requestedUrls.push(url);
-    if (requestOptions) {
-      state.gotOptions.push(requestOptions);
-    }
+    state.gotOptions.push(requestOptions);
     if (state.gotError) {
       return Promise.reject(state.gotError);
     }

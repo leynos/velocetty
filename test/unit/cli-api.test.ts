@@ -4,14 +4,20 @@ import type {JsonObject} from '@shared/types/json';
 
 import {createCliApi} from '../../cli/api';
 
+/**
+ * Registry request options as `cli/api.ts` sends them.
+ *
+ * Spelled out so the double's parameter matches the production client's, and
+ * so the assertion below can read back exactly what the API forwarded.
+ */
+type RegistryRequestOptions = {
+  readonly responseType: 'json';
+  readonly signal: AbortSignal | undefined;
+  readonly timeout: {readonly request: number};
+};
+
 let getUrl = '';
-let getOptions: {
-  readonly responseType?: string;
-  readonly signal?: AbortSignal;
-  readonly timeout?: {
-    readonly request?: number;
-  };
-} | null = null;
+let getOptions: RegistryRequestOptions | null = null;
 
 const buildRegistryResponse = (versions: JsonObject = {}) => ({
   body: {
@@ -41,7 +47,9 @@ cases.forEach(({name, packageName, expectedUrl}) => {
   test(`existsOnNpm() builds the url for ${name}`, async () => {
     const api = createCliApi({
       gotClient: {
-        get(url: string) {
+        // The unused options are declared, not dropped: the client surface is a
+        // function type, and a parameterless double would be rejected against it.
+        get: (url: string, _options: RegistryRequestOptions) => {
           getUrl = url;
           return Promise.resolve(buildRegistryResponse());
         }
@@ -58,7 +66,7 @@ test('existsOnNpm() forwards AbortSignal and timeout options to the registry cli
   const controller = new AbortController();
   const api = createCliApi({
     gotClient: {
-      get(url: string, options) {
+      get: (url: string, options: RegistryRequestOptions) => {
         getUrl = url;
         getOptions = options;
         return Promise.resolve(buildRegistryResponse());

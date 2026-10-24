@@ -14,6 +14,35 @@ const moduleFilePath = fileURLToPath(import.meta.url);
 const moduleDir = path.dirname(moduleFilePath);
 const isMain = process.argv[1] ? path.resolve(process.argv[1]) === moduleFilePath : false;
 
+/**
+ * Mirrors packaged production dependencies into `app/node_modules`.
+ *
+ * The injectable parameters are annotated because this file is JavaScript in a
+ * project with `checkJs` off: without the annotations the compiler synthesises
+ * a declaration from the inferred types, which are `typeof import('node:fs')`
+ * and friends — far wider than the three methods this function actually calls,
+ * and therefore impossible for a focused test double to satisfy.
+ *
+ * @param {object} [options]
+ * @param {string} [options.baseDir] Repository root holding `dist/` and `app/`.
+ * @param {{
+ *   cpSync: (
+ *     source: string,
+ *     destination: string,
+ *     options: {recursive: boolean, force: boolean, dereference: boolean, filter: (sourcePath: string) => boolean}
+ *   ) => void,
+ *   existsSync: (target: string) => boolean,
+ *   rmSync: (target: string, options?: {recursive: boolean, force: boolean}) => void
+ * }} [options.fsModule] Filesystem surface used for the copy.
+ * @param {(message: string) => void} [options.logger] Sink for progress lines.
+ * @param {{
+ *   join: (...parts: string[]) => string,
+ *   resolve: (...parts: string[]) => string,
+ *   relative: (from: string, to: string) => string,
+ *   sep: string
+ * }} [options.pathModule] Path surface used to build and compare locations.
+ * @returns {void}
+ */
 export function copyNodeModules({
   baseDir = path.resolve(moduleDir, '..'),
   fsModule = fs,

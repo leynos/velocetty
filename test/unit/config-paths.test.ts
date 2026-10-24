@@ -4,6 +4,7 @@ import {existsSync} from 'node:fs';
 import path from 'node:path';
 
 import {getElectronMock, registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
+import {importFresh} from '../testUtils/import-fresh';
 
 const repositoryRoot = path.resolve(import.meta.dir, '..', '..');
 
@@ -39,7 +40,7 @@ beforeAll(async () => {
   resetElectronMock();
   appRoot = getElectronMock().app.getAppPath();
 
-  paths = await import('../../app/config/paths.ts?config_paths_unit');
+  paths = await importFresh<typeof import('../../app/config/paths')>('../../app/config/paths', 'config_paths_unit');
 });
 
 test('anchors every configuration asset below the app root', () => {

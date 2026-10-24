@@ -1,6 +1,8 @@
 /** @file Verifies renderer RPC client lifecycle and event forwarding. */
 import {expect, mock, test} from 'bun:test';
 
+import {asCommandId} from '@shared/types/commands';
+
 import Client, {type RpcClientIpc} from '../../lib/utils/rpc';
 
 type IpcListener = (event: Electron.IpcRendererEvent, ...args: unknown[]) => void;
@@ -98,7 +100,7 @@ test('subscribes to init channel and becomes ready when init event arrives', () 
   expect(harness.onMock).toHaveBeenCalledWith('rpc-uid', expect.any(Function));
   expect(readyListener).toHaveBeenCalledTimes(1);
 
-  client.emit('command', 'tab:new');
+  client.emit('command', asCommandId('tab:new'));
   expect(harness.sendMock).toHaveBeenCalledWith('rpc-uid', {
     data: 'tab:new',
     ev: 'command'
@@ -133,14 +135,14 @@ test('does not register ready handler if cached rpc id is cleared before deferre
 
   expect(harness.onMock).not.toHaveBeenCalled();
   expect(readyListener).not.toHaveBeenCalled();
-  expect(() => client.emit('command', 'tab:new')).toThrow('Not ready');
+  expect(() => client.emit('command', asCommandId('tab:new'))).toThrow('Not ready');
 });
 
 test('throws when emitting commands before the rpc channel is ready', () => {
   const harness = createRpcClientHarness();
   const client = harness.createClient();
 
-  expect(() => client.emit('command', 'tab:new')).toThrow('Not ready');
+  expect(() => client.emit('command', asCommandId('tab:new'))).toThrow('Not ready');
 });
 
 test('destroy removes the pending init listener when client is destroyed before ready', () => {

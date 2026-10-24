@@ -6,13 +6,32 @@ import {createRoot} from 'react-dom/client';
 import {afterEach, beforeEach, expect, mock, test} from 'bun:test';
 
 import {createTabsComponent} from '../../lib/components/tabs-component';
+import type {getTabProps as getTabPropsContract} from '../../lib/utils/plugins';
 import {setupHappyDom} from '../testUtils/happy-dom';
 import {waitFor} from '../testUtils/wait-for';
-import type {TabsProps, TabProps} from '../../typings/hyper';
 
-type DecoratedTabProps = TabProps & {tabIndex: number};
-type DecoratedTab = TabsProps['tabs'][number] & {tabIndex: number};
-const getTabPropsMock = mock(<Props extends DecoratedTabProps>(_: DecoratedTab, __: TabsProps, props: Props) => props);
+/**
+ * Records tab-decoration lookups.
+ *
+ * Only `tabIndex` is read back, so the double takes the narrowest shape that
+ * carries it rather than the full production parameter list; the double handed
+ * to `createTabsComponent` below takes its parameter types from the real
+ * `getTabProps` instead.
+ */
+const getTabPropsMock = mock((_tab: {tabIndex: number}, _parentProps: unknown, props: unknown) => props);
+
+/**
+ * Double for the plugin-decorated lookup, typed by the production signature.
+ *
+ * It adds the two fields the real `getTabProps` always contributes — an empty
+ * decoration and the strip position — rather than returning `props` untouched.
+ * That is the shape callers receive, and returning less would make this double
+ * stricter than the contract it stands in for.
+ */
+const buildGetTabProps = (): typeof getTabPropsContract => (tab, parentProps, props) => {
+  getTabPropsMock(tab, parentProps, props);
+  return {...props, tabDecoration: {}, tabIndex: tab.tabIndex};
+};
 const unsubscribeDecorationUpdates = mock(() => {
   decorationListener = null;
 });
@@ -26,15 +45,14 @@ const loadTabsComponent = async () => {
   cleanupHappyDom = await setupHappyDom();
   Tabs = createTabsComponent({
     decorate: (Component) => Component,
-    getTabProps: <Props extends DecoratedTabProps>(tab: DecoratedTab, parentProps: TabsProps, props: Props) => {
-      getTabPropsMock(tab, parentProps, props);
-      return props;
-    },
+    getTabProps: buildGetTabProps(),
     subscribeTabDecorationUpdates: (listener: () => void) => {
       decorationListener = listener;
       return unsubscribeDecorationUpdates;
     },
-    DropdownButton: () => null
+    // The strip only needs a placeholder button; it must render something,
+    // because the dependency is typed as the real component.
+    DropdownButton: () => React.createElement('span')
   });
 };
 

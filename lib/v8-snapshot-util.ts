@@ -1,8 +1,12 @@
 /** @file Initializes snapshot module loading hooks for renderer runtime execution. */
 import {isFunction, isObject} from '@shared/types/guards';
 
+/** A module whose export is itself a function, such as `require('module')`. */
+export type SnapshotModuleCallable = (...args: never[]) => SnapshotModuleExport;
+
 export type SnapshotModuleExport =
   | SnapshotModuleObject
+  | SnapshotModuleCallable
   | string
   | number
   | bigint
@@ -11,8 +15,17 @@ export type SnapshotModuleExport =
   | null
   | undefined;
 
-/** Module exports may be null-prototype objects without inherited methods. */
+/**
+ * A module namespace object: named exports, which may be null-prototype
+ * objects without inherited methods.
+ *
+ * The index signature is what makes this a module object rather than an empty
+ * one. Without it the type admitted only the optional `toString`, so no real
+ * `require` result could be described: `require('module')` returns a callable
+ * carrying `_load`, and ordinary modules expose whatever names they export.
+ */
 export interface SnapshotModuleObject {
+  [exportName: string]: SnapshotModuleExport;
   toString?(): string;
 }
 

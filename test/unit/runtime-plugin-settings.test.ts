@@ -18,6 +18,7 @@ import type {
   setRuntimePluginEnabledPersisted as setRuntimePluginEnabledPersistedType
 } from '../../app/runtime/plugin-runtime';
 import {registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
+import {importFresh} from '../testUtils/import-fresh';
 
 type ReadTextFile = (path: string, encoding: BufferEncoding) => string;
 type WriteTextFile = (path: string, content: string, encoding: BufferEncoding) => void;
@@ -42,7 +43,10 @@ beforeAll(async () => {
     getRuntimePluginKeybindings,
     mergeRuntimePluginKeybindings,
     setRuntimePluginEnabledPersisted
-  } = await import('../../app/runtime/plugin-runtime.ts?runtime_plugin_settings_unit'));
+  } = await importFresh<typeof import('../../app/runtime/plugin-runtime')>(
+    '../../app/runtime/plugin-runtime',
+    'runtime_plugin_settings_unit'
+  ));
 });
 
 const createReadWritePair = (initialContent: string) => {
@@ -141,8 +145,9 @@ test('runtime plugin settings import remains safe on Windows when config paths r
     resetElectronMock();
     registerElectronMock();
 
-    const runtimePluginModule = await import(
-      '../../app/runtime/plugin-runtime.ts?runtime_plugin_settings_windows_user_data'
+    const runtimePluginModule = await importFresh<typeof import('../../app/runtime/plugin-runtime')>(
+      '../../app/runtime/plugin-runtime',
+      'runtime_plugin_settings_windows_user_data'
     );
     const {readFile, writeFile} = createReadWritePair(`{
       config: {},

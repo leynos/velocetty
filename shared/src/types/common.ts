@@ -198,6 +198,15 @@ export type IpcCommands = {
   'clipboard.writeText': (text: string) => void;
 };
 
+/**
+ * Any value a renderer IPC channel can answer with.
+ *
+ * Named here rather than at each test double: a double that answers every
+ * channel has to admit every declared result, and spelling the union out again
+ * per suite would let it drift from the command map.
+ */
+export type IpcResult = ReturnType<IpcCommands[keyof IpcCommands]>;
+
 /** Type-safe wrapper around Electron IpcMain.handle for shared command contracts. */
 export interface IpcMainWithCommands extends IpcMain {
   handle<E extends keyof IpcCommands>(
