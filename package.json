@@ -20,7 +20,7 @@
     "check:types": "bunx tsgo --project tsconfig.typecheck.json",
     "audit": "bun scripts/run-audit.mjs",
     "test": "bun run lint && bun run test:unit",
-    "test:unit:run": "bun test --concurrent test/unit",
+    "test:unit:run": "bun test --concurrent --isolate test/unit",
     "test:unit": "bun run test:unit:run",
     "test:unit:serialized": "bun test --max-concurrency=1 test/unit",
     "test:unit:shuffled": "bun test --randomize --seed=12345 test/unit",

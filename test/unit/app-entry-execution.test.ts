@@ -25,6 +25,7 @@
  */
 import {afterEach, beforeEach, describe, expect, test} from 'bun:test';
 
+import {readFileSync} from 'node:fs';
 import path from 'node:path';
 
 import {getElectronMock, registerElectronMock} from '../testUtils/electron-path';
@@ -42,7 +43,25 @@ const entryPoint = '../../app/index.mts';
 const stubSpecifier = (fileName: string): string => path.resolve(import.meta.dir, '../..', 'app', fileName);
 
 const configStubPath = stubSpecifier('config.js');
+const packageJsonStubPath = stubSpecifier('package.json');
 const startStubPath = stubSpecifier('start.js');
+
+/**
+ * The real `app/package.json` contents, so the stub below stays faithful.
+ *
+ * Reading the file instead of hard-coding a version keeps this suite honest:
+ * its own assertions look for the real version prefix, and any other suite that
+ * inherits the registration sees the same metadata the module really exports.
+ */
+const packageMetadata = parsePackageMetadata();
+
+/** Reads the metadata the stub below spreads. */
+function parsePackageMetadata(): {readonly productName: string; readonly version: string} {
+  const contents = readFileSync(path.join(import.meta.dir, '../../app/package.json'), 'utf8');
+  // SAFETY: `app/package.json` is a repository file whose `productName` and
+  // `version` fields are strings, which the assertions below read as text.
+  return JSON.parse(contents) as {readonly productName: string; readonly version: string};
+}
 
 /**
  * Where the shared config stub finds the behaviour for the current case.
@@ -98,6 +117,14 @@ const recordConfigurationSetup = (): ConfigSetupStub => ({
  * that module for. `getDefaultProfile` is one: `test/unit/updater.test.ts`
  * imports it from `../../app/config`, and a stub carrying only `setup` breaks
  * it, because Bun maps this `.js` key onto the shared `app/config.ts` entry.
+ *
+ * The metadata stub is the mirror image of that hazard. Bun keeps one mock
+ * registry for the whole process, so a double another suite registered first —
+ * `updater.test.ts` had a `{version}`-only one — is still in force when this
+ * suite imports the entry point, and its `default` import of the metadata
+ * object throws `Missing 'default' export`. A later registration replaces an
+ * earlier one, so claiming the module here makes this suite independent of
+ * file order rather than dependent on another suite's discipline.
  */
 const registerEntryStubs = (): void => {
   registerModuleMock(configStubPath, () => ({
@@ -105,6 +132,10 @@ const registerEntryStubs = (): void => {
       requireActiveConfigStub().setup();
     },
     getDefaultProfile: () => 'default'
+  }));
+  registerModuleMock(packageJsonStubPath, () => ({
+    ...packageMetadata,
+    default: packageMetadata
   }));
   registerModuleMock(startStubPath, () => {
     trace.appStart();

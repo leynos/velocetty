@@ -154,6 +154,17 @@ const buildWindowStub = (rpcStub: ReturnType<typeof buildRpcStub>) => {
   };
 };
 
+/**
+ * A faithful double for `app/package.json`.
+ *
+ * Bun keeps one mock registry for the whole test process, so this registration
+ * outlives the suite. A stub carrying only the export this file happens to read
+ * is not a mock of the module: `app/index.mts` default-imports the metadata
+ * object, and every other consumer reads named fields. Supplying both shapes
+ * means whichever module imports it next gets what its real counterpart exports.
+ */
+const packageMetadata = {productName: 'Hyper', version: '0.0.0-test'};
+
 const registerUpdaterMocks = (
   autoUpdater: AutoUpdaterStub,
   getDecoratedConfig: () => Pick<configOptions, 'disableAutoUpdates' | 'updateChannel'>
@@ -163,7 +174,10 @@ const registerUpdaterMocks = (
   registerModuleMock('../../app/plugins', () => ({
     getDecoratedConfig: () => getDecoratedConfig()
   }));
-  registerModuleMock('../../app/package.json', () => ({version: '0.0.0-test'}));
+  registerModuleMock('../../app/package.json', () => ({
+    ...packageMetadata,
+    default: packageMetadata
+  }));
   registerModuleMock('async-retry', () => ({
     default: async <Result>(fn: () => Result | Promise<Result>): Promise<Result> => await fn()
   }));
