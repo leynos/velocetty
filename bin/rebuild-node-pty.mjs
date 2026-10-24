@@ -1,3 +1,16 @@
+/**
+ * @file Rebuilds the packaged `node-pty` native module for Electron.
+ *
+ * `node-pty` ships a native addon built against the Node.js ABI, but Electron
+ * has its own. Running `node-gyp rebuild --runtime=electron` against the copy
+ * under `dist/app/node_modules` produces a binary Electron can load. The
+ * Electron version is taken from the npm-provided environment when a package
+ * script supplies it, and otherwise read out of `package.json`.
+ *
+ * Invoked by the `rebuild-node-pty` package script after `copy-node-modules`,
+ * and by the E2E preparation step. Set `SKIP_NODE_PTY_REBUILD=1` to skip it,
+ * for example when the addon is already built for the current target.
+ */
 import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 /**
- * Guard postinstall scripts that rely on Bun being available.
+ * @file Guard postinstall scripts that rely on Bun being available.
  *
  * This runs during `preinstall`, which executes before dependencies are
  * installed. It therefore avoids third-party modules and reads the pinned Bun
