@@ -403,8 +403,11 @@ design and the notification the user sees.
   added the Velocetty configuration tree requirement. This revision adds it as
   EP-P, KB-PATH-1 and KB-PATH-2, ADR-008, and end-to-end scenario E2E-KB-0.
 - [x] (2026-10-29) Approval gate: explicit human approval of this revision.
-- [ ] EP-A tooling: red (planted false `ensures` must fail); green
-  (`make prove` verifies the sample); CI step; gates.
+- [x] (2026-10-29 23:30Z) EP-A tooling: red confirmed with
+  `test/proofs/sample-false.ts` (Dafny named the unproved postcondition and
+  `make prove` exited 2); green confirmed on `test/proofs/sample.ts`
+  (`1 verified, 0 errors`); Linux-only CI step added; `make check-fmt`,
+  `make typecheck`, `make lint`, and `make test` (514 pass) all pass.
 - [ ] EP-P configuration tree: red; green; CLI parity; refactor; gates.
 - [ ] EP-B policy and proof: prototype go/no-go; red; green; negative
   controls; refactor; gates.
@@ -478,6 +481,14 @@ design and the notification the user sees.
 - Observation: in a fresh worktree on this host, `bun install` postinstall
   fails in `electron-builder install-app-deps` because of a stale npm cache.
   Impact: a workaround is in `Concrete steps`.
+- Observation: `lsc gen` creates a missing `.dfy` beside the `.dfy.gen`, but
+  `lsc gen` and `lsc regen` both refuse to rewrite a `.dfy` whose generated
+  lines were edited, reporting "modifications to generated lines (not
+  additions-only)". Evidence: the EP-A red step, where the planted contract
+  changed `ensures` in place. Removing the stale `.dfy` and regenerating
+  recreated it, but that discards handwritten proof additions. Impact: `.dfy`
+  files are additions-only, and a contract change needs the generated lines
+  reconciled by hand before `make prove` will run.
 
 ## Decision log
 
@@ -645,6 +656,16 @@ design and the notification the user sees.
   `config.json5` while the application runs takes effect after a restart.
   Rationale: switching the active file during a reload would be a new migration
   flow, outside this item's scope. Date/Author: 2026-10-29, planning agent.
+- Decision: `bin/prove.sh` requires `app/config/keybindings-policy.ts` to be
+  listed only when that file exists. Rationale: EP-A runs before EP-B creates
+  the policy, so an unconditional check would fail the tooling stage; once EP-B
+  lands, the condition becomes a permanent guard. Date/Author: 2026-10-29,
+  implementation agent.
+- Decision: the `prove` target invokes `./bin/prove.sh` rather than
+  `bun bin/prove.sh`. Rationale: the script uses bash arrays, `mapfile`, and
+  regular-expression tests that Bun's shell does not implement; the shebang and
+  executable bit make direct invocation both correct and portable within the
+  Linux-only proof step. Date/Author: 2026-10-29, implementation agent.
 
 ## Outcomes & retrospective
 
@@ -1976,6 +1997,63 @@ make markdownlint 0 issues in 65 files
 
 Red, green, negative-control, and end-to-end transcripts are added here during
 implementation.
+
+### EP-A: tooling
+
+Red, with `test/proofs/sample-false.ts` (`//@ ensures \result === 1` over a
+body returning `0`) listed in `LemmaScript-files.txt`:
+
+```plaintext
+Generated: .../test/proofs/sample.dfy.gen
+Running dafny verify...
+
+Dafny program verifier finished with 1 verified, 0 errors
+Generated: .../test/proofs/sample-false.dfy.gen
+Running dafny verify...
+sample-false.dfy(10,0): Error: a postcondition could not be proved on this return path
+   |
+10 | {
+   | ^
+
+sample-false.dfy(9,17): Related location: this is the postcondition that could not be proved
+  |
+9 |   ensures (one() == 1)
+  |                  ^^
+
+
+Dafny program verifier finished with 0 verified, 1 error
+prove: LemmaScript verification failed.
+make: *** [Makefile:43: prove] Error 1
+```
+
+Exit status 2. The negative control was then deleted and the list restored to
+one entry.
+
+Green, with only `test/proofs/sample.ts` listed:
+
+```plaintext
+./bin/prove.sh
+Generated: .../test/proofs/sample.dfy.gen
+Running dafny verify...
+
+Dafny program verifier finished with 1 verified, 0 errors
+```
+
+Exit status 0. `mbake validate Makefile` reports `Valid syntax`. `checkmake` is
+not installed on this host, so its check could not run.
+`build/esbuild/copy-artefacts.ts` copies only `.html`, `.json`, `.png`, `.svg`,
+and `patches`, so the proof artefacts are not packaged.
+
+Gate evidence for EP-A (branch `3-2-1-store-keybindings-in-keybindings-json5`,
+after the tooling changes):
+
+```plaintext
+make check-fmt    pass (323 files formatted, 67 Markdown files unchanged)
+make typecheck    pass
+make lint         pass (Biome, package boundaries, oxlint, actionlint)
+make test         514 pass, 0 fail (67 files)
+make prove        pass (1 verified, 0 errors)
+```
 
 ## Interfaces and dependencies
 

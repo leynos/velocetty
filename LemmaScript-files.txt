@@ -1,0 +1,1 @@
+test/proofs/sample.ts 30

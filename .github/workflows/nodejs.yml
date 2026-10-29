@@ -49,6 +49,12 @@ jobs:
       - name: Spelling
         if: runner.os == 'Linux'
         run: make spelling
+      - name: Prove LemmaScript contracts
+        if: runner.os == 'Linux'
+        run: |
+          dotnet tool install --global dafny --version 4.11.0
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          make prove
       - name: Set up isolated Rust for Merman
         if: runner.os == 'Linux'
         run: rustup toolchain install 1.95.0 --profile minimal
