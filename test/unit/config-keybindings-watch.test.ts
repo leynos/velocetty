@@ -1,21 +1,47 @@
 /** @file Verifies config watching covers keybindings.json5 and reloads through the existing path. */
 import {expect, mock, test} from 'bun:test';
 
-import type {parsedConfig} from '@shared/types/config';
+import type {parsedConfig, rawConfig} from '@shared/types/config';
+import {_init} from '../../app/config/init';
 import {getElectronMock, registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
+import {registerModuleMock} from '../testUtils/mock-module';
 
 let moduleInstanceCounter = 0;
 
+const baseRawConfig: rawConfig = {
+  config: {
+    css: '',
+    defaultProfile: 'default',
+    profiles: [{name: 'default', config: {}}],
+    termCSS: ''
+  },
+  plugins: [],
+  localPlugins: [],
+  keymaps: {}
+};
+
 const makeParsedConfig = (keymaps: Record<string, string[]>): parsedConfig =>
-  ({
-    config: {
-      defaultProfile: 'default',
-      profiles: [{name: 'default', config: {}}]
-    },
-    plugins: [],
-    localPlugins: [],
-    keymaps
-  }) as parsedConfig;
+  _init(structuredClone(baseRawConfig), {...structuredClone(baseRawConfig), keymaps}, () => {});
+
+const openModuleFactory = () => ({default: () => true});
+const pathsModuleFactory = () => ({
+  cfgDir: '/tmp',
+  cfgPath: '/tmp/config.json5',
+  defaultCfg: '/tmp/config-default.json',
+  defaultPlatformKeyPath: () => '/tmp/linux.json',
+  keybindingsPath: '/tmp/keybindings.json5',
+  plugs: {base: '/tmp/plugins', local: '/tmp/plugins/local'},
+  schemaFile: 'schema.json',
+  schemaPath: '/tmp/schema.json'
+});
+const windowsModuleFactory = () => ({defaults: {}, get: () => ({}), recordState: () => {}});
+const coloursModuleFactory = () => ({getColorMap: () => ({})});
+
+/** Registers one factory under both the extensionless and `.ts` specifiers Bun may resolve. */
+const registerAppModuleMock = <Exports>(specifier: string, factory: () => Exports) => {
+  registerModuleMock(specifier, factory);
+  registerModuleMock(`${specifier}.ts`, factory);
+};
 
 test.serial(
   'setup watches config.json5 and keybindings.json5, then reloads keymaps on keybindings changes',
@@ -35,48 +61,19 @@ test.serial(
 
     resetElectronMock();
     registerElectronMock();
-    const electronApp = getElectronMock().app as Record<string, unknown>;
-    electronApp.on = appOnMock;
-    mock.module('chokidar', () => ({
-      default: {
-        watch: watchMock
-      }
+    Object.assign(getElectronMock().app, {on: appOnMock});
+    registerModuleMock('chokidar', () => ({default: {watch: watchMock}}));
+    registerAppModuleMock('../../app/config/import', () => ({
+      createConfigImportModule: () => ({
+        _import: importMock,
+        getDefaultConfig: () => ({config: {colors: {}}})
+      })
     }));
-    const importModuleFactory = () => ({
-      _import: importMock,
-      getDefaultConfig: () => ({config: {colors: {}}})
-    });
-    mock.module('../../app/config/import', importModuleFactory);
-    mock.module('../../app/config/import.ts', importModuleFactory);
-    const openModuleFactory = () => ({
-      default: () => true
-    });
-    mock.module('../../app/config/open', openModuleFactory);
-    mock.module('../../app/config/open.ts', openModuleFactory);
-    const pathsModuleFactory = () => ({
-      cfgDir: '/tmp',
-      cfgPath: '/tmp/config.json5',
-      keybindingsPath: '/tmp/keybindings.json5'
-    });
-    mock.module('../../app/config/paths', pathsModuleFactory);
-    mock.module('../../app/config/paths.ts', pathsModuleFactory);
-    const windowsModuleFactory = () => ({
-      defaults: {},
-      get: () => ({}),
-      recordState: () => {}
-    });
-    mock.module('../../app/config/windows', windowsModuleFactory);
-    mock.module('../../app/config/windows.ts', windowsModuleFactory);
-    const notifyModuleFactory = () => ({
-      default: notifyMock
-    });
-    mock.module('../../app/notify', notifyModuleFactory);
-    mock.module('../../app/notify.ts', notifyModuleFactory);
-    const colorsModuleFactory = () => ({
-      getColorMap: () => ({})
-    });
-    mock.module('../../app/utils/colors', colorsModuleFactory);
-    mock.module('../../app/utils/colors.ts', colorsModuleFactory);
+    registerAppModuleMock('../../app/config/open', openModuleFactory);
+    registerAppModuleMock('../../app/config/paths', pathsModuleFactory);
+    registerAppModuleMock('../../app/config/windows', windowsModuleFactory);
+    registerAppModuleMock('../../app/notify', () => ({default: notifyMock}));
+    registerAppModuleMock('../../app/utils/colours', coloursModuleFactory);
 
     moduleInstanceCounter += 1;
     const configModule = await import(`../../app/config.ts?config_keybindings_watch_${moduleInstanceCounter}`);

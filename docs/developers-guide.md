@@ -253,8 +253,8 @@ When touching keybinding storage:
 - Extend `test/unit/config-import-json5.test.ts`,
   `test/unit/config-import-keybindings-json5.test.ts`,
   `test/unit/keybindings-json5.test.ts`, and
-  `test/unit/config-keybindings-watch.test.ts` when the keybindings file
-  format or reload behaviour changes.
+  `test/unit/config-keybindings-watch.test.ts` when the keybindings file format
+  or reload behaviour changes.
 
 Use `resolveConfigLayers()` from `app/config/layering.ts` to resolve the
 effective configuration:

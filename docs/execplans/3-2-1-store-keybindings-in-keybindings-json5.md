@@ -12,16 +12,15 @@
   edits.
 - Cross-links: `docs/roadmap.md`, `docs/velocetty-design.md`,
   `docs/velocetty-hyper-codebase.md`,
-  `docs/velocetty-product-requirements-document.md`,
-  `docs/developers-guide.md`, `app/config.ts`, `app/config/import.ts`,
-  `app/config/init.ts`, `app/config/paths.ts`, `app/config/open.ts`,
-  `app/plugins.ts`, `app/runtime/plugin-runtime.ts`,
-  `app/runtime/plugin-runtime-json5-roundtrip.ts`,
-  `lib/command-registry.ts`, `lib/containers/hyper.tsx`,
-  `shared/src/types/config.ts`, `shared/src/constants/config-reloadability.ts`,
+  `docs/velocetty-product-requirements-document.md`, `docs/developers-guide.md`,
+  `app/config.ts`, `app/config/import.ts`, `app/config/init.ts`,
+  `app/config/paths.ts`, `app/config/open.ts`, `app/plugins.ts`,
+  `app/runtime/plugin-runtime.ts`,
+  `app/runtime/plugin-runtime-json5-roundtrip.ts`, `lib/command-registry.ts`,
+  `lib/containers/hyper.tsx`, `shared/src/types/config.ts`,
+  `shared/src/constants/config-reloadability.ts`,
   `test/unit/config-import-json5.test.ts`,
-  `test/unit/config-hot-reload.test.ts`,
-  `test/unit/command-registry.test.ts`,
+  `test/unit/config-hot-reload.test.ts`, `test/unit/command-registry.test.ts`,
   `test/unit/runtime-plugin-settings.test.ts`, and
   `test/unit/cli-api-behaviour.test.ts`.
 - Skills signposts: use `execplans` to keep this document live during
@@ -32,10 +31,9 @@
   hygiene. Explorer sub-agents may gather context and compare file surfaces,
   but they must not run tests or mutate the branch.
 
-This ExecPlan is a living document. The sections `Constraints`,
-`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
+`Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
+`Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE (2026-04-23)
 
@@ -44,10 +42,10 @@ Status: COMPLETE (2026-04-23)
 Roadmap item `3.2.1` requires Velocetty to stop storing user keybinding
 overrides inside `config.json5` and instead persist them in a separate
 `keybindings.json5`. After this work, Velocetty must still layer keybindings
-deterministically as `core defaults -> plugin defaults -> user overrides`,
-must accept JSON5 comments and trailing commas, and must keep the current
-hot-reload experience where editing the file on disk causes the renderer to
-pick up the new bindings without restarting the application.
+deterministically as `core defaults -> plugin defaults -> user overrides`, must
+accept JSON5 comments and trailing commas, and must keep the current hot-reload
+experience where editing the file on disk causes the renderer to pick up the
+new bindings without restarting the application.
 
 This plan deliberately treats `3.2.1` as a storage and hot-reload foundation
 milestone, not as the full keybinding-engine or keybinding-editor milestone.
@@ -74,8 +72,8 @@ The expected observable outcomes are:
 - Preserve plugin-contributed default keybindings and current precedence over
   core defaults but below user overrides.
 - Treat workspace keybinding overrides as deferred for this milestone unless
-  the user explicitly widens scope. The plan assumes `core defaults -> plugin
-  defaults -> user overrides` only.
+  the user explicitly widens scope. The plan assumes
+  `core defaults -> plugin defaults -> user overrides` only.
 - Preserve JSON5 semantics: comments and trailing commas must parse cleanly,
   and diagnostics must remain structured with `path`, `message`, and
   `suggestedFix` as required fields.
@@ -106,8 +104,8 @@ The expected observable outcomes are:
   user-authored comments and formatting for unchanged regions with current
   helper patterns, stop and escalate before locking in a full-file rewrite.
 - Watchers: if supporting a second watched file requires a broad rewrite of the
-  config watcher architecture instead of a focused extension, stop and
-  document options in `Decision Log`.
+  config watcher architecture instead of a focused extension, stop and document
+  options in `Decision Log`.
 - Dependencies: if a new dependency appears necessary for import/export,
   validation, or roundtrip-safe writes, stop and escalate first.
 - Iteration: if any required gate fails 3 times without clear progress, stop
@@ -119,43 +117,34 @@ The expected observable outcomes are:
 
 - Risk: current runtime still stores user keymaps inside `rawConfig.keymaps` in
   `config.json5`, so moving to `keybindings.json5` needs a compatibility or
-  migration path.
-  Severity: high
-  Likelihood: high
-  Mitigation: implement an explicit bootstrap path that seeds
-  `keybindings.json5` from existing user `keymaps` when present and records the
-  decision in tests and `Decision Log`.
+  migration path. Severity: high Likelihood: high Mitigation: implement an
+  explicit bootstrap path that seeds `keybindings.json5` from existing user
+  `keymaps` when present and records the decision in tests and `Decision Log`.
 
 - Risk: the main-process config watcher currently watches only `cfgPath`, so a
   second file can silently fail the “hot-reload cleanly” success criterion.
-  Severity: high
-  Likelihood: high
-  Mitigation: extend the watcher model deliberately and add tests that prove
-  on-disk keybinding edits propagate to the renderer rebinding flow.
+  Severity: high Likelihood: high Mitigation: extend the watcher model
+  deliberately and add tests that prove on-disk keybinding edits propagate to
+  the renderer rebinding flow.
 
 - Risk: import/export is required by the roadmap and design docs, but current
-  app code exposes only config opening through `window:preferences`.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: define `3.2.1` import/export scope narrowly as validated utility
-  APIs plus any command plumbing that fits without widening into the command
-  system roadmap items.
+  app code exposes only config opening through `window:preferences`. Severity:
+  medium Likelihood: medium Mitigation: define `3.2.1` import/export scope
+  narrowly as validated utility APIs plus any command plumbing that fits
+  without widening into the command system roadmap items.
 
 - Risk: only the runtime plugin settings path currently demonstrates
   comment-preserving JSON5 patching, so keybinding writes could regress user
-  formatting if they reuse full `stringifyJson5` rewrites.
-  Severity: medium
-  Likelihood: medium
-  Mitigation: reuse or adapt the existing roundtrip helper pattern from
-  `app/runtime/plugin-runtime-json5-roundtrip.ts`, and add write-focused tests.
+  formatting if they reuse full `stringifyJson5` rewrites. Severity: medium
+  Likelihood: medium Mitigation: reuse or adapt the existing roundtrip helper
+  pattern from `app/runtime/plugin-runtime-json5-roundtrip.ts`, and add
+  write-focused tests.
 
 - Risk: repository docs describe Velocetty config directories, but runtime path
   code and some tests still use legacy Hyper naming and `hyper.json`
-  compatibility.
-  Severity: medium
-  Likelihood: high
-  Mitigation: call the drift out explicitly, keep path renaming out of scope
-  for `3.2.1`, and avoid widening into a broader config-path migration.
+  compatibility. Severity: medium Likelihood: high Mitigation: call the drift
+  out explicitly, keep path renaming out of scope for `3.2.1`, and avoid
+  widening into a broader config-path migration.
 
 ## Context and orientation
 
@@ -330,8 +319,8 @@ Update `docs/developers-guide.md` so contributors know:
 - which tests must be extended when keybinding storage changes.
 
 After runtime and test work is complete, update `docs/roadmap.md` to mark
-`3.2.1` and its child bullets done, then run the required sequential gates
-with durable logs before committing.
+`3.2.1` and its child bullets done, then run the required sequential gates with
+durable logs before committing.
 
 ## Concrete steps
 
@@ -346,7 +335,7 @@ nl -ba docs/velocetty-design.md | sed -n '918,1088p'
 nl -ba docs/developers-guide.md | sed -n '168,320p'
 ```
 
-2. Add or update focused failing tests first:
+1. Add or update focused failing tests first:
 
 ```bash
 set -o pipefail
@@ -359,7 +348,7 @@ bun test --max-concurrency=1 \
   test/unit/cli-api-behaviour.test.ts 2>&1 | tee "$TEST_LOG"
 ```
 
-3. Implement the dedicated keybinding storage path in the app config layer.
+1. Implement the dedicated keybinding storage path in the app config layer.
 
 Likely touched files:
 
@@ -371,26 +360,26 @@ Likely touched files:
 - one new dedicated helper under `app/config/` for keybinding JSON5 storage
 - `shared/src/types/config.ts` only as needed for the migration boundary
 
-4. Reuse or adapt existing JSON5 roundtrip helper patterns for any
+1. Reuse or adapt existing JSON5 roundtrip helper patterns for any
    comment-preserving writes:
 
 - `app/runtime/plugin-runtime-json5-roundtrip.ts`
 - any new `app/config/*keybindings*` helper introduced for this milestone
 
-5. Extend runtime integration and hot reload without widening plugin scope:
+1. Extend runtime integration and hot reload without widening plugin scope:
 
 - `app/plugins.ts`
 - `app/runtime/plugin-runtime.ts`
 - `lib/command-registry.ts`
 - `lib/containers/hyper.tsx`
 
-6. Update the documentation required for this milestone:
+1. Update the documentation required for this milestone:
 
 - `docs/developers-guide.md`
 - `docs/roadmap.md`
 - this ExecPlan’s `Progress`, `Surprises & Discoveries`, and `Decision Log`
 
-7. Run required gates sequentially with tee logs:
+1. Run required gates sequentially with tee logs:
 
 ```bash
 set -o pipefail
@@ -401,7 +390,7 @@ make lint 2>&1 | tee "/tmp/lint-$(get-project)-$(git branch --show).out"
 make test 2>&1 | tee "/tmp/test-$(get-project)-$(git branch --show).out"
 ```
 
-8. Because docs will change, run docs validation after the required gates:
+1. Because docs will change, run docs validation after the required gates:
 
 ```bash
 set -o pipefail
@@ -409,7 +398,7 @@ bunx markdownlint-cli2 "docs/**/*.md" 2>&1 | tee "/tmp/markdownlint-$(get-projec
 nixie --no-sandbox 2>&1 | tee "/tmp/nixie-$(get-project)-$(git branch --show).out"
 ```
 
-9. Close the milestone only after successful validation:
+1. Close the milestone only after successful validation:
 
 - mark `docs/roadmap.md` item `3.2.1` and its child bullets done;
 - record exact log paths and gate outcomes in this ExecPlan;
@@ -424,8 +413,8 @@ Behavioural acceptance:
 - Starting from a clean config directory bootstraps both `config.json5` and
   `keybindings.json5` in the expected locations.
 - If the user already has `keymaps` inside `config.json5` and no
-  `keybindings.json5`, Velocetty seeds the new file without losing the
-  existing bindings.
+  `keybindings.json5`, Velocetty seeds the new file without losing the existing
+  bindings.
 - Valid `keybindings.json5` comments and trailing commas parse correctly.
 - Invalid `keybindings.json5` does not clear active keybindings; the app keeps
   the last-known-good bindings and emits structured diagnostics.
@@ -481,9 +470,9 @@ Evidence acceptance:
 ## Surprises & Discoveries
 
 - The current tree already has the main pieces needed for the feature, but they
-  are split across old assumptions: user keymaps still live in
-  `config.json5`, while runtime plugin settings already have a separate JSON5
-  roundtrip-safe writer.
+  are split across old assumptions: user keymaps still live in `config.json5`,
+  while runtime plugin settings already have a separate JSON5 roundtrip-safe
+  writer.
 - The current watcher architecture is single-file only. Meeting the roadmap’s
   hot-reload success criterion depends more on watcher integration than on
   parser work.
@@ -518,14 +507,14 @@ Evidence acceptance:
   roadmap item does not require workspace storage.
 
 - 2026-04-22: Require an explicit compatibility path from legacy
-  `config.json5` `keymaps` into `keybindings.json5`.
-  Rationale: the current runtime stores user keymaps there, so shipping the new
-  file without bootstrap or migration would risk silent user data loss.
+  `config.json5` `keymaps` into `keybindings.json5`. Rationale: the current
+  runtime stores user keymaps there, so shipping the new file without bootstrap
+  or migration would risk silent user data loss.
 
 - 2026-04-22: Keep the main agent responsible for edits, gates, and commits,
-  with explorer sub-agents limited to read-only context gathering.
-  Rationale: repo instructions explicitly forbid sub-agents from running tests,
-  and the branch needs one owner for the sequential validation loop.
+  with explorer sub-agents limited to read-only context gathering. Rationale:
+  repo instructions explicitly forbid sub-agents from running tests, and the
+  branch needs one owner for the sequential validation loop.
 
 - 2026-04-23: Keep legacy `config.json5` `keymaps` as a one-time bootstrap
   source only, and do not remove them automatically during this milestone.
@@ -534,25 +523,25 @@ Evidence acceptance:
   `config.json5`.
 
 - 2026-04-23: Implement import/export as focused app-config utility functions
-  rather than new UI or command-palette surfaces.
-  Rationale: the roadmap item requires the file format and utility layer, while
-  command/UI affordances are explicitly separated into later roadmap work.
+  rather than new UI or command-palette surfaces. Rationale: the roadmap item
+  requires the file format and utility layer, while command/UI affordances are
+  explicitly separated into later roadmap work.
 
 - 2026-04-23: Avoid seeding `keybindings.json5` from a freshly bootstrapped
-  default `config.json5`.
-  Rationale: only pre-existing user `config.json5.keymaps` entries represent
-  migration-worthy user data; a newly generated config file should still
-  produce an empty `keybindings.json5` unless real legacy overrides existed.
+  default `config.json5`. Rationale: only pre-existing user
+  `config.json5.keymaps` entries represent migration-worthy user data; a newly
+  generated config file should still produce an empty `keybindings.json5`
+  unless real legacy overrides existed.
 
 ## Outcomes & Retrospective
 
 Velocetty now stores user keybinding overrides in `keybindings.json5`, keeps
 `config.json5.keymaps` as a one-time bootstrap source only, validates and
-roundtrips the dedicated file through focused import/export helpers, and watches
-both config files so keybinding edits reload through the existing renderer
-rebinding path. Invalid `keybindings.json5` content now preserves the last known
-good in-memory keymaps and emits structured diagnostics instead of clearing
-shortcuts.
+roundtrips the dedicated file through focused import/export helpers, and
+watches both config files so keybinding edits reload through the existing
+renderer rebinding path. Invalid `keybindings.json5` content now preserves the
+last known good in-memory keymaps and emits structured diagnostics instead of
+clearing shortcuts.
 
 High-level change areas:
 
@@ -582,11 +571,14 @@ Materialized risks and resolutions:
 
 Validation evidence:
 
-- `bun install` passed. Log: `/tmp/bun-install-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
-- `make build` passed. Log: `/tmp/build-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
+- `bun install` passed. Log:
+  `/tmp/bun-install-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
+- `make build` passed. Log:
+  `/tmp/build-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
 - `make check-fmt` passed after a `bun fmt` cleanup pass. Log:
   `/tmp/check-fmt-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
-- `make lint` passed. Log: `/tmp/lint-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
+- `make lint` passed. Log:
+  `/tmp/lint-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
 - `make test` passed with `434` unit tests green. Log:
   `/tmp/test-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`
 - `bunx markdownlint-cli2 "docs/**/*.md"` passed. Log:

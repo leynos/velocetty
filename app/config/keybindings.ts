@@ -16,12 +16,10 @@ type ConfigFilePath = {
   readonly path: string;
 };
 
-type ConfigSource = {
+export type KeybindingsSource = {
   readonly filePath: ConfigFilePath;
   readonly rawContent: string;
 };
-
-export type KeybindingsSource = ConfigSource;
 
 type KeybindingsDependencies = {
   readonly filePath: string;
@@ -110,7 +108,7 @@ export const createKeybindingsModule = (dependencies: KeybindingsDependencies) =
   let lastKnownGoodKeymaps: UserKeymaps | undefined;
 
   const notifyWithPrimaryDiagnostic = (baseMessage: string, diagnostics: readonly configValidationDiagnostic[]) => {
-    const primaryDiagnostic = diagnostics[0];
+    const primaryDiagnostic = diagnostics.at(0);
     if (!primaryDiagnostic) {
       notifyFn(baseMessage);
       return;
