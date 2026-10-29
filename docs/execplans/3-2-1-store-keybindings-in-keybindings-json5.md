@@ -14,7 +14,12 @@
   - The file is created only at start-up, never during a reload.
   - Legacy `config.json5.keymaps` migrate only from a successfully parsed
     `config.json5`, and only when they validate.
-  - The application never writes the user's `config.json5`.
+  - Keybinding code never writes the user's `config.json5`. Runtime-plugin
+    default persistence (`app/runtime/plugin-runtime.ts`) is existing,
+    separate behaviour.
+  - New configuration files are created only in the Velocetty configuration
+    tree. The legacy Hyper tree is still read for an existing `config.json5`,
+    but never receives a new configuration file.
 - Cross-links:
   - `docs/roadmap.md` (§3.2 and the dependent items `4.2.1`, `4.2.2`,
     `5.1.2`).
@@ -23,7 +28,9 @@
   - `docs/velocetty-product-requirements-document.md` (§3, command system and
     keybinding management).
   - `docs/adr-007-keybindings-json5-storage.md` (this item's architectural
-    decision record (ADR), status Proposed).
+    decision record (ADR), status Proposed) and
+    `docs/adr-008-velocetty-configuration-directory.md` (the configuration
+    tree, status Proposed).
   - `docs/developers-guide.md` (§Configuration format practice,
     §Configuration layering and reloadability practice, §Tests).
   - `docs/velocetty-hyper-codebase.md`, `docs/tracking-issues.md`,
@@ -32,8 +39,9 @@
     `docs/documentation-style-guide.md`.
   - Code: `app/config.ts`, `app/config/import.ts`, `app/config/keybindings.ts`,
     `app/config/paths.ts`, `app/config/init.ts`, `app/utils/map-keys.ts`,
-    `app/config/json5-config.ts`, `app/plugins.ts`, and
-    `app/runtime/plugin-runtime.ts`.
+    `app/config/json5-config.ts`, `app/plugins.ts`,
+    `app/runtime/plugin-runtime.ts`, and `cli/api.ts` (the CLI's own config
+    path resolver).
 - Skills signposts:
   - `execplans` for this format.
   - `hexagonal-architecture` for the policy, port, and adapter split.
@@ -57,13 +65,16 @@ proceeds.
 
 Status: DRAFT
 
-Implementation must not begin until a human explicitly approves this plan and
-answers the questions below.
+Implementation must not begin until a human explicitly approves this revised
+plan. The approval questions below were answered on 2026-10-29. The same answer
+added the Velocetty configuration tree requirement, which this revision
+incorporates.
 
 ## Approval questions
 
-These are the decisions the approver must make. Each has a recommendation;
-approving the plan without comment accepts all three recommendations.
+The approver accepted all three recommendations on 2026-10-29: question 1
+option A, question 2 as written, and question 3 option A. The options are kept
+here for the record.
 
 1. User-facing export and import. The roadmap asks for export and import "in
    the same format". The roadmap already places user-facing export and import
@@ -93,6 +104,43 @@ approving the plan without comment accepts all three recommendations.
      yields an empty file on the next start. That is about two more files and
      one more policy input.
 
+### Additional requirement: a Velocetty configuration tree
+
+The same answer added this requirement, quoted here: "Create a Velocetty named
+tree for the new file. Treat this tree with higher priority than the old tree.
+Keep the old tree supported for now, but not to be used for any new
+configuration files. Prefer an XDG configuration directory on Linux if
+possible."
+
+This plan reads it as follows. The decisions are recorded in `Decision log` and
+in ADR-008.
+
+- The Velocetty tree is `$XDG_CONFIG_HOME/Velocetty` when `XDG_CONFIG_HOME`
+  is set to an absolute path, on any platform. Otherwise it is
+  `~/.config/Velocetty` on Linux and macOS, and `%APPDATA%\Velocetty` on
+  Windows. On Linux, this follows the XDG Base Directory specification: an
+  empty or relative `XDG_CONFIG_HOME` is ignored, and `~/.config` is the
+  default.
+- `keybindings.json5` lives only in the Velocetty tree.
+- `config.json5` is looked up in the Velocetty tree first, then in the Hyper
+  tree (`config.json5`, then the older `hyper.json`). The Hyper tree's
+  resolution rules are unchanged.
+- When no `config.json5` exists anywhere, it is created in the Velocetty
+  tree. Fresh installs therefore never touch the Hyper tree.
+- Existing users keep their `config.json5` in the Hyper tree and it keeps
+  working. It is not moved. When both trees hold one, the Velocetty copy wins,
+  and a notification says the Hyper copy is ignored.
+- No new configuration file is ever created in the Hyper tree. That includes
+  the editor schema copy (`schema.json`), which is refreshed there only if it
+  already exists.
+- On Linux the Hyper tree is also Electron's `userData` directory, because
+  `productName` is still `Hyper`. Electron and `electron-store` keep writing
+  application state there (for example `config.json` for window state,
+  `Preferences`, and `GPUCache/`). That is application state, not
+  configuration, and this item leaves it alone.
+- The CLI's plugin commands resolve `config.json5` in the same order, so they
+  edit the same file the application reads.
+
 ## Purpose / big picture
 
 Velocetty is a terminal emulator forked from Hyper. It used to keep a user's
@@ -103,9 +151,10 @@ defaults, validated on read, and reloaded live when it changes.
 
 After this work a user can do the following:
 
-1. Open `keybindings.json5` in the configuration directory (for example
-   `~/.config/Hyper/keybindings.json5` on Linux), change a shortcut, save, and
-   see it take effect in the running application without a restart.
+1. Open `keybindings.json5` in the Velocetty configuration directory (for
+   example `~/.config/Velocetty/keybindings.json5` on Linux, or
+   `$XDG_CONFIG_HOME/Velocetty/keybindings.json5`), change a shortcut, save,
+   and see it take effect in the running application without a restart.
 2. Save a broken file and keep every shortcut that worked before the save. A
    non-blocking notification names the line and column, or the JSON Pointer
    path, together with a suggested fix. A JSON Pointer path is a
@@ -116,6 +165,9 @@ After this work a user can do the following:
    `config.json5` is left byte-for-byte untouched.
 4. Delete `keybindings.json5` and get platform defaults until the next start.
    The next start follows the rules in Approval question 3.
+5. Install Velocetty fresh and find all configuration under the Velocetty
+   tree. Or keep an existing Hyper-tree `config.json5` working unchanged, with
+   only the new `keybindings.json5` appearing under the Velocetty tree.
 
 Developers gain export and import utilities whose text is exactly the storage
 format, so roadmap items `4.2.2` and `5.1.2` need no new file format.
@@ -137,11 +189,25 @@ design and the notification the user sees.
     (`detectKeybindingConflicts` exists but stays unwired), and warnings for
     unknown command identifiers (`4.2.1`);
   - the keybinding editor (`4.2.2`);
-  - settings commands (`5.1.2`), subject to Approval question 1.
+  - settings commands (`5.1.2`), as answered in Approval question 1;
+  - automatic migration of an existing `config.json5` from the Hyper tree to
+    the Velocetty tree, and the `XDG_CONFIG_DIRS` system-wide search path.
 - The application must never write the user's `config.json5` from keybinding
   code. Tests compare its bytes before and after.
 - `keybindings.json5` is created only during start-up bootstrap. A reload
   never creates or rewrites it.
+- No configuration file is ever created in the legacy Hyper tree. New files go
+  to the Velocetty tree. The Hyper tree's own resolution rules
+  (`app/config/paths.ts` today) stay exactly as they are, so existing setups
+  keep resolving.
+- Plugin directories (`plugins/`, `plugins/local`, `plugins/cache`) follow the
+  directory of the active `config.json5`, as today. They hold plugin state
+  rather than configuration files, and moving them belongs to plugin
+  persistence work (`3.2.2`).
+- `config.json5` is created only at start-up, and only when the active tree is
+  `velocetty`. Plugin directories are created only at start-up. A reload never
+  creates a file or a directory. Today `_importConf` runs `mkdirpSync` and
+  `ensureUserConfigFile` on every reload, and this plan removes that.
 - Main-process code under `app/` must not import runtime values from
   `@shared/*`; `import type` only (see `app/config/reloadability-registry.ts`
   and `bun run check:boundaries`).
@@ -169,8 +235,8 @@ design and the notification the user sees.
 
 ## Tolerances (exception triggers)
 
-- Scope: stop and escalate if implementation needs more than 45 non-ExecPlan
-  files or more than 2,800 net added lines of code and other documentation.
+- Scope: stop and escalate if implementation needs more than 58 non-ExecPlan
+  files or more than 3,500 net added lines of code and other documentation.
   This ExecPlan file is excluded from both counts. Generated artefacts
   (`*.dfy.gen`, `bun.lock`, generated schema JSON) are excluded from the line
   count but count as files.
@@ -180,9 +246,14 @@ design and the notification the user sees.
   - `app/config/import.ts`
   - `app/config/watcher.ts`
   - `app/config.ts`
+  - `app/config/paths.ts` and the new `app/config/config-tree.ts`
+  - the new `shared/src/config/config-tree.ts` and `cli/api.ts`
+    (`resolveConfigPath` only)
   - `test/e2e/electron-e2e-helpers.ts`
 
   Adding `@deprecated` to `keymaps` in `typings/config.d.ts` is approved here.
+- Electron identity: escalate before calling `app.setPath('userData')` or
+  changing `productName`.
 - Dependencies: exactly two new development dependencies are approved,
   `fast-check` and `lemmascript`. Anything else needs escalation.
 - Persisted format: escalate before accepting any `keybindings.json5` shape
@@ -266,6 +337,39 @@ design and the notification the user sees.
 - Risk: users deleting the file are surprised by legacy re-seeding.
   Severity: low. Likelihood: low. Mitigation: Approval question 3 and the
   users' guide.
+- Risk: the application and the CLI resolve `config.json5` separately. If
+  their orders drift, `hyper install` edits a file the application does not
+  read. Severity: high. Likelihood: medium. Mitigation: the CLI may use only
+  `@shared` runtime code, so the pure resolver is mirrored in
+  `shared/src/config/config-tree.ts`. A parity test (KB-PATH-2) compares it with
+  `app/config/config-tree.ts` over the whole enumerated domain, following the
+  existing `test/unit/app-reloadability-parity.test.ts` precedent.
+- Risk: users with a `config.json5` in both trees edit the Hyper copy and see
+  no effect. Severity: medium. Likelihood: low. Mitigation: a notification at
+  start-up names the ignored copy, and the users' guide explains the order.
+- Risk: Electron's `userData` is `<appData>/Hyper` on every platform, because
+  the product name is still `Hyper`. On Linux that is the Hyper tree itself,
+  and Electron and `electron-store` write state there. Severity: low.
+  Likelihood: high. Mitigation: the Velocetty tree uses
+  `app.getPath('appData')` plus `Velocetty`, never `userData`. Tests assert
+  only that no configuration file name (`config.json5`, `hyper.json`,
+  `keybindings.json5`, `schema.json`, `keybindings.schema.json`) appears under
+  the Hyper tree unless it was seeded. They do not compare directory listings.
+- Risk: if the Velocetty directory is deleted mid-session, its watcher is lost
+  until restart. Severity: low. Likelihood: low. Mitigation: documented in the
+  users' guide. The next start-up recreates the directory.
+- Risk: a symlinked tree or file produces a false "ignored copy" notice, or a
+  broken dotfiles symlink in the Hyper tree reads as absent, so a new Velocetty
+  `config.json5` silently shadows it for good. Severity: medium. Likelihood:
+  low. Mitigation: the resolver takes an injected `sameFile` (real-path
+  equality) and a three-state `probe` that distinguishes `broken-link` from
+  `absent` (KB-PATH-1 named examples).
+- Risk: the two active files may now sit in different directories, so a
+  single-directory watcher would miss one. Severity: high. Likelihood: high
+  (for every existing user). Mitigation: the watcher watches the directory of
+  each active file at `depth: 0`, filtered to exact paths. The Velocetty
+  directory is created at start-up so it can be watched even when bootstrap is
+  deferred.
 - Risk: the local fast end-to-end lane needs `node-pty` built for Electron,
   and `bun run rebuild-node-pty` failed in the planning worktree. Severity:
   low. Likelihood: medium. Mitigation: CI builds it. Locally, follow the setup
@@ -295,10 +399,13 @@ design and the notification the user sees.
   architecture, verification, product and documentation, reliability and
   end-to-end, and plan quality. The review found 7 blockers and about 40 other
   findings. This revision addresses them, and ADR-007 is drafted as Proposed.
-- [ ] Approval gate: explicit human approval and answers to the approval
-  questions.
+- [x] (2026-10-29 22:40Z) Approver accepted all three recommendations and
+  added the Velocetty configuration tree requirement. This revision adds it as
+  EP-P, KB-PATH-1 and KB-PATH-2, ADR-008, and end-to-end scenario E2E-KB-0.
+- [ ] Approval gate: explicit human approval of this revision.
 - [ ] EP-A tooling: red (planted false `ensures` must fail); green
   (`make prove` verifies the sample); CI step; gates.
+- [ ] EP-P configuration tree: red; green; CLI parity; refactor; gates.
 - [ ] EP-B policy and proof: prototype go/no-go; red; green; negative
   controls; refactor; gates.
 - [ ] EP-C codec and schema: red; green; refactor; gates.
@@ -361,8 +468,13 @@ design and the notification the user sees.
   `keymaps`. Nothing calls it for keymaps yet. Impact: logged in
   `docs/tracking-issues.md` for the settings UI work, not fixed here.
 - Observation: the configuration directory is still named `Hyper`, not
-  `Velocetty` as the design proposes. Impact: none; the documentation states
-  the actual path.
+  `Velocetty` as the design proposes. On Windows it is Electron's `userData`
+  (`%APPDATA%\Hyper`, from `productName`). Impact: the approver directed a
+  Velocetty tree with higher priority (EP-P and ADR-008).
+- Observation: the CLI resolves `config.json5` itself (`cli/api.ts`
+  `resolveConfigPath`, which mirrors the Hyper rules), and only `@shared`
+  runtime code is available to it. Impact: a mirrored pure resolver and a
+  parity test.
 - Observation: in a fresh worktree on this host, `bun install` postinstall
   fails in `electron-builder install-app-deps` because of a stale npm cache.
   Impact: a workaround is in `Concrete steps`.
@@ -469,6 +581,71 @@ design and the notification the user sees.
   documented exception to the caret policy in `AGENTS.md`. Date/Author:
   2026-10-29, planning agent.
 
+- Decision: accept the three approval recommendations: utilities-only export
+  and import, ADR-007's map format, and documented re-seeding after deletion.
+  Rationale: the approver accepted them. Date/Author: 2026-10-29, approver.
+- Decision: add a Velocetty configuration tree, with the rules under
+  `Additional requirement` above. Rationale: the approver directed it. The
+  interpretation details are planning-agent decisions, recorded in ADR-008.
+  Date/Author: 2026-10-29, approver and planning agent.
+- Decision: one rule for `XDG_CONFIG_HOME` in the Velocetty tree on every
+  platform. An absolute, non-empty value wins. Otherwise the tree is
+  `~/.config/Velocetty` on Linux and macOS and `%APPDATA%\Velocetty` on
+  Windows. Rationale: it matches the Linux XDG specification, which the
+  approver asked for. It keeps the existing "XDG on any platform" behaviour
+  that end-to-end isolation relies on. It matches the design's paths table for
+  macOS and Windows. The Hyper tree keeps its current, laxer rule unchanged.
+  Date/Author: 2026-10-29, planning agent.
+- Decision: the directory is named `Velocetty`, capitalized, as in the
+  design's paths table. Rationale: it is consistent with the design and with
+  the Hyper tree's `Hyper`. Date/Author: 2026-10-29, planning agent.
+- Decision: `keybindings.json5` is resolved only in the Velocetty tree. A
+  `Hyper/keybindings.json5` written by unreleased builds of the earlier branch
+  is ignored. Rationale: the file is new, and no release ever wrote it to the
+  Hyper tree. Date/Author: 2026-10-29, planning agent.
+- Decision: the configuration schema copy is refreshed beside the active
+  `config.json5` only where it may create files. That is always in the
+  Velocetty tree, and in the Hyper tree only when the copy already exists.
+  `keybindings.schema.json` is copied beside `keybindings.json5`. Rationale: no
+  new file in the old tree, and editor validation keeps working for both trees.
+  Date/Author: 2026-10-29, planning agent.
+- Decision: development mode is unchanged. A repository-root `config.json5`
+  or `hyper.json` overrides both trees, and `keybindings.json5` then lives
+  beside it. Rationale: it preserves the developer workflow, and the end-to-end
+  lane asserts the path through `[e2e] keybindings-path`. Date/Author:
+  2026-10-29, planning agent.
+- Decision: `getConfigDir()` (`app/config.ts`), which plugins reach through
+  `app.config`, keeps returning the directory of the active `config.json5`, for
+  plugin compatibility. Files that third-party plugins write there are outside
+  this item (`3.2.2`). `app/config/open.ts` keeps opening the active `cfgPath`.
+  The `--help` output in `app/index.mts` also prints the keybindings path and
+  the active tree. Date/Author: 2026-10-29, planning agent.
+- Decision: macOS uses `~/.config/Velocetty`, not
+  `~/Library/Application Support/Velocetty`. Rationale: this matches the
+  design's paths table and the Hyper tree, which macOS users already know. On
+  Linux the name is case-sensitive, so a hand-made `~/.config/velocetty` is not
+  consulted, and the users' guide says so. Date/Author: 2026-10-29, planning
+  agent.
+- Decision: a Hyper-tree candidate that is a broken symlink (`lstat` succeeds
+  but `stat` fails) counts as present. It becomes the active config, defaults
+  apply, a notification is shown, and nothing is created. Shadowed entries that
+  are the same file as the active one are dropped. Rationale: never silently
+  replace a dotfiles-managed configuration. Date/Author: 2026-10-29, planning
+  agent.
+- Decision: KB-PATH-2 parity covers the resolver function only. Today the
+  application and the CLI derive their inputs differently:
+  - the development flag: `isDev` against `NODE_ENV !== 'production'`;
+  - the development directory: `dist/` against the repository root;
+  - Windows `appData`: Electron's known folder against `APPDATA` or
+    `<home>\AppData\Roaming`.
+
+  These are recorded in `docs/tracking-issues.md`, not fixed here. Date/Author:
+  2026-10-29, planning agent.
+- Decision: the choice of tree is made once, at start-up. Creating a Velocetty
+  `config.json5` while the application runs takes effect after a restart.
+  Rationale: switching the active file during a reload would be a new migration
+  flow, outside this item's scope. Date/Author: 2026-10-29, planning agent.
+
 ## Outcomes & retrospective
 
 Not yet started. Populate this at each milestone boundary and at completion.
@@ -485,9 +662,12 @@ configuration. The renderer (code under `lib/`) receives keymaps over IPC.
 Configuration lives in a per-user directory computed in `app/config/paths.ts`.
 It is `$XDG_CONFIG_HOME/Hyper` when that variable is set (on any platform).
 Otherwise it is `~/.config/Hyper` on Linux and macOS, or Electron's `userData`
-on Windows. In development mode it moves to the repository root if a
-`config.json5` exists there. The module exports `cfgDir`, `cfgPath`, and, on
-this branch, `keybindingsFile` and `keybindingsPath`.
+on Windows. This is the "Hyper tree". In development mode it moves to the
+repository root if a `config.json5` exists there. The module exports `cfgDir`,
+`cfgPath`, and, on this branch, `keybindingsFile` and `keybindingsPath`. EP-P
+adds the higher-priority "Velocetty tree" (see `Additional requirement`). The
+CLI (`cli/api.ts` `resolveConfigPath`) computes the same Hyper paths
+independently, for plugin commands.
 
 Start-up (`setup()` in `app/config.ts`) and every reload call `_import()` from
 `createConfigImportModule` (`app/config/import.ts`). Today `_import()` does the
@@ -594,7 +774,19 @@ Pull request #67 review findings:
 - REV-67-SIMPLE: drop the redundant path wrapper types.
 - REV-67-DOCS: define acronyms; keep the plan a living draft.
 
-ADR-007 (Proposed) records this item's format decisions.
+Approver direction of 2026-10-29 (see `Additional requirement`):
+
+- REQ-TREE-NEW: the new file lives in a Velocetty-named tree.
+- REQ-TREE-PRIORITY: the Velocetty tree outranks the Hyper tree.
+- REQ-TREE-LEGACY: the Hyper tree stays supported, but receives no new
+  configuration files.
+- REQ-TREE-XDG: prefer an XDG configuration directory on Linux.
+
+This also realizes the design's paths table (DES-CFG-FILES), which proposes
+`Velocetty` directories.
+
+ADR-007 (Proposed) records this item's format decisions. ADR-008 (Proposed)
+records the configuration tree.
 
 The governing standards are `AGENTS.md`, `docs/documentation-style-guide.md`,
 `docs/developers-guide.md`, ADR-001 (bun:test), and ADR-005 (layered end-to-end
@@ -614,6 +806,9 @@ RM-321-XI, DES-KB-EXPORT -> keybindings.ts importKeybindings, exportKeybindings 
 RM-321-OK, DES-CFG-HOT, REV-67-WATCH -> watcher.ts, app/config.ts -> EP-E -> KB-WATCH-1, E2E-KB-1 to E2E-KB-4
 DES-CFG-KB-LAYER (user over core only) -> app/config/init.ts (unchanged) -> EP-E -> KB-LAYER-1
 REV-67-SIMPLE, REV-67-DOCS -> EP-D, EP-F -> review, markdownlint
+REQ-TREE-NEW, REQ-TREE-PRIORITY, REQ-TREE-LEGACY, REQ-TREE-XDG, DES-CFG-FILES
+  -> config-tree.ts (app and shared mirror), paths.ts, cli/api.ts -> EP-P -> KB-PATH-1, KB-PATH-2
+  -> EP-E -> E2E-KB-0, E2E-KB-1
 ```
 
 ## Verification plan
@@ -934,7 +1129,10 @@ Non-vacuity:
 
 Statement:
 
-- `reload()` never calls `store.write`.
+- `reload()` never calls `store.write`, and no reload creates `config.json5`
+  or a plugin directory.
+- `config.json5` is created at start-up only when the active tree is
+  `velocetty`.
 - `start()` calls it at most once, and only when `decideBootstrap` returns
   `seed`.
 - No keybinding code writes `cfgPath`.
@@ -945,9 +1143,14 @@ comparison.
 
 Artefact: `test/unit/config-import-keybindings-json5.test.ts`, rewritten.
 
-Non-vacuity: the last-known-good case uses legacy keymaps that differ from the
-file, so the earlier coincidence cannot recur. A mid-session delete followed by
-`reload` must leave no file.
+Non-vacuity:
+
+- The last-known-good case uses legacy keymaps that differ from the file, so
+  the earlier coincidence cannot recur.
+- A mid-session delete of `keybindings.json5`, followed by `reload`, must
+  leave no file.
+- With the Hyper tree active, removing `Hyper/config.json5` (or all of
+  `Hyper/`) and calling `reload` must leave both absent.
 
 ### KB-STORE-1: atomic, non-destructive writes
 
@@ -1027,6 +1230,113 @@ Non-vacuity:
 - Negative control: swapping the spread order in `_init` must fail the
   property.
 
+### KB-PATH-1: configuration tree resolution
+
+Statement. `resolveConfigLocations(input)` is pure. Its inputs are the
+environment (`XDG_CONFIG_HOME`), the platform, the home directory, the Electron
+`appData` and `userData` directories, the development flag and directory, and an
+`exists(path)` predicate. It returns:
+
+- `velocettyDirectory`;
+- `config`, holding the active `config.json5` path, its tree (`velocetty`,
+  `hyper`, or `development`), and whether it exists;
+- `keybindingsPath`;
+- `shadowed`, the paths of any lower-priority `config.json5` that the active
+  one hides.
+
+These must hold over the whole domain:
+
+- Priority: if `Velocetty/config.json5` exists, it is active, and any existing
+  Hyper copy appears in `shadowed`. Otherwise the Hyper tree's rules apply
+  exactly as `app/config/paths.ts` applies them today.
+- Creation: if no candidate exists, the active path is
+  `<velocettyDirectory>/config.json5`, with `exists: false`.
+- Keybindings: `keybindingsPath` is always in `velocettyDirectory`, except in
+  development mode with a repository-root config, where it is beside that
+  config.
+- Legacy safety: no returned path that the caller may create (an active path
+  with `exists: false`, or `keybindingsPath`) lies in the Hyper tree.
+- XDG: an absolute, non-empty `XDG_CONFIG_HOME` gives
+  `<XDG_CONFIG_HOME>/Velocetty` on every platform. An empty or relative value
+  falls back to the platform default.
+- Hyper compatibility: when `Velocetty/config.json5` is absent and at least
+  one Hyper-tree or development candidate exists, `config.path` equals the
+  oracle's `cfgPath`, `config.exists` is true, and `tree` is `hyper` or
+  `development`. `keybindingsPath` and the creation path are not compared with
+  the oracle. The oracle keeps today's laxer rule for the Hyper tree, under
+  which any non-empty `XDG_CONFIG_HOME` counts.
+
+Method. Exhaustive enumeration with named invariant checks. The domain is all
+combinations of five existence flags (Velocetty `config.json5`, Hyper
+`config.json5`, Hyper `hyper.json`, development `config.json5`, development
+`hyper.json`), three platforms, four `XDG_CONFIG_HOME` states (unset, empty,
+relative, absolute), and the development flag: 32 × 3 × 4 × 2 = 768 cases.
+
+The invariants are stated independently of the implementation, for example "if
+`exists` is false then the path starts with `velocettyDirectory`". The
+Hyper-compatibility invariant compares against a frozen copy of today's
+resolution logic, kept as a test oracle.
+
+Path functions (`isAbsolute`, `join`) come from `path.win32` or `path.posix`
+according to `input.platform`, as `cli/api.ts` already does, so Linux test runs
+simulate Windows faithfully. The "absolute" `XDG_CONFIG_HOME` value is `/xdg`
+on POSIX and `C:\xdg` on win32.
+
+Named examples beside the enumeration:
+
+- win32 drive-relative `C:xdg`, which is ignored;
+- an MSYS-style `/c/Users/x/.config`, which is accepted as root-relative,
+  matching the Hyper tree;
+- a symlinked Velocetty tree pointing at the Hyper tree, which gives no
+  shadow notice;
+- a broken-symlink Hyper `config.json5`, which is active, with nothing
+  created.
+
+Rationale. The domain is finite once paths are abstracted to existence flags,
+so complete enumeration is an exhaustive proof for that abstraction. Path
+joining is axiomatic (`node:path`).
+
+Artefacts:
+
+- `app/config/config-tree.ts`
+- `test/unit/config-tree.test.ts`
+- `test/testUtils/legacy-hyper-paths-oracle.ts`
+
+Evidence. Red: the test fails against a stub that returns the Hyper paths.
+Green: all 768 cases satisfy every invariant.
+
+Non-vacuity:
+
+- Assert that each invariant's antecedent holds in at least one case. For
+  example, some cases have `exists: false`, and some have a shadowed copy. The
+  Hyper-compatibility antecedent holds on each of the three platforms.
+- Negative controls:
+  - swapping the Velocetty and Hyper priority must fail the priority
+    invariant;
+  - creating in the Hyper tree must fail legacy safety;
+  - accepting a relative `XDG_CONFIG_HOME` must fail the XDG invariant.
+
+### KB-PATH-2: CLI parity
+
+Statement. `shared/src/config/config-tree.ts` returns the same result as
+`app/config/config-tree.ts` for every case in the KB-PATH-1 enumeration.
+`cli/api.ts` `resolveConfigPath` returns the shared resolver's active config
+path.
+
+Method. A parity test over the full enumeration, plus updated CLI behaviour
+tests.
+
+Artefacts:
+
+- `test/unit/config-tree-parity.test.ts`
+- `test/unit/cli-api-behaviour.test.ts`, updated
+
+Evidence. Red: the parity test fails while the mirror is missing. The CLI tests
+fail while they still expect Hyper creation paths.
+
+Non-vacuity: a single-character change to the mirror's directory name must fail
+parity.
+
 ### End-to-end obligations
 
 These run in the fast lane, using the development-output launch (`RUN_E2E=1`)
@@ -1036,12 +1346,15 @@ timeout is 90 seconds, and each marker wait allows 10 seconds.
 Artefacts:
 
 - `test/e2e/keybindings.e2e.test.ts`
-- `test/e2e/electron-e2e-helpers.ts`, extended to expose `configDir` and to
-  seed files before launch.
+- `test/e2e/electron-e2e-helpers.ts`, extended to expose
+  `velocettyConfigDir` (`<tempHome>/Velocetty`) and `hyperConfigDir`
+  (`<tempHome>/Hyper`), and to seed files before launch. The helper already sets
+  `XDG_CONFIG_HOME` to the temporary home on every platform, so both trees
+  resolve inside it.
 
 Markers, emitted by `app/config.ts` only under `RUN_E2E=1`:
 
-- `[e2e] keybindings-path <path>`
+- `[e2e] keybindings-path <path>` and `[e2e] config-path <path>`
 - `[e2e] config-watcher-ready`, on chokidar's `ready` event.
 - `[e2e] keymaps-active status=<applied|kept> window:new=<normalized, comma-joined>`.
   This is printed once at start-up and once per reload, after subscribers run.
@@ -1052,12 +1365,28 @@ Precondition: the probe value `ctrl+alt+shift+n` appears in no
 
 Scenarios:
 
-- E2E-KB-1, migration and persistence:
-  - Seed: a legacy `config.json5` with
-    `keymaps: {'window:new': 'ctrl+alt+shift+n'}`, and no `keybindings.json5`.
+- E2E-KB-0, fresh install, in a separate short launch:
+  - Seed nothing.
   - Expect:
-    - after launch, `keybindings.json5` holds that map;
-    - `config.json5` bytes are unchanged;
+    - `config.json5` and `keybindings.json5` are created under
+      `<tempHome>/Velocetty`;
+    - no configuration file (`config.json5`, `hyper.json`,
+      `keybindings.json5`, `schema.json`, `keybindings.schema.json`) appears
+      under `<tempHome>/Hyper`.
+- E2E-KB-1, migration and persistence:
+  - Seed: a legacy `config.json5` in the Hyper tree (`<tempHome>/Hyper`) with
+    `keymaps: {'window:new': 'ctrl+alt+shift+n'}`, and no `keybindings.json5`
+    anywhere.
+  - Expect:
+    - after launch, `<tempHome>/Velocetty/keybindings.json5` holds that map;
+    - no configuration file name (`config.json5`, `hyper.json`,
+      `keybindings.json5`, `schema.json`, `keybindings.schema.json`) appears
+      in `<tempHome>/Hyper` unless it was seeded;
+    - the Hyper `config.json5` bytes are unchanged, and it is still the
+      active config, as reported by `[e2e] config-path`. The seed already
+      holds `config.plugins['velocetty.golden-path-demo']` equal to that
+      plugin's `settingsDefaults`, so runtime-plugin default persistence is a
+      no-op;
     - the marker reports `ctrl+alt+shift+n`;
     - `[e2e] keybindings-path` is inside the isolated directory.
 - E2E-KB-2, hot reload:
@@ -1120,6 +1449,52 @@ non-zero and name the postcondition.
 Green: remove the planted entry, after which `make prove` exits 0.
 
 Record both transcripts, then run the four gates.
+
+### Stage P: Velocetty configuration tree (EP-P; runs after EP-A)
+
+Red:
+
+- Write `test/testUtils/legacy-hyper-paths-oracle.ts`, a frozen copy of
+  today's resolution logic in `app/config/paths.ts`, rewritten as a pure
+  function.
+- Write `test/unit/config-tree.test.ts` (KB-PATH-1) and
+  `test/unit/config-tree-parity.test.ts` (KB-PATH-2).
+- Run `bun test --isolate test/unit/config-tree.test.ts`. It must fail with
+  `Cannot find module '../../app/config/config-tree'`. Once a stub that returns
+  Hyper paths exists, it must fail the priority and creation invariants.
+
+Green:
+
+- Create `app/config/config-tree.ts`, holding `resolveConfigLocations` and its
+  types. It imports nothing from Electron and does no I/O; `exists` is injected.
+- Make `app/config/paths.ts` call it with real inputs: `process.env`,
+  `process.platform`, `homedir()`, `app.getPath('appData')`,
+  `app.getPath('userData')`, `isDev`, the development directory, and a
+  `statSync`-based `exists`.
+- Export `velocettyDir`, `configTree`, and `shadowedConfigPaths` alongside
+  the existing names. `cfgDir` remains the directory of the active
+  `config.json5`.
+- Create `shared/src/config/config-tree.ts` as a mirror, with a header
+  comment pointing at the parity test.
+- Make `cli/api.ts` `resolveConfigPath` delegate to the mirror. Keep the
+  existing Hyper-precedence tests in `test/unit/cli-api-behaviour.test.ts` as
+  regression tests. Add these red tests first:
+  - (a) nothing exists, giving `<XDG>/Velocetty/config.json5`;
+  - (b) both trees exist, giving the Velocetty path;
+  - (c) `XDG_CONFIG_HOME='rel'` on Linux, giving
+    `<home>/.config/Velocetty/config.json5`;
+  - (d) Windows with `APPDATA` unset, and with it blank, giving
+    `<home>\AppData\Roaming\Velocetty\config.json5`;
+  - (e) `cli/index.ts` reporting "not found" with the Velocetty path.
+- Update `app/index.mts` `--help` output to print the keybindings path and the
+  active tree as well. `test/unit/app-startup-order.test.ts` keeps its existing
+  assertion.
+
+Refactor, then run the four gates and `make prove`. EP-P changes only path
+resolution. The importer still creates `keybindings.json5` beside the active
+config until EP-D, which is acceptable at this plateau: no release ships
+between milestones. EP-D moves creation to `keybindingsPath` and the tests
+prove it.
 
 ### Stage B: policy core with proof (EP-B; prototyping first)
 
@@ -1213,8 +1588,12 @@ In `app/config/import.ts`:
 
 In `app/config.ts`, the composition root, create the store and service, inject
 them, and export `importKeybindings` and `exportKeybindings` for later items.
-Add the legacy notifications and the `@deprecated` tag, then regenerate the
-schema. Update `test/testUtils/config-import-harness.ts` and
+Create `velocettyDir` with `mkdirp` at start-up, and copy
+`keybindings.schema.json` beside `keybindings.json5`. Make `ensureSchemaFile`
+skip the Hyper tree unless the copy already exists there. When
+`shadowedConfigPaths` is non-empty, notify once per process. Add the legacy
+notifications and the `@deprecated` tag, then regenerate the schema. Update
+`test/testUtils/config-import-harness.ts` and
 `test/unit/config-keybindings-watch.test.ts` for the new `_import` shape. Delete
 `test/unit/keybindings-json5.test.ts`, whose cases move into the service tests.
 
@@ -1241,8 +1620,10 @@ Red: write the following tests.
 - `test/e2e/keybindings.e2e.test.ts`.
 
 Green: implement `createConfigWatcher` in `app/config/watcher.ts`, and use it
-from `_watch` in `app/config.ts` with the chokidar adapter. Emit the `[e2e]`
-markers. Change `test:e2e:run` to
+from `_watch` in `app/config.ts` with the chokidar adapter. The adapter watches
+the distinct directories of the active `config.json5` and of
+`keybindings.json5`, each at `depth: 0`, filtered to the exact file paths. Emit
+the `[e2e]` markers. Change `test:e2e:run` to
 `bunx cross-env RUN_E2E=1 bun test test/e2e/`. Extend
 `test/e2e/electron-e2e-helpers.ts` with `configDir` and file seeding.
 
@@ -1252,13 +1633,14 @@ the CI log that the new suite ran on all three operating systems.
 
 ### Stage F: documentation and roadmap (EP-F)
 
-Mark ADR-007 `Accepted`, with the date and summary, and reconcile it with
-everything the implementation discovered.
+Mark ADR-007 and ADR-008 `Accepted`, with dates and summaries, and reconcile
+them with everything the implementation discovered.
 
 In `docs/velocetty-design.md`:
 
 - §Configuration system: JSON5 and layering gets the storage format, error
-  behaviour, migration, and the note that the directory is still `Hyper`;
+  behaviour, and migration. Its paths table records the Velocetty tree, its
+  priority over the legacy Hyper tree, and the XDG rule;
 - §Keybinding model notes that the stored format is the ADR-007 map, not the
   runtime `Keybinding` interface;
 - §Keybinding editor UI cross-links ADR-007 and adds `keybindings.import`;
@@ -1267,7 +1649,13 @@ In `docs/velocetty-design.md`:
 Create `docs/users-guide.md` with a "Keyboard shortcuts" section, and link it
 from `README.md`. Following `tutorial-howto-doc`, it covers:
 
-- file location per platform, and how to open the file;
+- file location per platform: the Velocetty tree, the XDG rule, how the legacy
+  Hyper tree is still read for `config.json5`, and how to open the file;
+- how to move an existing configuration across: quit Velocetty, move
+  `config.json5`, `schema.json`, and `plugins/` from the Hyper tree into the
+  existing Velocetty directory, and restart. Do not move the other files in the
+  Hyper directory, which are Electron application state;
+- that the directory name is case-sensitive on Linux;
 - format and examples;
 - Mousetrap shortcut syntax, with modifier names per platform;
 - `<command>:prefix` entries;
@@ -1297,12 +1685,16 @@ Update `docs/developers-guide.md`:
 - document the `[e2e]` marker convention;
 - list the new tests.
 
-Add the plugin-precedence deviation and the `getKeyScope` mismatch to
-`docs/tracking-issues.md`.
+Add the following to `docs/tracking-issues.md`:
 
-Tick roadmap `3.2.1`, rewording its sub-bullet as decided in Approval question
+- the plugin-precedence deviation;
+- the `getKeyScope` mismatch;
+- the differences in how the application and the CLI derive resolver inputs;
+- `userData` still being named `Hyper`.
 
-1. Then set this plan to `COMPLETE` after `Outcomes & retrospective`.
+Tick roadmap `3.2.1`, rewording its export and import sub-bullet as decided by
+the first approval question. Then set this plan to `COMPLETE` after
+`Outcomes & retrospective`.
 
 Run the gates, `make prove`, `make markdownlint`, and `make nixie`.
 
@@ -1329,6 +1721,32 @@ EP-A: tooling installed; CI proves the sample; no behaviour change.
 - Recovery: revert the commits.
 - Remaining gaps: everything else.
 - Compatibility decision: none.
+
+EP-P: the Velocetty configuration tree resolves with priority. The application
+and the CLI agree.
+
+- Requirements: REQ-TREE-NEW, REQ-TREE-PRIORITY, REQ-TREE-LEGACY,
+  REQ-TREE-XDG, and DES-CFG-FILES (paths).
+- Acceptance:
+  - KB-PATH-1 holds over all 768 cases;
+  - KB-PATH-2 parity holds;
+  - the updated CLI behaviour tests pass;
+  - the three negative controls fail as intended.
+- Conformance check:
+  - REQ-TREE-NEW, REQ-TREE-PRIORITY, REQ-TREE-LEGACY, and REQ-TREE-XDG
+    satisfied at the resolver level;
+  - Hyper-tree rules unchanged, as the oracle shows;
+  - no `@shared` runtime import from `app/`;
+  - interface changes confined to the tolerance list;
+  - no persisted-format change;
+  - trace links current.
+- Recovery: revert. Path resolution returns to today's behaviour.
+- Remaining gaps:
+  - keybinding creation still follows the active config until EP-D;
+  - the watcher covers one directory until EP-E.
+- Compatibility decision: existing Hyper-tree configurations are a deployed
+  state (REQ-TREE-LEGACY), handled by the resolver's lookup order. There is no
+  file migration and no source-level shim.
 
 EP-B: the proved policy exists, but the application does not use it yet.
 
@@ -1487,9 +1905,19 @@ bun run test:e2e:fast 2>&1 | tee /tmp/e2e-fast-velocetty-${BRANCH}.out
 
 These are manual checks a person can observe, using Linux paths as examples.
 
-1. Start the application with a `config.json5` whose `keymaps` binds
-   `window:new` to `ctrl+alt+shift+n`, and with no `keybindings.json5`.
-   - `keybindings.json5` appears holding that binding.
+0. With no `~/.config/Velocetty` and no `~/.config/Hyper`, start the
+   application. `~/.config/Velocetty/config.json5` and
+   `~/.config/Velocetty/keybindings.json5` appear, and `~/.config/Hyper` holds
+   no configuration file. With `XDG_CONFIG_HOME=/tmp/xdg`, the same files
+   appear under `/tmp/xdg/Velocetty`.
+
+1. Start the application with a `~/.config/Hyper/config.json5` whose
+   `keymaps` binds `window:new` to `ctrl+alt+shift+n`, and with no
+   `keybindings.json5`.
+   - `~/.config/Velocetty/keybindings.json5` appears holding that binding.
+   - No configuration file is created in `~/.config/Hyper`.
+   - `config.json5` is unchanged, apart from runtime-plugin defaults if they
+     were missing (existing behaviour).
    - A notification says shortcuts moved.
    - `config.json5` is unchanged.
    - `Ctrl+Alt+Shift+N` opens a window.
@@ -1607,6 +2035,36 @@ export function bootstrapObservation(
   write: 'written' | 'failed' | 'not-attempted'
 ): KeybindingsObservation | null; // null: read the file (write-nothing) or apply nothing (defer)
 ```
+
+`app/config/config-tree.ts` is pure. `shared/src/config/config-tree.ts` mirrors
+it for the CLI.
+
+```typescript
+export type ConfigTree = 'velocetty' | 'hyper' | 'development';
+
+export type ConfigLocationInput = {
+  readonly platform: NodeJS.Platform;
+  readonly xdgConfigHome: string | undefined;
+  readonly homeDirectory: string;
+  readonly appDataDirectory: string; // Electron app.getPath('appData'); CLI: APPDATA or <home>/AppData/Roaming
+  readonly hyperUserDataDirectory: string; // Electron app.getPath('userData'); Windows Hyper tree
+  readonly development: {readonly enabled: boolean; readonly directory: string};
+  readonly probe: (path: string) => 'present' | 'broken-link' | 'absent'; // stat, with an lstat fallback
+  readonly sameFile: (a: string, b: string) => boolean; // real-path equality
+};
+
+export type ConfigLocations = {
+  readonly velocettyDirectory: string;
+  readonly config: {readonly path: string; readonly tree: ConfigTree; readonly exists: boolean};
+  readonly keybindingsPath: string;
+  readonly shadowed: readonly string[];
+};
+
+export const resolveConfigLocations: (input: ConfigLocationInput) => ConfigLocations;
+```
+
+`app/config/paths.ts` keeps its current exports and adds `velocettyDir`,
+`configTree`, and `shadowedConfigPaths`.
 
 `app/config/keybindings-codec.ts`:
 
@@ -1763,3 +2221,27 @@ requires it. Any adjustment is recorded in `Decision log`.
     documentation plan is expanded.
 
   Remaining work is Stages A to F, after approval.
+- 2026-10-29 (third draft, after a focused cross-platform review): the
+  revision covers the following:
+  - `userData` coinciding with the Hyper tree on Linux;
+  - reload never creating files or directories;
+  - runtime-plugin default persistence in byte checks;
+  - a corrected Hyper-compatibility invariant;
+  - real red CLI tests;
+  - manual migration steps;
+  - symlink and broken-link handling;
+  - parity scope;
+  - platform-specific path functions;
+  - `getConfigDir`, macOS location, and case-sensitivity decisions.
+- 2026-10-29 (third draft): the approval questions are answered, with all
+  three recommendations accepted. The approver's Velocetty configuration tree
+  requirement is incorporated:
+  - a pure resolver mirrored for the CLI;
+  - EP-P with exhaustive KB-PATH-1 and KB-PATH-2 obligations;
+  - a two-directory watcher;
+  - a schema-copy rule that never creates files in the Hyper tree;
+  - fresh-install and legacy-tree end-to-end scenarios;
+  - ADR-008 (Proposed);
+  - larger scope tolerances.
+
+  Status stays `DRAFT` until this revision is approved.

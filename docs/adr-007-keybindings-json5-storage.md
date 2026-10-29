@@ -15,10 +15,10 @@ Proposed. To be marked Accepted, with a date and summary, when roadmap item
 Hyper, which Velocetty forks, kept user keyboard shortcuts in the main
 configuration file under a `keymaps` key. The Velocetty design
 (`docs/velocetty-design.md`, §Configuration system: JSON5 and layering) moves
-them into a separate `keybindings.json5` file in the same configuration
-directory. Built-in and plugin defaults sit beneath that file. It is validated
-on read and reloaded without a restart. When it is invalid, the last known good
-state stays in effect.
+them into a separate `keybindings.json5` file in the configuration directory.
+Built-in and plugin defaults sit beneath that file. It is validated on read and
+reloaded without a restart. When it is invalid, the last known good state stays
+in effect.
 
 That leaves several choices open. The design does not settle the on-disk shape
 of `keybindings.json5`, how import and export relate to that shape, what "last
@@ -39,8 +39,8 @@ chosen shape, so they are recorded here.
   and rich bindings with `when` clauses and arguments (roadmap `4.2.1`) must
   fit later without a breaking migration.
 - A broken save must never cost a user working shortcuts.
-- The application must not rewrite the user's `config.json5`. Its comments
-  and formatting are theirs.
+- Keybinding code must not rewrite the user's `config.json5`. Its comments and
+  formatting are theirs.
 
 ## Options considered
 
@@ -117,7 +117,8 @@ deferred to a later start-up rather than seeding an empty file.
   defaults currently beat plugin defaults, and legacy `decorateKeymaps` hooks
   run after user overrides. This ADR does not change that. Roadmap `4.2.1` owns
   precedence.
-- The configuration directory is still named `Hyper`, not `Velocetty`.
+- `keybindings.json5` lives in the Velocetty configuration tree, which may
+  differ from the directory of a legacy Hyper-tree `config.json5`. See ADR-008.
 
 ## Architectural rationale
 
