@@ -416,8 +416,14 @@ design and the notification the user sees.
   `cli/api.ts` cases; `--help` now prints the keybindings path and active tree;
   531 unit tests pass. Four negative controls each failed the intended
   invariant and were reverted; details in `Artefacts and notes`.
-- [ ] EP-B policy and proof: prototype go/no-go; red; green; negative
-  controls; refactor; gates.
+- [x] (2026-10-30) EP-B policy and proof: prototype go/no-go passed (LemmaScript
+  0.6.5 translates every planned construct, including unions, switch, backward
+  recursion, and an indexed fold); red confirmed by stubbing the bodies (3
+  verified, 11 unproved `ensures`); green on the real policy (8 verified, 0
+  errors) and 35 unit tests; negative controls (a) and (b) each failed the
+  intended invariants and were reverted; gates green (566 tests, proof 1 + 8
+  verified). Deviations and subset findings are recorded in
+  `Surprises & discoveries` and the Decision log.
 - [ ] EP-C codec and schema: red; green; refactor; gates.
 - [ ] EP-D store, service, importer: red; green; negative control (c);
   refactor; gates.
@@ -518,6 +524,48 @@ design and the notification the user sees.
   therefore still reports the Hyper copy as shadowed, whereas the application
   does not. Impact: accepted divergence, recorded in the Decision log; the
   notice is cosmetic and the CLI never writes.
+- Observation: the LemmaScript subset constrains the policy's shape more than
+  the plan anticipated. Each constraint below was found by a failing
+  translation or verification, not by reading the documentation:
+  - `//@ extern` is accepted only on a function with a body; it then emits an
+    axiomatic Dafny function, so `emptyUserKeymaps` stays the single trust
+    anchor.
+  - A loop invariant must be a leading comment of the first statement inside
+    the loop body. A `for...of` loop lowers to a range loop whose internal
+    counter (`_<head>_idx`) the source cannot name, so an invariant over the
+    consumed prefix needs an indexed C-style `for` loop. C-style loops receive
+    no automatic bound invariant, so `0 <= i` and `i <= history.length` must be
+    written explicitly.
+  - A `switch` scrutinee must be string-typed or a declared union. A nested
+    union field such as `input.legacy.kind` must be destructured to a local
+    first, otherwise the emitter produces `match ?`.
+  - `\result.kind` is not available when the result is a union, so contracts on
+    `BootstrapDecision` and `KeybindingsObservation | null` use boolean and
+    projection spec functions (`isSeed`, `isDefer`, `specSeedKeymaps`,
+    `specLegacyKeymaps`, `isDeferredObservation`, `specObservationKeymaps`).
+  - `Record<string, ...>` lowers to a synthetic opaque type, while an interface
+    with an index signature lowers to a comparable Dafny type. `UserKeymaps` is
+    therefore an interface.
+  - A lemma body may call only lemmas, so the non-vacuity witnesses are a
+    `method` over the shipped `replayKeybindingObservations`; naming a union
+    constructor requires qualification (`KeybindingsObservation.missing`).
+
+  Impact: the planned "forward `for...of` fold" is implemented as an equivalent
+  indexed fold, and the contracts are written through spec predicates. Both are
+  recorded in the Decision log.
+- Observation: `lsc gen` refuses to rewrite an edited `.dfy`, and a body change
+  makes the recorded generated lines stale. The workable procedure after any
+  policy edit is to delete the `.dfy`, regenerate it, and re-apply the proof
+  additions, then re-run `make prove`. Impact: `.dfy` proof additions are a
+  maintained patch, not a one-off edit.
+- Observation: oxlint does not model `noUncheckedIndexedAccess`, so it reads
+  `history[lastIndex]` and `history[i]` as always defined and reports the
+  `undefined` guards as unnecessary, while tsgo requires them. LemmaScript, in
+  turn, needs the truthiness form (`if (!last)`) to emit the branch as
+  unreachable; an `=== undefined` guard produces ill-typed Dafny. Impact: two
+  narrow `oxlint-disable-next-line typescript/no-unnecessary-condition`
+  comments with reasons, and no behavioural suppression. Precomputing
+  `lastIndex` also avoids `unicorn/prefer-at`, which LemmaScript cannot lower.
 
 ## Decision log
 
@@ -716,6 +764,40 @@ design and the notification the user sees.
   fixtures, and the input builder shared by KB-PATH-1 and KB-PATH-2, so the two
   suites cannot drift in the domain they exercise. Date/Author: 2026-10-29,
   implementation agent.
+- Decision: `replayKeybindingObservations` is an indexed C-style `for` loop,
+  not the planned `for...of` fold, with explicit `0 <= i` and
+  `i <= history.length` invariants and a `history.slice(0, i)` prefix
+  invariant. Rationale: LemmaScript lowers `for...of` through an internal
+  counter the invariant cannot name, so the planned fold cannot carry
+  KB-POL-1's replay contract. The indexed loop has the same semantics and the
+  same public signature. Date/Author: 2026-10-30, implementation agent.
+- Decision: KB-POL-2's contracts are expressed with the exported spec
+  predicates `isSeed`, `isDefer`, `specSeedKeymaps`, `specLegacyKeymaps`,
+  `isDeferredObservation`, and `specObservationKeymaps`. Rationale: LemmaScript
+  cannot project `\result.kind` from a union result, and these predicates are
+  also the vocabulary the unit tests use. They add public surface, so they are
+  documented in `Interfaces and dependencies`. Date/Author: 2026-10-30,
+  implementation agent.
+- Decision: `UserKeymaps` is an interface with a string index signature rather
+  than `Record<string, string | string[]>`. Rationale: `Record` lowers to a
+  synthetic opaque type in LemmaScript, losing comparability and field access;
+  the interface lowers to a Dafny type and is structurally identical at the
+  TypeScript boundary. Date/Author: 2026-10-30, implementation agent.
+- Decision: the checked-in `.dfy` adds four slice/exit assertions inside
+  `replayKeybindingObservations` and a `replayKeybindingObservationsExamples`
+  method. Rationale: the assertions are the two facts Dafny needs to unfold
+  `specLatestAccepted` at the consumed element and to close the postcondition;
+  no helper lemma was needed. The example method witnesses that each
+  observation kind is reachable through the shipped fold, so the contract is
+  not vacuous. Date/Author: 2026-10-30, implementation agent.
+- Decision: two `oxlint-disable-next-line typescript/no-unnecessary-condition`
+  comments guard the indexed reads in `specLatestAccepted` and the replay loop,
+  each with a written reason. Rationale: oxlint ignores
+  `noUncheckedIndexedAccess` while tsgo and LemmaScript both require the
+  guard's truthiness form; `.at()` and `=== undefined` were each rejected by
+  the translator. Precomputing `lastIndex` keeps the code free of
+  `unicorn/prefer-at`. No behavioural check is suppressed. Date/Author:
+  2026-10-30, implementation agent.
 
 ## Outcomes & retrospective
 
@@ -2190,6 +2272,79 @@ make prove        pass (1 verified, 0 errors)
 nixie --no-sandbox pass
 ```
 
+### EP-B: keybindings policy and proof
+
+Go/no-go. Before writing the policy, a prototype checked every construct the
+plan needs: discriminated unions, `switch` on a union, backward recursion with
+`decreases`, an indexed fold, and `//@ extern`. LemmaScript 0.6.5 translated
+all of them and Dafny verified the result, so the approach was accepted with
+the subset deviations recorded above.
+
+Red. The real contracts were placed over stub bodies that returned a constant
+value. `make prove` reported the unproved postconditions and stopped:
+
+```plaintext
+Generated: .../app/config/keybindings-policy.dfy.gen
+Running dafny verify...
+
+Dafny program verifier finished with 3 verified, 11 errors
+prove: LemmaScript verification failed.
+```
+
+The three verified declarations are the pure predicates with no contracts. The
+eleven errors are the `ensures` on `observeKeybindings`, `activeKeymaps`,
+`decideBootstrap`, `bootstrapObservation`, and `replayKeybindingObservations`,
+plus the replay loop invariant.
+
+Green. With the real bodies, the checked-in `.dfy` additions, and the example
+method:
+
+```plaintext
+Dafny program verifier finished with 8 verified, 0 errors
+```
+
+The focused suite also passes:
+
+```plaintext
+bun test --isolate test/unit/keybindings-policy.test.ts
+ 35 pass
+  0 fail
+ 57 expect() calls
+```
+
+Negative controls. Each was applied to the working tree, verified, and reverted;
+`diff` confirmed the restored files matched their snapshots before the next
+step, and `make prove` was green again afterwards.
+
+1. The `invalid` branch returned an empty accepted payload instead of keeping
+   the prior state: 5 errors, naming the `invalid` and `unreadable` keeps-state
+   and status postconditions and the replay loop invariant.
+2. A `missing` observation was treated as rejected: 4 errors, naming the
+   `missing` applies-empty-map postconditions and the replay loop invariant.
+
+Each control therefore fails exactly the contracts that mention the changed
+observation kind, and the replay contract fails as well, which shows the
+invariant is not implied by the per-step contract alone.
+
+Gate evidence for EP-B (branch `3-2-1-store-keybindings-in-keybindings-json5`,
+after the policy, proof, tests, and the two documented lint suppressions):
+
+```plaintext
+make check-fmt    pass (331 files formatted, 67 Markdown files unchanged)
+make typecheck    pass
+make lint         pass (Biome, package boundaries, oxlint)
+make test         566 pass, 0 fail (70 files)
+make spelling     pass (typos.toml current)
+make prove        pass (sample 1 verified; policy 8 verified, 0 errors)
+```
+
+The first gate attempt failed `make lint` with six oxlint findings (two test
+type assertions, `prefer-at`, `prefer-negative-index`, and two
+`no-unnecessary-condition` reports). The assertions were removed by typing the
+`test.each` rows, the index findings were removed by precomputing `lastIndex`,
+and the two remaining conditions are the documented suppressions described in
+the Decision log.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -2200,7 +2355,9 @@ in `app/package.json`.
 are opaque to the proof.
 
 ```typescript
-export type UserKeymaps = Record<string, string | string[]>;
+export interface UserKeymaps {
+  readonly [command: string]: string | string[];
+}
 
 //@ extern
 export function emptyUserKeymaps(): UserKeymaps;
@@ -2238,16 +2395,32 @@ export type BootstrapDecision =
   | {readonly kind: 'defer'}
   | {readonly kind: 'seed'; readonly keymaps: UserKeymaps};
 
-export function decideBootstrap(input: {
+export interface BootstrapInput {
   readonly file: BootstrapFileState;
   readonly legacy: LegacyKeymapsSource;
-}): BootstrapDecision;
+}
+
+export function decideBootstrap(input: BootstrapInput): BootstrapDecision;
 
 export function bootstrapObservation(
   decision: BootstrapDecision,
   write: 'written' | 'failed' | 'not-attempted'
 ): KeybindingsObservation | null; // null: read the file (write-nothing) or apply nothing (defer)
+
+// Spec predicates used by the KB-POL-2 contracts, and by the tests.
+export function isSeed(decision: BootstrapDecision): boolean;
+export function isDefer(decision: BootstrapDecision): boolean;
+export function specSeedKeymaps(decision: BootstrapDecision): UserKeymaps; // empty when it seeds nothing
+export function specLegacyKeymaps(legacy: LegacyKeymapsSource): UserKeymaps; // empty when it carries none
+export function isDeferredObservation(observation: KeybindingsObservation | null): boolean;
+export function specObservationKeymaps(observation: KeybindingsObservation | null): UserKeymaps;
 ```
+
+The contracts are written through these predicates because LemmaScript cannot
+project `\result.kind` from a union result. The checked-in
+`app/config/keybindings-policy.dfy` is the generated translation plus the proof
+additions described in the EP-B artefacts; `make prove` regenerates the
+`.dfy.gen` and verifies the `.dfy`.
 
 `app/config/config-tree.ts` is pure. `shared/src/config/config-tree.ts` mirrors
 it for the CLI.

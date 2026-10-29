@@ -1,1 +1,2 @@
 test/proofs/sample.ts 30
+app/config/keybindings-policy.ts 30
