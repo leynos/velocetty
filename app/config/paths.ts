@@ -5,13 +5,15 @@
  * including the resolved Bun binary used for plugin installs.
  */
 import {execSync} from 'node:child_process';
-import {statSync} from 'node:fs';
+import {lstatSync, realpathSync, statSync} from 'node:fs';
 import {homedir} from 'node:os';
 import path from 'node:path';
 
 import {app} from 'electron';
 
 import isDev from 'electron-is-dev';
+
+import {resolveConfigLocations} from './config-tree';
 
 const cfgFile = 'config.json5';
 const keybindingsFile = 'keybindings.json5';
@@ -24,55 +26,68 @@ const homeDirectory = homedir();
 // assets sit below that root rather than beside this module, so every asset
 // path is anchored to it instead of to the emitted file's directory.
 const appDirectory = app.getAppPath();
-
-// If the user defines XDG_CONFIG_HOME they definitely want their config there,
-// otherwise use the home directory in linux/mac and userdata in windows
-let cfgDir: string;
-if (process.env.XDG_CONFIG_HOME) {
-  cfgDir = path.join(process.env.XDG_CONFIG_HOME, 'Hyper');
-} else if (process.platform === 'win32') {
-  cfgDir = app.getPath('userData');
-} else {
-  cfgDir = path.join(homeDirectory, '.config', 'Hyper');
-}
-
-let cfgPath = path.join(cfgDir, cfgFile);
-let keybindingsPath = path.join(cfgDir, keybindingsFile);
-const legacyCfgPath = path.join(cfgDir, legacyCfgFile);
-const schemaPath = path.join(appDirectory, 'config', schemaFile);
-
 const devDir = path.resolve(appDirectory, '..');
-const devCfg = path.join(devDir, cfgFile);
-const devLegacyCfg = path.join(devDir, legacyCfgFile);
+const schemaPath = path.join(appDirectory, 'config', schemaFile);
 const defaultCfg = path.join(appDirectory, 'config', defaultCfgFile);
 
-const fileExists = (path: string): boolean => {
+/**
+ * Distinguishes a broken symlink from an absent file.
+ *
+ * A dotfiles-managed configuration that is temporarily dangling must not be
+ * treated as absent, or a new Velocetty file would silently shadow it for good.
+ */
+const probe = (candidate: string): 'present' | 'broken-link' | 'absent' => {
   try {
-    statSync(path);
-    return true;
+    statSync(candidate);
+    return 'present';
   } catch {
-    return false;
+    try {
+      lstatSync(candidate);
+      return 'broken-link';
+    } catch {
+      return 'absent';
+    }
   }
 };
 
-if (!fileExists(cfgPath) && fileExists(legacyCfgPath)) {
-  cfgPath = legacyCfgPath;
-}
+/** Compares real paths so a symlinked Velocetty tree is not reported as shadowing. */
+const sameFile = (left: string, right: string): boolean => {
+  try {
+    return realpathSync(left) === realpathSync(right);
+  } catch {
+    return path.resolve(left) === path.resolve(right);
+  }
+};
 
-if (isDev) {
-  // if a local config file exists, use it
-  if (fileExists(devCfg)) {
-    cfgPath = devCfg;
-    cfgDir = devDir;
-    keybindingsPath = path.join(devDir, keybindingsFile);
-    console.log('using config file:', cfgPath);
-  } else if (fileExists(devLegacyCfg)) {
-    cfgPath = devLegacyCfg;
-    cfgDir = devDir;
-    keybindingsPath = path.join(devDir, keybindingsFile);
+const locations = resolveConfigLocations({
+  platform: process.platform,
+  xdgConfigHome: process.env.XDG_CONFIG_HOME,
+  homeDirectory,
+  appDataDirectory: app.getPath('appData'),
+  hyperUserDataDirectory: app.getPath('userData'),
+  development: {enabled: isDev, directory: devDir},
+  probe,
+  sameFile
+});
+
+const cfgPath = locations.config.path;
+/** Directory of the active `config.json5`; plugins and the schema copy live beside it. */
+const cfgDir = path.dirname(cfgPath);
+const keybindingsPath = locations.keybindingsPath;
+/** The Velocetty tree, where new configuration files are created. */
+const velocettyDir = locations.velocettyDirectory;
+/** Which tree supplied the active configuration file. */
+const configTree = locations.config.tree;
+/** Lower-priority `config.json5` files the active one hides. */
+const shadowedConfigPaths = locations.shadowed;
+
+if (configTree === 'development') {
+  if (path.basename(cfgPath) === legacyCfgFile) {
     console.warn(
       `using legacy config file: ${cfgPath}. Rename to "${cfgFile}" to align with JSON5 config conventions.`
     );
+  } else {
+    console.log('using config file:', cfgPath);
   }
 }
 
@@ -135,6 +150,7 @@ const defaultPlatformKeyPath = () => {
 export {
   cfgDir,
   cfgPath,
+  configTree,
   keybindingsFile,
   keybindingsPath,
   cfgFile,
@@ -147,5 +163,7 @@ export {
   cliLinkPath,
   homeDirectory,
   schemaFile,
-  schemaPath
+  schemaPath,
+  shadowedConfigPaths,
+  velocettyDir
 };

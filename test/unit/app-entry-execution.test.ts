@@ -222,10 +222,12 @@ describe('the informational argument branch', () => {
 
       // Order matters: the diagnostics are printed before the process is asked
       // to quit, so a run that quit first would emit nothing a user could read.
-      expect(output.lines).toHaveLength(3);
+      expect(output.lines).toHaveLength(5);
       expect(output.lines[0]).toMatch(/^Hyper version \d/);
       expect(output.lines[1]).toContain('Hyper does not accept any command line arguments.');
       expect(output.lines[2]).toMatch(/^Hyper configuration file located at: /);
+      expect(output.lines[3]).toMatch(/^Hyper keybindings file located at: /);
+      expect(output.lines[4]).toMatch(/^Hyper configuration tree in use: /);
       expect(trace.labels).toEqual([]);
       expect(quits).toBe(1);
       expect(process.exitCode).toBe(0);

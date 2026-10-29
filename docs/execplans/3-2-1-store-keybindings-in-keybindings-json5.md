@@ -408,7 +408,14 @@ design and the notification the user sees.
   `make prove` exited 2); green confirmed on `test/proofs/sample.ts`
   (`1 verified, 0 errors`); Linux-only CI step added; `make check-fmt`,
   `make typecheck`, `make lint`, and `make test` (514 pass) all pass.
-- [ ] EP-P configuration tree: red; green; CLI parity; refactor; gates.
+- [x] (2026-10-29 23:55Z) EP-P configuration tree: red confirmed against a
+  stub that still returned Hyper paths (6 of 8 KB-PATH-1 tests failed, naming
+  the priority, creation, XDG, and symlink invariants); green on
+  `resolveConfigLocations` in `app/config/config-tree.ts` and its
+  `shared/src/config/config-tree.ts` mirror; CLI delegation and five new
+  `cli/api.ts` cases; `--help` now prints the keybindings path and active tree;
+  531 unit tests pass. Four negative controls each failed the intended
+  invariant and were reverted; details in `Artefacts and notes`.
 - [ ] EP-B policy and proof: prototype go/no-go; red; green; negative
   controls; refactor; gates.
 - [ ] EP-C codec and schema: red; green; refactor; gates.
@@ -489,6 +496,28 @@ design and the notification the user sees.
   recreated it, but that discards handwritten proof additions. Impact: `.dfy`
   files are additions-only, and a contract change needs the generated lines
   reconciled by hand before `make prove` will run.
+- Observation: EP-P's red step is only decisive once a stub exists. Without the
+  module, Bun reports a missing import and no invariant runs; with a stub that
+  returns the old Hyper paths, exactly the two non-vacuity tests pass and the
+  six behavioural ones fail. Impact: the stub phase is the red transcript
+  recorded in `Artefacts and notes`; the module-missing phase only proves the
+  test file loads.
+- Observation: the priority and symlink-shadowing invariants share one fixture,
+  so swapping the Velocetty and Hyper priority fails two tests, not one. The
+  symlink case asserts that a Velocetty directory symlinked to the Hyper tree
+  reports no shadowed copy; under Hyper-first priority the active tree becomes
+  Hyper and the case can no longer hold. Impact: negative control 1 is a
+  two-test signal, and neither test is redundant.
+- Observation: `shadowed` notices follow the priority order, so any change to
+  the Velocetty directory name also changes which copies appear shadowed in
+  development mode. The parity control therefore reported 768 mismatches, not
+  just a differing `velocettyDirectory` field. Impact: KB-PATH-2 checks the
+  whole result object, which is what makes a one-character mirror drift visible.
+- Observation: the CLI cannot resolve real paths, so its `sameFile` is string
+  equality. A CLI-side Velocetty directory symlinked to the Hyper tree
+  therefore still reports the Hyper copy as shadowed, whereas the application
+  does not. Impact: accepted divergence, recorded in the Decision log; the
+  notice is cosmetic and the CLI never writes.
 
 ## Decision log
 
@@ -666,6 +695,27 @@ design and the notification the user sees.
   regular-expression tests that Bun's shell does not implement; the shebang and
   executable bit make direct invocation both correct and portable within the
   Linux-only proof step. Date/Author: 2026-10-29, implementation agent.
+- Decision: `shadowed` lists lower-priority `config.json5` files only, not
+  `hyper.json`. Rationale: the notice names configuration files that the new
+  tree hides. Hyper-to-`hyper.json` fallback is unchanged from today and is not
+  shadowing, and the plan's KB-PATH-1 wording says "`config.json5` files".
+  Date/Author: 2026-10-29, implementation agent.
+- Decision: the CLI's `sameFile` is string equality, not `realpathSync`.
+  Rationale: `cli/api.ts` runs before any Electron or application state exists
+  and resolves only the active path, so it has no reason to touch the
+  filesystem beyond `existsSync`; a symlinked tree produces at worst a spurious
+  "ignored copy" notice in a code path that never writes. Date/Author:
+  2026-10-29, implementation agent.
+- Decision: the shared resolver is a duplicated file, not a re-export of
+  `app/`. Rationale: the package-boundary check forbids `shared/` importing from
+  `app/`, and the CLI bundles only `@shared` runtime code. KB-PATH-2 covers
+  the duplication cost with a 768-case deep-equality test. Date/Author:
+  2026-10-29, implementation agent.
+- Decision: `test/testUtils/config-tree-domain.ts` is an extra artefact beyond
+  the plan's list. Rationale: it holds the 768-case enumeration, the platform
+  fixtures, and the input builder shared by KB-PATH-1 and KB-PATH-2, so the two
+  suites cannot drift in the domain they exercise. Date/Author: 2026-10-29,
+  implementation agent.
 
 ## Outcomes & retrospective
 
@@ -2053,6 +2103,91 @@ make typecheck    pass
 make lint         pass (Biome, package boundaries, oxlint, actionlint)
 make test         514 pass, 0 fail (67 files)
 make prove        pass (1 verified, 0 errors)
+```
+
+### EP-P: Velocetty configuration tree
+
+Red. `test/unit/config-tree.test.ts` was written against a stub
+`app/config/config-tree.ts` that still returned the Hyper paths, so the suite
+loaded and every behavioural invariant ran:
+
+```plaintext
+✗ KB-PATH-1 > holds every invariant over the whole domain
+Expected: "/home/ada/.config/Velocetty"
+Received: "/home/ada/.config/Hyper"
+✗ KB-PATH-1 > applies the XDG rule to each state on each platform
+Expected: "C:\Users\ada\AppData\Roaming\Velocetty"
+Received: "C:xdg\Hyper"
+✗ KB-PATH-1 > ignores a win32 drive-relative XDG_CONFIG_HOME
+✗ KB-PATH-1 > accepts an MSYS-style root-relative XDG_CONFIG_HOME on win32
+✗ KB-PATH-1 > does not report a shadowed copy when the Velocetty tree is a symlink
+✗ KB-PATH-1 > treats a broken Hyper symlink as present and creates nothing
+ 2 pass
+ 6 fail
+```
+
+The suite name `KB-PATH-1 configuration tree resolution` is shortened to
+`KB-PATH-1` here, and the symlink test's name is truncated, so the transcript
+fits the code-block width.
+
+The two passing tests are the non-vacuity checks (`768` cases, and the
+Hyper-compatibility antecedent present on all three platforms); they assert
+properties of the domain, not of the resolver.
+
+Green. The real resolver, the mirror, and the CLI delegation give:
+
+```plaintext
+bun test test/unit/config-tree.test.ts test/unit/config-tree-parity.test.ts
+ 11 pass
+ 0 fail
+ 27 expect() calls
+```
+
+Negative controls. Each was applied to the working tree, run, and reverted;
+`diff` confirmed the restored files matched the snapshots before continuing.
+The quoted assertions are reflowed to the 120-column code-block limit.
+
+1. Hyper listed before Velocetty in `listCandidates`: two tests failed. The
+   whole-domain assertion reported:
+
+   ```plaintext
+   active /home/ada/.config/Hyper/config.json5 (hyper, exists=true);
+   expected /home/ada/.config/Velocetty/config.json5 (velocetty, exists=true)
+   ```
+
+   The symlink-shadowing case failed as well, because Hyper became the active
+   tree.
+2. Creation path changed to the Hyper directory: one test failed.
+
+   ```plaintext
+   active /home/ada/.config/Hyper/config.json5 (velocetty, exists=false);
+   expected /home/ada/.config/Velocetty/config.json5 (velocetty, exists=false)
+   ```
+
+   The tree label alone would not have caught this, which is why the assertion
+   compares path, tree, and `exists` together.
+3. `paths.isAbsolute` guard removed from the Velocetty XDG rule: three tests
+   failed. The XDG test reported `Expected "/home/ada/.config/Velocetty"` and
+   `Received "rel/Velocetty"`, and the win32 drive-relative case reported
+   `Received "C:xdg\Velocetty"`, so relative values leaked into both platform
+   families.
+4. The mirror's directory name changed from `Velocetty` to `Velocettz`: 1
+   failure, with all 768 cases mismatching. Beyond the directory field, the
+   development-mode shadowed lists differed, so a one-character drift cannot
+   hide behind a matching tree label.
+
+Gate evidence for EP-P (branch `3-2-1-store-keybindings-in-keybindings-json5`,
+after the tree resolver, CLI delegation, and `--help` changes):
+
+```plaintext
+make check-fmt    pass (330 files formatted, 67 Markdown files unchanged)
+make typecheck    pass
+make lint         pass (Biome, package boundaries, oxlint, actionlint)
+make test         531 pass, 0 fail (69 files)
+make markdownlint pass (0 issues, 67 files)
+make spelling     pass (typos.toml unchanged)
+make prove        pass (1 verified, 0 errors)
+nixie --no-sandbox pass
 ```
 
 ## Interfaces and dependencies

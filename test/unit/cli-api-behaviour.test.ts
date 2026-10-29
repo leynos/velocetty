@@ -3,6 +3,7 @@ import {expect, test} from 'bun:test';
 import {isObject, isString} from '@shared/types/guards';
 
 import JSON5 from 'json5';
+import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -425,6 +426,72 @@ test.each([
 
   expect(api.configPath).toBe(expectedPath);
   expect(api.exists()).toBe(true);
+});
+
+test('configPath creates in the Velocetty tree when nothing exists', () => {
+  const expectedPath = path.join('/tmp/velocetty-xdg', 'Velocetty', 'config.json5');
+  const {api} = createCliHarness({
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: '/tmp/velocetty-xdg'},
+    existingPaths: new Set()
+  });
+
+  expect(api.configPath).toBe(expectedPath);
+  expect(api.exists()).toBe(false);
+});
+
+test('configPath prefers the Velocetty tree when both trees hold a config', () => {
+  const velocettyPath = path.join('/tmp/velocetty-xdg', 'Velocetty', 'config.json5');
+  const hyperPath = path.join('/tmp/velocetty-xdg', 'Hyper', 'config.json5');
+  const {api} = createCliHarness({
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: '/tmp/velocetty-xdg'},
+    existingPaths: new Set([velocettyPath, hyperPath])
+  });
+
+  expect(api.configPath).toBe(velocettyPath);
+  expect(api.exists()).toBe(true);
+});
+
+test('configPath ignores a relative XDG_CONFIG_HOME on Linux', () => {
+  const homeDirectory = '/home/dana';
+  const {api} = createCliHarness({
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: 'relative'},
+    existingPaths: new Set(),
+    homeDirectory,
+    platform: 'linux'
+  });
+
+  expect(api.configPath).toBe(path.posix.join(homeDirectory, '.config', 'Velocetty', 'config.json5'));
+});
+
+test.each([
+  {label: 'when APPDATA is unset', appData: undefined, homeDirectory: 'C:\\Users\\erin'},
+  {label: 'when APPDATA is blank', appData: '   ', homeDirectory: 'C:\\Users\\frank'}
+])('configPath creates under the home-directory APPDATA path $label', ({appData, homeDirectory}) => {
+  const expectedPath = path.win32.join(homeDirectory, 'AppData', 'Roaming', 'Velocetty', 'config.json5');
+  const {api} = createCliHarness({
+    appData,
+    env: {NODE_ENV: 'production'},
+    existingPaths: new Set(),
+    homeDirectory,
+    platform: 'win32'
+  });
+
+  expect(api.configPath).toBe(expectedPath);
+});
+
+test('the not-found path names the Velocetty creation path', () => {
+  const cliIndexSource = readFileSync(path.join(CLI_DIRECTORY, 'index.ts'), 'utf8');
+  const expectedPath = path.join('/tmp/velocetty-xdg', 'Velocetty', 'config.json5');
+  const {api} = createCliHarness({
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: '/tmp/velocetty-xdg'},
+    existingPaths: new Set()
+  });
+
+  // `checkConfig` interpolates `api.configPath`, so the message the user sees
+  // is only correct while the resolver's creation path stays in Velocetty.
+  expect(cliIndexSource).toMatch(/Config file not found: \$\{api\.configPath\}/);
+  expect(api.exists()).toBe(false);
+  expect(api.configPath).toBe(expectedPath);
 });
 
 test('createCliApi() keeps request and config state isolated per instance', async () => {

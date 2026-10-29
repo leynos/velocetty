@@ -39,8 +39,8 @@ test('the entry point answers every informational argument the same way', async 
   expect(entrySource).toContain('app.quit();');
 });
 
-test('the informational branch reports the version, the argument contract and the config path', async () => {
-  // The three lines are the entire user-visible output of `--help`. Losing one
+test('the informational branch reports the version, the argument contract and the resolved paths', async () => {
+  // These lines are the entire user-visible output of `--help`. Losing one
   // is silent at runtime: the process still exits 0 with partial guidance.
   const entrySource = await readSource('app/index.mts');
 
@@ -50,6 +50,8 @@ test('the informational branch reports the version, the argument contract and th
   expect(entrySource).toMatch(/Hyper version \$\{packageMetadata\.version\}/);
   expect(entrySource).toContain('Hyper does not accept any command line arguments.');
   expect(entrySource).toMatch(/Hyper configuration file located at: \$\{cfgPath\}/);
+  expect(entrySource).toMatch(/Hyper keybindings file located at: \$\{keybindingsPath\}/);
+  expect(entrySource).toMatch(/Hyper configuration tree in use: \$\{configTree\}/);
 });
 
 test('a startup failure is reported and turns into a failing exit code', async () => {
