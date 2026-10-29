@@ -116,7 +116,7 @@ contents (including a sentinel comment) after each step.
   runtime or development, requires escalation.
 - Proof tooling: if LemmaScript cannot express either proof target (EP-M0
   prototype) after two restructuring attempts, stop and present options
-  (Dafny-only hand-written model with a refinement test, or narrower proof
+  (Dafny-only handwritten model with a refinement test, or narrower proof
   scope) rather than silently downgrading to property tests.
 - Persistence: if comment-preserving key removal cannot be made to satisfy
   the EP-M2 property suite after three fix iterations, stop and escalate.
@@ -136,7 +136,7 @@ contents (including a sentinel comment) after each step.
   `Tab` component but pass `tabType: 'settings'`; guard the settings uid in
   `changeTab` and `closeTab`; add a test that decorates tabs with a plugin
   double that reads `uid` and asserts no throw.
-- Risk: the hand-written JSON5 parser in
+- Risk: the handwritten JSON5 parser in
   `app/runtime/plugin-runtime-json5-parser.ts` has edge cases (comments between
   key and value, trailing commas, CRLF) that break key removal. Severity: high
   (data loss in user config). Likelihood: medium. Mitigation: EP-M2 property
@@ -367,7 +367,7 @@ Configuration:
   `live` or `restart`. `lib/hooks/use-config-reloadability.ts` and
   `lib/components/restart-required-indicator.tsx` already provide the restart
   indicator UI the settings tab must use.
-- `app/runtime/plugin-runtime-json5-parser.ts` is a hand-written JSON5 lexer
+- `app/runtime/plugin-runtime-json5-parser.ts` is a handwritten JSON5 lexer
   that reports property offsets;
   `app/runtime/plugin-runtime-json5-roundtrip.ts` uses it to upsert
   `config.plugins.<id>` without disturbing comments.
@@ -466,21 +466,22 @@ I/O are thin adapters around them.
 
 Axioms (trusted, not verified):
 
-- AX-AJV: Ajv correctly validates instances against the generated JSON
+- AXIOM-AJV: Ajv correctly validates instances against the generated JSON
   Schema.
-- AX-JSON5: `JSON5.parse` from the `json5` package correctly parses JSON5.
-- AX-IPC-ORDER: Electron delivers `ipcRenderer.invoke` calls from one renderer
-  to `ipcMain.handle` in send order, and values survive structured clone.
-- AX-FS-RENAME: `fs.rename` within one directory atomically replaces the
+- AXIOM-JSON5: `JSON5.parse` from the `json5` package correctly parses JSON5.
+- AXIOM-IPC-ORDER: Electron delivers `ipcRenderer.invoke` calls from one
+  renderer to `ipcMain.handle` in send order, and values survive structured
+  clone.
+- AXIOM-FS-RENAME: `fs.rename` within one directory atomically replaces the
   target on Linux, macOS, and Windows (Node uses `MoveFileEx` with
   replace-existing on Windows).
-- AX-WATCH: chokidar reports a change after the rename, triggering the
+- AXIOM-WATCH: chokidar reports a change after the rename, triggering the
   existing reload path.
-- AX-LS-MODEL: LemmaScript's Dafny translation is faithful for the fragment
+- AXIOM-LS-MODEL: LemmaScript's Dafny translation is faithful for the fragment
   used (strings, arrays, records, string-literal unions, integers). Case folding
   (`toLowerCase`) happens outside the verified functions, so its Unicode
   behaviour is not part of the proved model.
-- AX-REACT: React 19 `useReducer` applies dispatched actions in dispatch
+- AXIOM-REACT: React 19 `useReducer` applies dispatched actions in dispatch
   order.
 
 Obligations:
@@ -915,7 +916,7 @@ Feature: Editing core settings
   runs in `make test`. Conformance check:
   - No product requirement is claimed.
   - Design unaffected.
-  - Assumption AX-LS-MODEL tested on representative constructs.
+  - Assumption AXIOM-LS-MODEL tested on representative constructs.
   - Only the two pre-approved dependencies added.
   - No trust-boundary or persisted-format change.
   - Trace links unchanged.
@@ -927,7 +928,7 @@ Feature: Editing core settings
   `field-state.ts`; seeded mutations recorded as rejected. Conformance check:
   - Catalogue covers or explicitly excludes every schema key.
   - Domain imports nothing outside `shared/src`.
-  - AX-LS-MODEL still holds.
+  - AXIOM-LS-MODEL still holds.
   - No public interface change.
   - No persisted-format change.
   - Trace links for search and validation current.
@@ -952,7 +953,7 @@ Feature: Editing core settings
   contract test green with new constraints. Conformance check:
   - Rejected writes never reach disk.
   - Main remains sole writer.
-  - AX-FS-RENAME and AX-IPC-ORDER recorded.
+  - AXIOM-FS-RENAME and AXIOM-IPC-ORDER recorded.
   - New IPC channels documented in `IpcCommands`.
   - Schema gains constraints only (stricter validation); confirm the default
     config still validates.
