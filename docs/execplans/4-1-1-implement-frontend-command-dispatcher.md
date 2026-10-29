@@ -278,7 +278,7 @@ through commands belongs to 4.3.2.
   than remain pending. Date/Author: 2026-10-29, planning agent.
 - D-7. Decision: enablement is enforced for every source. A command with
   `defaultWhen` executes only when the expression evaluates to `true` against
-  the renderer context-key service; an unparseable expression fails closed with
+  the renderer context-key service; an unparsable expression fails closed with
   `INVALID_WHEN_EXPRESSION`. Commands without `defaultWhen` are always enabled.
   Rationale: the design's dispatcher path lists the `when` check as a gate, and
   the success criterion requires identical paths. VS Code instead ignores
@@ -335,7 +335,7 @@ Terms used in this plan:
 - Context-key service: `lib/context-key-service.ts#createContextKeyService`.
   It stores named values and evaluates `when` expressions such as
   `terminalFocus && !settingsOpen`. `evaluate` throws
-  `WhenExpressionSyntaxError` for an unparseable expression. Nothing in the
+  `WhenExpressionSyntaxError` for an unparsable expression. Nothing in the
   application constructs or populates one yet.
 - Host command: a command executed by the Electron main process, reached by
   `transport.emit('command', id)`.
