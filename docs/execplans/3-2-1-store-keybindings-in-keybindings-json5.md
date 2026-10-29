@@ -63,12 +63,12 @@ This execution plan (ExecPlan) is a living document. The sections `Constraints`,
 `Conformance basis`, and `Verification plan` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: APPROVED
 
-Implementation must not begin until a human explicitly approves this revised
-plan. The approval questions below were answered on 2026-10-29. The same answer
-added the Velocetty configuration tree requirement, which this revision
-incorporates.
+This revised plan was explicitly approved by a human on 2026-10-29.
+Implementation began after that approval. The approval questions below were
+answered on 2026-10-29. The same answer added the Velocetty configuration tree
+requirement, which this revision incorporates.
 
 ## Approval questions
 
@@ -402,7 +402,7 @@ design and the notification the user sees.
 - [x] (2026-10-29 22:40Z) Approver accepted all three recommendations and
   added the Velocetty configuration tree requirement. This revision adds it as
   EP-P, KB-PATH-1 and KB-PATH-2, ADR-008, and end-to-end scenario E2E-KB-0.
-- [ ] Approval gate: explicit human approval of this revision.
+- [x] (2026-10-29) Approval gate: explicit human approval of this revision.
 - [ ] EP-A tooling: red (planted false `ensures` must fail); green
   (`make prove` verifies the sample); CI step; gates.
 - [ ] EP-P configuration tree: red; green; CLI parity; refactor; gates.
