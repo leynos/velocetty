@@ -218,6 +218,8 @@ Populating context keys belongs to 4.2.1.
   alternatives, verification cost, contracts, failure modes, long-term
   viability). Verdict: proceed with conditions. Revision 2 addresses every
   blocking finding; see `Decision log` D-6 and D-11 to D-16.
+- [x] (2026-10-29) Pushed the branch and opened draft pull request
+  [#252](https://github.com/leynos/velocetty/pull/252).
 - [ ] User approval.
 - [ ] EP-M0 baseline.
 - [ ] EP-M1 registry refactor.
