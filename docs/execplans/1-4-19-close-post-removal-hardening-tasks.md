@@ -460,22 +460,22 @@ method, artefact, evidence, and non-vacuity check.
 
 ### Axioms (trusted, not verified here)
 
-- AX-1: Chromium in Electron 40 enforces a meta-delivered CSP on `file://`
+- AXIOM-1: Chromium in Electron 40 enforces a meta-delivered CSP on `file://`
   pages according to CSP Level 3, including `'self'` matching the bundle and
   stylesheet loaded beside `index.html`. This is exercised by the E2E start-up
   check rather than proved.
-- AX-2: Chromium reports blocked inline scripts as error-level console
+- AXIOM-2: Chromium reports blocked inline scripts as error-level console
   messages whose text contains "Content Security Policy". The fast lane
   forwards these as `[e2e][renderer-error]` lines. EP-M2's seeded-fault run
   exercises this axiom.
-- AX-3: CSSOM writes (`element.style.x = …`, `style.setProperty`) and
+- AXIOM-3: CSSOM writes (`element.style.x = …`, `style.setProperty`) and
   constructed stylesheets are not governed by `style-src`; `<style>` elements,
   `style="…"` markup, `setAttribute('style', …)`, and `style.cssText` are (MDN
   `style-src` reference). This is used only for documentation of blockers.
-- AX-4: `xterm@5.3.0`'s DOM renderer creates `<style>` elements (observed in
+- AXIOM-4: `xterm@5.3.0`'s DOM renderer creates `<style>` elements (observed in
   `node_modules/xterm/lib/xterm.js`).
-- AX-5: Node's `require` and `Module._load` are not governed by CSP.
-- AX-6: LemmaScript's model of `string` as a sequence of characters, with
+- AXIOM-5: Node's `require` and `Module._load` are not governed by CSP.
+- AXIOM-6: LemmaScript's model of `string` as a sequence of characters, with
   `s.length` and `s[i]` as sequence length and indexing, is faithful for the
   ASCII comparisons the scanner makes, and Dafny 4.x is sound. LemmaScript
   treats `number` as a mathematical integer; the scanner only uses indices
@@ -549,7 +549,7 @@ that each rule is checkable:
   the generator's own record, not a second scanner. Artefact:
   `test/unit/retired-style-hooks.property.test.ts`. Evidence: the property
   passes at the default 100 runs in `make test` and at 10,000 runs in a one-off
-  local run recorded in `Artifacts and notes`. Non-vacuity: use `fc.statistics`
+  local run recorded in `Artefacts and notes`. Non-vacuity: use `fc.statistics`
   (or a classification counter) to show that each run includes retired names in
   selectors, inside comments, inside strings, inside `url(...)`, and as
   prefixes of longer names such as `tab_tabTab`. Reject the run if any class
@@ -593,7 +593,7 @@ that each rule is checkable:
   helper uses a recorded real Chromium violation line and must classify it as a
   violation. A one-off seeded-fault run (tightened policy with one inline
   script left in place) must make the E2E check fail; record the failing output
-  in `Artifacts and notes`, then revert the fault.
+  in `Artefacts and notes`, then revert the fault.
 - Obligation HOOKS-PRESENT: after start-up, the renderer DOM contains at least
   one element for each supported terminal hook (`.term_fit`, `.term_term`,
   `.term_wrapper`), the active pane carries `.term_active`, and `#hyper`
@@ -1048,12 +1048,12 @@ Quality criteria:
 
 Every step is a file edit or a test run and can be repeated. The seeded-fault
 runs must be reverted immediately after recording; check with `git diff` before
-committing. `lsc regen` preserves hand-written proof helpers; never delete a
+committing. `lsc regen` preserves handwritten proof helpers; never delete a
 `.dfy` file to start again. If a GitHub issue is created twice, close the
 duplicate with a link to the original. Each milestone is one or more commits, so
 `git revert` restores the previous plateau.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Record here, during implementation: the red output of
 `renderer-csp-contract.test.ts`, the seeded-fault E2E output, the property
