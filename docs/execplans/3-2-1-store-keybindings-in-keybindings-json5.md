@@ -346,7 +346,9 @@ design and the notification the user sees.
   `EBUSY`). Severity: medium. Likelihood: medium. Mitigation, in the store
   adapter:
   - resolve the real path and create the temporary file beside the real
-    file;
+    file, following a dangling link chain by hand only when `realpath` reports
+    `ENOENT`, and failing closed on a cycle, an over-long chain, or an
+    inspection error so a link is never renamed over;
   - copy the original mode and `fsync` before renaming;
   - retry the rename only on `EPERM`, `EACCES`, and `EBUSY`, at most five
     times within about 200 milliseconds;
@@ -661,6 +663,17 @@ design and the notification the user sees.
     target is absent and writes to the link's target, so the link survives.
     Two store tests cover a single dangling link and a chain through an
     intermediate link.
+  - [x] (2026-10-31) CodeRabbit's follow-up on that Codex finding found the
+    hop-limit fallback still unsafe: at 40 hops `followLinks` returned the
+    remaining link, `accessSync` followed it to `ENOENT`, and the rename
+    replaced the last link with a regular file. Tool-call evidence: a 41-link
+    chain ending at a missing file reported `written` and left `link41` as a
+    regular file containing `{}`. Resolution now returns either a path known
+    not to be a link (or genuinely absent) or an `unresolved` error that
+    `write` reports as `failed`; `lstat`/`readlink` errors other than `ENOENT`
+    are unresolved rather than writable. Four tests cover a long chain, a
+    cycle, an unreadable link target, and an uninspectable path, asserting the
+    failure, intact links, an absent target, and no temporary residue.
 
 ## Surprises & discoveries
 
@@ -1896,6 +1909,11 @@ whole. Beyond that:
 - a symlinked target keeps its link, and the real file is replaced;
 - a symlink whose target does not exist yet keeps its link, and the target is
   created through it, so a dotfiles-managed file is never detached;
+- a link chain that cannot be resolved (a cycle, or a chain longer than the
+  bound) reports `failed` and leaves every link intact, rather than renaming a
+  regular file over one;
+- an inspection error on the path reports `failed` instead of treating the path
+  as absent and free to create;
 - no temporary file remains after a failed write that returned;
 - a read-only target reports `failed`.
 

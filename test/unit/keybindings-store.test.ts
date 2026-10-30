@@ -48,6 +48,13 @@ const temporaryNames = (directory: string): readonly string[] =>
 
 const targetPathIn = (workspace: string): string => path.join(workspace, FILE_NAME);
 
+/** Each link's recorded target, so a test can prove the links survived intact. */
+const linkTargetsOf = (linkPaths: readonly string[]): readonly string[] =>
+  linkPaths.map((linkPath) => {
+    expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(true);
+    return fs.readlinkSync(linkPath);
+  });
+
 /**
  * Builds a real `node:fs` surface in which exactly one operation throws.
  *
@@ -187,6 +194,85 @@ describe('atomic keybindings file store', () => {
     expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(true);
     expect(fs.lstatSync(intermediatePath).isSymbolicLink()).toBe(true);
     expect(fs.readFileSync(realPath, 'utf8')).toBe('{}');
+  });
+
+  test('refuses a dangling chain longer than the hop limit without replacing a link', () => {
+    const workspace = createWorkspace();
+    // One link more than the adapter's 40-hop bound, ending at a missing file.
+    const linkPaths = [
+      targetPathIn(workspace),
+      ...Array.from({length: 40}, (_, index) => path.join(workspace, `hop-${index + 1}.json5`))
+    ];
+    for (const [index, linkPath] of linkPaths.entries()) {
+      const next = linkPaths[index + 1] ?? path.join(workspace, 'missing-target.json5');
+      fs.symlinkSync(path.relative(workspace, next), linkPath);
+    }
+    const targetsBefore = linkTargetsOf(linkPaths);
+    const store = createFileKeybindingsStore({filePath: linkPaths[0]});
+
+    expect(store.write('{}').kind).toBe('failed');
+
+    expect(linkTargetsOf(linkPaths)).toEqual(targetsBefore);
+    expect(fs.existsSync(path.join(workspace, 'missing-target.json5'))).toBe(false);
+    expect(temporaryNames(workspace)).toEqual([]);
+  });
+
+  test('refuses a symlink cycle without replacing a link', () => {
+    const workspace = createWorkspace();
+    const linkPath = targetPathIn(workspace);
+    const otherPath = path.join(workspace, 'other.json5');
+    fs.symlinkSync(path.basename(otherPath), linkPath);
+    fs.symlinkSync(path.basename(linkPath), otherPath);
+    const store = createFileKeybindingsStore({filePath: linkPath});
+
+    expect(store.write('{}').kind).toBe('failed');
+
+    expect(linkTargetsOf([linkPath, otherPath])).toEqual([path.basename(otherPath), path.basename(linkPath)]);
+    expect(temporaryNames(workspace)).toEqual([]);
+  });
+
+  test('fails closed when the link target cannot be read', () => {
+    const workspace = createWorkspace();
+    const realPath = path.join(workspace, 'dotfiles-keybindings.json5');
+    const linkPath = targetPathIn(workspace);
+    fs.symlinkSync(path.basename(realPath), linkPath);
+    const store = createFileKeybindingsStore({
+      filePath: linkPath,
+      fs: {
+        ...realFileSystem(),
+        readlinkSync: () => {
+          throw errorWithCode('EACCES');
+        }
+      }
+    });
+
+    expect(store.write('{}').kind).toBe('failed');
+
+    expect(linkTargetsOf([linkPath])).toEqual([path.basename(realPath)]);
+    expect(fs.existsSync(realPath)).toBe(false);
+    expect(temporaryNames(workspace)).toEqual([]);
+  });
+
+  test('fails closed when the path cannot be inspected', () => {
+    const workspace = createWorkspace();
+    const realPath = path.join(workspace, 'dotfiles-keybindings.json5');
+    const linkPath = targetPathIn(workspace);
+    fs.symlinkSync(path.basename(realPath), linkPath);
+    const store = createFileKeybindingsStore({
+      filePath: linkPath,
+      fs: {
+        ...realFileSystem(),
+        lstatSync: () => {
+          throw errorWithCode('EACCES');
+        }
+      }
+    });
+
+    expect(store.write('{}').kind).toBe('failed');
+
+    expect(linkTargetsOf([linkPath])).toEqual([path.basename(realPath)]);
+    expect(fs.existsSync(realPath)).toBe(false);
+    expect(temporaryNames(workspace)).toEqual([]);
   });
 
   for (const point of FAULT_POINTS) {

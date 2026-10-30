@@ -66,6 +66,15 @@ type ReplacementPlan = Readonly<{
   readonly temporaryPath: string;
 }>;
 
+/**
+ * The path a write may land on, or why no such path could be established.
+ *
+ * A write is only ever safe against a path that is known not to be a symlink,
+ * or that is genuinely absent. Anything else must fail closed rather than
+ * gamble on a rename replacing a link with a regular file.
+ */
+type TargetResolution = Readonly<{kind: 'resolved'; path: string}> | Readonly<{kind: 'unresolved'; error: unknown}>;
+
 /** Blocks the calling thread; only used between transient Windows retries. */
 const defaultSleep = (milliseconds: number): void => {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
@@ -100,46 +109,56 @@ export const createFileKeybindingsStore = (
    * `keybindings.json5` is exactly that before the target file exists. Writing
    * to the link's own path would rename a regular file over the link and break
    * the user's setup, so the chain is followed by hand until a path that is not
-   * a link (or does not exist) is reached.
+   * a link, or that is genuinely absent, is reached.
+   *
+   * Resolution fails closed. A link the walk could not follow — a cycle, or a
+   * chain longer than the bound — is not a writable target, because renaming
+   * over it would replace the user's link with a regular file. Likewise, an
+   * inspection error means the path is unknown rather than free to create.
    */
-  const followLinks = (candidate: string, hops: number): string => {
-    if (hops >= MAX_SYMLINK_HOPS) {
-      return candidate;
-    }
-    let isLink = false;
+  const followLinks = (candidate: string, hops: number): TargetResolution => {
+    let isLink: boolean;
     try {
       isLink = fileSystem.lstatSync(candidate).isSymbolicLink();
-    } catch {
-      return candidate;
+    } catch (error) {
+      return errorCode(error) === 'ENOENT' ? {kind: 'resolved', path: candidate} : {kind: 'unresolved', error};
     }
     if (!isLink) {
-      return candidate;
+      return {kind: 'resolved', path: candidate};
+    }
+    if (hops >= MAX_SYMLINK_HOPS) {
+      return {
+        error: new Error(`Refusing to follow more than ${MAX_SYMLINK_HOPS} symlinks from "${options.filePath}".`),
+        kind: 'unresolved'
+      };
     }
     let linkTarget: string;
     try {
       linkTarget = fileSystem.readlinkSync(candidate);
-    } catch {
-      return candidate;
+    } catch (error) {
+      return {kind: 'unresolved', error};
     }
     return followLinks(path.resolve(path.dirname(candidate), linkTarget), hops + 1);
   };
 
   /** The symlink's target when there is one, so the link itself survives. */
-  const resolveTarget = (): string => {
+  const resolveTarget = (): TargetResolution => {
     try {
-      return fileSystem.realpathSync(options.filePath);
-    } catch {
-      return followLinks(options.filePath, 0);
+      return {kind: 'resolved', path: fileSystem.realpathSync(options.filePath)};
+    } catch (error) {
+      // Only a dangling chain can be resolved by hand; a cycle or an
+      // unreadable component is reported by `realpathSync` and must not be
+      // guessed at.
+      return errorCode(error) === 'ENOENT' ? followLinks(options.filePath, 0) : {kind: 'unresolved', error};
     }
   };
 
-  /** The target a replacement will land on, plus the mode it currently has. */
-  const resolveReplacementTarget = () => {
-    const target = resolveTarget();
+  /** The mode a replacement must keep, when the target already exists. */
+  const modeOf = (target: string): number | undefined => {
     try {
-      return {mode: fileSystem.statSync(target).mode & 0o777, path: target};
+      return fileSystem.statSync(target).mode & 0o777;
     } catch {
-      return {mode: undefined, path: target};
+      return undefined;
     }
   };
 
@@ -149,11 +168,10 @@ export const createFileKeybindingsStore = (
    * The counter makes a name unique within the process, so a failed attempt's
    * leftover cannot be mistaken for the next attempt's file.
    */
-  const planReplacement = (): ReplacementPlan => {
-    const {mode, path: target} = resolveReplacementTarget();
+  const planReplacement = (target: string): ReplacementPlan => {
     temporaryCounter += 1;
     const temporaryPath = path.join(path.dirname(target), `.${fileName}.${process.pid}.${temporaryCounter}.tmp`);
-    return {mode, target, temporaryPath};
+    return {mode: modeOf(target), target, temporaryPath};
   };
 
   /**
@@ -233,7 +251,11 @@ export const createFileKeybindingsStore = (
   };
 
   const write = (text: string): KeybindingsWriteOutcome => {
-    const plan = planReplacement();
+    const resolution = resolveTarget();
+    if (resolution.kind === 'unresolved') {
+      return {error: resolution.error, kind: 'failed'};
+    }
+    const plan = planReplacement(resolution.path);
     if (!canReplaceTarget(plan)) {
       return {error: new Error(`Refusing to replace read-only file "${plan.target}".`), kind: 'failed'};
     }
@@ -263,8 +285,15 @@ export const createFileKeybindingsStore = (
 
   /** Removes temporary files a crashed write left beside the target. */
   const removeStaleTemporaryFiles = (): void => {
-    const target = resolveTarget();
-    const directory = path.dirname(target);
+    const resolution = resolveTarget();
+    if (resolution.kind === 'unresolved') {
+      warnFn(
+        `[config-keybindings] Couldn't resolve "${options.filePath}" to inspect it for stale temporary files.`,
+        resolution.error
+      );
+      return;
+    }
+    const directory = path.dirname(resolution.path);
     let names: string[];
     try {
       names = fileSystem.readdirSync(directory);
