@@ -53,7 +53,7 @@ const targetPathIn = (workspace: string): string => path.join(workspace, FILE_NA
  *
  * Every other operation is the genuine one, so a fault test exercises the
  * adapter's real open/write/fsync/chmod/rename sequence rather than a
- * hand-written imitation of it.
+ * handwritten imitation of it.
  */
 const faultingFileSystem = (point: FaultPoint, code = 'EIO') => {
   const reached: FaultPoint[] = [];

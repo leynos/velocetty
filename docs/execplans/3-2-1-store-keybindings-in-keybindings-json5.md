@@ -447,6 +447,12 @@ design and the notification the user sees.
     chmod, rename) is asserted reached and leaves the previous bytes intact;
     symlink, mode-preservation, transient-retry, give-up, and stale-temporary
     cases pass. Gates green (626 tests, 75 files).
+  - [x] (2026-10-30) D2 service: `app/config/keybindings.ts` is rewritten as a
+    store-driven service with one state-change path, plus the temporary
+    `keybindings-legacy.ts` adapter that keeps the importer working until D3.
+    19 named examples, 7 KB-SVC-1 properties, and 2 KB-SVC-2 model tests pass.
+    Both required negative controls fail and were reverted; transcripts in
+    `Artefacts and notes`.
 - [ ] EP-E watcher and end-to-end: red; green; refactor; gates; CI end-to-end
   run on three operating systems.
 - [ ] EP-F documentation and roadmap: drafts; review; gates.
@@ -882,6 +888,28 @@ design and the notification the user sees.
   reviewable diff instead of hidden test data, and adding or removing a class
   without classifying it fails the suite. Date/Author: 2026-10-30,
   implementation agent.
+- Decision: the service exposes `active()` as a read-only query and keeps
+  `start`, `reload`, `importKeybindings`, and `exportKeybindings` as the only
+  state-changing commands. Rationale: KB-SVC-2's model has to observe the
+  keymaps in effect after every command without perturbing them, and the
+  alternative, reading through `exportKeybindings`, would conflate a filesystem
+  read with a query. The query returns a fresh map from `activeKeymaps`, so no
+  caller can mutate service state. Date/Author: 2026-10-30, implementation
+  agent.
+- Decision: the KB-SVC-2 model test does not pass an `fc.commands`
+  `replayPath` option. Rationale: the option takes a serialized shrink hint
+  such as `"EBC:F"`, not a filename; supplying a filename made the shrinker
+  throw. fast-check already prints `/*replayPath="..."*/` on failure, so the
+  reproduction hint is retained without the option. Date/Author: 2026-10-30,
+  implementation agent.
+- Decision: `app/config/keybindings-legacy.ts` is a temporary module holding
+  the earlier delivery's importer-facing API, re-exported from
+  `keybindings.ts`, rather than keeping both in one file. Rationale: the
+  service rewrite pushed `keybindings.ts` past the 400-line limit; splitting
+  the untouched legacy behaviour keeps the service reviewable and makes the D3
+  deletion a single file plus one export. It imports `UserKeymaps` from the
+  policy module, not from `keybindings.ts`, so no type cycle is introduced.
+  Date/Author: 2026-10-30, implementation agent.
 
 ## Outcomes & retrospective
 
@@ -2571,6 +2599,72 @@ table, which moved the agreement test to `Object.entries`; and
 `no-unnecessary-condition` would have rejected the `undefined` guard that
 `noUncheckedIndexedAccess` demands.
 
+### EP-D: atomic store, service, and importer
+
+Artefacts (D1 and D2):
+
+- `app/config/keybindings-store.ts` (new): the atomic file adapter.
+- `test/unit/keybindings-store.test.ts` (new): 14 KB-STORE-1 tests.
+- `app/config/keybindings.ts` (rewritten): the store-driven service and the
+  KB-SVC-1 import/export laws.
+- `app/config/keybindings-legacy.ts` (new, temporary): the earlier delivery's
+  importer-facing API, re-exported from `keybindings.ts` until D3 deletes it.
+- `test/testUtils/memory-keybindings-store.ts` (new): the store double.
+- `test/unit/keybindings-service.test.ts`,
+  `test/unit/keybindings-service.property.test.ts`, and
+  `test/unit/keybindings-service.model.test.ts` (new).
+
+D2 red. The three suites were written against the service before the rewrite,
+so the focused run stopped at the missing named export
+`createKeybindingsService`; no assertion ran. Green on the rewritten service:
+
+```plaintext
+bun test test/unit/keybindings-service.test.ts \
+  test/unit/keybindings-service.property.test.ts \
+  test/unit/keybindings-service.model.test.ts
+ 28 pass
+  0 fail
+ 5017 expect() calls
+Ran 28 tests across 3 files.
+```
+
+The model test runs 60 command sequences of at most 50 commands each at seed
+`20_261_030`. Its non-vacuity companion samples the same generator and asserts
+the exact set of ten command names, so a command that stopped being generated
+would fail the suite rather than silently weaken KB-SVC-2.
+
+Negative control (c), part 1: KB-SVC-1's stated mutation canonicalizes on
+import. `importKeybindings` was changed to write
+`serializeKeybindings(parsed.keymaps)` instead of the supplied text. The
+verbatim property failed on the compact-JSON arm, which is why that arm exists:
+
+```plaintext
+Property failed after 1 tests
+{ seed: 20261030, path: "0:0", endOnFailure: true }
+Counterexample: ["{}"]
+Shrunk 1 time(s)
+ 6 pass
+ 1 fail
+```
+
+Negative control (c), part 2: KB-SVC-2's stated defect applies the legacy
+keymaps when the file turns invalid. The service was changed to remember the
+`start` argument and apply it on an invalid reload. Five of the nineteen named
+examples failed, including the deterministic B≠A regression test, and the model
+test failed with:
+
+```plaintext
+Property failed after 15 tests
+Counterexample: [set invalid,start /*replayPath="GAM:F"*/]
+Shrunk 5 time(s)
+- [make unreadable,reload,set invalid,start /*replayPath="GAM:F"*/]
+- [reload,set invalid,start /*replayPath="GAM:F"*/]
+- [set invalid,start /*replayPath="GAM:F"*/]
+```
+
+Both mutations were reverted; `grep` confirms neither `legacyKeymaps` nor the
+canonicalizing write remains, and the three suites return to `28 pass`.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -2741,6 +2835,7 @@ export const createKeybindingsService: (dependencies: {
   readonly reload: () => KeybindingsLoadOutcome;
   readonly importKeybindings: (text: string, sourceLabel: string) => KeybindingsImportOutcome;
   readonly exportKeybindings: () => KeybindingsExport;
+  readonly active: () => UserKeymaps; // read-only query; KB-SVC-2 observes through it
 };
 ```
 

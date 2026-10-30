@@ -1,11 +1,23 @@
-/** @file JSON5-backed user keybindings storage, bootstrap, and import/export helpers. */
-import {existsSync, readFileSync, writeFileSync} from 'node:fs';
-
+/** @file JSON5-backed user keybindings service, bootstrap, and import/export laws. */
+/*
+ * The service owns the last-known-good state. It reads and writes through the
+ * `KeybindingsStore` port, so the rules that matter (no reload writes, no
+ * unreadable file is overwritten, import is verbatim) are testable without a
+ * filesystem.
+ */
 import type {configValidationDiagnostic} from '@shared/types/config';
-import {parseKeybindingsText, toRawKeymaps} from './keybindings-codec';
-import {stringifyJson5} from './json5-config';
-
-export type UserKeymaps = Record<string, string | string[]>;
+import {parseKeybindingsText, serializeKeybindings} from './keybindings-codec';
+import {
+  activeKeymaps,
+  bootstrapObservation,
+  decideBootstrap,
+  initialKeybindingsState,
+  observeKeybindings,
+  type BootstrapFileState,
+  type KeybindingsObservation,
+  type LegacyKeymapsSource,
+  type UserKeymaps
+} from './keybindings-policy';
 
 /** A notification sink shared by the configuration modules. */
 export type ConfigImportNotify = (title: string, body?: string, details?: {error?: unknown}) => void;
@@ -26,203 +38,203 @@ export type KeybindingsStore = {
   readonly write: (text: string) => KeybindingsWriteOutcome;
 };
 
-type TextReader = (path: string, encoding: BufferEncoding) => string;
-type TextWriter = (path: string, content: string, encoding: BufferEncoding) => void;
-type PathExists = (path: string) => boolean;
+/** What a start or reload left in effect. */
+export type KeybindingsLoadOutcome =
+  | {readonly kind: 'applied'; readonly keymaps: UserKeymaps; readonly origin: 'file' | 'missing' | 'seeded'}
+  | {
+      readonly kind: 'kept';
+      readonly keymaps: UserKeymaps;
+      readonly basis: 'last-known-good' | 'empty';
+      readonly cause: 'invalid' | 'unreadable' | 'deferred';
+      readonly diagnostics: readonly configValidationDiagnostic[];
+    };
 
-type ConfigFilePath = {
-  readonly path: string;
-};
+/** What importing user-supplied text did. */
+export type KeybindingsImportOutcome =
+  | {readonly kind: 'written'}
+  | {readonly kind: 'invalid'; readonly diagnostics: readonly configValidationDiagnostic[]}
+  | {readonly kind: 'failed'; readonly error: unknown};
 
-export type KeybindingsSource = {
-  readonly filePath: ConfigFilePath;
-  readonly rawContent: string;
-};
-
-type KeybindingsDependencies = {
-  readonly filePath: string;
-  readonly notify: (title: string, body?: string, details?: {error?: unknown}) => void;
-  readonly warn?: typeof console.warn;
-  readonly readFile?: TextReader;
-  readonly writeFile?: TextWriter;
-  readonly pathExists?: PathExists;
-};
-
-type KeybindingsLoadOptions = {
-  readonly bootstrapFrom?: UserKeymaps;
-};
-
-type KeybindingsMutationResult = {
-  readonly content: string;
-  readonly diagnostics: readonly configValidationDiagnostic[];
-  readonly keymaps: UserKeymaps;
-  readonly usedFallback: boolean;
-};
-
-type KeybindingsLoadResult = {
-  readonly diagnostics: readonly configValidationDiagnostic[];
-  readonly keymaps: UserKeymaps;
-  readonly usedFallback: boolean;
-  readonly usedLastKnownGood: boolean;
-};
+/** What the stored keybindings contain, read without side effects. */
+export type KeybindingsExport =
+  | {readonly kind: 'stored'; readonly text: string}
+  | {readonly kind: 'invalid'; readonly text: string; readonly diagnostics: readonly configValidationDiagnostic[]}
+  | {readonly kind: 'missing'}
+  | {readonly kind: 'unreadable'; readonly error: unknown};
 
 /**
- * Parses keybindings text through the codec.
+ * Formats the first diagnostic as a sentence suffix for a notification.
  *
- * The legacy module keeps its `value`/`usedFallback` shape until EP-D replaces
- * it with the service, but validation and diagnostics come from one place, so
- * this path cannot disagree with the codec about `$schema` or `__proto__`.
+ * Keeping this in one place means start-up, reload, and the earlier module
+ * cannot describe the same problem differently.
  */
-export const parseKeybindingsSource = (source: KeybindingsSource) => {
-  const outcome = parseKeybindingsText(source.rawContent, source.filePath.path);
-  return outcome.kind === 'ok'
-    ? {value: outcome.keymaps, diagnostics: [], usedFallback: false}
-    : {value: {}, diagnostics: outcome.diagnostics, usedFallback: true};
-};
-
-const reportDiagnostics = (
-  warnFn: typeof console.warn,
-  context: string,
-  source: ConfigFilePath,
-  diagnostics: readonly configValidationDiagnostic[]
-) => {
-  if (diagnostics.length === 0) {
-    return;
+const primaryDiagnosticHint = (diagnostics: readonly configValidationDiagnostic[]): string => {
+  const primaryDiagnostic = diagnostics.at(0);
+  if (!primaryDiagnostic) {
+    return '';
   }
-  warnFn(`[config-keybindings] ${context}`, {source: source.path, diagnostics});
+  const docHint = primaryDiagnostic.docHint ? ` Hint: ${primaryDiagnostic.docHint}.` : '';
+  const defaultHint = primaryDiagnostic.defaultHint ? ` Default: ${primaryDiagnostic.defaultHint}.` : '';
+  return ` ${primaryDiagnostic.path}: ${primaryDiagnostic.message} Suggested fix: ${primaryDiagnostic.suggestedFix}.${docHint}${defaultHint}`;
 };
 
-const stringifyKeybindings = (keymaps: UserKeymaps): string => stringifyJson5(keymaps);
+const diagnosticsSignature = (diagnostics: readonly configValidationDiagnostic[]): string =>
+  JSON.stringify(diagnostics.map((entry) => [entry.path, entry.message]));
 
-export const createKeybindingsModule = (dependencies: KeybindingsDependencies) => {
-  const notifyFn = dependencies.notify;
+/**
+ * Creates the keybindings service.
+ *
+ * State changes only through `start` and `reload`. `reload` never writes, and
+ * `importKeybindings` writes but changes no state until the next reload, so
+ * every state change has exactly one path.
+ *
+ * @example
+ * ```ts
+ * const service = createKeybindingsService({notify, store});
+ * service.start({kind: 'parsed-empty'}); // seeds an empty file when missing
+ * service.exportKeybindings(); // {kind: 'stored', text: '...'}
+ * ```
+ */
+export const createKeybindingsService = (dependencies: {
+  readonly store: KeybindingsStore;
+  readonly notify: ConfigImportNotify;
+  readonly warn?: typeof console.warn;
+}) => {
+  const {notify, store} = dependencies;
   const warnFn = dependencies.warn ?? console.warn;
-  const readFile = dependencies.readFile ?? readFileSync;
-  const writeFile = dependencies.writeFile ?? writeFileSync;
-  const pathExists = dependencies.pathExists ?? existsSync;
-  const keybindingsPath = dependencies.filePath;
-  let lastKnownGoodKeymaps: UserKeymaps | undefined;
+  let state = initialKeybindingsState;
+  let isStarted = false;
+  let lastShownDiagnostics = '';
 
-  const notifyWithPrimaryDiagnostic = (baseMessage: string, diagnostics: readonly configValidationDiagnostic[]) => {
-    const primaryDiagnostic = diagnostics.at(0);
-    if (!primaryDiagnostic) {
-      notifyFn(baseMessage);
-      return;
-    }
-
-    const docHint = primaryDiagnostic.docHint ? ` Hint: ${primaryDiagnostic.docHint}.` : '';
-    const defaultHint = primaryDiagnostic.defaultHint ? ` Default: ${primaryDiagnostic.defaultHint}.` : '';
-    notifyFn(
-      `${baseMessage} ${primaryDiagnostic.path}: ${primaryDiagnostic.message} Suggested fix: ${primaryDiagnostic.suggestedFix}.${docHint}${defaultHint}`
-    );
+  const applyObservation = (observation: KeybindingsObservation) => {
+    const result = observeKeybindings(state, observation);
+    state = result.state;
+    return result;
   };
 
-  const buildFallbackResult = (
-    diagnostics: readonly configValidationDiagnostic[],
-    fallbackKeymaps?: UserKeymaps
-  ): KeybindingsLoadResult => {
-    const keymaps = fallbackKeymaps ?? lastKnownGoodKeymaps ?? {};
-    return {
-      diagnostics,
-      keymaps: toRawKeymaps(keymaps),
-      usedFallback: true,
-      usedLastKnownGood: lastKnownGoodKeymaps !== undefined
-    };
-  };
+  const describeDeferred = (): KeybindingsLoadOutcome => ({
+    basis: state.lastAccepted === null ? 'empty' : 'last-known-good',
+    cause: 'deferred',
+    diagnostics: [],
+    keymaps: activeKeymaps(state),
+    kind: 'kept'
+  });
 
-  const ensureKeybindingsFile = (bootstrapFrom: UserKeymaps = {}) => {
-    if (pathExists(keybindingsPath)) {
-      return;
-    }
-
-    const initialKeymaps = toRawKeymaps(bootstrapFrom);
-    warnFn(
-      `[config-keybindings] User keybindings file missing at "${keybindingsPath}". Bootstrapping JSON5 keybindings.`
-    );
-    try {
-      writeFile(keybindingsPath, stringifyKeybindings(initialKeymaps), 'utf8');
-      lastKnownGoodKeymaps = initialKeymaps;
-    } catch (error) {
-      console.error(`[config-keybindings] Failed to write bootstrapped keybindings at "${keybindingsPath}".`, error);
-      notifyFn("Couldn't create a keybindings file. Check permissions and available disk space.");
-    }
-  };
-
-  const loadUserKeybindings = (options: KeybindingsLoadOptions = {}): KeybindingsLoadResult => {
-    ensureKeybindingsFile(options.bootstrapFrom);
-    const filePath: ConfigFilePath = {path: keybindingsPath};
-
-    try {
-      const keybindingsResult = parseKeybindingsSource({
-        filePath,
-        rawContent: readFile(keybindingsPath, 'utf8')
-      });
-      if (keybindingsResult.usedFallback) {
-        reportDiagnostics(warnFn, 'User keybindings diagnostics.', filePath, keybindingsResult.diagnostics);
-        notifyWithPrimaryDiagnostic(
-          "Couldn't parse keybindings file. Keeping the last known good keybindings.",
-          keybindingsResult.diagnostics
-        );
-        return buildFallbackResult(keybindingsResult.diagnostics, options.bootstrapFrom);
+  /** Applies a rejected read and tells the user what is actually in effect. */
+  const describeRejectedRead = (
+    cause: 'invalid' | 'unreadable',
+    diagnostics: readonly configValidationDiagnostic[]
+  ): KeybindingsLoadOutcome => {
+    const result = applyObservation({kind: cause});
+    const basis = result.usedLastKnownGood ? 'last-known-good' : 'empty';
+    const inEffect =
+      basis === 'last-known-good'
+        ? 'Keeping your previous shortcuts.'
+        : 'Using default shortcuts until the file is fixed.';
+    if (cause === 'invalid') {
+      const signature = diagnosticsSignature(diagnostics);
+      if (signature !== lastShownDiagnostics) {
+        lastShownDiagnostics = signature;
+        notify(`Couldn't parse keybindings file. ${inEffect}${primaryDiagnosticHint(diagnostics)}`);
       }
-
-      lastKnownGoodKeymaps = toRawKeymaps(keybindingsResult.value);
-      return {
-        diagnostics: keybindingsResult.diagnostics,
-        keymaps: toRawKeymaps(keybindingsResult.value),
-        usedFallback: false,
-        usedLastKnownGood: false
-      };
-    } catch (error) {
-      console.error(`[config-keybindings] Failed to read or parse keybindings at "${keybindingsPath}".`, error);
-      notifyFn("Couldn't read keybindings file. Keeping the last known good keybindings.");
-      return buildFallbackResult([], options.bootstrapFrom);
+    } else {
+      notify(`Couldn't read keybindings file. ${inEffect}`);
     }
+    return {basis, cause, diagnostics, keymaps: activeKeymaps(state), kind: 'kept'};
   };
 
-  const importKeybindings = (rawContent: string, sourceLabel = keybindingsPath): KeybindingsMutationResult => {
-    const parsed = parseKeybindingsSource({
-      filePath: {path: sourceLabel},
-      rawContent
-    });
+  /** Reads and applies whatever the file currently holds; never writes. */
+  const readCurrentFile = (): KeybindingsLoadOutcome => {
+    const readOutcome = store.read();
+    if (readOutcome.kind === 'missing') {
+      applyObservation({kind: 'missing'});
+      lastShownDiagnostics = '';
+      return {keymaps: activeKeymaps(state), kind: 'applied', origin: 'missing'};
+    }
+    if (readOutcome.kind === 'unreadable') {
+      warnFn(`[config-keybindings] Couldn't read "${store.location}".`, readOutcome.error);
+      return describeRejectedRead('unreadable', []);
+    }
 
-    if (parsed.usedFallback) {
-      return {
-        content: stringifyKeybindings(lastKnownGoodKeymaps ?? {}),
+    const parsed = parseKeybindingsText(readOutcome.text, store.location);
+    if (parsed.kind === 'invalid') {
+      warnFn('[config-keybindings] User keybindings diagnostics.', {
         diagnostics: parsed.diagnostics,
-        keymaps: toRawKeymaps(lastKnownGoodKeymaps ?? {}),
-        usedFallback: true
-      };
+        source: store.location
+      });
+      return describeRejectedRead('invalid', parsed.diagnostics);
+    }
+    lastShownDiagnostics = '';
+    applyObservation({keymaps: parsed.keymaps, kind: 'valid'});
+    return {keymaps: activeKeymaps(state), kind: 'applied', origin: 'file'};
+  };
+
+  const start = (legacy: LegacyKeymapsSource): KeybindingsLoadOutcome => {
+    // Start-up bootstrap runs once; a second call is just a reload.
+    if (isStarted) {
+      return readCurrentFile();
+    }
+    isStarted = true;
+
+    const readOutcome = store.read();
+    const file: BootstrapFileState = readOutcome.kind;
+    const decision = decideBootstrap({file, legacy});
+    if (decision.kind === 'defer') {
+      return describeDeferred();
+    }
+    if (decision.kind === 'write-nothing') {
+      return readCurrentFile();
     }
 
-    const normalizedKeymaps = toRawKeymaps(parsed.value);
-    const content = stringifyKeybindings(normalizedKeymaps);
-    writeFile(keybindingsPath, content, 'utf8');
-    lastKnownGoodKeymaps = normalizedKeymaps;
-    return {
-      content,
-      diagnostics: parsed.diagnostics,
-      keymaps: toRawKeymaps(normalizedKeymaps),
-      usedFallback: false
-    };
+    const writeOutcome = store.write(serializeKeybindings(decision.keymaps));
+    if (writeOutcome.kind === 'failed') {
+      notify("Couldn't create a keybindings file. Check permissions and available disk space.", undefined, {
+        error: writeOutcome.error
+      });
+    }
+    const observation = bootstrapObservation(decision, writeOutcome.kind === 'written' ? 'written' : 'failed');
+    if (observation === null) {
+      return describeDeferred();
+    }
+    lastShownDiagnostics = '';
+    applyObservation(observation);
+    return {keymaps: activeKeymaps(state), kind: 'applied', origin: 'seeded'};
   };
 
-  const exportKeybindings = (): KeybindingsMutationResult => {
-    const loaded = loadUserKeybindings();
-    const content = stringifyKeybindings(loaded.keymaps);
-    return {
-      content,
-      diagnostics: loaded.diagnostics,
-      keymaps: loaded.keymaps,
-      usedFallback: loaded.usedFallback
-    };
+  const reload = (): KeybindingsLoadOutcome => readCurrentFile();
+
+  const importKeybindings = (text: string, sourceLabel: string): KeybindingsImportOutcome => {
+    const parsed = parseKeybindingsText(text, sourceLabel);
+    if (parsed.kind === 'invalid') {
+      return {diagnostics: parsed.diagnostics, kind: 'invalid'};
+    }
+    const writeOutcome = store.write(text);
+    if (writeOutcome.kind === 'failed') {
+      notify("Couldn't save keybindings file.", undefined, {error: writeOutcome.error});
+      return {error: writeOutcome.error, kind: 'failed'};
+    }
+    return {kind: 'written'};
   };
 
-  return {
-    ensureKeybindingsFile,
-    loadUserKeybindings,
-    importKeybindings,
-    exportKeybindings,
-    stringifyKeybindings
+  const exportKeybindings = (): KeybindingsExport => {
+    const readOutcome = store.read();
+    if (readOutcome.kind === 'missing') {
+      return {kind: 'missing'};
+    }
+    if (readOutcome.kind === 'unreadable') {
+      return {error: readOutcome.error, kind: 'unreadable'};
+    }
+    const parsed = parseKeybindingsText(readOutcome.text, store.location);
+    return parsed.kind === 'ok'
+      ? {kind: 'stored', text: readOutcome.text}
+      : {diagnostics: parsed.diagnostics, kind: 'invalid', text: readOutcome.text};
   };
+
+  /** The keymaps currently in effect; a query with no side effects. */
+  const active = (): UserKeymaps => activeKeymaps(state);
+
+  return {active, exportKeybindings, importKeybindings, reload, start};
 };
+
+// Temporary re-export: the importer still calls the legacy module until EP-D.
+export {createKeybindingsModule} from './keybindings-legacy';
