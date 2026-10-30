@@ -14,10 +14,19 @@ readonly list_file='LemmaScript-files.txt'
 readonly max_timeout_seconds=60
 readonly policy_source='app/config/keybindings-policy.ts'
 readonly expected_dafny_prefix='4.11.'
+readonly lsc_bin='node_modules/.bin/lsc'
 
 fail() {
   printf 'prove: %s\n' "$*" >&2
   exit 1
+}
+
+# Pin the local install. A bare `bunx lsc` without `node_modules` resolves the
+# published npm package literally named `lsc`, which is a different tool that
+# fails with "Command not found!".
+require_lsc() {
+  [[ -x "$lsc_bin" ]] ||
+    fail "Missing ${lsc_bin}. Run 'bun install' first; without it a bare 'bunx lsc' runs an unrelated npm package."
 }
 
 require_dafny() {
@@ -70,10 +79,10 @@ check_generated_artefacts_are_current() {
   while IFS= read -r source; do
     read -r source _ <<<"$source"
     generated="${source%.ts}.dfy.gen"
-    [[ -f "$generated" ]] || fail "Missing generated proof artefact '${generated}'. Run 'bunx lsc gen --backend=dafny ${source}'."
+    [[ -f "$generated" ]] || fail "Missing generated proof artefact '${generated}'. Run '${lsc_bin} gen --backend=dafny ${source}'."
   done < <(read_entries)
 
-  bunx lsc gen --backend=dafny >/dev/null
+  "$lsc_bin" gen --backend=dafny >/dev/null
   if ! git diff --quiet -- '*.dfy.gen'; then
     fail "Generated Dafny artefacts are stale. Commit the regenerated *.dfy.gen files."
   fi
@@ -100,7 +109,7 @@ check_forbidden_trust_constructs() {
 
 run_verification() {
   local output verified
-  if ! output="$(bunx lsc check --backend=dafny 2>&1)"; then
+  if ! output="$("$lsc_bin" check --backend=dafny 2>&1)"; then
     printf '%s\n' "$output" >&2
     fail "LemmaScript verification failed."
   fi
@@ -117,6 +126,7 @@ run_verification() {
 
 main() {
   require_dafny
+  require_lsc
   validate_entries
   check_generated_artefacts_are_current
   check_forbidden_trust_constructs

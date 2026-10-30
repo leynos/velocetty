@@ -49,14 +49,13 @@ jobs:
       - name: Spelling
         if: runner.os == 'Linux'
         run: make spelling
-      - name: Prove LemmaScript contracts
+      - name: Install Dafny for LemmaScript
         if: runner.os == 'Linux'
         run: |
           dotnet tool install --global dafny --version 4.11.0
-          # `$GITHUB_PATH` only applies to later steps, so export the tool
-          # directory for the `make prove` in this one.
-          export PATH="$HOME/.dotnet/tools:$PATH"
-          make prove
+          # `$GITHUB_PATH` only affects later steps, which is why this and the
+          # prove step are separate.
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
       - name: Set up isolated Rust for Merman
         if: runner.os == 'Linux'
         run: rustup toolchain install 1.95.0 --profile minimal
@@ -104,6 +103,12 @@ jobs:
           TMP: ${{ runner.temp }}
           TEMP: ${{ runner.temp }}
           npm_config_tmp: ${{ runner.temp }}
+      - name: Prove LemmaScript contracts
+        if: runner.os == 'Linux'
+        # `make prove` needs the pinned `lsc` from `node_modules`, so it runs
+        # after the install steps; a bare `bunx lsc` would fetch the unrelated
+        # npm package of that name.
+        run: make prove
       - name: Install libarchive-tools
         if: runner.os == 'Linux'
         run: |

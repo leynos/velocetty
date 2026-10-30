@@ -520,10 +520,16 @@ design and the notification the user sees.
 - [ ] EP-G hosted CI repair: the first hosted run of `b1c8eaa1` failed on all
   three operating systems. Each cause is repaired; the repairs await the full
   gate set and a new hosted run.
-  - [x] (2026-10-30) Linux: `make prove` failed because `dotnet tool install`
-    was added to `PATH` through `$GITHUB_PATH`, which only applies to later
-    steps, so `lsc` could not find `dafny` inside the same step. The step now
-    exports `$HOME/.dotnet/tools` before `make prove`.
+  - [x] (2026-10-30) Linux: `make prove` failed twice. The first run failed
+    because `dotnet tool install` added itself to `PATH` through
+    `$GITHUB_PATH`, which only applies to later steps, so `dafny` was not found
+    inside the same step. Exporting `$HOME/.dotnet/tools` fixed that and
+    exposed the real cause: the step runs before `bun install`, so `bunx lsc`
+    had no local binary and resolved the unrelated npm package named `lsc`,
+    which prints `error:   Command not found!`. `bin/prove.sh` now runs the
+    pinned `node_modules/.bin/lsc` and fails with an actionable message when it
+    is missing; the workflow installs Dafny in its own step (so `$GITHUB_PATH`
+    applies) and runs `make prove` after the install steps.
   - [x] (2026-10-30) macOS: the packaged application could not start,
     `Cannot find module '@shared/types/json'` from
     `dist/app/config/keybindings-codec.js`. `app/` is compiled by `tsgo`, where
@@ -609,6 +615,13 @@ design and the notification the user sees.
   recreated it, but that discards handwritten proof additions. Impact: `.dfy`
   files are additions-only, and a contract change needs the generated lines
   reconciled by hand before `make prove` will run.
+- Observation: `bunx lsc` is not the LemmaScript CLI unless `node_modules`
+  exists. Without a local install it resolves the published npm package named
+  `lsc`, a different tool that prints `help: undefined 4.0.0-canary.5` and then
+  `error:   Command not found!`. Evidence: the Linux hosted job for `9a633520`,
+  reproduced verbatim in a scratch directory holding only `package.json`, the
+  file list, and the policy sources. Impact: `bin/prove.sh` invokes
+  `node_modules/.bin/lsc` and CI runs `make prove` after `bun install`.
 - Observation: EP-P's red step is only decisive once a stub exists. Without the
   module, Bun reports a missing import and no invariant runs; with a stub that
   returns the old Hyper paths, exactly the two non-vacuity tests pass and the

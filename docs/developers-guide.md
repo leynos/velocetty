@@ -1055,7 +1055,11 @@ normal `make test` gate runs them.
 ### Proofs (LemmaScript)
 
 `make prove` runs `./bin/prove.sh`, which verifies each source listed in
-`LemmaScript-files.txt` through `bunx lsc check --backend=dafny`.
+`LemmaScript-files.txt` through the pinned `node_modules/.bin/lsc` with
+`check --backend=dafny`. Run `bun install` first: with no `node_modules`, a bare
+`bunx lsc` resolves the unrelated npm package named `lsc` and fails with
+`Command not found!`. The script says so rather than leaving the wrong-tool
+error to be diagnosed.
 
 - The script refuses a vacuous pass. It fails on an empty file list, on an
   entry whose timeout exceeds 60 seconds (Dafny 4.11 is expected; `lsc` would
