@@ -4,7 +4,8 @@ import path from 'node:path';
 
 import type {configValidationDiagnostic, parsedConfig, rawConfig} from '@shared/types/config';
 import {isJsonValue} from '../utils/runtime-guards';
-import {createKeybindingsModule, parseKeybindingsSource} from './keybindings';
+import {createKeybindingsModule} from './keybindings';
+import {parseKeybindingsText, toRawKeymaps} from './keybindings-codec';
 import {parseJson5WithSchemaDiagnostics, safeParseRawConfig, stringifyJson5, type ParseSchema} from './json5-config';
 
 type LoadedConfig = {
@@ -88,7 +89,7 @@ const reportDiagnostics = (
   warnFn: typeof console.warn,
   context: string,
   source: ConfigFilePath,
-  diagnostics: configValidationDiagnostic[]
+  diagnostics: readonly configValidationDiagnostic[]
 ) => {
   if (diagnostics.length === 0) {
     return;
@@ -254,11 +255,12 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
       console.error(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`, error);
     }
 
-    const keymapResult = parseKeybindingsSource({filePath, rawContent: content});
-    if (keymapResult.usedFallback) {
+    const keymapResult = parseKeybindingsText(content, platformKeyPath);
+    if (keymapResult.kind === 'invalid') {
       reportDiagnostics(warnFn, 'Platform keymap diagnostics.', filePath, keymapResult.diagnostics);
+      return {};
     }
-    return keymapResult.value;
+    return toRawKeymaps(keymapResult.keymaps);
   };
 
   const loadUserConfig = (defaultConfigFallback: rawConfig): LoadedConfig => {

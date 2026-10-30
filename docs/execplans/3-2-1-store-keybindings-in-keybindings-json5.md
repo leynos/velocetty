@@ -424,7 +424,13 @@ design and the notification the user sees.
   intended invariants and were reverted; gates green (566 tests, proof 1 + 8
   verified). Deviations and subset findings are recorded in
   `Surprises & discoveries` and the Decision log.
-- [ ] EP-C codec and schema: red; green; refactor; gates.
+- [x] (2026-10-30) EP-C codec and schema: red confirmed with the missing
+  module (`Cannot find module '../../app/config/keybindings-codec'`); green on
+  `app/config/keybindings-codec.ts` with 44 focused tests across four suites
+  and a generated draft-07 schema at `shared/schemas/keybindings.schema.json`.
+  `bun run generate-schema` is idempotent, and a hand-edited `minLength` failed
+  both schema tests before being reverted; gates green (610 tests, proof 1 + 8
+  verified). Details in `Artefacts and notes`.
 - [ ] EP-D store, service, importer: red; green; negative control (c);
   refactor; gates.
 - [ ] EP-E watcher and end-to-end: red; green; refactor; gates; CI end-to-end
@@ -566,6 +572,36 @@ design and the notification the user sees.
   narrow `oxlint-disable-next-line typescript/no-unnecessary-condition`
   comments with reasons, and no behavioural suppression. Precomputing
   `lastIndex` also avoids `unicorn/prefer-at`, which LemmaScript cannot lower.
+
+- Observation: Zod 4's record parsing assigns validated entries with `[[Set]]`,
+  so an own `__proto__` key is silently dropped and never validated;
+  `safeParse` returns success with the key missing. Evidence: a probe on
+  `z.record(z.string(), z.string())` and the codec's prototype round-trip test.
+  By contrast, `JSON5.parse` does create an own `__proto__` data property while
+  keeping `Object.prototype`, which is why the fixture corpus can express the
+  case at all. Impact: the codec validates command ids and bindings
+  individually and assembles the map with `Object.fromEntries`; Ajv validates
+  the same document correctly, so the generated schema needed no workaround.
+- Observation: the plan expected `parseKeybindingsText` to catch a `RangeError`
+  from pathological nesting. On Bun 1.4.4, `'['.repeat(100_000)` raises JSON5's
+  own `SyntaxError` with `lineNumber`/`columnNumber`, so there is no separate
+  depth branch to write. Impact: one `try`/`catch` covers both syntax and depth
+  failures, and the regression test asserts non-throwing behaviour rather than
+  a specific error class.
+- Observation: oxlint's advice constrains how the corpus is expressed, in ways
+  the type checker does not. `deslop(no-known-value-widening)` rejects an
+  explicit `Readonly<Record<string, FixtureExpectation>>` annotation on the
+  fixture table, requiring inference plus `satisfies`; but with inference the
+  table cannot be indexed by `string`, and
+  `typescript(no-unnecessary-condition)` ignores `noUncheckedIndexedAccess` and
+  would report an `undefined` guard as unnecessary. Evidence: two successive
+  lint runs. Impact: the agreement test iterates `Object.entries(FIXTURES)`
+  instead of indexing by file name, and the key set is still pinned by a
+  separate assertion.
+- Observation: `z.toJSONSchema` returns Zod's schema-payload interface, which is
+  not assignable to the repository's `JsonValue`. Impact: the codec exports the
+  payload type as-is for the generator and Ajv, and the parity suite widens
+  only the assertion (`expect<unknown>`) rather than converting the schema.
 
 ## Decision log
 
@@ -798,6 +834,37 @@ design and the notification the user sees.
   the translator. Precomputing `lastIndex` keeps the code free of
   `unicorn/prefer-at`. No behavioural check is suppressed. Date/Author:
   2026-10-30, implementation agent.
+
+- Decision: `parseKeybindingsText` validates command ids and bindings with Zod
+  schemas but assembles the accepted map itself, with `Object.fromEntries`.
+  Rationale: `z.record` parses through `[[Set]]` and therefore loses an own
+  `__proto__` key without reporting an error, which would make the codec
+  disagree with its own JSON Schema. Validating entries individually keeps one
+  source of truth for the constraints while preserving every own key.
+  Date/Author: 2026-10-30, implementation agent.
+- Decision: the top-level `$schema` key is validated as an ordinary
+  binding-shaped entry and then dropped. Rationale: the generated JSON Schema
+  still describes it as an `additionalProperties` member, so Ajv and the codec
+  accept exactly the same documents; teaching the schema a special case would
+  have meant a refinement, which `z.toJSONSchema` would drop. Date/Author:
+  2026-10-30, implementation agent.
+- Decision: the codec exports `keybindingsJsonSchema`, which returns Zod's
+  draft-07 payload directly. The generator and the parity suite both consume
+  it, so there is one schema expression in the repository. Rationale:
+  converting the payload to `JsonValue` would add an error path that cannot
+  trigger, and re-declaring the schema in the generator would defeat the parity
+  check. Date/Author: 2026-10-30, implementation agent.
+- Decision: `app/config/keybindings.ts` still holds the legacy module until
+  EP-D, but its local Zod record schema is deleted and `keybindingsSchema` and
+  `toRawKeymaps` now come from the codec. Rationale: keeps one validation
+  definition during the transition without pre-empting the service rewrite.
+  Date/Author: 2026-10-30, implementation agent.
+- Decision: the KB-COD-2 rejection corpus is twelve JSON5 fixtures under
+  `test/fixtures/keybindings/`, nine of them rejections, and the parity suite
+  asserts the exact file set. Rationale: the class coverage becomes a
+  reviewable diff instead of hidden test data, and adding or removing a class
+  without classifying it fails the suite. Date/Author: 2026-10-30,
+  implementation agent.
 
 ## Outcomes & retrospective
 
@@ -2345,6 +2412,100 @@ type assertions, `prefer-at`, `prefer-negative-index`, and two
 and the two remaining conditions are the documented suppressions described in
 the Decision log.
 
+### EP-C: keybindings codec and JSON Schema
+
+Artefacts:
+
+- `app/config/keybindings-codec.ts` (new): the validation schema, the total
+  parser, the canonical writer, and the copying conversion.
+- `app/config/keybindings.ts`: local Zod record schema and `cloneKeymaps`
+  removed; the codec's schema and `toRawKeymaps` are used instead.
+- `app/config/import.ts`: platform keymaps parse through the codec.
+- `bin/generate-keybindings-schema.ts` (new) and the `generate-schema` script.
+- `shared/schemas/keybindings.schema.json` (new, generated).
+- `test/testUtils/keybindings-arbitraries.ts`,
+  `test/unit/keybindings-arbitraries.coverage.test.ts`,
+  `test/unit/keybindings-codec.test.ts`,
+  `test/unit/keybindings-codec.property.test.ts`,
+  `test/unit/keybindings-schema-parity.test.ts`, and twelve documents under
+  `test/fixtures/keybindings/`.
+
+Red. The suites were written against the codec before it existed, so the
+focused run stopped at the import:
+
+```plaintext
+bun test --isolate test/unit/keybindings-codec.test.ts
+error: Cannot find module '../../app/config/keybindings-codec'
+ 0 pass
+ 1 fail
+```
+
+Green. The four focused suites pass:
+
+```plaintext
+bun test test/unit/keybindings-codec.test.ts \
+  test/unit/keybindings-codec.property.test.ts \
+  test/unit/keybindings-schema-parity.test.ts \
+  test/unit/keybindings-arbitraries.coverage.test.ts
+ 44 pass
+  0 fail
+ 5864 expect() calls
+Ran 44 tests across 4 files.
+```
+
+- KB-COD-1 and KB-COD-2 run 500 cases each at seed `20_261_030`. The totality
+  property draws from valid maps, internally corrupted maps, binary strings,
+  and arbitrary JSON values, so non-object roots and unparsable text are
+  covered as well as shape violations.
+- The coverage guard samples 2000 maps and requires every key and binding class
+  in more than five per cent of samples, so the properties cannot pass
+  vacuously on uniform data.
+- The twelve fixtures are nine rejections and three acceptances. The parity
+  suite asserts the exact file set, so a class cannot be dropped or added
+  without classifying it, and it checks that Ajv and the codec agree on every
+  document. A document Ajv cannot parse must be classified `syntax error`.
+
+Schema parity control. The committed schema was hand-edited from
+`"minLength": 1` to `"minLength": 2`. Exactly the two schema tests failed; the
+Ajv agreement cases still passed, because every fixture command id is at least
+two characters.
+
+```plaintext
+ 13 pass
+  2 fail
+```
+
+The file was restored, `cmp` confirmed it matched the snapshot, and the suite
+returned `15 pass`. The control isolates committed-versus-generated drift,
+which is what KB-COD-3 exists to catch.
+
+Generation. After `bun run generate-schema`, `sha256sum -c` reports `OK` for
+`shared/schemas/schema.json`, `shared/schemas/keybindings.schema.json`, and
+`app/config/schema.json`, and `git status` shows only the EP-C paths. The
+formatter normalizes its own freshly written copy, and the committed bytes are
+stable under regeneration.
+
+Gate evidence for EP-C (branch `3-2-1-store-keybindings-in-keybindings-json5`,
+after the codec, generator, tests, fixtures, and lint remediation):
+
+```plaintext
+make check-fmt    pass (339 files formatted, 67 Markdown files unchanged)
+make typecheck    pass
+make lint         pass (Biome 340 files, package boundaries, oxlint)
+make test         pass (610 pass, 0 fail, 74 files)
+make spelling     pass (typos.toml current)
+make prove        pass (sample 1 verified; policy 8 verified, 0 errors)
+```
+
+The first lint attempt failed with nineteen oxlint findings. Most were
+mechanical (`no-array-callback-reference`, `prefer-spread`,
+`numeric-separators-style`, `no-conditional-empty-object-spread`). Three shaped
+the code: `no-unsafe-dictionary-type` required the parsed root to be narrowed
+with `isJsonObject`; `no-known-value-widening` rejected the typed fixture
+table, which moved the agreement test to `Object.entries`; and
+`no-unnecessary-condition` would have rejected the `undefined` guard that
+`noUncheckedIndexedAccess` demands.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -2460,6 +2621,7 @@ export type KeybindingsParseOutcome =
   | {readonly kind: 'invalid'; readonly diagnostics: readonly configValidationDiagnostic[]};
 
 export const keybindingsSchema: z.ZodType<UserKeymaps>;
+export const keybindingsJsonSchema: () => ZodStandardJSONSchemaPayload<typeof keybindingsSchema>; // draft-07
 export const parseKeybindingsText: (text: string, sourceLabel: string) => KeybindingsParseOutcome;
 export const serializeKeybindings: (keymaps: UserKeymaps) => string;
 export const toRawKeymaps: (keymaps: UserKeymaps) => NonNullable<rawConfig['keymaps']>; // copying

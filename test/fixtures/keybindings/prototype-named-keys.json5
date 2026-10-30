@@ -1,0 +1,6 @@
+{
+  '__proto__': 'ctrl+p',
+  constructor: 'ctrl+c',
+  toString: ['ctrl+t'],
+  valueOf: 'ctrl+v',
+}

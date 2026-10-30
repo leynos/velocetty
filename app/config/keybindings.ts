@@ -1,9 +1,8 @@
 /** @file JSON5-backed user keybindings storage, bootstrap, and import/export helpers. */
 import {existsSync, readFileSync, writeFileSync} from 'node:fs';
 
-import {z} from 'zod';
-
 import type {configValidationDiagnostic} from '@shared/types/config';
+import {keybindingsSchema, toRawKeymaps} from './keybindings-codec';
 import {parseJson5WithSchemaDiagnostics, stringifyJson5, type ParseSchema} from './json5-config';
 
 export type UserKeymaps = Record<string, string | string[]>;
@@ -48,22 +47,7 @@ type KeybindingsLoadResult = {
   readonly usedLastKnownGood: boolean;
 };
 
-const keymapValueSchema = z.union([z.string(), z.array(z.string())]);
-const keymapRecordSchema = z.record(z.string(), keymapValueSchema);
-
-const keymapSchema: ParseSchema<UserKeymaps> = {
-  safeParse: (value) => {
-    const parsed = keymapRecordSchema.safeParse(value);
-    if (!parsed.success) {
-      return {
-        success: false,
-        error: parsed.error
-      };
-    }
-
-    return {success: true, data: parsed.data};
-  }
-};
+const keymapSchema: ParseSchema<UserKeymaps> = keybindingsSchema;
 
 const keymapDiagnosticHints = {
   '/': {
@@ -71,8 +55,6 @@ const keymapDiagnosticHints = {
     defaultHint: '{}'
   }
 } as const;
-
-const cloneKeymaps = (keymaps: UserKeymaps): UserKeymaps => structuredClone(keymaps);
 
 export const parseKeybindingsSource = (source: KeybindingsSource) =>
   parseJson5WithSchemaDiagnostics({
@@ -128,7 +110,7 @@ export const createKeybindingsModule = (dependencies: KeybindingsDependencies) =
     const keymaps = fallbackKeymaps ?? lastKnownGoodKeymaps ?? {};
     return {
       diagnostics,
-      keymaps: cloneKeymaps(keymaps),
+      keymaps: toRawKeymaps(keymaps),
       usedFallback: true,
       usedLastKnownGood: lastKnownGoodKeymaps !== undefined
     };
@@ -139,7 +121,7 @@ export const createKeybindingsModule = (dependencies: KeybindingsDependencies) =
       return;
     }
 
-    const initialKeymaps = cloneKeymaps(bootstrapFrom);
+    const initialKeymaps = toRawKeymaps(bootstrapFrom);
     warnFn(
       `[config-keybindings] User keybindings file missing at "${keybindingsPath}". Bootstrapping JSON5 keybindings.`
     );
@@ -170,10 +152,10 @@ export const createKeybindingsModule = (dependencies: KeybindingsDependencies) =
         return buildFallbackResult(keybindingsResult.diagnostics, options.bootstrapFrom);
       }
 
-      lastKnownGoodKeymaps = cloneKeymaps(keybindingsResult.value);
+      lastKnownGoodKeymaps = toRawKeymaps(keybindingsResult.value);
       return {
         diagnostics: keybindingsResult.diagnostics,
-        keymaps: cloneKeymaps(keybindingsResult.value),
+        keymaps: toRawKeymaps(keybindingsResult.value),
         usedFallback: false,
         usedLastKnownGood: false
       };
@@ -194,19 +176,19 @@ export const createKeybindingsModule = (dependencies: KeybindingsDependencies) =
       return {
         content: stringifyKeybindings(lastKnownGoodKeymaps ?? {}),
         diagnostics: parsed.diagnostics,
-        keymaps: cloneKeymaps(lastKnownGoodKeymaps ?? {}),
+        keymaps: toRawKeymaps(lastKnownGoodKeymaps ?? {}),
         usedFallback: true
       };
     }
 
-    const normalizedKeymaps = cloneKeymaps(parsed.value);
+    const normalizedKeymaps = toRawKeymaps(parsed.value);
     const content = stringifyKeybindings(normalizedKeymaps);
     writeFile(keybindingsPath, content, 'utf8');
     lastKnownGoodKeymaps = normalizedKeymaps;
     return {
       content,
       diagnostics: parsed.diagnostics,
-      keymaps: cloneKeymaps(normalizedKeymaps),
+      keymaps: toRawKeymaps(normalizedKeymaps),
       usedFallback: false
     };
   };
