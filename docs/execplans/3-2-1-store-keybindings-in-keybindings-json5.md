@@ -601,12 +601,17 @@ design and the notification the user sees.
     `emptyUserKeymaps`.
   - [x] (2026-10-30) Bounded test evidence. KB-POL-2 now says the 15-row table
     is bounded evidence and that the unbounded claim rests on the Dafny lemma.
-  - [ ] Hosted exact-head transcript for the repaired prove step: awaiting the
-    run for the next published head.
-- [ ] Second CodeScene round, against the hosted review of `9a18d42d`. The
-  hosted check still failed four files that the first round left above an
-  advisory threshold, so this round removes the measured cause rather than
-  arguing with the metric.
+  - [x] (2026-10-30) Hosted exact-head transcript for the repaired prove step.
+    Node CI run 41139493745 on `a4fff0fd` ran `make prove` in
+    `build (ubuntu-latest)` and reported
+    `Dafny program verifier finished with 1 verified, 0 errors` for
+    `test/proofs/sample.dfy` and
+    `Dafny program verifier finished with 8 verified, 0 errors` for
+    `app/config/keybindings-policy.dfy`. All four build jobs passed.
+- [x] (2026-10-30) Second CodeScene round, against the hosted review of
+  `9a18d42d`. The hosted check still failed four files that the first round
+  left above an advisory threshold, so this round removes the measured cause
+  rather than arguing with the metric.
   - [x] (2026-10-30) `app/config/keybindings-store.ts`: `write` was a Complex
     Method at cyclomatic complexity 9, the hosted threshold. The partial-write
     loop, the tolerant close, and the tolerant unlink are now `writeAll`,
@@ -626,9 +631,8 @@ design and the notification the user sees.
     `replaceFileAtomically` take request objects; `escapeShortcut` folded into
     `probeMarker`, its only caller.
   - [x] (2026-10-30) Hosted rerun at `d59a5400` cleared the three
-        object-argument
-    files and improved `electron-e2e-helpers.ts` from 9.42 to 9.69, leaving two
-    findings: `Complex Method` in
+    object-argument files and improved `electron-e2e-helpers.ts` from 9.42 to
+    9.69, leaving two findings: `Complex Method` in
     `test/e2e/cleanup-retry.ts:removeDirectoryWithRetry` and `String Heavy
     Function Arguments` for `app/config/keybindings-store.ts` (9.69).
   - [x] (2026-10-30) `removeDirectoryWithRetry` split into
@@ -641,7 +645,10 @@ design and the notification the user sees.
     `planReplacement`, `canReplaceTarget`, `renameWithRetry`, and
     `removeQuietly`, replacing six separate path-string parameters with one
     plan value. The inferred string share drops from 53.8% to 18.2%.
-  - [ ] Hosted rerun of `CodeScene Code Health Review` for the third head.
+  - [x] (2026-10-30) Hosted rerun of `CodeScene Code Health Review` for
+    `a4fff0fd` passed: six quality gates, one file improved
+    (`electron-e2e-helpers.ts` 9.42 → 9.69), and no new issue listed. Both
+    findings named against `d59a5400` are gone.
 
 ## Surprises & discoveries
 
