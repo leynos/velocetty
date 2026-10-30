@@ -64,6 +64,13 @@ const commandIdDiagnostic = (command: string): configValidationDiagnostic =>
     'Remove the surrounding whitespace or rename the command.'
   );
 
+const schemaKeyDiagnostic = (): configValidationDiagnostic =>
+  diagnostic(
+    `/${RESERVED_SCHEMA_KEY}`,
+    'Expected the $schema key to hold a non-empty string.',
+    'Set $schema to the schema URL, or remove the key.'
+  );
+
 const bindingDiagnostic = (command: string): configValidationDiagnostic =>
   diagnostic(
     `/${command}`,
@@ -118,6 +125,11 @@ const readEntries = (root: JsonObject): EntryRead => {
 
   for (const [command, value] of Object.entries(root)) {
     if (command === RESERVED_SCHEMA_KEY) {
+      // The generated schema applies `additionalProperties` to `$schema` too,
+      // so the value must be binding-shaped or Ajv and the codec disagree.
+      if (!isBindingValue(value)) {
+        diagnostics.push(schemaKeyDiagnostic());
+      }
       continue;
     }
     if (!commandIdSchema.safeParse(command).success) {

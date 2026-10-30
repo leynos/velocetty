@@ -55,6 +55,45 @@ export const keymapsArb: fc.Arbitrary<UserKeymaps> = fc
   .dictionary(commandIdArb, bindingArb, {noNullPrototype: true, maxKeys: 5})
   .map((entries) => Object.fromEntries(Object.entries(entries)));
 
+/** A valid document with a random internal corruption. */
+export const corruptedValidDocArb = fc.tuple(keymapsArb, fc.nat({max: 4})).map(([keymaps, strategy]) => {
+  const entries = Object.entries(keymaps);
+  switch (strategy) {
+    case 0: {
+      return JSON.stringify({...keymaps, corrupted: 42});
+    }
+    case 1: {
+      return JSON.stringify({...keymaps, ' padded ': 'ctrl+n'});
+    }
+    case 2: {
+      return JSON.stringify({...keymaps, corrupted: ['ctrl+n', false]});
+    }
+    case 3: {
+      return JSON.stringify({...keymaps, corrupted: {nested: true}});
+    }
+    default: {
+      return JSON.stringify(Object.fromEntries([...entries, ['', 'ctrl+n']]));
+    }
+  }
+});
+
+/** JSON text for an arbitrary JSON value, including non-object roots. */
+const jsonValueDocArb = fc.jsonValue().map((value) => JSON.stringify(value));
+
+/**
+ * Documents for KB-COD-2's totality property.
+ *
+ * Valid documents keep the accepted outcome well represented, corrupted and
+ * arbitrary documents supply the rejection classes, and binary strings reach
+ * the parser's syntax-error path.
+ */
+export const textDocArb = fc.oneof(
+  {weight: 2, arbitrary: keymapsArb.map((keymaps) => JSON.stringify(keymaps))},
+  {weight: 2, arbitrary: corruptedValidDocArb},
+  {weight: 1, arbitrary: fc.string({unit: 'binary'})},
+  {weight: 1, arbitrary: jsonValueDocArb}
+);
+
 /** Whether an object carries an own key drawn from `Object.prototype`. */
 export const hasPrototypeNamedKey = (keymaps: UserKeymaps): boolean =>
   Object.hasOwn(keymaps, '__proto__') ||

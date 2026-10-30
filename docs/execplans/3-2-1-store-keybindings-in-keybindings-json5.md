@@ -426,11 +426,20 @@ design and the notification the user sees.
   `Surprises & discoveries` and the Decision log.
 - [x] (2026-10-30) EP-C codec and schema: red confirmed with the missing
   module (`Cannot find module '../../app/config/keybindings-codec'`); green on
-  `app/config/keybindings-codec.ts` with 44 focused tests across four suites
+  `app/config/keybindings-codec.ts` with 46 focused tests across four suites
   and a generated draft-07 schema at `shared/schemas/keybindings.schema.json`.
   `bun run generate-schema` is idempotent, and a hand-edited `minLength` failed
   both schema tests before being reverted; gates green (610 tests, proof 1 + 8
   verified). Details in `Artefacts and notes`.
+- [x] (2026-10-30) EP-C review follow-up: the milestone CodeRabbit review of
+  `4190d65b` (base `2132eabc`) reported three minor and one trivial finding,
+  all rooted in `$schema` handling. `readEntries` now validates the `$schema`
+  value before dropping it; a rejected `schema-key-invalid.json5` fixture and
+  parity case were added; and the legacy `parseKeybindingsSource` adapter now
+  parses through the codec. Also added the KB-COD-2 outcome-share guard and ran
+  the KB-COD-1 sorting-removal control, which failed two tests before being
+  reverted. Gates green after the follow-up (612 tests, 74 files; proof 1 + 8
+  verified).
 - [ ] EP-D store, service, importer: red; green; negative control (c);
   refactor; gates.
 - [ ] EP-E watcher and end-to-end: red; green; refactor; gates; CI end-to-end
@@ -843,10 +852,13 @@ design and the notification the user sees.
   source of truth for the constraints while preserving every own key.
   Date/Author: 2026-10-30, implementation agent.
 - Decision: the top-level `$schema` key is validated as an ordinary
-  binding-shaped entry and then dropped. Rationale: the generated JSON Schema
-  still describes it as an `additionalProperties` member, so Ajv and the codec
-  accept exactly the same documents; teaching the schema a special case would
-  have meant a refinement, which `z.toJSONSchema` would drop. Date/Author:
+  binding-shaped entry and then dropped. An invalid value, such as
+  `$schema: 42`, is rejected with a diagnostic. Rationale: the generated JSON
+  Schema still describes it as an `additionalProperties` member, so Ajv and the
+  codec accept exactly the same documents; teaching the schema a special case
+  would have meant a refinement, which `z.toJSONSchema` would drop. The first
+  implementation skipped the value unvalidated, which the milestone review
+  caught; `schema-key-invalid.json5` now pins the correction. Date/Author:
   2026-10-30, implementation agent.
 - Decision: the codec exports `keybindingsJsonSchema`, which returns Zod's
   draft-07 payload directly. The generator and the parity suite both consume
@@ -1251,7 +1263,9 @@ plus named examples for each rejection class:
 - an array element that is not a string;
 - a syntax error with line and column;
 - a `$schema` key, which is accepted and ignored;
-- `'['.repeat(100_000)`, which hits the `RangeError` path.
+- an invalid `$schema` value, which Ajv rejects as well;
+- `'['.repeat(100_000)`, whose deep nesting JSON5 reports as a syntax error on
+  Bun 1.4.4, so no separate depth path exists.
 
 Rationale. The codec sits on a trust boundary, because users type into the file.
 
@@ -2419,7 +2433,8 @@ Artefacts:
 - `app/config/keybindings-codec.ts` (new): the validation schema, the total
   parser, the canonical writer, and the copying conversion.
 - `app/config/keybindings.ts`: local Zod record schema and `cloneKeymaps`
-  removed; the codec's schema and `toRawKeymaps` are used instead.
+  removed; `toRawKeymaps` is used instead, and `parseKeybindingsSource` is a
+  thin adapter over `parseKeybindingsText` until EP-D replaces the module.
 - `app/config/import.ts`: platform keymaps parse through the codec.
 - `bin/generate-keybindings-schema.ts` (new) and the `generate-schema` script.
 - `shared/schemas/keybindings.schema.json` (new, generated).
@@ -2427,7 +2442,7 @@ Artefacts:
   `test/unit/keybindings-arbitraries.coverage.test.ts`,
   `test/unit/keybindings-codec.test.ts`,
   `test/unit/keybindings-codec.property.test.ts`,
-  `test/unit/keybindings-schema-parity.test.ts`, and twelve documents under
+  `test/unit/keybindings-schema-parity.test.ts`, and thirteen documents under
   `test/fixtures/keybindings/`.
 
 Red. The suites were written against the codec before it existed, so the
@@ -2447,10 +2462,10 @@ bun test test/unit/keybindings-codec.test.ts \
   test/unit/keybindings-codec.property.test.ts \
   test/unit/keybindings-schema-parity.test.ts \
   test/unit/keybindings-arbitraries.coverage.test.ts
- 44 pass
+ 46 pass
   0 fail
- 5864 expect() calls
-Ran 44 tests across 4 files.
+ 5868 expect() calls
+Ran 46 tests across 4 files.
 ```
 
 - KB-COD-1 and KB-COD-2 run 500 cases each at seed `20_261_030`. The totality
@@ -2459,8 +2474,9 @@ Ran 44 tests across 4 files.
   covered as well as shape violations.
 - The coverage guard samples 2000 maps and requires every key and binding class
   in more than five per cent of samples, so the properties cannot pass
-  vacuously on uniform data.
-- The twelve fixtures are nine rejections and three acceptances. The parity
+  vacuously on uniform data. It also samples 2000 totality documents and
+  requires the accepted and rejected outcomes each in more than ten per cent.
+- The thirteen fixtures are ten rejections and three acceptances. The parity
   suite asserts the exact file set, so a class cannot be dropped or added
   without classifying it, and it checks that Ajv and the codec agree on every
   document. A document Ajv cannot parse must be classified `syntax error`.
@@ -2476,8 +2492,39 @@ two characters.
 ```
 
 The file was restored, `cmp` confirmed it matched the snapshot, and the suite
-returned `15 pass`. The control isolates committed-versus-generated drift,
-which is what KB-COD-3 exists to catch.
+returned `15 pass` at that point; the follow-up fixture makes it 16. The
+control isolates committed-versus-generated drift, which is what KB-COD-3
+exists to catch.
+
+Sorting control. KB-COD-1's stated mutation removes key sorting from the
+serializer. Applied to `sortKeys` in `app/config/json5-config.ts`, it failed
+both the round-trip property and the totality property, which reuses the round
+trip:
+
+```plaintext
+Property failed after 5 tests
+{ seed: 20261030, path: "4:1:2:2:4:4", endOnFailure: true }
+Counterexample: ["{\"valueOf\":[\"ctrl++key\"],\"__proto__\":\"ctrl++key\"}"]
+ 1 pass
+ 2 fail
+```
+
+The serializer was restored, `cmp` confirmed it matched the snapshot, and the
+property suite returned `3 pass`. The first attempt mutated the `shared/` copy
+of `sortKeys` and changed nothing, because the codec resolves the `app/` copy;
+that duplication is a known defect for EP-F to reconcile.
+
+Milestone review.
+`coderabbit review --agent --committed --base-commit 2132eabc` reviewed exactly
+this commit and reported three minor and one trivial finding. All four concerned
+`$schema`: the codec dropped the key before validating it, so `$schema: 42`
+was accepted by the codec and rejected by Ajv; the parity corpus had no
+invalid-`$schema` case to notice; the legacy `parseKeybindingsSource` still
+used Zod's record parse and so kept `$schema` as a command and dropped an own
+`__proto__`; and the Decision log claimed a validation the code did not
+perform. The follow-up commit validates the `$schema` value with its own
+diagnostic, adds `test/fixtures/keybindings/schema-key-invalid.json5` and its
+parity case, and routes the legacy adapter through `parseKeybindingsText`.
 
 Generation. After `bun run generate-schema`, `sha256sum -c` reports `OK` for
 `shared/schemas/schema.json`, `shared/schemas/keybindings.schema.json`, and
@@ -2485,8 +2532,7 @@ Generation. After `bun run generate-schema`, `sha256sum -c` reports `OK` for
 formatter normalizes its own freshly written copy, and the committed bytes are
 stable under regeneration.
 
-Gate evidence for EP-C (branch `3-2-1-store-keybindings-in-keybindings-json5`,
-after the codec, generator, tests, fixtures, and lint remediation):
+Gate evidence for EP-C. The base milestone, committed as `4190d65b`:
 
 ```plaintext
 make check-fmt    pass (339 files formatted, 67 Markdown files unchanged)
@@ -2496,6 +2542,20 @@ make test         pass (610 pass, 0 fail, 74 files)
 make spelling     pass (typos.toml current)
 make prove        pass (sample 1 verified; policy 8 verified, 0 errors)
 ```
+
+The `$schema` follow-up candidate, re-run on all six gates:
+
+```plaintext
+make check-fmt    pass (339 files formatted, 67 Markdown files unchanged)
+make typecheck    pass
+make lint         pass (Biome 340 files, package boundaries, oxlint)
+make test         pass (612 pass, 0 fail, 74 files)
+make spelling     pass (typos.toml current)
+make prove        pass (sample 1 verified; policy 8 verified, 0 errors)
+```
+
+The focused EP-C suites report `46 pass`, `5868 expect() calls`, across four
+files: the follow-up added one parity fixture case and one coverage test.
 
 The first lint attempt failed with nineteen oxlint findings. Most were
 mechanical (`no-array-callback-reference`, `prefer-spread`,

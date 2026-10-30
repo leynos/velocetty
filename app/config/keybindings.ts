@@ -2,8 +2,8 @@
 import {existsSync, readFileSync, writeFileSync} from 'node:fs';
 
 import type {configValidationDiagnostic} from '@shared/types/config';
-import {keybindingsSchema, toRawKeymaps} from './keybindings-codec';
-import {parseJson5WithSchemaDiagnostics, stringifyJson5, type ParseSchema} from './json5-config';
+import {parseKeybindingsText, toRawKeymaps} from './keybindings-codec';
+import {stringifyJson5} from './json5-config';
 
 export type UserKeymaps = Record<string, string | string[]>;
 
@@ -47,24 +47,19 @@ type KeybindingsLoadResult = {
   readonly usedLastKnownGood: boolean;
 };
 
-const keymapSchema: ParseSchema<UserKeymaps> = keybindingsSchema;
-
-const keymapDiagnosticHints = {
-  '/': {
-    docHint: 'Keymap entries map command ids to keybinding strings or arrays.',
-    defaultHint: '{}'
-  }
-} as const;
-
-export const parseKeybindingsSource = (source: KeybindingsSource) =>
-  parseJson5WithSchemaDiagnostics({
-    raw: source.rawContent,
-    source: source.filePath.path,
-    schema: keymapSchema,
-    fallback: {},
-    itemType: 'keymap',
-    diagnosticHints: keymapDiagnosticHints
-  });
+/**
+ * Parses keybindings text through the codec.
+ *
+ * The legacy module keeps its `value`/`usedFallback` shape until EP-D replaces
+ * it with the service, but validation and diagnostics come from one place, so
+ * this path cannot disagree with the codec about `$schema` or `__proto__`.
+ */
+export const parseKeybindingsSource = (source: KeybindingsSource) => {
+  const outcome = parseKeybindingsText(source.rawContent, source.filePath.path);
+  return outcome.kind === 'ok'
+    ? {value: outcome.keymaps, diagnostics: [], usedFallback: false}
+    : {value: {}, diagnostics: outcome.diagnostics, usedFallback: true};
+};
 
 const reportDiagnostics = (
   warnFn: typeof console.warn,

@@ -9,7 +9,7 @@ import {
 } from '../../app/config/keybindings-codec';
 import type {UserKeymaps} from '../../app/config/keybindings-policy';
 import {isKeymapConfig} from '../../app/config/json5-config';
-import {bindingArb, KEYBINDINGS_PROPERTY_SEED, keymapsArb} from '../testUtils/keybindings-arbitraries';
+import {bindingArb, KEYBINDINGS_PROPERTY_SEED, keymapsArb, textDocArb} from '../testUtils/keybindings-arbitraries';
 
 const PROPERTY_RUNS = 500;
 const SOURCE = 'property-keybindings.json5';
@@ -38,38 +38,6 @@ const assertRoundTrip = (keymaps: UserKeymaps): void => {
   expect(serializeKeybindings(withEntriesInReverse(keymaps))).toBe(text);
 };
 
-/** A valid document with a random internal corruption. */
-const corruptedValidDoc = fc.tuple(keymapsArb, fc.nat({max: 4})).map(([keymaps, strategy]) => {
-  const entries = Object.entries(keymaps);
-  switch (strategy) {
-    case 0: {
-      return JSON.stringify({...keymaps, corrupted: 42});
-    }
-    case 1: {
-      return JSON.stringify({...keymaps, ' padded ': 'ctrl+n'});
-    }
-    case 2: {
-      return JSON.stringify({...keymaps, corrupted: ['ctrl+n', false]});
-    }
-    case 3: {
-      return JSON.stringify({...keymaps, corrupted: {nested: true}});
-    }
-    default: {
-      return JSON.stringify(Object.fromEntries([...entries, ['', 'ctrl+n']]));
-    }
-  }
-});
-
-/** JSON text for an arbitrary JSON value, including non-object roots. */
-const jsonValueDoc = fc.jsonValue().map((value) => JSON.stringify(value));
-
-const textDoc = fc.oneof(
-  {weight: 2, arbitrary: keymapsArb.map((keymaps) => JSON.stringify(keymaps))},
-  {weight: 2, arbitrary: corruptedValidDoc},
-  {weight: 1, arbitrary: fc.string({unit: 'binary'})},
-  {weight: 1, arbitrary: jsonValueDoc}
-);
-
 const assertDiagnostics = (outcome: KeybindingsParseOutcome): void => {
   expect(outcome.kind).toBe('invalid');
   if (outcome.kind !== 'invalid') {
@@ -94,7 +62,7 @@ test('KB-COD-1 serialization round-trips through the parser', () => {
 
 test('KB-COD-2 the parser is total and its outcomes are well formed', () => {
   fc.assert(
-    fc.property(textDoc, (text) => {
+    fc.property(textDocArb, (text) => {
       const outcome = parseKeybindingsText(text, SOURCE);
 
       if (outcome.kind === 'ok') {

@@ -2,13 +2,15 @@
 import {describe, expect, test} from 'bun:test';
 import fc from 'fast-check';
 
+import {parseKeybindingsText} from '../../app/config/keybindings-codec';
 import type {UserKeymaps} from '../../app/config/keybindings-policy';
 import {isString} from '../../app/utils/runtime-guards';
 import {
   hasIntegerLikeKey,
   hasPrototypeNamedKey,
   KEYBINDINGS_PROPERTY_SEED,
-  keymapsArb
+  keymapsArb,
+  textDocArb
 } from '../testUtils/keybindings-arbitraries';
 
 const SAMPLE_COUNT = 2000;
@@ -46,6 +48,15 @@ describe('keymap arbitrary coverage', () => {
     for (const [label, share] of Object.entries(shares)) {
       expect(`${label}: ${share > REQUIRED_SHARE ? 'covered' : 'sparse'}`).toBe(`${label}: covered`);
     }
+  });
+
+  test('the totality property sees both outcomes in more than ten per cent of samples', () => {
+    const documents = fc.sample(textDocArb, {numRuns: SAMPLE_COUNT, seed: KEYBINDINGS_PROPERTY_SEED});
+    const accepted = documents.filter((text) => parseKeybindingsText(text, 'sample.json5').kind === 'ok').length;
+    const acceptedShare = accepted / documents.length;
+
+    expect(acceptedShare).toBeGreaterThan(0.1);
+    expect(1 - acceptedShare).toBeGreaterThan(0.1);
   });
 
   test('prototype-named samples own the key without replacing the prototype', () => {
