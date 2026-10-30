@@ -18,6 +18,22 @@ export type RemoveDirectoryWithRetryOptions = Readonly<{
   sleepFn?: (ms: number) => Promise<void>;
 }>;
 
+/** The resolved retry bounds and collaborators for one removal. */
+type RetryPolicy = Readonly<{
+  readonly baseDelayMs: number;
+  readonly isWindows: boolean;
+  readonly maxAttempts: number;
+  readonly removeDirectory: (directory: string) => Promise<void>;
+  readonly sleepFn: (milliseconds: number) => Promise<void>;
+}>;
+
+/** One removal attempt, with the policy and attempt number that bound it. */
+type RemovalAttempt = Readonly<{
+  readonly attempt: number;
+  readonly directory: string;
+  readonly policy: RetryPolicy;
+}>;
+
 const windowsRetriableCleanupErrorCodes = new Set(['EBUSY', 'EPERM', 'ENOTEMPTY']);
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -38,6 +54,51 @@ const isRetriableCleanupError = (error: unknown, isWindows: boolean) => {
   return isString(code) && windowsRetriableCleanupErrorCodes.has(code);
 };
 
+/** Rejects an attempt count no retry loop could honour. */
+const requireAttempts = (maxAttempts: number): number => {
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
+    throw new RangeError('removeDirectoryWithRetry maxAttempts must be an integer greater than 0.');
+  }
+  return maxAttempts;
+};
+
+/** Rejects a starting delay that would make the backoff meaningless. */
+const requireDelay = (baseDelayMs: number): number => {
+  if (!Number.isFinite(baseDelayMs) || baseDelayMs <= 0) {
+    throw new RangeError('removeDirectoryWithRetry baseDelayMs must be a finite number greater than 0.');
+  }
+  return baseDelayMs;
+};
+
+const resolveRetryPolicy = (options: RemoveDirectoryWithRetryOptions): RetryPolicy => ({
+  // Validation order is observable: the attempt count is reported first.
+  maxAttempts: requireAttempts(options.maxAttempts ?? 5),
+  baseDelayMs: requireDelay(options.baseDelayMs ?? 100),
+  isWindows: options.isWindows ?? process.platform === 'win32',
+  removeDirectory: options.removeDirectory ?? removeDirectoryRecursive,
+  sleepFn: options.sleepFn ?? sleep
+});
+
+/**
+ * Tries the removal once.
+ *
+ * @returns `true` when the directory is gone, `false` when a retry is due.
+ * @throws The removal error when it is final or not worth retrying.
+ */
+const attemptRemoval = async ({attempt, directory, policy}: RemovalAttempt): Promise<boolean> => {
+  try {
+    await policy.removeDirectory(directory);
+    return true;
+  } catch (error) {
+    if (attempt >= policy.maxAttempts || !isRetriableCleanupError(error, policy.isWindows)) {
+      throw error;
+    }
+
+    await policy.sleepFn(policy.baseDelayMs * 2 ** (attempt - 1));
+    return false;
+  }
+};
+
 /**
  * Removes a directory, retrying only the errors that mean "not yet".
  *
@@ -55,31 +116,11 @@ const isRetriableCleanupError = (error: unknown, isWindows: boolean) => {
  * ```
  */
 export const removeDirectoryWithRetry = async (directory: string, options: RemoveDirectoryWithRetryOptions = {}) => {
-  const maxAttempts = options.maxAttempts ?? 5;
-  const baseDelayMs = options.baseDelayMs ?? 100;
-  const isWindows = options.isWindows ?? process.platform === 'win32';
-  const removeDirectory = options.removeDirectory ?? removeDirectoryRecursive;
-  const sleepFn = options.sleepFn ?? sleep;
+  const policy = resolveRetryPolicy(options);
 
-  if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
-    throw new RangeError('removeDirectoryWithRetry maxAttempts must be an integer greater than 0.');
-  }
-
-  if (!Number.isFinite(baseDelayMs) || baseDelayMs <= 0) {
-    throw new RangeError('removeDirectoryWithRetry baseDelayMs must be a finite number greater than 0.');
-  }
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      await removeDirectory(directory);
+  for (let attempt = 1; attempt <= policy.maxAttempts; attempt += 1) {
+    if (await attemptRemoval({attempt, directory, policy})) {
       return;
-    } catch (error) {
-      if (attempt >= maxAttempts || !isRetriableCleanupError(error, isWindows)) {
-        throw error;
-      }
-
-      const delayMs = baseDelayMs * 2 ** (attempt - 1);
-      await sleepFn(delayMs);
     }
   }
 };

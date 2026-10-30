@@ -625,7 +625,23 @@ design and the notification the user sees.
     `probeMarker`, `legacyHyperConfig`, `configFilesIn`, and
     `replaceFileAtomically` take request objects; `escapeShortcut` folded into
     `probeMarker`, its only caller.
-  - [ ] Hosted rerun of `CodeScene Code Health Review` for the repaired head.
+  - [x] (2026-10-30) Hosted rerun at `d59a5400` cleared the three
+        object-argument
+    files and improved `electron-e2e-helpers.ts` from 9.42 to 9.69, leaving two
+    findings: `Complex Method` in
+    `test/e2e/cleanup-retry.ts:removeDirectoryWithRetry` and `String Heavy
+    Function Arguments` for `app/config/keybindings-store.ts` (9.69).
+  - [x] (2026-10-30) `removeDirectoryWithRetry` split into
+    `resolveRetryPolicy`, `requireAttempts`, `requireDelay`, and
+    `attemptRemoval`, leaving the exported function as a bounded loop over one
+    attempt. Validation order is preserved, so the attempt-count error still
+    wins over the delay error when both are invalid.
+  - [x] (2026-10-30) `keybindings-store.ts` now carries one `ReplacementPlan`
+    (resolved target, temporary sibling, mode) through
+    `planReplacement`, `canReplaceTarget`, `renameWithRetry`, and
+    `removeQuietly`, replacing six separate path-string parameters with one
+    plan value. The inferred string share drops from 53.8% to 18.2%.
+  - [ ] Hosted rerun of `CodeScene Code Health Review` for the third head.
 
 ## Surprises & discoveries
 

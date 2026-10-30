@@ -54,6 +54,13 @@ const errorCode = (error: unknown): string | undefined => {
   return isString(code) ? code : undefined;
 };
 
+/** One replacement: the resolved target, its temporary sibling, and the mode to keep. */
+type ReplacementPlan = Readonly<{
+  readonly mode: number | undefined;
+  readonly target: string;
+  readonly temporaryPath: string;
+}>;
+
 /** Blocks the calling thread; only used between transient Windows retries. */
 const defaultSleep = (milliseconds: number): void => {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
@@ -90,12 +97,27 @@ export const createFileKeybindingsStore = (
     }
   };
 
-  const existingMode = (target: string): number | undefined => {
+  /** The target a replacement will land on, plus the mode it currently has. */
+  const resolveReplacementTarget = () => {
+    const target = resolveTarget();
     try {
-      return fileSystem.statSync(target).mode & 0o777;
+      return {mode: fileSystem.statSync(target).mode & 0o777, path: target};
     } catch {
-      return undefined;
+      return {mode: undefined, path: target};
     }
+  };
+
+  /**
+   * Describes one atomic replacement, allocating the temporary name to use.
+   *
+   * The counter makes a name unique within the process, so a failed attempt's
+   * leftover cannot be mistaken for the next attempt's file.
+   */
+  const planReplacement = (): ReplacementPlan => {
+    const {mode, path: target} = resolveReplacementTarget();
+    temporaryCounter += 1;
+    const temporaryPath = path.join(path.dirname(target), `.${fileName}.${process.pid}.${temporaryCounter}.tmp`);
+    return {mode, target, temporaryPath};
   };
 
   /**
@@ -106,7 +128,7 @@ export const createFileKeybindingsStore = (
    * target's own permission must be checked before the temporary file is made;
    * otherwise KB-STORE-1's "read-only target reports failed" would not hold.
    */
-  const isWritableTarget = (target: string): boolean => {
+  const canReplaceTarget = ({target}: ReplacementPlan): boolean => {
     try {
       fileSystem.accessSync(target, fileSystem.constants.W_OK);
       return true;
@@ -123,10 +145,10 @@ export const createFileKeybindingsStore = (
     }
   };
 
-  const renameWithRetry = (from: string, to: string): void => {
+  const renameWithRetry = ({target, temporaryPath}: ReplacementPlan): void => {
     for (let attempt = 0; ; attempt += 1) {
       try {
-        fileSystem.renameSync(from, to);
+        fileSystem.renameSync(temporaryPath, target);
         return;
       } catch (error) {
         const code = errorCode(error);
@@ -166,7 +188,7 @@ export const createFileKeybindingsStore = (
   };
 
   /** Removes a temporary file, tolerating the error raised when it is absent. */
-  const removeQuietly = (temporaryPath: string): void => {
+  const removeQuietly = ({temporaryPath}: ReplacementPlan): void => {
     try {
       fileSystem.unlinkSync(temporaryPath);
     } catch {
@@ -175,31 +197,30 @@ export const createFileKeybindingsStore = (
   };
 
   const write = (text: string): KeybindingsWriteOutcome => {
-    const target = resolveTarget();
-    if (!isWritableTarget(target)) {
-      return {error: new Error(`Refusing to replace read-only file "${target}".`), kind: 'failed'};
+    const plan = planReplacement();
+    if (!canReplaceTarget(plan)) {
+      return {error: new Error(`Refusing to replace read-only file "${plan.target}".`), kind: 'failed'};
     }
-    temporaryCounter += 1;
-    const temporaryPath = path.join(path.dirname(target), `.${fileName}.${process.pid}.${temporaryCounter}.tmp`);
-    const mode = existingMode(target);
     let descriptor: number | undefined;
     try {
       descriptor =
-        mode === undefined ? fileSystem.openSync(temporaryPath, 'wx') : fileSystem.openSync(temporaryPath, 'wx', mode);
+        plan.mode === undefined
+          ? fileSystem.openSync(plan.temporaryPath, 'wx')
+          : fileSystem.openSync(plan.temporaryPath, 'wx', plan.mode);
       writeAll(descriptor, Buffer.from(text, 'utf8'));
       fileSystem.fsyncSync(descriptor);
       fileSystem.closeSync(descriptor);
       descriptor = undefined;
-      if (mode !== undefined) {
-        fileSystem.chmodSync(temporaryPath, mode);
+      if (plan.mode !== undefined) {
+        fileSystem.chmodSync(plan.temporaryPath, plan.mode);
       }
-      renameWithRetry(temporaryPath, target);
+      renameWithRetry(plan);
       return {kind: 'written'};
     } catch (error) {
       if (descriptor !== undefined) {
         closeQuietly(descriptor);
       }
-      removeQuietly(temporaryPath);
+      removeQuietly(plan);
       return {kind: 'failed', error};
     }
   };
