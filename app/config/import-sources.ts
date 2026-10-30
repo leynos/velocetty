@@ -264,11 +264,11 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     console.error(
       `[config-import] Failed to parse bundled default config at "${pathDeps.defaultCfg}". Using safe fallback defaults.`
     );
-    notifyWithPrimaryDiagnostic(
-      notifyFn,
-      "Couldn't parse the bundled default config. Falling back to safe defaults.",
-      parsedDefaultConfigResult.diagnostics
-    );
+    notifyWithPrimaryDiagnostic({
+      baseMessage: "Couldn't parse the bundled default config. Falling back to safe defaults.",
+      diagnostics: parsedDefaultConfigResult.diagnostics,
+      notify: notifyFn
+    });
     return {
       config: cloneRawConfig(defaultRawConfigFallback),
       diagnostics: parsedDefaultConfigResult.diagnostics,
@@ -312,11 +312,11 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
       warnFn(
         `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
       );
-      notifyWithPrimaryDiagnostic(
-        notifyFn,
-        "Couldn't parse config file. Using default config instead.",
-        userCfgResult.diagnostics
-      );
+      notifyWithPrimaryDiagnostic({
+        baseMessage: "Couldn't parse config file. Using default config instead.",
+        diagnostics: userCfgResult.diagnostics,
+        notify: notifyFn
+      });
       return {
         config: cloneRawConfig(defaultConfigFallback),
         diagnostics: userCfgResult.diagnostics,
@@ -327,7 +327,11 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
       warnFn(
         `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
       );
-      notifyWithPrimaryDiagnostic(notifyFn, "Couldn't parse config file. Using default config instead.", []);
+      notifyWithPrimaryDiagnostic({
+        baseMessage: "Couldn't parse config file. Using default config instead.",
+        diagnostics: [],
+        notify: notifyFn
+      });
       return {
         config: cloneRawConfig(defaultConfigFallback),
         diagnostics: [],

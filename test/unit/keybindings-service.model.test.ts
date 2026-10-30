@@ -213,7 +213,7 @@ const IMPORT_VALID_COMMAND: fc.Arbitrary<fc.Command<Model, Real>> = validTextArb
       model.file = {kind: 'text', text};
     }
 
-    const outcome = real.service.importKeybindings(text, SOURCE);
+    const outcome = real.service.importKeybindings({sourceLabel: SOURCE, text});
 
     expect(outcome.kind).toBe(failed ? 'failed' : 'written');
     expect(real.service.active()).toEqual(before);
@@ -228,7 +228,7 @@ const IMPORT_INVALID_COMMAND: fc.Arbitrary<fc.Command<Model, Real>> = invalidTex
     const attemptsBefore = model.writeAttempts;
     const fileBefore = model.file;
 
-    const outcome = real.service.importKeybindings(text, SOURCE);
+    const outcome = real.service.importKeybindings({sourceLabel: SOURCE, text});
 
     expect(outcome.kind).toBe('invalid');
     expect(real.service.active()).toEqual(before);

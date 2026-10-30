@@ -4,7 +4,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import type {ConsoleMessage} from 'playwright';
-import {isObject, isString} from '@shared/types/guards';
+import {removeDirectoryWithRetry} from './cleanup-retry';
 
 type ResolveLaunchConfigOptions = Readonly<{
   platform?: NodeJS.Platform;
@@ -46,14 +46,6 @@ type IsolatedE2EEnvironment = Readonly<{
 
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
 
-type RemoveDirectoryWithRetryOptions = Readonly<{
-  maxAttempts?: number;
-  baseDelayMs?: number;
-  isWindows?: boolean;
-  removeDirectory?: (directory: string) => Promise<void>;
-  sleepFn?: (ms: number) => Promise<void>;
-}>;
-
 type ReadActiveTerminalBufferOptions = Readonly<{
   lineLimit?: number;
 }>;
@@ -80,55 +72,6 @@ const assertNever = (value: never): never => {
 };
 
 const defaultNonCriticalRendererErrorPatterns = [/Download the React DevTools/i, /DevTools failed to load source map/i];
-const windowsRetriableCleanupErrorCodes = new Set(['EBUSY', 'EPERM', 'ENOTEMPTY']);
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-const removeDirectoryRecursive = async (directory: string) => {
-  await fs.rm(directory, {recursive: true, force: true});
-};
-
-const isRetriableCleanupError = (error: unknown, isWindows: boolean) => {
-  if (!isWindows) {
-    return false;
-  }
-
-  if (!isObject(error) || !('code' in error)) {
-    return false;
-  }
-  const code = error.code;
-  return isString(code) && windowsRetriableCleanupErrorCodes.has(code);
-};
-
-export const removeDirectoryWithRetry = async (directory: string, options: RemoveDirectoryWithRetryOptions = {}) => {
-  const maxAttempts = options.maxAttempts ?? 5;
-  const baseDelayMs = options.baseDelayMs ?? 100;
-  const isWindows = options.isWindows ?? process.platform === 'win32';
-  const removeDirectory = options.removeDirectory ?? removeDirectoryRecursive;
-  const sleepFn = options.sleepFn ?? sleep;
-
-  if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
-    throw new RangeError('removeDirectoryWithRetry maxAttempts must be an integer greater than 0.');
-  }
-
-  if (!Number.isFinite(baseDelayMs) || baseDelayMs <= 0) {
-    throw new RangeError('removeDirectoryWithRetry baseDelayMs must be a finite number greater than 0.');
-  }
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      await removeDirectory(directory);
-      return;
-    } catch (error) {
-      if (attempt >= maxAttempts || !isRetriableCleanupError(error, isWindows)) {
-        throw error;
-      }
-
-      const delayMs = baseDelayMs * 2 ** (attempt - 1);
-      await sleepFn(delayMs);
-    }
-  }
-};
 
 export const isNonCriticalRendererError = (
   text: string,

@@ -139,6 +139,41 @@ export const createFileKeybindingsStore = (
     }
   };
 
+  /**
+   * Writes every byte of the buffer, looping over partial writes.
+   *
+   * `writeSync` may accept fewer bytes than offered, so a single call is not
+   * enough to guarantee the temporary file holds the whole document.
+   */
+  const writeAll = (descriptor: number, buffer: Buffer): void => {
+    let offset = 0;
+    while (offset < buffer.length) {
+      const written = fileSystem.writeSync(descriptor, buffer, offset, buffer.length - offset);
+      if (written <= 0) {
+        throw new Error('Short write while saving keybindings.');
+      }
+      offset += written;
+    }
+  };
+
+  /** Closes a descriptor, tolerating the error raised when it is already closed. */
+  const closeQuietly = (descriptor: number): void => {
+    try {
+      fileSystem.closeSync(descriptor);
+    } catch {
+      // The descriptor may already be closed; the write outcome is failure either way.
+    }
+  };
+
+  /** Removes a temporary file, tolerating the error raised when it is absent. */
+  const removeQuietly = (temporaryPath: string): void => {
+    try {
+      fileSystem.unlinkSync(temporaryPath);
+    } catch {
+      // Already removed, or never created; the caller only needs the failure.
+    }
+  };
+
   const write = (text: string): KeybindingsWriteOutcome => {
     const target = resolveTarget();
     if (!isWritableTarget(target)) {
@@ -151,15 +186,7 @@ export const createFileKeybindingsStore = (
     try {
       descriptor =
         mode === undefined ? fileSystem.openSync(temporaryPath, 'wx') : fileSystem.openSync(temporaryPath, 'wx', mode);
-      const buffer = Buffer.from(text, 'utf8');
-      let offset = 0;
-      while (offset < buffer.length) {
-        const written = fileSystem.writeSync(descriptor, buffer, offset, buffer.length - offset);
-        if (written <= 0) {
-          throw new Error('Short write while saving keybindings.');
-        }
-        offset += written;
-      }
+      writeAll(descriptor, Buffer.from(text, 'utf8'));
       fileSystem.fsyncSync(descriptor);
       fileSystem.closeSync(descriptor);
       descriptor = undefined;
@@ -170,17 +197,9 @@ export const createFileKeybindingsStore = (
       return {kind: 'written'};
     } catch (error) {
       if (descriptor !== undefined) {
-        try {
-          fileSystem.closeSync(descriptor);
-        } catch {
-          // The descriptor may already be closed; the write outcome is failure either way.
-        }
+        closeQuietly(descriptor);
       }
-      try {
-        fileSystem.unlinkSync(temporaryPath);
-      } catch {
-        // Already removed, or never created; the caller only needs the failure.
-      }
+      removeQuietly(temporaryPath);
       return {kind: 'failed', error};
     }
   };

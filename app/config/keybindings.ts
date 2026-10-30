@@ -56,6 +56,18 @@ export type KeybindingsLoadOutcome =
       readonly diagnostics: readonly configValidationDiagnostic[];
     };
 
+/** Text supplied by an importer, with the name its diagnostics should cite. */
+export type KeybindingsImportRequest = Readonly<{
+  readonly sourceLabel: string;
+  readonly text: string;
+}>;
+
+/** A rejected read to report, with the diagnostics that explain it. */
+type RejectedRead = Readonly<{
+  readonly cause: 'invalid' | 'unreadable';
+  readonly diagnostics: readonly configValidationDiagnostic[];
+}>;
+
 /** What importing user-supplied text did. */
 export type KeybindingsImportOutcome =
   | {readonly kind: 'written'}
@@ -90,12 +102,15 @@ export const describePrimaryDiagnostic = (diagnostics: readonly configValidation
   return ` ${primaryDiagnostic.path}: ${primaryDiagnostic.message} Suggested fix: ${primaryDiagnostic.suggestedFix}.${docHint}${defaultHint}`;
 };
 
+/** A caller's sentence about a rejected file, plus the diagnostics behind it. */
+export type PrimaryDiagnosticNotice = Readonly<{
+  readonly baseMessage: string;
+  readonly diagnostics: readonly configValidationDiagnostic[];
+  readonly notify: ConfigImportNotify;
+}>;
+
 /** Notifies with a message followed by the first diagnostic, when there is one. */
-export const notifyWithPrimaryDiagnostic = (
-  notify: ConfigImportNotify,
-  baseMessage: string,
-  diagnostics: readonly configValidationDiagnostic[]
-): void => {
+export const notifyWithPrimaryDiagnostic = ({baseMessage, diagnostics, notify}: PrimaryDiagnosticNotice): void => {
   notify(`${baseMessage}${describePrimaryDiagnostic(diagnostics)}`);
 };
 
@@ -160,10 +175,7 @@ export const createKeybindingsService = (dependencies: {
   });
 
   /** Applies a rejected read and tells the user what is actually in effect. */
-  const describeRejectedRead = (
-    cause: 'invalid' | 'unreadable',
-    diagnostics: readonly configValidationDiagnostic[]
-  ): KeybindingsLoadOutcome => {
+  const describeRejectedRead = ({cause, diagnostics}: RejectedRead): KeybindingsLoadOutcome => {
     const result = applyObservation({kind: cause});
     const basis = result.usedLastKnownGood ? 'last-known-good' : 'empty';
     const inEffect =
@@ -192,7 +204,7 @@ export const createKeybindingsService = (dependencies: {
     }
     if (readOutcome.kind === 'unreadable') {
       warnFn(`[config-keybindings] Couldn't read "${store.location}".`, readOutcome.error);
-      return describeRejectedRead('unreadable', []);
+      return describeRejectedRead({cause: 'unreadable', diagnostics: []});
     }
 
     const parsed = parseKeybindingsText(readOutcome.text, store.location);
@@ -201,7 +213,7 @@ export const createKeybindingsService = (dependencies: {
         diagnostics: parsed.diagnostics,
         source: store.location
       });
-      return describeRejectedRead('invalid', parsed.diagnostics);
+      return describeRejectedRead({cause: 'invalid', diagnostics: parsed.diagnostics});
     }
     lastShownDiagnostics = '';
     applyObservation({keymaps: parsed.keymaps, kind: 'valid'});
@@ -245,7 +257,7 @@ export const createKeybindingsService = (dependencies: {
 
   const reload = (): KeybindingsLoadOutcome => readCurrentFile();
 
-  const importKeybindings = (text: string, sourceLabel: string): KeybindingsImportOutcome => {
+  const importKeybindings = ({sourceLabel, text}: KeybindingsImportRequest): KeybindingsImportOutcome => {
     const parsed = parseKeybindingsText(text, sourceLabel);
     if (parsed.kind === 'invalid') {
       return {diagnostics: parsed.diagnostics, kind: 'invalid'};

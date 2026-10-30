@@ -50,7 +50,7 @@ test('KB-SVC-1 a valid import is written verbatim and applies on reload', () => 
       const before = service.active();
       const attemptsBefore = store.writeAttempts();
 
-      expect(service.importKeybindings(text, SOURCE)).toEqual({kind: 'written'});
+      expect(service.importKeybindings({sourceLabel: SOURCE, text})).toEqual({kind: 'written'});
       expect(store.writtenTexts()).toEqual([text]);
       expect(store.writeAttempts()).toBe(attemptsBefore + 1);
       expect(service.active()).toEqual(before);
@@ -70,7 +70,7 @@ test('KB-SVC-1 an invalid import writes nothing and changes nothing', () => {
       const before = service.active();
       const attemptsBefore = store.writeAttempts();
 
-      const outcome = service.importKeybindings(text, SOURCE);
+      const outcome = service.importKeybindings({sourceLabel: SOURCE, text});
 
       expect(outcome.kind).toBe('invalid');
       if (outcome.kind === 'invalid') {
@@ -90,7 +90,7 @@ test('KB-SVC-1 a failed import leaves the stored text and state unchanged', () =
       const before = service.active();
       store.failNextWrite();
 
-      const outcome = service.importKeybindings(text, SOURCE);
+      const outcome = service.importKeybindings({sourceLabel: SOURCE, text});
 
       expect(outcome.kind).toBe('failed');
       expect(service.exportKeybindings()).toEqual({kind: 'stored', text: SEED_TEXT});

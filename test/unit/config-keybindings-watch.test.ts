@@ -47,11 +47,23 @@ const pathsModuleFactory = () => ({
 const windowsModuleFactory = () => ({defaults: {}, get: () => ({}), recordState: () => {}});
 const coloursModuleFactory = () => ({getColorMap: () => ({})});
 
+/** One module factory to register, with the specifier Bun should resolve it under. */
+type AppModuleMockRequest<Exports> = Readonly<{
+  readonly factory: () => Exports;
+  readonly specifier: string;
+}>;
+
 /** Registers one factory under both the extensionless and `.ts` specifiers Bun may resolve. */
-const registerAppModuleMock = <Exports>(specifier: string, factory: () => Exports) => {
+const registerAppModuleMock = <Exports>({factory, specifier}: AppModuleMockRequest<Exports>) => {
   registerModuleMock(specifier, factory);
   registerModuleMock(`${specifier}.ts`, factory);
 };
+
+/** One watcher event delivered to every handler registered for its name. */
+type EmitRequest = Readonly<{
+  readonly event: WatchEvent;
+  readonly eventPath: string;
+}>;
 
 type WatchHarness = {
   readonly appOnMock: ReturnType<typeof mock>;
@@ -61,55 +73,66 @@ type WatchHarness = {
   readonly subscriberMock: ReturnType<typeof mock>;
   readonly watchMock: ReturnType<typeof mock>;
   readonly watcherMock: WatchMock;
-  readonly emit: (event: string, eventPath: string) => void;
+  readonly emit: (request: EmitRequest) => void;
   readonly setReport: (report: ConfigImportReport) => void;
   readonly setConfig: (config: parsedConfig) => void;
 };
+
+/** The watcher events the configuration module subscribes to. */
+type WatchEvent = 'add' | 'change' | 'unlink';
+
+/** The handler chokidar calls with the path that changed. */
+type WatchHandler = (eventPath: string) => void;
 
 /** The subset of chokidar's watcher surface the config module uses. */
 type WatchMock = {
   close: ReturnType<typeof mock>;
   getWatched: () => Record<string, string[]>;
-  on: ReturnType<typeof mock<(event: string, handler: (eventPath: string) => void) => WatchMock>>;
+  on: ReturnType<typeof mock<(...args: [event: WatchEvent, handler: WatchHandler]) => WatchMock>>;
 };
 
 /** Imports a fresh `app/config.ts` instance over mocked chokidar and electron. */
 const createWatchHarness = async (): Promise<WatchHarness> => {
   mock.restore();
-  const notifyMock = mock((_title: string, _body?: string) => {});
+  // These stand-ins ignore their arguments; recording them without naming their
+  // types keeps the harness free to assert on whatever the module passes.
+  const notifyMock = mock((..._args: unknown[]) => {});
   const subscriberMock = mock(() => {});
-  const appOnMock = mock((_event: string, _handler: () => void) => {});
+  const appOnMock = mock((..._args: unknown[]) => {});
   const watcherMock: WatchMock = {
     close: mock(async () => {}),
     getWatched: () => ({'/tmp': ['config.json5', 'keybindings.json5']}),
-    on: mock((_event: string, _handler: (eventPath: string) => void) => watcherMock)
+    on: mock((..._args: [event: WatchEvent, handler: WatchHandler]) => watcherMock)
   };
   const watchMock = mock((_paths: string[], _options?: unknown) => watcherMock);
 
   let currentConfig = makeParsedConfig({'window:new': ['ctrl+n']});
   let currentReport: ConfigImportReport = {config: 'applied', keybindings: 'applied'};
-  const importMock = mock((_phase: 'startup' | 'reload') => ({config: currentConfig, report: currentReport}));
+  const importMock = mock((..._args: unknown[]) => ({config: currentConfig, report: currentReport}));
 
   resetElectronMock();
   registerElectronMock();
   Object.assign(getElectronMock().app, {on: appOnMock});
   registerModuleMock('chokidar', () => ({default: {watch: watchMock}}));
-  registerAppModuleMock('../../app/config/import', () => ({
-    createConfigImportModule: () => ({
-      _import: importMock,
-      getDefaultConfig: () => ({config: {colors: {}}})
-    })
-  }));
-  registerAppModuleMock('../../app/config/open', openModuleFactory);
-  registerAppModuleMock('../../app/config/paths', pathsModuleFactory);
-  registerAppModuleMock('../../app/config/windows', windowsModuleFactory);
-  registerAppModuleMock('../../app/notify', () => ({default: notifyMock}));
-  registerAppModuleMock('../../app/utils/colours', coloursModuleFactory);
+  registerAppModuleMock({
+    factory: () => ({
+      createConfigImportModule: () => ({
+        _import: importMock,
+        getDefaultConfig: () => ({config: {colors: {}}})
+      })
+    }),
+    specifier: '../../app/config/import'
+  });
+  registerAppModuleMock({factory: openModuleFactory, specifier: '../../app/config/open'});
+  registerAppModuleMock({factory: pathsModuleFactory, specifier: '../../app/config/paths'});
+  registerAppModuleMock({factory: windowsModuleFactory, specifier: '../../app/config/windows'});
+  registerAppModuleMock({factory: () => ({default: notifyMock}), specifier: '../../app/notify'});
+  registerAppModuleMock({factory: coloursModuleFactory, specifier: '../../app/utils/colours'});
 
   moduleInstanceCounter += 1;
   const configModule = await import(`../../app/config.ts?config_keybindings_watch_${moduleInstanceCounter}`);
 
-  const emit = (event: string, eventPath: string) => {
+  const emit = ({event, eventPath}: EmitRequest) => {
     const handlers = watcherMock.on.mock.calls.filter(([name]) => name === event).map(([, handler]) => handler);
     for (const handler of handlers) {
       handler(eventPath);
@@ -160,7 +183,7 @@ test.serial('add and unlink events reload, and only applied reports notify', asy
     harness.configModule.subscribe(harness.subscriberMock);
     harness.setConfig(makeParsedConfig({'window:new': ['ctrl+shift+n']}));
 
-    harness.emit('add', '/tmp/keybindings.json5');
+    harness.emit({event: 'add', eventPath: '/tmp/keybindings.json5'});
     await settle();
 
     expect(harness.importMock.mock.calls.map(([phase]) => phase)).toEqual(['startup', 'reload']);
@@ -168,7 +191,7 @@ test.serial('add and unlink events reload, and only applied reports notify', asy
     expect(harness.notifyMock).toHaveBeenCalledWith('Configuration updated', 'Configuration reloaded!');
 
     harness.setReport({config: 'applied', keybindings: 'kept'});
-    harness.emit('unlink', '/tmp/keybindings.json5');
+    harness.emit({event: 'unlink', eventPath: '/tmp/keybindings.json5'});
     await settle();
 
     expect(harness.importMock).toHaveBeenCalledTimes(3);
@@ -176,7 +199,7 @@ test.serial('add and unlink events reload, and only applied reports notify', asy
     expect(harness.notifyMock).toHaveBeenCalledTimes(1);
 
     harness.setReport({config: 'fallback', keybindings: 'applied'});
-    harness.emit('change', '/tmp/config.json5');
+    harness.emit({event: 'change', eventPath: '/tmp/config.json5'});
     await settle();
 
     expect(harness.importMock).toHaveBeenCalledTimes(4);
@@ -193,9 +216,9 @@ test.serial('a burst touching both files reloads once and stays quiet when keybi
     harness.configModule.subscribe(harness.subscriberMock);
     harness.setReport({config: 'applied', keybindings: 'kept'});
 
-    harness.emit('change', '/tmp/config.json5');
+    harness.emit({event: 'change', eventPath: '/tmp/config.json5'});
     await new Promise((resolve) => setTimeout(resolve, 20));
-    harness.emit('change', '/tmp/keybindings.json5');
+    harness.emit({event: 'change', eventPath: '/tmp/keybindings.json5'});
     await settle();
 
     expect(harness.importMock.mock.calls.map(([phase]) => phase)).toEqual(['startup', 'reload']);
@@ -210,7 +233,7 @@ test.serial('events for unwatched files do not reload', async () => {
   const harness = await createWatchHarness();
   try {
     harness.configModule.setup();
-    harness.emit('change', '/tmp/schema.json');
+    harness.emit({event: 'change', eventPath: '/tmp/schema.json'});
     await settle();
     expect(harness.importMock.mock.calls.map(([phase]) => phase)).toEqual(['startup']);
   } finally {
@@ -224,11 +247,10 @@ test.serial('the watcher closes on before-quit', async () => {
     harness.configModule.setup();
     const quitHandler = harness.appOnMock.mock.calls.find(([event]) => event === 'before-quit')?.[1];
     expect(quitHandler).toBeFunction();
-    if (quitHandler === undefined) {
-      throw new Error('Expected config.ts to register a before-quit handler');
-    }
+    // SAFETY: the matcher above fails the test unless a handler was registered.
+    const notifyQuit = quitHandler as () => void;
 
-    quitHandler();
+    notifyQuit();
 
     expect(harness.watcherMock.close).toHaveBeenCalledTimes(1);
   } finally {

@@ -119,11 +119,11 @@ export const createKeybindingsNotices = (notify: ConfigImportNotify): Keybinding
         return;
       }
       deferred = true;
-      notifyWithPrimaryDiagnostic(
-        notify,
-        "Couldn't move shortcuts to keybindings.json5. Fix the keymaps in config.json5 to migrate them.",
-        diagnostics
-      );
+      notifyWithPrimaryDiagnostic({
+        baseMessage: "Couldn't move shortcuts to keybindings.json5. Fix the keymaps in config.json5 to migrate them.",
+        diagnostics,
+        notify
+      });
     },
     announceLegacyIgnored: () => {
       if (legacyIgnored) {

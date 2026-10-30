@@ -193,7 +193,7 @@ describe('importKeybindings', () => {
     const {service, store} = setup(serializeKeybindings(KEYMAPS_A));
     service.start({kind: 'parsed-empty'});
 
-    expect(service.importKeybindings(VALID_TEXT, 'import.json5')).toEqual({kind: 'written'});
+    expect(service.importKeybindings({sourceLabel: 'import.json5', text: VALID_TEXT})).toEqual({kind: 'written'});
     expect(store.writtenTexts()).toEqual([VALID_TEXT]);
 
     const outcome = service.reload();
@@ -205,7 +205,7 @@ describe('importKeybindings', () => {
     service.start({kind: 'parsed-empty'});
     const expected = parseKeybindingsText(INVALID_TEXT, 'import.json5');
 
-    const outcome = service.importKeybindings(INVALID_TEXT, 'import.json5');
+    const outcome = service.importKeybindings({sourceLabel: 'import.json5', text: INVALID_TEXT});
 
     expect(outcome).toEqual(
       expected.kind === 'invalid' ? {diagnostics: expected.diagnostics, kind: 'invalid'} : {kind: 'written'}
@@ -218,7 +218,7 @@ describe('importKeybindings', () => {
     service.start({kind: 'parsed-empty'});
     store.failNextWrite(new Error('disk full'));
 
-    const outcome = service.importKeybindings(VALID_TEXT, 'import.json5');
+    const outcome = service.importKeybindings({sourceLabel: 'import.json5', text: VALID_TEXT});
 
     expect(outcome.kind).toBe('failed');
     expect(store.writeAttempts()).toBe(1);
@@ -328,7 +328,7 @@ describe('stale temporary files', () => {
     service.reload();
     // A second `start` is a reload, so it must not clean again.
     service.start({kind: 'parsed-empty'});
-    service.importKeybindings(serializeKeybindings(KEYMAPS_A), 'memory-keybindings.json5');
+    service.importKeybindings({sourceLabel: 'memory-keybindings.json5', text: serializeKeybindings(KEYMAPS_A)});
 
     expect(cleanups).toBe(1);
   });
