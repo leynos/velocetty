@@ -15,6 +15,9 @@ readonly max_timeout_seconds=60
 readonly policy_source='app/config/keybindings-policy.ts'
 readonly expected_dafny_prefix='4.11.'
 readonly lsc_bin='node_modules/.bin/lsc'
+# The one admitted axiom, matched exactly so a forbidden construct cannot hide
+# on a line that merely mentions this function.
+readonly trusted_axiom_line='function {:axiom} emptyUserKeymaps(): UserKeymaps'
 
 fail() {
   printf 'prove: %s\n' "$*" >&2
@@ -39,6 +42,25 @@ require_dafny() {
   if [[ "$version" != "$expected_dafny_prefix"* ]]; then
     fail "Expected Dafny ${expected_dafny_prefix}x, found '${version:-unknown}'. Install Dafny ${expected_dafny_prefix}0."
   fi
+}
+
+# The dotnet tool installs no solver. On a clean runner the first source fails
+# with "Z3 is not found", which reads like a broken proof rather than a missing
+# dependency, so say what is actually wrong before starting.
+#
+# `dafny` is often a dotnet-tool shim symlinked onto PATH, and Dafny looks for
+# its solver beside the real executable rather than beside the symlink, so the
+# check resolves the link first.
+require_solver() {
+  local dafny_bin dafny_dir
+  dafny_bin="$(command -v dafny)"
+  if ! dafny_dir="$(dirname "$(readlink -f "$dafny_bin")")"; then
+    dafny_dir="$(dirname "$dafny_bin")"
+  fi
+  if command -v z3 >/dev/null 2>&1 || [[ -x "${dafny_dir}/z3/bin/z3-4.12.1" ]]; then
+    return
+  fi
+  fail "Z3 4.12.1 is not beside '${dafny_dir}' or on PATH. Install it where Dafny looks: ${dafny_dir}/z3/bin/z3-4.12.1."
 }
 
 read_entries() {
@@ -99,7 +121,7 @@ check_forbidden_trust_constructs() {
     # `emptyUserKeymaps` is the single admitted axiom; every other trust
     # construct makes the proof vacuous.
     local offending
-    offending="$(printf '%s\n' "$matches" | grep -v 'emptyUserKeymaps' || true)"
+    offending="$(printf '%s\n' "$matches" | sed -E 's/^[^:]+:[0-9]+://' | grep -vxF "$trusted_axiom_line" || true)"
     if [[ -n "$offending" ]]; then
       printf '%s\n' "$offending" >&2
       fail "Forbidden Dafny trust construct found; only emptyUserKeymaps may be an axiom."
@@ -108,7 +130,7 @@ check_forbidden_trust_constructs() {
 }
 
 run_verification() {
-  local output verified
+  local output verified summaries expected
   if ! output="$("$lsc_bin" check --backend=dafny 2>&1)"; then
     printf '%s\n' "$output" >&2
     fail "LemmaScript verification failed."
@@ -122,10 +144,19 @@ run_verification() {
     head -n 1)"
   [[ -n "$verified" ]] || fail "The verifier output did not report 'Dafny program verifier finished with <N> verified, 0 errors'."
   ((verified >= 1)) || fail "The verifier reported zero verified programs."
+
+  # Every listed source must report a positive summary. A combined or cached
+  # run that prints one summary for several sources would otherwise pass.
+  summaries="$(printf '%s\n' "$output" |
+    grep -cE 'Dafny program verifier finished with [0-9]+ verified, 0 errors' || true)"
+  expected="$(read_entries | wc -l)"
+  ((summaries >= expected)) ||
+    fail "Only ${summaries} verifier summaries for ${expected} listed sources; not every proof ran."
 }
 
 main() {
   require_dafny
+  require_solver
   require_lsc
   validate_entries
   check_generated_artefacts_are_current

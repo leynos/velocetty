@@ -15,6 +15,17 @@ const WATCHED_PATHS = [CONFIG_PATH, KEYBINDINGS_PATH] as const;
 
 type ScheduledTimer = {readonly callback: () => void; readonly due: number; readonly id: number};
 
+/** Orders timers by due time, then by id so equal deadlines stay stable. */
+const comesBefore = (candidate: ScheduledTimer, other: ScheduledTimer | undefined): boolean => {
+  if (other === undefined) {
+    return true;
+  }
+  if (candidate.due !== other.due) {
+    return candidate.due < other.due;
+  }
+  return candidate.id < other.id;
+};
+
 /**
  * A fake clock with the ordering KB-WATCH-1 specifies.
  *
@@ -46,11 +57,7 @@ const createFakeClock = () => {
       if (timer.due > limit) {
         continue;
       }
-      if (
-        earliest === undefined ||
-        timer.due < earliest.due ||
-        (timer.due === earliest.due && timer.id < earliest.id)
-      ) {
+      if (comesBefore(timer, earliest)) {
         earliest = timer;
       }
     }

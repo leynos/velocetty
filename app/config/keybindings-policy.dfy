@@ -39,8 +39,12 @@ lemma observeKeybindings_ensures(state: KeybindingsState, observation: Keybindin
   ensures (observation.unreadable? ==> (observeKeybindings(state, observation).status == "kept"))
   ensures (observation.valid? ==> (match observeKeybindings(state, observation).state.lastAccepted { case Some(i_value) => (i_value == observation.keymaps) case None => false }))
   ensures (observation.valid? ==> (observeKeybindings(state, observation).status == "applied"))
+  ensures (observation.valid? ==> (observeKeybindings(state, observation).usedLastKnownGood == false))
   ensures (observation.missing? ==> (match observeKeybindings(state, observation).state.lastAccepted { case Some(i_value) => (i_value == emptyUserKeymaps()) case None => false }))
   ensures (observation.missing? ==> (observeKeybindings(state, observation).status == "applied"))
+  ensures (observation.missing? ==> (observeKeybindings(state, observation).usedLastKnownGood == false))
+  ensures (observation.invalid? ==> (observeKeybindings(state, observation).usedLastKnownGood == (match state.lastAccepted { case Some(i_) => true case None => false })))
+  ensures (observation.unreadable? ==> (observeKeybindings(state, observation).usedLastKnownGood == (match state.lastAccepted { case Some(i_) => true case None => false })))
   ensures (observeKeybindings(observeKeybindings(state, observation).state, observation).state.lastAccepted == observeKeybindings(state, observation).state.lastAccepted)
 {
 }
@@ -131,11 +135,14 @@ function decideBootstrap(input: BootstrapInput): BootstrapDecision
 }
 
 lemma decideBootstrap_ensures(input: BootstrapInput)
+  ensures ((!input.file.missing?) ==> decideBootstrap(input).write_nothing?)
   ensures ((!input.file.missing?) ==> !(isSeed(decideBootstrap(input))))
   ensures ((!input.file.missing?) ==> !(isDefer(decideBootstrap(input))))
   ensures (input.file.missing? ==> input.legacy.parsed_keymaps? ==> isSeed(decideBootstrap(input)))
   ensures (input.file.missing? ==> input.legacy.parsed_keymaps? ==> (specSeedKeymaps(decideBootstrap(input)) == specLegacyKeymaps(input.legacy)))
+  ensures (input.file.missing? ==> input.legacy.parsed_empty? ==> isSeed(decideBootstrap(input)))
   ensures (input.file.missing? ==> input.legacy.parsed_empty? ==> (specSeedKeymaps(decideBootstrap(input)) == emptyUserKeymaps()))
+  ensures (input.file.missing? ==> input.legacy.freshly_created? ==> isSeed(decideBootstrap(input)))
   ensures (input.file.missing? ==> input.legacy.freshly_created? ==> (specSeedKeymaps(decideBootstrap(input)) == emptyUserKeymaps()))
   ensures (input.file.missing? ==> input.legacy.parsed_invalid? ==> isDefer(decideBootstrap(input)))
   ensures (input.file.missing? ==> input.legacy.fell_back? ==> isDefer(decideBootstrap(input)))
@@ -149,6 +156,16 @@ function isDeferredObservation(observation: Option<KeybindingsObservation>): boo
       false
     case None =>
       true
+  }
+}
+
+function isAcceptedObservation(observation: Option<KeybindingsObservation>): bool
+{
+  match observation {
+    case Some(i_observation_val) =>
+      i_observation_val.valid?
+    case None =>
+      false
   }
 }
 
@@ -186,8 +203,10 @@ lemma bootstrapObservation_ensures(decision: BootstrapDecision, write: string)
   ensures (decision.defer? ==> isDeferredObservation(bootstrapObservation(decision, write)))
   ensures (decision.write_nothing? ==> isDeferredObservation(bootstrapObservation(decision, write)))
   ensures (decision.seed? ==> (write == "written") ==> !(isDeferredObservation(bootstrapObservation(decision, write))))
+  ensures (decision.seed? ==> (write == "written") ==> isAcceptedObservation(bootstrapObservation(decision, write)))
   ensures (decision.seed? ==> (write == "written") ==> (specObservationKeymaps(bootstrapObservation(decision, write)) == specSeedKeymaps(decision)))
   ensures (decision.seed? ==> (write == "failed") ==> !(isDeferredObservation(bootstrapObservation(decision, write))))
+  ensures (decision.seed? ==> (write == "failed") ==> isAcceptedObservation(bootstrapObservation(decision, write)))
   ensures (decision.seed? ==> (write == "failed") ==> (specObservationKeymaps(bootstrapObservation(decision, write)) == specSeedKeymaps(decision)))
   ensures (decision.seed? ==> (write == "not-attempted") ==> isDeferredObservation(bootstrapObservation(decision, write)))
 {

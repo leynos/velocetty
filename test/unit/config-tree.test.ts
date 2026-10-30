@@ -126,6 +126,156 @@ const resolveXdgDirectory = (platform: NodeJS.Platform, xdgState: 'absolute' | '
   return resolveConfigLocations(testCase.input).velocettyDirectory;
 };
 
+/** The invariants that must each hold somewhere, so no assertion is vacuous. */
+type InvariantCounts = {
+  creation: number;
+  developmentActive: number;
+  hyperCompatibility: number;
+  shadowed: number;
+};
+
+/** One resolved case paired with the independent oracle for the same case. */
+type CaseEvaluation = {
+  readonly active: ExpectedConfig;
+  readonly keybindingsPath: string;
+  readonly result: ReturnType<typeof resolveConfigLocations>;
+  readonly shadowed: string[];
+  readonly testCase: ConfigTreeCase;
+};
+
+/** Trees that satisfy the Hyper-compatibility fallback. */
+const LEGACY_TREES: ReadonlySet<string> = new Set(['development', 'hyper']);
+
+/** With no Velocetty copy, the legacy oracle decides. */
+const isOracleCase = (testCase: ConfigTreeCase): boolean => !testCase.flags.velocettyConfig && testCase.oracleExists;
+
+/** Compares the active-config fields as one value rather than an `||` chain. */
+const activeSignature = (config: {readonly exists: boolean; readonly path: string; readonly tree: string}): string =>
+  JSON.stringify([config.path, config.tree, config.exists]);
+
+const evaluateCase = (testCase: ConfigTreeCase): CaseEvaluation => {
+  const active = expectedActiveConfig(testCase);
+  return {
+    active,
+    keybindingsPath: expectedKeybindingsPath(testCase, active),
+    result: resolveConfigLocations(testCase.input),
+    shadowed: expectedShadowed(testCase, active),
+    testCase
+  };
+};
+
+const directoryViolation = ({result, testCase}: CaseEvaluation): string | undefined =>
+  result.velocettyDirectory === testCase.velocettyDirectory
+    ? undefined
+    : `${testCase.label}: velocettyDirectory ${result.velocettyDirectory}`;
+
+const activeViolation = ({active, result, testCase}: CaseEvaluation): string | undefined =>
+  activeSignature(result.config) === activeSignature(active)
+    ? undefined
+    : `${testCase.label}: active ${result.config.path} (${result.config.tree}, exists=${result.config.exists}); ` +
+      `expected ${active.path} (${active.tree}, exists=${active.exists})`;
+
+const keybindingsViolation = ({keybindingsPath, result, testCase}: CaseEvaluation): string | undefined =>
+  result.keybindingsPath === keybindingsPath
+    ? undefined
+    : `${testCase.label}: keybindings ${result.keybindingsPath}; expected ${keybindingsPath}`;
+
+const shadowedViolation = ({result, shadowed, testCase}: CaseEvaluation): string | undefined =>
+  JSON.stringify(result.shadowed) === JSON.stringify(shadowed)
+    ? undefined
+    : `${testCase.label}: shadowed ${JSON.stringify(result.shadowed)}; expected ${JSON.stringify(shadowed)}`;
+
+/**
+ * Creation: an active path that does not exist is always the Velocetty
+ * creation path, so a fresh install never writes under the Hyper name.
+ */
+const creationViolation = ({active, testCase}: CaseEvaluation): string | undefined => {
+  if (active.exists) {
+    return undefined;
+  }
+  if (isInside(testCase.platform, active.path, testCase.velocettyDirectory)) {
+    return undefined;
+  }
+  return `${testCase.label}: creation path ${active.path} lies outside the Velocetty tree`;
+};
+
+/** Legacy safety: nothing the caller may create lies in the Hyper tree. */
+const legacySafetyViolation = ({result, testCase}: CaseEvaluation): string | undefined =>
+  isInside(testCase.platform, result.keybindingsPath, testCase.hyperDirectory)
+    ? `${testCase.label}: keybindings path ${result.keybindingsPath} lies in the Hyper tree`
+    : undefined;
+
+const oracleMismatch = ({result, testCase}: CaseEvaluation): boolean => {
+  if (result.config.path !== testCase.oraclePath) {
+    return true;
+  }
+  return !result.config.exists;
+};
+
+/** Hyper compatibility: the oracle names the path, and its tree is a legacy one. */
+const oracleViolations = (evaluation: CaseEvaluation): string[] => {
+  if (!isOracleCase(evaluation.testCase)) {
+    return [];
+  }
+  const {result, testCase} = evaluation;
+  const violations: string[] = [];
+  if (oracleMismatch(evaluation)) {
+    violations.push(
+      `${testCase.label}: oracle ${testCase.oraclePath}; got ${result.config.path} (exists=${result.config.exists})`
+    );
+  }
+  if (!LEGACY_TREES.has(result.config.tree)) {
+    violations.push(`${testCase.label}: oracle case reported tree ${result.config.tree}`);
+  }
+  return violations;
+};
+
+const caseViolations = (evaluation: CaseEvaluation): string[] => {
+  const direct = [
+    directoryViolation(evaluation),
+    activeViolation(evaluation),
+    keybindingsViolation(evaluation),
+    shadowedViolation(evaluation),
+    creationViolation(evaluation),
+    legacySafetyViolation(evaluation)
+  ].filter((violation): violation is string => violation !== undefined);
+  return [...direct, ...oracleViolations(evaluation)];
+};
+
+/** Counts how often each antecedent holds, so the test can refuse vacuity. */
+const countInvariants = (evaluation: CaseEvaluation, counts: InvariantCounts): void => {
+  if (!evaluation.active.exists) {
+    counts.creation += 1;
+  }
+  if (evaluation.active.tree === 'development') {
+    counts.developmentActive += 1;
+  }
+  if (evaluation.shadowed.length > 0) {
+    counts.shadowed += 1;
+  }
+  if (isOracleCase(evaluation.testCase)) {
+    counts.hyperCompatibility += 1;
+  }
+};
+
+/** Resolves win32 locations for a chosen XDG_CONFIG_HOME value. */
+const resolveWin32WithXdg = (xdgConfigHome: string) => {
+  const fixture = platformFixture('win32');
+  return {
+    fixture,
+    result: resolveConfigLocations({
+      platform: 'win32',
+      xdgConfigHome,
+      homeDirectory: fixture.homeDirectory,
+      appDataDirectory: fixture.appDataDirectory,
+      hyperUserDataDirectory: fixture.hyperUserDataDirectory,
+      development: {enabled: false, directory: fixture.developmentDirectory},
+      probe: () => 'absent',
+      sameFile: () => false
+    })
+  };
+};
+
 describe('KB-PATH-1 configuration tree resolution', () => {
   test('enumerates exactly 768 cases', () => {
     expect(cases).toHaveLength(768);
@@ -133,7 +283,7 @@ describe('KB-PATH-1 configuration tree resolution', () => {
 
   test('holds every invariant over the whole domain', () => {
     const violations: string[] = [];
-    const invariantCounts = {
+    const invariantCounts: InvariantCounts = {
       creation: 0,
       developmentActive: 0,
       hyperCompatibility: 0,
@@ -141,70 +291,9 @@ describe('KB-PATH-1 configuration tree resolution', () => {
     };
 
     for (const testCase of cases) {
-      const result = resolveConfigLocations(testCase.input);
-      const active = expectedActiveConfig(testCase);
-      const keybindingsPath = expectedKeybindingsPath(testCase, active);
-      const shadowed = expectedShadowed(testCase, active);
-
-      if (result.velocettyDirectory !== testCase.velocettyDirectory) {
-        violations.push(`${testCase.label}: velocettyDirectory ${result.velocettyDirectory}`);
-      }
-
-      if (
-        result.config.path !== active.path ||
-        result.config.tree !== active.tree ||
-        result.config.exists !== active.exists
-      ) {
-        violations.push(
-          `${testCase.label}: active ${result.config.path} (${result.config.tree}, exists=${result.config.exists}); ` +
-            `expected ${active.path} (${active.tree}, exists=${active.exists})`
-        );
-      }
-
-      if (result.keybindingsPath !== keybindingsPath) {
-        violations.push(`${testCase.label}: keybindings ${result.keybindingsPath}; expected ${keybindingsPath}`);
-      }
-
-      if (JSON.stringify(result.shadowed) !== JSON.stringify(shadowed)) {
-        violations.push(
-          `${testCase.label}: shadowed ${JSON.stringify(result.shadowed)}; expected ${JSON.stringify(shadowed)}`
-        );
-      }
-
-      // Creation: an active path that does not exist is always the Velocetty
-      // creation path, so a fresh install never writes under the Hyper name.
-      if (!active.exists) {
-        invariantCounts.creation += 1;
-        if (!isInside(testCase.platform, active.path, testCase.velocettyDirectory)) {
-          violations.push(`${testCase.label}: creation path ${active.path} lies outside the Velocetty tree`);
-        }
-      }
-
-      // Legacy safety: nothing the caller may create lies in the Hyper tree.
-      if (isInside(testCase.platform, result.keybindingsPath, testCase.hyperDirectory)) {
-        violations.push(`${testCase.label}: keybindings path ${result.keybindingsPath} lies in the Hyper tree`);
-      }
-
-      if (active.tree === 'development') {
-        invariantCounts.developmentActive += 1;
-      }
-
-      // Hyper compatibility: with no Velocetty copy, the legacy oracle decides.
-      if (!testCase.flags.velocettyConfig && testCase.oracleExists) {
-        invariantCounts.hyperCompatibility += 1;
-        if (result.config.path !== testCase.oraclePath || !result.config.exists) {
-          violations.push(
-            `${testCase.label}: oracle ${testCase.oraclePath}; got ${result.config.path} (exists=${result.config.exists})`
-          );
-        }
-        if (result.config.tree !== 'hyper' && result.config.tree !== 'development') {
-          violations.push(`${testCase.label}: oracle case reported tree ${result.config.tree}`);
-        }
-      }
-
-      if (shadowed.length > 0) {
-        invariantCounts.shadowed += 1;
-      }
+      const evaluation = evaluateCase(testCase);
+      violations.push(...caseViolations(evaluation));
+      countInvariants(evaluation, invariantCounts);
     }
 
     expect(violations).toEqual([]);
@@ -241,34 +330,14 @@ describe('KB-PATH-1 configuration tree resolution', () => {
   });
 
   test('ignores a win32 drive-relative XDG_CONFIG_HOME', () => {
-    const fixture = platformFixture('win32');
-    const result = resolveConfigLocations({
-      platform: 'win32',
-      xdgConfigHome: 'C:xdg',
-      homeDirectory: fixture.homeDirectory,
-      appDataDirectory: fixture.appDataDirectory,
-      hyperUserDataDirectory: fixture.hyperUserDataDirectory,
-      development: {enabled: false, directory: fixture.developmentDirectory},
-      probe: () => 'absent',
-      sameFile: () => false
-    });
+    const {fixture, result} = resolveWin32WithXdg('C:xdg');
 
     expect(result.velocettyDirectory).toBe(path.win32.join(fixture.appDataDirectory, 'Velocetty'));
     expect(result.config.exists).toBe(false);
   });
 
   test('accepts an MSYS-style root-relative XDG_CONFIG_HOME on win32', () => {
-    const fixture = platformFixture('win32');
-    const result = resolveConfigLocations({
-      platform: 'win32',
-      xdgConfigHome: '/c/Users/x/.config',
-      homeDirectory: fixture.homeDirectory,
-      appDataDirectory: fixture.appDataDirectory,
-      hyperUserDataDirectory: fixture.hyperUserDataDirectory,
-      development: {enabled: false, directory: fixture.developmentDirectory},
-      probe: () => 'absent',
-      sameFile: () => false
-    });
+    const {result} = resolveWin32WithXdg('/c/Users/x/.config');
 
     expect(result.velocettyDirectory).toBe(path.win32.join('/c/Users/x/.config', 'Velocetty'));
   });

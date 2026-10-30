@@ -170,6 +170,18 @@ const errorCode = (error: unknown): string | undefined => {
   return isString(code) ? code : undefined;
 };
 
+/** True when another rename attempt is worthwhile: attempts remain and the code is transient. */
+const isRetriableRenameFailure = (error: unknown, attempt: number): boolean => {
+  const code = errorCode(error);
+  if (attempt >= maxReplaceAttempts) {
+    return false;
+  }
+  if (code === undefined) {
+    return false;
+  }
+  return retriableReplaceCodes.has(code);
+};
+
 /** Replaces a file through a temporary sibling, retrying Windows lock errors. */
 const replaceFileAtomically = async (filePath: string, contents: string) => {
   const temporaryPath = `${filePath}.e2e-tmp`;
@@ -179,8 +191,7 @@ const replaceFileAtomically = async (filePath: string, contents: string) => {
       await fs.rename(temporaryPath, filePath);
       return;
     } catch (error) {
-      const code = errorCode(error);
-      if (attempt === maxReplaceAttempts || code === undefined || !retriableReplaceCodes.has(code)) {
+      if (!isRetriableRenameFailure(error, attempt)) {
         throw error;
       }
       await sleep(attempt * 100);
@@ -214,11 +225,11 @@ e2eTest(
   async () => {
     const environment = await createIsolatedE2EEnvironment();
     try {
-      const hyperConfigPath = await environment.seedFile(
-        environment.hyperConfigDir,
-        'config.json5',
-        legacyHyperConfig(`{'window:new': '${E2E_PROBE_SHORTCUT}'}`)
-      );
+      const hyperConfigPath = await environment.seedFile({
+        configDir: environment.hyperConfigDir,
+        contents: legacyHyperConfig(`{'window:new': '${E2E_PROBE_SHORTCUT}'}`),
+        fileName: 'config.json5'
+      });
       const hyperBytesBefore = await fs.readFile(hyperConfigPath);
 
       const app = await launchApp(environment);
@@ -252,11 +263,11 @@ e2eTest(
     const environment = await createIsolatedE2EEnvironment();
     const keybindingsPath = path.join(environment.velocettyConfigDir, 'keybindings.json5');
     try {
-      await environment.seedFile(
-        environment.hyperConfigDir,
-        'config.json5',
-        legacyHyperConfig(`{'window:new': '${E2E_PROBE_SHORTCUT}'}`)
-      );
+      await environment.seedFile({
+        configDir: environment.hyperConfigDir,
+        contents: legacyHyperConfig(`{'window:new': '${E2E_PROBE_SHORTCUT}'}`),
+        fileName: 'config.json5'
+      });
 
       const app = await launchApp(environment);
       try {
@@ -289,40 +300,60 @@ e2eTest(
 );
 
 e2eTest(
-  'a second launch leaves the keybindings and config bytes untouched',
+  'a relaunch reads the persisted edit and rewrites nothing',
   async () => {
+    // The legacy value differs from the persisted one, so a relaunch that
+    // re-migrated instead of reading the file could not pass by coincidence.
+    const legacyShortcut = 'ctrl+alt+shift+j';
+    const editedShortcut = 'ctrl+alt+shift+q';
     const environment = await createIsolatedE2EEnvironment();
     try {
-      const hyperConfigPath = await environment.seedFile(
-        environment.hyperConfigDir,
-        'config.json5',
-        legacyHyperConfig(`{'window:new': '${E2E_PROBE_SHORTCUT}'}`)
-      );
-      const keybindingsPath = await environment.seedFile(
-        environment.velocettyConfigDir,
-        'keybindings.json5',
-        `{'window:new': '${E2E_PROBE_SHORTCUT}'}`
-      );
-      const keybindingsBefore = await fs.readFile(keybindingsPath);
-      const keybindingsStatBefore = await fs.stat(keybindingsPath);
+      const hyperConfigPath = await environment.seedFile({
+        configDir: environment.hyperConfigDir,
+        contents: legacyHyperConfig(`{'window:new': '${legacyShortcut}'}`),
+        fileName: 'config.json5'
+      });
+      const keybindingsPath = await environment.seedFile({
+        configDir: environment.velocettyConfigDir,
+        contents: `{'window:new': '${E2E_PROBE_SHORTCUT}'}`,
+        fileName: 'keybindings.json5'
+      });
       const configBefore = await fs.readFile(hyperConfigPath);
 
-      const app = await launchApp(environment);
+      const firstLaunch = await launchApp(environment);
       try {
-        await app.waitFor(probeMarker('applied', E2E_PROBE_SHORTCUT), 'the restored keymap');
+        await firstLaunch.waitFor(probeMarker('applied', E2E_PROBE_SHORTCUT), 'the restored keymap');
       } finally {
-        await app.stop();
+        await firstLaunch.stop();
       }
 
-      const keybindingsAfter = await fs.readFile(keybindingsPath);
+      await replaceFileAtomically(keybindingsPath, `{'window:new': '${editedShortcut}'}`);
+      const keybindingsAfterEdit = await fs.readFile(keybindingsPath);
+
+      const secondLaunch = await launchApp(environment);
+      try {
+        await secondLaunch.waitFor(probeMarker('applied', editedShortcut), 'the persisted edit');
+      } finally {
+        await secondLaunch.stop();
+      }
+
+      const keybindingsStatBeforeThirdLaunch = await fs.stat(keybindingsPath);
+      const thirdLaunch = await launchApp(environment);
+      try {
+        await thirdLaunch.waitFor(probeMarker('applied', editedShortcut), 'the persisted edit after a relaunch');
+      } finally {
+        await thirdLaunch.stop();
+      }
+
+      const keybindingsAfterThirdLaunch = await fs.readFile(keybindingsPath);
       const keybindingsStatAfter = await fs.stat(keybindingsPath);
       const configAfter = await fs.readFile(hyperConfigPath);
-      expect(keybindingsAfter.equals(keybindingsBefore)).toBe(true);
-      expect(keybindingsStatAfter.mtimeMs).toBe(keybindingsStatBefore.mtimeMs);
+      expect(keybindingsAfterThirdLaunch.equals(keybindingsAfterEdit)).toBe(true);
+      expect(keybindingsStatAfter.mtimeMs).toBe(keybindingsStatBeforeThirdLaunch.mtimeMs);
       expect(configAfter.equals(configBefore)).toBe(true);
     } finally {
       await environment.cleanup();
     }
   },
-  scenarioTimeoutMs
+  scenarioTimeoutMs * 2
 );

@@ -9,7 +9,7 @@ import {z} from 'zod';
 
 import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
 import type {JsonObject} from '@shared/types/json';
-import {isJsonObject, isObject, isString} from '../utils/runtime-guards';
+import {isObject, isString} from '../utils/runtime-guards';
 import {stringifyJson5} from './json5-config';
 import type {UserKeymaps} from './keybindings-policy';
 
@@ -44,39 +44,46 @@ export const keybindingsSchema: z.ZodType<UserKeymaps> = z.record(commandIdSchem
 /** The draft-07 JSON Schema editors consume for `keybindings.json5`. */
 export const keybindingsJsonSchema = () => z.toJSONSchema(keybindingsSchema, {target: 'draft-7'});
 
-const diagnostic = (path: string, message: string, suggestedFix: string): configValidationDiagnostic => ({
-  path,
+/** The three parts of one actionable diagnostic. */
+type DiagnosticSpec = {
+  readonly message: string;
+  readonly path: string;
+  readonly suggestedFix: string;
+};
+
+const diagnostic = ({message, path, suggestedFix}: DiagnosticSpec): configValidationDiagnostic => ({
   message,
+  path,
   suggestedFix
 });
 
 const rootDiagnostic = (sourceLabel: string): configValidationDiagnostic =>
-  diagnostic(
-    sourceLabel,
-    'Expected a JSON5 object mapping command ids to shortcuts.',
-    'Wrap the keybindings in braces, for example {}.'
-  );
+  diagnostic({
+    message: 'Expected a JSON5 object mapping command ids to shortcuts.',
+    path: sourceLabel,
+    suggestedFix: 'Wrap the keybindings in braces, for example {}.'
+  });
 
 const commandIdDiagnostic = (command: string): configValidationDiagnostic =>
-  diagnostic(
-    `/${command}`,
-    `Invalid command identifier ${JSON.stringify(command)}: it must be non-empty and carry no leading or trailing whitespace.`,
-    'Remove the surrounding whitespace or rename the command.'
-  );
+  diagnostic({
+    message: `Invalid command identifier ${JSON.stringify(command)}: it must be non-empty and carry no leading or trailing whitespace.`,
+    path: `/${command}`,
+    suggestedFix: 'Remove the surrounding whitespace or rename the command.'
+  });
 
 const schemaKeyDiagnostic = (): configValidationDiagnostic =>
-  diagnostic(
-    `/${RESERVED_SCHEMA_KEY}`,
-    'Expected the $schema key to hold a non-empty string.',
-    'Set $schema to the schema URL, or remove the key.'
-  );
+  diagnostic({
+    message: 'Expected the $schema key to hold a non-empty string.',
+    path: `/${RESERVED_SCHEMA_KEY}`,
+    suggestedFix: 'Set $schema to the schema URL, or remove the key.'
+  });
 
 const bindingDiagnostic = (command: string): configValidationDiagnostic =>
-  diagnostic(
-    `/${command}`,
-    'Expected a non-empty shortcut string or an array of non-empty shortcut strings.',
-    "Set the command to a shortcut such as 'ctrl+n', or to [] to unbind it."
-  );
+  diagnostic({
+    message: 'Expected a non-empty shortcut string or an array of non-empty shortcut strings.',
+    path: `/${command}`,
+    suggestedFix: "Set the command to a shortcut such as 'ctrl+n', or to [] to unbind it."
+  });
 
 type LocatedError = {lineNumber?: number; columnNumber?: number};
 
@@ -104,8 +111,23 @@ const parseDiagnostic = (sourceLabel: string, error: unknown): configValidationD
     lineNumber !== undefined && columnNumber !== undefined
       ? `${sourceLabel}:${lineNumber}:${columnNumber}`
       : sourceLabel;
-  return diagnostic(path, message, 'Fix the JSON5 syntax (for example, commas, quotes, or braces) and retry.');
+  return diagnostic({
+    message,
+    path,
+    suggestedFix: 'Fix the JSON5 syntax (for example, commas, quotes, or braces) and retry.'
+  });
 };
+
+/**
+ * Narrows the parsed root to a JSON object without walking its values.
+ *
+ * `isJsonObject` recurses through every nested value, so a balanced but very
+ * deep document could exhaust the stack after `JSON5.parse` succeeded. Only the
+ * root needs narrowing here, and the claim is still sound because everything
+ * `JSON5.parse` produces is a JSON value. Each entry is validated shallowly
+ * below, which keeps parsing total.
+ */
+const isDocumentRoot = (value: unknown): value is JsonObject => isObject(value) && !Array.isArray(value);
 
 const isBindingValue = (value: unknown): value is string | string[] =>
   bindingSchema.safeParse(value).success &&
@@ -170,7 +192,7 @@ export const parseKeybindingsText = (text: string, sourceLabel: string): Keybind
     return {kind: 'invalid', diagnostics: [parseDiagnostic(sourceLabel, error)]};
   }
 
-  if (!isJsonObject(parsed)) {
+  if (!isDocumentRoot(parsed)) {
     return {kind: 'invalid', diagnostics: [rootDiagnostic(sourceLabel)]};
   }
 

@@ -114,27 +114,22 @@ export const expectedVelocettyDirectory = (fixture: PlatformFixture, xdgConfigHo
   if (xdgConfigHome && paths.isAbsolute(xdgConfigHome)) {
     return paths.join(xdgConfigHome, 'Velocetty');
   }
-
-  if (fixture.platform === 'win32') {
-    return paths.join(fixture.appDataDirectory, 'Velocetty');
-  }
-
-  return paths.join(fixture.homeDirectory, '.config', 'Velocetty');
+  return defaultTreeDirectory(fixture, 'Velocetty', paths.join(fixture.appDataDirectory, 'Velocetty'));
 };
 
 /** Computes the Hyper tree exactly as the legacy oracle does. */
 const hyperDirectoryFor = (fixture: PlatformFixture, xdgConfigHome: string | undefined): string => {
-  const paths = platformPath(fixture.platform);
   if (xdgConfigHome) {
-    return paths.join(xdgConfigHome, 'Hyper');
+    return platformPath(fixture.platform).join(xdgConfigHome, 'Hyper');
   }
-
-  if (fixture.platform === 'win32') {
-    return fixture.hyperUserDataDirectory;
-  }
-
-  return paths.join(fixture.homeDirectory, '.config', 'Hyper');
+  return defaultTreeDirectory(fixture, 'Hyper', fixture.hyperUserDataDirectory);
 };
+
+/** Windows uses the Electron data directory; Linux and macOS use `~/.config`. */
+const defaultTreeDirectory = (fixture: PlatformFixture, treeName: string, windowsDirectory: string): string =>
+  fixture.platform === 'win32'
+    ? windowsDirectory
+    : platformPath(fixture.platform).join(fixture.homeDirectory, '.config', treeName);
 
 const flagsForMask = (mask: number): ExistenceFlags => ({
   velocettyConfig: (mask & 1) !== 0,
@@ -224,21 +219,21 @@ export const buildConfigTreeCase = (
   };
 };
 
-/** Returns the full 768-case enumeration: 32 flag masks × 3 platforms × 4 XDG states × 2 development flags. */
-export const buildConfigTreeCases = (): ConfigTreeCase[] => {
-  const cases: ConfigTreeCase[] = [];
-  for (const fixture of platformFixtures) {
-    for (const xdgState of xdgStates) {
-      for (const developmentEnabled of [false, true]) {
-        for (let mask = 0; mask < 32; mask += 1) {
-          cases.push(buildConfigTreeCase(fixture, xdgState, developmentEnabled, flagsForMask(mask)));
-        }
-      }
-    }
-  }
+/** The 32 existence-flag masks, in ascending order. */
+const MASKS: readonly number[] = Array.from({length: 32}, (_unused, mask) => mask);
 
-  return cases;
-};
+const DEVELOPMENT_STATES: readonly boolean[] = [false, true];
+
+const casesForFixture = (fixture: PlatformFixture): ConfigTreeCase[] =>
+  xdgStates.flatMap((xdgState) =>
+    DEVELOPMENT_STATES.flatMap((developmentEnabled) =>
+      MASKS.map((mask) => buildConfigTreeCase(fixture, xdgState, developmentEnabled, flagsForMask(mask)))
+    )
+  );
+
+/** Returns the full 768-case enumeration: 32 flag masks × 3 platforms × 4 XDG states × 2 development flags. */
+export const buildConfigTreeCases = (): ConfigTreeCase[] =>
+  platformFixtures.flatMap((fixture) => casesForFixture(fixture));
 
 /** Exposes the platform fixtures to the named examples in both suites. */
 export const platformFixture = (platform: NodeJS.Platform): PlatformFixture => {

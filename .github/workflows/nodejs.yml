@@ -49,12 +49,25 @@ jobs:
       - name: Spelling
         if: runner.os == 'Linux'
         run: make spelling
-      - name: Install Dafny for LemmaScript
+      - name: Install Dafny and Z3 for LemmaScript
         if: runner.os == 'Linux'
         run: |
           dotnet tool install --global dafny --version 4.11.0
+          # The NuGet tool ships no solver, so Dafny fails with "Z3 is not
+          # found" on a clean runner. It looks for `z3/bin/z3-4.12.1` beside
+          # its own executable and otherwise for `z3` on `PATH`; provide both.
+          z3_zip="$RUNNER_TEMP/z3.zip"
+          curl -fsSL -o "$z3_zip" \
+            https://github.com/Z3Prover/z3/releases/download/z3-4.12.1/z3-4.12.1-x64-glibc-2.35.zip
+          unzip -q "$z3_zip" -d "$RUNNER_TEMP/z3-release"
+          mkdir -p "$HOME/.dotnet/tools/z3/bin"
+          install -m 0755 \
+            "$RUNNER_TEMP/z3-release/z3-4.12.1-x64-glibc-2.35/bin/z3" \
+            "$HOME/.dotnet/tools/z3/bin/z3"
+          ln -sf z3 "$HOME/.dotnet/tools/z3/bin/z3-4.12.1"
           # `$GITHUB_PATH` only affects later steps, which is why this and the
           # prove step are separate.
+          echo "$HOME/.dotnet/tools/z3/bin" >> "$GITHUB_PATH"
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
       - name: Set up isolated Rust for Merman
         if: runner.os == 'Linux'

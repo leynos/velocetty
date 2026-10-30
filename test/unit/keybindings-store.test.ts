@@ -80,6 +80,17 @@ const transientRenameFileSystem = (failures: number, code: string) => {
   return {fileSystem, attempts: () => attempts};
 };
 
+/** Prepares a store over an existing target whose first renames fail with `code`. */
+const setupRenameFailure = (failures: number, code: string) => {
+  const workspace = createWorkspace();
+  const filePath = targetPathIn(workspace);
+  fs.writeFileSync(filePath, 'previous', 'utf8');
+  const {fileSystem, attempts} = transientRenameFileSystem(failures, code);
+  const sleep = mock((_milliseconds: number) => {});
+  const store = createFileKeybindingsStore({filePath, fs: fileSystem, sleep});
+  return {attempts, filePath, sleep, store, workspace};
+};
+
 describe('atomic keybindings file store', () => {
   test('reads a present file, a missing file, and an unreadable file', () => {
     const workspace = createWorkspace();
@@ -162,7 +173,7 @@ describe('atomic keybindings file store', () => {
     });
   }
 
-  test('reports a read-only target as failed without touching it', () => {
+  test('reports a failed temporary-file creation without touching the target', () => {
     const workspace = createWorkspace();
     const filePath = targetPathIn(workspace);
     fs.writeFileSync(filePath, 'previous', 'utf8');
@@ -175,13 +186,25 @@ describe('atomic keybindings file store', () => {
     expect(temporaryNames(workspace)).toEqual([]);
   });
 
-  test('retries a transient rename failure and succeeds', () => {
+  // Windows models only a read-only attribute, and a POSIX rename over a
+  // read-only file still succeeds when the directory is writable, so the
+  // refusal is asserted where it is meaningful.
+  test.skipIf(process.platform === 'win32')('refuses a read-only target before creating anything', () => {
     const workspace = createWorkspace();
     const filePath = targetPathIn(workspace);
     fs.writeFileSync(filePath, 'previous', 'utf8');
-    const {fileSystem, attempts} = transientRenameFileSystem(2, 'EBUSY');
-    const sleep = mock((_milliseconds: number) => {});
-    const store = createFileKeybindingsStore({filePath, fs: fileSystem, sleep});
+    fs.chmodSync(filePath, 0o444);
+    const store = createFileKeybindingsStore({filePath});
+
+    const outcome = store.write('replacement');
+
+    expect(outcome.kind).toBe('failed');
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('previous');
+    expect(temporaryNames(workspace)).toEqual([]);
+  });
+
+  test('retries a transient rename failure and succeeds', () => {
+    const {attempts, filePath, sleep, store, workspace} = setupRenameFailure(2, 'EBUSY');
 
     expect(store.write('replacement')).toEqual({kind: 'written'});
 
@@ -192,12 +215,7 @@ describe('atomic keybindings file store', () => {
   });
 
   test('gives up after five transient rename failures', () => {
-    const workspace = createWorkspace();
-    const filePath = targetPathIn(workspace);
-    fs.writeFileSync(filePath, 'previous', 'utf8');
-    const {fileSystem, attempts} = transientRenameFileSystem(Number.POSITIVE_INFINITY, 'EPERM');
-    const sleep = mock((_milliseconds: number) => {});
-    const store = createFileKeybindingsStore({filePath, fs: fileSystem, sleep});
+    const {attempts, filePath, sleep, store, workspace} = setupRenameFailure(Number.POSITIVE_INFINITY, 'EPERM');
 
     expect(store.write('replacement').kind).toBe('failed');
 
@@ -208,12 +226,7 @@ describe('atomic keybindings file store', () => {
   });
 
   test('does not retry a permanent rename failure', () => {
-    const workspace = createWorkspace();
-    const filePath = targetPathIn(workspace);
-    fs.writeFileSync(filePath, 'previous', 'utf8');
-    const {fileSystem, attempts} = transientRenameFileSystem(1, 'ENOENT');
-    const sleep = mock((_milliseconds: number) => {});
-    const store = createFileKeybindingsStore({filePath, fs: fileSystem, sleep});
+    const {attempts, sleep, store, workspace} = setupRenameFailure(1, 'ENOENT');
 
     expect(store.write('replacement').kind).toBe('failed');
 

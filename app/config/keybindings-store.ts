@@ -2,8 +2,10 @@
 /*
  * Writes never truncate the user's file. The replacement is written to a
  * temporary file beside the real target, flushed, given the target's mode, and
- * renamed over it. A failure at any step removes the temporary file and leaves
- * the target untouched, with no direct-overwrite fallback.
+ * renamed over it. A read-only target is refused before anything is created,
+ * because a POSIX rename would otherwise replace it whenever the directory is
+ * writable. A failure at any step removes the temporary file and leaves the
+ * target untouched, with no direct-overwrite fallback.
  */
 import * as fs from 'node:fs';
 import path from 'node:path';
@@ -14,6 +16,8 @@ import type {KeybindingsReadOutcome, KeybindingsStore, KeybindingsWriteOutcome} 
 /** The filesystem subset the adapter uses; injected so tests can fail each step. */
 export type KeybindingsFileSystem = Pick<
   typeof import('node:fs'),
+  | 'accessSync'
+  | 'constants'
   | 'realpathSync'
   | 'readFileSync'
   | 'openSync'
@@ -94,6 +98,23 @@ export const createFileKeybindingsStore = (
     }
   };
 
+  /**
+   * Whether an existing target may be replaced.
+   *
+   * A missing target is created, so it counts as writable. On POSIX a rename
+   * over a read-only file succeeds whenever the directory is writable, so the
+   * target's own permission must be checked before the temporary file is made;
+   * otherwise KB-STORE-1's "read-only target reports failed" would not hold.
+   */
+  const isWritableTarget = (target: string): boolean => {
+    try {
+      fileSystem.accessSync(target, fileSystem.constants.W_OK);
+      return true;
+    } catch (error) {
+      return errorCode(error) === 'ENOENT';
+    }
+  };
+
   const read = (): KeybindingsReadOutcome => {
     try {
       return {kind: 'present', text: fileSystem.readFileSync(options.filePath, 'utf8')};
@@ -120,6 +141,9 @@ export const createFileKeybindingsStore = (
 
   const write = (text: string): KeybindingsWriteOutcome => {
     const target = resolveTarget();
+    if (!isWritableTarget(target)) {
+      return {error: new Error(`Refusing to replace read-only file "${target}".`), kind: 'failed'};
+    }
     temporaryCounter += 1;
     const temporaryPath = path.join(path.dirname(target), `.${fileName}.${process.pid}.${temporaryCounter}.tmp`);
     const mode = existingMode(target);

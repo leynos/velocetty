@@ -1,10 +1,15 @@
 /** @file Named examples for the keybindings service: start, reload, import, export. */
 import {describe, expect, test} from 'bun:test';
 
+import * as fs from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+
 import type {ConfigImportNotify} from '../../app/config/keybindings';
 import {createKeybindingsService} from '../../app/config/keybindings';
 import {parseKeybindingsText, serializeKeybindings} from '../../app/config/keybindings-codec';
 import type {UserKeymaps} from '../../app/config/keybindings-policy';
+import {createFileKeybindingsStore} from '../../app/config/keybindings-store';
 import {createMemoryKeybindingsStore} from '../testUtils/memory-keybindings-store';
 
 const KEYMAPS_A: UserKeymaps = {'window:new': 'ctrl+n'};
@@ -255,5 +260,101 @@ describe('exportKeybindings', () => {
     store.setUnreadable();
 
     expect(service.exportKeybindings()).toMatchObject({kind: 'unreadable'});
+  });
+});
+
+describe('active', () => {
+  test('returns a copy that cannot rewrite the accepted keymaps', () => {
+    // The verified policy keeps the payload opaque, so the service, not the
+    // proof, must stop a caller from editing accepted state in place.
+    const keymaps = {'window:new': ['ctrl+n', 'ctrl+shift+n']};
+    const {service} = setup(serializeKeybindings(keymaps));
+    service.start({kind: 'parsed-empty'});
+
+    const returned = service.active();
+    const shortcuts = returned['window:new'];
+    if (Array.isArray(shortcuts)) {
+      shortcuts.push('ctrl+alt+shift+n');
+    }
+    // SAFETY: `active()` returns the map it accepted, so assigning an extra
+    // command here is exactly the in-place rewrite this test proves cannot
+    // reach the accepted state.
+    (returned as Record<string, string | string[]>)['window:close'] = 'ctrl+w';
+
+    expect(service.active()).toEqual(keymaps);
+  });
+});
+
+describe('load outcomes', () => {
+  test('returns a copy that cannot rewrite the accepted keymaps', () => {
+    // `start` and `reload` hand back a load outcome too, so a shared map there
+    // would bypass the copy guarding `active()`.
+    const keymaps = {'window:new': ['ctrl+n', 'ctrl+shift+n']};
+    const {service} = setup(serializeKeybindings(keymaps));
+
+    const outcome = service.start({kind: 'parsed-empty'});
+    if (outcome.kind !== 'applied') {
+      throw new Error(`expected an applied outcome, got ${outcome.kind}`);
+    }
+
+    const shortcuts = outcome.keymaps['window:new'];
+    if (Array.isArray(shortcuts)) {
+      shortcuts.push('ctrl+alt+shift+n');
+    }
+    // SAFETY: the outcome carries the map the service accepted, so assigning an
+    // extra command here is the in-place rewrite this test proves is blocked.
+    (outcome.keymaps as Record<string, string | string[]>)['window:close'] = 'ctrl+w';
+
+    expect(service.active()).toEqual(keymaps);
+  });
+});
+
+describe('stale temporary files', () => {
+  test('cleans once at start-up and never on a reload or import', () => {
+    const store = createMemoryKeybindingsStore();
+    const {notify} = createNotifier();
+    let cleanups = 0;
+    const service = createKeybindingsService({
+      notify,
+      store: {
+        ...store,
+        removeStaleTemporaryFiles: () => {
+          cleanups += 1;
+        }
+      }
+    });
+
+    service.start({kind: 'parsed-empty'});
+    service.reload();
+    // A second `start` is a reload, so it must not clean again.
+    service.start({kind: 'parsed-empty'});
+    service.importKeybindings(serializeKeybindings(KEYMAPS_A), 'memory-keybindings.json5');
+
+    expect(cleanups).toBe(1);
+  });
+
+  test('removes a crash leftover through the real store at start-up', () => {
+    // The store test proves the matching rule; this one proves the composition
+    // actually reaches it, which a stub-only test cannot show.
+    const workspace = fs.mkdtempSync(path.join(tmpdir(), 'velocetty-keybindings-service-'));
+    try {
+      const filePath = path.join(workspace, 'keybindings.json5');
+      const stalePath = path.join(workspace, '.keybindings.json5.4242.1.tmp');
+      const stored = serializeKeybindings(KEYMAPS_A);
+      fs.writeFileSync(filePath, stored, 'utf8');
+      fs.writeFileSync(stalePath, 'partial write', 'utf8');
+      const service = createKeybindingsService({
+        notify: createNotifier().notify,
+        store: createFileKeybindingsStore({filePath})
+      });
+
+      const outcome = service.start({kind: 'parsed-empty'});
+
+      expect(outcome.kind).toBe('applied');
+      expect(fs.existsSync(stalePath)).toBe(false);
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(stored);
+    } finally {
+      fs.rmSync(workspace, {force: true, recursive: true});
+    }
   });
 });

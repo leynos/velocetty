@@ -13,6 +13,13 @@ type ResolveLaunchConfigOptions = Readonly<{
   baseDir?: string;
 }>;
 
+/** One file to write into a configuration tree. */
+type SeedFileRequest = Readonly<{
+  configDir: string;
+  contents: string;
+  fileName: string;
+}>;
+
 type IsolatedE2EEnvironment = Readonly<{
   /**
    * Launch environment handed straight to Playwright.
@@ -33,7 +40,7 @@ type IsolatedE2EEnvironment = Readonly<{
    * Creates the tree when the file needs it, so a seeded Hyper tree exists
    * without the application ever creating one.
    */
-  seedFile: (configDir: string, fileName: string, contents: string) => Promise<string>;
+  seedFile: (request: SeedFileRequest) => Promise<string>;
   cleanup: () => Promise<void>;
 }>;
 
@@ -144,7 +151,7 @@ export const extractRendererErrorMessage = (line: string) => {
 };
 
 /** Writes one file into a configuration tree, creating the tree on demand. */
-const seedFile = async (configDir: string, fileName: string, contents: string) => {
+const seedFile = async ({configDir, contents, fileName}: SeedFileRequest) => {
   await fs.mkdir(configDir, {recursive: true});
   const filePath = path.join(configDir, fileName);
   await fs.writeFile(filePath, contents, 'utf8');

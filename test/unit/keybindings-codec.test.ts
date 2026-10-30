@@ -125,6 +125,16 @@ describe('parseKeybindingsText rejected documents', () => {
 
     expectActionable(expectInvalid(outcome));
   });
+
+  test('returns invalid for a balanced deeply nested document', () => {
+    // A rooted recursive validation walk exhausted the stack on this input
+    // after `JSON5.parse` had already produced the value, escaping as a
+    // RangeError instead of an invalid outcome.
+    const depth = 20_000;
+    const text = `{'a': ${'['.repeat(depth)}${']'.repeat(depth)}}`;
+
+    expectActionable(expectInvalid(parseKeybindingsText(text, SOURCE)));
+  });
 });
 
 describe('serializeKeybindings canonical text', () => {

@@ -35,6 +35,13 @@ export type KeybindingsWriteOutcome = {readonly kind: 'written'} | {readonly kin
 export type KeybindingsStore = {
   readonly location: string;
   readonly read: () => KeybindingsReadOutcome;
+  /**
+   * Removes leftovers from a write that crashed before its rename.
+   *
+   * Start-up calls this once, before deciding whether to seed. Reload, import,
+   * and export never clean the directory.
+   */
+  readonly removeStaleTemporaryFiles?: () => void;
   readonly write: (text: string) => KeybindingsWriteOutcome;
 };
 
@@ -96,6 +103,21 @@ const diagnosticsSignature = (diagnostics: readonly configValidationDiagnostic[]
   JSON.stringify(diagnostics.map((entry) => [entry.path, entry.message]));
 
 /**
+ * Copies a keymaps payload, including every shortcut array.
+ *
+ * The verified policy retains an opaque payload, so it cannot promise that the
+ * payload's contents stay unchanged. Copying at the service boundary keeps a
+ * caller from rewriting the accepted state through a returned map.
+ */
+const copyKeymaps = (keymaps: UserKeymaps): UserKeymaps =>
+  Object.fromEntries(
+    Object.entries(keymaps).map(([command, shortcuts]) => [
+      command,
+      Array.isArray(shortcuts) ? [...shortcuts] : shortcuts
+    ])
+  );
+
+/**
  * Creates the keybindings service.
  *
  * State changes only through `start` and `reload`. `reload` never writes, and
@@ -126,11 +148,14 @@ export const createKeybindingsService = (dependencies: {
     return result;
   };
 
+  /** The keymaps in effect, copied so callers cannot mutate accepted state. */
+  const exposedKeymaps = (): UserKeymaps => copyKeymaps(activeKeymaps(state));
+
   const describeDeferred = (): KeybindingsLoadOutcome => ({
     basis: state.lastAccepted === null ? 'empty' : 'last-known-good',
     cause: 'deferred',
     diagnostics: [],
-    keymaps: activeKeymaps(state),
+    keymaps: exposedKeymaps(),
     kind: 'kept'
   });
 
@@ -154,7 +179,7 @@ export const createKeybindingsService = (dependencies: {
     } else {
       notify(`Couldn't read keybindings file. ${inEffect}`);
     }
-    return {basis, cause, diagnostics, keymaps: activeKeymaps(state), kind: 'kept'};
+    return {basis, cause, diagnostics, keymaps: exposedKeymaps(), kind: 'kept'};
   };
 
   /** Reads and applies whatever the file currently holds; never writes. */
@@ -163,7 +188,7 @@ export const createKeybindingsService = (dependencies: {
     if (readOutcome.kind === 'missing') {
       applyObservation({kind: 'missing'});
       lastShownDiagnostics = '';
-      return {keymaps: activeKeymaps(state), kind: 'applied', origin: 'missing'};
+      return {keymaps: exposedKeymaps(), kind: 'applied', origin: 'missing'};
     }
     if (readOutcome.kind === 'unreadable') {
       warnFn(`[config-keybindings] Couldn't read "${store.location}".`, readOutcome.error);
@@ -180,7 +205,7 @@ export const createKeybindingsService = (dependencies: {
     }
     lastShownDiagnostics = '';
     applyObservation({keymaps: parsed.keymaps, kind: 'valid'});
-    return {keymaps: activeKeymaps(state), kind: 'applied', origin: 'file'};
+    return {keymaps: exposedKeymaps(), kind: 'applied', origin: 'file'};
   };
 
   const start = (legacy: LegacyKeymapsSource): KeybindingsLoadOutcome => {
@@ -189,6 +214,9 @@ export const createKeybindingsService = (dependencies: {
       return readCurrentFile();
     }
     isStarted = true;
+    // A crashed write can leave a temporary file behind; start-up is the only
+    // phase that may remove it.
+    store.removeStaleTemporaryFiles?.();
 
     const readOutcome = store.read();
     const file: BootstrapFileState = readOutcome.kind;
@@ -212,7 +240,7 @@ export const createKeybindingsService = (dependencies: {
     }
     lastShownDiagnostics = '';
     applyObservation(observation);
-    return {keymaps: activeKeymaps(state), kind: 'applied', origin: 'seeded'};
+    return {keymaps: exposedKeymaps(), kind: 'applied', origin: 'seeded'};
   };
 
   const reload = (): KeybindingsLoadOutcome => readCurrentFile();
@@ -245,7 +273,7 @@ export const createKeybindingsService = (dependencies: {
   };
 
   /** The keymaps currently in effect; a query with no side effects. */
-  const active = (): UserKeymaps => activeKeymaps(state);
+  const active = (): UserKeymaps => exposedKeymaps();
 
   return {active, exportKeybindings, importKeybindings, reload, start};
 };

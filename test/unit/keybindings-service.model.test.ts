@@ -120,43 +120,65 @@ const EXTERNAL_COMMANDS: readonly fc.Arbitrary<fc.Command<Model, Real>>[] = [
   )
 ];
 
+type StartModelResult = {
+  readonly decisionKind: ReturnType<typeof decideBootstrap>['kind'];
+  readonly observation: KeybindingsObservation | null;
+};
+
+/** Applies the bootstrap decision to the model, mirroring the verified policy. */
+const applyStartCommand = (model: Model, legacy: LegacyKeymapsSource): StartModelResult => {
+  model.started = true;
+  const fileState = model.file.kind === 'text' ? 'present' : model.file.kind;
+  const decision = decideBootstrap({file: fileState, legacy});
+  if (decision.kind === 'defer') {
+    return {decisionKind: decision.kind, observation: null};
+  }
+  if (decision.kind === 'write-nothing') {
+    return {decisionKind: decision.kind, observation: observationFromFile(model.file)};
+  }
+
+  const shouldFailWrite = model.pendingWriteFailure;
+  model.pendingWriteFailure = false;
+  model.writeAttempts += 1;
+  if (!shouldFailWrite) {
+    model.file = {kind: 'text', text: serializeKeybindings(decision.keymaps)};
+  }
+  return {decisionKind: decision.kind, observation: {keymaps: decision.keymaps, kind: 'valid'}};
+};
+
+/** States the outcome the service must report for the modelled start. */
+const expectStartOutcome = (
+  outcome: ReturnType<Real['service']['start']>,
+  {decisionKind, observation}: StartModelResult
+): void => {
+  if (decisionKind === 'seed') {
+    expect(outcome).toMatchObject({kind: 'applied', origin: 'seeded'});
+    return;
+  }
+  if (observation?.kind === 'valid') {
+    expect(outcome).toMatchObject({kind: 'applied', origin: 'file'});
+    return;
+  }
+  if (observation?.kind === 'missing') {
+    expect(outcome).toMatchObject({kind: 'applied', origin: 'missing'});
+    return;
+  }
+  expect(outcome.kind).toBe('kept');
+};
+
 const START_COMMAND: fc.Arbitrary<fc.Command<Model, Real>> = legacyArb.map((legacy) =>
   command(
     'start',
     (model, real) => {
-      model.started = true;
-      const fileState = model.file.kind === 'text' ? 'present' : model.file.kind;
-      const decision = decideBootstrap({file: fileState, legacy});
       const historyBefore = [...model.history];
-      let observation: KeybindingsObservation | null = null;
-      if (decision.kind === 'defer') {
-        observation = null;
-      } else if (decision.kind === 'write-nothing') {
-        observation = observationFromFile(model.file);
-      } else {
-        const write = model.pendingWriteFailure ? 'failed' : 'written';
-        model.pendingWriteFailure = false;
-        model.writeAttempts += 1;
-        if (write === 'written') {
-          model.file = {kind: 'text', text: serializeKeybindings(decision.keymaps)};
-        }
-        observation = {keymaps: decision.keymaps, kind: 'valid'};
-      }
-      if (observation !== null) {
-        model.history.push(observation);
+      const modelled = applyStartCommand(model, legacy);
+      if (modelled.observation !== null) {
+        model.history.push(modelled.observation);
       }
 
       const outcome = real.service.start(legacy);
       observe(model, real, outcome, historyBefore);
-      if (decision.kind === 'seed') {
-        expect(outcome).toMatchObject({kind: 'applied', origin: 'seeded'});
-      } else if (observation?.kind === 'valid') {
-        expect(outcome).toMatchObject({kind: 'applied', origin: 'file'});
-      } else if (observation?.kind === 'missing') {
-        expect(outcome).toMatchObject({kind: 'applied', origin: 'missing'});
-      } else {
-        expect(outcome.kind).toBe('kept');
-      }
+      expectStartOutcome(outcome, modelled);
     },
     (model) => !model.started
   )

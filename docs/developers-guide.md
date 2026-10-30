@@ -1059,12 +1059,20 @@ normal `make test` gate runs them.
 `check --backend=dafny`. Run `bun install` first: with no `node_modules`, a bare
 `bunx lsc` resolves the unrelated npm package named `lsc` and fails with
 `Command not found!`. The script says so rather than leaving the wrong-tool
-error to be diagnosed.
+error to be diagnosed. The `dotnet tool` Dafny package ships no solver, so
+install Z3 4.12.1 where Dafny looks for it, as
+`~/.dotnet/tools/z3/bin/z3-4.12.1` beside the tool shim or as `z3` on `PATH`;
+otherwise the first source fails with `Z3 is not found`. The script checks for
+the solver before starting.
 
 - The script refuses a vacuous pass. It fails on an empty file list, on an
   entry whose timeout exceeds 60 seconds (Dafny 4.11 is expected; `lsc` would
-  otherwise downgrade the entry to a generation check), and on `extern` calls,
-  which it treats as axioms.
+  otherwise downgrade the entry to a generation check), on `extern` calls except
+  `emptyUserKeymaps`, which is admitted only on its exact declaration line,
+  and when it sees fewer positive verifier summaries than sources listed, so
+  one cached or combined run cannot stand in for the rest. This is a guard
+  against silent weakening, not a proof that Dafny, `lsc`, or the abstraction
+  is sound; those remain the trusted foundation.
 - Hand-authored contracts live in the `.dfy` beside the verified module. The
   `.dfy.gen` artefact is regenerated deterministically. Keep the `.dfy` and add
   clauses; review the regenerated diff as additions-only, so a contract that

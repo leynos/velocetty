@@ -45,6 +45,14 @@ type ConfigImportDependencies = {
   warn?: typeof console.warn;
 };
 
+/** True when the service created a brand-new file from the legacy keymaps. */
+const seededFreshFile = (outcome: KeybindingsLoadOutcome): boolean =>
+  outcome.kind === 'applied' && outcome.origin === 'seeded';
+
+/** True when the service kept a `keybindings.json5` the user already had. */
+const keptExistingFile = (outcome: KeybindingsLoadOutcome): boolean =>
+  outcome.kind === 'applied' && outcome.origin === 'file';
+
 /** Maps a service outcome onto the report vocabulary. */
 const keybindingsStatus = (outcome: KeybindingsLoadOutcome): ConfigImportReport['keybindings'] => {
   if (outcome.kind === 'applied') {
@@ -76,14 +84,14 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
 
   /** Shows the migration notices appropriate to what the service did. */
   const reportKeybindings = (outcome: KeybindingsLoadOutcome, classification: LegacyKeymapsClassification) => {
-    if (outcome.kind === 'applied' && outcome.origin === 'seeded') {
+    if (seededFreshFile(outcome)) {
       notices.announceSeeded();
       return;
     }
     if (classification.legacy.kind === 'parsed-invalid') {
       notices.announceDeferred(classification.diagnostics);
     }
-    if (outcome.kind === 'applied' && outcome.origin === 'file' && classification.legacy.kind === 'parsed-keymaps') {
+    if (keptExistingFile(outcome) && classification.legacy.kind === 'parsed-keymaps') {
       notices.announceLegacyIgnored();
     }
   };

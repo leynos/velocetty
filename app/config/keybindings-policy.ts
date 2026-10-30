@@ -59,8 +59,12 @@ export type ObservationResult = {
 //@ ensures observation.kind === 'unreadable' ==> \result.status === 'kept'
 //@ ensures observation.kind === 'valid' ==> \result.state.lastAccepted === observation.keymaps
 //@ ensures observation.kind === 'valid' ==> \result.status === 'applied'
+//@ ensures observation.kind === 'valid' ==> \result.usedLastKnownGood === false
 //@ ensures observation.kind === 'missing' ==> \result.state.lastAccepted === emptyUserKeymaps()
 //@ ensures observation.kind === 'missing' ==> \result.status === 'applied'
+//@ ensures observation.kind === 'missing' ==> \result.usedLastKnownGood === false
+//@ ensures observation.kind === 'invalid' ==> \result.usedLastKnownGood === (state.lastAccepted !== null)
+//@ ensures observation.kind === 'unreadable' ==> \result.usedLastKnownGood === (state.lastAccepted !== null)
 //@ ensures observeKeybindings(\result.state, observation).state.lastAccepted === \result.state.lastAccepted
 export function observeKeybindings(state: KeybindingsState, observation: KeybindingsObservation): ObservationResult {
   switch (observation.kind) {
@@ -237,11 +241,14 @@ export function specLegacyKeymaps(legacy: LegacyKeymapsSource): UserKeymaps {
  * // {kind: 'seed', keymaps: {}}
  * ```
  */
+//@ ensures input.file !== 'missing' ==> \result.kind === 'write-nothing'
 //@ ensures input.file !== 'missing' ==> !isSeed(\result)
 //@ ensures input.file !== 'missing' ==> !isDefer(\result)
 //@ ensures input.file === 'missing' && input.legacy.kind === 'parsed-keymaps' ==> isSeed(\result)
 //@ ensures input.file === 'missing' && input.legacy.kind === 'parsed-keymaps' ==> specSeedKeymaps(\result) === specLegacyKeymaps(input.legacy)
+//@ ensures input.file === 'missing' && input.legacy.kind === 'parsed-empty' ==> isSeed(\result)
 //@ ensures input.file === 'missing' && input.legacy.kind === 'parsed-empty' ==> specSeedKeymaps(\result) === emptyUserKeymaps()
+//@ ensures input.file === 'missing' && input.legacy.kind === 'freshly-created' ==> isSeed(\result)
 //@ ensures input.file === 'missing' && input.legacy.kind === 'freshly-created' ==> specSeedKeymaps(\result) === emptyUserKeymaps()
 //@ ensures input.file === 'missing' && input.legacy.kind === 'parsed-invalid' ==> isDefer(\result)
 //@ ensures input.file === 'missing' && input.legacy.kind === 'fell-back' ==> isDefer(\result)
@@ -271,6 +278,14 @@ export function decideBootstrap(input: BootstrapInput): BootstrapDecision {
 /** Whether a bootstrap observation is `null`, meaning nothing is applied. */
 export function isDeferredObservation(observation: KeybindingsObservation | null): boolean {
   return observation === null;
+}
+
+/** Whether a bootstrap observation applies a valid payload. */
+export function isAcceptedObservation(observation: KeybindingsObservation | null): boolean {
+  if (observation === null) {
+    return false;
+  }
+  return observation.kind === 'valid';
 }
 
 /** The keymaps a bootstrap observation carries, or the empty map for `null`. */
@@ -306,8 +321,10 @@ export function specObservationKeymaps(observation: KeybindingsObservation | nul
 //@ ensures decision.kind === 'defer' ==> isDeferredObservation(\result)
 //@ ensures decision.kind === 'write-nothing' ==> isDeferredObservation(\result)
 //@ ensures decision.kind === 'seed' && write === 'written' ==> !isDeferredObservation(\result)
+//@ ensures decision.kind === 'seed' && write === 'written' ==> isAcceptedObservation(\result)
 //@ ensures decision.kind === 'seed' && write === 'written' ==> specObservationKeymaps(\result) === specSeedKeymaps(decision)
 //@ ensures decision.kind === 'seed' && write === 'failed' ==> !isDeferredObservation(\result)
+//@ ensures decision.kind === 'seed' && write === 'failed' ==> isAcceptedObservation(\result)
 //@ ensures decision.kind === 'seed' && write === 'failed' ==> specObservationKeymaps(\result) === specSeedKeymaps(decision)
 //@ ensures decision.kind === 'seed' && write === 'not-attempted' ==> isDeferredObservation(\result)
 export function bootstrapObservation(
