@@ -156,6 +156,39 @@ describe('atomic keybindings file store', () => {
     expect(temporaryNames(workspace)).toEqual([]);
   });
 
+  test('creates the target of a dangling symlink instead of replacing the link', () => {
+    const workspace = createWorkspace();
+    const realPath = path.join(workspace, 'dotfiles-keybindings.json5');
+    const linkPath = targetPathIn(workspace);
+    fs.symlinkSync(path.basename(realPath), linkPath);
+    const store = createFileKeybindingsStore({filePath: linkPath});
+
+    expect(store.read()).toEqual({kind: 'missing'});
+    expect(store.write(`{'window:new': 'ctrl+n'}`)).toEqual({kind: 'written'});
+
+    expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(true);
+    expect(fs.readlinkSync(linkPath)).toBe(path.basename(realPath));
+    expect(fs.readFileSync(realPath, 'utf8')).toBe(`{'window:new': 'ctrl+n'}`);
+    expect(temporaryNames(workspace)).toEqual([]);
+  });
+
+  test('follows a dangling link through an intermediate link to the missing target', () => {
+    const workspace = createWorkspace();
+    const realPath = path.join(workspace, 'nested', 'dotfiles-keybindings.json5');
+    const intermediatePath = path.join(workspace, 'intermediate.json5');
+    const linkPath = targetPathIn(workspace);
+    fs.mkdirSync(path.dirname(realPath));
+    fs.symlinkSync(path.join('nested', 'dotfiles-keybindings.json5'), intermediatePath);
+    fs.symlinkSync(path.basename(intermediatePath), linkPath);
+    const store = createFileKeybindingsStore({filePath: linkPath});
+
+    expect(store.write('{}')).toEqual({kind: 'written'});
+
+    expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(true);
+    expect(fs.lstatSync(intermediatePath).isSymbolicLink()).toBe(true);
+    expect(fs.readFileSync(realPath, 'utf8')).toBe('{}');
+  });
+
   for (const point of FAULT_POINTS) {
     test(`reports failure and preserves the previous bytes when ${point} fails`, () => {
       const workspace = createWorkspace();

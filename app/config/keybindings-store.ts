@@ -25,6 +25,8 @@ export type KeybindingsFileSystem = Pick<
   | 'fsyncSync'
   | 'closeSync'
   | 'statSync'
+  | 'lstatSync'
+  | 'readlinkSync'
   | 'chmodSync'
   | 'renameSync'
   | 'unlinkSync'
@@ -42,6 +44,9 @@ type FileKeybindingsStoreOptions = {
 const RENAME_RETRY_DELAY_MS = 40;
 const MAX_RENAME_ATTEMPTS = 5;
 const TRANSIENT_RENAME_CODES: ReadonlySet<string> = new Set(['EPERM', 'EACCES', 'EBUSY']);
+
+/** Bounds link chasing so a symlink cycle cannot spin the resolver forever. */
+const MAX_SYMLINK_HOPS = 40;
 
 /** The `<pid>.<counter>` middle segment of a temporary file name. */
 const TEMPORARY_SEQUENCE = /^\d+\.\d+$/;
@@ -88,12 +93,43 @@ export const createFileKeybindingsStore = (
     name.endsWith('.tmp') &&
     TEMPORARY_SEQUENCE.test(name.slice(temporaryPrefix.length, -'.tmp'.length));
 
+  /**
+   * The path a symlink chain leads to, following links whose target is absent.
+   *
+   * `realpathSync` cannot resolve a dangling link, but a dotfiles-managed
+   * `keybindings.json5` is exactly that before the target file exists. Writing
+   * to the link's own path would rename a regular file over the link and break
+   * the user's setup, so the chain is followed by hand until a path that is not
+   * a link (or does not exist) is reached.
+   */
+  const followLinks = (candidate: string, hops: number): string => {
+    if (hops >= MAX_SYMLINK_HOPS) {
+      return candidate;
+    }
+    let isLink = false;
+    try {
+      isLink = fileSystem.lstatSync(candidate).isSymbolicLink();
+    } catch {
+      return candidate;
+    }
+    if (!isLink) {
+      return candidate;
+    }
+    let linkTarget: string;
+    try {
+      linkTarget = fileSystem.readlinkSync(candidate);
+    } catch {
+      return candidate;
+    }
+    return followLinks(path.resolve(path.dirname(candidate), linkTarget), hops + 1);
+  };
+
   /** The symlink's target when there is one, so the link itself survives. */
   const resolveTarget = (): string => {
     try {
       return fileSystem.realpathSync(options.filePath);
     } catch {
-      return options.filePath;
+      return followLinks(options.filePath, 0);
     }
   };
 

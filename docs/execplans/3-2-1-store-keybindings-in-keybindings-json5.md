@@ -649,6 +649,18 @@ design and the notification the user sees.
     `a4fff0fd` passed: six quality gates, one file improved
     (`electron-e2e-helpers.ts` 9.42 → 9.69), and no new issue listed. Both
     findings named against `d59a5400` are gone.
+- [x] (2026-10-31) Findings from the review of the ready PR at `4277e789`.
+  Two Codex findings were reproduced and repaired.
+  - [x] `test/e2e/keybindings.e2e.test.ts` was 402 lines, over the 400-line
+    limit AGENTS.md sets. Launch, marker, and file helpers moved to
+    `test/e2e/keybindings-e2e-harness.ts`, leaving the suite at the four
+    scenarios.
+  - [x] A dangling `keybindings.json5` symlink was read as missing, so
+    start-up seeded it by renaming a regular file over the link and detached a
+    dotfiles-managed configuration. `followLinks` now walks a link chain whose
+    target is absent and writes to the link's target, so the link survives.
+    Two store tests cover a single dangling link and a chain through an
+    intermediate link.
 
 ## Surprises & discoveries
 
@@ -1882,6 +1894,8 @@ whole. Beyond that:
 
 - the target's mode is preserved;
 - a symlinked target keeps its link, and the real file is replaced;
+- a symlink whose target does not exist yet keeps its link, and the target is
+  created through it, so a dotfiles-managed file is never detached;
 - no temporary file remains after a failed write that returned;
 - a read-only target reports `failed`.
 
