@@ -240,6 +240,10 @@ Keybindings follow a parallel layering model:
 2. **Plugin defaults** (runtime contributions, not persisted)
 3. **User overrides** (`keybindings.json5`)
 
+[Configuration architecture](configuration-architecture.md) describes the
+modules that carry this out, the start-up and reload data flow, and the
+verified policy boundary.
+
 When touching keybinding storage:
 
 - Treat `config.json5.keymaps` as a legacy bootstrap source only. If
@@ -250,11 +254,12 @@ When touching keybinding storage:
 - Preserve the last known good in-memory keybindings if `keybindings.json5`
   becomes invalid during hot reload, and surface structured diagnostics rather
   than clearing active shortcuts.
-- Extend `test/unit/config-import-json5.test.ts`,
-  `test/unit/config-import-keybindings-json5.test.ts`,
-  `test/unit/keybindings-json5.test.ts`, and
-  `test/unit/config-keybindings-watch.test.ts` when the keybindings file format
-  or reload behaviour changes.
+- Extend the tests named in `docs/configuration-architecture.md` when the file
+  format or reload behaviour changes. The codec, service, store, watcher,
+  layering, and tree-resolution claims each have a named test file there.
+- Keep `app/config/keybindings-policy.ts` pure. It is verified by `make prove`,
+  and the guards in `bin/prove.sh` reject Electron, filesystem, clock, and
+  `extern` use.
 
 Use `resolveConfigLayers()` from `app/config/layering.ts` to resolve the
 effective configuration:
@@ -1019,6 +1024,48 @@ Suites that rely on timer or logger seams must not mutate global state during
 test execution; instead, provide test-doubles through the module's public
 interface.
 
+### Property tests (fast-check)
+
+Property suites use `fast-check` and the `.property.test.ts` suffix, so the
+normal `make test` gate runs them.
+
+- Put shared arbitraries in `test/testUtils/` and export a fixed seed, as
+  `keybindings-arbitraries.ts` does with `KEYBINDINGS_PROPERTY_SEED`. A fixed
+  seed keeps failures reproducible; pass `seed` to `fc.assert` and `fc.sample`.
+- Every arbitrary needs a non-vacuity guard. A `.coverage.test.ts` file samples
+  the arbitrary and asserts that each interesting class occurs in more than
+  five per cent of samples. A law over an arbitrary that never produces the
+  interesting case proves nothing.
+- Keep generators small: bound string lengths, key counts, and event counts, so
+  a shrunk counterexample stays readable.
+- Never let a property depend on a real clock, a real file, or real timers.
+  Inject the scheduler, the handle, or the store, as
+  `config-watcher.property.test.ts` and `keybindings-service.property.test.ts`
+  do.
+- When a property fails, record the printed seed in the commit message or the
+  ExecPlan so the failure can be replayed.
+
+### Proofs (LemmaScript)
+
+`make prove` runs `./bin/prove.sh`, which verifies each source listed in
+`LemmaScript-files.txt` through `bunx lsc check --backend=dafny`.
+
+- The script refuses a vacuous pass. It fails on an empty file list, on an
+  entry whose timeout exceeds 60 seconds (Dafny 4.11 is expected; `lsc` would
+  otherwise downgrade the entry to a generation check), and on `extern` calls,
+  which it treats as axioms.
+- Hand-authored contracts live in the `.dfy` beside the verified module. The
+  `.dfy.gen` artefact is regenerated deterministically. Keep the `.dfy` and add
+  clauses; review the regenerated diff as additions-only, so a contract that
+  silently weakened would be visible.
+- After editing a verified module, run
+  `bunx lsc regen --backend=dafny <source.ts>`, then `make prove`. Never delete
+  the `.dfy`: `lsc gen` refuses to rewrite a `.dfy` whose generated body no
+  longer matches, and `lsc regen` is the supported way to catch up.
+- The verified module must stay pure. If a decision needs I/O, keep the
+  decision in the verified module and the I/O in an adapter that passes the
+  observed outcome in.
+
 ### End-to-end (E2E) tests (layered strategy)
 
 End-to-end tests are split into two lanes and require packaged binaries in
@@ -1035,6 +1082,23 @@ Fast lane (required on pull requests):
   additional stability window bounded by remaining test-timeout budget.
 - Supports `E2E_DEBUG=1` for verbose launch logs and `E2E_CAPTURE=1` for
   screenshot capture.
+
+Main-process `[e2e]` markers are single stdout lines, emitted only when
+`RUN_E2E=1`. Bun tests match them with a `waitFor` helper and a description, so
+a timeout names the marker that never arrived. Existing markers include
+`renderer-ready`, `keybindings-path <path>`, `config-path <path>`,
+`config-watcher-ready`, and
+`keymaps-active status=<applied|kept> window:new=<shortcuts>`.
+
+- Keep a marker on one line. Parsing is line-oriented, and a wrapped marker is
+  never matched.
+- Never log a marker unconditionally; gate it on `RUN_E2E === '1'` so production
+  logs stay clean.
+- When adding a marker, add the assertion that consumes it in the same change,
+  and keep the marker text stable once a test depends on it.
+- `test/e2e/keybindings.e2e.test.ts` covers the configuration markers. It needs
+  `bun run test:e2e:prepare` first, then `bun run test:e2e:run`, which sets
+  `RUN_E2E=1`. Without that variable the suite skips rather than fails.
 
 Deep lane (scheduled and release validation):
 

@@ -2,9 +2,12 @@
 
 ## Status
 
-Proposed. To be marked Accepted, with a date and summary, when roadmap item
-`3.2.1` is delivered under
-`docs/execplans/3-2-1-store-keybindings-in-keybindings-json5.md`.
+Accepted on 2026-10-30. Roadmap item `3.2.1` is delivered under
+`docs/execplans/3-2-1-store-keybindings-in-keybindings-json5.md`. The Velocetty
+tree is created at start-up, `config.json5` and `keybindings.json5` resolve
+through it first, the Hyper tree remains a read-only fallback, and the CLI
+resolves the same order through the mirrored resolver. `docs/users-guide.md`
+documents the user-facing consequences of the migration.
 
 ## Date
 
@@ -97,8 +100,15 @@ Option A.
   match the design's paths table and the Hyper tree.
 - On Linux the directory name is case-sensitive, and `~/.config/velocetty` is
   not consulted.
-- A broken symlink in the Hyper tree counts as present, so a dotfiles-managed
-  configuration is never silently shadowed.
+- A broken symlink in the Hyper tree counts as present in the application, so a
+  dotfiles-managed configuration is never silently shadowed. The CLI's narrower
+  filesystem slice cannot tell a dangling link from an absent file.
+- The application and the CLI pass different inputs to the mirrored resolver.
+  The CLI derives `userData` as `<appData>/Hyper`, compares trees by string
+  equality rather than by `realpath`, and detects development mode from
+  `NODE_ENV` rather than `electron-is-dev`. The priority rules are shared, but
+  a dangling symlink or an unusual development layout can resolve differently.
+  Tracking issue `CONFIG-003` records this.
 - `XDG_CONFIG_DIRS`, the system-wide configuration search path, is not
   consulted.
 - Electron still writes its own caches to `userData` (`%APPDATA%\Hyper` on

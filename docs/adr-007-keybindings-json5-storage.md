@@ -2,9 +2,15 @@
 
 ## Status
 
-Proposed. To be marked Accepted, with a date and summary, when roadmap item
-`3.2.1` is delivered under
-`docs/execplans/3-2-1-store-keybindings-in-keybindings-json5.md`.
+Accepted on 2026-10-30. Roadmap item `3.2.1` is delivered under
+`docs/execplans/3-2-1-store-keybindings-in-keybindings-json5.md`. The
+implementation stores the map decided below verbatim, holds the last known good
+in memory, migrates legacy `config.json5.keymaps` once at start-up, and never
+rewrites `config.json5`. `docs/configuration-architecture.md` describes the
+components that carry it out, and `docs/users-guide.md` describes what a user
+sees. One detail changed during implementation: the reserved `$schema` key is
+validated before it is dropped, so a non-string value is rejected with a
+diagnostic rather than silently ignored.
 
 ## Date
 

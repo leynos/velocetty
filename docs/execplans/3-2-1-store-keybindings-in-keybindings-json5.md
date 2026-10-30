@@ -63,7 +63,11 @@ This execution plan (ExecPlan) is a living document. The sections `Constraints`,
 `Conformance basis`, and `Verification plan` must be kept up to date as work
 proceeds.
 
-Status: APPROVED
+Status: COMPLETE
+
+Implementation completed on 2026-10-30. The hosted end-to-end run on three
+operating systems is the one outstanding validation; it is recorded under EP-E
+E4 in `Progress`, and `pr-babysitting` owns it.
 
 This revised plan was explicitly approved by a human on 2026-10-29.
 Implementation began after that approval. The approval questions below were
@@ -481,8 +485,37 @@ design and the notification the user sees.
     live in `app/config/e2e-keymap-probe.ts`, so the application and the tests
     share one definition. `bun run check:types`, `bun run lint`, and the
     focused suites pass.
-  - [ ] E4 commit gates and the CI end-to-end run on three operating systems.
-- [ ] EP-F documentation and roadmap: drafts; review; gates.
+  - [x] (2026-10-30) E4 commit gates: all eight gates pass (`check-fmt`,
+    `typecheck`, `lint`, `test` with 678 tests across 80 files, `spelling`,
+    `prove`, `markdownlint`, and `nixie`). Committed as `0ed7307b` and pushed.
+  - [ ] (pending) CI end-to-end run on the three operating systems. The local
+    machine cannot build `node-pty` for the Electron lane, so this waits on the
+    hosted run.
+- [x] EP-F documentation and roadmap: drafts; gates.
+  - [x] (2026-10-30) ADR-007 and ADR-008 marked `Accepted on 2026-10-30` with
+    implementation summaries and the discoveries reconciled, including the
+    `$schema` validation and the CLI/application resolver divergence recorded as
+    `CONFIG-003`.
+  - [x] (2026-10-30) `docs/users-guide.md` created and linked from `README.md`.
+  - [x] (2026-10-30) `docs/configuration-architecture.md` created and linked
+    from the design document, the developers' guide, and the component
+    inventory.
+  - [x] (2026-10-30) `docs/velocetty-design.md` updated: stored format, error
+    behaviour, migration, the Velocetty tree and XDG rule, the implemented
+    precedence, `keybindings.import`, and implementation-plan items 3.1 and 3.2
+    ticked.
+  - [x] (2026-10-30) `docs/developers-guide.md` updated: keybinding storage now
+    links to the architecture document, the stale
+    `test/unit/keybindings-json5.test.ts` reference is gone, and property-test,
+    proof, and `[e2e]` marker conventions are documented.
+  - [x] (2026-10-30) `docs/tracking-issues.md` gained `CONFIG-003`,
+    `CONFIG-004`, `KEYMAP-001`, and `KEYMAP-002`. Roadmap `3.2.1` is ticked with
+    the export/import sub-bullet reworded as approved.
+  - [x] (2026-10-30) EP-F gates. The diff is documentation only, so the
+    applicable set is the Markdown one: `make check-fmt` (69 files unchanged),
+    `make spelling` (typos.toml unchanged), `make markdownlint` (0 issues in 69
+    files), and `make nixie` (all diagrams valid). The code gates were last run
+    green for the EP-E commit `0ed7307b`, and no code changed since.
 
 ## Surprises & discoveries
 
@@ -1041,9 +1074,61 @@ design and the notification the user sees.
 
 ## Outcomes & retrospective
 
-Not yet started. Populate this at each milestone boundary and at completion.
-Compare the result with `Purpose / big picture`, and reconcile discoveries with
-ADR-007 and the design document before setting `COMPLETE`.
+Roadmap `3.2.1` is delivered. Every capability in `Purpose / big picture` is
+present and covered by a test:
+
+1. **Edit and hot reload.** `keybindings.json5` is read and validated by the
+   codec, observed by the verified policy, and reapplied by the watcher. A save
+   changes the active keymaps without a restart, on a debounce that coalesces a
+   burst of editor events into one reload.
+2. **A broken save is harmless.** An invalid file is rejected with a structured
+   diagnostic (path, message, suggested fix), and the last known good keymaps
+   stay in effect. This is the defect the plan set out to fix: the earlier
+   delivery fell back to legacy or empty keymaps. KB-POL-1 and KB-SVC-2 now
+   state and test the replacement law.
+3. **Migration.** A valid `config.json5.keymaps` is copied once into a new
+   `keybindings.json5`, `config.json5` is never written, and the end-to-end
+   suite compares the Hyper-tree file byte for byte before and after launch.
+4. **Deletion.** Deleting the file leaves platform defaults in effect until the
+   next start, and the next start follows the approved rule: it re-seeds from
+   legacy keymaps if they are still present, which is why `{}` is documented as
+   the reset.
+5. **The Velocetty tree.** Fresh installs create both files under the Velocetty
+   tree only, with the XDG rule on Linux and macOS. An existing Hyper-tree
+   `config.json5` keeps working and is never moved.
+
+Developers have verbatim import and export utilities, so roadmap `4.2.2` and
+`5.1.2` can call them without introducing another format.
+
+The implementation is a policy core, a codec, a service, a store adapter, an
+importer, and a watcher, composed in `app/config.ts`. The policy is verified
+with LemmaScript; the rest is covered by unit, property, model, and end-to-end
+tests. The split was worth the extra files: the two rules that must not be
+wrong (last known good, and start-up seeding) are stated as contracts, and the
+adapters that touch the filesystem are small enough to test by fault injection.
+
+Retrospective findings:
+
+- The first delivery looked complete and was not. Its invalid-reload path
+  silently dropped working shortcuts, and no test would have caught it. The
+  plan's requirement for a failing test before each fix, and for negative
+  controls, is what exposed it. Keep that requirement.
+- The design's plugin precedence and the implemented precedence differ, and the
+  verification work surfaced it rather than resolving it. It is now written down
+  (`KEYMAP-001`) instead of being implied.
+- The configuration-tree work grew out of one approval answer, and it touched
+  the CLI as well as the application. The mirrored resolver plus a parity test
+  contained that cost, but the inputs still differ; `CONFIG-003` records the
+  residual risk rather than hiding it.
+- `mdtablefix --breaks` reformats thematic breaks, not line breaks. A bulk run
+  during an earlier delivery exploded `docs/velocetty-design.md` into
+  blank-line-separated lines. This stage added normal paragraphs beside the
+  damaged ones; repairing the file is a separate, mechanical change.
+
+Remaining work, all recorded outside this plan's acceptance: the CI end-to-end
+run on three operating systems (`Progress`, EP-E E4), plugin precedence
+(`KEYMAP-001`), the `keymaps` scope mismatch (`KEYMAP-002`), the resolver-input
+divergence (`CONFIG-003`), and the `userData` name (`CONFIG-004`).
 
 ## Context and orientation
 
