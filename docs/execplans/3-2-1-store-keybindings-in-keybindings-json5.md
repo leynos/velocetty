@@ -217,8 +217,9 @@ design and the notification the user sees.
   and `bun run check:boundaries`).
 - The runtime contract `parsedConfig.keymaps: Record<string, string[]>`
   (`shared/src/types/config.ts`) is unchanged. So are its downstream consumers:
-  `app/plugins.ts` `getDecoratedKeymaps`, the IPC schema in
-  `lib/transport/ipc-schemas.ts`, menus, and `lib/command-registry.ts`.
+  `app/plugins.ts` `getDecoratedKeymaps`, the inter-process communication (IPC)
+  schema in `lib/transport/ipc-schemas.ts`, menus, and
+  `lib/command-registry.ts`.
 - The merge of user overrides over platform defaults in `app/config/init.ts`
   is unchanged. The plugin layer's current position deviates from the design
   (see `Surprises & discoveries`). It is recorded, not corrected, and the

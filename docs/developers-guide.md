@@ -251,9 +251,11 @@ verified policy boundary.
 
 When touching keybinding storage:
 
-- Treat `config.json5.keymaps` as a legacy bootstrap source only. If
-  `keybindings.json5` is missing, existing user keymaps may be copied there
-  once; after that, `keybindings.json5` is the source of truth.
+- Treat `config.json5.keymaps` as a legacy bootstrap source only. At start-up,
+  and only while `keybindings.json5` is missing, existing user keymaps may be
+  copied there once; after that, `keybindings.json5` is the source of truth. A
+  reload never copies, so a file deleted during a session stays deleted until
+  the next start.
 - Keep `keybindings.json5` JSON5-compatible, including comments and trailing
   commas.
 - Preserve the last known good in-memory keybindings if `keybindings.json5`
