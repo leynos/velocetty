@@ -1,4 +1,6 @@
 /** @file Verifies the config watcher covers both files and reports reloads honestly. */
+import path from 'node:path';
+
 import {expect, mock, test} from 'bun:test';
 
 import type {ConfigImportReport} from '../../app/config/import-report';
@@ -142,7 +144,9 @@ test.serial('setup watches the configuration directory once, filtered to both fi
     expect(harness.watchMock).toHaveBeenCalledTimes(1);
     // The active config and the keybindings file share `/tmp`, so one
     // directory watch covers both without watching the tree recursively.
-    expect(harness.watchMock.mock.calls[0]?.[0]).toEqual(['/tmp']);
+    // `path.resolve` makes the expectation portable: Windows turns the
+    // mock's `/tmp` into a drive-qualified path.
+    expect(harness.watchMock.mock.calls[0]?.[0]).toEqual([path.resolve('/tmp')]);
     expect(harness.watchMock.mock.calls[0]?.[1]).toEqual({depth: 0, ignoreInitial: true});
   } finally {
     mock.restore();

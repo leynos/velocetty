@@ -113,7 +113,11 @@ describe('atomic keybindings file store', () => {
     expect(store.write(`{'window:new': 'ctrl+n'}`)).toEqual({kind: 'written'});
 
     expect(fs.readFileSync(filePath, 'utf8')).toBe(`{'window:new': 'ctrl+n'}`);
-    expect(fs.statSync(filePath).mode & 0o777).toBe(0o640);
+    if (process.platform !== 'win32') {
+      // Windows models only the read-only bit, so the POSIX mode round trip
+      // is asserted where it is meaningful.
+      expect(fs.statSync(filePath).mode & 0o777).toBe(0o640);
+    }
     expect(temporaryNames(workspace)).toEqual([]);
   });
 
