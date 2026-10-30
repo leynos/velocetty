@@ -21,6 +21,19 @@ type IsolatedE2EEnvironment = Readonly<{
    * variables whose value is `undefined`, and `process.env` may contain them.
    */
   env: Record<string, string>;
+  /** The temporary home every configuration tree resolves under. */
+  tempHome: string;
+  /** The Velocetty configuration tree inside the temporary home. */
+  velocettyConfigDir: string;
+  /** The legacy Hyper configuration tree inside the temporary home. */
+  hyperConfigDir: string;
+  /**
+   * Writes one file into a configuration tree before launch.
+   *
+   * Creates the tree when the file needs it, so a seeded Hyper tree exists
+   * without the application ever creating one.
+   */
+  seedFile: (configDir: string, fileName: string, contents: string) => Promise<string>;
   cleanup: () => Promise<void>;
 }>;
 
@@ -130,6 +143,14 @@ export const extractRendererErrorMessage = (line: string) => {
   return payload.replace(/^\S+:\d+\s+/, '');
 };
 
+/** Writes one file into a configuration tree, creating the tree on demand. */
+const seedFile = async (configDir: string, fileName: string, contents: string) => {
+  await fs.mkdir(configDir, {recursive: true});
+  const filePath = path.join(configDir, fileName);
+  await fs.writeFile(filePath, contents, 'utf8');
+  return filePath;
+};
+
 /**
  * Creates an isolated HOME/XDG/Windows AppData environment to avoid loading
  * user plugins or local developer configuration during E2E runs.
@@ -155,8 +176,13 @@ export const createIsolatedE2EEnvironment = async (): Promise<IsolatedE2EEnviron
     APPDATA: appData,
     LOCALAPPDATA: localAppData
   } satisfies Record<string, string>;
+
   return {
     env,
+    tempHome,
+    velocettyConfigDir: path.join(tempHome, 'Velocetty'),
+    hyperConfigDir: path.join(tempHome, 'Hyper'),
+    seedFile,
     cleanup: async () => {
       await removeDirectoryWithRetry(tempHome);
     }

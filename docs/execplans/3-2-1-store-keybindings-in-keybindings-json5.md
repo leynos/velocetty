@@ -466,6 +466,22 @@ design and the notification the user sees.
     and were reverted; transcripts in `Artefacts and notes`.
 - [ ] EP-E watcher and end-to-end: red; green; refactor; gates; CI end-to-end
   run on three operating systems.
+  - [x] (2026-10-30) E1 red: KB-WATCH-1 failed against a stub that reproduced
+    the old per-event timers, shrinking to two simultaneous events and
+    expecting `[100]` but receiving `[100, 100]`. The rewritten watcher suite
+    also failed five ways against the old single-path watcher, including a
+    reload raised by `/tmp/schema.json` and the phase log
+    `['startup', 'reload', 'reload']`.
+  - [x] (2026-10-30) E2 green: `createConfigWatcher` in
+    `app/config/watcher.ts`, the chokidar directory adapter in
+    `app/config.ts`, the `[e2e]` markers, and the five E2E scenarios. The four
+    focused suites pass (`22 pass`, `0 fail`, 488 assertions).
+  - [x] (2026-10-30) E3 refactor and local gates: the watcher is a pure
+    debouncer over an injected handle, clock, and logger; the E2E probe strings
+    live in `app/config/e2e-keymap-probe.ts`, so the application and the tests
+    share one definition. `bun run check:types`, `bun run lint`, and the
+    focused suites pass.
+  - [ ] E4 commit gates and the CI end-to-end run on three operating systems.
 - [ ] EP-F documentation and roadmap: drafts; review; gates.
 
 ## Surprises & discoveries
@@ -633,6 +649,23 @@ design and the notification the user sees.
   not assignable to the repository's `JsonValue`. Impact: the codec exports the
   payload type as-is for the generator and Ajv, and the parity suite widens
   only the assertion (`expect<unknown>`) rather than converting the schema.
+- Observation: the inherited watcher was not merely a per-event timer. It
+  watched one resolved directory, keyed its handlers on `basename`, and
+  therefore reloaded for `schema.json` and `keybindings.schema.json` as well as
+  the two configuration files; its handlers also ran one reload per event. The
+  KB-WATCH-1 counterexample exposed the second defect, and the rewritten
+  watcher suite exposed the first. Impact: `createConfigWatcher` filters on
+  absolute resolved paths rather than basenames, and the chokidar adapter
+  watches the distinct directories of the active config and the keybindings
+  file at `depth: 0`.
+- Observation: an Electron E2E suite that only asserts on files cannot see
+  which keymaps are in effect, and a packaged launch is a 90-second proposition
+  per scenario. Impact: the application prints `[e2e]` markers on start-up and
+  after each reload, behind `RUN_E2E=1`, so the suite observes the real
+  composition root instead of re-deriving state from files. The probe strings
+  were extracted to `app/config/e2e-keymap-probe.ts` because the E2E suite must
+  import the same shortcut it asserts on; a duplicated literal would let the
+  suite pass while the application probed a different command.
 
 ## Decision log
 
@@ -966,6 +999,45 @@ design and the notification the user sees.
   idiom, and exporting the dependency type lets the composition root build the
   object without a type assertion. Date/Author: 2026-10-30, implementation
   agent.
+- Decision: `createConfigWatcher` takes its timer, handle, and logger as
+  injected dependencies rather than calling `setTimeout`, `chokidar`, and
+  `console` directly. Rationale: KB-WATCH-1 is stated over exact event times,
+  including the tie at a gap of exactly `debounceMs` and events raised from
+  inside `onReload`; a real timer cannot express those schedules
+  deterministically. The fake clock runs due timers before an event delivered
+  at the same instant, which is what makes the tie case assertable.
+  Date/Author: 2026-10-30, implementation agent.
+- Decision: the adapter watches the distinct directories of the active config
+  and `keybindings.json5` at `depth: 0`, and the watcher filters events on
+  absolute resolved paths. Rationale: an atomic save is a temporary sibling
+  plus a rename, which reaches chokidar as `unlink`/`add` for the target; a
+  watch registered on files alone is fragile across that sequence. Watching
+  directories also collapses to one watch when both files live in the Velocetty
+  tree, which the suite asserts (`watch` called once with `['/tmp']`).
+  Filtering on resolved absolute paths rather than basenames is what stops
+  `schema.json` and `keybindings.schema.json` from triggering reloads.
+  Date/Author: 2026-10-30, implementation agent.
+- Decision: the reload path clears the pending timer and checks the closed
+  flag before calling `onReload`, and catches a throwing `onReload` with a
+  warning. Rationale: an event raised during a reload must start a new burst
+  rather than be swallowed, and a failed reload must not silently disable the
+  watcher; the next edit is the user's retry and has to be observed. Both
+  behaviours are named tests rather than consequences of the property.
+  Date/Author: 2026-10-30, implementation agent.
+- Decision: the application emits `[e2e] keymaps-active` after the import and
+  after the reload subscribers run, and only when `RUN_E2E=1`. Rationale: the
+  E2E scenarios assert on the keymaps in effect, not on file contents, so the
+  marker has to report the state the composition root actually installed;
+  emitting before subscribers would let the marker precede the state it
+  describes. The probe shortcut and marker format live in
+  `app/config/e2e-keymap-probe.ts` so the suite and the application cannot
+  drift. Date/Author: 2026-10-30, implementation agent.
+- Decision: KB-LAYER-1 is checked through `_init` and the real `mapKeys`,
+  against an independently computed merge, rather than by calling `mapKeys`
+  directly. Rationale: the law is about the layering the application performs,
+  and the expected value must not be derived by the code under test. The
+  swapped-spread negative control proves the property is not vacuous.
+  Date/Author: 2026-10-30, implementation agent.
 
 ## Outcomes & retrospective
 
@@ -2805,6 +2877,104 @@ listed; `markdownlint` was blocked by that same spelling prerequisite. After
 the two deletions), the three affected gates were re-run and passed:
 `67 files left unchanged` for `check-fmt`, a clean spelling gate, and
 `0 issues in 67 files` for `markdownlint`.
+
+### EP-E: watcher and end-to-end
+
+Artefacts (E1 and E2):
+
+- `app/config/watcher.ts` (new, 112 lines): the debouncing watcher over an
+  injected `WatcherHandle`, timer functions, and warning sink.
+- `app/config/e2e-keymap-probe.ts` (new): the probe command, the shortcut the
+  suite asserts is unused, the `RUN_E2E` predicate, and the marker formatter.
+- `app/config.ts`: the chokidar directory adapter, `createConfigWatcher` wiring,
+  the start-up and reload markers, and the `before-quit` close.
+- `test/unit/config-watcher.property.test.ts` (new): KB-WATCH-1 over a fake
+  clock, its stub non-vacuity control, seven named edge-case tests, and a
+  coverage guard.
+- `test/unit/config-keybindings-watch.test.ts` (rewritten): the watch options,
+  `add`/`change`/`unlink` handling, notification rules, one burst across both
+  files, unwatched files, and `before-quit`.
+- `test/unit/config-keymap-layering.property.test.ts` (new): KB-LAYER-1, its
+  swapped-order control, an empty-binding example, and a coverage guard.
+- `test/unit/e2e-keymap-probe.test.ts` (new): scans every shipped keymap for
+  the probe shortcut and pins the marker format.
+- `test/e2e/keybindings.e2e.test.ts` (new): E2E-KB-0 to E2E-KB-4 and the
+  second-launch no-write scenario.
+- `test/e2e/electron-e2e-helpers.ts`: `tempHome`, both configuration-tree
+  directories, and `seedFile`.
+- `package.json`: `test:e2e:run` sets `RUN_E2E=1`.
+
+E1 red. KB-WATCH-1 was written before `watcher.ts` existed, then run against a
+stub that reproduced the old per-event timers. The stub failed and shrank to
+the smallest schedule that distinguishes the two designs:
+
+```plaintext
+Property failed after 2 tests
+Counterexample: [[{"at":0,"eventPath":"/cfg/config.json5","kind":"add"},
+  {"at":0,"eventPath":"/cfg/config.json5","kind":"add"}]]
+Shrunk 8 time(s)
+Expected: [100]
+Received: [100,100]
+```
+
+Two events in the same instant are one burst and must reload once, one debounce
+interval later. The rewritten watcher suite was red in five places against the
+old single-path watcher, including a reload raised by `/tmp/schema.json` and a
+phase log reading `['startup', 'reload', 'reload']` for one two-event burst.
+
+E2 green. Focused run:
+
+```plaintext
+bun test test/unit/config-watcher.property.test.ts \
+  test/unit/config-keybindings-watch.test.ts \
+  test/unit/config-keymap-layering.property.test.ts \
+  test/unit/e2e-keymap-probe.test.ts
+ 22 pass
+  0 fail
+ 488 expect() calls
+Ran 22 tests across 4 files.
+```
+
+The KB-WATCH-1 generator pins gaps of `0`, `d - 1`, `d`, and `d + 1` alongside
+uniform gaps, and its coverage guard samples 2000 schedules and requires single
+events, bursts of five or more, and exact-`d` gaps each to exceed 5 per cent.
+KB-LAYER-1's control swaps the spread order and fails, and its coverage guard
+requires overlapping and disjoint commands each to exceed 20 per cent.
+
+The E2E suite is skipped unless `RUN_E2E=1`, so the unit gate stays fast. It
+launches `dist/app` through Electron's CLI, reads the `[e2e]` markers from the
+child's output, and never infers state from a file it did not write: E2E-KB-0
+asserts a fresh install creates both files in the Velocetty tree only; E2E-KB-1
+asserts the marker paths, the migrated probe keymap, and that the Hyper tree
+still holds only its original `config.json5` with unchanged bytes; E2E-KB-2 to
+E2E-KB-4 drive a write, an atomic replace, an invalid file, and a deletion,
+asserting `applied`/`kept` and that the deleted file is not recreated within
+two seconds; the final scenario relaunches over existing files and asserts both
+byte content and the keybindings mtime are unchanged.
+
+EP-E commit gates (scrutineer, run sequentially against the staged candidate at
+`fa0e19b5`): all eight passed on the first run. `check-fmt` left
+`67 files unchanged`; `typecheck` emitted no diagnostics; `lint` reported
+`Checked 355 files`, a passing package-boundary check, and a silent oxlint;
+`test` reported `678 pass`, `0 fail`, 13810 assertions across 80 files;
+`spelling` reported `current: typos.toml`, so no regeneration was needed;
+`prove` reported `8 verified, 0 errors` for the policy and
+`1 verified, 0 errors` for the sample; `markdownlint` reported `0 issues`
+across 67 files; and `nixie` validated every diagram. The working tree was
+byte-identical before and after the run.
+
+Reaching that run took two local repair passes, both recorded here because they
+are the failure modes this repository's tooling produces. The Biome formatter
+rejected seven new or changed files (line wrapping and missing trailing
+newlines), and oxlint then rejected nine constructs the plan's own design had
+introduced: type assertions without a `SAFETY:` justification, a `typeof` check
+at a boundary without a parsing guard, `sort()` instead of `toSorted()`, a
+nested ternary, member access on an `await` expression, a `4`-digit numeric
+separator, a function captured by `seedFile` at inner scope, an explicitly
+widened dictionary type, and an `undefined` guard oxlint's type model does not
+need. Each was fixed rather than suppressed. The Electron E2E suite is not part
+of `make test`, so E4 remains open until CI runs it on all three operating
+systems.
 
 ## Interfaces and dependencies
 
