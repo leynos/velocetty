@@ -53,14 +53,9 @@ export type LoadedSources = {
   readonly usedFallback: boolean;
 };
 
-/** A file path used to identify a config artefact in diagnostics. */
-type ConfigFilePath = {
-  readonly path: string;
-};
-
-/** Bundles the raw text and originating file path of a config source. */
+/** Bundles the raw text of a config source with the path diagnostics cite. */
 type ConfigSource = {
-  readonly filePath: ConfigFilePath;
+  readonly filePath: string;
   readonly rawContent: string;
 };
 
@@ -115,13 +110,13 @@ const rawConfigDiagnosticHints = {
 const reportDiagnostics = (
   warnFn: typeof console.warn,
   context: string,
-  source: ConfigFilePath,
+  sourcePath: string,
   diagnostics: readonly configValidationDiagnostic[]
 ) => {
   if (diagnostics.length === 0) {
     return;
   }
-  warnFn(`[config-import] ${context}`, {source: source.path, diagnostics});
+  warnFn(`[config-import] ${context}`, {source: sourcePath, diagnostics});
 };
 
 type ConfigParseOptions<T> = {
@@ -134,7 +129,7 @@ type ConfigParseOptions<T> = {
 const parseConfigSource = <T>(source: ConfigSource, options: ConfigParseOptions<T>) =>
   parseJson5WithSchemaDiagnostics({
     raw: source.rawContent,
-    source: source.filePath.path,
+    source: source.filePath,
     schema: options.schema,
     fallback: options.fallback,
     itemType: options.itemType,
@@ -252,7 +247,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
       console.error(`[config-import] Failed to read bundled default config at "${pathDeps.defaultCfg}".`, error);
     }
 
-    const filePath: ConfigFilePath = {path: pathDeps.defaultCfg};
+    const filePath = pathDeps.defaultCfg;
     const parsedDefaultConfigResult = parseRawConfig({filePath, rawContent: defaultCfgRaw});
     if (parsedDefaultConfigResult.usedFallback) {
       reportDiagnostics(warnFn, 'Bundled default config diagnostics.', filePath, parsedDefaultConfigResult.diagnostics);
@@ -283,7 +278,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
 
   const loadPlatformKeymap = (): Record<string, string | string[]> => {
     const platformKeyPath = pathDeps.defaultPlatformKeyPath();
-    const filePath: ConfigFilePath = {path: platformKeyPath};
+    const filePath = platformKeyPath;
     let content = '{}';
     try {
       content = readFileSync(platformKeyPath, 'utf8');
@@ -300,7 +295,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
   };
 
   const loadUserConfig = (defaultConfigFallback: rawConfig): LoadedConfig => {
-    const filePath: ConfigFilePath = {path: pathDeps.cfgPath};
+    const filePath = pathDeps.cfgPath;
     try {
       const userCfgResult = parseRawConfig({filePath, rawContent: readFileSync(pathDeps.cfgPath, 'utf8')});
       if (userCfgResult.usedFallback) {
