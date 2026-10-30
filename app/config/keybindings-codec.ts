@@ -8,8 +8,8 @@ import JSON5 from 'json5';
 import {z} from 'zod';
 
 import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
-import {isJsonObject, type JsonObject} from '@shared/types/json';
-import {isObject, isString} from '../utils/runtime-guards';
+import type {JsonObject} from '@shared/types/json';
+import {isJsonObject, isObject, isString} from '../utils/runtime-guards';
 import {stringifyJson5} from './json5-config';
 import type {UserKeymaps} from './keybindings-policy';
 

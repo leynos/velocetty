@@ -115,7 +115,12 @@ also materializes runtime-resolvable modules under `dist/app/`. Use
 adapters/constants for main-process runtime dependencies.
 
 Boundary validation is enforced by `bun run check:boundaries`, which runs as
-part of `bun run lint` and therefore `make lint`.
+part of `bun run lint` and therefore `make lint`. That check also rejects a
+runtime `@shared/*` import in `app/`, where the alias has no runtime
+counterpart; `import {type X} from '@shared/...'` counts as runtime because
+`verbatimModuleSyntax` keeps the statement, so write `import type`. A `shared`
+value that `app/` needs at run time belongs in an app-local adapter, as
+`app/utils/runtime-guards.ts` does.
 
 Follow-up hardening tracked in `docs/tracking-issues.md`:
 

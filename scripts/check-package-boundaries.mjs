@@ -68,6 +68,21 @@ const extractStaticImportSpecifier = (node) => {
   return node.moduleSpecifier.text;
 };
 
+/**
+ * Reports whether a static import or re-export survives compilation.
+ *
+ * Only a clause-level `import type` (or `export type`) is erased outright.
+ * `import {type A} from 'x'` is not: `verbatimModuleSyntax` keeps the
+ * statement as `import {} from 'x'`, which still resolves `x` at runtime.
+ */
+const isTypeOnlyStaticImportOrExport = (node) => {
+  if (ts.isImportDeclaration(node)) {
+    return node.importClause?.isTypeOnly === true;
+  }
+
+  return ts.isExportDeclaration(node) && node.isTypeOnly;
+};
+
 const isDynamicImportCall = (node) =>
   ts.isCallExpression(node) && node.arguments.length === 1 && node.expression.kind === ts.SyntaxKind.ImportKeyword;
 
@@ -90,37 +105,37 @@ const extractDynamicImportSpecifier = (node) => {
   return firstArgument.text;
 };
 
-const pushSpecifierIfPresent = (importSpecifiers, specifier) => {
+const pushSpecifierIfPresent = (imports, specifier, isTypeOnly = false) => {
   if (specifier !== null) {
-    importSpecifiers.push(specifier);
+    imports.push({isTypeOnly, specifier});
   }
 };
 
-const handleImportExportNode = (node, importSpecifiers) => {
+const handleImportExportNode = (node, imports) => {
   const staticImportSpecifier = extractStaticImportSpecifier(node);
-  pushSpecifierIfPresent(importSpecifiers, staticImportSpecifier);
+  pushSpecifierIfPresent(imports, staticImportSpecifier, isTypeOnlyStaticImportOrExport(node));
 };
 
-const handleCallExpressionNode = (node, importSpecifiers) => {
+const handleCallExpressionNode = (node, imports) => {
   const dynamicImportSpecifier = extractDynamicImportSpecifier(node);
-  pushSpecifierIfPresent(importSpecifiers, dynamicImportSpecifier);
+  pushSpecifierIfPresent(imports, dynamicImportSpecifier);
 };
 
 const readImports = (filePath) => {
   const source = readFileSync(filePath, 'utf8');
   const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, getScriptKind(filePath));
-  const importSpecifiers = [];
+  const imports = [];
 
   const visit = (node) => {
-    handleImportExportNode(node, importSpecifiers);
-    handleCallExpressionNode(node, importSpecifiers);
+    handleImportExportNode(node, imports);
+    handleCallExpressionNode(node, imports);
 
     ts.forEachChild(node, visit);
   };
 
   visit(sourceFile);
 
-  return importSpecifiers;
+  return imports;
 };
 
 const collectFiles = (directoryPath, output = []) => {
@@ -194,6 +209,17 @@ const isDisallowedAliasSpecifier = (importSpecifier, disallowedAliases) =>
     return importSpecifier === aliasRoot || importSpecifier.startsWith(aliasPrefix);
   });
 
+/**
+ * `app/` is compiled by `tsgo` into `dist/app`, where the `@shared/*` alias
+ * has no runtime counterpart, so a value import type-checks and then throws
+ * `MODULE_NOT_FOUND` in the packaged application. Only `tsgo`-compiled app
+ * code is affected; the renderer and CLI bundles alias `@shared` themselves.
+ */
+const isAppSharedRuntimeImport = (filePath, importSpecifier, isTypeOnly) =>
+  toNormalizedRelativePath(filePath).startsWith('app/') &&
+  !isTypeOnly &&
+  isDisallowedAliasSpecifier(importSpecifier, ['@shared/']);
+
 const violations = [];
 
 for (const roots of Object.values(layerDefinitions)) {
@@ -205,7 +231,7 @@ for (const roots of Object.values(layerDefinitions)) {
       }
 
       const rules = layerRules[layer];
-      for (const importSpecifier of readImports(filePath)) {
+      for (const {isTypeOnly, specifier: importSpecifier} of readImports(filePath)) {
         if (isAllowedImportException(filePath, importSpecifier)) {
           continue;
         }
@@ -213,12 +239,14 @@ for (const roots of Object.values(layerDefinitions)) {
         const aliasViolation = isDisallowedAliasSpecifier(importSpecifier, rules.disallowedAliases);
         const relativeViolation = resolvesToDisallowedRoot(filePath, importSpecifier, rules.disallowedRoots);
         const bareRootViolation = isBareDisallowedRootSpecifier(importSpecifier, rules.disallowedRoots);
+        const sharedRuntimeViolation = isAppSharedRuntimeImport(filePath, importSpecifier, isTypeOnly);
 
-        if (aliasViolation || relativeViolation || bareRootViolation) {
+        if (aliasViolation || relativeViolation || bareRootViolation || sharedRuntimeViolation) {
           violations.push({
             file: path.relative(rootDir, filePath),
             importSpecifier,
-            layer
+            layer,
+            reason: sharedRuntimeViolation ? 'runtime `@shared/*` import in app/' : null
           });
         }
       }
@@ -229,7 +257,8 @@ for (const roots of Object.values(layerDefinitions)) {
 if (violations.length > 0) {
   console.error('Package boundary violations found:');
   for (const violation of violations) {
-    console.error(`- [${violation.layer}] ${violation.file}: ${violation.importSpecifier}`);
+    const suffix = violation.reason === null ? '' : ` (${violation.reason})`;
+    console.error(`- [${violation.layer}] ${violation.file}: ${violation.importSpecifier}${suffix}`);
   }
   process.exit(1);
 }
