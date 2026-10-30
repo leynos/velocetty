@@ -1,7 +1,7 @@
 /** @file Shared harness helpers for config-import unit tests. */
 import {mock} from 'bun:test';
 
-import {mkdtempSync} from 'node:fs';
+import {mkdtempSync, readFileSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 
@@ -11,6 +11,8 @@ import {isString} from '@shared/types/guards';
 
 import {createConfigImportModule, type ConfigImportPaths} from '../../app/config/import';
 import {_init} from '../../app/config/init';
+import {createKeybindingsService} from '../../app/config/keybindings';
+import {createFileKeybindingsStore} from '../../app/config/keybindings-store';
 import type {configValidationDiagnostic} from '@shared/types/config';
 
 type ConfigInit = Parameters<typeof createConfigImportModule>[0]['_init'];
@@ -21,6 +23,8 @@ export type ConfigImportHarness = {
   getDefaultConfig: ReturnType<typeof createConfigImportModule>['getDefaultConfig'];
   cleanup: () => void;
   initMock: ReturnType<typeof mock<ConfigInit>>;
+  /** The real service the importer drives, over a real temporary directory. */
+  keybindings: ReturnType<typeof createKeybindingsService>;
   mockPaths: ConfigImportPaths;
   notifyMock: ReturnType<typeof mock<ConfigNotify>>;
   warnMock: ReturnType<typeof mock<(_message?: string, ..._rest: Error[]) => void>>;
@@ -74,23 +78,50 @@ export const findDiagnosticsPayloadFromWarnMock = (
   throw new Error('Expected a structured diagnostics payload in warning logs.');
 };
 
-const createMockPaths = (workspaceRoot: string): ConfigImportPaths => ({
-  cfgDir: path.join(workspaceRoot, 'user-config'),
-  cfgPath: path.join(workspaceRoot, 'user-config', 'config.json5'),
-  defaultCfg: path.join(workspaceRoot, 'defaults', 'config-default.json'),
-  keybindingsPath: path.join(workspaceRoot, 'user-config', 'keybindings.json5'),
-  defaultPlatformKeyPath: () => path.join(workspaceRoot, 'defaults', 'linux.json'),
-  plugs: {
-    base: path.join(workspaceRoot, 'user-config', 'plugins'),
-    local: path.join(workspaceRoot, 'user-config', 'plugins', 'local')
-  },
-  schemaFile: 'schema.json',
-  schemaPath: path.join(workspaceRoot, 'defaults', 'schema.json')
-});
+/** How the harness lays out the configuration trees. */
+export type ConfigImportHarnessOptions = {
+  /**
+   * Model an active Hyper tree: `config.json5` lives outside the Velocetty
+   * tree, which owns `keybindings.json5` and every new file.
+   */
+  readonly hyperTree?: boolean;
+};
 
-export const createConfigImportHarness = async (): Promise<ConfigImportHarness> => {
+const createMockPaths = (workspaceRoot: string, options: ConfigImportHarnessOptions): ConfigImportPaths => {
+  const velocettyDir = path.join(workspaceRoot, options.hyperTree ? 'velocetty' : 'user-config');
+  const userConfigDir = options.hyperTree ? path.join(workspaceRoot, 'hyper') : velocettyDir;
+  return {
+    cfgDir: userConfigDir,
+    cfgPath: path.join(userConfigDir, 'config.json5'),
+    defaultCfg: path.join(workspaceRoot, 'defaults', 'config-default.json'),
+    keybindingsDir: velocettyDir,
+    keybindingsPath: path.join(velocettyDir, 'keybindings.json5'),
+    keybindingsSchemaFile: 'keybindings.schema.json',
+    keybindingsSchemaPath: path.join(workspaceRoot, 'defaults', 'keybindings.schema.json'),
+    defaultPlatformKeyPath: () => path.join(workspaceRoot, 'defaults', 'linux.json'),
+    plugs: {
+      base: path.join(userConfigDir, 'plugins'),
+      local: path.join(userConfigDir, 'plugins', 'local')
+    },
+    schemaFile: 'schema.json',
+    schemaPath: path.join(workspaceRoot, 'defaults', 'schema.json'),
+    shadowedConfigPaths: [],
+    velocettyDir
+  };
+};
+
+/** Captures `config.json5` bytes so a reload can be proved to leave them untouched. */
+export const snapshotConfigBytes = (mockPaths: ConfigImportPaths): Buffer => readFileSync(mockPaths.cfgPath);
+
+/** Whether `config.json5` still holds the bytes captured by {@link snapshotConfigBytes}. */
+export const configBytesUnchanged = (mockPaths: ConfigImportPaths, before: Buffer): boolean =>
+  readFileSync(mockPaths.cfgPath).equals(before);
+
+export const createConfigImportHarness = async (
+  options: ConfigImportHarnessOptions = {}
+): Promise<ConfigImportHarness> => {
   const workspaceRoot = mkdtempSync(path.join(tmpdir(), 'velocetty-config-import-'));
-  const mockPaths = createMockPaths(workspaceRoot);
+  const mockPaths = createMockPaths(workspaceRoot, options);
   const notifyMock = mock<ConfigNotify>(() => {});
   const initMock = mock<ConfigInit>((userCfg, defaultCfg, notify) => _init(userCfg, defaultCfg, notify));
   const warnMock = mock((_message?: string, ..._rest: Error[]) => {});
@@ -109,8 +140,17 @@ export const createConfigImportHarness = async (): Promise<ConfigImportHarness> 
 
   try {
     mkdirpSync(path.join(workspaceRoot, 'defaults'));
+    // The composition root creates the Velocetty tree before importing, so the
+    // seed write has somewhere to land even when the active tree is Hyper's.
+    mkdirpSync(mockPaths.velocettyDir);
+    // Both schemas are bundled with the application, so the harness supplies
+    // both; a missing one would make every import report a copy failure.
+    writeFileSync(mockPaths.keybindingsSchemaPath, '{"title":"keybindings-schema"}', 'utf8');
+    const store = createFileKeybindingsStore({filePath: mockPaths.keybindingsPath, warn: warnMock});
+    const keybindings = createKeybindingsService({notify: notifyMock, store, warn: warnMock});
     const configModule = createConfigImportModule({
       _init: initMock,
+      keybindings,
       notify: notifyMock,
       paths: mockPaths,
       warn: warnMock
@@ -121,6 +161,7 @@ export const createConfigImportHarness = async (): Promise<ConfigImportHarness> 
       getDefaultConfig: configModule.getDefaultConfig,
       cleanup,
       initMock,
+      keybindings,
       mockPaths,
       notifyMock,
       warnMock,

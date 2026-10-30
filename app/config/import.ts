@@ -1,356 +1,114 @@
-/** @file Imports and normalizes user and default configuration files. */
-import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
-import path from 'node:path';
+/** @file Composes config sources, the keybindings service, and migration notices. */
+/*
+ * The importer is the only place that knows both configuration files. It
+ * classifies the legacy keymaps, drives the keybindings service through the
+ * right phase, and reports what each file did so the application can decide
+ * whether "Configuration updated" is honest.
+ */
+import type {parsedConfig, rawConfig} from '@shared/types/config';
+import {
+  classifyLegacyKeymaps,
+  createKeybindingsNotices,
+  type LegacyKeymapsClassification,
+  readLegacyKeymaps,
+  replaceLegacyKeymaps
+} from './import-keybindings';
+import type {ConfigImportReport} from './import-report';
+import {
+  createConfigSourceLoader,
+  type ConfigImportPaths,
+  type ConfigImportPhase,
+  type ConfigSourceLoaderDependencies
+} from './import-sources';
+import type {ConfigImportNotify, KeybindingsLoadOutcome} from './keybindings';
+import type {LegacyKeymapsSource} from './keybindings-policy';
 
-import type {configValidationDiagnostic, parsedConfig, rawConfig} from '@shared/types/config';
-import {isJsonValue} from '../utils/runtime-guards';
-import {createKeybindingsModule} from './keybindings';
-import {parseKeybindingsText, toRawKeymaps} from './keybindings-codec';
-import {parseJson5WithSchemaDiagnostics, safeParseRawConfig, stringifyJson5, type ParseSchema} from './json5-config';
+export {shouldAnnounceReload} from './import-report';
+export type {ConfigImportReport} from './import-report';
+export type {ConfigImportPaths, ConfigImportPhase} from './import-sources';
 
-type LoadedConfig = {
-  config: rawConfig;
-  diagnostics: configValidationDiagnostic[];
-  usedFallback: boolean;
+/** The keybindings service as the importer sees it. */
+export type ConfigImportKeybindings = {
+  readonly start: (legacy: LegacyKeymapsSource) => KeybindingsLoadOutcome;
+  readonly reload: () => KeybindingsLoadOutcome;
 };
 
-type ConfigImportNotify = (title: string, body?: string, details?: {error?: unknown}) => void;
+type ConfigImportResult = {readonly config: parsedConfig; readonly report: ConfigImportReport};
+
 type ConfigInit = (userCfg: rawConfig, defaultCfg: rawConfig, notify: ConfigImportNotify) => parsedConfig;
-
-export type ConfigImportPaths = {
-  cfgDir: string;
-  cfgPath: string;
-  defaultCfg: string;
-  keybindingsPath: string;
-  defaultPlatformKeyPath: () => string;
-  plugs: {
-    base: string;
-    local: string;
-  };
-  schemaFile: string;
-  schemaPath: string;
-};
 
 type ConfigImportDependencies = {
   _init: ConfigInit;
-  notify: (title: string, body?: string, details?: {error?: unknown}) => void;
+  keybindings: ConfigImportKeybindings;
+  notify: ConfigImportNotify;
   paths: ConfigImportPaths;
   warn?: typeof console.warn;
 };
 
-/** A file path used to identify a config artefact in diagnostics. */
-type ConfigFilePath = {
-  readonly path: string;
-};
-
-/** Bundles the raw text and originating file path of a config source. */
-type ConfigSource = {
-  readonly filePath: ConfigFilePath;
-  readonly rawContent: string;
-};
-
-const defaultRawConfigFallback: rawConfig = {
-  plugins: [],
-  localPlugins: [],
-  keymaps: {}
-} as const;
-
-/** Creates an isolated copy of a raw config payload for safe mutation. */
-const cloneRawConfig = (config: rawConfig): rawConfig => structuredClone(config);
-
-const rawConfigSchema: ParseSchema<rawConfig> = {
-  safeParse: (value) => safeParseRawConfig(value)
-};
-
-const rawConfigDiagnosticHints = {
-  '/': {
-    docHint: 'Top-level config payload object.',
-    defaultHint: '{}'
-  },
-  '/config': {
-    docHint: 'Root terminal configuration object.',
-    defaultHint: '{}'
-  },
-  '/plugins': {
-    docHint: 'List of plugins to fetch and install from npm.',
-    defaultHint: '[]'
-  },
-  '/localPlugins': {
-    docHint: 'List of local plugin directories to load in development.',
-    defaultHint: '[]'
-  },
-  '/keymaps': {
-    docHint: 'Command keymap overrides as strings or string arrays.',
-    defaultHint: '{}'
+/** Maps a service outcome onto the report vocabulary. */
+const keybindingsStatus = (outcome: KeybindingsLoadOutcome): ConfigImportReport['keybindings'] => {
+  if (outcome.kind === 'applied') {
+    return 'applied';
   }
-} as const;
-
-const reportDiagnostics = (
-  warnFn: typeof console.warn,
-  context: string,
-  source: ConfigFilePath,
-  diagnostics: readonly configValidationDiagnostic[]
-) => {
-  if (diagnostics.length === 0) {
-    return;
-  }
-  warnFn(`[config-import] ${context}`, {source: source.path, diagnostics});
+  return outcome.cause === 'deferred' ? 'unchanged' : 'kept';
 };
 
 /**
- * Parses JSON5 config text into a validated raw config payload.
+ * Creates the configuration importer.
  *
- * Returns parsed payload plus structured diagnostics when fallback is used.
- */
-type ConfigParseOptions<T> = {
-  readonly schema: ParseSchema<T>;
-  readonly fallback: T;
-  readonly itemType: string;
-  readonly diagnosticHints: Record<string, {docHint?: string; defaultHint?: string}>;
-};
-
-const parseConfigSource = <T>(source: ConfigSource, options: ConfigParseOptions<T>) =>
-  parseJson5WithSchemaDiagnostics({
-    raw: source.rawContent,
-    source: source.filePath.path,
-    schema: options.schema,
-    fallback: options.fallback,
-    itemType: options.itemType,
-    diagnosticHints: options.diagnosticHints
-  });
-
-const parseRawConfig = (source: ConfigSource) =>
-  parseConfigSource(source, {
-    schema: rawConfigSchema,
-    fallback: null,
-    itemType: 'config',
-    diagnosticHints: rawConfigDiagnosticHints
-  });
-
-/** Serializes config using deterministic JSON5 formatting for stable snapshots. */
-const stringifyConfig = (config: rawConfig): string => {
-  if (!isJsonValue(config)) {
-    throw new TypeError('Config values must be JSON-compatible before serialization.');
-  }
-  return stringifyJson5(config);
-};
-
-const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPORT === '1';
-
-/**
- * Copies the bundled JSON schema into the user config directory.
+ * `_import('startup')` may create directories, copy schemas, and seed
+ * `keybindings.json5`; `_import('reload')` writes nothing at all.
  *
- * Logs and notifies when copying fails so schema-backed editor metadata issues
- * are visible to users.
+ * @example
+ * ```ts
+ * const importer = createConfigImportModule({_init, keybindings, notify, paths});
+ * const {config, report} = importer._import('reload');
+ * ```
  */
 export const createConfigImportModule = (dependencies: ConfigImportDependencies) => {
-  const {_init: initConfig, notify: notifyFn} = dependencies;
-  const warnFn = dependencies.warn ?? console.warn;
-  const pathDeps = dependencies.paths;
-  let defaultConfig: rawConfig | undefined;
-  let keybindingsModule: ReturnType<typeof createKeybindingsModule> | undefined;
+  const {_init: initConfig, keybindings, notify: notifyFn} = dependencies;
+  const notices = createKeybindingsNotices(notifyFn);
+  const sourceOptions: ConfigSourceLoaderDependencies = {notify: notifyFn, paths: dependencies.paths};
+  if (dependencies.warn !== undefined) {
+    sourceOptions.warn = dependencies.warn;
+  }
+  const sources = createConfigSourceLoader(sourceOptions);
 
-  const getKeybindingsModule = () => {
-    keybindingsModule ??= createKeybindingsModule({
-      filePath: pathDeps.keybindingsPath,
-      notify: notifyFn,
-      warn: warnFn
-    });
-    return keybindingsModule;
-  };
-
-  const notifyWithPrimaryDiagnostic = (baseMessage: string, diagnostics: configValidationDiagnostic[]) => {
-    const primaryDiagnostic = diagnostics.at(0);
-    if (!primaryDiagnostic) {
-      notifyFn(baseMessage);
+  /** Shows the migration notices appropriate to what the service did. */
+  const reportKeybindings = (outcome: KeybindingsLoadOutcome, classification: LegacyKeymapsClassification) => {
+    if (outcome.kind === 'applied' && outcome.origin === 'seeded') {
+      notices.announceSeeded();
       return;
     }
-
-    const docHint = primaryDiagnostic.docHint ? ` Hint: ${primaryDiagnostic.docHint}.` : '';
-    const defaultHint = primaryDiagnostic.defaultHint ? ` Default: ${primaryDiagnostic.defaultHint}.` : '';
-    notifyFn(
-      `${baseMessage} ${primaryDiagnostic.path}: ${primaryDiagnostic.message} Suggested fix: ${primaryDiagnostic.suggestedFix}.${docHint}${defaultHint}`
-    );
-  };
-
-  const ensureSchemaFile = () => {
-    const destinationPath = path.resolve(pathDeps.cfgDir, pathDeps.schemaFile);
-    try {
-      copySync(pathDeps.schemaPath, destinationPath, {overwrite: true});
-    } catch (error) {
-      console.error(
-        `[config-import] Failed to copy schema file from "${pathDeps.schemaPath}" to "${destinationPath}".`,
-        error
-      );
-      notifyFn("Couldn't update config schema metadata. Config editor validation may be stale.");
+    if (classification.legacy.kind === 'parsed-invalid') {
+      notices.announceDeferred(classification.diagnostics);
+    }
+    if (outcome.kind === 'applied' && outcome.origin === 'file' && classification.legacy.kind === 'parsed-keymaps') {
+      notices.announceLegacyIgnored();
     }
   };
 
-  /**
-   * Bootstraps the user config file from the provided default template.
-   *
-   * When writing fails, emits contextual error logs and notifies the user.
-   */
-  const ensureUserConfigFile = (defaultConfigTemplate: rawConfig) => {
-    if (existsSync(pathDeps.cfgPath)) {
-      return false;
+  const _import = (phase: ConfigImportPhase): ConfigImportResult => {
+    const loaded = sources.load(phase);
+    if (phase === 'startup') {
+      notices.announceShadowed(dependencies.paths.shadowedConfigPaths);
     }
+    const classification = classifyLegacyKeymaps({
+      bootstrapped: loaded.bootstrapped,
+      keymaps: readLegacyKeymaps(loaded.userCfg),
+      source: dependencies.paths.cfgPath,
+      usedFallback: loaded.usedFallback
+    });
+    const outcome = phase === 'startup' ? keybindings.start(classification.legacy) : keybindings.reload();
+    reportKeybindings(outcome, classification);
+    replaceLegacyKeymaps(loaded.userCfg, outcome.keymaps);
 
-    warnFn(
-      `[config-import] User config file missing at "${pathDeps.cfgPath}". Bootstrapping from default config template.`
-    );
-    try {
-      writeFileSync(pathDeps.cfgPath, stringifyConfig(defaultConfigTemplate), 'utf8');
-      return true;
-    } catch (error) {
-      console.error(`[config-import] Failed to write bootstrapped user config at "${pathDeps.cfgPath}".`, error);
-      notifyFn("Couldn't create a user config file. Check permissions and available disk space.");
-      return false;
-    }
-  };
-
-  const loadDefaultConfig = (): LoadedConfig => {
-    let defaultCfgRaw = '{}';
-    try {
-      defaultCfgRaw = readFileSync(pathDeps.defaultCfg, 'utf8');
-    } catch (error) {
-      console.error(`[config-import] Failed to read bundled default config at "${pathDeps.defaultCfg}".`, error);
-    }
-
-    const filePath: ConfigFilePath = {path: pathDeps.defaultCfg};
-    const parsedDefaultConfigResult = parseRawConfig({filePath, rawContent: defaultCfgRaw});
-    if (parsedDefaultConfigResult.usedFallback) {
-      reportDiagnostics(warnFn, 'Bundled default config diagnostics.', filePath, parsedDefaultConfigResult.diagnostics);
-    }
-
-    if (!parsedDefaultConfigResult.usedFallback && parsedDefaultConfigResult.value !== null) {
-      return {
-        config: parsedDefaultConfigResult.value,
-        diagnostics: parsedDefaultConfigResult.diagnostics,
-        usedFallback: false
-      };
-    }
-
-    console.error(
-      `[config-import] Failed to parse bundled default config at "${pathDeps.defaultCfg}". Using safe fallback defaults.`
-    );
-    notifyWithPrimaryDiagnostic(
-      "Couldn't parse the bundled default config. Falling back to safe defaults.",
-      parsedDefaultConfigResult.diagnostics
-    );
+    const config = initConfig(loaded.userCfg, loaded.defaultCfg, notifyFn);
     return {
-      config: cloneRawConfig(defaultRawConfigFallback),
-      diagnostics: parsedDefaultConfigResult.diagnostics,
-      usedFallback: true
+      config,
+      report: {config: loaded.usedFallback ? 'fallback' : 'applied', keybindings: keybindingsStatus(outcome)}
     };
   };
 
-  const loadPlatformKeymap = (): Record<string, string | string[]> => {
-    const platformKeyPath = pathDeps.defaultPlatformKeyPath();
-    const filePath: ConfigFilePath = {path: platformKeyPath};
-    let content = '{}';
-    try {
-      content = readFileSync(platformKeyPath, 'utf8');
-    } catch (error) {
-      console.error(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`, error);
-    }
-
-    const keymapResult = parseKeybindingsText(content, platformKeyPath);
-    if (keymapResult.kind === 'invalid') {
-      reportDiagnostics(warnFn, 'Platform keymap diagnostics.', filePath, keymapResult.diagnostics);
-      return {};
-    }
-    return toRawKeymaps(keymapResult.keymaps);
-  };
-
-  const loadUserConfig = (defaultConfigFallback: rawConfig): LoadedConfig => {
-    const filePath: ConfigFilePath = {path: pathDeps.cfgPath};
-    try {
-      const userCfgResult = parseRawConfig({filePath, rawContent: readFileSync(pathDeps.cfgPath, 'utf8')});
-      if (userCfgResult.usedFallback) {
-        reportDiagnostics(warnFn, 'User config diagnostics.', filePath, userCfgResult.diagnostics);
-      }
-      if (!userCfgResult.usedFallback && userCfgResult.value !== null) {
-        return {
-          config: userCfgResult.value,
-          diagnostics: userCfgResult.diagnostics,
-          usedFallback: false
-        };
-      }
-
-      warnFn(
-        `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
-      );
-      notifyWithPrimaryDiagnostic(
-        "Couldn't parse config file. Using default config instead.",
-        userCfgResult.diagnostics
-      );
-      return {
-        config: cloneRawConfig(defaultConfigFallback),
-        diagnostics: userCfgResult.diagnostics,
-        usedFallback: true
-      };
-    } catch (error) {
-      console.error(`[config-import] Failed to read or parse user config at "${pathDeps.cfgPath}".`, error);
-      warnFn(
-        `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
-      );
-      notifyWithPrimaryDiagnostic("Couldn't parse config file. Using default config instead.", []);
-      return {
-        config: cloneRawConfig(defaultConfigFallback),
-        diagnostics: [],
-        usedFallback: true
-      };
-    }
-  };
-
-  const _importConf = () => {
-    if (isConfigImportDebugEnabled()) {
-      warnFn('[config-import] Initializing config import using app-local JSON5 helpers.');
-    }
-    // init plugin directories if not present
-    mkdirpSync(pathDeps.plugs.base);
-    mkdirpSync(pathDeps.plugs.local);
-    ensureSchemaFile();
-
-    const {config: _defaultCfg} = loadDefaultConfig();
-
-    const userConfigBootstrapped = ensureUserConfigFile(_defaultCfg);
-
-    _defaultCfg.keymaps = loadPlatformKeymap();
-
-    const userConfigResult = loadUserConfig(_defaultCfg);
-    const userCfg = cloneRawConfig(userConfigResult.config);
-    const bootstrapKeymaps = userConfigResult.usedFallback || userConfigBootstrapped ? {} : (userCfg.keymaps ?? {});
-    const keybindingsResult = getKeybindingsModule().loadUserKeybindings({bootstrapFrom: bootstrapKeymaps});
-    userCfg.keymaps = keybindingsResult.keymaps;
-
-    return {userCfg, defaultCfg: _defaultCfg};
-  };
-
-  const _import = () => {
-    const imported = _importConf();
-    defaultConfig = imported.defaultCfg;
-    const result = initConfig(imported.userCfg, imported.defaultCfg, notifyFn);
-    return result;
-  };
-
-  /**
-   * Returns the cached default config payload.
-   *
-   * When `_import` has not run yet, this method lazily calls `_importConf` to
-   * initialize `defaultConfig`. That initialization performs filesystem side
-   * effects:
-   * - plugin directory creation (`mkdirpSync`)
-   * - schema copy into the config directory (`ensureSchemaFile`)
-   * - user config bootstrapping when missing (`ensureUserConfigFile`)
-   */
-  const getDefaultConfig = () => {
-    if (!defaultConfig) {
-      defaultConfig = _importConf().defaultCfg;
-    }
-    return defaultConfig;
-  };
-
-  return {_import, getDefaultConfig};
+  return {_import, getDefaultConfig: sources.getDefaultConfig};
 };

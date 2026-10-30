@@ -65,10 +65,15 @@ export type KeybindingsExport =
 /**
  * Formats the first diagnostic as a sentence suffix for a notification.
  *
- * Keeping this in one place means start-up, reload, and the earlier module
- * cannot describe the same problem differently.
+ * Keeping this in one place means start-up, reload, and the importer cannot
+ * describe the same problem differently.
+ *
+ * @example
+ * ```ts
+ * describePrimaryDiagnostic([]); // ''
+ * ```
  */
-const primaryDiagnosticHint = (diagnostics: readonly configValidationDiagnostic[]): string => {
+export const describePrimaryDiagnostic = (diagnostics: readonly configValidationDiagnostic[]): string => {
   const primaryDiagnostic = diagnostics.at(0);
   if (!primaryDiagnostic) {
     return '';
@@ -76,6 +81,15 @@ const primaryDiagnosticHint = (diagnostics: readonly configValidationDiagnostic[
   const docHint = primaryDiagnostic.docHint ? ` Hint: ${primaryDiagnostic.docHint}.` : '';
   const defaultHint = primaryDiagnostic.defaultHint ? ` Default: ${primaryDiagnostic.defaultHint}.` : '';
   return ` ${primaryDiagnostic.path}: ${primaryDiagnostic.message} Suggested fix: ${primaryDiagnostic.suggestedFix}.${docHint}${defaultHint}`;
+};
+
+/** Notifies with a message followed by the first diagnostic, when there is one. */
+export const notifyWithPrimaryDiagnostic = (
+  notify: ConfigImportNotify,
+  baseMessage: string,
+  diagnostics: readonly configValidationDiagnostic[]
+): void => {
+  notify(`${baseMessage}${describePrimaryDiagnostic(diagnostics)}`);
 };
 
 const diagnosticsSignature = (diagnostics: readonly configValidationDiagnostic[]): string =>
@@ -135,7 +149,7 @@ export const createKeybindingsService = (dependencies: {
       const signature = diagnosticsSignature(diagnostics);
       if (signature !== lastShownDiagnostics) {
         lastShownDiagnostics = signature;
-        notify(`Couldn't parse keybindings file. ${inEffect}${primaryDiagnosticHint(diagnostics)}`);
+        notify(`Couldn't parse keybindings file. ${inEffect}${describePrimaryDiagnostic(diagnostics)}`);
       }
     } else {
       notify(`Couldn't read keybindings file. ${inEffect}`);
@@ -235,6 +249,3 @@ export const createKeybindingsService = (dependencies: {
 
   return {active, exportKeybindings, importKeybindings, reload, start};
 };
-
-// Temporary re-export: the importer still calls the legacy module until EP-D.
-export {createKeybindingsModule} from './keybindings-legacy';

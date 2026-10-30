@@ -1,12 +1,17 @@
 import {app} from 'electron';
 
 import chokidar from 'chokidar';
+import {mkdirpSync} from 'fs-extra';
+import path from 'node:path';
 
 import type {parsedConfig, configOptions} from '@shared/types/config';
 import {isJsonObject} from './utils/runtime-guards';
 
 import {createConfigImportModule} from './config/import';
+import {shouldAnnounceReload} from './config/import-report';
 import {_init} from './config/init';
+import {createKeybindingsService} from './config/keybindings';
+import {createFileKeybindingsStore} from './config/keybindings-store';
 import _openConfig from './config/open';
 import {
   cfgPath,
@@ -14,18 +19,46 @@ import {
   defaultCfg,
   defaultPlatformKeyPath,
   keybindingsPath,
+  keybindingsSchemaFile,
+  keybindingsSchemaPath,
   plugs,
   schemaFile,
-  schemaPath
+  schemaPath,
+  shadowedConfigPaths,
+  velocettyDir
 } from './config/paths';
 import notify from './notify';
 import {getColorMap} from './utils/colours';
 
+const keybindingsStore = createFileKeybindingsStore({filePath: keybindingsPath});
+const keybindingsService = createKeybindingsService({notify, store: keybindingsStore});
+
 const {_import, getDefaultConfig} = createConfigImportModule({
   _init,
+  keybindings: {reload: keybindingsService.reload, start: keybindingsService.start},
   notify,
-  paths: {cfgDir, cfgPath, defaultCfg, defaultPlatformKeyPath, keybindingsPath, plugs, schemaFile, schemaPath}
+  paths: {
+    cfgDir,
+    cfgPath,
+    defaultCfg,
+    defaultPlatformKeyPath,
+    keybindingsDir: path.dirname(keybindingsPath),
+    keybindingsPath,
+    keybindingsSchemaFile,
+    keybindingsSchemaPath,
+    plugs,
+    schemaFile,
+    schemaPath,
+    shadowedConfigPaths,
+    velocettyDir
+  }
 });
+
+/** Imports keybindings text verbatim; the active keymaps change on the next reload. */
+export const importKeybindings = keybindingsService.importKeybindings;
+
+/** Reports the stored keybindings text without writing, notifying, or changing state. */
+export const exportKeybindings = keybindingsService.exportKeybindings;
 
 const watchers: Function[] = [];
 let cfg: parsedConfig | undefined;
@@ -70,8 +103,11 @@ const _watch = () => {
   const onChange = () => {
     // Need to wait 100ms to ensure that write is complete
     setTimeout(() => {
-      cfg = _import();
-      notify('Configuration updated', 'Hyper configuration reloaded!');
+      const {config, report} = _import('reload');
+      cfg = config;
+      if (shouldAnnounceReload(report)) {
+        notify('Configuration updated', 'Configuration reloaded!');
+      }
       watchers.forEach((fn) => {
         fn();
       });
@@ -163,7 +199,10 @@ export const getKeymaps = () => {
 };
 
 export const setup = () => {
-  cfg = _import();
+  // The Velocetty tree holds new configuration files, so it must exist before
+  // the importer copies schemas or seeds `keybindings.json5` into it.
+  mkdirpSync(velocettyDir);
+  cfg = _import('startup').config;
   _watch();
   checkDeprecatedConfig();
 };

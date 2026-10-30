@@ -38,7 +38,7 @@ const runDiagnosticFallbackTest = async (options: DiagnosticFallbackTestOptions)
     writeFileSync(harness.mockPaths.cfgPath, options.userConfigContent, 'utf8');
     writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
 
-    harness._import();
+    harness._import('startup');
 
     expect(harness.notifyMock).toHaveBeenCalledTimes(1);
     // The call-count assertion above is what establishes the call exists, so
@@ -162,10 +162,11 @@ test('imports user config with JSON5 comments and trailing commas', async () => 
     );
     writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
 
-    const importedConfig = harness._import();
+    const importedConfig = harness._import('startup');
 
     expect(harness.initMock).toHaveBeenCalledTimes(1);
-    expect(importedConfig.config.defaultProfile).toBe('work');
+    expect(importedConfig.config.config.defaultProfile).toBe('work');
+    expect(importedConfig.report).toEqual({config: 'applied', keybindings: 'applied'});
 
     const calledUserCfg = ensureObject(harness.initMock.mock.calls[0]?.[0]);
     const userConfigSection = ensureObject(calledUserCfg.config);
@@ -186,7 +187,10 @@ test('imports user config with JSON5 comments and trailing commas', async () => 
     expect(existsSync(harness.mockPaths.keybindingsPath)).toBe(true);
     expect(existsSync(harness.mockPaths.plugs.base)).toBe(true);
     expect(existsSync(harness.mockPaths.plugs.local)).toBe(true);
-    expect(harness.notifyMock).not.toHaveBeenCalled();
+    // Start-up seeds the new file from the legacy keymaps, which is a
+    // one-time migration the user should hear about.
+    expect(harness.notifyMock).toHaveBeenCalledTimes(1);
+    expect(harness.notifyMock.mock.calls[0]?.[0]).toBe('Shortcuts moved to keybindings.json5');
   } finally {
     harness.cleanup();
   }
@@ -210,14 +214,17 @@ test('bootstraps missing config with JSON5 output without legacy migration paths
       'utf8'
     );
 
-    harness._import();
+    harness._import('startup');
 
     expect(existsSync(harness.mockPaths.cfgPath)).toBe(true);
     expect(existsSync(harness.mockPaths.keybindingsPath)).toBe(true);
     expect(existsSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(true);
     expect(existsSync(harness.mockPaths.plugs.base)).toBe(true);
     expect(existsSync(harness.mockPaths.plugs.local)).toBe(true);
-    expect(harness.notifyMock).not.toHaveBeenCalled();
+    // A freshly created config has no shortcuts to migrate, so this only
+    // announces the new file.
+    expect(harness.notifyMock).toHaveBeenCalledTimes(1);
+    expect(harness.notifyMock.mock.calls[0]?.[0]).toBe('Shortcuts moved to keybindings.json5');
 
     const writtenConfig = JSON5.parse(readFileSync(harness.mockPaths.cfgPath, 'utf8'));
     const expectedConfig = JSON5.parse(defaultConfigFixture);

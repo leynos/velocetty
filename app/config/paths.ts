@@ -20,6 +20,7 @@ const keybindingsFile = 'keybindings.json5';
 const legacyCfgFile = 'hyper.json';
 const defaultCfgFile = 'config-default.json';
 const schemaFile = 'schema.json';
+const keybindingsSchemaFile = 'keybindings.schema.json';
 const homeDirectory = homedir();
 // `app.getAppPath()` resolves to the app root: `dist/app` during development
 // and in the unpacked build, and the packaged archive once shipped. Compiled
@@ -28,6 +29,7 @@ const homeDirectory = homedir();
 const appDirectory = app.getAppPath();
 const devDir = path.resolve(appDirectory, '..');
 const schemaPath = path.join(appDirectory, 'config', schemaFile);
+const keybindingsSchemaPath = path.join(appDirectory, 'config', keybindingsSchemaFile);
 const defaultCfg = path.join(appDirectory, 'config', defaultCfgFile);
 
 /**
@@ -153,6 +155,8 @@ export {
   configTree,
   keybindingsFile,
   keybindingsPath,
+  keybindingsSchemaFile,
+  keybindingsSchemaPath,
   cfgFile,
   defaultCfg,
   icon,

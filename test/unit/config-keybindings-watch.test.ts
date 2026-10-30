@@ -29,10 +29,15 @@ const pathsModuleFactory = () => ({
   cfgPath: '/tmp/config.json5',
   defaultCfg: '/tmp/config-default.json',
   defaultPlatformKeyPath: () => '/tmp/linux.json',
+  keybindingsDir: '/tmp',
   keybindingsPath: '/tmp/keybindings.json5',
+  keybindingsSchemaFile: 'keybindings.schema.json',
+  keybindingsSchemaPath: '/tmp/keybindings.schema.json',
   plugs: {base: '/tmp/plugins', local: '/tmp/plugins/local'},
   schemaFile: 'schema.json',
-  schemaPath: '/tmp/schema.json'
+  schemaPath: '/tmp/schema.json',
+  shadowedConfigPaths: ['/home/user/.hyper/config.json5'],
+  velocettyDir: '/tmp'
 });
 const windowsModuleFactory = () => ({defaults: {}, get: () => ({}), recordState: () => {}});
 const coloursModuleFactory = () => ({getColorMap: () => ({})});
@@ -57,7 +62,10 @@ test.serial(
     };
     const watchMock = mock((_paths: string[]) => watcherMock);
     let currentConfig = makeParsedConfig({'window:new': ['ctrl+n']});
-    const importMock = mock(() => currentConfig);
+    const importMock = mock((_phase: 'startup' | 'reload') => ({
+      config: currentConfig,
+      report: {config: 'applied' as const, keybindings: 'applied' as const}
+    }));
 
     resetElectronMock();
     registerElectronMock();
@@ -91,8 +99,9 @@ test.serial(
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     expect(importMock).toHaveBeenCalledTimes(2);
+    expect(importMock.mock.calls.map(([phase]) => phase)).toEqual(['startup', 'reload']);
     expect(subscriberMock).toHaveBeenCalledTimes(1);
-    expect(notifyMock).toHaveBeenCalledWith('Configuration updated', 'Hyper configuration reloaded!');
+    expect(notifyMock).toHaveBeenCalledWith('Configuration updated', 'Configuration reloaded!');
     expect(configModule.getKeymaps()).toEqual({'window:new': ['ctrl+shift+n']});
 
     mock.restore();

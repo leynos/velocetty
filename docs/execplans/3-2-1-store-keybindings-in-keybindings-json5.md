@@ -453,6 +453,17 @@ design and the notification the user sees.
     19 named examples, 7 KB-SVC-1 properties, and 2 KB-SVC-2 model tests pass.
     Both required negative controls fail and were reverted; transcripts in
     `Artefacts and notes`.
+  - [x] (2026-10-30) D3 importer and composition: `import.ts` is now a 114-line
+    composition over `import-sources.ts` (start-up side effects and config
+    loading), `import-keybindings.ts` (legacy classification, notices, and the
+    only access to the deprecated `keymaps` key), and `import-report.ts` (the
+    reload-notice predicate). The importer takes a `ConfigImportKeybindings`
+    port and returns `{config, report}`; reload writes nothing, and start-up
+    bootstraps `config.json5` only when the active tree is Velocetty's.
+    `app/config.ts` owns the store and service composition. The rewritten
+    KB-SVC-3 suite has 8 examples, including a Hyper-tree layout supplied by a
+    new harness option. Two negative controls each failed the intended tests
+    and were reverted; transcripts in `Artefacts and notes`.
 - [ ] EP-E watcher and end-to-end: red; green; refactor; gates; CI end-to-end
   run on three operating systems.
 - [ ] EP-F documentation and roadmap: drafts; review; gates.
@@ -910,6 +921,51 @@ design and the notification the user sees.
   deletion a single file plus one export. It imports `UserKeymaps` from the
   policy module, not from `keybindings.ts`, so no type cycle is introduced.
   Date/Author: 2026-10-30, implementation agent.
+- Decision: `shouldAnnounceReload` and `ConfigImportReport` live in
+  `app/config/import-report.ts`, re-exported by `import.ts`. Rationale: the
+  watcher needs the predicate but must not import the importer, whose module
+  graph reaches `fs-extra` and the keybindings service; keeping the predicate
+  in a leaf module lets `test/unit/config-keybindings-watch.test.ts` exercise
+  the real rule while mocking only `createConfigImportModule`. It also keeps
+  `import.ts`, now 114 lines, a composition rather than a utility drawer.
+  Date/Author: 2026-10-30, implementation agent.
+- Decision: `import.ts` is split into `import-sources.ts` and
+  `import-keybindings.ts`. Rationale: the single-file rewrite reached 464
+  lines, past the 400-line rule and the plan's 360-line target. The source
+  loader owns start-up side effects and config parsing; the keybindings module
+  owns legacy classification, the one-per-process notices, and the only access
+  to the deprecated `keymaps` key. Both files stay under 400 lines and the
+  composition reads as the import narrative. Date/Author: 2026-10-30,
+  implementation agent.
+- Decision: `load(phase)` performs its filesystem side effects only for
+  `'startup'`. Rationale: KB-SVC-3 forbids a reload from creating
+  `config.json5` or a plugin directory, and the previous code reached
+  `loadConfiguration` on every event. `getDefaultConfig` still performs the
+  start-up side effects because it is the application's first-start path and
+  never drives the keybindings service. Date/Author: 2026-10-30, implementation
+  agent.
+- Decision: start-up bootstraps `config.json5` only when
+  `cfgDir === velocettyDir` (`canBootstrapUserConfig`). Rationale: KB-SVC-3
+  says the file is created at start-up only when the active tree is
+  Velocetty's. Writing a Velocetty-style file into an active Hyper tree would
+  not migrate the user's configuration; it would shadow it on the next start.
+  The harness gained a `hyperTree` option to model that layout, with
+  `keybindings.json5` in the Velocetty tree. Date/Author: 2026-10-30,
+  implementation agent.
+- Decision: every read or write of `rawConfig.keymaps` goes through
+  `readLegacyKeymaps` or `replaceLegacyKeymaps` in `import-keybindings.ts`.
+  Rationale: tagging the key `@deprecated` made oxlint's
+  `typescript/no-deprecated` reject each direct access in `init.ts`,
+  `import.ts`, and `import-sources.ts`. Two justified suppressions in the
+  migration module are clearer than eight scattered ones, and they mark the
+  boundary that will be removed when the legacy key is eventually dropped.
+  Date/Author: 2026-10-30, implementation agent.
+- Decision: `ConfigSourceLoaderDependencies` is exported and `warn` is added
+  to the options object in a statement rather than a conditional spread.
+  Rationale: deslop's `no-conditional-empty-object-spread` rejects the spread
+  idiom, and exporting the dependency type lets the composition root build the
+  object without a type assertion. Date/Author: 2026-10-30, implementation
+  agent.
 
 ## Outcomes & retrospective
 
@@ -2665,6 +2721,91 @@ Shrunk 5 time(s)
 Both mutations were reverted; `grep` confirms neither `legacyKeymaps` nor the
 canonicalizing write remains, and the three suites return to `28 pass`.
 
+D3 artefacts:
+
+- `app/config/import-sources.ts` (new, 392 lines): the two config layers,
+  start-up side effects, schema copies, and `ConfigImportPaths`.
+- `app/config/import-keybindings.ts` (new, 156 lines): legacy keymaps
+  classification, the one-per-process notices, and the deprecated-key accessors.
+- `app/config/import-report.ts` (new, 31 lines): `ConfigImportReport` and
+  `shouldAnnounceReload`.
+- `app/config/import.ts` (rewritten, 114 lines): the composition.
+- `app/config.ts`: store and service creation, the injected keybindings port,
+  `importKeybindings` and `exportKeybindings`, `velocettyDir` creation, and the
+  report-driven reload notification.
+- `app/config/paths.ts`: `keybindingsSchemaFile` and `keybindingsSchemaPath`.
+- `bin/sync-shared-schema.mjs`: copies both bundled schemas into `app/config`.
+- `app/config/keybindings.schema.json` (generated, new).
+- `shared/src/types/config.ts`: the `@deprecated` migration note on `keymaps`.
+- Deleted: `app/config/keybindings-legacy.ts` and
+  `test/unit/keybindings-json5.test.ts`.
+- `test/testUtils/config-import-harness.ts`: builds the real service over the
+  real file store, runs it in a temporary directory, supplies both bundled
+  schemas, models a Hyper tree on request, and exposes byte-comparison helpers.
+- `test/unit/config-import-keybindings-json5.test.ts` (rewritten, 8 KB-SVC-3
+  examples) and `test/unit/config-keybindings-watch.test.ts` (new `_import`
+  shape and notification text).
+
+D3 green. Focused run:
+
+```plaintext
+bun test --isolate test/unit/config-import-json5.test.ts \
+  test/unit/config-import-keybindings-json5.test.ts \
+  test/unit/config-keybindings-watch.test.ts
+ 15 pass
+  0 fail
+Ran 15 tests across 3 files.
+```
+
+The KB-SVC-3 suite alone runs 8 examples. Its last-known-good case uses file
+keymaps `window:new` and legacy keymaps `window:close`, so the earlier
+coincidence cannot recur; the delete case asserts the file stays absent after
+reload; the byte helpers prove `config.json5` is untouched.
+
+Negative control D3-1: `load(phase)` treated `'reload'` as a start-up as well.
+The two "reload creates nothing" examples failed, and every other example
+passed:
+
+```plaintext
+Expected: false
+Received: true
+✗ a reload recreates neither config.json5 nor the plugin directories
+Expected: false
+Received: true
+✗ an active Hyper tree never has config.json5 created for it
+ 6 pass
+ 2 fail
+```
+
+Negative control D3-2: `canBootstrapUserConfig` returned `true`
+unconditionally, so start-up bootstrapped `config.json5` inside the active
+Hyper tree. Exactly the intended example failed:
+
+```plaintext
+Expected: false
+Received: true
+✗ an active Hyper tree never has config.json5 created for it
+ 7 pass
+ 1 fail
+```
+
+Both mutations were reverted; the suite returns to `8 pass`, and
+`bun run generate-schema` is idempotent (a second run leaves `git status`
+unchanged).
+
+D3 commit gates (scrutineer, run sequentially against the D3 working tree):
+`make check-fmt`, `make typecheck`, `make lint`, `make test`, `make spelling`,
+`make prove`, `make markdownlint`, and `make nixie`. On the first pass,
+`typecheck`, `lint`, `test`, `prove`, and `nixie` passed (`657 pass`, `0 fail`
+across 77 files; 8 LemmaScript obligations verified with 0 errors). `check-fmt`
+failed on three over-long paragraphs in this plan, and `spelling` failed
+because the scanner reads the Git index, where the two deleted files were still
+listed; `markdownlint` was blocked by that same spelling prerequisite. After
+`mdtablefix --in-place` (pure line-wrap in this plan) and `git add -A` (staging
+the two deletions), the three affected gates were re-run and passed:
+`67 files left unchanged` for `check-fmt`, a clean spelling gate, and
+`0 issues in 67 files` for `markdownlint`.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -2896,6 +3037,10 @@ export type ConfigImportReport = {
 //   _import: (phase: 'startup' | 'reload') => {readonly config: parsedConfig; readonly report: ConfigImportReport}
 //   getDefaultConfig: () => rawConfig   (no longer runs keybindings start-up)
 ```
+
+`ConfigImportReport` and `shouldAnnounceReload` live in
+`app/config/import-report.ts` and are re-exported here; `ConfigImportPaths` and
+`ConfigImportPhase` live in `app/config/import-sources.ts`.
 
 Exact names may be adjusted during the Stage B prototype if LemmaScript
 requires it. Any adjustment is recorded in `Decision log`.

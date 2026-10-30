@@ -2,11 +2,11 @@ import merge from 'lodash/merge';
 
 import type {configOptions, parsedConfig, rawConfig} from '@shared/types/config';
 import mapKeys from '../utils/map-keys';
-
-type ConfigNotify = (title: string, body?: string, details?: {error?: unknown}) => void;
+import {readLegacyKeymaps} from './import-keybindings';
+import type {ConfigImportNotify} from './keybindings';
 
 // init config
-const _init = (userCfg: rawConfig, defaultCfg: rawConfig, notify: ConfigNotify): parsedConfig => {
+const _init = (userCfg: rawConfig, defaultCfg: rawConfig, notify: ConfigImportNotify): parsedConfig => {
   return {
     config: (() => {
       if (userCfg.config) {
@@ -33,7 +33,7 @@ const _init = (userCfg: rawConfig, defaultCfg: rawConfig, notify: ConfigNotify):
       }
     })(),
     // Merging platform specific keymaps with user defined keymaps
-    keymaps: mapKeys({...defaultCfg.keymaps, ...userCfg.keymaps}),
+    keymaps: mapKeys({...readLegacyKeymaps(defaultCfg), ...readLegacyKeymaps(userCfg)}),
     // Ignore undefined values in plugin and localPlugins array Issue #1862
     plugins: userCfg.plugins?.filter(Boolean) || [],
     localPlugins: userCfg.localPlugins?.filter(Boolean) || []
