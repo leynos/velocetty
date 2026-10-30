@@ -442,6 +442,11 @@ design and the notification the user sees.
   verified).
 - [ ] EP-D store, service, importer: red; green; negative control (c);
   refactor; gates.
+  - [x] (2026-10-30) D1 atomic store: `app/config/keybindings-store.ts` and
+    its 14 KB-STORE-1 tests. Each injected fault point (open, write, `fsync`,
+    chmod, rename) is asserted reached and leaves the previous bytes intact;
+    symlink, mode-preservation, transient-retry, give-up, and stale-temporary
+    cases pass. Gates green (626 tests, 75 files).
 - [ ] EP-E watcher and end-to-end: red; green; refactor; gates; CI end-to-end
   run on three operating systems.
 - [ ] EP-F documentation and roadmap: drafts; review; gates.

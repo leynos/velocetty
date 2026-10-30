@@ -7,6 +7,25 @@ import {stringifyJson5} from './json5-config';
 
 export type UserKeymaps = Record<string, string | string[]>;
 
+/** A notification sink shared by the configuration modules. */
+export type ConfigImportNotify = (title: string, body?: string, details?: {error?: unknown}) => void;
+
+/** What reading the keybindings file observed. */
+export type KeybindingsReadOutcome =
+  | {readonly kind: 'present'; readonly text: string}
+  | {readonly kind: 'missing'}
+  | {readonly kind: 'unreadable'; readonly error: unknown};
+
+/** What writing the keybindings file did. */
+export type KeybindingsWriteOutcome = {readonly kind: 'written'} | {readonly kind: 'failed'; readonly error: unknown};
+
+/** The driven port the keybindings service reads and writes through. */
+export type KeybindingsStore = {
+  readonly location: string;
+  readonly read: () => KeybindingsReadOutcome;
+  readonly write: (text: string) => KeybindingsWriteOutcome;
+};
+
 type TextReader = (path: string, encoding: BufferEncoding) => string;
 type TextWriter = (path: string, content: string, encoding: BufferEncoding) => void;
 type PathExists = (path: string) => boolean;
