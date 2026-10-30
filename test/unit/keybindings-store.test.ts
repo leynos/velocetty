@@ -5,6 +5,7 @@ import * as fs from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 
+import type {KeybindingsStore} from '../../app/config/keybindings';
 import type {KeybindingsFileSystem} from '../../app/config/keybindings-store';
 import {createFileKeybindingsStore} from '../../app/config/keybindings-store';
 
@@ -54,6 +55,28 @@ const linkTargetsOf = (linkPaths: readonly string[]): readonly string[] =>
     expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(true);
     return fs.readlinkSync(linkPath);
   });
+
+/** A store over a dangling `keybindings.json5`, with one filesystem operation replaced. */
+const danglingLinkStoreWith = (overrides: Partial<KeybindingsFileSystem>) => {
+  const workspace = createWorkspace();
+  const realPath = path.join(workspace, 'dotfiles-keybindings.json5');
+  const linkPath = targetPathIn(workspace);
+  fs.symlinkSync(path.basename(realPath), linkPath);
+  const store = createFileKeybindingsStore({filePath: linkPath, fs: {...realFileSystem(), ...overrides}});
+  return {linkPath, realPath, store, workspace};
+};
+
+/** Asserts a write was refused and left every link, the target, and the directory untouched. */
+const expectRefusedWrite = ({
+  linkPaths,
+  store,
+  workspace
+}: Readonly<{linkPaths: readonly string[]; store: KeybindingsStore; workspace: string}>): void => {
+  const targetsBefore = linkTargetsOf(linkPaths);
+  expect(store.write('{}').kind).toBe('failed');
+  expect(linkTargetsOf(linkPaths)).toEqual(targetsBefore);
+  expect(temporaryNames(workspace)).toEqual([]);
+};
 
 /**
  * Builds a real `node:fs` surface in which exactly one operation throws.
@@ -207,14 +230,11 @@ describe('atomic keybindings file store', () => {
       const next = linkPaths[index + 1] ?? path.join(workspace, 'missing-target.json5');
       fs.symlinkSync(path.relative(workspace, next), linkPath);
     }
-    const targetsBefore = linkTargetsOf(linkPaths);
     const store = createFileKeybindingsStore({filePath: linkPaths[0]});
 
-    expect(store.write('{}').kind).toBe('failed');
+    expectRefusedWrite({linkPaths, store, workspace});
 
-    expect(linkTargetsOf(linkPaths)).toEqual(targetsBefore);
     expect(fs.existsSync(path.join(workspace, 'missing-target.json5'))).toBe(false);
-    expect(temporaryNames(workspace)).toEqual([]);
   });
 
   test('refuses a symlink cycle without replacing a link', () => {
@@ -225,55 +245,40 @@ describe('atomic keybindings file store', () => {
     fs.symlinkSync(path.basename(linkPath), otherPath);
     const store = createFileKeybindingsStore({filePath: linkPath});
 
-    expect(store.write('{}').kind).toBe('failed');
-
-    expect(linkTargetsOf([linkPath, otherPath])).toEqual([path.basename(otherPath), path.basename(linkPath)]);
-    expect(temporaryNames(workspace)).toEqual([]);
+    expectRefusedWrite({linkPaths: [linkPath, otherPath], store, workspace});
   });
 
-  test('fails closed when the link target cannot be read', () => {
-    const workspace = createWorkspace();
-    const realPath = path.join(workspace, 'dotfiles-keybindings.json5');
-    const linkPath = targetPathIn(workspace);
-    fs.symlinkSync(path.basename(realPath), linkPath);
-    const store = createFileKeybindingsStore({
-      filePath: linkPath,
-      fs: {
-        ...realFileSystem(),
+  const unresolvableCases: readonly Readonly<{
+    description: string;
+    overrides: Partial<KeybindingsFileSystem>;
+  }>[] = [
+    {
+      description: 'the link target cannot be read',
+      overrides: {
         readlinkSync: () => {
           throw errorWithCode('EACCES');
         }
       }
-    });
-
-    expect(store.write('{}').kind).toBe('failed');
-
-    expect(linkTargetsOf([linkPath])).toEqual([path.basename(realPath)]);
-    expect(fs.existsSync(realPath)).toBe(false);
-    expect(temporaryNames(workspace)).toEqual([]);
-  });
-
-  test('fails closed when the path cannot be inspected', () => {
-    const workspace = createWorkspace();
-    const realPath = path.join(workspace, 'dotfiles-keybindings.json5');
-    const linkPath = targetPathIn(workspace);
-    fs.symlinkSync(path.basename(realPath), linkPath);
-    const store = createFileKeybindingsStore({
-      filePath: linkPath,
-      fs: {
-        ...realFileSystem(),
+    },
+    {
+      description: 'the path cannot be inspected',
+      overrides: {
         lstatSync: () => {
           throw errorWithCode('EACCES');
         }
       }
+    }
+  ];
+
+  for (const {description, overrides} of unresolvableCases) {
+    test(`fails closed when ${description}`, () => {
+      const {linkPath, realPath, store, workspace} = danglingLinkStoreWith(overrides);
+
+      expectRefusedWrite({linkPaths: [linkPath], store, workspace});
+
+      expect(fs.existsSync(realPath)).toBe(false);
     });
-
-    expect(store.write('{}').kind).toBe('failed');
-
-    expect(linkTargetsOf([linkPath])).toEqual([path.basename(realPath)]);
-    expect(fs.existsSync(realPath)).toBe(false);
-    expect(temporaryNames(workspace)).toEqual([]);
-  });
+  }
 
   for (const point of FAULT_POINTS) {
     test(`reports failure and preserves the previous bytes when ${point} fails`, () => {

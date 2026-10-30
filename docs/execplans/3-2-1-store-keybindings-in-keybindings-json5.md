@@ -674,6 +674,13 @@ design and the notification the user sees.
     are unresolved rather than writable. Four tests cover a long chain, a
     cycle, an unreadable link target, and an uninspectable path, asserting the
     failure, intact links, an absent target, and no temporary residue.
+  - [x] (2026-10-31) Hosted `CodeScene Code Health Review` failed on
+    `656edb9f`: `test/unit/keybindings-store.test.ts` scored 9.39 under
+    `Code Duplication`, so the new code health and advisory gates failed. The
+    four tests now share `danglingLinkStoreWith` and `expectRefusedWrite`, and
+    the two injected-failure cases are one parameterized loop. `cs review`
+    reports 10.0 for both `test/unit/keybindings-store.test.ts` and
+    `app/config/keybindings-store.ts`.
 
 ## Surprises & discoveries
 
