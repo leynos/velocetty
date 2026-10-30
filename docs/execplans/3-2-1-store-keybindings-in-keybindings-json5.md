@@ -516,6 +516,26 @@ design and the notification the user sees.
     `make spelling` (typos.toml unchanged), `make markdownlint` (0 issues in 69
     files), and `make nixie` (all diagrams valid). The code gates were last run
     green for the EP-E commit `0ed7307b`, and no code changed since.
+- [ ] EP-G hosted CI repair: the first hosted run of `b1c8eaa1` failed on all
+  three operating systems. Each cause is repaired; the repairs await the full
+  gate set and a new hosted run.
+  - [x] (2026-10-30) Linux: `make prove` failed because `dotnet tool install`
+    was added to `PATH` through `$GITHUB_PATH`, which only applies to later
+    steps, so `lsc` could not find `dafny` inside the same step. The step now
+    exports `$HOME/.dotnet/tools` before `make prove`.
+  - [x] (2026-10-30) macOS: the packaged application could not start,
+    `Cannot find module '@shared/types/json'` from
+    `dist/app/config/keybindings-codec.js`. `app/` is compiled by `tsgo`, where
+    the `@shared/*` alias is erased and never rewritten, so the codec's value
+    import became an unresolvable `require`. The codec now takes `isJsonObject`
+    from `app/utils/runtime-guards`, and
+    `scripts/check-package-boundaries.mjs` now rejects any runtime `@shared/*`
+    import in `app/`, including the `import {type X}` form that
+    `verbatimModuleSyntax` keeps.
+  - [x] (2026-10-30) Windows: two POSIX assumptions in the new tests. The
+    watcher test expected the literal `/tmp` where `path.resolve` produces
+    `D:\tmp`, and the store test expected `0o640`, which Windows reports as
+    `0o666`. Both now express the platform-independent intent.
 
 ## Surprises & discoveries
 
@@ -699,6 +719,18 @@ design and the notification the user sees.
   were extracted to `app/config/e2e-keymap-probe.ts` because the E2E suite must
   import the same shortcut it asserts on; a duplicated literal would let the
   suite pass while the application probed a different command.
+- Observation: a `@shared/*` import that type-checks can still break the
+  packaged application. `app/` is compiled by `tsgo` into `dist/app`, where the
+  alias has no runtime counterpart, so
+  `import {isJsonObject} from '@shared/types/json'` became
+  `require('@shared/types/json')` and every E2E scenario died at launch with
+  `MODULE_NOT_FOUND`. The unit and type gates could not see it, and no existing
+  check covered it. Evidence: the macOS hosted run of `b1c8eaa1`, and the rule
+  in `docs/developers-guide.md` that the code had broken. Impact: `app/` keeps
+  its own runtime guards, and `scripts/check-package-boundaries.mjs` now fails
+  on a runtime `@shared/*` import in `app/` — including `import {type X}`, which
+  `verbatimModuleSyntax` emits as `import {} from` and so still resolves at
+  run time.
 
 ## Decision log
 

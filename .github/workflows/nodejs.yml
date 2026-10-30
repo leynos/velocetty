@@ -53,7 +53,9 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           dotnet tool install --global dafny --version 4.11.0
-          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          # `$GITHUB_PATH` only applies to later steps, so export the tool
+          # directory for the `make prove` in this one.
+          export PATH="$HOME/.dotnet/tools:$PATH"
           make prove
       - name: Set up isolated Rust for Merman
         if: runner.os == 'Linux'
