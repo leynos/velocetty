@@ -341,16 +341,25 @@ shortcut can leak into a log.
 
 ```text
 [config] import decision phase=reload config=applied keybindings=applied origin=file announced=true
-  attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,retries:0
+  attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0
+[config] import failure phase=reload cause=thrown
+  attempts:2,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0
 [config] keybindings rename attempt=1 category=busy exhausted=false
 ```
+
+A reload that throws before it can report a per-file outcome emits the failure
+record instead of a decision record: there is no outcome to describe, and
+claiming one would invent evidence. The error itself is still reported by the
+watcher after the failure record is written.
 
 The counter snapshot is appended to the decision record on the same line; it is
 shown wrapped here. Its fields mean:
 
 - `phase` is `startup` for the first import and `reload` for a watched change.
 - `config` is `applied`, or `fallback` when `config.json5` could not be read or
-  parsed and the bundled defaults filled in.
+  parsed and the bundled defaults filled in. A fallback carries `cause=parse`
+  when the file was read but rejected, and `cause=read` when it could not be
+  read at all.
 - `keybindings` is `applied` with an `origin` (`file`, `missing`, `seeded`, or
   `seeded-unsaved`), or `kept` with the surviving `basis` (`last-known-good` or
   `empty`) and the `cause` (`invalid`, `unreadable`, or `deferred`). A parse
@@ -361,8 +370,8 @@ shown wrapped here. Its fields mean:
 - `attempts` counts imports, `applies` counts keybindings files put into
   effect, `parseFailures` and `readFailures` separate invalid content from an
   unreadable file, `fallbacks` counts imports that used the bundled defaults,
-  and `retries` counts refused rename attempts. All counters are cumulative for
-  the process lifetime.
+  `importFailures` counts imports that threw, and `retries` counts refused
+  rename attempts. All counters are cumulative for the process lifetime.
 - `category` is `permission` for `EPERM` and `EACCES`, `busy` for `EBUSY`, and
   `other` for anything else. `exhausted` marks the attempt that ended the
   write, so a retry that later succeeds emits only `exhausted=false` events.

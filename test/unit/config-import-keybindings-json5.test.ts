@@ -263,7 +263,8 @@ test('a Hyper tree seeds keybindings in the Velocetty tree and keeps them on rel
     const {report} = harness._import('reload');
 
     expect(existsSync(keybindingsInVelocettyTree)).toBe(true);
-    expect(report).toEqual({config: 'fallback', keybindings: 'applied'});
+    // The Hyper tree is gone, so the reload reports a read fallback and says so.
+    expect(report).toEqual({config: 'fallback', configCause: 'read', keybindings: 'applied'});
     expect(shouldAnnounceReload(report)).toBe(false);
   } finally {
     harness.cleanup();

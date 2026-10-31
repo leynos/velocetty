@@ -100,8 +100,10 @@ const bindingDiagnostic = (command: string): configValidationDiagnostic =>
 
 type LocatedError = {lineNumber?: number; columnNumber?: number};
 
+/** Narrows to a usable line or column number, rejecting NaN and Infinity. */
 const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
+/** Extracts the optional source position a JSON5 syntax error carries. */
 const locatedError = (error: unknown): LocatedError => {
   const located: LocatedError = {};
   if (!isObject(error)) {
@@ -116,6 +118,7 @@ const locatedError = (error: unknown): LocatedError => {
   return located;
 };
 
+/** Turns a JSON5 syntax error into a diagnostic with a located path. */
 const parseDiagnostic = (sourceLabel: string, error: unknown): configValidationDiagnostic => {
   const message =
     error instanceof Error && error.message.length > 0 ? error.message : `Failed to parse ${sourceLabel}.`;
@@ -142,10 +145,12 @@ const parseDiagnostic = (sourceLabel: string, error: unknown): configValidationD
  */
 const isDocumentRoot = (value: unknown): value is JsonObject => isObject(value) && !Array.isArray(value);
 
+/** Accepts a non-empty shortcut string or an array of them; `[]` unbinds. */
 const isBindingValue = (value: unknown): value is string | string[] =>
   bindingSchema.safeParse(value).success &&
   (isString(value) || (Array.isArray(value) && value.every((item) => isString(item))));
 
+/** Copies an array binding so callers cannot alias the parsed document. */
 const copyBinding = (binding: string | string[]): string | string[] =>
   Array.isArray(binding) ? [...binding] : binding;
 
@@ -154,6 +159,7 @@ type EntryRead = {
   readonly diagnostics: readonly configValidationDiagnostic[];
 };
 
+/** Validates every binding shallowly, dropping invalid entries with a diagnostic. */
 const readEntries = (root: JsonObject): EntryRead => {
   const entries: Array<readonly [string, string | string[]]> = [];
   const diagnostics: configValidationDiagnostic[] = [];

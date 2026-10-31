@@ -7,7 +7,7 @@
  * carry a path, a command identifier, or a shortcut.
  */
 import {describeConfigCounters, type ConfigCounters, type ConfigMetrics} from './config-metrics';
-import {describeImportDecision, type ConfigImportReport} from './import-report';
+import {describeImportDecision, type ConfigImportReport, type ImportDecision} from './import-report';
 import type {KeybindingsLoadOutcome} from './keybindings';
 import type {RenameRetryEvent} from './keybindings-store';
 
@@ -28,10 +28,24 @@ export type ImportRecord = {
   readonly announced: boolean;
 };
 
+/** An import attempt that threw before it could report a per-file outcome. */
+export type ImportFailureRecord = {
+  /** The only failure this record describes: an exception out of the import. */
+  readonly cause: 'thrown';
+  readonly phase: 'reload';
+};
+
 /** The recorder the composition root wires into the importer and the store. */
 export type ImportRecorder = {
   /** Counts one attempt and emits its single decision record. */
   readonly recordImport: (record: ImportRecord) => void;
+  /**
+   * Counts one attempt that threw, and emits its bounded failure record.
+   *
+   * A thrown import produces this record instead of a decision record: there is
+   * no per-file outcome to describe, and claiming one would invent evidence.
+   */
+  readonly recordImportFailure: (record: ImportFailureRecord) => void;
   /** Counts one refused rename attempt and emits its bounded record. */
   readonly recordRenameRetry: (event: RenameRetryEvent) => void;
   /** The cumulative counters, for diagnostics and tests. */
@@ -79,8 +93,24 @@ export const createImportRecorder = (dependencies: {
         metrics.increment('fallbacks');
       }
       countKeybindingsOutcome(metrics, outcome);
-      const decision = describeImportDecision({announced, config: report.config, keybindings: outcome, phase});
-      sink.info(`[config] import decision ${decision} ${describeConfigCounters(metrics.snapshot())}`);
+      const decision: ImportDecision = {
+        announced,
+        config: report.config,
+        keybindings: outcome,
+        phase
+      };
+      // Assigned only when known: `exactOptionalPropertyTypes` forbids `undefined`.
+      if (report.configCause !== undefined) {
+        Object.assign(decision, {configCause: report.configCause});
+      }
+      sink.info(
+        `[config] import decision ${describeImportDecision(decision)} ${describeConfigCounters(metrics.snapshot())}`
+      );
+    },
+    recordImportFailure: ({cause, phase}) => {
+      metrics.increment('attempts');
+      metrics.increment('importFailures');
+      sink.warn(`[config] import failure phase=${phase} cause=${cause} ${describeConfigCounters(metrics.snapshot())}`);
     },
     recordRenameRetry: (event) => {
       metrics.increment('retries');

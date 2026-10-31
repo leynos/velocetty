@@ -8,10 +8,11 @@ object. It is a migration note; the users' guide remains the detailed manual.
 
 ## Target release
 
-The migration applies from the next Velocetty release. Velocetty has not yet
-published a numbered release, so the version number for that release is pending
-the maintainer's decision. This document assigns no version number; the number
-is independent of the inherited Hyper version.
+The migration applies from Velocetty 4.0.0, the first stable release after the
+inherited `4.0.0-canary.5` version recorded in `package.json`. Velocetty has
+not yet published a numbered release, so the maintainer owns the final version
+number; if the release is renumbered, this target moves with it rather than
+naming the inherited Hyper version.
 
 ## What changes
 

@@ -78,6 +78,7 @@ const renameFailureCategory = (code: string | undefined): RenameFailureCategory 
   return code === 'EBUSY' ? 'busy' : 'other';
 };
 
+/** Reads a Node-style errno code without trusting the thrown value's shape. */
 const errorCode = (error: unknown): string | undefined => {
   if (!isObject(error) || !('code' in error)) {
     return undefined;
@@ -107,6 +108,22 @@ const defaultSleep = (milliseconds: number): void => {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
 };
 
+/**
+ * Creates the filesystem adapter behind `KeybindingsStore`.
+ *
+ * Writes go to a temporary sibling and are renamed into place, so a reader
+ * never sees a half-written file. A target that is a symlink, a directory, or
+ * otherwise unresolvable is refused rather than replaced. Filesystem, sleep,
+ * and warning dependencies are injectable so tests can exercise each failure
+ * path without touching the real disk.
+ *
+ * @example
+ * ```ts
+ * const store = createFileKeybindingsStore({filePath: '/home/u/.config/Velocetty/keybindings.json5'});
+ * store.read(); // {kind: 'missing'} on a fresh install
+ * store.write("{'window:new': 'ctrl+n'}"); // {kind: 'written'}
+ * ```
+ */
 export const createFileKeybindingsStore = (
   options: FileKeybindingsStoreOptions
 ): KeybindingsStore & {readonly removeStaleTemporaryFiles: () => void} => {
@@ -218,6 +235,7 @@ export const createFileKeybindingsStore = (
     }
   };
 
+  /** Reads the file, mapping a missing file apart from any other failure. */
   const read = (): KeybindingsReadOutcome => {
     try {
       return {kind: 'present', text: fileSystem.readFileSync(options.filePath, 'utf8')};
@@ -226,6 +244,12 @@ export const createFileKeybindingsStore = (
     }
   };
 
+  /**
+   * Renames the temporary file into place, retrying only transient failures.
+   *
+   * Windows can report a busy destination while an editor or antivirus holds
+   * it. Each attempt is reported so the retry counter has a bounded reason.
+   */
   const renameWithRetry = ({target, temporaryPath}: ReplacementPlan): void => {
     for (let attempt = 1; ; attempt += 1) {
       try {
@@ -279,6 +303,12 @@ export const createFileKeybindingsStore = (
     }
   };
 
+  /**
+   * Writes the document atomically, refusing any unsafe replacement target.
+   *
+   * The temporary file is created exclusively, fully written, flushed, and
+   * renamed, so either the old file or the complete new one is visible.
+   */
   const write = (text: string): KeybindingsWriteOutcome => {
     const resolution = resolveTarget();
     if (resolution.kind === 'unresolved') {

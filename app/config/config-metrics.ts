@@ -7,7 +7,14 @@
  */
 
 /** The fixed counter vocabulary. */
-export type ConfigCounter = 'attempts' | 'applies' | 'parseFailures' | 'readFailures' | 'fallbacks' | 'retries';
+export type ConfigCounter =
+  | 'attempts'
+  | 'applies'
+  | 'parseFailures'
+  | 'readFailures'
+  | 'fallbacks'
+  | 'importFailures'
+  | 'retries';
 
 /**
  * Every counter, in the order a record renders them.
@@ -21,6 +28,7 @@ export const CONFIG_COUNTERS: readonly ConfigCounter[] = [
   'parseFailures',
   'readFailures',
   'fallbacks',
+  'importFailures',
   'retries'
 ];
 
@@ -40,7 +48,7 @@ export type ConfigMetrics = {
  * @example
  * ```ts
  * describeConfigCounters(createConfigMetrics().snapshot());
- * // 'attempts:0,applies:0,parseFailures:0,readFailures:0,fallbacks:0,retries:0'
+ * // 'attempts:0,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0'
  * ```
  */
 export const describeConfigCounters = (counters: ConfigCounters): string =>
@@ -65,6 +73,7 @@ export const createConfigMetrics = (): ConfigMetrics => {
     applies: 0,
     attempts: 0,
     fallbacks: 0,
+    importFailures: 0,
     parseFailures: 0,
     readFailures: 0,
     retries: 0

@@ -825,6 +825,52 @@ design and the notification the user sees.
   plain `git add` of hand-wrapped prose is not enough, because the formatter's
   width model differs from the 80-column rule.
 
+- [x] (2026-10-31 11:00Z) Pre-merge reconciliation round on the rows CodeRabbit
+  reported for `573d208a`. Dispositions and repairs:
+  - [x] User-Facing Documentation: `docs/migration-keybindings-json5.md` named
+    the inherited `4.0.0-canary.5` as the target release. It now names
+    Velocetty 4.0.0 and records that the maintainer owns the final number,
+    because the project has published no numbered release.
+  - [x] Developer Documentation: the plan described ADR-007 and ADR-008 as
+    "Proposed" after both were accepted. The conformance basis now says
+    Accepted, which is what the ADR files and their 2026-10-30 dates record.
+  - [x] Docstring coverage: doc comments were added to the unexported helpers
+    and adapters this branch adds or splits — the two configuration-tree
+    resolvers, the importer's `_import` and source loaders, the six codec
+    helpers, the store's read/write/rename/error helpers, the keybindings
+    service's deferred path, and the composition root's E2E marker. The exact
+    18-function set behind the 66.67% figure could not be reproduced offline;
+    the aim was to document every genuinely bare function in the changed
+    modules rather than to chase the metric.
+  - [x] Observability, configuration fallback cause: `ConfigImportReport` now
+    carries an optional `configCause` (`parse` or `read`), so a record can tell
+    a rejected file from an unreadable one. `describeImportDecision` renders it
+    as `config=fallback cause=parse`, and a real-importer test asserts both
+    causes.
+  - [x] Observability, thrown reload: the composition root now splits the
+    watcher's reload into `reloadConfiguration` and `reloadFromWatcher`, which
+    records a bounded `importFailures` counter and a
+    `[config] import failure phase=reload cause=thrown` line before rethrowing
+    so the watcher keeps owning its warning. `importFailures` joins the closed
+    counter vocabulary and the developers' guide documents it.
+  - [x] Observability, unreadable reload: the watcher harness gained
+    `setOutcome`, and two `test.serial` cases now assert that an unreadable
+    keybindings file emits its decision record with `cause=unreadable`,
+    increments `readFailures`, notifies nobody, and still dispatches to
+    subscribers; and that a thrown reload emits the failure record, increments
+    `importFailures`, and leaves the watcher's own warning in place.
+  - [x] Tracing spans: not applicable. The repository has no tracing
+    infrastructure (`opentelemetry`, `trace`, and `span` do not appear in
+    `app/`, `shared/`, or `lib/`), so a span API here would be the only one and
+    would not be exported anywhere. The bounded records and counters are the
+    observability surface this codebase actually has.
+  - [x] Domain Architecture and Unit Architecture: the port/adapter split and
+    the query-named `getDefaultConfig` are inherited shapes, not new defects;
+    the comparison and the remaining work are recorded as `KEYMAP-003` in
+    `docs/tracking-issues.md`. The one new write on the getter path is the
+    keybindings *schema* copy inside `ensureSchemaFile`; a query cannot seed
+    `keybindings.json5`, because it never starts the keybindings service.
+
 ## Surprises & discoveries
 
 - Observation: `typos.toml` is generated from a shared dictionary fetched from
@@ -1667,7 +1713,7 @@ Approver direction of 2026-10-29 (see `Additional requirement`):
 This also realizes the design's paths table (DES-CFG-FILES), which proposes
 `Velocetty` directories.
 
-ADR-007 (Proposed) records this item's format decisions. ADR-008 (Proposed)
+ADR-007 (Accepted) records this item's format decisions. ADR-008 (Accepted)
 records the configuration tree.
 
 The governing standards are `AGENTS.md`, `docs/documentation-style-guide.md`,

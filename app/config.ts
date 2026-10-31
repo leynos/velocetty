@@ -118,6 +118,7 @@ const checkDeprecatedConfig = () => {
   notify('Configuration warning', `Your configuration uses some deprecated CSS classes (${deprecatedStr})`);
 };
 
+/** Writes a marker line only when the end-to-end lane is running. */
 const emitE2EMarker = (line: string) => {
   if (isE2ERun()) {
     console.log(line);
@@ -166,6 +167,44 @@ const createChokidarHandle = (directories: readonly string[]): WatcherHandle => 
   };
 };
 
+/**
+ * Re-imports every source after a watched file changed.
+ *
+ * One bounded record is emitted per reload attempt, whether it applied, fell
+ * back, or kept the previous keymaps and suppressed the user-facing notice.
+ */
+const reloadConfiguration = () => {
+  const {config, keybindings: outcome, report} = _import('reload');
+  cfg = config;
+  const announced = shouldAnnounceReload(report);
+  recorder.recordImport({announced, outcome, phase: 'reload', report});
+  if (announced) {
+    notify('Configuration updated', 'Configuration reloaded!');
+  }
+  watchers.forEach((fn) => {
+    fn();
+  });
+  checkDeprecatedConfig();
+  emitKeymapsMarker(report);
+};
+
+/**
+ * Records a thrown reload, then lets the watcher report it as it always has.
+ *
+ * A thrown import produces no per-file outcomes, so it gets its own bounded
+ * failure record and counter rather than a decision record that would have to
+ * invent them. The error is rethrown so the watcher keeps owning the warning
+ * and the decision to keep watching.
+ */
+const reloadFromWatcher = () => {
+  try {
+    reloadConfiguration();
+  } catch (error) {
+    recorder.recordImportFailure({cause: 'thrown', phase: 'reload'});
+    throw error;
+  }
+};
+
 /** Starts the configuration watcher once; later calls are no-ops. */
 const _watch = () => {
   if (configWatcher !== undefined) {
@@ -182,22 +221,8 @@ const _watch = () => {
     fileNames: [path.resolve(cfgPath), path.resolve(keybindingsPath)],
     handle: createChokidarHandle(watchedDirectories),
     onReady: () => emitE2EMarker('[e2e] config-watcher-ready'),
-    onReload: () => {
-      const {config, keybindings: outcome, report} = _import('reload');
-      cfg = config;
-      // One bounded record per reload attempt, whether it applied, fell back,
-      // or kept the previous keymaps and suppressed the user-facing notice.
-      const announced = shouldAnnounceReload(report);
-      recorder.recordImport({announced, outcome, phase: 'reload', report});
-      if (announced) {
-        notify('Configuration updated', 'Configuration reloaded!');
-      }
-      watchers.forEach((fn) => {
-        fn();
-      });
-      checkDeprecatedConfig();
-      emitKeymapsMarker(report);
-    },
+    /** Re-imports on a debounced change; the watcher catches whatever it throws. */
+    onReload: reloadFromWatcher,
     schedule: (callback, delayMs) => setTimeout(callback, delayMs)
   });
 

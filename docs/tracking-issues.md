@@ -233,6 +233,54 @@ Last updated: 2026-10-30
 - A unit test asserts the scope of `keymaps` and of an unknown profile key.
 - `docs/developers-guide.md` describes the scope helper without the mismatch.
 
+## KEYMAP-003 Split the importer and keybindings service from their adapters
+
+Status: Open  
+Owner: TBD  
+Last updated: 2026-10-31
+
+### KEYMAP-003 summary
+
+- `getDefaultConfig` is named as a query, but its uncached path calls
+  `load('startup')` (`app/config/import-sources.ts:409-412`). That command
+  creates the plugin directories, copies both JSON schemas, and bootstraps
+  `config.json5` when it is missing. The behaviour is inherited: the equivalent
+  side effects are documented on `origin/main` at
+  `app/config/import.ts:353-362` and performed by its `_importConf` helper.
+- This branch adds the `keybindings.schema.json` copy to `ensureSchemaFile`,
+  so a query made before start-up copies one more file than before. It does not
+  seed `keybindings.json5`: `getDefaultConfig` never starts the keybindings
+  service, which a test pins by asserting the importer's init hook and the
+  notification sink stay untouched.
+- `createConfigSourceLoader` imports `fs-extra` directly, reads `process.env`
+  for the debug flag, and writes to `console`, while
+  `ConfigSourceLoaderDependencies` injects only `notify` and `warn`
+  (`app/config/import-sources.ts:69-73`, `:7`, `:155`, `:165`, `:236`, `:247`,
+  `:264`, `:286`).
+- `app/config/keybindings.ts` owns the accepted-state policy but imports the
+  JSON5 codec, passes the store's filesystem `location` into parse diagnostics,
+  serializes the seed, calls `removeStaleTemporaryFiles`, and emits
+  notifications and console warnings. `app/config/keybindings-store.ts` imports
+  its port types back from the service, so the adapter depends on the module it
+  implements.
+- The change is structural: it moves boundaries across the importer, the
+  service, the store, the composition root, and their test fakes. No
+  correctness, safety, or data-loss defect follows from the current shape, and
+  doing the split here would rewrite the tests that pin the storage behaviour
+  this branch delivers.
+
+### KEYMAP-003 exit criteria
+
+- `getDefaultConfig` either performs no writes or is renamed and documented as
+  a start-up command.
+- The importer receives injected filesystem, environment, and logging ports.
+- The store port and domain outcome types live in a neutral module, with codec
+  parse and seed serialization injected as ports.
+- Filesystem paths, console writes, notifications, retry reporting, and stale
+  temporary-file cleanup live in the adapter or the composition root.
+- Unit tests exercise the service against domain-shaped fakes and the adapter
+  against a fake filesystem.
+
 ## WINARM64-001 Track Windows aarch64 CI enablement after Bun support lands
 
 Status: Open  

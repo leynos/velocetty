@@ -191,6 +191,7 @@ export const createKeybindingsService = (dependencies: {
   /** The keymaps in effect, copied so callers cannot mutate accepted state. */
   const exposedKeymaps = (): UserKeymaps => copyKeymaps(activeKeymaps(state));
 
+  /** Reports the current keymaps unchanged because start-up deferred the seed. */
   const describeDeferred = (): KeybindingsLoadOutcome => ({
     basis: state.lastAccepted === null ? 'empty' : 'last-known-good',
     cause: 'deferred',

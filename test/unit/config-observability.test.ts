@@ -1,7 +1,7 @@
 /** @file The bounded decision record, retry record, and counters for an import. */
 import {describe, expect, test} from 'bun:test';
 
-import {mkdirpSync, writeFileSync} from 'fs-extra';
+import {mkdirpSync, rmSync, writeFileSync} from 'fs-extra';
 
 import {createConfigMetrics, describeConfigCounters} from '../../app/config/config-metrics';
 import {createImportRecorder} from '../../app/config/config-observability';
@@ -47,13 +47,14 @@ describe('the import decision record', () => {
 
     expect(sink.info).toEqual([
       '[config] import decision phase=reload config=applied keybindings=applied origin=file announced=true ' +
-        'attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,retries:0'
+        'attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0'
     ]);
     expect(sink.warn).toEqual([]);
     expect(recorder.counters()).toEqual({
       applies: 1,
       attempts: 1,
       fallbacks: 0,
+      importFailures: 0,
       parseFailures: 0,
       readFailures: 0,
       retries: 0
@@ -93,7 +94,7 @@ describe('the import decision record', () => {
 
     expect(sink.info[0]).toBe(
       '[config] import decision phase=reload config=applied keybindings=kept basis=last-known-good cause=invalid ' +
-        'announced=false attempts:1,applies:0,parseFailures:1,readFailures:0,fallbacks:0,retries:0'
+        'announced=false attempts:1,applies:0,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0'
     );
   });
 
@@ -136,6 +137,34 @@ describe('the import decision record', () => {
 
     expect(sink.info[0]).toContain('config=fallback keybindings=applied origin=file');
     expect(recorder.counters()).toMatchObject({applies: 1, attempts: 1, fallbacks: 1});
+  });
+
+  test('names the fallback cause, so a parse failure differs from a read failure', () => {
+    const {recorder, sink} = harness();
+
+    recorder.recordImport({
+      announced: false,
+      outcome: applied('file'),
+      phase: 'reload',
+      report: {config: 'fallback', configCause: 'parse', keybindings: 'applied'}
+    });
+
+    expect(sink.info[0]).toContain('config=fallback cause=parse keybindings=applied origin=file');
+  });
+});
+
+describe('the import failure record', () => {
+  test('counts a thrown attempt once and keeps the closed vocabulary', () => {
+    const {recorder, sink} = harness();
+
+    recorder.recordImportFailure({cause: 'thrown', phase: 'reload'});
+
+    expect(sink.warn).toEqual([
+      '[config] import failure phase=reload cause=thrown ' +
+        'attempts:1,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0'
+    ]);
+    expect(sink.info).toEqual([]);
+    expect(recorder.counters()).toMatchObject({attempts: 1, importFailures: 1});
   });
 });
 
@@ -190,12 +219,27 @@ describe('a reload sequence', () => {
 
       expect(sink.info).toEqual([
         '[config] import decision phase=startup config=applied keybindings=applied origin=file announced=false ' +
-          'attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,retries:0',
+          'attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0',
         '[config] import decision phase=reload config=applied keybindings=kept basis=last-known-good cause=invalid ' +
-          'announced=false attempts:2,applies:1,parseFailures:1,readFailures:0,fallbacks:0,retries:0',
+          'announced=false attempts:2,applies:1,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0',
         '[config] import decision phase=reload config=applied keybindings=applied origin=file announced=true ' +
-          'attempts:3,applies:2,parseFailures:1,readFailures:0,fallbacks:0,retries:0'
+          'attempts:3,applies:2,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0'
       ]);
+    } finally {
+      importer.cleanup();
+    }
+  });
+
+  test('reports why the user config fell back, distinguishing parse from read', async () => {
+    const importer = await createConfigImportHarness();
+    try {
+      writeSources(importer);
+      writeFileSync(importer.mockPaths.cfgPath, '{config: ', 'utf8');
+      expect(importer._import('reload').report).toMatchObject({config: 'fallback', configCause: 'parse'});
+
+      // Removing the file makes the read itself fail, not the parse.
+      rmSync(importer.mockPaths.cfgPath);
+      expect(importer._import('reload').report).toMatchObject({config: 'fallback', configCause: 'read'});
     } finally {
       importer.cleanup();
     }
@@ -218,7 +262,7 @@ describe('the counter snapshot', () => {
 
   test('renders every counter in a fixed order', () => {
     expect(describeConfigCounters(createConfigMetrics().snapshot())).toBe(
-      'attempts:0,applies:0,parseFailures:0,readFailures:0,fallbacks:0,retries:0'
+      'attempts:0,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0'
     );
   });
 });

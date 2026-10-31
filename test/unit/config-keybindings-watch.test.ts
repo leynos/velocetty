@@ -1,7 +1,7 @@
 /** @file Verifies the config watcher covers both files and reports reloads honestly. */
 import path from 'node:path';
 
-import {expect, mock, test} from 'bun:test';
+import {expect, mock, spyOn, test} from 'bun:test';
 
 import type {ConfigImportReport} from '../../app/config/import-report';
 import type {KeybindingsLoadOutcome} from '../../app/config/keybindings';
@@ -77,6 +77,7 @@ type WatchHarness = {
   readonly emit: (request: EmitRequest) => void;
   readonly setReport: (report: ConfigImportReport) => void;
   readonly setConfig: (config: parsedConfig) => void;
+  readonly setOutcome: (outcome: KeybindingsLoadOutcome) => void;
 };
 
 /** The watcher events the configuration module subscribes to. */
@@ -126,9 +127,13 @@ const createWatchHarness = async (): Promise<WatchHarness> => {
 
   let currentConfig = makeParsedConfig({'window:new': ['ctrl+n']});
   let currentReport: ConfigImportReport = {config: 'applied', keybindings: 'applied'};
+  // An explicit outcome overrides the one derived from the report, so a test
+  // can exercise causes the report vocabulary cannot express, such as an
+  // unreadable keybindings file.
+  let currentOutcome: KeybindingsLoadOutcome | undefined;
   const importMock = mock((..._args: unknown[]) => ({
     config: currentConfig,
-    keybindings: outcomeFor(currentReport),
+    keybindings: currentOutcome ?? outcomeFor(currentReport),
     report: currentReport
   }));
 
@@ -169,6 +174,9 @@ const createWatchHarness = async (): Promise<WatchHarness> => {
     notifyMock,
     setConfig: (config) => {
       currentConfig = config;
+    },
+    setOutcome: (outcome) => {
+      currentOutcome = outcome;
     },
     setReport: (report) => {
       currentReport = report;
@@ -227,6 +235,65 @@ test.serial('add and unlink events reload, and only applied reports notify', asy
     expect(harness.importMock).toHaveBeenCalledTimes(4);
     expect(harness.notifyMock).toHaveBeenCalledTimes(1);
   } finally {
+    mock.restore();
+  }
+});
+
+test.serial('an unreadable keybindings file is recorded and counted without notifying', async () => {
+  const harness = await createWatchHarness();
+  // The composition root's recorder writes to the real console, so the record
+  // it emits is captured here rather than through an injected sink.
+  const infoSpy = spyOn(console, 'info').mockImplementation(() => {});
+  const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    harness.configModule.setup();
+    harness.configModule.subscribe(harness.subscriberMock);
+    harness.setReport({config: 'applied', keybindings: 'kept'});
+    harness.setOutcome({basis: 'last-known-good', cause: 'unreadable', diagnostics: [], keymaps: {}, kind: 'kept'});
+
+    harness.emit({event: 'change', eventPath: '/tmp/keybindings.json5'});
+    await settle();
+
+    const decisionLines = infoSpy.mock.calls.map(([line]) => line);
+    expect(decisionLines).toHaveLength(2);
+    expect(decisionLines[1]).toBe(
+      '[config] import decision phase=reload config=applied keybindings=kept basis=last-known-good cause=unreadable ' +
+        'announced=false attempts:2,applies:1,parseFailures:0,readFailures:1,fallbacks:0,importFailures:0,retries:0'
+    );
+    // The service owns the user-facing diagnostic; the watcher stays quiet and
+    // still dispatches the reload to its subscribers.
+    expect(harness.notifyMock).not.toHaveBeenCalled();
+    expect(harness.subscriberMock).toHaveBeenCalledTimes(1);
+    expect(warnSpy).not.toHaveBeenCalled();
+  } finally {
+    infoSpy.mockRestore();
+    warnSpy.mockRestore();
+    mock.restore();
+  }
+});
+
+test.serial('a thrown reload is counted, recorded, and still reported by the watcher', async () => {
+  const harness = await createWatchHarness();
+  const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    harness.configModule.setup();
+    harness.configModule.subscribe(harness.subscriberMock);
+    harness.importMock.mockImplementation(() => {
+      throw new Error('boom');
+    });
+
+    harness.emit({event: 'change', eventPath: '/tmp/config.json5'});
+    await settle();
+
+    expect(warnSpy.mock.calls.map(([line]) => line)).toEqual([
+      '[config] import failure phase=reload cause=thrown ' +
+        'attempts:2,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0',
+      '[config-watcher] Configuration reload failed.'
+    ]);
+    expect(harness.notifyMock).not.toHaveBeenCalled();
+    expect(harness.subscriberMock).not.toHaveBeenCalled();
+  } finally {
+    warnSpy.mockRestore();
     mock.restore();
   }
 });

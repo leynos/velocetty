@@ -113,6 +113,14 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
     }
   };
 
+  /**
+   * Runs one import and reports what each file did.
+   *
+   * Start-up may create directories, refresh schemas, seed
+   * `keybindings.json5`, and bootstrap `config.json5`. Reload writes nothing.
+   * The returned report is the only per-file summary the composition root
+   * needs to decide whether "Configuration updated" is honest.
+   */
   const _import = (phase: ConfigImportPhase): ConfigImportResult => {
     const loaded = sources.load(phase);
     if (phase === 'startup') {
@@ -129,11 +137,15 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
     replaceLegacyKeymaps(loaded.userCfg, outcome.keymaps);
 
     const config = initConfig(loaded.userCfg, loaded.defaultCfg, notifyFn);
-    return {
-      config,
-      keybindings: outcome,
-      report: {config: loaded.usedFallback ? 'fallback' : 'applied', keybindings: keybindingsStatus(outcome)}
+    const report: ConfigImportReport = {
+      config: loaded.usedFallback ? 'fallback' : 'applied',
+      keybindings: keybindingsStatus(outcome)
     };
+    // A fallback with no known cause still reports the fallback itself.
+    if (loaded.fallbackCause !== undefined) {
+      Object.assign(report, {configCause: loaded.fallbackCause});
+    }
+    return {config, keybindings: outcome, report};
   };
 
   return {_import, getDefaultConfig: sources.getDefaultConfig};

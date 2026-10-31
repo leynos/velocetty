@@ -7,9 +7,20 @@
  */
 import type {KeybindingsLoadOutcome} from './keybindings';
 
+/**
+ * Why the user configuration fell back, in a closed vocabulary.
+ *
+ * `parse` means the file was read but rejected; `read` means it could not be
+ * read at all. A record that named only "fallback" could not tell an editor
+ * typo from a permissions problem without opening the file again.
+ */
+export type ConfigFallbackCause = 'parse' | 'read';
+
 /** What each configuration file did during an import. */
 export type ConfigImportReport = {
   readonly config: 'applied' | 'fallback';
+  /** Present only for a fallback, and only when the cause is known. */
+  readonly configCause?: ConfigFallbackCause;
   readonly keybindings: 'applied' | 'kept' | 'unchanged';
 };
 
@@ -23,6 +34,8 @@ export type ConfigImportReport = {
 export type ImportDecision = {
   readonly phase: 'reload' | 'startup';
   readonly config: 'applied' | 'fallback';
+  /** Why the config fell back; absent when it applied or the cause is unknown. */
+  readonly configCause?: ConfigFallbackCause;
   readonly keybindings: KeybindingsLoadOutcome;
   /** Whether the "Configuration updated" notice was shown. */
   readonly announced: boolean;
@@ -59,6 +72,17 @@ const describeKeybindingsDecision = (outcome: KeybindingsLoadOutcome): string =>
     : `keybindings=kept basis=${outcome.basis} cause=${outcome.cause}`;
 
 /**
+ * Describes the configuration half of a decision, including the fallback cause.
+ *
+ * A fallback whose cause is unknown still renders as `config=fallback`; the
+ * field is omitted rather than guessed.
+ */
+const describeConfigDecision = (decision: ImportDecision): string =>
+  decision.configCause === undefined
+    ? `config=${decision.config}`
+    : `config=${decision.config} cause=${decision.configCause}`;
+
+/**
  * Describes one import attempt as a single bounded log record.
  *
  * The composition root emits exactly one of these per attempt, including the
@@ -72,12 +96,13 @@ const describeKeybindingsDecision = (outcome: KeybindingsLoadOutcome): string =>
  * ```ts
  * describeImportDecision({
  *   announced: false,
- *   config: 'applied',
+ *   config: 'fallback',
+ *   configCause: 'parse',
  *   keybindings: {kind: 'applied', keymaps: {}, origin: 'file'},
  *   phase: 'reload'
  * });
- * // 'phase=reload config=applied keybindings=applied origin=file announced=false'
+ * // 'phase=reload config=fallback cause=parse keybindings=applied origin=file announced=false'
  * ```
  */
 export const describeImportDecision = (decision: ImportDecision): string =>
-  `phase=${decision.phase} config=${decision.config} ${describeKeybindingsDecision(decision.keybindings)} announced=${decision.announced}`;
+  `phase=${decision.phase} ${describeConfigDecision(decision)} ${describeKeybindingsDecision(decision.keybindings)} announced=${decision.announced}`;

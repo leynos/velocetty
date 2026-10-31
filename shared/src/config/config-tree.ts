@@ -46,6 +46,7 @@ const configFileName = 'config.json5';
 const legacyConfigFileName = 'hyper.json';
 const keybindingsFileName = 'keybindings.json5';
 
+/** Picks the path flavour whose separators match the reported platform. */
 const platformPath = (platform: NodeJS.Platform) => (platform === 'win32' ? path.win32 : path.posix);
 
 /**
@@ -88,6 +89,14 @@ const resolveHyperDirectory = (input: ConfigLocationInput, paths: typeof path.po
   return paths.join(input.homeDirectory, '.config', 'Hyper');
 };
 
+/**
+ * Lists the configuration candidates in priority order.
+ *
+ * The development directory comes first when it is active, then the Velocetty
+ * tree, then the Hyper tree's two historical names. Listing is pure: existence
+ * is probed by the caller, so the same order serves both the resolver and the
+ * "every candidate is shadowed" check.
+ */
 const listCandidates = (
   input: ConfigLocationInput,
   paths: typeof path.posix,

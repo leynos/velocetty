@@ -4,11 +4,13 @@
  * bootstrap `config.json5`. A reload reads the same layers but writes nothing,
  * so a file the user deleted mid-session stays deleted.
  */
-import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
+import {existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
 import path from 'node:path';
 
 import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
 import {isJsonValue} from '../utils/runtime-guards';
+import type {ConfigFallbackCause} from './import-report';
+import {ensureSchemaFiles, type SchemaCopyRequest} from './schema-copy';
 import {notifyWithPrimaryDiagnostic, type ConfigImportNotify} from './keybindings';
 import {replaceLegacyKeymaps} from './import-keybindings';
 import {parseKeybindingsText, toRawKeymaps} from './keybindings-codec';
@@ -42,6 +44,8 @@ export type ConfigImportPaths = {
 type LoadedConfig = {
   config: rawConfig;
   diagnostics: configValidationDiagnostic[];
+  /** Present only when the payload is a fallback, naming why it fell back. */
+  failure?: ConfigFallbackCause;
   usedFallback: boolean;
 };
 
@@ -50,6 +54,8 @@ export type LoadedSources = {
   readonly userCfg: rawConfig;
   readonly defaultCfg: rawConfig;
   readonly bootstrapped: boolean;
+  /** Why the user config fell back; absent when it applied. */
+  readonly fallbackCause?: ConfigFallbackCause;
   readonly usedFallback: boolean;
 };
 
@@ -57,13 +63,6 @@ export type LoadedSources = {
 type ConfigSource = {
   readonly filePath: string;
   readonly rawContent: string;
-};
-
-/** One schema copy: bundled source, destination directory, and file name. */
-type SchemaTarget = {
-  readonly directory: string;
-  readonly fileName: string;
-  readonly source: string;
 };
 
 export type ConfigSourceLoaderDependencies = {
@@ -107,6 +106,7 @@ const rawConfigDiagnosticHints = {
   }
 } as const;
 
+/** Emits one warning per non-empty diagnostic list, tagged with its source. */
 const reportDiagnostics = (
   warnFn: typeof console.warn,
   context: string,
@@ -154,19 +154,6 @@ const stringifyConfig = (config: rawConfig): string => {
 
 const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPORT === '1';
 
-/** Copies one bundled schema beside the configuration file that uses it. */
-const copySchemaTarget = (target: SchemaTarget): boolean => {
-  const destinationPath = path.resolve(target.directory, target.fileName);
-  try {
-    mkdirpSync(target.directory);
-    copySync(target.source, destinationPath, {overwrite: true});
-    return true;
-  } catch (error) {
-    console.error(`[config-import] Failed to copy schema file from "${target.source}" to "${destinationPath}".`, error);
-    return false;
-  }
-};
-
 /**
  * Creates the loader for the bundled defaults and the user config.
  *
@@ -193,27 +180,22 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
    * new file in it.
    */
   const ensureSchemaFile = () => {
-    const targets: readonly SchemaTarget[] = [
-      {directory: pathDeps.velocettyDir, fileName: pathDeps.schemaFile, source: pathDeps.schemaPath},
-      {
-        directory: pathDeps.keybindingsDir,
-        fileName: pathDeps.keybindingsSchemaFile,
-        source: pathDeps.keybindingsSchemaPath
-      }
-    ];
-    const legacyTargets: SchemaTarget[] = [];
-    if (pathDeps.cfgDir !== pathDeps.velocettyDir) {
-      for (const target of targets) {
-        const legacyTarget = {...target, directory: pathDeps.cfgDir};
-        if (existsSync(path.resolve(legacyTarget.directory, legacyTarget.fileName))) {
-          legacyTargets.push(legacyTarget);
+    const request: SchemaCopyRequest = {
+      notify: notifyFn,
+      targets: [
+        {directory: pathDeps.velocettyDir, fileName: pathDeps.schemaFile, source: pathDeps.schemaPath},
+        {
+          directory: pathDeps.keybindingsDir,
+          fileName: pathDeps.keybindingsSchemaFile,
+          source: pathDeps.keybindingsSchemaPath
         }
-      }
+      ]
+    };
+    // Set only when the trees differ, so each target is written once.
+    if (pathDeps.cfgDir !== pathDeps.velocettyDir) {
+      Object.assign(request, {legacyDirectory: pathDeps.cfgDir});
     }
-    const results = [...targets, ...legacyTargets].map((target) => copySchemaTarget(target));
-    if (results.includes(false)) {
-      notifyFn("Couldn't update config schema metadata. Config editor validation may be stale.");
-    }
+    ensureSchemaFiles(request);
   };
 
   /**
@@ -239,6 +221,12 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     }
   };
 
+  /**
+   * Reads the bundled default config, keeping safe defaults on any error.
+   *
+   * A missing, unreadable, or invalid bundled file is a packaging fault rather
+   * than a user fault, so it is reported and the process continues.
+   */
   const loadDefaultConfig = (): LoadedConfig => {
     let defaultCfgRaw = '{}';
     try {
@@ -276,6 +264,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     };
   };
 
+  /** Reads the shipped per-platform keymap, treating any failure as no defaults. */
   const loadPlatformKeymap = (): Record<string, string | string[]> => {
     const platformKeyPath = pathDeps.defaultPlatformKeyPath();
     const filePath = platformKeyPath;
@@ -294,6 +283,13 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     return toRawKeymaps(keymapResult.keymaps);
   };
 
+  /**
+   * Reads the user config, falling back to the supplied defaults.
+   *
+   * The fallback is deliberate and user-visible: a parse failure keeps the
+   * diagnostic list, an unreadable file reports no diagnostics, and both leave
+   * `config.json5` untouched so the user can repair it.
+   */
   const loadUserConfig = (defaultConfigFallback: rawConfig): LoadedConfig => {
     const filePath = pathDeps.cfgPath;
     try {
@@ -320,6 +316,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
       return {
         config: cloneRawConfig(defaultConfigFallback),
         diagnostics: userCfgResult.diagnostics,
+        failure: 'parse',
         usedFallback: true
       };
     } catch (error) {
@@ -335,6 +332,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
       return {
         config: cloneRawConfig(defaultConfigFallback),
         diagnostics: [],
+        failure: 'read',
         usedFallback: true
       };
     }
@@ -366,12 +364,17 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     defaultConfig = defaultCfg;
 
     const userConfigResult = loadUserConfig(defaultCfg);
-    return {
+    const sources: LoadedSources = {
       bootstrapped,
       defaultCfg,
       usedFallback: userConfigResult.usedFallback,
       userCfg: cloneRawConfig(userConfigResult.config)
     };
+    // Added only when the fallback has a known cause, never as `undefined`.
+    if (userConfigResult.failure !== undefined) {
+      Object.assign(sources, {fallbackCause: userConfigResult.failure});
+    }
+    return sources;
   };
 
   /**
