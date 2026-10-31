@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 
 import type {KeybindingsStore} from '../../app/config/keybindings';
-import type {KeybindingsFileSystem} from '../../app/config/keybindings-store';
+import type {KeybindingsFileSystem, RenameRetryEvent} from '../../app/config/keybindings-store';
 import {createFileKeybindingsStore} from '../../app/config/keybindings-store';
 
 const FILE_NAME = 'keybindings.json5';
@@ -117,8 +117,16 @@ const setupRenameFailure = (failures: number, code: string) => {
   fs.writeFileSync(filePath, 'previous', 'utf8');
   const {fileSystem, attempts} = transientRenameFileSystem(failures, code);
   const sleep = mock((_milliseconds: number) => {});
-  const store = createFileKeybindingsStore({filePath, fs: fileSystem, sleep});
-  return {attempts, filePath, sleep, store, workspace};
+  const events: RenameRetryEvent[] = [];
+  const store = createFileKeybindingsStore({
+    filePath,
+    fs: fileSystem,
+    onRetry: (event) => {
+      events.push(event);
+    },
+    sleep
+  });
+  return {attempts, events, filePath, sleep, store, workspace};
 };
 
 describe('atomic keybindings file store', () => {
@@ -330,7 +338,7 @@ describe('atomic keybindings file store', () => {
   });
 
   test('retries a transient rename failure and succeeds', () => {
-    const {attempts, filePath, sleep, store, workspace} = setupRenameFailure(2, 'EBUSY');
+    const {attempts, events, filePath, sleep, store, workspace} = setupRenameFailure(2, 'EBUSY');
 
     expect(store.write('replacement')).toEqual({kind: 'written'});
 
@@ -338,10 +346,16 @@ describe('atomic keybindings file store', () => {
     expect(sleep).toHaveBeenCalledTimes(2);
     expect(fs.readFileSync(filePath, 'utf8')).toBe('replacement');
     expect(temporaryNames(workspace)).toEqual([]);
+    // Each refusal is reported, but a retry that later succeeds was not a
+    // failed write, so no event claims exhaustion.
+    expect(events).toEqual([
+      {attempt: 1, category: 'busy', exhausted: false},
+      {attempt: 2, category: 'busy', exhausted: false}
+    ]);
   });
 
   test('gives up after five transient rename failures', () => {
-    const {attempts, filePath, sleep, store, workspace} = setupRenameFailure(Number.POSITIVE_INFINITY, 'EPERM');
+    const {attempts, events, filePath, sleep, store, workspace} = setupRenameFailure(Number.POSITIVE_INFINITY, 'EPERM');
 
     expect(store.write('replacement').kind).toBe('failed');
 
@@ -349,16 +363,32 @@ describe('atomic keybindings file store', () => {
     expect(sleep).toHaveBeenCalledTimes(4);
     expect(fs.readFileSync(filePath, 'utf8')).toBe('previous');
     expect(temporaryNames(workspace)).toEqual([]);
+    // Exactly one event marks the end, and it is the last attempt.
+    expect(events.map((event) => event.attempt)).toEqual([1, 2, 3, 4, 5]);
+    expect(events.map((event) => event.exhausted)).toEqual([false, false, false, false, true]);
+    expect(new Set(events.map((event) => event.category))).toEqual(new Set(['permission']));
   });
 
   test('does not retry a permanent rename failure', () => {
-    const {attempts, sleep, store, workspace} = setupRenameFailure(1, 'ENOENT');
+    const {attempts, events, sleep, store, workspace} = setupRenameFailure(1, 'ENOENT');
 
     expect(store.write('replacement').kind).toBe('failed');
 
     expect(attempts()).toBe(1);
     expect(sleep).not.toHaveBeenCalled();
     expect(temporaryNames(workspace)).toEqual([]);
+    // An unrecognized errno is reported as `other` and ends the write at once.
+    expect(events).toEqual([{attempt: 1, category: 'other', exhausted: true}]);
+  });
+
+  test('categorizes a refused permission rename as permission', () => {
+    const {events, store} = setupRenameFailure(Number.POSITIVE_INFINITY, 'EACCES');
+
+    expect(store.write('replacement').kind).toBe('failed');
+
+    // EACCES is transient on Windows and shares the `permission` category with
+    // EPERM, so the two cannot be told apart from the counter alone.
+    expect(new Set(events.map((event) => event.category))).toEqual(new Set(['permission']));
   });
 
   test('removes only its own stale temporary files', () => {

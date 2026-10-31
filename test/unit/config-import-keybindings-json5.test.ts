@@ -4,7 +4,7 @@ import {expect, test} from 'bun:test';
 import {existsSync, mkdirpSync, readFileSync, removeSync, writeFileSync} from 'fs-extra';
 import JSON5 from 'json5';
 
-import {describeReloadDecision, shouldAnnounceReload} from '../../app/config/import-report';
+import {describeImportDecision, shouldAnnounceReload} from '../../app/config/import-report';
 import {
   configBytesUnchanged,
   createConfigImportHarness,
@@ -19,6 +19,14 @@ const userConfigWithKeymaps = (keymaps: string): string => `{
   localPlugins: [],
   keymaps: ${keymaps}
 }`;
+
+/** Builds one decision record for the table below without repeating the shape. */
+const describeDecision = (
+  phase: 'reload' | 'startup',
+  config: 'applied' | 'fallback',
+  keybindings: Parameters<typeof describeImportDecision>[0]['keybindings'],
+  announced = false
+) => describeImportDecision({announced, config, keybindings, phase});
 
 /** Writes the bundled defaults and an empty platform keymap to isolate user keymaps. */
 const writeDefaultSources = (harness: ConfigImportHarness) => {
@@ -225,13 +233,45 @@ test('announces a reload only when a file applied and none fell back', () => {
   expect(shouldAnnounceReload({config: 'fallback', keybindings: 'unchanged'})).toBe(false);
 });
 
-test('describes each reload decision on one bounded line', () => {
-  expect(describeReloadDecision({config: 'applied', keybindings: 'applied'}, true)).toBe(
-    'config=applied keybindings=applied announced=true'
+test('describes each import decision in the outcome vocabulary', () => {
+  expect(describeDecision('reload', 'applied', {keymaps: {}, kind: 'applied', origin: 'file'}, true)).toBe(
+    'phase=reload config=applied keybindings=applied origin=file announced=true'
   );
-  // The suppressed case still records the decision, which is the point of the
-  // log line: a fallback is otherwise invisible outside the notification.
-  expect(describeReloadDecision({config: 'fallback', keybindings: 'kept'}, false)).toBe(
-    'config=fallback keybindings=kept announced=false'
+  // A seed and an empty file are applications too, so `origin` separates them.
+  expect(describeDecision('startup', 'applied', {keymaps: {}, kind: 'applied', origin: 'seeded'})).toBe(
+    'phase=startup config=applied keybindings=applied origin=seeded announced=false'
   );
+  expect(describeDecision('startup', 'applied', {keymaps: {}, kind: 'applied', origin: 'seeded-unsaved'})).toBe(
+    'phase=startup config=applied keybindings=applied origin=seeded-unsaved announced=false'
+  );
+  // The kept states carry the basis and the cause, so a parse failure, a read
+  // failure, and a deferred bootstrap are three distinct records rather than
+  // one indistinguishable "kept".
+  expect(
+    describeDecision('reload', 'applied', {
+      basis: 'last-known-good',
+      cause: 'invalid',
+      diagnostics: [],
+      keymaps: {},
+      kind: 'kept'
+    })
+  ).toBe('phase=reload config=applied keybindings=kept basis=last-known-good cause=invalid announced=false');
+  expect(
+    describeDecision('reload', 'applied', {
+      basis: 'empty',
+      cause: 'unreadable',
+      diagnostics: [],
+      keymaps: {},
+      kind: 'kept'
+    })
+  ).toBe('phase=reload config=applied keybindings=kept basis=empty cause=unreadable announced=false');
+  expect(
+    describeDecision('reload', 'fallback', {
+      basis: 'last-known-good',
+      cause: 'deferred',
+      diagnostics: [],
+      keymaps: {},
+      kind: 'kept'
+    })
+  ).toBe('phase=reload config=fallback keybindings=kept basis=last-known-good cause=deferred announced=false');
 });

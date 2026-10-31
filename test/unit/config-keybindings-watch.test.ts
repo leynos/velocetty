@@ -4,6 +4,7 @@ import path from 'node:path';
 import {expect, mock, test} from 'bun:test';
 
 import type {ConfigImportReport} from '../../app/config/import-report';
+import type {KeybindingsLoadOutcome} from '../../app/config/keybindings';
 import type {parsedConfig, rawConfig} from '@shared/types/config';
 import {_init} from '../../app/config/init';
 import {getElectronMock, registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
@@ -92,6 +93,23 @@ type WatchMock = {
 };
 
 /** Imports a fresh `app/config.ts` instance over mocked chokidar and electron. */
+/**
+ * The keybindings outcome a stub importer returns for a given summary.
+ *
+ * The composition root records this outcome, so the stub must report a state
+ * consistent with the report it also returns.
+ */
+const outcomeFor = (report: ConfigImportReport): KeybindingsLoadOutcome =>
+  report.keybindings === 'applied'
+    ? {keymaps: {}, kind: 'applied', origin: 'file'}
+    : {
+        basis: 'last-known-good',
+        cause: report.keybindings === 'unchanged' ? 'deferred' : 'invalid',
+        diagnostics: [],
+        keymaps: {},
+        kind: 'kept'
+      };
+
 const createWatchHarness = async (): Promise<WatchHarness> => {
   mock.restore();
   // These stand-ins ignore their arguments; recording them without naming their
@@ -108,7 +126,11 @@ const createWatchHarness = async (): Promise<WatchHarness> => {
 
   let currentConfig = makeParsedConfig({'window:new': ['ctrl+n']});
   let currentReport: ConfigImportReport = {config: 'applied', keybindings: 'applied'};
-  const importMock = mock((..._args: unknown[]) => ({config: currentConfig, report: currentReport}));
+  const importMock = mock((..._args: unknown[]) => ({
+    config: currentConfig,
+    keybindings: outcomeFor(currentReport),
+    report: currentReport
+  }));
 
   resetElectronMock();
   registerElectronMock();

@@ -28,9 +28,9 @@
   - `docs/velocetty-product-requirements-document.md` (§3, command system and
     keybinding management).
   - `docs/adr-007-keybindings-json5-storage.md` (this item's architectural
-    decision record (ADR), status Proposed) and
+    decision record (ADR), accepted 2026-10-30) and
     `docs/adr-008-velocetty-configuration-directory.md` (the configuration
-    tree, status Proposed).
+    tree, accepted 2026-10-30).
   - `docs/developers-guide.md` (§Configuration format practice,
     §Configuration layering and reloadability practice, §Tests).
   - `docs/velocetty-hyper-codebase.md`, `docs/tracking-issues.md`,
@@ -63,17 +63,15 @@ This execution plan (ExecPlan) is a living document. The sections `Constraints`,
 `Conformance basis`, and `Verification plan` must be kept up to date as work
 proceeds.
 
-Status: IMPLEMENTED (2026-10-30; hosted delivery pending)
+Status: IMPLEMENTED (2026-10-31; hosted validation green, review convergence
+pending)
 
-Implementation completed on 2026-10-30. The hosted end-to-end run on three
-operating systems is the one outstanding validation; it is recorded under EP-E
-E4 in `Progress`, and `pr-babysitting` owns it.
-
-A milestone's parent checkbox is ticked only when every child is. EP-D, EP-E,
-and EP-G stay unticked for that reason: EP-E's hosted three-operating-system
-run and EP-G's hosted rerun of the repaired workflow are delivery evidence, not
-implementation, and neither exists yet. `IMPLEMENTED` records the code, tests,
-proofs, and local gates; it does not claim the hosted run.
+Implementation completed on 2026-10-30. The hosted `Node CI` run at `fc9a184e`
+(run 41166608503) succeeded on all four builds, with the earlier run at
+`eada2f0e` (run 41147868161) also green; both are recorded under EP-E E4 in
+`Progress`. `pr-babysitting` owns the remaining review convergence: the
+pre-merge rows, the CodeRabbit pause, and the formal approval request. Those
+are delivery evidence, not implementation, so this status does not claim them.
 
 This revised plan was explicitly approved by a human on 2026-10-29.
 Implementation began after that approval. The approval questions below were
@@ -467,7 +465,7 @@ design and the notification the user sees.
   the KB-COD-1 sorting-removal control, which failed two tests before being
   reverted. Gates green after the follow-up (612 tests, 74 files; proof 1 + 8
   verified).
-- [ ] EP-D store, service, importer: red; green; negative control (c);
+- [x] EP-D store, service, importer: red; green; negative control (c);
   refactor; gates.
   - [x] (2026-10-30) D1 atomic store: `app/config/keybindings-store.ts` and
     its 14 KB-STORE-1 tests. Each injected fault point (open, write, `fsync`,
@@ -491,7 +489,7 @@ design and the notification the user sees.
     KB-SVC-3 suite has 8 examples, including a Hyper-tree layout supplied by a
     new harness option. Two negative controls each failed the intended tests
     and were reverted; transcripts in `Artefacts and notes`.
-- [ ] EP-E watcher and end-to-end: red; green; refactor; gates; CI end-to-end
+- [x] EP-E watcher and end-to-end: red; green; refactor; gates; CI end-to-end
   run on three operating systems.
   - [x] (2026-10-30) E1 red: KB-WATCH-1 failed against a stub that reproduced
     the old per-event timers, shrinking to two simultaneous events and
@@ -511,14 +509,15 @@ design and the notification the user sees.
   - [x] (2026-10-30) E4 commit gates: all eight gates pass (`check-fmt`,
     `typecheck`, `lint`, `test` with 678 tests across 80 files, `spelling`,
     `prove`, `markdownlint`, and `nixie`). Committed as `0ed7307b` and pushed.
-  - [ ] (pending) CI end-to-end run on the three operating systems. The local
-    machine cannot build `node-pty` for the Electron lane, so this waits on the
-    hosted run. Run 41122386166 against `03e2792c` is the current evidence, and
-    it failed: Ubuntu in the proof step (repaired under EP-G), and macOS,
-    Windows, and Linux aarch64 during `bun install` with `404 Not Found` for
-    `tslib-2.9.1.tgz`. The installer failure is not attributed to this branch;
-    the root lockfile selects `tslib@2.6.2`, so it is diagnosed separately
-    before the lanes are rerun.
+  - [x] (2026-10-31) CI on the three operating systems. Run 41166608503 on
+    `fc9a184e` completed successfully in `build (ubuntu-latest)`,
+    `build (macos-latest)`, `build (windows-2022)`, and
+    `build-linux-aarch64`; run 41147868161 on `eada2f0e` did the same. The
+    earlier failure, run 41122386166 on `03e2792c`, is retained as history:
+    Ubuntu failed in the proof step (repaired under EP-G), and macOS, Windows,
+    and Linux aarch64 failed in `bun install` with `404 Not Found` for
+    `tslib-2.9.1.tgz`, an installer problem not attributed to this branch. The
+    repaired workflow has since passed on every lane, including the proof step.
 - [x] EP-F documentation and roadmap: drafts; gates.
   - [x] (2026-10-30) ADR-007 and ADR-008 marked `Accepted on 2026-10-30` with
     implementation summaries and the discoveries reconciled, including the
@@ -544,11 +543,11 @@ design and the notification the user sees.
     `make spelling` (typos.toml unchanged), `make markdownlint` (0 issues in 69
     files), and `make nixie` (all diagrams valid). The code gates were last run
     green for the EP-E commit `0ed7307b`, and no code changed since.
-- [ ] EP-G hosted CI repair: the hosted runs of `b1c8eaa1` and `03e2792c`
-  failed on all three operating systems. The Linux proof failure and the macOS
-  runtime-import failure are repaired. The installer `404` in run 41122386166
-  is a separate install-time problem, not attributed to this branch. The
-  repairs await the full gate set and a new hosted run.
+- [x] EP-G hosted CI repair: the hosted runs of `b1c8eaa1` and `03e2792c`
+  failed on all three operating systems. Every repair below has since passed a
+  hosted run on all four builds (run 41166608503 on `fc9a184e`). The installer
+  `404` in run 41122386166 was a separate install-time problem, not attributed
+  to this branch.
   - [x] (2026-10-30) Linux: `make prove` failed twice. The first run failed
     because `dotnet tool install` added itself to `PATH` through
     `$GITHUB_PATH`, which only applies to later steps, so `dafny` was not found
@@ -583,9 +582,10 @@ design and the notification the user sees.
     Windows default disappeared. The file now uses the canonical `[]`, and
     `test/unit/shipped-keymaps.test.ts` parses every shipped keymap through
     the codec.
-- [ ] EP-H proof-assessment hardening, from the hosted CodeRabbit proof
+- [x] EP-H proof-assessment hardening, from the hosted CodeRabbit proof
   assessment (`velocetty-pr67-proof-20261030`). The assessment accepted the
-  replay theorem and the abstraction, and named five unresolved concerns.
+  replay theorem and the abstraction, and named five unresolved concerns, all
+  now addressed.
   - [x] (2026-10-30) Contract gaps. `observeKeybindings` now proves
     `usedLastKnownGood` for every kind; `decideBootstrap` proves the seed kind
     for `parsed-empty` and `freshly-created` and `write-nothing` for a present
@@ -749,6 +749,39 @@ design and the notification the user sees.
     origin was added, was repaired by extracting `seedFile`, `seedWriteStatus`,
     `seedOrigin`, and `SeedDecision`; `cs review app/config/keybindings.ts`
     reports 10.0 again.
+
+- [x] (2026-10-31 06:45Z) Second observability round, from CodeRabbit's
+  follow-up on the pre-merge reconciliation. The decision record now covers
+  start-up as well as reload, and names the keybindings outcome in its own
+  vocabulary rather than a parallel one.
+  - [x] `describeReloadDecision` became `describeImportDecision`, taking an
+    `ImportDecision` of `phase`, `config`, `keybindings`, and `announced`. The
+    carried `KeybindingsLoadOutcome` preserves `origin`, `basis`, and `cause`,
+    so a seed, an empty file, a parse failure, a read failure, and a deferred
+    bootstrap are five distinguishable records.
+  - [x] `app/config/import.ts` returns the outcome alongside the report, so
+    the composition root never re-derives it.
+  - [x] `app/config/config-metrics.ts` holds the closed counter vocabulary
+    (`attempts`, `applies`, `parseFailures`, `readFailures`, `fallbacks`,
+    `retries`) with a fixed render order and a copying snapshot.
+  - [x] `app/config/config-observability.ts` emits exactly one decision record
+    per import attempt, including failures and suppressed notices, and one
+    warning per refused rename, driven by the store's `RenameRetryEvent`.
+  - [x] `app/config/keybindings-store.ts` reports each refused rename through
+    an injected `onRetry`, with a bounded `category` (`permission`, `busy`,
+    `other`) and an `exhausted` flag; the errno string is not reported.
+  - [x] Tests: `test/unit/config-observability.test.ts` covers every
+    distinguishable state, the exact record text, counter evolution across a
+    valid → invalid → recovered sequence, and the retry records.
+    `test/unit/keybindings-store.test.ts` asserts the retry event sequences for
+    success, exhaustion, a permanent failure, and both permission errnos.
+  - [x] `test/unit/keybindings-codec.test.ts` pins the serialized output, the
+    diagnostic wording, and the syntax-error shape in three snapshots.
+  - [x] `docs/developers-guide.md` gains
+    `### Configuration health signals`, documenting the record fields, the
+    counter meanings, and the retry categories.
+  - [x] `docs/migration-keybindings-json5.md` adds the standalone migration
+    note, and `docs/users-guide.md` links to it.
 
 ## Surprises & discoveries
 
@@ -1390,11 +1423,21 @@ design and the notification the user sees.
   single-purpose helpers instead of suppressed. Date/Author: 2026-10-30,
   implementation agent.
 
+- Decision: the observability record carries the whole
+  `KeybindingsLoadOutcome` rather than a flattened second vocabulary.
+  Rationale: the outcome already distinguishes `origin`, `basis`, and `cause`,
+  and a parallel enum would be a second place for those distinctions to drift.
+  Keeping the record's fields closed also means no path, command identifier, or
+  shortcut can reach a log line. The counters are a fixed-name record rather
+  than labels, for the same aggregation-safety reason. Date/Author: 2026-10-31,
+  implementation agent.
+
 ## Outcomes & retrospective
 
-Roadmap `3.2.1` is implemented; hosted delivery is still pending, as the status
-line records. Every capability in `Purpose / big picture` is present and
-covered by a test:
+Roadmap `3.2.1` is implemented, and the hosted `Node CI` run is green on all
+four builds at `fc9a184e`; review convergence is the remaining delivery step,
+as the status line records. Every capability in `Purpose / big picture` is
+present and covered by a test:
 
 1. **Edit and hot reload.** `keybindings.json5` is read and validated by the
    codec, observed by the verified policy, and reapplied by the watcher. A save

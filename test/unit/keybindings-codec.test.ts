@@ -164,6 +164,41 @@ describe('serializeKeybindings canonical text', () => {
   });
 });
 
+describe('output contracts', () => {
+  // These snapshots pin the exact text a user sees. The semantic tests above
+  // say "a header, sorted keys, round-trips"; these say "this text, byte for
+  // byte", so an accidental change to wording, quoting, or indentation fails
+  // here instead of reaching a user's file.
+  test.serial('serializes the canonical document exactly', () => {
+    const keymaps: UserKeymaps = {'window:new': ['ctrl+n', 'ctrl+shift+n'], 'window:close': 'ctrl+w', 'pane:split': []};
+
+    expect(serializeKeybindings(keymaps)).toMatchSnapshot();
+  });
+
+  test.serial('reports representative validation diagnostics exactly', () => {
+    const text = `{
+      'window:new': 1,
+      '': 'ctrl+n',
+      'window:close': ['ctrl+w', ' ']
+    }`;
+
+    // The diagnostics carry a JSON pointer and no filesystem path, so the
+    // snapshot needs no normalisation and cannot embed a user's directory.
+    expect(expectInvalid(parseKeybindingsText(text, SOURCE))).toMatchSnapshot();
+  });
+
+  // The JSON5 library supplies this wording, so a dependency upgrade that
+  // changes user-facing text fails here and is reviewed rather than shipped.
+  test.serial('reports a syntax error with a normalised source position', () => {
+    const [diagnostic] = expectInvalid(parseKeybindingsText(`{'a': 'ctrl+n'`, SOURCE));
+    if (diagnostic === undefined) {
+      throw new Error('Expected one diagnostic.');
+    }
+
+    expect({...diagnostic, path: diagnostic.path.replace(SOURCE, '<source>')}).toMatchSnapshot();
+  });
+});
+
 describe('toRawKeymaps copying conversion', () => {
   test('copies the map and each binding array', () => {
     const binding = ['ctrl+n', 'ctrl+shift+n'];

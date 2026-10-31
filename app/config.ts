@@ -17,9 +17,11 @@ import path from 'node:path';
 import type {parsedConfig, configOptions} from '@shared/types/config';
 import {isJsonObject} from './utils/runtime-guards';
 
+import {createConfigMetrics} from './config/config-metrics';
+import {createImportRecorder} from './config/config-observability';
 import {formatKeymapsMarker, isE2ERun, type E2EKeymapStatus} from './config/e2e-keymap-probe';
 import {createConfigImportModule} from './config/import';
-import {describeReloadDecision, shouldAnnounceReload, type ConfigImportReport} from './config/import-report';
+import {shouldAnnounceReload, type ConfigImportReport} from './config/import-report';
 import {_init} from './config/init';
 import {createKeybindingsService} from './config/keybindings';
 import {createFileKeybindingsStore} from './config/keybindings-store';
@@ -42,7 +44,14 @@ import notify from './notify';
 import {getColorMap} from './utils/colours';
 import {createConfigWatcher, type WatcherEvent, type WatcherHandle} from './config/watcher';
 
-const keybindingsStore = createFileKeybindingsStore({filePath: keybindingsPath});
+const metrics = createConfigMetrics();
+
+const recorder = createImportRecorder({
+  metrics,
+  sink: {info: (line) => console.info(line), warn: (line) => console.warn(line)}
+});
+
+const keybindingsStore = createFileKeybindingsStore({filePath: keybindingsPath, onRetry: recorder.recordRenameRetry});
 const keybindingsService = createKeybindingsService({notify, store: keybindingsStore});
 
 const {_import, getDefaultConfig} = createConfigImportModule({
@@ -174,12 +183,12 @@ const _watch = () => {
     handle: createChokidarHandle(watchedDirectories),
     onReady: () => emitE2EMarker('[e2e] config-watcher-ready'),
     onReload: () => {
-      const {config, report} = _import('reload');
+      const {config, keybindings: outcome, report} = _import('reload');
       cfg = config;
-      // One bounded record per reload boundary: it states what each file did
-      // even when the user-facing notice is suppressed.
+      // One bounded record per reload attempt, whether it applied, fell back,
+      // or kept the previous keymaps and suppressed the user-facing notice.
       const announced = shouldAnnounceReload(report);
-      console.info(`[config] reload decision ${describeReloadDecision(report, announced)}`);
+      recorder.recordImport({announced, outcome, phase: 'reload', report});
       if (announced) {
         notify('Configuration updated', 'Configuration reloaded!');
       }
@@ -270,8 +279,11 @@ export const setup = () => {
   // The Velocetty tree holds new configuration files, so it must exist before
   // the importer copies schemas or seeds `keybindings.json5` into it.
   mkdirpSync(velocettyDir);
-  const {config, report} = _import('startup');
+  const {config, keybindings: outcome, report} = _import('startup');
   cfg = config;
+  // Start-up never shows "Configuration updated", so the record states that
+  // rather than leaving the field absent.
+  recorder.recordImport({announced: false, outcome, phase: 'startup', report});
   _watch();
   checkDeprecatedConfig();
   emitE2EMarker(`[e2e] keybindings-path ${keybindingsPath}`);

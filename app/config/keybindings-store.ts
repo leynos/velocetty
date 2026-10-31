@@ -33,9 +33,28 @@ export type KeybindingsFileSystem = Pick<
   | 'readdirSync'
 >;
 
+/**
+ * The bounded reason a rename was refused.
+ *
+ * The errno string itself is not reported: it is not a fixed vocabulary, and a
+ * counter or log that accepts arbitrary text cannot be aggregated safely.
+ */
+export type RenameFailureCategory = 'permission' | 'busy' | 'other';
+
+/** One refused rename attempt, and whether the store stopped retrying. */
+export type RenameRetryEvent = {
+  /** 1-based count of the attempt that was refused. */
+  readonly attempt: number;
+  readonly category: RenameFailureCategory;
+  /** True when this refusal ended the retries, so the write failed. */
+  readonly exhausted: boolean;
+};
+
 type FileKeybindingsStoreOptions = {
   readonly filePath: string;
   readonly fs?: KeybindingsFileSystem;
+  /** Called once per refused rename attempt, so a caller can count and log it. */
+  readonly onRetry?: (event: RenameRetryEvent) => void;
   readonly sleep?: (milliseconds: number) => void;
   readonly warn?: typeof console.warn;
 };
@@ -50,6 +69,14 @@ const MAX_SYMLINK_HOPS = 40;
 
 /** The `<pid>.<counter>` middle segment of a temporary file name. */
 const TEMPORARY_SEQUENCE = /^\d+\.\d+$/;
+
+/** Maps an errno code onto the closed category vocabulary. */
+const renameFailureCategory = (code: string | undefined): RenameFailureCategory => {
+  if (code === 'EPERM' || code === 'EACCES') {
+    return 'permission';
+  }
+  return code === 'EBUSY' ? 'busy' : 'other';
+};
 
 const errorCode = (error: unknown): string | undefined => {
   if (!isObject(error) || !('code' in error)) {
@@ -200,14 +227,16 @@ export const createFileKeybindingsStore = (
   };
 
   const renameWithRetry = ({target, temporaryPath}: ReplacementPlan): void => {
-    for (let attempt = 0; ; attempt += 1) {
+    for (let attempt = 1; ; attempt += 1) {
       try {
         fileSystem.renameSync(temporaryPath, target);
         return;
       } catch (error) {
         const code = errorCode(error);
         const canRetry = code !== undefined && TRANSIENT_RENAME_CODES.has(code);
-        if (!canRetry || attempt + 1 >= MAX_RENAME_ATTEMPTS) {
+        const exhausted = !canRetry || attempt >= MAX_RENAME_ATTEMPTS;
+        options.onRetry?.({attempt, category: renameFailureCategory(code), exhausted});
+        if (exhausted) {
           throw error;
         }
         sleep(RENAME_RETRY_DELAY_MS);

@@ -5,11 +5,27 @@
  * from the importer lets the watcher use it without pulling in the importer's
  * filesystem dependencies.
  */
+import type {KeybindingsLoadOutcome} from './keybindings';
 
 /** What each configuration file did during an import. */
 export type ConfigImportReport = {
   readonly config: 'applied' | 'fallback';
   readonly keybindings: 'applied' | 'kept' | 'unchanged';
+};
+
+/**
+ * One import attempt, described for a bounded log record.
+ *
+ * The keybindings outcome is carried whole rather than flattened: its own
+ * `origin`, `basis`, and `cause` are what distinguish a first-run seed from a
+ * parse failure, and a second parallel vocabulary would let the two drift.
+ */
+export type ImportDecision = {
+  readonly phase: 'reload' | 'startup';
+  readonly config: 'applied' | 'fallback';
+  readonly keybindings: KeybindingsLoadOutcome;
+  /** Whether the "Configuration updated" notice was shown. */
+  readonly announced: boolean;
 };
 
 /**
@@ -31,21 +47,37 @@ export const shouldAnnounceReload = (report: ConfigImportReport): boolean => {
 };
 
 /**
- * Describes one reload decision as a single bounded log record.
+ * Describes the keybindings half of a decision in that outcome's own terms.
  *
- * The watcher emits exactly one of these per reload boundary, so a session's
- * log shows what each file did without repeating the per-file diagnostics the
- * user already sees as notifications.
+ * `applied` names where the keymaps came from, and `kept` names both the basis
+ * that survived and the cause, so a seed, an empty file, a parse failure, a
+ * read failure, and a deferred bootstrap are five distinguishable states.
+ */
+const describeKeybindingsDecision = (outcome: KeybindingsLoadOutcome): string =>
+  outcome.kind === 'applied'
+    ? `keybindings=applied origin=${outcome.origin}`
+    : `keybindings=kept basis=${outcome.basis} cause=${outcome.cause}`;
+
+/**
+ * Describes one import attempt as a single bounded log record.
  *
- * @param report - Per-file outcomes from the import.
- * @param announced - Whether the "Configuration updated" notice was shown.
+ * The composition root emits exactly one of these per attempt, including the
+ * attempts that fail and the reloads whose user-facing notice is suppressed.
+ *
+ * @param decision - The phase, the config result, the keybindings outcome, and
+ * whether a notice was shown.
  * @returns A one-line summary suitable for a log record.
  *
  * @example
  * ```ts
- * describeReloadDecision({config: 'applied', keybindings: 'kept'}, false);
- * // 'config=applied keybindings=kept announced=false'
+ * describeImportDecision({
+ *   announced: false,
+ *   config: 'applied',
+ *   keybindings: {kind: 'applied', keymaps: {}, origin: 'file'},
+ *   phase: 'reload'
+ * });
+ * // 'phase=reload config=applied keybindings=applied origin=file announced=false'
  * ```
  */
-export const describeReloadDecision = (report: ConfigImportReport, announced: boolean): string =>
-  `config=${report.config} keybindings=${report.keybindings} announced=${announced}`;
+export const describeImportDecision = (decision: ImportDecision): string =>
+  `phase=${decision.phase} config=${decision.config} ${describeKeybindingsDecision(decision.keybindings)} announced=${decision.announced}`;

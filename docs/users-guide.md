@@ -162,6 +162,9 @@ Once `keybindings.json5` exists, the legacy `keymaps` key is ignored and a
 notification says so. If `config.json5` cannot be parsed at start-up, migration
 is postponed to a later start rather than seeding an empty file.
 
+For a standalone summary of the change, including the target release, see the
+[migration note](migration-keybindings-json5.md).
+
 ### Sharing shortcuts
 
 `keybindings.json5` is a plain text file. Share it by copying it to the same

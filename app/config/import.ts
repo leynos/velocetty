@@ -33,7 +33,16 @@ export type ConfigImportKeybindings = {
   readonly reload: () => KeybindingsLoadOutcome;
 };
 
-type ConfigImportResult = {readonly config: parsedConfig; readonly report: ConfigImportReport};
+type ConfigImportResult = {
+  readonly config: parsedConfig;
+  readonly report: ConfigImportReport;
+  /**
+   * What the keybindings service decided, passed through unflattened so the
+   * caller can report its `origin`, `basis`, and `cause` without re-deriving
+   * them from the coarser report vocabulary.
+   */
+  readonly keybindings: KeybindingsLoadOutcome;
+};
 
 type ConfigInit = (userCfg: rawConfig, defaultCfg: rawConfig, notify: ConfigImportNotify) => parsedConfig;
 
@@ -114,6 +123,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
     const config = initConfig(loaded.userCfg, loaded.defaultCfg, notifyFn);
     return {
       config,
+      keybindings: outcome,
       report: {config: loaded.usedFallback ? 'fallback' : 'applied', keybindings: keybindingsStatus(outcome)}
     };
   };

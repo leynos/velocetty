@@ -316,6 +316,48 @@ Injecting these dependencies keeps the service, importer, and watcher testable
 in `bun test` without Electron, a real clock, or a real filesystem. See
 [Configuration architecture](configuration-architecture.md) for the data flow.
 
+### Configuration health signals
+
+Each import attempt emits exactly one bounded record on `console.info`, and
+each refused atomic-write rename emits one on `console.warn`. Both carry only
+values from a closed vocabulary, so neither a path, a command identifier, nor a
+shortcut can leak into a log.
+
+```text
+[config] import decision phase=reload config=applied keybindings=applied origin=file announced=true
+  attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,retries:0
+[config] keybindings rename attempt=1 category=busy exhausted=false
+```
+
+The counter snapshot is appended to the decision record on the same line; it is
+shown wrapped here. Its fields mean:
+
+- `phase` is `startup` for the first import and `reload` for a watched change.
+- `config` is `applied`, or `fallback` when `config.json5` could not be read or
+  parsed and the bundled defaults filled in.
+- `keybindings` is `applied` with an `origin` (`file`, `missing`, `seeded`, or
+  `seeded-unsaved`), or `kept` with the surviving `basis` (`last-known-good` or
+  `empty`) and the `cause` (`invalid`, `unreadable`, or `deferred`). A parse
+  failure, a read failure, and a deferred bootstrap are therefore three
+  distinct records rather than one indistinguishable "kept".
+- `announced` records whether "Configuration updated" was shown. A suppressed
+  notice still leaves its decision in the record.
+- `attempts` counts imports, `applies` counts keybindings files put into
+  effect, `parseFailures` and `readFailures` separate invalid content from an
+  unreadable file, `fallbacks` counts imports that used the bundled defaults,
+  and `retries` counts refused rename attempts. All counters are cumulative for
+  the process lifetime.
+- `category` is `permission` for `EPERM` and `EACCES`, `busy` for `EBUSY`, and
+  `other` for anything else. `exhausted` marks the attempt that ended the
+  write, so a retry that later succeeds emits only `exhausted=false` events.
+
+`createConfigMetrics` and `createImportRecorder` live in
+`app/config/config-metrics.ts` and `app/config/config-observability.ts`. Both
+take their sink as a parameter, so a test can assert the exact text and
+counters without Electron. A seeded migration that could not be written is
+recorded as `origin=seeded-unsaved`; it applies in memory, but the counter line
+and the record do not claim a completed migration.
+
 ### Reloadability classification
 
 Every configuration key must have a reloadability classification:
