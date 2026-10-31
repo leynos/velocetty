@@ -23,6 +23,7 @@ import {z} from 'zod';
 import {isNumber, isObject, isString} from '@shared/types/guards';
 import type {JsonValue} from '@shared/types/json';
 import {parseJson5StrictWithSchema, stringifyJson5} from '@shared/config/json5-config';
+import {resolveConfigLocations} from '@shared/config/config-tree';
 
 /** Branded type for plugin specifiers (e.g., 'hyper-plugin', '@scope/plugin@1.0.0') */
 type PluginSpecifier = string & {readonly __brand: 'PluginSpecifier'};
@@ -107,13 +108,6 @@ const npmRegistryResponseSchema = z.object({
 
 type NpmRegistryResponse = z.infer<typeof npmRegistryResponseSchema>;
 
-type ApplicationDirectoryInput = {
-  readonly appData: string | undefined;
-  readonly env: Pick<CliApiEnvironment, 'XDG_CONFIG_HOME'>;
-  readonly homeDirectory: string;
-  readonly platform: NodeJS.Platform;
-};
-
 type ConfigPathInput = {
   readonly appData: string | undefined;
   readonly env: Pick<CliApiEnvironment, 'NODE_ENV' | 'XDG_CONFIG_HOME'>;
@@ -181,8 +175,6 @@ const packageName = (value: string): PackageName => {
   return value as PackageName;
 };
 
-const configFileName = 'config.json5';
-const legacyConfigFileName = 'hyper.json';
 const currentModuleDirectory = path.dirname(fileURLToPath(import.meta.url));
 
 const getPlatformPath = (platform: NodeJS.Platform) => (platform === 'win32' ? path.win32 : path.posix);
@@ -237,25 +229,19 @@ const normalizeConfiguredAppData = (appData: string | undefined): string | undef
   return appData.trim() ? appData : undefined;
 };
 
-// If the user defines XDG_CONFIG_HOME they definitely want their config there,
-// otherwise use the home directory in linux/mac and userdata in windows.
-const resolveApplicationDirectory = ({appData, env, homeDirectory, platform}: ApplicationDirectoryInput): string => {
-  const platformPath = getPlatformPath(platform);
-  const configuredXdgConfigHome = env.XDG_CONFIG_HOME;
-  if (configuredXdgConfigHome) {
-    return platformPath.join(configuredXdgConfigHome, 'Hyper');
-  }
-
-  if (platform === 'win32') {
-    return platformPath.join(
-      normalizeConfiguredAppData(appData) ?? platformPath.join(homeDirectory, 'AppData', 'Roaming'),
-      'Hyper'
-    );
-  }
-
-  return platformPath.join(homeDirectory, '.config', 'Hyper');
-};
-
+/**
+ * Resolves the CLI's active `config.json5` with the shared resolver.
+ *
+ * The CLI is on the `@shared` side of the package boundary, so it cannot import
+ * the app copy. KB-PATH-2 keeps the two resolvers identical. Its relation to
+ * the main process's inputs differs only in what it can observe:
+ *
+ * - the development flag is `NODE_ENV !== 'production'`;
+ * - the development directory is the repository root relative to this module;
+ * - `APPDATA` stands in for Electron's `appData`, with a home-based default.
+ *
+ * These differences are recorded in `docs/tracking-issues.md`.
+ */
 const resolveConfigPath = ({
   appData,
   env,
@@ -265,36 +251,26 @@ const resolveConfigPath = ({
   platform
 }: ConfigPathInput): string => {
   const platformPath = getPlatformPath(platform);
-  const applicationDirectory = resolveApplicationDirectory({
-    appData,
-    env,
+  const appDataDirectory =
+    normalizeConfiguredAppData(appData) ?? platformPath.join(homeDirectory, 'AppData', 'Roaming');
+
+  const locations = resolveConfigLocations({
+    platform,
+    xdgConfigHome: env.XDG_CONFIG_HOME,
     homeDirectory,
-    platform
+    appDataDirectory,
+    hyperUserDataDirectory: platformPath.join(appDataDirectory, 'Hyper'),
+    development: {
+      enabled: env.NODE_ENV !== 'production',
+      directory: platformPath.join(moduleDirectory, '..')
+    },
+    probe: (candidate) => (fsModule.existsSync(candidate) ? 'present' : 'absent'),
+    // The CLI's narrow filesystem slice cannot call `realpath`, so identical
+    // joined paths are the strongest equality it can establish.
+    sameFile: (left, right) => left === right
   });
-  const devConfigFileName = platformPath.join(moduleDirectory, '..', configFileName);
-  const devLegacyConfigFileName = platformPath.join(moduleDirectory, '..', legacyConfigFileName);
 
-  if (env.NODE_ENV !== 'production') {
-    if (fsModule.existsSync(devConfigFileName)) {
-      return devConfigFileName;
-    }
-
-    if (fsModule.existsSync(devLegacyConfigFileName)) {
-      return devLegacyConfigFileName;
-    }
-  }
-
-  const configPath = platformPath.join(applicationDirectory, configFileName);
-  if (fsModule.existsSync(configPath)) {
-    return configPath;
-  }
-
-  const legacyConfigPath = platformPath.join(applicationDirectory, legacyConfigFileName);
-  if (fsModule.existsSync(legacyConfigPath)) {
-    return legacyConfigPath;
-  }
-
-  return configPath;
+  return locations.config.path;
 };
 
 const pluginNameSchema = z.string().refine((value) => value.trim().length > 0, {

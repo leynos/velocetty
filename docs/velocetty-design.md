@@ -772,6 +772,17 @@ export interface Keybinding {
 
 
 
+The interface above is the runtime model, not the stored format.
+`keybindings.json5` stores the map recorded in
+[ADR 007](adr-007-keybindings-json5-storage.md): a JSON5 object whose keys are
+command identifiers and whose values are one shortcut string or an array of
+them. The map is the format every consumer already expects, so loading is a
+plain merge with no adapter. It evolves additively: a later version may widen
+each array element to `{keys, when?, args?}` for roadmap `4.2.1`, without
+invalidating existing files. Shortcut syntax is Mousetrap's, which is why the
+stored strings look like `ctrl+shift+p` and `meta+shift+p`; chords and
+layout-independent key names arrive with the `4.2.1` parser.
+
 Key string format:
 
 
@@ -839,6 +850,15 @@ Deterministic resolution rules:
 
 
 
+Implemented layering today is narrower. Roadmap `3.2.1` delivered
+`core defaults → user overrides → legacy decorateKeymaps hooks`, with a
+verified last-known-good rule for user overrides. Plugin defaults do not yet
+take part in resolution, built-in defaults currently beat plugin defaults, and
+a legacy `decorateKeymaps` hook runs last. The full precedence rules above,
+including conflict detection, belong to roadmap `4.2.1`. The components
+involved, and where the verified boundary sits, are described in
+[Configuration architecture](configuration-architecture.md).
+
 Conflict detection:
 
 
@@ -865,7 +885,8 @@ The editor provides:
 
 - Reset a command binding to default.
 
-- Export/import as JSON5.
+- Export/import as JSON5, in the storage format of
+  [ADR 007](adr-007-keybindings-json5-storage.md).
 
 
 
@@ -882,6 +903,8 @@ The editor is itself driven by commands:
 - `keybindings.resetToDefault`
 
 - `keybindings.export`
+
+- `keybindings.import`
 
 
 
@@ -926,6 +949,47 @@ product name):
 *Table 2: Proposed config locations.\*
 
 
+
+### Implemented storage and resolution (roadmap 3.2.1)
+
+The paths above were delivered by roadmap `3.2.1` as
+[ADR 008](adr-008-velocetty-configuration-directory.md). The Velocetty tree is
+created at start-up. `keybindings.json5` lives there, except that a development
+build with an active development-mode `config.json5` or `hyper.json` keeps it
+beside that file.
+
+- The Velocetty tree is `$XDG_CONFIG_HOME/Velocetty` when `XDG_CONFIG_HOME` is
+  set to an absolute path, on any platform; otherwise `~/.config/Velocetty` on
+  Linux and macOS, and `%APPDATA%\Velocetty` on Windows. An empty or relative
+  `XDG_CONFIG_HOME` is ignored. On Linux the directory name is case-sensitive.
+- `config.json5` resolves in this order: a development-mode file beside the
+  build output, `Velocetty/config.json5`, then the legacy Hyper tree
+  (`config.json5`, then `hyper.json`). When none exists it is created in the
+  Velocetty tree. When both trees hold one, the Velocetty copy wins and a
+  notification names the ignored copy.
+- The Hyper tree remains readable and is never used for a new configuration
+  file. A Hyper-tree `schema.json` is refreshed only if it already exists.
+
+Storage format, per [ADR 007](adr-007-keybindings-json5-storage.md), is the
+Hyper-compatible map: command identifier to one shortcut string or an array of
+them. `[]` unbinds a command's default, `{}` resets the file, and `$schema` is
+validated as a string and then ignored. Import and export are verbatim:
+validation never rewrites the user's text, so comments and formatting survive.
+Canonical text is written only when the file is first created.
+
+Error behaviour follows "last known good". A missing file means "no overrides".
+An invalid or unreadable file changes nothing: the shortcuts in effect stay in
+effect, and a notification carries the first structured diagnostic. Before
+anything has been accepted, the overrides are empty, so the platform defaults
+apply. A reload never writes; only start-up may create the file.
+
+Migration copies a successfully parsed `config.json5.keymaps` into a new
+`keybindings.json5` once, at start-up, when that file is missing. It never
+writes `config.json5`. Once `keybindings.json5` exists, the legacy key is
+ignored with a notification. If `config.json5` fails to parse, migration is
+deferred to a later start rather than seeding an empty file. Deleting
+`keybindings.json5` while legacy keymaps remain therefore re-seeds on the next
+start; the users' guide documents `{}` as the way to reset.
 
 ### Layering rules
 
@@ -2235,9 +2299,9 @@ section, and
 
 
 
-- \[ ] 3.1. JSON5 config loader, schema validation, and diagnostics.
+- \[x] 3.1. JSON5 config loader, schema validation, and diagnostics.
 
-- \[ ] 3.2. Keybindings stored and loaded from `keybindings.json5`.
+- \[x] 3.2. Keybindings stored and loaded from `keybindings.json5`.
 
 - \[ ] 3.3. Command palette UI.
 

@@ -1,0 +1,4 @@
+{
+  $schema: 'https://velocetty.example/keybindings.schema.json',
+  'window:new': 'ctrl+n',
+}

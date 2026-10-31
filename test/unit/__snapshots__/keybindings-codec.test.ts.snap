@@ -1,0 +1,44 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`output contracts serializes the canonical document exactly 1`] = `
+"// Velocetty keybindings: command ids mapped to a shortcut string or an array of shortcuts.
+// An empty array unbinds a command.
+
+{
+  'pane:split': [],
+  'window:close': 'ctrl+w',
+  'window:new': [
+    'ctrl+n',
+    'ctrl+shift+n',
+  ],
+}
+"
+`;
+
+exports[`output contracts reports representative validation diagnostics exactly 1`] = `
+[
+  {
+    "message": "Expected a non-empty shortcut string or an array of non-empty shortcut strings.",
+    "path": "/window:new",
+    "suggestedFix": "Set the command to a shortcut such as 'ctrl+n', or to [] to unbind it.",
+  },
+  {
+    "message": "Invalid command identifier "": it must be non-empty and carry no leading or trailing whitespace.",
+    "path": "/",
+    "suggestedFix": "Remove the surrounding whitespace or rename the command.",
+  },
+  {
+    "message": "Expected a non-empty shortcut string or an array of non-empty shortcut strings.",
+    "path": "/window:close",
+    "suggestedFix": "Set the command to a shortcut such as 'ctrl+n', or to [] to unbind it.",
+  },
+]
+`;
+
+exports[`output contracts reports a syntax error with a normalised source position 1`] = `
+{
+  "message": "JSON5: invalid end of input at 1:15",
+  "path": "<source>:1:15",
+  "suggestedFix": "Fix the JSON5 syntax (for example, commas, quotes, or braces) and retry.",
+}
+`;

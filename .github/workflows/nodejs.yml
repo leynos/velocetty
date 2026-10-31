@@ -49,6 +49,31 @@ jobs:
       - name: Spelling
         if: runner.os == 'Linux'
         run: make spelling
+      - name: Install Dafny and Z3 for LemmaScript
+        if: runner.os == 'Linux'
+        run: |
+          dotnet tool install --global dafny --version 4.11.0
+          # The NuGet tool ships no solver, so Dafny fails with "Z3 is not
+          # found" on a clean runner. It looks for `z3/bin/z3-4.12.1` beside
+          # its own executable and otherwise for `z3` on `PATH`; provide both.
+          z3_zip="$RUNNER_TEMP/z3.zip"
+          curl -fsSL -o "$z3_zip" \
+            https://github.com/Z3Prover/z3/releases/download/z3-4.12.1/z3-4.12.1-x64-glibc-2.35.zip
+          # The release publishes no checksum file, so the digest below was
+          # recorded from the pinned asset. Checking it keeps a swapped or
+          # truncated archive from running as the solver behind `make prove`.
+          echo "c5360fd157b0f861ec8780ba3e51e2197e9486798dc93cd878df69a4b0c2b7c5  $z3_zip" |
+            sha256sum --check --strict -
+          unzip -q "$z3_zip" -d "$RUNNER_TEMP/z3-release"
+          mkdir -p "$HOME/.dotnet/tools/z3/bin"
+          install -m 0755 \
+            "$RUNNER_TEMP/z3-release/z3-4.12.1-x64-glibc-2.35/bin/z3" \
+            "$HOME/.dotnet/tools/z3/bin/z3"
+          ln -sf z3 "$HOME/.dotnet/tools/z3/bin/z3-4.12.1"
+          # `$GITHUB_PATH` only affects later steps, which is why this and the
+          # prove step are separate.
+          echo "$HOME/.dotnet/tools/z3/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
       - name: Set up isolated Rust for Merman
         if: runner.os == 'Linux'
         run: rustup toolchain install 1.95.0 --profile minimal
@@ -96,6 +121,12 @@ jobs:
           TMP: ${{ runner.temp }}
           TEMP: ${{ runner.temp }}
           npm_config_tmp: ${{ runner.temp }}
+      - name: Prove LemmaScript contracts
+        if: runner.os == 'Linux'
+        # `make prove` needs the pinned `lsc` from `node_modules`, so it runs
+        # after the install steps; a bare `bunx lsc` would fetch the unrelated
+        # npm package of that name.
+        run: make prove
       - name: Install libarchive-tools
         if: runner.os == 'Linux'
         run: |

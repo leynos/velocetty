@@ -1,26 +1,91 @@
+/** @file Composition root: resolves the config tree and wires import, keybindings, and reload. */
+/*
+ * This module owns the process-wide configuration state. It resolves the
+ * active Velocetty or development tree, builds the keybindings store and
+ * service over that path, imports every configuration source, and re-runs the
+ * import whenever a watched file changes. The adapters it constructs take
+ * filesystem, clock, and notification dependencies as parameters, so the
+ * modules below it stay testable without Electron.
+ */
+
 import {app} from 'electron';
 
 import chokidar from 'chokidar';
+import {mkdirpSync} from 'fs-extra';
+import path from 'node:path';
 
 import type {parsedConfig, configOptions} from '@shared/types/config';
 import {isJsonObject} from './utils/runtime-guards';
 
+import {createConfigMetrics} from './config/config-metrics';
+import {createImportRecorder} from './config/config-observability';
+import {formatKeymapsMarker, isE2ERun, type E2EKeymapStatus} from './config/e2e-keymap-probe';
 import {createConfigImportModule} from './config/import';
+import {shouldAnnounceReload, type ConfigImportReport} from './config/import-report';
 import {_init} from './config/init';
+import {createKeybindingsService} from './config/keybindings';
+import {createFileKeybindingsStore} from './config/keybindings-store';
 import _openConfig from './config/open';
-import {cfgPath, cfgDir, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath} from './config/paths';
+import {
+  cfgPath,
+  cfgDir,
+  defaultCfg,
+  defaultPlatformKeyPath,
+  keybindingsPath,
+  keybindingsSchemaFile,
+  keybindingsSchemaPath,
+  plugs,
+  schemaFile,
+  schemaPath,
+  shadowedConfigPaths,
+  velocettyDir
+} from './config/paths';
 import notify from './notify';
 import {getColorMap} from './utils/colours';
+import {createConfigWatcher, type WatcherEvent, type WatcherHandle} from './config/watcher';
+
+const metrics = createConfigMetrics();
+
+const recorder = createImportRecorder({
+  metrics,
+  sink: {info: (line) => console.info(line), warn: (line) => console.warn(line)}
+});
+
+const keybindingsStore = createFileKeybindingsStore({filePath: keybindingsPath, onRetry: recorder.recordRenameRetry});
+const keybindingsService = createKeybindingsService({notify, store: keybindingsStore});
 
 const {_import, getDefaultConfig} = createConfigImportModule({
   _init,
+  keybindings: {reload: keybindingsService.reload, start: keybindingsService.start},
   notify,
-  paths: {cfgDir, cfgPath, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath}
+  paths: {
+    cfgDir,
+    cfgPath,
+    defaultCfg,
+    defaultPlatformKeyPath,
+    keybindingsDir: path.dirname(keybindingsPath),
+    keybindingsPath,
+    keybindingsSchemaFile,
+    keybindingsSchemaPath,
+    plugs,
+    schemaFile,
+    schemaPath,
+    shadowedConfigPaths,
+    velocettyDir
+  }
 });
+
+/** Imports keybindings text verbatim; the active keymaps change on the next reload. */
+export const importKeybindings = keybindingsService.importKeybindings;
+
+/** Reports the stored keybindings text without writing, notifying, or changing state. */
+export const exportKeybindings = keybindingsService.exportKeybindings;
+
+const CONFIG_DEBOUNCE_MS = 100;
 
 const watchers: Function[] = [];
 let cfg: parsedConfig | undefined;
-let _watcher: chokidar.FSWatcher | undefined;
+let configWatcher: {readonly close: () => Promise<void>} | undefined;
 
 const getCurrentConfig = (): parsedConfig => {
   if (cfg === undefined) {
@@ -53,36 +118,93 @@ const checkDeprecatedConfig = () => {
   notify('Configuration warning', `Your configuration uses some deprecated CSS classes (${deprecatedStr})`);
 };
 
+const emitE2EMarker = (line: string) => {
+  if (isE2ERun()) {
+    console.log(line);
+  }
+};
+
+/** Maps the import report onto the keymap status the E2E lane asserts on. */
+const keymapStatus = (report: ConfigImportReport): E2EKeymapStatus =>
+  report.keybindings === 'applied' ? 'applied' : 'kept';
+
+/** Reports the probe binding the E2E lane asserts on after every reload. */
+const emitKeymapsMarker = (report: ConfigImportReport) => {
+  emitE2EMarker(formatKeymapsMarker(keymapStatus(report), getCurrentConfig().keymaps));
+};
+
+/** Wraps chokidar in the adapter the watcher debounces over. */
+const createChokidarHandle = (directories: readonly string[]): WatcherHandle => {
+  const watcher = chokidar.watch([...directories], {depth: 0, ignoreInitial: true});
+  const on = (event: WatcherEvent, listener: (eventPath: string) => void) => {
+    switch (event) {
+      case 'add': {
+        watcher.on('add', listener);
+        break;
+      }
+      case 'change': {
+        watcher.on('change', listener);
+        break;
+      }
+      case 'unlink': {
+        watcher.on('unlink', listener);
+        break;
+      }
+    }
+  };
+
+  return {
+    close: async () => watcher.close(),
+    on,
+    onError: (listener) => {
+      // SAFETY: chokidar's error event emits the error as its only argument.
+      watcher.on('error', (error: unknown) => listener(error));
+    },
+    onReady: (listener) => {
+      watcher.on('ready', listener);
+    }
+  };
+};
+
+/** Starts the configuration watcher once; later calls are no-ops. */
 const _watch = () => {
-  if (_watcher !== undefined) {
+  if (configWatcher !== undefined) {
     return;
   }
 
-  const onChange = () => {
-    // Need to wait 100ms to ensure that write is complete
-    setTimeout(() => {
-      cfg = _import();
-      notify('Configuration updated', 'Hyper configuration reloaded!');
+  const watchedDirectories = [
+    ...new Set([path.dirname(cfgPath), path.dirname(keybindingsPath)].map((directory) => path.resolve(directory)))
+  ];
+
+  configWatcher = createConfigWatcher<ReturnType<typeof setTimeout>>({
+    cancel: (timer) => clearTimeout(timer),
+    debounceMs: CONFIG_DEBOUNCE_MS,
+    fileNames: [path.resolve(cfgPath), path.resolve(keybindingsPath)],
+    handle: createChokidarHandle(watchedDirectories),
+    onReady: () => emitE2EMarker('[e2e] config-watcher-ready'),
+    onReload: () => {
+      const {config, keybindings: outcome, report} = _import('reload');
+      cfg = config;
+      // One bounded record per reload attempt, whether it applied, fell back,
+      // or kept the previous keymaps and suppressed the user-facing notice.
+      const announced = shouldAnnounceReload(report);
+      recorder.recordImport({announced, outcome, phase: 'reload', report});
+      if (announced) {
+        notify('Configuration updated', 'Configuration reloaded!');
+      }
       watchers.forEach((fn) => {
         fn();
       });
       checkDeprecatedConfig();
-    }, 100);
-  };
-
-  _watcher = chokidar.watch(cfgPath);
-  _watcher.on('change', onChange);
-  _watcher.on('error', (error) => {
-    console.error('error watching config', error);
+      emitKeymapsMarker(report);
+    },
+    schedule: (callback, delayMs) => setTimeout(callback, delayMs)
   });
 
   app.on('before-quit', () => {
-    const watcher = _watcher;
-    if (watcher && Object.keys(watcher.getWatched()).length > 0) {
-      watcher.close().catch((error) => {
-        console.warn(error);
-      });
-    }
+    configWatcher?.close().catch((error) => {
+      console.warn(error);
+    });
   });
 };
 
@@ -154,9 +276,19 @@ export const getKeymaps = () => {
 };
 
 export const setup = () => {
-  cfg = _import();
+  // The Velocetty tree holds new configuration files, so it must exist before
+  // the importer copies schemas or seeds `keybindings.json5` into it.
+  mkdirpSync(velocettyDir);
+  const {config, keybindings: outcome, report} = _import('startup');
+  cfg = config;
+  // Start-up never shows "Configuration updated", so the record states that
+  // rather than leaving the field absent.
+  recorder.recordImport({announced: false, outcome, phase: 'startup', report});
   _watch();
   checkDeprecatedConfig();
+  emitE2EMarker(`[e2e] keybindings-path ${keybindingsPath}`);
+  emitE2EMarker(`[e2e] config-path ${cfgPath}`);
+  emitKeymapsMarker(report);
 };
 
 export {get as getWin, recordState as winRecord, defaults as windowDefaults} from './config/windows';

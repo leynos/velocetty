@@ -116,6 +116,123 @@ and resolution paths are not yet defined.
 - Documentation updated in `docs/developers-guide.md`.
 - `make lint` and `make test` remain green.
 
+## CONFIG-003 Align application and CLI configuration-tree inputs
+
+Status: Open  
+Owner: TBD  
+Last updated: 2026-10-30
+
+### CONFIG-003 summary
+
+- The configuration-tree rules are shared between the application
+  (`app/config/config-tree.ts`) and the CLI
+  (`shared/src/config/config-tree.ts`), and a parity test covers the pure
+  function. The inputs they are given still differ.
+- The CLI derives the legacy Hyper tree as `<appData>/Hyper` by string join,
+  whereas the application passes Electron's `userData` path.
+- The CLI compares candidate trees with string equality, because its narrow
+  filesystem slice cannot call `realpath`. The application can, so a symlinked
+  dotfiles configuration can resolve differently.
+- The CLI treats any `NODE_ENV` other than `production` as development mode,
+  whereas the application uses `electron-is-dev`.
+- The CLI's filesystem probe is two-state (`present` or `absent`), so a dangling
+  symlink looks absent. The application's probe is three-state and reports a
+  broken link as present, so an intentionally dangling managed file is not
+  silently shadowed.
+- Recorded as a known risk in
+  [ADR 008](adr-008-velocetty-configuration-directory.md).
+
+### CONFIG-003 exit criteria
+
+- The CLI receives `realpath`-capable comparison, or both sides document why
+  string equality is sufficient.
+- Broken-link handling is either shared or explicitly documented as an
+  application-only guarantee.
+- Development-mode detection has a single definition used by both sides.
+- Tests cover a symlinked tree and a dangling symlink on both sides.
+
+## CONFIG-004 Rename the Electron `userData` directory away from `Hyper`
+
+Status: Open  
+Owner: TBD  
+Last updated: 2026-10-30
+
+### CONFIG-004 summary
+
+- Velocetty now reads and writes configuration under a Velocetty-named tree, but
+  `app/package.json` still sets `"productName": "Hyper"`, so Electron and
+  `electron-store` continue to use `<appData>/Hyper` as `userData`.
+- That directory holds application state, not configuration: window layout,
+  `Preferences`, caches, and the `config.json` that `electron-store` writes.
+  Roadmap item `3.2.1` deliberately left it alone.
+- On Linux the Hyper tree and `userData` are the same directory, so the two
+  concepts are easy to confuse in support discussions.
+- Changing `productName` renames the directory and would strand existing
+  application state unless a migration is written.
+
+### CONFIG-004 exit criteria
+
+- `productName` names Velocetty, and `userData` resolves to a Velocetty-named
+  directory on every platform.
+- A one-time migration moves or imports existing application state without
+  losing window layout or preferences.
+- The users' guide and
+  [ADR 008](adr-008-velocetty-configuration-directory.md) are updated.
+
+## KEYMAP-001 Align plugin keybinding precedence with the design
+
+Status: Open  
+Owner: TBD  
+Last updated: 2026-10-30
+
+### KEYMAP-001 summary
+
+- The design orders keybinding precedence as user bindings, then
+  plugin-contributed defaults, then core defaults (`docs/velocetty-design.md`,
+  §Resolution and precedence).
+- The implementation differs in two ways. `mergeRuntimePluginKeybindings`
+  spreads runtime plugin keybindings first and the resolved keymaps second
+  (`app/runtime/plugin-runtime.ts`), so core defaults beat plugin defaults.
+  Legacy `decorateKeymaps` hooks then run after user overrides
+  (`app/plugins.ts`), so a plugin can change or remove a user's binding.
+- [ADR 007](adr-007-keybindings-json5-storage.md) records this as a known
+  limitation. Roadmap item `4.2.1` owns the full precedence rules.
+- Users are told about the `decorateKeymaps` effect in the
+  [users' guide](users-guide.md).
+
+### KEYMAP-001 exit criteria
+
+- Plugin defaults outrank core defaults, and user bindings outrank both.
+- `when`-scoped resolution and conflict detection follow the design.
+- An end-to-end or integration test pins the precedence order.
+- The limitation is removed from ADR 007 and the users' guide.
+
+## KEYMAP-002 Classify the `keymaps` key for reloadability
+
+Status: Open  
+Owner: TBD  
+Last updated: 2026-10-30
+
+### KEYMAP-002 summary
+
+- `getKeyScope` in `app/config/reloadability-registry.ts` and in
+  `shared/src/constants/config-reloadability.ts` recognizes a keymap key through
+  `KEYMAP_KEYS = new Set(['keymap'])`.
+- The configuration key is `keymaps`, plural. A `keymaps` change in
+  `config.json5` is therefore classified as `profile` scope rather than
+  `keymap` scope, and falls back to the fail-safe `restart` classification.
+- Today keybindings live in `keybindings.json5`, which has its own watcher and
+  reload path, so the mismatch has no user-visible effect. It would matter to
+  the legacy `keymaps` key and to any future consumer of the scope helper.
+- Both copies are mirrored, so a fix must change both and keep the parity test
+  green.
+
+### KEYMAP-002 exit criteria
+
+- The keymap key set matches the configuration key, in both copies.
+- A unit test asserts the scope of `keymaps` and of an unknown profile key.
+- `docs/developers-guide.md` describes the scope helper without the mismatch.
+
 ## WINARM64-001 Track Windows aarch64 CI enablement after Bun support lands
 
 Status: Open  

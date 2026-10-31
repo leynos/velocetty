@@ -21,6 +21,7 @@
     ".terraform/**",
     ".uv-cache/**",
     "memories/**",
-    "CRUSH.md"
+    "CRUSH.md",
+    "**/*.dfy.gen"
   ]
 }

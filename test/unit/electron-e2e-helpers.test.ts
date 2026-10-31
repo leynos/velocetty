@@ -5,11 +5,11 @@ import path from 'node:path';
 import {expect, test} from 'bun:test';
 import type {ConsoleMessage} from 'playwright';
 
+import {removeDirectoryWithRetry} from '../e2e/cleanup-retry';
 import {
   createIsolatedE2EEnvironment,
   extractRendererErrorMessage,
   isNonCriticalRendererError,
-  removeDirectoryWithRetry,
   readActiveTerminalBuffer,
   resolveLaunchConfig,
   startRendererConsoleMonitor,

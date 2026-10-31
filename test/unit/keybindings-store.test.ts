@@ -1,0 +1,411 @@
+/** @file KB-STORE-1: atomic, non-destructive writes through the file adapter. */
+import {afterEach, describe, expect, mock, test} from 'bun:test';
+
+import * as fs from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+
+import type {KeybindingsStore} from '../../app/config/keybindings';
+import type {KeybindingsFileSystem, RenameRetryEvent} from '../../app/config/keybindings-store';
+import {createFileKeybindingsStore} from '../../app/config/keybindings-store';
+
+const FILE_NAME = 'keybindings.json5';
+const TEMPORARY_PREFIX = `.${FILE_NAME}.`;
+
+type FaultPoint = 'open' | 'write' | 'fsync' | 'chmod' | 'rename';
+
+const FAULT_POINTS: readonly FaultPoint[] = ['open', 'write', 'fsync', 'chmod', 'rename'];
+
+/** A real `node:fs` surface that tests can override one operation at a time. */
+const realFileSystem = (): KeybindingsFileSystem => ({...fs});
+
+/** Replaces exactly the operation named by the fault point. */
+const FAULT_OVERRIDES: Readonly<Record<FaultPoint, (fail: () => never) => KeybindingsFileSystem>> = {
+  chmod: (fail) => ({...realFileSystem(), chmodSync: fail}),
+  fsync: (fail) => ({...realFileSystem(), fsyncSync: fail}),
+  open: (fail) => ({...realFileSystem(), openSync: fail}),
+  rename: (fail) => ({...realFileSystem(), renameSync: fail}),
+  write: (fail) => ({...realFileSystem(), writeSync: fail})
+};
+
+const workspaces: string[] = [];
+
+const createWorkspace = (): string => {
+  const workspace = fs.mkdtempSync(path.join(tmpdir(), 'velocetty-keybindings-store-'));
+  workspaces.push(workspace);
+  return workspace;
+};
+
+afterEach(() => {
+  for (const workspace of workspaces.splice(0)) {
+    fs.rmSync(workspace, {recursive: true, force: true});
+  }
+});
+
+const errorWithCode = (code: string): NodeJS.ErrnoException => Object.assign(new Error(code), {code});
+
+const temporaryNames = (directory: string): readonly string[] =>
+  fs.readdirSync(directory).filter((name) => name.startsWith(TEMPORARY_PREFIX) && name.endsWith('.tmp'));
+
+const targetPathIn = (workspace: string): string => path.join(workspace, FILE_NAME);
+
+/** Each link's recorded target, so a test can prove the links survived intact. */
+const linkTargetsOf = (linkPaths: readonly string[]): readonly string[] =>
+  linkPaths.map((linkPath) => {
+    expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(true);
+    return fs.readlinkSync(linkPath);
+  });
+
+/** A store over a dangling `keybindings.json5`, with one filesystem operation replaced. */
+const danglingLinkStoreWith = (overrides: Partial<KeybindingsFileSystem>) => {
+  const workspace = createWorkspace();
+  const realPath = path.join(workspace, 'dotfiles-keybindings.json5');
+  const linkPath = targetPathIn(workspace);
+  fs.symlinkSync(path.basename(realPath), linkPath);
+  const store = createFileKeybindingsStore({filePath: linkPath, fs: {...realFileSystem(), ...overrides}});
+  return {linkPath, realPath, store, workspace};
+};
+
+/** Asserts a write was refused and left every link, the target, and the directory untouched. */
+const expectRefusedWrite = ({
+  linkPaths,
+  store,
+  workspace
+}: Readonly<{linkPaths: readonly string[]; store: KeybindingsStore; workspace: string}>): void => {
+  const targetsBefore = linkTargetsOf(linkPaths);
+  expect(store.write('{}').kind).toBe('failed');
+  expect(linkTargetsOf(linkPaths)).toEqual(targetsBefore);
+  expect(temporaryNames(workspace)).toEqual([]);
+};
+
+/**
+ * Builds a real `node:fs` surface in which exactly one operation throws.
+ *
+ * Every other operation is the genuine one, so a fault test exercises the
+ * adapter's real open/write/fsync/chmod/rename sequence rather than a
+ * handwritten imitation of it.
+ */
+const faultingFileSystem = (point: FaultPoint, code = 'EIO') => {
+  const reached: FaultPoint[] = [];
+  const fail = (): never => {
+    reached.push(point);
+    throw errorWithCode(code);
+  };
+  return {fileSystem: FAULT_OVERRIDES[point](fail), reached};
+};
+
+/** Fails the first `failures` renames with `code`, then delegates. */
+const transientRenameFileSystem = (failures: number, code: string) => {
+  let attempts = 0;
+  const fileSystem: KeybindingsFileSystem = {
+    ...realFileSystem(),
+    renameSync: (from, to) => {
+      attempts += 1;
+      if (attempts <= failures) {
+        throw errorWithCode(code);
+      }
+      fs.renameSync(from, to);
+    }
+  };
+  return {fileSystem, attempts: () => attempts};
+};
+
+/** Prepares a store over an existing target whose first renames fail with `code`. */
+const setupRenameFailure = (failures: number, code: string) => {
+  const workspace = createWorkspace();
+  const filePath = targetPathIn(workspace);
+  fs.writeFileSync(filePath, 'previous', 'utf8');
+  const {fileSystem, attempts} = transientRenameFileSystem(failures, code);
+  const sleep = mock((_milliseconds: number) => {});
+  const events: RenameRetryEvent[] = [];
+  const store = createFileKeybindingsStore({
+    filePath,
+    fs: fileSystem,
+    onRetry: (event) => {
+      events.push(event);
+    },
+    sleep
+  });
+  return {attempts, events, filePath, sleep, store, workspace};
+};
+
+describe('atomic keybindings file store', () => {
+  test('reads a present file, a missing file, and an unreadable file', () => {
+    const workspace = createWorkspace();
+    const filePath = targetPathIn(workspace);
+    const store = createFileKeybindingsStore({filePath});
+
+    expect(store.read()).toEqual({kind: 'missing'});
+
+    fs.writeFileSync(filePath, `{'window:new': 'ctrl+n'}`, 'utf8');
+    expect(store.read()).toEqual({kind: 'present', text: `{'window:new': 'ctrl+n'}`});
+
+    const unreadable = createFileKeybindingsStore({
+      filePath,
+      fs: {
+        ...realFileSystem(),
+        readFileSync: () => {
+          throw errorWithCode('EACCES');
+        }
+      }
+    });
+    expect(unreadable.read().kind).toBe('unreadable');
+  });
+
+  test('writes the replacement bytes and preserves the target mode', () => {
+    const workspace = createWorkspace();
+    const filePath = targetPathIn(workspace);
+    fs.writeFileSync(filePath, '{}', 'utf8');
+    fs.chmodSync(filePath, 0o640);
+    const store = createFileKeybindingsStore({filePath});
+
+    expect(store.write(`{'window:new': 'ctrl+n'}`)).toEqual({kind: 'written'});
+
+    expect(fs.readFileSync(filePath, 'utf8')).toBe(`{'window:new': 'ctrl+n'}`);
+    if (process.platform !== 'win32') {
+      // Windows models only the read-only bit, so the POSIX mode round trip
+      // is asserted where it is meaningful.
+      expect(fs.statSync(filePath).mode & 0o777).toBe(0o640);
+    }
+    expect(temporaryNames(workspace)).toEqual([]);
+  });
+
+  test('creates a missing file', () => {
+    const workspace = createWorkspace();
+    const store = createFileKeybindingsStore({filePath: targetPathIn(workspace)});
+
+    expect(store.write('{}')).toEqual({kind: 'written'});
+    expect(fs.readFileSync(targetPathIn(workspace), 'utf8')).toBe('{}');
+  });
+
+  test('keeps a symlink and replaces the file it points at', () => {
+    const workspace = createWorkspace();
+    const realPath = path.join(workspace, 'dotfiles-keybindings.json5');
+    const linkPath = targetPathIn(workspace);
+    fs.writeFileSync(realPath, '{}', 'utf8');
+    fs.symlinkSync(path.basename(realPath), linkPath);
+    const store = createFileKeybindingsStore({filePath: linkPath});
+
+    expect(store.write(`{'window:new': 'ctrl+n'}`)).toEqual({kind: 'written'});
+
+    expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(true);
+    expect(fs.readlinkSync(linkPath)).toBe(path.basename(realPath));
+    expect(fs.readFileSync(realPath, 'utf8')).toBe(`{'window:new': 'ctrl+n'}`);
+    expect(temporaryNames(workspace)).toEqual([]);
+  });
+
+  test('creates the target of a dangling symlink instead of replacing the link', () => {
+    const workspace = createWorkspace();
+    const realPath = path.join(workspace, 'dotfiles-keybindings.json5');
+    const linkPath = targetPathIn(workspace);
+    fs.symlinkSync(path.basename(realPath), linkPath);
+    const store = createFileKeybindingsStore({filePath: linkPath});
+
+    expect(store.read()).toEqual({kind: 'missing'});
+    expect(store.write(`{'window:new': 'ctrl+n'}`)).toEqual({kind: 'written'});
+
+    expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(true);
+    expect(fs.readlinkSync(linkPath)).toBe(path.basename(realPath));
+    expect(fs.readFileSync(realPath, 'utf8')).toBe(`{'window:new': 'ctrl+n'}`);
+    expect(temporaryNames(workspace)).toEqual([]);
+  });
+
+  test('follows a dangling link through an intermediate link to the missing target', () => {
+    const workspace = createWorkspace();
+    const realPath = path.join(workspace, 'nested', 'dotfiles-keybindings.json5');
+    const intermediatePath = path.join(workspace, 'intermediate.json5');
+    const linkPath = targetPathIn(workspace);
+    fs.mkdirSync(path.dirname(realPath));
+    fs.symlinkSync(path.join('nested', 'dotfiles-keybindings.json5'), intermediatePath);
+    fs.symlinkSync(path.basename(intermediatePath), linkPath);
+    const store = createFileKeybindingsStore({filePath: linkPath});
+
+    expect(store.write('{}')).toEqual({kind: 'written'});
+
+    expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(true);
+    expect(fs.lstatSync(intermediatePath).isSymbolicLink()).toBe(true);
+    expect(fs.readFileSync(realPath, 'utf8')).toBe('{}');
+  });
+
+  test('refuses a dangling chain longer than the hop limit without replacing a link', () => {
+    const workspace = createWorkspace();
+    // One link more than the adapter's 40-hop bound, ending at a missing file.
+    const linkPaths = [
+      targetPathIn(workspace),
+      ...Array.from({length: 40}, (_, index) => path.join(workspace, `hop-${index + 1}.json5`))
+    ];
+    for (const [index, linkPath] of linkPaths.entries()) {
+      const next = linkPaths[index + 1] ?? path.join(workspace, 'missing-target.json5');
+      fs.symlinkSync(path.relative(workspace, next), linkPath);
+    }
+    const store = createFileKeybindingsStore({filePath: linkPaths[0]});
+
+    expectRefusedWrite({linkPaths, store, workspace});
+
+    expect(fs.existsSync(path.join(workspace, 'missing-target.json5'))).toBe(false);
+  });
+
+  test('refuses a symlink cycle without replacing a link', () => {
+    const workspace = createWorkspace();
+    const linkPath = targetPathIn(workspace);
+    const otherPath = path.join(workspace, 'other.json5');
+    fs.symlinkSync(path.basename(otherPath), linkPath);
+    fs.symlinkSync(path.basename(linkPath), otherPath);
+    const store = createFileKeybindingsStore({filePath: linkPath});
+
+    expectRefusedWrite({linkPaths: [linkPath, otherPath], store, workspace});
+  });
+
+  const unresolvableCases: readonly Readonly<{
+    description: string;
+    overrides: Partial<KeybindingsFileSystem>;
+  }>[] = [
+    {
+      description: 'the link target cannot be read',
+      overrides: {
+        readlinkSync: () => {
+          throw errorWithCode('EACCES');
+        }
+      }
+    },
+    {
+      description: 'the path cannot be inspected',
+      overrides: {
+        lstatSync: () => {
+          throw errorWithCode('EACCES');
+        }
+      }
+    }
+  ];
+
+  for (const {description, overrides} of unresolvableCases) {
+    test(`fails closed when ${description}`, () => {
+      const {linkPath, realPath, store, workspace} = danglingLinkStoreWith(overrides);
+
+      expectRefusedWrite({linkPaths: [linkPath], store, workspace});
+
+      expect(fs.existsSync(realPath)).toBe(false);
+    });
+  }
+
+  for (const point of FAULT_POINTS) {
+    test(`reports failure and preserves the previous bytes when ${point} fails`, () => {
+      const workspace = createWorkspace();
+      const filePath = targetPathIn(workspace);
+      fs.writeFileSync(filePath, 'previous', 'utf8');
+      const {fileSystem, reached} = faultingFileSystem(point);
+      const store = createFileKeybindingsStore({filePath, fs: fileSystem});
+
+      const outcome = store.write('replacement');
+
+      expect(outcome.kind).toBe('failed');
+      expect(reached).toEqual([point]);
+      expect(fs.readFileSync(filePath, 'utf8')).toBe('previous');
+      expect(temporaryNames(workspace)).toEqual([]);
+    });
+  }
+
+  test('reports a failed temporary-file creation without touching the target', () => {
+    const workspace = createWorkspace();
+    const filePath = targetPathIn(workspace);
+    fs.writeFileSync(filePath, 'previous', 'utf8');
+    const {fileSystem} = faultingFileSystem('open', 'EACCES');
+    const store = createFileKeybindingsStore({filePath, fs: fileSystem});
+
+    expect(store.write('replacement').kind).toBe('failed');
+
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('previous');
+    expect(temporaryNames(workspace)).toEqual([]);
+  });
+
+  // Windows models only a read-only attribute, and a POSIX rename over a
+  // read-only file still succeeds when the directory is writable, so the
+  // refusal is asserted where it is meaningful. Root bypasses POSIX permission
+  // bits, so `accessSync(W_OK)` succeeds there too.
+  const cannotModelReadOnly = process.platform === 'win32' || process.getuid?.() === 0;
+  test.skipIf(cannotModelReadOnly)('refuses a read-only target before creating anything', () => {
+    const workspace = createWorkspace();
+    const filePath = targetPathIn(workspace);
+    fs.writeFileSync(filePath, 'previous', 'utf8');
+    fs.chmodSync(filePath, 0o444);
+    const store = createFileKeybindingsStore({filePath});
+
+    const outcome = store.write('replacement');
+
+    expect(outcome.kind).toBe('failed');
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('previous');
+    expect(temporaryNames(workspace)).toEqual([]);
+  });
+
+  test('retries a transient rename failure and succeeds', () => {
+    const {attempts, events, filePath, sleep, store, workspace} = setupRenameFailure(2, 'EBUSY');
+
+    expect(store.write('replacement')).toEqual({kind: 'written'});
+
+    expect(attempts()).toBe(3);
+    expect(sleep).toHaveBeenCalledTimes(2);
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('replacement');
+    expect(temporaryNames(workspace)).toEqual([]);
+    // Each refusal is reported, but a retry that later succeeds was not a
+    // failed write, so no event claims exhaustion.
+    expect(events).toEqual([
+      {attempt: 1, category: 'busy', exhausted: false},
+      {attempt: 2, category: 'busy', exhausted: false}
+    ]);
+  });
+
+  test('gives up after five transient rename failures', () => {
+    const {attempts, events, filePath, sleep, store, workspace} = setupRenameFailure(Number.POSITIVE_INFINITY, 'EPERM');
+
+    expect(store.write('replacement').kind).toBe('failed');
+
+    expect(attempts()).toBe(5);
+    expect(sleep).toHaveBeenCalledTimes(4);
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('previous');
+    expect(temporaryNames(workspace)).toEqual([]);
+    // Exactly one event marks the end, and it is the last attempt.
+    expect(events.map((event) => event.attempt)).toEqual([1, 2, 3, 4, 5]);
+    expect(events.map((event) => event.exhausted)).toEqual([false, false, false, false, true]);
+    expect(new Set(events.map((event) => event.category))).toEqual(new Set(['permission']));
+  });
+
+  test('does not retry a permanent rename failure', () => {
+    const {attempts, events, sleep, store, workspace} = setupRenameFailure(1, 'ENOENT');
+
+    expect(store.write('replacement').kind).toBe('failed');
+
+    expect(attempts()).toBe(1);
+    expect(sleep).not.toHaveBeenCalled();
+    expect(temporaryNames(workspace)).toEqual([]);
+    // An unrecognized errno is reported as `other` and ends the write at once.
+    expect(events).toEqual([{attempt: 1, category: 'other', exhausted: true}]);
+  });
+
+  test('categorizes a refused permission rename as permission', () => {
+    const {events, store} = setupRenameFailure(Number.POSITIVE_INFINITY, 'EACCES');
+
+    expect(store.write('replacement').kind).toBe('failed');
+
+    // EACCES is transient on Windows and shares the `permission` category with
+    // EPERM, so the two cannot be told apart from the counter alone.
+    expect(new Set(events.map((event) => event.category))).toEqual(new Set(['permission']));
+  });
+
+  test('removes only its own stale temporary files', () => {
+    const workspace = createWorkspace();
+    const filePath = targetPathIn(workspace);
+    const ownStale = path.join(workspace, `${TEMPORARY_PREFIX}4242.0.tmp`);
+    const ownOther = path.join(workspace, `${TEMPORARY_PREFIX}4242.1.tmp`);
+    const foreign = path.join(workspace, '.other.json5.1.2.tmp');
+    fs.writeFileSync(ownStale, 'stale', 'utf8');
+    fs.writeFileSync(ownOther, 'stale', 'utf8');
+    fs.writeFileSync(foreign, 'foreign', 'utf8');
+    const store = createFileKeybindingsStore({filePath});
+
+    store.removeStaleTemporaryFiles();
+
+    expect(fs.existsSync(ownStale)).toBe(false);
+    expect(fs.existsSync(ownOther)).toBe(false);
+    expect(fs.existsSync(foreign)).toBe(true);
+  });
+});
