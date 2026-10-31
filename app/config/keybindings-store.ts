@@ -112,10 +112,21 @@ const defaultSleep = (milliseconds: number): void => {
  * Creates the filesystem adapter behind `KeybindingsStore`.
  *
  * Writes go to a temporary sibling and are renamed into place, so a reader
- * never sees a half-written file. A target that is a symlink, a directory, or
- * otherwise unresolvable is refused rather than replaced. Filesystem, sleep,
- * and warning dependencies are injectable so tests can exercise each failure
- * path without touching the real disk.
+ * never sees a half-written file. A symlinked target is resolved first, so the
+ * replacement lands on what the link points at and the link itself survives,
+ * including when the chain currently dangles. What is refused before anything
+ * is created is a target that cannot safely be replaced: a symlink cycle, a
+ * chain longer than the supported hop bound, a read-only target, or a
+ * resolution failure of any other kind.
+ *
+ * Not every inspection failure is fatal. A directory target can look writable,
+ * so it fails later, when the rename cannot replace it. A failed `statSync`
+ * only means the existing mode is unknown, so the temporary file takes the
+ * default mode. Stale temporary-file cleanup is best-effort and reports its
+ * failures as warnings.
+ *
+ * Filesystem, sleep, and warning dependencies are injectable so tests can
+ * exercise each failure path without touching the real disk.
  *
  * @example
  * ```ts

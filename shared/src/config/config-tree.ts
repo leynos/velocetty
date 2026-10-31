@@ -151,7 +151,9 @@ export const resolveConfigLocations = (input: ConfigLocationInput): ConfigLocati
   const velocettyDirectory = resolveVelocettyDirectory(input, paths);
   const hyperDirectory = resolveHyperDirectory(input, paths);
   const candidates = listCandidates(input, paths, velocettyDirectory, hyperDirectory);
+  /** A candidate that exists, even as a dangling symlink, is not shadowed. */
   const isPresent = (candidate: Candidate) => input.probe(candidate.path) !== 'absent';
+  /** The first candidate in priority order that exists, or `-1` if none does. */
   const activeIndex = candidates.findIndex((candidate) => isPresent(candidate));
   const activeCandidate = activeIndex === -1 ? undefined : candidates[activeIndex];
 

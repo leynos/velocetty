@@ -126,6 +126,7 @@ type ConfigParseOptions<T> = {
   readonly diagnosticHints: Record<string, {docHint?: string; defaultHint?: string}>;
 };
 
+/** Parses one source with the shared JSON5 helper and the caller's schema. */
 const parseConfigSource = <T>(source: ConfigSource, options: ConfigParseOptions<T>) =>
   parseJson5WithSchemaDiagnostics({
     raw: source.rawContent,
@@ -136,6 +137,7 @@ const parseConfigSource = <T>(source: ConfigSource, options: ConfigParseOptions<
     diagnosticHints: options.diagnosticHints
   });
 
+/** Parses a configuration payload, falling back to `null` on invalid input. */
 const parseRawConfig = (source: ConfigSource) =>
   parseConfigSource(source, {
     schema: rawConfigSchema,
@@ -152,6 +154,7 @@ const stringifyConfig = (config: rawConfig): string => {
   return stringifyJson5(config);
 };
 
+/** Whether the opt-in start-up trace is enabled for this process. */
 const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPORT === '1';
 
 /**

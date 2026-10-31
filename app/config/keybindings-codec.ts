@@ -64,12 +64,14 @@ type DiagnosticSpec = {
   readonly suggestedFix: string;
 };
 
+/** Builds one diagnostic from the three fields every caller supplies. */
 const diagnostic = ({message, path, suggestedFix}: DiagnosticSpec): configValidationDiagnostic => ({
   message,
   path,
   suggestedFix
 });
 
+/** The diagnostic for a document whose root is not an object. */
 const rootDiagnostic = (sourceLabel: string): configValidationDiagnostic =>
   diagnostic({
     message: 'Expected a JSON5 object mapping command ids to shortcuts.',

@@ -55,6 +55,7 @@ export const createConfigWatcher = <TimerHandle>(options: ConfigWatcherOptions<T
   let pendingTimer: TimerHandle | undefined;
   let isClosed = false;
 
+  /** Cancels the queued reload, if one is waiting for the debounce to elapse. */
   const cancelPending = () => {
     if (pendingTimer === undefined) {
       return;
@@ -63,6 +64,7 @@ export const createConfigWatcher = <TimerHandle>(options: ConfigWatcherOptions<T
     pendingTimer = undefined;
   };
 
+  /** Runs one reload, keeping a thrown failure from silencing later events. */
   const reload = () => {
     pendingTimer = undefined;
     if (isClosed) {
@@ -77,6 +79,7 @@ export const createConfigWatcher = <TimerHandle>(options: ConfigWatcherOptions<T
     }
   };
 
+  /** Debounces one watched-file event into a single scheduled reload. */
   const onFileEvent = (eventPath: string) => {
     if (isClosed || !watchedPaths.has(path.resolve(eventPath))) {
       return;

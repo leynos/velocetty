@@ -871,6 +871,46 @@ design and the notification the user sees.
     keybindings *schema* copy inside `ensureSchemaFile`; a query cannot seed
     `keybindings.json5`, because it never starts the keybindings service.
 
+- [x] (2026-10-31 17:55Z) Repair round for the review of `7a84078d`, the first
+  head that included the fallback-cause and thrown-reload work.
+  - [x] Lint: the four `deslop(no-conditional-empty-object-spread)` findings
+    were repaired by building each record first and assigning the optional
+    field only when it is known, which keeps `exactOptionalPropertyTypes`
+    satisfied without assigning `undefined`.
+  - [x] Tests: `config-import-keybindings-json5.test.ts` now expects
+    `configCause: 'read'` after the harness deletes the Hyper tree.
+  - [x] Docstrings: the remaining bare helpers in the changed modules gained
+    comments — the chokidar event adapter, both configuration-tree
+    `isPresent`/`activeIndex` pairs, the importer's parse helpers and debug
+    flag, the codec's diagnostic builders, and the watcher's cancel, reload,
+    and event handlers.
+  - [x] Developer Documentation: the plan's current-context section still said
+    the repository had no property tests or proofs, listed the three-OS CI run
+    as remaining work, and described `_import()` as still loading
+    `keybindings.json5` through the earlier module. All three now describe the
+    delivered state, with the property-test and proof paths named.
+  - Observation: `make test` runs with `--concurrent --isolate`, so ad-hoc
+    multi-file `bun test` runs without `--isolate` report cross-file module
+    mock interference that the repository target does not have.
+- [x] (2026-10-31 19:20Z) Repair round for the two inline findings in the
+  review of `7a84078d` (comments `4432694147` and `4432694151`).
+  - [x] `app/config.ts`: the guarded region now covers only the
+    `_import('reload')` call. `reloadFromWatcher` was deleted and
+    `reloadConfiguration` is passed as `onReload`, so a throwing subscriber or
+    deprecated-CSS check after a successful import can no longer fabricate an
+    import-failure record that contradicts the decision record just written.
+  - [x] `app/config/keybindings-store.ts`: the `createFileKeybindingsStore`
+    docstring now states the real contract — a symlinked target, dangling
+    links included, is resolved so the link survives; cycles, over-long
+    chains, read-only targets, and unresolvable targets are refused before
+    anything is created; directory targets fail at the rename; a `statSync`
+    failure only means an unknown mode; and stale-file cleanup only warns.
+  - Gate evidence: the first gate run straddled the edit and reported seven
+    `ReferenceError: reloadFromWatcher is not defined` failures from the
+    intermediate save, so it was discarded rather than treated as a defect.
+    The re-run on the frozen tree passed all eight gates, with `make test` at
+    717 pass / 0 fail.
+
 ## Surprises & discoveries
 
 - Observation: `typos.toml` is generated from a shared dictionary fetched from
@@ -1575,10 +1615,12 @@ Retrospective findings:
   blank-line-separated lines. This stage added normal paragraphs beside the
   damaged ones; repairing the file is a separate, mechanical change.
 
-Remaining work, all recorded outside this plan's acceptance: the CI end-to-end
-run on three operating systems (`Progress`, EP-E E4), plugin precedence
+Remaining work, all recorded outside this plan's acceptance: plugin precedence
 (`KEYMAP-001`), the `keymaps` scope mismatch (`KEYMAP-002`), the resolver-input
-divergence (`CONFIG-003`), and the `userData` name (`CONFIG-004`).
+divergence (`CONFIG-003`), the `userData` name (`CONFIG-004`), and the importer
+and keybindings-service split from their adapters (`KEYMAP-003`). The three-OS
+CI end-to-end lane is no longer remaining work: EP-E E4 records green runs on
+`fc9a184e` and `eada2f0e`.
 
 ## Context and orientation
 
@@ -1598,16 +1640,19 @@ CLI (`cli/api.ts` `resolveConfigPath`) computes the same Hyper paths
 independently, for plugin commands.
 
 Start-up (`setup()` in `app/config.ts`) and every reload call `_import()` from
-`createConfigImportModule` (`app/config/import.ts`). Today `_import()` does the
+`createConfigImportModule` (`app/config/import.ts`). `_import()` does the
 following:
 
-1. Creates the plugin directories and copies the configuration schema.
+1. On start-up only, creates the plugin directories and copies both JSON
+   schemas into the configuration trees; a reload writes nothing.
 2. Loads the bundled defaults, and writes `config.json5` from them if it is
    missing.
 3. Reads `app/keymaps/<platform>.json` into the defaults.
-4. Loads `config.json5`, falling back to defaults on error.
-5. Loads `keybindings.json5` through the earlier delivery's module,
-   bootstrapping it if missing.
+4. Loads `config.json5`, falling back to defaults on error and recording the
+   bounded cause (`parse` or `read`).
+5. Drives the keybindings service: `start()` seeds or reads
+   `keybindings.json5`, `reload()` only reads it, and both report the outcome
+   as applied, kept with a basis and cause, or unchanged.
 6. Calls `_init` (`app/config/init.ts`), which computes
    `keymaps: mapKeys({...defaultCfg.keymaps, ...userCfg.keymaps})`. A user
    entry therefore replaces the default for that command.
@@ -1658,8 +1703,15 @@ Terms used in this plan:
 
 Tests run with `bun test --concurrent --isolate test/unit` through `make test`.
 Per-test temporary directories and injected dependencies are the norm
-(`docs/developers-guide.md` §Unit tests (Bun)). The repository has no property
-tests or proofs yet.
+(`docs/developers-guide.md` §Unit tests (Bun)). The repository now carries the
+property tests and proofs this plan added:
+`test/unit/keybindings-codec.property.test.ts`,
+`test/unit/keybindings-service.property.test.ts`,
+`test/unit/keybindings-service.model.test.ts`,
+`test/unit/config-watcher.property.test.ts`,
+`test/unit/config-keymap-layering.property.test.ts`, and
+`app/config/keybindings-policy.dfy` with its generated `.dfy.gen`, checked by
+`bin/prove.sh`.
 
 The fast end-to-end lane, `bun run test:e2e:fast`, launches Electron with an
 isolated home directory (`test/e2e/electron-e2e-helpers.ts`

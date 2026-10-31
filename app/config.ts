@@ -137,6 +137,7 @@ const emitKeymapsMarker = (report: ConfigImportReport) => {
 /** Wraps chokidar in the adapter the watcher debounces over. */
 const createChokidarHandle = (directories: readonly string[]): WatcherHandle => {
   const watcher = chokidar.watch([...directories], {depth: 0, ignoreInitial: true});
+  /** Subscribes one listener to a single chokidar event name. */
   const on = (event: WatcherEvent, listener: (eventPath: string) => void) => {
     switch (event) {
       case 'add': {
@@ -172,9 +173,20 @@ const createChokidarHandle = (directories: readonly string[]): WatcherHandle => 
  *
  * One bounded record is emitted per reload attempt, whether it applied, fell
  * back, or kept the previous keymaps and suppressed the user-facing notice.
+ * A thrown import produces no per-file outcomes, so it gets its own bounded
+ * failure record and counter instead. Only the import is guarded: a subscriber
+ * that throws afterwards must not fabricate an import failure.
  */
 const reloadConfiguration = () => {
-  const {config, keybindings: outcome, report} = _import('reload');
+  let imported: ReturnType<typeof _import>;
+  try {
+    imported = _import('reload');
+  } catch (error) {
+    recorder.recordImportFailure({cause: 'thrown', phase: 'reload'});
+    // The watcher still owns the warning and the decision to keep watching.
+    throw error;
+  }
+  const {config, keybindings: outcome, report} = imported;
   cfg = config;
   const announced = shouldAnnounceReload(report);
   recorder.recordImport({announced, outcome, phase: 'reload', report});
@@ -186,23 +198,6 @@ const reloadConfiguration = () => {
   });
   checkDeprecatedConfig();
   emitKeymapsMarker(report);
-};
-
-/**
- * Records a thrown reload, then lets the watcher report it as it always has.
- *
- * A thrown import produces no per-file outcomes, so it gets its own bounded
- * failure record and counter rather than a decision record that would have to
- * invent them. The error is rethrown so the watcher keeps owning the warning
- * and the decision to keep watching.
- */
-const reloadFromWatcher = () => {
-  try {
-    reloadConfiguration();
-  } catch (error) {
-    recorder.recordImportFailure({cause: 'thrown', phase: 'reload'});
-    throw error;
-  }
 };
 
 /** Starts the configuration watcher once; later calls are no-ops. */
@@ -222,7 +217,7 @@ const _watch = () => {
     handle: createChokidarHandle(watchedDirectories),
     onReady: () => emitE2EMarker('[e2e] config-watcher-ready'),
     /** Re-imports on a debounced change; the watcher catches whatever it throws. */
-    onReload: reloadFromWatcher,
+    onReload: reloadConfiguration,
     schedule: (callback, delayMs) => setTimeout(callback, delayMs)
   });
 
