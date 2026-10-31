@@ -74,12 +74,17 @@ export function observeKeybindings(state: KeybindingsState, observation: Keybind
     case 'missing': {
       return {state: {lastAccepted: emptyUserKeymaps()}, status: 'applied', usedLastKnownGood: false};
     }
-    default: {
-      // `invalid` and `unreadable` both keep the prior state. The flag records
-      // whether a last-known-good payload backed that fallback.
+    case 'invalid':
+    case 'unreadable': {
+      // Both keep the prior state. The flag records whether a last-known-good
+      // payload backed that fallback.
       return {state, status: 'kept', usedLastKnownGood: state.lastAccepted !== null};
     }
   }
+  // Exhaustiveness guard: dead code today, but a new observation kind makes
+  // this assignment a type error instead of silently taking the fallback.
+  const unreachable: never = observation;
+  return unreachable;
 }
 
 /**
@@ -137,10 +142,14 @@ export function specLatestAccepted(history: KeybindingsObservation[]): UserKeyma
     case 'missing': {
       return emptyUserKeymaps();
     }
-    default: {
+    case 'invalid':
+    case 'unreadable': {
       return specLatestAccepted(history.slice(0, lastIndex));
     }
   }
+  // Exhaustiveness guard: a new kind must be handled rather than searched.
+  const unreachable: never = last;
+  return unreachable;
 }
 
 /**
@@ -267,12 +276,16 @@ export function decideBootstrap(input: BootstrapInput): BootstrapDecision {
     case 'freshly-created': {
       return {kind: 'seed', keymaps: emptyUserKeymaps()};
     }
-    default: {
-      // `parsed-invalid` and `fell-back` defer: a transient legacy parse
-      // failure must not seed an empty file that blocks a later migration.
+    case 'parsed-invalid':
+    case 'fell-back': {
+      // Both defer: a transient legacy parse failure must not seed an empty
+      // file that blocks a later migration.
       return {kind: 'defer'};
     }
   }
+  // Exhaustiveness guard: a new legacy source kind cannot defer silently.
+  const unreachable: never = legacy;
+  return unreachable;
 }
 
 /** Whether a bootstrap observation is `null`, meaning nothing is applied. */
@@ -297,10 +310,15 @@ export function specObservationKeymaps(observation: KeybindingsObservation | nul
     case 'valid': {
       return observation.keymaps;
     }
-    default: {
+    case 'missing':
+    case 'invalid':
+    case 'unreadable': {
       return emptyUserKeymaps();
     }
   }
+  // Exhaustiveness guard: a new kind cannot map to the empty map silently.
+  const unreachable: never = observation;
+  return unreachable;
 }
 
 /**

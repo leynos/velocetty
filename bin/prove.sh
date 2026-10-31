@@ -116,7 +116,9 @@ check_forbidden_trust_constructs() {
   ((${#dafny_files[@]} > 0)) || return 0
 
   local matches
-  matches="$(grep -nE '(^|[^[:alnum:]_])(assume)([^[:alnum:]_]|$)|\{:verify false\}|\{:axiom\}' "${dafny_files[@]}" || true)"
+  # Dafny accepts whitespace around an attribute's colon and name, so the
+  # axiom pattern must too; otherwise `{:axiom }` would slip past the guard.
+  matches="$(grep -nE '(^|[^[:alnum:]_])(assume)([^[:alnum:]_]|$)|\{[[:space:]]*:[[:space:]]*verify[[:space:]]+false[[:space:]]*\}|\{[[:space:]]*:[[:space:]]*axiom[[:space:]]*\}' "${dafny_files[@]}" || true)"
   if [[ -n "$matches" ]]; then
     # `emptyUserKeymaps` is the single admitted axiom; every other trust
     # construct makes the proof vacuous.

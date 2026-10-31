@@ -123,6 +123,8 @@ const EXTERNAL_COMMANDS: readonly fc.Arbitrary<fc.Command<Model, Real>>[] = [
 type StartModelResult = {
   readonly decisionKind: ReturnType<typeof decideBootstrap>['kind'];
   readonly observation: KeybindingsObservation | null;
+  /** Whether a seed decision's write actually reached the modelled file. */
+  readonly seedWritten: boolean;
 };
 
 /** Applies the bootstrap decision to the model, mirroring the verified policy. */
@@ -131,10 +133,10 @@ const applyStartCommand = (model: Model, legacy: LegacyKeymapsSource): StartMode
   const fileState = model.file.kind === 'text' ? 'present' : model.file.kind;
   const decision = decideBootstrap({file: fileState, legacy});
   if (decision.kind === 'defer') {
-    return {decisionKind: decision.kind, observation: null};
+    return {decisionKind: decision.kind, observation: null, seedWritten: false};
   }
   if (decision.kind === 'write-nothing') {
-    return {decisionKind: decision.kind, observation: observationFromFile(model.file)};
+    return {decisionKind: decision.kind, observation: observationFromFile(model.file), seedWritten: false};
   }
 
   const shouldFailWrite = model.pendingWriteFailure;
@@ -143,16 +145,22 @@ const applyStartCommand = (model: Model, legacy: LegacyKeymapsSource): StartMode
   if (!shouldFailWrite) {
     model.file = {kind: 'text', text: serializeKeybindings(decision.keymaps)};
   }
-  return {decisionKind: decision.kind, observation: {keymaps: decision.keymaps, kind: 'valid'}};
+  return {
+    decisionKind: decision.kind,
+    observation: {keymaps: decision.keymaps, kind: 'valid'},
+    seedWritten: !shouldFailWrite
+  };
 };
 
 /** States the outcome the service must report for the modelled start. */
 const expectStartOutcome = (
   outcome: ReturnType<Real['service']['start']>,
-  {decisionKind, observation}: StartModelResult
+  {decisionKind, observation, seedWritten}: StartModelResult
 ): void => {
   if (decisionKind === 'seed') {
-    expect(outcome).toMatchObject({kind: 'applied', origin: 'seeded'});
+    // A seed that could not be written still applies in memory, but it is not
+    // reported as a completed migration.
+    expect(outcome).toMatchObject({kind: 'applied', origin: seedWritten ? 'seeded' : 'seeded-unsaved'});
     return;
   }
   if (observation?.kind === 'valid') {

@@ -64,6 +64,19 @@ describe('start', () => {
     expect(store.writtenTexts()).toEqual([serializeKeybindings({})]);
   });
 
+  test('reports an unsaved seed when the write fails', () => {
+    const {calls, service, store} = setup();
+    store.failNextWrite(new Error('disk full'));
+
+    const outcome = service.start({keymaps: KEYMAPS_A, kind: 'parsed-keymaps'});
+
+    // The shortcut set still takes effect for this session, but nothing reached
+    // the disk, so the origin distinguishes it from a completed migration.
+    expect(outcome).toEqual({keymaps: KEYMAPS_A, kind: 'applied', origin: 'seeded-unsaved'});
+    expect(store.writtenTexts()).toEqual([]);
+    expect(lastCall(calls)?.title).toContain("Couldn't create a keybindings file");
+  });
+
   test('defers an invalid legacy source without writing', () => {
     const {service, store} = setup();
 

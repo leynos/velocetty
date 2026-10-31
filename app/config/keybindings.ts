@@ -47,7 +47,15 @@ export type KeybindingsStore = {
 
 /** What a start or reload left in effect. */
 export type KeybindingsLoadOutcome =
-  | {readonly kind: 'applied'; readonly keymaps: UserKeymaps; readonly origin: 'file' | 'missing' | 'seeded'}
+  | {
+      readonly kind: 'applied';
+      readonly keymaps: UserKeymaps;
+      /**
+       * `seeded-unsaved` means the seed was applied in memory but the file
+       * could not be written, so nothing was migrated on disk.
+       */
+      readonly origin: 'file' | 'missing' | 'seeded' | 'seeded-unsaved';
+    }
   | {
       readonly kind: 'kept';
       readonly keymaps: UserKeymaps;
@@ -252,7 +260,13 @@ export const createKeybindingsService = (dependencies: {
     }
     lastShownDiagnostics = '';
     applyObservation(observation);
-    return {keymaps: exposedKeymaps(), kind: 'applied', origin: 'seeded'};
+    // The seed applies in memory either way, but only a written file counts as
+    // a completed migration; the importer must not announce one that failed.
+    return {
+      keymaps: exposedKeymaps(),
+      kind: 'applied',
+      origin: writeOutcome.kind === 'written' ? 'seeded' : 'seeded-unsaved'
+    };
   };
 
   const reload = (): KeybindingsLoadOutcome => readCurrentFile();

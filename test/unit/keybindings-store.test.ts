@@ -312,8 +312,10 @@ describe('atomic keybindings file store', () => {
 
   // Windows models only a read-only attribute, and a POSIX rename over a
   // read-only file still succeeds when the directory is writable, so the
-  // refusal is asserted where it is meaningful.
-  test.skipIf(process.platform === 'win32')('refuses a read-only target before creating anything', () => {
+  // refusal is asserted where it is meaningful. Root bypasses POSIX permission
+  // bits, so `accessSync(W_OK)` succeeds there too.
+  const cannotModelReadOnly = process.platform === 'win32' || process.getuid?.() === 0;
+  test.skipIf(cannotModelReadOnly)('refuses a read-only target before creating anything', () => {
     const workspace = createWorkspace();
     const filePath = targetPathIn(workspace);
     fs.writeFileSync(filePath, 'previous', 'utf8');

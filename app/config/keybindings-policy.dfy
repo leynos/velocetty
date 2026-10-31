@@ -27,7 +27,9 @@ function observeKeybindings(state: KeybindingsState, observation: KeybindingsObs
       ObservationResult(KeybindingsState(Some(i_observation_keymaps)), "applied", false)
     case missing =>
       ObservationResult(KeybindingsState(Some(emptyUserKeymaps())), "applied", false)
-    case _ =>
+    case invalid =>
+      ObservationResult(state, "kept", (match state.lastAccepted { case Some(i_) => true case None => false }))
+    case unreadable =>
       ObservationResult(state, "kept", (match state.lastAccepted { case Some(i_) => true case None => false }))
   }
 }
@@ -81,7 +83,9 @@ function specLatestAccepted(history: seq<KeybindingsObservation>): Option<UserKe
           Some(i_last_keymaps)
         case missing =>
           Some(emptyUserKeymaps())
-        case _ =>
+        case invalid =>
+          specLatestAccepted(history[0..lastIndex])
+        case unreadable =>
           specLatestAccepted(history[0..lastIndex])
       }
 }
@@ -129,7 +133,9 @@ function decideBootstrap(input: BootstrapInput): BootstrapDecision
         seed(emptyUserKeymaps())
       case freshly_created =>
         seed(emptyUserKeymaps())
-      case _ =>
+      case parsed_invalid =>
+        BootstrapDecision.defer
+      case fell_back =>
         BootstrapDecision.defer
     }
 }
@@ -176,7 +182,11 @@ function specObservationKeymaps(observation: Option<KeybindingsObservation>): Us
       match i_observation_val {
         case valid(i__observation_val_keymaps) =>
           i__observation_val_keymaps
-        case _ =>
+        case missing =>
+          emptyUserKeymaps()
+        case invalid =>
+          emptyUserKeymaps()
+        case unreadable =>
           emptyUserKeymaps()
       }
     case None =>

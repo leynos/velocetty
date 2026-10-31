@@ -85,6 +85,11 @@ export type ConfigImportHarnessOptions = {
    * tree, which owns `keybindings.json5` and every new file.
    */
   readonly hyperTree?: boolean;
+  /**
+   * Models a store whose writes always fail, so the importer sees an unsaved
+   * seed rather than a completed migration.
+   */
+  readonly failSeedWrite?: boolean;
 };
 
 const createMockPaths = (workspaceRoot: string, options: ConfigImportHarnessOptions): ConfigImportPaths => {
@@ -146,7 +151,11 @@ export const createConfigImportHarness = async (
     // Both schemas are bundled with the application, so the harness supplies
     // both; a missing one would make every import report a copy failure.
     writeFileSync(mockPaths.keybindingsSchemaPath, '{"title":"keybindings-schema"}', 'utf8');
-    const store = createFileKeybindingsStore({filePath: mockPaths.keybindingsPath, warn: warnMock});
+    const fileStore = createFileKeybindingsStore({filePath: mockPaths.keybindingsPath, warn: warnMock});
+    const store =
+      options.failSeedWrite === true
+        ? {...fileStore, write: () => ({kind: 'failed' as const, error: new Error('injected seed write failure')})}
+        : fileStore;
     const keybindings = createKeybindingsService({notify: notifyMock, store, warn: warnMock});
     const configModule = createConfigImportModule({
       _init: initMock,

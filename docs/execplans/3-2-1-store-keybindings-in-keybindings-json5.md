@@ -681,6 +681,41 @@ design and the notification the user sees.
     the two injected-failure cases are one parameterized loop. `cs review`
     reports 10.0 for both `test/unit/keybindings-store.test.ts` and
     `app/config/keybindings-store.ts`.
+- [x] (2026-10-31 02:55Z) Findings from CodeRabbit's formal review of
+  `eada2f0e` (12 inline comments). All twelve were verified against the current
+  tree and repaired.
+  - [x] Exhaustive union switches in the verified policy. A `default` branch
+    cannot carry a `never` guard in this module: explicit cases plus a
+    trailing `case _` make Dafny report "this branch is redundant", which is
+    fatal (`--allow-warnings` is false), and `void`, `satisfies`, and `throw`
+    either fail LemmaScript generation or turn the verified function into a
+    Dafny method. The working form handles every kind by name and places the
+    guard after the switch, which LemmaScript drops as unreachable and Dafny
+    accepts. `lsc check` reports 8 verified, 0 errors; the regenerated `.gen`
+    has no `case _` in the four switches.
+  - [x] Unsaved seed. A failed start-up write returned `origin: 'seeded'`, so
+    the importer announced a migration that never happened. The new
+    `seeded-unsaved` origin keeps the in-memory application and suppresses
+    the notice. Covered by a service example, the model test, and an importer
+    test over a harness store whose writes fail.
+  - [x] `bin/prove.sh` axiom guard now tolerates whitespace inside the
+    attribute (`{:axiom }`, `{ :axiom }`) for both `axiom` and
+    `verify false`, so the trust-construct check cannot be evaded by
+    formatting.
+  - [x] `generate-schema` now runs `generate-keybindings-schema.ts` before
+    `sync-shared-schema.mjs`, so `app/config/keybindings.schema.json` receives
+    the freshly generated schema in one run.
+  - [x] Documentation: ADR-008 records the development-mode exception for
+    `keybindings.json5`; `configuration-architecture.md` names the admitted
+    `emptyUserKeymaps` axiom and wraps its cross-link bullet; `users-guide.md`
+    drops the second-person wording and reflows its opening links.
+  - [x] `scripts/check-package-boundaries.mjs` classifies a clause with only
+    type bindings as type-only, matching this repository's
+    `verbatimModuleSyntax: false`, and accepts a two-argument dynamic import
+    so its specifier is inspected.
+  - [x] `test/testUtils/config-tree-domain.ts` names `'absolute'` and guards
+    the remainder with `never`; the read-only store test also skips under
+    uid 0, where POSIX permission bits do not model the refusal.
 
 ## Surprises & discoveries
 

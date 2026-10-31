@@ -75,6 +75,28 @@ test('seeds keybindings.json5 from legacy keymaps when the new file is missing',
   }
 });
 
+test('does not announce a completed migration when the seed write fails', async () => {
+  const harness = await createConfigImportHarness({failSeedWrite: true});
+  try {
+    writeDefaultSources(harness);
+    mkdirpSync(harness.mockPaths.cfgDir);
+    writeFileSync(harness.mockPaths.cfgPath, userConfigWithKeymaps(`{'window:close': 'ctrl+w'}`), 'utf8');
+
+    const {config, report} = harness._import('startup');
+
+    // The seed still applies in memory, so the session keeps the shortcuts...
+    expect(config.keymaps).toEqual({'window:close': ['ctrl+w']});
+    expect(report).toEqual({config: 'applied', keybindings: 'applied'});
+    // ...but nothing was migrated on disk, so only the failure is reported.
+    expect(existsSync(harness.mockPaths.keybindingsPath)).toBe(false);
+    const titles = harness.notifyMock.mock.calls.map((call) => call[0]);
+    expect(titles.some((title) => title.includes("Couldn't create a keybindings file"))).toBe(true);
+    expect(titles).not.toContain('Shortcuts moved to keybindings.json5');
+  } finally {
+    harness.cleanup();
+  }
+});
+
 test('keeps the last known good keymaps when the file becomes invalid', async () => {
   const harness = await createConfigImportHarness();
   try {

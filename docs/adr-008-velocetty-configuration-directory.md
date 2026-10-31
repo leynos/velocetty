@@ -74,8 +74,9 @@ Option A.
   If none exists, it is created in the Velocetty tree. A development-mode
   `config.json5` beside the application root (`dist/` for the application)
   takes precedence over both trees, as it does today.
-- `keybindings.json5`, and any later new configuration file, lives only in the
-  Velocetty tree.
+- `keybindings.json5`, and any later new configuration file, lives in the
+  Velocetty tree, except that an active development-mode `config.json5` or
+  `hyper.json` keeps it beside that development file.
 - No configuration file is created in the Hyper tree. The editor schema copy
   is refreshed there only if it already exists. Plugin directories follow the
   active `config.json5`, because they hold plugin state rather than

@@ -96,8 +96,12 @@ export const xdgValue = (state: XdgState, fixture: PlatformFixture): string | un
     case 'relative': {
       return 'rel';
     }
-    default: {
+    case 'absolute': {
       return fixture.absoluteXdg;
+    }
+    default: {
+      const unreachable: never = state;
+      throw new Error(`Unhandled XDG state: ${String(unreachable)}`);
     }
   }
 };

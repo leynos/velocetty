@@ -54,7 +54,7 @@ header comment and an empty object. Open it in any text editor, for example:
 code ~/.config/Velocetty/keybindings.json5
 ```
 
-There is not yet a menu entry or command that opens the file for you.
+No menu entry or command opens the file yet.
 
 ### Moving an existing configuration
 
@@ -140,7 +140,7 @@ is to reset.
 Save the file and Velocetty applies the change within a fraction of a second,
 without a restart. Unsaved edits do nothing.
 
-An invalid file never costs you working shortcuts:
+An invalid file never removes working shortcuts:
 
 - If `keybindings.json5` is invalid while Velocetty is running, the shortcuts
   already in effect stay in effect, and a notification names the first problem.
@@ -156,7 +156,7 @@ Fix the reported problem and save again; the next valid save is applied.
 Hyper kept shortcuts under the `keymaps` key of `config.json5`. On the first
 start after an upgrade, when `keybindings.json5` does not exist, Velocetty
 copies a valid `config.json5.keymaps` into the new file. It never writes to
-`config.json5`; its comments and formatting remain yours.
+`config.json5`; its comments and formatting remain unchanged.
 
 Once `keybindings.json5` exists, the legacy `keymaps` key is ignored and a
 notification says so. If `config.json5` cannot be parsed at start-up, migration

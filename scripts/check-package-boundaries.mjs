@@ -68,23 +68,57 @@ const extractStaticImportSpecifier = (node) => {
   return node.moduleSpecifier.text;
 };
 
+/** Whether an import clause binds anything that exists at runtime. */
+const hasValueImportBinding = (clause) => {
+  if (clause.name !== undefined) {
+    return true;
+  }
+
+  if (clause.namedBindings === undefined) {
+    return false;
+  }
+
+  if (ts.isNamespaceImport(clause.namedBindings)) {
+    return true;
+  }
+
+  return clause.namedBindings.elements.some((element) => !element.isTypeOnly);
+};
+
+/** Whether an export clause re-exports anything that exists at runtime. */
+const hasValueExportBinding = (node) => {
+  if (node.exportClause === undefined || ts.isNamespaceExport(node.exportClause)) {
+    return true;
+  }
+
+  return node.exportClause.elements.some((element) => !element.isTypeOnly);
+};
+
 /**
- * Reports whether a static import or re-export survives compilation.
+ * Reports whether a static import or re-export is erased at compile time.
  *
- * Only a clause-level `import type` (or `export type`) is erased outright.
- * `import {type A} from 'x'` is not: `verbatimModuleSyntax` keeps the
- * statement as `import {} from 'x'`, which still resolves `x` at runtime.
+ * `verbatimModuleSyntax` is off in every build here, so a clause that binds
+ * only types is erased whether or not the clause itself says `type`:
+ * `import type {A} from 'x'` and `import {type A} from 'x'` both disappear.
+ * A mixed clause such as `import {type A, b} from 'x'` keeps a runtime import
+ * for `b`, so only clauses with no value binding count as type-only.
  */
 const isTypeOnlyStaticImportOrExport = (node) => {
   if (ts.isImportDeclaration(node)) {
-    return node.importClause?.isTypeOnly === true;
+    const clause = node.importClause;
+    return clause !== undefined && (clause.isTypeOnly || !hasValueImportBinding(clause));
   }
 
-  return ts.isExportDeclaration(node) && node.isTypeOnly;
+  return ts.isExportDeclaration(node) && (node.isTypeOnly || !hasValueExportBinding(node));
 };
 
+// `import('x')` and `import('x', {with: {type: 'json'}})` are both dynamic
+// imports; only the first argument names the module.
 const isDynamicImportCall = (node) =>
-  ts.isCallExpression(node) && node.arguments.length === 1 && node.expression.kind === ts.SyntaxKind.ImportKeyword;
+  ts.isCallExpression(node) &&
+  node.arguments.length > 0 &&
+  node.arguments.length <= 2 &&
+  node.expression.kind === ts.SyntaxKind.ImportKeyword;
 
 const isCommonJsRequireCall = (node) =>
   ts.isCallExpression(node) &&

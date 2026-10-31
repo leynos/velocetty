@@ -168,9 +168,10 @@ _Table 2: Where each claim is checked._
 `make prove` runs `bin/prove.sh`. It refuses a vacuous success: it fails on an
 empty file list, on an entry whose timeout exceeds 60 seconds (`lsc` would
 silently downgrade those to generation checks), and on `extern` calls, which it
-treats as axioms. `app/config/keybindings-policy.dfy.gen` is regenerated
-deterministically from the TypeScript source and is additions-only; auditing
-the diff shows that the verified model still matches the shipped code.
+treats as axioms. The one admitted axiom is `emptyUserKeymaps`, accepted only
+on its exact declaration line. `app/config/keybindings-policy.dfy.gen` is
+regenerated deterministically from the TypeScript source and is additions-only;
+auditing the diff shows that the verified model still matches the shipped code.
 
 Everything below the policy line is trusted-but-tested. The adapters are the
 only code allowed to touch Electron, `node:fs`, or real time, which is why each
