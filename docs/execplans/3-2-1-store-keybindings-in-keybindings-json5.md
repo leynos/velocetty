@@ -684,6 +684,14 @@ design and the notification the user sees.
 
 ## Surprises & discoveries
 
+- Observation: `typos.toml` is generated from a shared dictionary fetched from
+  a mutable upstream ref, so an unrelated dictionary update can appear as a
+  local diff at any time. Evidence: `make spelling` refreshed that file on
+  2026-10-31, adding tokio attribute patterns and dropping the old word-boundary
+  `flavor` rule while the keybindings work was unchanged. Impact: the refresh
+  is committed separately (`41ca168d`) with its own rationale, so the feature
+  commits stay focused; AGENTS.md's preferred separate base pull request would
+  need a merge this assignment does not authorize.
 - Observation: a `dafny` installed as a dotnet tool is commonly a symlink on
   `PATH`, and Dafny looks for Z3 beside the real executable, not beside the
   link. Evidence: `~/.local/bin/dafny` resolves to `~/.dotnet/tools/dafny`, and
