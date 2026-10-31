@@ -62,6 +62,10 @@ const seededFreshFile = (outcome: KeybindingsLoadOutcome): boolean =>
 const keptExistingFile = (outcome: KeybindingsLoadOutcome): boolean =>
   outcome.kind === 'applied' && outcome.origin === 'file';
 
+/** True when start-up left the legacy keymaps where they were, pending a fix. */
+const deferredMigration = (outcome: KeybindingsLoadOutcome): boolean =>
+  outcome.kind === 'kept' && outcome.cause === 'deferred';
+
 /** Maps a service outcome onto the report vocabulary. */
 const keybindingsStatus = (outcome: KeybindingsLoadOutcome): ConfigImportReport['keybindings'] => {
   if (outcome.kind === 'applied') {
@@ -97,7 +101,11 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
       notices.announceSeeded();
       return;
     }
-    if (classification.legacy.kind === 'parsed-invalid') {
+    // "Fix the keymaps to migrate them" is only true when start-up actually
+    // deferred the migration. An existing file wins over the legacy keymaps,
+    // so telling the user to fix them there would promise a migration that
+    // cannot happen.
+    if (deferredMigration(outcome) && classification.legacy.kind === 'parsed-invalid') {
       notices.announceDeferred(classification.diagnostics);
     }
     if (keptExistingFile(outcome) && classification.legacy.kind === 'parsed-keymaps') {

@@ -59,6 +59,11 @@ jobs:
           z3_zip="$RUNNER_TEMP/z3.zip"
           curl -fsSL -o "$z3_zip" \
             https://github.com/Z3Prover/z3/releases/download/z3-4.12.1/z3-4.12.1-x64-glibc-2.35.zip
+          # The release publishes no checksum file, so the digest below was
+          # recorded from the pinned asset. Checking it keeps a swapped or
+          # truncated archive from running as the solver behind `make prove`.
+          echo "c5360fd157b0f861ec8780ba3e51e2197e9486798dc93cd878df69a4b0c2b7c5  $z3_zip" |
+            sha256sum --check --strict -
           unzip -q "$z3_zip" -d "$RUNNER_TEMP/z3-release"
           mkdir -p "$HOME/.dotnet/tools/z3/bin"
           install -m 0755 \

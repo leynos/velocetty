@@ -41,8 +41,21 @@ const bindingSchema = z.union([shortcutSchema, z.array(shortcutSchema)]);
  */
 export const keybindingsSchema: z.ZodType<UserKeymaps> = z.record(commandIdSchema, bindingSchema);
 
-/** The draft-07 JSON Schema editors consume for `keybindings.json5`. */
-export const keybindingsJsonSchema = () => z.toJSONSchema(keybindingsSchema, {target: 'draft-7'});
+/**
+ * The draft-07 JSON Schema editors consume for `keybindings.json5`.
+ *
+ * `$schema` is editor metadata rather than a binding, so the schema names it
+ * explicitly and requires a non-blank string. Draft-07 applies
+ * `additionalProperties` only to keys absent from `properties`, so the other
+ * keys keep the binding shape while `$schema` does not.
+ */
+export const keybindingsJsonSchema = () => {
+  const recordSchema = z.toJSONSchema(keybindingsSchema, {target: 'draft-7'});
+  return {
+    ...recordSchema,
+    properties: {[RESERVED_SCHEMA_KEY]: {pattern: '\\S', type: 'string'}}
+  };
+};
 
 /** The three parts of one actionable diagnostic. */
 type DiagnosticSpec = {
@@ -147,9 +160,9 @@ const readEntries = (root: JsonObject): EntryRead => {
 
   for (const [command, value] of Object.entries(root)) {
     if (command === RESERVED_SCHEMA_KEY) {
-      // The generated schema applies `additionalProperties` to `$schema` too,
-      // so the value must be binding-shaped or Ajv and the codec disagree.
-      if (!isBindingValue(value)) {
+      // The generated schema names `$schema` as a string, so the codec must
+      // require one too or Ajv and the codec would accept different files.
+      if (!shortcutSchema.safeParse(value).success) {
         diagnostics.push(schemaKeyDiagnostic());
       }
       continue;

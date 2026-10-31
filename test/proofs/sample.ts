@@ -1,4 +1,10 @@
-/** @file Smoke-test LemmaScript contract for `make prove`. */
+/**
+ * @file Registered LemmaScript smoke-test source for `make prove`.
+ *
+ * This module provides the `zero` contract used to verify LemmaScript-to-Dafny
+ * generation and proof execution. The proof workflow regenerates and verifies
+ * `test/proofs/sample.dfy.gen` from this source.
+ */
 
 /**
  * Returns zero.

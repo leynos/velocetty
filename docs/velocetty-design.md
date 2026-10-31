@@ -954,7 +954,9 @@ product name):
 
 The paths above were delivered by roadmap `3.2.1` as
 [ADR 008](adr-008-velocetty-configuration-directory.md). The Velocetty tree is
-created at start-up. `keybindings.json5` lives only there.
+created at start-up. `keybindings.json5` lives there, except that a development
+build with an active development-mode `config.json5` or `hyper.json` keeps it
+beside that file.
 
 - The Velocetty tree is `$XDG_CONFIG_HOME/Velocetty` when `XDG_CONFIG_HOME` is
   set to an absolute path, on any platform; otherwise `~/.config/Velocetty` on

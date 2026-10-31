@@ -6,9 +6,11 @@
   the Velocetty repository.
 - Invariants: Keep Makefile targets and validation steps aligned with
   Continuous Integration (CI) and tooling changes.
-- Cross-links: [Testing with Bun](testing-with-bun.md),
-  [ADR 001](adr-001-replace-ava-with-bun-test.md), [ADR 002](adr-002-replace-webpack-babel-with-esbuild.md),
-  and [Roadmap](roadmap.md).
+- Cross-links:
+  - [Testing with Bun](testing-with-bun.md)
+  - [ADR 001](adr-001-replace-ava-with-bun-test.md)
+  - [ADR 002](adr-002-replace-webpack-babel-with-esbuild.md)
+  - [Roadmap](roadmap.md)
 
 This guide captures the development practices specific to the Velocetty
 repository. It is intentionally concise and focused on the steps developers
@@ -117,9 +119,11 @@ adapters/constants for main-process runtime dependencies.
 Boundary validation is enforced by `bun run check:boundaries`, which runs as
 part of `bun run lint` and therefore `make lint`. That check also rejects a
 runtime `@shared/*` import in `app/`, where the alias has no runtime
-counterpart; `import {type X} from '@shared/...'` counts as runtime because
-`verbatimModuleSyntax` keeps the statement, so write `import type`. A `shared`
-value that `app/` needs at run time belongs in an app-local adapter, as
+counterpart. It classifies both `import type {X}` and `import {type X}` as
+type-only and accepts them, because `app/tsconfig.build.json` sets
+`verbatimModuleSyntax` to `false` and the clause is erased. A mixed clause such
+as `import {type X, y}` keeps a runtime import for `y` and is rejected. A
+`shared` value that `app/` needs at run time belongs in an app-local adapter, as
 `app/utils/runtime-guards.ts` does.
 
 Follow-up hardening tracked in `docs/tracking-issues.md`:
@@ -245,6 +249,14 @@ Keybindings follow a parallel layering model:
 2. **Plugin defaults** (runtime contributions, not persisted)
 3. **User overrides** (`keybindings.json5`)
 
+The current merge does not yet match that order.
+`mergeRuntimePluginKeybindings()` in `app/runtime/plugin-runtime.ts` spreads
+the runtime contributions first and the resolved keymaps second, so core
+defaults override plugin defaults. Legacy `decorateKeymaps` hooks then run over
+the merged map and can modify user bindings. `KEYMAP-001` in
+[Tracking issues](tracking-issues.md) tracks aligning the merge with the order
+above.
+
 [Configuration architecture](configuration-architecture.md) describes the
 modules that carry this out, the start-up and reload data flow, and the
 verified policy boundary.
@@ -264,9 +276,13 @@ When touching keybinding storage:
 - Extend the tests named in `docs/configuration-architecture.md` when the file
   format or reload behaviour changes. The codec, service, store, watcher,
   layering, and tree-resolution claims each have a named test file there.
-- Keep `app/config/keybindings-policy.ts` pure. It is verified by `make prove`,
-  and the guards in `bin/prove.sh` reject Electron, filesystem, clock, and
-  `extern` use.
+- Keep `app/config/keybindings-policy.ts` pure. It is verified by `make prove`.
+  The guards in `bin/prove.sh` police the proof, not the TypeScript: they
+  reject Dafny trust constructs other than the admitted `emptyUserKeymaps`
+  axiom and require a positive verifier summary per listed source. They never
+  inspect TypeScript function bodies, so a green proof does not establish that
+  an `extern` body such as `emptyUserKeymaps` is pure. Keeping Electron,
+  filesystem, and clock access out of the policy is still a review duty.
 
 Use `resolveConfigLayers()` from `app/config/layering.ts` to resolve the
 effective configuration:

@@ -782,6 +782,48 @@ design and the notification the user sees.
     counter meanings, and the retry categories.
   - [x] `docs/migration-keybindings-json5.md` adds the standalone migration
     note, and `docs/users-guide.md` links to it.
+- [x] (2026-10-31 06:00Z) That round was committed as `573d208a` and pushed.
+  Hosted CI run 41174814420 passed all four builds, and CodeScene approved the
+  head at 06:02Z.
+- [x] (2026-10-31 07:15Z) Findings from CodeRabbit's formal review of
+  `573d208a` (eight, all minor or trivial). Each was verified against the
+  source before repair.
+  - [x] `app/config/import.ts`: the deferred-migration notice fired whenever
+    the legacy keymaps failed the codec, even when an existing
+    `keybindings.json5` meant nothing had been deferred. It now requires a
+    `kept` outcome with `cause: 'deferred'`. Two importer tests cover the
+    true case (no file, invalid legacy keymaps announce once and create
+    nothing) and the false case (an existing file wins and stays silent).
+  - [x] `app/config/keybindings-codec.ts`: `$schema` is now a non-blank
+    string in both the codec and the generated draft-07 schema. The schema
+    names it in `properties`, so `additionalProperties` no longer governs
+    it, and a new `schema-key-array.json5` fixture keeps Ajv and the codec
+    agreeing on the rule the diagnostic and the documents describe.
+  - [x] `.github/workflows/nodejs.yml`: the Z3 archive is verified against
+    the SHA-256 recorded from the pinned asset before it is unzipped.
+  - [x] Documentation corrections: `configuration-architecture.md` credits
+    `listCandidates` and `resolveConfigLocations` with the candidate list and
+    the development-mode override; `developers-guide.md` states that the
+    boundary checker accepts both type-only import forms, separates the
+    current plugin-keybinding merge from the intended order, and no longer
+    claims `bin/prove.sh` inspects TypeScript bodies; `users-guide.md` and
+    `velocetty-design.md` record the development-mode keybindings location.
+    The cross-link bullets in the users' guide, the configuration
+    architecture, and the developers' guide are now one-link-per-line nested
+    lists: `mdtablefix --wrap` measures rendered link text rather than raw
+    columns, so that is the only shape that also holds every line within the
+    80-column rule.
+  - [x] `test/proofs/sample.ts` gains the expanded module header. `lsc` does
+    not copy the header into `sample.dfy.gen`, so the generated artefact is
+    unchanged.
+- [x] (2026-10-31 09:30Z) Commit-gate run on the repair candidate. Seven of the
+  eight gates passed first time; `make check-fmt` failed because
+  `mdtablefix --wrap` wanted to refill four touched documents, and its refill
+  rejoined the users' guide cross-link bullet into a 92-column line. Applying
+  the tool in place and restructuring the three cross-link bullets as nested
+  lists made `check-fmt` and `markdownlint` pass. Note for the next round: a
+  plain `git add` of hand-wrapped prose is not enough, because the formatter's
+  width model differs from the 80-column rule.
 
 ## Surprises & discoveries
 

@@ -7,9 +7,11 @@
 - Invariants: every path and behaviour here matches `app/config` and the
   automated tests named in
   [Configuration architecture](configuration-architecture.md).
-- Cross-links: [Configuration architecture](configuration-architecture.md),
-  [Developers' guide](developers-guide.md), [ADR 007](adr-007-keybindings-json5-storage.md),
-  and [ADR 008](adr-008-velocetty-configuration-directory.md).
+- Cross-links:
+  - [Configuration architecture](configuration-architecture.md)
+  - [Developers' guide](developers-guide.md)
+  - [ADR 007](adr-007-keybindings-json5-storage.md)
+  - [ADR 008](adr-008-velocetty-configuration-directory.md)
 
 ## Where configuration lives
 
@@ -41,8 +43,10 @@ When no `config.json5` exists anywhere, Velocetty creates one in the Velocetty
 directory. If both directories hold one, the Velocetty copy wins and a
 notification names the ignored copy.
 
-`keybindings.json5` lives only in the Velocetty directory. Velocetty never
-creates a new configuration file in the Hyper directory.
+`keybindings.json5` lives in the Velocetty directory. A development build that
+uses a development-mode `config.json5` or `hyper.json` keeps it beside that
+file instead. Velocetty never creates a new configuration file in the Hyper
+directory.
 
 ## Keyboard shortcuts
 

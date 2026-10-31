@@ -20,5 +20,11 @@
         }
       }
     ]
+  },
+  "properties": {
+    "$schema": {
+      "pattern": "\\S",
+      "type": "string"
+    }
   }
 }

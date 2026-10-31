@@ -32,6 +32,7 @@ const FIXTURES = {
   'padded-command-id.json5': {outcome: 'rejected', class: 'padded command identifier'},
   'prototype-named-invalid.json5': {outcome: 'rejected', class: 'prototype-named invalid binding'},
   'prototype-named-keys.json5': {outcome: 'accepted', class: 'prototype-named command ids'},
+  'schema-key-array.json5': {outcome: 'rejected', class: 'array $schema value'},
   'schema-key-invalid.json5': {outcome: 'rejected', class: 'invalid $schema value'},
   'schema-key.json5': {outcome: 'accepted', class: 'ignored $schema key'},
   'syntax-error.json5': {outcome: 'rejected', class: 'syntax error'},

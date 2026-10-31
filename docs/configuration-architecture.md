@@ -8,9 +8,11 @@
 - Invariants: every component named here exists under `app/config` or
   `shared/src/config`; the verified module `app/config/keybindings-policy.ts`
   stays free of Electron, filesystem, and clock access.
-- Cross-links: [ADR 007](adr-007-keybindings-json5-storage.md),
-  [ADR 008](adr-008-velocetty-configuration-directory.md), [Users' guide](users-guide.md),
-  and [Developers' guide](developers-guide.md).
+- Cross-links:
+  - [ADR 007](adr-007-keybindings-json5-storage.md)
+  - [ADR 008](adr-008-velocetty-configuration-directory.md)
+  - [Users' guide](users-guide.md)
+  - [Developers' guide](developers-guide.md)
 
 ## Shape
 
@@ -100,9 +102,13 @@ something actually changed. Migration notices fire at most once per process.
 `config-tree.ts` resolves the Velocetty and Hyper trees as a pure function of
 the platform, the environment paths, and two injected filesystem predicates.
 Neither tree is probed directly, so every combination is enumerable in tests.
-`shared/src/config/config-tree.ts` mirrors it for the command-line interface
-(CLI), and a parity test keeps the copies in step. `paths.ts` adds the
-development-mode override and the ordered list of `config.json5` candidates.
+Its `listCandidates` builds the development-mode override and the ordered
+`config.json5` candidate list, and `resolveConfigLocations` selects the active
+file from them. `shared/src/config/config-tree.ts` mirrors this split for the
+command-line interface (CLI), and a parity test keeps the copies in step.
+`paths.ts` supplies the Electron inputs — `isDev`, the development directory,
+and the `probe` and `sameFile` adapters — and then calls
+`resolveConfigLocations`.
 
 ### Watcher
 

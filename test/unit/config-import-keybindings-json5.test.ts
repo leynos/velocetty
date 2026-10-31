@@ -105,6 +105,51 @@ test('does not announce a completed migration when the seed write fails', async 
   }
 });
 
+test('announces a deferred migration when an invalid legacy keymaps value blocks the seed', async () => {
+  const harness = await createConfigImportHarness();
+  try {
+    writeDefaultSources(harness);
+    mkdirpSync(harness.mockPaths.cfgDir);
+    // The legacy value passes the raw-config schema but fails the codec, so
+    // start-up has nothing it can safely seed.
+    writeFileSync(harness.mockPaths.cfgPath, userConfigWithKeymaps(`{'': 'ctrl+n'}`), 'utf8');
+
+    const {report} = harness._import('startup');
+
+    // A deferred bootstrap leaves the file absent, which the report calls
+    // `unchanged` rather than `kept`: there was nothing to keep.
+    expect(report).toEqual({config: 'applied', keybindings: 'unchanged'});
+    expect(existsSync(harness.mockPaths.keybindingsPath)).toBe(false);
+    const titles = harness.notifyMock.mock.calls.map((call) => call[0]);
+    expect(titles.some((title) => title.startsWith("Couldn't move shortcuts to keybindings.json5."))).toBe(true);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('does not announce a deferred migration when the keybindings file already exists', async () => {
+  const harness = await createConfigImportHarness();
+  try {
+    writeDefaultSources(harness);
+    mkdirpSync(harness.mockPaths.cfgDir);
+    writeFileSync(harness.mockPaths.cfgPath, userConfigWithKeymaps(`{'': 'ctrl+n'}`), 'utf8');
+    const storedKeymaps = `{'window:new': 'ctrl+n'}`;
+    writeFileSync(harness.mockPaths.keybindingsPath, storedKeymaps, 'utf8');
+
+    const {config, report} = harness._import('startup');
+
+    expect(config.keymaps).toEqual({'window:new': ['ctrl+n']});
+    expect(report).toEqual({config: 'applied', keybindings: 'applied'});
+    expect(readFileSync(harness.mockPaths.keybindingsPath, 'utf8')).toBe(storedKeymaps);
+    // Nothing was deferred: the file wins, so "fix the keymaps" would promise a
+    // migration that cannot happen.
+    const titles = harness.notifyMock.mock.calls.map((call) => call[0]);
+    expect(titles.some((title) => title.startsWith("Couldn't move shortcuts"))).toBe(false);
+  } finally {
+    harness.cleanup();
+  }
+});
+
 test('keeps the last known good keymaps when the file becomes invalid', async () => {
   const harness = await createConfigImportHarness();
   try {
