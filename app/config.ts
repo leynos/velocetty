@@ -1,3 +1,13 @@
+/** @file Composition root: resolves the config tree and wires import, keybindings, and reload. */
+/*
+ * This module owns the process-wide configuration state. It resolves the
+ * active Velocetty or development tree, builds the keybindings store and
+ * service over that path, imports every configuration source, and re-runs the
+ * import whenever a watched file changes. The adapters it constructs take
+ * filesystem, clock, and notification dependencies as parameters, so the
+ * modules below it stay testable without Electron.
+ */
+
 import {app} from 'electron';
 
 import chokidar from 'chokidar';
@@ -9,7 +19,7 @@ import {isJsonObject} from './utils/runtime-guards';
 
 import {formatKeymapsMarker, isE2ERun, type E2EKeymapStatus} from './config/e2e-keymap-probe';
 import {createConfigImportModule} from './config/import';
-import {shouldAnnounceReload, type ConfigImportReport} from './config/import-report';
+import {describeReloadDecision, shouldAnnounceReload, type ConfigImportReport} from './config/import-report';
 import {_init} from './config/init';
 import {createKeybindingsService} from './config/keybindings';
 import {createFileKeybindingsStore} from './config/keybindings-store';
@@ -105,6 +115,7 @@ const emitE2EMarker = (line: string) => {
   }
 };
 
+/** Maps the import report onto the keymap status the E2E lane asserts on. */
 const keymapStatus = (report: ConfigImportReport): E2EKeymapStatus =>
   report.keybindings === 'applied' ? 'applied' : 'kept';
 
@@ -146,6 +157,7 @@ const createChokidarHandle = (directories: readonly string[]): WatcherHandle => 
   };
 };
 
+/** Starts the configuration watcher once; later calls are no-ops. */
 const _watch = () => {
   if (configWatcher !== undefined) {
     return;
@@ -164,7 +176,11 @@ const _watch = () => {
     onReload: () => {
       const {config, report} = _import('reload');
       cfg = config;
-      if (shouldAnnounceReload(report)) {
+      // One bounded record per reload boundary: it states what each file did
+      // even when the user-facing notice is suppressed.
+      const announced = shouldAnnounceReload(report);
+      console.info(`[config] reload decision ${describeReloadDecision(report, announced)}`);
+      if (announced) {
         notify('Configuration updated', 'Configuration reloaded!');
       }
       watchers.forEach((fn) => {

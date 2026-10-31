@@ -29,3 +29,23 @@ export const shouldAnnounceReload = (report: ConfigImportReport): boolean => {
   const hasFallback = report.config === 'fallback' || report.keybindings === 'kept';
   return hasApplied && !hasFallback;
 };
+
+/**
+ * Describes one reload decision as a single bounded log record.
+ *
+ * The watcher emits exactly one of these per reload boundary, so a session's
+ * log shows what each file did without repeating the per-file diagnostics the
+ * user already sees as notifications.
+ *
+ * @param report - Per-file outcomes from the import.
+ * @param announced - Whether the "Configuration updated" notice was shown.
+ * @returns A one-line summary suitable for a log record.
+ *
+ * @example
+ * ```ts
+ * describeReloadDecision({config: 'applied', keybindings: 'kept'}, false);
+ * // 'config=applied keybindings=kept announced=false'
+ * ```
+ */
+export const describeReloadDecision = (report: ConfigImportReport, announced: boolean): string =>
+  `config=${report.config} keybindings=${report.keybindings} announced=${announced}`;

@@ -716,6 +716,39 @@ design and the notification the user sees.
   - [x] `test/testUtils/config-tree-domain.ts` names `'absolute'` and guards
     the remainder with `never`; the read-only store test also skips under
     uid 0, where POSIX permission bits do not model the refusal.
+- [x] (2026-10-31 04:10Z) Pre-merge check rows from the walkthrough at
+  `c5ab2e3e`. Each row was re-read against the current tree before it was
+  repaired or rebutted.
+  - [x] Module-Level Documentation. `app/config.ts` and `app/config/init.ts`
+    gain `@file` headers stating purpose, ownership, and why the adapters take
+    their ports as parameters.
+  - [x] Developer Documentation. `docs/developers-guide.md` gains a
+    `### Keybindings storage internals` list naming `KeybindingsStore`,
+    `createKeybindingsService`, `ConfigImportKeybindings`,
+    `ConfigImportPaths.keybindingsPath`, `ConfigImportNotify`, and
+    `createConfigWatcher` with the ports each one injects.
+  - [x] Testing (compile-time contracts). `test/unit/keybindings-types.test.ts`
+    asserts the four keybindings contracts through `@ts-expect-error`, so a
+    loosened `UserKeymaps`, applied-outcome `origin`, or missing
+    `keybindingsPath` fails `bun check:types` rather than a call site.
+  - [x] Observability. `describeReloadDecision` renders the per-reload
+    decision as one bounded record, and the watcher logs exactly one per reload
+    boundary, including the suppressed case that previously left a fallback
+    invisible outside a notification.
+  - [x] User-Facing Documentation rebutted with evidence: `users-guide.md`
+    already documents where the file lives (line 44), how to edit it (lines
+    49-54), the invalid-file fallback (line 145), seeding on upgrade (line
+    157), and that the legacy `keymaps` key is then ignored (line 161).
+  - [x] Docstring Coverage improved by the headers and by the JSDoc added to
+    `_init`, `keymapStatus`, `_watch`, `describeReloadDecision`, and, in the
+    keybindings service, `applyObservation`, `start`, `reload`,
+    `importKeybindings`, `exportKeybindings`, `seedFile`, `seedWriteStatus`,
+    and `seedOrigin`.
+  - [x] A hosted CodeScene `Complex Method` regression in
+    `createKeybindingsService.start`, introduced when the `seeded-unsaved`
+    origin was added, was repaired by extracting `seedFile`, `seedWriteStatus`,
+    `seedOrigin`, and `SeedDecision`; `cs review app/config/keybindings.ts`
+    reports 10.0 again.
 
 ## Surprises & discoveries
 

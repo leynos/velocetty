@@ -1,3 +1,11 @@
+/** @file Turns raw user configuration into the profile and keymap shape the app expects. */
+/*
+ * `_init` merges the user's `config` object over the bundled defaults, repairs
+ * the profile list, and normalises legacy keymaps. The configuration importer
+ * calls it once per import, and a missing `config` key is reported through the
+ * injected notifier rather than thrown.
+ */
+
 import merge from 'lodash/merge';
 
 import type {configOptions, parsedConfig, rawConfig} from '@shared/types/config';
@@ -5,7 +13,24 @@ import mapKeys from '../utils/map-keys';
 import {readLegacyKeymaps} from './import-keybindings';
 import type {ConfigImportNotify} from './keybindings';
 
-// init config
+/**
+ * Merges the user configuration over the bundled defaults.
+ *
+ * The user's profiles are repaired in place: a missing `defaultProfile` or
+ * profile name is filled in, and a `defaultProfile` that names no profile
+ * falls back to the first one. Legacy keymaps from both sources are merged
+ * last, so a user binding wins over the bundled platform binding.
+ *
+ * @param userCfg - The parsed user configuration.
+ * @param defaultCfg - The bundled default configuration.
+ * @param notify - Reports a missing `config` key to the user.
+ * @returns The effective configuration for this import.
+ *
+ * @example
+ * ```ts
+ * _init({config: {}}, {config: {profiles: []}}, notify); // default profile filled in
+ * ```
+ */
 const _init = (userCfg: rawConfig, defaultCfg: rawConfig, notify: ConfigImportNotify): parsedConfig => {
   return {
     config: (() => {

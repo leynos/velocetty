@@ -13,7 +13,7 @@ import {
   decideBootstrap,
   initialKeybindingsState,
   observeKeybindings,
-  type BootstrapFileState,
+  type BootstrapDecision,
   type KeybindingsObservation,
   type LegacyKeymapsSource,
   type UserKeymaps
@@ -30,6 +30,22 @@ export type KeybindingsReadOutcome =
 
 /** What writing the keybindings file did. */
 export type KeybindingsWriteOutcome = {readonly kind: 'written'} | {readonly kind: 'failed'; readonly error: unknown};
+
+/** A bootstrap decision that writes a seed. */
+type SeedDecision = Extract<BootstrapDecision, {kind: 'seed'}>;
+
+/** Normalises the write outcome to the two states the policy understands. */
+const seedWriteStatus = (outcome: KeybindingsWriteOutcome): 'written' | 'failed' =>
+  outcome.kind === 'written' ? 'written' : 'failed';
+
+/**
+ * Names where the applied keymaps came from.
+ *
+ * A seed that could not be written still applies in memory, but only a written
+ * file counts as a completed migration.
+ */
+const seedOrigin = (outcome: KeybindingsWriteOutcome): 'seeded' | 'seeded-unsaved' =>
+  outcome.kind === 'written' ? 'seeded' : 'seeded-unsaved';
 
 /** The driven port the keybindings service reads and writes through. */
 export type KeybindingsStore = {
@@ -165,6 +181,7 @@ export const createKeybindingsService = (dependencies: {
   let isStarted = false;
   let lastShownDiagnostics = '';
 
+  /** Advances the state through the verified policy and reports what it did. */
   const applyObservation = (observation: KeybindingsObservation) => {
     const result = observeKeybindings(state, observation);
     state = result.state;
@@ -228,6 +245,29 @@ export const createKeybindingsService = (dependencies: {
     return {keymaps: exposedKeymaps(), kind: 'applied', origin: 'file'};
   };
 
+  /** Writes the seed and applies it, reporting how far the migration got. */
+  const seedFile = (decision: SeedDecision): KeybindingsLoadOutcome => {
+    const writeOutcome = store.write(serializeKeybindings(decision.keymaps));
+    if (writeOutcome.kind === 'failed') {
+      notify("Couldn't create a keybindings file. Check permissions and available disk space.", undefined, {
+        error: writeOutcome.error
+      });
+    }
+    const observation = bootstrapObservation(decision, seedWriteStatus(writeOutcome));
+    if (observation === null) {
+      return describeDeferred();
+    }
+    lastShownDiagnostics = '';
+    applyObservation(observation);
+    return {keymaps: exposedKeymaps(), kind: 'applied', origin: seedOrigin(writeOutcome)};
+  };
+
+  /**
+   * Runs the start-up bootstrap, or a plain reload when start-up already ran.
+   *
+   * Only this call may seed or clean up; every later state change goes through
+   * `reload`.
+   */
   const start = (legacy: LegacyKeymapsSource): KeybindingsLoadOutcome => {
     // Start-up bootstrap runs once; a second call is just a reload.
     if (isStarted) {
@@ -238,39 +278,25 @@ export const createKeybindingsService = (dependencies: {
     // phase that may remove it.
     store.removeStaleTemporaryFiles?.();
 
-    const readOutcome = store.read();
-    const file: BootstrapFileState = readOutcome.kind;
-    const decision = decideBootstrap({file, legacy});
-    if (decision.kind === 'defer') {
-      return describeDeferred();
-    }
+    const decision = decideBootstrap({file: store.read().kind, legacy});
     if (decision.kind === 'write-nothing') {
       return readCurrentFile();
     }
-
-    const writeOutcome = store.write(serializeKeybindings(decision.keymaps));
-    if (writeOutcome.kind === 'failed') {
-      notify("Couldn't create a keybindings file. Check permissions and available disk space.", undefined, {
-        error: writeOutcome.error
-      });
-    }
-    const observation = bootstrapObservation(decision, writeOutcome.kind === 'written' ? 'written' : 'failed');
-    if (observation === null) {
+    if (decision.kind === 'defer') {
       return describeDeferred();
     }
-    lastShownDiagnostics = '';
-    applyObservation(observation);
-    // The seed applies in memory either way, but only a written file counts as
-    // a completed migration; the importer must not announce one that failed.
-    return {
-      keymaps: exposedKeymaps(),
-      kind: 'applied',
-      origin: writeOutcome.kind === 'written' ? 'seeded' : 'seeded-unsaved'
-    };
+    return seedFile(decision);
   };
 
+  /** Reads and applies the file again; never writes. */
   const reload = (): KeybindingsLoadOutcome => readCurrentFile();
 
+  /**
+   * Validates importer-supplied text and stores it verbatim.
+   *
+   * The active keymaps change on the next reload, so an import cannot leave the
+   * session in a state that disagrees with the file on disk.
+   */
   const importKeybindings = ({sourceLabel, text}: KeybindingsImportRequest): KeybindingsImportOutcome => {
     const parsed = parseKeybindingsText(text, sourceLabel);
     if (parsed.kind === 'invalid') {
@@ -284,6 +310,12 @@ export const createKeybindingsService = (dependencies: {
     return {kind: 'written'};
   };
 
+  /**
+   * Returns the stored text for an exporter, reporting why when it cannot.
+   *
+   * The text is returned unchanged rather than re-serialised, so an export
+   * preserves the user's comments and formatting.
+   */
   const exportKeybindings = (): KeybindingsExport => {
     const readOutcome = store.read();
     if (readOutcome.kind === 'missing') {

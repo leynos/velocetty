@@ -282,6 +282,40 @@ const runtimeOverrides = {} as Partial<configOptions>;
 const effectiveConfig = resolveConfigLayers(defaults, userConfig, runtimeOverrides);
 ```
 
+### Keybindings storage internals
+
+The storage path is split into a pure verified policy, an adapter store, a
+service, an importer, and a watcher; the composition root in `app/config.ts`
+wires them together.
+
+- **`KeybindingsStore`** (`app/config/keybindings.ts`): the driven port for the
+  file, exposing `location`, `read()`, optional `removeStaleTemporaryFiles()`,
+  and `write(text)`. `createFileKeybindingsStore` in
+  `app/config/keybindings-store.ts` supplies the filesystem implementation,
+  which replaces the file through a temporary sibling and fails closed on an
+  unresolvable symlink chain.
+- **`createKeybindingsService`** (`app/config/keybindings.ts`): owns the
+  last-known-good state and the reload, start, import, and export operations.
+  It takes `notify`, a `KeybindingsStore`, and an optional `warn`.
+- **`ConfigImportKeybindings`** (`app/config/import.ts`): the type of the
+  `keybindings` option accepted by `createConfigImportModule`, that is, the
+  `{reload, start}` pairing the importer calls.
+- **`ConfigImportPaths.keybindingsPath`** (`app/config/import-sources.ts`): the
+  single resolved path of `keybindings.json5`. The sibling `keybindingsDir`,
+  `keybindingsSchemaFile`, and `keybindingsSchemaPath` fields describe where
+  the schema copy belongs.
+- **`ConfigImportNotify`** (`app/config/keybindings.ts`): the notification port
+  `(title, body?, details?)`, so the service and importer never import
+  Electron's notifier directly.
+- **`createConfigWatcher`** (`app/config/watcher.ts`): coalesces a burst of
+  directory events into one complete reload. It takes an injected `handle`,
+  `fileNames`, `debounceMs`, `schedule`, `cancel`, and `onReload`, plus optional
+  `onReady` and `warn`.
+
+Injecting these dependencies keeps the service, importer, and watcher testable
+in `bun test` without Electron, a real clock, or a real filesystem. See
+[Configuration architecture](configuration-architecture.md) for the data flow.
+
 ### Reloadability classification
 
 Every configuration key must have a reloadability classification:

@@ -4,7 +4,7 @@ import {expect, test} from 'bun:test';
 import {existsSync, mkdirpSync, readFileSync, removeSync, writeFileSync} from 'fs-extra';
 import JSON5 from 'json5';
 
-import {shouldAnnounceReload} from '../../app/config/import-report';
+import {describeReloadDecision, shouldAnnounceReload} from '../../app/config/import-report';
 import {
   configBytesUnchanged,
   createConfigImportHarness,
@@ -223,4 +223,15 @@ test('announces a reload only when a file applied and none fell back', () => {
   expect(shouldAnnounceReload({config: 'fallback', keybindings: 'applied'})).toBe(false);
   expect(shouldAnnounceReload({config: 'applied', keybindings: 'kept'})).toBe(false);
   expect(shouldAnnounceReload({config: 'fallback', keybindings: 'unchanged'})).toBe(false);
+});
+
+test('describes each reload decision on one bounded line', () => {
+  expect(describeReloadDecision({config: 'applied', keybindings: 'applied'}, true)).toBe(
+    'config=applied keybindings=applied announced=true'
+  );
+  // The suppressed case still records the decision, which is the point of the
+  // log line: a fallback is otherwise invisible outside the notification.
+  expect(describeReloadDecision({config: 'fallback', keybindings: 'kept'}, false)).toBe(
+    'config=fallback keybindings=kept announced=false'
+  );
 });
