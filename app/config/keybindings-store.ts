@@ -51,13 +51,17 @@ const errorCode = (error: unknown): string | undefined => {
   return isString(code) ? code : undefined;
 };
 
+/** The errno codes with a dedicated port category; adding one is data, not a new disjunct. */
+const STORAGE_FAILURES = new Map<string, KeybindingsStorageFailure>([
+  ['EACCES', 'permission'],
+  ['EPERM', 'permission'],
+  ['EROFS', 'permission'],
+  ['ENOENT', 'missing']
+]);
+
 /** Maps a raw errno code onto the port's bounded failure vocabulary. */
-const storageFailure = (code: string | undefined): KeybindingsStorageFailure => {
-  if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') {
-    return 'permission';
-  }
-  return code === 'ENOENT' ? 'missing' : 'other';
-};
+const storageFailure = (code: string | undefined): KeybindingsStorageFailure =>
+  (code === undefined ? undefined : STORAGE_FAILURES.get(code)) ?? 'other';
 
 /** One replacement: the resolved target, its temporary sibling, and the mode to keep. */
 type ReplacementPlan = Readonly<{
@@ -65,6 +69,11 @@ type ReplacementPlan = Readonly<{
   readonly target: string;
   readonly temporaryPath: string;
 }>;
+
+/** A vetted replacement target, or the refusal the caller must see. */
+type PreparedWrite = Readonly<
+  {kind: 'ready'; plan: ReplacementPlan} | {kind: 'refused'; outcome: KeybindingsWriteOutcome}
+>;
 
 /**
  * The path a write may land on, or why no safe path could be established.
@@ -289,6 +298,52 @@ export const createFileKeybindingsStore = (
     }
   };
 
+  /** Resolves and vets the replacement target, reporting any refusal. */
+  const prepareWrite = (): PreparedWrite => {
+    const resolution = resolveTarget();
+    if (resolution.kind === 'unresolved') {
+      warnFn(`[config-keybindings] Couldn't resolve "${options.filePath}" for writing.`, resolution.error);
+      return {kind: 'refused', outcome: {failure: storageFailure(errorCode(resolution.error)), kind: 'failed'}};
+    }
+    const plan = planReplacement(resolution.path);
+    if (!canReplaceTarget(plan)) {
+      // The synthetic refusal is logged for diagnosis; the port sees the category.
+      warnFn(`[config-keybindings] Refused to replace read-only file "${plan.target}".`);
+      return {kind: 'refused', outcome: {failure: 'permission', kind: 'failed'}};
+    }
+    return {kind: 'ready', plan};
+  };
+
+  /** Opens the temporary sibling exclusively, with the target's mode when known. */
+  const openTemporary = (plan: ReplacementPlan): number =>
+    plan.mode === undefined
+      ? fileSystem.openSync(plan.temporaryPath, 'wx')
+      : fileSystem.openSync(plan.temporaryPath, 'wx', plan.mode);
+
+  /** Fills, flushes, and renames the temporary file over the resolved target. */
+  const commitWrite = (plan: ReplacementPlan, text: string): KeybindingsWriteOutcome => {
+    let descriptor: number | undefined;
+    try {
+      descriptor = openTemporary(plan);
+      writeAll(descriptor, Buffer.from(text, 'utf8'));
+      fileSystem.fsyncSync(descriptor);
+      closeQuietly(descriptor);
+      descriptor = undefined;
+      if (plan.mode !== undefined) {
+        fileSystem.chmodSync(plan.temporaryPath, plan.mode);
+      }
+      renameWithRetry(plan);
+      return {kind: 'written'};
+    } catch (error) {
+      if (descriptor !== undefined) {
+        closeQuietly(descriptor);
+      }
+      removeQuietly(plan);
+      warnFn(`[config-keybindings] Couldn't write "${options.filePath}".`, error);
+      return {failure: storageFailure(errorCode(error)), kind: 'failed'};
+    }
+  };
+
   /**
    * Writes the document atomically, refusing any unsafe replacement target.
    *
@@ -297,44 +352,14 @@ export const createFileKeybindingsStore = (
    */
   const write = (text: string): KeybindingsWriteOutcome => {
     const finishSpan = options.spans?.begin('keybindings-write');
-    const resolution = resolveTarget();
-    if (resolution.kind === 'unresolved') {
-      warnFn(`[config-keybindings] Couldn't resolve "${options.filePath}" for writing.`, resolution.error);
+    const prepared = prepareWrite();
+    if (prepared.kind === 'refused') {
       finishSpan?.('failed');
-      return {failure: storageFailure(errorCode(resolution.error)), kind: 'failed'};
+      return prepared.outcome;
     }
-    const plan = planReplacement(resolution.path);
-    if (!canReplaceTarget(plan)) {
-      // The synthetic refusal is logged for diagnosis; the port sees the category.
-      warnFn(`[config-keybindings] Refused to replace read-only file "${plan.target}".`);
-      finishSpan?.('failed');
-      return {failure: 'permission', kind: 'failed'};
-    }
-    let descriptor: number | undefined;
-    try {
-      descriptor =
-        plan.mode === undefined
-          ? fileSystem.openSync(plan.temporaryPath, 'wx')
-          : fileSystem.openSync(plan.temporaryPath, 'wx', plan.mode);
-      writeAll(descriptor, Buffer.from(text, 'utf8'));
-      fileSystem.fsyncSync(descriptor);
-      fileSystem.closeSync(descriptor);
-      descriptor = undefined;
-      if (plan.mode !== undefined) {
-        fileSystem.chmodSync(plan.temporaryPath, plan.mode);
-      }
-      renameWithRetry(plan);
-      finishSpan?.('written');
-      return {kind: 'written'};
-    } catch (error) {
-      if (descriptor !== undefined) {
-        closeQuietly(descriptor);
-      }
-      removeQuietly(plan);
-      warnFn(`[config-keybindings] Couldn't write "${options.filePath}".`, error);
-      finishSpan?.('failed');
-      return {failure: storageFailure(errorCode(error)), kind: 'failed'};
-    }
+    const outcome = commitWrite(prepared.plan, text);
+    finishSpan?.(outcome.kind === 'written' ? 'written' : 'failed');
+    return outcome;
   };
 
   /** Removes temporary files a crashed write left beside the target. */

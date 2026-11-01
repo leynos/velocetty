@@ -5,6 +5,7 @@ import * as fs from 'node:fs';
 import path from 'node:path';
 
 import type {ConfigSpanRecorder} from '../../app/config/config-spans';
+import type {KeybindingsReadOutcome, KeybindingsWriteOutcome} from '../../app/config/keybindings-ports';
 import type {KeybindingsFileSystem} from '../../app/config/keybindings-store';
 import {createFileKeybindingsStore} from '../../app/config/keybindings-store';
 import {
@@ -20,6 +21,9 @@ import {
 } from '../testUtils/keybindings-store-harness';
 
 afterEach(cleanupWorkspaces);
+
+/** The adapter under test, so table-driven cases can name its methods. */
+type Store = ReturnType<typeof createFileKeybindingsStore>;
 
 /** Records the operation and outcome of every completed span, in order. */
 const recordingSpans = () => {
@@ -55,47 +59,57 @@ describe('atomic keybindings file store', () => {
     expect(unreadable.read().kind).toBe('unreadable');
   });
 
-  test('classifies a permission read failure and still logs the raw error', () => {
-    const workspace = createWorkspace();
-    const filePath = targetPathIn(workspace);
-    const raw = errorWithCode('EACCES');
-    const warn = mock(() => {});
-    const store = createFileKeybindingsStore({
-      filePath,
-      fs: {
-        ...realFileSystem(),
+  /**
+   * Each permission test fails one filesystem call and states what the port
+   * should see, so the read and write paths are proved by the same assertions.
+   */
+  const permissionCases: readonly Readonly<{
+    call: (store: Store) => KeybindingsReadOutcome | KeybindingsWriteOutcome;
+    description: string;
+    message: string;
+    outcome: KeybindingsReadOutcome | KeybindingsWriteOutcome;
+    overrides: (raw: unknown) => Partial<KeybindingsFileSystem>;
+  }>[] = [
+    {
+      call: (store) => store.read(),
+      description: 'read',
+      message: "Couldn't read",
+      outcome: {failure: 'permission', kind: 'unreadable'},
+      overrides: (raw) => ({
         readFileSync: () => {
           throw raw;
         }
-      },
-      warn
-    });
-
-    // The port sees only the bounded reason; the adapter keeps the raw error
-    // diagnosable through its own warning sink.
-    expect(store.read()).toEqual({failure: 'permission', kind: 'unreadable'});
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Couldn't read"), raw);
-  });
-
-  test('classifies a permission write failure and still logs the raw error', () => {
-    const workspace = createWorkspace();
-    const filePath = targetPathIn(workspace);
-    const raw = errorWithCode('EACCES');
-    const warn = mock(() => {});
-    const store = createFileKeybindingsStore({
-      filePath,
-      fs: {
-        ...realFileSystem(),
+      })
+    },
+    {
+      call: (store) => store.write('replacement'),
+      description: 'write',
+      message: "Couldn't write",
+      outcome: {failure: 'permission', kind: 'failed'},
+      overrides: (raw) => ({
         openSync: () => {
           throw raw;
         }
-      },
-      warn
-    });
+      })
+    }
+  ];
 
-    expect(store.write('replacement')).toEqual({failure: 'permission', kind: 'failed'});
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Couldn't write"), raw);
-  });
+  for (const {call, description, message, outcome, overrides} of permissionCases) {
+    test(`classifies a permission ${description} failure and still logs the raw error`, () => {
+      const raw = errorWithCode('EACCES');
+      const warn = mock(() => {});
+      const store = createFileKeybindingsStore({
+        filePath: targetPathIn(createWorkspace()),
+        fs: {...realFileSystem(), ...overrides(raw)},
+        warn
+      });
+
+      // The port sees only the bounded reason; the adapter keeps the raw error
+      // diagnosable through its own warning sink.
+      expect(call(store)).toEqual(outcome);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(message), raw);
+    });
+  }
 
   test('maps a missing target to its bounded failure category', () => {
     const workspace = createWorkspace();
@@ -140,37 +154,47 @@ describe('atomic keybindings file store', () => {
     expect(fs.readFileSync(targetPathIn(workspace), 'utf8')).toBe('{}');
   });
 
-  test('keeps a symlink and replaces the file it points at', () => {
-    const workspace = createWorkspace();
-    const realPath = path.join(workspace, 'dotfiles-keybindings.json5');
-    const linkPath = targetPathIn(workspace);
-    fs.writeFileSync(realPath, '{}', 'utf8');
-    fs.symlinkSync(path.basename(realPath), linkPath);
-    const store = createFileKeybindingsStore({filePath: linkPath});
+  /**
+   * A link is written through, whether its target exists or not. Only the read
+   * before the write differs, so the shared assertions are stated once.
+   */
+  const symlinkCases: readonly Readonly<{
+    description: string;
+    expectedRead: KeybindingsReadOutcome;
+    seedTarget: boolean;
+  }>[] = [
+    {
+      description: 'keeps a symlink and replaces the file it points at',
+      expectedRead: {kind: 'present', text: '{}'},
+      seedTarget: true
+    },
+    {
+      description: 'creates the target of a dangling symlink instead of replacing the link',
+      expectedRead: {kind: 'missing'},
+      seedTarget: false
+    }
+  ];
 
-    expect(store.write(`{'window:new': 'ctrl+n'}`)).toEqual({kind: 'written'});
+  for (const {description, expectedRead, seedTarget} of symlinkCases) {
+    test(description, () => {
+      const workspace = createWorkspace();
+      const realPath = path.join(workspace, 'dotfiles-keybindings.json5');
+      const linkPath = targetPathIn(workspace);
+      if (seedTarget) {
+        fs.writeFileSync(realPath, '{}', 'utf8');
+      }
+      fs.symlinkSync(path.basename(realPath), linkPath);
+      const store = createFileKeybindingsStore({filePath: linkPath});
 
-    expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(true);
-    expect(fs.readlinkSync(linkPath)).toBe(path.basename(realPath));
-    expect(fs.readFileSync(realPath, 'utf8')).toBe(`{'window:new': 'ctrl+n'}`);
-    expect(temporaryNames(workspace)).toEqual([]);
-  });
+      expect(store.read()).toEqual(expectedRead);
+      expect(store.write(`{'window:new': 'ctrl+n'}`)).toEqual({kind: 'written'});
 
-  test('creates the target of a dangling symlink instead of replacing the link', () => {
-    const workspace = createWorkspace();
-    const realPath = path.join(workspace, 'dotfiles-keybindings.json5');
-    const linkPath = targetPathIn(workspace);
-    fs.symlinkSync(path.basename(realPath), linkPath);
-    const store = createFileKeybindingsStore({filePath: linkPath});
-
-    expect(store.read()).toEqual({kind: 'missing'});
-    expect(store.write(`{'window:new': 'ctrl+n'}`)).toEqual({kind: 'written'});
-
-    expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(true);
-    expect(fs.readlinkSync(linkPath)).toBe(path.basename(realPath));
-    expect(fs.readFileSync(realPath, 'utf8')).toBe(`{'window:new': 'ctrl+n'}`);
-    expect(temporaryNames(workspace)).toEqual([]);
-  });
+      expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(true);
+      expect(fs.readlinkSync(linkPath)).toBe(path.basename(realPath));
+      expect(fs.readFileSync(realPath, 'utf8')).toBe(`{'window:new': 'ctrl+n'}`);
+      expect(temporaryNames(workspace)).toEqual([]);
+    });
+  }
 
   test('follows a dangling link through an intermediate link to the missing target', () => {
     const workspace = createWorkspace();

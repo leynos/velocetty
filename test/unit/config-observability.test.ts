@@ -4,7 +4,7 @@ import {describe, expect, test} from 'bun:test';
 import {mkdirpSync, rmSync, writeFileSync} from 'fs-extra';
 
 import {createConfigMetrics, describeConfigCounters} from '../../app/config/config-metrics';
-import {createImportRecorder} from '../../app/config/config-observability';
+import {createImportRecorder, type ImportRecorder} from '../../app/config/config-observability';
 import {shouldAnnounceReload, type ConfigImportReport} from '../../app/config/import-report';
 import type {KeybindingsLoadOutcome} from '../../app/config/keybindings';
 import {
@@ -37,6 +37,12 @@ const kept = (
 ): KeybindingsLoadOutcome => ({basis, cause, diagnostics: [], keymaps: {}, kind: 'kept'});
 
 const APPLIED_REPORT: ConfigImportReport = {config: 'applied', keybindings: 'applied'};
+
+/** Records one reload decision from the Velocetty tree, as the app does. */
+const recordImport = (recorder: ImportRecorder, outcome: KeybindingsLoadOutcome, report: ConfigImportReport): void => {
+  recorder.beginImport({phase: 'reload'});
+  recorder.recordImport({announced: false, configSource: 'velocetty', outcome, phase: 'reload', report});
+};
 const KEPT_REPORT: ConfigImportReport = {config: 'applied', keybindings: 'kept'};
 
 describe('the import decision record', () => {
@@ -113,36 +119,37 @@ describe('the import decision record', () => {
     );
   });
 
-  test('counts an unreadable file separately from an invalid one', () => {
-    const {recorder} = harness();
+  /**
+   * Each rejected read teaches a different fact about the counters: an
+   * unreadable file is counted, a deferred bootstrap is not.
+   */
+  const keptCounterCases: readonly Readonly<{
+    cause: 'deferred' | 'unreadable';
+    description: string;
+    expected: Readonly<{applies: number; parseFailures: number; readFailures: number}>;
+  }>[] = [
+    {
+      cause: 'unreadable',
+      description: 'counts an unreadable file separately from an invalid one',
+      expected: {applies: 0, parseFailures: 0, readFailures: 1}
+    },
+    {
+      cause: 'deferred',
+      description: 'counts neither failure for a deferred bootstrap',
+      expected: {applies: 0, parseFailures: 0, readFailures: 0}
+    }
+  ];
 
-    recorder.beginImport({phase: 'reload'});
-    recorder.recordImport({
-      announced: false,
-      configSource: 'velocetty',
-      outcome: kept('empty', 'unreadable'),
-      phase: 'reload',
-      report: KEPT_REPORT
+  for (const {cause, description, expected} of keptCounterCases) {
+    test(description, () => {
+      const {recorder, sink} = harness();
+
+      recordImport(recorder, kept(cause === 'deferred' ? 'last-known-good' : 'empty', cause), KEPT_REPORT);
+
+      expect(sink.info[1]).toContain(`cause=${cause}`);
+      expect(recorder.counters()).toMatchObject(expected);
     });
-
-    expect(recorder.counters()).toMatchObject({applies: 0, parseFailures: 0, readFailures: 1});
-  });
-
-  test('counts neither failure for a deferred bootstrap', () => {
-    const {recorder, sink} = harness();
-
-    recorder.beginImport({phase: 'reload'});
-    recorder.recordImport({
-      announced: false,
-      configSource: 'velocetty',
-      outcome: kept('last-known-good', 'deferred'),
-      phase: 'reload',
-      report: KEPT_REPORT
-    });
-
-    expect(sink.info[1]).toContain('cause=deferred');
-    expect(recorder.counters()).toMatchObject({applies: 0, parseFailures: 0, readFailures: 0});
-  });
+  }
 
   test('counts a config fallback and names the basis it fell back to', () => {
     const {recorder, sink} = harness();
@@ -184,14 +191,7 @@ describe('the import decision record', () => {
   test('omits the fallback basis when the decision is not a fallback', () => {
     const {recorder, sink} = harness();
 
-    recorder.beginImport({phase: 'reload'});
-    recorder.recordImport({
-      announced: false,
-      configSource: 'velocetty',
-      outcome: applied('file'),
-      phase: 'reload',
-      report: APPLIED_REPORT
-    });
+    recordImport(recorder, applied('file'), APPLIED_REPORT);
 
     expect(sink.info[1]).not.toContain('fallbackBasis');
   });
@@ -210,14 +210,7 @@ describe('the import attempt record', () => {
   test('does not double-count the attempt when the decision record follows', () => {
     const {recorder} = harness();
 
-    recorder.beginImport({phase: 'reload'});
-    recorder.recordImport({
-      announced: false,
-      configSource: 'velocetty',
-      outcome: applied('file'),
-      phase: 'reload',
-      report: APPLIED_REPORT
-    });
+    recordImport(recorder, applied('file'), APPLIED_REPORT);
 
     expect(recorder.counters().attempts).toBe(1);
   });
