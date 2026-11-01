@@ -334,32 +334,42 @@ in `bun test` without Electron, a real clock, or a real filesystem. See
 
 ### Configuration health signals
 
-Each import attempt emits exactly one bounded record on `console.info`, and
-each refused atomic-write rename emits one on `console.warn`. Both carry only
+Each import attempt emits one attempt line and exactly one bounded record on
+`console.info`, each completed operation emits one span line, and each refused
+atomic-write rename emits one record on `console.warn`. All of them carry only
 values from a closed vocabulary, so neither a path, a command identifier, nor a
 shortcut can leak into a log.
 
 ```text
-[config] import decision phase=reload config=applied keybindings=applied origin=file announced=true
+[config] import attempt phase=reload
+[config] import decision phase=reload config=applied configSource=velocetty
+  keybindings=applied origin=file announced=true
   attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0
+[config] span operation=reload outcome=applied ms=2
+[config] span operation=watcher-dispatch outcome=applied ms=2
 [config] import failure phase=reload cause=thrown
   attempts:2,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0
 [config] keybindings rename attempt=1 category=busy exhausted=false
 ```
 
-A reload that throws before it can report a per-file outcome emits the failure
-record instead of a decision record: there is no outcome to describe, and
-claiming one would invent evidence. The error itself is still reported by the
-watcher after the failure record is written.
+The attempt line is written before the import runs, so an import that throws
+before it can report anything is still counted. A reload that throws before it
+can report a per-file outcome emits the failure record instead of a decision
+record: there is no outcome to describe, and claiming one would invent
+evidence. The error itself is still reported by the watcher after the failure
+record is written.
 
-The counter snapshot is appended to the decision record on the same line; it is
-shown wrapped here. Its fields mean:
+The decision record is one line, with the counter snapshot appended; long
+records are shown wrapped here. Its fields mean:
 
 - `phase` is `startup` for the first import and `reload` for a watched change.
 - `config` is `applied`, or `fallback` when `config.json5` could not be read or
   parsed and the bundled defaults filled in. A fallback carries `cause=parse`
   when the file was read but rejected, and `cause=read` when it could not be
   read at all.
+- `configSource` is `development`, `velocetty`, or `hyper`, naming the tree the
+  active configuration file came from. A fallback adds `fallbackBasis=defaults`
+  so a record never leaves the replacement source implicit.
 - `keybindings` is `applied` with an `origin` (`file`, `missing`, `seeded`, or
   `seeded-unsaved`), or `kept` with the surviving `basis` (`last-known-good` or
   `empty`) and the `cause` (`invalid`, `unreadable`, or `deferred`). A parse
@@ -375,13 +385,20 @@ shown wrapped here. Its fields mean:
 - `category` is `permission` for `EPERM` and `EACCES`, `busy` for `EBUSY`, and
   `other` for anything else. `exhausted` marks the attempt that ended the
   write, so a retry that later succeeds emits only `exhausted=false` events.
+- A span's `operation` is `reload`, `watcher-dispatch`, `keybindings-read`, or
+  `keybindings-write`; its `outcome` is `applied`, `fallback`, or `thrown` for
+  the import operations and `present`, `missing`, `unreadable`, `written`, or
+  `failed` for the storage operations. `ms` is the elapsed time rounded to a
+  whole millisecond, so a span line is a completion record rather than an
+  in-progress marker.
 
-`createConfigMetrics` and `createImportRecorder` live in
-`app/config/config-metrics.ts` and `app/config/config-observability.ts`. Both
-take their sink as a parameter, so a test can assert the exact text and
-counters without Electron. A seeded migration that could not be written is
-recorded as `origin=seeded-unsaved`; it applies in memory, but the counter line
-and the record do not claim a completed migration.
+`createConfigMetrics`, `createImportRecorder`, and `createConfigSpanRecorder`
+live in `app/config/config-metrics.ts`, `app/config/config-observability.ts`,
+and `app/config/config-spans.ts`. All three take their sink as a parameter, and
+the span recorder also takes its clock, so a test can assert the exact text,
+counters, and elapsed times without Electron. A seeded migration that could not
+be written is recorded as `origin=seeded-unsaved`; it applies in memory, but
+the counter line and the record do not claim a completed migration.
 
 ### Reloadability classification
 

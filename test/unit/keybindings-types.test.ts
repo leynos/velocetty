@@ -1,7 +1,8 @@
 /** @file Compile-time contracts for the keybindings types, checked by `bun check:types`. */
 import {expect, test} from 'bun:test';
 
-import type {ConfigImportNotify, KeybindingsLoadOutcome, KeybindingsStore} from '../../app/config/keybindings';
+import type {ConfigImportNotify} from '../../app/config/import-report';
+import type {KeybindingsLoadOutcome, KeybindingsStore} from '../../app/config/keybindings-ports';
 import type {UserKeymaps} from '../../app/config/keybindings-policy';
 import type {ConfigImportPaths} from '../../app/config/import-sources';
 
@@ -35,12 +36,14 @@ const assertTypeContracts = (): void => {
   void missingPath;
   void notify;
   const store: KeybindingsStore = {
-    location: '/home/ada/.config/Velocetty/keybindings.json5',
+    label: 'keybindings.json5',
     read: () => ({kind: 'missing'}),
-    removeStaleTemporaryFiles: () => {},
     write: () => ({kind: 'written'})
   };
   void store;
+  // @ts-expect-error the port carries a short label, never a filesystem path
+  const pathLabelledStore: KeybindingsStore = {...store, label: 42};
+  void pathLabelledStore;
 };
 
 test('the keybindings contracts compile', () => {

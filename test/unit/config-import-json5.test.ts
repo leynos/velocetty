@@ -3,11 +3,13 @@ import {expect, test} from 'bun:test';
 
 import path from 'node:path';
 
+import * as fsExtra from 'fs-extra';
 import {existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
 import JSON5 from 'json5';
 import {isString} from '@shared/types/guards';
 
 import type {ConfigImportPaths} from '../../app/config/import';
+import type {ConfigImportFileSystem} from '../../app/config/import-sources';
 import type {configValidationDiagnostic} from '@shared/types/config';
 import {
   createConfigImportHarness,
@@ -219,6 +221,7 @@ test('bootstraps missing config with JSON5 output without legacy migration paths
     expect(existsSync(harness.mockPaths.cfgPath)).toBe(true);
     expect(existsSync(harness.mockPaths.keybindingsPath)).toBe(true);
     expect(existsSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(true);
+    expect(existsSync(path.join(harness.mockPaths.keybindingsDir, harness.mockPaths.keybindingsSchemaFile))).toBe(true);
     expect(existsSync(harness.mockPaths.plugs.base)).toBe(true);
     expect(existsSync(harness.mockPaths.plugs.local)).toBe(true);
     // A freshly created config has no shortcuts to migrate, so this only
@@ -228,6 +231,9 @@ test('bootstraps missing config with JSON5 output without legacy migration paths
 
     const writtenConfig = JSON5.parse(readFileSync(harness.mockPaths.cfgPath, 'utf8'));
     const expectedConfig = JSON5.parse(defaultConfigFixture);
+    // The bootstrap template is the cached default payload, which already has
+    // the platform keymap merged, so the platform binding wins inside it.
+    expectedConfig.keymaps = {'window:new': ['ctrl+n']};
     expect(writtenConfig.plugins).toEqual(['plugin-a']);
     expect(writtenConfig).toEqual(expectedConfig);
     expect(JSON5.parse(readFileSync(harness.mockPaths.keybindingsPath, 'utf8'))).toEqual({});
@@ -236,7 +242,7 @@ test('bootstraps missing config with JSON5 output without legacy migration paths
   }
 });
 
-test('getDefaultConfig lazily loads and caches the default config', async () => {
+test('getDefaultConfig reads and caches the defaults without writing', async () => {
   const harness = await createConfigImportHarness();
   try {
     writeFileSync(
@@ -255,16 +261,71 @@ test('getDefaultConfig lazily loads and caches the default config', async () => 
     const result = harness.getDefaultConfig();
 
     expect(result).toEqual(expect.any(Object));
-    expect(existsSync(harness.mockPaths.plugs.base)).toBe(true);
-    expect(existsSync(harness.mockPaths.plugs.local)).toBe(true);
-    expect(existsSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(true);
+    // A query is read-only: no plugin directories, schema copy, or user file.
+    expect(existsSync(harness.mockPaths.plugs.base)).toBe(false);
+    expect(existsSync(harness.mockPaths.plugs.local)).toBe(false);
+    expect(existsSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(false);
+    expect(existsSync(harness.mockPaths.cfgPath)).toBe(false);
     expect(harness.initMock).not.toHaveBeenCalled();
     expect(harness.notifyMock).not.toHaveBeenCalled();
 
-    // Second call must return the same cached object reference.
+    // A second query returns an equal defensive copy of the cached payload.
     const result2 = harness.getDefaultConfig();
-    expect(result2).toBe(result);
+    expect(result2).toEqual(result);
+    expect(result2).not.toBe(result);
     expect(harness.initMock).not.toHaveBeenCalled();
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('getDefaultConfig performs zero writes through the injected filesystem', async () => {
+  const writeCounts = {mkdirp: 0, writeFile: 0};
+  const recordingFileSystem: ConfigImportFileSystem = {
+    ...fsExtra,
+    mkdirpSync: (directory) => {
+      writeCounts.mkdirp += 1;
+      fsExtra.mkdirpSync(directory);
+    },
+    writeFileSync: (...args) => {
+      writeCounts.writeFile += 1;
+      fsExtra.writeFileSync(...args);
+    }
+  };
+  const harness = await createConfigImportHarness({fs: recordingFileSystem});
+  try {
+    writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
+    writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), `{"window:new": ["ctrl+n"]}`, 'utf8');
+    writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+
+    const defaults = harness.getDefaultConfig();
+
+    expect(defaults).toEqual(expect.any(Object));
+    // The recording double is the proof: the query made no directory and wrote
+    // no file, so the plugin tree and schema copies cannot have been created.
+    expect(writeCounts).toEqual({mkdirp: 0, writeFile: 0});
+    expect(existsSync(harness.mockPaths.plugs.base)).toBe(false);
+    expect(existsSync(harness.mockPaths.plugs.local)).toBe(false);
+    expect(existsSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(false);
+    expect(existsSync(harness.mockPaths.cfgPath)).toBe(false);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('getDefaultConfig returns the same defaults before and after a start-up import', async () => {
+  const harness = await createConfigImportHarness();
+  try {
+    writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
+    writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), `{"window:new": ["ctrl+n"]}`, 'utf8');
+    writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+
+    const before = harness.getDefaultConfig();
+    harness._import('startup');
+    const after = harness.getDefaultConfig();
+
+    expect(after).toEqual(before);
+    expect(after.keymaps).toEqual({'window:new': ['ctrl+n']});
   } finally {
     harness.cleanup();
   }

@@ -3,7 +3,7 @@ import {expect, test} from 'bun:test';
 import fc from 'fast-check';
 
 import {createKeybindingsService} from '../../app/config/keybindings';
-import {parseKeybindingsText, serializeKeybindings} from '../../app/config/keybindings-codec';
+import {keybindingsCodec, parseKeybindingsText, serializeKeybindings} from '../../app/config/keybindings-codec';
 import {createMemoryKeybindingsStore} from '../testUtils/memory-keybindings-store';
 import {KEYBINDINGS_PROPERTY_SEED, keymapsArb, textDocArb} from '../testUtils/keybindings-arbitraries';
 
@@ -34,8 +34,9 @@ const startService = (initialText: string) => {
   store.setText(initialText);
   const notifications: string[] = [];
   const service = createKeybindingsService({
-    notify: (title) => {
-      notifications.push(title);
+    codec: keybindingsCodec,
+    report: (notice) => {
+      notifications.push(notice.kind);
     },
     store
   });
@@ -124,7 +125,7 @@ test('KB-SVC-1 export reports invalid text with the parser diagnostics', () => {
       const {notifications, service, store} = startService(SEED_TEXT);
       const before = service.active();
       store.setText(text);
-      const expected = parseKeybindingsText(text, store.location);
+      const expected = parseKeybindingsText(text, store.label);
       const notificationsBefore = notifications.length;
 
       const outcome = service.exportKeybindings();

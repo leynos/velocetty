@@ -40,14 +40,22 @@ const APPLIED_REPORT: ConfigImportReport = {config: 'applied', keybindings: 'app
 const KEPT_REPORT: ConfigImportReport = {config: 'applied', keybindings: 'kept'};
 
 describe('the import decision record', () => {
-  test('names the origin of an applied file and counts one apply', () => {
+  test('names the origin of an applied file and counts one attempt and apply', () => {
     const {recorder, sink} = harness();
 
-    recorder.recordImport({announced: true, outcome: applied('file'), phase: 'reload', report: APPLIED_REPORT});
+    recorder.beginImport({phase: 'reload'});
+    recorder.recordImport({
+      announced: true,
+      configSource: 'velocetty',
+      outcome: applied('file'),
+      phase: 'reload',
+      report: APPLIED_REPORT
+    });
 
     expect(sink.info).toEqual([
-      '[config] import decision phase=reload config=applied keybindings=applied origin=file announced=true ' +
-        'attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0'
+      '[config] import attempt phase=reload',
+      '[config] import decision phase=reload config=applied configSource=velocetty keybindings=applied origin=file ' +
+        'announced=true attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0'
     ]);
     expect(sink.warn).toEqual([]);
     expect(recorder.counters()).toEqual({
@@ -64,45 +72,54 @@ describe('the import decision record', () => {
   test('separates an empty file from a first-run seed by origin alone', () => {
     const {recorder, sink} = harness();
 
-    recorder.recordImport({announced: false, outcome: applied('missing'), phase: 'startup', report: APPLIED_REPORT});
-    recorder.recordImport({announced: false, outcome: applied('seeded'), phase: 'startup', report: APPLIED_REPORT});
-    recorder.recordImport({
-      announced: false,
-      outcome: applied('seeded-unsaved'),
-      phase: 'startup',
-      report: APPLIED_REPORT
-    });
+    for (const origin of ['missing', 'seeded', 'seeded-unsaved'] as const) {
+      recorder.beginImport({phase: 'startup'});
+      recorder.recordImport({
+        announced: false,
+        configSource: 'velocetty',
+        outcome: applied(origin),
+        phase: 'startup',
+        report: APPLIED_REPORT
+      });
+    }
 
-    expect(sink.info.map((line) => line.split(' announced=')[0])).toEqual([
-      '[config] import decision phase=startup config=applied keybindings=applied origin=missing',
-      '[config] import decision phase=startup config=applied keybindings=applied origin=seeded',
-      '[config] import decision phase=startup config=applied keybindings=applied origin=seeded-unsaved'
+    const decisionLines = sink.info.filter((line) => line.startsWith('[config] import decision'));
+    expect(decisionLines.map((line) => line.split(' announced=')[0])).toEqual([
+      '[config] import decision phase=startup config=applied configSource=velocetty keybindings=applied origin=missing',
+      '[config] import decision phase=startup config=applied configSource=velocetty keybindings=applied origin=seeded',
+      '[config] import decision phase=startup config=applied configSource=velocetty keybindings=applied origin=seeded-unsaved'
     ]);
     // A seed that could not be written still applied in memory.
     expect(recorder.counters().applies).toBe(3);
+    expect(recorder.counters().attempts).toBe(3);
   });
 
   test('counts a parse failure as a kept outcome, not a fallback', () => {
     const {recorder, sink} = harness();
 
+    recorder.beginImport({phase: 'reload'});
     recorder.recordImport({
       announced: false,
+      configSource: 'velocetty',
       outcome: kept('last-known-good', 'invalid'),
       phase: 'reload',
       report: KEPT_REPORT
     });
 
-    expect(sink.info[0]).toBe(
-      '[config] import decision phase=reload config=applied keybindings=kept basis=last-known-good cause=invalid ' +
-        'announced=false attempts:1,applies:0,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0'
+    expect(sink.info[1]).toBe(
+      '[config] import decision phase=reload config=applied configSource=velocetty keybindings=kept ' +
+        'basis=last-known-good cause=invalid announced=false ' +
+        'attempts:1,applies:0,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0'
     );
   });
 
   test('counts an unreadable file separately from an invalid one', () => {
     const {recorder} = harness();
 
+    recorder.beginImport({phase: 'reload'});
     recorder.recordImport({
       announced: false,
+      configSource: 'velocetty',
       outcome: kept('empty', 'unreadable'),
       phase: 'reload',
       report: KEPT_REPORT
@@ -114,42 +131,95 @@ describe('the import decision record', () => {
   test('counts neither failure for a deferred bootstrap', () => {
     const {recorder, sink} = harness();
 
+    recorder.beginImport({phase: 'reload'});
     recorder.recordImport({
       announced: false,
+      configSource: 'velocetty',
       outcome: kept('last-known-good', 'deferred'),
       phase: 'reload',
       report: KEPT_REPORT
     });
 
-    expect(sink.info[0]).toContain('cause=deferred');
+    expect(sink.info[1]).toContain('cause=deferred');
     expect(recorder.counters()).toMatchObject({applies: 0, parseFailures: 0, readFailures: 0});
   });
 
-  test('counts a config fallback while still reporting the keybindings outcome', () => {
+  test('counts a config fallback and names the basis it fell back to', () => {
     const {recorder, sink} = harness();
 
+    recorder.beginImport({phase: 'reload'});
     recorder.recordImport({
       announced: false,
+      configSource: 'hyper',
+      fallbackBasis: 'defaults',
       outcome: applied('file'),
       phase: 'reload',
       report: {config: 'fallback', keybindings: 'applied'}
     });
 
-    expect(sink.info[0]).toContain('config=fallback keybindings=applied origin=file');
+    expect(sink.info[1]).toContain(
+      'config=fallback configSource=hyper fallbackBasis=defaults keybindings=applied origin=file'
+    );
     expect(recorder.counters()).toMatchObject({applies: 1, attempts: 1, fallbacks: 1});
   });
 
   test('names the fallback cause, so a parse failure differs from a read failure', () => {
     const {recorder, sink} = harness();
 
+    recorder.beginImport({phase: 'reload'});
     recorder.recordImport({
       announced: false,
+      configSource: 'development',
+      fallbackBasis: 'defaults',
       outcome: applied('file'),
       phase: 'reload',
       report: {config: 'fallback', configCause: 'parse', keybindings: 'applied'}
     });
 
-    expect(sink.info[0]).toContain('config=fallback cause=parse keybindings=applied origin=file');
+    expect(sink.info[1]).toContain(
+      'config=fallback cause=parse configSource=development fallbackBasis=defaults keybindings=applied origin=file'
+    );
+  });
+
+  test('omits the fallback basis when the decision is not a fallback', () => {
+    const {recorder, sink} = harness();
+
+    recorder.beginImport({phase: 'reload'});
+    recorder.recordImport({
+      announced: false,
+      configSource: 'velocetty',
+      outcome: applied('file'),
+      phase: 'reload',
+      report: APPLIED_REPORT
+    });
+
+    expect(sink.info[1]).not.toContain('fallbackBasis');
+  });
+});
+
+describe('the import attempt record', () => {
+  test('emits and counts an attempt before any result is known', () => {
+    const {recorder, sink} = harness();
+
+    recorder.beginImport({phase: 'startup'});
+
+    expect(sink.info).toEqual(['[config] import attempt phase=startup']);
+    expect(recorder.counters()).toMatchObject({attempts: 1, importFailures: 0});
+  });
+
+  test('does not double-count the attempt when the decision record follows', () => {
+    const {recorder} = harness();
+
+    recorder.beginImport({phase: 'reload'});
+    recorder.recordImport({
+      announced: false,
+      configSource: 'velocetty',
+      outcome: applied('file'),
+      phase: 'reload',
+      report: APPLIED_REPORT
+    });
+
+    expect(recorder.counters().attempts).toBe(1);
   });
 });
 
@@ -157,13 +227,14 @@ describe('the import failure record', () => {
   test('counts a thrown attempt once and keeps the closed vocabulary', () => {
     const {recorder, sink} = harness();
 
+    recorder.beginImport({phase: 'reload'});
     recorder.recordImportFailure({cause: 'thrown', phase: 'reload'});
 
     expect(sink.warn).toEqual([
       '[config] import failure phase=reload cause=thrown ' +
         'attempts:1,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0'
     ]);
-    expect(sink.info).toEqual([]);
+    expect(sink.info).toEqual(['[config] import attempt phase=reload']);
     expect(recorder.counters()).toMatchObject({attempts: 1, importFailures: 1});
   });
 });
@@ -204,10 +275,17 @@ describe('a reload sequence', () => {
     try {
       writeSources(importer);
       const run = (phase: 'reload' | 'startup') => {
+        recorder.beginImport({phase});
         const result = importer._import(phase);
         // Start-up never shows "Configuration updated"; only a reload can.
         const announced = phase === 'reload' && shouldAnnounceReload(result.report);
-        recorder.recordImport({announced, outcome: result.keybindings, phase, report: result.report});
+        recorder.recordImport({
+          announced,
+          configSource: 'velocetty',
+          outcome: result.keybindings,
+          phase,
+          report: result.report
+        });
       };
 
       writeFileSync(importer.mockPaths.keybindingsPath, `{'window:new': 'ctrl+n'}`, 'utf8');
@@ -217,13 +295,15 @@ describe('a reload sequence', () => {
       writeFileSync(importer.mockPaths.keybindingsPath, `{'window:new': 'ctrl+shift+n'}`, 'utf8');
       run('reload');
 
-      expect(sink.info).toEqual([
-        '[config] import decision phase=startup config=applied keybindings=applied origin=file announced=false ' +
-          'attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0',
-        '[config] import decision phase=reload config=applied keybindings=kept basis=last-known-good cause=invalid ' +
-          'announced=false attempts:2,applies:1,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0',
-        '[config] import decision phase=reload config=applied keybindings=applied origin=file announced=true ' +
-          'attempts:3,applies:2,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0'
+      const decisionLines = sink.info.filter((line) => line.startsWith('[config] import decision'));
+      expect(decisionLines).toEqual([
+        '[config] import decision phase=startup config=applied configSource=velocetty keybindings=applied origin=file ' +
+          'announced=false attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0',
+        '[config] import decision phase=reload config=applied configSource=velocetty keybindings=kept ' +
+          'basis=last-known-good cause=invalid announced=false ' +
+          'attempts:2,applies:1,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0',
+        '[config] import decision phase=reload config=applied configSource=velocetty keybindings=applied origin=file ' +
+          'announced=true attempts:3,applies:2,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0'
       ]);
     } finally {
       importer.cleanup();

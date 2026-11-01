@@ -6,7 +6,8 @@
  * process, so a burst of reloads cannot repeat them.
  */
 import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
-import {notifyWithPrimaryDiagnostic, type ConfigImportNotify} from './keybindings';
+import type {ConfigImportNotify} from './import-report';
+import {notifyWithPrimaryDiagnostic} from './keybindings-notifier';
 import {parseKeybindingsText, serializeKeybindings, toRawKeymaps} from './keybindings-codec';
 import type {LegacyKeymapsSource, UserKeymaps} from './keybindings-policy';
 

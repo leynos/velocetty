@@ -12,7 +12,10 @@ import {isString} from '@shared/types/guards';
 import {createConfigImportModule, type ConfigImportPaths} from '../../app/config/import';
 import {_init} from '../../app/config/init';
 import {createKeybindingsService} from '../../app/config/keybindings';
+import {keybindingsCodec} from '../../app/config/keybindings-codec';
+import {createKeybindingsNotifier} from '../../app/config/keybindings-notifier';
 import {createFileKeybindingsStore} from '../../app/config/keybindings-store';
+import type {ConfigImportFileSystem} from '../../app/config/import-sources';
 import type {configValidationDiagnostic} from '@shared/types/config';
 
 type ConfigInit = Parameters<typeof createConfigImportModule>[0]['_init'];
@@ -90,6 +93,11 @@ export type ConfigImportHarnessOptions = {
    * seed rather than a completed migration.
    */
   readonly failSeedWrite?: boolean;
+  /**
+   * Replaces the loader's filesystem functions. A recording double lets a test
+   * prove the default-config query performs no writes.
+   */
+  readonly fs?: ConfigImportFileSystem;
 };
 
 const createMockPaths = (workspaceRoot: string, options: ConfigImportHarnessOptions): ConfigImportPaths => {
@@ -154,16 +162,24 @@ export const createConfigImportHarness = async (
     const fileStore = createFileKeybindingsStore({filePath: mockPaths.keybindingsPath, warn: warnMock});
     const store =
       options.failSeedWrite === true
-        ? {...fileStore, write: () => ({kind: 'failed' as const, error: new Error('injected seed write failure')})}
+        ? {...fileStore, write: () => ({failure: 'other' as const, kind: 'failed' as const})}
         : fileStore;
-    const keybindings = createKeybindingsService({notify: notifyMock, store, warn: warnMock});
-    const configModule = createConfigImportModule({
+    const keybindings = createKeybindingsService({
+      codec: keybindingsCodec,
+      report: createKeybindingsNotifier(notifyMock, warnMock),
+      store
+    });
+    const configDependencies = {
       _init: initMock,
       keybindings,
       notify: notifyMock,
       paths: mockPaths,
       warn: warnMock
-    });
+    };
+    if (options.fs !== undefined) {
+      Object.assign(configDependencies, {fs: options.fs});
+    }
+    const configModule = createConfigImportModule(configDependencies);
 
     return {
       _import: configModule._import,

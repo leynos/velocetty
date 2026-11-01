@@ -11,6 +11,7 @@ import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
 import type {JsonObject} from '@shared/types/json';
 import {isObject, isString} from '../utils/runtime-guards';
 import {stringifyJson5} from './json5-config';
+import type {KeybindingsTextCodec} from './keybindings-ports';
 import type {UserKeymaps} from './keybindings-policy';
 
 /** The parser's verdict on one keybindings document. */
@@ -245,6 +246,19 @@ const HEADER = [
  * ```
  */
 export const serializeKeybindings = (keymaps: UserKeymaps): string => `${HEADER}\n\n${stringifyJson5(keymaps)}`;
+
+/**
+ * The codec as the keybindings service's port.
+ *
+ * The service holds this interface, so it never imports JSON5 or the
+ * serialiser directly.
+ *
+ * @example
+ * ```ts
+ * keybindingsCodec.parse(`{}`, 'keybindings.json5'); // {kind: 'ok', keymaps: {}}
+ * ```
+ */
+export const keybindingsCodec: KeybindingsTextCodec = {parse: parseKeybindingsText, serialize: serializeKeybindings};
 
 /**
  * Copies validated keymaps into the mutable raw-config shape.

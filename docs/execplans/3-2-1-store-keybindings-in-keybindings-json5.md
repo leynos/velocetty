@@ -863,13 +863,18 @@ design and the notification the user sees.
     infrastructure (`opentelemetry`, `trace`, and `span` do not appear in
     `app/`, `shared/`, or `lib/`), so a span API here would be the only one and
     would not be exported anywhere. The bounded records and counters are the
-    observability surface this codebase actually has.
+    observability surface this codebase actually has. Superseded on 2026-11-01:
+    the hosted assessment required operation spans across the storage and
+    asynchronous boundaries, and `app/config/config-spans.ts` now supplies a
+    narrow injected recorder that emits through the same sink.
   - [x] Domain Architecture and Unit Architecture: the port/adapter split and
     the query-named `getDefaultConfig` are inherited shapes, not new defects;
     the comparison and the remaining work are recorded as `KEYMAP-003` in
     `docs/tracking-issues.md`. The one new write on the getter path is the
     keybindings *schema* copy inside `ensureSchemaFile`; a query cannot seed
     `keybindings.json5`, because it never starts the keybindings service.
+    Superseded on 2026-11-01: the hosted assessment did not accept the
+    deferral, so both are now implemented and `KEYMAP-003` is closed.
 
 - [x] (2026-10-31 17:55Z) Repair round for the review of `7a84078d`, the first
   head that included the fallback-cause and thrown-reload work.
@@ -910,6 +915,51 @@ design and the notification the user sees.
     intermediate save, so it was discarded rather than treated as a defect.
     The re-run on the frozen tree passed all eight gates, with `make test` at
     717 pass / 0 fail.
+
+- [x] (2026-11-01) Repair round for the pre-merge assessment of `293986fb`.
+  The assessment refused the earlier deferral of Unit Architecture, Domain
+  Architecture, Observability, and the remaining current-context documentation
+  claims, so all four are now implemented rather than argued with.
+  - [x] Unit Architecture: `getDefaultConfig` is a pure query over the cached
+    bundled defaults. Directory creation, the two schema copies, and the
+    `config.json5` bootstrap moved into the explicitly named start-up command
+    (`load('startup')`), which the composition root invokes only from
+    `setup()`. `test/unit/config-import-json5.test.ts` asserts zero writes
+    through the injected filesystem and still asserts the command's intended
+    effects separately.
+  - [x] Domain Architecture: `app/config/keybindings-ports.ts` holds the store
+    and codec ports plus the domain outcomes and the bounded storage-failure
+    vocabulary; `app/config/keybindings-notifier.ts` holds the presentation
+    strings; `app/config/keybindings-store-contract.ts` holds the adapter's own
+    options. The store imports only the neutral module, the service never
+    imports the JSON5 codec, and `app/config.ts` owns stale-temporary-file
+    cleanup and rename-retry reporting. `KEYMAP-003` in
+    `docs/tracking-issues.md` records the resolution and is now closed.
+  - [x] Observability, spans: `app/config/config-spans.ts` defines one injected
+    recorder for `reload`, `watcher-dispatch`, `keybindings-read`, and
+    `keybindings-write`, emitting `operation`, `outcome`, and elapsed
+    milliseconds through the existing sink. The clock is injected so the test
+    can pin the elapsed value; no tracing dependency was added.
+  - [x] Observability, attempt signal: `ImportRecorder.beginImport` emits
+    `[config] import attempt phase=<phase>` and counts the attempt before
+    `_import` runs, so an import that throws before reporting is still tallied.
+  - [x] Observability, bounded configuration outcome: `ImportDecision` and
+    `ImportRecord` carry `configSource` (`development`, `velocetty`, or
+    `hyper`) and, only for a fallback, `fallbackBasis: 'defaults'`;
+    `describeImportDecision` renders both fields.
+  - [x] Developer Documentation: the four current-context statements the
+    assessment named now describe the delivered behaviour — the configuration
+    tree resolution order and its exports, the start-up-only `config.json5`
+    creation, the `applied`/`kept` outcome vocabulary, and the conditional
+    reload notice with unconditional subscriber dispatch.
+  - [x] `docs/tracking-issues.md` `KEYMAP-003` moves to Resolved with one
+    delivered counterpart per exit criterion.
+  - [x] Gate evidence: the eight gates were run sequentially on the frozen
+    tree. `check-fmt` (371 files, no fixes; 70 files unchanged), `typecheck`
+    (no diagnostics), and `lint` (372 files; boundaries passed; oxlint clean)
+    passed, then `test` (734 pass, 0 fail across 85 files), `spelling`
+    (`typos.toml` unchanged), `markdownlint` (0 issues in 70 files), `nixie`
+    (all diagrams valid), and `prove` (1 + 8 verified, 0 errors).
 
 ## Surprises & discoveries
 
@@ -1617,10 +1667,11 @@ Retrospective findings:
 
 Remaining work, all recorded outside this plan's acceptance: plugin precedence
 (`KEYMAP-001`), the `keymaps` scope mismatch (`KEYMAP-002`), the resolver-input
-divergence (`CONFIG-003`), the `userData` name (`CONFIG-004`), and the importer
-and keybindings-service split from their adapters (`KEYMAP-003`). The three-OS
+divergence (`CONFIG-003`), and the `userData` name (`CONFIG-004`). The three-OS
 CI end-to-end lane is no longer remaining work: EP-E E4 records green runs on
-`fc9a184e` and `eada2f0e`.
+`fc9a184e` and `eada2f0e`. The importer and keybindings-service split from
+their adapters (`KEYMAP-003`) is also complete: the 2026-11-01 round moved the
+ports into neutral modules and made the default-config query read-only.
 
 ## Context and orientation
 
@@ -1629,15 +1680,24 @@ configuration. The renderer (code under `lib/`) receives keymaps over IPC.
 `shared/` holds code shared with the renderer and the command-line interface
 (CLI), but the main process may import only types from it.
 
-Configuration lives in a per-user directory computed in `app/config/paths.ts`.
-It is `$XDG_CONFIG_HOME/Hyper` when that variable is set (on any platform).
-Otherwise it is `~/.config/Hyper` on Linux and macOS, or Electron's `userData`
-on Windows. This is the "Hyper tree". In development mode it moves to the
-repository root if a `config.json5` exists there. The module exports `cfgDir`,
-`cfgPath`, and, on this branch, `keybindingsFile` and `keybindingsPath`. EP-P
-adds the higher-priority "Velocetty tree" (see `Additional requirement`). The
-CLI (`cli/api.ts` `resolveConfigPath`) computes the same Hyper paths
-independently, for plugin commands.
+Configuration file resolution is delivered in `app/config/config-tree.ts`, with
+paths re-exported from `app/config/paths.ts`. The Velocetty tree is
+`$XDG_CONFIG_HOME/Velocetty` when `XDG_CONFIG_HOME` is absolute; otherwise it is
+`~/.config/Velocetty` on Linux and macOS, or Electron's `appData` directory
+plus `/Velocetty` on Windows. A relative or empty `XDG_CONFIG_HOME` does not
+count for this tree. The legacy Hyper tree is `$XDG_CONFIG_HOME/Hyper` for any
+non-empty `XDG_CONFIG_HOME` (deliberately laxer), otherwise `~/.config/Hyper`
+on Linux and macOS, or Electron's `userData` directory on Windows. Candidates
+are tried in order: in development mode the repository root's `config.json5`
+then `hyper.json`; then `<Velocetty>/config.json5`; then
+`<Hyper>/config.json5`; then `<Hyper>/hyper.json`. The first candidate that
+exists wins, including a dangling symlink. When none exists the creation path is
+`<Velocetty>/config.json5` and `exists` is false. The module exports `cfgDir`,
+`cfgPath`, `configTree` (the tree that supplied the active file: `development`,
+`velocetty`, or `hyper`), `shadowedConfigPaths`, `velocettyDir`,
+`keybindingsFile`, and `keybindingsPath`. The CLI (`cli/api.ts`
+`resolveConfigPath`) computes the same locations independently, for plugin
+commands.
 
 Start-up (`setup()` in `app/config.ts`) and every reload call `_import()` from
 `createConfigImportModule` (`app/config/import.ts`). `_import()` does the
@@ -1645,25 +1705,34 @@ following:
 
 1. On start-up only, creates the plugin directories and copies both JSON
    schemas into the configuration trees; a reload writes nothing.
-2. Loads the bundled defaults, and writes `config.json5` from them if it is
-   missing.
+2. Loads the bundled defaults, and, on start-up only, writes `config.json5`
+   from them if it is missing. Writing happens only when
+   `canBootstrapUserConfig()` is true, which compares the resolved `cfgDir` with
+   `velocettyDir`; an active Hyper tree is never given a shadowing
+   Velocetty-style file. `getDefaultConfig()` is a query that never starts the
+   keybindings service.
 3. Reads `app/keymaps/<platform>.json` into the defaults.
 4. Loads `config.json5`, falling back to defaults on error and recording the
    bounded cause (`parse` or `read`).
 5. Drives the keybindings service: `start()` seeds or reads
    `keybindings.json5`, `reload()` only reads it, and both report the outcome
-   as applied, kept with a basis and cause, or unchanged.
+   as applied (with origin `file`, `missing`, `seeded`, or `seeded-unsaved`) or
+   kept (with basis `last-known-good` or `empty` and cause `invalid`,
+   `unreadable`, or `deferred`).
 6. Calls `_init` (`app/config/init.ts`), which computes
    `keymaps: mapKeys({...defaultCfg.keymaps, ...userCfg.keymaps})`. A user
    entry therefore replaces the default for that command.
    `app/utils/map-keys.ts` normalizes values to arrays, rewrites `cmd` to
    `command`, and expands `<command>:prefix` entries into numbered commands.
 
-`app/config.ts` then notifies "Configuration updated" and calls its
-subscribers: menus (`app/start.ts`), windows (`app/ui/window.ts`, which sends
-`config change` to the renderer), plugins, and the updater. After that,
-`app/plugins.ts` `getDecoratedKeymaps` merges runtime plugin keybindings and
-runs plugin `decorateKeymaps` hooks.
+`app/config.ts` (`reloadConfiguration`) computes
+`announced = shouldAnnounceReload(report)` and shows the "Configuration
+updated" / "Configuration reloaded!" notification only when `announced` is
+true. Regardless of the notice, it then calls its subscribers — menus
+(`app/start.ts`), windows (`app/ui/window.ts`, which sends `config change` to
+the renderer), plugins, and the updater — runs `checkDeprecatedConfig`, and
+emits the keymaps marker. After that, `app/plugins.ts` `getDecoratedKeymaps`
+merges runtime plugin keybindings and runs plugin `decorateKeymaps` hooks.
 
 `app/config/json5-config.ts` provides two helpers:
 

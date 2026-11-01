@@ -2,19 +2,20 @@
 /*
  * Start-up is the only phase allowed to create directories, copy schemas, or
  * bootstrap `config.json5`. A reload reads the same layers but writes nothing,
- * so a file the user deleted mid-session stays deleted.
+ * so a file the user deleted mid-session stays deleted. The default-config
+ * query is read-only too: it reads and caches the bundled defaults without
+ * copying a schema or creating a user file.
  */
 import {existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
 import path from 'node:path';
 
 import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
-import {isJsonValue} from '../utils/runtime-guards';
-import type {ConfigFallbackCause} from './import-report';
+import type {ConfigFallbackCause, ConfigImportNotify} from './import-report';
 import {ensureSchemaFiles, type SchemaCopyRequest} from './schema-copy';
-import {notifyWithPrimaryDiagnostic, type ConfigImportNotify} from './keybindings';
+import {notifyWithPrimaryDiagnostic} from './keybindings-notifier';
 import {replaceLegacyKeymaps} from './import-keybindings';
 import {parseKeybindingsText, toRawKeymaps} from './keybindings-codec';
-import {parseJson5WithSchemaDiagnostics, safeParseRawConfig, stringifyJson5, type ParseSchema} from './json5-config';
+import {parseRawConfig, reportDiagnostics, stringifyConfig} from './import-sources-parse';
 
 /** Which import the application is performing. */
 export type ConfigImportPhase = 'startup' | 'reload';
@@ -41,6 +42,12 @@ export type ConfigImportPaths = {
   velocettyDir: string;
 };
 
+/** The filesystem subset the loader uses; injected so a query can be proved read-only. */
+export type ConfigImportFileSystem = Pick<
+  typeof import('fs-extra'),
+  'existsSync' | 'mkdirpSync' | 'readFileSync' | 'writeFileSync'
+>;
+
 type LoadedConfig = {
   config: rawConfig;
   diagnostics: configValidationDiagnostic[];
@@ -59,17 +66,21 @@ export type LoadedSources = {
   readonly usedFallback: boolean;
 };
 
-/** Bundles the raw text of a config source with the path diagnostics cite. */
-type ConfigSource = {
-  readonly filePath: string;
-  readonly rawContent: string;
-};
-
 export type ConfigSourceLoaderDependencies = {
+  /**
+   * The filesystem functions the loader may call. Injected so a test can show
+   * that the default query writes nothing.
+   */
+  fs?: ConfigImportFileSystem;
+  /** Whether the opt-in start-up trace is enabled; injected for the same reason. */
+  isDebugEnabled?: () => boolean;
   notify: ConfigImportNotify;
   paths: ConfigImportPaths;
   warn?: typeof console.warn;
+  error?: typeof console.error;
 };
+
+const defaultFileSystem: ConfigImportFileSystem = {existsSync, mkdirpSync, readFileSync, writeFileSync};
 
 const defaultRawConfigFallback: rawConfig = {
   plugins: [],
@@ -78,81 +89,6 @@ const defaultRawConfigFallback: rawConfig = {
 
 /** Creates an isolated copy of a raw config payload for safe mutation. */
 const cloneRawConfig = (config: rawConfig): rawConfig => structuredClone(config);
-
-const rawConfigSchema: ParseSchema<rawConfig> = {
-  safeParse: (value) => safeParseRawConfig(value)
-};
-
-const rawConfigDiagnosticHints = {
-  '/': {
-    docHint: 'Top-level config payload object.',
-    defaultHint: '{}'
-  },
-  '/config': {
-    docHint: 'Root terminal configuration object.',
-    defaultHint: '{}'
-  },
-  '/plugins': {
-    docHint: 'List of plugins to fetch and install from npm.',
-    defaultHint: '[]'
-  },
-  '/localPlugins': {
-    docHint: 'List of local plugin directories to load in development.',
-    defaultHint: '[]'
-  },
-  '/keymaps': {
-    docHint: 'Command keymap overrides as strings or string arrays.',
-    defaultHint: '{}'
-  }
-} as const;
-
-/** Emits one warning per non-empty diagnostic list, tagged with its source. */
-const reportDiagnostics = (
-  warnFn: typeof console.warn,
-  context: string,
-  sourcePath: string,
-  diagnostics: readonly configValidationDiagnostic[]
-) => {
-  if (diagnostics.length === 0) {
-    return;
-  }
-  warnFn(`[config-import] ${context}`, {source: sourcePath, diagnostics});
-};
-
-type ConfigParseOptions<T> = {
-  readonly schema: ParseSchema<T>;
-  readonly fallback: T;
-  readonly itemType: string;
-  readonly diagnosticHints: Record<string, {docHint?: string; defaultHint?: string}>;
-};
-
-/** Parses one source with the shared JSON5 helper and the caller's schema. */
-const parseConfigSource = <T>(source: ConfigSource, options: ConfigParseOptions<T>) =>
-  parseJson5WithSchemaDiagnostics({
-    raw: source.rawContent,
-    source: source.filePath,
-    schema: options.schema,
-    fallback: options.fallback,
-    itemType: options.itemType,
-    diagnosticHints: options.diagnosticHints
-  });
-
-/** Parses a configuration payload, falling back to `null` on invalid input. */
-const parseRawConfig = (source: ConfigSource) =>
-  parseConfigSource(source, {
-    schema: rawConfigSchema,
-    fallback: null,
-    itemType: 'config',
-    diagnosticHints: rawConfigDiagnosticHints
-  });
-
-/** Serializes config using deterministic JSON5 formatting for stable snapshots. */
-const stringifyConfig = (config: rawConfig): string => {
-  if (!isJsonValue(config)) {
-    throw new TypeError('Config values must be JSON-compatible before serialization.');
-  }
-  return stringifyJson5(config);
-};
 
 /** Whether the opt-in start-up trace is enabled for this process. */
 const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPORT === '1';
@@ -171,9 +107,12 @@ const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPOR
  */
 export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDependencies) => {
   const {notify: notifyFn} = dependencies;
+  const fileSystem = dependencies.fs ?? defaultFileSystem;
+  const isDebugEnabled = dependencies.isDebugEnabled ?? isConfigImportDebugEnabled;
   const warnFn = dependencies.warn ?? console.warn;
+  const errorFn = dependencies.error ?? console.error;
   const pathDeps = dependencies.paths;
-  let defaultConfig: rawConfig | undefined;
+  let defaultsCache: rawConfig | undefined;
 
   /**
    * Copies the bundled JSON schemas into the configuration directories.
@@ -207,7 +146,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
    * When writing fails, emits contextual error logs and notifies the user.
    */
   const ensureUserConfigFile = (defaultConfigTemplate: rawConfig) => {
-    if (existsSync(pathDeps.cfgPath)) {
+    if (fileSystem.existsSync(pathDeps.cfgPath)) {
       return false;
     }
 
@@ -215,10 +154,10 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
       `[config-import] User config file missing at "${pathDeps.cfgPath}". Bootstrapping from default config template.`
     );
     try {
-      writeFileSync(pathDeps.cfgPath, stringifyConfig(defaultConfigTemplate), 'utf8');
+      fileSystem.writeFileSync(pathDeps.cfgPath, stringifyConfig(defaultConfigTemplate), 'utf8');
       return true;
     } catch (error) {
-      console.error(`[config-import] Failed to write bootstrapped user config at "${pathDeps.cfgPath}".`, error);
+      errorFn(`[config-import] Failed to write bootstrapped user config at "${pathDeps.cfgPath}".`, error);
       notifyFn("Couldn't create a user config file. Check permissions and available disk space.");
       return false;
     }
@@ -233,9 +172,9 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
   const loadDefaultConfig = (): LoadedConfig => {
     let defaultCfgRaw = '{}';
     try {
-      defaultCfgRaw = readFileSync(pathDeps.defaultCfg, 'utf8');
+      defaultCfgRaw = fileSystem.readFileSync(pathDeps.defaultCfg, 'utf8');
     } catch (error) {
-      console.error(`[config-import] Failed to read bundled default config at "${pathDeps.defaultCfg}".`, error);
+      errorFn(`[config-import] Failed to read bundled default config at "${pathDeps.defaultCfg}".`, error);
     }
 
     const filePath = pathDeps.defaultCfg;
@@ -252,7 +191,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
       };
     }
 
-    console.error(
+    errorFn(
       `[config-import] Failed to parse bundled default config at "${pathDeps.defaultCfg}". Using safe fallback defaults.`
     );
     notifyWithPrimaryDiagnostic({
@@ -273,9 +212,9 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     const filePath = platformKeyPath;
     let content = '{}';
     try {
-      content = readFileSync(platformKeyPath, 'utf8');
+      content = fileSystem.readFileSync(platformKeyPath, 'utf8');
     } catch (error) {
-      console.error(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`, error);
+      errorFn(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`, error);
     }
 
     const keymapResult = parseKeybindingsText(content, platformKeyPath);
@@ -296,7 +235,10 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
   const loadUserConfig = (defaultConfigFallback: rawConfig): LoadedConfig => {
     const filePath = pathDeps.cfgPath;
     try {
-      const userCfgResult = parseRawConfig({filePath, rawContent: readFileSync(pathDeps.cfgPath, 'utf8')});
+      const userCfgResult = parseRawConfig({
+        filePath,
+        rawContent: fileSystem.readFileSync(pathDeps.cfgPath, 'utf8')
+      });
       if (userCfgResult.usedFallback) {
         reportDiagnostics(warnFn, 'User config diagnostics.', filePath, userCfgResult.diagnostics);
       }
@@ -323,7 +265,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
         usedFallback: true
       };
     } catch (error) {
-      console.error(`[config-import] Failed to read or parse user config at "${pathDeps.cfgPath}".`, error);
+      errorFn(`[config-import] Failed to read or parse user config at "${pathDeps.cfgPath}".`, error);
       warnFn(
         `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
       );
@@ -349,27 +291,46 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
    */
   const canBootstrapUserConfig = (): boolean => path.resolve(pathDeps.cfgDir) === path.resolve(pathDeps.velocettyDir);
 
+  /**
+   * Reads the bundled defaults and merges the platform keymap, with no writes.
+   *
+   * The result is cached for the process, so a later start-up import reuses the
+   * payload it already read rather than touching the bundled files again.
+   *
+   * @example
+   * ```ts
+   * const defaults = sources.loadDefaultsOnly();
+   * defaults.keymaps; // the platform bindings, merged into the bundled defaults
+   * ```
+   */
+  const loadDefaultsOnly = (): rawConfig => {
+    if (defaultsCache === undefined) {
+      const {config: defaultCfg} = loadDefaultConfig();
+      replaceLegacyKeymaps(defaultCfg, loadPlatformKeymap());
+      defaultsCache = defaultCfg;
+    }
+    return defaultsCache;
+  };
+
   /** Reads both layers, creating files only during a start-up import. */
   const load = (phase: ConfigImportPhase): LoadedSources => {
     if (phase === 'startup') {
-      if (isConfigImportDebugEnabled()) {
+      if (isDebugEnabled()) {
         warnFn('[config-import] Initializing config import using app-local JSON5 helpers.');
       }
       // init plugin directories if not present
-      mkdirpSync(pathDeps.plugs.base);
-      mkdirpSync(pathDeps.plugs.local);
+      fileSystem.mkdirpSync(pathDeps.plugs.base);
+      fileSystem.mkdirpSync(pathDeps.plugs.local);
       ensureSchemaFile();
     }
 
-    const {config: defaultCfg} = loadDefaultConfig();
+    const defaultCfg = loadDefaultsOnly();
     const bootstrapped = phase === 'startup' && canBootstrapUserConfig() ? ensureUserConfigFile(defaultCfg) : false;
-    replaceLegacyKeymaps(defaultCfg, loadPlatformKeymap());
-    defaultConfig = defaultCfg;
 
     const userConfigResult = loadUserConfig(defaultCfg);
     const sources: LoadedSources = {
       bootstrapped,
-      defaultCfg,
+      defaultCfg: cloneRawConfig(defaultCfg),
       usedFallback: userConfigResult.usedFallback,
       userCfg: cloneRawConfig(userConfigResult.config)
     };
@@ -381,17 +342,21 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
   };
 
   /**
-   * Returns the cached default config payload.
+   * Returns a defensive copy of the bundled defaults.
    *
-   * When `_import` has not run yet, this method lazily loads the configuration
-   * sources, which performs the same start-up side effects as `load('startup')`.
-   * It never starts the keybindings service, so querying defaults cannot seed
-   * or re-read `keybindings.json5`.
+   * The query is read-only: it reads and caches the bundled defaults and the
+   * platform keymap, but never creates a directory, copies a schema, or
+   * bootstraps `config.json5`. It also never starts the keybindings service,
+   * so querying defaults cannot seed or re-read `keybindings.json5`.
+   *
+   * @example
+   * ```ts
+   * const first = sources.getDefaultConfig();
+   * const second = sources.getDefaultConfig();
+   * first === second; // false, because each caller gets its own copy
+   * ```
    */
-  const getDefaultConfig = () => {
-    defaultConfig ??= load('startup').defaultCfg;
-    return defaultConfig;
-  };
+  const getDefaultConfig = (): rawConfig => cloneRawConfig(loadDefaultsOnly());
 
-  return {getDefaultConfig, load};
+  return {getDefaultConfig, load, loadDefaultsOnly};
 };

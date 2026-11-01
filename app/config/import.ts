@@ -13,14 +13,15 @@ import {
   readLegacyKeymaps,
   replaceLegacyKeymaps
 } from './import-keybindings';
-import type {ConfigImportReport} from './import-report';
+import type {ConfigImportNotify, ConfigImportReport} from './import-report';
 import {
   createConfigSourceLoader,
+  type ConfigImportFileSystem,
   type ConfigImportPaths,
   type ConfigImportPhase,
   type ConfigSourceLoaderDependencies
 } from './import-sources';
-import type {ConfigImportNotify, KeybindingsLoadOutcome} from './keybindings';
+import type {KeybindingsLoadOutcome} from './keybindings-ports';
 import type {LegacyKeymapsSource} from './keybindings-policy';
 
 export {shouldAnnounceReload} from './import-report';
@@ -51,7 +52,10 @@ type ConfigImportDependencies = {
   keybindings: ConfigImportKeybindings;
   notify: ConfigImportNotify;
   paths: ConfigImportPaths;
+  fs?: ConfigImportFileSystem;
+  isDebugEnabled?: () => boolean;
   warn?: typeof console.warn;
+  error?: typeof console.error;
 };
 
 /** True when the service created a brand-new file from the legacy keymaps. */
@@ -90,8 +94,18 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
   const {_init: initConfig, keybindings, notify: notifyFn} = dependencies;
   const notices = createKeybindingsNotices(notifyFn);
   const sourceOptions: ConfigSourceLoaderDependencies = {notify: notifyFn, paths: dependencies.paths};
+  // Assigned only when supplied: `exactOptionalPropertyTypes` forbids `undefined`.
   if (dependencies.warn !== undefined) {
     sourceOptions.warn = dependencies.warn;
+  }
+  if (dependencies.error !== undefined) {
+    sourceOptions.error = dependencies.error;
+  }
+  if (dependencies.fs !== undefined) {
+    sourceOptions.fs = dependencies.fs;
+  }
+  if (dependencies.isDebugEnabled !== undefined) {
+    sourceOptions.isDebugEnabled = dependencies.isDebugEnabled;
   }
   const sources = createConfigSourceLoader(sourceOptions);
 

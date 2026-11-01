@@ -11,7 +11,7 @@ import merge from 'lodash/merge';
 import type {configOptions, parsedConfig, rawConfig} from '@shared/types/config';
 import mapKeys from '../utils/map-keys';
 import {readLegacyKeymaps} from './import-keybindings';
-import type {ConfigImportNotify} from './keybindings';
+import type {ConfigImportNotify} from './import-report';
 
 /**
  * Merges the user configuration over the bundled defaults.

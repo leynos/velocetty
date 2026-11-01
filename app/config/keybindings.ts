@@ -1,12 +1,11 @@
 /** @file JSON5-backed user keybindings service, bootstrap, and import/export laws. */
 /*
  * The service owns the last-known-good state. It reads and writes through the
- * `KeybindingsStore` port, so the rules that matter (no reload writes, no
- * unreadable file is overwritten, import is verbatim) are testable without a
- * filesystem.
+ * neutral ports in `keybindings-ports`, so the rules that matter (no reload
+ * writes, no unreadable file is overwritten, import is verbatim) are testable
+ * without a filesystem and without any presentation dependency.
  */
 import type {configValidationDiagnostic} from '@shared/types/config';
-import {parseKeybindingsText, serializeKeybindings} from './keybindings-codec';
 import {
   activeKeymaps,
   bootstrapObservation,
@@ -18,18 +17,34 @@ import {
   type LegacyKeymapsSource,
   type UserKeymaps
 } from './keybindings-policy';
+import type {
+  KeybindingsBasis,
+  KeybindingsExport,
+  KeybindingsImportOutcome,
+  KeybindingsImportRequest,
+  KeybindingsLoadOutcome,
+  KeybindingsReporter,
+  KeybindingsStorageFailure,
+  KeybindingsStore,
+  KeybindingsTextCodec,
+  KeybindingsWriteOutcome
+} from './keybindings-ports';
 
-/** A notification sink shared by the configuration modules. */
-export type ConfigImportNotify = (title: string, body?: string, details?: {error?: unknown}) => void;
-
-/** What reading the keybindings file observed. */
-export type KeybindingsReadOutcome =
-  | {readonly kind: 'present'; readonly text: string}
-  | {readonly kind: 'missing'}
-  | {readonly kind: 'unreadable'; readonly error: unknown};
-
-/** What writing the keybindings file did. */
-export type KeybindingsWriteOutcome = {readonly kind: 'written'} | {readonly kind: 'failed'; readonly error: unknown};
+export type {
+  KeybindingsBasis,
+  KeybindingsExport,
+  KeybindingsImportOutcome,
+  KeybindingsImportRequest,
+  KeybindingsLoadOutcome,
+  KeybindingsNotice,
+  KeybindingsReadOutcome,
+  KeybindingsReporter,
+  KeybindingsStorageFailure,
+  KeybindingsStore,
+  KeybindingsTextCodec,
+  KeybindingsWriteOutcome
+} from './keybindings-ports';
+export type {ConfigImportNotify} from './import-report';
 
 /** A bootstrap decision that writes a seed. */
 type SeedDecision = Extract<BootstrapDecision, {kind: 'seed'}>;
@@ -47,96 +62,10 @@ const seedWriteStatus = (outcome: KeybindingsWriteOutcome): 'written' | 'failed'
 const seedOrigin = (outcome: KeybindingsWriteOutcome): 'seeded' | 'seeded-unsaved' =>
   outcome.kind === 'written' ? 'seeded' : 'seeded-unsaved';
 
-/** The driven port the keybindings service reads and writes through. */
-export type KeybindingsStore = {
-  readonly location: string;
-  readonly read: () => KeybindingsReadOutcome;
-  /**
-   * Removes leftovers from a write that crashed before its rename.
-   *
-   * Start-up calls this once, before deciding whether to seed. Reload, import,
-   * and export never clean the directory.
-   */
-  readonly removeStaleTemporaryFiles?: () => void;
-  readonly write: (text: string) => KeybindingsWriteOutcome;
-};
-
-/** What a start or reload left in effect. */
-export type KeybindingsLoadOutcome =
-  | {
-      readonly kind: 'applied';
-      readonly keymaps: UserKeymaps;
-      /**
-       * `seeded-unsaved` means the seed was applied in memory but the file
-       * could not be written, so nothing was migrated on disk.
-       */
-      readonly origin: 'file' | 'missing' | 'seeded' | 'seeded-unsaved';
-    }
-  | {
-      readonly kind: 'kept';
-      readonly keymaps: UserKeymaps;
-      readonly basis: 'last-known-good' | 'empty';
-      readonly cause: 'invalid' | 'unreadable' | 'deferred';
-      readonly diagnostics: readonly configValidationDiagnostic[];
-    };
-
-/** Text supplied by an importer, with the name its diagnostics should cite. */
-export type KeybindingsImportRequest = Readonly<{
-  readonly sourceLabel: string;
-  readonly text: string;
-}>;
-
-/** A rejected read to report, with the diagnostics that explain it. */
-type RejectedRead = Readonly<{
-  readonly cause: 'invalid' | 'unreadable';
-  readonly diagnostics: readonly configValidationDiagnostic[];
-}>;
-
-/** What importing user-supplied text did. */
-export type KeybindingsImportOutcome =
-  | {readonly kind: 'written'}
-  | {readonly kind: 'invalid'; readonly diagnostics: readonly configValidationDiagnostic[]}
-  | {readonly kind: 'failed'; readonly error: unknown};
-
-/** What the stored keybindings contain, read without side effects. */
-export type KeybindingsExport =
-  | {readonly kind: 'stored'; readonly text: string}
-  | {readonly kind: 'invalid'; readonly text: string; readonly diagnostics: readonly configValidationDiagnostic[]}
-  | {readonly kind: 'missing'}
-  | {readonly kind: 'unreadable'; readonly error: unknown};
-
-/**
- * Formats the first diagnostic as a sentence suffix for a notification.
- *
- * Keeping this in one place means start-up, reload, and the importer cannot
- * describe the same problem differently.
- *
- * @example
- * ```ts
- * describePrimaryDiagnostic([]); // ''
- * ```
- */
-export const describePrimaryDiagnostic = (diagnostics: readonly configValidationDiagnostic[]): string => {
-  const primaryDiagnostic = diagnostics.at(0);
-  if (!primaryDiagnostic) {
-    return '';
-  }
-  const docHint = primaryDiagnostic.docHint ? ` Hint: ${primaryDiagnostic.docHint}.` : '';
-  const defaultHint = primaryDiagnostic.defaultHint ? ` Default: ${primaryDiagnostic.defaultHint}.` : '';
-  return ` ${primaryDiagnostic.path}: ${primaryDiagnostic.message} Suggested fix: ${primaryDiagnostic.suggestedFix}.${docHint}${defaultHint}`;
-};
-
-/** A caller's sentence about a rejected file, plus the diagnostics behind it. */
-export type PrimaryDiagnosticNotice = Readonly<{
-  readonly baseMessage: string;
-  readonly diagnostics: readonly configValidationDiagnostic[];
-  readonly notify: ConfigImportNotify;
-}>;
-
-/** Notifies with a message followed by the first diagnostic, when there is one. */
-export const notifyWithPrimaryDiagnostic = ({baseMessage, diagnostics, notify}: PrimaryDiagnosticNotice): void => {
-  notify(`${baseMessage}${describePrimaryDiagnostic(diagnostics)}`);
-};
+/** A rejected read to report, with the bounded reason that explains it. */
+type RejectedRead =
+  | {readonly cause: 'invalid'; readonly diagnostics: readonly configValidationDiagnostic[]}
+  | {readonly cause: 'unreadable'; readonly failure: KeybindingsStorageFailure};
 
 const diagnosticsSignature = (diagnostics: readonly configValidationDiagnostic[]): string =>
   JSON.stringify(diagnostics.map((entry) => [entry.path, entry.message]));
@@ -165,18 +94,17 @@ const copyKeymaps = (keymaps: UserKeymaps): UserKeymaps =>
  *
  * @example
  * ```ts
- * const service = createKeybindingsService({notify, store});
+ * const service = createKeybindingsService({codec, report, store});
  * service.start({kind: 'parsed-empty'}); // seeds an empty file when missing
  * service.exportKeybindings(); // {kind: 'stored', text: '...'}
  * ```
  */
 export const createKeybindingsService = (dependencies: {
+  readonly codec: KeybindingsTextCodec;
   readonly store: KeybindingsStore;
-  readonly notify: ConfigImportNotify;
-  readonly warn?: typeof console.warn;
+  readonly report: KeybindingsReporter;
 }) => {
-  const {notify, store} = dependencies;
-  const warnFn = dependencies.warn ?? console.warn;
+  const {codec, report, store} = dependencies;
   let state = initialKeybindingsState;
   let isStarted = false;
   let lastShownDiagnostics = '';
@@ -200,24 +128,20 @@ export const createKeybindingsService = (dependencies: {
     kind: 'kept'
   });
 
-  /** Applies a rejected read and tells the user what is actually in effect. */
-  const describeRejectedRead = ({cause, diagnostics}: RejectedRead): KeybindingsLoadOutcome => {
-    const result = applyObservation({kind: cause});
-    const basis = result.usedLastKnownGood ? 'last-known-good' : 'empty';
-    const inEffect =
-      basis === 'last-known-good'
-        ? 'Keeping your previous shortcuts.'
-        : 'Using default shortcuts until the file is fixed.';
-    if (cause === 'invalid') {
-      const signature = diagnosticsSignature(diagnostics);
+  /** Applies a rejected read and tells the edge what is actually in effect. */
+  const describeRejectedRead = (rejected: RejectedRead): KeybindingsLoadOutcome => {
+    const result = applyObservation({kind: rejected.cause});
+    const basis: KeybindingsBasis = result.usedLastKnownGood ? 'last-known-good' : 'empty';
+    if (rejected.cause === 'invalid') {
+      const signature = diagnosticsSignature(rejected.diagnostics);
       if (signature !== lastShownDiagnostics) {
         lastShownDiagnostics = signature;
-        notify(`Couldn't parse keybindings file. ${inEffect}${describePrimaryDiagnostic(diagnostics)}`);
+        report({basis, diagnostics: rejected.diagnostics, kind: 'invalid-file'});
       }
-    } else {
-      notify(`Couldn't read keybindings file. ${inEffect}`);
+      return {basis, cause: rejected.cause, diagnostics: rejected.diagnostics, keymaps: exposedKeymaps(), kind: 'kept'};
     }
-    return {basis, cause, diagnostics, keymaps: exposedKeymaps(), kind: 'kept'};
+    report({basis, failure: rejected.failure, kind: 'unreadable-file'});
+    return {basis, cause: rejected.cause, diagnostics: [], keymaps: exposedKeymaps(), kind: 'kept'};
   };
 
   /** Reads and applies whatever the file currently holds; never writes. */
@@ -229,16 +153,12 @@ export const createKeybindingsService = (dependencies: {
       return {keymaps: exposedKeymaps(), kind: 'applied', origin: 'missing'};
     }
     if (readOutcome.kind === 'unreadable') {
-      warnFn(`[config-keybindings] Couldn't read "${store.location}".`, readOutcome.error);
-      return describeRejectedRead({cause: 'unreadable', diagnostics: []});
+      return describeRejectedRead({cause: 'unreadable', failure: readOutcome.failure});
     }
 
-    const parsed = parseKeybindingsText(readOutcome.text, store.location);
+    const parsed = codec.parse(readOutcome.text, store.label);
     if (parsed.kind === 'invalid') {
-      warnFn('[config-keybindings] User keybindings diagnostics.', {
-        diagnostics: parsed.diagnostics,
-        source: store.location
-      });
+      report({diagnostics: parsed.diagnostics, kind: 'diagnostics', label: store.label});
       return describeRejectedRead({cause: 'invalid', diagnostics: parsed.diagnostics});
     }
     lastShownDiagnostics = '';
@@ -248,11 +168,9 @@ export const createKeybindingsService = (dependencies: {
 
   /** Writes the seed and applies it, reporting how far the migration got. */
   const seedFile = (decision: SeedDecision): KeybindingsLoadOutcome => {
-    const writeOutcome = store.write(serializeKeybindings(decision.keymaps));
+    const writeOutcome = store.write(codec.serialize(decision.keymaps));
     if (writeOutcome.kind === 'failed') {
-      notify("Couldn't create a keybindings file. Check permissions and available disk space.", undefined, {
-        error: writeOutcome.error
-      });
+      report({failure: writeOutcome.failure, kind: 'seed-failed'});
     }
     const observation = bootstrapObservation(decision, seedWriteStatus(writeOutcome));
     if (observation === null) {
@@ -266,8 +184,8 @@ export const createKeybindingsService = (dependencies: {
   /**
    * Runs the start-up bootstrap, or a plain reload when start-up already ran.
    *
-   * Only this call may seed or clean up; every later state change goes through
-   * `reload`.
+   * Only this call may seed; every later state change goes through `reload`.
+   * Start-up cleanup belongs to the edge that owns the adapter, not here.
    */
   const start = (legacy: LegacyKeymapsSource): KeybindingsLoadOutcome => {
     // Start-up bootstrap runs once; a second call is just a reload.
@@ -275,9 +193,6 @@ export const createKeybindingsService = (dependencies: {
       return readCurrentFile();
     }
     isStarted = true;
-    // A crashed write can leave a temporary file behind; start-up is the only
-    // phase that may remove it.
-    store.removeStaleTemporaryFiles?.();
 
     const decision = decideBootstrap({file: store.read().kind, legacy});
     if (decision.kind === 'write-nothing') {
@@ -299,14 +214,14 @@ export const createKeybindingsService = (dependencies: {
    * session in a state that disagrees with the file on disk.
    */
   const importKeybindings = ({sourceLabel, text}: KeybindingsImportRequest): KeybindingsImportOutcome => {
-    const parsed = parseKeybindingsText(text, sourceLabel);
+    const parsed = codec.parse(text, sourceLabel);
     if (parsed.kind === 'invalid') {
       return {diagnostics: parsed.diagnostics, kind: 'invalid'};
     }
     const writeOutcome = store.write(text);
     if (writeOutcome.kind === 'failed') {
-      notify("Couldn't save keybindings file.", undefined, {error: writeOutcome.error});
-      return {error: writeOutcome.error, kind: 'failed'};
+      report({failure: writeOutcome.failure, kind: 'import-failed'});
+      return {failure: writeOutcome.failure, kind: 'failed'};
     }
     return {kind: 'written'};
   };
@@ -323,9 +238,9 @@ export const createKeybindingsService = (dependencies: {
       return {kind: 'missing'};
     }
     if (readOutcome.kind === 'unreadable') {
-      return {error: readOutcome.error, kind: 'unreadable'};
+      return {failure: readOutcome.failure, kind: 'unreadable'};
     }
-    const parsed = parseKeybindingsText(readOutcome.text, store.location);
+    const parsed = codec.parse(readOutcome.text, store.label);
     return parsed.kind === 'ok'
       ? {kind: 'stored', text: readOutcome.text}
       : {diagnostics: parsed.diagnostics, kind: 'invalid', text: readOutcome.text};

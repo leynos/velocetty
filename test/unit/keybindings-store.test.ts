@@ -2,131 +2,34 @@
 import {afterEach, describe, expect, mock, test} from 'bun:test';
 
 import * as fs from 'node:fs';
-import {tmpdir} from 'node:os';
 import path from 'node:path';
 
-import type {KeybindingsStore} from '../../app/config/keybindings';
-import type {KeybindingsFileSystem, RenameRetryEvent} from '../../app/config/keybindings-store';
+import type {ConfigSpanRecorder} from '../../app/config/config-spans';
+import type {KeybindingsFileSystem} from '../../app/config/keybindings-store';
 import {createFileKeybindingsStore} from '../../app/config/keybindings-store';
+import {
+  cleanupWorkspaces,
+  createWorkspace,
+  danglingLinkStoreWith,
+  errorWithCode,
+  expectRefusedWrite,
+  realFileSystem,
+  TEMPORARY_PREFIX,
+  targetPathIn,
+  temporaryNames
+} from '../testUtils/keybindings-store-harness';
 
-const FILE_NAME = 'keybindings.json5';
-const TEMPORARY_PREFIX = `.${FILE_NAME}.`;
+afterEach(cleanupWorkspaces);
 
-type FaultPoint = 'open' | 'write' | 'fsync' | 'chmod' | 'rename';
-
-const FAULT_POINTS: readonly FaultPoint[] = ['open', 'write', 'fsync', 'chmod', 'rename'];
-
-/** A real `node:fs` surface that tests can override one operation at a time. */
-const realFileSystem = (): KeybindingsFileSystem => ({...fs});
-
-/** Replaces exactly the operation named by the fault point. */
-const FAULT_OVERRIDES: Readonly<Record<FaultPoint, (fail: () => never) => KeybindingsFileSystem>> = {
-  chmod: (fail) => ({...realFileSystem(), chmodSync: fail}),
-  fsync: (fail) => ({...realFileSystem(), fsyncSync: fail}),
-  open: (fail) => ({...realFileSystem(), openSync: fail}),
-  rename: (fail) => ({...realFileSystem(), renameSync: fail}),
-  write: (fail) => ({...realFileSystem(), writeSync: fail})
-};
-
-const workspaces: string[] = [];
-
-const createWorkspace = (): string => {
-  const workspace = fs.mkdtempSync(path.join(tmpdir(), 'velocetty-keybindings-store-'));
-  workspaces.push(workspace);
-  return workspace;
-};
-
-afterEach(() => {
-  for (const workspace of workspaces.splice(0)) {
-    fs.rmSync(workspace, {recursive: true, force: true});
-  }
-});
-
-const errorWithCode = (code: string): NodeJS.ErrnoException => Object.assign(new Error(code), {code});
-
-const temporaryNames = (directory: string): readonly string[] =>
-  fs.readdirSync(directory).filter((name) => name.startsWith(TEMPORARY_PREFIX) && name.endsWith('.tmp'));
-
-const targetPathIn = (workspace: string): string => path.join(workspace, FILE_NAME);
-
-/** Each link's recorded target, so a test can prove the links survived intact. */
-const linkTargetsOf = (linkPaths: readonly string[]): readonly string[] =>
-  linkPaths.map((linkPath) => {
-    expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(true);
-    return fs.readlinkSync(linkPath);
-  });
-
-/** A store over a dangling `keybindings.json5`, with one filesystem operation replaced. */
-const danglingLinkStoreWith = (overrides: Partial<KeybindingsFileSystem>) => {
-  const workspace = createWorkspace();
-  const realPath = path.join(workspace, 'dotfiles-keybindings.json5');
-  const linkPath = targetPathIn(workspace);
-  fs.symlinkSync(path.basename(realPath), linkPath);
-  const store = createFileKeybindingsStore({filePath: linkPath, fs: {...realFileSystem(), ...overrides}});
-  return {linkPath, realPath, store, workspace};
-};
-
-/** Asserts a write was refused and left every link, the target, and the directory untouched. */
-const expectRefusedWrite = ({
-  linkPaths,
-  store,
-  workspace
-}: Readonly<{linkPaths: readonly string[]; store: KeybindingsStore; workspace: string}>): void => {
-  const targetsBefore = linkTargetsOf(linkPaths);
-  expect(store.write('{}').kind).toBe('failed');
-  expect(linkTargetsOf(linkPaths)).toEqual(targetsBefore);
-  expect(temporaryNames(workspace)).toEqual([]);
-};
-
-/**
- * Builds a real `node:fs` surface in which exactly one operation throws.
- *
- * Every other operation is the genuine one, so a fault test exercises the
- * adapter's real open/write/fsync/chmod/rename sequence rather than a
- * handwritten imitation of it.
- */
-const faultingFileSystem = (point: FaultPoint, code = 'EIO') => {
-  const reached: FaultPoint[] = [];
-  const fail = (): never => {
-    reached.push(point);
-    throw errorWithCode(code);
-  };
-  return {fileSystem: FAULT_OVERRIDES[point](fail), reached};
-};
-
-/** Fails the first `failures` renames with `code`, then delegates. */
-const transientRenameFileSystem = (failures: number, code: string) => {
-  let attempts = 0;
-  const fileSystem: KeybindingsFileSystem = {
-    ...realFileSystem(),
-    renameSync: (from, to) => {
-      attempts += 1;
-      if (attempts <= failures) {
-        throw errorWithCode(code);
-      }
-      fs.renameSync(from, to);
+/** Records the operation and outcome of every completed span, in order. */
+const recordingSpans = () => {
+  const finished: string[] = [];
+  const spans: ConfigSpanRecorder = {
+    begin: (operation) => (outcome) => {
+      finished.push(`${operation}:${outcome}`);
     }
   };
-  return {fileSystem, attempts: () => attempts};
-};
-
-/** Prepares a store over an existing target whose first renames fail with `code`. */
-const setupRenameFailure = (failures: number, code: string) => {
-  const workspace = createWorkspace();
-  const filePath = targetPathIn(workspace);
-  fs.writeFileSync(filePath, 'previous', 'utf8');
-  const {fileSystem, attempts} = transientRenameFileSystem(failures, code);
-  const sleep = mock((_milliseconds: number) => {});
-  const events: RenameRetryEvent[] = [];
-  const store = createFileKeybindingsStore({
-    filePath,
-    fs: fileSystem,
-    onRetry: (event) => {
-      events.push(event);
-    },
-    sleep
-  });
-  return {attempts, events, filePath, sleep, store, workspace};
+  return {finished, spans};
 };
 
 describe('atomic keybindings file store', () => {
@@ -150,6 +53,65 @@ describe('atomic keybindings file store', () => {
       }
     });
     expect(unreadable.read().kind).toBe('unreadable');
+  });
+
+  test('classifies a permission read failure and still logs the raw error', () => {
+    const workspace = createWorkspace();
+    const filePath = targetPathIn(workspace);
+    const raw = errorWithCode('EACCES');
+    const warn = mock(() => {});
+    const store = createFileKeybindingsStore({
+      filePath,
+      fs: {
+        ...realFileSystem(),
+        readFileSync: () => {
+          throw raw;
+        }
+      },
+      warn
+    });
+
+    // The port sees only the bounded reason; the adapter keeps the raw error
+    // diagnosable through its own warning sink.
+    expect(store.read()).toEqual({failure: 'permission', kind: 'unreadable'});
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Couldn't read"), raw);
+  });
+
+  test('classifies a permission write failure and still logs the raw error', () => {
+    const workspace = createWorkspace();
+    const filePath = targetPathIn(workspace);
+    const raw = errorWithCode('EACCES');
+    const warn = mock(() => {});
+    const store = createFileKeybindingsStore({
+      filePath,
+      fs: {
+        ...realFileSystem(),
+        openSync: () => {
+          throw raw;
+        }
+      },
+      warn
+    });
+
+    expect(store.write('replacement')).toEqual({failure: 'permission', kind: 'failed'});
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Couldn't write"), raw);
+  });
+
+  test('maps a missing target to its bounded failure category', () => {
+    const workspace = createWorkspace();
+    const filePath = targetPathIn(workspace);
+    const store = createFileKeybindingsStore({
+      filePath,
+      fs: {
+        ...realFileSystem(),
+        renameSync: () => {
+          throw errorWithCode('ENOENT');
+        }
+      },
+      warn: mock(() => {})
+    });
+
+    expect(store.write('replacement')).toEqual({failure: 'missing', kind: 'failed'});
   });
 
   test('writes the replacement bytes and preserves the target mode', () => {
@@ -288,109 +250,6 @@ describe('atomic keybindings file store', () => {
     });
   }
 
-  for (const point of FAULT_POINTS) {
-    test(`reports failure and preserves the previous bytes when ${point} fails`, () => {
-      const workspace = createWorkspace();
-      const filePath = targetPathIn(workspace);
-      fs.writeFileSync(filePath, 'previous', 'utf8');
-      const {fileSystem, reached} = faultingFileSystem(point);
-      const store = createFileKeybindingsStore({filePath, fs: fileSystem});
-
-      const outcome = store.write('replacement');
-
-      expect(outcome.kind).toBe('failed');
-      expect(reached).toEqual([point]);
-      expect(fs.readFileSync(filePath, 'utf8')).toBe('previous');
-      expect(temporaryNames(workspace)).toEqual([]);
-    });
-  }
-
-  test('reports a failed temporary-file creation without touching the target', () => {
-    const workspace = createWorkspace();
-    const filePath = targetPathIn(workspace);
-    fs.writeFileSync(filePath, 'previous', 'utf8');
-    const {fileSystem} = faultingFileSystem('open', 'EACCES');
-    const store = createFileKeybindingsStore({filePath, fs: fileSystem});
-
-    expect(store.write('replacement').kind).toBe('failed');
-
-    expect(fs.readFileSync(filePath, 'utf8')).toBe('previous');
-    expect(temporaryNames(workspace)).toEqual([]);
-  });
-
-  // Windows models only a read-only attribute, and a POSIX rename over a
-  // read-only file still succeeds when the directory is writable, so the
-  // refusal is asserted where it is meaningful. Root bypasses POSIX permission
-  // bits, so `accessSync(W_OK)` succeeds there too.
-  const cannotModelReadOnly = process.platform === 'win32' || process.getuid?.() === 0;
-  test.skipIf(cannotModelReadOnly)('refuses a read-only target before creating anything', () => {
-    const workspace = createWorkspace();
-    const filePath = targetPathIn(workspace);
-    fs.writeFileSync(filePath, 'previous', 'utf8');
-    fs.chmodSync(filePath, 0o444);
-    const store = createFileKeybindingsStore({filePath});
-
-    const outcome = store.write('replacement');
-
-    expect(outcome.kind).toBe('failed');
-    expect(fs.readFileSync(filePath, 'utf8')).toBe('previous');
-    expect(temporaryNames(workspace)).toEqual([]);
-  });
-
-  test('retries a transient rename failure and succeeds', () => {
-    const {attempts, events, filePath, sleep, store, workspace} = setupRenameFailure(2, 'EBUSY');
-
-    expect(store.write('replacement')).toEqual({kind: 'written'});
-
-    expect(attempts()).toBe(3);
-    expect(sleep).toHaveBeenCalledTimes(2);
-    expect(fs.readFileSync(filePath, 'utf8')).toBe('replacement');
-    expect(temporaryNames(workspace)).toEqual([]);
-    // Each refusal is reported, but a retry that later succeeds was not a
-    // failed write, so no event claims exhaustion.
-    expect(events).toEqual([
-      {attempt: 1, category: 'busy', exhausted: false},
-      {attempt: 2, category: 'busy', exhausted: false}
-    ]);
-  });
-
-  test('gives up after five transient rename failures', () => {
-    const {attempts, events, filePath, sleep, store, workspace} = setupRenameFailure(Number.POSITIVE_INFINITY, 'EPERM');
-
-    expect(store.write('replacement').kind).toBe('failed');
-
-    expect(attempts()).toBe(5);
-    expect(sleep).toHaveBeenCalledTimes(4);
-    expect(fs.readFileSync(filePath, 'utf8')).toBe('previous');
-    expect(temporaryNames(workspace)).toEqual([]);
-    // Exactly one event marks the end, and it is the last attempt.
-    expect(events.map((event) => event.attempt)).toEqual([1, 2, 3, 4, 5]);
-    expect(events.map((event) => event.exhausted)).toEqual([false, false, false, false, true]);
-    expect(new Set(events.map((event) => event.category))).toEqual(new Set(['permission']));
-  });
-
-  test('does not retry a permanent rename failure', () => {
-    const {attempts, events, sleep, store, workspace} = setupRenameFailure(1, 'ENOENT');
-
-    expect(store.write('replacement').kind).toBe('failed');
-
-    expect(attempts()).toBe(1);
-    expect(sleep).not.toHaveBeenCalled();
-    expect(temporaryNames(workspace)).toEqual([]);
-    // An unrecognized errno is reported as `other` and ends the write at once.
-    expect(events).toEqual([{attempt: 1, category: 'other', exhausted: true}]);
-  });
-
-  test('categorizes a refused permission rename as permission', () => {
-    const {events, store} = setupRenameFailure(Number.POSITIVE_INFINITY, 'EACCES');
-
-    expect(store.write('replacement').kind).toBe('failed');
-
-    // EACCES is transient on Windows and shares the `permission` category with
-    // EPERM, so the two cannot be told apart from the counter alone.
-    expect(new Set(events.map((event) => event.category))).toEqual(new Set(['permission']));
-  });
-
   test('removes only its own stale temporary files', () => {
     const workspace = createWorkspace();
     const filePath = targetPathIn(workspace);
@@ -407,5 +266,69 @@ describe('atomic keybindings file store', () => {
     expect(fs.existsSync(ownStale)).toBe(false);
     expect(fs.existsSync(ownOther)).toBe(false);
     expect(fs.existsSync(foreign)).toBe(true);
+  });
+
+  test('records one read span for a present, missing, and unreadable file', () => {
+    const workspace = createWorkspace();
+    const filePath = targetPathIn(workspace);
+    const {finished, spans} = recordingSpans();
+    const store = createFileKeybindingsStore({filePath, spans});
+
+    store.read();
+    fs.writeFileSync(filePath, '{}', 'utf8');
+    store.read();
+    const unreadable = createFileKeybindingsStore({
+      filePath,
+      fs: {
+        ...realFileSystem(),
+        readFileSync: () => {
+          throw errorWithCode('EACCES');
+        }
+      },
+      spans
+    });
+    unreadable.read();
+
+    expect(finished).toEqual(['keybindings-read:missing', 'keybindings-read:present', 'keybindings-read:unreadable']);
+  });
+
+  test('records a write span for a success and each refusal path', () => {
+    const workspace = createWorkspace();
+    const filePath = targetPathIn(workspace);
+    const {finished, spans} = recordingSpans();
+    const store = createFileKeybindingsStore({filePath, spans});
+
+    expect(store.write('{}')).toEqual({kind: 'written'});
+
+    // The early read-only refusal never creates a temporary file, but it still
+    // completes the span, so a refused write cannot go uncounted.
+    const readOnly = createFileKeybindingsStore({
+      filePath,
+      fs: {
+        ...realFileSystem(),
+        accessSync: () => {
+          throw errorWithCode('EACCES');
+        }
+      },
+      spans,
+      warn: mock(() => {})
+    });
+    expect(readOnly.write('replacement')).toEqual({failure: 'permission', kind: 'failed'});
+
+    // A failure after the temporary file exists takes the same outcome.
+    const failing = createFileKeybindingsStore({
+      filePath,
+      fs: {
+        ...realFileSystem(),
+        openSync: () => {
+          throw errorWithCode('EACCES');
+        }
+      },
+      spans,
+      warn: mock(() => {})
+    });
+    expect(failing.write('replacement')).toEqual({failure: 'permission', kind: 'failed'});
+
+    expect(finished).toEqual(['keybindings-write:written', 'keybindings-write:failed', 'keybindings-write:failed']);
   });
 });

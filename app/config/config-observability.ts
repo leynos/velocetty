@@ -7,9 +7,14 @@
  * carry a path, a command identifier, or a shortcut.
  */
 import {describeConfigCounters, type ConfigCounters, type ConfigMetrics} from './config-metrics';
-import {describeImportDecision, type ConfigImportReport, type ImportDecision} from './import-report';
-import type {KeybindingsLoadOutcome} from './keybindings';
-import type {RenameRetryEvent} from './keybindings-store';
+import {
+  describeImportDecision,
+  type ConfigImportReport,
+  type ConfigSourceKind,
+  type ImportDecision
+} from './import-report';
+import type {KeybindingsLoadOutcome} from './keybindings-ports';
+import type {RenameRetryEvent} from './keybindings-store-contract';
 
 /** Where bounded records go; injected so a test can capture them. */
 export type ObservabilitySink = {
@@ -22,6 +27,10 @@ export type ImportRecord = {
   readonly phase: 'reload' | 'startup';
   /** The per-file summary, whose `config` half the counters use. */
   readonly report: ConfigImportReport;
+  /** Which tree supplied the active configuration file. */
+  readonly configSource: ConfigSourceKind;
+  /** What the config fell back to; present only for a fallback. */
+  readonly fallbackBasis?: 'defaults';
   /** The keybindings outcome, passed through so `origin`/`basis`/`cause` survive. */
   readonly outcome: KeybindingsLoadOutcome;
   /** Whether the "Configuration updated" notice was shown. */
@@ -37,10 +46,17 @@ export type ImportFailureRecord = {
 
 /** The recorder the composition root wires into the importer and the store. */
 export type ImportRecorder = {
-  /** Counts one attempt and emits its single decision record. */
+  /**
+   * Counts one attempt before the importer runs.
+   *
+   * Counting here rather than in the outcome records means an attempt that
+   * throws before reporting still appears in the tally.
+   */
+  readonly beginImport: (record: {readonly phase: 'reload' | 'startup'}) => void;
+  /** Emits one attempt's single decision record. */
   readonly recordImport: (record: ImportRecord) => void;
   /**
-   * Counts one attempt that threw, and emits its bounded failure record.
+   * Emits the bounded record for an attempt that threw.
    *
    * A thrown import produces this record instead of a decision record: there is
    * no per-file outcome to describe, and claiming one would invent evidence.
@@ -86,9 +102,12 @@ export const createImportRecorder = (dependencies: {
   const {metrics, sink} = dependencies;
 
   return {
-    counters: () => metrics.snapshot(),
-    recordImport: ({phase, report, outcome, announced}) => {
+    beginImport: ({phase}) => {
       metrics.increment('attempts');
+      sink.info(`[config] import attempt phase=${phase}`);
+    },
+    counters: () => metrics.snapshot(),
+    recordImport: ({phase, report, configSource, fallbackBasis, outcome, announced}) => {
       if (report.config === 'fallback') {
         metrics.increment('fallbacks');
       }
@@ -96,6 +115,7 @@ export const createImportRecorder = (dependencies: {
       const decision: ImportDecision = {
         announced,
         config: report.config,
+        configSource,
         keybindings: outcome,
         phase
       };
@@ -103,12 +123,14 @@ export const createImportRecorder = (dependencies: {
       if (report.configCause !== undefined) {
         Object.assign(decision, {configCause: report.configCause});
       }
+      if (fallbackBasis !== undefined) {
+        Object.assign(decision, {fallbackBasis});
+      }
       sink.info(
         `[config] import decision ${describeImportDecision(decision)} ${describeConfigCounters(metrics.snapshot())}`
       );
     },
     recordImportFailure: ({cause, phase}) => {
-      metrics.increment('attempts');
       metrics.increment('importFailures');
       sink.warn(`[config] import failure phase=${phase} cause=${cause} ${describeConfigCounters(metrics.snapshot())}`);
     },

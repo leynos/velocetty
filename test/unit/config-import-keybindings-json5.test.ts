@@ -26,7 +26,7 @@ const describeDecision = (
   config: 'applied' | 'fallback',
   keybindings: Parameters<typeof describeImportDecision>[0]['keybindings'],
   announced = false
-) => describeImportDecision({announced, config, keybindings, phase});
+) => describeImportDecision({announced, config, configSource: 'velocetty', keybindings, phase});
 
 /** Writes the bundled defaults and an empty platform keymap to isolate user keymaps. */
 const writeDefaultSources = (harness: ConfigImportHarness) => {
@@ -281,14 +281,14 @@ test('announces a reload only when a file applied and none fell back', () => {
 
 test('describes each import decision in the outcome vocabulary', () => {
   expect(describeDecision('reload', 'applied', {keymaps: {}, kind: 'applied', origin: 'file'}, true)).toBe(
-    'phase=reload config=applied keybindings=applied origin=file announced=true'
+    'phase=reload config=applied configSource=velocetty keybindings=applied origin=file announced=true'
   );
   // A seed and an empty file are applications too, so `origin` separates them.
   expect(describeDecision('startup', 'applied', {keymaps: {}, kind: 'applied', origin: 'seeded'})).toBe(
-    'phase=startup config=applied keybindings=applied origin=seeded announced=false'
+    'phase=startup config=applied configSource=velocetty keybindings=applied origin=seeded announced=false'
   );
   expect(describeDecision('startup', 'applied', {keymaps: {}, kind: 'applied', origin: 'seeded-unsaved'})).toBe(
-    'phase=startup config=applied keybindings=applied origin=seeded-unsaved announced=false'
+    'phase=startup config=applied configSource=velocetty keybindings=applied origin=seeded-unsaved announced=false'
   );
   // The kept states carry the basis and the cause, so a parse failure, a read
   // failure, and a deferred bootstrap are three distinct records rather than
@@ -301,7 +301,9 @@ test('describes each import decision in the outcome vocabulary', () => {
       keymaps: {},
       kind: 'kept'
     })
-  ).toBe('phase=reload config=applied keybindings=kept basis=last-known-good cause=invalid announced=false');
+  ).toBe(
+    'phase=reload config=applied configSource=velocetty keybindings=kept basis=last-known-good cause=invalid announced=false'
+  );
   expect(
     describeDecision('reload', 'applied', {
       basis: 'empty',
@@ -310,7 +312,9 @@ test('describes each import decision in the outcome vocabulary', () => {
       keymaps: {},
       kind: 'kept'
     })
-  ).toBe('phase=reload config=applied keybindings=kept basis=empty cause=unreadable announced=false');
+  ).toBe(
+    'phase=reload config=applied configSource=velocetty keybindings=kept basis=empty cause=unreadable announced=false'
+  );
   expect(
     describeDecision('reload', 'fallback', {
       basis: 'last-known-good',
@@ -319,5 +323,7 @@ test('describes each import decision in the outcome vocabulary', () => {
       keymaps: {},
       kind: 'kept'
     })
-  ).toBe('phase=reload config=fallback keybindings=kept basis=last-known-good cause=deferred announced=false');
+  ).toBe(
+    'phase=reload config=fallback configSource=velocetty keybindings=kept basis=last-known-good cause=deferred announced=false'
+  );
 });

@@ -1,63 +1,27 @@
 /** @file Atomic file adapter for `keybindings.json5` (KB-STORE-1). */
 /*
- * Writes never truncate the user's file. The replacement is written to a
- * temporary file beside the real target, flushed, given the target's mode, and
- * renamed over it. A read-only target is refused before anything is created,
- * because a POSIX rename would otherwise replace it whenever the directory is
- * writable. A failure at any step removes the temporary file and leaves the
- * target untouched, with no direct-overwrite fallback.
+ * Writes go to a temporary sibling that is flushed, given the target's mode,
+ * and renamed over it. A read-only target is refused before anything is
+ * created, and a failure removes the temporary file without overwriting.
  */
 import * as fs from 'node:fs';
 import path from 'node:path';
 
 import {isObject, isString} from '../utils/runtime-guards';
-import type {KeybindingsReadOutcome, KeybindingsStore, KeybindingsWriteOutcome} from './keybindings';
+import type {
+  KeybindingsReadOutcome,
+  KeybindingsStorageFailure,
+  KeybindingsStore,
+  KeybindingsWriteOutcome
+} from './keybindings-ports';
+import type {FileKeybindingsStoreOptions, RenameFailureCategory} from './keybindings-store-contract';
 
-/** The filesystem subset the adapter uses; injected so tests can fail each step. */
-export type KeybindingsFileSystem = Pick<
-  typeof import('node:fs'),
-  | 'accessSync'
-  | 'constants'
-  | 'realpathSync'
-  | 'readFileSync'
-  | 'openSync'
-  | 'writeSync'
-  | 'fsyncSync'
-  | 'closeSync'
-  | 'statSync'
-  | 'lstatSync'
-  | 'readlinkSync'
-  | 'chmodSync'
-  | 'renameSync'
-  | 'unlinkSync'
-  | 'readdirSync'
->;
-
-/**
- * The bounded reason a rename was refused.
- *
- * The errno string itself is not reported: it is not a fixed vocabulary, and a
- * counter or log that accepts arbitrary text cannot be aggregated safely.
- */
-export type RenameFailureCategory = 'permission' | 'busy' | 'other';
-
-/** One refused rename attempt, and whether the store stopped retrying. */
-export type RenameRetryEvent = {
-  /** 1-based count of the attempt that was refused. */
-  readonly attempt: number;
-  readonly category: RenameFailureCategory;
-  /** True when this refusal ended the retries, so the write failed. */
-  readonly exhausted: boolean;
-};
-
-type FileKeybindingsStoreOptions = {
-  readonly filePath: string;
-  readonly fs?: KeybindingsFileSystem;
-  /** Called once per refused rename attempt, so a caller can count and log it. */
-  readonly onRetry?: (event: RenameRetryEvent) => void;
-  readonly sleep?: (milliseconds: number) => void;
-  readonly warn?: typeof console.warn;
-};
+export type {
+  FileKeybindingsStoreOptions,
+  KeybindingsFileSystem,
+  RenameFailureCategory,
+  RenameRetryEvent
+} from './keybindings-store-contract';
 
 /** Four gaps between five attempts, keeping retries within about 200ms. */
 const RENAME_RETRY_DELAY_MS = 40;
@@ -87,6 +51,14 @@ const errorCode = (error: unknown): string | undefined => {
   return isString(code) ? code : undefined;
 };
 
+/** Maps a raw errno code onto the port's bounded failure vocabulary. */
+const storageFailure = (code: string | undefined): KeybindingsStorageFailure => {
+  if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') {
+    return 'permission';
+  }
+  return code === 'ENOENT' ? 'missing' : 'other';
+};
+
 /** One replacement: the resolved target, its temporary sibling, and the mode to keep. */
 type ReplacementPlan = Readonly<{
   readonly mode: number | undefined;
@@ -95,11 +67,10 @@ type ReplacementPlan = Readonly<{
 }>;
 
 /**
- * The path a write may land on, or why no such path could be established.
+ * The path a write may land on, or why no safe path could be established.
  *
- * A write is only ever safe against a path that is known not to be a symlink,
- * or that is genuinely absent. Anything else must fail closed rather than
- * gamble on a rename replacing a link with a regular file.
+ * A write is only safe against a path known not to be a symlink, or genuinely
+ * absent; anything else fails closed rather than replacing a link.
  */
 type TargetResolution = Readonly<{kind: 'resolved'; path: string}> | Readonly<{kind: 'unresolved'; error: unknown}>;
 
@@ -111,22 +82,15 @@ const defaultSleep = (milliseconds: number): void => {
 /**
  * Creates the filesystem adapter behind `KeybindingsStore`.
  *
- * Writes go to a temporary sibling and are renamed into place, so a reader
- * never sees a half-written file. A symlinked target is resolved first, so the
- * replacement lands on what the link points at and the link itself survives,
- * including when the chain currently dangles. What is refused before anything
- * is created is a target that cannot safely be replaced: a symlink cycle, a
- * chain longer than the supported hop bound, a read-only target, or a
- * resolution failure of any other kind.
+ * Writes go to a temporary sibling and are renamed into place. A symlinked
+ * target is resolved first, so the replacement lands on what the link points
+ * at and the link itself survives, including a dangling chain. A symlink cycle,
+ * an over-long chain, a read-only target, or any other resolution failure is
+ * refused before anything is created. A failed `statSync` is not fatal: the
+ * temporary file simply takes the default mode. Stale temporary-file cleanup
+ * is best-effort and reports its failures as warnings.
  *
- * Not every inspection failure is fatal. A directory target can look writable,
- * so it fails later, when the rename cannot replace it. A failed `statSync`
- * only means the existing mode is unknown, so the temporary file takes the
- * default mode. Stale temporary-file cleanup is best-effort and reports its
- * failures as warnings.
- *
- * Filesystem, sleep, and warning dependencies are injectable so tests can
- * exercise each failure path without touching the real disk.
+ * Filesystem, sleep, and warning dependencies are injectable for tests.
  *
  * @example
  * ```ts
@@ -248,10 +212,21 @@ export const createFileKeybindingsStore = (
 
   /** Reads the file, mapping a missing file apart from any other failure. */
   const read = (): KeybindingsReadOutcome => {
+    const finishSpan = options.spans?.begin('keybindings-read');
     try {
-      return {kind: 'present', text: fileSystem.readFileSync(options.filePath, 'utf8')};
+      const text = fileSystem.readFileSync(options.filePath, 'utf8');
+      finishSpan?.('present');
+      return {kind: 'present', text};
     } catch (error) {
-      return errorCode(error) === 'ENOENT' ? {kind: 'missing'} : {kind: 'unreadable', error};
+      const code = errorCode(error);
+      if (code === 'ENOENT') {
+        finishSpan?.('missing');
+        return {kind: 'missing'};
+      }
+      // The port keeps only a bounded reason; the raw error stays diagnosable here.
+      warnFn(`[config-keybindings] Couldn't read "${options.filePath}".`, error);
+      finishSpan?.('unreadable');
+      return {failure: storageFailure(code), kind: 'unreadable'};
     }
   };
 
@@ -321,13 +296,19 @@ export const createFileKeybindingsStore = (
    * renamed, so either the old file or the complete new one is visible.
    */
   const write = (text: string): KeybindingsWriteOutcome => {
+    const finishSpan = options.spans?.begin('keybindings-write');
     const resolution = resolveTarget();
     if (resolution.kind === 'unresolved') {
-      return {error: resolution.error, kind: 'failed'};
+      warnFn(`[config-keybindings] Couldn't resolve "${options.filePath}" for writing.`, resolution.error);
+      finishSpan?.('failed');
+      return {failure: storageFailure(errorCode(resolution.error)), kind: 'failed'};
     }
     const plan = planReplacement(resolution.path);
     if (!canReplaceTarget(plan)) {
-      return {error: new Error(`Refusing to replace read-only file "${plan.target}".`), kind: 'failed'};
+      // The synthetic refusal is logged for diagnosis; the port sees the category.
+      warnFn(`[config-keybindings] Refused to replace read-only file "${plan.target}".`);
+      finishSpan?.('failed');
+      return {failure: 'permission', kind: 'failed'};
     }
     let descriptor: number | undefined;
     try {
@@ -343,13 +324,16 @@ export const createFileKeybindingsStore = (
         fileSystem.chmodSync(plan.temporaryPath, plan.mode);
       }
       renameWithRetry(plan);
+      finishSpan?.('written');
       return {kind: 'written'};
     } catch (error) {
       if (descriptor !== undefined) {
         closeQuietly(descriptor);
       }
       removeQuietly(plan);
-      return {kind: 'failed', error};
+      warnFn(`[config-keybindings] Couldn't write "${options.filePath}".`, error);
+      finishSpan?.('failed');
+      return {failure: storageFailure(errorCode(error)), kind: 'failed'};
     }
   };
 
@@ -383,5 +367,5 @@ export const createFileKeybindingsStore = (
     }
   };
 
-  return {location: options.filePath, read, removeStaleTemporaryFiles, write};
+  return {label: fileName, read, removeStaleTemporaryFiles, write};
 };

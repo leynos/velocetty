@@ -18,17 +18,21 @@ import type {parsedConfig, configOptions} from '@shared/types/config';
 import {isJsonObject} from './utils/runtime-guards';
 
 import {createConfigMetrics} from './config/config-metrics';
-import {createImportRecorder} from './config/config-observability';
+import {createImportRecorder, type ImportRecord} from './config/config-observability';
+import {createConfigSpanRecorder} from './config/config-spans';
 import {formatKeymapsMarker, isE2ERun, type E2EKeymapStatus} from './config/e2e-keymap-probe';
 import {createConfigImportModule} from './config/import';
 import {shouldAnnounceReload, type ConfigImportReport} from './config/import-report';
 import {_init} from './config/init';
 import {createKeybindingsService} from './config/keybindings';
+import {keybindingsCodec} from './config/keybindings-codec';
+import {createKeybindingsNotifier} from './config/keybindings-notifier';
 import {createFileKeybindingsStore} from './config/keybindings-store';
 import _openConfig from './config/open';
 import {
   cfgPath,
   cfgDir,
+  configTree,
   defaultCfg,
   defaultPlatformKeyPath,
   keybindingsPath,
@@ -51,8 +55,24 @@ const recorder = createImportRecorder({
   sink: {info: (line) => console.info(line), warn: (line) => console.warn(line)}
 });
 
-const keybindingsStore = createFileKeybindingsStore({filePath: keybindingsPath, onRetry: recorder.recordRenameRetry});
-const keybindingsService = createKeybindingsService({notify, store: keybindingsStore});
+const spans = createConfigSpanRecorder({
+  now: () => performance.now(),
+  sink: {info: (line) => console.info(line), warn: (line) => console.warn(line)}
+});
+
+// The adapters are built once, at module load, exactly as before the ports
+// were split: only the start-up *command* is deferred to `setup()`, so a
+// query made earlier still works and still performs no start-up side effects.
+const keybindingsStore = createFileKeybindingsStore({
+  filePath: keybindingsPath,
+  onRetry: recorder.recordRenameRetry,
+  spans
+});
+const keybindingsService = createKeybindingsService({
+  codec: keybindingsCodec,
+  report: createKeybindingsNotifier(notify),
+  store: keybindingsStore
+});
 
 const {_import, getDefaultConfig} = createConfigImportModule({
   _init,
@@ -178,18 +198,26 @@ const createChokidarHandle = (directories: readonly string[]): WatcherHandle => 
  * that throws afterwards must not fabricate an import failure.
  */
 const reloadConfiguration = () => {
+  const finishSpan = spans.begin('reload');
   let imported: ReturnType<typeof _import>;
   try {
+    recorder.beginImport({phase: 'reload'});
     imported = _import('reload');
   } catch (error) {
+    finishSpan('thrown');
     recorder.recordImportFailure({cause: 'thrown', phase: 'reload'});
     // The watcher still owns the warning and the decision to keep watching.
     throw error;
   }
   const {config, keybindings: outcome, report} = imported;
+  finishSpan(report.config === 'fallback' ? 'fallback' : 'applied');
   cfg = config;
   const announced = shouldAnnounceReload(report);
-  recorder.recordImport({announced, outcome, phase: 'reload', report});
+  const record: ImportRecord = {announced, configSource: configTree, outcome, phase: 'reload', report};
+  if (report.config === 'fallback') {
+    Object.assign(record, {fallbackBasis: 'defaults' as const});
+  }
+  recorder.recordImport(record);
   if (announced) {
     notify('Configuration updated', 'Configuration reloaded!');
   }
@@ -218,7 +246,8 @@ const _watch = () => {
     onReady: () => emitE2EMarker('[e2e] config-watcher-ready'),
     /** Re-imports on a debounced change; the watcher catches whatever it throws. */
     onReload: reloadConfiguration,
-    schedule: (callback, delayMs) => setTimeout(callback, delayMs)
+    schedule: (callback, delayMs) => setTimeout(callback, delayMs),
+    spans
   });
 
   app.on('before-quit', () => {
@@ -299,11 +328,20 @@ export const setup = () => {
   // The Velocetty tree holds new configuration files, so it must exist before
   // the importer copies schemas or seeds `keybindings.json5` into it.
   mkdirpSync(velocettyDir);
+  // A crashed write can leave a temporary file behind. Start-up is the only
+  // phase that may remove it, and the edge owns that cleanup immediately before
+  // the seed decision reads the file.
+  keybindingsStore.removeStaleTemporaryFiles();
+  recorder.beginImport({phase: 'startup'});
   const {config, keybindings: outcome, report} = _import('startup');
   cfg = config;
   // Start-up never shows "Configuration updated", so the record states that
   // rather than leaving the field absent.
-  recorder.recordImport({announced: false, outcome, phase: 'startup', report});
+  const record: ImportRecord = {announced: false, configSource: configTree, outcome, phase: 'startup', report};
+  if (report.config === 'fallback') {
+    Object.assign(record, {fallbackBasis: 'defaults' as const});
+  }
+  recorder.recordImport(record);
   _watch();
   checkDeprecatedConfig();
   emitE2EMarker(`[e2e] keybindings-path ${keybindingsPath}`);

@@ -3,7 +3,7 @@ import {expect, test} from 'bun:test';
 import fc from 'fast-check';
 
 import {createKeybindingsService} from '../../app/config/keybindings';
-import {parseKeybindingsText, serializeKeybindings} from '../../app/config/keybindings-codec';
+import {keybindingsCodec, parseKeybindingsText, serializeKeybindings} from '../../app/config/keybindings-codec';
 import {
   type KeybindingsObservation,
   type LegacyKeymapsSource,
@@ -287,7 +287,7 @@ const commandsArb = fc.commands([...ALL_COMMANDS], {maxCommands: MAX_COMMANDS});
 
 const setup = (): Setup => {
   const store = createMemoryKeybindingsStore(SOURCE);
-  const service = createKeybindingsService({notify: () => {}, store, warn: () => {}});
+  const service = createKeybindingsService({codec: keybindingsCodec, report: () => {}, store});
   return {
     model: {file: {kind: 'missing'}, history: [], pendingWriteFailure: false, started: false, writeAttempts: 0},
     real: {service, store}

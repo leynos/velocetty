@@ -5,7 +5,13 @@
  * from the importer lets the watcher use it without pulling in the importer's
  * filesystem dependencies.
  */
-import type {KeybindingsLoadOutcome} from './keybindings';
+import type {KeybindingsLoadOutcome} from './keybindings-ports';
+
+/** A notification sink shared by the configuration modules. */
+export type ConfigImportNotify = (title: string, body?: string, details?: {error?: unknown}) => void;
+
+/** Which tree supplied the active configuration file. */
+export type ConfigSourceKind = 'development' | 'velocetty' | 'hyper';
 
 /**
  * Why the user configuration fell back, in a closed vocabulary.
@@ -36,6 +42,10 @@ export type ImportDecision = {
   readonly config: 'applied' | 'fallback';
   /** Why the config fell back; absent when it applied or the cause is unknown. */
   readonly configCause?: ConfigFallbackCause;
+  /** Which tree supplied the active configuration file. */
+  readonly configSource: ConfigSourceKind;
+  /** What a fallback fell back to; absent unless the config fell back. */
+  readonly fallbackBasis?: 'defaults';
   readonly keybindings: KeybindingsLoadOutcome;
   /** Whether the "Configuration updated" notice was shown. */
   readonly announced: boolean;
@@ -72,15 +82,22 @@ const describeKeybindingsDecision = (outcome: KeybindingsLoadOutcome): string =>
     : `keybindings=kept basis=${outcome.basis} cause=${outcome.cause}`;
 
 /**
- * Describes the configuration half of a decision, including the fallback cause.
+ * Describes the configuration half of a decision, including its source.
  *
  * A fallback whose cause is unknown still renders as `config=fallback`; the
- * field is omitted rather than guessed.
+ * cause and the fallback basis are omitted rather than guessed.
  */
-const describeConfigDecision = (decision: ImportDecision): string =>
-  decision.configCause === undefined
-    ? `config=${decision.config}`
-    : `config=${decision.config} cause=${decision.configCause}`;
+const describeConfigDecision = (decision: ImportDecision): string => {
+  const fields = [`config=${decision.config}`];
+  if (decision.configCause !== undefined) {
+    fields.push(`cause=${decision.configCause}`);
+  }
+  fields.push(`configSource=${decision.configSource}`);
+  if (decision.fallbackBasis !== undefined) {
+    fields.push(`fallbackBasis=${decision.fallbackBasis}`);
+  }
+  return fields.join(' ');
+};
 
 /**
  * Describes one import attempt as a single bounded log record.
@@ -98,10 +115,12 @@ const describeConfigDecision = (decision: ImportDecision): string =>
  *   announced: false,
  *   config: 'fallback',
  *   configCause: 'parse',
+ *   configSource: 'velocetty',
+ *   fallbackBasis: 'defaults',
  *   keybindings: {kind: 'applied', keymaps: {}, origin: 'file'},
  *   phase: 'reload'
  * });
- * // 'phase=reload config=fallback cause=parse keybindings=applied origin=file announced=false'
+ * // 'phase=reload config=fallback cause=parse configSource=velocetty fallbackBasis=defaults keybindings=applied origin=file announced=false'
  * ```
  */
 export const describeImportDecision = (decision: ImportDecision): string =>

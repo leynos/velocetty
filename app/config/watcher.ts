@@ -7,6 +7,8 @@
  */
 import path from 'node:path';
 
+import type {ConfigSpanRecorder} from './config-spans';
+
 /** The filesystem events the watcher treats as a configuration change. */
 export type WatcherEvent = 'add' | 'change' | 'unlink';
 
@@ -27,6 +29,8 @@ export type ConfigWatcherOptions<TimerHandle> = {
   readonly cancel: (handle: TimerHandle) => void;
   readonly onReload: () => void;
   readonly onReady?: () => void;
+  /** Records one span per dispatched reload, including a reload that throws. */
+  readonly spans?: ConfigSpanRecorder;
   readonly warn?: (message: string, error: unknown) => void;
 };
 
@@ -70,9 +74,12 @@ export const createConfigWatcher = <TimerHandle>(options: ConfigWatcherOptions<T
     if (isClosed) {
       return;
     }
+    const finishSpan = options.spans?.begin('watcher-dispatch');
     try {
       options.onReload();
+      finishSpan?.('applied');
     } catch (error) {
+      finishSpan?.('thrown');
       // A failed reload must not silence the watcher: the next edit is the
       // user's retry, and it has to be observed like any other event.
       warnFn('[config-watcher] Configuration reload failed.', error);

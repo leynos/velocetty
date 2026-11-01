@@ -4,7 +4,12 @@
  * one write. Reads return whatever file state the test last set, so service
  * tests observe the same interface the file adapter provides.
  */
-import type {KeybindingsReadOutcome, KeybindingsStore, KeybindingsWriteOutcome} from '../../app/config/keybindings';
+import type {
+  KeybindingsReadOutcome,
+  KeybindingsStorageFailure,
+  KeybindingsStore,
+  KeybindingsWriteOutcome
+} from '../../app/config/keybindings-ports';
 
 export type MemoryKeybindingsStore = KeybindingsStore & {
   /** How many writes were attempted, successful or not. */
@@ -13,23 +18,23 @@ export type MemoryKeybindingsStore = KeybindingsStore & {
   readonly writtenTexts: () => readonly string[];
   readonly setText: (text: string) => void;
   readonly setMissing: () => void;
-  readonly setUnreadable: (error?: unknown) => void;
+  readonly setUnreadable: (failure?: KeybindingsStorageFailure) => void;
   /** Makes the next write fail, then clears the fault. */
-  readonly failNextWrite: (error?: unknown) => void;
+  readonly failNextWrite: (failure?: KeybindingsStorageFailure) => void;
 };
 
-export const createMemoryKeybindingsStore = (location = 'memory-keybindings.json5'): MemoryKeybindingsStore => {
+export const createMemoryKeybindingsStore = (label = 'memory-keybindings.json5'): MemoryKeybindingsStore => {
   let file: KeybindingsReadOutcome = {kind: 'missing'};
   let attempts = 0;
-  let pendingFailure: {readonly error: unknown} | undefined;
+  let pendingFailure: KeybindingsStorageFailure | undefined;
   const written: string[] = [];
 
   const write = (text: string): KeybindingsWriteOutcome => {
     attempts += 1;
     if (pendingFailure !== undefined) {
-      const {error} = pendingFailure;
+      const failure = pendingFailure;
       pendingFailure = undefined;
-      return {kind: 'failed', error};
+      return {failure, kind: 'failed'};
     }
     written.push(text);
     file = {kind: 'present', text};
@@ -37,10 +42,10 @@ export const createMemoryKeybindingsStore = (location = 'memory-keybindings.json
   };
 
   return {
-    failNextWrite: (error = new Error('injected write failure')) => {
-      pendingFailure = {error};
+    failNextWrite: (failure = 'other') => {
+      pendingFailure = failure;
     },
-    location,
+    label,
     read: () => file,
     setMissing: () => {
       file = {kind: 'missing'};
@@ -48,8 +53,8 @@ export const createMemoryKeybindingsStore = (location = 'memory-keybindings.json
     setText: (text) => {
       file = {kind: 'present', text};
     },
-    setUnreadable: (error = new Error('injected read failure')) => {
-      file = {kind: 'unreadable', error};
+    setUnreadable: (failure = 'other') => {
+      file = {failure, kind: 'unreadable'};
     },
     write,
     writeAttempts: () => attempts,

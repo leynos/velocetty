@@ -1,15 +1,10 @@
 /** @file Named examples for the keybindings service: start, reload, import, export. */
 import {describe, expect, test} from 'bun:test';
 
-import * as fs from 'node:fs';
-import {tmpdir} from 'node:os';
-import path from 'node:path';
-
-import type {ConfigImportNotify} from '../../app/config/keybindings';
 import {createKeybindingsService} from '../../app/config/keybindings';
-import {parseKeybindingsText, serializeKeybindings} from '../../app/config/keybindings-codec';
+import {keybindingsCodec, parseKeybindingsText, serializeKeybindings} from '../../app/config/keybindings-codec';
+import type {KeybindingsNotice} from '../../app/config/keybindings-ports';
 import type {UserKeymaps} from '../../app/config/keybindings-policy';
-import {createFileKeybindingsStore} from '../../app/config/keybindings-store';
 import {createMemoryKeybindingsStore} from '../testUtils/memory-keybindings-store';
 
 const KEYMAPS_A: UserKeymaps = {'window:new': 'ctrl+n'};
@@ -18,41 +13,41 @@ const VALID_TEXT = serializeKeybindings(KEYMAPS_B);
 const INVALID_TEXT = '{broken';
 const OTHER_INVALID_TEXT = '[1, 2]';
 
-type Notified = {
-  readonly title: string;
-  readonly body: string | undefined;
-  readonly details: {readonly error?: unknown} | undefined;
-};
-
-const createNotifier = () => {
-  const calls: Notified[] = [];
-  const notify: ConfigImportNotify = (title, body, details) => {
-    calls.push({body, details, title});
+/** Records the bounded notices the service reports, with no presentation. */
+const createReporter = () => {
+  const notices: KeybindingsNotice[] = [];
+  return {
+    notices,
+    report: (notice: KeybindingsNotice) => {
+      notices.push(notice);
+    }
   };
-  return {calls, notify};
 };
 
-const lastCall = (calls: readonly Notified[]): Notified | undefined => calls.at(-1);
+const lastNotice = (notices: readonly KeybindingsNotice[]): KeybindingsNotice | undefined => notices.at(-1);
+
+const invalidFileNotices = (notices: readonly KeybindingsNotice[]) =>
+  notices.filter((notice) => notice.kind === 'invalid-file');
 
 const setup = (initialText?: string) => {
   const store = createMemoryKeybindingsStore();
   if (initialText !== undefined) {
     store.setText(initialText);
   }
-  const notifier = createNotifier();
-  const service = createKeybindingsService({notify: notifier.notify, store});
-  return {...notifier, service, store};
+  const reporter = createReporter();
+  const service = createKeybindingsService({codec: keybindingsCodec, report: reporter.report, store});
+  return {...reporter, service, store};
 };
 
 describe('start', () => {
   test('seeds a missing file from parsed legacy keymaps', () => {
-    const {calls, service, store} = setup();
+    const {notices, service, store} = setup();
 
     const outcome = service.start({keymaps: KEYMAPS_A, kind: 'parsed-keymaps'});
 
     expect(outcome).toEqual({keymaps: KEYMAPS_A, kind: 'applied', origin: 'seeded'});
     expect(store.writtenTexts()).toEqual([serializeKeybindings(KEYMAPS_A)]);
-    expect(calls).toEqual([]);
+    expect(notices).toEqual([]);
   });
 
   test('seeds an empty file when the legacy source carries no keymaps', () => {
@@ -65,8 +60,8 @@ describe('start', () => {
   });
 
   test('reports an unsaved seed when the write fails', () => {
-    const {calls, service, store} = setup();
-    store.failNextWrite(new Error('disk full'));
+    const {notices, service, store} = setup();
+    store.failNextWrite('permission');
 
     const outcome = service.start({keymaps: KEYMAPS_A, kind: 'parsed-keymaps'});
 
@@ -74,7 +69,7 @@ describe('start', () => {
     // the disk, so the origin distinguishes it from a completed migration.
     expect(outcome).toEqual({keymaps: KEYMAPS_A, kind: 'applied', origin: 'seeded-unsaved'});
     expect(store.writtenTexts()).toEqual([]);
-    expect(lastCall(calls)?.title).toContain("Couldn't create a keybindings file");
+    expect(lastNotice(notices)).toEqual({failure: 'permission', kind: 'seed-failed'});
   });
 
   test('defers an invalid legacy source without writing', () => {
@@ -96,14 +91,15 @@ describe('start', () => {
   });
 
   test('keeps the default shortcuts when the file is unreadable', () => {
-    const {calls, service, store} = setup();
-    store.setUnreadable();
+    const {notices, service, store} = setup();
+    store.setUnreadable('permission');
 
     const outcome = service.start({kind: 'parsed-empty'});
 
     expect(outcome).toMatchObject({basis: 'empty', cause: 'unreadable', keymaps: {}, kind: 'kept'});
     expect(store.writeAttempts()).toBe(0);
-    expect(calls.map((call) => call.title).join(' ')).toContain('Using default shortcuts until the file is fixed');
+    // The service names the bounded reason; the edge composes the sentence.
+    expect(notices).toEqual([{basis: 'empty', failure: 'permission', kind: 'unreadable-file'}]);
   });
 
   test('bootstraps at most once', () => {
@@ -119,7 +115,7 @@ describe('start', () => {
 
 describe('reload', () => {
   test('keeps the last known good and says so', () => {
-    const {calls, service, store} = setup(serializeKeybindings(KEYMAPS_A));
+    const {notices, service, store} = setup(serializeKeybindings(KEYMAPS_A));
     service.start({kind: 'parsed-empty'});
     store.setText(INVALID_TEXT);
 
@@ -131,7 +127,7 @@ describe('reload', () => {
       keymaps: KEYMAPS_A,
       kind: 'kept'
     });
-    expect(calls.map((call) => call.title).join(' ')).toContain('Keeping your previous shortcuts');
+    expect(lastNotice(notices)).toMatchObject({basis: 'last-known-good', kind: 'invalid-file'});
     expect(store.writeAttempts()).toBe(0);
   });
 
@@ -163,7 +159,7 @@ describe('reload', () => {
   });
 
   test('treats a missing file as an accepted empty map', () => {
-    const {calls, service, store} = setup(serializeKeybindings(KEYMAPS_A));
+    const {notices, service, store} = setup(serializeKeybindings(KEYMAPS_A));
     service.start({kind: 'parsed-empty'});
     store.setMissing();
     service.reload();
@@ -174,22 +170,22 @@ describe('reload', () => {
     // `missing` is an accepted observation in the policy, so the rejected read
     // that follows is backed by a last-known-good payload (the empty map).
     expect(outcome).toMatchObject({basis: 'last-known-good', cause: 'invalid', kind: 'kept'});
-    expect(lastCall(calls)?.title).toContain('Keeping your previous shortcuts');
+    expect(lastNotice(notices)).toMatchObject({basis: 'last-known-good', kind: 'invalid-file'});
   });
 
   test('shows an unchanged diagnostic only once', () => {
-    const {calls, service, store} = setup(serializeKeybindings(KEYMAPS_A));
+    const {notices, service, store} = setup(serializeKeybindings(KEYMAPS_A));
     service.start({kind: 'parsed-empty'});
     store.setText(INVALID_TEXT);
 
     service.reload();
     service.reload();
 
-    expect(calls).toHaveLength(1);
+    expect(invalidFileNotices(notices)).toHaveLength(1);
   });
 
   test('shows a changed diagnostic again', () => {
-    const {calls, service, store} = setup(serializeKeybindings(KEYMAPS_A));
+    const {notices, service, store} = setup(serializeKeybindings(KEYMAPS_A));
     service.start({kind: 'parsed-empty'});
     store.setText(INVALID_TEXT);
     service.reload();
@@ -197,7 +193,7 @@ describe('reload', () => {
 
     service.reload();
 
-    expect(calls).toHaveLength(2);
+    expect(invalidFileNotices(notices)).toHaveLength(2);
   });
 });
 
@@ -227,27 +223,27 @@ describe('importKeybindings', () => {
   });
 
   test('reports a failed write and notifies', () => {
-    const {calls, service, store} = setup(serializeKeybindings(KEYMAPS_A));
+    const {notices, service, store} = setup(serializeKeybindings(KEYMAPS_A));
     service.start({kind: 'parsed-empty'});
-    store.failNextWrite(new Error('disk full'));
+    store.failNextWrite('other');
 
     const outcome = service.importKeybindings({sourceLabel: 'import.json5', text: VALID_TEXT});
 
-    expect(outcome.kind).toBe('failed');
+    expect(outcome).toEqual({failure: 'other', kind: 'failed'});
     expect(store.writeAttempts()).toBe(1);
     expect(store.writtenTexts()).toEqual([]);
-    expect(lastCall(calls)?.title).toContain("Couldn't save keybindings file");
+    expect(lastNotice(notices)).toEqual({failure: 'other', kind: 'import-failed'});
   });
 });
 
 describe('exportKeybindings', () => {
   test('returns the stored text verbatim', () => {
-    const {calls, service, store} = setup(VALID_TEXT);
+    const {notices, service, store} = setup(VALID_TEXT);
     service.start({kind: 'parsed-empty'});
 
     expect(service.exportKeybindings()).toEqual({kind: 'stored', text: VALID_TEXT});
     expect(store.writeAttempts()).toBe(0);
-    expect(calls).toEqual([]);
+    expect(notices).toEqual([]);
   });
 
   test('returns invalid text with diagnostics', () => {
@@ -270,9 +266,9 @@ describe('exportKeybindings', () => {
 
   test('reports an unreadable file', () => {
     const {service, store} = setup();
-    store.setUnreadable();
+    store.setUnreadable('permission');
 
-    expect(service.exportKeybindings()).toMatchObject({kind: 'unreadable'});
+    expect(service.exportKeybindings()).toEqual({failure: 'permission', kind: 'unreadable'});
   });
 });
 
@@ -322,52 +318,51 @@ describe('load outcomes', () => {
   });
 });
 
-describe('stale temporary files', () => {
-  test('cleans once at start-up and never on a reload or import', () => {
-    const store = createMemoryKeybindingsStore();
-    const {notify} = createNotifier();
+describe('startup cleanup ownership', () => {
+  test('never removes stale temporary files itself', () => {
     let cleanups = 0;
-    const service = createKeybindingsService({
-      notify,
-      store: {
-        ...store,
-        removeStaleTemporaryFiles: () => {
-          cleanups += 1;
-        }
+    // The adapter owns cleanup beside the port, so the test double carries it
+    // too; the service must still never reach for it.
+    const store = {
+      ...createMemoryKeybindingsStore(),
+      removeStaleTemporaryFiles: () => {
+        cleanups += 1;
       }
+    };
+    const service = createKeybindingsService({
+      codec: keybindingsCodec,
+      report: createReporter().report,
+      store
     });
 
     service.start({kind: 'parsed-empty'});
     service.reload();
-    // A second `start` is a reload, so it must not clean again.
+    // A second `start` is a reload too.
     service.start({kind: 'parsed-empty'});
     service.importKeybindings({sourceLabel: 'memory-keybindings.json5', text: serializeKeybindings(KEYMAPS_A)});
 
-    expect(cleanups).toBe(1);
+    // Cleanup belongs to the composition root, which calls it before `start`.
+    expect(cleanups).toBe(0);
   });
+});
 
-  test('removes a crash leftover through the real store at start-up', () => {
-    // The store test proves the matching rule; this one proves the composition
-    // actually reaches it, which a stub-only test cannot show.
-    const workspace = fs.mkdtempSync(path.join(tmpdir(), 'velocetty-keybindings-service-'));
-    try {
-      const filePath = path.join(workspace, 'keybindings.json5');
-      const stalePath = path.join(workspace, '.keybindings.json5.4242.1.tmp');
-      const stored = serializeKeybindings(KEYMAPS_A);
-      fs.writeFileSync(filePath, stored, 'utf8');
-      fs.writeFileSync(stalePath, 'partial write', 'utf8');
-      const service = createKeybindingsService({
-        notify: createNotifier().notify,
-        store: createFileKeybindingsStore({filePath})
-      });
+describe('bounded notices', () => {
+  test('reports only the notice vocabulary, never presentation text', () => {
+    const store = createMemoryKeybindingsStore();
+    store.setText(INVALID_TEXT);
+    const notices: KeybindingsNotice[] = [];
+    const service = createKeybindingsService({
+      codec: keybindingsCodec,
+      report: (notice) => notices.push(notice),
+      store
+    });
 
-      const outcome = service.start({kind: 'parsed-empty'});
+    service.start({kind: 'parsed-empty'});
 
-      expect(outcome.kind).toBe('applied');
-      expect(fs.existsSync(stalePath)).toBe(false);
-      expect(fs.readFileSync(filePath, 'utf8')).toBe(stored);
-    } finally {
-      fs.rmSync(workspace, {force: true, recursive: true});
-    }
+    // The reporter sees only structured notices: no titles, bodies, or paths.
+    expect(notices).toHaveLength(2);
+    expect(notices[0]).toMatchObject({kind: 'diagnostics', label: 'memory-keybindings.json5'});
+    expect(notices[1]).toMatchObject({basis: 'empty', kind: 'invalid-file'});
+    expect(notices.map((notice) => Object.hasOwn(notice, 'title'))).toEqual([false, false]);
   });
 });

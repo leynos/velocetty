@@ -235,9 +235,9 @@ Last updated: 2026-10-30
 
 ## KEYMAP-003 Split the importer and keybindings service from their adapters
 
-Status: Open  
-Owner: TBD  
-Last updated: 2026-10-31
+Status: Resolved (2026-11-01)  
+Owner: @leynos  
+Last updated: 2026-11-01
 
 ### KEYMAP-003 summary
 
@@ -263,23 +263,46 @@ Last updated: 2026-10-31
   notifications and console warnings. `app/config/keybindings-store.ts` imports
   its port types back from the service, so the adapter depends on the module it
   implements.
-- The change is structural: it moves boundaries across the importer, the
+- The change was structural: it moved boundaries across the importer, the
   service, the store, the composition root, and their test fakes. No
-  correctness, safety, or data-loss defect follows from the current shape, and
-  doing the split here would rewrite the tests that pin the storage behaviour
-  this branch delivers.
+  correctness, safety, or data-loss defect followed from the shape it recorded,
+  and the storage behaviour this branch delivers is preserved by the split —
+  the store, symlink, mode, retry, and stale-file tests all still pass.
+
+### KEYMAP-003 resolution
+
+The split landed on 2026-11-01. Each exit criterion now has a delivered
+counterpart:
+
+- `getDefaultConfig` is a pure query. It returns a defensive copy of the cached
+  bundled defaults and performs no directory, schema, or user-file write; a
+  separate `load('startup')` command owns every start-up side effect.
+- `createConfigSourceLoader` takes `fs`, `isDebugEnabled`, `warn`, and `error`
+  as optional ports with production defaults, so a test can substitute each one
+  and assert on what the loader actually calls.
+- `app/config/keybindings-ports.ts` holds `KeybindingsStore`,
+  `KeybindingsTextCodec`, the read and write outcomes, the bounded storage
+  failure vocabulary, and the notice and reporter types. The service receives
+  the codec as a port, so it never imports the JSON5 implementation.
+- `app/config/keybindings-store.ts` is the only module that names a filesystem
+  path or an errno; `app/config/keybindings-notifier.ts` owns the presentation
+  strings; `app/config.ts` owns stale-temporary-file cleanup and wires rename
+  retries into the recorder.
+- `test/testUtils/memory-keybindings-store.ts` drives the service with a
+  domain-shaped fake, and `test/testUtils/keybindings-store-harness.ts` drives
+  the adapter through an injected filesystem, including injected write faults.
 
 ### KEYMAP-003 exit criteria
 
-- `getDefaultConfig` either performs no writes or is renamed and documented as
-  a start-up command.
-- The importer receives injected filesystem, environment, and logging ports.
-- The store port and domain outcome types live in a neutral module, with codec
-  parse and seed serialization injected as ports.
-- Filesystem paths, console writes, notifications, retry reporting, and stale
-  temporary-file cleanup live in the adapter or the composition root.
-- Unit tests exercise the service against domain-shaped fakes and the adapter
-  against a fake filesystem.
+- [x] `getDefaultConfig` performs no writes.
+- [x] The importer receives injected filesystem, environment, and logging
+  ports.
+- [x] The store port and domain outcome types live in a neutral module, with
+  codec parse and seed serialization injected as ports.
+- [x] Filesystem paths, console writes, notifications, retry reporting, and
+  stale temporary-file cleanup live in the adapter or the composition root.
+- [x] Unit tests exercise the service against domain-shaped fakes and the
+  adapter against a fake filesystem.
 
 ## WINARM64-001 Track Windows aarch64 CI enablement after Bun support lands
 
