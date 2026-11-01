@@ -275,8 +275,9 @@ The split landed on 2026-11-01. Each exit criterion now has a delivered
 counterpart:
 
 - `getDefaultConfig` is a pure query. It returns a defensive copy of the cached
-  bundled defaults and performs no directory, schema, or user-file write; a
-  separate `load('startup')` command owns every start-up side effect.
+  bundled defaults, performs no directory, schema, or user-file write, and
+  sends no notification; a separate `load('startup')` command owns every
+  start-up side effect, including announcing a bundled-defaults fallback once.
 - `createConfigSourceLoader` takes `fs`, `isDebugEnabled`, `warn`, and `error`
   as optional ports with production defaults, so a test can substitute each one
   and assert on what the loader actually calls.
@@ -294,7 +295,7 @@ counterpart:
 
 ### KEYMAP-003 exit criteria
 
-- [x] `getDefaultConfig` performs no writes.
+- [x] `getDefaultConfig` performs no writes and sends no notifications.
 - [x] The importer receives injected filesystem, environment, and logging
   ports.
 - [x] The store port and domain outcome types live in a neutral module, with

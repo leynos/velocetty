@@ -280,9 +280,13 @@ test('getDefaultConfig reads and caches the defaults without writing', async () 
 });
 
 test('getDefaultConfig performs zero writes through the injected filesystem', async () => {
-  const writeCounts = {mkdirp: 0, writeFile: 0};
+  const writeCounts = {copy: 0, mkdirp: 0, writeFile: 0};
   const recordingFileSystem: ConfigImportFileSystem = {
     ...fsExtra,
+    copySync: (...args) => {
+      writeCounts.copy += 1;
+      fsExtra.copySync(...args);
+    },
     mkdirpSync: (directory) => {
       writeCounts.mkdirp += 1;
       fsExtra.mkdirpSync(directory);
@@ -301,9 +305,9 @@ test('getDefaultConfig performs zero writes through the injected filesystem', as
     const defaults = harness.getDefaultConfig();
 
     expect(defaults).toEqual(expect.any(Object));
-    // The recording double is the proof: the query made no directory and wrote
-    // no file, so the plugin tree and schema copies cannot have been created.
-    expect(writeCounts).toEqual({mkdirp: 0, writeFile: 0});
+    // The recording double is the proof: the query made no directory, copied
+    // no schema, and wrote no file.
+    expect(writeCounts).toEqual({copy: 0, mkdirp: 0, writeFile: 0});
     expect(existsSync(harness.mockPaths.plugs.base)).toBe(false);
     expect(existsSync(harness.mockPaths.plugs.local)).toBe(false);
     expect(existsSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(false);
@@ -326,26 +330,6 @@ test('getDefaultConfig returns the same defaults before and after a start-up imp
 
     expect(after).toEqual(before);
     expect(after.keymaps).toEqual({'window:new': ['ctrl+n']});
-  } finally {
-    harness.cleanup();
-  }
-});
-
-test('getDefaultConfig falls back to safe defaults when bundled default config is invalid', async () => {
-  const harness = await createConfigImportHarness();
-  try {
-    // Malformed: plugins is a string rather than an array.
-    writeFileSync(harness.mockPaths.defaultCfg, '{plugins: "not-an-array"}', 'utf8');
-    // Empty platform keymap so keymaps stays {} after merge.
-    writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), '{}', 'utf8');
-    writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
-
-    const result = harness.getDefaultConfig();
-
-    expect(result).toEqual({plugins: [], localPlugins: [], keymaps: {}});
-    expect(harness.notifyMock).toHaveBeenCalledTimes(1);
-    expect(harness.notifyMock.mock.calls[0]?.[0]).toContain('Suggested fix:');
-    expect(harness.initMock).not.toHaveBeenCalled();
   } finally {
     harness.cleanup();
   }

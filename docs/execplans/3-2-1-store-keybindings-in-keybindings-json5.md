@@ -961,6 +961,53 @@ design and the notification the user sees.
     (`typos.toml` unchanged), `markdownlint` (0 issues in 70 files), `nixie`
     (all diagrams valid), and `prove` (1 + 8 verified, 0 errors).
 
+- [x] (2026-11-01 21:50Z) CodeScene repair round. The hosted review of the
+  first repaired head (`10106344`) failed two gates: three new files below
+  10.00, and the same three files under the advisory rules.
+  - [x] `app/config/keybindings-store.ts`: `write` (Complex Method, cc 12) now
+    delegates to `prepareWrite`, `openTemporary`, and `commitWrite`, and
+    `storageFailure` reads a `Map` instead of chaining errno comparisons
+    (Complex Conditional). The file scores 10.00 with `cs review`.
+  - [x] Code Duplication in `test/unit/keybindings-store.test.ts` and
+    `test/unit/config-observability.test.ts`: the paired permission, symlink,
+    and counter tests became table-driven loops, and the observability tests
+    share one `recordImport` helper. Both files score 10.00.
+  - [x] Gate evidence for `36b2947b`: all eight gates pass sequentially —
+    `check-fmt` (371 files; 70 Markdown files unchanged), `typecheck` (no
+    diagnostics), `lint` (372 files; boundaries and oxlint clean), `test`
+    (734 pass, 0 fail, 14,050 expects), `spelling` (`typos.toml` unchanged),
+    `markdownlint` (0 issues in 70 files), `nixie` (all diagrams valid), and
+    `prove` (1 + 8 verified, 0 errors).
+
+- [x] (2026-11-01 22:20Z) CodeRabbit reconciliation round. The reply to the
+  pre-merge reconciliation accepted the architecture and observability repairs,
+  kept the query side effect and the document inventory open, and asked for
+  fresh evidence.
+  - [x] `getDefaultConfig` no longer notifies. The bundled-defaults parse fault
+    is carried in the cached load and announced once by `load('startup')`
+    through `announceDefaultFaults`, so the read-only query has no user-visible
+    effect.
+  - [x] Schema copies go through the injected filesystem. `SchemaCopyRequest.fs`
+    is now required, `ensureSchemaFiles` copies and probes existence through
+    it, and `ConfigImportFileSystem` includes `copySync`.
+  - [x] `test/unit/config-import-defaults.test.ts` covers valid, invalid, and
+    unreadable bundled defaults before and after start-up, and records schema
+    copies plus a refused copy through the injected port. The zero-write query
+    test now counts copies alongside directories and files.
+  - [x] `docs/developers-guide.md` describes the delivered ports
+    (`label`/`read`/`write`, `codec`/`report`/`store`, `KeybindingsReporter`,
+    `createKeybindingsNotifier`, composition-root cleanup) and corrects the
+    sink claim for `createConfigMetrics`. `docs/tracking-issues.md` records the
+    notification-free query.
+  - [x] Gate evidence: all eight gates pass sequentially on this tree —
+    `check-fmt` (372 files; 70 Markdown files unchanged), `typecheck` (no
+    diagnostics), `lint` (373 files; boundaries and oxlint clean), `test`
+    (735 pass, 0 fail, 14,067 expects), `spelling` (`typos.toml` unchanged),
+    `markdownlint` (0 issues in 70 files), `nixie` (all diagrams valid), and
+    `prove` (1 + 8 verified, 0 errors). The first pass caught one 91-column
+    line in `docs/developers-guide.md`; after rewrapping, `check-fmt` and
+    `markdownlint` were re-run and passed.
+
 ## Surprises & discoveries
 
 - Observation: `typos.toml` is generated from a shared dictionary fetched from

@@ -304,15 +304,21 @@ The storage path is split into a pure verified policy, an adapter store, a
 service, an importer, and a watcher; the composition root in `app/config.ts`
 wires them together.
 
-- **`KeybindingsStore`** (`app/config/keybindings.ts`): the driven port for the
-  file, exposing `location`, `read()`, optional `removeStaleTemporaryFiles()`,
-  and `write(text)`. `createFileKeybindingsStore` in
+- **`KeybindingsStore`** (`app/config/keybindings-ports.ts`): the driven port
+  for the file, exposing a short `label`, `read()`, and `write(text)`. It
+  carries no filesystem path and no raw error, so a caller cannot persist
+  through anything but the port. `createFileKeybindingsStore` in
   `app/config/keybindings-store.ts` supplies the filesystem implementation,
   which replaces the file through a temporary sibling and fails closed on an
   unresolvable symlink chain.
 - **`createKeybindingsService`** (`app/config/keybindings.ts`): owns the
   last-known-good state and the reload, start, import, and export operations.
-  It takes `notify`, a `KeybindingsStore`, and an optional `warn`.
+  It takes a `codec`, a `KeybindingsReporter`, and a `KeybindingsStore`, so
+  parsing, reporting, and storage are all supplied by the caller.
+- **`KeybindingsReporter`** (`app/config/keybindings-ports.ts`): the closure
+  the service calls with one bounded notice per event.
+  `createKeybindingsNotifier` in `app/config/keybindings-notifier.ts` is the
+  edge implementation, and it composes the sentences a user reads.
 - **`ConfigImportKeybindings`** (`app/config/import.ts`): the type of the
   `keybindings` option accepted by `createConfigImportModule`, that is, the
   `{reload, start}` pairing the importer calls.
@@ -320,13 +326,17 @@ wires them together.
   single resolved path of `keybindings.json5`. The sibling `keybindingsDir`,
   `keybindingsSchemaFile`, and `keybindingsSchemaPath` fields describe where
   the schema copy belongs.
-- **`ConfigImportNotify`** (`app/config/keybindings.ts`): the notification port
-  `(title, body?, details?)`, so the service and importer never import
+- **`ConfigImportNotify`** (`app/config/import-report.ts`): the notification
+  port `(title, body?, details?)`, so the loader and importer never import
   Electron's notifier directly.
 - **`createConfigWatcher`** (`app/config/watcher.ts`): coalesces a burst of
   directory events into one complete reload. It takes an injected `handle`,
   `fileNames`, `debounceMs`, `schedule`, `cancel`, and `onReload`, plus optional
   `onReady` and `warn`.
+- **Composition root** (`app/config.ts`): creates the store, the codec, and the
+  notifier, and calls `removeStaleTemporaryFiles()` itself at start-up. Stale
+  temporary cleanup is therefore a start-up decision of the root, not part of
+  the service's contract.
 
 Injecting these dependencies keeps the service, importer, and watcher testable
 in `bun test` without Electron, a real clock, or a real filesystem. See
@@ -394,11 +404,12 @@ records are shown wrapped here. Its fields mean:
 
 `createConfigMetrics`, `createImportRecorder`, and `createConfigSpanRecorder`
 live in `app/config/config-metrics.ts`, `app/config/config-observability.ts`,
-and `app/config/config-spans.ts`. All three take their sink as a parameter, and
-the span recorder also takes its clock, so a test can assert the exact text,
-counters, and elapsed times without Electron. A seeded migration that could not
-be written is recorded as `origin=seeded-unsaved`; it applies in memory, but
-the counter line and the record do not claim a completed migration.
+and `app/config/config-spans.ts`. The metrics factory is an in-memory counter
+tally that takes no sink; the import and span recorders take their sink as a
+parameter, and the span recorder also takes its clock, so a test can assert the
+exact text, counters, and elapsed times without Electron. A seeded migration
+that could not be written is recorded as `origin=seeded-unsaved`; it applies in
+memory, but the counter line and the record do not claim a completed migration.
 
 ### Reloadability classification
 

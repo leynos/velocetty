@@ -6,7 +6,7 @@
  * query is read-only too: it reads and caches the bundled defaults without
  * copying a schema or creating a user file.
  */
-import {existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
+import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
 import path from 'node:path';
 
 import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
@@ -45,7 +45,7 @@ export type ConfigImportPaths = {
 /** The filesystem subset the loader uses; injected so a query can be proved read-only. */
 export type ConfigImportFileSystem = Pick<
   typeof import('fs-extra'),
-  'existsSync' | 'mkdirpSync' | 'readFileSync' | 'writeFileSync'
+  'copySync' | 'existsSync' | 'mkdirpSync' | 'readFileSync' | 'writeFileSync'
 >;
 
 type LoadedConfig = {
@@ -80,7 +80,7 @@ export type ConfigSourceLoaderDependencies = {
   error?: typeof console.error;
 };
 
-const defaultFileSystem: ConfigImportFileSystem = {existsSync, mkdirpSync, readFileSync, writeFileSync};
+const defaultFileSystem: ConfigImportFileSystem = {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync};
 
 const defaultRawConfigFallback: rawConfig = {
   plugins: [],
@@ -112,7 +112,8 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
   const warnFn = dependencies.warn ?? console.warn;
   const errorFn = dependencies.error ?? console.error;
   const pathDeps = dependencies.paths;
-  let defaultsCache: rawConfig | undefined;
+  let defaultsCache: LoadedConfig | undefined;
+  let hasAnnouncedDefaultFaults = false;
 
   /**
    * Copies the bundled JSON schemas into the configuration directories.
@@ -123,6 +124,8 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
    */
   const ensureSchemaFile = () => {
     const request: SchemaCopyRequest = {
+      // The copies go through the loader's port, so a test can observe them.
+      fs: fileSystem,
       notify: notifyFn,
       targets: [
         {directory: pathDeps.velocettyDir, fileName: pathDeps.schemaFile, source: pathDeps.schemaPath},
@@ -194,11 +197,8 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     errorFn(
       `[config-import] Failed to parse bundled default config at "${pathDeps.defaultCfg}". Using safe fallback defaults.`
     );
-    notifyWithPrimaryDiagnostic({
-      baseMessage: "Couldn't parse the bundled default config. Falling back to safe defaults.",
-      diagnostics: parsedDefaultConfigResult.diagnostics,
-      notify: notifyFn
-    });
+    // The fault is returned rather than announced: only the start-up command
+    // tells the user, so the read-only query stays free of notifications.
     return {
       config: cloneRawConfig(defaultRawConfigFallback),
       diagnostics: parsedDefaultConfigResult.diagnostics,
@@ -292,6 +292,22 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
   const canBootstrapUserConfig = (): boolean => path.resolve(pathDeps.cfgDir) === path.resolve(pathDeps.velocettyDir);
 
   /**
+   * Reads and caches the bundled defaults and merges the platform keymap.
+   *
+   * Caching the whole load, not only its payload, keeps the diagnostics that
+   * explain a fallback available to the start-up command without re-reading
+   * the bundled files.
+   */
+  const readDefaults = (): LoadedConfig => {
+    if (defaultsCache === undefined) {
+      const loaded = loadDefaultConfig();
+      replaceLegacyKeymaps(loaded.config, loadPlatformKeymap());
+      defaultsCache = loaded;
+    }
+    return defaultsCache;
+  };
+
+  /**
    * Reads the bundled defaults and merges the platform keymap, with no writes.
    *
    * The result is cached for the process, so a later start-up import reuses the
@@ -303,13 +319,24 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
    * defaults.keymaps; // the platform bindings, merged into the bundled defaults
    * ```
    */
-  const loadDefaultsOnly = (): rawConfig => {
-    if (defaultsCache === undefined) {
-      const {config: defaultCfg} = loadDefaultConfig();
-      replaceLegacyKeymaps(defaultCfg, loadPlatformKeymap());
-      defaultsCache = defaultCfg;
+  const loadDefaultsOnly = (): rawConfig => cloneRawConfig(readDefaults().config);
+
+  /**
+   * Tells the user once that the bundled defaults could not be parsed.
+   *
+   * Called from the start-up command, never from the read-only query, so
+   * bootstrapping is announced at the moment the application acts on it.
+   */
+  const announceDefaultFaults = ({diagnostics, usedFallback}: LoadedConfig): void => {
+    if (!usedFallback || hasAnnouncedDefaultFaults) {
+      return;
     }
-    return defaultsCache;
+    hasAnnouncedDefaultFaults = true;
+    notifyWithPrimaryDiagnostic({
+      baseMessage: "Couldn't parse the bundled default config. Falling back to safe defaults.",
+      diagnostics,
+      notify: notifyFn
+    });
   };
 
   /** Reads both layers, creating files only during a start-up import. */
@@ -324,7 +351,11 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
       ensureSchemaFile();
     }
 
-    const defaultCfg = loadDefaultsOnly();
+    const defaults = readDefaults();
+    if (phase === 'startup') {
+      announceDefaultFaults(defaults);
+    }
+    const defaultCfg = defaults.config;
     const bootstrapped = phase === 'startup' && canBootstrapUserConfig() ? ensureUserConfigFile(defaultCfg) : false;
 
     const userConfigResult = loadUserConfig(defaultCfg);
@@ -346,8 +377,10 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
    *
    * The query is read-only: it reads and caches the bundled defaults and the
    * platform keymap, but never creates a directory, copies a schema, or
-   * bootstraps `config.json5`. It also never starts the keybindings service,
-   * so querying defaults cannot seed or re-read `keybindings.json5`.
+   * bootstraps `config.json5`, and it never notifies the user. A bundled
+   * defaults fault is announced by the start-up command instead. It also never
+   * starts the keybindings service, so querying defaults cannot seed or
+   * re-read `keybindings.json5`.
    *
    * @example
    * ```ts
