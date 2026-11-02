@@ -1161,6 +1161,22 @@ design and the notification the user sees.
   - [x] Documentation: corrected the CI progress grammar and described the
     migration source as the active legacy configuration file rather than only
     `config.json5.keymaps`.
+- [x] (2026-11-02 09:50Z) Addressed the inline findings and pre-merge rows from
+  review `5734325686` and the refreshed walkthrough on `6815e5e7`.
+  - [x] Functional Correctness: `withDefaultColors` no longer casts a partial
+    map to `ColorMap`. It spreads a 16-slot `FALLBACK_COLORS` palette beneath
+    the bundled and user colours, so a degraded package still yields a
+    complete map. A parity test reads `app/config/config-default.json`.
+  - [x] Documentation: the reset and recreation rules name the active legacy
+    configuration file and list both `config.json5` and `hyper.json`.
+  - [x] Module-Level Documentation: `app/utils/colours.ts` has a `@file` header,
+    and `getColorMap` and `isColorMap` carry docstrings.
+  - [x] Developer Documentation: the importer example destructures the
+    `keybindings` outcome, and the developers' guide documents
+    `ConfigImportResult` and `KeybindingsLoadOutcome`.
+  - [x] Gates: all eight commit gates pass on `6815e5e7` (753 tests, 9 proofs).
+  - Inline replies: `#discussion_r4440862690` and `#discussion_r4440865555`.
+  - Pre-merge reconciliation: issue comment `6574064501`.
 
 ## Surprises & discoveries
 
