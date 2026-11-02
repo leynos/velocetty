@@ -39,10 +39,38 @@ export function getColorMap(colors: ColorMap | readonly string[]): ColorMap | Re
 const isColorMap = (colors: ColorMap | readonly string[]): colors is ColorMap => !Array.isArray(colors);
 
 /**
+ * The last-resort palette used when the bundled configuration cannot be read.
+ *
+ * It mirrors the `colors` section of `app/config/config-default.json`, and a
+ * parity test keeps the two in step. It exists so a degraded package still
+ * yields a complete `ColorMap`; xterm would otherwise receive `undefined` for
+ * every slot the user did not set.
+ */
+const FALLBACK_COLORS: ColorMap = {
+  black: '#000000',
+  blue: '#0A2FC4',
+  cyan: '#20C5C6',
+  green: '#1DC121',
+  lightBlack: '#686868',
+  lightBlue: '#6A76FB',
+  lightCyan: '#68FDFE',
+  lightGreen: '#67F86F',
+  lightMagenta: '#FD7CFC',
+  lightRed: '#FD6F6B',
+  lightWhite: '#FFFFFF',
+  lightYellow: '#FFFA72',
+  magenta: '#C839C5',
+  red: '#C51E14',
+  white: '#C7C7C7',
+  yellow: '#C7C329'
+};
+
+/**
  * Fills a configuration's unset colours from the bundled defaults.
  *
  * A bundled config that could not be read or parsed has no `colors` section,
- * so the user's own colours are kept rather than dereferencing `undefined`.
+ * so the last-resort palette stands in for it. The user's own colours always
+ * win, and the result is always a complete map.
  *
  * @param colors - The configuration's colours, as a map or a legacy list.
  * @param defaultColors - The bundled defaults; absent or partial when the
@@ -54,10 +82,11 @@ const isColorMap = (colors: ColorMap | readonly string[]): colors is ColorMap =>
  * withDefaultColors(['#111'], {black: '#000'}); // {black: '#111'}
  * ```
  */
-export const withDefaultColors = (colors: ColorMap | readonly string[], defaultColors?: Partial<ColorMap>): ColorMap =>
-  // Spreading `undefined` is a no-op, so an unavailable bundled config needs no
-  // placeholder object. SAFETY: `ColorMap` is total, but a bundled config that
-  // never loaded has no colours at all. The cast records that degraded
-  // packaging state instead of inventing values; every colour the user set is
-  // still present.
-  ({...defaultColors, ...(isColorMap(colors) ? colors : getColorMap(colors))}) as ColorMap;
+export const withDefaultColors = (
+  colors: ColorMap | readonly string[],
+  defaultColors?: Partial<ColorMap>
+): ColorMap => ({
+  ...FALLBACK_COLORS,
+  ...defaultColors,
+  ...(isColorMap(colors) ? colors : getColorMap(colors))
+});
