@@ -101,6 +101,10 @@ export type KeybindingsNotices = {
  * Each notice fires at most once per process. Repeating them on every reload
  * would train users to ignore them.
  *
+ * @param notify - The user-facing notification sink.
+ * @param configFileName - The active legacy configuration file's name, so a
+ * Hyper tree's `hyper.json` is named rather than `config.json5`.
+ *
  * @example
  * ```ts
  * const notices = createKeybindingsNotices(notify);
@@ -108,7 +112,10 @@ export type KeybindingsNotices = {
  * notices.announceSeeded(); // no second notification
  * ```
  */
-export const createKeybindingsNotices = (notify: ConfigImportNotify): KeybindingsNotices => {
+export const createKeybindingsNotices = (
+  notify: ConfigImportNotify,
+  configFileName = 'config.json5'
+): KeybindingsNotices => {
   let seeded = false;
   let legacyIgnored = false;
   let deferred = false;
@@ -132,7 +139,7 @@ export const createKeybindingsNotices = (notify: ConfigImportNotify): Keybinding
       }
       deferred = true;
       notifyWithPrimaryDiagnostic({
-        baseMessage: "Couldn't move shortcuts to keybindings.json5. Fix the keymaps in config.json5 to migrate them.",
+        baseMessage: `Couldn't move shortcuts to keybindings.json5. Fix the keymaps in ${configFileName} to migrate them.`,
         diagnostics,
         notify
       });
@@ -151,8 +158,8 @@ export const createKeybindingsNotices = (notify: ConfigImportNotify): Keybinding
       }
       legacyIgnored = true;
       notify(
-        'Shortcuts in config.json5 are ignored',
-        'keybindings.json5 takes precedence, so the keymaps key in config.json5 is not used.'
+        `Shortcuts in ${configFileName} are ignored`,
+        `keybindings.json5 takes precedence, so the keymaps key in ${configFileName} is not used.`
       );
     },
     /**
@@ -170,7 +177,7 @@ export const createKeybindingsNotices = (notify: ConfigImportNotify): Keybinding
       seeded = true;
       notify(
         'Shortcuts moved to keybindings.json5',
-        'Your shortcuts now live in keybindings.json5. The keymaps key in config.json5 is no longer read.'
+        `Your shortcuts now live in keybindings.json5. The keymaps key in ${configFileName} is no longer read.`
       );
     },
     /**

@@ -57,6 +57,35 @@ test('an empty input says nothing and does not consume the notice', () => {
   ]);
 });
 
+test('the migration notices name the active legacy configuration file', () => {
+  const sent: Notice[] = [];
+  // A Hyper tree's active file is `hyper.json`, so the notices must not tell
+  // the user to edit a `config.json5` that is not there.
+  const notices = createKeybindingsNotices((title, body) => {
+    sent.push(body === undefined ? {title} : {body, title});
+  }, 'hyper.json');
+
+  notices.announceSeeded();
+  notices.announceLegacyIgnored();
+  notices.announceDeferred([diagnostic]);
+
+  expect(sent).toEqual([
+    {
+      body: 'Your shortcuts now live in keybindings.json5. The keymaps key in hyper.json is no longer read.',
+      title: 'Shortcuts moved to keybindings.json5'
+    },
+    {
+      body: 'keybindings.json5 takes precedence, so the keymaps key in hyper.json is not used.',
+      title: 'Shortcuts in hyper.json are ignored'
+    },
+    {
+      title:
+        "Couldn't move shortcuts to keybindings.json5. Fix the keymaps in hyper.json to migrate them. " +
+        '/keymaps: bad shortcut Suggested fix: Fix the shortcut.'
+    }
+  ]);
+});
+
 test('the shadowed notice stays accurate when development mode hides Velocetty', () => {
   const {notices, sent} = createRecorder();
 

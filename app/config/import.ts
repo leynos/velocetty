@@ -5,6 +5,8 @@
  * right phase, and reports what each file did so the application can decide
  * whether "Configuration updated" is honest.
  */
+import path from 'node:path';
+
 import type {parsedConfig, rawConfig} from '@shared/types/config';
 import {
   classifyLegacyKeymaps,
@@ -92,7 +94,9 @@ const keybindingsStatus = (outcome: KeybindingsLoadOutcome): ConfigImportReport[
  */
 export const createConfigImportModule = (dependencies: ConfigImportDependencies) => {
   const {_init: initConfig, keybindings, notify: notifyFn} = dependencies;
-  const notices = createKeybindingsNotices(notifyFn);
+  // A Hyper tree's active file is `hyper.json`, so the notices must name the
+  // file the user actually has rather than assuming `config.json5`.
+  const notices = createKeybindingsNotices(notifyFn, path.basename(dependencies.paths.cfgPath));
   const sourceOptions: ConfigSourceLoaderDependencies = {notify: notifyFn, paths: dependencies.paths};
   // Assigned only when supplied: `exactOptionalPropertyTypes` forbids `undefined`.
   if (dependencies.warn !== undefined) {

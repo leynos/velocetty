@@ -12,8 +12,9 @@
     `keybindings.json5` state, or no overrides.
   - A failed parse never replaces working keybindings.
   - The file is created only at start-up, never during a reload.
-  - Legacy `config.json5.keymaps` migrate only from a successfully parsed
-    `config.json5`, and only when they validate.
+  - Legacy `keymaps` migrate only from a successfully parsed active legacy
+    configuration file (`config.json5`, or the legacy `hyper.json`), and only
+    when they validate.
   - Keybinding code never writes the user's `config.json5`. Runtime-plugin
     default persistence (`app/runtime/plugin-runtime.ts`) is existing,
     separate behaviour.
@@ -1050,10 +1051,10 @@ design and the notification the user sees.
   answered by a change rather than by an argument.
   - [x] Unit Architecture: the read-only query returns a structured
     `DefaultConfigQuery` (`defaults`, optional `failure`,
-    `platformKeymapFault`)
-    instead of a bare payload, so a caller can see that a shipped file fell
-    back or could not be read. Start-up still owns the announcement; a
-    platform-keymap fault now has its own one-per-process notice.
+    `platformKeymapFault`, optional `platformKeymapFailure`) instead of a bare
+    payload, so a caller can see that a shipped file fell back or could not be
+    read. Start-up still owns the announcement; a platform-keymap fault now has
+    its own one-per-process notice.
   - [x] `schema-copy.ts` no longer touches `console.error`. Each copy returns a
     `SchemaCopyResult`, `ensureSchemaFiles` never collapses failures into a
     notification, and `import-sources.ts` logs every failure through the
@@ -1126,6 +1127,29 @@ design and the notification the user sees.
     `app/config/keybindings-codec.ts` that this diff touches.
   - [x] Developer Documentation: the three stale `{config, report}` claims are
     marked superseded with the delivered `{config, keybindings, report}` shape.
+- [x] (2026-11-02 08:20Z) Answered CodeRabbit's follow-up on `4349da82`.
+  - [x] Testing (Overall): a scripted keybindings double now repeats one
+    outcome across two start-ups and a reload for each notice, so the guard,
+    not the service, is what suppresses the repeat. The complete notification
+    arguments are asserted, not a title prefix.
+  - [x] Unit Architecture: `fixConfigDefaults` no longer dereferences
+    `defaults.config` with a non-null assertion. `withDefaultColors` keeps the
+    user's colours when the bundled config never loaded, and a unit test covers
+    that fallback.
+  - [x] Developer Documentation: the current `getDefaultConfig` interface now
+    lists the optional `platformKeymapFailure`. The query does not expose
+    `platformKeymapDiagnostics`; those stay in the loader's cache.
+  - [x] CodeScene: the Hyper schema-copy matrix is split into a named helper
+    and a table-driven test, preserving all four combinations and the
+    single-notice assertion.
+  - [x] Functional Correctness: the migration notices name the active legacy
+    configuration file, so a Hyper tree is told to fix `hyper.json` rather than
+    a `config.json5` it does not have. The users' guide and migration note now
+    describe both files.
+  - [x] Functional Correctness: `bin/prove.sh` skips the generated module
+    header when scanning for forbidden trust constructs. The header carries the
+    TypeScript `@file` summary, which is prose and may legitimately contain a
+    word the scan forbids; the proof body is still checked.
 
 ## Surprises & discoveries
 
@@ -4174,8 +4198,9 @@ export type ConfigImportKeybindings = {
 //   }
 //   getDefaultConfig: () => {
 //     readonly defaults: rawConfig;
-//     readonly failure?: ConfigFallbackCause;      // absent when the file was usable
+//     readonly failure?: ConfigFallbackCause;              // absent when the file was usable
 //     readonly platformKeymapFault: boolean;
+//     readonly platformKeymapFailure?: ConfigFallbackCause; // absent when the keymap was usable
 //   }   // read-only; never starts the keybindings service
 ```
 

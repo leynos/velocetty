@@ -52,7 +52,8 @@ const pathsModuleFactory = () => ({
   velocettyDir: '/tmp'
 });
 const windowsModuleFactory = () => ({defaults: {}, get: () => ({}), recordState: () => {}});
-const coloursModuleFactory = () => ({getColorMap: () => ({})});
+// The watcher tests never inspect colours, so both exports return an empty map.
+const coloursModuleFactory = () => ({getColorMap: () => ({}), withDefaultColors: () => ({})});
 
 /** One module factory to register, with the specifier Bun should resolve it under. */
 type AppModuleMockRequest<Exports> = Readonly<{

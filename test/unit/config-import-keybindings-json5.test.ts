@@ -4,7 +4,9 @@ import {expect, test} from 'bun:test';
 import {existsSync, mkdirpSync, readFileSync, removeSync, writeFileSync} from 'fs-extra';
 import JSON5 from 'json5';
 
+import type {ConfigImportKeybindings} from '../../app/config/import';
 import {describeImportDecision, shouldAnnounceReload} from '../../app/config/import-report';
+import type {KeybindingsLoadOutcome} from '../../app/config/keybindings-ports';
 import {
   configBytesUnchanged,
   createConfigImportHarness,
@@ -336,6 +338,109 @@ test('one importer announces each start-up notice at most once across reloads', 
         const matching = titles.filter((title) => title === expected || title.startsWith(expected));
         expect(matching, `${scenario.label}: ${expected}`).toHaveLength(1);
       }
+    } finally {
+      harness.cleanup();
+    }
+  }
+});
+
+/** A keybindings double that returns the same outcome for every import. */
+const repeatingKeybindings = (outcome: KeybindingsLoadOutcome): ConfigImportKeybindings => ({
+  reload: () => outcome,
+  start: () => outcome
+});
+
+/** One recorded notification, in the shape the mock stores its arguments. */
+type NotifyCall = [title: string, body?: string, details?: {error?: unknown}];
+
+/** One notice scenario driven through a scripted keybindings double. */
+type NoticeGuardScenario = {
+  readonly expected: NotifyCall[];
+  readonly label: string;
+  readonly options: Parameters<typeof createConfigImportHarness>[0];
+  readonly outcome: KeybindingsLoadOutcome;
+  readonly prepare: (harness: ConfigImportHarness) => void;
+};
+
+/**
+ * The four notices, each produced by a double that repeats its outcome.
+ *
+ * The real service changes what it reports on a second import, so only a
+ * double can show that the guard, rather than the service, suppresses a
+ * repeat. Start-up is repeated because the shadowed notice is reachable only
+ * from that phase.
+ */
+const noticeGuardScenarios: readonly NoticeGuardScenario[] = [
+  {
+    expected: [
+      [
+        'Shortcuts moved to keybindings.json5',
+        'Your shortcuts now live in keybindings.json5. The keymaps key in config.json5 is no longer read.'
+      ]
+    ],
+    label: 'seeded',
+    options: {},
+    outcome: {keymaps: {'window:close': 'ctrl+w'}, kind: 'applied', origin: 'seeded'},
+    prepare: (harness) => {
+      writeFileSync(harness.mockPaths.cfgPath, userConfigWithKeymaps(`{'window:close': 'ctrl+w'}`), 'utf8');
+    }
+  },
+  {
+    expected: [
+      [
+        'Couldn\'t move shortcuts to keybindings.json5. Fix the keymaps in config.json5 to migrate them. /: Invalid command identifier "": it must be non-empty and carry no leading or trailing whitespace. Suggested fix: Remove the surrounding whitespace or rename the command..'
+      ]
+    ],
+    label: 'deferred',
+    options: {},
+    outcome: {basis: 'empty', cause: 'deferred', diagnostics: [], keymaps: {}, kind: 'kept'},
+    prepare: (harness) => {
+      writeFileSync(harness.mockPaths.cfgPath, userConfigWithKeymaps(`{'': 'ctrl+n'}`), 'utf8');
+    }
+  },
+  {
+    expected: [
+      [
+        'Shortcuts in config.json5 are ignored',
+        'keybindings.json5 takes precedence, so the keymaps key in config.json5 is not used.'
+      ]
+    ],
+    label: 'legacy-ignored',
+    options: {},
+    outcome: {keymaps: {'window:close': 'ctrl+w'}, kind: 'applied', origin: 'file'},
+    prepare: (harness) => {
+      writeFileSync(harness.mockPaths.cfgPath, userConfigWithKeymaps(`{'window:close': 'ctrl+w'}`), 'utf8');
+    }
+  },
+  {
+    expected: [
+      ['Using the active configuration', 'Ignoring the lower-priority copy at /home/user/.hyper/config.json5.']
+    ],
+    label: 'shadowed',
+    options: {shadowedConfigPaths: ['/home/user/.hyper/config.json5']},
+    outcome: {keymaps: {}, kind: 'applied', origin: 'file'},
+    prepare: () => {}
+  }
+];
+
+test('repeated start-ups through one importer announce each notice once', async () => {
+  for (const scenario of noticeGuardScenarios) {
+    const harness = await createConfigImportHarness({
+      ...scenario.options,
+      keybindings: repeatingKeybindings(scenario.outcome)
+    });
+    try {
+      writeDefaultSources(harness);
+      mkdirpSync(harness.mockPaths.cfgDir);
+      scenario.prepare(harness);
+
+      harness._import('startup');
+      harness._import('startup');
+      harness._import('reload');
+
+      // The complete argument list is asserted, so a changed body or a second
+      // notification fails rather than passing on a title prefix.
+      expect(harness.notifyMock.mock.calls, scenario.label).toEqual(scenario.expected);
     } finally {
       harness.cleanup();
     }

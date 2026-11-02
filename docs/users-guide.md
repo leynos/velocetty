@@ -56,11 +56,11 @@ directory.
 
 Keyboard shortcuts are stored in `keybindings.json5`, separately from the rest
 of the configuration. When the file does not exist at start-up, Velocetty
-creates it with a short header comment. If `config.json5` still holds valid
-legacy `keymaps`, those shortcuts are copied into the new file; otherwise it
-starts as an empty object. Creation does not happen when the legacy
-configuration cannot be read or parsed, or its `keymaps` value is invalid, and
-a failed write leaves no file behind — see
+creates it with a short header comment. If the active legacy configuration file
+(`config.json5`, or the legacy `hyper.json`) still holds valid `keymaps`, those
+shortcuts are copied into the new file; otherwise it starts as an empty object.
+Creation does not happen when that file cannot be read or parsed, or its
+`keymaps` value is invalid, and a failed write leaves no file behind — see
 [Recreation](#unbinding-and-resetting). Open the file in any text editor, for
 example:
 
@@ -181,19 +181,21 @@ An invalid file never removes working shortcuts:
 
 Fix the reported problem and save again; the next valid save is applied.
 
-### Migration from `config.json5`
+### Migration from a legacy configuration file
 
-Hyper kept shortcuts under the `keymaps` key of `config.json5`. On the first
-start after an upgrade, when `keybindings.json5` does not exist, Velocetty
-copies a valid `config.json5.keymaps` into the new file. It never writes to
-`config.json5`; its comments and formatting remain unchanged.
+Hyper kept shortcuts under the `keymaps` key of its configuration file. On the
+first start after an upgrade, when `keybindings.json5` does not exist,
+Velocetty copies valid `keymaps` from the active legacy configuration file
+(`config.json5`, or the legacy `hyper.json`) into the new file. It never writes
+to that file; its comments and formatting remain unchanged.
 
 Once `keybindings.json5` exists, the legacy `keymaps` key is ignored and a
-notification says so. If `config.json5` cannot be parsed at start-up, or its
-`keymaps` value is invalid, migration is postponed to a later start rather than
-seeding an empty file. If the new file cannot be written, Velocetty reports the
-failure and applies the valid legacy shortcuts for the current session without
-persisting them; the next start tries the migration again.
+notification says so. If the legacy configuration file cannot be parsed at
+start-up, or its `keymaps` value is invalid, migration is postponed to a later
+start rather than seeding an empty file. If the new file cannot be written,
+Velocetty reports the failure and applies the valid legacy shortcuts for the
+current session without persisting them; the next start tries the migration
+again.
 
 For a standalone summary of the change, including the target release, see the
 [migration note](migration-keybindings-json5.md).

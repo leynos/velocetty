@@ -45,7 +45,7 @@ import {
   velocettyDir
 } from './config/paths';
 import notify from './notify';
-import {getColorMap} from './utils/colours';
+import {withDefaultColors} from './utils/colours';
 import {createConfigWatcher, type WatcherEvent, type WatcherHandle} from './config/watcher';
 
 const metrics = createConfigMetrics();
@@ -476,10 +476,12 @@ export {get as getWin, recordState as winRecord, defaults as windowDefaults} fro
  * ```
  */
 export const fixConfigDefaults = (decoratedConfig: configOptions) => {
-  const defaultConfig = getDefaultConfig().defaults.config!;
-  const colorOverrides = getColorMap(decoratedConfig.colors);
+  // A bundled config that could not be read or parsed has no `config` section,
+  // so the defaults are absent rather than merely incomplete. Keep the user's
+  // own colours instead of dereferencing `undefined`.
+  const defaultColors = getDefaultConfig().defaults.config?.colors;
   // We must have default colours for xterm css.
-  decoratedConfig.colors = {...defaultConfig.colors, ...colorOverrides};
+  decoratedConfig.colors = withDefaultColors(decoratedConfig.colors, defaultColors);
   return decoratedConfig;
 };
 

@@ -9,7 +9,7 @@ import {mkdirpSync, removeSync} from 'fs-extra';
 import {isJsonObject, type JsonObject, type JsonValue} from '@shared/types/json';
 import {isString} from '@shared/types/guards';
 
-import {createConfigImportModule, type ConfigImportPaths} from '../../app/config/import';
+import {createConfigImportModule, type ConfigImportKeybindings, type ConfigImportPaths} from '../../app/config/import';
 import {_init} from '../../app/config/init';
 import {createKeybindingsService} from '../../app/config/keybindings';
 import {keybindingsCodec} from '../../app/config/keybindings-codec';
@@ -26,8 +26,8 @@ export type ConfigImportHarness = {
   getDefaultConfig: ReturnType<typeof createConfigImportModule>['getDefaultConfig'];
   cleanup: () => void;
   initMock: ReturnType<typeof mock<ConfigInit>>;
-  /** The real service the importer drives, over a real temporary directory. */
-  keybindings: ReturnType<typeof createKeybindingsService>;
+  /** The service the importer drives: the real one, or an injected double. */
+  keybindings: ConfigImportKeybindings;
   mockPaths: ConfigImportPaths;
   notifyMock: ReturnType<typeof mock<ConfigNotify>>;
   warnMock: ReturnType<typeof mock<(_message?: string, ..._rest: Error[]) => void>>;
@@ -104,6 +104,11 @@ export type ConfigImportHarnessOptions = {
   readonly error?: typeof console.error;
   readonly fs?: ConfigImportFileSystem;
   /**
+   * Replaces the keybindings service, so a test can repeat one outcome across
+   * imports and prove the notice guards, not the service, suppress repeats.
+   */
+  readonly keybindings?: ConfigImportKeybindings;
+  /**
    * Lower-priority config files the active tree hides. Supplying one lets a
    * test observe the shadowed-copy notice, which is silent when empty.
    */
@@ -174,11 +179,13 @@ export const createConfigImportHarness = async (
       options.failSeedWrite === true
         ? {...fileStore, write: () => ({failure: 'other' as const, kind: 'failed' as const})}
         : fileStore;
-    const keybindings = createKeybindingsService({
-      codec: keybindingsCodec,
-      report: createKeybindingsNotifier(notifyMock, warnMock),
-      store
-    });
+    const keybindings =
+      options.keybindings ??
+      createKeybindingsService({
+        codec: keybindingsCodec,
+        report: createKeybindingsNotifier(notifyMock, warnMock),
+        store
+      });
     const configDependencies = {
       _init: initMock,
       keybindings,

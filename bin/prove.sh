@@ -18,6 +18,11 @@ readonly lsc_bin='node_modules/.bin/lsc'
 # The one admitted axiom, matched exactly so a forbidden construct cannot hide
 # on a line that merely mentions this function.
 readonly trusted_axiom_line='function {:axiom} emptyUserKeymaps(): UserKeymaps'
+# Dafny accepts whitespace around an attribute's colon and name, so the axiom
+# pattern must too; otherwise `{:axiom }` would slip past the guard.
+# Braces are written as `[{]`/`[}]` so the same pattern is valid in both
+# `grep -E` and `awk`, which disagree about escaping a literal brace.
+readonly trust_pattern='(^|[^[:alnum:]_])(assume)([^[:alnum:]_]|$)|[{][[:space:]]*:[[:space:]]*verify[[:space:]]+false[[:space:]]*[}]|[{][[:space:]]*:[[:space:]]*axiom[[:space:]]*[}]'
 
 fail() {
   printf 'prove: %s\n' "$*" >&2
@@ -112,15 +117,39 @@ check_generated_artefacts_are_current() {
   fi
 }
 
+# Prints the forbidden constructs in one proof file, as `file:line:content`.
+#
+# A generated artefact starts with a header copied from its TypeScript module's
+# `@file` summary. That summary is prose and may legitimately use a word the
+# scan forbids, so the header is skipped; the proof body is still checked.
+scan_for_trust_constructs() {
+  local file="$1"
+  if [[ "$file" != *.dfy.gen ]]; then
+    # `-H` keeps the `file:line:content` shape the caller strips, even though
+    # only one file is searched.
+    grep -HnE "$trust_pattern" "$file" || true
+    return
+  fi
+  awk -v pattern="$trust_pattern" '
+    FNR == 1 && /^\/\/ -+$/ {in_header = 1; next}
+    in_header && /^\/\/ -+$/ {in_header = 0; next}
+    in_header {next}
+    $0 ~ pattern {printf "%s:%d:%s\n", FILENAME, FNR, $0}
+  ' "$file"
+}
+
 check_forbidden_trust_constructs() {
   local -a dafny_files=()
   mapfile -t dafny_files < <(find app/config test/proofs -type f \( -name '*.dfy' -o -name '*.dfy.gen' \) -print)
   ((${#dafny_files[@]} > 0)) || return 0
 
-  local matches
-  # Dafny accepts whitespace around an attribute's colon and name, so the
-  # axiom pattern must too; otherwise `{:axiom }` would slip past the guard.
-  matches="$(grep -nE '(^|[^[:alnum:]_])(assume)([^[:alnum:]_]|$)|\{[[:space:]]*:[[:space:]]*verify[[:space:]]+false[[:space:]]*\}|\{[[:space:]]*:[[:space:]]*axiom[[:space:]]*\}' "${dafny_files[@]}" || true)"
+  local matches='' file found
+  for file in "${dafny_files[@]}"; do
+    found="$(scan_for_trust_constructs "$file")"
+    if [[ -n "$found" ]]; then
+      matches+="$found"$'\n'
+    fi
+  done
   if [[ -n "$matches" ]]; then
     # `emptyUserKeymaps` is the single admitted axiom; every other trust
     # construct makes the proof vacuous.

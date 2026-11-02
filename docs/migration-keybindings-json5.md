@@ -1,10 +1,11 @@
 # Migration to `keybindings.json5`
 
 This document describes the migration of keyboard shortcuts from the `keymaps`
-key of Hyper's `config.json5` to the separate `keybindings.json5` file. It
-covers the storage location, the conditional start-up migration, precedence,
-hot reload, and the difference between deleting the file and writing an empty
-object. It is a migration note; the users' guide remains the detailed manual.
+key of Hyper's active configuration file (`config.json5`, or the legacy
+`hyper.json`) to the separate `keybindings.json5` file. It covers the storage
+location, the conditional start-up migration, precedence, hot reload, and the
+difference between deleting the file and writing an empty object. It is a
+migration note; the users' guide remains the detailed manual.
 
 ## Target release
 
@@ -16,8 +17,9 @@ naming the inherited Hyper version.
 
 ## What changes
 
-- Keyboard shortcuts move from `config.json5.keymaps` to a separate
-  `keybindings.json5` file. The legacy key is not deleted from `config.json5`;
+- Keyboard shortcuts move from the active legacy configuration file's `keymaps`
+  entry (`config.json5`, or the legacy `hyper.json`) to a separate
+  `keybindings.json5` file. The legacy key is not deleted from that file;
   Velocetty simply stops reading it once the new file exists.
 - `keybindings.json5` lives in the Velocetty configuration directory. On every
   platform, an absolute `XDG_CONFIG_HOME` takes precedence, and the directory
@@ -26,13 +28,13 @@ naming the inherited Hyper version.
   - Windows: `%APPDATA%\Velocetty`.
 - Start-up migration is conditional. It runs only when `keybindings.json5`
   does not exist. A valid `keymaps` value is copied into the new file, and
-  Velocetty never rewrites `config.json5`, so its comments and formatting are
-  preserved. When `config.json5` holds no `keymaps`, the new file is created
-  with an empty object. If `config.json5` cannot be parsed, or its `keymaps`
-  value is invalid, migration is postponed to a later start rather than seeding
-  an empty file. If the new file cannot be written, Velocetty reports the
-  failure, applies the valid legacy shortcuts for that session without
-  persisting them, and retries the migration on the next start.
+  Velocetty never rewrites the legacy configuration file, so its comments and
+  formatting are preserved. When that file holds no `keymaps`, the new file is
+  created with an empty object. If it cannot be parsed, or its `keymaps` value
+  is invalid, migration is postponed to a later start rather than seeding an
+  empty file. If the new file cannot be written, Velocetty reports the failure,
+  applies the valid legacy shortcuts for that session without persisting them,
+  and retries the migration on the next start.
 - Once `keybindings.json5` exists, it is the source of truth. The legacy
   `keymaps` key is ignored; when it holds a valid `keymaps` value, a
   notification states that `keybindings.json5` takes precedence.
@@ -44,9 +46,9 @@ naming the inherited Hyper version.
   - `{}` is an explicit empty set of user overrides. It persists, so the
     platform defaults remain in effect on later starts.
   - Deleting the file is not a durable reset. On the next start Velocetty
-    recreates the file when it can classify the legacy configuration. If
-    `config.json5` still holds valid `keymaps`, those shortcuts are migrated
-    again; if it holds none, the recreated file is `{}`. If `config.json5`
+    recreates the file when it can classify the legacy configuration. If the
+    legacy configuration file still holds valid `keymaps`, those shortcuts are
+    migrated again; if it holds none, the recreated file is `{}`. If that file
     cannot be parsed, recreation is postponed, as described above.
 - Invalid and unreadable files never remove working shortcuts during a
   session:

@@ -165,63 +165,91 @@ test('start-up copies schemas through the injected filesystem and reports a refu
   }
 });
 
+/** The schema paths a Hyper-tree start-up may copy to, and what it did. */
+type HyperSchemaRun = {
+  readonly copies: readonly string[];
+  readonly expected: {
+    readonly hyperKeybindingsSchema: string;
+    readonly hyperSchema: string;
+    readonly velocettyKeybindingsSchema: string;
+    readonly velocettySchema: string;
+  };
+  readonly loggedFailures: number;
+  readonly refusedNotices: number;
+};
+
+/** Runs one Hyper-tree start-up and records its schema-copy effects. */
+const runHyperSchemaScenario = async ({
+  legacySchemaExists,
+  shouldFail
+}: {
+  legacySchemaExists: boolean;
+  shouldFail: boolean;
+}): Promise<HyperSchemaRun> => {
+  const copies: string[] = [];
+  const recordingFileSystem: ConfigImportFileSystem = {
+    ...fsExtra,
+    copySync: (source, destination, options) => {
+      copies.push(destination);
+      if (shouldFail) {
+        throw new Error('copy refused');
+      }
+      fsExtra.copySync(source, destination, options);
+    }
+  };
+  const errorMock = mock<typeof console.error>(() => {});
+  const harness = await createConfigImportHarness({error: errorMock, fs: recordingFileSystem, hyperTree: true});
+  try {
+    seedBundledFiles(harness, sharedDefaultConfigFixture);
+    fsExtra.mkdirpSync(harness.mockPaths.cfgDir);
+    if (legacySchemaExists) {
+      writeFileSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile), '{"title":"stale"}', 'utf8');
+    }
+
+    harness._import('startup');
+
+    const refusedCopy = "Couldn't update config schema metadata. Config editor validation may be stale.";
+    return {
+      copies,
+      expected: {
+        hyperKeybindingsSchema: path.join(harness.mockPaths.cfgDir, harness.mockPaths.keybindingsSchemaFile),
+        hyperSchema: path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile),
+        velocettyKeybindingsSchema: path.join(harness.mockPaths.velocettyDir, harness.mockPaths.keybindingsSchemaFile),
+        velocettySchema: path.join(harness.mockPaths.velocettyDir, harness.mockPaths.schemaFile)
+      },
+      loggedFailures: errorMock.mock.calls.filter(([message]) => String(message).includes('Failed to copy schema file'))
+        .length,
+      refusedNotices: harness.notifyMock.mock.calls
+        .map(([message]) => message)
+        .filter((message) => message === refusedCopy).length
+    };
+  } finally {
+    harness.cleanup();
+  }
+};
+
 test('reports each refused Hyper schema copy but notifies once', async () => {
   for (const legacySchemaExists of [false, true]) {
     for (const shouldFail of [false, true]) {
-      const copies: string[] = [];
-      const recordingFileSystem: ConfigImportFileSystem = {
-        ...fsExtra,
-        copySync: (source, destination, options) => {
-          copies.push(destination);
-          if (shouldFail) {
-            throw new Error('copy refused');
-          }
-          fsExtra.copySync(source, destination, options);
-        }
-      };
-      const errorMock = mock<typeof console.error>(() => {});
-      const harness = await createConfigImportHarness({error: errorMock, fs: recordingFileSystem, hyperTree: true});
-      try {
-        seedBundledFiles(harness, sharedDefaultConfigFixture);
-        fsExtra.mkdirpSync(harness.mockPaths.cfgDir);
-        if (legacySchemaExists) {
-          writeFileSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile), '{"title":"stale"}', 'utf8');
-        }
+      const {copies, expected, loggedFailures, refusedNotices} = await runHyperSchemaScenario({
+        legacySchemaExists,
+        shouldFail
+      });
 
-        harness._import('startup');
+      // Both Velocetty copies are always attempted.
+      expect(copies).toContain(expected.velocettySchema);
+      expect(copies).toContain(expected.velocettyKeybindingsSchema);
+      // The legacy copy is refreshed only when it already exists, and a
+      // missing legacy keybindings schema is never created.
+      expect(copies.includes(expected.hyperSchema)).toBe(legacySchemaExists);
+      expect(copies).not.toContain(expected.hyperKeybindingsSchema);
 
-        const velocettySchema = path.join(harness.mockPaths.velocettyDir, harness.mockPaths.schemaFile);
-        const velocettyKeybindingsSchema = path.join(
-          harness.mockPaths.velocettyDir,
-          harness.mockPaths.keybindingsSchemaFile
-        );
-        const hyperSchema = path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile);
-        const hyperKeybindingsSchema = path.join(harness.mockPaths.cfgDir, harness.mockPaths.keybindingsSchemaFile);
+      const expectedCopies = 2 + (legacySchemaExists ? 1 : 0);
+      expect(copies).toHaveLength(expectedCopies);
 
-        // Both Velocetty copies are always attempted.
-        expect(copies).toContain(velocettySchema);
-        expect(copies).toContain(velocettyKeybindingsSchema);
-        // The legacy copy is refreshed only when it already exists, and a
-        // missing legacy keybindings schema is never created.
-        expect(copies.includes(hyperSchema)).toBe(legacySchemaExists);
-        expect(copies).not.toContain(hyperKeybindingsSchema);
-
-        const expectedCopies = 2 + (legacySchemaExists ? 1 : 0);
-        expect(copies).toHaveLength(expectedCopies);
-
-        // Each refused copy is logged, but the user sees one notice.
-        const loggedFailures = errorMock.mock.calls.filter(([message]) =>
-          String(message).includes('Failed to copy schema file')
-        );
-        expect(loggedFailures).toHaveLength(shouldFail ? expectedCopies : 0);
-        const refusedCopy = "Couldn't update config schema metadata. Config editor validation may be stale.";
-        const refusedNotices = harness.notifyMock.mock.calls
-          .map(([message]) => message)
-          .filter((message) => message === refusedCopy);
-        expect(refusedNotices).toHaveLength(shouldFail ? 1 : 0);
-      } finally {
-        harness.cleanup();
-      }
+      // Each refused copy is logged, but the user sees one notice.
+      expect(loggedFailures).toBe(shouldFail ? expectedCopies : 0);
+      expect(refusedNotices).toBe(shouldFail ? 1 : 0);
     }
   }
 });
