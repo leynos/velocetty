@@ -1082,6 +1082,21 @@ design and the notification the user sees.
     carries this round; 66.67% is not carried forward.
   - [ ] The formal review request is queued (`comenq` `d832ea56`) because
     CodeRabbit auto-paused reviews after the commit burst.
+- [x] (2026-11-02 01:33Z) Published the reconciliation round as `82e1d034`,
+  after every Makefile gate passed sequentially, with a Markdown-only re-check
+  after the final prose edit.
+  - [x] `check-fmt`, `typecheck`, `lint`, `test` (741 passed, 0 failed),
+    `spelling`, `markdownlint`, `nixie`, and `prove` (1 and 8 obligations
+    verified) all passed. `prove` left no generated-artefact drift.
+  - [x] The remote-tracking ref was refreshed to `82e1d034`, matching
+    `git ls-remote`, and the branch upstream was set to `origin`.
+  - [x] CodeRabbit confirmed the three source findings repaired at
+    `82e1d034` and asked for the hosted Docstring Coverage measurement.
+  - [ ] Docstring Coverage stays unresolved until the queued review
+    (`comenq` `d832ea56`) runs against this head; 66.67% is not carried
+    forward.
+  - [ ] Hosted Node CI run 41373080447 was still in progress when this round
+    was published.
 
 ## Surprises & discoveries
 
