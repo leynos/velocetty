@@ -49,7 +49,7 @@ export type {ConfigImportNotify} from './import-report';
 /** A bootstrap decision that writes a seed. */
 type SeedDecision = Extract<BootstrapDecision, {kind: 'seed'}>;
 
-/** Normalises the write outcome to the two states the policy understands. */
+/** Normalizes the write outcome to the two states the policy understands. */
 const seedWriteStatus = (outcome: KeybindingsWriteOutcome): 'written' | 'failed' =>
   outcome.kind === 'written' ? 'written' : 'failed';
 
@@ -171,11 +171,14 @@ export const createKeybindingsService = (dependencies: {
       lastShownDiagnostics = '';
       return {keymaps: exposedKeymaps(), kind: 'applied', origin: 'missing'};
     }
-    // The file exists again, so any earlier unsaved seed is superseded.
-    hasUnsavedSeed = false;
     if (readOutcome.kind === 'unreadable') {
+      // An unreadable file may still be missing: a permission failure on a
+      // parent directory hides whether the seed ever landed. Keep the flag so
+      // a later successful read can still tell the two cases apart.
       return describeRejectedRead({cause: 'unreadable', failure: readOutcome.failure});
     }
+    // The file exists again, so any earlier unsaved seed is superseded.
+    hasUnsavedSeed = false;
 
     const parsed = codec.parse(readOutcome.text, store.label);
     if (parsed.kind === 'invalid') {
@@ -257,7 +260,8 @@ export const createKeybindingsService = (dependencies: {
    * preserves the user's comments and formatting.
    */
   const exportKeybindings = (): KeybindingsExport => {
-    const readOutcome = store.read();
+    // Export is a query, so it must not add a read span or a warning.
+    const readOutcome = store.peek();
     if (readOutcome.kind === 'missing') {
       return {kind: 'missing'};
     }

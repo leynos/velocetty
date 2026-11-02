@@ -172,6 +172,22 @@ describe('reload', () => {
     expect(store.writeAttempts()).toBe(1);
   });
 
+  test('keeps an unsaved seed through an unreadable reload while the file is missing', () => {
+    const {service, store} = setup();
+    store.failNextWrite('permission');
+    service.start({keymaps: KEYMAPS_A, kind: 'parsed-keymaps'});
+
+    // A permission failure on a parent directory hides whether the seed ever
+    // reached the disk, so it cannot supersede the unsaved marker.
+    store.setUnreadable('permission');
+    expect(service.reload()).toMatchObject({basis: 'last-known-good', cause: 'unreadable', kind: 'kept'});
+
+    // Permissions recover and the file is still absent: the seed is still unsaved.
+    store.setMissing();
+    expect(service.reload()).toEqual({keymaps: KEYMAPS_A, kind: 'applied', origin: 'seeded-unsaved'});
+    expect(service.active()).toEqual(KEYMAPS_A);
+  });
+
   test('clears the unsaved-seed marker once the file can be read', () => {
     const {service, store} = setup();
     store.failNextWrite('permission');

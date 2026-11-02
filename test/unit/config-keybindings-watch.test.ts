@@ -131,6 +131,33 @@ test.serial('a thrown reload is counted, recorded, and still reported by the wat
   }
 });
 
+test.serial('a thrown startup import is counted, recorded, and rethrown', async () => {
+  const harness = await createWatchHarness();
+  const infoSpy = spyOn(console, 'info').mockImplementation(() => {});
+  const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    harness.importMock.mockImplementation(() => {
+      throw new Error('boom');
+    });
+
+    expect(() => harness.configModule.setup()).toThrow('boom');
+
+    // Start-up has no per-file outcome, so the failure record and the thrown
+    // span are the only evidence that the import ran at all.
+    expect(warnSpy.mock.calls.map(([line]) => line)).toEqual([
+      '[config] import failure phase=startup cause=thrown ' +
+        'attempts:1,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0'
+    ]);
+    expect(infoSpy.mock.calls.map(([line]) => line).filter((line) => line.startsWith('[config] span'))).toEqual([
+      expect.stringMatching(/^\[config\] span operation=startup outcome=thrown ms=\d+$/)
+    ]);
+  } finally {
+    infoSpy.mockRestore();
+    warnSpy.mockRestore();
+    mock.restore();
+  }
+});
+
 test.serial('a dispatched reload records both spans with the real outcome', async () => {
   const harness = await createWatchHarness();
   const infoSpy = spyOn(console, 'info').mockImplementation(() => {});
@@ -138,6 +165,8 @@ test.serial('a dispatched reload records both spans with the real outcome', asyn
   const spanLines = () => infoSpy.mock.calls.map(([line]) => line).filter((line) => line.startsWith('[config] span'));
   try {
     harness.configModule.setup();
+    // Start-up has its own span; this test is about the reload pair.
+    infoSpy.mockClear();
     harness.emit({event: 'change', eventPath: '/tmp/config.json5'});
     await settle();
 

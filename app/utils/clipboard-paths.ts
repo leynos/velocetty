@@ -32,6 +32,15 @@ export type ClipboardPort = {
  */
 export const CLIPBOARD_URI_LIST_MIME = 'text/uri-list';
 
+/**
+ * Converts one `file:` URI into an absolute path, or `null` for anything else.
+ *
+ * @example
+ * ```ts
+ * toFilePath('file:///tmp/a%20b.txt'); // '/tmp/a b.txt'
+ * toFilePath('https://example.com'); // null
+ * ```
+ */
 const toFilePath = (uri: string): string | null => {
   try {
     const url = new URL(uri);
@@ -60,6 +69,15 @@ export const parseUriList = (uriList: string): string[] =>
     .map((line) => toFilePath(line))
     .filter((path): path is string => path !== null);
 
+/**
+ * Reads a clipboard payload as text, treating a missing payload as empty.
+ *
+ * @example
+ * ```ts
+ * await readPayloadText(new Blob(['hi'])); // 'hi'
+ * await readPayloadText(null); // null
+ * ```
+ */
 const readPayloadText = async (payload: ClipboardPayload | null): Promise<string | null> => {
   if (payload === null) {
     return null;

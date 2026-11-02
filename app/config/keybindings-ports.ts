@@ -36,7 +36,20 @@ export type KeybindingsWriteOutcome =
 export type KeybindingsStore = {
   /** A short human label such as `keybindings.json5`, never a filesystem path. */
   readonly label: string;
+  /**
+   * Reads the file as part of the service's own work.
+   *
+   * The adapter records a read span and warns when the file cannot be read, so
+   * this is the method for loads and reloads that the user should see.
+   */
   readonly read: () => KeybindingsReadOutcome;
+  /**
+   * Reads the file without recording a span or warning.
+   *
+   * Export is a query over what is stored, not a service operation, so it must
+   * not add noise to the read telemetry.
+   */
+  readonly peek: () => KeybindingsReadOutcome;
   readonly write: (text: string) => KeybindingsWriteOutcome;
 };
 

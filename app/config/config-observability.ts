@@ -41,7 +41,8 @@ export type ImportRecord = {
 export type ImportFailureRecord = {
   /** The only failure this record describes: an exception out of the import. */
   readonly cause: 'thrown';
-  readonly phase: 'reload';
+  /** Which import threw, so a start-up crash is not counted as a reload. */
+  readonly phase: 'reload' | 'startup';
 };
 
 /** The recorder the composition root wires into the importer and the store. */

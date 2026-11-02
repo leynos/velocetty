@@ -7,7 +7,7 @@
 import type {ObservabilitySink} from './config-observability';
 
 /** The operations a span may describe. */
-export type ConfigOperation = 'reload' | 'watcher-dispatch' | 'keybindings-read' | 'keybindings-write';
+export type ConfigOperation = 'reload' | 'startup' | 'watcher-dispatch' | 'keybindings-read' | 'keybindings-write';
 
 /** The ways an operation may finish. */
 export type ConfigSpanOutcome =

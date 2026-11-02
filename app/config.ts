@@ -107,6 +107,18 @@ const watchers: Function[] = [];
 let cfg: parsedConfig | undefined;
 let configWatcher: {readonly close: () => Promise<void>} | undefined;
 
+/**
+ * Returns the configuration the last import applied.
+ *
+ * Throws rather than returning `undefined`, so a caller that runs before
+ * `setup()` fails loudly instead of reading a half-built configuration.
+ *
+ * @example
+ * ```ts
+ * setup();
+ * getCurrentConfig().keymaps; // the keymaps now in effect
+ * ```
+ */
 const getCurrentConfig = (): parsedConfig => {
   if (cfg === undefined) {
     throw new Error('Configuration has not been initialized');
@@ -278,6 +290,18 @@ const _watch = () => {
   });
 };
 
+/**
+ * Registers a callback that runs after every applied reload.
+ *
+ * Returns an unsubscribe function, so a caller that is torn down does not keep
+ * receiving reloads.
+ *
+ * @example
+ * ```ts
+ * const unsubscribe = subscribe(() => render());
+ * unsubscribe(); // the callback no longer runs
+ * ```
+ */
 export const subscribe = (fn: Function) => {
   watchers.push(fn);
   return () => {
@@ -435,15 +459,27 @@ export const getKeymaps = () => {
  * ```
  */
 export const setup = () => {
-  // The Velocetty tree holds new configuration files, so it must exist before
-  // the importer copies schemas or seeds `keybindings.json5` into it.
-  mkdirpSync(velocettyDir);
-  // A crashed write can leave a temporary file behind. Start-up is the only
-  // phase that may remove it, and the edge owns that cleanup immediately before
-  // the seed decision reads the file.
-  keybindingsStore.removeStaleTemporaryFiles();
-  recorder.beginImport({phase: 'startup'});
-  const {config, keybindings: outcome, report} = _import('startup');
+  const finishSpan = spans.begin('startup');
+  let imported: ReturnType<typeof _import>;
+  try {
+    // The Velocetty tree holds new configuration files, so it must exist before
+    // the importer copies schemas or seeds `keybindings.json5` into it.
+    mkdirpSync(velocettyDir);
+    // A crashed write can leave a temporary file behind. Start-up is the only
+    // phase that may remove it, and the edge owns that cleanup immediately
+    // before the seed decision reads the file.
+    keybindingsStore.removeStaleTemporaryFiles();
+    recorder.beginImport({phase: 'startup'});
+    imported = _import('startup');
+  } catch (error) {
+    // A start-up crash is otherwise invisible: no per-file outcome exists, so
+    // it needs the same bounded failure record a thrown reload gets.
+    finishSpan('thrown');
+    recorder.recordImportFailure({cause: 'thrown', phase: 'startup'});
+    throw error;
+  }
+  const {config, keybindings: outcome, report} = imported;
+  finishSpan(report.config === 'fallback' ? 'fallback' : 'applied');
   cfg = config;
   // Start-up never shows "Configuration updated", so the record states that
   // rather than leaving the field absent.

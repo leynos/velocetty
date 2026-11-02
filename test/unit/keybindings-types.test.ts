@@ -37,6 +37,7 @@ const assertTypeContracts = (): void => {
   void notify;
   const store: KeybindingsStore = {
     label: 'keybindings.json5',
+    peek: () => ({kind: 'missing'}),
     read: () => ({kind: 'missing'}),
     write: () => ({kind: 'written'})
   };

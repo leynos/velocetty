@@ -1,4 +1,4 @@
-/** @file Normalises legacy and bundled colour configuration into a complete `ColorMap`. */
+/** @file Normalizes legacy and bundled colour configuration into a complete `ColorMap`. */
 /*
  * `getColorMap` accepts either the modern map or the legacy positional list,
  * and `withDefaultColors` layers the bundled defaults underneath the user's

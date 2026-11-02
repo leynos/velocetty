@@ -316,6 +316,35 @@ describe('atomic keybindings file store', () => {
     expect(finished).toEqual(['keybindings-read:missing', 'keybindings-read:present', 'keybindings-read:unreadable']);
   });
 
+  test('peek reads the same states without a span or a warning', () => {
+    const workspace = createWorkspace();
+    const filePath = targetPathIn(workspace);
+    const {finished, spans} = recordingSpans();
+    const warn = mock(() => {});
+    const store = createFileKeybindingsStore({filePath, spans, warn});
+
+    expect(store.peek()).toEqual({kind: 'missing'});
+    fs.writeFileSync(filePath, '{}', 'utf8');
+    expect(store.peek()).toEqual({kind: 'present', text: '{}'});
+
+    const unreadable = createFileKeybindingsStore({
+      filePath,
+      fs: {
+        ...realFileSystem(),
+        readFileSync: () => {
+          throw errorWithCode('EACCES');
+        }
+      },
+      spans,
+      warn
+    });
+    expect(unreadable.peek()).toEqual({failure: 'permission', kind: 'unreadable'});
+
+    // Export is a query, so it must stay out of the read telemetry entirely.
+    expect(finished).toEqual([]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   test('records a write span for a success and each refusal path', () => {
     const workspace = createWorkspace();
     const filePath = targetPathIn(workspace);

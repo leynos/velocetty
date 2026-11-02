@@ -6,6 +6,18 @@
  * keeps the adapter itself within the repository's file-size limit.
  */
 import type {ConfigSpanRecorder} from './config-spans';
+import type {KeybindingsReadOutcome} from './keybindings-ports';
+
+/**
+ * A read result paired with the raw error the port deliberately hides.
+ *
+ * The adapter needs the error to warn with it, while the port exposes only a
+ * bounded failure reason.
+ */
+export type RawRead = {
+  readonly error?: unknown;
+  readonly outcome: KeybindingsReadOutcome;
+};
 
 /** The filesystem subset the adapter uses; injected so tests can fail each step. */
 export type KeybindingsFileSystem = Pick<

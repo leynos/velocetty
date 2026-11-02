@@ -170,6 +170,7 @@ export const createWatchHarness = async (): Promise<WatchHarness> => {
     factory: () => ({
       createFileKeybindingsStore: () => ({
         label: 'keybindings.json5',
+        peek: () => ({kind: 'missing'}),
         read: () => ({kind: 'missing'}),
         removeStaleTemporaryFiles: storeCleanupMock,
         write: () => ({kind: 'written'})

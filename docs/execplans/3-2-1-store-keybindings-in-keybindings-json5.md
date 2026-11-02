@@ -1188,6 +1188,26 @@ design and the notification the user sees.
   - CodeRabbit remains paused by its automatic commit-count rule. A
     `@coderabbitai resume` request is queued as `5e260c6c`; the review decision
     stays `CHANGES_REQUESTED` until that review runs.
+- [x] (2026-11-02 19:30Z) Disposed of the resumed review on `81291ca9`.
+  - [x] Spelling: `Normalises` became `Normalizes` in `app/utils/colours.ts`
+    and `app/config/keybindings.ts`, matching the en-GB-oxendict `-ize` rule.
+  - [x] Functional Correctness: `readCurrentFile` no longer clears
+    `hasUnsavedSeed` before the `unreadable` branch. A permission failure on a
+    parent directory hides whether the seed landed, so the marker survives
+    until a read proves the file exists. `keybindings-service.test.ts` covers
+    the unreadable-then-missing sequence.
+  - [x] Unit Architecture: the store port gained `peek()`, a quiet read that
+    records no span and emits no warning. `exportKeybindings` uses it, so the
+    documented side-effect-free query no longer writes read telemetry.
+    `keybindings-store.test.ts` asserts `peek` stays silent for present,
+    missing, and unreadable files.
+  - [x] Observability: `ImportFailureRecord.phase` and `ConfigOperation` accept
+    `'startup'`. `setup()` now wraps preparation and `_import('startup')` in a
+    `try/catch` that closes a `startup` span and records the bounded failure
+    before rethrowing. A new watcher test asserts the failure line, the
+    `importFailures:1` counter, and the thrown span.
+  - [x] Docstring Coverage: added docstrings to `isJsonValue`, `isJsonObject`,
+    `toFilePath`, `readPayloadText`, `getCurrentConfig`, and `subscribe`.
 
 ## Surprises & discoveries
 

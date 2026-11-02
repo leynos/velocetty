@@ -46,6 +46,7 @@ export const createMemoryKeybindingsStore = (label = 'memory-keybindings.json5')
       pendingFailure = failure;
     },
     label,
+    peek: () => file,
     read: () => file,
     setMissing: () => {
       file = {kind: 'missing'};

@@ -14,7 +14,7 @@ import type {
   KeybindingsStore,
   KeybindingsWriteOutcome
 } from './keybindings-ports';
-import type {FileKeybindingsStoreOptions, RenameFailureCategory} from './keybindings-store-contract';
+import type {FileKeybindingsStoreOptions, RawRead, RenameFailureCategory} from './keybindings-store-contract';
 
 export type {
   FileKeybindingsStoreOptions,
@@ -219,25 +219,29 @@ export const createFileKeybindingsStore = (
     }
   };
 
-  /** Reads the file, mapping a missing file apart from any other failure. */
-  const read = (): KeybindingsReadOutcome => {
-    const finishSpan = options.spans?.begin('keybindings-read');
+  /** Reads the file, keeping the raw error the port deliberately hides. */
+  const readRaw = (): RawRead => {
     try {
-      const text = fileSystem.readFileSync(options.filePath, 'utf8');
-      finishSpan?.('present');
-      return {kind: 'present', text};
+      return {outcome: {kind: 'present', text: fileSystem.readFileSync(options.filePath, 'utf8')}};
     } catch (error) {
       const code = errorCode(error);
-      if (code === 'ENOENT') {
-        finishSpan?.('missing');
-        return {kind: 'missing'};
-      }
-      // The port keeps only a bounded reason; the raw error stays diagnosable here.
-      warnFn(`[config-keybindings] Couldn't read "${options.filePath}".`, error);
-      finishSpan?.('unreadable');
-      return {failure: storageFailure(code), kind: 'unreadable'};
+      return code === 'ENOENT'
+        ? {outcome: {kind: 'missing'}}
+        : {error, outcome: {failure: storageFailure(code), kind: 'unreadable'}};
     }
   };
+  /** Reads the file for the service, recording a span and warning on failure. */
+  const read = (): KeybindingsReadOutcome => {
+    const finishSpan = options.spans?.begin('keybindings-read');
+    const {error, outcome} = readRaw();
+    // The port keeps only a bounded reason; the raw error stays diagnosable here.
+    if (error !== undefined) warnFn(`[config-keybindings] Couldn't read "${options.filePath}".`, error);
+    finishSpan?.(outcome.kind);
+    return outcome;
+  };
+
+  /** Reads the file without recording a span or warning. */
+  const peek = (): KeybindingsReadOutcome => readRaw().outcome;
 
   /**
    * Renames the temporary file into place, retrying only transient failures.
@@ -392,5 +396,5 @@ export const createFileKeybindingsStore = (
     }
   };
 
-  return {label: fileName, read, removeStaleTemporaryFiles, write};
+  return {label: fileName, peek, read, removeStaleTemporaryFiles, write};
 };

@@ -17,6 +17,15 @@ type JsonPrimitive = string | number | boolean | null;
 const isJsonPrimitive = (value: unknown): value is JsonPrimitive =>
   value === null || isString(value) || isNumber(value) || isBoolean(value);
 
+/**
+ * Narrows a value to a `JsonValue`, recursing through arrays and objects.
+ *
+ * @example
+ * ```ts
+ * isJsonValue({a: [1, null]}); // true
+ * isJsonValue(new Date()); // false
+ * ```
+ */
 export const isJsonValue = (value: unknown): value is JsonValue => {
   if (isJsonPrimitive(value)) {
     return true;
@@ -27,6 +36,18 @@ export const isJsonValue = (value: unknown): value is JsonValue => {
   return isJsonObject(value);
 };
 
+/**
+ * Narrows a value to a plain `JsonObject` whose members are all JSON values.
+ *
+ * Arrays are rejected even though `typeof [] === 'object'`, because a JSON
+ * object is a map rather than a list.
+ *
+ * @example
+ * ```ts
+ * isJsonObject({a: 1}); // true
+ * isJsonObject([1]); // false
+ * ```
+ */
 export const isJsonObject = (value: unknown): value is JsonObject => {
   if (!isObject(value) || Array.isArray(value)) {
     return false;
