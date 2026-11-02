@@ -1177,6 +1177,17 @@ design and the notification the user sees.
   - [x] Gates: all eight commit gates pass on `6815e5e7` (753 tests, 9 proofs).
   - Inline replies: `#discussion_r4440862690` and `#discussion_r4440865555`.
   - Pre-merge reconciliation: issue comment `6574064501`.
+- [x] (2026-11-02 10:20Z) Hosted CI on `8e852c38` is green after one rerun.
+  - The first Windows job failed in
+    `test/unit/esbuild-migration-contracts.test.ts`
+    with `EBUSY` while removing a temporary directory. That file is unchanged
+    by this branch, and the same job passed on `ff6c3ba8`, so the failure is a
+    pre-existing Windows cleanup race rather than a regression here. The failed
+    job was rerun once and passed; all four builds, CodeScene, and Gecko are
+    green, and `mergeStateStatus` is `CLEAN`.
+  - CodeRabbit remains paused by its automatic commit-count rule. A
+    `@coderabbitai resume` request is queued as `5e260c6c`; the review decision
+    stays `CHANGES_REQUESTED` until that review runs.
 
 ## Surprises & discoveries
 
