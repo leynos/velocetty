@@ -115,6 +115,17 @@ export const createKeybindingsNotices = (notify: ConfigImportNotify): Keybinding
   let shadowed = false;
 
   return {
+    /**
+     * Reports shortcuts that could not be migrated.
+     *
+     * Silent when there are no diagnostics: a migration with nothing to say
+     * should not interrupt the user.
+     *
+     * @example
+     * ```ts
+     * notices.announceDeferred([]); // no notification
+     * ```
+     */
     announceDeferred: (diagnostics) => {
       if (deferred || diagnostics.length === 0) {
         return;
@@ -126,6 +137,14 @@ export const createKeybindingsNotices = (notify: ConfigImportNotify): Keybinding
         notify
       });
     },
+    /**
+     * Explains that `keybindings.json5` wins over `config.json5` keymaps.
+     *
+     * @example
+     * ```ts
+     * notices.announceLegacyIgnored(); // "Shortcuts in config.json5 are ignored"
+     * ```
+     */
     announceLegacyIgnored: () => {
       if (legacyIgnored) {
         return;
@@ -136,6 +155,14 @@ export const createKeybindingsNotices = (notify: ConfigImportNotify): Keybinding
         'keybindings.json5 takes precedence, so the keymaps key in config.json5 is not used.'
       );
     },
+    /**
+     * Confirms that legacy shortcuts were copied into `keybindings.json5`.
+     *
+     * @example
+     * ```ts
+     * notices.announceSeeded(); // "Shortcuts moved to keybindings.json5"
+     * ```
+     */
     announceSeeded: () => {
       if (seeded) {
         return;
@@ -146,6 +173,16 @@ export const createKeybindingsNotices = (notify: ConfigImportNotify): Keybinding
         'Your shortcuts now live in keybindings.json5. The keymaps key in config.json5 is no longer read.'
       );
     },
+    /**
+     * Names the lower-priority configuration copies the active tree hides.
+     *
+     * Silent when nothing is shadowed, so the common case stays quiet.
+     *
+     * @example
+     * ```ts
+     * notices.announceShadowed(['/home/user/.hyper/config.json5']);
+     * ```
+     */
     announceShadowed: (paths) => {
       if (shadowed || paths.length === 0) {
         return;

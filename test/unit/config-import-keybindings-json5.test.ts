@@ -248,6 +248,28 @@ test('an active Hyper tree never has config.json5 created for it', async () => {
   }
 });
 
+test('announces the hidden configuration copies once, at start-up only', async () => {
+  const shadowed = ['/home/user/.hyper/config.json5'];
+  const harness = await createConfigImportHarness({hyperTree: true, shadowedConfigPaths: shadowed});
+  try {
+    writeDefaultSources(harness);
+    mkdirpSync(harness.mockPaths.cfgDir);
+    writeFileSync(harness.mockPaths.cfgPath, userConfigWithKeymaps('{}'), 'utf8');
+
+    harness._import('startup');
+    harness._import('reload');
+
+    // The notice belongs to start-up; a reload must not repeat it.
+    const shadowedNotices = harness.notifyMock.mock.calls.filter(
+      ([title]) => title === 'Using the Velocetty configuration'
+    );
+    expect(shadowedNotices).toHaveLength(1);
+    expect(shadowedNotices[0]?.[1]).toContain('/home/user/.hyper/config.json5');
+  } finally {
+    harness.cleanup();
+  }
+});
+
 test('a Hyper tree seeds keybindings in the Velocetty tree and keeps them on reload', async () => {
   const harness = await createConfigImportHarness({hyperTree: true});
   try {

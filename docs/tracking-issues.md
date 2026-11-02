@@ -237,7 +237,7 @@ Last updated: 2026-10-30
 
 Status: Resolved (2026-11-01)  
 Owner: @leynos  
-Last updated: 2026-11-01
+Last updated: 2026-11-02
 
 ### KEYMAP-003 summary
 
@@ -274,10 +274,12 @@ Last updated: 2026-11-01
 The split landed on 2026-11-01. Each exit criterion now has a delivered
 counterpart:
 
-- `getDefaultConfig` is a pure query. It returns a defensive copy of the cached
-  bundled defaults, performs no directory, schema, or user-file write, and
-  sends no notification; a separate `load('startup')` command owns every
-  start-up side effect, including announcing a bundled-defaults fallback once.
+- `getDefaultConfig` is a pure query. It returns a structured result — a
+  defensive copy of the cached bundled defaults, the fallback cause when the
+  bundled file was unusable, and whether the platform keymap could be read —
+  and performs no directory, schema, or user-file write and sends no
+  notification. A separate `load('startup')` command owns every start-up side
+  effect, including announcing a bundled-defaults or platform-keymap fault once.
 - `createConfigSourceLoader` takes `fs`, `isDebugEnabled`, `warn`, and `error`
   as optional ports with production defaults, so a test can substitute each one
   and assert on what the loader actually calls.

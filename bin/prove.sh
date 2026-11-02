@@ -101,10 +101,12 @@ check_generated_artefacts_are_current() {
   while IFS= read -r source; do
     read -r source _ <<<"$source"
     generated="${source%.ts}.dfy.gen"
-    [[ -f "$generated" ]] || fail "Missing generated proof artefact '${generated}'. Run '${lsc_bin} gen --backend=dafny ${source}'."
+    [[ -f "$generated" ]] || fail "Missing generated proof artefact '${generated}'. Run 'bun bin/generate-dafny.mjs'."
   done < <(read_entries)
 
-  "$lsc_bin" gen --backend=dafny >/dev/null
+  # The wrapper runs `lsc gen` and then prepends the module header, so the
+  # comparison below is against the artefact the project actually ships.
+  bun bin/generate-dafny.mjs >/dev/null
   if ! git diff --quiet -- '*.dfy.gen'; then
     fail "Generated Dafny artefacts are stale. Commit the regenerated *.dfy.gen files."
   fi
@@ -156,6 +158,16 @@ run_verification() {
     fail "Only ${summaries} verifier summaries for ${expected} listed sources; not every proof ran."
 }
 
+# `lsc check` rewrites each `.dfy.gen` without the module header the shipped
+# artefact carries. Regenerate through the wrapper afterwards, so a green run
+# leaves the worktree as it found it and the next diff stays meaningful.
+restore_generated_artefacts() {
+  bun bin/generate-dafny.mjs >/dev/null
+  if ! git diff --quiet -- '*.dfy.gen'; then
+    fail "Regenerated proof artefacts differ from the committed ones after verification."
+  fi
+}
+
 main() {
   require_dafny
   require_solver
@@ -164,6 +176,7 @@ main() {
   check_generated_artefacts_are_current
   check_forbidden_trust_constructs
   run_verification
+  restore_generated_artefacts
 }
 
 main "$@"

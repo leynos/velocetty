@@ -972,7 +972,8 @@ design and the notification the user sees.
     `test/unit/config-observability.test.ts`: the paired permission, symlink,
     and counter tests became table-driven loops, and the observability tests
     share one `recordImport` helper. Both files score 10.00.
-  - [x] Gate evidence for `36b2947b`: all eight gates pass sequentially —
+  - [x] Gate evidence for `36b2947b` shows that all eight gates passed
+    sequentially —
     `check-fmt` (371 files; 70 Markdown files unchanged), `typecheck` (no
     diagnostics), `lint` (372 files; boundaries and oxlint clean), `test`
     (734 pass, 0 fail, 14,050 expects), `spelling` (`typos.toml` unchanged),
@@ -1007,6 +1008,62 @@ design and the notification the user sees.
     `prove` (1 + 8 verified, 0 errors). The first pass caught one 91-column
     line in `docs/developers-guide.md`; after rewrapping, `check-fmt` and
     `markdownlint` were re-run and passed.
+- [x] (2026-11-02 00:35Z) Post-review round on `e68f1635`. CodeRabbit's queued
+  review inspected that head and asked for one source change and three
+  documentation corrections.
+  - [x] The bootstrap template no longer carries shortcuts.
+    `createBootstrapTemplate` strips `keymaps` from the copy written to a
+    missing `config.json5`, while the cached defaults keep the platform keymap
+    for the running configuration. A bootstrap file that carried the platform
+    map would be reported as ignored on every later launch.
+  - [x] The bootstrap test now expects an empty persisted `keymaps` object and
+    checks that the platform bindings still reach `_init` through the defaults
+    layer.
+  - [x] The configuration-location section qualifies the CLI parity claim and
+    links CONFIG-003; the start-up list states each schema's destination and
+    that legacy Hyper copies are refreshed only when already present.
+  - [x] The gate-evidence sentence in this plan now uses the past tense.
+  - [x] An unreadable bundled default is now a fallback even though `{}` would
+    parse: `loadDefaultConfig` returns `failure: 'read'` (and `'parse'` on a
+    parse fault), so `announceDefaultFaults` names the fault that actually
+    happened rather than staying silent. `config-import-defaults.test.ts`
+    covers the valid, unparsable, and unreadable cases.
+  - [x] The four keybindings notices carry docstrings, and
+    `keybindings-notices.test.ts` proves each fires once across repeated
+    reloads, stays silent on empty input, and names every shadowed copy.
+  - [x] The importer test harness accepts `shadowedConfigPaths`, so an
+    importer test now shows the shadowed-copy notice once at start-up and
+    never again on reload.
+  - [x] The users' guide separates the Velocetty `XDG_CONFIG_HOME` rule (an
+    absolute path only) from the laxer Hyper fallback (any non-empty value),
+    and states that an existing legacy `hyper.json` also suppresses creation
+    of `config.json5`.
+  - [x] This section's interface listing is rewritten against the shipped
+    ports: `keybindings-ports.ts` rather than errors in the service signature,
+    a store `label` rather than a filesystem location, `KeybindingsReporter`
+    rather than a bare `notify`, `{codec, store, report}` composition, the
+    `configCause` report field, and the unflattened keybindings outcome.
+- [x] (2026-11-02 02:10Z) Pre-merge reconciliation round. Every row is now
+  answered by a change rather than by an argument.
+  - [x] Unit Architecture: the read-only query returns a structured
+    `DefaultConfigQuery` (`config`, optional `failure`, `platformKeymapFault`)
+    instead of a bare payload, so a caller can see that a shipped file fell
+    back or could not be read. Start-up still owns the announcement; a
+    platform-keymap fault now has its own one-per-process notice.
+  - [x] `schema-copy.ts` no longer touches `console.error`. Each copy returns a
+    `SchemaCopyResult`, `ensureSchemaFiles` never collapses failures into a
+    notification, and `import-sources.ts` logs every failure through the
+    injected error sink and then publishes one notice.
+  - [x] Tests cover the query's reported faults, the injected error sink for a
+    refused copy, the legacy-schema refresh-without-creation rule, and the
+    one-per-process notices.
+  - [x] Generated Dafny modules carry a module header. `bin/generate-dafny.mjs`
+    derives the header from each source's `@file` summary and prepends it after
+    `lsc gen`, and `bin/prove.sh` regenerates through that script so the
+    staleness check stays reproducible.
+  - [x] The users' guide qualifies recreation of `keybindings.json5`: a
+    deferred migration, a failed write, and an invalid or unreadable existing
+    file each leave the file alone and are reported.
 
 ## Surprises & discoveries
 
@@ -1744,14 +1801,20 @@ exists wins, including a dangling symlink. When none exists the creation path is
 `velocetty`, or `hyper`), `shadowedConfigPaths`, `velocettyDir`,
 `keybindingsFile`, and `keybindingsPath`. The CLI (`cli/api.ts`
 `resolveConfigPath`) computes the same locations independently, for plugin
-commands.
+commands, and agrees only while both sides receive equivalent
+configuration-tree inputs; the remaining input differences are tracked as
+CONFIG-003 in `docs/tracking-issues.md`.
 
 Start-up (`setup()` in `app/config.ts`) and every reload call `_import()` from
 `createConfigImportModule` (`app/config/import.ts`). `_import()` does the
 following:
 
 1. On start-up only, creates the plugin directories and copies both JSON
-   schemas into the configuration trees; a reload writes nothing.
+   schemas: `schema.json` into the Velocetty tree, and
+   `keybindings.schema.json` into the Velocetty tree, or the active development
+   directory when the development tree is active. Matching schema copies in the
+   legacy Hyper tree are refreshed only when those files already exist; a
+   reload writes nothing.
 2. Loads the bundled defaults, and, on start-up only, writes `config.json5`
    from them if it is missing. Writing happens only when
    `canBootstrapUserConfig()` is true, which compares the resolved `cfgDir` with
@@ -3871,80 +3934,130 @@ export const serializeKeybindings: (keymaps: UserKeymaps) => string;
 export const toRawKeymaps: (keymaps: UserKeymaps) => NonNullable<rawConfig['keymaps']>; // copying
 ```
 
-`app/config/keybindings.ts` is the application service and declares its driven
-port:
+`app/config/keybindings-ports.ts` is the domain boundary: neutral ports,
+outcomes, and a closed notice vocabulary. No filesystem path, raw `Error`, or
+user-facing wording crosses it. A raw errno is translated by the file adapter
+into the bounded `KeybindingsStorageFailure`, and composing a sentence is the
+edge's job (`keybindings-notifier.ts`).
 
 ```typescript
-export type ConfigImportNotify = (title: string, body?: string, details?: {error?: unknown}) => void;
+export type KeybindingsStorageFailure = 'permission' | 'missing' | 'other';
+export type KeybindingsBasis = 'last-known-good' | 'empty';
 
 export type KeybindingsReadOutcome =
   | {readonly kind: 'present'; readonly text: string}
   | {readonly kind: 'missing'}
-  | {readonly kind: 'unreadable'; readonly error: unknown};
+  | {readonly kind: 'unreadable'; readonly failure: KeybindingsStorageFailure};
 
-export type KeybindingsWriteOutcome = {readonly kind: 'written'} | {readonly kind: 'failed'; readonly error: unknown};
+export type KeybindingsWriteOutcome =
+  | {readonly kind: 'written'}
+  | {readonly kind: 'failed'; readonly failure: KeybindingsStorageFailure};
 
 export type KeybindingsStore = {
-  readonly location: string;
+  /** A human label such as `keybindings.json5`, never a filesystem path. */
+  readonly label: string;
   readonly read: () => KeybindingsReadOutcome;
   readonly write: (text: string) => KeybindingsWriteOutcome;
 };
 
+export type KeybindingsTextCodec = {
+  readonly parse: (
+    text: string,
+    label: string
+  ) =>
+    | {readonly kind: 'ok'; readonly keymaps: UserKeymaps}
+    | {readonly kind: 'invalid'; readonly diagnostics: readonly configValidationDiagnostic[]};
+  readonly serialize: (keymaps: UserKeymaps) => string;
+};
+
+export type KeybindingsNotice =
+  | {readonly basis: KeybindingsBasis; readonly diagnostics: readonly configValidationDiagnostic[]; readonly kind: 'invalid-file'}
+  | {readonly basis: KeybindingsBasis; readonly failure: KeybindingsStorageFailure; readonly kind: 'unreadable-file'}
+  | {readonly failure: KeybindingsStorageFailure; readonly kind: 'seed-failed'}
+  | {readonly failure: KeybindingsStorageFailure; readonly kind: 'import-failed'}
+  | {readonly diagnostics: readonly configValidationDiagnostic[]; readonly kind: 'diagnostics'; readonly label: string};
+
+export type KeybindingsReporter = (notice: KeybindingsNotice) => void;
+
 export type KeybindingsLoadOutcome =
-  | {readonly kind: 'applied'; readonly keymaps: UserKeymaps; readonly origin: 'file' | 'missing' | 'seeded'}
+  | {
+      readonly kind: 'applied';
+      readonly keymaps: UserKeymaps;
+      /** `seeded-unsaved` applied in memory but could not write the file. */
+      readonly origin: 'file' | 'missing' | 'seeded' | 'seeded-unsaved';
+    }
   | {
       readonly kind: 'kept';
       readonly keymaps: UserKeymaps;
-      readonly basis: 'last-known-good' | 'empty';
+      readonly basis: KeybindingsBasis;
       readonly cause: 'invalid' | 'unreadable' | 'deferred';
       readonly diagnostics: readonly configValidationDiagnostic[];
     };
 
 /** Text supplied by an importer, with the name its diagnostics should cite. */
-export type KeybindingsImportRequest = Readonly<{
-  readonly sourceLabel: string;
-  readonly text: string;
-}>;
+export type KeybindingsImportRequest = Readonly<{readonly sourceLabel: string; readonly text: string}>;
 
 export type KeybindingsImportOutcome =
   | {readonly kind: 'written'}
   | {readonly kind: 'invalid'; readonly diagnostics: readonly configValidationDiagnostic[]}
-  | {readonly kind: 'failed'; readonly error: unknown};
+  | {readonly kind: 'failed'; readonly failure: KeybindingsStorageFailure};
 
 export type KeybindingsExport =
   | {readonly kind: 'stored'; readonly text: string}
   | {readonly kind: 'invalid'; readonly text: string; readonly diagnostics: readonly configValidationDiagnostic[]}
   | {readonly kind: 'missing'}
-  | {readonly kind: 'unreadable'; readonly error: unknown};
+  | {readonly kind: 'unreadable'; readonly failure: KeybindingsStorageFailure};
+```
 
-export const createKeybindingsService: (dependencies: {
+`app/config/keybindings.ts` composes those ports around the verified policy.
+The service depends on `{codec, store, report}`, so the notification sink is a
+port rather than a concrete `notify` function:
+
+```typescript
+export const createKeybindingsService = (dependencies: {
+  readonly codec: KeybindingsTextCodec;
   readonly store: KeybindingsStore;
-  readonly notify: ConfigImportNotify;
-  readonly warn?: typeof console.warn;
+  readonly report: KeybindingsReporter;
 }) => {
   readonly start: (legacy: LegacyKeymapsSource) => KeybindingsLoadOutcome;
-  readonly reload: () => KeybindingsLoadOutcome;
+  readonly reload: () => KeybindingsLoadOutcome; // never writes
   readonly importKeybindings: (request: KeybindingsImportRequest) => KeybindingsImportOutcome;
   readonly exportKeybindings: () => KeybindingsExport;
   readonly active: () => UserKeymaps; // read-only query; KB-SVC-2 observes through it
 };
 ```
 
-`app/config/keybindings-store.ts` is the file adapter:
+`app/config/keybindings-notifier.ts` is the edge that presents those notices.
+`createKeybindingsNotifier(notify, warn?)` returns a `KeybindingsReporter`, and
+`notifyWithPrimaryDiagnostic({baseMessage, diagnostics, notify})` appends the
+first diagnostic's path, message, and suggested fix to a base sentence.
+
+`app/config/keybindings-store.ts` is the file adapter behind
+`KeybindingsStore`. It translates raw errno codes into
+`KeybindingsStorageFailure`, so the failure vocabulary above is the only one
+the service sees. Its contract types live in
+`app/config/keybindings-store-contract.ts`:
 
 ```typescript
 export type KeybindingsFileSystem = Pick<
   typeof import('node:fs'),
-  'realpathSync' | 'readFileSync' | 'openSync' | 'writeSync' | 'fsyncSync' | 'closeSync'
-  | 'statSync' | 'chmodSync' | 'renameSync' | 'unlinkSync' | 'readdirSync'
+  | 'accessSync' | 'constants' | 'realpathSync' | 'readFileSync' | 'openSync'
+  | 'writeSync' | 'fsyncSync' | 'closeSync' | 'statSync' | 'lstatSync'
+  | 'readlinkSync' | 'chmodSync' | 'renameSync' | 'unlinkSync' | 'readdirSync'
 >;
 
-export const createFileKeybindingsStore: (options: {
+export type FileKeybindingsStoreOptions = {
   readonly filePath: string;
   readonly fs?: KeybindingsFileSystem; // defaults to node:fs; injected for fault tests
+  readonly onRetry?: (event: RenameRetryEvent) => void; // one call per refused rename
   readonly sleep?: (milliseconds: number) => void; // bounded retry back-off; injected in tests
+  readonly spans?: ConfigSpanRecorder;
   readonly warn?: typeof console.warn;
-}) => KeybindingsStore & {readonly removeStaleTemporaryFiles: () => void};
+};
+
+export const createFileKeybindingsStore: (
+  options: FileKeybindingsStoreOptions
+) => KeybindingsStore & {readonly removeStaleTemporaryFiles: () => void};
 ```
 
 `app/config/watcher.ts`:
@@ -3970,7 +4083,8 @@ export const createConfigWatcher: <TimerHandle>(options: {
 }) => {readonly close: () => Promise<void>};
 ```
 
-`app/config/import.ts`:
+`app/config/import.ts` composes the source loader, the keybindings service, and
+the migration notices:
 
 ```typescript
 export type ConfigImportKeybindings = {
@@ -3978,19 +4092,51 @@ export type ConfigImportKeybindings = {
   readonly reload: () => KeybindingsLoadOutcome;
 };
 
+// createConfigImportModule({_init, keybindings, notify, paths, fs?, isDebugEnabled?, warn?, error?}) returns:
+//   _import: (phase: 'startup' | 'reload') => {
+//     readonly config: parsedConfig;
+//     readonly report: ConfigImportReport;
+//     readonly keybindings: KeybindingsLoadOutcome; // passed through unflattened
+//   }
+//   getDefaultConfig: () => {
+//     readonly defaults: rawConfig;
+//     readonly failure?: ConfigFallbackCause;      // absent when the file was usable
+//     readonly platformKeymapFault: boolean;
+//   }   // read-only; never starts the keybindings service
+```
+
+`app/config/import-report.ts` owns the reporting vocabulary:
+
+```typescript
+export type ConfigFallbackCause = 'parse' | 'read';
+export type ConfigSourceKind = 'development' | 'velocetty' | 'hyper';
+
 export type ConfigImportReport = {
   readonly config: 'applied' | 'fallback';
+  /** Present only for a fallback, and only when the cause is known. */
+  readonly configCause?: ConfigFallbackCause;
   readonly keybindings: 'applied' | 'kept' | 'unchanged';
 };
 
-// createConfigImportModule gains `keybindings: ConfigImportKeybindings` in its dependencies and returns:
-//   _import: (phase: 'startup' | 'reload') => {readonly config: parsedConfig; readonly report: ConfigImportReport}
-//   getDefaultConfig: () => rawConfig   (no longer runs keybindings start-up)
+export type ImportDecision = {
+  readonly phase: 'reload' | 'startup';
+  readonly config: 'applied' | 'fallback';
+  readonly configCause?: ConfigFallbackCause;
+  readonly configSource: ConfigSourceKind;
+  readonly fallbackBasis?: 'defaults';
+  readonly keybindings: KeybindingsLoadOutcome;
+  readonly announced: boolean;
+};
+
+export const shouldAnnounceReload: (report: ConfigImportReport) => boolean;
+export const describeImportDecision: (decision: ImportDecision) => string;
 ```
 
-`ConfigImportReport` and `shouldAnnounceReload` live in
-`app/config/import-report.ts` and are re-exported here; `ConfigImportPaths` and
-`ConfigImportPhase` live in `app/config/import-sources.ts`.
+`app/config/import-sources.ts` owns `ConfigImportPaths`, `ConfigImportPhase`,
+and `createConfigSourceLoader`. `app/config/import-keybindings.ts` owns
+`readLegacyKeymaps`, `replaceLegacyKeymaps`, `classifyLegacyKeymaps`, and
+`createKeybindingsNotices`; each notice fires at most once per process, so a
+burst of reloads cannot repeat it.
 
 Exact names may be adjusted during the Stage B prototype if LemmaScript
 requires it. Any adjustment is recorded in `Decision log`.

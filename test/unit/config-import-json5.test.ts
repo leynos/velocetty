@@ -231,11 +231,15 @@ test('bootstraps missing config with JSON5 output without legacy migration paths
 
     const writtenConfig = JSON5.parse(readFileSync(harness.mockPaths.cfgPath, 'utf8'));
     const expectedConfig = JSON5.parse(defaultConfigFixture);
-    // The bootstrap template is the cached default payload, which already has
-    // the platform keymap merged, so the platform binding wins inside it.
-    expectedConfig.keymaps = {'window:new': ['ctrl+n']};
+    // Shortcuts belong in `keybindings.json5`; a copy here would be ignored on
+    // the next launch and reported as an ignored setting, so the bootstrap
+    // template carries none even though the runtime defaults still have them.
+    expectedConfig.keymaps = {};
     expect(writtenConfig.plugins).toEqual(['plugin-a']);
     expect(writtenConfig).toEqual(expectedConfig);
+    // The file carries no shortcuts, but the platform bindings still reach the
+    // running configuration through the defaults layer.
+    expect(harness.initMock.mock.calls[0]?.[1]).toMatchObject({keymaps: {'window:new': ['ctrl+n']}});
     expect(JSON5.parse(readFileSync(harness.mockPaths.keybindingsPath, 'utf8'))).toEqual({});
   } finally {
     harness.cleanup();
@@ -260,7 +264,9 @@ test('getDefaultConfig reads and caches the defaults without writing', async () 
 
     const result = harness.getDefaultConfig();
 
-    expect(result).toEqual(expect.any(Object));
+    expect(result.defaults).toEqual(expect.any(Object));
+    expect(result.failure).toBeUndefined();
+    expect(result.platformKeymapFault).toBe(false);
     // A query is read-only: no plugin directories, schema copy, or user file.
     expect(existsSync(harness.mockPaths.plugs.base)).toBe(false);
     expect(existsSync(harness.mockPaths.plugs.local)).toBe(false);
@@ -304,7 +310,7 @@ test('getDefaultConfig performs zero writes through the injected filesystem', as
 
     const defaults = harness.getDefaultConfig();
 
-    expect(defaults).toEqual(expect.any(Object));
+    expect(defaults.defaults).toEqual(expect.any(Object));
     // The recording double is the proof: the query made no directory, copied
     // no schema, and wrote no file.
     expect(writeCounts).toEqual({copy: 0, mkdirp: 0, writeFile: 0});
@@ -329,7 +335,7 @@ test('getDefaultConfig returns the same defaults before and after a start-up imp
     const after = harness.getDefaultConfig();
 
     expect(after).toEqual(before);
-    expect(after.keymaps).toEqual({'window:new': ['ctrl+n']});
+    expect(after.defaults.keymaps).toEqual({'window:new': ['ctrl+n']});
   } finally {
     harness.cleanup();
   }

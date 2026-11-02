@@ -1,5 +1,5 @@
 /** @file Verifies the read-only default query and the injected schema copy. */
-import {expect, test} from 'bun:test';
+import {expect, mock, test} from 'bun:test';
 
 import path from 'node:path';
 
@@ -29,7 +29,8 @@ const seedBundledFiles = (harness: ConfigImportHarness, defaultConfig?: string):
   writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
 };
 
-// The bundled file is valid, invalid, or absent; only a parse fault is announced.
+// A valid bundled file applies; a read or parse fault falls back and is
+// announced once at start-up, with the fault named in the message.
 const bundledDefaultCases = [
   {
     announces: false,
@@ -41,29 +42,69 @@ const bundledDefaultCases = [
     announces: true,
     description: 'invalid',
     expected: {plugins: [], localPlugins: [], keymaps: {}},
+    fault: 'parse' as const,
     seed: '{plugins: "not-an-array"}'
   },
-  {announces: false, description: 'unreadable', expected: {keymaps: {}}, seed: undefined}
+  {
+    announces: true,
+    description: 'unreadable',
+    expected: {plugins: [], localPlugins: [], keymaps: {}},
+    fault: 'read' as const,
+    seed: undefined
+  }
 ];
 
 test('getDefaultConfig neither notifies nor re-reads, before or after start-up', async () => {
-  for (const {announces, description, expected, seed} of bundledDefaultCases) {
+  for (const {announces, description, expected, fault, seed} of bundledDefaultCases) {
     const harness = await createConfigImportHarness();
     try {
       seedBundledFiles(harness, seed);
 
-      expect(harness.getDefaultConfig(), description).toEqual(expected);
+      const queried = harness.getDefaultConfig();
+      expect(queried.defaults, description).toEqual(expected);
+      // The query reports the fault instead of hiding it, without notifying.
+      expect(queried.failure, description).toBe(fault);
       expect(bundledDefaultNotices(harness.notifyMock), description).toEqual([]);
 
       harness._import('startup');
 
-      // Start-up is the command that acts on the fault, so it announces it once.
-      expect(bundledDefaultNotices(harness.notifyMock), description).toHaveLength(announces ? 1 : 0);
-      expect(harness.getDefaultConfig(), description).toEqual(expected);
+      // Start-up is the command that acts on the fault, so it announces it once,
+      // naming whether the file could not be read or could not be parsed.
+      const notices = bundledDefaultNotices(harness.notifyMock);
+      expect(notices, description).toHaveLength(announces ? 1 : 0);
+      if (fault !== undefined) {
+        expect(notices[0], description).toContain(`Couldn't ${fault} the bundled default config`);
+      }
+      expect(harness.getDefaultConfig().defaults, description).toEqual(expected);
       expect(bundledDefaultNotices(harness.notifyMock), description).toHaveLength(announces ? 1 : 0);
     } finally {
       harness.cleanup();
     }
+  }
+});
+
+test('reports a missing platform keymap in the query and once at start-up', async () => {
+  const harness = await createConfigImportHarness();
+  try {
+    // The bundled config is usable; only the platform keymap is absent.
+    writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
+    writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+
+    const queried = harness.getDefaultConfig();
+    expect(queried.platformKeymapFault).toBe(true);
+    expect(queried.failure).toBeUndefined();
+    // The query reports the fault but never notifies.
+    expect(harness.notifyMock).not.toHaveBeenCalled();
+
+    harness._import('startup');
+    harness._import('reload');
+
+    const faultNotices = harness.notifyMock.mock.calls.filter(([title]) =>
+      title.startsWith("Couldn't read the bundled platform keymap")
+    );
+    expect(faultNotices).toHaveLength(1);
+  } finally {
+    harness.cleanup();
   }
 });
 
@@ -80,7 +121,8 @@ test('start-up copies schemas through the injected filesystem and reports a refu
         fsExtra.copySync(source, destination, options);
       }
     };
-    const harness = await createConfigImportHarness({fs: recordingFileSystem});
+    const errorMock = mock<typeof console.error>(() => {});
+    const harness = await createConfigImportHarness({error: errorMock, fs: recordingFileSystem});
     try {
       seedBundledFiles(harness, sharedDefaultConfigFixture);
 
@@ -91,8 +133,45 @@ test('start-up copies schemas through the injected filesystem and reports a refu
       const messages = harness.notifyMock.mock.calls.map(([message]) => message);
       const refusedCopy = "Couldn't update config schema metadata. Config editor validation may be stale.";
       expect(messages.includes(refusedCopy)).toBe(shouldFail);
+      // Both copy targets fail together, and each failure is logged through
+      // the injected error sink, not printed straight to the process.
+      const loggedFailures = errorMock.mock.calls.filter(([message]) =>
+        String(message).includes('Failed to copy schema file')
+      );
+      expect(loggedFailures).toHaveLength(shouldFail ? 2 : 0);
     } finally {
       harness.cleanup();
     }
+  }
+});
+
+test('refreshes an existing Hyper schema but never creates a missing one', async () => {
+  const harness = await createConfigImportHarness({hyperTree: true});
+  try {
+    seedBundledFiles(harness, sharedDefaultConfigFixture);
+    fsExtra.mkdirpSync(harness.mockPaths.cfgDir);
+    // Only the legacy config schema exists; the legacy keybindings schema does
+    // not, and upgrading must not add one to the old tree.
+    writeFileSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile), '{"title":"stale"}', 'utf8');
+
+    harness._import('startup');
+
+    const velocettySchema = path.join(harness.mockPaths.velocettyDir, harness.mockPaths.schemaFile);
+    const velocettyKeybindingsSchema = path.join(
+      harness.mockPaths.velocettyDir,
+      harness.mockPaths.keybindingsSchemaFile
+    );
+    // Both new copies land in the Velocetty tree.
+    expect(fsExtra.readFileSync(velocettySchema, 'utf8')).toBe('{"title":"schema"}');
+    expect(fsExtra.existsSync(velocettyKeybindingsSchema)).toBe(true);
+    // The copy that was already in the Hyper tree is refreshed in place.
+    expect(fsExtra.readFileSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile), 'utf8')).toBe(
+      '{"title":"schema"}'
+    );
+    expect(fsExtra.existsSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.keybindingsSchemaFile))).toBe(
+      false
+    );
+  } finally {
+    harness.cleanup();
   }
 });

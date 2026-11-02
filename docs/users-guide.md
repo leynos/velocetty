@@ -27,10 +27,11 @@ working without being moved.
 
 _Table 1: Configuration directories._
 
-On every platform, `XDG_CONFIG_HOME` wins when it is set to an absolute path.
-An empty or relative value is ignored, as the XDG Base Directory specification
-requires. On Linux the directory name is case-sensitive: `~/.config/velocetty`
-is not consulted.
+For the Velocetty directory, `XDG_CONFIG_HOME` wins when it is set to an
+absolute path; an empty or relative value is ignored, as the XDG Base Directory
+specification requires. The Hyper fallback keeps its historical rule, which is
+laxer: any non-empty `XDG_CONFIG_HOME` counts, even a relative one. On Linux
+the directory name is case-sensitive: `~/.config/velocetty` is not consulted.
 
 `config.json5` is resolved in this order:
 
@@ -39,9 +40,12 @@ is not consulted.
 2. `Velocetty/config.json5`;
 3. the Hyper directory's `config.json5`, then its older `hyper.json`.
 
-When no `config.json5` exists anywhere, Velocetty creates one in the Velocetty
-directory. If both directories hold one, the Velocetty copy wins and a
-notification names the ignored copy.
+When no configuration file exists anywhere, Velocetty creates `config.json5` in
+the Velocetty directory. An existing legacy `hyper.json` counts, so Velocetty
+leaves that tree alone rather than adding a Velocetty-named file that would
+shadow the configuration already in use. If both directories hold a
+`config.json5`, the Velocetty copy wins and a notification names the ignored
+copy.
 
 `keybindings.json5` lives in the Velocetty directory. A development build that
 uses a development-mode `config.json5` or `hyper.json` keeps it beside that
@@ -135,9 +139,21 @@ The example binds `ctrl+1` through `ctrl+8` to `tab:jump:1` through
 
 Deleting the file is not the same as resetting it. While Velocetty is running,
 deleting the file removes all user overrides until the next start. On the next
-start, Velocetty recreates the file, and if the legacy `config.json5` still
-holds `keymaps` it seeds the new file from them again. Use `{}` when the intent
-is to reset.
+start Velocetty normally recreates the file, and if the legacy `config.json5`
+still holds `keymaps` it seeds the new file from them again. Use `{}` when the
+intent is to reset.
+
+Recreation has three exceptions, and in each case the file stays absent rather
+than being written with content that would hide the problem:
+
+- If `config.json5` cannot be read or parsed, seeding is postponed to a later
+  start instead of writing an empty file.
+- If the configuration directory or the file cannot be written — a permission
+  or disk-space problem — Velocetty reports the failure and carries on with the
+  platform defaults.
+- If the file exists but is invalid or unreadable, Velocetty does not rewrite
+  it; it starts with the platform defaults and reports the first problem, as
+  described under [Hot reload](#hot-reload).
 
 ### Hot reload
 
@@ -164,7 +180,9 @@ copies a valid `config.json5.keymaps` into the new file. It never writes to
 
 Once `keybindings.json5` exists, the legacy `keymaps` key is ignored and a
 notification says so. If `config.json5` cannot be parsed at start-up, migration
-is postponed to a later start rather than seeding an empty file.
+is postponed to a later start rather than seeding an empty file. If the new
+file cannot be written, Velocetty reports the failure and runs with the
+platform defaults; the next start tries the migration again.
 
 For a standalone summary of the change, including the target release, see the
 [migration note](migration-keybindings-json5.md).

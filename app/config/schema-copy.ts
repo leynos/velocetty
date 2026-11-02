@@ -16,7 +16,12 @@ export type SchemaTarget = Readonly<{
 /** The filesystem subset a copy uses; required so every effect is observable. */
 export type SchemaCopyFileSystem = Pick<typeof import('fs-extra'), 'copySync' | 'existsSync' | 'mkdirpSync'>;
 
-/** What to copy, where a legacy copy may also live, and how to report failure. */
+/** What one schema copy did, so the caller owns logging and notification. */
+export type SchemaCopyResult =
+  | {readonly destinationPath: string; readonly kind: 'copied'}
+  | {readonly destinationPath: string; readonly error: unknown; readonly kind: 'failed'};
+
+/** What to copy and where a legacy copy may also live. */
 export type SchemaCopyRequest = {
   /**
    * The filesystem the copies go through.
@@ -32,7 +37,6 @@ export type SchemaCopyRequest = {
    * twice.
    */
   readonly legacyDirectory?: string;
-  readonly notify: (message: string) => void;
   readonly targets: readonly SchemaTarget[];
 };
 
@@ -40,18 +44,21 @@ export type SchemaCopyRequest = {
  * Copies one bundled schema beside the configuration file that uses it.
  *
  * The destination directory is created first, because a fresh configuration
- * tree has no directory of its own. A failure is reported and never thrown:
- * a stale schema degrades editor validation, it does not stop start-up.
+ * tree has no directory of its own. A failure is returned rather than thrown:
+ * a stale schema degrades editor validation, it does not stop start-up, and
+ * the caller decides how to report it.
  */
-const copySchemaTarget = ({directory, fileName, source}: SchemaTarget, fileSystem: SchemaCopyFileSystem): boolean => {
+const copySchemaTarget = (
+  {directory, fileName, source}: SchemaTarget,
+  fileSystem: SchemaCopyFileSystem
+): SchemaCopyResult => {
   const destinationPath = path.resolve(directory, fileName);
   try {
     fileSystem.mkdirpSync(directory);
     fileSystem.copySync(source, destinationPath, {overwrite: true});
-    return true;
+    return {destinationPath, kind: 'copied'};
   } catch (error) {
-    console.error(`[config-import] Failed to copy schema file from "${source}" to "${destinationPath}".`, error);
-    return false;
+    return {destinationPath, error, kind: 'failed'};
   }
 };
 
@@ -77,20 +84,20 @@ const locatedTargets = (
 /**
  * Copies every bundled schema into the configuration trees.
  *
- * @param request - The targets, the optional legacy tree, and the notifier.
+ * The results are returned so the caller can log each failure and decide
+ * whether the user needs one notification.
+ *
+ * @param request - The targets, the optional legacy tree, and the filesystem.
+ * @returns One result per copy attempted, in the order the targets were built.
  *
  * @example
  * ```ts
- * ensureSchemaFiles({
+ * const results = ensureSchemaFiles({
  *   fs,
- *   notify,
  *   targets: [{directory: velocettyDir, fileName: 'schema.json', source: schemaPath}]
  * });
+ * results.every(({kind}) => kind === 'copied'); // true when every copy landed
  * ```
  */
-export const ensureSchemaFiles = (request: SchemaCopyRequest): void => {
-  const results = locatedTargets(request, request.fs).map((target) => copySchemaTarget(target, request.fs));
-  if (results.includes(false)) {
-    request.notify("Couldn't update config schema metadata. Config editor validation may be stale.");
-  }
-};
+export const ensureSchemaFiles = (request: SchemaCopyRequest): readonly SchemaCopyResult[] =>
+  locatedTargets(request, request.fs).map((target) => copySchemaTarget(target, request.fs));

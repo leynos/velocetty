@@ -97,7 +97,17 @@ export type ConfigImportHarnessOptions = {
    * Replaces the loader's filesystem functions. A recording double lets a test
    * prove the default-config query performs no writes.
    */
+  /**
+   * Replaces the loader's error sink, so a test can observe a refused schema
+   * copy without writing to the test runner's own standard error.
+   */
+  readonly error?: typeof console.error;
   readonly fs?: ConfigImportFileSystem;
+  /**
+   * Lower-priority config files the active tree hides. Supplying one lets a
+   * test observe the shadowed-copy notice, which is silent when empty.
+   */
+  readonly shadowedConfigPaths?: readonly string[];
 };
 
 const createMockPaths = (workspaceRoot: string, options: ConfigImportHarnessOptions): ConfigImportPaths => {
@@ -118,7 +128,7 @@ const createMockPaths = (workspaceRoot: string, options: ConfigImportHarnessOpti
     },
     schemaFile: 'schema.json',
     schemaPath: path.join(workspaceRoot, 'defaults', 'schema.json'),
-    shadowedConfigPaths: [],
+    shadowedConfigPaths: options.shadowedConfigPaths ?? [],
     velocettyDir
   };
 };
@@ -176,6 +186,9 @@ export const createConfigImportHarness = async (
       paths: mockPaths,
       warn: warnMock
     };
+    if (options.error !== undefined) {
+      Object.assign(configDependencies, {error: options.error});
+    }
     if (options.fs !== undefined) {
       Object.assign(configDependencies, {fs: options.fs});
     }

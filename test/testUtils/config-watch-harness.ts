@@ -160,7 +160,7 @@ export const createWatchHarness = async (): Promise<WatchHarness> => {
     factory: () => ({
       createConfigImportModule: () => ({
         _import: importMock,
-        getDefaultConfig: () => ({config: {colors: {}}})
+        getDefaultConfig: () => ({defaults: {colors: {}}, platformKeymapFault: false})
       })
     }),
     specifier: '../../app/config/import'

@@ -14,6 +14,7 @@ import type {ConfigFallbackCause, ConfigImportNotify} from './import-report';
 import {ensureSchemaFiles, type SchemaCopyRequest} from './schema-copy';
 import {notifyWithPrimaryDiagnostic} from './keybindings-notifier';
 import {replaceLegacyKeymaps} from './import-keybindings';
+import type {UserKeymaps} from './keybindings-policy';
 import {parseKeybindingsText, toRawKeymaps} from './keybindings-codec';
 import {parseRawConfig, reportDiagnostics, stringifyConfig} from './import-sources-parse';
 
@@ -54,6 +55,30 @@ type LoadedConfig = {
   /** Present only when the payload is a fallback, naming why it fell back. */
   failure?: ConfigFallbackCause;
   usedFallback: boolean;
+};
+
+/** A loaded default payload plus whether its platform keymap could be used. */
+type LoadedDefaults = LoadedConfig & {platformKeymapFault: boolean};
+
+/** The bundled defaults, with what start-up learned about the shipped files. */
+export type DefaultConfigQuery = {
+  readonly defaults: rawConfig;
+  /** Present when the bundled config file could not be read or parsed. */
+  readonly failure?: ConfigFallbackCause;
+  /**
+   * Whether the shipped platform keymap could not be read or parsed.
+   *
+   * It is reported separately from `failure` because the two files fail
+   * independently: the platform keymap can be missing while the bundled config
+   * still applies unchanged.
+   */
+  readonly platformKeymapFault: boolean;
+};
+
+/** One shipped-file load: the payload plus whether the file could be used. */
+type PlatformKeymapLoad = {
+  readonly fault: boolean;
+  readonly keymaps: UserKeymaps;
 };
 
 /** The user and default payloads plus what start-up learned about them. */
@@ -112,8 +137,9 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
   const warnFn = dependencies.warn ?? console.warn;
   const errorFn = dependencies.error ?? console.error;
   const pathDeps = dependencies.paths;
-  let defaultsCache: LoadedConfig | undefined;
+  let defaultsCache: LoadedDefaults | undefined;
   let hasAnnouncedDefaultFaults = false;
+  let hasAnnouncedPlatformKeymapFault = false;
 
   /**
    * Copies the bundled JSON schemas into the configuration directories.
@@ -126,7 +152,6 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     const request: SchemaCopyRequest = {
       // The copies go through the loader's port, so a test can observe them.
       fs: fileSystem,
-      notify: notifyFn,
       targets: [
         {directory: pathDeps.velocettyDir, fileName: pathDeps.schemaFile, source: pathDeps.schemaPath},
         {
@@ -140,7 +165,38 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     if (pathDeps.cfgDir !== pathDeps.velocettyDir) {
       Object.assign(request, {legacyDirectory: pathDeps.cfgDir});
     }
-    ensureSchemaFiles(request);
+    const results = ensureSchemaFiles(request);
+    for (const result of results) {
+      if (result.kind === 'failed') {
+        errorFn(`[config-import] Failed to copy schema file to "${result.destinationPath}".`, result.error);
+      }
+    }
+    // One notice covers any number of refused copies: the user's action, not
+    // the count, is what matters.
+    if (results.some(({kind}) => kind === 'failed')) {
+      notifyFn("Couldn't update config schema metadata. Config editor validation may be stale.");
+    }
+  };
+
+  /**
+   * Builds the template written to a missing `config.json5`.
+   *
+   * The platform keymap stays in the cached defaults because it seeds the
+   * runtime configuration, but it is left out of the bootstrap file: shortcuts
+   * belong in `keybindings.json5`, so a copy here would be ignored on every
+   * later launch and reported to the user as an ignored setting.
+   *
+   * @example
+   * ```ts
+   * createBootstrapTemplate({keymaps: {'window:new': ['ctrl+n']}});
+   * // {keymaps: {}}
+   * ```
+   */
+  const createBootstrapTemplate = (defaults: rawConfig): rawConfig => {
+    // Clearing the legacy key is the point: a bootstrap file must not carry
+    // shortcuts that `keybindings.json5` will supersede on the next launch.
+    // oxlint-disable-next-line typescript/no-deprecated -- The template owns this key.
+    return {...cloneRawConfig(defaults), keymaps: {}};
   };
 
   /**
@@ -173,11 +229,19 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
    * than a user fault, so it is reported and the process continues.
    */
   const loadDefaultConfig = (): LoadedConfig => {
-    let defaultCfgRaw = '{}';
+    let defaultCfgRaw: string;
     try {
       defaultCfgRaw = fileSystem.readFileSync(pathDeps.defaultCfg, 'utf8');
     } catch (error) {
       errorFn(`[config-import] Failed to read bundled default config at "${pathDeps.defaultCfg}".`, error);
+      // A substituted payload is a fallback even though `{}` would parse, so
+      // start-up can tell the user the bundled defaults were never read.
+      return {
+        config: cloneRawConfig(defaultRawConfigFallback),
+        diagnostics: [],
+        failure: 'read',
+        usedFallback: true
+      };
     }
 
     const filePath = pathDeps.defaultCfg;
@@ -202,12 +266,19 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     return {
       config: cloneRawConfig(defaultRawConfigFallback),
       diagnostics: parsedDefaultConfigResult.diagnostics,
+      failure: 'parse',
       usedFallback: true
     };
   };
 
-  /** Reads the shipped per-platform keymap, treating any failure as no defaults. */
-  const loadPlatformKeymap = (): Record<string, string | string[]> => {
+  /**
+   * Reads the shipped per-platform keymap, recording whether it was usable.
+   *
+   * The fault flag travels with the payload so start-up can tell the user that
+   * the platform defaults are missing, rather than silently running without
+   * them. It is not announced here: only the start-up command notifies.
+   */
+  const loadPlatformKeymap = (): PlatformKeymapLoad => {
     const platformKeyPath = pathDeps.defaultPlatformKeyPath();
     const filePath = platformKeyPath;
     let content = '{}';
@@ -215,14 +286,15 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
       content = fileSystem.readFileSync(platformKeyPath, 'utf8');
     } catch (error) {
       errorFn(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`, error);
+      return {fault: true, keymaps: {}};
     }
 
     const keymapResult = parseKeybindingsText(content, platformKeyPath);
     if (keymapResult.kind === 'invalid') {
       reportDiagnostics(warnFn, 'Platform keymap diagnostics.', filePath, keymapResult.diagnostics);
-      return {};
+      return {fault: true, keymaps: {}};
     }
-    return toRawKeymaps(keymapResult.keymaps);
+    return {fault: false, keymaps: toRawKeymaps(keymapResult.keymaps)};
   };
 
   /**
@@ -298,45 +370,71 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
    * explain a fallback available to the start-up command without re-reading
    * the bundled files.
    */
-  const readDefaults = (): LoadedConfig => {
+  const readDefaults = (): LoadedDefaults => {
     if (defaultsCache === undefined) {
       const loaded = loadDefaultConfig();
-      replaceLegacyKeymaps(loaded.config, loadPlatformKeymap());
-      defaultsCache = loaded;
+      const platform = loadPlatformKeymap();
+      replaceLegacyKeymaps(loaded.config, platform.keymaps);
+      defaultsCache = {...loaded, platformKeymapFault: platform.fault};
     }
     return defaultsCache;
   };
 
   /**
-   * Reads the bundled defaults and merges the platform keymap, with no writes.
+   * Describes the bundled defaults without writing or notifying.
    *
    * The result is cached for the process, so a later start-up import reuses the
-   * payload it already read rather than touching the bundled files again.
+   * payload it already read rather than touching the bundled files again. Both
+   * shipped-file faults are part of the result: a caller that needs a usable
+   * payload can still read `config`, while one that reports health has the
+   * cause instead of guessing.
    *
    * @example
    * ```ts
    * const defaults = sources.loadDefaultsOnly();
-   * defaults.keymaps; // the platform bindings, merged into the bundled defaults
+   * defaults.defaults.keymaps; // the platform bindings, merged into the defaults
    * ```
    */
-  const loadDefaultsOnly = (): rawConfig => cloneRawConfig(readDefaults().config);
+  const loadDefaultsOnly = (): DefaultConfigQuery => {
+    const loaded = readDefaults();
+    const result: DefaultConfigQuery = {
+      defaults: cloneRawConfig(loaded.config),
+      platformKeymapFault: loaded.platformKeymapFault
+    };
+    // Added only when the bundled file actually fell back, never as `undefined`.
+    if (loaded.failure !== undefined) {
+      Object.assign(result, {failure: loaded.failure});
+    }
+    return result;
+  };
 
   /**
-   * Tells the user once that the bundled defaults could not be parsed.
+   * Tells the user once that the bundled defaults could not be read or parsed.
+   *
+   * Named separately because a missing file is a packaging fault the user can
+   * act on, while a parse fault points at the shipped content.
    *
    * Called from the start-up command, never from the read-only query, so
    * bootstrapping is announced at the moment the application acts on it.
    */
-  const announceDefaultFaults = ({diagnostics, usedFallback}: LoadedConfig): void => {
-    if (!usedFallback || hasAnnouncedDefaultFaults) {
-      return;
+  const announceDefaultFaults = (loaded: LoadedDefaults): void => {
+    const {diagnostics, failure, platformKeymapFault, usedFallback} = loaded;
+    if (usedFallback && !hasAnnouncedDefaultFaults) {
+      hasAnnouncedDefaultFaults = true;
+      const fault = failure === 'read' ? 'read' : 'parse';
+      notifyWithPrimaryDiagnostic({
+        baseMessage: `Couldn't ${fault} the bundled default config. Falling back to safe defaults.`,
+        diagnostics,
+        notify: notifyFn
+      });
     }
-    hasAnnouncedDefaultFaults = true;
-    notifyWithPrimaryDiagnostic({
-      baseMessage: "Couldn't parse the bundled default config. Falling back to safe defaults.",
-      diagnostics,
-      notify: notifyFn
-    });
+    if (platformKeymapFault && !hasAnnouncedPlatformKeymapFault) {
+      hasAnnouncedPlatformKeymapFault = true;
+      notifyFn(
+        "Couldn't read the bundled platform keymap. Starting without the platform shortcuts.",
+        'Reinstall Velocetty, or check that the application files were not modified.'
+      );
+    }
   };
 
   /** Reads both layers, creating files only during a start-up import. */
@@ -356,7 +454,10 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
       announceDefaultFaults(defaults);
     }
     const defaultCfg = defaults.config;
-    const bootstrapped = phase === 'startup' && canBootstrapUserConfig() ? ensureUserConfigFile(defaultCfg) : false;
+    const bootstrapped =
+      phase === 'startup' && canBootstrapUserConfig()
+        ? ensureUserConfigFile(createBootstrapTemplate(defaultCfg))
+        : false;
 
     const userConfigResult = loadUserConfig(defaultCfg);
     const sources: LoadedSources = {
@@ -373,23 +474,24 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
   };
 
   /**
-   * Returns a defensive copy of the bundled defaults.
+   * Returns a defensive copy of the bundled defaults and their health.
    *
    * The query is read-only: it reads and caches the bundled defaults and the
    * platform keymap, but never creates a directory, copies a schema, or
-   * bootstraps `config.json5`, and it never notifies the user. A bundled
-   * defaults fault is announced by the start-up command instead. It also never
-   * starts the keybindings service, so querying defaults cannot seed or
-   * re-read `keybindings.json5`.
+   * bootstraps `config.json5`, and it never notifies the user. A fault is
+   * announced by the start-up command instead. It also never starts the
+   * keybindings service, so querying defaults cannot seed or re-read
+   * `keybindings.json5`.
    *
    * @example
    * ```ts
    * const first = sources.getDefaultConfig();
    * const second = sources.getDefaultConfig();
-   * first === second; // false, because each caller gets its own copy
+   * first.defaults === second.defaults; // false, because each caller gets its own copy
+   * first.failure; // undefined when the bundled file was read and parsed
    * ```
    */
-  const getDefaultConfig = (): rawConfig => cloneRawConfig(loadDefaultsOnly());
+  const getDefaultConfig = (): DefaultConfigQuery => loadDefaultsOnly();
 
   return {getDefaultConfig, load, loadDefaultsOnly};
 };
