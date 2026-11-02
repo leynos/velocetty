@@ -322,6 +322,14 @@ wires them together.
 - **`ConfigImportKeybindings`** (`app/config/import.ts`): the type of the
   `keybindings` option accepted by `createConfigImportModule`, that is, the
   `{reload, start}` pairing the importer calls.
+- **`ConfigImportResult`** (`app/config/import.ts`): what `_import` returns —
+  the parsed `config`, the coarse `ConfigImportReport`, and the unflattened
+  `KeybindingsLoadOutcome`. The outcome keeps `origin`, `basis`, and `cause`
+  available, so the composition root can report the migration without
+  re-deriving it from the coarser report vocabulary.
+- **`KeybindingsLoadOutcome`** (`app/config/keybindings-ports.ts`): the
+  discriminated union of `applied` (with `origin`) and `kept` (with `basis`,
+  `cause`, and `diagnostics`) results that `start` and `reload` return.
 - **`ConfigImportPaths.keybindingsPath`** (`app/config/import-sources.ts`): the
   single resolved path of `keybindings.json5`. The sibling `keybindingsDir`,
   `keybindingsSchemaFile`, and `keybindingsSchemaPath` fields describe where
