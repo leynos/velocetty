@@ -1100,7 +1100,8 @@ design and the notification the user sees.
     (`comenq` `d832ea56`) runs against this head; 66.67% is not carried
     forward.
   - [x] Hosted Node CI run 41373080447 (`82e1d034`) and run 41373550049
-    (`04ade833`) both completed success, with `e2e-deep` skipped as designed.
+    (`04ade833`) both completed successfully, with `e2e-deep` skipped as
+    designed.
     CodeScene and Gecko also passed, and the merge state was clean.
 - [x] (2026-11-02 07:30Z) Disposed of the three findings from CodeRabbit review
   `5733229248` on `04ade833`; all three were valid.
@@ -1150,6 +1151,16 @@ design and the notification the user sees.
     header when scanning for forbidden trust constructs. The header carries the
     TypeScript `@file` summary, which is prose and may legitimately contain a
     word the scan forbids; the proof body is still checked.
+- [x] (2026-11-02 09:35Z) Disposed of CodeRabbit review `5734325686` on
+  `cef53c9d`.
+  - [x] Functional Correctness: a bootstrap seed whose write failed now
+    survives reloads. `readCurrentFile` keeps the unsaved seed when the file is
+    still missing, and clears the marker after a non-missing read or a
+    successful import write, so a deleted file still resets the overrides.
+    `keybindings-service.test.ts` covers both directions.
+  - [x] Documentation: corrected the CI progress grammar and described the
+    migration source as the active legacy configuration file rather than only
+    `config.json5.keymaps`.
 
 ## Surprises & discoveries
 
@@ -1819,9 +1830,10 @@ present and covered by a test:
    stay in effect. This is the defect the plan set out to fix: the earlier
    delivery fell back to legacy or empty keymaps. KB-POL-1 and KB-SVC-2 now
    state and test the replacement law.
-3. **Migration.** A valid `config.json5.keymaps` is copied once into a new
-   `keybindings.json5`, `config.json5` is never written, and the end-to-end
-   suite compares the Hyper-tree file byte for byte before and after launch.
+3. **Migration.** Valid legacy keymaps from the active legacy configuration
+   file (`config.json5`, or the legacy `hyper.json`) are copied once into a new
+   `keybindings.json5`, that file is never written, and the end-to-end suite
+   compares the Hyper-tree file byte for byte before and after launch.
 4. **Deletion.** Deleting the file leaves platform defaults in effect until the
    next start, and the next start follows the approved rule: it re-seeds from
    legacy keymaps if they are still present, which is why `{}` is documented as

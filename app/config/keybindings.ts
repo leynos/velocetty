@@ -119,6 +119,9 @@ export const createKeybindingsService = (dependencies: {
   let state = initialKeybindingsState;
   let isStarted = false;
   let lastShownDiagnostics = '';
+  // A seed that could not be written is still in effect for this session, so a
+  // reload must not mistake the still-missing file for a deliberate reset.
+  let hasUnsavedSeed = false;
 
   /** Advances the state through the verified policy and reports what it did. */
   const applyObservation = (observation: KeybindingsObservation) => {
@@ -159,10 +162,17 @@ export const createKeybindingsService = (dependencies: {
   const readCurrentFile = (): KeybindingsLoadOutcome => {
     const readOutcome = store.read();
     if (readOutcome.kind === 'missing') {
+      // The seed never reached the disk, so the file is still missing for a
+      // reason the user did not choose. Keep the shortcuts it put in effect.
+      if (hasUnsavedSeed) {
+        return {keymaps: exposedKeymaps(), kind: 'applied', origin: 'seeded-unsaved'};
+      }
       applyObservation({kind: 'missing'});
       lastShownDiagnostics = '';
       return {keymaps: exposedKeymaps(), kind: 'applied', origin: 'missing'};
     }
+    // The file exists again, so any earlier unsaved seed is superseded.
+    hasUnsavedSeed = false;
     if (readOutcome.kind === 'unreadable') {
       return describeRejectedRead({cause: 'unreadable', failure: readOutcome.failure});
     }
@@ -180,6 +190,7 @@ export const createKeybindingsService = (dependencies: {
   /** Writes the seed and applies it, reporting how far the migration got. */
   const seedFile = (decision: SeedDecision): KeybindingsLoadOutcome => {
     const writeOutcome = store.write(codec.serialize(decision.keymaps));
+    hasUnsavedSeed = writeOutcome.kind === 'failed';
     if (writeOutcome.kind === 'failed') {
       report({failure: writeOutcome.failure, kind: 'seed-failed'});
     }
@@ -234,6 +245,8 @@ export const createKeybindingsService = (dependencies: {
       report({failure: writeOutcome.failure, kind: 'import-failed'});
       return {failure: writeOutcome.failure, kind: 'failed'};
     }
+    // The import wrote the file, so a seed that never persisted is superseded.
+    hasUnsavedSeed = false;
     return {kind: 'written'};
   };
 

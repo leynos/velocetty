@@ -158,6 +158,33 @@ describe('reload', () => {
     expect(store.writeAttempts()).toBe(0);
   });
 
+  test('keeps an unsaved seed in effect while the file is still missing', () => {
+    const {service, store} = setup();
+    store.failNextWrite('permission');
+    service.start({keymaps: KEYMAPS_A, kind: 'parsed-keymaps'});
+
+    const outcome = service.reload();
+
+    // The seed never reached the disk, so the still-missing file is not a
+    // deliberate reset and must not drop the shortcuts it put in effect.
+    expect(outcome).toEqual({keymaps: KEYMAPS_A, kind: 'applied', origin: 'seeded-unsaved'});
+    expect(service.active()).toEqual(KEYMAPS_A);
+    expect(store.writeAttempts()).toBe(1);
+  });
+
+  test('clears the unsaved-seed marker once the file can be read', () => {
+    const {service, store} = setup();
+    store.failNextWrite('permission');
+    service.start({keymaps: KEYMAPS_A, kind: 'parsed-keymaps'});
+    store.setText(serializeKeybindings(KEYMAPS_B));
+
+    expect(service.reload()).toEqual({keymaps: KEYMAPS_B, kind: 'applied', origin: 'file'});
+
+    // The file exists again, so deleting it is a deliberate reset once more.
+    store.setMissing();
+    expect(service.reload()).toEqual({keymaps: {}, kind: 'applied', origin: 'missing'});
+  });
+
   test('treats a missing file as an accepted empty map', () => {
     const {notices, service, store} = setup(serializeKeybindings(KEYMAPS_A));
     service.start({kind: 'parsed-empty'});
