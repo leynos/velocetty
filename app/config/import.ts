@@ -89,7 +89,7 @@ const keybindingsStatus = (outcome: KeybindingsLoadOutcome): ConfigImportReport[
  * @example
  * ```ts
  * const importer = createConfigImportModule({_init, keybindings, notify, paths});
- * const {config, report} = importer._import('reload');
+ * const {config, keybindings: outcome, report} = importer._import('reload');
  * ```
  */
 export const createConfigImportModule = (dependencies: ConfigImportDependencies) => {
@@ -136,8 +136,10 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
    *
    * Start-up may create directories, refresh schemas, seed
    * `keybindings.json5`, and bootstrap `config.json5`. Reload writes nothing.
-   * The returned report is the only per-file summary the composition root
-   * needs to decide whether "Configuration updated" is honest.
+   * The result carries the parsed `config`, the coarse per-file `report` the
+   * composition root uses to decide whether "Configuration updated" is honest,
+   * and the unflattened `keybindings` outcome so the caller can report its
+   * `origin`, `basis`, and `cause` without re-deriving them.
    */
   const _import = (phase: ConfigImportPhase): ConfigImportResult => {
     const loaded = sources.load(phase);

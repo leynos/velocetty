@@ -1,3 +1,11 @@
+/** @file Normalises legacy and bundled colour configuration into a complete `ColorMap`. */
+/*
+ * `getColorMap` accepts either the modern map or the legacy positional list,
+ * and `withDefaultColors` layers the bundled defaults underneath the user's
+ * colours. `app/config.ts` uses both when it resolves the effective
+ * configuration, and `lib/components/term.tsx` reads every slot into xterm's
+ * theme, so the result must always be total.
+ */
 import type {ColorMap} from '@shared/types/config';
 
 const colorList = [
@@ -21,6 +29,19 @@ const colorList = [
   'grayscale'
 ];
 
+/**
+ * Maps a legacy positional colour list onto the named `ColorMap` slots.
+ *
+ * A `ColorMap` is returned unchanged, so callers may pass either shape.
+ *
+ * @param colors - A colour map, or the legacy list in xterm's slot order.
+ * @returns The named map; a legacy list yields only the slots it supplies.
+ *
+ * @example
+ * ```ts
+ * getColorMap(['#000', '#f00']); // {black: '#000', red: '#f00'}
+ * ```
+ */
 export function getColorMap(colors: ColorMap): ColorMap;
 export function getColorMap(colors: readonly string[]): Record<string, string>;
 export function getColorMap(colors: ColorMap | readonly string[]): ColorMap | Record<string, string> {
@@ -36,6 +57,7 @@ export function getColorMap(colors: ColorMap | readonly string[]): ColorMap | Re
   return result;
 }
 
+/** Narrows the union to the map shape; a legacy colour list is an array. */
 const isColorMap = (colors: ColorMap | readonly string[]): colors is ColorMap => !Array.isArray(colors);
 
 /**
