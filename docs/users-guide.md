@@ -145,16 +145,17 @@ The example binds `ctrl+1` through `ctrl+8` to `tab:jump:1` through
 
 Deleting the file is not the same as resetting it. While Velocetty is running,
 deleting the file removes all user overrides until the next start. On the next
-start Velocetty normally recreates the file, and if the legacy `config.json5`
-still holds `keymaps` it seeds the new file from them again. Use `{}` when the
-intent is to reset.
+start Velocetty normally recreates the file, and if the active legacy
+configuration file (`config.json5`, or the legacy `hyper.json`) still holds
+`keymaps` it seeds the new file from them again. Use `{}` when the intent is to
+reset.
 
 When the file is absent, recreation has two exceptions, and in each case no
 file is written rather than one holding content that would hide the problem:
 
-- If `config.json5` cannot be read or parsed, or its `keymaps` value is
-  invalid, seeding is postponed to a later start instead of writing an empty
-  file.
+- If the active legacy configuration file cannot be read or parsed, or its
+  `keymaps` value is invalid, seeding is postponed to a later start instead of
+  writing an empty file.
 - If the configuration directory or the file cannot be written — a permission
   or disk-space problem — Velocetty reports the failure. Valid legacy shortcuts
   still apply for the current session, so the workspace keeps working; nothing
