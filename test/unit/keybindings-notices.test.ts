@@ -62,7 +62,11 @@ test('the shadowed notice names every hidden copy', () => {
 
   notices.announceShadowed(['/home/user/.hyper/config.json5', '/etc/velocetty/config.json5']);
 
-  expect(sent).toHaveLength(1);
-  expect(sent[0]?.body).toContain('/home/user/.hyper/config.json5');
-  expect(sent[0]?.body).toContain('/etc/velocetty/config.json5');
+  // The whole notice is fixed, so a lost path or a changed sentence fails here.
+  expect(sent).toEqual([
+    {
+      body: 'Ignoring the lower-priority copy at /home/user/.hyper/config.json5, /etc/velocetty/config.json5.',
+      title: 'Using the Velocetty configuration'
+    }
+  ]);
 });

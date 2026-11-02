@@ -55,8 +55,14 @@ directory.
 ## Keyboard shortcuts
 
 Keyboard shortcuts are stored in `keybindings.json5`, separately from the rest
-of the configuration. Velocetty creates the file on first start with a short
-header comment and an empty object. Open it in any text editor, for example:
+of the configuration. When the file does not exist at start-up, Velocetty
+creates it with a short header comment. If `config.json5` still holds valid
+legacy `keymaps`, those shortcuts are copied into the new file; otherwise it
+starts as an empty object. Creation does not happen when the legacy
+configuration cannot be read or parsed, or its `keymaps` value is invalid, and
+a failed write leaves no file behind — see
+[Recreation](#unbinding-and-resetting). Open the file in any text editor, for
+example:
 
 ```bash
 code ~/.config/Velocetty/keybindings.json5
@@ -143,17 +149,21 @@ start Velocetty normally recreates the file, and if the legacy `config.json5`
 still holds `keymaps` it seeds the new file from them again. Use `{}` when the
 intent is to reset.
 
-Recreation has three exceptions, and in each case the file stays absent rather
-than being written with content that would hide the problem:
+When the file is absent, recreation has two exceptions, and in each case no
+file is written rather than one holding content that would hide the problem:
 
-- If `config.json5` cannot be read or parsed, seeding is postponed to a later
-  start instead of writing an empty file.
+- If `config.json5` cannot be read or parsed, or its `keymaps` value is
+  invalid, seeding is postponed to a later start instead of writing an empty
+  file.
 - If the configuration directory or the file cannot be written — a permission
-  or disk-space problem — Velocetty reports the failure and carries on with the
-  platform defaults.
-- If the file exists but is invalid or unreadable, Velocetty does not rewrite
-  it; it starts with the platform defaults and reports the first problem, as
-  described under [Hot reload](#hot-reload).
+  or disk-space problem — Velocetty reports the failure. Valid legacy shortcuts
+  still apply for the current session, so the workspace keeps working; nothing
+  is persisted, and the next start tries the migration again. The platform
+  defaults apply only when there are no legacy shortcuts to apply.
+
+A file that exists but is invalid or unreadable is a different case: Velocetty
+never rewrites it, starts with the platform defaults, and reports the first
+problem, as described under [Hot reload](#hot-reload).
 
 ### Hot reload
 
@@ -179,10 +189,11 @@ copies a valid `config.json5.keymaps` into the new file. It never writes to
 `config.json5`; its comments and formatting remain unchanged.
 
 Once `keybindings.json5` exists, the legacy `keymaps` key is ignored and a
-notification says so. If `config.json5` cannot be parsed at start-up, migration
-is postponed to a later start rather than seeding an empty file. If the new
-file cannot be written, Velocetty reports the failure and runs with the
-platform defaults; the next start tries the migration again.
+notification says so. If `config.json5` cannot be parsed at start-up, or its
+`keymaps` value is invalid, migration is postponed to a later start rather than
+seeding an empty file. If the new file cannot be written, Velocetty reports the
+failure and applies the valid legacy shortcuts for the current session without
+persisting them; the next start tries the migration again.
 
 For a standalone summary of the change, including the target release, see the
 [migration note](migration-keybindings-json5.md).

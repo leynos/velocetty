@@ -1046,7 +1046,8 @@ design and the notification the user sees.
 - [x] (2026-11-02 02:10Z) Pre-merge reconciliation round. Every row is now
   answered by a change rather than by an argument.
   - [x] Unit Architecture: the read-only query returns a structured
-    `DefaultConfigQuery` (`config`, optional `failure`, `platformKeymapFault`)
+    `DefaultConfigQuery` (`defaults`, optional `failure`,
+    `platformKeymapFault`)
     instead of a bare payload, so a caller can see that a shipped file fell
     back or could not be read. Start-up still owns the announcement; a
     platform-keymap fault now has its own one-per-process notice.
@@ -1064,6 +1065,23 @@ design and the notification the user sees.
   - [x] The users' guide qualifies recreation of `keybindings.json5`: a
     deferred migration, a failed write, and an invalid or unreadable existing
     file each leave the file alone and are reported.
+- [x] (2026-11-02 01:26Z) Reconciliation follow-up on `1d7c2203`, after
+  CodeRabbit's assessment of that head.
+  - [x] The shadowed-notice test now asserts the whole notice, title and body,
+    for two paths instead of two substring checks.
+  - [x] The refused schema-copy test counts the notice: one per batch even when
+    both targets fail, and zero when both succeed.
+  - [x] The users' guide and the migration note distinguish an absent file that
+    cannot be written (valid legacy shortcuts apply for the session, nothing is
+    persisted, the next start retries) from an existing invalid or unreadable
+    file (never rewritten, platform defaults, reported). Invalid legacy
+    `keymaps` is named as a deferral condition.
+  - [x] `Interfaces and dependencies` declares `createKeybindingsService` with a
+    valid function type over a named `KeybindingsService` return type.
+  - [ ] Docstring Coverage needs a fresh hosted measurement on the head that
+    carries this round; 66.67% is not carried forward.
+  - [ ] The formal review request is queued (`comenq` `d832ea56`) because
+    CodeRabbit auto-paused reviews after the commit burst.
 
 ## Surprises & discoveries
 
@@ -4014,17 +4032,19 @@ The service depends on `{codec, store, report}`, so the notification sink is a
 port rather than a concrete `notify` function:
 
 ```typescript
-export const createKeybindingsService = (dependencies: {
-  readonly codec: KeybindingsTextCodec;
-  readonly store: KeybindingsStore;
-  readonly report: KeybindingsReporter;
-}) => {
+export type KeybindingsService = {
   readonly start: (legacy: LegacyKeymapsSource) => KeybindingsLoadOutcome;
   readonly reload: () => KeybindingsLoadOutcome; // never writes
   readonly importKeybindings: (request: KeybindingsImportRequest) => KeybindingsImportOutcome;
   readonly exportKeybindings: () => KeybindingsExport;
   readonly active: () => UserKeymaps; // read-only query; KB-SVC-2 observes through it
 };
+
+export const createKeybindingsService: (dependencies: {
+  readonly codec: KeybindingsTextCodec;
+  readonly store: KeybindingsStore;
+  readonly report: KeybindingsReporter;
+}) => KeybindingsService;
 ```
 
 `app/config/keybindings-notifier.ts` is the edge that presents those notices.

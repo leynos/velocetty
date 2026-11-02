@@ -132,7 +132,9 @@ test('start-up copies schemas through the injected filesystem and reports a refu
       expect(copies).toContain(path.join(harness.mockPaths.keybindingsDir, harness.mockPaths.keybindingsSchemaFile));
       const messages = harness.notifyMock.mock.calls.map(([message]) => message);
       const refusedCopy = "Couldn't update config schema metadata. Config editor validation may be stale.";
-      expect(messages.includes(refusedCopy)).toBe(shouldFail);
+      // Both copies failing still produces one notice, not one per target.
+      const refusedNotices = messages.filter((message) => message === refusedCopy);
+      expect(refusedNotices).toHaveLength(shouldFail ? 1 : 0);
       // Both copy targets fail together, and each failure is logged through
       // the injected error sink, not printed straight to the process.
       const loggedFailures = errorMock.mock.calls.filter(([message]) =>

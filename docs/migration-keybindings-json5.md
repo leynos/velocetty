@@ -30,7 +30,9 @@ naming the inherited Hyper version.
   preserved. When `config.json5` holds no `keymaps`, the new file is created
   with an empty object. If `config.json5` cannot be parsed, or its `keymaps`
   value is invalid, migration is postponed to a later start rather than seeding
-  an empty file.
+  an empty file. If the new file cannot be written, Velocetty reports the
+  failure, applies the valid legacy shortcuts for that session without
+  persisting them, and retries the migration on the next start.
 - Once `keybindings.json5` exists, it is the source of truth. The legacy
   `keymaps` key is ignored; when it holds a valid `keymaps` value, a
   notification states that `keybindings.json5` takes precedence.
