@@ -36,7 +36,7 @@ test('each notice fires once no matter how many reloads ask for it', () => {
   expect(titles.slice(1)).toEqual([
     'Shortcuts in config.json5 are ignored',
     'Shortcuts moved to keybindings.json5',
-    'Using the Velocetty configuration'
+    'Using the active configuration'
   ]);
 });
 
@@ -53,7 +53,22 @@ test('an empty input says nothing and does not consume the notice', () => {
   expect(sent.map(({title}) => title)).toEqual([
     "Couldn't move shortcuts to keybindings.json5. Fix the keymaps in config.json5 to migrate them. " +
       '/keymaps: bad shortcut Suggested fix: Fix the shortcut.',
-    'Using the Velocetty configuration'
+    'Using the active configuration'
+  ]);
+});
+
+test('the shadowed notice stays accurate when development mode hides Velocetty', () => {
+  const {notices, sent} = createRecorder();
+
+  // Development mode outranks the Velocetty tree, so the notice must not
+  // claim the Velocetty copy is the one in use.
+  notices.announceShadowed(['/home/user/.config/Velocetty/config.json5']);
+
+  expect(sent).toEqual([
+    {
+      body: 'Ignoring the lower-priority copy at /home/user/.config/Velocetty/config.json5.',
+      title: 'Using the active configuration'
+    }
   ]);
 });
 
@@ -66,7 +81,7 @@ test('the shadowed notice names every hidden copy', () => {
   expect(sent).toEqual([
     {
       body: 'Ignoring the lower-priority copy at /home/user/.hyper/config.json5, /etc/velocetty/config.json5.',
-      title: 'Using the Velocetty configuration'
+      title: 'Using the active configuration'
     }
   ]);
 });

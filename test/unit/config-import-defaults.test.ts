@@ -56,7 +56,8 @@ const bundledDefaultCases = [
 
 test('getDefaultConfig neither notifies nor re-reads, before or after start-up', async () => {
   for (const {announces, description, expected, fault, seed} of bundledDefaultCases) {
-    const harness = await createConfigImportHarness();
+    const errorMock = mock<typeof console.error>(() => {});
+    const harness = await createConfigImportHarness({error: errorMock});
     try {
       seedBundledFiles(harness, seed);
 
@@ -65,6 +66,10 @@ test('getDefaultConfig neither notifies nor re-reads, before or after start-up',
       // The query reports the fault instead of hiding it, without notifying.
       expect(queried.failure, description).toBe(fault);
       expect(bundledDefaultNotices(harness.notifyMock), description).toEqual([]);
+      // A query must not reach the warning or error sinks either: only the
+      // start-up command turns a fault into a log line.
+      expect(harness.warnMock, description).not.toHaveBeenCalled();
+      expect(errorMock, description).not.toHaveBeenCalled();
 
       harness._import('startup');
 
@@ -75,6 +80,11 @@ test('getDefaultConfig neither notifies nor re-reads, before or after start-up',
       if (fault !== undefined) {
         expect(notices[0], description).toContain(`Couldn't ${fault} the bundled default config`);
       }
+      // Start-up is the boundary that logs the fault, once.
+      const loggedFaults = errorMock.mock.calls.filter(([message]) =>
+        String(message).includes(`Failed to ${fault ?? 'read'} bundled default config`)
+      );
+      expect(loggedFaults, description).toHaveLength(fault === undefined ? 0 : 1);
       expect(harness.getDefaultConfig().defaults, description).toEqual(expected);
       expect(bundledDefaultNotices(harness.notifyMock), description).toHaveLength(announces ? 1 : 0);
     } finally {
@@ -84,7 +94,8 @@ test('getDefaultConfig neither notifies nor re-reads, before or after start-up',
 });
 
 test('reports a missing platform keymap in the query and once at start-up', async () => {
-  const harness = await createConfigImportHarness();
+  const errorMock = mock<typeof console.error>(() => {});
+  const harness = await createConfigImportHarness({error: errorMock});
   try {
     // The bundled config is usable; only the platform keymap is absent.
     writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
@@ -92,9 +103,11 @@ test('reports a missing platform keymap in the query and once at start-up', asyn
 
     const queried = harness.getDefaultConfig();
     expect(queried.platformKeymapFault).toBe(true);
+    expect(queried.platformKeymapFailure).toBe('read');
     expect(queried.failure).toBeUndefined();
-    // The query reports the fault but never notifies.
+    // The query reports the fault but never notifies or logs.
     expect(harness.notifyMock).not.toHaveBeenCalled();
+    expect(errorMock).not.toHaveBeenCalled();
 
     harness._import('startup');
     harness._import('reload');
@@ -103,6 +116,11 @@ test('reports a missing platform keymap in the query and once at start-up', asyn
       title.startsWith("Couldn't read the bundled platform keymap")
     );
     expect(faultNotices).toHaveLength(1);
+    // The read fault reaches the error sink at start-up, and only once.
+    const loggedFaults = errorMock.mock.calls.filter(([message]) =>
+      String(message).includes('Failed to read platform keymap')
+    );
+    expect(loggedFaults).toHaveLength(1);
   } finally {
     harness.cleanup();
   }
@@ -143,6 +161,67 @@ test('start-up copies schemas through the injected filesystem and reports a refu
       expect(loggedFailures).toHaveLength(shouldFail ? 2 : 0);
     } finally {
       harness.cleanup();
+    }
+  }
+});
+
+test('reports each refused Hyper schema copy but notifies once', async () => {
+  for (const legacySchemaExists of [false, true]) {
+    for (const shouldFail of [false, true]) {
+      const copies: string[] = [];
+      const recordingFileSystem: ConfigImportFileSystem = {
+        ...fsExtra,
+        copySync: (source, destination, options) => {
+          copies.push(destination);
+          if (shouldFail) {
+            throw new Error('copy refused');
+          }
+          fsExtra.copySync(source, destination, options);
+        }
+      };
+      const errorMock = mock<typeof console.error>(() => {});
+      const harness = await createConfigImportHarness({error: errorMock, fs: recordingFileSystem, hyperTree: true});
+      try {
+        seedBundledFiles(harness, sharedDefaultConfigFixture);
+        fsExtra.mkdirpSync(harness.mockPaths.cfgDir);
+        if (legacySchemaExists) {
+          writeFileSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile), '{"title":"stale"}', 'utf8');
+        }
+
+        harness._import('startup');
+
+        const velocettySchema = path.join(harness.mockPaths.velocettyDir, harness.mockPaths.schemaFile);
+        const velocettyKeybindingsSchema = path.join(
+          harness.mockPaths.velocettyDir,
+          harness.mockPaths.keybindingsSchemaFile
+        );
+        const hyperSchema = path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile);
+        const hyperKeybindingsSchema = path.join(harness.mockPaths.cfgDir, harness.mockPaths.keybindingsSchemaFile);
+
+        // Both Velocetty copies are always attempted.
+        expect(copies).toContain(velocettySchema);
+        expect(copies).toContain(velocettyKeybindingsSchema);
+        // The legacy copy is refreshed only when it already exists, and a
+        // missing legacy keybindings schema is never created.
+        expect(copies.includes(hyperSchema)).toBe(legacySchemaExists);
+        expect(copies).not.toContain(hyperKeybindingsSchema);
+
+        const expectedCopies = 2 + (legacySchemaExists ? 1 : 0);
+        expect(copies).toHaveLength(expectedCopies);
+
+        // Each refused copy is logged, but the user sees one notice.
+        const loggedFailures = errorMock.mock.calls.filter(([message]) =>
+          String(message).includes('Failed to copy schema file')
+        );
+        expect(loggedFailures).toHaveLength(shouldFail ? expectedCopies : 0);
+        const refusedCopy = "Couldn't update config schema metadata. Config editor validation may be stale.";
+        const refusedNotices = harness.notifyMock.mock.calls
+          .map(([message]) => message)
+          .filter((message) => message === refusedCopy);
+        expect(refusedNotices).toHaveLength(shouldFail ? 1 : 0);
+      } finally {
+        harness.cleanup();
+      }
     }
   }
 });

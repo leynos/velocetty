@@ -188,7 +188,9 @@ export const createKeybindingsNotices = (notify: ConfigImportNotify): Keybinding
         return;
       }
       shadowed = true;
-      notify('Using the Velocetty configuration', `Ignoring the lower-priority copy at ${paths.join(', ')}.`);
+      // The active tree may be the development directory, so the title must
+      // not name Velocetty: that would point the user at a hidden copy.
+      notify('Using the active configuration', `Ignoring the lower-priority copy at ${paths.join(', ')}.`);
     }
   };
 };

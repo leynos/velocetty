@@ -80,6 +80,14 @@ const rootDiagnostic = (sourceLabel: string): configValidationDiagnostic =>
     suggestedFix: 'Wrap the keybindings in braces, for example {}.'
   });
 
+/**
+ * Builds the diagnostic for a command id that is empty or padded with spaces.
+ *
+ * @example
+ * ```ts
+ * commandIdDiagnostic(' window:new').path; // '/ window:new'
+ * ```
+ */
 const commandIdDiagnostic = (command: string): configValidationDiagnostic =>
   diagnostic({
     message: `Invalid command identifier ${JSON.stringify(command)}: it must be non-empty and carry no leading or trailing whitespace.`,
@@ -87,6 +95,14 @@ const commandIdDiagnostic = (command: string): configValidationDiagnostic =>
     suggestedFix: 'Remove the surrounding whitespace or rename the command.'
   });
 
+/**
+ * Builds the diagnostic for a `$schema` key that is not a non-empty string.
+ *
+ * @example
+ * ```ts
+ * schemaKeyDiagnostic().path; // '/$schema'
+ * ```
+ */
 const schemaKeyDiagnostic = (): configValidationDiagnostic =>
   diagnostic({
     message: 'Expected the $schema key to hold a non-empty string.',
@@ -94,6 +110,14 @@ const schemaKeyDiagnostic = (): configValidationDiagnostic =>
     suggestedFix: 'Set $schema to the schema URL, or remove the key.'
   });
 
+/**
+ * Builds the diagnostic for a value that is neither a shortcut nor a list.
+ *
+ * @example
+ * ```ts
+ * bindingDiagnostic('window:new').path; // '/window:new'
+ * ```
+ */
 const bindingDiagnostic = (command: string): configValidationDiagnostic =>
   diagnostic({
     message: 'Expected a non-empty shortcut string or an array of non-empty shortcut strings.',

@@ -67,6 +67,17 @@ type RejectedRead =
   | {readonly cause: 'invalid'; readonly diagnostics: readonly configValidationDiagnostic[]}
   | {readonly cause: 'unreadable'; readonly failure: KeybindingsStorageFailure};
 
+/**
+ * Reduces diagnostics to the pair that decides whether a repeat is new.
+ *
+ * A reload that fails the same way must not notify again, so the service
+ * compares these signatures instead of the whole diagnostic objects.
+ *
+ * @example
+ * ```ts
+ * diagnosticsSignature([{message: 'bad', path: '/x', suggestedFix: ''}]); // '/x/bad'
+ * ```
+ */
 const diagnosticsSignature = (diagnostics: readonly configValidationDiagnostic[]): string =>
   JSON.stringify(diagnostics.map((entry) => [entry.path, entry.message]));
 

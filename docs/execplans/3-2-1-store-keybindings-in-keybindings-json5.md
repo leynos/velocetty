@@ -485,6 +485,9 @@ design and the notification the user sees.
     reload-notice predicate). The importer takes a `ConfigImportKeybindings`
     port and returns `{config, report}`; reload writes nothing, and start-up
     bootstraps `config.json5` only when the active tree is Velocetty's.
+    *Superseded (2026-11-02):* the delivered `ConfigImportResult` also carries
+    `keybindings`, so the shape is `{config, keybindings, report}`. See the
+    interface block under `Stage D` for the current definition.
     `app/config.ts` owns the store and service composition. The rewritten
     KB-SVC-3 suite has 8 examples, including a Hyper-tree layout supplied by a
     new harness option. Two negative controls each failed the intended tests
@@ -1095,8 +1098,34 @@ design and the notification the user sees.
   - [ ] Docstring Coverage stays unresolved until the queued review
     (`comenq` `d832ea56`) runs against this head; 66.67% is not carried
     forward.
-  - [ ] Hosted Node CI run 41373080447 was still in progress when this round
-    was published.
+  - [x] Hosted Node CI run 41373080447 (`82e1d034`) and run 41373550049
+    (`04ade833`) both completed success, with `e2e-deep` skipped as designed.
+    CodeScene and Gecko also passed, and the merge state was clean.
+- [x] (2026-11-02 07:30Z) Disposed of the three findings from CodeRabbit review
+  `5733229248` on `04ade833`; all three were valid.
+  - [x] `announceShadowed` now titles its notice "Using the active
+    configuration". Development mode outranks the Velocetty tree, so the old
+    title pointed at a hidden copy. A new notice test models that state.
+  - [x] The overlong `KeybindingsNotice` union member in this plan is wrapped
+    to the 120-column limit.
+  - [x] The domain-boundary paragraph now says store paths, raw `Error`
+    values, and user-facing wording do not cross it, while diagnostic source
+    labels may contain filesystem paths. The legacy importer does pass
+    `config.json5` as the codec's source label.
+- [x] (2026-11-02 08:05Z) Reconciled the four pre-merge rows on `04ade833`.
+  - [x] Unit Architecture: `getDefaultConfig()` no longer reaches the warning
+    or error sinks. `loadDefaultConfig` and `loadPlatformKeymap` return the
+    read or parse fault, and `announceDefaultFaults` logs it at start-up. The
+    query tests now assert both sinks stay unused until start-up.
+  - [x] Testing (Overall): one importer now runs start-up plus two reloads for
+    the seeded, deferred, legacy-ignored, and shadowed notices, asserting each
+    exact notice appears once. A Hyper-layout schema-copy test covers an
+    existing and a missing legacy schema, with and without a refused copy.
+  - [x] Docstring Coverage: added docstrings to the undocumented functions in
+    `app/config.ts`, `app/config/keybindings.ts`, and
+    `app/config/keybindings-codec.ts` that this diff touches.
+  - [x] Developer Documentation: the three stale `{config, report}` claims are
+    marked superseded with the delivered `{config, keybindings, report}` shape.
 
 ## Surprises & discoveries
 
@@ -1398,12 +1427,15 @@ design and the notification the user sees.
 - Decision: `_import` takes a phase and returns `{config, report}`. The
   report is
   `{config: 'applied' | 'fallback'; keybindings: 'applied' | 'kept' | 'unchanged'}`.
-  It replaces a hidden "last report" query. "Configuration updated" is shown
-  when at least one file applied and neither fell back. The keybindings error
-  is shown again only when its diagnostics differ from the last shown.
-  Rationale: a value is returned instead of mutable state; each file's status
-  is independent. `getDefaultConfig` is split from `_importConf`, so querying
-  defaults never starts keybindings. Date/Author: 2026-10-29, planning agent.
+  *Superseded (2026-11-02):* the delivered result is
+  `{config, keybindings, report}`, where `keybindings` is the
+  `KeybindingsLoadOutcome` the record and E2E markers need. It replaces a
+  hidden "last report" query. "Configuration updated" is shown when at least
+  one file applied and neither fell back. The keybindings error is shown again
+  only when its diagnostics differ from the last shown. Rationale: a value is
+  returned instead of mutable state; each file's status is independent.
+  `getDefaultConfig` is split from `_importConf`, so querying defaults never
+  starts keybindings. Date/Author: 2026-10-29, planning agent.
 - Decision: legacy `config.json5.keymaps` handling. Migration shows one
   notification ("Shortcuts moved to keybindings.json5"). When legacy keymaps
   coexist with the file, one notification per process says they are ignored.
@@ -2817,7 +2849,9 @@ In `app/config/import.ts`:
 
 - declare `ConfigImportKeybindings`, `{start(legacy), reload()}`;
 - accept the dependency;
-- change `_import` to `_import(phase)`, returning `{config, report}`;
+- change `_import` to `_import(phase)`, returning `{config, report}`
+  (*superseded 2026-11-02:* the delivered result is
+  `{config, keybindings, report}`);
 - classify the legacy source;
 - split `getDefaultConfig` from `_importConf`;
 - remove the duplicated `notifyWithPrimaryDiagnostic` in favour of one helper
@@ -3968,10 +4002,11 @@ export const toRawKeymaps: (keymaps: UserKeymaps) => NonNullable<rawConfig['keym
 ```
 
 `app/config/keybindings-ports.ts` is the domain boundary: neutral ports,
-outcomes, and a closed notice vocabulary. No filesystem path, raw `Error`, or
-user-facing wording crosses it. A raw errno is translated by the file adapter
-into the bounded `KeybindingsStorageFailure`, and composing a sentence is the
-edge's job (`keybindings-notifier.ts`).
+outcomes, and a closed notice vocabulary. Store paths, raw `Error` values, and
+user-facing wording do not cross it. Diagnostic source labels may contain
+filesystem paths. A raw errno is translated by the file adapter into the bounded
+`KeybindingsStorageFailure`, and composing a sentence is the edge's job
+(`keybindings-notifier.ts`).
 
 ```typescript
 export type KeybindingsStorageFailure = 'permission' | 'missing' | 'other';
@@ -4004,7 +4039,11 @@ export type KeybindingsTextCodec = {
 };
 
 export type KeybindingsNotice =
-  | {readonly basis: KeybindingsBasis; readonly diagnostics: readonly configValidationDiagnostic[]; readonly kind: 'invalid-file'}
+  | {
+      readonly basis: KeybindingsBasis;
+      readonly diagnostics: readonly configValidationDiagnostic[];
+      readonly kind: 'invalid-file';
+    }
   | {readonly basis: KeybindingsBasis; readonly failure: KeybindingsStorageFailure; readonly kind: 'unreadable-file'}
   | {readonly failure: KeybindingsStorageFailure; readonly kind: 'seed-failed'}
   | {readonly failure: KeybindingsStorageFailure; readonly kind: 'import-failed'}

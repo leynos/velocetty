@@ -261,12 +261,84 @@ test('announces the hidden configuration copies once, at start-up only', async (
 
     // The notice belongs to start-up; a reload must not repeat it.
     const shadowedNotices = harness.notifyMock.mock.calls.filter(
-      ([title]) => title === 'Using the Velocetty configuration'
+      ([title]) => title === 'Using the active configuration'
     );
     expect(shadowedNotices).toHaveLength(1);
     expect(shadowedNotices[0]?.[1]).toContain('/home/user/.hyper/config.json5');
   } finally {
     harness.cleanup();
+  }
+});
+
+/** One start-up notice and the state that produces it. */
+type NoticeScenario = {
+  readonly label: string;
+  readonly notices: readonly string[];
+  readonly options: Parameters<typeof createConfigImportHarness>[0];
+  readonly prepare: (harness: ConfigImportHarness) => void;
+};
+
+/**
+ * The four start-up notices, each reachable through the same importer.
+ *
+ * The guards live in the notice factory, so one importer must not repeat a
+ * notice when a reload runs the same reporting path again.
+ */
+const noticeScenarios: readonly NoticeScenario[] = [
+  {
+    label: 'seeded',
+    notices: ['Shortcuts moved to keybindings.json5'],
+    options: {},
+    prepare: (harness) => {
+      writeFileSync(harness.mockPaths.cfgPath, userConfigWithKeymaps(`{'window:close': 'ctrl+w'}`), 'utf8');
+    }
+  },
+  {
+    label: 'deferred',
+    notices: ["Couldn't move shortcuts to keybindings.json5."],
+    options: {},
+    prepare: (harness) => {
+      writeFileSync(harness.mockPaths.cfgPath, userConfigWithKeymaps(`{'': 'ctrl+n'}`), 'utf8');
+    }
+  },
+  {
+    label: 'legacy-ignored',
+    notices: ['Shortcuts in config.json5 are ignored'],
+    options: {},
+    prepare: (harness) => {
+      writeFileSync(harness.mockPaths.cfgPath, userConfigWithKeymaps(`{'window:close': 'ctrl+w'}`), 'utf8');
+      writeFileSync(harness.mockPaths.keybindingsPath, `{'window:new': 'ctrl+n'}`, 'utf8');
+    }
+  },
+  {
+    label: 'shadowed',
+    notices: ['Using the active configuration'],
+    options: {shadowedConfigPaths: ['/home/user/.hyper/config.json5']},
+    prepare: () => {}
+  }
+];
+
+test('one importer announces each start-up notice at most once across reloads', async () => {
+  for (const scenario of noticeScenarios) {
+    const harness = await createConfigImportHarness(scenario.options);
+    try {
+      writeDefaultSources(harness);
+      mkdirpSync(harness.mockPaths.cfgDir);
+      scenario.prepare(harness);
+
+      harness._import('startup');
+      harness._import('reload');
+      harness._import('reload');
+
+      const titles = harness.notifyMock.mock.calls.map(([title]) => title);
+      for (const expected of scenario.notices) {
+        // The deferred notice appends diagnostics, so only its opening is fixed.
+        const matching = titles.filter((title) => title === expected || title.startsWith(expected));
+        expect(matching, `${scenario.label}: ${expected}`).toHaveLength(1);
+      }
+    } finally {
+      harness.cleanup();
+    }
   }
 });
 

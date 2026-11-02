@@ -115,6 +115,17 @@ const getCurrentConfig = (): parsedConfig => {
   return cfg;
 };
 
+/**
+ * Lists the deprecated CSS class names the configuration still uses.
+ *
+ * @param config - The decorated configuration to inspect.
+ * @returns The deprecated names found in `css` or `termCSS`, in a fixed order.
+ *
+ * @example
+ * ```ts
+ * getDeprecatedCSS({css: '.x-screen {}', termCSS: ''} as configOptions); // ['x-screen']
+ * ```
+ */
 export const getDeprecatedCSS = (config: configOptions) => {
   const deprecated: string[] = [];
   const deprecatedCSS = ['x-screen', 'x-row', 'cursor-node', '::selection'];
@@ -126,6 +137,16 @@ export const getDeprecatedCSS = (config: configOptions) => {
   return deprecated;
 };
 
+/**
+ * Warns once when the active configuration uses deprecated CSS classes.
+ *
+ * Silent before start-up has stored a configuration, so a query cannot warn.
+ *
+ * @example
+ * ```ts
+ * checkDeprecatedConfig(); // notifies only when a deprecated class is in use
+ * ```
+ */
 const checkDeprecatedConfig = () => {
   if (cfg === undefined) {
     return;
@@ -264,21 +285,60 @@ export const subscribe = (fn: Function) => {
   };
 };
 
+/**
+ * Returns the active configuration directory.
+ *
+ * Plugins load from here, so it names the tree the running configuration came
+ * from rather than the Velocetty tree unconditionally.
+ *
+ * @example
+ * ```ts
+ * getConfigDir(); // '/home/ada/.config/Velocetty'
+ * ```
+ */
 export const getConfigDir = () => {
   // expose config directory to load plugin from the right place
   return cfgDir;
 };
 
+/**
+ * Returns the name of the profile the application starts with.
+ *
+ * Falls back to the first configured profile, then to `default`, so a config
+ * that names no profile still resolves to something usable.
+ *
+ * @example
+ * ```ts
+ * getDefaultProfile(); // 'default'
+ * ```
+ */
 export const getDefaultProfile = () => {
   const {config} = getCurrentConfig();
   return config.defaultProfile || config.profiles[0]?.name || 'default';
 };
 
-// get config for the default profile, keeping it for backward compatibility
+/**
+ * Returns the merged configuration for the default profile.
+ *
+ * Kept for backward compatibility with callers that predate profiles.
+ *
+ * @example
+ * ```ts
+ * getConfig().colors; // the default profile's colours
+ * ```
+ */
 export const getConfig = () => {
   return getProfileConfig(getDefaultProfile());
 };
 
+/**
+ * Returns every configured profile.
+ *
+ * @example
+ * ```ts
+ * getProfiles().map(({name}) => name); // ['default']
+ * ```
+ */
 export const getProfiles = () => {
   return getCurrentConfig().config.profiles;
 };
@@ -286,6 +346,20 @@ export const getProfiles = () => {
 /** The settings a profile is allowed to override in the root configuration. */
 type ProfileOverrideKey = keyof configOptions['profiles'][number]['config'];
 
+/**
+ * Merges one profile over the root configuration.
+ *
+ * Object-valued settings merge key by key, so a profile can recolour one entry
+ * without restating the rest; every other setting replaces the root value.
+ *
+ * @param profileName - The profile to merge; an unknown name contributes nothing.
+ * @returns A new configuration with the profile's overrides applied.
+ *
+ * @example
+ * ```ts
+ * getProfileConfig('default').colors; // root colours plus the profile's overrides
+ * ```
+ */
 export const getProfileConfig = (profileName: string): configOptions => {
   const {profiles, defaultProfile, ...baseConfig} = getCurrentConfig().config;
   const profileConfig = profiles.find((candidate) => candidate.name === profileName)?.config ?? {};
@@ -308,10 +382,26 @@ export const getProfileConfig = (profileName: string): configOptions => {
   return merged;
 };
 
+/**
+ * Opens the active configuration file in the user's editor.
+ *
+ * @example
+ * ```ts
+ * openConfig(); // launches the configured editor on config.json5
+ * ```
+ */
 export const openConfig = () => {
   return _openConfig();
 };
 
+/**
+ * Returns the plugins the active configuration enables.
+ *
+ * @example
+ * ```ts
+ * getPlugins(); // {plugins: ['hyper-simple'], localPlugins: []}
+ * ```
+ */
 export const getPlugins = () => {
   const currentConfig = getCurrentConfig();
   return {
@@ -320,10 +410,30 @@ export const getPlugins = () => {
   };
 };
 
+/**
+ * Returns the keymaps the running configuration applies.
+ *
+ * @example
+ * ```ts
+ * getKeymaps(); // {'window:new': ['ctrl+shift+n']}
+ * ```
+ */
 export const getKeymaps = () => {
   return getCurrentConfig().keymaps;
 };
 
+/**
+ * Runs the start-up import, then starts watching for configuration changes.
+ *
+ * Creates the Velocetty tree, clears a stale temporary keybindings file, and
+ * records the import before any watcher can fire, so the first reload sees a
+ * complete state.
+ *
+ * @example
+ * ```ts
+ * setup(); // the application is now reading and watching its configuration
+ * ```
+ */
 export const setup = () => {
   // The Velocetty tree holds new configuration files, so it must exist before
   // the importer copies schemas or seeds `keybindings.json5` into it.
@@ -351,6 +461,20 @@ export const setup = () => {
 
 export {get as getWin, recordState as winRecord, defaults as windowDefaults} from './config/windows';
 
+/**
+ * Fills the colours the decorated configuration leaves unset.
+ *
+ * The terminal needs a colour for every xterm CSS slot, so the bundled
+ * defaults supply any the user did not override.
+ *
+ * @param decoratedConfig - The configuration to complete, mutated in place.
+ * @returns The same configuration with a full colour map.
+ *
+ * @example
+ * ```ts
+ * fixConfigDefaults({colors: {}} as configOptions).colors.background; // the bundled default
+ * ```
+ */
 export const fixConfigDefaults = (decoratedConfig: configOptions) => {
   const defaultConfig = getDefaultConfig().defaults.config!;
   const colorOverrides = getColorMap(decoratedConfig.colors);
@@ -359,6 +483,17 @@ export const fixConfigDefaults = (decoratedConfig: configOptions) => {
   return decoratedConfig;
 };
 
+/**
+ * Rewrites legacy hterm CSS selectors to their current equivalents.
+ *
+ * @param config - The configuration whose `css` and `termCSS` are rewritten.
+ * @returns The same configuration with the selectors translated.
+ *
+ * @example
+ * ```ts
+ * htermConfigTranslate({css: '.x-screen {}', termCSS: ''} as configOptions).css; // '.xterm-rows > div {}'
+ * ```
+ */
 export const htermConfigTranslate = (config: configOptions) => {
   const cssReplacements = {
     'x-screen x-row([ {.[])': '.xterm-rows > div$1',
