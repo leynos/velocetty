@@ -449,9 +449,10 @@ export const getKeymaps = () => {
 /**
  * Runs the start-up import, then starts watching for configuration changes.
  *
- * Creates the Velocetty tree, clears a stale temporary keybindings file, and
- * records the import before any watcher can fire, so the first reload sees a
- * complete state.
+ * Counts the attempt, creates the Velocetty tree, clears a stale temporary
+ * keybindings file, and records the import before any watcher can fire, so the
+ * first reload sees a complete state. Counting first means a failure during
+ * preparation is still reported as a start-up attempt.
  *
  * @example
  * ```ts
@@ -462,6 +463,10 @@ export const setup = () => {
   const finishSpan = spans.begin('startup');
   let imported: ReturnType<typeof _import>;
   try {
+    // Count the attempt before any preparation runs: a failure while creating
+    // the tree or clearing a stale temporary file is still a start-up attempt,
+    // and the failure record below would otherwise describe an uncounted one.
+    recorder.beginImport({phase: 'startup'});
     // The Velocetty tree holds new configuration files, so it must exist before
     // the importer copies schemas or seeds `keybindings.json5` into it.
     mkdirpSync(velocettyDir);
@@ -469,7 +474,6 @@ export const setup = () => {
     // phase that may remove it, and the edge owns that cleanup immediately
     // before the seed decision reads the file.
     keybindingsStore.removeStaleTemporaryFiles();
-    recorder.beginImport({phase: 'startup'});
     imported = _import('startup');
   } catch (error) {
     // A start-up crash is otherwise invisible: no per-file outcome exists, so

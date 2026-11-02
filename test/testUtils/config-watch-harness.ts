@@ -84,6 +84,8 @@ export type WatchHarness = {
   readonly watchMock: ReturnType<typeof mock>;
   readonly watcherMock: WatchMock;
   readonly emit: (request: EmitRequest) => void;
+  /** Makes the next stale-file cleanup throw, to exercise preparation failure. */
+  readonly setCleanupError: (error: unknown) => void;
   readonly setReport: (report: ConfigImportReport) => void;
   readonly setConfig: (config: parsedConfig) => void;
   readonly setOutcome: (outcome: KeybindingsLoadOutcome) => void;
@@ -126,8 +128,10 @@ export const createWatchHarness = async (): Promise<WatchHarness> => {
   // types keeps the harness free to assert on whatever the module passes.
   const callOrder: string[] = [];
   const notifyMock = mock((..._args: unknown[]) => {});
+  let cleanupError: unknown;
   const storeCleanupMock = mock(() => {
     callOrder.push('cleanup');
+    if (cleanupError !== undefined) throw cleanupError;
   });
   const subscriberMock = mock(() => {});
   const appOnMock = mock((..._args: unknown[]) => {});
@@ -202,6 +206,9 @@ export const createWatchHarness = async (): Promise<WatchHarness> => {
     importMock,
     notifyMock,
     storeCleanupMock,
+    setCleanupError: (error) => {
+      cleanupError = error;
+    },
     setConfig: (config) => {
       currentConfig = config;
     },

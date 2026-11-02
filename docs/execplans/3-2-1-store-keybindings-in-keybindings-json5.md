@@ -1224,6 +1224,27 @@ design and the notification the user sees.
   - Remote head `73f118fe205f41b520996523aa51c774608d0647` matches local
     `HEAD`, and the tracking ref and upstream were refreshed from the
     explicit-URL push.
+- [x] (2026-11-02 20:20Z) Disposed of the two follow-ups in CodeRabbit's
+  pre-merge reconciliation on `d7fc6d9b`.
+  - [x] Startup attempt ordering: `setup()` now calls
+    `recorder.beginImport({phase: 'startup'})` before `mkdirpSync` and
+    `removeStaleTemporaryFiles`, so a preparation failure is counted as a
+    start-up attempt. A new watcher test makes the stale-file cleanup throw and
+    asserts `attempts:1`, `importFailures:1`, one thrown `startup` span,
+    propagation of the original error, and that neither the importer nor the
+    watcher started.
+  - [x] Documentation: the ExecPlan's `KeybindingsStore` declaration now lists
+    `peek()` and distinguishes its silent query behaviour from the instrumented
+    `read()`.
+  - All eight gates pass on the candidate: `make check-fmt`, `make typecheck`,
+    `make lint`, `make test` (757 pass, 0 fail), `make spelling`,
+    `make markdownlint`, `make nixie`, and `make prove`.
+  - Hosted `build (ubuntu-latest)` is red on `d7fc6d9b` and on `73f118fe`:
+    `rpmbuild` exits 1 while packaging the RPM. Both runs used the
+    `ubuntu-26.04` runner image; the last green run (`81291ca9`, 10:21Z) used
+    `ubuntu-24.04`, and the aarch64 job on `ubuntu-22.04-arm` still builds its
+    RPM successfully. The failure is an image-roll regression, not a change in
+    this branch.
 
 ## Surprises & discoveries
 
@@ -4123,7 +4144,16 @@ export type KeybindingsWriteOutcome =
 export type KeybindingsStore = {
   /** A human label such as `keybindings.json5`, never a filesystem path. */
   readonly label: string;
+  /**
+   * The instrumented read: records a `keybindings-read` span and warns on
+   * failure. Used by the start-up and reload commands the user initiated.
+   */
   readonly read: () => KeybindingsReadOutcome;
+  /**
+   * The quiet query: the same read with no span and no warning. Used by
+   * `exportKeybindings`, which is documented as side-effect free.
+   */
+  readonly peek: () => KeybindingsReadOutcome;
   readonly write: (text: string) => KeybindingsWriteOutcome;
 };
 

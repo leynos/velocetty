@@ -158,6 +158,34 @@ test.serial('a thrown startup import is counted, recorded, and rethrown', async 
   }
 });
 
+test.serial('a preparation failure is counted as a startup attempt and rethrown', async () => {
+  const harness = await createWatchHarness();
+  const infoSpy = spyOn(console, 'info').mockImplementation(() => {});
+  const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const failure = new Error('cleanup failed');
+    harness.setCleanupError(failure);
+
+    expect(() => harness.configModule.setup()).toThrow(failure);
+
+    // Preparation runs before the importer, so the attempt counter is the only
+    // evidence that start-up began; the failure record must still describe it.
+    expect(warnSpy.mock.calls.map(([line]) => line)).toEqual([
+      '[config] import failure phase=startup cause=thrown ' +
+        'attempts:1,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0'
+    ]);
+    expect(infoSpy.mock.calls.map(([line]) => line).filter((line) => line.startsWith('[config] span'))).toEqual([
+      expect.stringMatching(/^\[config\] span operation=startup outcome=thrown ms=\d+$/)
+    ]);
+    expect(harness.importMock).not.toHaveBeenCalled();
+    expect(harness.watchMock).not.toHaveBeenCalled();
+  } finally {
+    infoSpy.mockRestore();
+    warnSpy.mockRestore();
+    mock.restore();
+  }
+});
+
 test.serial('a dispatched reload records both spans with the real outcome', async () => {
   const harness = await createWatchHarness();
   const infoSpy = spyOn(console, 'info').mockImplementation(() => {});
