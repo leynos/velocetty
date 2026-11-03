@@ -20,6 +20,7 @@ type BindingClass = 'string' | 'array' | 'empty-array';
 
 const bindingsOf = (keymaps: UserKeymaps): readonly (string | string[])[] => Object.values(keymaps);
 
+/** Sorts a binding into the shape classes the coverage guard samples. */
 const classify = (binding: string | string[]): BindingClass => {
   if (!Array.isArray(binding)) {
     return 'string';

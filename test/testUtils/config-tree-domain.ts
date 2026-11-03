@@ -194,6 +194,7 @@ export const buildConfigTreeCase = (
     appDataDirectory: fixture.appDataDirectory,
     hyperUserDataDirectory: fixture.hyperUserDataDirectory,
     development: {enabled: developmentEnabled, directory: developmentDirectory},
+    /** Answers from the simulated file set; these cases model no broken links. */
     probe: (candidate) => (presentPaths.has(candidate) ? 'present' : 'absent'),
     sameFile: (left, right) => left === right
   };

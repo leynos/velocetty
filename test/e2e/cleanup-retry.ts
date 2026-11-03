@@ -42,6 +42,7 @@ const removeDirectoryRecursive = async (directory: string) => {
   await fs.rm(directory, {recursive: true, force: true});
 };
 
+/** Decides whether a removal error is one Windows will release on its own shortly. */
 const isRetriableCleanupError = (error: unknown, isWindows: boolean) => {
   if (!isWindows) {
     return false;
@@ -70,6 +71,7 @@ const requireDelay = (baseDelayMs: number): number => {
   return baseDelayMs;
 };
 
+/** Fills the caller's options with the defaults, validating bounds before use. */
 const resolveRetryPolicy = (options: RemoveDirectoryWithRetryOptions): RetryPolicy => ({
   // Validation order is observable: the attempt count is reported first.
   maxAttempts: requireAttempts(options.maxAttempts ?? 5),

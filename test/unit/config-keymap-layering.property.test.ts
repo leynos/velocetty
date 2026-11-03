@@ -57,12 +57,17 @@ const expectedKeymaps = (defaults: Record<string, Binding>, user: Record<string,
   return normalized;
 };
 
+/**
+ * Mirrors the layer merge under test; `isSwapped` flips the spread order so the
+ * companion test can prove the law is not vacuous.
+ */
 const layerKeymaps = (defaults: Record<string, Binding>, user: Record<string, Binding>, isSwapped = false) =>
   mapKeys(isSwapped ? {...user, ...defaults} : {...defaults, ...user});
 
 const hasOverlap = ([defaults, user]: readonly [Record<string, Binding>, Record<string, Binding>]) =>
   Object.keys(defaults).some((command) => Object.hasOwn(user, command));
 
+/** True when either side has a command the other lacks, so layers are not fully overlapping. */
 const hasDisjointCommand = ([defaults, user]: readonly [Record<string, Binding>, Record<string, Binding>]) =>
   Object.keys(defaults).some((command) => !Object.hasOwn(user, command)) ||
   Object.keys(user).some((command) => !Object.hasOwn(defaults, command));

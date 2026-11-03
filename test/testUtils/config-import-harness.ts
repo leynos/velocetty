@@ -34,6 +34,7 @@ export type ConfigImportHarness = {
   workspaceRoot: string;
 };
 
+/** Narrows a fixture value to a JSON object, failing the test rather than returning a bad shape. */
 export const ensureObject = (value: unknown): JsonObject => {
   if (!isJsonObject(value)) {
     throw new Error('Expected object value.');
@@ -47,8 +48,10 @@ export type ParsedDiagnosticsPayload = Readonly<{
 
 const isValidObject = isJsonObject;
 
+/** Reads the `diagnostics` field from a logged entry, or null when the entry is not a payload. */
 const extractDiagnostics = (entry: JsonObject) => ('diagnostics' in entry ? entry.diagnostics : null);
 
+/** Guards that a logged value carries the fields every validation diagnostic must expose. */
 const isConfigValidationDiagnostic = (value: JsonValue): value is JsonObject & configValidationDiagnostic =>
   isJsonObject(value) &&
   isString(value.path) &&
@@ -57,11 +60,13 @@ const isConfigValidationDiagnostic = (value: JsonValue): value is JsonObject & c
   (value.docHint === undefined || isString(value.docHint)) &&
   (value.defaultHint === undefined || isString(value.defaultHint));
 
+/** Requires a non-empty array of well-formed diagnostics, so an empty payload is not a hit. */
 const isValidDiagnosticsArray = (diagnostics: JsonValue): diagnostics is configValidationDiagnostic[] =>
   Array.isArray(diagnostics) &&
   diagnostics.length > 0 &&
   diagnostics.every((entry) => isConfigValidationDiagnostic(entry));
 
+/** Finds the structured diagnostics payload among recorded warnings, throwing when none appears. */
 export const findDiagnosticsPayloadFromWarnMock = (
   warnMock: ReturnType<typeof mock<(_message?: string, ..._rest: Error[]) => void>>
 ): ParsedDiagnosticsPayload => {
@@ -115,6 +120,7 @@ export type ConfigImportHarnessOptions = {
   readonly shadowedConfigPaths?: readonly string[];
 };
 
+/** Lays out the path map for an isolated workspace, modelling either tree the importer supports. */
 const createMockPaths = (workspaceRoot: string, options: ConfigImportHarnessOptions): ConfigImportPaths => {
   const velocettyDir = path.join(workspaceRoot, options.hyperTree ? 'velocetty' : 'user-config');
   const userConfigDir = options.hyperTree ? path.join(workspaceRoot, 'hyper') : velocettyDir;
@@ -145,6 +151,7 @@ export const snapshotConfigBytes = (mockPaths: ConfigImportPaths): Buffer => rea
 export const configBytesUnchanged = (mockPaths: ConfigImportPaths, before: Buffer): boolean =>
   readFileSync(mockPaths.cfgPath).equals(before);
 
+/** Builds an isolated import module over a temporary workspace so a test can drive it safely. */
 export const createConfigImportHarness = async (
   options: ConfigImportHarnessOptions = {}
 ): Promise<ConfigImportHarness> => {
@@ -155,6 +162,7 @@ export const createConfigImportHarness = async (
   const warnMock = mock((_message?: string, ..._rest: Error[]) => {});
   let cleanupCalled = false;
 
+  /** Removes the temporary workspace once; repeat calls are no-ops for shared fixtures. */
   const cleanup = () => {
     if (cleanupCalled) {
       return;

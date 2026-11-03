@@ -191,6 +191,7 @@ export const createWatchHarness = async (): Promise<WatchHarness> => {
   moduleInstanceCounter += 1;
   const configModule = await import(`../../app/config.ts?config_keybindings_watch_${moduleInstanceCounter}`);
 
+  /** Dispatches an event to every handler chokidar registered for it. */
   const emit = ({event, eventPath}: EmitRequest) => {
     const handlers = watcherMock.on.mock.calls.filter(([name]) => name === event).map(([, handler]) => handler);
     for (const handler of handlers) {

@@ -21,6 +21,12 @@ const sortedEntries = (keymaps: UserKeymaps) =>
 const withEntriesInReverse = (keymaps: UserKeymaps): UserKeymaps =>
   Object.fromEntries(Object.entries(keymaps).toReversed());
 
+/**
+ * Narrows an accepted parse outcome and returns its keymaps.
+ *
+ * The throw keeps a failed expectation from letting the property continue with
+ * an unusable outcome, so a regression reports at the failing sample.
+ */
 const expectOk = (outcome: KeybindingsParseOutcome): UserKeymaps => {
   expect(outcome.kind).toBe('ok');
   if (outcome.kind !== 'ok') {
@@ -38,6 +44,12 @@ const assertRoundTrip = (keymaps: UserKeymaps): void => {
   expect(serializeKeybindings(withEntriesInReverse(keymaps))).toBe(text);
 };
 
+/**
+ * Asserts that a rejected parse carries actionable diagnostics.
+ *
+ * Totality alone would let a rejection report nothing useful to the user, so
+ * every diagnostic must name a path and suggest a fix.
+ */
 const assertDiagnostics = (outcome: KeybindingsParseOutcome): void => {
   expect(outcome.kind).toBe('invalid');
   if (outcome.kind !== 'invalid') {

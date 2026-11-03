@@ -29,6 +29,12 @@ const lastNotice = (notices: readonly KeybindingsNotice[]): KeybindingsNotice | 
 const invalidFileNotices = (notices: readonly KeybindingsNotice[]) =>
   notices.filter((notice) => notice.kind === 'invalid-file');
 
+/**
+ * Builds the store, reporter, and service shared by the named examples.
+ *
+ * An omitted initial text leaves the file absent, letting each example choose
+ * between a missing, valid, or invalid starting state.
+ */
 const setup = (initialText?: string) => {
   const store = createMemoryKeybindingsStore();
   if (initialText !== undefined) {

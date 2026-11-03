@@ -13,6 +13,12 @@ import {isKeymapConfig} from '../../app/config/json5-config';
 
 const SOURCE = '/tmp/keybindings.json5';
 
+/**
+ * Narrows an accepted parse outcome and returns its keymaps.
+ *
+ * The throw keeps the example from continuing with an unusable outcome after
+ * a failed expectation, so the failure is reported at the assertion.
+ */
 const expectOk = (outcome: KeybindingsParseOutcome): UserKeymaps => {
   expect(outcome.kind).toBe('ok');
   if (outcome.kind !== 'ok') {
@@ -21,6 +27,7 @@ const expectOk = (outcome: KeybindingsParseOutcome): UserKeymaps => {
   return outcome.keymaps;
 };
 
+/** Narrows a rejected parse outcome and returns its diagnostics for inspection. */
 const expectInvalid = (outcome: KeybindingsParseOutcome): readonly configValidationDiagnostic[] => {
   expect(outcome.kind).toBe('invalid');
   if (outcome.kind !== 'invalid') {
@@ -29,6 +36,13 @@ const expectInvalid = (outcome: KeybindingsParseOutcome): readonly configValidat
   return outcome.diagnostics;
 };
 
+/**
+ * Asserts that each diagnostic names a path, explains the fault, and offers a
+ * fix.
+ *
+ * A rejection without those fields tells the user nothing about how to repair
+ * the file.
+ */
 const expectActionable = (diagnostics: readonly configValidationDiagnostic[]): void => {
   expect(diagnostics.length).toBeGreaterThan(0);
   for (const diagnostic of diagnostics) {

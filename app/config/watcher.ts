@@ -127,6 +127,7 @@ export const createConfigWatcher = <TimerHandle>(options: ConfigWatcherOptions<T
   });
 
   return {
+    /** Cancels a pending reload and releases the handle; repeat calls are harmless. */
     close: async () => {
       if (isClosed) {
         return;

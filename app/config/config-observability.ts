@@ -108,6 +108,7 @@ export const createImportRecorder = (dependencies: {
       sink.info(`[config] import attempt phase=${phase}`);
     },
     counters: () => metrics.snapshot(),
+    /** Counts the outcome and logs one decision line, including the reason when known. */
     recordImport: ({phase, report, configSource, fallbackBasis, outcome, announced}) => {
       if (report.config === 'fallback') {
         metrics.increment('fallbacks');

@@ -267,6 +267,7 @@ describe('a reload sequence', () => {
     const {recorder, sink} = harness();
     try {
       writeSources(importer);
+      /** Drives one import of the given phase and records its decision, keeping the cases alike. */
       const run = (phase: 'reload' | 'startup') => {
         recorder.beginImport({phase});
         const result = importer._import(phase);

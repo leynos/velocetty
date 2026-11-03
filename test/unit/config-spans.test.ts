@@ -8,6 +8,7 @@ const createHarness = (times: readonly number[]) => {
   const lines: string[] = [];
   let clockIndex = 0;
   const recorder = createConfigSpanRecorder({
+    /** Reads the next scripted time, then holds the last value once the list runs out. */
     now: () => {
       // `at` rather than indexing: it keeps the out-of-range case explicitly
       // `undefined` for the type checker and for the lint rule alike.

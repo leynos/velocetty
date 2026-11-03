@@ -19,6 +19,12 @@ const validTextArb = fc.oneof(
   keymapsArb.map((keymaps) => JSON.stringify(keymaps))
 );
 
+/**
+ * Parses text that the property's generator promised is valid.
+ *
+ * A failure here means the generator or codec contract broke rather than a
+ * user-facing rejection, so the failing text is included in the error.
+ */
 const parseOrThrow = (text: string) => {
   const parsed = parseKeybindingsText(text, SOURCE);
   if (parsed.kind !== 'ok') {

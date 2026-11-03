@@ -37,6 +37,7 @@ const createFakeClock = () => {
   let nextId = 1;
   const timers = new Map<number, ScheduledTimer>();
 
+  /** Schedules a timer on the fake clock, rejecting delays the real timer would refuse. */
   const schedule = (callback: () => void, delayMs: number) => {
     if (!Number.isFinite(delayMs) || delayMs < 0) {
       throw new RangeError(`Delay must be finite and non-negative, received ${delayMs}`);
@@ -51,6 +52,7 @@ const createFakeClock = () => {
     timers.delete(id);
   };
 
+  /** Finds the earliest timer due at or before the limit, breaking ties by insertion id. */
   const earliestDueTimer = (limit: number): ScheduledTimer | undefined => {
     let earliest: ScheduledTimer | undefined;
     for (const timer of timers.values()) {
@@ -97,6 +99,7 @@ const createFakeHandle = (): FakeHandle => {
   let isClosed = false;
 
   return {
+    /** Delivers the event to every listener registered for that event. */
     emit: (event, eventPath) => {
       for (const listener of listeners[event]) {
         listener(eventPath);
@@ -281,6 +284,7 @@ test('close cancels a pending reload', async () => {
 test('events raised during onReload start a new burst', async () => {
   let hasRaisedEvent = false;
   const harness = createHarness({
+    /** Re-emits one keybindings event on the first reload to reopen the burst. */
     onReload: () => {
       if (hasRaisedEvent) {
         return;
@@ -301,6 +305,7 @@ test('events raised during onReload start a new burst', async () => {
 test('a throwing onReload is logged and does not disable the watcher', async () => {
   let shouldThrow = true;
   const harness = createHarness({
+    /** Throws on the first reload only, so later reloads prove the watcher recovered. */
     onReload: () => {
       if (shouldThrow) {
         shouldThrow = false;
@@ -433,6 +438,7 @@ describe('KB-WATCH-1 event schedule coverage', () => {
   const shareOf = (predicate: (events: readonly TimedEvent[]) => boolean): number =>
     samples.filter((events) => predicate(events)).length / samples.length;
 
+  /** True when two consecutive events are exactly one debounce interval apart. */
   const hasExactGap = (events: readonly TimedEvent[]): boolean => {
     let previousAt: number | undefined;
     for (const event of events) {

@@ -48,6 +48,13 @@ const legacyArb: fc.Arbitrary<LegacyKeymapsSource> = fc.oneof(
   fc.constant<LegacyKeymapsSource>({kind: 'fell-back'})
 );
 
+/**
+ * Maps the modelled file state to the observation the verified policy would
+ * derive from it.
+ *
+ * Modelling parse failures here keeps the model independent of the service
+ * under test, so agreement between them means something.
+ */
 const observationFromFile = (file: FileModel): KeybindingsObservation => {
   switch (file.kind) {
     case 'missing': {
@@ -63,8 +70,10 @@ const observationFromFile = (file: FileModel): KeybindingsObservation => {
   }
 };
 
+/** Derives the active keymaps the verified specification predicts for the model. */
 const expectedActive = (history: readonly KeybindingsObservation[]) => specLatestAccepted([...history]) ?? {};
 
+/** Checks the real service and store against the model after one command. */
 const observe = (
   model: Model,
   real: Real,

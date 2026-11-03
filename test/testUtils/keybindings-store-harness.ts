@@ -107,6 +107,7 @@ const transientRenameFileSystem = (failures: number, code: string) => {
   let attempts = 0;
   const fileSystem: KeybindingsFileSystem = {
     ...realFileSystem(),
+    /** Fails the first `failures` renames so the adapter's retry path is exercised. */
     renameSync: (from, to) => {
       attempts += 1;
       if (attempts <= failures) {

@@ -39,6 +39,12 @@ const FIXTURES = {
   'valid-map.json5': {outcome: 'accepted', class: 'valid map'}
 } satisfies Record<string, FixtureExpectation>;
 
+/**
+ * Reads the committed schema from disk, rejecting a payload that is not JSON.
+ *
+ * Narrowing to `JsonValue` keeps the structural comparison with the generated
+ * schema honest, rather than falling back to `any`.
+ */
 const readSchema = (): JsonValue => {
   const parsed: unknown = JSON.parse(fs.readFileSync(SCHEMA_PATH, 'utf8'));
   if (!isJsonValue(parsed)) {
@@ -53,6 +59,12 @@ const fixtureNames = (): readonly string[] =>
     .filter((name) => name.endsWith('.json5'))
     .toSorted();
 
+/**
+ * Parses a JSON5 fixture, turning a syntax error into a result value.
+ *
+ * Fixtures that are meant to exercise syntax errors must stay part of the
+ * corpus, so a parse failure is data here rather than a thrown exception.
+ */
 const parseFixture = (text: string): {readonly ok: true; readonly value: unknown} | {readonly ok: false} => {
   try {
     return {ok: true, value: JSON5.parse(text)};

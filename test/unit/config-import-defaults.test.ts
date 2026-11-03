@@ -131,6 +131,7 @@ test('start-up copies schemas through the injected filesystem and reports a refu
     const copies: string[] = [];
     const recordingFileSystem: ConfigImportFileSystem = {
       ...fsExtra,
+      /** Records each copy target and can refuse the copy to exercise the failure path. */
       copySync: (source, destination, options) => {
         copies.push(destination);
         if (shouldFail) {
@@ -189,6 +190,7 @@ const runHyperSchemaScenario = async ({
   const copies: string[] = [];
   const recordingFileSystem: ConfigImportFileSystem = {
     ...fsExtra,
+    /** Records each copy target and can refuse the copy so the Hyper-tree failure is observable. */
     copySync: (source, destination, options) => {
       copies.push(destination);
       if (shouldFail) {

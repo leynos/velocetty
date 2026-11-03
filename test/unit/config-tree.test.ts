@@ -106,6 +106,10 @@ const expectedShadowed = (testCase: ConfigTreeCase, active: ExpectedConfig): str
   );
 };
 
+/**
+ * Reports whether `candidate` lies strictly beneath `directory`, so a path equal
+ * to the directory is not counted as inside it.
+ */
 const isInside = (platform: NodeJS.Platform, candidate: string, directory: string): boolean => {
   const paths = platformPath(platform);
   const relative = paths.relative(directory, candidate);
@@ -164,22 +168,26 @@ const evaluateCase = (testCase: ConfigTreeCase): CaseEvaluation => {
   };
 };
 
+/** Returns a labelled description of the Velocetty-directory mismatch, or nothing when it matches. */
 const directoryViolation = ({result, testCase}: CaseEvaluation): string | undefined =>
   result.velocettyDirectory === testCase.velocettyDirectory
     ? undefined
     : `${testCase.label}: velocettyDirectory ${result.velocettyDirectory}`;
 
+/** Returns a labelled description of the active-config mismatch, or nothing when it matches. */
 const activeViolation = ({active, result, testCase}: CaseEvaluation): string | undefined =>
   activeSignature(result.config) === activeSignature(active)
     ? undefined
     : `${testCase.label}: active ${result.config.path} (${result.config.tree}, exists=${result.config.exists}); ` +
       `expected ${active.path} (${active.tree}, exists=${active.exists})`;
 
+/** Returns a labelled description of the keybindings-path mismatch, or nothing when it matches. */
 const keybindingsViolation = ({keybindingsPath, result, testCase}: CaseEvaluation): string | undefined =>
   result.keybindingsPath === keybindingsPath
     ? undefined
     : `${testCase.label}: keybindings ${result.keybindingsPath}; expected ${keybindingsPath}`;
 
+/** Returns a labelled description of the shadowed-file-set mismatch, or nothing when it matches. */
 const shadowedViolation = ({result, shadowed, testCase}: CaseEvaluation): string | undefined =>
   JSON.stringify(result.shadowed) === JSON.stringify(shadowed)
     ? undefined
@@ -205,6 +213,7 @@ const legacySafetyViolation = ({result, testCase}: CaseEvaluation): string | und
     ? `${testCase.label}: keybindings path ${result.keybindingsPath} lies in the Hyper tree`
     : undefined;
 
+/** True when the resolved config disagrees with the independent oracle for the case. */
 const oracleMismatch = ({result, testCase}: CaseEvaluation): boolean => {
   if (result.config.path !== testCase.oraclePath) {
     return true;
@@ -372,6 +381,7 @@ describe('KB-PATH-1 configuration tree resolution', () => {
 
     const result = resolveConfigLocations({
       ...testCase.input,
+      /** Reports a broken symlink for the fixture path and absence for everything else. */
       probe: (candidate) => (candidate === brokenLink ? 'broken-link' : 'absent')
     });
 

@@ -87,6 +87,7 @@ export const launchApp = async (
     child.once('exit', () => resolve());
   });
 
+  /** Polls captured output for a marker, failing fast if Electron exits first. */
   const waitFor = async ({description, matcher}: MarkerWait): Promise<string> => {
     const deadline = Date.now() + markerTimeoutMs;
     while (Date.now() < deadline) {
@@ -104,6 +105,7 @@ export const launchApp = async (
 
   return {
     output: () => output,
+    /** Terminates the app, escalating to SIGKILL if it ignores SIGTERM. */
     stop: async () => {
       child.kill('SIGTERM');
       try {
@@ -130,6 +132,7 @@ export const configFilesIn = async ({directory}: Readonly<{directory: string}>):
 export const probeMarker = ({shortcut, status}: ProbeMarkerRequest) =>
   new RegExp(`\\[e2e\\] keymaps-active status=${status} window:new=${shortcut.replaceAll('+', String.raw`\+`)}`);
 
+/** The bundled keymap whose defaults the suite compares against on this platform. */
 const platformKeymapFile = (): string => {
   switch (process.platform) {
     case 'darwin': {

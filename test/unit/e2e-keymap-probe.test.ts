@@ -9,6 +9,7 @@ import {isJsonObject, isString} from '../../app/utils/runtime-guards';
 
 const keymapDirectory = path.resolve(import.meta.dir, '../../app/keymaps');
 
+/** Collects the command bindings from one keymap file, accepting single and array values. */
 const readBindings = (filePath: string): string[] => {
   const parsed: unknown = JSON.parse(readFileSync(filePath, 'utf8'));
   if (!isJsonObject(parsed)) {

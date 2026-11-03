@@ -11,6 +11,7 @@ export type LegacyHyperPathInput = {
   readonly exists: (candidate: string) => boolean;
 };
 
+/** Picks the path flavour matching the platform's separators, as the old resolver did. */
 const platformPath = (platform: NodeJS.Platform) => (platform === 'win32' ? path.win32 : path.posix);
 
 /**

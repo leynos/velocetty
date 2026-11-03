@@ -29,6 +29,7 @@ export const createMemoryKeybindingsStore = (label = 'memory-keybindings.json5')
   let pendingFailure: KeybindingsStorageFailure | undefined;
   const written: string[] = [];
 
+  /** Applies a pending one-shot failure, otherwise records the text as the file state. */
   const write = (text: string): KeybindingsWriteOutcome => {
     attempts += 1;
     if (pendingFailure !== undefined) {
