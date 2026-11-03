@@ -1307,6 +1307,25 @@ design and the notification the user sees.
     `docs/configuration-architecture.md` now list `peek()` alongside `read()`
     and `write()`, and state that `peek()` emits no span or warning while
     `read()` is instrumented.
+- [x] (2026-11-03 13:20Z) Disposed of the three open non-protected review
+  findings on `9bca05a5`.
+  - `shared/src/types/json.ts`: the example claimed
+    `isJsonValue(new Date())` is `false`; it is `true`, because
+    `isJsonObject` accepts any non-array object with JSON-valued members and
+    does not inspect the prototype. The example and both docstrings now say
+    so; runtime validation is unchanged.
+  - `app/utils/clipboard-paths.ts`: `readPayloadText`'s docstring claimed a
+    missing payload is treated as empty; it returns `null`. Corrected.
+  - `app/config.ts`: chokidar's `ignoreInitial` scan suppresses the event for a
+    file that changes after the start-up import and before readiness, so that
+    save waited for the next edit. `createConfigWatcher` now accepts a
+    `reconcileOnReady` predicate; `_watch` compares each watched file's
+    `mtimeMs` and `size` against the values read after the import and runs one
+    reload through the existing guarded path only when a file moved. An
+    unchanged start-up therefore adds no reload, span, import record, or
+    notification. KB-WATCH-1 records the opt-in, and two new unit tests cover
+    the predicate's false and true verdicts, including the queued-burst
+    discard.
 
 ## Surprises & discoveries
 
@@ -2638,7 +2657,10 @@ exactly `d` starts a new burst. Also:
 - `close()` cancels a pending timer;
 - events during `onReload` start a new burst;
 - a throwing `onReload` is logged and does not disable the watcher;
-- no reload happens before the first real event (`ignoreInitial`).
+- no reload happens before the first real event (`ignoreInitial`) unless the
+  caller supplies a `reconcileOnReady` predicate and it reports a change; a
+  true verdict runs one reload at readiness and discards any burst the initial
+  scan queued.
 
 A continuous stream of events closer together than `d` postpones reload
 indefinitely, by design, and this is documented.

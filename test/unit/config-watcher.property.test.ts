@@ -363,6 +363,68 @@ test('the ready callback is forwarded once', () => {
   expect(readyCalls).toBe(1);
 });
 
+test('readiness does not reload unless reconciliation is requested', () => {
+  const clock = createFakeClock();
+  const fake = createFakeHandle();
+  const reloadTimes: number[] = [];
+  createConfigWatcher<number>({
+    cancel: clock.cancel,
+    debounceMs: DEBOUNCE_MS,
+    fileNames: WATCHED_PATHS,
+    handle: fake.handle,
+    onReload: () => reloadTimes.push(clock.now()),
+    schedule: clock.schedule
+  });
+
+  fake.signalReady();
+
+  expect(reloadTimes).toEqual([]);
+});
+
+test('readiness does not reload when the predicate reports no change', () => {
+  const clock = createFakeClock();
+  const fake = createFakeHandle();
+  const reloadTimes: number[] = [];
+  createConfigWatcher<number>({
+    cancel: clock.cancel,
+    debounceMs: DEBOUNCE_MS,
+    fileNames: WATCHED_PATHS,
+    handle: fake.handle,
+    onReload: () => reloadTimes.push(clock.now()),
+    reconcileOnReady: () => false,
+    schedule: clock.schedule
+  });
+
+  fake.signalReady();
+
+  expect(reloadTimes).toEqual([]);
+});
+
+test('reconciliation reloads once at readiness and drops the queued burst', () => {
+  const clock = createFakeClock();
+  const fake = createFakeHandle();
+  const reloadTimes: number[] = [];
+  createConfigWatcher<number>({
+    cancel: clock.cancel,
+    debounceMs: DEBOUNCE_MS,
+    fileNames: WATCHED_PATHS,
+    handle: fake.handle,
+    onReload: () => reloadTimes.push(clock.now()),
+    reconcileOnReady: () => true,
+    schedule: clock.schedule
+  });
+
+  // A change seen during the initial scan is queued but not yet applied.
+  fake.emit('change', CONFIG_PATH);
+  fake.signalReady();
+
+  expect(reloadTimes).toEqual([0]);
+
+  // The queued burst predates the reconciliation read, so it must not fire.
+  clock.advanceTo(DEBOUNCE_MS);
+  expect(reloadTimes).toEqual([0]);
+});
+
 describe('KB-WATCH-1 event schedule coverage', () => {
   const SAMPLE_COUNT = 2000;
   const REQUIRED_SHARE = 0.05;

@@ -12,6 +12,7 @@ import {app} from 'electron';
 
 import chokidar from 'chokidar';
 import {mkdirpSync} from 'fs-extra';
+import {statSync} from 'node:fs';
 import path from 'node:path';
 
 import type {parsedConfig, configOptions} from '@shared/types/config';
@@ -261,22 +262,49 @@ const reloadConfiguration = () => {
   emitKeymapsMarker(report);
 };
 
+/** A watched file's identity at one instant; `null` means the file was absent. */
+type WatchedFileStamp = {readonly mtimeMs: number; readonly size: number} | null;
+
+/** Reads one watched file's identity, treating an unreadable file as absent. */
+const readStamp = (filePath: string): WatchedFileStamp => {
+  try {
+    const {mtimeMs, size} = statSync(filePath);
+    return {mtimeMs, size};
+  } catch {
+    return null;
+  }
+};
+
+/** Compares two identities, including the case where either or both are absent. */
+const stampsMatch = (before: WatchedFileStamp, after: WatchedFileStamp): boolean => {
+  if (before === null || after === null) {
+    return before === after;
+  }
+  return before.mtimeMs === after.mtimeMs && before.size === after.size;
+};
+
 /** Starts the configuration watcher once; later calls are no-ops. */
 const _watch = () => {
   if (configWatcher !== undefined) {
     return;
   }
 
-  const watchedDirectories = [
-    ...new Set([path.dirname(cfgPath), path.dirname(keybindingsPath)].map((directory) => path.resolve(directory)))
-  ];
+  const watchedFiles = [path.resolve(cfgPath), path.resolve(keybindingsPath)];
+  const watchedDirectories = [...new Set(watchedFiles.map((fileName) => path.dirname(fileName)))];
+  // Chokidar's initial scan suppresses events for the files it finds, so a
+  // save that lands mid-scan would otherwise wait for the next edit. Remember
+  // what the start-up import saw, and reconcile only when a file has moved.
+  const stampsAfterImport = new Map(watchedFiles.map((fileName) => [fileName, readStamp(fileName)]));
 
   configWatcher = createConfigWatcher<ReturnType<typeof setTimeout>>({
     cancel: (timer) => clearTimeout(timer),
     debounceMs: CONFIG_DEBOUNCE_MS,
-    fileNames: [path.resolve(cfgPath), path.resolve(keybindingsPath)],
+    fileNames: watchedFiles,
     handle: createChokidarHandle(watchedDirectories),
     onReady: () => emitE2EMarker('[e2e] config-watcher-ready'),
+    /** Re-reads only when a file changed while the initial scan was running. */
+    reconcileOnReady: () =>
+      watchedFiles.some((fileName) => !stampsMatch(stampsAfterImport.get(fileName) ?? null, readStamp(fileName))),
     /** Re-imports on a debounced change; the watcher catches whatever it throws. */
     onReload: reloadConfiguration,
     schedule: (callback, delayMs) => setTimeout(callback, delayMs),

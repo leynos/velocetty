@@ -29,6 +29,15 @@ export type ConfigWatcherOptions<TimerHandle> = {
   readonly cancel: (handle: TimerHandle) => void;
   readonly onReload: () => void;
   readonly onReady?: () => void;
+  /**
+   * Decides whether readiness needs one catch-up reload.
+   *
+   * A handle that scans the directory before watching it can drop the event
+   * for a file that changed after the caller's first read but before the scan
+   * finished. The predicate lets the caller compare the files against what
+   * that read saw, so an ordinary start-up reconciles nothing.
+   */
+  readonly reconcileOnReady?: () => boolean;
   /** Records one span per dispatched reload, including a reload that throws. */
   readonly spans?: ConfigSpanRecorder;
   readonly warn?: (message: string, error: unknown) => void;
@@ -99,8 +108,16 @@ export const createConfigWatcher = <TimerHandle>(options: ConfigWatcherOptions<T
     options.handle.on(event, onFileEvent);
   }
   options.handle.onReady(() => {
-    if (!isClosed) {
-      options.onReady?.();
+    if (isClosed) {
+      return;
+    }
+    options.onReady?.();
+    if (options.reconcileOnReady?.() === true) {
+      // The scan may have swallowed the event for a file that changed after
+      // the caller's first read, so read once now that it is complete. Any
+      // burst the scan already queued predates that read and is now stale.
+      cancelPending();
+      reload();
     }
   });
   options.handle.onError((error) => {
