@@ -149,6 +149,28 @@ jobs:
         run: |
           make lint
           make test
+      - name: Install fpm for rpm package builds
+        if: runner.os == 'Linux'
+        run: |
+          # Ubuntu 26.04, the current ubuntu-latest image, ships RPM 6. RPM 6
+          # ignores the legacy `BuildRoot:` spec tag that fpm < 1.16.0 relies
+          # on, so electron-builder's bundled fpm 1.9.3 stages the payload in
+          # one directory while rpmbuild looks in another and fails to find
+          # any files. Build with the system fpm pinned in Gemfile instead.
+          # Bundler is taken from Gemfile.lock so resolution matches the
+          # committed lock.
+          bundler_version=$(awk '/^BUNDLED WITH/{getline; print; exit}' Gemfile.lock 2>/dev/null | tr -d ' ' || true)
+          if [ -z "$bundler_version" ]; then
+            bundler_version="2.4.0"
+          fi
+          echo "Installing Bundler version: $bundler_version"
+          sudo gem install bundler -v "$bundler_version" --no-document
+          sudo bundle _"${bundler_version}"_ install --jobs 4 --retry 3 --frozen
+          # Generate binstub so fpm is available in PATH for electron-builder.
+          sudo bundle _"${bundler_version}"_ binstubs fpm --path /usr/local/bin
+          # app-builder otherwise downloads its own fpm build. `$GITHUB_ENV`
+          # only affects later steps, which is why the Build step follows.
+          echo "USE_SYSTEM_FPM=1" >> "$GITHUB_ENV"
       - name: Getting Build Icon
         if: github.ref == 'refs/heads/canary' || github.base_ref == 'canary'
         run: |

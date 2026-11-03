@@ -1248,6 +1248,65 @@ design and the notification the user sees.
     `ubuntu-24.04`, and the aarch64 job on `ubuntu-22.04-arm` still builds its
     RPM successfully. The failure is an image-roll regression, not a change in
     this branch.
+- [x] (2026-11-02 20:45Z) Investigated the RPM failure. The payload-compression
+  diagnosis recorded here was wrong; it is superseded by the 2026-11-03 entry
+  below, and the `rpm.compression: "bzip2"` change it produced in `238be638` is
+  reverted there.
+  - Hypothesis: `ubuntu-latest` now resolves to `ubuntu-26.04`, which ships
+    RPM 6.0.1, and that release removed the `xzmt` payload compression.
+  - Evidence: a container probe on `ubuntu:26.04` ran `rpmbuild` against
+    hand-built archives. `w9.xzmt` exited 1 with
+    `error: Unknown payload compression: w9.xzmt`, while `w9.bzdio`,
+    `w9.xzdio`, and `w9.gzdio` all exited 0.
+  - Why it was wrong: the probe exercised `rpmbuild` directly rather than the
+    command fpm issues. electron-builder 24.13.3 passes `rpm.compression`
+    verbatim to `--rpm-compression` and sets no default, so the pre-existing
+    configuration produced no compression flag at all and fpm's own default
+    (`gzip`) applied. The `xzmt` error never occurred in CI.
+  - Pinning `ubuntu-latest` to a dated image was considered and rejected: it
+    would rename the required check from `build (ubuntu-latest)` to
+    `build (ubuntu-24.04)`, which can never satisfy the required context.
+- [x] (2026-11-03 12:55Z) Established the real RPM failure and fixed it
+  systemically.
+  - Root cause: RPM 6.0.1 ignores the legacy `BuildRoot:` spec tag. fpm
+    < 1.16.0 stages the payload under `<topdir>/BUILD` and relies on
+    `--define buildroot <path>` plus `BuildRoot: %buildroot` to make rpmbuild
+    package from there. RPM 6 uses its own default buildroot instead, finds no
+    files, and exits 1 in under a second. electron-builder 24.13.3 bundles fpm
+    1.9.3, so the failure is independent of payload compression.
+  - Evidence: on `ubuntu:26.04`, `rpmbuild --define buildroot <path>` against
+    an fpm-style spec fails with
+    `File not found: .../BUILDROOT/opt/Hyper/hyper`, while
+    `rpmbuild --buildroot <path>` exits 0 and produces the RPM. fpm `v1.15.1`
+    emits only the `--define`; `v1.16.0` adds `--buildroot`.
+  - Fix: `Gemfile` pins fpm `1.16.0`, the first release that passes
+    `--buildroot`; `Gemfile.lock` is regenerated with bundler 2.4.0; and the
+    `build` job installs that fpm as a system binstub and exports
+    `USE_SYSTEM_FPM=1` for Linux, mirroring the aarch64 lane.
+    `electron-builder.json`'s `rpm.compression` is reverted to the default.
+  - Verification: on `ubuntu:26.04` with the committed lockfile,
+    `bundle _2.4.0_ install --frozen` and `bundle _2.4.0_ binstubs fpm` install
+    fpm 1.16.0, which builds both `hyper-4.0.0-1.x86_64.rpm`
+    (`PAYLOADCOMPRESSOR` `gzip`) and `hyper_4.0.0_amd64.deb`.
+- [x] (2026-11-02 21:00Z) Disposed of the three docstyle follow-ups in
+  CodeRabbit's review `5742103525` on `d7fc6d9b`.
+  - [x] Docstring Coverage: the checklist item now stays open. Listing the six
+    added docstrings does not establish compliance, and this Entry stays
+    unresolved until a hosted analysis reports a fresh percentage, population,
+    and denominator against the 80% threshold. A local TypeScript-AST model
+    measured 27.67% over 889 changed functions with cyclomatic complexity of at
+    least 2, which does not reconcile with the hosted 70%, so a local number
+    cannot substitute for the hosted measurement.
+  - [x] `peek()` in the `KeybindingsStore` example: already satisfied by
+    `a58ab0cf`, which added `peek()` with a note that it is silent while
+    `read()` stays instrumented.
+  - [x] Timeout attribution: the isolated-rerun sentence now claims only that
+    the file passes alone, and the full-suite timeout stays recorded as a
+    failure rather than being reclassified as a pre-existing flake.
+  - [x] Developer Documentation: `docs/developers-guide.md` and
+    `docs/configuration-architecture.md` now list `peek()` alongside `read()`
+    and `write()`, and state that `peek()` emits no span or warning while
+    `read()` is instrumented.
 
 ## Surprises & discoveries
 
