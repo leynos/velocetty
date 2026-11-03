@@ -1344,6 +1344,19 @@ design and the notification the user sees.
     `that reports a change`, and the `isJsonValue` note drops the comma before
     `because`.
 
+- [x] (2026-11-03 15:55Z) Converted the CLI's `probe` comment to JSDoc and
+  widened the coverage scan.
+  - CodeRabbit observed that `probe` carried an ordinary `//` comment rather
+    than a JSDoc block, which contradicted the claim that all three named
+    production functions were documented. It now carries a JSDoc block.
+  - The scan measures eligibility from a function's leading trivia through its
+    body, matching the hosted rule that counts documentation-only edits and
+    deletions within surviving functions. Against base `40949b2f` it reports
+    213 eligible functions, 213 documented, and none undocumented.
+  - Hosted coverage is still unresolved. The exact-head CodeRabbit check read
+    `Review paused`, so no fresh figure exists; the 70.00% measurement from the
+    `d7fc6d9b..3971f380` comparison is stale and must not be carried forward.
+
 ## Surprises & discoveries
 
 - Observation: `typos.toml` is generated from a shared dictionary fetched from

@@ -264,7 +264,7 @@ const resolveConfigPath = ({
       enabled: env.NODE_ENV !== 'production',
       directory: platformPath.join(moduleDirectory, '..')
     },
-    // The CLI only needs presence, so it never resolves a link target.
+    /** The CLI only needs presence, so it never resolves a link target. */
     probe: (candidate) => (fsModule.existsSync(candidate) ? 'present' : 'absent'),
     // The CLI's narrow filesystem slice cannot call `realpath`, so identical
     // joined paths are the strongest equality it can establish.
