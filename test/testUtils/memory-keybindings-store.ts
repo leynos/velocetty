@@ -23,6 +23,20 @@ export type MemoryKeybindingsStore = KeybindingsStore & {
   readonly failNextWrite: (failure?: KeybindingsStorageFailure) => void;
 };
 
+/**
+ * Builds an in-memory store whose file state, faults, and writes a test drives.
+ *
+ * The label only appears in diagnostics, so a test can tell two doubles apart
+ * without touching a real file.
+ *
+ * @example
+ * ```ts
+ * const store = createMemoryKeybindingsStore();
+ * store.setMissing();
+ * store.failNextWrite('permission');
+ * store.write('{}'); // {failure: 'permission', kind: 'failed'}
+ * ```
+ */
 export const createMemoryKeybindingsStore = (label = 'memory-keybindings.json5'): MemoryKeybindingsStore => {
   let file: KeybindingsReadOutcome = {kind: 'missing'};
   let attempts = 0;

@@ -1377,6 +1377,33 @@ design and the notification the user sees.
     obtain. The row is therefore recorded as unresolved with local evidence
     only, and must not be treated as a fresh measurement.
 
+- [x] (2026-11-03 18:20Z) Published the reliability counters and re-measured
+  docstring coverage with an anonymous-inclusive scan.
+  - `9af48094` carries the write-failure and watcher-failure counters, their
+    tests, the developer-guide text, and the regenerated counter strings. All
+    eight gates passed on that exact content before the commit.
+  - The pre-push hook re-runs the unit suite and failed twice on
+    `test/unit/esbuild-migration-contracts.test.ts`, which timed out at the
+    bun default of 5 s while the host load average sat between 55 and 73 on 24
+    cores. The same file passed on the third attempt and in isolation, and the
+    branch does not touch it, so the hook failure was environmental rather than
+    a candidate defect. No timeout override belongs in this branch.
+  - Remote head matches `9af48094`, verified by `ls-remote` after the push, and
+    the tracking ref was refreshed so the branch is neither ahead nor behind.
+  - CodeRabbit auto-paused after reviewing `d73d1e22` and edited its
+    walkthrough to say so. A full review of the new head was queued through
+    `comenq` (request `b432f1e0`), which reported an ETA of roughly three
+    hours. The pre-merge table is therefore still the `d73d1e22` table.
+  - A revised compiler-API scan counts every function the diff touches,
+    including anonymous callbacks, where the earlier scan counted only named
+    declarations. It reports 306 functions with cyclomatic complexity of at
+    least 2, 220 with a JSDoc block, and 71.90% coverage. Of the 86 without
+    documentation, 85 are anonymous callbacks passed as arguments and one is a
+    named test factory, `createMemoryKeybindingsStore`, which now documents
+    itself. The remaining gap is a counting difference, not missing
+    documentation on a named declaration: no production function in the diff
+    lacks a docstring.
+
 ## Surprises & discoveries
 
 - Observation: `typos.toml` is generated from a shared dictionary fetched from
