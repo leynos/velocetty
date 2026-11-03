@@ -23,8 +23,13 @@ const isJsonPrimitive = (value: unknown): value is JsonPrimitive =>
  * @example
  * ```ts
  * isJsonValue({a: [1, null]}); // true
- * isJsonValue(new Date()); // false
+ * isJsonValue(new Date()); // true
  * ```
+ *
+ * A `Date` passes because it is a non-array object with no own enumerable
+ * members, so it satisfies the structural contract even though it would not
+ * survive a JSON round trip. Callers that need to reject such values must
+ * validate the shape they actually require.
  */
 export const isJsonValue = (value: unknown): value is JsonValue => {
   if (isJsonPrimitive(value)) {
@@ -37,10 +42,12 @@ export const isJsonValue = (value: unknown): value is JsonValue => {
 };
 
 /**
- * Narrows a value to a plain `JsonObject` whose members are all JSON values.
+ * Narrows a value to a `JsonObject` whose members are all JSON values.
  *
  * Arrays are rejected even though `typeof [] === 'object'`, because a JSON
- * object is a map rather than a list.
+ * object is a map rather than a list. The prototype is not inspected, so a
+ * class instance with JSON-valued own enumerable members is accepted; this is
+ * a structural check, not a proof that the value came from JSON.
  *
  * @example
  * ```ts

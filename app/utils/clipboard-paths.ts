@@ -70,7 +70,7 @@ export const parseUriList = (uriList: string): string[] =>
     .filter((path): path is string => path !== null);
 
 /**
- * Reads a clipboard payload as text, treating a missing payload as empty.
+ * Reads a clipboard payload as text, returning `null` for a missing payload.
  *
  * @example
  * ```ts
