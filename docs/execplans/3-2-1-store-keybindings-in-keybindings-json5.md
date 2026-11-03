@@ -1396,13 +1396,15 @@ design and the notification the user sees.
     hours. The pre-merge table is therefore still the `d73d1e22` table.
   - A revised compiler-API scan counts every function the diff touches,
     including anonymous callbacks, where the earlier scan counted only named
-    declarations. It reports 306 functions with cyclomatic complexity of at
-    least 2, 220 with a JSDoc block, and 71.90% coverage. Of the 86 without
-    documentation, 85 are anonymous callbacks passed as arguments and one is a
-    named test factory, `createMemoryKeybindingsStore`, which now documents
-    itself. The remaining gap is a counting difference, not missing
-    documentation on a named declaration: no production function in the diff
-    lacks a docstring.
+    declarations. It finds 306 functions with cyclomatic complexity of at
+    least 2. Before `298e2345` it measured 220 with a JSDoc block, or 71.90%;
+    of the 86 without documentation, 85 were anonymous callbacks passed as
+    arguments and one was the named test factory
+    `createMemoryKeybindingsStore`. That factory now documents itself, and the
+    scan at `298e2345` measures 221 of 306, or 72.22%, with all 85 remaining
+    gaps anonymous callbacks. The shortfall is a counting difference, not
+    missing documentation on a named declaration: no production function in
+    the diff lacks a docstring.
 
 ## Surprises & discoveries
 
