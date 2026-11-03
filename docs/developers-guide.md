@@ -305,12 +305,15 @@ service, an importer, and a watcher; the composition root in `app/config.ts`
 wires them together.
 
 - **`KeybindingsStore`** (`app/config/keybindings-ports.ts`): the driven port
-  for the file, exposing a short `label`, `read()`, and `write(text)`. It
-  carries no filesystem path and no raw error, so a caller cannot persist
-  through anything but the port. `createFileKeybindingsStore` in
-  `app/config/keybindings-store.ts` supplies the filesystem implementation,
-  which replaces the file through a temporary sibling and fails closed on an
-  unresolvable symlink chain.
+  for the file, exposing a short `label`, `read()`, `peek()`, and `write(text)`.
+  `read()` records a `keybindings-read` span and warns on failure, while
+  `peek()` performs the same read with no span and no warning;
+  `exportKeybindings` uses `peek()` because export is a query that must not add
+  noise to the read telemetry. The port carries no filesystem path and no raw
+  error, so a caller cannot persist through anything but the port.
+  `createFileKeybindingsStore` in `app/config/keybindings-store.ts` supplies
+  the filesystem implementation, which replaces the file through a temporary
+  sibling and fails closed on an unresolvable symlink chain.
 - **`createKeybindingsService`** (`app/config/keybindings.ts`): owns the
   last-known-good state and the reload, start, import, and export operations.
   It takes a `codec`, a `KeybindingsReporter`, and a `KeybindingsStore`, so

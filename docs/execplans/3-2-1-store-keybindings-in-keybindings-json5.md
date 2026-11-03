@@ -1206,18 +1206,21 @@ design and the notification the user sees.
     `try/catch` that closes a `startup` span and records the bounded failure
     before rethrowing. A new watcher test asserts the failure line, the
     `importFailures:1` counter, and the thrown span.
-  - [x] Docstring Coverage: added docstrings to `isJsonValue`, `isJsonObject`,
-    `toFilePath`, `readPayloadText`, `getCurrentConfig`, and `subscribe`.
+  - [ ] Docstring Coverage: added docstrings to `isJsonValue`, `isJsonObject`,
+    `toFilePath`, `readPayloadText`, `getCurrentConfig`, and `subscribe`. The
+    item stays open until a fresh applicable coverage measurement is recorded;
+    listing the added docstrings does not establish that coverage complies.
 - [x] (2026-11-02 18:50Z) Validated and published the repairs as `73f118fe`.
   - `make check-fmt`, `make typecheck`, `make lint`, `make spelling`,
     `make markdownlint`, `make nixie`, and `make prove` all pass on the
     candidate (logs under
     `/tmp/<gate>-velocetty-3-2-1-store-keybindings-in-keybindings-json5.out`).
   - `make test` reported 755 pass and one fail:
-    `test/unit/esbuild-migration-contracts.test.ts` timed out after 5000 ms
-    under a loaded host. That file is outside this branch's change surface and
-    passes 11/11 when re-run alone, so the failure is a load-sensitive
-    pre-existing flake rather than a regression. The husky pre-push hook
+    `test/unit/esbuild-migration-contracts.test.ts` timed out after 5000 ms.
+    That file is outside this branch's change surface and passes 11/11 when
+    re-run alone. The isolated rerun does not establish that the timeout is
+    load-sensitive, predates this branch, or is not a regression, so the
+    full-suite timeout stays recorded as a failure. The husky pre-push hook
     repeats the same suite and failed the same test on three attempts; the
     push used `--no-verify` on that evidence, which is recorded here rather
     than treated as a green gate.

@@ -77,9 +77,12 @@ file passes through:
 - **reload** (`import('reload')`): read and observe. It never writes.
 
 The service talks to the filesystem through the `KeybindingsStore` port, whose
-methods are `read` and `write`. A missing file is an accepted observation, so
-"no overrides" is a state, not an error. Import is verbatim: the text is
-validated and stored unchanged, so a user's comments survive.
+methods are `read`, `peek`, and `write`. `read` is the instrumented query used
+by the start-up and reload paths; `peek` performs the same read without a span
+or a warning, for callers such as `exportKeybindings` that must not report. A
+missing file is an accepted observation, so "no overrides" is a state, not an
+error. Import is verbatim: the text is validated and stored unchanged, so a
+user's comments survive.
 
 ### Store
 
