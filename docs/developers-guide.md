@@ -357,19 +357,19 @@ in `bun test` without Electron, a real clock, or a real filesystem. See
 
 Each import attempt emits one attempt line and exactly one bounded record on
 `console.info`, each completed operation emits one span line, and each refused
-atomic-write rename emits one record on `console.warn`. All of them carry only
-values from a closed vocabulary, so neither a path, a command identifier, nor a
-shortcut can leak into a log.
+atomic-write rename or watcher failure emits one record on `console.warn`. All
+of them carry only values from a closed vocabulary, so neither a path, a
+command identifier, nor a shortcut can leak into a log.
 
 ```text
 [config] import attempt phase=reload
 [config] import decision phase=reload config=applied configSource=velocetty
   keybindings=applied origin=file announced=true
-  attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0
+  attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0,writeFailures:0,watcherFailures:0
 [config] span operation=reload outcome=applied ms=2
 [config] span operation=watcher-dispatch outcome=applied ms=2
 [config] import failure phase=reload cause=thrown
-  attempts:2,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0
+  attempts:2,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0,writeFailures:0,watcherFailures:0
 [config] keybindings rename attempt=1 category=busy exhausted=false
 ```
 
@@ -401,8 +401,11 @@ records are shown wrapped here. Its fields mean:
 - `attempts` counts imports, `applies` counts keybindings files put into
   effect, `parseFailures` and `readFailures` separate invalid content from an
   unreadable file, `fallbacks` counts imports that used the bundled defaults,
-  `importFailures` counts imports that threw, and `retries` counts refused
-  rename attempts. All counters are cumulative for the process lifetime.
+  `importFailures` counts imports that threw, `retries` counts refused rename
+  attempts, `writeFailures` counts every failed `keybindings.json5` write
+  including a bootstrap seed and a refused replacement target, and
+  `watcherFailures` counts a watcher handle error and a failing watcher close.
+  All counters are cumulative for the process lifetime.
 - `category` is `permission` for `EPERM` and `EACCES`, `busy` for `EBUSY`, and
   `other` for anything else. `exhausted` marks the attempt that ended the
   write, so a retry that later succeeds emits only `exhausted=false` events.

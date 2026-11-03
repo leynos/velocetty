@@ -5,6 +5,7 @@
  * module name a retry event without importing the filesystem adapter, and it
  * keeps the adapter itself within the repository's file-size limit.
  */
+import type {ConfigMetrics} from './config-metrics';
 import type {ConfigSpanRecorder} from './config-spans';
 import type {KeybindingsReadOutcome} from './keybindings-ports';
 
@@ -60,6 +61,14 @@ export type RenameRetryEvent = {
 export type FileKeybindingsStoreOptions = {
   readonly filePath: string;
   readonly fs?: KeybindingsFileSystem;
+  /**
+   * Counts every failed write in the shared bounded vocabulary.
+   *
+   * Counting in the adapter rather than at a caller means a bootstrap write and
+   * a public import are both measured, including the bootstrap case that the
+   * service reports as `applied` with an unsaved origin.
+   */
+  readonly metrics?: ConfigMetrics;
   /** Called once per refused rename attempt, so a caller can count and log it. */
   readonly onRetry?: (event: RenameRetryEvent) => void;
   readonly sleep?: (milliseconds: number) => void;

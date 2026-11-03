@@ -7,6 +7,7 @@
  */
 import path from 'node:path';
 
+import {describeConfigCounters, type ConfigMetrics} from './config-metrics';
 import type {ConfigSpanRecorder} from './config-spans';
 
 /** The filesystem events the watcher treats as a configuration change. */
@@ -24,6 +25,14 @@ export type ConfigWatcherOptions<TimerHandle> = {
   readonly handle: WatcherHandle;
   /** Absolute paths of the files a reload must react to. */
   readonly fileNames: readonly string[];
+  /**
+   * Counts watch failures in the shared bounded vocabulary.
+   *
+   * A lost directory or a failing close is a reliability signal the session
+   * should be able to report without parsing log prose, so both are counted
+   * here rather than left to the caller's own logging.
+   */
+  readonly metrics?: ConfigMetrics;
   readonly debounceMs: number;
   readonly schedule: (callback: () => void, delayMs: number) => TimerHandle;
   readonly cancel: (handle: TimerHandle) => void;
@@ -67,6 +76,18 @@ export const createConfigWatcher = <TimerHandle>(options: ConfigWatcherOptions<T
   const watchedPaths = new Set(options.fileNames.map((fileName) => path.resolve(fileName)));
   let pendingTimer: TimerHandle | undefined;
   let isClosed = false;
+
+  /**
+   * Counts one watch failure and reports it with the current tally.
+   *
+   * The counters are rendered through the shared fixed-shape describer, so the
+   * failure record carries only the closed vocabulary and no path or errno.
+   */
+  const recordWatchFailure = (message: string, error: unknown): void => {
+    options.metrics?.increment('watcherFailures');
+    const counters = options.metrics === undefined ? '' : ` ${describeConfigCounters(options.metrics.snapshot())}`;
+    warnFn(`${message}${counters}`, error);
+  };
 
   /** Cancels the queued reload, if one is waiting for the debounce to elapse. */
   const cancelPending = () => {
@@ -123,7 +144,7 @@ export const createConfigWatcher = <TimerHandle>(options: ConfigWatcherOptions<T
   options.handle.onError((error) => {
     // The watch can lose a directory without the process exiting; log it and
     // keep the handle open so a recreated file is still observed.
-    warnFn('[config-watcher] Configuration watch failed.', error);
+    recordWatchFailure('[config-watcher] Configuration watch failed.', error);
   });
 
   return {
@@ -134,7 +155,14 @@ export const createConfigWatcher = <TimerHandle>(options: ConfigWatcherOptions<T
       }
       isClosed = true;
       cancelPending();
-      await options.handle.close();
+      try {
+        await options.handle.close();
+      } catch (error) {
+        // The handle is already marked closed, so this cannot retry; count and
+        // rethrow so the caller still sees why the release failed.
+        recordWatchFailure('[config-watcher] Configuration watch close failed.', error);
+        throw error;
+      }
     }
   };
 };

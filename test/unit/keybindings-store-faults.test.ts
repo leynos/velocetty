@@ -3,6 +3,7 @@ import {afterEach, describe, expect, test} from 'bun:test';
 
 import * as fs from 'node:fs';
 
+import {createConfigMetrics} from '../../app/config/config-metrics';
 import {createFileKeybindingsStore} from '../../app/config/keybindings-store';
 import {
   cleanupWorkspaces,
@@ -33,6 +34,22 @@ describe('atomic write failures', () => {
       expect(temporaryNames(workspace)).toEqual([]);
     });
   }
+
+  test('counts every failed write and leaves successful writes uncounted', () => {
+    const workspace = createWorkspace();
+    const filePath = targetPathIn(workspace);
+    fs.writeFileSync(filePath, 'previous', 'utf8');
+    const metrics = createConfigMetrics();
+    const {fileSystem} = faultingFileSystem('open', 'EACCES');
+    const failingStore = createFileKeybindingsStore({filePath, fs: fileSystem, metrics, warn: () => {}});
+
+    expect(failingStore.write('replacement').kind).toBe('failed');
+    expect(metrics.snapshot().writeFailures).toBe(1);
+
+    const healthyStore = createFileKeybindingsStore({filePath, metrics, warn: () => {}});
+    expect(healthyStore.write('replacement').kind).toBe('written');
+    expect(metrics.snapshot().writeFailures).toBe(1);
+  });
 
   test('reports a failed temporary-file creation without touching the target', () => {
     const workspace = createWorkspace();

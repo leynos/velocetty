@@ -66,6 +66,7 @@ const spans = createConfigSpanRecorder({
 // query made earlier still works and still performs no start-up side effects.
 const keybindingsStore = createFileKeybindingsStore({
   filePath: keybindingsPath,
+  metrics,
   onRetry: recorder.recordRenameRetry,
   spans
 });
@@ -301,6 +302,7 @@ const _watch = () => {
     debounceMs: CONFIG_DEBOUNCE_MS,
     fileNames: watchedFiles,
     handle: createChokidarHandle(watchedDirectories),
+    metrics,
     onReady: () => emitE2EMarker('[e2e] config-watcher-ready'),
     /** Re-reads only when a file changed while the initial scan was running. */
     reconcileOnReady: () =>

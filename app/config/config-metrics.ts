@@ -14,7 +14,9 @@ export type ConfigCounter =
   | 'readFailures'
   | 'fallbacks'
   | 'importFailures'
-  | 'retries';
+  | 'retries'
+  | 'writeFailures'
+  | 'watcherFailures';
 
 /**
  * Every counter, in the order a record renders them.
@@ -29,7 +31,9 @@ export const CONFIG_COUNTERS: readonly ConfigCounter[] = [
   'readFailures',
   'fallbacks',
   'importFailures',
-  'retries'
+  'retries',
+  'writeFailures',
+  'watcherFailures'
 ];
 
 /** A point-in-time copy of every counter. */
@@ -48,7 +52,7 @@ export type ConfigMetrics = {
  * @example
  * ```ts
  * describeConfigCounters(createConfigMetrics().snapshot());
- * // 'attempts:0,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0'
+ * // 'attempts:0,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0,writeFailures:0,watcherFailures:0'
  * ```
  */
 export const describeConfigCounters = (counters: ConfigCounters): string =>
@@ -76,7 +80,9 @@ export const createConfigMetrics = (): ConfigMetrics => {
     importFailures: 0,
     parseFailures: 0,
     readFailures: 0,
-    retries: 0
+    retries: 0,
+    watcherFailures: 0,
+    writeFailures: 0
   };
 
   return {

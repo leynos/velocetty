@@ -2,6 +2,7 @@
 import {describe, expect, test} from 'bun:test';
 import fc from 'fast-check';
 
+import {createConfigMetrics, type ConfigMetrics} from '../../app/config/config-metrics';
 import {createConfigWatcher, type WatcherEvent, type WatcherHandle} from '../../app/config/watcher';
 
 const DEBOUNCE_MS = 100;
@@ -130,6 +131,7 @@ type LoggedError = {readonly error: unknown; readonly message: string};
 type WatcherHarness = {
   readonly clock: ReturnType<typeof createFakeClock>;
   readonly fake: FakeHandle;
+  readonly metrics: ConfigMetrics;
   readonly reloadTimes: number[];
   readonly warnings: LoggedError[];
   readonly close: () => Promise<void>;
@@ -143,6 +145,7 @@ type HarnessOptions = {
 const createHarness = (options: HarnessOptions = {}): WatcherHarness => {
   const clock = createFakeClock();
   const fake = createFakeHandle();
+  const metrics = createConfigMetrics();
   const reloadTimes: number[] = [];
   const warnings: LoggedError[] = [];
 
@@ -151,6 +154,7 @@ const createHarness = (options: HarnessOptions = {}): WatcherHarness => {
     debounceMs: DEBOUNCE_MS,
     fileNames: WATCHED_PATHS,
     handle: fake.handle,
+    metrics,
     onReload: () => {
       reloadTimes.push(clock.now());
       options.onReload?.();
@@ -161,7 +165,7 @@ const createHarness = (options: HarnessOptions = {}): WatcherHarness => {
     }
   });
 
-  return {clock, close: watcher.close, fake, reloadTimes, warnings};
+  return {clock, close: watcher.close, fake, metrics, reloadTimes, warnings};
 };
 
 type TimedEvent = {readonly at: number; readonly kind: WatcherEvent; readonly eventPath: string};
@@ -341,10 +345,42 @@ test('a watcher error is logged without stopping later reloads', async () => {
     harness.clock.advanceTo(DEBOUNCE_MS);
 
     expect(harness.warnings).toHaveLength(1);
+    expect(harness.metrics.snapshot().watcherFailures).toBe(1);
     expect(harness.reloadTimes).toEqual([DEBOUNCE_MS]);
   } finally {
     await harness.close();
   }
+});
+
+test('a failing close is counted and still rejects', async () => {
+  const metrics = createConfigMetrics();
+  const failure = new Error('close failed');
+  const warnings: LoggedError[] = [];
+
+  const watcher = createConfigWatcher<number>({
+    cancel: () => {},
+    debounceMs: DEBOUNCE_MS,
+    fileNames: WATCHED_PATHS,
+    handle: {
+      close: async () => {
+        throw failure;
+      },
+      on: () => {},
+      onError: () => {},
+      onReady: () => {}
+    },
+    metrics,
+    onReload: () => {},
+    schedule: () => 0,
+    warn: (message, error) => {
+      warnings.push({error, message});
+    }
+  });
+
+  await expect(watcher.close()).rejects.toBe(failure);
+  expect(metrics.snapshot().watcherFailures).toBe(1);
+  expect(warnings).toHaveLength(1);
+  expect(warnings[0]?.message).toContain('watcherFailures:1');
 });
 
 test('the ready callback is forwarded once', () => {

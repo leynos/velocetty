@@ -91,7 +91,7 @@ test.serial('an unreadable keybindings file is recorded and counted without noti
     expect(decisionLines[1]).toBe(
       '[config] import decision phase=reload config=applied configSource=velocetty keybindings=kept ' +
         'basis=last-known-good cause=unreadable announced=false ' +
-        'attempts:2,applies:1,parseFailures:0,readFailures:1,fallbacks:0,importFailures:0,retries:0'
+        'attempts:2,applies:1,parseFailures:0,readFailures:1,fallbacks:0,importFailures:0,retries:0,writeFailures:0,watcherFailures:0'
     );
     // The service owns the user-facing diagnostic; the watcher stays quiet and
     // still dispatches the reload to its subscribers.
@@ -120,7 +120,7 @@ test.serial('a thrown reload is counted, recorded, and still reported by the wat
 
     expect(warnSpy.mock.calls.map(([line]) => line)).toEqual([
       '[config] import failure phase=reload cause=thrown ' +
-        'attempts:2,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0',
+        'attempts:2,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0,writeFailures:0,watcherFailures:0',
       '[config-watcher] Configuration reload failed.'
     ]);
     expect(harness.notifyMock).not.toHaveBeenCalled();
@@ -146,7 +146,7 @@ test.serial('a thrown startup import is counted, recorded, and rethrown', async 
     // span are the only evidence that the import ran at all.
     expect(warnSpy.mock.calls.map(([line]) => line)).toEqual([
       '[config] import failure phase=startup cause=thrown ' +
-        'attempts:1,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0'
+        'attempts:1,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0,writeFailures:0,watcherFailures:0'
     ]);
     expect(infoSpy.mock.calls.map(([line]) => line).filter((line) => line.startsWith('[config] span'))).toEqual([
       expect.stringMatching(/^\[config\] span operation=startup outcome=thrown ms=\d+$/)
@@ -172,7 +172,7 @@ test.serial('a preparation failure is counted as a startup attempt and rethrown'
     // evidence that start-up began; the failure record must still describe it.
     expect(warnSpy.mock.calls.map(([line]) => line)).toEqual([
       '[config] import failure phase=startup cause=thrown ' +
-        'attempts:1,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0'
+        'attempts:1,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0,writeFailures:0,watcherFailures:0'
     ]);
     expect(infoSpy.mock.calls.map(([line]) => line).filter((line) => line.startsWith('[config] span'))).toEqual([
       expect.stringMatching(/^\[config\] span operation=startup outcome=thrown ms=\d+$/)

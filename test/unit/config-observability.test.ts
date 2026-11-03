@@ -61,7 +61,7 @@ describe('the import decision record', () => {
     expect(sink.info).toEqual([
       '[config] import attempt phase=reload',
       '[config] import decision phase=reload config=applied configSource=velocetty keybindings=applied origin=file ' +
-        'announced=true attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0'
+        'announced=true attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0,writeFailures:0,watcherFailures:0'
     ]);
     expect(sink.warn).toEqual([]);
     expect(recorder.counters()).toEqual({
@@ -71,7 +71,9 @@ describe('the import decision record', () => {
       importFailures: 0,
       parseFailures: 0,
       readFailures: 0,
-      retries: 0
+      retries: 0,
+      watcherFailures: 0,
+      writeFailures: 0
     });
   });
 
@@ -115,7 +117,7 @@ describe('the import decision record', () => {
     expect(sink.info[1]).toBe(
       '[config] import decision phase=reload config=applied configSource=velocetty keybindings=kept ' +
         'basis=last-known-good cause=invalid announced=false ' +
-        'attempts:1,applies:0,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0'
+        'attempts:1,applies:0,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0,writeFailures:0,watcherFailures:0'
     );
   });
 
@@ -225,7 +227,7 @@ describe('the import failure record', () => {
 
     expect(sink.warn).toEqual([
       '[config] import failure phase=reload cause=thrown ' +
-        'attempts:1,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0'
+        'attempts:1,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0,writeFailures:0,watcherFailures:0'
     ]);
     expect(sink.info).toEqual(['[config] import attempt phase=reload']);
     expect(recorder.counters()).toMatchObject({attempts: 1, importFailures: 1});
@@ -292,12 +294,12 @@ describe('a reload sequence', () => {
       const decisionLines = sink.info.filter((line) => line.startsWith('[config] import decision'));
       expect(decisionLines).toEqual([
         '[config] import decision phase=startup config=applied configSource=velocetty keybindings=applied origin=file ' +
-          'announced=false attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0',
+          'announced=false attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0,writeFailures:0,watcherFailures:0',
         '[config] import decision phase=reload config=applied configSource=velocetty keybindings=kept ' +
           'basis=last-known-good cause=invalid announced=false ' +
-          'attempts:2,applies:1,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0',
+          'attempts:2,applies:1,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0,writeFailures:0,watcherFailures:0',
         '[config] import decision phase=reload config=applied configSource=velocetty keybindings=applied origin=file ' +
-          'announced=true attempts:3,applies:2,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0'
+          'announced=true attempts:3,applies:2,parseFailures:1,readFailures:0,fallbacks:0,importFailures:0,retries:0,writeFailures:0,watcherFailures:0'
       ]);
     } finally {
       importer.cleanup();
@@ -336,7 +338,7 @@ describe('the counter snapshot', () => {
 
   test('renders every counter in a fixed order', () => {
     expect(describeConfigCounters(createConfigMetrics().snapshot())).toBe(
-      'attempts:0,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0'
+      'attempts:0,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0,writeFailures:0,watcherFailures:0'
     );
   });
 });

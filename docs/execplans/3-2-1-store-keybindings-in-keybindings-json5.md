@@ -1351,11 +1351,31 @@ design and the notification the user sees.
     production functions were documented. It now carries a JSDoc block.
   - The scan measures eligibility from a function's leading trivia through its
     body, matching the hosted rule that counts documentation-only edits and
-    deletions within surviving functions. Against base `40949b2f` it reports
+    deletions within surviving functions. Against base `40949b2f`, it reports
     213 eligible functions, 213 documented, and none undocumented.
   - Hosted coverage is still unresolved. The exact-head CodeRabbit check read
     `Review paused`, so no fresh figure exists; the 70.00% measurement from the
     `d7fc6d9b..3971f380` comparison is stale and must not be carried forward.
+- [x] (2026-11-03 16:20Z) Added bounded write-failure and watcher-failure
+  counters and recorded the hosted coverage provenance limit.
+  - `app/config/keybindings-store.ts` now counts every failed `write()` in the
+    shared vocabulary, including the bootstrap write the service reports as
+    `applied` with a `seeded-unsaved` origin, and the refused-target route.
+  - `app/config/watcher.ts` counts a handle error and a failing `close()`, and
+    renders the tally into the failure line through the same fixed-shape
+    describer the decision records use.
+  - Both counters are appended to `CONFIG_COUNTERS`, so they appear in every
+    decision and failure record without a second renderer. The composition root
+    passes the existing `metrics` instance to the store and the watcher.
+  - Corrected the missing comma after the introductory phrase at line 1354.
+  - The hosted Docstring Coverage row remains unbound to a SHA. CodeRabbit
+    confirmed that the check ran `Run analysis checks` and that the walkthrough
+    was edited at the same time, but also that neither output binds the
+    percentage to a commit and that the check publishes no declaration
+    annotations. It declined to name the six uncovered functions and asked for
+    an analyser record held by an administrator, which this agent cannot
+    obtain. The row is therefore recorded as unresolved with local evidence
+    only, and must not be treated as a fresh measurement.
 
 ## Surprises & discoveries
 

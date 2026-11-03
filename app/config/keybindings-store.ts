@@ -112,6 +112,7 @@ export const createFileKeybindingsStore = (
   options: FileKeybindingsStoreOptions
 ): KeybindingsStore & {readonly removeStaleTemporaryFiles: () => void} => {
   const fileSystem = options.fs ?? fs;
+  const metrics = options.metrics;
   const sleep = options.sleep ?? defaultSleep;
   const warnFn = options.warn ?? console.warn;
   const fileName = path.basename(options.filePath);
@@ -349,6 +350,20 @@ export const createFileKeybindingsStore = (
   };
 
   /**
+   * Counts one failed write, then hands the outcome back unchanged.
+   *
+   * Both failure routes — a refused target and a failed commit — pass through
+   * here, so a caller that only sees `kind: 'failed'` still contributes to the
+   * write-failure tally, and the reason stays in the port's own vocabulary.
+   */
+  const countWriteOutcome = (outcome: KeybindingsWriteOutcome): KeybindingsWriteOutcome => {
+    if (outcome.kind === 'failed') {
+      metrics?.increment('writeFailures');
+    }
+    return outcome;
+  };
+
+  /**
    * Writes the document atomically, refusing any unsafe replacement target.
    *
    * The temporary file is created exclusively, fully written, flushed, and
@@ -359,11 +374,11 @@ export const createFileKeybindingsStore = (
     const prepared = prepareWrite();
     if (prepared.kind === 'refused') {
       finishSpan?.('failed');
-      return prepared.outcome;
+      return countWriteOutcome(prepared.outcome);
     }
     const outcome = commitWrite(prepared.plan, text);
     finishSpan?.(outcome.kind === 'written' ? 'written' : 'failed');
-    return outcome;
+    return countWriteOutcome(outcome);
   };
 
   /** Removes temporary files a crashed write left beside the target. */
