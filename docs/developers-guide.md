@@ -794,6 +794,21 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
   before other gates and keep `npm_config_node_gyp` pointed at the workspace
   `node-gyp` entrypoint in CI jobs that rebuild native modules.
 
+### RPM packaging baseline on RPM 6 hosts
+
+Ubuntu 26.04, and therefore the current `ubuntu-latest` runner, ships RPM 6.
+RPM 6 ignores the legacy `BuildRoot:` spec tag, so rpmbuild reads its own
+default buildroot instead of the directory fpm staged the payload in, finds no
+files, and aborts. fpm only passes `--buildroot` from 1.16.0 onwards, so Linux
+package builds keep:
+
+- `Gemfile` and `Gemfile.lock` pinned to fpm 1.16.0, installed with the Bundler
+  version recorded under `BUNDLED WITH` in the lock file.
+- `USE_SYSTEM_FPM=1` in the build job, so electron-builder uses that binstub
+  instead of downloading its own bundled fpm 1.9.3.
+- No explicit `rpm.compression` in `electron-builder.json`; fpm's gzip default
+  is accepted by RPM 6.
+
 Windows runtime reliability baseline after roadmap item `1.4.15` Windows scope:
 
 - Keep Windows CI on `windows-2022` (x64) in the shared build matrix and run

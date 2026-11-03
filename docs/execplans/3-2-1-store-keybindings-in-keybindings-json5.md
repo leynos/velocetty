@@ -1310,7 +1310,7 @@ design and the notification the user sees.
 - [x] (2026-11-03 13:20Z) Disposed of the three open non-protected review
   findings on `9bca05a5`.
   - `shared/src/types/json.ts`: the example claimed
-    `isJsonValue(new Date())` is `false`; it is `true`, because
+    `isJsonValue(new Date())` is `false`; it is `true` because
     `isJsonObject` accepts any non-array object with JSON-valued members and
     does not inspect the prototype. The example and both docstrings now say
     so; runtime validation is unchanged.
@@ -1326,6 +1326,23 @@ design and the notification the user sees.
     notification. KB-WATCH-1 records the opt-in, and two new unit tests cover
     the predicate's false and true verdicts, including the queued-burst
     discard.
+- [x] (2026-11-03 14:30Z) Raised docstring coverage and disposed of the
+  remaining pre-merge rows on `3971f380`.
+  - Docstring Coverage: a TypeScript-AST scan of the branch diff found 205
+    functions with cyclomatic complexity of at least 2 whose bodies the diff
+    touches, of which 54 lacked a JSDoc block. All 54 now carry one: three in
+    production (`recordImport`, the watcher's `close`, and the CLI's `probe`)
+    and 51 test helpers. The scan now reports none outstanding. The hosted
+    percentage is still the stale 70.00% from the `d7fc6d9b..3971f380`
+    comparison, so a fresh hosted measurement is required before the row can
+    be closed.
+  - Developer Documentation: `docs/developers-guide.md` now records the RPM 6
+    packaging baseline — fpm 1.16.0 from the committed `Gemfile.lock`,
+    `USE_SYSTEM_FPM=1`, and no explicit `rpm.compression`.
+  - Three docstyle findings in this plan: the `read()` contract no longer
+    claims reloads are user-initiated, the `reconcileOnReady` sentence uses
+    `that reports a change`, and the `isJsonValue` note drops the comma before
+    `because`.
 
 ## Surprises & discoveries
 
@@ -2658,9 +2675,9 @@ exactly `d` starts a new burst. Also:
 - events during `onReload` start a new burst;
 - a throwing `onReload` is logged and does not disable the watcher;
 - no reload happens before the first real event (`ignoreInitial`) unless the
-  caller supplies a `reconcileOnReady` predicate and it reports a change; a
-  true verdict runs one reload at readiness and discards any burst the initial
-  scan queued.
+  caller supplies a `reconcileOnReady` predicate that reports a change; a true
+  verdict runs one reload at readiness and discards any burst the initial scan
+  queued.
 
 A continuous stream of events closer together than `d` postpones reload
 indefinitely, by design, and this is documented.
@@ -4230,7 +4247,8 @@ export type KeybindingsStore = {
   readonly label: string;
   /**
    * The instrumented read: records a `keybindings-read` span and warns on
-   * failure. Used by the start-up and reload commands the user initiated.
+   * failure. Used by the start-up and reload operations, including reloads
+   * triggered by watched file events.
    */
   readonly read: () => KeybindingsReadOutcome;
   /**
