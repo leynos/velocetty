@@ -123,7 +123,7 @@
     "electron": "^44.4.1",
     "electron-builder": "^24.13.3",
     "electron-link": "^0.6.0",
-    "electron-mksnapshot": "^44.4.1",
+    "electron-mksnapshot": "^45.0.0",
     "electronmon": "^2.0.4",
     "esbuild": "^0.25.12",
     "happy-dom": "^20.3.9",
