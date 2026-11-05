@@ -109,7 +109,7 @@
     "@types/lodash": "^4.17.0",
     "@types/mousetrap": "^1.6.15",
     "@types/ms": "^0.7.34",
-    "@types/node": "^24.10.12",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
     "@types/seamless-immutable": "^7.1.19",
