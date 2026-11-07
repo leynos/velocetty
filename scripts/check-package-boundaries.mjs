@@ -112,8 +112,12 @@ const isTypeOnlyStaticImportOrExport = (node) => {
   return ts.isExportDeclaration(node) && (node.isTypeOnly || !hasValueExportBinding(node));
 };
 
-// `import('x')` and `import('x', {with: {type: 'json'}})` are both dynamic
-// imports; only the first argument names the module.
+/**
+ * Whether a call is a dynamic `import()`, with or without an import attribute.
+ *
+ * `import('x')` and `import('x', {with: {type: 'json'}})` both name their
+ * module in the first argument; the two-argument form must not be skipped.
+ */
 const isDynamicImportCall = (node) =>
   ts.isCallExpression(node) &&
   node.arguments.length > 0 &&
@@ -139,6 +143,12 @@ const extractDynamicImportSpecifier = (node) => {
   return firstArgument.text;
 };
 
+/**
+ * Records a specifier when the node named one, keeping its type-only flag.
+ *
+ * Extraction returns `null` for calls and declarations that name no module, so
+ * this is the single place that decides whether there is anything to record.
+ */
 const pushSpecifierIfPresent = (imports, specifier, isTypeOnly = false) => {
   if (specifier !== null) {
     imports.push({isTypeOnly, specifier});

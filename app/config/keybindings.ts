@@ -23,6 +23,7 @@ import type {
   KeybindingsImportOutcome,
   KeybindingsImportRequest,
   KeybindingsLoadOutcome,
+  KeybindingsReadOutcome,
   KeybindingsReporter,
   KeybindingsStorageFailure,
   KeybindingsStore,
@@ -158,9 +159,15 @@ export const createKeybindingsService = (dependencies: {
     return {basis, cause: rejected.cause, diagnostics: [], keymaps: exposedKeymaps(), kind: 'kept'};
   };
 
-  /** Reads and applies whatever the file currently holds; never writes. */
-  const readCurrentFile = (): KeybindingsLoadOutcome => {
-    const readOutcome = store.read();
+  /**
+   * Applies one read outcome; never writes.
+   *
+   * Start-up already holds the read that decided the bootstrap, so it passes
+   * that outcome here instead of reading the file a second time. A second read
+   * could observe a different file and make the decision and the applied state
+   * disagree.
+   */
+  const applyReadOutcome = (readOutcome: KeybindingsReadOutcome): KeybindingsLoadOutcome => {
     if (readOutcome.kind === 'missing') {
       // The seed never reached the disk, so the file is still missing for a
       // reason the user did not choose. Keep the shortcuts it put in effect.
@@ -189,6 +196,9 @@ export const createKeybindingsService = (dependencies: {
     applyObservation({keymaps: parsed.keymaps, kind: 'valid'});
     return {keymaps: exposedKeymaps(), kind: 'applied', origin: 'file'};
   };
+
+  /** Reads once and applies the result; never writes. */
+  const readCurrentFile = (): KeybindingsLoadOutcome => applyReadOutcome(store.read());
 
   /** Writes the seed and applies it, reporting how far the migration got. */
   const seedFile = (decision: SeedDecision): KeybindingsLoadOutcome => {
@@ -219,9 +229,13 @@ export const createKeybindingsService = (dependencies: {
     }
     isStarted = true;
 
-    const decision = decideBootstrap({file: store.read().kind, legacy});
+    // One read decides the bootstrap and, for `write-nothing`, supplies the
+    // observation as well. Reading again here could apply a file the decision
+    // never saw.
+    const readOutcome = store.read();
+    const decision = decideBootstrap({file: readOutcome.kind, legacy});
     if (decision.kind === 'write-nothing') {
-      return readCurrentFile();
+      return applyReadOutcome(readOutcome);
     }
     if (decision.kind === 'defer') {
       return describeDeferred();

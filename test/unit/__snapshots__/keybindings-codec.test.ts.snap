@@ -35,7 +35,7 @@ exports[`output contracts reports representative validation diagnostics exactly 
 ]
 `;
 
-exports[`output contracts reports a syntax error with a normalised source position 1`] = `
+exports[`output contracts reports a syntax error with a normalized source position 1`] = `
 {
   "message": "JSON5: invalid end of input at 1:15",
   "path": "<source>:1:15",

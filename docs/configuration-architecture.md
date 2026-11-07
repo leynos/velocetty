@@ -22,16 +22,17 @@ watcher, and the user interface. The policy is the only part that is formally
 verified, so the untrusted parts stay small enough to test by example and
 property.
 
-| Layer       | Modules                                                                                  | Depends on                     |
-| ----------- | ---------------------------------------------------------------------------------------- | ------------------------------ |
-| Policy      | `app/config/keybindings-policy.ts`                                                       | nothing (pure functions)       |
-| Codec       | `app/config/keybindings-codec.ts`                                                        | `json5`, `zod`                 |
-| Service     | `app/config/keybindings.ts`                                                              | codec, policy, store port      |
-| Importer    | `app/config/import.ts`, `import-keybindings.ts`, `import-report.ts`, `import-sources.ts` | service, legacy config         |
-| Paths       | `app/config/config-tree.ts`, `app/config/paths.ts`                                       | injected filesystem predicates |
-| Store       | `app/config/keybindings-store.ts`                                                        | `node:fs`                      |
-| Watcher     | `app/config/watcher.ts`                                                                  | injected scheduler and handle  |
-| Composition | `app/config.ts`, `app/config/init.ts`, `reload-handler.ts`                               | all of the above, Electron     |
+| Layer         | Modules                                                                                  | Depends on                     |
+| ------------- | ---------------------------------------------------------------------------------------- | ------------------------------ |
+| Policy        | `app/config/keybindings-policy.ts`                                                       | nothing (pure functions)       |
+| Codec         | `app/config/keybindings-codec.ts`                                                        | `json5`, `zod`                 |
+| Service       | `app/config/keybindings.ts`                                                              | codec, policy, store port      |
+| Importer      | `app/config/import.ts`, `import-keybindings.ts`, `import-report.ts`, `import-sources.ts` | service, legacy config         |
+| Paths         | `app/config/config-tree.ts`, `app/config/paths.ts`                                       | injected filesystem predicates |
+| Store         | `app/config/keybindings-store.ts`                                                        | `node:fs`                      |
+| Watcher       | `app/config/watcher.ts`                                                                  | injected scheduler and handle  |
+| Observability | `config-metrics.ts`, `config-observability.ts`, `config-spans.ts`, `e2e-keymap-probe.ts` | injected sink and clock        |
+| Composition   | `app/config.ts`, `app/config/init.ts`, `app/config/reload-handler.ts`                    | all of the above, Electron     |
 
 _Table 1: Configuration components._
 
@@ -120,6 +121,22 @@ chokidar handle, the scheduler, and the logger are injected, so the debounce
 law is tested against a fake clock rather than real time. A reload clears a
 pending timer, reads once, and catches a throwing reload so a bad file cannot
 stop future reloads.
+
+Chokidar's initial scan can miss a file that changed after the start-up import
+but before the watcher became ready. On readiness, `createConfigWatcher` calls
+`reconcileOnReady`; the composition root compares each file's `mtimeMs` and
+`size` with the values it recorded after the import and runs one catch-up
+reload only when a file moved.
+
+### Observability
+
+`config-metrics.ts` holds the counters, `config-observability.ts` turns one
+import attempt into a single bounded record, and `config-spans.ts` records the
+read and write spans. `e2e-keymap-probe.ts` emits the marker the end-to-end
+lane reads. Every record comes from a closed vocabulary, so it can state which
+phase ran, which file fell back, and which keybindings outcome held, but it
+cannot carry a path, a command identifier, or a shortcut. The sink and the
+clock are injected, so the record shape is tested without Electron or real time.
 
 ## Data flow
 

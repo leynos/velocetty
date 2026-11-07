@@ -9,6 +9,20 @@ import type {ConfigImportNotify} from './import-report';
 import type {KeybindingsBasis, KeybindingsNotice, KeybindingsReporter} from './keybindings-ports';
 
 /**
+ * Ends `text` as a sentence without doubling a full stop the producer supplied.
+ *
+ * Diagnostic producers write their own sentence and may already close with a
+ * full stop, so appending one unconditionally renders `..` to the user.
+ *
+ * @example
+ * ```ts
+ * asSentence('Rename the command.'); // 'Rename the command.'
+ * asSentence('Rename the command'); // 'Rename the command.'
+ * ```
+ */
+const asSentence = (text: string): string => (text.endsWith('.') ? text : `${text}.`);
+
+/**
  * Formats the first diagnostic as a sentence suffix for a notification.
  *
  * Keeping this in one place means start-up, reload, and the importer cannot
@@ -24,9 +38,9 @@ export const describePrimaryDiagnostic = (diagnostics: readonly configValidation
   if (!primaryDiagnostic) {
     return '';
   }
-  const docHint = primaryDiagnostic.docHint ? ` Hint: ${primaryDiagnostic.docHint}.` : '';
-  const defaultHint = primaryDiagnostic.defaultHint ? ` Default: ${primaryDiagnostic.defaultHint}.` : '';
-  return ` ${primaryDiagnostic.path}: ${primaryDiagnostic.message} Suggested fix: ${primaryDiagnostic.suggestedFix}.${docHint}${defaultHint}`;
+  const docHint = primaryDiagnostic.docHint ? ` Hint: ${asSentence(primaryDiagnostic.docHint)}` : '';
+  const defaultHint = primaryDiagnostic.defaultHint ? ` Default: ${asSentence(primaryDiagnostic.defaultHint)}` : '';
+  return ` ${primaryDiagnostic.path}: ${primaryDiagnostic.message} Suggested fix: ${asSentence(primaryDiagnostic.suggestedFix)}${docHint}${defaultHint}`;
 };
 
 /** A caller's sentence about a rejected file, plus the diagnostics behind it. */

@@ -212,10 +212,21 @@ for active configuration files:
   `config.json5`; avoid full-file canonical rewrites for targeted runtime
   settings updates.
 
-`shared/schemas/schema.json` and `app/config/schema.json` are generated, but
-tracked. `bun run generate-schema` derives them from the types in
-`typings/config.d.ts`; `bun install` regenerates them from `postinstall`. Keep
-the committed copies in step with the source types, because CI regenerates on
+The config schema (`shared/schemas/schema.json`, copied to
+`app/config/schema.json`) and the keybindings schema
+(`shared/schemas/keybindings.schema.json`, copied to
+`app/config/keybindings.schema.json`) are generated, but tracked. `bun install`
+regenerates them from `postinstall`, and `bun run generate-schema` runs the
+same chain by hand:
+
+1. `typescript-json-schema` derives the config schema from the types in
+   `typings/config.d.ts`;
+2. `bin/generate-keybindings-schema.ts` derives the keybindings schema from
+   `keybindingsJsonSchema()` in `app/config/keybindings-codec.ts`, so editors
+   and the runtime cannot drift apart;
+3. `bin/sync-shared-schema.mjs` copies both schemas into `app/config/`.
+
+Keep the committed copies in step with their sources, because CI regenerates on
 checkout: a stale file passes locally and then changes under the build.
 `typescript-json-schema` names each definition after the TypeScript type it
 came from, so renaming a type in `typings/` or `shared/src/types/` rewrites the
@@ -348,6 +359,14 @@ wires them together.
   notifier, and calls `removeStaleTemporaryFiles()` itself at start-up. Stale
   temporary cleanup is therefore a start-up decision of the root, not part of
   the service's contract.
+- **`fixConfigDefaults`** (`app/config/fix-config-defaults.ts`): completes the
+  decorated configuration's colour map. `withDefaultColors` in
+  `app/utils/colours.ts` layers the bundled defaults underneath the user's
+  colours, so a partial user map keeps its own values and gains the rest. When
+  the bundled config could not be read, the last-resort palette stands in and
+  the user's colours still win. The composition root supplies
+  `getDefaultConfig().defaults.config?.colors`, and the pure function is tested
+  without Electron.
 
 Injecting these dependencies keeps the service, importer, and watcher testable
 in `bun test` without Electron, a real clock, or a real filesystem. See
@@ -356,10 +375,13 @@ in `bun test` without Electron, a real clock, or a real filesystem. See
 ### Configuration health signals
 
 Each import attempt emits one attempt line and exactly one bounded record on
-`console.info`, each completed operation emits one span line, and each refused
-atomic-write rename or watcher failure emits one record on `console.warn`. All
-of them carry only values from a closed vocabulary, so neither a path, a
-command identifier, nor a shortcut can leak into a log.
+`console.info`. An attempt that throws instead emits its bounded
+`import failure` record on `console.warn`, so a reader filtering for
+`console.info` must not assume every attempt produced a decision record. Each
+completed operation emits one span line, and each refused atomic-write rename
+or watcher failure emits one record on `console.warn`. All of them carry only
+values from a closed vocabulary, so neither a path, a command identifier, nor a
+shortcut can leak into a log.
 
 ```text
 [config] import attempt phase=reload

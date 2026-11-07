@@ -7,6 +7,7 @@ import {keybindingsCodec, parseKeybindingsText, serializeKeybindings} from '../.
 import {
   type KeybindingsObservation,
   type LegacyKeymapsSource,
+  type UserKeymaps,
   decideBootstrap,
   specLatestAccepted
 } from '../../app/config/keybindings-policy';
@@ -27,6 +28,8 @@ type Model = {
   history: KeybindingsObservation[];
   pendingWriteFailure: boolean;
   started: boolean;
+  /** A seed applied in memory whose write never reached the file. */
+  unsavedSeed: boolean;
   writeAttempts: number;
 };
 
@@ -96,6 +99,21 @@ const command = (
   check: (model: Readonly<Model>) => boolean = () => true
 ): fc.Command<Model, Real> => ({check, run, toString: () => name});
 
+const DELETE_FILE = command('delete file', (model, real) => {
+  model.file = {kind: 'missing'};
+  real.store.setMissing();
+});
+
+const MAKE_UNREADABLE = command('make unreadable', (model, real) => {
+  model.file = {kind: 'unreadable'};
+  real.store.setUnreadable();
+});
+
+const FAIL_NEXT_WRITE = command('fail next write', (model, real) => {
+  model.pendingWriteFailure = true;
+  real.store.failNextWrite();
+});
+
 const EXTERNAL_COMMANDS: readonly fc.Arbitrary<fc.Command<Model, Real>>[] = [
   validTextArb.map((text) =>
     command('set valid', (model, real) => {
@@ -109,24 +127,9 @@ const EXTERNAL_COMMANDS: readonly fc.Arbitrary<fc.Command<Model, Real>>[] = [
       real.store.setText(text);
     })
   ),
-  fc.constant(
-    command('delete file', (model, real) => {
-      model.file = {kind: 'missing'};
-      real.store.setMissing();
-    })
-  ),
-  fc.constant(
-    command('make unreadable', (model, real) => {
-      model.file = {kind: 'unreadable'};
-      real.store.setUnreadable();
-    })
-  ),
-  fc.constant(
-    command('fail next write', (model, real) => {
-      model.pendingWriteFailure = true;
-      real.store.failNextWrite();
-    })
-  )
+  fc.constant(DELETE_FILE),
+  fc.constant(MAKE_UNREADABLE),
+  fc.constant(FAIL_NEXT_WRITE)
 ];
 
 type StartModelResult = {
@@ -151,6 +154,9 @@ const applyStartCommand = (model: Model, legacy: LegacyKeymapsSource): StartMode
   const shouldFailWrite = model.pendingWriteFailure;
   model.pendingWriteFailure = false;
   model.writeAttempts += 1;
+  // A seed that could not be written still applies in memory, so the model
+  // remembers it until a read proves the file exists.
+  model.unsavedSeed = shouldFailWrite;
   if (!shouldFailWrite) {
     model.file = {kind: 'text', text: serializeKeybindings(decision.keymaps)};
   }
@@ -183,7 +189,7 @@ const expectStartOutcome = (
   expect(outcome.kind).toBe('kept');
 };
 
-const START_COMMAND: fc.Arbitrary<fc.Command<Model, Real>> = legacyArb.map((legacy) =>
+const startWith = (legacy: LegacyKeymapsSource): fc.Command<Model, Real> =>
   command(
     'start',
     (model, real) => {
@@ -198,28 +204,42 @@ const START_COMMAND: fc.Arbitrary<fc.Command<Model, Real>> = legacyArb.map((lega
       expectStartOutcome(outcome, modelled);
     },
     (model) => !model.started
-  )
-);
+  );
 
-const RELOAD_COMMAND = fc.constant(
-  command('reload', (model, real) => {
-    const historyBefore = [...model.history];
-    const observation = observationFromFile(model.file);
+const START_COMMAND: fc.Arbitrary<fc.Command<Model, Real>> = legacyArb.map((legacy) => startWith(legacy));
+
+const RELOAD = command('reload', (model, real) => {
+  const historyBefore = [...model.history];
+  // A readable file supersedes any seed that never reached the disk; a
+  // still-missing file leaves the unsaved seed in effect instead of
+  // reporting the absence as a deliberate reset.
+  const preservesUnsavedSeed = model.file.kind === 'missing' && model.unsavedSeed;
+  if (model.file.kind === 'text') {
+    model.unsavedSeed = false;
+  }
+  const observation = observationFromFile(model.file);
+  if (!preservesUnsavedSeed) {
     model.history.push(observation);
+  }
 
-    const outcome = real.service.reload();
-    observe(model, real, outcome, historyBefore);
-    if (observation.kind === 'valid') {
-      expect(outcome).toMatchObject({kind: 'applied', origin: 'file'});
-    } else if (observation.kind === 'missing') {
-      expect(outcome).toMatchObject({kind: 'applied', origin: 'missing'});
-    } else {
-      expect(outcome.kind).toBe('kept');
-    }
-  })
-);
+  const outcome = real.service.reload();
+  observe(model, real, outcome, historyBefore);
+  if (preservesUnsavedSeed) {
+    expect(outcome).toMatchObject({kind: 'applied', origin: 'seeded-unsaved'});
+    return;
+  }
+  if (observation.kind === 'valid') {
+    expect(outcome).toMatchObject({kind: 'applied', origin: 'file'});
+  } else if (observation.kind === 'missing') {
+    expect(outcome).toMatchObject({kind: 'applied', origin: 'missing'});
+  } else {
+    expect(outcome.kind).toBe('kept');
+  }
+});
 
-const IMPORT_VALID_COMMAND: fc.Arbitrary<fc.Command<Model, Real>> = validTextArb.map((text) =>
+const RELOAD_COMMAND = fc.constant(RELOAD);
+
+const importValidWith = (text: string): fc.Command<Model, Real> =>
   command('import valid', (model, real) => {
     const before = real.service.active();
     const historyBefore = [...model.history];
@@ -228,6 +248,8 @@ const IMPORT_VALID_COMMAND: fc.Arbitrary<fc.Command<Model, Real>> = validTextArb
     model.pendingWriteFailure = false;
     if (!failed) {
       model.file = {kind: 'text', text};
+      // The import wrote the file, so a seed that never persisted is gone.
+      model.unsavedSeed = false;
     }
 
     const outcome = real.service.importKeybindings({sourceLabel: SOURCE, text});
@@ -236,8 +258,9 @@ const IMPORT_VALID_COMMAND: fc.Arbitrary<fc.Command<Model, Real>> = validTextArb
     expect(real.service.active()).toEqual(before);
     expect(model.history).toEqual(historyBefore);
     expect(real.store.writeAttempts()).toBe(model.writeAttempts);
-  })
-);
+  });
+
+const IMPORT_VALID_COMMAND: fc.Arbitrary<fc.Command<Model, Real>> = validTextArb.map((text) => importValidWith(text));
 
 const IMPORT_INVALID_COMMAND: fc.Arbitrary<fc.Command<Model, Real>> = invalidTextArb.map((text) =>
   command('import invalid', (model, real) => {
@@ -298,7 +321,14 @@ const setup = (): Setup => {
   const store = createMemoryKeybindingsStore(SOURCE);
   const service = createKeybindingsService({codec: keybindingsCodec, report: () => {}, store});
   return {
-    model: {file: {kind: 'missing'}, history: [], pendingWriteFailure: false, started: false, writeAttempts: 0},
+    model: {
+      file: {kind: 'missing'},
+      history: [],
+      pendingWriteFailure: false,
+      started: false,
+      unsavedSeed: false,
+      writeAttempts: 0
+    },
     real: {service, store}
   };
 };
@@ -308,6 +338,31 @@ test('KB-SVC-2 the service refines the policy under any command sequence', () =>
     fc.property(commandsArb, (commands) => fc.modelRun(setup, commands)),
     PROPERTY_OPTIONS
   );
+});
+
+/** A concrete legacy source, so the fixed runs below need no generator. */
+const FIXED_KEYMAPS: UserKeymaps = {'window:new': 'ctrl+alt+n'};
+const FIXED_LEGACY: LegacyKeymapsSource = {keymaps: FIXED_KEYMAPS, kind: 'parsed-keymaps'};
+const FIXED_TEXT = serializeKeybindings(FIXED_KEYMAPS);
+
+test('KB-SVC-2 fixed: a failed seed survives a missing-file reload', () => {
+  // The write never reached the disk, so the reload must keep the in-memory
+  // seed rather than reporting the still-missing file as a deliberate reset.
+  fc.modelRun(setup, [FAIL_NEXT_WRITE, startWith(FIXED_LEGACY), RELOAD]);
+});
+
+test('KB-SVC-2 fixed: start seeds from parsed legacy keymaps', () => {
+  fc.modelRun(setup, [startWith(FIXED_LEGACY)]);
+});
+
+test('KB-SVC-2 fixed: reload applies the file', () => {
+  fc.modelRun(setup, [RELOAD]);
+});
+
+test('KB-SVC-2 fixed: a successful import clears the unsaved seed', () => {
+  // After the import writes the file, deleting it and reloading must report a
+  // plain missing file, not a retained seed.
+  fc.modelRun(setup, [importValidWith(FIXED_TEXT), DELETE_FILE, RELOAD]);
 });
 
 test('KB-SVC-2 non-vacuity: every command is generated', () => {

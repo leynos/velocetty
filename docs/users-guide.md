@@ -73,9 +73,11 @@ No menu entry or command opens the file yet.
 ### Moving an existing configuration
 
 1. Quit Velocetty.
-2. Move `config.json5`, `schema.json`, and the `plugins/` directory from the
-   Hyper directory into the Velocetty directory. Create the Velocetty directory
-   if it does not exist yet.
+2. Move the active configuration file into the Velocetty directory. If the
+   Hyper directory holds `config.json5`, move it under that name; if it holds
+   only the older `hyper.json`, move that file and rename it to `config.json5`.
+   Also move `schema.json` and the `plugins/` directory. Create the Velocetty
+   directory if it does not exist yet.
 3. Start Velocetty again.
 
 Do not move the other files in the Hyper directory. They are Electron's
@@ -106,8 +108,8 @@ The optional `$schema` key names a JSON Schema file for editor completion.
 Velocetty checks that it is a string, then ignores it.
 
 Command identifiers are the identifiers shown in the command palette and the
-menus, such as `window:new` or `pane:split:vertical`. They must not be empty
-and must not start or end with whitespace.
+menus, such as `window:new` or `pane:splitRight`. They must not be empty and
+must not start or end with whitespace.
 
 ### Shortcut syntax
 

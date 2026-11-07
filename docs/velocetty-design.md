@@ -850,13 +850,14 @@ Deterministic resolution rules:
 
 
 
-Implemented layering today is narrower. Roadmap `3.2.1` delivered
-`core defaults → user overrides → legacy decorateKeymaps hooks`, with a
-verified last-known-good rule for user overrides. Plugin defaults do not yet
-take part in resolution, built-in defaults currently beat plugin defaults, and
-a legacy `decorateKeymaps` hook runs last. The full precedence rules above,
-including conflict detection, belong to roadmap `4.2.1`. The components
-involved, and where the verified boundary sits, are described in
+Implemented layering today is narrower. Roadmap `3.2.1` delivered core defaults
+→ user overrides → plugin defaults → legacy `decorateKeymaps` hooks, with a
+verified last-known-good rule for user overrides. Runtime plugin defaults do
+take part in the merge, but they lose to resolved core and user keymaps for the
+same command: `getDecoratedKeymaps` spreads the plugin contributions first and
+the resolved keymaps over them, then runs the legacy hooks. The full precedence
+rules above, including conflict detection, belong to roadmap `4.2.1`. The
+components involved, and where the verified boundary sits, are described in
 [Configuration architecture](configuration-architecture.md).
 
 Conflict detection:

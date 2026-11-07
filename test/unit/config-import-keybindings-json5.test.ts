@@ -388,7 +388,7 @@ const noticeGuardScenarios: readonly NoticeGuardScenario[] = [
   {
     expected: [
       [
-        'Couldn\'t move shortcuts to keybindings.json5. Fix the keymaps in config.json5 to migrate them. /: Invalid command identifier "": it must be non-empty and carry no leading or trailing whitespace. Suggested fix: Remove the surrounding whitespace or rename the command..'
+        'Couldn\'t move shortcuts to keybindings.json5. Fix the keymaps in config.json5 to migrate them. /: Invalid command identifier "": it must be non-empty and carry no leading or trailing whitespace. Suggested fix: Remove the surrounding whitespace or rename the command.'
       ]
     ],
     label: 'deferred',

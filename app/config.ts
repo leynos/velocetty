@@ -22,6 +22,7 @@ import {createConfigMetrics} from './config/config-metrics';
 import {createImportRecorder, type ImportRecord} from './config/config-observability';
 import {createConfigSpanRecorder} from './config/config-spans';
 import {formatKeymapsMarker, isE2ERun, type E2EKeymapStatus} from './config/e2e-keymap-probe';
+import {fixConfigDefaults as applyConfigDefaults} from './config/fix-config-defaults';
 import {createConfigImportModule} from './config/import';
 import {shouldAnnounceReload, type ConfigImportReport} from './config/import-report';
 import {_init} from './config/init';
@@ -46,7 +47,6 @@ import {
   velocettyDir
 } from './config/paths';
 import notify from './notify';
-import {withDefaultColors} from './utils/colours';
 import {createConfigWatcher, type WatcherEvent, type WatcherHandle} from './config/watcher';
 
 const metrics = createConfigMetrics();
@@ -545,15 +545,11 @@ export {get as getWin, recordState as winRecord, defaults as windowDefaults} fro
  * fixConfigDefaults({colors: {}} as configOptions).colors.background; // the bundled default
  * ```
  */
-export const fixConfigDefaults = (decoratedConfig: configOptions) => {
+export const fixConfigDefaults = (decoratedConfig: configOptions) =>
   // A bundled config that could not be read or parsed has no `config` section,
   // so the defaults are absent rather than merely incomplete. Keep the user's
   // own colours instead of dereferencing `undefined`.
-  const defaultColors = getDefaultConfig().defaults.config?.colors;
-  // We must have default colours for xterm css.
-  decoratedConfig.colors = withDefaultColors(decoratedConfig.colors, defaultColors);
-  return decoratedConfig;
-};
+  applyConfigDefaults(decoratedConfig, getDefaultConfig().defaults.config?.colors);
 
 /**
  * Rewrites legacy hterm CSS selectors to their current equivalents.

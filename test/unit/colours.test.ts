@@ -1,9 +1,10 @@
-/** @file Verifies colour-map normalisation and the bundled-default fallback. */
+/** @file Verifies colour-map normalization and the bundled-default fallback. */
 import {expect, test} from 'bun:test';
 import {readFileSync} from 'node:fs';
 
-import type {ColorMap} from '@shared/types/config';
+import type {ColorMap, configOptions} from '@shared/types/config';
 
+import {fixConfigDefaults} from '../../app/config/fix-config-defaults';
 import {getColorMap, withDefaultColors} from '../../app/utils/colours';
 
 /** A complete bundled palette, so a partial override has something to fall on. */
@@ -44,6 +45,46 @@ test('withDefaultColors keeps the user colours when the bundled defaults are una
   // A bundled config that could not be read or parsed has no `colors` section,
   // so the fallback must neither throw nor drop the user's own colours.
   expect(withDefaultColors(userColors)).toEqual(userColors);
+});
+
+/** A configuration stub carrying only the property `fixConfigDefaults` reads. */
+const configWith = (colors: ColorMap | readonly string[]): configOptions =>
+  // SAFETY: `fixConfigDefaults` reads and writes `colors` only, and the cast
+  // supplies exactly that property; asserting the whole shape would make the
+  // test repeat an unrelated production type.
+  ({colors}) as configOptions;
+
+/**
+ * A partial user colour map, as a hand-edited configuration may supply.
+ *
+ * `withDefaultColors` fills every missing slot from the bundled defaults, so a
+ * partial map is safe at runtime even though the static type describes a
+ * complete palette.
+ */
+const partialColors = (colors: Partial<ColorMap>): ColorMap =>
+  // SAFETY: the layering under test is what makes the missing slots total.
+  colors as ColorMap;
+
+test('fixConfigDefaults keeps the user colours over the bundled defaults', () => {
+  const layered = fixConfigDefaults(configWith(partialColors({black: '#111111'})), bundledDefaults);
+
+  expect(layered.colors.black).toBe('#111111');
+  expect(layered.colors.blue).toBe(bundledDefaults.blue);
+});
+
+test('fixConfigDefaults falls back to the bundled defaults for unset slots', () => {
+  const layered = fixConfigDefaults(configWith([]), bundledDefaults);
+
+  expect(layered.colors).toEqual(bundledDefaults);
+});
+
+test('fixConfigDefaults keeps the user colours when the bundled defaults are absent', () => {
+  // A bundled config that could not be read or parsed supplies no colours at
+  // all, so the last-resort palette stands in without dropping the user's own.
+  const layered = fixConfigDefaults(configWith(partialColors({black: '#111111'})));
+
+  expect(layered.colors.black).toBe('#111111');
+  expect(layered.colors.blue).toBe(withDefaultColors([]).blue);
 });
 
 test('the last-resort palette matches the bundled defaults', () => {

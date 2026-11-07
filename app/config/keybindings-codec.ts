@@ -275,7 +275,7 @@ export const serializeKeybindings = (keymaps: UserKeymaps): string => `${HEADER}
  * The codec as the keybindings service's port.
  *
  * The service holds this interface, so it never imports JSON5 or the
- * serialiser directly.
+ * serializer directly.
  *
  * @example
  * ```ts

@@ -26,6 +26,11 @@ naming the inherited Hyper version.
   is created beneath it. Otherwise:
   - Linux and macOS: `~/.config/Velocetty`.
   - Windows: `%APPDATA%\Velocetty`.
+
+  A development build that uses a development-mode `config.json5` or
+  `hyper.json` keeps `keybindings.json5` beside that file instead, so
+  development builds edit the file next to the configuration they are actually
+  using rather than the user-wide Velocetty copy.
 - Start-up migration is conditional. It runs only when `keybindings.json5`
   does not exist. A valid `keymaps` value is copied into the new file, and
   Velocetty never rewrites the legacy configuration file, so its comments and

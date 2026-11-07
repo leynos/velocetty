@@ -197,13 +197,13 @@ describe('output contracts', () => {
     }`;
 
     // The diagnostics carry a JSON pointer and no filesystem path, so the
-    // snapshot needs no normalisation and cannot embed a user's directory.
+    // snapshot needs no normalization and cannot embed a user's directory.
     expect(expectInvalid(parseKeybindingsText(text, SOURCE))).toMatchSnapshot();
   });
 
   // The JSON5 library supplies this wording, so a dependency upgrade that
   // changes user-facing text fails here and is reviewed rather than shipped.
-  test.serial('reports a syntax error with a normalised source position', () => {
+  test.serial('reports a syntax error with a normalized source position', () => {
     const [diagnostic] = expectInvalid(parseKeybindingsText(`{'a': 'ctrl+n'`, SOURCE));
     if (diagnostic === undefined) {
       throw new Error('Expected one diagnostic.');

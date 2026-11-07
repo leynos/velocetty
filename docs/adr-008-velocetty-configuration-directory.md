@@ -92,8 +92,9 @@ Option A.
 
 - Users with a `config.json5` in both trees may edit the ignored copy. The
   start-up notification and the users' guide mitigate this.
-- Moving an existing configuration is manual. Quit Velocetty, move
-  `config.json5`, `schema.json`, and `plugins/` from the Hyper tree into the
+- Moving an existing configuration is manual. Quit Velocetty, move the active
+  configuration file (`config.json5`, or `hyper.json` renamed to
+  `config.json5`), `schema.json`, and `plugins/` from the Hyper tree into the
   existing Velocetty directory, and restart. Do not move the other files in the
   Hyper directory; they are Electron application state. Automatic migration may
   follow once the Hyper tree is retired.
