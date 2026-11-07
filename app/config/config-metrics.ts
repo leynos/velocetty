@@ -3,7 +3,7 @@
  * The counter names are a closed set and carry no free-form labels, so neither
  * a log record nor an exported snapshot can embed a path, a command identifier,
  * or any other user data. The composition root owns the only instance; the
- * modules below it only report events they already recognise.
+ * modules below it only report events they already recognize.
  */
 
 /** The fixed counter vocabulary. */

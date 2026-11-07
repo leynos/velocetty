@@ -86,6 +86,9 @@ validate_entries() {
   while IFS= read -r entry; do
     read -r source timeout extra <<<"$entry"
     [[ -f "$source" ]] || fail "Listed proof source '${source}' does not exist."
+    # The list has two columns. Silently ignoring a third would let a typo or a
+    # copied timeout pass as configuration the script does not implement.
+    [[ -z "${extra:-}" ]] || fail "Unexpected text '${extra}' after the timeout for '${source}'."
     if [[ -n "${timeout:-}" ]]; then
       [[ "$timeout" =~ ^[0-9]+$ ]] || fail "Timeout '${timeout}' for '${source}' is not an integer."
       ((timeout <= max_timeout_seconds)) ||
@@ -138,19 +141,34 @@ scan_for_trust_constructs() {
   ' "$file"
 }
 
+# Prints the hand-authored and generated Dafny file of every listed source.
+#
+# The list is authoritative: a proof may live outside `app/config`, and deriving
+# the scan targets from it means a listed proof cannot be verified while
+# escaping the trust-construct scan.
+list_proof_artefacts() {
+  local entry source base candidate
+  while IFS= read -r entry; do
+    read -r source _ <<<"$entry"
+    base="${source%.ts}"
+    for candidate in "${base}.dfy" "${base}.dfy.gen"; do
+      if [[ -f "$candidate" ]]; then
+        printf '%s\n' "$candidate"
+      fi
+    done
+  done < <(read_entries)
+}
+
 check_forbidden_trust_constructs() {
   # A `while read` loop rather than `mapfile`, which is a bash 4 builtin:
   # macOS still ships bash 3.2, and this guard must run there too.
   local matches='' file found
-  local found_any=0
   while IFS= read -r file; do
-    found_any=1
     found="$(scan_for_trust_constructs "$file")"
     if [[ -n "$found" ]]; then
       matches+="$found"$'\n'
     fi
-  done < <(find app/config test/proofs -type f \( -name '*.dfy' -o -name '*.dfy.gen' \) -print)
-  ((found_any == 1)) || return 0
+  done < <(list_proof_artefacts)
   if [[ -n "$matches" ]]; then
     # `emptyUserKeymaps` is the single admitted axiom; every other trust
     # construct makes the proof vacuous.
@@ -175,7 +193,7 @@ run_verification() {
     grep -oE 'Dafny program verifier finished with [0-9]+ verified, 0 errors' |
     tail -n 1 |
     grep -oE '[0-9]+' |
-    head -n 1)"
+    head -n 1 || true)"
   [[ -n "$verified" ]] || fail "The verifier output did not report 'Dafny program verifier finished with <N> verified, 0 errors'."
   ((verified >= 1)) || fail "The verifier reported zero verified programs."
 

@@ -101,7 +101,7 @@ const FALLBACK_COLORS: ColorMap = {
  *
  * @example
  * ```ts
- * withDefaultColors(['#111'], {black: '#000'}); // {black: '#111'}
+ * withDefaultColors(['#111'], {black: '#000'}).black; // '#111'
  * ```
  */
 export const withDefaultColors = (

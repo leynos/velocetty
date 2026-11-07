@@ -52,6 +52,23 @@ uses a development-mode `config.json5` or `hyper.json` keeps it beside that
 file instead. Velocetty never creates a new configuration file in the Hyper
 directory.
 
+### Informational command-line arguments
+
+Velocetty starts the terminal whatever arguments it is given. Three arguments
+are special: `--help`, `-v`, and `--version` print diagnostics and exit without
+starting Electron. All three print the same report:
+
+- the Velocetty version;
+- a reminder that settings live in the configuration file rather than on the
+  command line;
+- the active `config.json5` path;
+- the active `keybindings.json5` path;
+- which tree supplied the configuration (`velocetty`, `hyper`, or
+  `development`).
+
+The paths are the resolved ones, so the report is the quickest way to find out
+which file an installation is actually reading.
+
 ## Keyboard shortcuts
 
 Keyboard shortcuts are stored in `keybindings.json5`, separately from the rest
@@ -73,9 +90,17 @@ No menu entry or command opens the file yet.
 ### Moving an existing configuration
 
 1. Quit Velocetty.
-2. Move the active configuration file into the Velocetty directory. If the
-   Hyper directory holds `config.json5`, move it under that name; if it holds
-   only the older `hyper.json`, move that file and rename it to `config.json5`.
+2. Check whether the Velocetty directory already holds a `config.json5`.
+   - If the active file is already in the Velocetty directory, there is
+     nothing to move.
+   - If both trees hold a configuration file, merge the Hyper-tree file into
+     the Velocetty copy by hand. The Velocetty copy wins at start-up, so
+     overwriting it would discard the settings Velocetty is already using.
+   - Otherwise move the active configuration file into the Velocetty
+     directory. If the Hyper directory holds `config.json5`, move it under
+     that name; if it holds only the older `hyper.json`, move that file and
+     rename it to `config.json5`.
+
    Also move `schema.json` and the `plugins/` directory. Create the Velocetty
    directory if it does not exist yet.
 3. Start Velocetty again.

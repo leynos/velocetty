@@ -360,9 +360,10 @@ test('KB-SVC-2 fixed: reload applies the file', () => {
 });
 
 test('KB-SVC-2 fixed: a successful import clears the unsaved seed', () => {
-  // After the import writes the file, deleting it and reloading must report a
-  // plain missing file, not a retained seed.
-  fc.modelRun(setup, [importValidWith(FIXED_TEXT), DELETE_FILE, RELOAD]);
+  // The failed seed write leaves a genuinely unsaved seed in memory, so the
+  // import is what clears it. Deleting the file afterwards must then report a
+  // plain missing file rather than the retained seed.
+  fc.modelRun(setup, [FAIL_NEXT_WRITE, startWith(FIXED_LEGACY), importValidWith(FIXED_TEXT), DELETE_FILE, RELOAD]);
 });
 
 test('KB-SVC-2 non-vacuity: every command is generated', () => {

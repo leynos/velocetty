@@ -52,56 +52,61 @@ const checkAppFixture = async (fixtureName: string, content: string): Promise<Ch
   }
 };
 
-test(
-  'a type-only import of @shared from app/ passes',
-  async () => {
-    const result = await checkAppFixture(
-      'type-only.ts',
-      "import type {A} from '@shared/types/config';\nimport {type B} from '@shared/types/other';\nexport type Both = A | B;\n"
-    );
+/** One import shape and the outcome the checker must produce for it. */
+type CheckerCase = {
+  readonly content: string;
+  readonly expectedOutput: string;
+  readonly fixtureName: string;
+  readonly isRejected: boolean;
+  readonly title: string;
+};
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('Package boundary check passed.');
+const CHECKER_CASES: readonly CheckerCase[] = [
+  {
+    content:
+      "import type {A} from '@shared/types/config';\nimport {type B} from '@shared/types/other';\nexport type Both = A | B;\n",
+    expectedOutput: 'Package boundary check passed.',
+    fixtureName: 'type-only.ts',
+    isRejected: false,
+    title: 'a type-only import of @shared from app/ passes'
   },
-  CHECKER_TIMEOUT_MS
-);
-
-test(
-  'a runtime import of @shared from app/ fails with the packaging reason',
-  async () => {
-    const result = await checkAppFixture('runtime.ts', "import {a} from '@shared/x';\nconsole.log(a);\n");
-
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain('runtime `@shared/*` import in app/');
+  {
+    content: "import {a} from '@shared/x';\nconsole.log(a);\n",
+    expectedOutput: 'runtime `@shared/*` import in app/',
+    fixtureName: 'runtime.ts',
+    isRejected: true,
+    title: 'a runtime import of @shared from app/ fails with the packaging reason'
   },
-  CHECKER_TIMEOUT_MS
-);
-
-test(
-  'a mixed type and value import of @shared from app/ fails',
-  async () => {
+  {
     // The value binding survives compilation, so the clause is not type-only
     // even though it also carries a type import.
-    const result = await checkAppFixture('mixed.ts', "import {type A, b} from '@shared/x';\nconsole.log(b);\n");
-
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain('runtime `@shared/*` import in app/');
+    content: "import {type A, b} from '@shared/x';\nconsole.log(b);\n",
+    expectedOutput: 'runtime `@shared/*` import in app/',
+    fixtureName: 'mixed.ts',
+    isRejected: true,
+    title: 'a mixed type and value import of @shared from app/ fails'
   },
-  CHECKER_TIMEOUT_MS
-);
-
-test(
-  'a two-argument dynamic import of @shared from app/ is analysed',
-  async () => {
+  {
     // `import('x', {with: {type: 'json'}})` names its module in the first
     // argument; skipping the two-argument form would let it through.
-    const result = await checkAppFixture(
-      'dynamic.ts',
-      "const load = () => import('@shared/x', {with: {type: 'json'}});\nexport {load};\n"
-    );
+    content: "const load = () => import('@shared/x', {with: {type: 'json'}});\nexport {load};\n",
+    expectedOutput: 'runtime `@shared/*` import in app/',
+    fixtureName: 'dynamic.ts',
+    isRejected: true,
+    title: 'a two-argument dynamic import of @shared from app/ is analysed'
+  }
+];
 
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain('runtime `@shared/*` import in app/');
-  },
-  CHECKER_TIMEOUT_MS
-);
+for (const {content, expectedOutput, fixtureName, isRejected, title} of CHECKER_CASES) {
+  test(
+    title,
+    async () => {
+      const result = await checkAppFixture(fixtureName, content);
+
+      expect(result.status).toBe(isRejected ? 1 : 0);
+      // A pass reports itself on stdout; a rejection explains itself on stderr.
+      expect(isRejected ? result.stderr : result.stdout).toContain(expectedOutput);
+    },
+    CHECKER_TIMEOUT_MS
+  );
+}

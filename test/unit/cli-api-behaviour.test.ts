@@ -34,6 +34,7 @@ type GotRequestOptions = {
 
 type CliHarnessOptions = {
   readonly appData?: string;
+  readonly brokenLinkPaths?: Set<string>;
   readonly configData?: ConfigData;
   readonly env?: {
     APPDATA?: string;
@@ -53,6 +54,7 @@ type CliHarnessOptions = {
 };
 
 type CliHarnessState = {
+  brokenLinkPaths: Set<string>;
   configData: ConfigData;
   existingPaths: Set<string> | null;
   fsExistsSyncResult: boolean;
@@ -94,27 +96,40 @@ const parseConfigData = (contents: string): ConfigData => {
  * comments, and a non-string would be a broken fixture rather than a valid
  * case.
  */
-const buildFsModule = (state: CliHarnessState) => ({
-  existsSync: (candidatePath: string) => {
-    if (state.existingPaths) {
-      return state.existingPaths.has(candidatePath);
+/** Node's stat calls throw for a missing entry rather than returning a value. */
+const throwMissing = (candidatePath: string): never => {
+  throw new Error(`ENOENT: no such file or directory, '${candidatePath}'`);
+};
+
+/** Stands in for `fs.Stats`: the probe checks only that the call succeeded. */
+const PATH_ENTRY = {};
+
+const buildFsModule = (state: CliHarnessState) => {
+  const pathExists = (candidatePath: string) =>
+    state.existingPaths ? state.existingPaths.has(candidatePath) : state.fsExistsSyncResult;
+
+  return {
+    existsSync: pathExists,
+    // A dangling symlink resolves for `lstat` but not for `stat`, which is the
+    // distinction the probe relies on.
+    lstatSync: (candidatePath: string) =>
+      pathExists(candidatePath) || state.brokenLinkPaths.has(candidatePath) ? PATH_ENTRY : throwMissing(candidatePath),
+    readFileSync: (_target: string, _encoding: 'utf8') => {
+      state.fsReadFileSyncCallCount += 1;
+      const contents = state.hasReadFileSyncOverride ? state.fsReadFileSyncValue : JSON.stringify(state.configData);
+      if (!isString(contents)) {
+        throw new TypeError('Expected the read-file override to be a string.');
+      }
+      return contents;
+    },
+    statSync: (candidatePath: string) => (pathExists(candidatePath) ? PATH_ENTRY : throwMissing(candidatePath)),
+    writeFileSync: (_target: string, contents: string, _encoding: 'utf8') => {
+      const parsed = parseConfigData(contents);
+      state.savedConfigs.push(parsed);
+      state.configData = parsed;
     }
-    return state.fsExistsSyncResult;
-  },
-  readFileSync: (_target: string, _encoding: 'utf8') => {
-    state.fsReadFileSyncCallCount += 1;
-    const contents = state.hasReadFileSyncOverride ? state.fsReadFileSyncValue : JSON.stringify(state.configData);
-    if (!isString(contents)) {
-      throw new TypeError('Expected the read-file override to be a string.');
-    }
-    return contents;
-  },
-  writeFileSync: (_target: string, contents: string, _encoding: 'utf8') => {
-    const parsed = parseConfigData(contents);
-    state.savedConfigs.push(parsed);
-    state.configData = parsed;
-  }
-});
+  };
+};
 
 const buildGotClient = (state: CliHarnessState) => ({
   get: (url: string, requestOptions: GotRequestOptions) => {
@@ -129,6 +144,7 @@ const buildGotClient = (state: CliHarnessState) => ({
 
 const createCliHarness = (options: CliHarnessOptions = {}): CliHarness => {
   const state: CliHarnessState = {
+    brokenLinkPaths: options.brokenLinkPaths ?? new Set(),
     configData: options.configData ?? {plugins: [], localPlugins: []},
     existingPaths: options.existingPaths ?? null,
     fsExistsSyncResult: options.fsExistsSyncResult ?? true,
@@ -449,6 +465,21 @@ test('configPath prefers the Velocetty tree when both trees hold a config', () =
 
   expect(api.configPath).toBe(velocettyPath);
   expect(api.exists()).toBe(true);
+});
+
+test('configPath keeps a dangling Velocetty link ahead of a readable Hyper config', () => {
+  const velocettyPath = path.join('/tmp/velocetty-xdg', 'Velocetty', 'config.json5');
+  const hyperPath = path.join('/tmp/velocetty-xdg', 'Hyper', 'config.json5');
+  const {api} = createCliHarness({
+    brokenLinkPaths: new Set([velocettyPath]),
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: '/tmp/velocetty-xdg'},
+    existingPaths: new Set([hyperPath])
+  });
+
+  // The Velocetty file is dotfiles-managed and only its target is missing.
+  // Falling through to Hyper would have the CLI write a file the application
+  // ignores, so the dangling link must still win.
+  expect(api.configPath).toBe(velocettyPath);
 });
 
 test('configPath ignores a relative XDG_CONFIG_HOME on Linux', () => {

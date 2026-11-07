@@ -135,10 +135,10 @@ Last updated: 2026-10-30
   dotfiles configuration can resolve differently.
 - The CLI treats any `NODE_ENV` other than `production` as development mode,
   whereas the application uses `electron-is-dev`.
-- The CLI's filesystem probe is two-state (`present` or `absent`), so a dangling
-  symlink looks absent. The application's probe is three-state and reports a
-  broken link as present, so an intentionally dangling managed file is not
-  silently shadowed.
+- The CLI's filesystem probe is now three-state like the application's, so a
+  dangling symlink counts as present in both. Each side implements the
+  `stat`-then-`lstat` sequence separately, because they cannot share a concrete
+  filesystem module.
 - Recorded as a known risk in
   [ADR 008](adr-008-velocetty-configuration-directory.md).
 
@@ -146,8 +146,9 @@ Last updated: 2026-10-30
 
 - The CLI receives `realpath`-capable comparison, or both sides document why
   string equality is sufficient.
-- Broken-link handling is either shared or explicitly documented as an
-  application-only guarantee.
+- ~~Broken-link handling is either shared or explicitly documented as an
+  application-only guarantee.~~ Both probes are three-state; only the concrete
+  filesystem access differs.
 - Development-mode detection has a single definition used by both sides.
 - Tests cover a symlinked tree and a dangling symlink on both sides.
 

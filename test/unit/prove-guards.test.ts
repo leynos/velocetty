@@ -4,7 +4,7 @@ import {chmodSync, copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync} 
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 
-import {afterEach, expect, test} from 'bun:test';
+import {expect, test} from 'bun:test';
 
 const REPOSITORY_ROOT = path.join(import.meta.dir, '..', '..');
 const PROVE_SCRIPT = path.join(REPOSITORY_ROOT, 'bin', 'prove.sh');
@@ -15,14 +15,17 @@ const POLICY_SOURCE = 'app/config/keybindings-policy.ts';
 /** A generated artefact whose body carries no trust construct. */
 const GENERATED_STUB = 'lemma Generated()\n  ensures true\n{\n}\n';
 
-/** Fixture repositories created by the current test, removed afterwards. */
-const fixtures: string[] = [];
+/** The rule line that opens and closes a generated artefact's module header. */
+const HEADER_RULE = `// ${'-'.repeat(66)}`;
 
-afterEach(() => {
-  for (const fixture of fixtures.splice(0)) {
-    rmSync(fixture, {force: true, recursive: true});
-  }
-});
+/**
+ * A generated artefact whose header is prose copied from its TypeScript module.
+ *
+ * The scan skips that header, because a summary may legitimately mention a word
+ * the proof body must never contain.
+ */
+const generatedWithHeader = (headerLine: string, body = GENERATED_STUB): string =>
+  [HEADER_RULE, `// ${headerLine}`, HEADER_RULE, body].join('\n');
 
 /**
  * Git variables that would point a fixture at the outer repository.
@@ -64,7 +67,6 @@ const writeStub = (filePath: string, body: string) => {
  */
 const createFixture = (): string => {
   const root = mkdtempSync(path.join(tmpdir(), 'velocetty-prove-'));
-  fixtures.push(root);
   mkdirSync(path.join(root, 'bin'), {recursive: true});
   mkdirSync(path.join(root, 'test', 'proofs'), {recursive: true});
   copyFileSync(PROVE_SCRIPT, path.join(root, 'bin', 'prove.sh'));
@@ -97,25 +99,38 @@ const writeList = (root: string, lines: readonly string[]) => {
   writeFileSync(path.join(root, 'LemmaScript-files.txt'), `${lines.join('\n')}\n`, 'utf8');
 };
 
-/** Creates a fixture whose policy source exists, ready for a list. */
-const createPolicyFixture = (): string => {
+/**
+ * Runs one test inside a fixture it owns outright.
+ *
+ * Per-test ownership means a failing assertion cannot leave a directory behind
+ * or let one test observe another's files.
+ */
+const inFixture = (body: (root: string) => void): void => {
   const root = createFixture();
+  try {
+    body(root);
+  } finally {
+    rmSync(root, {force: true, recursive: true});
+  }
+};
+
+/** Adds the policy source, so the guard's policy check is satisfiable. */
+const addPolicySource = (root: string): void => {
   writeSource(root, POLICY_SOURCE);
-  return root;
 };
 
 /** Runs the script against a policy fixture with the given list contents. */
-const runWithList = (lines: readonly string[]) => {
-  const root = createPolicyFixture();
+const runWithList = (root: string, lines: readonly string[]) => {
+  addPolicySource(root);
   writeList(root, lines);
   return runProve(root);
 };
 
-/** Runs the script against a policy fixture carrying the given Dafny proof. */
-const runWithProof = (dafnySource: string) => {
-  const root = createPolicyFixture();
+/** Runs the script against a policy fixture carrying the given Dafny proofs. */
+const runWithProof = (root: string, dafnySource: string, generated = GENERATED_STUB) => {
+  addPolicySource(root);
   writeSource(root, 'app/config/keybindings-policy.dfy', dafnySource);
-  writeSource(root, 'app/config/keybindings-policy.dfy.gen', GENERATED_STUB);
+  writeSource(root, 'app/config/keybindings-policy.dfy.gen', generated);
   writeList(root, [POLICY_SOURCE]);
   return runProve(root);
 };
@@ -134,61 +149,153 @@ const runProve = (root: string) => {
 };
 
 test('prove refuses a missing proof-source list', () => {
-  const result = runProve(createFixture());
+  inFixture((root) => {
+    const result = runProve(root);
 
-  expect(result.status).toBe(1);
-  expect(result.stderr).toContain('Missing LemmaScript-files.txt.');
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Missing LemmaScript-files.txt.');
+  });
 });
 
 test('prove refuses a list with no proof sources', () => {
-  const result = runWithList(['# only a comment']);
+  inFixture((root) => {
+    const result = runWithList(root, ['# only a comment']);
 
-  expect(result.status).toBe(1);
-  expect(result.stderr).toContain('lists no proof sources');
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('lists no proof sources');
+  });
 });
 
 test('prove refuses a listed source that does not exist', () => {
-  const result = runWithList(['app/config/absent.ts']);
+  inFixture((root) => {
+    const result = runWithList(root, ['app/config/absent.ts']);
 
-  expect(result.status).toBe(1);
-  expect(result.stderr).toContain("Listed proof source 'app/config/absent.ts' does not exist.");
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Listed proof source 'app/config/absent.ts' does not exist.");
+  });
 });
 
 test('prove refuses a non-integer timeout', () => {
-  const result = runWithList([`${POLICY_SOURCE} soon`]);
+  inFixture((root) => {
+    const result = runWithList(root, [`${POLICY_SOURCE} soon`]);
 
-  expect(result.status).toBe(1);
-  expect(result.stderr).toContain(`Timeout 'soon' for '${POLICY_SOURCE}' is not an integer.`);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(`Timeout 'soon' for '${POLICY_SOURCE}' is not an integer.`);
+  });
 });
 
 test('prove refuses a timeout long enough for lsc to downgrade the check', () => {
-  const result = runWithList([`${POLICY_SOURCE} 61`]);
+  inFixture((root) => {
+    const result = runWithList(root, [`${POLICY_SOURCE} 61`]);
 
-  expect(result.status).toBe(1);
-  expect(result.stderr).toContain('exceeds the 60s limit');
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('exceeds the 60s limit');
+  });
+});
+
+test('prove refuses text after the timeout column', () => {
+  // The list has two columns; a third word would otherwise be silently ignored.
+  inFixture((root) => {
+    const result = runWithList(root, [`${POLICY_SOURCE} 10 typo`]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(`Unexpected text 'typo' after the timeout for '${POLICY_SOURCE}'.`);
+  });
 });
 
 test('prove refuses to skip the policy proof when the policy exists unlisted', () => {
-  const root = createPolicyFixture();
-  writeSource(root, 'app/config/other.ts');
-  writeList(root, ['app/config/other.ts']);
+  inFixture((root) => {
+    writeSource(root, POLICY_SOURCE);
+    writeSource(root, 'app/config/other.ts');
+    writeList(root, ['app/config/other.ts']);
 
-  const result = runProve(root);
+    const result = runProve(root);
 
-  expect(result.status).toBe(1);
-  expect(result.stderr).toContain(`${POLICY_SOURCE} exists but is not listed`);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(`${POLICY_SOURCE} exists but is not listed`);
+  });
 });
 
 test('prove refuses a forbidden Dafny trust construct', () => {
-  const result = runWithProof('lemma Bad()\n  ensures false\n{\n  assume false;\n}\n');
+  inFixture((root) => {
+    const result = runWithProof(root, 'lemma Bad()\n  ensures false\n{\n  assume false;\n}\n');
 
-  expect(result.status).toBe(1);
-  expect(result.stderr).toContain('Forbidden Dafny trust construct found');
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Forbidden Dafny trust construct found');
+  });
+});
+
+test('prove refuses a spaced axiom attribute that is not the admitted one', () => {
+  // Dafny accepts whitespace inside an attribute, so `{: axiom }` must not slip
+  // past the comparison against the one admitted line.
+  inFixture((root) => {
+    const result = runWithProof(root, 'function {: axiom } emptyUserKeymaps(): UserKeymaps\n');
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Forbidden Dafny trust construct found');
+  });
+});
+
+test('prove refuses a spaced verify-false attribute', () => {
+  inFixture((root) => {
+    const result = runWithProof(root, 'lemma Bad()\n  ensures true\n  {: verify false }\n{\n}\n');
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Forbidden Dafny trust construct found');
+  });
+});
+
+test('prove refuses a trust construct in a generated artefact body', () => {
+  inFixture((root) => {
+    const result = runWithProof(
+      root,
+      '// hand-authored proof\n',
+      generatedWithHeader('Generated proof.', 'lemma Bad()\n{\n  assume false;\n}\n')
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Forbidden Dafny trust construct found');
+  });
+});
+
+test('prove ignores a trust word in a generated artefact header', () => {
+  // The header is copied from the TypeScript module's prose summary, so a word
+  // the scan forbids there is a description, not a proof step.
+  inFixture((root) => {
+    const result = runWithProof(
+      root,
+      '// hand-authored proof\n',
+      generatedWithHeader('Assumes the user keymaps are empty.')
+    );
+
+    expect(result.status).toBe(0);
+  });
+});
+
+test('prove ignores a hand-authored proof outside the policy directory', () => {
+  // The list is authoritative, so a proof listed from elsewhere is still
+  // scanned; this pins that the scan follows the list rather than a fixed path.
+  inFixture((root) => {
+    writeSource(root, POLICY_SOURCE);
+    writeSource(root, 'app/config/keybindings-policy.dfy.gen', GENERATED_STUB);
+    writeSource(root, 'test/proofs/other.ts');
+    writeSource(root, 'test/proofs/other.dfy', 'lemma Other()\n{\n  assume false;\n}\n');
+    writeSource(root, 'test/proofs/other.dfy.gen', GENERATED_STUB);
+    writeList(root, [POLICY_SOURCE, 'test/proofs/other.ts']);
+
+    const result = runProve(root);
+
+    expect(result.status).toBe(1);
+    // The refusal prints the offending line, which only this proof contains.
+    expect(result.stderr).toContain('assume false;');
+  });
 });
 
 test('prove admits only the emptyUserKeymaps axiom and then verifies', () => {
-  const result = runWithProof('function {:axiom} emptyUserKeymaps(): UserKeymaps\n');
+  inFixture((root) => {
+    const result = runWithProof(root, 'function {:axiom} emptyUserKeymaps(): UserKeymaps\n');
 
-  expect(result.status).toBe(0);
-  expect(result.stdout).toContain('Dafny program verifier finished with 1 verified, 0 errors');
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('Dafny program verifier finished with 1 verified, 0 errors');
+  });
 });

@@ -270,7 +270,7 @@ export const createKeybindingsService = (dependencies: {
   /**
    * Returns the stored text for an exporter, reporting why when it cannot.
    *
-   * The text is returned unchanged rather than re-serialised, so an export
+   * The text is returned unchanged rather than re-serialized, so an export
    * preserves the user's comments and formatting.
    */
   const exportKeybindings = (): KeybindingsExport => {

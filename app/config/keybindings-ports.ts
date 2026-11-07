@@ -53,7 +53,7 @@ export type KeybindingsStore = {
   readonly write: (text: string) => KeybindingsWriteOutcome;
 };
 
-/** The text codec port: parsing and serialising stay behind this boundary. */
+/** The text codec port: parsing and serializing stay behind this boundary. */
 export type KeybindingsTextCodec = {
   readonly parse: (
     text: string,

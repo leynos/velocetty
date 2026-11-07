@@ -93,6 +93,26 @@ test('getDefaultConfig neither notifies nor re-reads, before or after start-up',
   }
 });
 
+test('a default query and the later start-up command share one cached payload', async () => {
+  const harness = await createConfigImportHarness();
+  try {
+    // The default file is absent, so the first query reports a read fault.
+    seedBundledFiles(harness);
+    const first = harness.getDefaultConfig();
+    expect(first.failure).toBe('read');
+
+    // The shipped files do not change while the application runs, so the
+    // payload is read once. A file that appears mid-run must not make the
+    // query and the start-up command disagree about what is in effect.
+    writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
+    harness._import('startup');
+
+    expect(harness.getDefaultConfig()).toEqual(first);
+  } finally {
+    harness.cleanup();
+  }
+});
+
 test('reports a missing platform keymap in the query and once at start-up', async () => {
   const errorMock = mock<typeof console.error>(() => {});
   const harness = await createConfigImportHarness({error: errorMock});

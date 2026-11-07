@@ -41,9 +41,20 @@ type PackageName = string & {readonly __brand: 'PackageName'};
  */
 type CliApiFsModule = {
   existsSync(target: string): boolean;
+  lstatSync(target: string): CliApiPathEntry;
   readFileSync(target: string, encoding: 'utf8'): string;
+  statSync(target: string): CliApiPathEntry;
   writeFileSync(target: string, contents: string, encoding: 'utf8'): void;
 };
+
+/**
+ * What a successful `stat` or `lstat` proves to the probe.
+ *
+ * The probe distinguishes throw from no-throw and reads nothing else, so the
+ * slice names that single fact rather than exposing Node's `Stats`, which a
+ * double would have to reproduce field by field.
+ */
+type CliApiPathEntry = object;
 
 /**
  * The slice of the HTTP client this module depends on.
@@ -238,7 +249,12 @@ const normalizeConfiguredAppData = (appData: string | undefined): string | undef
  *
  * - the development flag is `NODE_ENV !== 'production'`;
  * - the development directory is the repository root relative to this module;
- * - `APPDATA` stands in for Electron's `appData`, with a home-based default.
+ * - `APPDATA` stands in for Electron's `appData`, with a home-based default;
+ * - `sameFile` compares joined paths, because this slice cannot call `realpath`.
+ *
+ * The probe still distinguishes a dangling symlink from an absent file, so a
+ * dotfiles-managed configuration the CLI cannot follow is not mistaken for a
+ * missing one and shadowed by a file the application would ignore.
  *
  * These differences are recorded in `docs/tracking-issues.md`.
  */
@@ -264,8 +280,22 @@ const resolveConfigPath = ({
       enabled: env.NODE_ENV !== 'production',
       directory: platformPath.join(moduleDirectory, '..')
     },
-    /** The CLI only needs presence, so it never resolves a link target. */
-    probe: (candidate) => (fsModule.existsSync(candidate) ? 'present' : 'absent'),
+    // Mirrors the application's probe: a dangling symlink is a managed file
+    // whose target is temporarily missing, not an absent one. Reporting it as
+    // absent would let the CLI create a config the application then ignores.
+    probe: (candidate) => {
+      try {
+        fsModule.statSync(candidate);
+        return 'present';
+      } catch {
+        try {
+          fsModule.lstatSync(candidate);
+          return 'broken-link';
+        } catch {
+          return 'absent';
+        }
+      }
+    },
     // The CLI's narrow filesystem slice cannot call `realpath`, so identical
     // joined paths are the strongest equality it can establish.
     sameFile: (left, right) => left === right

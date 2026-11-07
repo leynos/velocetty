@@ -542,7 +542,7 @@ export {get as getWin, recordState as winRecord, defaults as windowDefaults} fro
  *
  * @example
  * ```ts
- * fixConfigDefaults({colors: {}} as configOptions).colors.background; // the bundled default
+ * fixConfigDefaults({colors: {}} as configOptions).colors.black; // the bundled default
  * ```
  */
 export const fixConfigDefaults = (decoratedConfig: configOptions) =>

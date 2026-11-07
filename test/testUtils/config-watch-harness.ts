@@ -8,7 +8,7 @@ import {mock} from 'bun:test';
 
 import type {ConfigImportReport} from '../../app/config/import-report';
 import type {KeybindingsLoadOutcome} from '../../app/config/keybindings';
-import type {parsedConfig, rawConfig} from '@shared/types/config';
+import type {ColorMap, parsedConfig, rawConfig} from '@shared/types/config';
 import {_init} from '../../app/config/init';
 import {getElectronMock, registerElectronMock, resetElectronMock} from './electron-path';
 import {registerModuleMock} from './mock-module';
@@ -52,8 +52,6 @@ const pathsModuleFactory = () => ({
   velocettyDir: '/tmp'
 });
 const windowsModuleFactory = () => ({defaults: {}, get: () => ({}), recordState: () => {}});
-// The watcher tests never inspect colours, so both exports return an empty map.
-const coloursModuleFactory = () => ({getColorMap: () => ({}), withDefaultColors: () => ({})});
 
 /** One module factory to register, with the specifier Bun should resolve it under. */
 type AppModuleMockRequest<Exports> = Readonly<{
@@ -121,8 +119,14 @@ const outcomeFor = (report: ConfigImportReport): KeybindingsLoadOutcome =>
         kind: 'kept'
       };
 
+/** Variations a test can ask of the composition root's collaborators. */
+export type WatchHarnessOptions = Readonly<{
+  /** The bundled colour defaults the stubbed importer reports. */
+  readonly bundledColors?: Partial<ColorMap>;
+}>;
+
 /** Imports a fresh `app/config.ts` instance over mocked chokidar and electron. */
-export const createWatchHarness = async (): Promise<WatchHarness> => {
+export const createWatchHarness = async (options: WatchHarnessOptions = {}): Promise<WatchHarness> => {
   mock.restore();
   // These stand-ins ignore their arguments; recording them without naming their
   // types keeps the harness free to assert on whatever the module passes.
@@ -165,7 +169,12 @@ export const createWatchHarness = async (): Promise<WatchHarness> => {
     factory: () => ({
       createConfigImportModule: () => ({
         _import: importMock,
-        getDefaultConfig: () => ({defaults: {colors: {}}, platformKeymapFault: false})
+        // The real query returns a whole `rawConfig`; a bundled file that could
+        // not be read has no `config` section, so the stub mirrors that shape.
+        getDefaultConfig: () => ({
+          defaults: options.bundledColors === undefined ? {} : {config: {colors: options.bundledColors}},
+          platformKeymapFault: false
+        })
       })
     }),
     specifier: '../../app/config/import'
@@ -186,7 +195,9 @@ export const createWatchHarness = async (): Promise<WatchHarness> => {
   registerAppModuleMock({factory: pathsModuleFactory, specifier: '../../app/config/paths'});
   registerAppModuleMock({factory: windowsModuleFactory, specifier: '../../app/config/windows'});
   registerAppModuleMock({factory: () => ({default: notifyMock}), specifier: '../../app/notify'});
-  registerAppModuleMock({factory: coloursModuleFactory, specifier: '../../app/utils/colours'});
+  // `app/utils/colours` is deliberately left real: it is a leaf module, and a
+  // test that inspects the composed defaults must see the same layering the
+  // application performs.
 
   moduleInstanceCounter += 1;
   const configModule = await import(`../../app/config.ts?config_keybindings_watch_${moduleInstanceCounter}`);

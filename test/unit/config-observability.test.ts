@@ -316,6 +316,10 @@ describe('a reload sequence', () => {
       // Removing the file makes the read itself fail, not the parse.
       rmSync(importer.mockPaths.cfgPath);
       expect(importer._import('reload').report).toMatchObject({config: 'fallback', configCause: 'read'});
+      // The notice must not tell a user whose file could not be read that it
+      // was parsed and rejected, because the fix is entirely different.
+      const notices = importer.notifyMock.mock.calls;
+      expect(notices.at(-1)?.[0]).toBe("Couldn't read or parse config file. Using default config instead.");
     } finally {
       importer.cleanup();
     }

@@ -68,4 +68,7 @@ naming the inherited Hyper version.
 ## Detailed instructions
 
 Step-by-step instructions, including the file format and shortcut syntax, are
-in the [users' guide](users-guide.md).
+in the [users' guide](users-guide.md). Running Velocetty with `--help`, `-v`, or
+`--version` prints the resolved `keybindings.json5` path, the configuration
+path, and the configuration tree in use, without starting the terminal, so the
+report shows which files an installation actually reads.

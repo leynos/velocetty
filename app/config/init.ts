@@ -1,7 +1,7 @@
 /** @file Turns raw user configuration into the profile and keymap shape the app expects. */
 /*
  * `_init` merges the user's `config` object over the bundled defaults, repairs
- * the profile list, and normalises legacy keymaps. The configuration importer
+ * the profile list, and normalizes legacy keymaps. The configuration importer
  * calls it once per import, and a missing `config` key is reported through the
  * injected notifier rather than thrown.
  */

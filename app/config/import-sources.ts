@@ -345,7 +345,9 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
         `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
       );
       notifyWithPrimaryDiagnostic({
-        baseMessage: "Couldn't parse config file. Using default config instead.",
+        // The catch covers the read as well as anything after it, so the
+        // wording must not claim a parse failure the user may not have.
+        baseMessage: "Couldn't read or parse config file. Using default config instead.",
         diagnostics: [],
         notify: notifyFn
       });

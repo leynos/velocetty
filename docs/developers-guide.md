@@ -367,6 +367,19 @@ wires them together.
   the user's colours still win. The composition root supplies
   `getDefaultConfig().defaults.config?.colors`, and the pure function is tested
   without Electron.
+- **Import and export APIs** (`app/config/keybindings.ts`):
+  `importKeybindings` validates the text, writes it through the store, and
+  clears the unsaved-seed flag only when the write succeeded. A failed write
+  leaves the in-memory shortcuts untouched and reports `failed`, so the next
+  start retries the migration. `exportKeybindings` is a query: it reads through
+  `peek()`, adding no read span and no warning, and returns the stored text
+  unchanged rather than re-serializing it.
+- **`resolveConfigLocations`** (`app/config/config-tree.ts`): the pure selector
+  behind `paths.ts`. It takes the platform, the environment paths, the
+  development override, and the `probe` and `sameFile` predicates, and returns
+  the active file, the creation path, the Velocetty directory, and the shadowed
+  candidates. `shared/src/config/config-tree.ts` mirrors it for the CLI, and a
+  parity test keeps the two copies in step.
 
 Injecting these dependencies keeps the service, importer, and watcher testable
 in `bun test` without Electron, a real clock, or a real filesystem. See
