@@ -289,11 +289,13 @@ test('prove refuses a trust construct in a generated artefact body', () => {
 
 test('prove ignores a trust word in a generated artefact header', () => {
   // The header is copied from the TypeScript module's prose summary, so a word
-  // the scan forbids there is a description, not a proof step.
+  // the scan forbids there is a description, not a proof step. The word is the
+  // standalone lowercase form the pattern matches: "Assumes" would slip past
+  // the scan even without the header skip, and the test would prove nothing.
   inFixture((fixture) => {
     const result = runWithProof(fixture, {
       dafnySource: '// hand-authored proof\n',
-      generated: generatedWithHeader({headerLine: 'Assumes the user keymaps are empty.'})
+      generated: generatedWithHeader({headerLine: 'We assume nothing here.'})
     });
 
     expect(result.status).toBe(0);
