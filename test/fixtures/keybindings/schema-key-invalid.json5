@@ -1,0 +1,4 @@
+{
+  $schema: 42,
+  'window:new': 'ctrl+n',
+}
