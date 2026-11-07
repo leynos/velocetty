@@ -4163,6 +4163,56 @@ three helpers with no closing-over variables (`seededFreshFile`,
 callback reference passed to `flatMap` had to be wrapped in an arrow function.
 Each was fixed rather than suppressed.
 
+### EP-F: review-convergence repairs
+
+Commit `1dee6800` ("Repair the keybindings review findings", 22 files,
++478/−154) repaired every inline CodeRabbit finding from the review of
+`7974c4aa`: the `stat`/`lstat` probe shape, the config-composition and
+observability test fixtures, the `prove.sh` guard coverage, and the migration
+document rewording, among others. Sixteen inline replies were posted with
+per-finding evidence.
+
+Commit `b8d6a6f2` ("Bound the keybindings diagnostics log") changed
+`app/config/keybindings-notifier.ts` so the structured log records only
+`{count, kinds, source}`, where `kinds` is a sorted, closed set (`document`,
+`schema-key`, `command`); the command identifier and file wording remain in the
+user-facing notification only. `test/unit/keybindings-notifier.test.ts` pins
+the payload and asserts that neither the command identifier nor `/$schema`
+survives into the log. The remaining full-path/raw-diagnostic surface in
+`app/config/import-sources-parse.ts` is tracked in issue #272.
+
+Commit `177e1acc` ("Pass the prove fixture as a typed object") replaced the
+string-heavy `prove.sh` test helpers with a `Fixture` object and typed
+parameter objects; CodeScene reports 10.00 for
+`test/unit/prove-guards.test.ts`. All fourteen guard tests were preserved.
+
+Commit `44be1022` ("Match the header skip test to the scan") changed the
+generated-artefact header case from `Assumes` to `We assume nothing here.`,
+because the scan's `assume` pattern is case-sensitive and standalone; the
+earlier string let the test pass without exercising the header skip.
+
+Gates on the tree at `44be1022` (scrutineer, sequential): `check-fmt` pass (380
+Biome files, 70 Markdown files unchanged), `lint` pass (381 files, package
+boundary passed, oxlint clean), `typecheck` pass (no diagnostics), `test` pass
+(794 pass, 0 fail, 14,265 assertions, 92 files).
+
+Hosted CI: run `42379889253` on `177e1acc` and run `42381592662` on `44be1022`
+both completed `success`; the four build jobs passed and `e2e-deep-linux` was
+skipped by design. CodeScene Code Health passed and Gecko reported no
+vulnerabilities on both heads. Sourcery skipped because the diff exceeds
+150,000 characters. CodeRabbit reported "Review paused" (check-run `skipped`)
+on both heads, so a full review was queued through the managed queue rather
+than claimed as complete.
+
+Thread disposition: six addressed threads authored by Sourcery or the Codex
+connector were resolved after their authors confirmed the fixes; the two
+CodeRabbit threads were answered with commit evidence. Every reply used the
+pool comment identity, not the lifecycle account.
+
+The manual-check limitation in `## Validation and acceptance` still stands: no
+person has pressed `Ctrl+Alt+Shift+N` or `Ctrl+Alt+Shift+M` or read the menu
+accelerator on this candidate.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
