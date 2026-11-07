@@ -139,17 +139,18 @@ scan_for_trust_constructs() {
 }
 
 check_forbidden_trust_constructs() {
-  local -a dafny_files=()
-  mapfile -t dafny_files < <(find app/config test/proofs -type f \( -name '*.dfy' -o -name '*.dfy.gen' \) -print)
-  ((${#dafny_files[@]} > 0)) || return 0
-
+  # A `while read` loop rather than `mapfile`, which is a bash 4 builtin:
+  # macOS still ships bash 3.2, and this guard must run there too.
   local matches='' file found
-  for file in "${dafny_files[@]}"; do
+  local found_any=0
+  while IFS= read -r file; do
+    found_any=1
     found="$(scan_for_trust_constructs "$file")"
     if [[ -n "$found" ]]; then
       matches+="$found"$'\n'
     fi
-  done
+  done < <(find app/config test/proofs -type f \( -name '*.dfy' -o -name '*.dfy.gen' \) -print)
+  ((found_any == 1)) || return 0
   if [[ -n "$matches" ]]; then
     # `emptyUserKeymaps` is the single admitted axiom; every other trust
     # construct makes the proof vacuous.

@@ -4562,3 +4562,11 @@ requires it. Any adjustment is recorded in `Decision log`.
   - larger scope tolerances.
 
   Status stays `DRAFT` until this revision is approved.
+- 2026-11-07 (review convergence): two portability defects surfaced once the
+  new unit tests ran on every platform:
+  - `bin/prove.sh` used the bash 4 `mapfile` builtin, which macOS's bash 3.2
+    lacks, so the forbidden-construct guard aborted with exit 127. It now uses
+    a `while read` loop, and the guard suite runs unchanged on macOS.
+  - The package-boundary tests spawn a checker that loads the TypeScript
+    compiler; they now declare a thirty-second timeout, because Bun's
+    five-second default expires under concurrent load.

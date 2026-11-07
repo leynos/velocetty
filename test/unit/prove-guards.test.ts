@@ -9,6 +9,12 @@ import {afterEach, expect, test} from 'bun:test';
 const REPOSITORY_ROOT = path.join(import.meta.dir, '..', '..');
 const PROVE_SCRIPT = path.join(REPOSITORY_ROOT, 'bin', 'prove.sh');
 
+/** The policy proof source the guard insists on seeing in the list. */
+const POLICY_SOURCE = 'app/config/keybindings-policy.ts';
+
+/** A generated artefact whose body carries no trust construct. */
+const GENERATED_STUB = 'lemma Generated()\n  ensures true\n{\n}\n';
+
 /** Fixture repositories created by the current test, removed afterwards. */
 const fixtures: string[] = [];
 
@@ -91,6 +97,29 @@ const writeList = (root: string, lines: readonly string[]) => {
   writeFileSync(path.join(root, 'LemmaScript-files.txt'), `${lines.join('\n')}\n`, 'utf8');
 };
 
+/** Creates a fixture whose policy source exists, ready for a list. */
+const createPolicyFixture = (): string => {
+  const root = createFixture();
+  writeSource(root, POLICY_SOURCE);
+  return root;
+};
+
+/** Runs the script against a policy fixture with the given list contents. */
+const runWithList = (lines: readonly string[]) => {
+  const root = createPolicyFixture();
+  writeList(root, lines);
+  return runProve(root);
+};
+
+/** Runs the script against a policy fixture carrying the given Dafny proof. */
+const runWithProof = (dafnySource: string) => {
+  const root = createPolicyFixture();
+  writeSource(root, 'app/config/keybindings-policy.dfy', dafnySource);
+  writeSource(root, 'app/config/keybindings-policy.dfy.gen', GENERATED_STUB);
+  writeList(root, [POLICY_SOURCE]);
+  return runProve(root);
+};
+
 /** Runs the script in its fixture and captures the refusal it produced. */
 const runProve = (root: string) => {
   const result = spawnSync('bash', ['bin/prove.sh'], {
@@ -112,80 +141,53 @@ test('prove refuses a missing proof-source list', () => {
 });
 
 test('prove refuses a list with no proof sources', () => {
-  const root = createFixture();
-  writeList(root, ['# only a comment']);
-
-  const result = runProve(root);
+  const result = runWithList(['# only a comment']);
 
   expect(result.status).toBe(1);
   expect(result.stderr).toContain('lists no proof sources');
 });
 
 test('prove refuses a listed source that does not exist', () => {
-  const root = createFixture();
-  writeList(root, ['app/config/absent.ts']);
-
-  const result = runProve(root);
+  const result = runWithList(['app/config/absent.ts']);
 
   expect(result.status).toBe(1);
   expect(result.stderr).toContain("Listed proof source 'app/config/absent.ts' does not exist.");
 });
 
 test('prove refuses a non-integer timeout', () => {
-  const root = createFixture();
-  writeSource(root, 'app/config/keybindings-policy.ts');
-  writeList(root, ['app/config/keybindings-policy.ts soon']);
-
-  const result = runProve(root);
+  const result = runWithList([`${POLICY_SOURCE} soon`]);
 
   expect(result.status).toBe(1);
-  expect(result.stderr).toContain("Timeout 'soon' for 'app/config/keybindings-policy.ts' is not an integer.");
+  expect(result.stderr).toContain(`Timeout 'soon' for '${POLICY_SOURCE}' is not an integer.`);
 });
 
 test('prove refuses a timeout long enough for lsc to downgrade the check', () => {
-  const root = createFixture();
-  writeSource(root, 'app/config/keybindings-policy.ts');
-  writeList(root, ['app/config/keybindings-policy.ts 61']);
-
-  const result = runProve(root);
+  const result = runWithList([`${POLICY_SOURCE} 61`]);
 
   expect(result.status).toBe(1);
   expect(result.stderr).toContain('exceeds the 60s limit');
 });
 
 test('prove refuses to skip the policy proof when the policy exists unlisted', () => {
-  const root = createFixture();
-  writeSource(root, 'app/config/keybindings-policy.ts');
+  const root = createPolicyFixture();
   writeSource(root, 'app/config/other.ts');
   writeList(root, ['app/config/other.ts']);
 
   const result = runProve(root);
 
   expect(result.status).toBe(1);
-  expect(result.stderr).toContain('app/config/keybindings-policy.ts exists but is not listed');
+  expect(result.stderr).toContain(`${POLICY_SOURCE} exists but is not listed`);
 });
 
 test('prove refuses a forbidden Dafny trust construct', () => {
-  const root = createFixture();
-  writeSource(root, 'app/config/keybindings-policy.ts');
-  writeSource(root, 'app/config/keybindings-policy.dfy', 'lemma Bad()\n  ensures false\n{\n  assume false;\n}\n');
-  writeSource(root, 'app/config/keybindings-policy.dfy.gen', 'lemma Generated()\n  ensures true\n{\n}\n');
-  writeList(root, ['app/config/keybindings-policy.ts']);
-
-  const result = runProve(root);
+  const result = runWithProof('lemma Bad()\n  ensures false\n{\n  assume false;\n}\n');
 
   expect(result.status).toBe(1);
   expect(result.stderr).toContain('Forbidden Dafny trust construct found');
 });
 
 test('prove admits only the emptyUserKeymaps axiom and then verifies', () => {
-  const root = createFixture();
-  writeSource(root, 'app/config/keybindings-policy.ts');
-  writeSource(root, 'app/config/keybindings-policy.dfy', 'function {:axiom} emptyUserKeymaps(): UserKeymaps\n');
-  writeSource(root, 'app/config/keybindings-policy.dfy.gen', 'lemma Generated()\n  ensures true\n{\n}\n');
-  writeList(root, ['app/config/keybindings-policy.ts']);
-
-  const result = runProve(root);
+  const result = runWithProof('function {:axiom} emptyUserKeymaps(): UserKeymaps\n');
 
   expect(result.status).toBe(0);
   expect(result.stdout).toContain('Dafny program verifier finished with 1 verified, 0 errors');
