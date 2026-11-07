@@ -59,6 +59,35 @@ export const notifyWithPrimaryDiagnostic = ({baseMessage, diagnostics, notify}: 
 const inEffectSentence = (basis: KeybindingsBasis): string =>
   basis === 'last-known-good' ? 'Keeping your previous shortcuts.' : 'Using default shortcuts until the file is fixed.';
 
+/** The closed set of shapes a keybindings diagnostic can describe. */
+type DiagnosticKind = 'command' | 'document' | 'schema-key';
+
+/**
+ * Classifies a diagnostic without repeating its path.
+ *
+ * A diagnostic path is one of three shapes: the source label for a
+ * document-level error, `/$schema` for the reserved key, or a slash followed
+ * by a command identifier. Reporting the shape keeps the identifier, and any
+ * file wording behind it, out of the structured log.
+ *
+ * @example
+ * ```ts
+ * diagnosticKind('keybindings.json5', 'keybindings.json5'); // 'document'
+ * diagnosticKind('/$schema', 'keybindings.json5'); // 'schema-key'
+ * diagnosticKind('/window:new', 'keybindings.json5'); // 'command'
+ * ```
+ */
+const diagnosticKind = (path: string, sourceLabel: string): DiagnosticKind => {
+  if (path === sourceLabel) {
+    return 'document';
+  }
+  return path === '/$schema' ? 'schema-key' : 'command';
+};
+
+/** The distinct categories in one notice, sorted so the log is deterministic. */
+const diagnosticKinds = (diagnostics: readonly configValidationDiagnostic[], sourceLabel: string): DiagnosticKind[] =>
+  [...new Set(diagnostics.map((entry) => diagnosticKind(entry.path, sourceLabel)))].toSorted();
+
 /**
  * Maps one bounded notice onto the notification or log it has always produced.
  *
@@ -90,8 +119,12 @@ const presentNotice = (notice: KeybindingsNotice, notify: ConfigImportNotify, wa
       return;
     }
     case 'diagnostics': {
+      // The notification is the surface that explains a problem to the user.
+      // The log keeps only a count and closed categories, so a command
+      // identifier or a fragment of the user's file cannot reach it.
       warn('[config-keybindings] User keybindings diagnostics.', {
-        diagnostics: notice.diagnostics,
+        count: notice.diagnostics.length,
+        kinds: diagnosticKinds(notice.diagnostics, notice.label),
         source: notice.label
       });
       return;
