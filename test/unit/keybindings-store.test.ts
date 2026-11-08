@@ -95,7 +95,7 @@ describe('atomic keybindings file store', () => {
   ];
 
   for (const {call, description, message, outcome, overrides} of permissionCases) {
-    test(`classifies a permission ${description} failure and still logs the raw error`, () => {
+    test(`classifies a permission ${description} failure and logs only the bounded errno`, () => {
       const raw = errorWithCode('EACCES');
       const warn = mock(() => {});
       const store = createFileKeybindingsStore({
@@ -104,10 +104,10 @@ describe('atomic keybindings file store', () => {
         warn
       });
 
-      // The port sees only the bounded reason; the adapter keeps the raw error
-      // diagnosable through its own warning sink.
+      // The port sees only the bounded reason, and the sink gets only the errno
+      // code: the raw error's message can repeat a path or the file's content.
       expect(call(store)).toEqual(outcome);
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining(message), raw);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(message), {code: 'EACCES'});
     });
   }
 

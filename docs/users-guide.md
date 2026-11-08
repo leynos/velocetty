@@ -55,13 +55,15 @@ directory.
 ### Informational command-line arguments
 
 Velocetty starts the terminal whatever arguments it is given. Three arguments
-are special: `--help`, `-v`, and `--version` print diagnostics and exit without
-starting Electron. All three print the same report:
+are special: `--help`, `-v`, and `--version` print diagnostics and quit before
+any window is created, so Electron is imported but no terminal starts. All
+three print the same report:
 
 - the Velocetty version;
 - a reminder that settings live in the configuration file rather than on the
   command line;
-- the active `config.json5` path;
+- the path of the active configuration file, which is `config.json5` in the
+  Velocetty directory or a legacy `hyper.json`;
 - the active `keybindings.json5` path;
 - which tree supplied the configuration (`velocetty`, `hyper`, or
   `development`).

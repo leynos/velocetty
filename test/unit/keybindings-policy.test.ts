@@ -128,6 +128,18 @@ describe('KB-POL-1 observation transitions', () => {
     expect(activeKeymaps(accepted(seeds))).toBe(seeds);
     expect(activeKeymaps(rejected)).toEqual(emptyUserKeymaps());
   });
+
+  test('emptyUserKeymaps returns a fresh map, so the spec === is value equality', () => {
+    const first = emptyUserKeymaps();
+    const second = emptyUserKeymaps();
+
+    // The LemmaScript contract writes `===`, which is value equality there. The
+    // TypeScript implementation returns a new object each call, so a reference
+    // comparison would be false; the correspondence is by value, and the
+    // assertions above use `toEqual` for that reason.
+    expect(first).not.toBe(second);
+    expect(first).toEqual(second);
+  });
 });
 
 describe('KB-POL-2 bootstrap decision table', () => {

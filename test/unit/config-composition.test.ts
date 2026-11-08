@@ -8,6 +8,7 @@ import {expect, mock, test} from 'bun:test';
 
 import type {ColorMap, configOptions} from '@shared/types/config';
 
+import {fallbackColors} from '../../app/utils/colours';
 import {createWatchHarness} from '../testUtils/config-watch-harness';
 
 /**
@@ -28,8 +29,9 @@ test.serial('fixConfigDefaults layers the bundled colours under the user colours
 
     // The user's value wins, the bundled configuration supplies the rest, and
     // slots neither sets come from the last-resort palette, so the map is
-    // complete for xterm.
-    expect(fixed.colors).toMatchObject({black: '#111111', red: '#654321', white: '#C7C7C7'});
+    // complete for xterm. Comparing the whole map proves the third layer fills
+    // every remaining slot, not only the two this fixture happens to name.
+    expect(fixed.colors).toEqual({...fallbackColors(), black: '#111111', red: '#654321'});
   } finally {
     mock.restore();
   }
@@ -42,8 +44,9 @@ test.serial('fixConfigDefaults keeps the user colours when the bundled config ha
 
     // A bundled file that could not be read or parsed has no `config` section,
     // so the composition root must not dereference an absent colour map. The
-    // last-resort palette still fills every slot the user left unset.
-    expect(fixed.colors).toMatchObject({black: '#111111', white: '#C7C7C7'});
+    // last-resort palette still fills every slot the user left unset, which
+    // whole-map equality states once for every slot.
+    expect(fixed.colors).toEqual({...fallbackColors(), black: '#111111'});
   } finally {
     mock.restore();
   }

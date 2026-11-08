@@ -6,29 +6,20 @@ import path from 'node:path';
 import * as fsExtra from 'fs-extra';
 import {existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
 import JSON5 from 'json5';
-import {isString} from '@shared/types/guards';
 
 import type {ConfigImportPaths} from '../../app/config/import';
 import type {ConfigImportFileSystem} from '../../app/config/import-sources';
-import type {configValidationDiagnostic} from '@shared/types/config';
-import {
-  createConfigImportHarness,
-  ensureObject,
-  findDiagnosticsPayloadFromWarnMock,
-  sharedDefaultConfigFixture
-} from '../testUtils/config-import-harness';
+import {createConfigImportHarness, ensureObject, sharedDefaultConfigFixture} from '../testUtils/config-import-harness';
 
 type DiagnosticFallbackTestOptions = {
   userConfigContent: string;
-  assertNotification: (message: string, mockPaths: ConfigImportPaths) => void;
   /**
-   * Called with the diagnostics the import reported.
+   * Asserts the user-facing notification.
    *
-   * Read-only, because the warning payload is frozen by the time it reaches a
-   * caller: an assertion helper has no business writing to it, and declaring
-   * it mutable would reject the payload actually passed in.
+   * It is the only surface that carries the diagnostic text now: the log keeps
+   * a count and closed categories, never a path or a message.
    */
-  assertPrimaryDiagnostic: (diagnostics: readonly configValidationDiagnostic[], mockPaths: ConfigImportPaths) => void;
+  assertNotification: (message: string, mockPaths: ConfigImportPaths) => void;
 };
 
 const runDiagnosticFallbackTest = async (options: DiagnosticFallbackTestOptions): Promise<void> => {
@@ -47,11 +38,7 @@ const runDiagnosticFallbackTest = async (options: DiagnosticFallbackTestOptions)
     // the message is read directly rather than checked for absence twice.
     const [notificationMessage] = harness.notifyMock.mock.calls[0];
     options.assertNotification(notificationMessage, harness.mockPaths);
-    expect(harness.notifyMock.mock.calls[0]?.[0]).toContain('Suggested fix:');
-
-    const diagnosticsPayload = findDiagnosticsPayloadFromWarnMock(harness.warnMock);
-    const diagnostics = diagnosticsPayload.diagnostics;
-    options.assertPrimaryDiagnostic(diagnostics, harness.mockPaths);
+    expect(notificationMessage).toContain('Suggested fix:');
 
     const expectedFallbackConfig = ensureObject(JSON5.parse(sharedDefaultConfigFixture));
     expectedFallbackConfig.keymaps = {};
@@ -68,20 +55,11 @@ test('notifies and falls back to default config on invalid JSON5 user config', a
       plugins: [],
     }`,
     assertNotification: (message, mockPaths) => {
+      // The notification names the file and the JSON5 fault, and carries the
+      // suggested fix that the log deliberately omits.
       expect(message).toContain(mockPaths.cfgPath);
-    },
-    assertPrimaryDiagnostic: (diagnostics, mockPaths) => {
-      const primaryDiagnostic = diagnostics.find((d) => {
-        const path = isString(d.path) ? d.path : '';
-        const message = isString(d.message) ? d.message : '';
-        return path.includes(mockPaths.cfgPath) && message.includes('JSON5');
-      });
-      if (!primaryDiagnostic) {
-        throw new TypeError('Expected parse diagnostic for config file path.');
-      }
-      expect(primaryDiagnostic.path).toContain(mockPaths.cfgPath);
-      expect(primaryDiagnostic.message).toContain('JSON5');
-      expect(primaryDiagnostic.suggestedFix).toContain('Fix');
+      expect(message).toContain('JSON5');
+      expect(message).toContain('Fix');
     }
   });
 });
@@ -95,18 +73,13 @@ test('reports schema validation diagnostics with doc and default hints', async (
       keymaps: {}
     }`,
     assertNotification: (message) => {
+      // The notification carries the primary diagnostic's path, message,
+      // suggested fix, and both hints in one sentence.
       expect(message).toContain('/plugins');
-    },
-    assertPrimaryDiagnostic: (diagnostics) => {
-      const primaryDiagnostic = diagnostics.find((d) => d.path === '/plugins');
-      if (!primaryDiagnostic) {
-        throw new Error('Expected schema diagnostic for /plugins.');
-      }
-      expect(primaryDiagnostic.path).toBe('/plugins');
-      expect(primaryDiagnostic.message).toContain('array of strings');
-      expect(primaryDiagnostic.suggestedFix).toContain('array of plugin');
-      expect(primaryDiagnostic.defaultHint).toBe('[]');
-      expect(primaryDiagnostic.docHint).toContain('plugins');
+      expect(message).toContain('array of strings');
+      expect(message).toContain('array of plugin');
+      expect(message).toContain('Default: []');
+      expect(message).toContain('Hint:');
     }
   });
 });
@@ -121,14 +94,8 @@ test('rejects invalid values nested in config options', async () => {
     }`,
     assertNotification: (message) => {
       expect(message).toContain('/config/profiles/0/config/fontSize');
-    },
-    assertPrimaryDiagnostic: (diagnostics) => {
-      const primaryDiagnostic = diagnostics.find((d) => d.path === '/config/profiles/0/config/fontSize');
-      if (!primaryDiagnostic) {
-        throw new Error('Expected schema diagnostic for nested profile fontSize.');
-      }
-      expect(primaryDiagnostic.message).toContain('number');
-      expect(primaryDiagnostic.suggestedFix).toContain('documented types');
+      expect(message).toContain('number');
+      expect(message).toContain('documented types');
     }
   });
 });

@@ -371,7 +371,9 @@ wires them together.
   `importKeybindings` validates the text, writes it through the store, and
   clears the unsaved-seed flag only when the write succeeded. A failed write
   leaves the in-memory shortcuts untouched and reports `failed`, so the next
-  start retries the migration. `exportKeybindings` is a query: it reads through
+  start retries the migration. Valid text is stored verbatim: import does not
+  re-serialize it, and the active keymaps change on the next reload rather than
+  at the moment of import. `exportKeybindings` is a query: it reads through
   `peek()`, adding no read span and no warning, and returns the stored text
   unchanged rather than re-serializing it.
 - **`resolveConfigLocations`** (`app/config/config-tree.ts`): the pure selector

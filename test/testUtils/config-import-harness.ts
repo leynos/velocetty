@@ -6,8 +6,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 
 import {mkdirpSync, removeSync} from 'fs-extra';
-import {isJsonObject, type JsonObject, type JsonValue} from '@shared/types/json';
-import {isString} from '@shared/types/guards';
+import {isJsonObject, type JsonObject} from '@shared/types/json';
 
 import {createConfigImportModule, type ConfigImportKeybindings, type ConfigImportPaths} from '../../app/config/import';
 import {_init} from '../../app/config/init';
@@ -16,7 +15,6 @@ import {keybindingsCodec} from '../../app/config/keybindings-codec';
 import {createKeybindingsNotifier} from '../../app/config/keybindings-notifier';
 import {createFileKeybindingsStore} from '../../app/config/keybindings-store';
 import type {ConfigImportFileSystem} from '../../app/config/import-sources';
-import type {configValidationDiagnostic} from '@shared/types/config';
 
 type ConfigInit = Parameters<typeof createConfigImportModule>[0]['_init'];
 type ConfigNotify = Parameters<typeof createConfigImportModule>[0]['notify'];
@@ -40,50 +38,6 @@ export const ensureObject = (value: unknown): JsonObject => {
     throw new Error('Expected object value.');
   }
   return value;
-};
-
-export type ParsedDiagnosticsPayload = Readonly<{
-  diagnostics: ReadonlyArray<configValidationDiagnostic>;
-}>;
-
-const isValidObject = isJsonObject;
-
-/** Reads the `diagnostics` field from a logged entry, or null when the entry is not a payload. */
-const extractDiagnostics = (entry: JsonObject) => ('diagnostics' in entry ? entry.diagnostics : null);
-
-/** Guards that a logged value carries the fields every validation diagnostic must expose. */
-const isConfigValidationDiagnostic = (value: JsonValue): value is JsonObject & configValidationDiagnostic =>
-  isJsonObject(value) &&
-  isString(value.path) &&
-  isString(value.message) &&
-  isString(value.suggestedFix) &&
-  (value.docHint === undefined || isString(value.docHint)) &&
-  (value.defaultHint === undefined || isString(value.defaultHint));
-
-/** Requires a non-empty array of well-formed diagnostics, so an empty payload is not a hit. */
-const isValidDiagnosticsArray = (diagnostics: JsonValue): diagnostics is configValidationDiagnostic[] =>
-  Array.isArray(diagnostics) &&
-  diagnostics.length > 0 &&
-  diagnostics.every((entry) => isConfigValidationDiagnostic(entry));
-
-/** Finds the structured diagnostics payload among recorded warnings, throwing when none appears. */
-export const findDiagnosticsPayloadFromWarnMock = (
-  warnMock: ReturnType<typeof mock<(_message?: string, ..._rest: Error[]) => void>>
-): ParsedDiagnosticsPayload => {
-  for (const call of warnMock.mock.calls) {
-    for (const entry of call) {
-      if (!isValidObject(entry)) {
-        continue;
-      }
-      const diagnostics = extractDiagnostics(entry);
-      if (!isValidDiagnosticsArray(diagnostics)) {
-        continue;
-      }
-      return {diagnostics};
-    }
-  }
-
-  throw new Error('Expected a structured diagnostics payload in warning logs.');
 };
 
 /** How the harness lays out the configuration trees. */

@@ -4213,6 +4213,39 @@ The manual-check limitation in `## Validation and acceptance` still stands: no
 person has pressed `Ctrl+Alt+Shift+N` or `Ctrl+Alt+Shift+M` or read the menu
 accelerator on this candidate.
 
+### EP-G: pre-merge reconciliation repairs
+
+The pre-merge reconciliation reply (`6707979850`) left nine rows open or partly
+open. This round addresses the observability and documentation rows.
+
+Bounded logging: every `warnFn`/`errorFn` in `app/config/keybindings-store.ts`
+now records the file name, a fixed message, and the errno `code` rather than
+the full path or the raw error; the user-facing notification is unchanged. The
+same treatment covers `app/config/import-sources.ts` (schema copy, bootstrap,
+user-config read and parse faults) and the shared notification sink
+`app/notify.ts`, which logs `{code, name}` for a thrown value instead of the
+error object. `app/config/import-sources-parse.ts` already logged only a count.
+
+Defaults caching: `readDefaults` now caches only a usable load. A faulted
+default load is returned to its caller but re-read on the next query, so a
+repaired bundled file is picked up and a stale fallback cannot be bootstrapped
+into `config.json5`. The two caching tests were rewritten around that contract.
+
+Evidence: `test/unit/keybindings-store-faults.test.ts` asserts a read and a
+write fault log the file name and errno without the workspace path or the raw
+message; `test/unit/config-import-defaults.test.ts` asserts a user-config read
+fault logs only its code, and splits the old shared-cache test into a usable
+case (cached, reused by start-up) and a faulted case (re-read after repair);
+`test/unit/keybindings-policy.test.ts` pins that `emptyUserKeymaps()` returns a
+fresh map, so the LemmaScript `===` corresponds to value equality and the
+assertions correctly use `toEqual`.
+
+Documentation: `docs/users-guide.md` no longer claims `--help`/`--version` exit
+without starting Electron (Electron is imported and `app.quit()` runs before a
+window exists), and names `hyper.json` as a possible active file.
+`docs/developers-guide.md` states that import stores valid text verbatim and
+that the active keymaps change on reload, not at import.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.

@@ -41,17 +41,23 @@ const rawConfigDiagnosticHints = {
   }
 } as const;
 
-/** Emits one warning per non-empty diagnostic list, tagged with its source. */
+/**
+ * Emits one bounded warning per non-empty diagnostic list.
+ *
+ * The context names the layer in fixed words. Neither the source path nor the
+ * diagnostics are logged: a diagnostic path can repeat a command identifier
+ * and its message can quote the user's file. The user-facing notification is
+ * the surface that explains the problem; the log keeps only the count.
+ */
 export const reportDiagnostics = (
   warnFn: typeof console.warn,
   context: string,
-  sourcePath: string,
   diagnostics: readonly configValidationDiagnostic[]
 ) => {
   if (diagnostics.length === 0) {
     return;
   }
-  warnFn(`[config-import] ${context}`, {source: sourcePath, diagnostics});
+  warnFn(`[config-import] ${context}`, {count: diagnostics.length});
 };
 
 type ConfigParseOptions<T> = {

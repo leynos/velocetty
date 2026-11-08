@@ -1,5 +1,5 @@
 /** @file KB-STORE-1 fault injection: atomic-write failures and rename retries. */
-import {afterEach, describe, expect, test} from 'bun:test';
+import {afterEach, describe, expect, mock, test} from 'bun:test';
 
 import * as fs from 'node:fs';
 
@@ -10,6 +10,8 @@ import {
   createWorkspace,
   FAULT_POINTS,
   faultingFileSystem,
+  FILE_NAME,
+  realFileSystem,
   setupRenameFailure,
   targetPathIn,
   temporaryNames
@@ -81,6 +83,59 @@ describe('atomic write failures', () => {
     expect(outcome).toEqual({failure: 'permission', kind: 'failed'});
     expect(fs.readFileSync(filePath, 'utf8')).toBe('previous');
     expect(temporaryNames(workspace)).toEqual([]);
+  });
+});
+
+describe('bounded logging', () => {
+  test('a read failure logs the file name and errno, not the path or message', () => {
+    const workspace = createWorkspace();
+    const filePath = targetPathIn(workspace);
+    const warn = mock<typeof console.warn>(() => {});
+    const fileSystem = {
+      ...realFileSystem(),
+      /** Fails the read with a message that repeats the path, as Node does. */
+      readFileSync: () => {
+        throw Object.assign(new Error(`EACCES: permission denied, open '${filePath}'`), {code: 'EACCES'});
+      }
+    };
+    const store = createFileKeybindingsStore({filePath, fs: fileSystem, warn});
+
+    expect(store.read()).toEqual({failure: 'permission', kind: 'unreadable'});
+
+    const [[message, details] = []] = warn.mock.calls;
+    // The file name locates the failure; the directory and the raw message can
+    // carry sensitive identifiers, so neither reaches the log.
+    const line = String(message);
+    expect({details, hasFileName: line.includes(FILE_NAME), leaksWorkspace: line.includes(workspace)}).toEqual({
+      details: {code: 'EACCES'},
+      hasFileName: true,
+      leaksWorkspace: false
+    });
+  });
+
+  test('a write failure logs the file name and errno, not the path or message', () => {
+    const workspace = createWorkspace();
+    const filePath = targetPathIn(workspace);
+    fs.writeFileSync(filePath, 'previous', 'utf8');
+    const warn = mock<typeof console.warn>(() => {});
+    const fileSystem = {
+      ...realFileSystem(),
+      /** Fails the temporary-file creation with a path-bearing message. */
+      openSync: () => {
+        throw Object.assign(new Error(`EIO: i/o error, open '${filePath}'`), {code: 'EIO'});
+      }
+    };
+    const store = createFileKeybindingsStore({filePath, fs: fileSystem, warn});
+
+    expect(store.write('replacement').kind).toBe('failed');
+
+    const [[message, details] = []] = warn.mock.calls;
+    const line = String(message);
+    expect({details, hasFileName: line.includes(FILE_NAME), leaksWorkspace: line.includes(workspace)}).toEqual({
+      details: {code: 'EIO'},
+      hasFileName: true,
+      leaksWorkspace: false
+    });
   });
 });
 

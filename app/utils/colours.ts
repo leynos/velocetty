@@ -88,6 +88,22 @@ const FALLBACK_COLORS: ColorMap = {
 };
 
 /**
+ * Returns a copy of the last-resort palette.
+ *
+ * The composition tests compare a completed colour map against the whole
+ * palette, so they need the same values this module falls back to. A copy
+ * keeps a caller from mutating the constant the fill relies on.
+ *
+ * @returns A fresh map holding every palette slot.
+ *
+ * @example
+ * ```ts
+ * fallbackColors().black; // '#000000'
+ * ```
+ */
+export const fallbackColors = (): ColorMap => ({...FALLBACK_COLORS});
+
+/**
  * Fills a configuration's unset colours from the bundled defaults.
  *
  * A bundled config that could not be read or parsed has no `colors` section,

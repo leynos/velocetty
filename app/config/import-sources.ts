@@ -10,6 +10,7 @@ import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-
 import path from 'node:path';
 
 import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
+import {isObject, isString} from '../utils/runtime-guards';
 import type {ConfigFallbackCause, ConfigImportNotify} from './import-report';
 import {ensureSchemaFiles, type SchemaCopyRequest} from './schema-copy';
 import {notifyWithPrimaryDiagnostic} from './keybindings-notifier';
@@ -117,6 +118,20 @@ export type ConfigSourceLoaderDependencies = {
 
 const defaultFileSystem: ConfigImportFileSystem = {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync};
 
+/**
+ * Reads a Node-style errno code without trusting the thrown value's shape.
+ *
+ * Log lines carry this code rather than the raw error: an error's message can
+ * repeat a path or quote the user's file, while the code is a fixed token.
+ */
+const errorCode = (error: unknown): string | undefined => {
+  if (!isObject(error) || !('code' in error)) {
+    return undefined;
+  }
+  const {code} = error;
+  return isString(code) ? code : undefined;
+};
+
 const defaultRawConfigFallback: rawConfig = {
   plugins: [],
   localPlugins: []
@@ -178,7 +193,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     const results = ensureSchemaFiles(request);
     for (const result of results) {
       if (result.kind === 'failed') {
-        errorFn(`[config-import] Failed to copy schema file to "${result.destinationPath}".`, result.error);
+        errorFn('[config-import] Failed to copy schema file.', {code: errorCode(result.error)});
       }
     }
     // One notice covers any number of refused copies: the user's action, not
@@ -219,14 +234,12 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
       return false;
     }
 
-    warnFn(
-      `[config-import] User config file missing at "${pathDeps.cfgPath}". Bootstrapping from default config template.`
-    );
+    warnFn('[config-import] User config file missing. Bootstrapping from default config template.');
     try {
       fileSystem.writeFileSync(pathDeps.cfgPath, stringifyConfig(defaultConfigTemplate), 'utf8');
       return true;
     } catch (error) {
-      errorFn(`[config-import] Failed to write bootstrapped user config at "${pathDeps.cfgPath}".`, error);
+      errorFn('[config-import] Failed to write bootstrapped user config.', {code: errorCode(error)});
       notifyFn("Couldn't create a user config file. Check permissions and available disk space.");
       return false;
     }
@@ -315,7 +328,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
         rawContent: fileSystem.readFileSync(pathDeps.cfgPath, 'utf8')
       });
       if (userCfgResult.usedFallback) {
-        reportDiagnostics(warnFn, 'User config diagnostics.', filePath, userCfgResult.diagnostics);
+        reportDiagnostics(warnFn, 'User config diagnostics.', userCfgResult.diagnostics);
       }
       if (!userCfgResult.usedFallback && userCfgResult.value !== null) {
         return {
@@ -325,9 +338,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
         };
       }
 
-      warnFn(
-        `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
-      );
+      warnFn('[config-import] Using default config fallback after user config parse failure.');
       notifyWithPrimaryDiagnostic({
         baseMessage: "Couldn't parse config file. Using default config instead.",
         diagnostics: userCfgResult.diagnostics,
@@ -340,10 +351,8 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
         usedFallback: true
       };
     } catch (error) {
-      errorFn(`[config-import] Failed to read or parse user config at "${pathDeps.cfgPath}".`, error);
-      warnFn(
-        `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
-      );
+      errorFn('[config-import] Failed to read or parse user config.', {code: errorCode(error)});
+      warnFn('[config-import] Using default config fallback after user config parse failure.');
       notifyWithPrimaryDiagnostic({
         // The catch covers the read as well as anything after it, so the
         // wording must not claim a parse failure the user may not have.
@@ -374,30 +383,41 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
    * Caching the whole load, not only its payload, keeps the diagnostics that
    * explain a fallback available to the start-up command without re-reading
    * the bundled files.
+   *
+   * Only a usable load is cached. A faulted one is returned to the caller that
+   * asked, but the next query re-reads the files: the bundled files are shipped
+   * artefacts that a repair can fix during the same run, and a start-up that
+   * reused a stale fallback would refuse to recover and would persist that
+   * fallback into `config.json5`.
    */
   const readDefaults = (): LoadedDefaults => {
-    if (defaultsCache === undefined) {
-      const loaded = loadDefaultConfig();
-      const platform = loadPlatformKeymap();
-      replaceLegacyKeymaps(loaded.config, platform.keymaps);
-      defaultsCache = {
-        ...loaded,
-        platformKeymapDiagnostics: platform.diagnostics,
-        platformKeymapFault: platform.fault
-      };
-      // Added only when the keymap actually failed, never as `undefined`.
-      if (platform.failure !== undefined) {
-        Object.assign(defaultsCache, {platformKeymapFailure: platform.failure});
-      }
+    if (defaultsCache !== undefined) {
+      return defaultsCache;
     }
-    return defaultsCache;
+    const loaded = loadDefaultConfig();
+    const platform = loadPlatformKeymap();
+    replaceLegacyKeymaps(loaded.config, platform.keymaps);
+    const defaults: LoadedDefaults = {
+      ...loaded,
+      platformKeymapDiagnostics: platform.diagnostics,
+      platformKeymapFault: platform.fault
+    };
+    // Added only when the keymap actually failed, never as `undefined`.
+    if (platform.failure !== undefined) {
+      Object.assign(defaults, {platformKeymapFailure: platform.failure});
+    }
+    if (!loaded.usedFallback) {
+      defaultsCache = defaults;
+    }
+    return defaults;
   };
 
   /**
    * Describes the bundled defaults without writing, logging, or notifying.
    *
-   * The result is cached for the process, so a later start-up import reuses the
-   * payload it already read rather than touching the bundled files again. Both
+   * A usable result is cached for the process, so a later start-up import
+   * reuses the payload it already read rather than touching the bundled files
+   * again; a faulted result is not, so a repaired file is re-read. Both
    * shipped-file faults are part of the result: a caller that needs a usable
    * payload can still read `config`, while one that reports health has the
    * cause instead of guessing. The start-up command turns those causes into
@@ -440,13 +460,11 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     diagnostics: readonly configValidationDiagnostic[]
   ): void => {
     if (failure === 'read') {
-      errorFn(`[config-import] Failed to read bundled default config at "${pathDeps.defaultCfg}".`);
+      errorFn('[config-import] Failed to read the bundled default config. Using safe fallback defaults.');
       return;
     }
-    reportDiagnostics(warnFn, 'Bundled default config diagnostics.', pathDeps.defaultCfg, diagnostics);
-    errorFn(
-      `[config-import] Failed to parse bundled default config at "${pathDeps.defaultCfg}". Using safe fallback defaults.`
-    );
+    reportDiagnostics(warnFn, 'Bundled default config diagnostics.', diagnostics);
+    errorFn('[config-import] Failed to parse the bundled default config. Using safe fallback defaults.');
   };
 
   /**
@@ -461,12 +479,11 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     failure: ConfigFallbackCause | undefined,
     diagnostics: readonly configValidationDiagnostic[]
   ): void => {
-    const platformKeyPath = pathDeps.defaultPlatformKeyPath();
     if (failure === 'read') {
-      errorFn(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`);
+      errorFn('[config-import] Failed to read the platform keymap. Using no platform defaults.');
       return;
     }
-    reportDiagnostics(warnFn, 'Platform keymap diagnostics.', platformKeyPath, diagnostics);
+    reportDiagnostics(warnFn, 'Platform keymap diagnostics.', diagnostics);
   };
 
   /**

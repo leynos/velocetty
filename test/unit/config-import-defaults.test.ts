@@ -82,7 +82,7 @@ test('getDefaultConfig neither notifies nor re-reads, before or after start-up',
       }
       // Start-up is the boundary that logs the fault, once.
       const loggedFaults = errorMock.mock.calls.filter(([message]) =>
-        String(message).includes(`Failed to ${fault ?? 'read'} bundled default config`)
+        String(message).includes(`Failed to ${fault ?? 'read'} the bundled default config`)
       );
       expect(loggedFaults, description).toHaveLength(fault === undefined ? 0 : 1);
       expect(harness.getDefaultConfig().defaults, description).toEqual(expected);
@@ -93,21 +93,69 @@ test('getDefaultConfig neither notifies nor re-reads, before or after start-up',
   }
 });
 
-test('a default query and the later start-up command share one cached payload', async () => {
-  const harness = await createConfigImportHarness();
+test('a usable default query is cached and reused by start-up', async () => {
+  const harness = await createConfigImportHarness({error: mock<typeof console.error>(() => {})});
+  try {
+    seedBundledFiles(harness, sharedDefaultConfigFixture);
+    const first = harness.getDefaultConfig();
+    expect(first.failure).toBeUndefined();
+
+    // The shipped files do not change while the application runs, so a usable
+    // payload is read once. Breaking the file mid-run must not make the query
+    // and the start-up command disagree about what is in effect.
+    writeFileSync(harness.mockPaths.defaultCfg, '{plugins: "not-an-array"}', 'utf8');
+    harness._import('startup');
+
+    expect(harness.getDefaultConfig()).toEqual(first);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('a faulted default query is not cached, so a repaired file is re-read', async () => {
+  const harness = await createConfigImportHarness({error: mock<typeof console.error>(() => {})});
   try {
     // The default file is absent, so the first query reports a read fault.
     seedBundledFiles(harness);
     const first = harness.getDefaultConfig();
     expect(first.failure).toBe('read');
 
-    // The shipped files do not change while the application runs, so the
-    // payload is read once. A file that appears mid-run must not make the
-    // query and the start-up command disagree about what is in effect.
+    // A faulted load is not cached: the bundled files are shipped artefacts a
+    // repair can fix during the same run. Reusing the stale fallback would
+    // refuse to recover and would persist that fallback into `config.json5`.
     writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
+    const recovered = harness.getDefaultConfig();
+    expect(recovered.failure).toBeUndefined();
+    expect(recovered.defaults).toEqual({...ensureObject(JSON5.parse(sharedDefaultConfigFixture)), keymaps: {}});
+
     harness._import('startup');
 
-    expect(harness.getDefaultConfig()).toEqual(first);
+    expect(harness.getDefaultConfig()).toEqual(recovered);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('a user-config read fault logs a bounded line, not the path or raw error', async () => {
+  const errorMock = mock<typeof console.error>(() => {});
+  const harness = await createConfigImportHarness({error: errorMock});
+  try {
+    seedBundledFiles(harness, sharedDefaultConfigFixture);
+    // A directory where the file should be makes the read fail with EISDIR,
+    // and the message Node builds repeats the path.
+    fsExtra.mkdirpSync(harness.mockPaths.cfgPath);
+
+    harness._import('startup');
+
+    const faultLines = errorMock.mock.calls.filter(([message]) =>
+      String(message).includes('Failed to read or parse user config')
+    );
+    expect(faultLines).toHaveLength(1);
+    const [message, details] = faultLines[0] ?? [];
+    // The workspace path and the raw message can carry sensitive identifiers,
+    // so the log keeps only the errno code.
+    expect(String(message)).not.toContain(harness.workspaceRoot);
+    expect(details).toEqual({code: 'EISDIR'});
   } finally {
     harness.cleanup();
   }
@@ -138,7 +186,7 @@ test('reports a missing platform keymap in the query and once at start-up', asyn
     expect(faultNotices).toHaveLength(1);
     // The read fault reaches the error sink at start-up, and only once.
     const loggedFaults = errorMock.mock.calls.filter(([message]) =>
-      String(message).includes('Failed to read platform keymap')
+      String(message).includes('Failed to read the platform keymap')
     );
     expect(loggedFaults).toHaveLength(1);
   } finally {

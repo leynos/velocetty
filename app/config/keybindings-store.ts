@@ -235,8 +235,10 @@ export const createFileKeybindingsStore = (
   const read = (): KeybindingsReadOutcome => {
     const finishSpan = options.spans?.begin('keybindings-read');
     const {error, outcome} = readRaw();
-    // The port keeps only a bounded reason; the raw error stays diagnosable here.
-    if (error !== undefined) warnFn(`[config-keybindings] Couldn't read "${options.filePath}".`, error);
+    // The port keeps only a bounded reason, and so does the log: the file name
+    // is enough to locate the failure, while the raw error can carry a path or
+    // a fragment of the file.
+    if (error !== undefined) warnFn(`[config-keybindings] Couldn't read ${fileName}.`, {code: errorCode(error)});
     finishSpan?.(outcome.kind);
     return outcome;
   };
@@ -307,13 +309,13 @@ export const createFileKeybindingsStore = (
   const prepareWrite = (): PreparedWrite => {
     const resolution = resolveTarget();
     if (resolution.kind === 'unresolved') {
-      warnFn(`[config-keybindings] Couldn't resolve "${options.filePath}" for writing.`, resolution.error);
+      warnFn(`[config-keybindings] Couldn't resolve ${fileName} for writing.`, {code: errorCode(resolution.error)});
       return {kind: 'refused', outcome: {failure: storageFailure(errorCode(resolution.error)), kind: 'failed'}};
     }
     const plan = planReplacement(resolution.path);
     if (!canReplaceTarget(plan)) {
       // The synthetic refusal is logged for diagnosis; the port sees the category.
-      warnFn(`[config-keybindings] Refused to replace read-only file "${plan.target}".`);
+      warnFn(`[config-keybindings] Refused to replace read-only file ${fileName}.`);
       return {kind: 'refused', outcome: {failure: 'permission', kind: 'failed'}};
     }
     return {kind: 'ready', plan};
@@ -344,7 +346,7 @@ export const createFileKeybindingsStore = (
         closeQuietly(descriptor);
       }
       removeQuietly(plan);
-      warnFn(`[config-keybindings] Couldn't write "${options.filePath}".`, error);
+      warnFn(`[config-keybindings] Couldn't write ${fileName}.`, {code: errorCode(error)});
       return {failure: storageFailure(errorCode(error)), kind: 'failed'};
     }
   };
@@ -385,10 +387,9 @@ export const createFileKeybindingsStore = (
   const removeStaleTemporaryFiles = (): void => {
     const resolution = resolveTarget();
     if (resolution.kind === 'unresolved') {
-      warnFn(
-        `[config-keybindings] Couldn't resolve "${options.filePath}" to inspect it for stale temporary files.`,
-        resolution.error
-      );
+      warnFn(`[config-keybindings] Couldn't resolve ${fileName} to inspect it for stale temporary files.`, {
+        code: errorCode(resolution.error)
+      });
       return;
     }
     const directory = path.dirname(resolution.path);
@@ -396,7 +397,9 @@ export const createFileKeybindingsStore = (
     try {
       names = fileSystem.readdirSync(directory);
     } catch (error) {
-      warnFn(`[config-keybindings] Couldn't inspect "${directory}" for stale temporary files.`, error);
+      warnFn(`[config-keybindings] Couldn't inspect the keybindings directory for stale temporary files.`, {
+        code: errorCode(error)
+      });
       return;
     }
     for (const name of names) {
@@ -406,7 +409,7 @@ export const createFileKeybindingsStore = (
       try {
         fileSystem.unlinkSync(path.join(directory, name));
       } catch (error) {
-        warnFn(`[config-keybindings] Couldn't remove stale temporary file "${name}".`, error);
+        warnFn("[config-keybindings] Couldn't remove a stale temporary file.", {code: errorCode(error)});
       }
     }
   };
