@@ -229,7 +229,9 @@ export const createFileKeybindingsStore = (
     // The port keeps only a bounded reason, and so does the log: the file name
     // is enough to locate the failure, while the raw error can carry a path or
     // a fragment of the file.
-    if (error !== undefined) warnFn(`[config-keybindings] Couldn't read ${fileName}.`, {code: errorCode(error)});
+    if (error !== undefined) {
+      warnFn(`[config-keybindings] Couldn't read ${fileName}.`, {failure: storageFailure(errorCode(error))});
+    }
     finishSpan?.(outcome.kind);
     return outcome;
   };
@@ -300,7 +302,9 @@ export const createFileKeybindingsStore = (
   const prepareWrite = (): PreparedWrite => {
     const resolution = resolveTarget();
     if (resolution.kind === 'unresolved') {
-      warnFn(`[config-keybindings] Couldn't resolve ${fileName} for writing.`, {code: errorCode(resolution.error)});
+      warnFn(`[config-keybindings] Couldn't resolve ${fileName} for writing.`, {
+        failure: storageFailure(errorCode(resolution.error))
+      });
       return {kind: 'refused', outcome: {failure: storageFailure(errorCode(resolution.error)), kind: 'failed'}};
     }
     const plan = planReplacement(resolution.path);
@@ -337,7 +341,7 @@ export const createFileKeybindingsStore = (
         closeQuietly(descriptor);
       }
       removeQuietly(plan);
-      warnFn(`[config-keybindings] Couldn't write ${fileName}.`, {code: errorCode(error)});
+      warnFn(`[config-keybindings] Couldn't write ${fileName}.`, {failure: storageFailure(errorCode(error))});
       return {failure: storageFailure(errorCode(error)), kind: 'failed'};
     }
   };
@@ -379,7 +383,7 @@ export const createFileKeybindingsStore = (
     const resolution = resolveTarget();
     if (resolution.kind === 'unresolved') {
       warnFn(`[config-keybindings] Couldn't resolve ${fileName} to inspect it for stale temporary files.`, {
-        code: errorCode(resolution.error)
+        failure: storageFailure(errorCode(resolution.error))
       });
       return;
     }
@@ -389,7 +393,7 @@ export const createFileKeybindingsStore = (
       names = fileSystem.readdirSync(directory);
     } catch (error) {
       warnFn(`[config-keybindings] Couldn't inspect the keybindings directory for stale temporary files.`, {
-        code: errorCode(error)
+        failure: storageFailure(errorCode(error))
       });
       return;
     }
@@ -400,7 +404,9 @@ export const createFileKeybindingsStore = (
       try {
         fileSystem.unlinkSync(path.join(directory, name));
       } catch (error) {
-        warnFn("[config-keybindings] Couldn't remove a stale temporary file.", {code: errorCode(error)});
+        warnFn("[config-keybindings] Couldn't remove a stale temporary file.", {
+          failure: storageFailure(errorCode(error))
+        });
       }
     }
   };

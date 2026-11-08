@@ -358,7 +358,8 @@ wires them together.
 - **Composition root** (`app/config.ts`): creates the store, the codec, and the
   notifier, and calls `removeStaleTemporaryFiles()` itself at start-up. Stale
   temporary cleanup is therefore a start-up decision of the root, not part of
-  the service's contract.
+  the service's contract. It also exports `importKeybindings` and
+  `exportKeybindings`, the two entry points the IPC layer calls.
 - **`fixConfigDefaults`** (`app/config/fix-config-defaults.ts`): completes the
   decorated configuration's colour map. `withDefaultColors` in
   `app/utils/colours.ts` layers the bundled defaults underneath the user's
@@ -380,9 +381,10 @@ wires them together.
 - **`resolveConfigLocations`** (`app/config/config-tree.ts`): the pure selector
   behind `paths.ts`. It takes the platform, the environment paths, the
   development override, and the `probe` and `sameFile` predicates, and returns
-  the active file, the creation path, the Velocetty directory, and the shadowed
-  candidates. `shared/src/config/config-tree.ts` mirrors it for the CLI, and a
-  parity test keeps the two copies in step.
+  the active file, the creation path, the Velocetty directory, the
+  `keybindingsPath`, and the shadowed candidates.
+  `shared/src/config/config-tree.ts` mirrors it for the CLI, and a parity test
+  keeps the two copies in step.
 
 Injecting these dependencies keeps the service, importer, and watcher testable
 in `bun test` without Electron, a real clock, or a real filesystem. See

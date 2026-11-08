@@ -239,6 +239,12 @@ const oracleViolations = (evaluation: CaseEvaluation): string[] => {
   return violations;
 };
 
+/**
+ * Collects every invariant a single generated case breaks.
+ *
+ * @param evaluation - One resolved case and the inputs it was built from.
+ * @returns One message per broken invariant, empty when the case is sound.
+ */
 const caseViolations = (evaluation: CaseEvaluation): string[] => {
   const direct = [
     directoryViolation(evaluation),

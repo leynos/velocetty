@@ -15,9 +15,11 @@ const PROPERTY_RUNS = 500;
 const SOURCE = 'property-keybindings.json5';
 const PROPERTY_OPTIONS = {numRuns: PROPERTY_RUNS, seed: KEYBINDINGS_PROPERTY_SEED} as const;
 
+/** The keymap's entries in a stable order, so two maps compare by content. */
 const sortedEntries = (keymaps: UserKeymaps) =>
   Object.entries(keymaps).toSorted(([left], [right]) => left.localeCompare(right));
 
+/** The same keymap with its entries inserted in the opposite order. */
 const withEntriesInReverse = (keymaps: UserKeymaps): UserKeymaps =>
   Object.fromEntries(Object.entries(keymaps).toReversed());
 

@@ -68,7 +68,9 @@ naming the inherited Hyper version.
 ## Detailed instructions
 
 Step-by-step instructions, including the file format and shortcut syntax, are
-in the [users' guide](users-guide.md). Running Velocetty with `--help`, `-v`, or
-`--version` prints the resolved `keybindings.json5` path, the configuration
-path, and the configuration tree in use, without starting the terminal, so the
-report shows which files an installation actually reads.
+in the [users' guide](users-guide.md). Running the application executable with
+`--help`, `-v`, or `--version` prints the resolved `keybindings.json5` path,
+the configuration path, and the configuration tree in use, without starting the
+terminal, so the report shows which files an installation actually reads. The
+installed `hyper` launcher is the plugin command-line interface and does not
+print this report; the users' guide gives the per-platform executable paths.

@@ -1,4 +1,11 @@
 /** @file Mirror of `app/config/config-tree.ts` for the CLI; parity is enforced by KB-PATH-2. */
+/*
+ * The CLI cannot import application code, so it carries its own copy of the
+ * resolution rules: which `config.json5` is active, where `keybindings.json5`
+ * lives, and which lower-priority copies are hidden. The application's copy in
+ * `app/config/config-tree.ts` is authoritative; KB-PATH-2 compares the two and
+ * fails when they diverge.
+ */
 import path from 'node:path';
 
 /** The tree that supplied the active configuration file. */

@@ -18,6 +18,7 @@ const REQUIRED_SHARE = 0.05;
 
 type BindingClass = 'string' | 'array' | 'empty-array';
 
+/** Every binding in a keymap, whatever shape it has. */
 const bindingsOf = (keymaps: UserKeymaps): readonly (string | string[])[] => Object.values(keymaps);
 
 /** Sorts a binding into the shape classes the coverage guard samples. */

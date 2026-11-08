@@ -30,10 +30,19 @@ const baseRawConfig: rawConfig = {
   keymaps: {}
 };
 
+/**
+ * Builds a parsed configuration whose keymaps are the given bindings.
+ *
+ * @param keymaps - Command identifiers mapped to their binding lists.
+ * @returns The configuration `_init` produces for that raw document.
+ */
 export const makeParsedConfig = (keymaps: Record<string, string[]>): parsedConfig =>
   _init(structuredClone(baseRawConfig), {...structuredClone(baseRawConfig), keymaps}, () => {});
 
+/** Stands in for the `open` adapter, which the composition root only calls. */
 const openModuleFactory = () => ({default: () => true});
+
+/** Stands in for the resolved paths, so no test reads the real home directory. */
 const pathsModuleFactory = () => ({
   cfgDir: '/tmp',
   cfgPath: '/tmp/config.json5',
@@ -51,6 +60,7 @@ const pathsModuleFactory = () => ({
   shadowedConfigPaths: ['/home/user/.hyper/config.json5'],
   velocettyDir: '/tmp'
 });
+/** Stands in for the window-state store, which the composition root only wires. */
 const windowsModuleFactory = () => ({defaults: {}, get: () => ({}), recordState: () => {}});
 
 /** One module factory to register, with the specifier Bun should resolve it under. */

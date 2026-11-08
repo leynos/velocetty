@@ -324,7 +324,10 @@ test('a throwing onReload is logged and does not disable the watcher', async () 
   harness.clock.advanceTo(2 * DEBOUNCE_MS);
 
   expect(harness.warnings).toHaveLength(1);
-  expect(harness.warnings[0]?.error).toBeInstanceOf(Error);
+  // The log gets the bounded description, not the thrown message, which can
+  // repeat a path or a fragment of the user's configuration.
+  expect(harness.warnings[0]?.error).toEqual({name: 'Error'});
+  expect(harness.warnings[0]?.message).not.toContain('reload blew up');
   expect(harness.reloadTimes).toEqual([DEBOUNCE_MS, 2 * DEBOUNCE_MS]);
   await harness.close();
 });
@@ -471,6 +474,7 @@ describe('KB-WATCH-1 event schedule coverage', () => {
   const REQUIRED_SHARE = 0.05;
   const samples = fc.sample(timedEventsArb, {numRuns: SAMPLE_COUNT, seed: PROPERTY_SEED});
 
+  /** The fraction of sampled schedules that satisfy `predicate`. */
   const shareOf = (predicate: (events: readonly TimedEvent[]) => boolean): number =>
     samples.filter((events) => predicate(events)).length / samples.length;
 

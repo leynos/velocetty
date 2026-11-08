@@ -87,7 +87,7 @@ describe('atomic write failures', () => {
 });
 
 describe('bounded logging', () => {
-  test('a read failure logs the file name and errno, not the path or message', () => {
+  test('a read failure logs the file name and bounded category, not the path or message', () => {
     const workspace = createWorkspace();
     const filePath = targetPathIn(workspace);
     const warn = mock<typeof console.warn>(() => {});
@@ -107,13 +107,13 @@ describe('bounded logging', () => {
     // carry sensitive identifiers, so neither reaches the log.
     const line = String(message);
     expect({details, hasFileName: line.includes(FILE_NAME), leaksWorkspace: line.includes(workspace)}).toEqual({
-      details: {code: 'EACCES'},
+      details: {failure: 'permission'},
       hasFileName: true,
       leaksWorkspace: false
     });
   });
 
-  test('a write failure logs the file name and errno, not the path or message', () => {
+  test('a write failure logs the file name and bounded category, not the path or message', () => {
     const workspace = createWorkspace();
     const filePath = targetPathIn(workspace);
     fs.writeFileSync(filePath, 'previous', 'utf8');
@@ -132,7 +132,7 @@ describe('bounded logging', () => {
     const [[message, details] = []] = warn.mock.calls;
     const line = String(message);
     expect({details, hasFileName: line.includes(FILE_NAME), leaksWorkspace: line.includes(workspace)}).toEqual({
-      details: {code: 'EIO'},
+      details: {failure: 'other'},
       hasFileName: true,
       leaksWorkspace: false
     });

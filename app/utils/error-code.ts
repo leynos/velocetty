@@ -34,3 +34,26 @@ export const errorCode = (error: unknown): string | undefined => {
   const {code} = error;
   return isString(code) ? code : undefined;
 };
+
+/**
+ * A bounded description of a thrown value, for a shared log line.
+ *
+ * A thrown message can repeat a path, quote the user's file, or name a command
+ * the user wrote, so it never reaches a log. The errno code and the constructor
+ * name are fixed tokens that still tell a developer which failure occurred; the
+ * user-facing notification carries the actionable text.
+ *
+ * @returns The errno code, when the value has one, plus the constructor name.
+ *
+ * @example
+ * ```ts
+ * const error = Object.assign(new Error('ENOENT: no such file, open /home/ada'), {code: 'ENOENT'});
+ * describeError(error); // {code: 'ENOENT', name: 'Error'}
+ * describeError('not an error'); // {name: 'UnknownError'}
+ * ```
+ */
+export const describeError = (error: unknown): {readonly code?: string; readonly name: string} => {
+  const name = error instanceof Error ? error.name : 'UnknownError';
+  const code = errorCode(error);
+  return code === undefined ? {name} : {code, name};
+};

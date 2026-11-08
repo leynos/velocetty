@@ -21,7 +21,9 @@ import {
 const seeds: UserKeymaps = {'window:new': 'ctrl+alt+shift+n'};
 const other: UserKeymaps = {'pane:split': ['ctrl+shift+d', 'ctrl+shift+e']};
 
+/** A state that has accepted `keymaps` as its last-known-good payload. */
 const accepted = (keymaps: UserKeymaps): KeybindingsState => ({lastAccepted: keymaps});
+/** A state that has accepted nothing yet. */
 const rejected: KeybindingsState = initialKeybindingsState;
 
 const observations: readonly {readonly label: string; readonly observation: KeybindingsObservation}[] = [
@@ -30,6 +32,22 @@ const observations: readonly {readonly label: string; readonly observation: Keyb
   {label: 'invalid', observation: {kind: 'invalid'}},
   {label: 'unreadable', observation: {kind: 'unreadable'}}
 ];
+
+/**
+ * Every history of at most `maxLength` observations, shortest first.
+ *
+ * Two distinct valid payloads are included so a replay that kept the first
+ * accepted map instead of the latest would be caught.
+ */
+const historiesUpTo = (kinds: readonly KeybindingsObservation[], maxLength: number): KeybindingsObservation[][] => {
+  const histories: KeybindingsObservation[][] = [[]];
+  let frontier: KeybindingsObservation[][] = [[]];
+  for (let length = 1; length <= maxLength; length += 1) {
+    frontier = frontier.flatMap((history) => kinds.map((kind) => [...history, kind]));
+    histories.push(...frontier);
+  }
+  return histories;
+};
 
 const legacySources: readonly {readonly label: string; readonly legacy: LegacyKeymapsSource}[] = [
   {label: 'parsed-keymaps', legacy: {kind: 'parsed-keymaps', keymaps: seeds}},
@@ -122,6 +140,24 @@ describe('KB-POL-1 observation transitions', () => {
 
     expect(replayed.lastAccepted).toEqual(expected);
     expect(replayed.lastAccepted).toEqual(specLatestAccepted(history));
+  });
+
+  test('replay agrees with the spec for every history of up to three observations', () => {
+    const kinds: readonly KeybindingsObservation[] = [
+      {kind: 'valid', keymaps: seeds},
+      {kind: 'valid', keymaps: other},
+      {kind: 'missing'},
+      {kind: 'invalid'},
+      {kind: 'unreadable'}
+    ];
+    const histories = historiesUpTo(kinds, 3);
+    const replayed = histories.map((history) => replayKeybindingObservations(history).lastAccepted);
+    const specified = histories.map((history) => specLatestAccepted(history));
+
+    // 1 + 5 + 25 + 125 histories, compared as one projection so a single
+    // mismatch identifies its history by index.
+    expect(histories).toHaveLength(156);
+    expect(replayed).toEqual(specified);
   });
 
   test('activeKeymaps reports the accepted payload or the empty map', () => {

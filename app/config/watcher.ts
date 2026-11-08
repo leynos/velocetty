@@ -7,6 +7,7 @@
  */
 import path from 'node:path';
 
+import {describeError} from '../utils/error-code';
 import {describeConfigCounters, type ConfigMetrics} from './config-metrics';
 import type {ConfigSpanRecorder} from './config-spans';
 
@@ -86,7 +87,8 @@ export const createConfigWatcher = <TimerHandle>(options: ConfigWatcherOptions<T
   const recordWatchFailure = (message: string, error: unknown): void => {
     options.metrics?.increment('watcherFailures');
     const counters = options.metrics === undefined ? '' : ` ${describeConfigCounters(options.metrics.snapshot())}`;
-    warnFn(`${message}${counters}`, error);
+    // Chokidar's errors can carry a path, so the log gets the bounded shape.
+    warnFn(`${message}${counters}`, describeError(error));
   };
 
   /** Cancels the queued reload, if one is waiting for the debounce to elapse. */
@@ -112,7 +114,7 @@ export const createConfigWatcher = <TimerHandle>(options: ConfigWatcherOptions<T
       finishSpan?.('thrown');
       // A failed reload must not silence the watcher: the next edit is the
       // user's retry, and it has to be observed like any other event.
-      warnFn('[config-watcher] Configuration reload failed.', error);
+      warnFn('[config-watcher] Configuration reload failed.', describeError(error));
     }
   };
 

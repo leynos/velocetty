@@ -71,6 +71,21 @@ three print the same report:
 The paths are the resolved ones, so the report is the quickest way to find out
 which file an installation is actually reading.
 
+The report comes from the application executable, so invoke that directly
+rather than the installed `hyper` launcher. On Linux the packaged executable is
+`/opt/Hyper/hyper`, on macOS it is
+`/Applications/Hyper.app/Contents/MacOS/Hyper`, and on Windows it is
+`Hyper.exe`. For example:
+
+```sh
+/opt/Hyper/hyper --help
+/Applications/Hyper.app/Contents/MacOS/Hyper --help
+```
+
+The `hyper` launcher on `PATH` is the plugin command-line interface, not the
+application: its `--help` lists CLI commands, and `-v` selects its verbose
+mode, so none of the three arguments reaches the report.
+
 ### Moving an existing configuration
 
 1. Quit Velocetty.

@@ -155,11 +155,13 @@ const pushSpecifierIfPresent = (imports, specifier, isTypeOnly = false) => {
   }
 };
 
+/** Records the specifier of a static `import`/`export` declaration, if it names one. */
 const handleImportExportNode = (node, imports) => {
   const staticImportSpecifier = extractStaticImportSpecifier(node);
   pushSpecifierIfPresent(imports, staticImportSpecifier, isTypeOnlyStaticImportOrExport(node));
 };
 
+/** Records the specifier of a dynamic `import()` call, if it names one. */
 const handleCallExpressionNode = (node, imports) => {
   const dynamicImportSpecifier = extractDynamicImportSpecifier(node);
   pushSpecifierIfPresent(imports, dynamicImportSpecifier);

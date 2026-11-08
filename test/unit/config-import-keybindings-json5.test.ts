@@ -15,6 +15,12 @@ import {
   snapshotConfigBytes
 } from '../testUtils/config-import-harness';
 
+/**
+ * Wraps a keymaps literal in the rest of a minimal user configuration.
+ *
+ * @param keymaps - The JSON5 text to place after `keymaps:`.
+ * @returns A complete `config.json5` document.
+ */
 const userConfigWithKeymaps = (keymaps: string): string => `{
   config: { defaultProfile: 'default', profiles: [{ name: 'default', config: {} }] },
   plugins: [],

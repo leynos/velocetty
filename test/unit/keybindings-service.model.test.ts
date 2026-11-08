@@ -189,6 +189,7 @@ const expectStartOutcome = (
   expect(outcome.kind).toBe('kept');
 };
 
+/** The `start` command for one legacy source, valid only before the service starts. */
 const startWith = (legacy: LegacyKeymapsSource): fc.Command<Model, Real> =>
   command(
     'start',
@@ -239,6 +240,7 @@ const RELOAD = command('reload', (model, real) => {
 
 const RELOAD_COMMAND = fc.constant(RELOAD);
 
+/** The `import valid` command for one document, which must leave the active map alone. */
 const importValidWith = (text: string): fc.Command<Model, Real> =>
   command('import valid', (model, real) => {
     const before = real.service.active();
@@ -317,6 +319,7 @@ const ALL_COMMANDS: readonly fc.Arbitrary<fc.Command<Model, Real>>[] = [
 // A failing sequence prints its own `replayPath` hint, so no option is needed.
 const commandsArb = fc.commands([...ALL_COMMANDS], {maxCommands: MAX_COMMANDS});
 
+/** A fresh model and real service pair, both starting from a missing file. */
 const setup = (): Setup => {
   const store = createMemoryKeybindingsStore(SOURCE);
   const service = createKeybindingsService({codec: keybindingsCodec, report: () => {}, store});

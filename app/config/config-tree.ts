@@ -1,4 +1,14 @@
 /** @file Pure Velocetty/Hyper configuration-tree resolution (KB-PATH-1). */
+/*
+ * Decides which `config.json5` is active, where `keybindings.json5` lives, and
+ * which lower-priority copies the active file hides. The Velocetty tree wins
+ * over the legacy Hyper tree, and a development build reads the repository's
+ * own tree instead. Every machine-dependent input is injected, so the resolver
+ * is pure and the same rules can be exercised for every platform.
+ *
+ * `shared/src/config/config-tree.ts` mirrors this module for the CLI; KB-PATH-2
+ * fails if the two disagree.
+ */
 import path from 'node:path';
 
 /** The tree that supplied the active configuration file. */

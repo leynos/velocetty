@@ -190,6 +190,7 @@ test.serial('a dispatched reload records both spans with the real outcome', asyn
   const harness = await createWatchHarness();
   const infoSpy = spyOn(console, 'info').mockImplementation(() => {});
   const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+  /** The span records the reload emitted, in the order they were logged. */
   const spanLines = () => infoSpy.mock.calls.map(([line]) => line).filter((line) => line.startsWith('[config] span'));
   try {
     harness.configModule.setup();

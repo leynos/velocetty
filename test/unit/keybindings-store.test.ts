@@ -104,10 +104,10 @@ describe('atomic keybindings file store', () => {
         warn
       });
 
-      // The port sees only the bounded reason, and the sink gets only the errno
-      // code: the raw error's message can repeat a path or the file's content.
+      // The port sees only the bounded reason, and so does the sink: the raw
+      // error's message can repeat a path or the file's content.
       expect(call(store)).toEqual(outcome);
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining(message), {code: 'EACCES'});
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(message), {failure: 'permission'});
     });
   }
 

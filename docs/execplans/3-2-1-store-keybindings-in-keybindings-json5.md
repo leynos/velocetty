@@ -4686,3 +4686,17 @@ requires it. Any adjustment is recorded in `Decision log`.
   - The package-boundary tests spawn a checker that loads the TypeScript
     compiler; they now declare a thirty-second timeout, because Bun's
     five-second default expires under concurrent load.
+- 2026-11-08 (observability review round): the shared notification sink and the
+  keybindings store no longer log user-facing text:
+  - `notify()` logs a fixed marker plus `describeError`'s bounded
+    `{code?, name}` record, so a command identifier or path in a title or body
+    never reaches the log while the notification still shows it.
+  - The store's six warning sites report `{failure: <category>}` from the
+    closed `KeybindingsStorageFailure` vocabulary instead of a raw errno.
+  - The watcher reports `describeError(error)` for a failed reload, a lost
+    watch, and a failed close.
+  - Regression tests cover the production `notify()` path and the injected
+    sinks, and the policy suite now replays every history of up to three
+    observations against the spec.
+  - The users' guide and migration note name the application executable per
+    platform, because the installed `hyper` launcher is the plugin CLI.
