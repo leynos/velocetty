@@ -4246,6 +4246,17 @@ window exists), and names `hyper.json` as a possible active file.
 `docs/developers-guide.md` states that import stores valid text verbatim and
 that the active keymaps change on reload, not at import.
 
+Executed shortcut (E2E-KB-5): the lane now presses the shortcut instead of
+inferring execution from the configuration marker. The test writes one chord
+per line to the application's standard input;
+`app/config/e2e-shortcut-chord.ts` parses it and
+`app/config/e2e-shortcut-probe.ts` converts it into `sendInputEvent` presses in
+the focused window. The `window:new` handler prints
+`[e2e] command-executed window:new`, so the assertion is about the command
+having run. The scenario edits the binding, presses it after the reload, saves
+invalid input, and presses the working chord again; the parser has its own unit
+test at `test/unit/e2e-shortcut-chord.test.ts`.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.

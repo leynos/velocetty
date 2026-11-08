@@ -1301,8 +1301,16 @@ Main-process `[e2e]` markers are single stdout lines, emitted only when
 `RUN_E2E=1`. Bun tests match them with a `waitFor` helper and a description, so
 a timeout names the marker that never arrived. Existing markers include
 `renderer-ready`, `keybindings-path <path>`, `config-path <path>`,
-`config-watcher-ready`, and
-`keymaps-active status=<applied|kept> window:new=<shortcuts>`.
+`config-watcher-ready`,
+`keymaps-active status=<applied|kept> window:new=<shortcuts>`, and
+`command-executed <command>`.
+
+The `command-executed` marker is printed by the command handler itself, so it
+proves a shortcut ran its command rather than merely that the configuration
+declared it. The suite presses a shortcut by writing one chord per line to the
+application's standard input; the E2E-only probe at
+`app/config/e2e-shortcut-probe.ts` turns that line into the input events a real
+keypress produces. Standard input is read only when `RUN_E2E=1`.
 
 - Keep a marker on one line. Parsing is line-oriented, and a wrapped marker is
   never matched.

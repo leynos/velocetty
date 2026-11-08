@@ -58,7 +58,11 @@ type ProbeMarkerRequest = Readonly<{
 }>;
 
 type LaunchedApp = {
+  /** How many captured lines match, so a caller can wait for the next one. */
+  readonly count: (matcher: RegExp) => number;
   readonly output: () => string;
+  /** Writes one line to the probe's standard input. */
+  readonly send: (line: string) => void;
   readonly waitFor: (wait: MarkerWait) => Promise<string>;
   readonly stop: () => Promise<void>;
 };
@@ -75,7 +79,9 @@ export const launchApp = async (
   const child: ChildProcess = spawn(process.execPath, developmentAppLaunchArgs, {
     cwd: process.cwd(),
     env: {...environment.env, ELECTRONMON_LOGLEVEL: 'error', RUN_E2E: '1'},
-    stdio: ['ignore', 'pipe', 'pipe']
+    // Standard input carries shortcut requests to the app's E2E probe, so a
+    // scenario can press a chord exactly when it is ready to.
+    stdio: ['pipe', 'pipe', 'pipe']
   });
   const append = (chunk: Buffer) => {
     output += chunk.toString();
@@ -103,8 +109,15 @@ export const launchApp = async (
     throw new Error(`Timed out waiting for ${description}. Output:\n${output}`);
   };
 
+  /** Counts captured lines that match, so a scenario can wait for a later one. */
+  const count = (matcher: RegExp): number => output.split('\n').filter((line) => matcher.test(line)).length;
+
   return {
+    count,
     output: () => output,
+    send: (line: string) => {
+      child.stdin?.write(`${line}\n`);
+    },
     /** Terminates the app, escalating to SIGKILL if it ignores SIGTERM. */
     stop: async () => {
       child.kill('SIGTERM');
@@ -131,6 +144,41 @@ export const configFilesIn = async ({directory}: Readonly<{directory: string}>):
 /** The `[e2e]` line the app emits when it applies or keeps a shortcut. */
 export const probeMarker = ({shortcut, status}: ProbeMarkerRequest) =>
   new RegExp(`\\[e2e\\] keymaps-active status=${status} window:new=${shortcut.replaceAll('+', String.raw`\+`)}`);
+
+/** The `[e2e]` line a command handler prints when the lane has driven it. */
+export const commandExecutedMarker = (command: string) => new RegExp(`\\[e2e\\] command-executed ${command}`);
+
+const pressAttempts = 20;
+const pressIntervalMs = 250;
+
+type PressRequest = Readonly<{
+  app: LaunchedApp;
+  command: string;
+  shortcut: string;
+}>;
+
+/**
+ * Presses a chord until the command handler prints a marker that was not there
+ * before.
+ *
+ * The renderer binds its key listeners asynchronously after a reload, so the
+ * first press can arrive before anything is listening. Repeating the press
+ * until the marker count grows makes the scenario deterministic without
+ * guessing a delay, and it stops as soon as the command has run.
+ */
+export const pressUntilExecuted = async ({app, command, shortcut}: PressRequest): Promise<void> => {
+  const matcher = commandExecutedMarker(command);
+  const before = app.count(matcher);
+  let after = before;
+  for (let attempt = 0; attempt < pressAttempts && after === before; attempt += 1) {
+    app.send(shortcut);
+    await sleep(pressIntervalMs);
+    after = app.count(matcher);
+  }
+  if (after === before) {
+    throw new Error(`The ${shortcut} shortcut never executed ${command}. Output:\n${app.output()}`);
+  }
+};
 
 /** The bundled keymap whose defaults the suite compares against on this platform. */
 const platformKeymapFile = (): string => {

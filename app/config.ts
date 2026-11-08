@@ -21,7 +21,7 @@ import {isJsonObject} from './utils/runtime-guards';
 import {createConfigMetrics} from './config/config-metrics';
 import {createImportRecorder, type ImportRecord} from './config/config-observability';
 import {createConfigSpanRecorder} from './config/config-spans';
-import {formatKeymapsMarker, isE2ERun, type E2EKeymapStatus} from './config/e2e-keymap-probe';
+import {emitE2EMarker, formatKeymapsMarker, type E2EKeymapStatus} from './config/e2e-keymap-probe';
 import {fixConfigDefaults as applyConfigDefaults} from './config/fix-config-defaults';
 import {createConfigImportModule} from './config/import';
 import {shouldAnnounceReload, type ConfigImportReport} from './config/import-report';
@@ -171,13 +171,6 @@ const checkDeprecatedConfig = () => {
   }
   const deprecatedStr = deprecated.join(', ');
   notify('Configuration warning', `Your configuration uses some deprecated CSS classes (${deprecatedStr})`);
-};
-
-/** Writes a marker line only when the end-to-end lane is running. */
-const emitE2EMarker = (line: string) => {
-  if (isE2ERun()) {
-    console.log(line);
-  }
 };
 
 /** Maps the import report onto the keymap status the E2E lane asserts on. */

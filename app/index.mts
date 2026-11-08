@@ -2,6 +2,7 @@
 import {app} from 'electron';
 
 import packageMetadata from './package.json' with {type: 'json'};
+import {startShortcutProbe} from './config/e2e-shortcut-probe.js';
 import {cfgPath, configTree, keybindingsPath} from './config/paths.js';
 
 const informationalArguments = ['--help', '-v', '--version'];
@@ -25,6 +26,9 @@ if (requestedArgument && informationalArguments.includes(requestedArgument)) {
     // to sit relative to a statement in a lower module.
     const config = await import('./config.js');
     config.setup();
+    // Dormant outside the end-to-end lane: the probe's own guard decides
+    // whether standard input is read as shortcut requests.
+    startShortcutProbe();
 
     await import('./start.js');
   } catch (error) {

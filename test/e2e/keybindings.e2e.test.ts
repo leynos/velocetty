@@ -11,12 +11,14 @@ import {expect} from 'bun:test';
 import {E2E_PROBE_SHORTCUT} from '../../app/config/e2e-keymap-probe';
 import {createIsolatedE2EEnvironment} from './electron-e2e-helpers';
 import {
+  commandExecutedMarker,
   configFilesIn,
   e2eTest,
   launchApp,
   legacyHyperConfig,
   noRecreationWaitMs,
   platformDefaultShortcut,
+  pressUntilExecuted,
   probeMarker,
   replaceFileAtomically,
   scenarioTimeoutMs,
@@ -137,6 +139,62 @@ e2eTest(
 
         await sleep(noRecreationWaitMs);
         expect(existsSync(keybindingsPath)).toBe(false);
+      } finally {
+        await app.stop();
+      }
+    } finally {
+      await environment.cleanup();
+    }
+  },
+  scenarioTimeoutMs
+);
+
+e2eTest(
+  'E2E-KB-5 a reloaded shortcut runs its command, and an invalid file does not stop it',
+  async () => {
+    const environment = await createIsolatedE2EEnvironment();
+    const keybindingsPath = path.join(environment.velocettyConfigDir, 'keybindings.json5');
+    const editedShortcut = 'ctrl+alt+shift+m';
+    const command = 'window:new';
+    try {
+      await environment.seedFile({
+        configDir: environment.hyperConfigDir,
+        contents: legacyHyperConfig({keymaps: `{'window:new': '${E2E_PROBE_SHORTCUT}'}`}),
+        fileName: 'config.json5'
+      });
+
+      const app = await launchApp(environment);
+      try {
+        await app.waitFor({
+          description: 'the seeded keymap',
+          matcher: probeMarker({shortcut: E2E_PROBE_SHORTCUT, status: 'applied'})
+        });
+
+        await replaceFileAtomically({
+          contents: `{'window:new': '${editedShortcut}'}`,
+          filePath: keybindingsPath
+        });
+        await app.waitFor({
+          description: 'the edited keymap',
+          matcher: probeMarker({shortcut: editedShortcut, status: 'applied'})
+        });
+
+        // A command marker, not the configuration marker above, is what shows
+        // the shortcut actually ran the command it was bound to.
+        await pressUntilExecuted({app, command, shortcut: editedShortcut});
+        expect(app.count(commandExecutedMarker(command))).toBeGreaterThan(0);
+
+        await fs.writeFile(keybindingsPath, `{'window:new':`, 'utf8');
+        await app.waitFor({
+          description: 'the invalid file keeping the working keymap',
+          matcher: probeMarker({shortcut: editedShortcut, status: 'kept'})
+        });
+
+        // The rejected file must not have unbound the shortcut that still
+        // works: pressing it again should run a further command.
+        const executedBeforeSecondPress = app.count(commandExecutedMarker(command));
+        await pressUntilExecuted({app, command, shortcut: editedShortcut});
+        expect(app.count(commandExecutedMarker(command))).toBeGreaterThan(executedBeforeSecondPress);
       } finally {
         await app.stop();
       }

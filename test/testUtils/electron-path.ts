@@ -45,7 +45,29 @@ export type IpcHandleListener = (event: IpcMainEvent, ...args: any[]) => any;
 /**
  * Minimal Electron module surface used by tests.
  */
+/**
+ * The slice of a `BrowserWindow` the mocked registry exposes.
+ *
+ * The end-to-end shortcut probe is the only caller that reaches a window from
+ * main-process code under test, and it only needs the input-event channel.
+ */
+type MockBrowserWindow = {
+  webContents: {
+    sendInputEvent: (event: unknown) => void;
+  };
+};
+
 type ElectronMock = {
+  /**
+   * The window registry the main process reads.
+   *
+   * Tests run without a real window, so the default is an empty registry; a
+   * suite that needs a target replaces one of the two lookups.
+   */
+  BrowserWindow: {
+    getAllWindows: () => MockBrowserWindow[];
+    getFocusedWindow: () => MockBrowserWindow | null;
+  };
   default: {
     autoUpdater?: unknown;
     screen: {
@@ -101,6 +123,10 @@ type ElectronMockOverrides = {
 };
 
 const electronMock: ElectronMock = {
+  BrowserWindow: {
+    getAllWindows: () => [],
+    getFocusedWindow: () => null
+  },
   default: {
     screen: {
       getAllDisplays: () => []
@@ -146,6 +172,8 @@ export const getElectronMock = () => electronMock;
  * ```
  */
 export const resetElectronMock = () => {
+  electronMock.BrowserWindow.getAllWindows = () => [];
+  electronMock.BrowserWindow.getFocusedWindow = () => null;
   delete electronMock.default.autoUpdater;
   electronMock.default.screen.getAllDisplays = () => [];
   electronMock.app.getAppPath = () => '/tmp/velocetty-app';

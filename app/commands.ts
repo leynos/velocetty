@@ -3,6 +3,7 @@ import {app, Menu} from 'electron';
 import type {BrowserWindow} from 'electron';
 import type {CommandId} from '@shared/types/commands';
 import {isString} from './utils/runtime-guards';
+import {emitE2EMarker} from './config/e2e-keymap-probe';
 
 import {openConfig, getConfig} from './config';
 import {asProfileId} from './utils/shared-ids';
@@ -23,6 +24,9 @@ const getGoldenPathNotificationMessage = () => {
 
 const commands = {
   'window:new': () => {
+    // The end-to-end lane asserts on the command having run, so the marker
+    // belongs to the handler rather than to the configuration that bound it.
+    emitE2EMarker('[e2e] command-executed window:new');
     // If window is created on the same tick, it will consume event too
     setTimeout(app.createWindow, 0);
   },

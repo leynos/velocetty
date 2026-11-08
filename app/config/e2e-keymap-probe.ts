@@ -14,6 +14,23 @@ export const E2E_PROBE_SHORTCUT = 'ctrl+alt+shift+n';
 /** Whether this process was started by the end-to-end lane. */
 export const isE2ERun = (): boolean => process.env.RUN_E2E === '1';
 
+/**
+ * Writes a marker line only when the end-to-end lane is running.
+ *
+ * The marker stream is the lane's only observation surface: the test reads the
+ * child process's standard output, so every assertion is a line printed here.
+ *
+ * @example
+ * ```ts
+ * emitE2EMarker('[e2e] renderer-ready'); // prints only under RUN_E2E=1
+ * ```
+ */
+export const emitE2EMarker = (line: string): void => {
+  if (isE2ERun()) {
+    console.log(line);
+  }
+};
+
 /** The reload status vocabulary the marker reports. */
 export type E2EKeymapStatus = 'applied' | 'kept';
 
