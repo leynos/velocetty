@@ -178,7 +178,18 @@ const runProve = (fixture: Fixture) => {
   return {status: result.status ?? 1, stderr: result.stderr, stdout: result.stdout};
 };
 
-test('prove refuses a missing proof-source list', () => {
+/**
+ * Each of these tests spawns `bin/prove.sh`, so the default five-second budget
+ * is too tight once the suite runs its files concurrently.
+ */
+const proofTimeoutMs = 30_000;
+
+/** Declares a test that runs the prover script within that budget. */
+const proofTest = (name: string, body: () => void): void => {
+  test(name, body, proofTimeoutMs);
+};
+
+proofTest('prove refuses a missing proof-source list', () => {
   inFixture((fixture) => {
     const result = runProve(fixture);
 
@@ -187,7 +198,7 @@ test('prove refuses a missing proof-source list', () => {
   });
 });
 
-test('prove refuses a list with no proof sources', () => {
+proofTest('prove refuses a list with no proof sources', () => {
   inFixture((fixture) => {
     const result = runWithList(fixture, ['# only a comment']);
 
@@ -196,7 +207,7 @@ test('prove refuses a list with no proof sources', () => {
   });
 });
 
-test('prove refuses a listed source that does not exist', () => {
+proofTest('prove refuses a listed source that does not exist', () => {
   inFixture((fixture) => {
     const result = runWithList(fixture, ['app/config/absent.ts']);
 
@@ -205,7 +216,7 @@ test('prove refuses a listed source that does not exist', () => {
   });
 });
 
-test('prove refuses a non-integer timeout', () => {
+proofTest('prove refuses a non-integer timeout', () => {
   inFixture((fixture) => {
     const result = runWithList(fixture, [`${POLICY_SOURCE} soon`]);
 
@@ -214,7 +225,7 @@ test('prove refuses a non-integer timeout', () => {
   });
 });
 
-test('prove refuses a timeout long enough for lsc to downgrade the check', () => {
+proofTest('prove refuses a timeout long enough for lsc to downgrade the check', () => {
   inFixture((fixture) => {
     const result = runWithList(fixture, [`${POLICY_SOURCE} 61`]);
 
@@ -223,7 +234,7 @@ test('prove refuses a timeout long enough for lsc to downgrade the check', () =>
   });
 });
 
-test('prove refuses text after the timeout column', () => {
+proofTest('prove refuses text after the timeout column', () => {
   // The list has two columns; a third word would otherwise be silently ignored.
   inFixture((fixture) => {
     const result = runWithList(fixture, [`${POLICY_SOURCE} 10 typo`]);
@@ -233,7 +244,7 @@ test('prove refuses text after the timeout column', () => {
   });
 });
 
-test('prove refuses to skip the policy proof when the policy exists unlisted', () => {
+proofTest('prove refuses to skip the policy proof when the policy exists unlisted', () => {
   inFixture((fixture) => {
     writeSource(fixture, {relativePath: POLICY_SOURCE});
     writeSource(fixture, {relativePath: 'app/config/other.ts'});
@@ -246,7 +257,7 @@ test('prove refuses to skip the policy proof when the policy exists unlisted', (
   });
 });
 
-test('prove refuses a forbidden Dafny trust construct', () => {
+proofTest('prove refuses a forbidden Dafny trust construct', () => {
   inFixture((fixture) => {
     const result = runWithProof(fixture, {dafnySource: 'lemma Bad()\n  ensures false\n{\n  assume false;\n}\n'});
 
@@ -255,7 +266,7 @@ test('prove refuses a forbidden Dafny trust construct', () => {
   });
 });
 
-test('prove refuses a spaced axiom attribute that is not the admitted one', () => {
+proofTest('prove refuses a spaced axiom attribute that is not the admitted one', () => {
   // Dafny accepts whitespace inside an attribute, so `{: axiom }` must not slip
   // past the comparison against the one admitted line.
   inFixture((fixture) => {
@@ -266,7 +277,7 @@ test('prove refuses a spaced axiom attribute that is not the admitted one', () =
   });
 });
 
-test('prove refuses a spaced verify-false attribute', () => {
+proofTest('prove refuses a spaced verify-false attribute', () => {
   inFixture((fixture) => {
     const result = runWithProof(fixture, {dafnySource: 'lemma Bad()\n  ensures true\n  {: verify false }\n{\n}\n'});
 
@@ -275,7 +286,7 @@ test('prove refuses a spaced verify-false attribute', () => {
   });
 });
 
-test('prove refuses a trust construct in a generated artefact body', () => {
+proofTest('prove refuses a trust construct in a generated artefact body', () => {
   inFixture((fixture) => {
     const result = runWithProof(fixture, {
       dafnySource: '// hand-authored proof\n',
@@ -287,7 +298,7 @@ test('prove refuses a trust construct in a generated artefact body', () => {
   });
 });
 
-test('prove ignores a trust word in a generated artefact header', () => {
+proofTest('prove ignores a trust word in a generated artefact header', () => {
   // The header is copied from the TypeScript module's prose summary, so a word
   // the scan forbids there is a description, not a proof step. The word is the
   // standalone lowercase form the pattern matches: "Assumes" would slip past
@@ -302,7 +313,7 @@ test('prove ignores a trust word in a generated artefact header', () => {
   });
 });
 
-test('prove ignores a hand-authored proof outside the policy directory', () => {
+proofTest('prove ignores a hand-authored proof outside the policy directory', () => {
   // The list is authoritative, so a proof listed from elsewhere is still
   // scanned; this pins that the scan follows the list rather than a fixed path.
   inFixture((fixture) => {
@@ -321,7 +332,7 @@ test('prove ignores a hand-authored proof outside the policy directory', () => {
   });
 });
 
-test('prove admits only the emptyUserKeymaps axiom and then verifies', () => {
+proofTest('prove admits only the emptyUserKeymaps axiom and then verifies', () => {
   inFixture((fixture) => {
     const result = runWithProof(fixture, {dafnySource: 'function {:axiom} emptyUserKeymaps(): UserKeymaps\n'});
 
