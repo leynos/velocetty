@@ -98,13 +98,11 @@ No menu entry or command opens the file yet.
    - If both trees hold a configuration file, merge the Hyper-tree file into
      the Velocetty copy by hand. The Velocetty copy wins at start-up, so
      overwriting it would discard the settings Velocetty is already using.
-   - Otherwise move the active configuration file into the Velocetty
+   - Otherwise, move the active configuration file into the Velocetty
      directory. If the Hyper directory holds `config.json5`, move it under
      that name; if it holds only the older `hyper.json`, move that file and
-     rename it to `config.json5`.
-
-   Also move `schema.json` and the `plugins/` directory. Create the Velocetty
-   directory if it does not exist yet.
+     rename it to `config.json5`. Also move `schema.json` and the `plugins/`
+     directory, and create the Velocetty directory if it does not exist yet.
 3. Start Velocetty again.
 
 Do not move the other files in the Hyper directory. They are Electron's

@@ -4246,6 +4246,15 @@ window exists), and names `hyper.json` as a possible active file.
 `docs/developers-guide.md` states that import stores valid text verbatim and
 that the active keymaps change on reload, not at import.
 
+Inline review follow-ups: a JSON5 syntax error reports its position as
+`keybindings.json5:line:column`, so `diagnosticKind` now treats any path that
+starts with the source label followed by a colon as a `document` diagnostic
+rather than a `command`; a notifier test pins the positioned shape. The
+developers' guide no longer claims that a failed import write retries the
+migration (`importKeybindings` never changes in-memory shortcuts, and only an
+unpersisted seed is retried), and the users' guide attaches the `schema.json`
+and `plugins/` move to the "Otherwise" branch, matching ADR-008.
+
 Executed shortcut (E2E-KB-5): the lane now presses the shortcut instead of
 inferring execution from the configuration marker. The test writes one chord
 per line to the application's standard input;

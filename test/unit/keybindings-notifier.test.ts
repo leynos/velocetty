@@ -61,6 +61,21 @@ test('a document-level diagnostic is logged as the document category', () => {
   expect(warnings[0]?.[1]).toEqual({count: 1, kinds: ['document'], source: SOURCE});
 });
 
+test('a positioned syntax error is a document diagnostic, not a command', () => {
+  const {report, warnings} = createSinks();
+
+  // A JSON5 syntax error carries `label:line:column`, which is still the
+  // document itself rather than a command identifier.
+  report({
+    diagnostics: [diagnostic(`${SOURCE}:1:15`, 'Unexpected token.')],
+    kind: 'diagnostics',
+    label: SOURCE
+  });
+
+  expect(warnings[0]?.[1]).toEqual({count: 1, kinds: ['document'], source: SOURCE});
+  expect(JSON.stringify(warnings)).not.toContain('1:15');
+});
+
 test('the user-facing notification still names the problem', () => {
   const {notices, report, warnings} = createSinks();
 

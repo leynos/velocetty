@@ -65,20 +65,23 @@ type DiagnosticKind = 'command' | 'document' | 'schema-key';
 /**
  * Classifies a diagnostic without repeating its path.
  *
- * A diagnostic path is one of three shapes: the source label for a
- * document-level error, `/$schema` for the reserved key, or a slash followed
- * by a command identifier. Reporting the shape keeps the identifier, and any
- * file wording behind it, out of the structured log.
+ * A diagnostic path is one of three shapes: the source label, or that label
+ * followed by a line and column, for a document-level error; `/$schema` for
+ * the reserved key; or a slash followed by a command identifier. Reporting the
+ * shape keeps the identifier, and any file wording behind it, out of the
+ * structured log.
  *
  * @example
  * ```ts
  * diagnosticKind('keybindings.json5', 'keybindings.json5'); // 'document'
+ * diagnosticKind('keybindings.json5:1:15', 'keybindings.json5'); // 'document'
  * diagnosticKind('/$schema', 'keybindings.json5'); // 'schema-key'
  * diagnosticKind('/window:new', 'keybindings.json5'); // 'command'
  * ```
  */
 const diagnosticKind = (path: string, sourceLabel: string): DiagnosticKind => {
-  if (path === sourceLabel) {
+  // A JSON5 syntax error reports its position as `label:line:column`.
+  if (path === sourceLabel || path.startsWith(`${sourceLabel}:`)) {
     return 'document';
   }
   return path === '/$schema' ? 'schema-key' : 'command';

@@ -368,14 +368,15 @@ wires them together.
   `getDefaultConfig().defaults.config?.colors`, and the pure function is tested
   without Electron.
 - **Import and export APIs** (`app/config/keybindings.ts`):
-  `importKeybindings` validates the text, writes it through the store, and
-  clears the unsaved-seed flag only when the write succeeded. A failed write
-  leaves the in-memory shortcuts untouched and reports `failed`, so the next
-  start retries the migration. Valid text is stored verbatim: import does not
-  re-serialize it, and the active keymaps change on the next reload rather than
-  at the moment of import. `exportKeybindings` is a query: it reads through
-  `peek()`, adding no read span and no warning, and returns the stored text
-  unchanged rather than re-serializing it.
+  `importKeybindings` validates the text and writes it through the store. It
+  never changes the in-memory shortcuts; the next reload applies the file. A
+  successful write clears the unsaved-seed flag. A failed write reports
+  `failed` and keeps the flag, so a seed that never persisted is retried at the
+  next start. Valid text is stored verbatim: import does not re-serialize it,
+  and the active keymaps change on the next reload rather than at the moment of
+  import. `exportKeybindings` is a query: it reads through `peek()`, adding no
+  read span and no warning, and returns the stored text unchanged rather than
+  re-serializing it.
 - **`resolveConfigLocations`** (`app/config/config-tree.ts`): the pure selector
   behind `paths.ts`. It takes the platform, the environment paths, the
   development override, and the `probe` and `sameFile` predicates, and returns
