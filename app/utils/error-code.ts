@@ -2,8 +2,9 @@
  * @file Extracts a Node-style errno code from a thrown value.
  *
  * `errorCode` returns whatever `code` string a value carries, for filesystem
- * decisions. `boundedErrorCode` and `describeError` narrow that value to fixed
- * tokens for log lines, where an arbitrary string could repeat a path.
+ * decisions. `boundedErrorCode` and `describeError` keep that value only when it
+ * names a known errno, for log lines, where an arbitrary string could repeat a
+ * path or a secret.
  */
 /*
  * Log lines and user-facing diagnostics carry this code rather than the raw
@@ -16,6 +17,8 @@
  * inspects is whatever a `catch` clause caught, which TypeScript types as
  * `unknown` and which may be anything a dependency chose to throw.
  */
+
+import {constants} from 'node:os';
 
 import {isObject, isString} from './runtime-guards';
 
@@ -42,10 +45,13 @@ export const errorCode = (error: unknown): string | undefined => {
 };
 
 /**
- * The shape of an errno token: uppercase ASCII with digits and underscores,
- * bounded in length. Paths, messages, and other prose do not match.
+ * The errno names this platform can report.
+ *
+ * The set comes from Node, so it is exactly the vocabulary the runtime uses
+ * rather than a hand-kept list. A string that merely looks errno-shaped, such as
+ * `PRIVATE_TOKEN`, is not a member and is dropped.
  */
-const ERRNO_CODE = /^[A-Z][A-Z0-9_]{0,31}$/;
+const KNOWN_ERRNO_CODES: ReadonlySet<string> = new Set(Object.keys(constants.errno));
 
 /**
  * The constructor names a log may carry.
@@ -66,25 +72,26 @@ const KNOWN_ERROR_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Reads an errno `code` only when it has the errno token shape.
+ * Reads an errno `code` only when it names a known errno.
  *
  * This is the log-safe form of {@link errorCode}. A `code` property may hold any
- * string, so a thrown value could carry a path or a fragment of the user's file
- * there; anything that is not an errno token is dropped rather than logged.
- * Filesystem decisions keep using {@link errorCode} and compare the full value,
- * because a dropped code must not be mistaken for a matching one.
+ * string, so a thrown value could carry a path, a token, or a fragment of the
+ * user's file there; anything outside Node's errno vocabulary is dropped rather
+ * than logged. Filesystem decisions keep using {@link errorCode} and compare the
+ * full value, because a dropped code must not be mistaken for a matching one.
  *
- * @returns The code when it is an errno token, otherwise `undefined`.
+ * @returns The code when it is a known errno, otherwise `undefined`.
  *
  * @example
  * ```ts
  * boundedErrorCode(Object.assign(new Error('denied'), {code: 'EACCES'})); // 'EACCES'
  * boundedErrorCode(Object.assign(new Error('denied'), {code: '/home/ada'})); // undefined
+ * boundedErrorCode(Object.assign(new Error('denied'), {code: 'PRIVATE_TOKEN'})); // undefined
  * ```
  */
 export const boundedErrorCode = (error: unknown): string | undefined => {
   const code = errorCode(error);
-  return code !== undefined && ERRNO_CODE.test(code) ? code : undefined;
+  return code !== undefined && KNOWN_ERRNO_CODES.has(code) ? code : undefined;
 };
 
 /**
@@ -109,9 +116,10 @@ const boundedErrorName = (error: unknown): string => {
  * name are fixed tokens that still tell a developer which failure occurred; the
  * user-facing notification carries the actionable text.
  *
- * Both fields are checked against their bounded vocabularies: a `code` that is
- * not an errno token and a constructor name outside the standard built-ins are
- * dropped, so a crafted value cannot smuggle a path into a log through either.
+ * Both fields are checked against their bounded vocabularies: a `code` outside
+ * Node's errno names and a constructor name outside the standard built-ins are
+ * dropped, so a crafted value cannot smuggle a path or a secret into a log
+ * through either.
  *
  * @returns The errno code, when the value has one, plus the constructor name.
  *

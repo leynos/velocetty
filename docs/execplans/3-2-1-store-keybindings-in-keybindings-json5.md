@@ -4704,10 +4704,13 @@ requires it. Any adjustment is recorded in `Decision log`.
   forms so a filesystem decision and a log line each get the right one:
   - `errorCode` still returns whatever `code` string a value carries, because
     the store and CLI-install decisions must compare the full errno.
-  - The new `boundedErrorCode` returns it only when it has the errno token
-    shape, and `describeError` now uses it for the code while narrowing
-    `Error.name` to the standard built-in names. A crafted `code` or `name`
-    therefore reports `{name: 'Error'}` rather than repeating a path.
+  - The new `boundedErrorCode` returns it only when Node's errno vocabulary
+    (`os.constants.errno`) contains it, and `describeError` now uses it for the
+    code while narrowing `Error.name` to the standard built-in names. A crafted
+    `code` or `name` therefore reports `{name: 'Error'}` rather than repeating a
+    path or an errno-shaped secret.
   - The `config-import` error sink switches to `boundedErrorCode`.
-  - Regression tests inject a home path through both fields and assert it
-    reaches neither the log record nor the serialized call arguments.
+  - Regression tests inject a home path and the errno-shaped token
+    `PRIVATE_TOKEN` through both fields, including through the production
+    `notify()` surface, and assert neither reaches the log record or the
+    serialized call arguments.

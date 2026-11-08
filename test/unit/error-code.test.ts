@@ -39,9 +39,16 @@ describe('boundedErrorCode', () => {
     expect(boundedErrorCode(error)).toBe('EACCES');
   });
 
-  test('drops a code that is not an errno token', () => {
-    // `code` accepts any string, so it could hold a path or a whole message.
-    const values = ['/home/ada/secret', 'EACCES: permission denied', 'eacces', 'A'.repeat(33), 'no code'];
+  test('drops a code that is not a known errno', () => {
+    // `code` accepts any string, so it could hold a path, a token, or a message.
+    const values = [
+      '/home/ada/secret',
+      'EACCES: permission denied',
+      'eacces',
+      'PRIVATE_TOKEN',
+      'A'.repeat(33),
+      'no code'
+    ];
     for (const code of values) {
       const error = Object.assign(new Error('x'), {code});
       expect(boundedErrorCode(error)).toBeUndefined();
@@ -54,6 +61,12 @@ describe('describeError', () => {
     const error = Object.assign(new TypeError('denied'), {code: 'EACCES'});
 
     expect(describeError(error)).toEqual({code: 'EACCES', name: 'TypeError'});
+  });
+
+  test('drops an errno-shaped token that is not an errno', () => {
+    const error = Object.assign(new Error('x'), {code: 'PRIVATE_TOKEN'});
+
+    expect(describeError(error)).toEqual({name: 'Error'});
   });
 
   test('drops a path smuggled through either field', () => {

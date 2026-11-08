@@ -17,6 +17,8 @@ const electronPath = realpathSync(appRequire.resolve('electron'));
 /** A command identifier and a path a user could plausibly have written. */
 const COMMAND_ID = 'window:open-private-notes';
 const USER_PATH = '/home/ada/private/notes.txt';
+/** An errno-shaped value that is not an errno, so a shape test alone would pass it. */
+const SENSITIVE_TOKEN = 'PRIVATE_TOKEN';
 
 /** The paths module stub, which only needs to expose the icon the notifier uses. */
 const pathsMock = () => ({icon: '/tmp/icon.png'});
@@ -82,8 +84,11 @@ describe('notify', () => {
     mock.restore();
   });
 
-  test('shows the full text while the log keeps only the bounded marker', async () => {
-    const shown: Array<{readonly body: string; readonly title: string}> = [];
+  /**
+   * Stubs the modules the notifier resolves, records what it shows, and loads it
+   * under a cache key of its own so each test gets untouched module state.
+   */
+  const loadNotify = async (shown: Array<{readonly body: string; readonly title: string}>, key: string) => {
     const electronMock = () => ({
       app: {isReady: () => true, on: () => {}},
       Notification: class {
@@ -99,10 +104,13 @@ describe('notify', () => {
     registerModuleMock('../../app/config/paths.ts', pathsMock);
     const logSpy = spyOn(console, 'log').mockImplementation(() => {});
     const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
-    const {default: notify} = await importFresh<typeof import('../../app/notify')>(
-      '../../app/notify',
-      'notification_log_unit'
-    );
+    const {default: notify} = await importFresh<typeof import('../../app/notify')>('../../app/notify', key);
+    return {errorSpy, logSpy, notify};
+  };
+
+  test('shows the full text while the log keeps only the bounded marker', async () => {
+    const shown: Array<{readonly body: string; readonly title: string}> = [];
+    const {errorSpy, logSpy, notify} = await loadNotify(shown, 'notification_log_unit');
     const error = Object.assign(new Error(`EACCES: permission denied, open '${USER_PATH}'`), {code: 'EACCES'});
 
     notify(`Could not run ${COMMAND_ID}`, `Check ${USER_PATH}`, {error});
@@ -116,5 +124,23 @@ describe('notify', () => {
     expect(logged).not.toContain(USER_PATH);
     expect(logSpy).toHaveBeenCalledWith('[Notification] Notification shown.');
     expect(errorSpy).toHaveBeenCalledWith('[Notification]', {code: 'EACCES', name: 'Error'});
+  });
+
+  test('drops an errno-shaped secret through the production path', async () => {
+    const shown: Array<{readonly body: string; readonly title: string}> = [];
+    const {errorSpy, logSpy, notify} = await loadNotify(shown, 'notification_log_unit_token');
+    const error = Object.assign(new Error(`could not use ${SENSITIVE_TOKEN}`), {
+      code: SENSITIVE_TOKEN,
+      name: SENSITIVE_TOKEN
+    });
+
+    notify(`Could not run ${COMMAND_ID}`, `Check ${USER_PATH}`, {error});
+
+    expect(shown).toHaveLength(1);
+    const logged = JSON.stringify([logSpy.mock.calls, errorSpy.mock.calls]);
+    expect(logged).not.toContain(SENSITIVE_TOKEN);
+    expect(logged).not.toContain(COMMAND_ID);
+    expect(logged).not.toContain(USER_PATH);
+    expect(errorSpy).toHaveBeenCalledWith('[Notification]', {name: 'Error'});
   });
 });
