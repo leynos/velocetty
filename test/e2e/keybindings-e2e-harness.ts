@@ -61,7 +61,7 @@ type LaunchedApp = {
   /** How many captured lines match, so a caller can wait for the next one. */
   readonly count: (matcher: RegExp) => number;
   readonly output: () => string;
-  /** Writes one line to the probe's standard input. */
+  /** Appends one chord request to the file the E2E probe polls. */
   readonly send: (line: string) => void;
   readonly waitFor: (wait: MarkerWait) => Promise<string>;
   readonly stop: () => Promise<void>;

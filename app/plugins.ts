@@ -17,7 +17,8 @@ import type {IpcMainWithCommands} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
 
 import * as config from './config';
-import {isFunction, isObject, isString} from './utils/runtime-guards';
+import {errorCode} from './utils/error-code';
+import {isFunction, isObject} from './utils/runtime-guards';
 import {plugs} from './config/paths';
 import notify from './notify';
 import {availableExtensions} from './plugins/extensions';
@@ -369,9 +370,9 @@ function requirePlugins(): any[] {
 
       return mod;
     } catch (error) {
-      const errorCode = isObject(error) && 'code' in error && isString(error.code) ? error.code : undefined;
+      const code = errorCode(error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorCode === 'MODULE_NOT_FOUND') {
+      if (code === 'MODULE_NOT_FOUND') {
         console.warn(`Plugin error while loading "${path.basename(path_)}" (${path_}): ${errorMessage}`);
       } else {
         notify('Plugin error!', `Plugin "${path.basename(path_)}" failed to load (${errorMessage})`, {error});

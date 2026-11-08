@@ -9,7 +9,8 @@ import {mkdirpSync} from 'fs-extra';
 import * as Registry from 'native-reg';
 import type {ValueType} from 'native-reg';
 import sudoPrompt from 'sudo-prompt';
-import {isObject, isString} from './runtime-guards';
+import {errorCode} from './error-code';
+import {isString} from './runtime-guards';
 
 import {cliScriptPath, cliLinkPath} from '../config/paths';
 import notify from '../notify';
@@ -21,15 +22,11 @@ const sudoExec = promisify(sudoPrompt.exec);
 /** The `ln` invocation the elevated fallback runs, without its `sudo` prefix. */
 const lnCommand = `ln -sf "${cliScriptPath}" "${cliLinkPath}"`;
 
-/** Reads a string `code` property from a thrown value, when it has one. */
-const getErrorCode = (error: unknown): string | undefined =>
-  isObject(error) && 'code' in error && isString(error.code) ? error.code : undefined;
-
 const checkInstall = async (): Promise<boolean> => {
   try {
     return (await readLink(cliLinkPath)) === cliScriptPath;
   } catch (error) {
-    if (getErrorCode(error) === 'ENOENT') {
+    if (errorCode(error) === 'ENOENT') {
       return false;
     }
     throw error;
@@ -43,12 +40,12 @@ const checkInstall = async (): Promise<boolean> => {
  * already there, so both mean the same thing to the user.
  */
 const describeSymlinkError = (caughtError: unknown): string => {
-  const errorCode = getErrorCode(caughtError);
-  if (errorCode === 'EEXIST' || errorCode === 'EINVAL') {
+  const code = errorCode(caughtError);
+  if (code === 'EEXIST' || code === 'EINVAL') {
     return `File already exists: ${cliLinkPath}`;
   }
   const errorMessage = caughtError instanceof Error ? caughtError.message : undefined;
-  const detail = errorCode ?? 'Unknown error';
+  const detail = code ?? 'Unknown error';
   return `Symlink creation failed: ${detail}${errorMessage ? ` (${errorMessage})` : ''}`;
 };
 
@@ -91,7 +88,7 @@ sudo ${lnCommand}`,
  */
 const resolveSymlinkFailure = async (caughtError: unknown, silent: boolean): Promise<string | null> => {
   // Need sudo access to create symlink
-  if (getErrorCode(caughtError) !== 'EACCES' || silent) {
+  if (errorCode(caughtError) !== 'EACCES' || silent) {
     return describeSymlinkError(caughtError);
   }
   return (await runSudoSymlink()) ?? describeSymlinkError(caughtError);

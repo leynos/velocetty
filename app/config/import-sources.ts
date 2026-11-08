@@ -10,7 +10,7 @@ import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-
 import path from 'node:path';
 
 import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
-import {isObject, isString} from '../utils/runtime-guards';
+import {errorCode} from '../utils/error-code';
 import type {ConfigFallbackCause, ConfigImportNotify} from './import-report';
 import {ensureSchemaFiles, type SchemaCopyRequest} from './schema-copy';
 import {notifyWithPrimaryDiagnostic} from './keybindings-notifier';
@@ -117,20 +117,6 @@ export type ConfigSourceLoaderDependencies = {
 };
 
 const defaultFileSystem: ConfigImportFileSystem = {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync};
-
-/**
- * Reads a Node-style errno code without trusting the thrown value's shape.
- *
- * Log lines carry this code rather than the raw error: an error's message can
- * repeat a path or quote the user's file, while the code is a fixed token.
- */
-const errorCode = (error: unknown): string | undefined => {
-  if (!isObject(error) || !('code' in error)) {
-    return undefined;
-  }
-  const {code} = error;
-  return isString(code) ? code : undefined;
-};
 
 const defaultRawConfigFallback: rawConfig = {
   plugins: [],
@@ -384,11 +370,11 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
    * explain a fallback available to the start-up command without re-reading
    * the bundled files.
    *
-   * Only a usable load is cached. A faulted one is returned to the caller that
-   * asked, but the next query re-reads the files: the bundled files are shipped
-   * artefacts that a repair can fix during the same run, and a start-up that
-   * reused a stale fallback would refuse to recover and would persist that
-   * fallback into `config.json5`.
+   * Only a fully usable load is cached. A faulted one — from either shipped
+   * file — is returned to the caller that asked, but the next query re-reads
+   * the files: they are shipped artefacts that a repair can fix during the
+   * same run, and a start-up that reused a stale fallback would refuse to
+   * recover and would persist that fallback into `config.json5`.
    */
   const readDefaults = (): LoadedDefaults => {
     if (defaultsCache !== undefined) {
@@ -406,7 +392,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     if (platform.failure !== undefined) {
       Object.assign(defaults, {platformKeymapFailure: platform.failure});
     }
-    if (!loaded.usedFallback) {
+    if (!loaded.usedFallback && !platform.fault) {
       defaultsCache = defaults;
     }
     return defaults;

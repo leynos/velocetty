@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import path from 'node:path';
 
-import {isObject, isString} from '../utils/runtime-guards';
+import {errorCode} from '../utils/error-code';
 import type {
   KeybindingsReadOutcome,
   KeybindingsStorageFailure,
@@ -40,15 +40,6 @@ const renameFailureCategory = (code: string | undefined): RenameFailureCategory 
     return 'permission';
   }
   return code === 'EBUSY' ? 'busy' : 'other';
-};
-
-/** Reads a Node-style errno code without trusting the thrown value's shape. */
-const errorCode = (error: unknown): string | undefined => {
-  if (!isObject(error) || !('code' in error)) {
-    return undefined;
-  }
-  const {code} = error;
-  return isString(code) ? code : undefined;
 };
 
 /** The errno codes with a dedicated port category; adding one is data, not a new disjunct. */

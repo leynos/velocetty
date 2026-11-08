@@ -71,24 +71,6 @@ three print the same report:
 The paths are the resolved ones, so the report is the quickest way to find out
 which file an installation is actually reading.
 
-## Keyboard shortcuts
-
-Keyboard shortcuts are stored in `keybindings.json5`, separately from the rest
-of the configuration. When the file does not exist at start-up, Velocetty
-creates it with a short header comment. If the active legacy configuration file
-(`config.json5`, or the legacy `hyper.json`) still holds valid `keymaps`, those
-shortcuts are copied into the new file; otherwise it starts as an empty object.
-Creation does not happen when that file cannot be read or parsed, or its
-`keymaps` value is invalid, and a failed write leaves no file behind — see
-[Recreation](#unbinding-and-resetting). Open the file in any text editor, for
-example:
-
-```bash
-code ~/.config/Velocetty/keybindings.json5
-```
-
-No menu entry or command opens the file yet.
-
 ### Moving an existing configuration
 
 1. Quit Velocetty.
@@ -107,6 +89,24 @@ No menu entry or command opens the file yet.
 
 Do not move the other files in the Hyper directory. They are Electron's
 application state (window layout, caches, preferences), not configuration.
+
+## Keyboard shortcuts
+
+Keyboard shortcuts are stored in `keybindings.json5`, separately from the rest
+of the configuration. When the file does not exist at start-up, Velocetty
+creates it with a short header comment. If the active legacy configuration file
+(`config.json5`, or the legacy `hyper.json`) still holds valid `keymaps`, those
+shortcuts are copied into the new file; otherwise it starts as an empty object.
+Creation does not happen when that file cannot be read or parsed, or its
+`keymaps` value is invalid, and a failed write leaves no file behind — see
+[Recreation](#unbinding-and-resetting). Open the file in any text editor, for
+example:
+
+```bash
+code ~/.config/Velocetty/keybindings.json5
+```
+
+No menu entry or command opens the file yet.
 
 ### Format
 

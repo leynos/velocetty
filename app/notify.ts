@@ -1,10 +1,10 @@
 import {app, Notification} from 'electron';
 
 import {icon} from './config/paths';
-import {isObject, isString} from './utils/runtime-guards';
+import {errorCode} from './utils/error-code';
 
 /**
- * The errno code a thrown value carries, when it has a string one.
+ * A bounded description of a thrown value, for the shared log line.
  *
  * The notification sink is shared by every feature, so it must not print an
  * arbitrary error: a message can carry a path, a command identifier, or a
@@ -12,13 +12,9 @@ import {isObject, isString} from './utils/runtime-guards';
  * tokens that still tell a developer which failure occurred; the user-facing
  * notification body carries the actionable text.
  */
-const errorCodeOf = (error: unknown): string | undefined =>
-  isObject(error) && 'code' in error && isString(error.code) ? error.code : undefined;
-
-/** A bounded description of a thrown value, for the shared log line. */
 const describeError = (error: unknown) => {
   const name = error instanceof Error ? error.name : 'UnknownError';
-  const code = errorCodeOf(error);
+  const code = errorCode(error);
 
   return code === undefined ? {name} : {code, name};
 };

@@ -4265,11 +4265,15 @@ unpersisted seed is retried), and the users' guide attaches the `schema.json`
 and `plugins/` move to the "Otherwise" branch, matching ADR-008.
 
 Executed shortcut (E2E-KB-5): the lane now presses the shortcut instead of
-inferring execution from the configuration marker. The test writes one chord
-per line to the application's standard input;
+inferring execution from the configuration marker. The test appends one chord
+per line to the request file named by `VELOCETTY_E2E_PRESS_FILE`;
 `app/config/e2e-shortcut-chord.ts` parses it and
-`app/config/e2e-shortcut-probe.ts` converts it into `sendInputEvent` presses in
-the focused window. The `window:new` handler prints
+`app/config/e2e-shortcut-probe.ts` polls the file and dispatches a
+`KeyboardEvent` into the newest window's page. A file, rather than standard
+input, because Electron on Windows has no console and never delivers piped
+input, and a page-level event, rather than `sendInputEvent`, because the
+renderer keymap binding is the boundary under test and it must not depend on
+the window holding operating-system focus. The `window:new` handler prints
 `[e2e] command-executed window:new`, so the assertion is about the command
 having run. The scenario edits the binding, presses it after the reload, saves
 invalid input, and presses the working chord again; the parser has its own unit

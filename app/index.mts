@@ -26,8 +26,8 @@ if (requestedArgument && informationalArguments.includes(requestedArgument)) {
     // to sit relative to a statement in a lower module.
     const config = await import('./config.js');
     config.setup();
-    // Dormant outside the end-to-end lane: the probe's own guard decides
-    // whether standard input is read as shortcut requests.
+    // Dormant outside the end-to-end lane: the probe reads requests only when
+    // `RUN_E2E=1`, and only from the file `VELOCETTY_E2E_PRESS_FILE` names.
     startShortcutProbe();
 
     await import('./start.js');

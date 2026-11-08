@@ -1308,10 +1308,13 @@ a timeout names the marker that never arrived. Existing markers include
 
 The `command-executed` marker is printed by the command handler itself, so it
 proves a shortcut ran its command rather than merely that the configuration
-declared it. The suite presses a shortcut by writing one chord per line to the
-application's standard input; the E2E-only probe at
-`app/config/e2e-shortcut-probe.ts` turns that line into the input events a real
-keypress produces. Standard input is read only when `RUN_E2E=1`.
+declared it. The suite presses a shortcut by appending one chord per line to
+the request file named by `VELOCETTY_E2E_PRESS_FILE`. The E2E-only probe at
+`app/config/e2e-shortcut-probe.ts` polls that file and dispatches a
+`KeyboardEvent` into the page, which is the boundary a real keypress crosses
+before it reaches the renderer keymap. A file replaces standard input because
+Electron on Windows never delivers piped input to the main process. The file is
+read only when `RUN_E2E=1`.
 
 - Keep a marker on one line. Parsing is line-oriented, and a wrapped marker is
   never matched.
