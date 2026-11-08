@@ -7,7 +7,7 @@
  * also keeps both files inside the repository's 400-line limit.
  */
 import {spawn, type ChildProcess} from 'node:child_process';
-import {existsSync} from 'node:fs';
+import {appendFileSync, existsSync} from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -75,13 +75,22 @@ export const launchApp = async (
     throw new Error('Expected dist/app to exist. Run `bun run test:e2e:prepare` before the keybindings E2E suite.');
   }
 
+  // The app's E2E probe presses the chords appended here, so a scenario can
+  // press one exactly when it is ready to. A file rather than standard input:
+  // Electron on Windows has no console and never delivers piped input.
+  const pressRequestsPath = path.join(environment.tempHome, 'shortcut-requests.txt');
+  await fs.writeFile(pressRequestsPath, '', 'utf8');
+
   let output = '';
   const child: ChildProcess = spawn(process.execPath, developmentAppLaunchArgs, {
     cwd: process.cwd(),
-    env: {...environment.env, ELECTRONMON_LOGLEVEL: 'error', RUN_E2E: '1'},
-    // Standard input carries shortcut requests to the app's E2E probe, so a
-    // scenario can press a chord exactly when it is ready to.
-    stdio: ['pipe', 'pipe', 'pipe']
+    env: {
+      ...environment.env,
+      ELECTRONMON_LOGLEVEL: 'error',
+      RUN_E2E: '1',
+      VELOCETTY_E2E_PRESS_FILE: pressRequestsPath
+    },
+    stdio: ['ignore', 'pipe', 'pipe']
   });
   const append = (chunk: Buffer) => {
     output += chunk.toString();
@@ -116,7 +125,7 @@ export const launchApp = async (
     count,
     output: () => output,
     send: (line: string) => {
-      child.stdin?.write(`${line}\n`);
+      appendFileSync(pressRequestsPath, `${line}\n`, 'utf8');
     },
     /** Terminates the app, escalating to SIGKILL if it ignores SIGTERM. */
     stop: async () => {

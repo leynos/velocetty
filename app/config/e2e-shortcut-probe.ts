@@ -2,8 +2,8 @@
 /*
  * The lane proves a shortcut executes its command by pressing it, not by
  * reading the configuration that declares it. This module is the main-process
- * half: the test writes one shortcut per line to standard input, and the probe
- * presses that chord in the newest window's page.
+ * half: the test appends one shortcut per line to a request file, and the
+ * probe presses that chord in the newest window's page.
  *
  * A press is a `KeyboardEvent` dispatched into the page rather than a key
  * event synthesized by the operating system. The scenario under test is the
@@ -13,9 +13,15 @@
  * the window holds operating-system focus, which a headless Linux runner and a
  * Windows runner without a foreground window never give it.
  *
- * It is dormant outside `RUN_E2E=1`, so a shipped build never reads standard
- * input and never synthesizes key events.
+ * The request file stands in for standard input because Electron on Windows
+ * has no console and never delivers piped standard input to the main process,
+ * so a stdin channel there would silently press nothing.
+ *
+ * It is dormant outside `RUN_E2E=1`, so a shipped build never reads a request
+ * file and never synthesizes key events.
  */
+import * as fs from 'node:fs';
+
 import {BrowserWindow, type WebContents} from 'electron';
 
 import {emitE2EMarker, isE2ERun} from './e2e-keymap-probe';
@@ -23,6 +29,9 @@ import {parseShortcut, toKeyPress, type KeyPress} from './e2e-shortcut-chord';
 
 /** The shape of the reply the page returns for a pressed chord. */
 type EvaluateReply = Readonly<{result?: Readonly<{value?: unknown}>}>;
+
+/** How often the request file is checked for new lines. */
+const pollIntervalMs = 50;
 
 /** The page a press should reach: the focused window, else the newest one. */
 const targetContents = (): WebContents | undefined => {
@@ -97,25 +106,56 @@ const pressLine = async (line: string): Promise<void> => {
   }
 };
 
+/** The request file the harness named, if it named one. */
+const requestFile = (): string | undefined => {
+  const file = process.env.VELOCETTY_E2E_PRESS_FILE;
+  return file === undefined || file.length === 0 ? undefined : file;
+};
+
 /**
- * Starts reading chords from standard input, one per line.
+ * Presses every complete request line appended since the last read.
  *
- * The end-to-end harness owns the write side, so this is a command channel
- * rather than a user interface: a line is a request to press that chord. Lines
- * are pressed in order, so a burst of writes cannot interleave two presses.
+ * A trailing partial line is left for the next read, so a write that lands
+ * mid-line cannot press a truncated chord.
+ *
+ * @returns The offset the next read should start from.
+ */
+const pressAppendedLines = async (file: string, offset: number): Promise<number> => {
+  const contents = await fs.promises.readFile(file, 'utf8').catch(() => '');
+  const fresh = contents.slice(offset);
+  const lastBreak = fresh.lastIndexOf('\n');
+  if (lastBreak === -1) {
+    return offset;
+  }
+  for (const line of fresh.slice(0, lastBreak).split('\n')) {
+    if (line.trim().length > 0) {
+      await pressLine(line);
+    }
+  }
+  return offset + lastBreak + 1;
+};
+
+/**
+ * Starts pressing the chords the end-to-end harness appends to its file.
+ *
+ * The harness owns the write side, so this is a command channel rather than a
+ * user interface: a line is a request to press that chord. Lines are pressed
+ * in order, so a burst of writes cannot interleave two presses.
  */
 export const startShortcutProbe = (): void => {
   if (!isE2ERun()) {
     return;
   }
+  const file = requestFile();
+  if (file === undefined) {
+    return;
+  }
 
+  let offset = 0;
   let pending: Promise<void> = Promise.resolve();
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('data', (chunk: string) => {
-    for (const line of chunk.split('\n')) {
-      if (line.trim().length > 0) {
-        pending = pending.then(() => pressLine(line));
-      }
-    }
+  fs.watchFile(file, {interval: pollIntervalMs}, () => {
+    pending = pending.then(async () => {
+      offset = await pressAppendedLines(file, offset);
+    });
   });
 };
