@@ -5,6 +5,14 @@
 // lsc generates the body from the TypeScript source; the proof contracts and
 // lemmas below the generated lines are maintained here. Run `make prove` to
 // verify this file against the regenerated `keybindings-policy.dfy.gen`.
+//
+// Abstraction boundary: `UserKeymaps` is an opaque value type here, so `==`
+// in every contract is value equality. In TypeScript a keymap is a plain
+// object, where `===` compares identity, and `emptyUserKeymaps()` returns a
+// fresh object on each call. Read each contract as a value comparison; the
+// TypeScript tests use `toEqual` to match, and
+// `test/unit/keybindings-policy.test.ts` pins the fresh-object behaviour so
+// the correspondence cannot drift silently.
 // ---------------------------------------------------------------------------
 
 datatype Option<T> = None | Some(value: T)

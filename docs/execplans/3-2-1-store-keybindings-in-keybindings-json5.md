@@ -4246,6 +4246,15 @@ window exists), and names `hyper.json` as a possible active file.
 `docs/developers-guide.md` states that import stores valid text verbatim and
 that the active keymaps change on reload, not at import.
 
+Proof correspondence: both `app/config/keybindings-policy.ts` and the
+hand-maintained header of `app/config/keybindings-policy.dfy` now state the
+abstraction boundary: `===` in a contract is value equality, because the proof
+treats `UserKeymaps` as an opaque value, while TypeScript `===` on a plain
+object compares identity and `emptyUserKeymaps()` is fresh per call. The tests
+match contracts with `toEqual`, and the fresh-object test pins the difference.
+`make prove` regenerated the artefacts byte-identically and verified 1 and 8
+programs with 0 errors.
+
 Inline review follow-ups: a JSON5 syntax error reports its position as
 `keybindings.json5:line:column`, so `diagnosticKind` now treats any path that
 starts with the source label followed by a colon as a `document` diagnostic

@@ -3,6 +3,12 @@
  * This module is LemmaScript-verified. Keep it pure: it must not import
  * Electron, touch the filesystem, or read the clock. The contracts below are
  * the specification, and `LemmaScript-files.txt` makes `make prove` verify them.
+ *
+ * `===` in a contract is value equality, because the proof treats
+ * `UserKeymaps` as an opaque value. A TypeScript keymap is a plain object, so
+ * `===` there compares identity, and `emptyUserKeymaps()` returns a fresh
+ * object per call. Every contract is therefore matched with value equality in
+ * the tests (`toEqual`), never with `toBe`.
  */
 
 /** User keybindings, opaque to the proof. */
