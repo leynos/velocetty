@@ -18,6 +18,7 @@ import {
   legacyHyperConfig,
   noRecreationWaitMs,
   platformDefaultShortcut,
+  pressAndAwaitProbe,
   pressUntilExecuted,
   probeMarker,
   replaceFileAtomically,
@@ -170,6 +171,11 @@ e2eTest(
           matcher: probeMarker({shortcut: E2E_PROBE_SHORTCUT, status: 'applied'})
         });
 
+        // The seeded binding runs its command before the file is replaced, so
+        // the silence after the replacement is a change in binding rather than
+        // a lane that never worked.
+        await pressUntilExecuted({app, command, shortcut: E2E_PROBE_SHORTCUT});
+
         await replaceFileAtomically({
           contents: `{'window:new': '${editedShortcut}'}`,
           filePath: keybindingsPath
@@ -178,6 +184,13 @@ e2eTest(
           description: 'the edited keymap',
           matcher: probeMarker({shortcut: editedShortcut, status: 'applied'})
         });
+
+        // The replaced binding no longer runs the command. The probe's own
+        // marker synchronizes the press, so a press that has not been handled
+        // yet cannot satisfy this assertion by accident.
+        const executedBeforeReplacement = app.count(commandExecutedMarker(command));
+        await pressAndAwaitProbe({app, shortcuts: [E2E_PROBE_SHORTCUT]});
+        expect(app.count(commandExecutedMarker(command))).toBe(executedBeforeReplacement);
 
         // A command marker, not the configuration marker above, is what shows
         // the shortcut actually ran the command it was bound to.
@@ -189,6 +202,11 @@ e2eTest(
           description: 'the invalid file keeping the working keymap',
           matcher: probeMarker({shortcut: editedShortcut, status: 'kept'})
         });
+
+        // The rejected file must not have rebound the old chord either.
+        const executedBeforeInvalidReload = app.count(commandExecutedMarker(command));
+        await pressAndAwaitProbe({app, shortcuts: [E2E_PROBE_SHORTCUT]});
+        expect(app.count(commandExecutedMarker(command))).toBe(executedBeforeInvalidReload);
 
         // The rejected file must not have unbound the shortcut that still
         // works: pressing it again should run a further command.

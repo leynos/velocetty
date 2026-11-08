@@ -160,6 +160,36 @@ export const commandExecutedMarker = (command: string) => new RegExp(`\\[e2e\\] 
 const pressAttempts = 20;
 const pressIntervalMs = 250;
 
+/** The `[e2e]` line the probe emits once it has handled a request line. */
+const probeOutcomeMarker = /\[e2e\] shortcut-probe (?:pressed|rejected|failed) /;
+
+type PressAndAwaitRequest = Readonly<{
+  app: LaunchedApp;
+  shortcuts: readonly string[];
+}>;
+
+/**
+ * Sends chords and waits until the probe reports handling every one.
+ *
+ * The probe presses requests in order, so the last marker proves the earlier
+ * ones have been processed. A scenario can then assert that a chord did *not*
+ * run its command without racing the file channel, which a fixed delay would
+ * only approximate.
+ */
+export const pressAndAwaitProbe = async ({app, shortcuts}: PressAndAwaitRequest): Promise<void> => {
+  const before = app.count(probeOutcomeMarker);
+  for (const shortcut of shortcuts) {
+    app.send(shortcut);
+  }
+  const deadline = Date.now() + markerTimeoutMs;
+  while (app.count(probeOutcomeMarker) < before + shortcuts.length) {
+    if (Date.now() > deadline) {
+      throw new Error(`The probe never handled ${shortcuts.join(', ')}. Output:\n${app.output()}`);
+    }
+    await sleep(50);
+  }
+};
+
 type PressRequest = Readonly<{
   app: LaunchedApp;
   command: string;
