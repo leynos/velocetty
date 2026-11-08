@@ -4700,3 +4700,14 @@ requires it. Any adjustment is recorded in `Decision log`.
     observations against the spec.
   - The users' guide and migration note name the application executable per
     platform, because the installed `hyper` launcher is the plugin CLI.
+- 2026-11-08 (bounded-log fields): `errorCode`'s result is available in two
+  forms so a filesystem decision and a log line each get the right one:
+  - `errorCode` still returns whatever `code` string a value carries, because
+    the store and CLI-install decisions must compare the full errno.
+  - The new `boundedErrorCode` returns it only when it has the errno token
+    shape, and `describeError` now uses it for the code while narrowing
+    `Error.name` to the standard built-in names. A crafted `code` or `name`
+    therefore reports `{name: 'Error'}` rather than repeating a path.
+  - The `config-import` error sink switches to `boundedErrorCode`.
+  - Regression tests inject a home path through both fields and assert it
+    reaches neither the log record nor the serialized call arguments.

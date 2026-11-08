@@ -1,7 +1,7 @@
 /** @file Verifies the shared errno-code extraction every log sink uses. */
 import {describe, expect, test} from 'bun:test';
 
-import {errorCode} from '../../app/utils/error-code';
+import {boundedErrorCode, describeError, errorCode} from '../../app/utils/error-code';
 
 describe('errorCode', () => {
   test('returns the code a Node filesystem error carries', () => {
@@ -29,5 +29,41 @@ describe('errorCode', () => {
     for (const value of [undefined, null, 'ENOENT', 1, true]) {
       expect(errorCode(value)).toBeUndefined();
     }
+  });
+});
+
+describe('boundedErrorCode', () => {
+  test('keeps an errno token', () => {
+    const error = Object.assign(new Error('denied'), {code: 'EACCES'});
+
+    expect(boundedErrorCode(error)).toBe('EACCES');
+  });
+
+  test('drops a code that is not an errno token', () => {
+    // `code` accepts any string, so it could hold a path or a whole message.
+    const values = ['/home/ada/secret', 'EACCES: permission denied', 'eacces', 'A'.repeat(33), 'no code'];
+    for (const code of values) {
+      const error = Object.assign(new Error('x'), {code});
+      expect(boundedErrorCode(error)).toBeUndefined();
+    }
+  });
+});
+
+describe('describeError', () => {
+  test('keeps a built-in constructor name and an errno code', () => {
+    const error = Object.assign(new TypeError('denied'), {code: 'EACCES'});
+
+    expect(describeError(error)).toEqual({code: 'EACCES', name: 'TypeError'});
+  });
+
+  test('drops a path smuggled through either field', () => {
+    const error = Object.assign(new Error('x'), {name: '/home/ada/secret', code: '/home/ada/secret'});
+
+    expect(describeError(error)).toEqual({name: 'Error'});
+    expect(JSON.stringify(describeError(error))).not.toContain('/home/ada');
+  });
+
+  test('reports UnknownError for a value that is not an Error', () => {
+    expect(describeError('not an error')).toEqual({name: 'UnknownError'});
   });
 });

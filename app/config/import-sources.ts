@@ -10,7 +10,7 @@ import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-
 import path from 'node:path';
 
 import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
-import {errorCode} from '../utils/error-code';
+import {boundedErrorCode} from '../utils/error-code';
 import type {ConfigFallbackCause, ConfigImportNotify} from './import-report';
 import {ensureSchemaFiles, type SchemaCopyRequest} from './schema-copy';
 import {notifyWithPrimaryDiagnostic} from './keybindings-notifier';
@@ -179,7 +179,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     const results = ensureSchemaFiles(request);
     for (const result of results) {
       if (result.kind === 'failed') {
-        errorFn('[config-import] Failed to copy schema file.', {code: errorCode(result.error)});
+        errorFn('[config-import] Failed to copy schema file.', {code: boundedErrorCode(result.error)});
       }
     }
     // One notice covers any number of refused copies: the user's action, not
@@ -225,7 +225,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
       fileSystem.writeFileSync(pathDeps.cfgPath, stringifyConfig(defaultConfigTemplate), 'utf8');
       return true;
     } catch (error) {
-      errorFn('[config-import] Failed to write bootstrapped user config.', {code: errorCode(error)});
+      errorFn('[config-import] Failed to write bootstrapped user config.', {code: boundedErrorCode(error)});
       notifyFn("Couldn't create a user config file. Check permissions and available disk space.");
       return false;
     }
@@ -337,7 +337,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
         usedFallback: true
       };
     } catch (error) {
-      errorFn('[config-import] Failed to read or parse user config.', {code: errorCode(error)});
+      errorFn('[config-import] Failed to read or parse user config.', {code: boundedErrorCode(error)});
       warnFn('[config-import] Using default config fallback after user config parse failure.');
       notifyWithPrimaryDiagnostic({
         // The catch covers the read as well as anything after it, so the

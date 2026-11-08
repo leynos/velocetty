@@ -56,6 +56,17 @@ describe('logNotificationShown', () => {
     expect(JSON.stringify([info, errors])).not.toContain(USER_PATH);
   });
 
+  test('drops a path smuggled through the code or the name', () => {
+    const {errors, sinks} = createSinks();
+    const error = Object.assign(new Error(`open '${USER_PATH}'`), {code: USER_PATH, name: USER_PATH});
+
+    logNotificationShown({error}, sinks);
+
+    // Both fields are writable, so neither may pass a path through unchanged.
+    expect(errors).toEqual([['[Notification]', {name: 'Error'}]]);
+    expect(JSON.stringify(errors)).not.toContain(USER_PATH);
+  });
+
   test('describes a non-Error thrown value without inventing a code', () => {
     const {errors, sinks} = createSinks();
 
