@@ -194,6 +194,28 @@ test('reports a missing platform keymap in the query and once at start-up', asyn
   }
 });
 
+test('a faulted platform keymap query is not cached, so a repaired file is re-read', async () => {
+  const harness = await createConfigImportHarness({error: mock<typeof console.error>(() => {})});
+  try {
+    // The bundled config is usable and only the platform keymap is absent, so
+    // nothing but the platform file can explain the first fault.
+    writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
+    writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+
+    const first = harness.getDefaultConfig();
+    expect(first.platformKeymapFault).toBe(true);
+
+    // Both shipped files are artefacts a repair can fix during the same run,
+    // so a faulted platform keymap must not pin the process to empty defaults.
+    writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), `{'window:new': 'ctrl+alt+shift+n'}`, 'utf8');
+    const recovered = harness.getDefaultConfig();
+    expect(recovered.platformKeymapFault).toBe(false);
+    expect(recovered.defaults.keymaps).toEqual({'window:new': 'ctrl+alt+shift+n'});
+  } finally {
+    harness.cleanup();
+  }
+});
+
 test('start-up copies schemas through the injected filesystem and reports a refused copy', async () => {
   for (const shouldFail of [false, true]) {
     const copies: string[] = [];
