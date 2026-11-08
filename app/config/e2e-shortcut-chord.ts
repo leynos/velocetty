@@ -2,10 +2,10 @@
 /*
  * Kept separate from the Electron adapter so the spelling rules can be unit
  * tested without a running Electron process: the adapter only knows how to
- * turn a parsed chord into input events.
+ * turn a parsed chord into a key press in the page.
  */
 
-/** The modifier names Electron's input events accept. */
+/** The modifier names a user file may spell. */
 export type ModifierName = 'alt' | 'control' | 'meta' | 'shift';
 
 /** One parsed chord: the final key plus the modifiers held with it. */
@@ -14,7 +14,7 @@ export type ShortcutChord = Readonly<{
   modifiers: readonly ModifierName[];
 }>;
 
-/** Maps the chord spellings a user file may use onto Electron's names. */
+/** Maps the chord spellings a user file may use onto the canonical names. */
 const modifierNames = new Map<string, ModifierName>([
   ['alt', 'alt'],
   ['cmd', 'meta'],
@@ -26,8 +26,75 @@ const modifierNames = new Map<string, ModifierName>([
   ['super', 'meta']
 ]);
 
+/** One key press in the shape the page's `KeyboardEvent` constructor wants. */
+export type KeyPress = Readonly<{
+  /** Whether the alt key is held. */
+  altKey: boolean;
+  /** The physical key, such as `KeyM`. */
+  code: string;
+  /** Whether the control key is held. */
+  ctrlKey: boolean;
+  /** The printable key value, such as `m`. */
+  key: string;
+  /** The legacy key number the page's keyboard library matches on. */
+  keyCode: number;
+  /** Whether the meta (command or super) key is held. */
+  metaKey: boolean;
+  /** Whether the shift key is held. */
+  shiftKey: boolean;
+}>;
+
+const letterKeys = /^[a-z]$/;
+const digitKeys = /^[0-9]$/;
+
+/** The numeric code of one key character; every caller passes a single ASCII one. */
+const keyNumber = (character: string): number => character.codePointAt(0) ?? 0;
+
+/** The fields that do not depend on the modifiers, for one key. */
+const keyFields = (keyName: string): Omit<KeyPress, 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'> | undefined => {
+  if (letterKeys.test(keyName)) {
+    const upper = keyName.toUpperCase();
+    return {code: `Key${upper}`, key: keyName, keyCode: keyNumber(upper)};
+  }
+  if (digitKeys.test(keyName)) {
+    return {code: `Digit${keyName}`, key: keyName, keyCode: keyNumber(keyName)};
+  }
+  return undefined;
+};
+
 /**
- * Parses a `ctrl+alt+shift+n` style chord into input-event parts.
+ * Converts a parsed chord into the `KeyboardEvent` fields that press it.
+ *
+ * Only letter and digit keys are supported: those are what the lane presses,
+ * and anything else is reported as unsupported rather than guessed at.
+ *
+ * @returns The press, or `undefined` when the key has no mapping.
+ *
+ * @example
+ * ```ts
+ * toKeyPress({keyCode: 'm', modifiers: ['control', 'alt', 'shift']});
+ * // {altKey: true, code: 'KeyM', ctrlKey: true, key: 'm', keyCode: 77,
+ * //  metaKey: false, shiftKey: true}
+ * ```
+ */
+export const toKeyPress = (chord: ShortcutChord): KeyPress | undefined => {
+  const fields = keyFields(chord.keyCode);
+  if (fields === undefined) {
+    return undefined;
+  }
+
+  const held = new Set(chord.modifiers);
+  return {
+    ...fields,
+    altKey: held.has('alt'),
+    ctrlKey: held.has('control'),
+    metaKey: held.has('meta'),
+    shiftKey: held.has('shift')
+  };
+};
+
+/**
+ * Parses a `ctrl+alt+shift+n` style chord into its parts.
  *
  * A chord needs at least one modifier and a final key. Anything else is
  * rejected rather than guessed at, so a typo cannot silently press a different
