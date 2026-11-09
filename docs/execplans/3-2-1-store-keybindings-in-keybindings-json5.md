@@ -4379,6 +4379,20 @@ which keep the same precedence, `exists`, `inspection`, and `shadowed` results
 — the parity suite and the resolver tests pin that — and the test harness
 answers `stat`/`lstat` through one `answerStat` helper.
 
+A second hosted round then failed the same two copies on the advisory
+`String Heavy Function Arguments` rule (9.69 each): the module reported that
+half of its function arguments were typed `string`, the injected probe among
+them. The remedy is the domain type the rule names. `ConfigPath` brands a path
+the resolver built from the platform's own joins, `configPath` is its only
+constructor, and candidate and creation paths are branded where they are
+joined; the probe now accepts only such a path. The exported `ConfigLocations`
+shape still reports plain strings, so no consumer, test, or snapshot changed.
+The rule's own delta threshold is 40 %: ablations that removed any one
+string-parameter callback signature dropped the module to 10.00, and `cs`
+1.0.56 — the first CLI release that reproduces the hosted rule — reports 10.00
+for both copies. Hosted run 42590867706 then passed all four builds, both E2E
+lanes, and the CodeScene check on head `023ba123`.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
