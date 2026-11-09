@@ -4281,11 +4281,14 @@ window when none holds focus. A file, rather than standard input, because
 Electron on Windows has no console and never delivers piped input, and a
 page-level event, rather than `sendInputEvent`, because the renderer keymap
 binding is the boundary under test and it must not depend on the window holding
-operating-system focus. The `window:new` handler prints
-`[e2e] command-executed window:new`, so the assertion is about the command
-having run. The scenario edits the binding, presses it after the reload, saves
-invalid input, and presses the working chord again; the parser has its own unit
-test at `test/unit/e2e-shortcut-chord.test.ts`.
+operating-system focus. The probe also watches the target window's command
+channel, so its reply reports whether that press ran a command: `pressed` when
+the main process handled one, `unbound` when the page took the press and none
+followed, and `rejected` when there was no page to press on. The `window:new`
+handler prints `[e2e] command-executed window:new`, so the assertion is about
+the command having run. The scenario edits the binding, presses it after the
+reload, saves invalid input, and presses the working chord again; the parser
+has its own unit test at `test/unit/e2e-shortcut-chord.test.ts`.
 
 ### EP-H: review-round repairs for head `8a082a62`
 
@@ -4851,8 +4854,19 @@ requires it. Any adjustment is recorded in `Decision log`.
     so a retry could press the same chord twice. Every request is now waited for
     until it answers, and one that never answers fails the run rather than
     leaving a press in flight.
-  - `E2E-KB-5` presses the edited chord twice and requires exactly two runs, so
-    a single press of the replaced chord cannot satisfy the barrier.
   - The creation invariant now requires `inspection: 'ok'`; an inaccessible
     Hyper candidate keeps `exists: false` at its own priority and is not
     creatable.
+- 2026-11-09 (command-observation round): CodeRabbit showed that a marker count
+  cannot attribute a command to a press, because a late marker from an earlier
+  press can satisfy a later wait. The probe now listens on the target window's
+  command channel before dispatching, so its reply says whether that press ran
+  a command: `pressed` when the main process handled one, `unbound` when the
+  page took the press and nothing followed, and `rejected` when there was no
+  page to press on. `pressUntilExecuted` returns only on `pressed`, so a retry
+  can follow only a press that ran nothing and one press cannot run its command
+  twice. `pressWithoutCommand` replaces the count-based barrier with a direct
+  assertion that the replaced chord is `unbound`, and `E2E-KB-5` presses each
+  chord once and asserts a single run. The count poll was removed, and the
+  marker a press prints is already in the captured output when the probe's
+  reply that follows it is read.

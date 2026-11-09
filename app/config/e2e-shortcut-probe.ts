@@ -3,7 +3,9 @@
  * The lane proves a shortcut executes its command by pressing it, not by
  * reading the configuration that declares it. This module is the main-process
  * half: the test appends one shortcut per line to a request file, and the
- * probe presses that chord in the newest window's page.
+ * probe presses that chord in the newest window's page. Because the probe also
+ * watches the window's command channel, its reply says whether that press ran
+ * a command, so the harness never has to infer that from a marker count.
  *
  * A press is a `KeyboardEvent` dispatched into the page rather than a key
  * event synthesized by the operating system. The scenario under test is the
@@ -22,6 +24,7 @@
  */
 import * as fs from 'node:fs';
 
+import type {CommandId} from '@shared/types/commands';
 import {BrowserWindow, type WebContents} from 'electron';
 
 import {emitE2EMarker, isE2ERun} from './e2e-keymap-probe';
@@ -33,11 +36,21 @@ type EvaluateReply = Readonly<{result?: Readonly<{value?: unknown}>}>;
 /** How often the request file is checked for new lines. */
 const pollIntervalMs = 50;
 
-/** The page a press should reach: the focused window, else the newest one. */
-const targetContents = (): WebContents | undefined => {
-  const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows().at(-1);
-  return window?.webContents;
-};
+/**
+ * How long a press may take to reach the main process's command handler.
+ *
+ * The page sends the command during the dispatch, so this only covers the IPC
+ * hop back into the main process. The wait is also what tells a chord that is
+ * bound to no command apart from one that is.
+ */
+const commandTimeoutMs = 2000;
+
+/** What one press established about the chord it dispatched. */
+export type ShortcutOutcome = 'pressed' | 'unbound' | 'rejected';
+
+/** The window a press should reach: the focused window, else the newest one. */
+const targetWindow = (): BrowserWindow | undefined =>
+  BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows().at(-1);
 
 /**
  * The page expression that presses one chord.
@@ -74,23 +87,54 @@ const pressInPage = async (contents: WebContents, press: KeyPress): Promise<bool
 };
 
 /**
+ * Presses one chord and reports whether the main process handled a command.
+ *
+ * The reply is a completion boundary: when it says `pressed`, the command has
+ * already reached the main process, so the harness knows this press ran it
+ * rather than guessing from a marker count that a late marker from an earlier
+ * press could satisfy. `unbound` means the page accepted the press and no
+ * command followed, which is how a scenario proves a binding is gone.
+ */
+const pressAndObserve = async (window: BrowserWindow, press: KeyPress): Promise<ShortcutOutcome> => {
+  let settle: ((command: CommandId | undefined) => void) | undefined;
+  const observed = new Promise<CommandId | undefined>((resolve) => {
+    settle = resolve;
+  });
+  const listener = (command: CommandId) => settle?.(command);
+  window.rpc.on('command', listener);
+  try {
+    if (!(await pressInPage(window.webContents, press))) {
+      return 'rejected';
+    }
+    const timeout = setTimeout(() => settle?.(undefined), commandTimeoutMs);
+    const command = await observed;
+    clearTimeout(timeout);
+    return command === undefined ? 'unbound' : 'pressed';
+  } finally {
+    window.rpc.emitter.removeListener('command', listener);
+  }
+};
+
+/**
  * Presses one chord in the window the user is looking at.
  *
- * @returns `true` when the chord was understood and the page accepted it.
+ * @returns `pressed` when the chord ran a command, `unbound` when the page
+ * accepted it but no command followed, and `rejected` when there was no page
+ * to press on or the chord was not understood.
  *
  * @example
  * ```ts
- * await sendShortcut('ctrl+alt+shift+n'); // presses the chord in the focused window
+ * await sendShortcut('ctrl+alt+shift+n'); // 'pressed' once the window handles window:new
  * ```
  */
-export const sendShortcut = async (text: string): Promise<boolean> => {
+export const sendShortcut = async (text: string): Promise<ShortcutOutcome> => {
   const chord = parseShortcut(text);
-  const contents = targetContents();
+  const window = targetWindow();
   const press = chord === undefined ? undefined : toKeyPress(chord);
-  if (press === undefined || contents === undefined) {
-    return false;
+  if (press === undefined || window === undefined) {
+    return 'rejected';
   }
-  return pressInPage(contents, press);
+  return pressAndObserve(window, press);
 };
 
 /**
@@ -129,11 +173,8 @@ const parseRequest = (line: string): ProbeRequest => {
 const pressLine = async (line: string): Promise<void> => {
   const {replyPrefix, shortcut} = parseRequest(line);
   try {
-    if (await sendShortcut(shortcut)) {
-      emitE2EMarker(`[e2e] shortcut-probe pressed ${replyPrefix}${shortcut}`);
-    } else {
-      emitE2EMarker(`[e2e] shortcut-probe rejected ${replyPrefix}${shortcut}`);
-    }
+    const outcome = await sendShortcut(shortcut);
+    emitE2EMarker(`[e2e] shortcut-probe ${outcome} ${replyPrefix}${shortcut}`);
   } catch (error) {
     emitE2EMarker(`[e2e] shortcut-probe failed ${replyPrefix}${shortcut}: ${String(error)}`);
   }

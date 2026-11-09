@@ -7,10 +7,10 @@
  */
 import {expect, test} from 'bun:test';
 
-import {pressAndAwaitProbe, pressUntilExecuted} from '../e2e/keybindings-e2e-harness';
+import {pressUntilExecuted, pressWithoutCommand} from '../e2e/keybindings-e2e-harness';
 
 /** The verdicts a scripted probe can report for a request. */
-type ProbeVerdict = 'pressed' | 'rejected' | 'failed' | 'unanswered';
+type ProbeVerdict = 'pressed' | 'unbound' | 'rejected' | 'failed' | 'unanswered';
 
 /** Extracts the request ordinal a harness wait is looking for. */
 const ordinalOf = (matcher: RegExp): number => {
@@ -121,15 +121,26 @@ const rejectionMessage = async (promise: Promise<unknown>): Promise<string | nul
 test('a rejected press fails instead of standing in for a handled one', async () => {
   const app = createFakeApp(() => 'rejected');
 
-  expect(await rejectionMessage(pressAndAwaitProbe({app, shortcuts: ['ctrl+n']}))).toMatch(/last press rejected/);
+  expect(await rejectionMessage(pressWithoutCommand({app, shortcuts: ['ctrl+n']}))).toMatch(
+    /could not be pressed \(rejected\)/
+  );
 });
 
 test('a press rejected by a window that is still loading is retried', async () => {
   // `window:new` starts a window with no body to press on yet, so the probe
-  // rejects the first request. Repeating it reaches the loaded page.
-  const app = createFakeApp((ordinal) => (ordinal === 1 ? 'rejected' : 'pressed'));
+  // rejects the first request. Repeating it reaches the loaded page, where the
+  // chord runs no command.
+  const app = createFakeApp((ordinal) => (ordinal === 1 ? 'rejected' : 'unbound'));
 
-  expect(await rejectionMessage(pressAndAwaitProbe({app, shortcuts: ['ctrl+n']}))).toBeNull();
+  expect(await rejectionMessage(pressWithoutCommand({app, shortcuts: ['ctrl+n']}))).toBeNull();
+});
+
+test('a chord that still runs a command fails the negative assertion', async () => {
+  // The probe observed the handler run, so the binding is not gone however the
+  // marker count looks.
+  const app = createFakeApp(() => 'pressed');
+
+  expect(await rejectionMessage(pressWithoutCommand({app, shortcuts: ['ctrl+n']}))).toMatch(/still ran a command/);
 });
 
 test('a stale reply for an earlier press cannot satisfy the wait', async () => {
@@ -137,7 +148,9 @@ test('a stale reply for an earlier press cannot satisfy the wait', async () => {
   // exists from an earlier press; only the ordinal keeps the two apart.
   const app = createFakeApp(() => 'unanswered');
 
-  expect(await rejectionMessage(pressAndAwaitProbe({app, shortcuts: ['ctrl+n']}))).toMatch(/never answered request #1/);
+  expect(await rejectionMessage(pressWithoutCommand({app, shortcuts: ['ctrl+n']}))).toMatch(
+    /never answered request #1/
+  );
 });
 
 test('a press the probe never answers fails instead of being repeated', async () => {
@@ -163,10 +176,19 @@ test('a press the probe answers after the retry interval is waited for, not repe
 test('a press of a chord that must not run is also waited for, not repeated', async () => {
   // The negative assertion after this helper rests on exactly one press of the
   // old chord, so a slow reply must extend the wait rather than add a press.
-  const app = createFakeApp(() => 'pressed', new Set([1]));
+  const app = createFakeApp(() => 'unbound', new Set([1]));
 
-  expect(await rejectionMessage(pressAndAwaitProbe({app, shortcuts: ['ctrl+n']}))).toBeNull();
+  expect(await rejectionMessage(pressWithoutCommand({app, shortcuts: ['ctrl+n']}))).toBeNull();
   expect(app.sent()).toBe(1);
+});
+
+test('a press that runs no command is retried until the command follows', async () => {
+  // The chord was pressed before the renderer bound its listeners, so the first
+  // attempt reports `unbound`. Repeating it is safe because nothing ran.
+  const app = createFakeApp((ordinal) => (ordinal === 1 ? 'unbound' : 'pressed'));
+
+  expect(await rejectionMessage(pressUntilExecuted({app, command: 'window:new', shortcut: 'ctrl+n'}))).toBeNull();
+  expect(app.sent()).toBe(2);
 });
 
 test('pressing until a command runs reports the last verdict when no press works', async () => {

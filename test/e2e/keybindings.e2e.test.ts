@@ -18,8 +18,8 @@ import {
   legacyHyperConfig,
   noRecreationWaitMs,
   platformDefaultShortcut,
-  pressAndAwaitProbe,
   pressUntilExecuted,
+  pressWithoutCommand,
   probeMarker,
   replaceFileAtomically,
   scenarioTimeoutMs,
@@ -185,21 +185,15 @@ e2eTest(
           matcher: probeMarker({shortcut: editedShortcut, status: 'applied'})
         });
 
-        // The replaced binding no longer runs the command. The probe's own
-        // reply names this request, so an earlier press of the same chord
-        // cannot satisfy the wait by accident.
+        // The replaced binding no longer runs the command. The probe answers
+        // `unbound` only after the page took the press and the main process
+        // handled no command for it, so this is the binding itself being gone
+        // rather than a marker an earlier press might have left behind. The
+        // edited chord then runs its command exactly once.
         const executedBeforeReplacement = app.count(commandExecutedMarker(command));
-        await pressAndAwaitProbe({app, shortcuts: [E2E_PROBE_SHORTCUT]});
-
-        // Pressing the still-bound chord and awaiting its command marker is the
-        // completion barrier: the main process handles commands in arrival
-        // order, so by now it has handled anything the old press sent. The
-        // replaced chord was pressed once and so can add at most one run, while
-        // the edited chord is pressed twice; a total of two therefore means the
-        // replaced chord ran nothing and the edited chord ran both times.
+        await pressWithoutCommand({app, shortcuts: [E2E_PROBE_SHORTCUT]});
         await pressUntilExecuted({app, command, shortcut: editedShortcut});
-        await pressUntilExecuted({app, command, shortcut: editedShortcut});
-        expect(app.count(commandExecutedMarker(command)) - executedBeforeReplacement).toBe(2);
+        expect(app.count(commandExecutedMarker(command)) - executedBeforeReplacement).toBe(1);
 
         await fs.writeFile(keybindingsPath, `{'window:new':`, 'utf8');
         await app.waitFor({
@@ -209,13 +203,12 @@ e2eTest(
 
         // The rejected file must not have rebound the old chord either, and it
         // must not have unbound the shortcut that still works. As above, the
-        // single press of the old chord can add at most one run while the two
-        // presses of the edited chord add exactly two.
+        // probe reports the old chord as unbound and the edited chord as
+        // pressed, and the count shows the edited chord ran exactly once.
         const executedBeforeInvalidReload = app.count(commandExecutedMarker(command));
-        await pressAndAwaitProbe({app, shortcuts: [E2E_PROBE_SHORTCUT]});
+        await pressWithoutCommand({app, shortcuts: [E2E_PROBE_SHORTCUT]});
         await pressUntilExecuted({app, command, shortcut: editedShortcut});
-        await pressUntilExecuted({app, command, shortcut: editedShortcut});
-        expect(app.count(commandExecutedMarker(command)) - executedBeforeInvalidReload).toBe(2);
+        expect(app.count(commandExecutedMarker(command)) - executedBeforeInvalidReload).toBe(1);
       } finally {
         await app.stop();
       }

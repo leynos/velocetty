@@ -1319,7 +1319,11 @@ declared it. The suite presses a shortcut by appending one chord per line to
 the request file named by `VELOCETTY_E2E_PRESS_FILE`. The E2E-only probe at
 `app/config/e2e-shortcut-probe.ts` polls that file and dispatches a
 `KeyboardEvent` into the page, which is the boundary a real keypress crosses
-before it reaches the renderer keymap. A file replaces standard input because
+before it reaches the renderer keymap. The probe watches the target window's
+command channel while it presses, so its reply reports whether that press ran a
+command (`pressed`), ran none (`unbound`), or found no page to press on
+(`rejected`). A scenario can therefore assert that a binding is gone without
+inferring it from a marker count. A file replaces standard input because
 Electron on Windows never delivers piped input to the main process. The file is
 read only when `RUN_E2E=1`.
 

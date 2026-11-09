@@ -174,15 +174,22 @@ export const commandExecutedMarker = (command: string) => new RegExp(`\\[e2e\\] 
 const pressAttempts = 20;
 const pressIntervalMs = 1000;
 
-/** The probe's verdict on one request. */
-type ProbeVerdict = 'pressed' | 'rejected' | 'failed' | 'unanswered';
+/**
+ * The probe's verdict on one request.
+ *
+ * `pressed` means the press reached the page and the main process handled the
+ * command it produced; `unbound` means the page took the press but no command
+ * followed. The distinction is the probe's own observation, so a scenario does
+ * not have to infer which press produced a marker.
+ */
+type ProbeVerdict = 'pressed' | 'unbound' | 'rejected' | 'failed' | 'unanswered';
 
 /** A verdict the probe has actually reported, so no request is left in flight. */
 type AnsweredVerdict = Exclude<ProbeVerdict, 'unanswered'>;
 
 /** The `[e2e]` line the probe emits once it has handled the request with this ordinal. */
 const probeOutcomeMarker = (ordinal: number) =>
-  new RegExp(`\\[e2e\\] shortcut-probe (?:pressed|rejected|failed) #${ordinal} `);
+  new RegExp(`\\[e2e\\] shortcut-probe (?:pressed|unbound|rejected|failed) #${ordinal} `);
 
 /**
  * Waits for the probe's reply to one request.
@@ -207,6 +214,9 @@ const awaitProbeOutcome = async ({
       matcher: probeOutcomeMarker(ordinal),
       timeoutMs
     });
+    if (marker.includes(' unbound ')) {
+      return 'unbound';
+    }
     if (marker.includes(' rejected ')) {
       return 'rejected';
     }
@@ -257,16 +267,16 @@ type PressAndAwaitRequest = Readonly<{
 }>;
 
 /**
- * Presses one chord until the probe reports it pressed.
+ * Presses one chord until the probe reports that a live page took the press.
  *
  * A chord the probe rejects is retried, because the newest window may still be
  * loading its first document: `window:new` spawns a window that has no body
- * for a while, and the probe cannot press into one. The loop stops at the first
- * `pressed` verdict, so a scenario's negative assertion still rests on a press
- * that reached a live page rather than on a request the probe set aside.
+ * for a while, and the probe cannot press into one. The loop stops at the
+ * first verdict that reached a page, which is `pressed` or `unbound`.
  *
- * @returns The last verdict, which is `pressed` only on success. A request the
- * probe never answers fails the run rather than being reported here.
+ * @returns The last verdict, which reached a page unless every attempt was
+ * rejected. A request the probe never answers fails the run rather than being
+ * reported here.
  */
 const pressUntilProbed = async ({
   app,
@@ -276,7 +286,7 @@ const pressUntilProbed = async ({
   for (let attempt = 0; attempt < pressAttempts; attempt += 1) {
     const ordinal = app.send(shortcut);
     lastVerdict = await awaitAnsweredPress({app, ordinal, shortcut});
-    if (lastVerdict === 'pressed') {
+    if (lastVerdict === 'pressed' || lastVerdict === 'unbound') {
       break;
     }
   }
@@ -284,19 +294,19 @@ const pressUntilProbed = async ({
 };
 
 /**
- * Sends chords and waits until the probe has pressed every one.
+ * Sends chords and requires that pressing each one runs no command.
  *
- * Each request is answered individually, so the assertion that follows tests
- * the chord that was just sent rather than any earlier press of the same
- * chord. Only a pressed verdict satisfies the caller: a rejected or failed
- * press never reached a live page, so treating it as handled would let a
- * "the old shortcut no longer runs" assertion pass without testing the binding.
+ * The probe watches the window's command channel, so `unbound` is its own
+ * observation that the page took the press and the main process handled no
+ * command for it. That makes this a direct test that a binding is gone: it
+ * cannot be satisfied by a marker that some earlier press left behind.
  */
-export const pressAndAwaitProbe = async ({app, shortcuts}: PressAndAwaitRequest): Promise<void> => {
+export const pressWithoutCommand = async ({app, shortcuts}: PressAndAwaitRequest): Promise<void> => {
   for (const shortcut of shortcuts) {
     const verdict = await pressUntilProbed({app, shortcut});
-    if (verdict !== 'pressed') {
-      throw new Error(`The probe could not press ${shortcut} (last press ${verdict}). Output:\n${app.output()}`);
+    if (verdict !== 'unbound') {
+      const failure = verdict === 'pressed' ? 'still ran a command' : `could not be pressed (${verdict})`;
+      throw new Error(`The ${shortcut} shortcut ${failure}. Output:\n${app.output()}`);
     }
   }
 };
@@ -308,55 +318,25 @@ type PressRequest = Readonly<{
 }>;
 
 /**
- * Waits until the command handler has printed one more marker.
- *
- * The probe reports a press as soon as the page accepted the event, but the
- * handler runs in the main process, so its marker appears one IPC hop later.
- * Sampling the count once would race that hop and press the chord again; polling
- * waits for the command itself, within one retry interval.
- *
- * @returns Whether the count grew past `before`, re-read after the final poll.
- */
-const awaitCountAbove = async ({
-  app,
-  before,
-  matcher
-}: Readonly<{app: LaunchedApp; before: number; matcher: RegExp}>): Promise<boolean> => {
-  const deadline = Date.now() + pressIntervalMs;
-  while (Date.now() < deadline) {
-    if (app.count(matcher) > before) {
-      return true;
-    }
-    await sleep(pollIntervalMs);
-  }
-  return app.count(matcher) > before;
-};
-
-/**
- * Presses a chord until the command handler prints a marker that was not there
- * before.
+ * Presses a chord until the main process has handled the command it produces.
  *
  * The renderer binds its key listeners asynchronously after a reload, so the
- * first press can arrive before anything is listening. Repeating the press
- * until the marker count grows makes the scenario deterministic without
- * guessing a delay, and it stops as soon as the command has run.
+ * first press can arrive before anything is listening and report `unbound`.
+ * Repeating the press until the probe reports `pressed` makes the scenario
+ * deterministic without guessing a delay.
  *
- * The probe's reply only says the page accepted the event, so each attempt
- * waits for the handler's marker rather than sampling the count once. Every
- * request is answered before the next is sent, and a request the probe is slow
- * to reach is waited for rather than repeated, so the helper never returns with
- * an earlier press still in flight. The next helper's negative assertion
- * therefore cannot be satisfied by work this helper started, and one press
- * cannot run its command twice.
+ * The probe replies only after the main process has handled the command, so a
+ * `pressed` verdict is proof that this press ran it and a retry can only follow
+ * a press that ran nothing. One press therefore cannot run its command twice,
+ * and the marker it printed is already in the captured output, because the
+ * probe's reply is written after it on the same stream.
  */
 export const pressUntilExecuted = async ({app, command, shortcut}: PressRequest): Promise<void> => {
-  const matcher = commandExecutedMarker(command);
-  const before = app.count(matcher);
   let lastVerdict: ProbeVerdict = 'unanswered';
   for (let attempt = 0; attempt < pressAttempts; attempt += 1) {
     const ordinal = app.send(shortcut);
     lastVerdict = await awaitAnsweredPress({app, ordinal, shortcut});
-    if (lastVerdict === 'pressed' && (await awaitCountAbove({app, before, matcher}))) {
+    if (lastVerdict === 'pressed') {
       return;
     }
   }
