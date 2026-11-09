@@ -73,7 +73,15 @@ const rejectionMessage = async (promise: Promise<unknown>): Promise<string | nul
 test('a rejected press fails instead of standing in for a handled one', async () => {
   const app = createFakeApp(() => 'rejected');
 
-  expect(await rejectionMessage(pressAndAwaitProbe({app, shortcuts: ['ctrl+n']}))).toMatch(/was rejected/);
+  expect(await rejectionMessage(pressAndAwaitProbe({app, shortcuts: ['ctrl+n']}))).toMatch(/last press rejected/);
+});
+
+test('a press rejected by a window that is still loading is retried', async () => {
+  // `window:new` starts a window with no body to press on yet, so the probe
+  // rejects the first request. Repeating it reaches the loaded page.
+  const app = createFakeApp((ordinal) => (ordinal === 1 ? 'rejected' : 'pressed'));
+
+  expect(await rejectionMessage(pressAndAwaitProbe({app, shortcuts: ['ctrl+n']}))).toBeNull();
 });
 
 test('a stale reply for an earlier press cannot satisfy the wait', async () => {
@@ -81,7 +89,7 @@ test('a stale reply for an earlier press cannot satisfy the wait', async () => {
   // exists from an earlier press; only the ordinal keeps the two apart.
   const app = createFakeApp(() => 'unanswered');
 
-  expect(await rejectionMessage(pressAndAwaitProbe({app, shortcuts: ['ctrl+n']}))).toMatch(/was unanswered/);
+  expect(await rejectionMessage(pressAndAwaitProbe({app, shortcuts: ['ctrl+n']}))).toMatch(/last press unanswered/);
 });
 
 test('pressing until a command runs retries an unanswered press', async () => {

@@ -237,6 +237,66 @@ const listCandidates = (
  */
 const isVisible = (state: ProbeState): boolean => state === 'present' || state === 'broken-link';
 
+/** One candidate and what the probe established about it. */
+type ProbedCandidate = Readonly<{candidate: Candidate; state: ProbeState}>;
+
+/** The active configuration file, and the priority it won at. */
+type ActiveSelection = Readonly<{active: ConfigLocations['config']; index: number}>;
+
+/**
+ * Selects the first candidate whose absence is not established.
+ *
+ * An inaccessible candidate wins on priority: its contents are unknown, so
+ * falling through to a readable lower-priority file would silently change
+ * which configuration the user gets. It is reported as not present and not
+ * absent, so the caller keeps its defaults instead of creating a file that may
+ * shadow the one it could not read.
+ */
+const selectActiveConfig = (probed: readonly ProbedCandidate[], creationPath: string): ActiveSelection => {
+  const index = probed.findIndex((entry) => entry.state !== 'absent');
+  const entry = index === -1 ? undefined : probed[index];
+  if (entry === undefined) {
+    return {active: {path: creationPath, tree: 'velocetty', exists: false, inspection: 'ok'}, index};
+  }
+  const isInaccessible = entry.state === 'inaccessible';
+  return {
+    active: {
+      path: entry.candidate.path,
+      tree: entry.candidate.tree,
+      exists: !isInaccessible,
+      inspection: isInaccessible ? 'inaccessible' : 'ok'
+    },
+    index
+  };
+};
+
+/**
+ * Lists the lower-priority configuration files the active one hides.
+ *
+ * A path that could not be inspected is not an ignored copy, and an
+ * inaccessible active file leaves the priority order unresolved rather than
+ * shadowing anything, so both report no hidden copies.
+ */
+const listShadowed = ({
+  active,
+  activeIndex,
+  probed,
+  sameFile
+}: Readonly<{
+  active: ConfigLocations['config'];
+  activeIndex: number;
+  probed: readonly ProbedCandidate[];
+  sameFile: (left: string, right: string) => boolean;
+}>): readonly string[] => {
+  if (activeIndex === -1 || active.inspection === 'inaccessible') {
+    return [];
+  }
+  return probed
+    .filter((entry, index) => index > activeIndex && entry.candidate.isConfigFile && isVisible(entry.state))
+    .map((entry) => entry.candidate.path)
+    .filter((candidatePath) => candidatePath !== active.path && !sameFile(candidatePath, active.path));
+};
+
 /**
  * Resolves the active configuration file and the paths around it.
  *
@@ -269,40 +329,13 @@ export const resolveConfigLocations = (input: ConfigLocationInput): ConfigLocati
   const paths = platformPath(input.platform);
   const velocettyDirectory = resolveVelocettyDirectory(input, paths);
   const hyperDirectory = resolveHyperDirectory(input, paths);
-  const candidates = listCandidates(input, paths, velocettyDirectory, hyperDirectory);
-  const probed = candidates.map((candidate) => ({candidate, state: input.probe(candidate.path)}));
-  /**
-   * The first candidate whose absence is not established, or `-1` if none is.
-   *
-   * An inaccessible candidate wins on priority: its contents are unknown, so
-   * falling through to a readable lower-priority file would silently change
-   * which configuration the user gets.
-   */
-  const activeIndex = probed.findIndex((entry) => entry.state !== 'absent');
-  const activeEntry = activeIndex === -1 ? undefined : probed[activeIndex];
-  const activeState = activeEntry?.state ?? 'absent';
-
+  const probed = listCandidates(input, paths, velocettyDirectory, hyperDirectory).map((candidate) => ({
+    candidate,
+    state: input.probe(candidate.path)
+  }));
   const creationPath = paths.join(velocettyDirectory, configFileName);
-  const active: ConfigLocations['config'] =
-    activeEntry === undefined
-      ? {path: creationPath, tree: 'velocetty', exists: false, inspection: 'ok'}
-      : {
-          path: activeEntry.candidate.path,
-          tree: activeEntry.candidate.tree,
-          // An inaccessible path is not absence, but it is not presence either.
-          exists: activeState !== 'inaccessible',
-          inspection: activeState === 'inaccessible' ? 'inaccessible' : 'ok'
-        };
-
-  // A path we could not inspect is not an ignored copy, and an inaccessible
-  // active file leaves the priority order unresolved rather than shadowing.
-  const shadowed =
-    activeEntry === undefined || active.inspection === 'inaccessible'
-      ? []
-      : probed
-          .filter((entry, index) => index > activeIndex && entry.candidate.isConfigFile && isVisible(entry.state))
-          .map((entry) => entry.candidate.path)
-          .filter((candidatePath) => candidatePath !== active.path && !input.sameFile(candidatePath, active.path));
+  const {active, index} = selectActiveConfig(probed, creationPath);
+  const shadowed = listShadowed({active, activeIndex: index, probed, sameFile: input.sameFile});
 
   const keybindingsPath =
     active.tree === 'development'

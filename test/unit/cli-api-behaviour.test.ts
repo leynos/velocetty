@@ -94,14 +94,6 @@ const parseConfigData = (contents: string): ConfigData => {
   return {plugins: value.plugins, localPlugins: value.localPlugins};
 };
 
-/**
- * Filesystem double backed by the harness state.
- *
- * The read result is asserted to be a string here rather than typed as one
- * upstream: `fsReadFileSyncValue` exists so a test can supply JSON5 containing
- * comments, and a non-string would be a broken fixture rather than a valid
- * case.
- */
 /** Node's stat calls throw for a missing entry rather than returning a value. */
 const throwMissing = (candidatePath: string): never => {
   throw new Error(`ENOENT: no such file or directory, '${candidatePath}'`);
@@ -115,38 +107,44 @@ const throwInaccessible = (candidatePath: string): never => {
 /** Stands in for `fs.Stats`: the probe checks only that the call succeeded. */
 const PATH_ENTRY = {};
 
+/** Answers one stat or lstat call: a fault, an entry, or genuine absence. */
+const answerStat = (state: CliHarnessState, candidatePath: string, isPresent: boolean) => {
+  if (state.inaccessiblePaths.has(candidatePath)) {
+    return throwInaccessible(candidatePath);
+  }
+  return isPresent ? PATH_ENTRY : throwMissing(candidatePath);
+};
+
+/** Produces the contents the harness was configured to read. */
+const readConfigContents = (state: CliHarnessState): string => {
+  state.fsReadFileSyncCallCount += 1;
+  const contents = state.hasReadFileSyncOverride ? state.fsReadFileSyncValue : JSON.stringify(state.configData);
+  if (!isString(contents)) {
+    throw new TypeError('Expected the read-file override to be a string.');
+  }
+  return contents;
+};
+
+/**
+ * Filesystem double backed by the harness state.
+ *
+ * The read result is asserted to be a string here rather than typed as one
+ * upstream: `fsReadFileSyncValue` exists so a test can supply JSON5 containing
+ * comments, and a non-string would be a broken fixture rather than a valid
+ * case.
+ */
 const buildFsModule = (state: CliHarnessState) => {
   const pathExists = (candidatePath: string) =>
     state.existingPaths ? state.existingPaths.has(candidatePath) : state.fsExistsSyncResult;
-
-  const isInaccessible = (candidatePath: string) => state.inaccessiblePaths.has(candidatePath);
 
   return {
     existsSync: pathExists,
     // A dangling symlink resolves for `lstat` but not for `stat`, which is the
     // distinction the probe relies on. A permission fault fails both calls.
-    lstatSync: (candidatePath: string) => {
-      if (isInaccessible(candidatePath)) {
-        return throwInaccessible(candidatePath);
-      }
-      return pathExists(candidatePath) || state.brokenLinkPaths.has(candidatePath)
-        ? PATH_ENTRY
-        : throwMissing(candidatePath);
-    },
-    readFileSync: (_target: string, _encoding: 'utf8') => {
-      state.fsReadFileSyncCallCount += 1;
-      const contents = state.hasReadFileSyncOverride ? state.fsReadFileSyncValue : JSON.stringify(state.configData);
-      if (!isString(contents)) {
-        throw new TypeError('Expected the read-file override to be a string.');
-      }
-      return contents;
-    },
-    statSync: (candidatePath: string) => {
-      if (isInaccessible(candidatePath)) {
-        return throwInaccessible(candidatePath);
-      }
-      return pathExists(candidatePath) ? PATH_ENTRY : throwMissing(candidatePath);
-    },
+    lstatSync: (candidatePath: string) =>
+      answerStat(state, candidatePath, pathExists(candidatePath) || state.brokenLinkPaths.has(candidatePath)),
+    readFileSync: (_target: string, _encoding: 'utf8') => readConfigContents(state),
+    statSync: (candidatePath: string) => answerStat(state, candidatePath, pathExists(candidatePath)),
     writeFileSync: (_target: string, contents: string, _encoding: 'utf8') => {
       const parsed = parseConfigData(contents);
       state.savedConfigs.push(parsed);

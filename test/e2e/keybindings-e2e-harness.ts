@@ -222,22 +222,46 @@ type PressAndAwaitRequest = Readonly<{
 }>;
 
 /**
+ * Presses one chord until the probe reports it pressed.
+ *
+ * A chord the probe rejects is retried, because the newest window may still be
+ * loading its first document: `window:new` spawns a window that has no body
+ * for a while, and the probe cannot press into one. Only a `pressed` verdict
+ * returns, so a scenario's negative assertion still rests on a press that
+ * reached a live page rather than on a request the probe set aside.
+ *
+ * @returns The last verdict, which is `pressed` only on success.
+ */
+const pressUntilProbed = async ({
+  app,
+  shortcut
+}: Readonly<{app: LaunchedApp; shortcut: string}>): Promise<ProbeVerdict> => {
+  let lastVerdict: ProbeVerdict = 'unanswered';
+  for (let attempt = 0; attempt < pressAttempts; attempt += 1) {
+    const ordinal = app.send(shortcut);
+    lastVerdict = await awaitProbeOutcome({app, ordinal, timeoutMs: pressIntervalMs});
+    if (lastVerdict === 'pressed') {
+      break;
+    }
+  }
+  return lastVerdict;
+};
+
+/**
  * Sends chords and waits until the probe has pressed every one.
  *
  * Each request is answered individually, so the assertion that follows tests
  * the chord that was just sent rather than any earlier press of the same
- * chord. A request the probe could not press fails the scenario: a rejected or
- * failed press never reached the page, so treating it as handled would let a
+ * chord. Only a pressed verdict satisfies the caller: a rejected or failed
+ * press never reached a live page, so treating it as handled would let a
  * "the old shortcut no longer runs" assertion pass without testing the binding.
  */
 export const pressAndAwaitProbe = async ({app, shortcuts}: PressAndAwaitRequest): Promise<void> => {
-  const ordinals = shortcuts.map((shortcut) => app.send(shortcut));
-  const verdicts = await Promise.all(ordinals.map((ordinal) => awaitProbeOutcome({app, ordinal})));
-  const unpressed = verdicts.flatMap((verdict, index) =>
-    verdict === 'pressed' ? [] : [`${shortcuts[index] ?? ''} was ${verdict} (request #${ordinals[index] ?? 0})`]
-  );
-  if (unpressed.length > 0) {
-    throw new Error(`The probe could not press ${unpressed.join('; ')}. Output:\n${app.output()}`);
+  for (const shortcut of shortcuts) {
+    const verdict = await pressUntilProbed({app, shortcut});
+    if (verdict !== 'pressed') {
+      throw new Error(`The probe could not press ${shortcut} (last press ${verdict}). Output:\n${app.output()}`);
+    }
   }
 };
 

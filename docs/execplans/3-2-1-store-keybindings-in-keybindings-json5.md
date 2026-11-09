@@ -4290,13 +4290,22 @@ Probe attribution: the request file carried only the chord, so two presses of
 the same chord were indistinguishable and a stale reply could satisfy a later
 wait. Each request now carries a harness-assigned ordinal (`<token>\t<chord>`);
 the probe echoes the token in its `pressed`/`rejected`/`failed` reply, and the
-harness waits for the reply naming *its* request. A `rejected` or `failed`
-verdict is an error rather than a handled press, and `pressUntilExecuted`
-retries only an *unanswered* request, so a chord the page never accepted can no
-longer pass as executed. `test/unit/keybindings-e2e-harness.test.ts` pins all
-four behaviours (rejected fails, a stale same-chord reply cannot satisfy a new
-wait, retries an unanswered press, reports the last verdict when every press
-fails) against a scripted stand-in for the launcher.
+harness waits for the reply naming *its* request. Only a `pressed` verdict
+satisfies a caller, so a chord the page never accepted can no longer pass as
+executed. Both helpers retry, because a rejected press is not yet a verdict on
+the binding: `window:new` runs during the scenario and spawns a window whose
+first document has no body for a while, so the probe answers `rejected` until
+that page loads. `pressUntilExecuted` retries until a press is both pressed and
+followed by a new command marker; `pressAndAwaitProbe` retries until a press is
+pressed and then fails with the last verdict. The hosted macOS lane exposed the
+distinction: a single-shot `pressAndAwaitProbe` failed E2E-KB-5 with
+`ctrl+alt+shift+n was rejected (request #4)` immediately after the reload
+marker, where an earlier press of the same chord had reached the page.
+`test/unit/keybindings-e2e-harness.test.ts` pins five behaviours (a
+persistently rejected press fails, a rejection from a still-loading window is
+retried, a stale same-chord reply cannot satisfy a new wait, retries an
+unanswered press, reports the last verdict when every press fails) against a
+scripted stand-in for the launcher.
 
 Negative assertions in E2E-KB-5 now use a completion barrier: they press the
 still-bound chord and await its own command marker before measuring the delta.
@@ -4362,6 +4371,13 @@ for an inaccessible path; `cli-api-behaviour.test.ts` covers the CLI path and
 error. `docs/adr-008-velocetty-configuration-directory.md`,
 `docs/tracking-issues.md`, `docs/configuration-architecture.md`, and
 `docs/developers-guide.md` record the four-state contract.
+
+The hosted CodeScene check then failed the head on `resolveConfigLocations`
+(Complex Method, 9.69 in both copies) and on `buildFsModule` in the CLI test
+harness. The resolver now delegates to `selectActiveConfig` and `listShadowed`,
+which keep the same precedence, `exists`, `inspection`, and `shadowed` results
+— the parity suite and the resolver tests pin that — and the test harness
+answers `stat`/`lstat` through one `answerStat` helper.
 
 ## Interfaces and dependencies
 
