@@ -4886,3 +4886,11 @@ requires it. Any adjustment is recorded in `Decision log`.
   falling through to the Hyper copy. The CLI test filesystem also throws coded
   `ENOENT` for absence, as Node does, because an uncoded error is no longer
   evidence of a missing file.
+- 2026-11-09 (compile-time contracts): the Compile-Time / Ui row asked for
+  assertions on both `ConfigPath` declarations, so
+  `test/unit/config-tree-types.test.ts` now pins them under `make typecheck`. A
+  branded path stays assignable to `string`, both resolvers' probes accept a
+  branded path and reject an ordinary one, and each copy's `createPathProbe`
+  result satisfies its resolver input without a re-brand. The
+  `@ts-expect-error` lines fail the build if either brand is ever widened back
+  to `string`.
