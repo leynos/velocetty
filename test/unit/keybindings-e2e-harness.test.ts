@@ -21,6 +21,46 @@ const ordinalOf = (matcher: RegExp): number => {
   return Number(match[1]);
 };
 
+/** The line a scripted probe prints for a request it answered. */
+const scriptedReply = (ordinal: number, verdict: ProbeVerdict): string =>
+  `[e2e] shortcut-probe ${verdict} #${ordinal} ctrl+n`;
+
+/** The reply an earlier press of the same chord leaves in the output. */
+const earlierReply = '[e2e] shortcut-probe pressed #0 ctrl+n';
+
+/** The error a scripted wait throws when the probe has no reply for it. */
+const timedOut = (ordinal: number) => new Error(`Timed out waiting for the probe's reply to request #${ordinal}.`);
+
+/** Records one wait on a request, so a reply can be withheld from the first. */
+const countWait = (waitsByOrdinal: Map<number, number>, ordinal: number): number => {
+  const waits = (waitsByOrdinal.get(ordinal) ?? 0) + 1;
+  waitsByOrdinal.set(ordinal, waits);
+  return waits;
+};
+
+/** Whether the probe is still on its way to this request, so the first wait misses it. */
+const isWithheldReply = (lateReplies: ReadonlySet<number>, ordinal: number, waits: number): boolean =>
+  lateReplies.has(ordinal) && waits === 1;
+
+/**
+ * The line a scripted probe gives in answer to one wait.
+ *
+ * A verdict of `unanswered`, or a reply the probe has not reached yet, times
+ * out instead; the caller's own `matcher` check then decides whether the reply
+ * names the request it asked about.
+ */
+const answerWait = (
+  wait: Readonly<{ordinal: number; waits: number; verdict: ProbeVerdict; lateReplies: ReadonlySet<number>}>
+): string => {
+  if (wait.verdict === 'unanswered') {
+    throw timedOut(wait.ordinal);
+  }
+  if (isWithheldReply(wait.lateReplies, wait.ordinal, wait.waits)) {
+    throw timedOut(wait.ordinal);
+  }
+  return scriptedReply(wait.ordinal, wait.verdict);
+};
+
 /**
  * A launched-app stand-in whose probe verdicts come from a script.
  *
@@ -52,19 +92,17 @@ const createFakeApp = (verdictFor: (ordinal: number) => ProbeVerdict, lateReplie
     stop: async () => {},
     waitFor: async ({matcher}: Readonly<{matcher: RegExp}>): Promise<string> => {
       const ordinal = ordinalOf(matcher);
-      const waits = (waitsByOrdinal.get(ordinal) ?? 0) + 1;
-      waitsByOrdinal.set(ordinal, waits);
+      const waits = countWait(waitsByOrdinal, ordinal);
       // A reply from an earlier press of the same chord, which a chord-only
       // wait would have accepted for this one.
-      if (matcher.test('[e2e] shortcut-probe pressed #0 ctrl+n')) {
+      if (matcher.test(earlierReply)) {
         throw new Error('The wait accepted a reply that names another request.');
       }
-      const verdict = verdictFor(ordinal);
-      const isLate = lateReplies.has(ordinal) && waits === 1;
-      if (verdict === 'unanswered' || isLate || !matcher.test(`[e2e] shortcut-probe ${verdict} #${ordinal} ctrl+n`)) {
-        throw new Error(`Timed out waiting for the probe's reply to request #${ordinal}.`);
+      const reply = answerWait({ordinal, waits, verdict: verdictFor(ordinal), lateReplies});
+      if (!matcher.test(reply)) {
+        throw timedOut(ordinal);
       }
-      return `[e2e] shortcut-probe ${verdict} #${ordinal} ctrl+n`;
+      return reply;
     }
   };
   return app;
