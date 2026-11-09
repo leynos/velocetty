@@ -193,11 +193,13 @@ e2eTest(
 
         // Pressing the still-bound chord and awaiting its command marker is the
         // completion barrier: the main process handles commands in arrival
-        // order, so by now it has handled anything the old press sent. Exactly
-        // one new run therefore belongs to the edited chord, and a run by the
-        // replaced chord would make two.
+        // order, so by now it has handled anything the old press sent. The
+        // replaced chord was pressed once and so can add at most one run, while
+        // the edited chord is pressed twice; a total of two therefore means the
+        // replaced chord ran nothing and the edited chord ran both times.
         await pressUntilExecuted({app, command, shortcut: editedShortcut});
-        expect(app.count(commandExecutedMarker(command)) - executedBeforeReplacement).toBe(1);
+        await pressUntilExecuted({app, command, shortcut: editedShortcut});
+        expect(app.count(commandExecutedMarker(command)) - executedBeforeReplacement).toBe(2);
 
         await fs.writeFile(keybindingsPath, `{'window:new':`, 'utf8');
         await app.waitFor({
@@ -206,13 +208,14 @@ e2eTest(
         });
 
         // The rejected file must not have rebound the old chord either, and it
-        // must not have unbound the shortcut that still works. The edited
-        // chord's own run is the completion barrier, so exactly one new run in
-        // total means the old chord stayed unbound.
+        // must not have unbound the shortcut that still works. As above, the
+        // single press of the old chord can add at most one run while the two
+        // presses of the edited chord add exactly two.
         const executedBeforeInvalidReload = app.count(commandExecutedMarker(command));
         await pressAndAwaitProbe({app, shortcuts: [E2E_PROBE_SHORTCUT]});
         await pressUntilExecuted({app, command, shortcut: editedShortcut});
-        expect(app.count(commandExecutedMarker(command)) - executedBeforeInvalidReload).toBe(1);
+        await pressUntilExecuted({app, command, shortcut: editedShortcut});
+        expect(app.count(commandExecutedMarker(command)) - executedBeforeInvalidReload).toBe(2);
       } finally {
         await app.stop();
       }

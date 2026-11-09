@@ -2797,13 +2797,20 @@ These must hold over the whole domain:
 - Priority: if `Velocetty/config.json5` exists, it is active, and any existing
   Hyper copy appears in `shadowed`. Otherwise the Hyper tree's rules apply
   exactly as `app/config/paths.ts` applies them today.
-- Creation: if no candidate exists, the active path is
-  `<velocettyDirectory>/config.json5`, with `exists: false`.
+- Creation: if no candidate exists and no candidate could not be inspected,
+  the active path is `<velocettyDirectory>/config.json5`, with `exists: false`
+  and `inspection: 'ok'`.
+- Creation safety: a candidate is creatable only when its `inspection` is
+  `'ok'`. An inaccessible candidate is selected at its own priority with
+  `exists: false` and `inspection: 'inaccessible'`, so the caller keeps the
+  defaults rather than writing a file that may shadow what it could not read.
 - Keybindings: `keybindingsPath` is always in `velocettyDirectory`, except in
   development mode with a repository-root config, where it is beside that
   config.
 - Legacy safety: no returned path that the caller may create (an active path
-  with `exists: false`, or `keybindingsPath`) lies in the Hyper tree.
+  with `exists: false` and `inspection: 'ok'`, or `keybindingsPath`) lies in
+  the Hyper tree. An inaccessible Hyper candidate is not creatable, so its
+  `exists: false` path may legitimately remain in the Hyper tree.
 - XDG: an absolute, non-empty `XDG_CONFIG_HOME` gives
   `<XDG_CONFIG_HOME>/Velocetty` on every platform. An empty or relative value
   falls back to the platform default.
@@ -2821,9 +2828,9 @@ combinations of five existence flags (Velocetty `config.json5`, Hyper
 relative, absolute), and the development flag: 32 × 3 × 4 × 2 = 768 cases.
 
 The invariants are stated independently of the implementation, for example "if
-`exists` is false then the path starts with `velocettyDirectory`". The
-Hyper-compatibility invariant compares against a frozen copy of today's
-resolution logic, kept as a test oracle.
+`exists` is false and the path is creatable then it starts with
+`velocettyDirectory`". The Hyper-compatibility invariant compares against a
+frozen copy of today's resolution logic, kept as a test oracle.
 
 Path functions (`isAbsolute`, `join`) come from `path.win32` or `path.posix`
 according to `input.platform`, as `cli/api.ts` already does, so Linux test runs
@@ -4828,3 +4835,24 @@ requires it. Any adjustment is recorded in `Decision log`.
     `PRIVATE_TOKEN` through both fields, including through the production
     `notify()` surface, and assert neither reaches the log record or the
     serialized call arguments.
+- 2026-11-09 (advisory-rule round): the hosted CodeScene check failed both
+  `config-tree.ts` copies on *String Heavy Function Arguments*. The remedy is
+  the domain type the rule names: `ConfigPath` brands a path the resolver built
+  with the platform's own joins, `configPath` is its only constructor, and the
+  probe accepts nothing else. The exported `ConfigLocations` shape still
+  reports plain strings, so no consumer or test changed, and `cs` 1.0.56 now
+  reports 10.00 for both copies.
+- 2026-11-09 (harness review round): the E2E press helper had two sampling
+  defects, and the KB-PATH-1 creation wording was incomplete:
+  - `pressUntilExecuted` sampled the command count once, immediately after the
+    probe's reply, although the main process prints the marker one IPC hop
+    later. It now polls for the growth within one retry interval.
+  - A request that timed out stayed in the probe's file and was pressed later,
+    so a retry could press the same chord twice. Every request is now waited for
+    until it answers, and one that never answers fails the run rather than
+    leaving a press in flight.
+  - `E2E-KB-5` presses the edited chord twice and requires exactly two runs, so
+    a single press of the replaced chord cannot satisfy the barrier.
+  - The creation invariant now requires `inspection: 'ok'`; an inaccessible
+    Hyper candidate keeps `exists: false` at its own priority and is not
+    creatable.
