@@ -11,6 +11,7 @@ import path from 'node:path';
 
 import type {configValidationDiagnostic, rawConfig} from '@shared/types/config';
 import {boundedErrorCode} from '../utils/error-code';
+import type {ConfigInspection} from './config-tree';
 import type {ConfigFallbackCause, ConfigImportNotify} from './import-report';
 import {ensureSchemaFiles, type SchemaCopyRequest} from './schema-copy';
 import {notifyWithPrimaryDiagnostic} from './keybindings-notifier';
@@ -25,6 +26,13 @@ export type ConfigImportPhase = 'startup' | 'reload';
 export type ConfigImportPaths = {
   cfgDir: string;
   cfgPath: string;
+  /**
+   * Whether the active config path could be inspected.
+   *
+   * An `inaccessible` path may hold the user's configuration, so start-up must
+   * not create a file that would shadow it.
+   */
+  configInspection: ConfigInspection;
   defaultCfg: string;
   /** Directory holding `keybindings.json5`; its schema copy belongs beside it. */
   keybindingsDir: string;
@@ -359,9 +367,12 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
    * Whether this run may create `config.json5`.
    *
    * An active Hyper tree is left alone: creating a Velocetty-style file there
-   * would shadow the user's real configuration instead of migrating it.
+   * would shadow the user's real configuration instead of migrating it. An
+   * unreadable path is left alone for the same reason: the file may already
+   * exist, and writing over it would replace a configuration we could not read.
    */
-  const canBootstrapUserConfig = (): boolean => path.resolve(pathDeps.cfgDir) === path.resolve(pathDeps.velocettyDir);
+  const canBootstrapUserConfig = (): boolean =>
+    pathDeps.configInspection === 'ok' && path.resolve(pathDeps.cfgDir) === path.resolve(pathDeps.velocettyDir);
 
   /**
    * Reads and caches the bundled defaults and merges the platform keymap.

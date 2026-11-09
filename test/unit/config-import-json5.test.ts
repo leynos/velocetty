@@ -213,6 +213,23 @@ test('bootstraps missing config with JSON5 output without legacy migration paths
   }
 });
 
+test('start-up creates no config file when the active path could not be inspected', async () => {
+  const harness = await createConfigImportHarness({configInspection: 'inaccessible'});
+  try {
+    writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
+    writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), '{}', 'utf8');
+    writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+
+    harness._import('startup');
+
+    // A file we could not read may already hold the user's configuration, so
+    // bootstrapping would replace it rather than fill a gap.
+    expect(existsSync(harness.mockPaths.cfgPath)).toBe(false);
+  } finally {
+    harness.cleanup();
+  }
+});
+
 test('getDefaultConfig reads and caches the defaults without writing', async () => {
   const harness = await createConfigImportHarness();
   try {

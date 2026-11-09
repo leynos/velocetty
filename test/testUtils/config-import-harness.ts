@@ -14,6 +14,7 @@ import {createKeybindingsService} from '../../app/config/keybindings';
 import {keybindingsCodec} from '../../app/config/keybindings-codec';
 import {createKeybindingsNotifier} from '../../app/config/keybindings-notifier';
 import {createFileKeybindingsStore} from '../../app/config/keybindings-store';
+import type {ConfigInspection} from '../../app/config/config-tree';
 import type {ConfigImportFileSystem} from '../../app/config/import-sources';
 
 type ConfigInit = Parameters<typeof createConfigImportModule>[0]['_init'];
@@ -68,6 +69,11 @@ export type ConfigImportHarnessOptions = {
    */
   readonly keybindings?: ConfigImportKeybindings;
   /**
+   * Models a path the resolver could not inspect, so start-up must keep the
+   * defaults rather than create a file that could shadow it.
+   */
+  readonly configInspection?: ConfigInspection;
+  /**
    * Lower-priority config files the active tree hides. Supplying one lets a
    * test observe the shadowed-copy notice, which is silent when empty.
    */
@@ -81,6 +87,7 @@ const createMockPaths = (workspaceRoot: string, options: ConfigImportHarnessOpti
   return {
     cfgDir: userConfigDir,
     cfgPath: path.join(userConfigDir, 'config.json5'),
+    configInspection: options.configInspection ?? 'ok',
     defaultCfg: path.join(workspaceRoot, 'defaults', 'config-default.json'),
     keybindingsDir: velocettyDir,
     keybindingsPath: path.join(velocettyDir, 'keybindings.json5'),

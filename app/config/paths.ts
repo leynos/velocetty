@@ -13,7 +13,7 @@ import {app} from 'electron';
 
 import isDev from 'electron-is-dev';
 
-import {resolveConfigLocations} from './config-tree';
+import {createPathProbe, resolveConfigLocations} from './config-tree';
 
 const cfgFile = 'config.json5';
 const keybindingsFile = 'keybindings.json5';
@@ -33,24 +33,13 @@ const keybindingsSchemaPath = path.join(appDirectory, 'config', keybindingsSchem
 const defaultCfg = path.join(appDirectory, 'config', defaultCfgFile);
 
 /**
- * Distinguishes a broken symlink from an absent file.
+ * Distinguishes a broken symlink and an unreadable path from an absent file.
  *
  * A dotfiles-managed configuration that is temporarily dangling must not be
  * treated as absent, or a new Velocetty file would silently shadow it for good.
+ * The probe is shared with the CLI so both copies classify a fault identically.
  */
-const probe = (candidate: string): 'present' | 'broken-link' | 'absent' => {
-  try {
-    statSync(candidate);
-    return 'present';
-  } catch {
-    try {
-      lstatSync(candidate);
-      return 'broken-link';
-    } catch {
-      return 'absent';
-    }
-  }
-};
+const probe = createPathProbe({statSync, lstatSync});
 
 /** Compares real paths so a symlinked Velocetty tree is not reported as shadowing. */
 const sameFile = (left: string, right: string): boolean => {
@@ -80,6 +69,13 @@ const keybindingsPath = locations.keybindingsPath;
 const velocettyDir = locations.velocettyDirectory;
 /** Which tree supplied the active configuration file. */
 const configTree = locations.config.tree;
+/**
+ * Whether the active configuration could be inspected at all.
+ *
+ * An unreadable path is reported so start-up can keep the defaults instead of
+ * creating a file that would shadow the configuration it could not read.
+ */
+const configInspection = locations.config.inspection;
 /** Lower-priority `config.json5` files the active one hides. */
 const shadowedConfigPaths = locations.shadowed;
 
@@ -152,6 +148,7 @@ const defaultPlatformKeyPath = () => {
 export {
   cfgDir,
   cfgPath,
+  configInspection,
   configTree,
   keybindingsFile,
   keybindingsPath,

@@ -4324,6 +4324,45 @@ focused-window-then-newest-window fallback. `parseRequest`,
 `isCommonJsRequireCall`, and `isDisallowedAliasSpecifier` gained the JSDoc
 their neighbours already had.
 
+### EP-I: inaccessible path probes (issue `#271`)
+
+CodeRabbit's assessment of the signed-off head required issue `#271` to be
+fixed before merge rather than deferred. The defect: both path probes treated
+every `stat`/`lstat` failure as absence, so a `config.json5` that existed but
+could not be read (`EACCES`, `EPERM`, `EIO`) was reported as missing and
+start-up bootstrapped a fresh file over a configuration it could not inspect.
+
+The probe is now four-state — `present`, `broken-link`, `absent`,
+`inaccessible` — in both copies. `isInspectionFailure` accepts only permission
+and I/O codes, so `ENOENT`/`ENOTDIR` and a dangling symlink still mean what
+they did. `createPathProbe` holds the single `stat`-then-`lstat` sequence each
+copy exports; `app/config/paths.ts` and `cli/api.ts` both build their probe
+from it instead of carrying a local copy.
+
+The resolver selects the first candidate whose absence is not established, so
+an inaccessible priority file still wins over a readable lower-priority one; it
+reports `exists: false` with `inspection: 'inaccessible'` and an empty
+`shadowed` list, because precedence over the files it cannot see is not
+established. Consequences:
+
+- `ConfigImportPaths.configInspection` reaches the importer, and
+  `canBootstrapUserConfig` refuses to seed a file whose path could not be
+  inspected. The reload path still reads and falls back with the existing
+  user-visible notice, so a repaired file is picked up by the watcher.
+- The CLI exposes `configInspection` and refuses `getFileContents` with an
+  error naming the accessibility fault; `checkConfig` in `cli/index.ts` reports
+  it rather than claiming the file does not exist.
+
+Tests: `test/unit/config-tree-probe.test.ts` (KB-PATH-3) tables every call
+outcome for both copies and asserts they classify identically;
+`config-tree-parity.test.ts` adds an inaccessible variant of every enumerated
+case; `config-tree.test.ts` asserts the resolver's precedence, `exists`, and
+`shadowed` rules; `config-import-json5.test.ts` proves start-up creates no file
+for an inaccessible path; `cli-api-behaviour.test.ts` covers the CLI path and
+error. `docs/adr-008-velocetty-configuration-directory.md`,
+`docs/tracking-issues.md`, `docs/configuration-architecture.md`, and
+`docs/developers-guide.md` record the four-state contract.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.

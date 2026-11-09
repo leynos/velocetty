@@ -34,6 +34,7 @@ import _openConfig from './config/open';
 import {
   cfgPath,
   cfgDir,
+  configInspection,
   configTree,
   defaultCfg,
   defaultPlatformKeyPath,
@@ -83,6 +84,7 @@ const {_import, getDefaultConfig} = createConfigImportModule({
   paths: {
     cfgDir,
     cfgPath,
+    configInspection,
     defaultCfg,
     defaultPlatformKeyPath,
     keybindingsDir: path.dirname(keybindingsPath),

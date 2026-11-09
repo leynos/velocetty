@@ -48,6 +48,11 @@ type CliHarnessOptions = {
   readonly gotVersions?: unknown;
   readonly hasReadFileSyncOverride?: boolean;
   readonly homeDirectory?: string;
+  /**
+   * Paths whose `stat` and `lstat` fail with `EACCES`, so the probe reports a
+   * permission fault rather than absence.
+   */
+  readonly inaccessiblePaths?: Set<string>;
   readonly moduleDirectory?: string;
   readonly platform?: NodeJS.Platform;
   readonly registryUrl?: string;
@@ -57,6 +62,7 @@ type CliHarnessState = {
   brokenLinkPaths: Set<string>;
   configData: ConfigData;
   existingPaths: Set<string> | null;
+  inaccessiblePaths: Set<string>;
   fsExistsSyncResult: boolean;
   fsReadFileSyncCallCount: number;
   fsReadFileSyncValue: unknown;
@@ -101,6 +107,11 @@ const throwMissing = (candidatePath: string): never => {
   throw new Error(`ENOENT: no such file or directory, '${candidatePath}'`);
 };
 
+/** A permission fault carries the code the probe classifies, unlike `throwMissing`. */
+const throwInaccessible = (candidatePath: string): never => {
+  throw Object.assign(new Error(`EACCES: permission denied, '${candidatePath}'`), {code: 'EACCES'});
+};
+
 /** Stands in for `fs.Stats`: the probe checks only that the call succeeded. */
 const PATH_ENTRY = {};
 
@@ -108,12 +119,20 @@ const buildFsModule = (state: CliHarnessState) => {
   const pathExists = (candidatePath: string) =>
     state.existingPaths ? state.existingPaths.has(candidatePath) : state.fsExistsSyncResult;
 
+  const isInaccessible = (candidatePath: string) => state.inaccessiblePaths.has(candidatePath);
+
   return {
     existsSync: pathExists,
     // A dangling symlink resolves for `lstat` but not for `stat`, which is the
-    // distinction the probe relies on.
-    lstatSync: (candidatePath: string) =>
-      pathExists(candidatePath) || state.brokenLinkPaths.has(candidatePath) ? PATH_ENTRY : throwMissing(candidatePath),
+    // distinction the probe relies on. A permission fault fails both calls.
+    lstatSync: (candidatePath: string) => {
+      if (isInaccessible(candidatePath)) {
+        return throwInaccessible(candidatePath);
+      }
+      return pathExists(candidatePath) || state.brokenLinkPaths.has(candidatePath)
+        ? PATH_ENTRY
+        : throwMissing(candidatePath);
+    },
     readFileSync: (_target: string, _encoding: 'utf8') => {
       state.fsReadFileSyncCallCount += 1;
       const contents = state.hasReadFileSyncOverride ? state.fsReadFileSyncValue : JSON.stringify(state.configData);
@@ -122,7 +141,12 @@ const buildFsModule = (state: CliHarnessState) => {
       }
       return contents;
     },
-    statSync: (candidatePath: string) => (pathExists(candidatePath) ? PATH_ENTRY : throwMissing(candidatePath)),
+    statSync: (candidatePath: string) => {
+      if (isInaccessible(candidatePath)) {
+        return throwInaccessible(candidatePath);
+      }
+      return pathExists(candidatePath) ? PATH_ENTRY : throwMissing(candidatePath);
+    },
     writeFileSync: (_target: string, contents: string, _encoding: 'utf8') => {
       const parsed = parseConfigData(contents);
       state.savedConfigs.push(parsed);
@@ -147,6 +171,7 @@ const createCliHarness = (options: CliHarnessOptions = {}): CliHarness => {
     brokenLinkPaths: options.brokenLinkPaths ?? new Set(),
     configData: options.configData ?? {plugins: [], localPlugins: []},
     existingPaths: options.existingPaths ?? null,
+    inaccessiblePaths: options.inaccessiblePaths ?? new Set(),
     fsExistsSyncResult: options.fsExistsSyncResult ?? true,
     fsReadFileSyncCallCount: 0,
     fsReadFileSyncValue: options.fsReadFileSyncValue,
@@ -480,6 +505,33 @@ test('configPath keeps a dangling Velocetty link ahead of a readable Hyper confi
   // Falling through to Hyper would have the CLI write a file the application
   // ignores, so the dangling link must still win.
   expect(api.configPath).toBe(velocettyPath);
+});
+
+test('configPath reports an inaccessible Velocetty config instead of falling through to Hyper', () => {
+  const velocettyPath = path.join('/tmp/velocetty-xdg', 'Velocetty', 'config.json5');
+  const hyperPath = path.join('/tmp/velocetty-xdg', 'Hyper', 'config.json5');
+  const {api} = createCliHarness({
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: '/tmp/velocetty-xdg'},
+    existingPaths: new Set([hyperPath]),
+    inaccessiblePaths: new Set([velocettyPath])
+  });
+
+  // A permission fault means the file may exist. Reporting the Hyper copy
+  // instead would read a different configuration than the application does.
+  expect(api.configPath).toBe(velocettyPath);
+  expect(api.configInspection).toBe('inaccessible');
+});
+
+test('an inaccessible config read names accessibility rather than absence', () => {
+  const velocettyPath = path.join('/tmp/velocetty-xdg', 'Velocetty', 'config.json5');
+  const {api} = createCliHarness({
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: '/tmp/velocetty-xdg'},
+    inaccessiblePaths: new Set([velocettyPath])
+  });
+
+  expect(() => api.list()).toThrow(
+    `Config file could not be inspected because it is not accessible: ${velocettyPath}.`
+  );
 });
 
 test('configPath ignores a relative XDG_CONFIG_HOME on Linux', () => {

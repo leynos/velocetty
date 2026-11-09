@@ -22,6 +22,15 @@ const configFileName = 'config.json5';
 const legacyConfigFileName = 'hyper.json';
 const keybindingsFileName = 'keybindings.json5';
 
+/** No candidate exists: the state a fresh install starts from. */
+const NO_FLAGS = {
+  developmentConfig: false,
+  developmentLegacy: false,
+  hyperConfig: false,
+  hyperLegacy: false,
+  velocettyConfig: false
+} as const;
+
 /** States the expected active config independently of the implementation. */
 const expectedActiveConfig = (testCase: ConfigTreeCase): ExpectedConfig => {
   const paths = platformPath(testCase.platform);
@@ -194,6 +203,13 @@ const shadowedViolation = ({result, shadowed, testCase}: CaseEvaluation): string
     : `${testCase.label}: shadowed ${JSON.stringify(result.shadowed)}; expected ${JSON.stringify(shadowed)}`;
 
 /**
+ * Inspection: every enumerated case answers from a present/absent probe, so
+ * none of them may claim the active path was unreadable.
+ */
+const inspectionViolation = ({result, testCase}: CaseEvaluation): string | undefined =>
+  result.config.inspection === 'ok' ? undefined : `${testCase.label}: reported inspection ${result.config.inspection}`;
+
+/**
  * Creation: an active path that does not exist is always the Velocetty
  * creation path, so a fresh install never writes under the Hyper name.
  */
@@ -251,6 +267,7 @@ const caseViolations = (evaluation: CaseEvaluation): string[] => {
     activeViolation(evaluation),
     keybindingsViolation(evaluation),
     shadowedViolation(evaluation),
+    inspectionViolation(evaluation),
     creationViolation(evaluation),
     legacySafetyViolation(evaluation)
   ].filter((violation): violation is string => violation !== undefined);
@@ -393,5 +410,53 @@ describe('KB-PATH-1 configuration tree resolution', () => {
 
     expect(result.config).toMatchObject({path: brokenLink, tree: 'hyper', exists: true});
     expect(isInside('linux', result.keybindingsPath, testCase.hyperDirectory)).toBe(false);
+  });
+
+  test('reports an unreadable active config without treating it as absent', () => {
+    const fixture = platformFixture('linux');
+    const testCase = buildConfigTreeCase(fixture, 'unset', false, NO_FLAGS);
+    const velocettyConfig = platformPath('linux').join(testCase.velocettyDirectory, configFileName);
+
+    const result = resolveConfigLocations({
+      ...testCase.input,
+      probe: (candidate) => (candidate === velocettyConfig ? 'inaccessible' : 'absent')
+    });
+
+    // The path is still the one the user meant, so it is reported rather than
+    // replaced by the creation path; `exists` stays false because presence was
+    // never established.
+    expect(result.config).toEqual({
+      exists: false,
+      inspection: 'inaccessible',
+      path: velocettyConfig,
+      tree: 'velocetty'
+    });
+    expect(result.shadowed).toEqual([]);
+  });
+
+  test('keeps an unreadable priority file ahead of a readable lower-priority copy', () => {
+    const fixture = platformFixture('linux');
+    const testCase = buildConfigTreeCase(fixture, 'unset', false, {
+      ...NO_FLAGS,
+      hyperConfig: true
+    });
+    const velocettyConfig = platformPath('linux').join(testCase.velocettyDirectory, configFileName);
+    const hyperConfig = platformPath('linux').join(testCase.hyperDirectory, configFileName);
+
+    const result = resolveConfigLocations({
+      ...testCase.input,
+      probe: (candidate) => {
+        if (candidate === velocettyConfig) {
+          return 'inaccessible';
+        }
+        return candidate === hyperConfig ? 'present' : 'absent';
+      }
+    });
+
+    // Falling through to the Hyper copy would change which configuration the
+    // user gets, and reporting the Hyper copy as ignored would assert a
+    // precedence the resolver could not establish.
+    expect(result.config).toMatchObject({inspection: 'inaccessible', path: velocettyConfig, tree: 'velocetty'});
+    expect(result.shadowed).toEqual([]);
   });
 });

@@ -23,7 +23,12 @@ import {z} from 'zod';
 import {isNumber, isObject, isString} from '@shared/types/guards';
 import type {JsonValue} from '@shared/types/json';
 import {parseJson5StrictWithSchema, stringifyJson5} from '@shared/config/json5-config';
-import {resolveConfigLocations} from '@shared/config/config-tree';
+import {
+  type ConfigInspection,
+  type ConfigLocations,
+  createPathProbe,
+  resolveConfigLocations
+} from '@shared/config/config-tree';
 
 /** Branded type for plugin specifiers (e.g., 'hyper-plugin', '@scope/plugin@1.0.0') */
 type PluginSpecifier = string & {readonly __brand: 'PluginSpecifier'};
@@ -108,6 +113,8 @@ type CliRuntimeConfig = {
   readonly homeDirectory: string;
   readonly moduleDirectory: string;
   readonly configPath: string;
+  /** Whether the resolved config path could be inspected at all. */
+  readonly configInspection: ConfigInspection;
 };
 
 type CliApiContext = CliApiDependencies & CliRuntimeConfig;
@@ -133,6 +140,13 @@ type ConfigPathInput = {
  */
 export type CliApi = {
   readonly configPath: string;
+  /**
+   * Whether the resolved config path could be inspected.
+   *
+   * `inaccessible` means a permission or I/O fault: the file may exist, so the
+   * CLI reports that it cannot be read rather than that it is missing.
+   */
+  readonly configInspection: ConfigInspection;
   /** Returns `true` when the resolved config file exists on disk. */
   exists: () => boolean;
   /**
@@ -207,16 +221,19 @@ const resolveRuntimeConfig = (dependencies: CliApiDependencies, options: CliApiO
   const appData = options.appData ?? dependencies.env.APPDATA;
   const moduleDirectory = options.moduleDirectory ?? currentModuleDirectory;
 
+  const resolvedConfig = resolveConfigPath({
+    appData,
+    env: dependencies.env,
+    fsModule: dependencies.fsModule,
+    homeDirectory,
+    moduleDirectory,
+    platform: dependencies.platform
+  });
+
   return {
     appData,
-    configPath: resolveConfigPath({
-      appData,
-      env: dependencies.env,
-      fsModule: dependencies.fsModule,
-      homeDirectory,
-      moduleDirectory,
-      platform: dependencies.platform
-    }),
+    configInspection: resolvedConfig.inspection,
+    configPath: resolvedConfig.path,
     homeDirectory,
     moduleDirectory
   };
@@ -254,7 +271,10 @@ const normalizeConfiguredAppData = (appData: string | undefined): string | undef
  *
  * The probe still distinguishes a dangling symlink from an absent file, so a
  * dotfiles-managed configuration the CLI cannot follow is not mistaken for a
- * missing one and shadowed by a file the application would ignore.
+ * missing one and shadowed by a file the application would ignore. It also
+ * reports a permission or I/O fault, which reaches the caller as
+ * `inspection: 'inaccessible'` so the CLI can say why it cannot read the file
+ * instead of claiming it does not exist.
  *
  * These differences are recorded in `docs/tracking-issues.md`.
  */
@@ -265,7 +285,7 @@ const resolveConfigPath = ({
   homeDirectory,
   moduleDirectory,
   platform
-}: ConfigPathInput): string => {
+}: ConfigPathInput): ConfigLocations['config'] => {
   const platformPath = getPlatformPath(platform);
   const appDataDirectory =
     normalizeConfiguredAppData(appData) ?? platformPath.join(homeDirectory, 'AppData', 'Roaming');
@@ -280,28 +300,16 @@ const resolveConfigPath = ({
       enabled: env.NODE_ENV !== 'production',
       directory: platformPath.join(moduleDirectory, '..')
     },
-    // Mirrors the application's probe: a dangling symlink is a managed file
-    // whose target is temporarily missing, not an absent one. Reporting it as
-    // absent would let the CLI create a config the application then ignores.
-    probe: (candidate) => {
-      try {
-        fsModule.statSync(candidate);
-        return 'present';
-      } catch {
-        try {
-          fsModule.lstatSync(candidate);
-          return 'broken-link';
-        } catch {
-          return 'absent';
-        }
-      }
-    },
+    // The shared probe, not a local copy: the application and the CLI must
+    // classify a dangling symlink, a permission fault, and an absent file the
+    // same way, or KB-PATH-2's parity would stop meaning what it claims.
+    probe: createPathProbe(fsModule),
     // The CLI's narrow filesystem slice cannot call `realpath`, so identical
     // joined paths are the strongest equality it can establish.
     sameFile: (left, right) => left === right
   });
 
-  return locations.config.path;
+  return locations.config;
 };
 
 const pluginNameSchema = z.string().refine((value) => value.trim().length > 0, {
@@ -427,7 +435,23 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   const context = resolveCliApiContext(options);
   const {configPath} = context;
 
-  const getFileContents = () => context.fsModule.readFileSync(configPath, 'utf8');
+  /**
+   * Reads the active config.
+   *
+   * An unreadable path is refused here rather than left to `readFileSync`: the
+   * raw `EACCES` names the operation but not the configuration the user meant,
+   * and a caller that saw only "file not found" would send them looking for a
+   * file that may well be there.
+   */
+  const getFileContents = () => {
+    if (context.configInspection === 'inaccessible') {
+      throw new Error(
+        `Config file could not be inspected because it is not accessible: ${configPath}. ` +
+          'Check that the file and its directory are readable, then retry.'
+      );
+    }
+    return context.fsModule.readFileSync(configPath, 'utf8');
+  };
 
   const normalizeParsedConfig = (config: ParsedCliConfig): NormalizedCliConfig => {
     return {
@@ -540,13 +564,25 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
     return false;
   };
 
-  return {configPath, exists, existsOnNpm, install, isInstalled, list, uninstall};
+  return {
+    configInspection: context.configInspection,
+    configPath,
+    exists,
+    existsOnNpm,
+    install,
+    isInstalled,
+    list,
+    uninstall
+  };
 };
 
 const defaultCliApi = createCliApi();
 
 /** Resolved Hyper config path for the default CLI API instance. */
 export const configPath = defaultCliApi.configPath;
+
+/** Whether the default CLI config path could be inspected. */
+export const configInspection = defaultCliApi.configInspection;
 
 /** Returns `true` when the default CLI config file exists on disk. */
 export const exists = defaultCliApi.exists;

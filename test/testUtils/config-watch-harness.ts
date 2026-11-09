@@ -48,6 +48,8 @@ const pathsModuleFactory = () => ({
   cfgPath: '/tmp/config.json5',
   // The composition root names the active tree in every import record.
   configTree: 'velocetty',
+  // The stub paths are always readable, so start-up may bootstrap as before.
+  configInspection: 'ok',
   defaultCfg: '/tmp/config-default.json',
   defaultPlatformKeyPath: () => '/tmp/linux.json',
   keybindingsDir: '/tmp',

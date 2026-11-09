@@ -105,9 +105,14 @@ Option A.
 - On Linux the directory name is case-sensitive, and `~/.config/velocetty` is
   not consulted.
 - A broken symlink in either tree counts as present, so a dotfiles-managed
-  configuration is never silently shadowed. Both probes are three-state: the
+  configuration is never silently shadowed. Both probes are four-state: the
   application resolves with `stat` and falls back to `lstat`, and the CLI's
-  narrower filesystem slice implements the same sequence.
+  narrower filesystem slice runs the same sequence through its own copy of
+  `createPathProbe`.
+- A permission or I/O fault is `inaccessible`, not `absent`. The resolver
+  reports it as the active path with `inspection: 'inaccessible'`, so start-up
+  keeps the defaults rather than creating a file that could shadow a
+  configuration it could not read.
 - The application and the CLI pass different inputs to the mirrored resolver.
   The CLI derives `userData` as `<appData>/Hyper`, compares trees by string
   equality rather than by `realpath`, and detects development mode from

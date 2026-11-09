@@ -384,7 +384,10 @@ wires them together.
   behind `paths.ts`. It takes the platform, the environment paths, the
   development override, and the `probe` and `sameFile` predicates, and returns
   the active file, the creation path, the Velocetty directory, the
-  `keybindingsPath`, and the shadowed candidates.
+  `keybindingsPath`, and the shadowed candidates. The probe distinguishes
+  presence, a broken link, absence, and `inaccessible`; an unreadable active
+  path is reported with `inspection: 'inaccessible'`, which tells start-up to
+  keep the defaults rather than bootstrap a file that may already exist.
   `shared/src/config/config-tree.ts` mirrors it for the CLI, and a parity test
   keeps the two copies in step.
 

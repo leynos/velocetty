@@ -23,7 +23,7 @@ export type ConfigLocationInput = {
   readonly appDataDirectory: string;
   readonly hyperUserDataDirectory: string;
   readonly development: {readonly enabled: boolean; readonly directory: string};
-  readonly probe: (candidate: string) => 'present' | 'broken-link' | 'absent';
+  readonly probe: (candidate: string) => 'present' | 'broken-link' | 'absent' | 'inaccessible';
   readonly sameFile: (left: string, right: string) => boolean;
 };
 

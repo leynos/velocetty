@@ -58,6 +58,16 @@ const assertPluginName = (pluginName: string): string => {
 };
 
 const checkConfig = () => {
+  // A permission or I/O fault is not absence: telling the user the file is
+  // missing would send them to recreate one that is already there.
+  if (api.configInspection === 'inaccessible') {
+    throw new ExpectedFailureError(
+      chalk.red(
+        `Error! Config file could not be read: ${api.configPath}\n` +
+          'Check that the file and its directory are readable, then retry.'
+      )
+    );
+  }
   if (api.exists()) {
     return true;
   }
