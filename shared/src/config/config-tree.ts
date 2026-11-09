@@ -25,6 +25,21 @@ export type ConfigTree = 'velocetty' | 'hyper' | 'development';
 export type ProbeState = 'present' | 'broken-link' | 'absent' | 'inaccessible';
 
 /**
+ * A configuration path the resolver reached through its own priority order.
+ *
+ * The resolver owns how paths are built: platform-flavoured joins of known
+ * segments. The probe is only ever asked about such a path, and `configPath` is
+ * the sole constructor, so an unrelated string cannot be probed by accident.
+ */
+export type ConfigPath = string & {readonly __brand: 'ConfigPath'};
+
+/** Brands a path this resolver built; the only constructor of {@link ConfigPath}. */
+const configPath = (value: string): ConfigPath => {
+  // SAFETY: This constructor is the only source of configuration-path brands.
+  return value as ConfigPath;
+};
+
+/**
  * Whether a configuration path could be inspected at all.
  *
  * `inaccessible` propagates from the active probe to the caller's decision: the
@@ -119,7 +134,7 @@ export type ConfigLocationInput = {
   /** Electron's `userData`, which is the Hyper tree on Windows only. */
   readonly hyperUserDataDirectory: string;
   readonly development: {readonly enabled: boolean; readonly directory: string};
-  readonly probe: (candidate: string) => ProbeState;
+  readonly probe: (candidate: ConfigPath) => ProbeState;
   readonly sameFile: (left: string, right: string) => boolean;
 };
 
@@ -145,7 +160,7 @@ export type ConfigLocations = {
 };
 
 type Candidate = {
-  readonly path: string;
+  readonly path: ConfigPath;
   readonly tree: ConfigTree;
   readonly isConfigFile: boolean;
 };
@@ -215,15 +230,23 @@ const listCandidates = (
 
   if (input.development.enabled) {
     candidates.push(
-      {path: paths.join(input.development.directory, configFileName), tree: 'development', isConfigFile: true},
-      {path: paths.join(input.development.directory, legacyConfigFileName), tree: 'development', isConfigFile: false}
+      {
+        path: configPath(paths.join(input.development.directory, configFileName)),
+        tree: 'development',
+        isConfigFile: true
+      },
+      {
+        path: configPath(paths.join(input.development.directory, legacyConfigFileName)),
+        tree: 'development',
+        isConfigFile: false
+      }
     );
   }
 
   candidates.push(
-    {path: paths.join(velocettyDirectory, configFileName), tree: 'velocetty', isConfigFile: true},
-    {path: paths.join(hyperDirectory, configFileName), tree: 'hyper', isConfigFile: true},
-    {path: paths.join(hyperDirectory, legacyConfigFileName), tree: 'hyper', isConfigFile: false}
+    {path: configPath(paths.join(velocettyDirectory, configFileName)), tree: 'velocetty', isConfigFile: true},
+    {path: configPath(paths.join(hyperDirectory, configFileName)), tree: 'hyper', isConfigFile: true},
+    {path: configPath(paths.join(hyperDirectory, legacyConfigFileName)), tree: 'hyper', isConfigFile: false}
   );
 
   return candidates;
@@ -252,7 +275,7 @@ type ActiveSelection = Readonly<{active: ConfigLocations['config']; index: numbe
  * absent, so the caller keeps its defaults instead of creating a file that may
  * shadow the one it could not read.
  */
-const selectActiveConfig = (probed: readonly ProbedCandidate[], creationPath: string): ActiveSelection => {
+const selectActiveConfig = (probed: readonly ProbedCandidate[], creationPath: ConfigPath): ActiveSelection => {
   const index = probed.findIndex((entry) => entry.state !== 'absent');
   const entry = index === -1 ? undefined : probed[index];
   if (entry === undefined) {
@@ -333,7 +356,7 @@ export const resolveConfigLocations = (input: ConfigLocationInput): ConfigLocati
     candidate,
     state: input.probe(candidate.path)
   }));
-  const creationPath = paths.join(velocettyDirectory, configFileName);
+  const creationPath = configPath(paths.join(velocettyDirectory, configFileName));
   const {active, index} = selectActiveConfig(probed, creationPath);
   const shadowed = listShadowed({active, activeIndex: index, probed, sameFile: input.sameFile});
 
