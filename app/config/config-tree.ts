@@ -20,9 +20,9 @@ export type ConfigTree = 'velocetty' | 'hyper' | 'development';
 /**
  * What a filesystem probe could establish about a candidate path.
  *
- * `inaccessible` is distinct from `absent`: a permission or I/O fault means the
- * file may well exist, so treating it as missing would let Velocetty create a
- * file that shadows a configuration it simply could not read.
+ * `inaccessible` is distinct from `absent`: any error other than established
+ * absence means the file may well exist, so treating it as missing would let
+ * Velocetty create a file that shadows a configuration it could not read.
  */
 export type ProbeState = 'present' | 'broken-link' | 'absent' | 'inaccessible';
 
@@ -65,29 +65,33 @@ export type PathProbeFileSystem = {
   readonly lstatSync: (candidate: string) => PathProbeEntry;
 };
 
-/** Filesystem error codes that mean "could not inspect", not "absent". */
-const inspectionFailureCodes: ReadonlySet<string> = new Set(['EACCES', 'EPERM', 'EIO']);
+/** Filesystem error codes that establish the path is absent. */
+const absenceCodes: ReadonlySet<string> = new Set(['ENOENT', 'ENOTDIR']);
 
 /**
- * Whether a filesystem error means the path could not be inspected.
+ * Whether a filesystem error leaves presence unresolved.
  *
- * Only permission and I/O faults qualify. `ENOENT` and `ENOTDIR` are genuine
- * absence, and a dangling symlink is `lstat` succeeding after `stat` failed.
+ * Only the codes that establish absence are absence: a missing file, or a path
+ * whose parent is not a directory. A permission or I/O fault, a symlink loop,
+ * or an error this code cannot classify may all hide an existing file, so each
+ * reports `inaccessible` rather than letting the caller create a file that
+ * shadows what it could not read.
  */
 export const isInspectionFailure = (error: unknown): boolean => {
   if (!isObject(error) || !('code' in error)) {
-    return false;
+    return true;
   }
   const {code} = error;
-  return isString(code) && inspectionFailureCodes.has(code);
+  return !(isString(code) && absenceCodes.has(code));
 };
 
 /**
  * Builds the probe both the application and the CLI inject into the resolver.
  *
  * `stat` proves presence; when it throws, `lstat` distinguishes a dangling
- * symlink from absence. A permission or I/O fault reports `inaccessible` at
- * either step, because neither tells us whether the file exists.
+ * symlink from absence. Any error that does not establish absence reports
+ * `inaccessible` at either step, because neither tells us whether the file
+ * exists.
  *
  * @param fileSystem - The caller's `stat`/`lstat` pair.
  * @returns A probe for {@link resolveConfigLocations}.

@@ -4352,11 +4352,14 @@ could not be read (`EACCES`, `EPERM`, `EIO`) was reported as missing and
 start-up bootstrapped a fresh file over a configuration it could not inspect.
 
 The probe is now four-state — `present`, `broken-link`, `absent`,
-`inaccessible` — in both copies. `isInspectionFailure` accepts only permission
-and I/O codes, so `ENOENT`/`ENOTDIR` and a dangling symlink still mean what
-they did. `createPathProbe` holds the single `stat`-then-`lstat` sequence each
-copy exports; `app/config/paths.ts` and `cli/api.ts` both build their probe
-from it instead of carrying a local copy.
+`inaccessible` — in both copies. `isInspectionFailure` inverts an absence
+allow-list: `ENOENT`/`ENOTDIR` still mean what they did, and a dangling symlink
+is still `broken-link`, but every other fault — permission or I/O codes, a
+symlink loop, an unknown code, or an error carrying no code — is
+`inaccessible`, because none of them establishes that the file is missing.
+`createPathProbe` holds the single `stat`-then-`lstat` sequence each copy
+exports; `app/config/paths.ts` and `cli/api.ts` both build their probe from it
+instead of carrying a local copy.
 
 The resolver selects the first candidate whose absence is not established, so
 an inaccessible priority file still wins over a readable lower-priority one; it
@@ -4870,3 +4873,16 @@ requires it. Any adjustment is recorded in `Decision log`.
   chord once and asserts a single run. The count poll was removed, and the
   marker a press prints is already in the captured output when the probe's
   reply that follows it is read.
+- 2026-11-09 (absence-allow-list round): the Unit Architecture row was right
+  that the probe still treated some inspection failures as absence. The
+  classification is now an absence allow-list rather than a failure allow-list:
+  `ENOENT` and `ENOTDIR` establish `absent`, a dangling symlink is still
+  `broken-link`, and every other outcome — `EACCES`, `EPERM`, `EIO`, `ELOOP`,
+  an unknown code, or an error carrying no code — is `inaccessible`. The probe
+  suite now tabulates those outcomes for both copies, and two boundary tests
+  carry the rule outwards: an unclassifiable `stat` failure reaches the
+  application resolver as `inspection: 'inaccessible'` with the defaults kept,
+  and a symlink loop reaches the CLI as an inaccessible active path rather than
+  falling through to the Hyper copy. The CLI test filesystem also throws coded
+  `ENOENT` for absence, as Node does, because an uncoded error is no longer
+  evidence of a missing file.

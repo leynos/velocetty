@@ -49,9 +49,11 @@ type CliHarnessOptions = {
   readonly hasReadFileSyncOverride?: boolean;
   readonly homeDirectory?: string;
   /**
-   * Paths whose `stat` and `lstat` fail with `EACCES`, so the probe reports a
-   * permission fault rather than absence.
+   * Paths whose `stat` and `lstat` fail, so the probe reports a fault rather
+   * than absence. `inaccessibleCode` picks the code, which defaults to
+   * `EACCES`.
    */
+  readonly inaccessibleCode?: string;
   readonly inaccessiblePaths?: Set<string>;
   readonly moduleDirectory?: string;
   readonly platform?: NodeJS.Platform;
@@ -62,6 +64,7 @@ type CliHarnessState = {
   brokenLinkPaths: Set<string>;
   configData: ConfigData;
   existingPaths: Set<string> | null;
+  inaccessibleCode: string;
   inaccessiblePaths: Set<string>;
   fsExistsSyncResult: boolean;
   fsReadFileSyncCallCount: number;
@@ -96,12 +99,12 @@ const parseConfigData = (contents: string): ConfigData => {
 
 /** Node's stat calls throw for a missing entry rather than returning a value. */
 const throwMissing = (candidatePath: string): never => {
-  throw new Error(`ENOENT: no such file or directory, '${candidatePath}'`);
+  throw Object.assign(new Error(`ENOENT: no such file or directory, '${candidatePath}'`), {code: 'ENOENT'});
 };
 
-/** A permission fault carries the code the probe classifies, unlike `throwMissing`. */
-const throwInaccessible = (candidatePath: string): never => {
-  throw Object.assign(new Error(`EACCES: permission denied, '${candidatePath}'`), {code: 'EACCES'});
+/** A fault carries the code the probe classifies, unlike `throwMissing`. */
+const throwInaccessible = (candidatePath: string, code: string): never => {
+  throw Object.assign(new Error(`${code}: cannot inspect '${candidatePath}'`), {code});
 };
 
 /** Stands in for `fs.Stats`: the probe checks only that the call succeeded. */
@@ -110,7 +113,7 @@ const PATH_ENTRY = {};
 /** Answers one stat or lstat call: a fault, an entry, or genuine absence. */
 const answerStat = (state: CliHarnessState, candidatePath: string, isPresent: boolean) => {
   if (state.inaccessiblePaths.has(candidatePath)) {
-    return throwInaccessible(candidatePath);
+    return throwInaccessible(candidatePath, state.inaccessibleCode);
   }
   return isPresent ? PATH_ENTRY : throwMissing(candidatePath);
 };
@@ -169,6 +172,7 @@ const createCliHarness = (options: CliHarnessOptions = {}): CliHarness => {
     brokenLinkPaths: options.brokenLinkPaths ?? new Set(),
     configData: options.configData ?? {plugins: [], localPlugins: []},
     existingPaths: options.existingPaths ?? null,
+    inaccessibleCode: options.inaccessibleCode ?? 'EACCES',
     inaccessiblePaths: options.inaccessiblePaths ?? new Set(),
     fsExistsSyncResult: options.fsExistsSyncResult ?? true,
     fsReadFileSyncCallCount: 0,
@@ -516,6 +520,22 @@ test('configPath reports an inaccessible Velocetty config instead of falling thr
 
   // A permission fault means the file may exist. Reporting the Hyper copy
   // instead would read a different configuration than the application does.
+  expect(api.configPath).toBe(velocettyPath);
+  expect(api.configInspection).toBe('inaccessible');
+});
+
+test('a config path whose inspection fails for another reason is inaccessible, not absent', () => {
+  const velocettyPath = path.join('/tmp/velocetty-xdg', 'Velocetty', 'config.json5');
+  const {api} = createCliHarness({
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: '/tmp/velocetty-xdg'},
+    existingPaths: new Set(),
+    inaccessibleCode: 'ELOOP',
+    inaccessiblePaths: new Set([velocettyPath])
+  });
+
+  // Only `ENOENT` and `ENOTDIR` establish absence, so a symlink loop leaves
+  // presence unresolved: the CLI reports the path it could not inspect rather
+  // than falling through to a copy the application would not read.
   expect(api.configPath).toBe(velocettyPath);
   expect(api.configInspection).toBe('inaccessible');
 });

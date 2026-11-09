@@ -109,10 +109,12 @@ Option A.
   application resolves with `stat` and falls back to `lstat`, and the CLI's
   narrower filesystem slice runs the same sequence through its own copy of
   `createPathProbe`.
-- A permission or I/O fault is `inaccessible`, not `absent`. The resolver
-  reports it as the active path with `inspection: 'inaccessible'`, so start-up
-  keeps the defaults rather than creating a file that could shadow a
-  configuration it could not read.
+- Only `ENOENT` and `ENOTDIR` are `absent`; every other fault is
+  `inaccessible`. That covers permission and I/O errors, symlink loops, and
+  errors the probe cannot classify, each of which may hide an existing file.
+  The resolver reports it as the active path with `inspection: 'inaccessible'`,
+  so start-up keeps the defaults rather than creating a file that could shadow
+  a configuration it could not read.
 - The application and the CLI pass different inputs to the mirrored resolver.
   The CLI derives `userData` as `<appData>/Hyper`, compares trees by string
   equality rather than by `realpath`, and detects development mode from

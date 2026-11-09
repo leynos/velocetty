@@ -112,12 +112,13 @@ file from them. `shared/src/config/config-tree.ts` mirrors this split for the
 command-line interface (CLI), and a parity test keeps the copies in step.
 `paths.ts` supplies the Electron inputs — `isDev`, the development directory,
 and the `probe` and `sameFile` adapters — and then calls
-`resolveConfigLocations`. The probe is four-state: a permission or I/O fault is
-`inaccessible`, not `absent`, so an unreadable file is reported as the active
-path with `inspection: 'inaccessible'` and start-up keeps the defaults instead
-of creating a file that could shadow it. Both sides build the probe with
-`createPathProbe`, so the `stat`-then-`lstat` sequence and its error codes have
-one definition per copy.
+`resolveConfigLocations`. The probe is four-state: only `ENOENT` and `ENOTDIR`
+establish `absent`, so any other fault — a permission or I/O error, a symlink
+loop, or an unclassifiable error — is `inaccessible`. An unreadable file is
+therefore reported as the active path with `inspection: 'inaccessible'`, and
+start-up keeps the defaults instead of creating a file that could shadow it.
+Both sides build the probe with `createPathProbe`, so the `stat`-then-`lstat`
+sequence and its error codes have one definition per copy.
 
 ### Watcher
 

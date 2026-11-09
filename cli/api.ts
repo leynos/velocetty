@@ -143,8 +143,9 @@ export type CliApi = {
   /**
    * Whether the resolved config path could be inspected.
    *
-   * `inaccessible` means a permission or I/O fault: the file may exist, so the
-   * CLI reports that it cannot be read rather than that it is missing.
+   * `inaccessible` means an error that does not establish absence, such as a
+   * permission or I/O fault: the file may exist, so the CLI reports that it
+   * cannot be read rather than that it is missing.
    */
   readonly configInspection: ConfigInspection;
   /** Returns `true` when the resolved config file exists on disk. */

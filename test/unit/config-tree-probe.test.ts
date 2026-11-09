@@ -4,44 +4,60 @@ import {describe, expect, test} from 'bun:test';
 import {
   createPathProbe as createAppPathProbe,
   type PathProbeFileSystem,
-  type ProbeState
+  type ProbeState,
+  resolveConfigLocations
 } from '../../app/config/config-tree';
 import {createPathProbe as createSharedPathProbe} from '../../shared/src/config/config-tree';
 
 /** What one `stat` or `lstat` call does in a case. */
-type CallOutcome = 'entry' | 'missing' | 'denied' | 'not-permitted' | 'io-error' | 'codeless-error';
+type CallOutcome =
+  | 'entry'
+  | 'missing'
+  | 'not-a-directory'
+  | 'denied'
+  | 'not-permitted'
+  | 'io-error'
+  | 'symlink-loop'
+  | 'unknown-code'
+  | 'codeless-error';
 
 /** Builds a Node-style errno error, the shape the probe classifies. */
 const coded = (code: string) => Object.assign(new Error(`${code}: simulated`), {code});
 
+/** The outcome of a call that answers with an entry, and has no error to build. */
+type AnsweringOutcome = 'entry';
+
+/** The outcome of a call that fails with an error carrying no code. */
+type UncodedOutcome = 'codeless-error';
+
+/**
+ * The errno code each coded failure carries.
+ *
+ * `ESTALE` stands in for any code this module has never seen: it proves nothing
+ * about the file, exactly as an unknown code from a future platform would not.
+ * The `Record` keys make the table exhaustive by construction.
+ */
+const failureCodes: Readonly<Record<Exclude<CallOutcome, AnsweringOutcome | UncodedOutcome>, string>> = {
+  missing: 'ENOENT',
+  'not-a-directory': 'ENOTDIR',
+  denied: 'EACCES',
+  'not-permitted': 'EPERM',
+  'io-error': 'EIO',
+  'symlink-loop': 'ELOOP',
+  'unknown-code': 'ESTALE'
+};
+
 /** Builds the error a call throws, or nothing when it answers with an entry. */
 const errorFor = (outcome: CallOutcome): Error | undefined => {
-  switch (outcome) {
-    case 'entry': {
-      return undefined;
-    }
-    case 'missing': {
-      return coded('ENOENT');
-    }
-    case 'denied': {
-      return coded('EACCES');
-    }
-    case 'not-permitted': {
-      return coded('EPERM');
-    }
-    case 'io-error': {
-      return coded('EIO');
-    }
-    case 'codeless-error': {
-      // A double, or a foreign error, that carries no code: it proves nothing
-      // about the file, so it must not be read as a permission fault.
-      return new Error('simulated failure');
-    }
-    default: {
-      const unreachable: never = outcome;
-      throw new Error(`Unhandled call outcome: ${String(unreachable)}`);
-    }
+  if (outcome === 'entry') {
+    return undefined;
   }
+  if (outcome === 'codeless-error') {
+    // A double, or a foreign error, that carries no code: it proves nothing
+    // about the file.
+    return new Error('simulated failure');
+  }
+  return coded(failureCodes[outcome]);
 };
 
 /** A filesystem slice whose two calls answer from the supplied outcomes. */
@@ -68,15 +84,22 @@ const probeCases: readonly ProbeCase[] = [
   {expected: 'present', lstat: 'denied', stat: 'entry'},
   // `lstat` succeeding after `stat` failed is a dangling symlink.
   {expected: 'broken-link', lstat: 'entry', stat: 'missing'},
+  // Only a missing entry, or a parent that is not a directory, is absence.
   {expected: 'absent', lstat: 'missing', stat: 'missing'},
-  // A fault means the file may exist, so it is never reported as absent.
+  {expected: 'absent', lstat: 'not-a-directory', stat: 'not-a-directory'},
+  {expected: 'absent', lstat: 'not-a-directory', stat: 'missing'},
+  // Every other fault means the file may exist, so absence is never claimed.
   {expected: 'inaccessible', lstat: 'entry', stat: 'denied'},
   {expected: 'inaccessible', lstat: 'entry', stat: 'not-permitted'},
   {expected: 'inaccessible', lstat: 'entry', stat: 'io-error'},
+  {expected: 'inaccessible', lstat: 'entry', stat: 'symlink-loop'},
   {expected: 'inaccessible', lstat: 'denied', stat: 'missing'},
-  // An uncoded error establishes nothing, so it falls through to `lstat`.
-  {expected: 'broken-link', lstat: 'entry', stat: 'codeless-error'},
-  {expected: 'absent', lstat: 'codeless-error', stat: 'codeless-error'}
+  // A secondary check that fails establishes nothing either.
+  {expected: 'inaccessible', lstat: 'symlink-loop', stat: 'missing'},
+  {expected: 'inaccessible', lstat: 'unknown-code', stat: 'missing'},
+  // Errors carrying no code are unclassifiable, so they cannot be absence.
+  {expected: 'inaccessible', lstat: 'entry', stat: 'codeless-error'},
+  {expected: 'inaccessible', lstat: 'codeless-error', stat: 'codeless-error'}
 ];
 
 const candidates = ['/home/ada/.config/Velocetty/config.json5', '/home/ada/.config/Hyper/config.json5'] as const;
@@ -96,5 +119,42 @@ describe('KB-PATH-3 path probe classification', () => {
         expect(createAppPathProbe(fileSystem)(candidate)).toBe(createSharedPathProbe(fileSystem)(candidate));
       }
     }
+  });
+
+  test('carries an unclassifiable failure into the resolver as inaccessible', () => {
+    // The probe is the resolver's only view of the disk, so an error it cannot
+    // classify has to reach the start-up decision as "presence unknown", not as
+    // permission for start-up to create a file over whatever may be there.
+    const activePath = '/home/ada/.config/Velocetty/config.json5';
+    const missing = () => {
+      throw coded('ENOENT');
+    };
+    const probe = createAppPathProbe({
+      lstatSync: missing,
+      statSync: (candidate) => {
+        if (candidate === activePath) {
+          throw new Error('simulated failure');
+        }
+        throw coded('ENOENT');
+      }
+    });
+
+    const locations = resolveConfigLocations({
+      appDataDirectory: '/home/ada/.config',
+      development: {directory: '/repo', enabled: false},
+      homeDirectory: '/home/ada',
+      hyperUserDataDirectory: '/home/ada/.config/Hyper',
+      platform: 'linux',
+      probe,
+      sameFile: (left, right) => left === right,
+      xdgConfigHome: undefined
+    });
+
+    expect(locations.config).toEqual({
+      exists: false,
+      inspection: 'inaccessible',
+      path: activePath,
+      tree: 'velocetty'
+    });
   });
 });
