@@ -4269,15 +4269,60 @@ inferring execution from the configuration marker. The test appends one chord
 per line to the request file named by `VELOCETTY_E2E_PRESS_FILE`;
 `app/config/e2e-shortcut-chord.ts` parses it and
 `app/config/e2e-shortcut-probe.ts` polls the file and dispatches a
-`KeyboardEvent` into the newest window's page. A file, rather than standard
-input, because Electron on Windows has no console and never delivers piped
-input, and a page-level event, rather than `sendInputEvent`, because the
-renderer keymap binding is the boundary under test and it must not depend on
-the window holding operating-system focus. The `window:new` handler prints
+`KeyboardEvent` into the focused window's page, falling back to the newest
+window when none holds focus. A file, rather than standard input, because
+Electron on Windows has no console and never delivers piped input, and a
+page-level event, rather than `sendInputEvent`, because the renderer keymap
+binding is the boundary under test and it must not depend on the window holding
+operating-system focus. The `window:new` handler prints
 `[e2e] command-executed window:new`, so the assertion is about the command
 having run. The scenario edits the binding, presses it after the reload, saves
 invalid input, and presses the working chord again; the parser has its own unit
 test at `test/unit/e2e-shortcut-chord.test.ts`.
+
+### EP-H: review-round repairs for head `8a082a62`
+
+CodeRabbit's review of head `8a082a62` (review 5822039897) raised one inline
+finding, two outside-diff findings, and nine failed pre-merge rows. The same
+round surfaced a defect the earlier lane design had hidden.
+
+Probe attribution: the request file carried only the chord, so two presses of
+the same chord were indistinguishable and a stale reply could satisfy a later
+wait. Each request now carries a harness-assigned ordinal (`<token>\t<chord>`);
+the probe echoes the token in its `pressed`/`rejected`/`failed` reply, and the
+harness waits for the reply naming *its* request. A `rejected` or `failed`
+verdict is an error rather than a handled press, and `pressUntilExecuted`
+retries only an *unanswered* request, so a chord the page never accepted can no
+longer pass as executed. `test/unit/keybindings-e2e-harness.test.ts` pins all
+four behaviours (rejected fails, a stale same-chord reply cannot satisfy a new
+wait, retries an unanswered press, reports the last verdict when every press
+fails) against a scripted stand-in for the launcher.
+
+Negative assertions in E2E-KB-5 now use a completion barrier: they press the
+still-bound chord and await its own command marker before measuring the delta.
+The main process handles commands in arrival order, so the delta for the
+replaced (or still-unbound) chord is exactly 1 when the binding really changed
+and 2 when the old chord still runs.
+
+Shutdown logging: the `before-quit` watcher close logged the raw error, which
+can carry the configuration path. `closeWatcherAtShutdown` in
+`app/config/watcher.ts` is now the single shutdown close path and logs
+`describeError(error)` — the same bounded `{code, name}` shape the rest of the
+store uses. `test/unit/config-keybindings-watch.test.ts` drives the registered
+`before-quit` handler with a rejecting mock whose error carries an `EACCES`
+code and a user path, and asserts the logged details are
+`{code: 'EACCES', name: 'Error'}` with neither the path nor `/home/ada` in any
+serialized call.
+
+Documentation: both `config-tree.ts` module headers now state which
+`config.json5` is active, where `keybindings.json5` lives, and that the
+lower-priority copies are hidden (KB-PATH-1/2); the developers' guide records
+that `importKeybindings`/`exportKeybindings` are a main-process API with no IPC
+caller yet, and lists `onReady`, `reconcileOnReady`, `spans`, and `warn` in the
+`createConfigWatcher` option list; the ExecPlan's probe description matches the
+focused-window-then-newest-window fallback. `parseRequest`,
+`isCommonJsRequireCall`, and `isDisallowedAliasSpecifier` gained the JSDoc
+their neighbours already had.
 
 ## Interfaces and dependencies
 

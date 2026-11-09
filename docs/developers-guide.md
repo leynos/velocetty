@@ -354,12 +354,14 @@ wires them together.
 - **`createConfigWatcher`** (`app/config/watcher.ts`): coalesces a burst of
   directory events into one complete reload. It takes an injected `handle`,
   `fileNames`, `debounceMs`, `schedule`, `cancel`, and `onReload`, plus optional
-  `onReady` and `warn`.
+  `metrics`, `onReady`, `reconcileOnReady`, `spans`, and `warn`.
 - **Composition root** (`app/config.ts`): creates the store, the codec, and the
   notifier, and calls `removeStaleTemporaryFiles()` itself at start-up. Stale
   temporary cleanup is therefore a start-up decision of the root, not part of
   the service's contract. It also exports `importKeybindings` and
-  `exportKeybindings`, the two entry points the IPC layer calls.
+  `exportKeybindings`, the two entry points a future IPC layer will call
+  (roadmap items 4.2.2 and 5.1.2). No IPC caller exists yet: the exports are a
+  main-process API only.
 - **`fixConfigDefaults`** (`app/config/fix-config-defaults.ts`): completes the
   decorated configuration's colour map. `withDefaultColors` in
   `app/utils/colours.ts` layers the bundled defaults underneath the user's

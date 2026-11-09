@@ -277,3 +277,34 @@ test.serial('the watcher closes on before-quit', async () => {
     mock.restore();
   }
 });
+
+test.serial('a failed shutdown close logs a bounded description, never the path', async () => {
+  const userPath = '/home/ada/private/keybindings.json5';
+  const harness = await createWatchHarness();
+  const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    harness.configModule.setup();
+    // A chokidar release can fail with the path it was watching, so the log
+    // must carry only the bounded shape of that failure.
+    harness.watcherMock.close.mockImplementation(() =>
+      Promise.reject(Object.assign(new Error(`cannot release ${userPath}`), {code: 'EACCES', path: userPath}))
+    );
+    const quitHandler = harness.appOnMock.mock.calls.find(([event]) => event === 'before-quit')?.[1];
+    expect(quitHandler).toBeFunction();
+    // SAFETY: the matcher above fails the test unless a handler was registered.
+    const notifyQuit = quitHandler as () => void;
+
+    notifyQuit();
+    await settle();
+
+    expect(warnSpy).toHaveBeenCalledWith('[config-watcher] Configuration watch close failed during shutdown.', {
+      code: 'EACCES',
+      name: 'Error'
+    });
+    const loggedCalls = JSON.stringify(warnSpy.mock.calls);
+    expect(loggedCalls).not.toContain(userPath);
+    expect(loggedCalls).not.toContain('/home/ada');
+  } finally {
+    mock.restore();
+  }
+});

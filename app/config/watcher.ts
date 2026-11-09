@@ -168,3 +168,30 @@ export const createConfigWatcher = <TimerHandle>(options: ConfigWatcherOptions<T
     }
   };
 };
+
+/** The bounded details a shutdown close failure is allowed to carry. */
+type BoundedError = ReturnType<typeof describeError>;
+
+/**
+ * Closes a watcher at shutdown, logging a bounded description of any failure.
+ *
+ * `close` has already counted the failure and rethrown it, so this line only
+ * adds the shutdown context. The raw error is never logged: a chokidar failure
+ * can name the user's configuration directory.
+ *
+ * @param watcher - The watcher to release, or `undefined` when none started.
+ * @param warn - Receives the fixed line and the bounded error description.
+ *
+ * @example
+ * ```ts
+ * closeWatcherAtShutdown(watcher, (line, details) => console.warn(line, details));
+ * ```
+ */
+export const closeWatcherAtShutdown = (
+  watcher: Pick<WatcherHandle, 'close'> | undefined,
+  warn: (line: string, details: BoundedError) => void
+): void => {
+  watcher?.close().catch((error: unknown) => {
+    warn('[config-watcher] Configuration watch close failed during shutdown.', describeError(error));
+  });
+};

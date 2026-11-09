@@ -49,6 +49,8 @@ const developmentAppLaunchArgs =
 type MarkerWait = Readonly<{
   readonly description: string;
   readonly matcher: RegExp;
+  /** Overrides the default wait, so a caller can retry instead of failing. */
+  readonly timeoutMs?: number;
 }>;
 
 /** The probe marker a keymap should emit for a shortcut. */
@@ -61,8 +63,14 @@ type LaunchedApp = {
   /** How many captured lines match, so a caller can wait for the next one. */
   readonly count: (matcher: RegExp) => number;
   readonly output: () => string;
-  /** Appends one chord request to the file the E2E probe polls. */
-  readonly send: (line: string) => void;
+  /**
+   * Appends one chord request and returns the request's ordinal.
+   *
+   * The ordinal travels with the request, so the probe's reply names the
+   * request rather than only the chord. Two presses of the same chord then stay
+   * distinguishable, which a count of markers cannot do.
+   */
+  readonly send: (line: string) => number;
   readonly waitFor: (wait: MarkerWait) => Promise<string>;
   readonly stop: () => Promise<void>;
 };
@@ -103,8 +111,8 @@ export const launchApp = async (
   });
 
   /** Polls captured output for a marker, failing fast if Electron exits first. */
-  const waitFor = async ({description, matcher}: MarkerWait): Promise<string> => {
-    const deadline = Date.now() + markerTimeoutMs;
+  const waitFor = async ({description, matcher, timeoutMs = markerTimeoutMs}: MarkerWait): Promise<string> => {
+    const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const match = matcher.exec(output);
       if (match !== null) {
@@ -121,11 +129,15 @@ export const launchApp = async (
   /** Counts captured lines that match, so a scenario can wait for a later one. */
   const count = (matcher: RegExp): number => output.split('\n').filter((line) => matcher.test(line)).length;
 
+  let requestOrdinal = 0;
+
   return {
     count,
     output: () => output,
     send: (line: string) => {
-      appendFileSync(pressRequestsPath, `${line}\n`, 'utf8');
+      requestOrdinal += 1;
+      appendFileSync(pressRequestsPath, `#${requestOrdinal}\t${line}\n`, 'utf8');
+      return requestOrdinal;
     },
     /** Terminates the app, escalating to SIGKILL if it ignores SIGTERM. */
     stop: async () => {
@@ -158,10 +170,51 @@ export const probeMarker = ({shortcut, status}: ProbeMarkerRequest) =>
 export const commandExecutedMarker = (command: string) => new RegExp(`\\[e2e\\] command-executed ${command}`);
 
 const pressAttempts = 20;
-const pressIntervalMs = 250;
+const pressIntervalMs = 1000;
 
-/** The `[e2e]` line the probe emits once it has handled a request line. */
-const probeOutcomeMarker = /\[e2e\] shortcut-probe (?:pressed|rejected|failed) /;
+/** The probe's verdict on one request. */
+type ProbeVerdict = 'pressed' | 'rejected' | 'failed' | 'unanswered';
+
+/** The `[e2e]` line the probe emits once it has handled the request with this ordinal. */
+const probeOutcomeMarker = (ordinal: number) =>
+  new RegExp(`\\[e2e\\] shortcut-probe (?:pressed|rejected|failed) #${ordinal} `);
+
+/**
+ * Waits for the probe's reply to one request.
+ *
+ * A reply names the request's ordinal, so a stale reply to an earlier press of
+ * the same chord can never stand in for this one. The wait is per attempt and
+ * bounded: an unanswered request is reported to the caller rather than ending
+ * the run, so a caller that retries can try again.
+ */
+const awaitProbeOutcome = async ({
+  app,
+  ordinal,
+  timeoutMs = markerTimeoutMs
+}: Readonly<{
+  app: LaunchedApp;
+  ordinal: number;
+  timeoutMs?: number;
+}>): Promise<ProbeVerdict> => {
+  try {
+    const marker = await app.waitFor({
+      description: `the probe's reply to request #${ordinal}`,
+      matcher: probeOutcomeMarker(ordinal),
+      timeoutMs
+    });
+    if (marker.includes(' rejected ')) {
+      return 'rejected';
+    }
+    return marker.includes(' failed ') ? 'failed' : 'pressed';
+  } catch (error) {
+    // A timeout is the one failure a caller may retry; an app that exited is
+    // not, so its error keeps its message and its stack.
+    if (error instanceof Error && error.message.startsWith('Timed out')) {
+      return 'unanswered';
+    }
+    throw error;
+  }
+};
 
 type PressAndAwaitRequest = Readonly<{
   app: LaunchedApp;
@@ -169,24 +222,22 @@ type PressAndAwaitRequest = Readonly<{
 }>;
 
 /**
- * Sends chords and waits until the probe reports handling every one.
+ * Sends chords and waits until the probe has pressed every one.
  *
- * The probe presses requests in order, so the last marker proves the earlier
- * ones have been processed. A scenario can then assert that a chord did *not*
- * run its command without racing the file channel, which a fixed delay would
- * only approximate.
+ * Each request is answered individually, so the assertion that follows tests
+ * the chord that was just sent rather than any earlier press of the same
+ * chord. A request the probe could not press fails the scenario: a rejected or
+ * failed press never reached the page, so treating it as handled would let a
+ * "the old shortcut no longer runs" assertion pass without testing the binding.
  */
 export const pressAndAwaitProbe = async ({app, shortcuts}: PressAndAwaitRequest): Promise<void> => {
-  const before = app.count(probeOutcomeMarker);
-  for (const shortcut of shortcuts) {
-    app.send(shortcut);
-  }
-  const deadline = Date.now() + markerTimeoutMs;
-  while (app.count(probeOutcomeMarker) < before + shortcuts.length) {
-    if (Date.now() > deadline) {
-      throw new Error(`The probe never handled ${shortcuts.join(', ')}. Output:\n${app.output()}`);
-    }
-    await sleep(50);
+  const ordinals = shortcuts.map((shortcut) => app.send(shortcut));
+  const verdicts = await Promise.all(ordinals.map((ordinal) => awaitProbeOutcome({app, ordinal})));
+  const unpressed = verdicts.flatMap((verdict, index) =>
+    verdict === 'pressed' ? [] : [`${shortcuts[index] ?? ''} was ${verdict} (request #${ordinals[index] ?? 0})`]
+  );
+  if (unpressed.length > 0) {
+    throw new Error(`The probe could not press ${unpressed.join('; ')}. Output:\n${app.output()}`);
   }
 };
 
@@ -204,19 +255,26 @@ type PressRequest = Readonly<{
  * first press can arrive before anything is listening. Repeating the press
  * until the marker count grows makes the scenario deterministic without
  * guessing a delay, and it stops as soon as the command has run.
+ *
+ * Each attempt waits for the probe's reply to that attempt before the next
+ * one, so the helper never returns with an earlier press still in flight. The
+ * next helper's negative assertion therefore cannot be satisfied by a late
+ * reply to work this helper started.
  */
 export const pressUntilExecuted = async ({app, command, shortcut}: PressRequest): Promise<void> => {
   const matcher = commandExecutedMarker(command);
   const before = app.count(matcher);
-  let after = before;
-  for (let attempt = 0; attempt < pressAttempts && after === before; attempt += 1) {
-    app.send(shortcut);
-    await sleep(pressIntervalMs);
-    after = app.count(matcher);
+  let lastVerdict: ProbeVerdict = 'unanswered';
+  for (let attempt = 0; attempt < pressAttempts; attempt += 1) {
+    const ordinal = app.send(shortcut);
+    lastVerdict = await awaitProbeOutcome({app, ordinal, timeoutMs: pressIntervalMs});
+    if (lastVerdict === 'pressed' && app.count(matcher) > before) {
+      return;
+    }
   }
-  if (after === before) {
-    throw new Error(`The ${shortcut} shortcut never executed ${command}. Output:\n${app.output()}`);
-  }
+  throw new Error(
+    `The ${shortcut} shortcut never executed ${command} (last press ${lastVerdict}). Output:\n${app.output()}`
+  );
 };
 
 /** The bundled keymap whose defaults the suite compares against on this platform. */

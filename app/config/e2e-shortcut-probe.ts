@@ -93,16 +93,49 @@ export const sendShortcut = async (text: string): Promise<boolean> => {
   return pressInPage(contents, press);
 };
 
-/** Presses one line and reports a rejected or failed request as a marker. */
+/**
+ * One request line, split into the caller's token and the chord.
+ *
+ * The harness writes `<token>` and a tab before the chord. The token travels
+ * back in the reply so the caller can tell its reply from an earlier press of
+ * the same chord; a line without a tab still presses its chord, which keeps a
+ * handwritten request working.
+ */
+type ProbeRequest = Readonly<{
+  /** The caller's token and a trailing space, or nothing for a bare chord. */
+  readonly replyPrefix: string;
+  readonly shortcut: string;
+}>;
+
+/**
+ * Splits one request line into the caller's token and the chord.
+ *
+ * @param line - A request as the harness wrote it.
+ * @returns The reply prefix, empty for a bare chord, and the chord to press.
+ *
+ * @example
+ * ```ts
+ * parseRequest('#7\tctrl+alt+shift+n'); // {replyPrefix: '#7 ', shortcut: 'ctrl+alt+shift+n'}
+ * ```
+ */
+const parseRequest = (line: string): ProbeRequest => {
+  const tab = line.indexOf('\t');
+  return tab === -1
+    ? {replyPrefix: '', shortcut: line}
+    : {replyPrefix: `${line.slice(0, tab)} `, shortcut: line.slice(tab + 1)};
+};
+
+/** Presses one request and reports its outcome under the request's token. */
 const pressLine = async (line: string): Promise<void> => {
+  const {replyPrefix, shortcut} = parseRequest(line);
   try {
-    if (await sendShortcut(line)) {
-      emitE2EMarker(`[e2e] shortcut-probe pressed ${line}`);
+    if (await sendShortcut(shortcut)) {
+      emitE2EMarker(`[e2e] shortcut-probe pressed ${replyPrefix}${shortcut}`);
     } else {
-      emitE2EMarker(`[e2e] shortcut-probe rejected ${line}`);
+      emitE2EMarker(`[e2e] shortcut-probe rejected ${replyPrefix}${shortcut}`);
     }
   } catch (error) {
-    emitE2EMarker(`[e2e] shortcut-probe failed ${line}: ${String(error)}`);
+    emitE2EMarker(`[e2e] shortcut-probe failed ${replyPrefix}${shortcut}: ${String(error)}`);
   }
 };
 

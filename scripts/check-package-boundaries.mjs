@@ -124,6 +124,7 @@ const isDynamicImportCall = (node) =>
   node.arguments.length <= 2 &&
   node.expression.kind === ts.SyntaxKind.ImportKeyword;
 
+/** Whether a call is a single-argument `require('x')` from CommonJS. */
 const isCommonJsRequireCall = (node) =>
   ts.isCallExpression(node) &&
   node.arguments.length === 1 &&
@@ -249,6 +250,7 @@ const isBareDisallowedRootSpecifier = (importSpecifier, disallowedRoots) => {
   return disallowedRoots.some((root) => importSpecifier === root || importSpecifier.startsWith(`${root}/`));
 };
 
+/** Whether a specifier is, or sits under, one of the forbidden aliases. */
 const isDisallowedAliasSpecifier = (importSpecifier, disallowedAliases) =>
   disallowedAliases.some((aliasPrefix) => {
     const aliasRoot = aliasPrefix.endsWith('/') ? aliasPrefix.slice(0, -1) : aliasPrefix;

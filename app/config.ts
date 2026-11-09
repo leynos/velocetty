@@ -47,7 +47,7 @@ import {
   velocettyDir
 } from './config/paths';
 import notify from './notify';
-import {createConfigWatcher, type WatcherEvent, type WatcherHandle} from './config/watcher';
+import {closeWatcherAtShutdown, createConfigWatcher, type WatcherEvent, type WatcherHandle} from './config/watcher';
 
 const metrics = createConfigMetrics();
 
@@ -307,9 +307,9 @@ const _watch = () => {
   });
 
   app.on('before-quit', () => {
-    configWatcher?.close().catch((error) => {
-      console.warn(error);
-    });
+    // A failed release is already counted; logging its bounded shape keeps a
+    // configuration path out of the shutdown log.
+    closeWatcherAtShutdown(configWatcher, (line, details) => console.warn(line, details));
   });
 };
 
