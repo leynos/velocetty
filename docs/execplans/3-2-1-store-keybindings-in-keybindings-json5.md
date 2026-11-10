@@ -4489,6 +4489,12 @@ it for the CLI.
 ```typescript
 export type ConfigTree = 'velocetty' | 'hyper' | 'development';
 
+/** Brands a path this resolver built; the probe accepts nothing else. */
+export type ConfigPath = string & {readonly __brand: 'ConfigPath'};
+
+/** Only an established absence is `absent`; every other fault is `inaccessible`. */
+export type ProbeState = 'present' | 'broken-link' | 'absent' | 'inaccessible';
+
 export type ConfigLocationInput = {
   readonly platform: NodeJS.Platform;
   readonly xdgConfigHome: string | undefined;
@@ -4496,13 +4502,18 @@ export type ConfigLocationInput = {
   readonly appDataDirectory: string; // Electron app.getPath('appData'); CLI: APPDATA or <home>/AppData/Roaming
   readonly hyperUserDataDirectory: string; // Electron app.getPath('userData'); Windows Hyper tree
   readonly development: {readonly enabled: boolean; readonly directory: string};
-  readonly probe: (path: string) => 'present' | 'broken-link' | 'absent'; // stat, with an lstat fallback
+  readonly probe: (path: ConfigPath) => ProbeState; // stat, with an lstat fallback
   readonly sameFile: (a: string, b: string) => boolean; // real-path equality
 };
 
 export type ConfigLocations = {
   readonly velocettyDirectory: string;
-  readonly config: {readonly path: string; readonly tree: ConfigTree; readonly exists: boolean};
+  readonly config: {
+    readonly path: string;
+    readonly tree: ConfigTree;
+    readonly exists: boolean;
+    readonly inspection: 'ok' | 'inaccessible';
+  };
   readonly keybindingsPath: string;
   readonly shadowed: readonly string[];
 };
@@ -4863,16 +4874,25 @@ requires it. Any adjustment is recorded in `Decision log`.
 - 2026-11-09 (command-observation round): CodeRabbit showed that a marker count
   cannot attribute a command to a press, because a late marker from an earlier
   press can satisfy a later wait. The probe now listens on the target window's
-  command channel before dispatching, so its reply says whether that press ran
-  a command: `pressed` when the main process handled one, `unbound` when the
-  page took the press and nothing followed, and `rejected` when there was no
-  page to press on. `pressUntilExecuted` returns only on `pressed`, so a retry
-  can follow only a press that ran nothing and one press cannot run its command
-  twice. `pressWithoutCommand` replaces the count-based barrier with a direct
-  assertion that the replaced chord is `unbound`, and `E2E-KB-5` presses each
-  chord once and asserts a single run. The count poll was removed, and the
-  marker a press prints is already in the captured output when the probe's
-  reply that follows it is read.
+  command channel before dispatching, so its reply reports what that press's
+  observation window saw: `pressed` when the main process handled a command,
+  `unbound` when the page took the press and no command arrived within two
+  seconds, and `rejected` when there was no page to press on or the chord was
+  not understood. `pressUntilExecuted` returns only on `pressed`, so a retry
+  follows only a press whose window saw no command. `pressWithoutCommand`
+  replaces the count-based barrier with a direct assertion that the replaced
+  chord is `unbound`, and `E2E-KB-5` presses each chord once and asserts a
+  single run. The count poll was removed, and the marker a press prints is
+  already in the captured output when the probe's reply that follows it is read.
+- 2026-11-09 (timeout wording): the command channel carries no request
+  identifier, so the probe attributes a command by observation window, not by
+  request, and `unbound` means "no command within two seconds" rather than
+  proof that none ran. A command delayed past that window — which needs an
+  event-loop stall that long between the renderer's synchronous emit and the
+  main handler — could be counted against the following press, so the
+  exactly-once claim holds per window, not per request. The replaced-chord
+  assertion is unaffected in the safe direction: a chord that is still bound
+  emits within microseconds and reports `pressed`, which fails the assertion.
 - 2026-11-09 (absence-allow-list round): the Unit Architecture row was right
   that the probe still treated some inspection failures as absence. The
   classification is now an absence allow-list rather than a failure allow-list:

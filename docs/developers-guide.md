@@ -1321,11 +1321,14 @@ the request file named by `VELOCETTY_E2E_PRESS_FILE`. The E2E-only probe at
 `KeyboardEvent` into the page, which is the boundary a real keypress crosses
 before it reaches the renderer keymap. The probe watches the target window's
 command channel while it presses, so its reply reports whether that press ran a
-command (`pressed`), ran none (`unbound`), or found no page to press on
-(`rejected`). A scenario can therefore assert that a binding is gone without
-inferring it from a marker count. A file replaces standard input because
-Electron on Windows never delivers piped input to the main process. The file is
-read only when `RUN_E2E=1`.
+command (`pressed`), saw none within two seconds (`unbound`), or found no page
+to press on (`rejected`). `unbound` is an observation window rather than proof
+that no command ran, because the channel carries no request identifier; a
+command delayed past the window would be counted against the following press. A
+scenario can therefore assert that a binding is gone without inferring it from
+a marker count. A file replaces standard input because Electron on Windows
+never delivers piped input to the main process. The file is read only when
+`RUN_E2E=1`.
 
 - Keep a marker on one line. Parsing is line-oriented, and a wrapped marker is
   never matched.
