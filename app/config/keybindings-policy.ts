@@ -9,6 +9,17 @@
  * `===` there compares identity, and `emptyUserKeymaps()` returns a fresh
  * object per call. Every contract is therefore matched with value equality in
  * the tests (`toEqual`), never with `toBe`.
+ *
+ * The relation the two sides share is structural equality of plain objects
+ * whose own enumerable values are strings or arrays of strings: two keymaps
+ * are equal exactly when they have the same command ids matched to equal
+ * shortcuts, independent of insertion order or object identity. The Dafny
+ * model never inspects a keymap's contents, so reading its opaque `==` as
+ * this relation is the one trusted assumption. It rests on the codec, which
+ * admits only that shape (`app/config/keybindings-codec.ts`), not on this
+ * module. The replay tests are bounded evidence, not a proof: the exhaustive
+ * histories and the fast-check histories cover the transitions, while the
+ * Dafny lemmas are what establish the property for every history.
  */
 
 /** User keybindings, opaque to the proof. */

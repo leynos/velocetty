@@ -95,6 +95,15 @@ mode, so none of the three arguments reaches the report.
    - If both trees hold a configuration file, merge the Hyper-tree file into
      the Velocetty copy by hand. The Velocetty copy wins at start-up, so
      overwriting it would discard the settings Velocetty is already using.
+     Preserve plugins from both copies while merging:
+     - Combine the `plugins` list, which names installed plugins, and the
+       `localPlugins` list, which names directories under `plugins/local/`,
+       dropping duplicates if a plugin appears in both files.
+     - Merge the `plugins/` directories as well: copy any plugin folder the
+       Velocetty tree lacks, including the `plugins/local/` folders named by
+       `localPlugins`, so no list entry points at a missing folder.
+     - Copy `schema.json` from the Hyper directory if the Velocetty directory
+       has none.
    - Otherwise, move the active configuration file into the Velocetty
      directory. If the Hyper directory holds `config.json5`, move it under
      that name; if it holds only the older `hyper.json`, move that file and

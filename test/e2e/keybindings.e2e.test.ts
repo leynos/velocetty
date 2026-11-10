@@ -185,11 +185,11 @@ e2eTest(
           matcher: probeMarker({shortcut: editedShortcut, status: 'applied'})
         });
 
-        // The replaced binding no longer runs the command. The probe answers
-        // `unbound` only after the page took the press and the main process
-        // handled no command for it, so this is the binding itself being gone
-        // rather than a marker an earlier press might have left behind. The
-        // edited chord then runs its command exactly once.
+        // The replaced binding no longer runs the command. The probe records
+        // the commands emitted while it dispatches the key event, so `unbound`
+        // means this press emitted none: the binding itself is gone rather
+        // than a marker an earlier press might have left behind. The edited
+        // chord then runs its command exactly once.
         const executedBeforeReplacement = app.count(commandExecutedMarker(command));
         await pressWithoutCommand({app, shortcuts: [E2E_PROBE_SHORTCUT]});
         await pressUntilExecuted({app, command, shortcut: editedShortcut});
@@ -202,9 +202,10 @@ e2eTest(
         });
 
         // The rejected file must not have rebound the old chord either, and it
-        // must not have unbound the shortcut that still works. As above, the
-        // probe reports the old chord as unbound and the edited chord as
-        // pressed, and the count shows the edited chord ran exactly once.
+        // must not have unbound the shortcut that still works. As above, each
+        // press is credited with the command it emitted itself: the old chord
+        // emits none and the edited chord emits `window:new`, and the count
+        // shows the edited chord ran exactly once.
         const executedBeforeInvalidReload = app.count(commandExecutedMarker(command));
         await pressWithoutCommand({app, shortcuts: [E2E_PROBE_SHORTCUT]});
         await pressUntilExecuted({app, command, shortcut: editedShortcut});

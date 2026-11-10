@@ -1,5 +1,6 @@
 /** @file KB-POL-1 and KB-POL-2: keybindings policy transitions and the bootstrap table. */
 import {describe, expect, test} from 'bun:test';
+import fc from 'fast-check';
 
 import {
   activeKeymaps,
@@ -17,6 +18,7 @@ import {
   specLatestAccepted,
   type UserKeymaps
 } from '../../app/config/keybindings-policy';
+import {KEYBINDINGS_PROPERTY_SEED, keymapsArb} from '../testUtils/keybindings-arbitraries';
 
 const seeds: UserKeymaps = {'window:new': 'ctrl+alt+shift+n'};
 const other: UserKeymaps = {'pane:split': ['ctrl+shift+d', 'ctrl+shift+e']};
@@ -32,6 +34,17 @@ const observations: readonly {readonly label: string; readonly observation: Keyb
   {label: 'invalid', observation: {kind: 'invalid'}},
   {label: 'unreadable', observation: {kind: 'unreadable'}}
 ];
+
+/** Any observation, including a `valid` one whose keymap is generated afresh. */
+const observationArb: fc.Arbitrary<KeybindingsObservation> = fc.oneof(
+  keymapsArb.map((keymaps): KeybindingsObservation => ({keymaps, kind: 'valid'})),
+  fc.constant<KeybindingsObservation>({kind: 'missing'}),
+  fc.constant<KeybindingsObservation>({kind: 'invalid'}),
+  fc.constant<KeybindingsObservation>({kind: 'unreadable'})
+);
+
+/** A replay history long enough to outrun the exhaustive table. */
+const replayHistoryArb = fc.array(observationArb, {maxLength: 12});
 
 /**
  * Every history of at most `maxLength` observations, shortest first.
@@ -158,6 +171,33 @@ describe('KB-POL-1 observation transitions', () => {
     // mismatch identifies its history by index.
     expect(histories).toHaveLength(156);
     expect(replayed).toEqual(specified);
+  });
+
+  // The exhaustive table above is bounded evidence. These properties extend
+  // the same correspondence past its length limit, with generated keymaps that
+  // no handwritten fixture covers.
+  test('replay agrees with the spec for generated histories', () => {
+    fc.assert(
+      fc.property(replayHistoryArb, (history) => {
+        expect(replayKeybindingObservations(history).lastAccepted).toEqual(specLatestAccepted(history));
+      }),
+      {numRuns: 100, seed: KEYBINDINGS_PROPERTY_SEED}
+    );
+  });
+
+  test('a missing observation always replaces the accepted payload with the empty map', () => {
+    fc.assert(
+      fc.property(replayHistoryArb, (history) => {
+        const observed = [...history, {kind: 'missing'} as const];
+        const replayed = replayKeybindingObservations(observed);
+
+        // Whatever was accepted before, a missing file is an accepted empty
+        // map — the contract's `missing` transition, not a fallback.
+        expect(replayed.lastAccepted).toEqual({});
+        expect(replayed.lastAccepted).toEqual(specLatestAccepted(observed));
+      }),
+      {numRuns: 100, seed: KEYBINDINGS_PROPERTY_SEED}
+    );
   });
 
   test('activeKeymaps reports the accepted payload or the empty map', () => {

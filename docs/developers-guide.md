@@ -1319,16 +1319,18 @@ declared it. The suite presses a shortcut by appending one chord per line to
 the request file named by `VELOCETTY_E2E_PRESS_FILE`. The E2E-only probe at
 `app/config/e2e-shortcut-probe.ts` polls that file and dispatches a
 `KeyboardEvent` into the page, which is the boundary a real keypress crosses
-before it reaches the renderer keymap. The probe watches the target window's
-command channel while it presses, so its reply reports whether that press ran a
-command (`pressed`), saw none within two seconds (`unbound`), or found no page
-to press on (`rejected`). `unbound` is an observation window rather than proof
-that no command ran, because the channel carries no request identifier; a
-command delayed past the window would be counted against the following press. A
-scenario can therefore assert that a binding is gone without inferring it from
-a marker count. A file replaces standard input because Electron on Windows
-never delivers piped input to the main process. The file is read only when
-`RUN_E2E=1`.
+before it reaches the renderer keymap. While the event is dispatched, the probe
+records the commands the renderer sends on the window's command channel, so its
+reply names the command *that* press emitted (`pressed`), reports that the
+press emitted none (`unbound`), or reports that it found no page to press on
+(`rejected`). The redux effects middleware runs a command effect synchronously
+inside `dispatchEvent`, so the record covers exactly the press being
+dispatched: a command from an earlier press, however late its IPC message
+arrives, is attributed to that earlier press or to none. A scenario can
+therefore assert both that a binding is gone and that a press ran the command
+it expected, without inferring either from a marker count. A file replaces
+standard input because Electron on Windows never delivers piped input to the
+main process. The file is read only when `RUN_E2E=1`.
 
 - Keep a marker on one line. Parsing is line-oriented, and a wrapped marker is
   never matched.

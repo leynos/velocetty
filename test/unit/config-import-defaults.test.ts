@@ -93,52 +93,67 @@ test('getDefaultConfig neither notifies nor re-reads, before or after start-up',
   }
 });
 
-test('a usable default query is cached and reused by start-up', async () => {
+test('start-up applies a source change a successful query did not see', async () => {
   const harness = await createConfigImportHarness({error: mock<typeof console.error>(() => {})});
   try {
     seedBundledFiles(harness, sharedDefaultConfigFixture);
-    const first = harness.getDefaultConfig();
-    expect(first.failure).toBeUndefined();
+    const queried = harness.getDefaultConfig();
+    expect(queried.failure).toBeUndefined();
 
-    // The shipped files do not change while the application runs, so a usable
-    // payload is read once. Breaking the file mid-run must not make the query
-    // and the start-up command disagree about what is in effect.
-    writeFileSync(harness.mockPaths.defaultCfg, '{plugins: "not-an-array"}', 'utf8');
+    // The shipped file is replaced between the query and start-up. Start-up is
+    // the authority on what is in effect, so it must apply what the file holds
+    // now rather than the snapshot the earlier query returned.
+    const changed = `{
+      config: { defaultProfile: 'changed', profiles: [{ name: 'default', config: {} }] },
+      plugins: [],
+      localPlugins: [],
+      keymaps: {}
+    }`;
+    writeFileSync(harness.mockPaths.defaultCfg, changed, 'utf8');
     harness._import('startup');
 
-    // Start-up consumed the cached payload, not the file broken mid-run, so
-    // the command that acts on the defaults cannot disagree with the query.
-    expect(harness.initMock.mock.calls[0]?.[1]).toEqual(first.defaults);
-    expect(harness.getDefaultConfig()).toEqual(first);
+    const expected = {...ensureObject(JSON5.parse(changed)), keymaps: {}};
+    expect(harness.initMock.mock.calls[0]?.[1]).toEqual(expected);
+    // The query reflects the replacement too: nothing links it to the earlier
+    // read, so it cannot mask a start-up that ignored the change.
+    expect(harness.getDefaultConfig().defaults).toEqual(expected);
   } finally {
     harness.cleanup();
   }
 });
 
-test('a faulted default query is not cached, so a repaired file is re-read', async () => {
-  const harness = await createConfigImportHarness({error: mock<typeof console.error>(() => {})});
-  try {
-    // The default file is absent, so the first query reports a read fault.
-    seedBundledFiles(harness);
-    const first = harness.getDefaultConfig();
-    expect(first.failure).toBe('read');
+// A shipped file can fail to be read or to be parsed. Repairing either must be
+// enough for a start-up that runs afterwards: start-up reads the file itself,
+// so recovery never depends on a query having refreshed a cached payload.
+const defaultConfigRepairCases = [
+  {description: 'unreadable', seed: undefined},
+  {description: 'invalid', seed: '{plugins: "not-an-array"}'}
+] as const;
 
-    // A faulted load is not cached: the bundled files are shipped artefacts a
-    // repair can fix during the same run. Reusing the stale fallback would
-    // refuse to recover and would persist that fallback into `config.json5`.
-    writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
-    const recovered = harness.getDefaultConfig();
-    expect(recovered.failure).toBeUndefined();
-    expect(recovered.defaults).toEqual({...ensureObject(JSON5.parse(sharedDefaultConfigFixture)), keymaps: {}});
+test('start-up after a repaired default-config fault applies the repaired file', async () => {
+  for (const {description, seed} of defaultConfigRepairCases) {
+    const harness = await createConfigImportHarness({error: mock<typeof console.error>(() => {})});
+    try {
+      // A query observes the fault first, so recovery cannot rest on a later
+      // query refreshing a cache: start-up is the reader that must recover.
+      seedBundledFiles(harness, seed);
+      const faulted = harness.getDefaultConfig();
+      expect(faulted.failure, description).toBe(seed === undefined ? 'read' : 'parse');
+      writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
 
-    harness._import('startup');
+      harness._import('startup');
 
-    // Start-up re-read the repaired file rather than reusing the faulted
-    // fallback, so recovery does not depend on a query running first.
-    expect(harness.initMock.mock.calls[0]?.[1]).toEqual(recovered.defaults);
-    expect(harness.getDefaultConfig()).toEqual(recovered);
-  } finally {
-    harness.cleanup();
+      const expected = {...ensureObject(JSON5.parse(sharedDefaultConfigFixture)), keymaps: {}};
+      expect(harness.initMock.mock.calls[0]?.[1], description).toEqual(expected);
+      // The bootstrapped file carries the repaired defaults, without the
+      // platform keymaps that belong in `keybindings.json5`.
+      expect(JSON5.parse(fsExtra.readFileSync(harness.mockPaths.cfgPath, 'utf8')), description).toEqual(expected);
+      // The fault is gone, so start-up neither announced nor logged one.
+      expect(bundledDefaultNotices(harness.notifyMock), description).toEqual([]);
+      expect(harness.getDefaultConfig().failure, description).toBeUndefined();
+    } finally {
+      harness.cleanup();
+    }
   }
 });
 
@@ -200,32 +215,49 @@ test('reports a missing platform keymap in the query and once at start-up', asyn
   }
 });
 
-test('a faulted platform keymap query is not cached, so a repaired file is re-read', async () => {
-  const harness = await createConfigImportHarness({error: mock<typeof console.error>(() => {})});
-  try {
-    // The bundled config is usable and only the platform keymap is absent, so
-    // nothing but the platform file can explain the first fault.
-    writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
-    writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+// The platform keymap can equally be absent (a read fault) or unparseable. A
+// repaired copy must reach a start-up that runs straight afterwards.
+const platformKeymapRepairCases = [
+  {description: 'unreadable', seed: undefined},
+  {description: 'invalid', seed: '{not json'}
+] as const;
 
-    const first = harness.getDefaultConfig();
-    expect(first.platformKeymapFault).toBe(true);
+test('start-up after a repaired platform-keymap fault applies the repaired keymap', async () => {
+  for (const {description, seed} of platformKeymapRepairCases) {
+    const harness = await createConfigImportHarness({error: mock<typeof console.error>(() => {})});
+    try {
+      // The bundled config is usable, so only the platform file can fault.
+      writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
+      writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+      if (seed !== undefined) {
+        writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), seed, 'utf8');
+      }
 
-    // Both shipped files are artefacts a repair can fix during the same run,
-    // so a faulted platform keymap must not pin the process to empty defaults.
-    writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), `{'window:new': 'ctrl+alt+shift+n'}`, 'utf8');
-    harness._import('startup');
+      // A query observes the fault first, so start-up must notice the repaired
+      // file itself rather than inheriting a refreshed snapshot.
+      const faulted = harness.getDefaultConfig();
+      expect(faulted.platformKeymapFault, description).toBe(true);
+      expect(faulted.platformKeymapFailure, description).toBe(seed === undefined ? 'read' : 'parse');
+      writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), `{'window:new': 'ctrl+alt+shift+n'}`, 'utf8');
+      harness._import('startup');
 
-    // Start-up reads the repaired platform keymap directly: no query has to
-    // run first for the fresh bindings to reach the merged configuration.
-    expect(harness.initMock.mock.calls[0]?.[1]).toMatchObject({
-      keymaps: {'window:new': 'ctrl+alt+shift+n'}
-    });
-    const recovered = harness.getDefaultConfig();
-    expect(recovered.platformKeymapFault).toBe(false);
-    expect(recovered.defaults.keymaps).toEqual({'window:new': 'ctrl+alt+shift+n'});
-  } finally {
-    harness.cleanup();
+      // The repaired bindings reach the applied configuration.
+      expect(harness.initMock.mock.calls[0]?.[1], description).toMatchObject({
+        keymaps: {'window:new': 'ctrl+alt+shift+n'}
+      });
+      // The bootstrapped file keeps shortcuts out of `config.json5`.
+      const bootstrapped: unknown = JSON5.parse(fsExtra.readFileSync(harness.mockPaths.cfgPath, 'utf8'));
+      expect(bootstrapped, description).toEqual({
+        ...ensureObject(JSON5.parse(sharedDefaultConfigFixture)),
+        keymaps: {}
+      });
+      // No query is needed to recover: start-up read the repaired file itself.
+      const recovered = harness.getDefaultConfig();
+      expect(recovered.platformKeymapFault, description).toBe(false);
+      expect(recovered.defaults.keymaps, description).toEqual({'window:new': 'ctrl+alt+shift+n'});
+    } finally {
+      harness.cleanup();
+    }
   }
 });
 

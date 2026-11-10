@@ -45,6 +45,20 @@ export type IpcHandleListener = (event: IpcMainEvent, ...args: any[]) => any;
 /**
  * Minimal Electron module surface used by tests.
  */
+/** A DevTools protocol request the shortcut probe sends. */
+export type DebuggerCommandParams = Readonly<{expression: string; returnByValue: boolean}>;
+
+/**
+ * The slice of a DevTools `Runtime.evaluate` reply the probe reads.
+ *
+ * `value` stays `unknown`: it crosses from the page's own JavaScript, so the
+ * probe classifies it with guards rather than trusting a declared shape.
+ */
+export type DebuggerCommandReply = Readonly<{
+  result?: Readonly<{value?: unknown}>;
+  exceptionDetails?: Readonly<{text?: string}>;
+}>;
+
 /**
  * The slice of a `BrowserWindow` the mocked registry exposes.
  *
@@ -53,6 +67,17 @@ export type IpcHandleListener = (event: IpcMainEvent, ...args: any[]) => any;
  */
 type MockBrowserWindow = {
   webContents: {
+    /**
+     * The DevTools session the shortcut probe evaluates its press in.
+     *
+     * A suite that does not press anything leaves this absent; the probe test
+     * supplies a session that evaluates the expression in a sandboxed page.
+     */
+    debugger?: {
+      attach: (protocolVersion: string) => void;
+      isAttached: () => boolean;
+      sendCommand: (method: string, params: DebuggerCommandParams) => Promise<DebuggerCommandReply>;
+    };
     sendInputEvent: (event: unknown) => void;
   };
 };

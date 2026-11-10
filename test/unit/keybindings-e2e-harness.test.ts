@@ -21,12 +21,14 @@ const ordinalOf = (matcher: RegExp): number => {
   return Number(match[1]);
 };
 
-/** The line a scripted probe prints for a request it answered. */
-const scriptedReply = (ordinal: number, verdict: ProbeVerdict): string =>
-  `[e2e] shortcut-probe ${verdict} #${ordinal} ctrl+n`;
+/** The line a scripted probe prints for a request it answered, newline included. */
+const scriptedReply = (ordinal: number, verdict: ProbeVerdict, command: string): string =>
+  verdict === 'pressed'
+    ? `[e2e] shortcut-probe pressed #${ordinal} ctrl+n command=${command}\n`
+    : `[e2e] shortcut-probe ${verdict} #${ordinal} ctrl+n\n`;
 
 /** The reply an earlier press of the same chord leaves in the output. */
-const earlierReply = '[e2e] shortcut-probe pressed #0 ctrl+n';
+const earlierReply = '[e2e] shortcut-probe pressed #0 ctrl+n command=window:new';
 
 /** The error a scripted wait throws when the probe has no reply for it. */
 const timedOut = (ordinal: number) => new Error(`Timed out waiting for the probe's reply to request #${ordinal}.`);
@@ -50,7 +52,13 @@ const isWithheldReply = (lateReplies: ReadonlySet<number>, ordinal: number, wait
  * names the request it asked about.
  */
 const answerWait = (
-  wait: Readonly<{ordinal: number; waits: number; verdict: ProbeVerdict; lateReplies: ReadonlySet<number>}>
+  wait: Readonly<{
+    ordinal: number;
+    waits: number;
+    verdict: ProbeVerdict;
+    command: string;
+    lateReplies: ReadonlySet<number>;
+  }>
 ): string => {
   if (wait.verdict === 'unanswered') {
     throw timedOut(wait.ordinal);
@@ -58,7 +66,7 @@ const answerWait = (
   if (isWithheldReply(wait.lateReplies, wait.ordinal, wait.waits)) {
     throw timedOut(wait.ordinal);
   }
-  return scriptedReply(wait.ordinal, wait.verdict);
+  return scriptedReply(wait.ordinal, wait.verdict, wait.command);
 };
 
 /**
@@ -71,9 +79,18 @@ const answerWait = (
  * An ordinal in `lateReplies` models a probe that reaches the request only after
  * the harness's first, shorter wait has expired: that wait times out, and the
  * next wait on the same request is answered.
+ *
+ * `command` is the command the scripted probe attributes to each `pressed`
+ * reply, so a test can model a press that ran some other binding's command.
+ * `markersBefore` seeds the output with command markers an earlier press left.
  */
-const createFakeApp = (verdictFor: (ordinal: number) => ProbeVerdict, lateReplies: ReadonlySet<number> = new Set()) => {
-  let commandRuns = 0;
+const createFakeApp = (
+  verdictFor: (ordinal: number) => ProbeVerdict,
+  lateReplies: ReadonlySet<number> = new Set(),
+  command = 'window:new',
+  markersBefore = 0
+) => {
+  let commandRuns = markersBefore;
   let ordinalsSent = 0;
   const waitsByOrdinal = new Map<number, number>();
   const app = {
@@ -98,7 +115,7 @@ const createFakeApp = (verdictFor: (ordinal: number) => ProbeVerdict, lateReplie
       if (matcher.test(earlierReply)) {
         throw new Error('The wait accepted a reply that names another request.');
       }
-      const reply = answerWait({ordinal, waits, verdict: verdictFor(ordinal), lateReplies});
+      const reply = answerWait({ordinal, waits, verdict: verdictFor(ordinal), command, lateReplies});
       if (!matcher.test(reply)) {
         throw timedOut(ordinal);
       }
@@ -107,6 +124,9 @@ const createFakeApp = (verdictFor: (ordinal: number) => ProbeVerdict, lateReplie
   };
   return app;
 };
+
+/** Test budget for a helper that spends its whole retry pause budget. */
+const pressRetryBudgetMs = 20_000;
 
 /** Runs a promise and reports its rejection message, or `null` when it resolved. */
 const rejectionMessage = async (promise: Promise<unknown>): Promise<string | null> => {
@@ -118,13 +138,18 @@ const rejectionMessage = async (promise: Promise<unknown>): Promise<string | nul
   }
 };
 
-test('a rejected press fails instead of standing in for a handled one', async () => {
-  const app = createFakeApp(() => 'rejected');
+test(
+  'a rejected press fails instead of standing in for a handled one',
+  async () => {
+    const app = createFakeApp(() => 'rejected');
 
-  expect(await rejectionMessage(pressWithoutCommand({app, shortcuts: ['ctrl+n']}))).toMatch(
-    /could not be pressed \(rejected\)/
-  );
-});
+    expect(await rejectionMessage(pressWithoutCommand({app, shortcuts: ['ctrl+n']}))).toMatch(
+      /could not be pressed \(rejected\)/
+    );
+  },
+  // The helper spends its whole retry budget on rejected presses.
+  pressRetryBudgetMs
+);
 
 test('a press rejected by a window that is still loading is retried', async () => {
   // `window:new` starts a window with no body to press on yet, so the probe
@@ -136,11 +161,23 @@ test('a press rejected by a window that is still loading is retried', async () =
 });
 
 test('a chord that still runs a command fails the negative assertion', async () => {
-  // The probe observed the handler run, so the binding is not gone however the
-  // marker count looks.
+  // The probe saw the press itself emit the command, so the binding is not gone
+  // however the marker count looks, and the message names what still ran.
   const app = createFakeApp(() => 'pressed');
 
-  expect(await rejectionMessage(pressWithoutCommand({app, shortcuts: ['ctrl+n']}))).toMatch(/still ran a command/);
+  expect(await rejectionMessage(pressWithoutCommand({app, shortcuts: ['ctrl+n']}))).toMatch(/still ran window:new/);
+});
+
+test('a press that ran another command fails instead of satisfying the expected one', async () => {
+  // The press emitted the command of a different binding, so the shortcut under
+  // test did not run it. Accepting any command would let a stale binding stand
+  // in for the one the scenario meant to exercise.
+  const app = createFakeApp(() => 'pressed', new Set(), 'window:close');
+
+  expect(await rejectionMessage(pressUntilExecuted({app, command: 'window:new', shortcut: 'ctrl+n'}))).toMatch(
+    /ran window:close, not window:new/
+  );
+  expect(app.sent()).toBe(1);
 });
 
 test('a stale reply for an earlier press cannot satisfy the wait', async () => {
@@ -152,6 +189,23 @@ test('a stale reply for an earlier press cannot satisfy the wait', async () => {
     /never answered request #1/
   );
 });
+
+test(
+  'a command an earlier press left behind cannot satisfy the new shortcut',
+  async () => {
+    // The old binding ran its command before the file was replaced, so the
+    // captured output already holds its marker. The new chord's own press emits
+    // nothing, so the harness must fail: that marker proves some press ran the
+    // command, not that this one did.
+    const app = createFakeApp(() => 'unbound', new Set(), 'window:new', 1);
+
+    expect(app.count()).toBe(1);
+    expect(await rejectionMessage(pressUntilExecuted({app, command: 'window:new', shortcut: 'ctrl+n'}))).toMatch(
+      /never executed window:new/
+    );
+  },
+  pressRetryBudgetMs
+);
 
 test('a press the probe never answers fails instead of being repeated', async () => {
   // The request stays in the probe's file, so sending another would press the
@@ -191,10 +245,14 @@ test('a press that runs no command is retried until the command follows', async 
   expect(app.sent()).toBe(2);
 });
 
-test('pressing until a command runs reports the last verdict when no press works', async () => {
-  const app = createFakeApp(() => 'rejected');
+test(
+  'pressing until a command runs reports the last verdict when no press works',
+  async () => {
+    const app = createFakeApp(() => 'rejected');
 
-  expect(await rejectionMessage(pressUntilExecuted({app, command: 'window:new', shortcut: 'ctrl+n'}))).toMatch(
-    /last press rejected/
-  );
-});
+    expect(await rejectionMessage(pressUntilExecuted({app, command: 'window:new', shortcut: 'ctrl+n'}))).toMatch(
+      /last press rejected/
+    );
+  },
+  pressRetryBudgetMs
+);

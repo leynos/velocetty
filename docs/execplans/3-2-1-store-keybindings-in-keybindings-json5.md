@@ -924,8 +924,8 @@ design and the notification the user sees.
   The assessment refused the earlier deferral of Unit Architecture, Domain
   Architecture, Observability, and the remaining current-context documentation
   claims, so all four are now implemented rather than argued with.
-  - [x] Unit Architecture: `getDefaultConfig` is a pure query over the cached
-    bundled defaults. Directory creation, the two schema copies, and the
+  - [x] Unit Architecture: `getDefaultConfig` is a pure query over the bundled
+    defaults. Directory creation, the two schema copies, and the
     `config.json5` bootstrap moved into the explicitly named start-up command
     (`load('startup')`), which the composition root invokes only from
     `setup()`. `test/unit/config-import-json5.test.ts` asserts zero writes
@@ -989,7 +989,7 @@ design and the notification the user sees.
   kept the query side effect and the document inventory open, and asked for
   fresh evidence.
   - [x] `getDefaultConfig` no longer notifies. The bundled-defaults parse fault
-    is carried in the cached load and announced once by `load('startup')`
+    is carried in the load and announced once by `load('startup')`
     through `announceDefaultFaults`, so the read-only query has no user-visible
     effect.
   - [x] Schema copies go through the injected filesystem. `SchemaCopyRequest.fs`
@@ -1017,7 +1017,7 @@ design and the notification the user sees.
   documentation corrections.
   - [x] The bootstrap template no longer carries shortcuts.
     `createBootstrapTemplate` strips `keymaps` from the copy written to a
-    missing `config.json5`, while the cached defaults keep the platform keymap
+    missing `config.json5`, while the loaded defaults keep the platform keymap
     for the running configuration. A bootstrap file that carried the platform
     map would be reported as ignored on every later launch.
   - [x] The bootstrap test now expects an empty persisted `keymaps` object and
@@ -1139,7 +1139,7 @@ design and the notification the user sees.
     that fallback.
   - [x] Developer Documentation: the current `getDefaultConfig` interface now
     lists the optional `platformKeymapFailure`. The query does not expose
-    `platformKeymapDiagnostics`; those stay in the loader's cache.
+    `platformKeymapDiagnostics`; those stay in the loader's result.
   - [x] CodeScene: the Hyper schema-copy matrix is split into a named helper
     and a table-driven test, preserving all four combinations and the
     single-notice assertion.
@@ -4233,19 +4233,22 @@ user-config read and parse faults) and the shared notification sink
 `app/notify.ts`, which logs `{code, name}` for a thrown value instead of the
 error object. `app/config/import-sources-parse.ts` already logged only a count.
 
-Defaults caching: `readDefaults` now caches only a usable load. A faulted
-default load is returned to its caller but re-read on the next query, so a
-repaired bundled file is picked up and a stale fallback cannot be bootstrapped
-into `config.json5`. The two caching tests were rewritten around that contract.
+Defaults freshness: `readDefaults` reads both shipped files on every call and
+retains nothing between calls, so a query cannot influence what start-up
+applies. A source changed after a successful query is seen by start-up, and a
+read or parse fault repaired after a query is picked up by the next start-up
+without a refresh query. A stale fallback therefore cannot be bootstrapped into
+`config.json5`. The tests are rewritten around that contract.
 
 Evidence: `test/unit/keybindings-store-faults.test.ts` asserts a read and a
 write fault log the file name and errno without the workspace path or the raw
 message; `test/unit/config-import-defaults.test.ts` asserts a user-config read
-fault logs only its code, and splits the old shared-cache test into a usable
-case (cached, reused by start-up) and a faulted case (re-read after repair);
-`test/unit/keybindings-policy.test.ts` pins that `emptyUserKeymaps()` returns a
-fresh map, so the LemmaScript `===` corresponds to value equality and the
-assertions correctly use `toEqual`.
+fault logs only its code, that a source change after a successful query reaches
+start-up and the bootstrapped file, and that a repaired default-config or
+platform-keymap read/parse fault reaches a start-up that runs without a
+refreshing query; `test/unit/keybindings-policy.test.ts` pins that
+`emptyUserKeymaps()` returns a fresh map, so the LemmaScript `===` corresponds
+to value equality and the assertions correctly use `toEqual`.
 
 Documentation: `docs/users-guide.md` no longer claims `--help`/`--version` exit
 without starting Electron (Electron is imported and `app.quit()` runs before a
@@ -4281,14 +4284,16 @@ window when none holds focus. A file, rather than standard input, because
 Electron on Windows has no console and never delivers piped input, and a
 page-level event, rather than `sendInputEvent`, because the renderer keymap
 binding is the boundary under test and it must not depend on the window holding
-operating-system focus. The probe also watches the target window's command
-channel, so its reply reports whether that press ran a command: `pressed` when
-the main process handled one, `unbound` when the page took the press and none
-followed, and `rejected` when there was no page to press on. The `window:new`
-handler prints `[e2e] command-executed window:new`, so the assertion is about
-the command having run. The scenario edits the binding, presses it after the
-reload, saves invalid input, and presses the working chord again; the parser
-has its own unit test at `test/unit/e2e-shortcut-chord.test.ts`.
+operating-system focus. The probe records the commands emitted while it
+dispatches the event, so its reply names the command *that* press produced
+(`pressed command=<id>`), reports that the press emitted none (`unbound`), or
+reports that it could not press (`rejected`). Recording is synchronous with
+dispatch, because the redux effects middleware runs a command effect inside
+`dispatch`, so no timing component is involved. The `window:new` handler prints
+`[e2e] command-executed window:new`, so the assertion is about the command
+having run. The scenario edits the binding, presses it after the reload, saves
+invalid input, and presses the working chord again; the parser has its own unit
+test at `test/unit/e2e-shortcut-chord.test.ts`.
 
 ### EP-H: review-round repairs for head `8a082a62`
 
@@ -4914,3 +4919,58 @@ requires it. Any adjustment is recorded in `Decision log`.
   result satisfies its resolver input without a re-brand. The
   `@ts-expect-error` lines fail the build if either brand is ever widened back
   to `string`.
+- 2026-11-10 (synchronous attribution): the observation window is gone, so the
+  timeout caveat above no longer applies. The press expression now wraps
+  `ipcRenderer.send` for the duration of `body.dispatchEvent` and collects the
+  payloads whose event is `command` (the RPC client sends every event on the
+  window's own channel and names the event in the payload), restoring the
+  method in a `finally` block. Redux runs a command effect synchronously inside
+  `dispatch`, so every command collected was emitted by the press being
+  dispatched, and a command that an earlier press emitted — however late its
+  IPC message arrives — is attributed to that earlier press or to none. The
+  reply therefore reads `pressed command=<id>`, `unbound`, or `rejected`, with
+  no timing component, and `pressUntilExecuted` fails rather than retries when
+  the captured command is not the expected one. Two unit tests pin the
+  adversarial cases: a press that emitted another binding's command fails, and
+  a command marker left by an earlier press cannot satisfy a press that emitted
+  none.
+- 2026-11-10 (start-up freshness): the loader no longer keeps the bundled
+  defaults between calls. `readDefaults` reads `config-default.json` and the
+  platform keymap on every query and every import, so a query cannot influence
+  what start-up applies: a source replaced after a successful query is applied
+  by the next start-up, and a read or parse fault repaired after a faulted
+  query is picked up by a start-up that runs without a refreshing query. The
+  earlier contract — cache a usable load so the query and start-up agree —
+  protected the wrong invariant. The shipped files do not change under a
+  running application in normal use, so the cache bought nothing there, while
+  it made start-up's behaviour depend on whether a query had run. A faulted
+  payload could also be pinned into `config.json5` through a bootstrap.
+  `test/unit/config-import-defaults.test.ts` now asserts the source-change case
+  (applied defaults and bootstrapped file contents) and both fault kinds for
+  both bundled files, each repaired before the start-up that reads it.
+- 2026-11-10 (review-round evidence): the remaining findings from the
+  `abb74999` review are addressed with evidence at the same boundaries.
+  - Shortcut attribution: the reply had cited
+    `test/unit/e2e-shortcut-probe.test.ts`,
+    which did not exist. It now does: the test evaluates the expression the
+    probe really sends inside a `node:vm` page whose `ipcRenderer.send` it
+    controls, so `pressed`, `unbound`, and `rejected` are exercised, and a
+    command sent after the press returns is shown not to be credited to it.
+  - Property/proof: `app/config/keybindings-policy.ts` now states the shared
+    relation — structural equality of plain objects whose values are strings or
+    arrays of strings — and names the one trusted assumption (the opaque Dafny
+    `==` reads as that relation because the model never inspects a keymap).
+    Two fast-check properties extend the bounded 156-history table: replay
+    agrees with `specLatestAccepted` for generated histories, and a `missing`
+    observation always replaces the accepted payload with the empty map. The
+    header says plainly that these are bounded tests, while the Dafny lemmas
+    are the proof.
+  - Users' guide: "Moving an existing configuration" now lists how to preserve
+    plugin lists and plugin directories when both trees hold a configuration,
+    including merging `plugins`/`localPlugins` and copying missing plugin
+    folders and `schema.json`. The migration note's link points at that
+    section.
+  - Entry-point privacy: `test/unit/app-entry-execution.test.ts` now keeps the
+    raw console argument tuples and asserts the bounded description object
+    (`{code: 'ENOENT', name: 'Error'}`) directly, plus a case where a sensitive
+    path is carried in the error's `code` field and must be dropped.

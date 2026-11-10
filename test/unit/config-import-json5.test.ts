@@ -230,7 +230,7 @@ test('start-up creates no config file when the active path could not be inspecte
   }
 });
 
-test('getDefaultConfig reads and caches the defaults without writing', async () => {
+test('getDefaultConfig reads the defaults without writing', async () => {
   const harness = await createConfigImportHarness();
   try {
     writeFileSync(
@@ -259,7 +259,8 @@ test('getDefaultConfig reads and caches the defaults without writing', async () 
     expect(harness.initMock).not.toHaveBeenCalled();
     expect(harness.notifyMock).not.toHaveBeenCalled();
 
-    // A second query returns an equal defensive copy of the cached payload.
+    // A second query re-reads the shipped files and returns an equal, independent
+    // copy of the same payload.
     const result2 = harness.getDefaultConfig();
     expect(result2).toEqual(result);
     expect(result2).not.toBe(result);

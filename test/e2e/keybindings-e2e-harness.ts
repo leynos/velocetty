@@ -176,21 +176,47 @@ const pressAttempts = 20;
 const pressIntervalMs = 1000;
 
 /**
+ * The pause between presses that reached no page.
+ *
+ * A rejected press means the window's document was not ready, and the renderer
+ * needs about two seconds from launch to load. Pausing between attempts spreads
+ * twenty of them over five seconds, so a slow start does not exhaust the budget
+ * before there is anything to press on.
+ */
+const retryIntervalMs = 250;
+
+/**
  * The probe's verdict on one request.
  *
- * `pressed` means the press reached the page and the main process handled the
- * command it produced; `unbound` means the page took the press but no command
- * followed. The distinction is the probe's own observation, so a scenario does
- * not have to infer which press produced a marker.
+ * `pressed` means the page accepted the press and emitted a command while the
+ * key event was dispatched, and names that command; `unbound` means the page
+ * accepted the press and emitted none. Both are the probe's own observation of
+ * the press itself, so a scenario never has to infer which press produced a
+ * command from a marker count.
  */
-type ProbeVerdict = 'pressed' | 'unbound' | 'rejected' | 'failed' | 'unanswered';
+type ProbeReply =
+  | Readonly<{verdict: 'pressed'; command: string}>
+  | Readonly<{verdict: 'unbound'}>
+  | Readonly<{verdict: 'rejected'}>
+  | Readonly<{verdict: 'failed'}>
+  | Readonly<{verdict: 'unanswered'}>;
 
-/** A verdict the probe has actually reported, so no request is left in flight. */
-type AnsweredVerdict = Exclude<ProbeVerdict, 'unanswered'>;
+/** A reply the probe has actually sent, so no request is left in flight. */
+type AnsweredReply = Exclude<ProbeReply, Readonly<{verdict: 'unanswered'}>>;
 
-/** The `[e2e]` line the probe emits once it has handled the request with this ordinal. */
+/**
+ * The `[e2e]` line the probe emits once it has handled the request with this
+ * ordinal.
+ *
+ * The whole line is matched, up to and including its newline, so the reply's
+ * trailing command is captured and a line that has not been written in full yet
+ * is never accepted.
+ */
 const probeOutcomeMarker = (ordinal: number) =>
-  new RegExp(`\\[e2e\\] shortcut-probe (?:pressed|unbound|rejected|failed) #${ordinal} `);
+  new RegExp(`\\[e2e\\] shortcut-probe (?:pressed|unbound|rejected|failed) #${ordinal} [^\\n]*\\n`);
+
+/** The command a `pressed` reply attributes to the press that produced it. */
+const replyCommand = (marker: string): string | undefined => /\bcommand=(\S+)\s*$/.exec(marker)?.[1];
 
 /**
  * Waits for the probe's reply to one request.
@@ -208,25 +234,35 @@ const awaitProbeOutcome = async ({
   app: LaunchedApp;
   ordinal: number;
   timeoutMs?: number;
-}>): Promise<ProbeVerdict> => {
+}>): Promise<ProbeReply> => {
   try {
-    const marker = await app.waitFor({
+    const reply = await app.waitFor({
       description: `the probe's reply to request #${ordinal}`,
       matcher: probeOutcomeMarker(ordinal),
       timeoutMs
     });
+    const marker = reply.trimEnd();
     if (marker.includes(' unbound ')) {
-      return 'unbound';
+      return {verdict: 'unbound'};
     }
     if (marker.includes(' rejected ')) {
-      return 'rejected';
+      return {verdict: 'rejected'};
     }
-    return marker.includes(' failed ') ? 'failed' : 'pressed';
+    if (marker.includes(' failed ')) {
+      return {verdict: 'failed'};
+    }
+    const command = replyCommand(marker);
+    if (command === undefined) {
+      // A pressed reply always names its command, so a reply without one means
+      // the probe and this harness disagree about the protocol.
+      throw new Error(`The probe's reply to request #${ordinal} named no command: ${marker}`);
+    }
+    return {verdict: 'pressed', command};
   } catch (error) {
     // A timeout is the one failure a caller may retry; an app that exited is
     // not, so its error keeps its message and its stack.
     if (error instanceof Error && error.message.startsWith('Timed out')) {
-      return 'unanswered';
+      return {verdict: 'unanswered'};
     }
     throw error;
   }
@@ -245,21 +281,21 @@ const awaitProbeOutcome = async ({
  *
  * @param ordinal - The request's ordinal, which its reply names.
  * @param shortcut - The chord, used in the failure message.
- * @returns The verdict, which is never `unanswered`.
+ * @returns The reply, which is never `unanswered`.
  */
 const awaitAnsweredPress = async ({
   app,
   ordinal,
   shortcut
-}: Readonly<{app: LaunchedApp; ordinal: number; shortcut: string}>): Promise<AnsweredVerdict> => {
+}: Readonly<{app: LaunchedApp; ordinal: number; shortcut: string}>): Promise<AnsweredReply> => {
   const first = await awaitProbeOutcome({app, ordinal, timeoutMs: pressIntervalMs});
-  const verdict = first === 'unanswered' ? await awaitProbeOutcome({app, ordinal}) : first;
-  if (verdict === 'unanswered') {
+  const reply = first.verdict === 'unanswered' ? await awaitProbeOutcome({app, ordinal}) : first;
+  if (reply.verdict === 'unanswered') {
     throw new Error(
       `The probe never answered request #${ordinal} for ${shortcut}, so that press may still run. Output:\n${app.output()}`
     );
   }
-  return verdict;
+  return reply;
 };
 
 type PressAndAwaitRequest = Readonly<{
@@ -272,41 +308,45 @@ type PressAndAwaitRequest = Readonly<{
  *
  * A chord the probe rejects is retried, because the newest window may still be
  * loading its first document: `window:new` spawns a window that has no body
- * for a while, and the probe cannot press into one. The loop stops at the
- * first verdict that reached a page, which is `pressed` or `unbound`.
+ * for a while, and the probe cannot press into one. The pause between attempts
+ * gives that document time to load. The loop stops at the first verdict that
+ * reached a page, which is `pressed` or `unbound`.
  *
- * @returns The last verdict, which reached a page unless every attempt was
+ * @returns The last reply, which reached a page unless every attempt was
  * rejected. A request the probe never answers fails the run rather than being
  * reported here.
  */
 const pressUntilProbed = async ({
   app,
   shortcut
-}: Readonly<{app: LaunchedApp; shortcut: string}>): Promise<ProbeVerdict> => {
-  let lastVerdict: ProbeVerdict = 'unanswered';
+}: Readonly<{app: LaunchedApp; shortcut: string}>): Promise<ProbeReply> => {
+  let lastReply: ProbeReply = {verdict: 'unanswered'};
   for (let attempt = 0; attempt < pressAttempts; attempt += 1) {
     const ordinal = app.send(shortcut);
-    lastVerdict = await awaitAnsweredPress({app, ordinal, shortcut});
-    if (lastVerdict === 'pressed' || lastVerdict === 'unbound') {
+    lastReply = await awaitAnsweredPress({app, ordinal, shortcut});
+    if (lastReply.verdict === 'pressed' || lastReply.verdict === 'unbound') {
       break;
     }
+    await sleep(retryIntervalMs);
   }
-  return lastVerdict;
+  return lastReply;
 };
 
 /**
  * Sends chords and requires that pressing each one runs no command.
  *
- * The probe watches the window's command channel, so `unbound` is its own
- * observation that the page took the press and the main process handled no
- * command for it. That makes this a direct test that a binding is gone: it
- * cannot be satisfied by a marker that some earlier press left behind.
+ * The probe captures commands emitted while the key event is dispatched, so
+ * `unbound` is its own observation that the page took this press and emitted
+ * nothing. That makes this a direct test that a binding is gone: it cannot be
+ * satisfied by a command that some earlier press left behind, because that
+ * command was attributed to the press that emitted it.
  */
 export const pressWithoutCommand = async ({app, shortcuts}: PressAndAwaitRequest): Promise<void> => {
   for (const shortcut of shortcuts) {
-    const verdict = await pressUntilProbed({app, shortcut});
-    if (verdict !== 'unbound') {
-      const failure = verdict === 'pressed' ? 'still ran a command' : `could not be pressed (${verdict})`;
+    const reply = await pressUntilProbed({app, shortcut});
+    if (reply.verdict !== 'unbound') {
+      const failure =
+        reply.verdict === 'pressed' ? `still ran ${reply.command}` : `could not be pressed (${reply.verdict})`;
       throw new Error(`The ${shortcut} shortcut ${failure}. Output:\n${app.output()}`);
     }
   }
@@ -319,27 +359,35 @@ type PressRequest = Readonly<{
 }>;
 
 /**
- * Presses a chord until the main process has handled the command it produces.
+ * Presses a chord until the press itself emits the expected command.
  *
  * The renderer binds its key listeners asynchronously after a reload, so the
  * first press can arrive before anything is listening and report `unbound`.
  * Repeating the press until the probe reports `pressed` makes the scenario
  * deterministic without guessing a delay.
  *
- * The probe replies only after the main process has handled the command, so a
- * `pressed` verdict is proof that this press ran it and a retry can only follow
- * a press that ran nothing. One press therefore cannot run its command twice,
- * and the marker it printed is already in the captured output, because the
- * probe's reply is written after it on the same stream.
+ * Attribution does not depend on timing: the probe records the command emitted
+ * while the key event is dispatched, so a reply names the command *this* press
+ * produced. A press that produced some other command is a failure rather than
+ * a retry, because the binding under test is then simply wrong, and a command
+ * that an earlier press emitted late is attributed to that earlier press or to
+ * none at all. One press therefore cannot run its command twice, and the
+ * marker it printed is already in the captured output, because the probe's
+ * reply is written after it on the same stream.
  */
 export const pressUntilExecuted = async ({app, command, shortcut}: PressRequest): Promise<void> => {
-  let lastVerdict: ProbeVerdict = 'unanswered';
+  let lastVerdict: ProbeReply['verdict'] = 'unanswered';
   for (let attempt = 0; attempt < pressAttempts; attempt += 1) {
     const ordinal = app.send(shortcut);
-    lastVerdict = await awaitAnsweredPress({app, ordinal, shortcut});
-    if (lastVerdict === 'pressed') {
+    const reply = await awaitAnsweredPress({app, ordinal, shortcut});
+    lastVerdict = reply.verdict;
+    if (reply.verdict === 'pressed' && reply.command !== command) {
+      throw new Error(`The ${shortcut} shortcut ran ${reply.command}, not ${command}. Output:\n${app.output()}`);
+    }
+    if (reply.verdict === 'pressed') {
       return;
     }
+    await sleep(retryIntervalMs);
   }
   throw new Error(
     `The ${shortcut} shortcut never executed ${command} (last press ${lastVerdict}). Output:\n${app.output()}`

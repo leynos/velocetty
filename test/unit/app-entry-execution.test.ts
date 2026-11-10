@@ -143,19 +143,35 @@ const registerEntryStubs = (): void => {
   });
 };
 
-/** The console output a single entry-point evaluation produced. */
-type CapturedOutput = {readonly lines: string[]};
+/** One console call as the entry point made it, with its arguments unflattened. */
+type ConsoleRecord = Readonly<{readonly args: readonly unknown[]; readonly stream: 'log' | 'error'}>;
 
-/** Collects the entry point's console output instead of printing it. */
+/** The console output a single entry-point evaluation produced. */
+type CapturedOutput = {
+  readonly lines: string[];
+  readonly records: ConsoleRecord[];
+};
+
+/**
+ * Collects the entry point's console output instead of printing it.
+ *
+ * Both the flattened text and the raw argument tuples are kept: the text suits
+ * presence assertions, while `records` lets a test inspect a structured
+ * argument such as the bounded error description without `String` collapsing
+ * its fields into one line.
+ */
 const captureConsole = (): CapturedOutput => {
   const lines: string[] = [];
+  const records: ConsoleRecord[] = [];
   console.log = (...args: unknown[]) => {
+    records.push({args, stream: 'log'});
     lines.push(args.map(String).join(' '));
   };
   console.error = (...args: unknown[]) => {
+    records.push({args, stream: 'error'});
     lines.push(`ERROR ${args.map(String).join(' ')}`);
   };
-  return {lines};
+  return {lines, records};
 };
 
 const originalArgv = process.argv;
@@ -283,6 +299,32 @@ describe('the startup branch', () => {
     expect(output.lines[0]).toContain('ERROR Failed to start Hyper.');
     expect(output.lines[0]).not.toContain(sensitivePath);
     expect(output.lines[0]).not.toContain('PRIVATE_TOKEN');
+    // Inspect the structured argument itself, not its `String` rendering: the
+    // second argument is exactly the bounded description, so no extra field
+    // can carry the message or the path into the log.
+    const [message, details] = output.records[0]?.args ?? [];
+    expect(message).toBe('Failed to start Hyper.');
+    expect(details).toEqual({code: 'ENOENT', name: 'Error'});
+    expect(process.exitCode).toBe(1);
+  });
+
+  test.serial('a startup failure drops a sensitive value carried in an error field', async () => {
+    const sensitivePath = '/home/ada/.config/Velocetty/PRIVATE_TOKEN/config.json5';
+    activeConfigStub = {
+      setup: () => {
+        // A crafted `code` is the interesting field: it is the one the helper
+        // copies, so it must survive only when it names a real errno.
+        throw Object.assign(new Error('read failed'), {code: sensitivePath});
+      }
+    };
+
+    await runEntryPoint(['--no-sandbox']);
+
+    const [, details] = output.records[0]?.args ?? [];
+    expect(details).toEqual({name: 'Error'});
+    // Checked over the raw tuples as well, so a nested field cannot hide the
+    // value from a flattened-text assertion.
+    expect(JSON.stringify(output.records)).not.toContain('PRIVATE_TOKEN');
     expect(process.exitCode).toBe(1);
   });
 });

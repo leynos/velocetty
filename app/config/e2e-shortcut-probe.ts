@@ -3,9 +3,9 @@
  * The lane proves a shortcut executes its command by pressing it, not by
  * reading the configuration that declares it. This module is the main-process
  * half: the test appends one shortcut per line to a request file, and the
- * probe presses that chord in the newest window's page. Because the probe also
- * watches the window's command channel, its reply says whether that press ran
- * a command, so the harness never has to infer that from a marker count.
+ * probe presses that chord in the newest window's page. The press reports the
+ * command it emitted, captured while the key event was dispatched, so the
+ * harness never has to infer attribution from a marker count.
  *
  * A press is a `KeyboardEvent` dispatched into the page rather than a key
  * event synthesized by the operating system. The scenario under test is the
@@ -24,57 +24,109 @@
  */
 import * as fs from 'node:fs';
 
-import type {CommandId} from '@shared/types/commands';
 import {BrowserWindow, type WebContents} from 'electron';
 
+import {isString} from '../utils/runtime-guards';
 import {emitE2EMarker, isE2ERun} from './e2e-keymap-probe';
 import {parseShortcut, toKeyPress, type KeyPress} from './e2e-shortcut-chord';
 
 /** The shape of the reply the page returns for a pressed chord. */
-type EvaluateReply = Readonly<{result?: Readonly<{value?: unknown}>}>;
+type EvaluateReply = Readonly<{
+  result?: Readonly<{value?: unknown}>;
+  exceptionDetails?: Readonly<{text?: string}>;
+}>;
 
 /** How often the request file is checked for new lines. */
 const pollIntervalMs = 50;
 
-/**
- * How long a press may take to reach the main process's command handler.
- *
- * The page sends the command during the dispatch, so this only covers the IPC
- * hop back into the main process. The wait is also what tells a chord that is
- * bound to no command apart from one that is.
- */
-const commandTimeoutMs = 2000;
-
 /** What one press established about the chord it dispatched. */
-export type ShortcutOutcome = 'pressed' | 'unbound' | 'rejected';
+export type ShortcutOutcome =
+  | Readonly<{kind: 'pressed'; command: string}>
+  | Readonly<{kind: 'unbound'}>
+  | Readonly<{kind: 'rejected'}>;
 
 /** The window a press should reach: the focused window, else the newest one. */
 const targetWindow = (): BrowserWindow | undefined =>
   BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows().at(-1);
 
 /**
- * The page expression that presses one chord.
+ * The page expression that presses one chord and reports what it emitted.
  *
  * `KeyboardEvent` carries the same fields a real press does, so the page's
  * keyboard library matches the chord exactly as it would for a user. The body
  * is the element that library listens on, and pressing there keeps the press
  * away from the terminal, which would otherwise receive it as typed input.
  *
- * @returns The expression, which evaluates to `true` once the press is
- * dispatched and `false` while the page has no body to press on yet.
+ * The expression also attributes the press. Mousetrap handles the event and
+ * the redux effects middleware runs the command effect synchronously inside
+ * `dispatchEvent`, so a command recorded while the event is dispatched was
+ * emitted by this press. A command from an earlier press whose IPC message
+ * arrives late is not recorded here, and so cannot be counted for this one.
+ *
+ * @returns The expression, which evaluates to `null` when the page has no body
+ * to press on yet, or to the command identifiers this press emitted.
  */
 const pressExpression = (press: KeyPress): string => {
   const eventInit = JSON.stringify({...press, bubbles: true, cancelable: true});
   return `(() => {
   const body = document.body;
-  if (body === null) return false;
-  body.dispatchEvent(new KeyboardEvent('keydown', ${eventInit}));
-  return true;
+  if (body === null) return null;
+  const requireModule = window.require;
+  if (typeof requireModule !== 'function') {
+    throw new Error('ipcRenderer is unavailable in the page');
+  }
+  const ipc = requireModule('electron').ipcRenderer;
+  const send = ipc.send;
+  const commands = [];
+  // The renderer's RPC client sends every event on the window's own channel
+  // and names the event in the payload, so the command is payload.data rather
+  // than the channel name.
+  ipc.send = function (channel, ...args) {
+    const payload = args[0];
+    if (payload !== null && typeof payload === 'object' && payload.ev === 'command' && typeof payload.data === 'string') {
+      commands.push(payload.data);
+    }
+    return send.call(this, channel, ...args);
+  };
+  try {
+    body.dispatchEvent(new KeyboardEvent('keydown', ${eventInit}));
+  } finally {
+    ipc.send = send;
+  }
+  return commands;
 })()`;
 };
 
-/** Dispatches one press in the page through the window's DevTools session. */
-const pressInPage = async (contents: WebContents, press: KeyPress): Promise<boolean> => {
+/**
+ * Reads the page's press result.
+ *
+ * @param value - The value the page returned.
+ * @returns The emitted commands, or `undefined` when there was no body.
+ */
+const classifyCommands = (value: unknown): readonly string[] | undefined => {
+  if (value === null) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new TypeError('The page returned an unexpected press result.');
+  }
+  const commands: string[] = [];
+  for (const item of value) {
+    if (!isString(item)) {
+      throw new TypeError('The page returned a non-string command.');
+    }
+    commands.push(item);
+  }
+  return commands;
+};
+
+/**
+ * Dispatches one press in the page through the window's DevTools session.
+ *
+ * @returns The commands the press emitted, or `undefined` when the page had no
+ * body to press on.
+ */
+const pressInPage = async (contents: WebContents, press: KeyPress): Promise<readonly string[] | undefined> => {
   // A second `attach` throws, so an already-attached session is reused.
   if (!contents.debugger.isAttached()) {
     contents.debugger.attach('1.3');
@@ -83,49 +135,43 @@ const pressInPage = async (contents: WebContents, press: KeyPress): Promise<bool
     expression: pressExpression(press),
     returnByValue: true
   });
-  return reply.result?.value === true;
+  if (reply.exceptionDetails !== undefined) {
+    throw new Error(`The page could not be instrumented: ${reply.exceptionDetails.text ?? 'unknown error'}`);
+  }
+  return classifyCommands(reply.result?.value);
 };
 
 /**
- * Presses one chord and reports whether the main process handled a command.
+ * Presses one chord and reports the command it emitted, if any.
  *
- * The reply is a completion boundary: when it says `pressed`, the command has
- * already reached the main process, so the harness knows this press ran it
- * rather than guessing from a marker count that a late marker from an earlier
- * press could satisfy. `unbound` means the page accepted the press and no
- * command followed, which is how a scenario proves a binding is gone.
+ * The command is attributable because it is captured while the key event is
+ * dispatched. `unbound` means the page accepted the press and emitted no
+ * command, which is how a scenario proves a binding is gone; the harness
+ * separately counts the marker the main process prints when it executes the
+ * reported command.
  */
 const pressAndObserve = async (window: BrowserWindow, press: KeyPress): Promise<ShortcutOutcome> => {
-  let settle: ((command: CommandId | undefined) => void) | undefined;
-  const observed = new Promise<CommandId | undefined>((resolve) => {
-    settle = resolve;
-  });
-  /** Resolves this press's observation with the command it ran, if any. */
-  const listener = (command: CommandId) => settle?.(command);
-  window.rpc.on('command', listener);
-  try {
-    if (!(await pressInPage(window.webContents, press))) {
-      return 'rejected';
-    }
-    const timeout = setTimeout(() => settle?.(undefined), commandTimeoutMs);
-    const command = await observed;
-    clearTimeout(timeout);
-    return command === undefined ? 'unbound' : 'pressed';
-  } finally {
-    window.rpc.emitter.removeListener('command', listener);
+  const commands = await pressInPage(window.webContents, press);
+  if (commands === undefined) {
+    return {kind: 'rejected'};
   }
+  // `at` reports absence explicitly; indexing would be typed as a plain
+  // `string` because the typecheck configuration disables
+  // `noUncheckedIndexedAccess`.
+  const command = commands.at(0);
+  return command === undefined ? {kind: 'unbound'} : {kind: 'pressed', command};
 };
 
 /**
  * Presses one chord in the window the user is looking at.
  *
- * @returns `pressed` when the chord ran a command, `unbound` when the page
- * accepted it but no command followed, and `rejected` when there was no page
- * to press on or the chord was not understood.
+ * @returns `pressed` with the command the chord emitted, `unbound` when the
+ * page accepted it but emitted no command, and `rejected` when there was no
+ * page to press on or the chord was not understood.
  *
  * @example
  * ```ts
- * await sendShortcut('ctrl+alt+shift+n'); // 'pressed' once the window handles window:new
+ * await sendShortcut('ctrl+alt+shift+n'); // {kind: 'pressed', command: 'window:new'}
  * ```
  */
 export const sendShortcut = async (text: string): Promise<ShortcutOutcome> => {
@@ -133,7 +179,7 @@ export const sendShortcut = async (text: string): Promise<ShortcutOutcome> => {
   const window = targetWindow();
   const press = chord === undefined ? undefined : toKeyPress(chord);
   if (press === undefined || window === undefined) {
-    return 'rejected';
+    return {kind: 'rejected'};
   }
   return pressAndObserve(window, press);
 };
@@ -175,7 +221,10 @@ const pressLine = async (line: string): Promise<void> => {
   const {replyPrefix, shortcut} = parseRequest(line);
   try {
     const outcome = await sendShortcut(shortcut);
-    emitE2EMarker(`[e2e] shortcut-probe ${outcome} ${replyPrefix}${shortcut}`);
+    // The command travels in the reply so a scenario can require the press to
+    // have run the command it expected, not merely some command.
+    const detail = outcome.kind === 'pressed' ? ` command=${outcome.command}` : '';
+    emitE2EMarker(`[e2e] shortcut-probe ${outcome.kind} ${replyPrefix}${shortcut}${detail}`);
   } catch (error) {
     emitE2EMarker(`[e2e] shortcut-probe failed ${replyPrefix}${shortcut}: ${String(error)}`);
   }

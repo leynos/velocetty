@@ -3,8 +3,8 @@
  * Start-up is the only phase allowed to create directories, copy schemas, or
  * bootstrap `config.json5`. A reload reads the same layers but writes nothing,
  * so a file the user deleted mid-session stays deleted. The default-config
- * query is read-only too: it reads and caches the bundled defaults without
- * copying a schema or creating a user file.
+ * query is read-only too: it reads the bundled defaults without copying a
+ * schema or creating a user file.
  */
 import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
 import path from 'node:path';
@@ -140,8 +140,9 @@ const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPOR
 /**
  * Creates the loader for the bundled defaults and the user config.
  *
- * The loader owns the import's start-up side effects and the cached default
- * payload. It never touches `keybindings.json5`; the caller composes that.
+ * The loader owns the import's start-up side effects and the reading of the
+ * bundled default payload. It never touches `keybindings.json5`; the caller
+ * composes that.
  *
  * @example
  * ```ts
@@ -156,7 +157,6 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
   const warnFn = dependencies.warn ?? console.warn;
   const errorFn = dependencies.error ?? console.error;
   const pathDeps = dependencies.paths;
-  let defaultsCache: LoadedDefaults | undefined;
   let hasAnnouncedDefaultFaults = false;
   let hasAnnouncedPlatformKeymapFault = false;
 
@@ -200,7 +200,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
   /**
    * Builds the template written to a missing `config.json5`.
    *
-   * The platform keymap stays in the cached defaults because it seeds the
+   * The platform keymap stays in the loaded defaults because it seeds the
    * runtime configuration, but it is left out of the bootstrap file: shortcuts
    * belong in `keybindings.json5`, so a copy here would be ignored on every
    * later launch and reported to the user as an ignored setting.
@@ -375,22 +375,17 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     pathDeps.configInspection === 'ok' && path.resolve(pathDeps.cfgDir) === path.resolve(pathDeps.velocettyDir);
 
   /**
-   * Reads and caches the bundled defaults and merges the platform keymap.
+   * Reads the bundled defaults and merges the platform keymap.
    *
-   * Caching the whole load, not only its payload, keeps the diagnostics that
-   * explain a fallback available to the start-up command without re-reading
-   * the bundled files.
-   *
-   * Only a fully usable load is cached. A faulted one — from either shipped
-   * file — is returned to the caller that asked, but the next query re-reads
-   * the files: they are shipped artefacts that a repair can fix during the
-   * same run, and a start-up that reused a stale fallback would refuse to
-   * recover and would persist that fallback into `config.json5`.
+   * Each call reads both shipped files afresh rather than reusing an earlier
+   * result. A query must not influence what start-up applies: the files are
+   * shipped artefacts, and a start-up that reused a query's snapshot could
+   * apply a payload the files no longer hold — including a faulted fallback,
+   * which it would then persist into `config.json5`. Reading them again costs
+   * one small parse and keeps start-up the single authority on what is in
+   * effect.
    */
   const readDefaults = (): LoadedDefaults => {
-    if (defaultsCache !== undefined) {
-      return defaultsCache;
-    }
     const loaded = loadDefaultConfig();
     const platform = loadPlatformKeymap();
     replaceLegacyKeymaps(loaded.config, platform.keymaps);
@@ -403,22 +398,16 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     if (platform.failure !== undefined) {
       Object.assign(defaults, {platformKeymapFailure: platform.failure});
     }
-    if (!loaded.usedFallback && !platform.fault) {
-      defaultsCache = defaults;
-    }
     return defaults;
   };
 
   /**
    * Describes the bundled defaults without writing, logging, or notifying.
    *
-   * A usable result is cached for the process, so a later start-up import
-   * reuses the payload it already read rather than touching the bundled files
-   * again; a faulted result is not, so a repaired file is re-read. Both
-   * shipped-file faults are part of the result: a caller that needs a usable
-   * payload can still read `config`, while one that reports health has the
-   * cause instead of guessing. The start-up command turns those causes into
-   * log lines and notices, so a query never reaches a sink.
+   * Both shipped-file faults are part of the result: a caller that needs a
+   * usable payload can still read `config`, while one that reports health has
+   * the cause instead of guessing. The start-up command turns those causes
+   * into log lines and notices, so a query never reaches a sink.
    *
    * @example
    * ```ts
@@ -554,12 +543,14 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
   /**
    * Returns a defensive copy of the bundled defaults and their health.
    *
-   * The query is read-only: it reads and caches the bundled defaults and the
-   * platform keymap, but never creates a directory, copies a schema, or
-   * bootstraps `config.json5`, and it never notifies the user or writes to the
-   * warning and error sinks. A fault is logged and announced by the start-up
-   * command instead. It also never starts the keybindings service, so querying
-   * defaults cannot seed or re-read `keybindings.json5`.
+   * The query is read-only: it reads the bundled defaults and the platform
+   * keymap, but never creates a directory, copies a schema, or bootstraps
+   * `config.json5`, and it never notifies the user or writes to the warning
+   * and error sinks. A fault is logged and announced by the start-up command
+   * instead. It also never starts the keybindings service, so querying
+   * defaults cannot seed or re-read `keybindings.json5`. Nothing is retained
+   * between calls, so a later start-up applies what the files hold then rather
+   * than what an earlier query saw.
    *
    * @example
    * ```ts
