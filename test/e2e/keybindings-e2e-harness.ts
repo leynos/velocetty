@@ -219,6 +219,43 @@ const probeOutcomeMarker = (ordinal: number) =>
 const replyCommand = (marker: string): string | undefined => /\bcommand=(\S+)\s*$/.exec(marker)?.[1];
 
 /**
+ * Classifies one reply line as the verdict it reports.
+ *
+ * A pressed reply always names its command, so a reply without one means the
+ * probe and this harness disagree about the protocol rather than that the
+ * press was unbound.
+ */
+const classifyProbeReply = (marker: string, ordinal: number): ProbeReply => {
+  if (marker.includes(' unbound ')) {
+    return {verdict: 'unbound'};
+  }
+  if (marker.includes(' rejected ')) {
+    return {verdict: 'rejected'};
+  }
+  if (marker.includes(' failed ')) {
+    return {verdict: 'failed'};
+  }
+  const command = replyCommand(marker);
+  if (command === undefined) {
+    throw new Error(`The probe's reply to request #${ordinal} named no command: ${marker}`);
+  }
+  return {verdict: 'pressed', command};
+};
+
+/**
+ * Reports a wait that timed out as retryable, and rethrows anything else.
+ *
+ * A timeout is the one failure a caller may retry; an app that exited is not,
+ * so its error keeps its message and its stack.
+ */
+const unansweredOnTimeout = (error: unknown): ProbeReply => {
+  if (error instanceof Error && error.message.startsWith('Timed out')) {
+    return {verdict: 'unanswered'};
+  }
+  throw error;
+};
+
+/**
  * Waits for the probe's reply to one request.
  *
  * A reply names the request's ordinal, so a stale reply to an earlier press of
@@ -241,30 +278,9 @@ const awaitProbeOutcome = async ({
       matcher: probeOutcomeMarker(ordinal),
       timeoutMs
     });
-    const marker = reply.trimEnd();
-    if (marker.includes(' unbound ')) {
-      return {verdict: 'unbound'};
-    }
-    if (marker.includes(' rejected ')) {
-      return {verdict: 'rejected'};
-    }
-    if (marker.includes(' failed ')) {
-      return {verdict: 'failed'};
-    }
-    const command = replyCommand(marker);
-    if (command === undefined) {
-      // A pressed reply always names its command, so a reply without one means
-      // the probe and this harness disagree about the protocol.
-      throw new Error(`The probe's reply to request #${ordinal} named no command: ${marker}`);
-    }
-    return {verdict: 'pressed', command};
+    return classifyProbeReply(reply.trimEnd(), ordinal);
   } catch (error) {
-    // A timeout is the one failure a caller may retry; an app that exited is
-    // not, so its error keeps its message and its stack.
-    if (error instanceof Error && error.message.startsWith('Timed out')) {
-      return {verdict: 'unanswered'};
-    }
-    throw error;
+    return unansweredOnTimeout(error);
   }
 };
 
