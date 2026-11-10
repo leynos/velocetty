@@ -65,6 +65,30 @@ naming the inherited Hyper version.
   - An unreadable file, for example because of file permissions, is treated
     the same way.
 
+## Configuration directory and plugins
+
+The same migration moves the rest of the configuration to a Velocetty-named
+directory, and the two changes interact through the active configuration tree:
+
+- `config.json5` is resolved from the Velocetty directory first, then from the
+  Hyper directory as `config.json5` or the older `hyper.json`. An existing
+  Hyper configuration therefore keeps working without being moved, and
+  Velocetty creates nothing in the Hyper directory.
+- When both trees hold a `config.json5`, the Velocetty copy wins and a
+  notification names the ignored copy. Merging the two by hand is the only way
+  to keep settings from both.
+- `plugins/` and `plugins/local/` are resolved from the tree that supplied the
+  configuration, so a plugin directory beside the Hyper configuration stays in
+  effect until the configuration moves. Moving the configuration means moving
+  `plugins/` and `schema.json` with it, and merging plugin lists when both
+  trees declare plugins.
+- `keybindings.json5` always lives in the Velocetty directory, or beside a
+  development-mode configuration, whichever tree that configuration came from.
+
+The [users' guide](users-guide.md#moving-an-existing-configuration) gives the
+step-by-step move, including how to preserve plugins when configurations from
+both trees are merged.
+
 ## Detailed instructions
 
 Step-by-step instructions, including the file format and shortcut syntax, are
