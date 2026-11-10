@@ -143,6 +143,7 @@ const flagsForMask = (mask: number): ExistenceFlags => ({
   developmentLegacy: (mask & 16) !== 0
 });
 
+/** Renders an existence mask as the labels a failing case names. */
 const describeFlags = (flags: ExistenceFlags): string =>
   [
     `vel=${Number(flags.velocettyConfig)}`,

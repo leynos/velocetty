@@ -114,6 +114,9 @@ test('start-up applies a source change a successful query did not see', async ()
 
     const expected = {...ensureObject(JSON5.parse(changed)), keymaps: {}};
     expect(harness.initMock.mock.calls[0]?.[1]).toEqual(expected);
+    // The bootstrapped file records the same change, so start-up neither
+    // reused the earlier snapshot nor wrote it through to the user's config.
+    expect(JSON5.parse(fsExtra.readFileSync(harness.mockPaths.cfgPath, 'utf8'))).toEqual(expected);
     // The query reflects the replacement too: nothing links it to the earlier
     // read, so it cannot mask a start-up that ignored the change.
     expect(harness.getDefaultConfig().defaults).toEqual(expected);
@@ -151,6 +154,34 @@ test('start-up after a repaired default-config fault applies the repaired file',
       // The fault is gone, so start-up neither announced nor logged one.
       expect(bundledDefaultNotices(harness.notifyMock), description).toEqual([]);
       expect(harness.getDefaultConfig().failure, description).toBeUndefined();
+    } finally {
+      harness.cleanup();
+    }
+  }
+});
+
+// The safe fallback is the configuration a faulted bundled file leaves in
+// effect. Start-up both applies it and writes it into a new `config.json5`, so
+// the user's file describes what the app is actually running with rather than
+// plugin defaults it could not read. The fault is announced once, so the
+// fallback is visible rather than silent.
+const fallbackBootstrapCases = [
+  {description: 'unreadable', seed: undefined},
+  {description: 'invalid', seed: '{plugins: "not-an-array"}'}
+] as const;
+
+test('start-up with a faulted bundled default bootstraps the applied fallback', async () => {
+  for (const {description, seed} of fallbackBootstrapCases) {
+    const harness = await createConfigImportHarness({error: mock<typeof console.error>(() => {})});
+    try {
+      seedBundledFiles(harness, seed);
+
+      harness._import('startup');
+
+      const fallback = {plugins: [], localPlugins: [], keymaps: {}};
+      expect(harness.initMock.mock.calls[0]?.[1], description).toEqual(fallback);
+      expect(JSON5.parse(fsExtra.readFileSync(harness.mockPaths.cfgPath, 'utf8')), description).toEqual(fallback);
+      expect(bundledDefaultNotices(harness.notifyMock), description).toHaveLength(1);
     } finally {
       harness.cleanup();
     }

@@ -89,6 +89,7 @@ const CLI_DIRECTORY = path.join(TEST_DIRECTORY, '..', '..', 'cli');
 const isConfigPayload = (value: unknown): value is {plugins: unknown; localPlugins: unknown} =>
   isObject(value) && 'plugins' in value && 'localPlugins' in value;
 
+/** Parses persisted config, failing on a payload without both plugin lists. */
 const parseConfigData = (contents: string): ConfigData => {
   const value = JSON5.parse(contents);
   if (!isConfigPayload(value)) {
@@ -168,6 +169,7 @@ const buildGotClient = (state: CliHarnessState) => ({
   }
 });
 
+/** Builds the CLI API context with inert filesystem and registry doubles. */
 const createCliHarness = (options: CliHarnessOptions = {}): CliHarness => {
   const state: CliHarnessState = {
     brokenLinkPaths: options.brokenLinkPaths ?? new Set(),

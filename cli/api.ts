@@ -250,6 +250,16 @@ const resolveCliApiContext = (options: CliApiOptions = {}): CliApiContext => {
   };
 };
 
+/**
+ * Normalizes the configured application-data directory.
+ *
+ * A missing, empty, or whitespace-only value means "use the platform
+ * default", so it is treated as absent rather than passed through as a
+ * directory name that cannot exist.
+ *
+ * @param appData - The value read from the configuration, if any.
+ * @returns The configured path, or `undefined` when it is unusable.
+ */
 const normalizeConfiguredAppData = (appData: string | undefined): string | undefined => {
   if (!isString(appData)) {
     return undefined;
@@ -557,6 +567,12 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
     save(config);
   };
 
+  /**
+   * Formats the installed plugins one per line.
+   *
+   * @returns The plugin names, or `false` when none are installed, so the
+   * command reports its empty case rather than printing a blank line.
+   */
   const list = () => {
     const plugins = getPlugins();
     if (plugins.length > 0) {

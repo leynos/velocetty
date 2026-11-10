@@ -49,6 +49,13 @@ const completeCommand = (): void => {
   commandPromise = Promise.resolve();
 };
 
+/**
+ * Rejects a blank plugin name before it reaches npm or the filesystem.
+ *
+ * @param pluginName - The name typed on the command line.
+ * @returns The trimmed name.
+ * @throws {ExpectedFailureError} When the name is empty or whitespace only.
+ */
 const assertPluginName = (pluginName: string): string => {
   const normalizedPluginName = pluginName.trim();
   if (!normalizedPluginName) {

@@ -22,31 +22,50 @@ const configWith = (colors: Partial<ColorMap>): configOptions =>
   // keeps the fixture from restating every unrelated option.
   ({colors}) as configOptions;
 
-test.serial('fixConfigDefaults layers the bundled colours under the user colours', async () => {
-  const harness = await createWatchHarness({bundledColors: {black: '#123456', red: '#654321'}});
+test.serial('fixConfigDefaults layers the applied colours under the user colours', async () => {
+  const harness = await createWatchHarness();
   try {
-    const fixed = harness.configModule.fixConfigDefaults(configWith({black: '#111111'}));
+    const fixed = harness.configModule.fixConfigDefaults(configWith({black: '#111111'}), {
+      black: '#123456',
+      red: '#654321'
+    });
 
-    // The user's value wins, the bundled configuration supplies the rest, and
-    // slots neither sets come from the last-resort palette, so the map is
-    // complete for xterm. Comparing the whole map proves the third layer fills
-    // every remaining slot, not only the two this fixture happens to name.
+    // The user's value wins, the applied palette supplies the rest, and slots
+    // neither sets come from the last-resort palette, so the map is complete
+    // for xterm. Comparing the whole map proves the third layer fills every
+    // remaining slot, not only the two this fixture happens to name.
     expect(fixed.colors).toEqual({...fallbackColors(), black: '#111111', red: '#654321'});
   } finally {
     mock.restore();
   }
 });
 
-test.serial('fixConfigDefaults keeps the user colours when the bundled config has none', async () => {
+test.serial('fixConfigDefaults keeps the user colours when no palette was applied', async () => {
   const harness = await createWatchHarness();
   try {
     const fixed = harness.configModule.fixConfigDefaults(configWith({black: '#111111'}));
 
     // A bundled file that could not be read or parsed has no `config` section,
-    // so the composition root must not dereference an absent colour map. The
-    // last-resort palette still fills every slot the user left unset, which
-    // whole-map equality states once for every slot.
+    // so the composition root passes no palette rather than dereferencing an
+    // absent colour map. The last-resort palette still fills every slot the
+    // user left unset, which whole-map equality states once for every slot.
     expect(fixed.colors).toEqual({...fallbackColors(), black: '#111111'});
+  } finally {
+    mock.restore();
+  }
+});
+
+test.serial('decoration reads no bundled file, so a later fault cannot change the colours', async () => {
+  const harness = await createWatchHarness();
+  try {
+    // The palette is whatever the import applied. The stub importer exposes no
+    // defaults query at all, so a decoration that went back to the bundled
+    // file would throw here instead of quietly returning different colours.
+    const first = harness.configModule.fixConfigDefaults(configWith({}), {black: '#123456'});
+    const second = harness.configModule.fixConfigDefaults(configWith({}), {black: '#123456'});
+
+    expect(first.colors).toEqual(second.colors);
+    expect(first.colors.black).toBe('#123456');
   } finally {
     mock.restore();
   }

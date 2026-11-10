@@ -8,7 +8,7 @@ import {mock} from 'bun:test';
 
 import type {ConfigImportReport} from '../../app/config/import-report';
 import type {KeybindingsLoadOutcome} from '../../app/config/keybindings';
-import type {ColorMap, parsedConfig, rawConfig} from '@shared/types/config';
+import type {parsedConfig, rawConfig} from '@shared/types/config';
 import {_init} from '../../app/config/init';
 import {getElectronMock, registerElectronMock, resetElectronMock} from './electron-path';
 import {registerModuleMock} from './mock-module';
@@ -131,14 +131,8 @@ const outcomeFor = (report: ConfigImportReport): KeybindingsLoadOutcome =>
         kind: 'kept'
       };
 
-/** Variations a test can ask of the composition root's collaborators. */
-export type WatchHarnessOptions = Readonly<{
-  /** The bundled colour defaults the stubbed importer reports. */
-  readonly bundledColors?: Partial<ColorMap>;
-}>;
-
 /** Imports a fresh `app/config.ts` instance over mocked chokidar and electron. */
-export const createWatchHarness = async (options: WatchHarnessOptions = {}): Promise<WatchHarness> => {
+export const createWatchHarness = async (): Promise<WatchHarness> => {
   mock.restore();
   // These stand-ins ignore their arguments; recording them without naming their
   // types keeps the harness free to assert on whatever the module passes.
@@ -179,15 +173,10 @@ export const createWatchHarness = async (options: WatchHarnessOptions = {}): Pro
   registerModuleMock('chokidar', () => ({default: {watch: watchMock}}));
   registerAppModuleMock({
     factory: () => ({
-      createConfigImportModule: () => ({
-        _import: importMock,
-        // The real query returns a whole `rawConfig`; a bundled file that could
-        // not be read has no `config` section, so the stub mirrors that shape.
-        getDefaultConfig: () => ({
-          defaults: options.bundledColors === undefined ? {} : {config: {colors: options.bundledColors}},
-          platformKeymapFault: false
-        })
-      })
+      // Decoration uses the palette the import applied, so the stub importer
+      // exposes no query at all: a reintroduced bundled-file read during
+      // decoration would fail rather than pass unnoticed.
+      createConfigImportModule: () => ({_import: importMock})
     }),
     specifier: '../../app/config/import'
   });

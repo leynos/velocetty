@@ -23,6 +23,7 @@ const createSinks = () => {
   return {notices, report, warnings};
 };
 
+/** Builds a validation diagnostic naming the given file and problem. */
 const diagnostic = (path: string, message: string): configValidationDiagnostic => ({
   message,
   path,

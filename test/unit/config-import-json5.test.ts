@@ -22,6 +22,11 @@ type DiagnosticFallbackTestOptions = {
   assertNotification: (message: string, mockPaths: ConfigImportPaths) => void;
 };
 
+/**
+ * Runs one diagnostic-fallback case over a freshly imported config module.
+ *
+ * @param options - The user configuration to write and the assertions to run.
+ */
 const runDiagnosticFallbackTest = async (options: DiagnosticFallbackTestOptions): Promise<void> => {
   const harness = await createConfigImportHarness();
   try {

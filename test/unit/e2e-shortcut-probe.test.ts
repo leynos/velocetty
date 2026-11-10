@@ -15,6 +15,9 @@
  */
 import {afterEach, describe, expect, test} from 'bun:test';
 
+import {mkdtempSync, rmSync, unwatchFile, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
 import vm from 'node:vm';
 
 import {isJsonObject, isString} from '../../app/utils/runtime-guards';
@@ -29,16 +32,21 @@ import {
 // before the dynamic import below resolves it.
 registerElectronMock();
 
-const {sendShortcut} = await import('../../app/config/e2e-shortcut-probe');
+const {E2E_COMPLETION_BARRIER_CHANNEL, sendShortcut, startShortcutProbe} = await import(
+  '../../app/config/e2e-shortcut-probe'
+);
 
 /** One message the page's RPC client sent. */
 type SentMessage = Readonly<{channel: string; payload: unknown}>;
 
 /** The page's IPC double and the key events the probe dispatched into it. */
 type Page = Readonly<{
+  barrierChannels: string[];
+  /** Whether the probe's `send` wrapper was already restored at each barrier. */
+  barrierSawRestoredSend: boolean[];
   context: vm.Context;
   eventInits: unknown[];
-  ipc: {send: (channel: string, payload: unknown) => void};
+  ipc: {send: (channel: string, payload: unknown) => void; sendSync: (channel: string) => boolean};
   originalSend: (channel: string, payload: unknown) => void;
   sent: SentMessage[];
 }>;
@@ -61,12 +69,20 @@ const createPage = ({
   duringDispatch = () => {}
 }: Readonly<{duringDispatch?: (send: (channel: string, payload: unknown) => void) => void}> = {}): Page => {
   const sent: SentMessage[] = [];
+  const barrierChannels: string[] = [];
+  const barrierSawRestoredSend: boolean[] = [];
+  const originalSend = (channel: string, payload: unknown) => {
+    sent.push({channel, payload});
+  };
   const ipc = {
-    send: (channel: string, payload: unknown) => {
-      sent.push({channel, payload});
+    send: originalSend,
+    // The probe waits for main on this channel after every dispatch.
+    sendSync: (channel: string) => {
+      barrierChannels.push(channel);
+      barrierSawRestoredSend.push(ipc.send === originalSend);
+      return true;
     }
   };
-  const originalSend = ipc.send;
   const eventInits: unknown[] = [];
   // A body element is the element the renderer's keyboard library listens on;
   // a page without one cannot be pressed, which `document.body === null` maps.
@@ -90,7 +106,7 @@ const createPage = ({
     KeyboardEvent: FakeKeyboardEvent,
     window: {require: () => ({ipcRenderer: ipc})}
   });
-  return {context, eventInits, ipc, originalSend, sent};
+  return {barrierChannels, barrierSawRestoredSend, context, eventInits, ipc, originalSend, sent};
 };
 
 /** A page with no body to press on yet, which is what a loading window has. */
@@ -123,6 +139,15 @@ const installWindow = (session: ReturnType<typeof evaluatingSession> | ReturnTyp
     webContents: {debugger: session, sendInputEvent: () => {}}
   });
 };
+
+/** Restores one environment variable to the value it had before a test. */
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
+}
 
 afterEach(() => {
   resetElectronMock();
@@ -186,6 +211,22 @@ describe('what a press established', () => {
     expect(page.sent).toHaveLength(1);
   });
 
+  test('the press waits for the main process before it reports', async () => {
+    const page = createPage({
+      duringDispatch: (send) => send('window-uid', {data: 'window:new', ev: 'command'})
+    });
+    installWindow(evaluatingSession(page.context));
+
+    expect(await sendShortcut('ctrl+n')).toEqual({command: 'window:new', kind: 'pressed'});
+    // The page blocks on a synchronous round-trip, so the command's
+    // main-process handler has run by the time the probe reports the press.
+    expect(page.barrierChannels).toEqual([E2E_COMPLETION_BARRIER_CHANNEL]);
+    // The wrapper is restored first, so the round-trip itself is never
+    // recorded as a message the press sent.
+    expect(page.barrierSawRestoredSend).toEqual([true]);
+    expect(page.sent).toHaveLength(1);
+  });
+
   test('a page with no body cannot be pressed', async () => {
     installWindow(evaluatingSession(pageWithoutBody()));
 
@@ -239,5 +280,52 @@ describe('a page that cannot be instrumented', () => {
     expect(await sendShortcut('ctrl+n')).toEqual({kind: 'unbound'});
     // Chromium throws when a second `attach` runs on the same session.
     expect(attaches).toBe(0);
+  });
+});
+
+describe('starting the probe', () => {
+  test('start-up arms the completion barrier the page waits on', () => {
+    const registeredChannels: string[] = [];
+    // The probe holds the module's `ipcMain` object, so the suite replaces the
+    // listener slot on it rather than swapping the object.
+    getElectronMock().ipcMain.on = (channel) => {
+      registeredChannels.push(channel);
+    };
+    const directory = mkdtempSync(path.join(tmpdir(), 'velocetty-probe-'));
+    const requestFile = path.join(directory, 'requests.txt');
+    writeFileSync(requestFile, '', 'utf8');
+    const previousRunE2E = process.env.RUN_E2E;
+    const previousPressFile = process.env.VELOCETTY_E2E_PRESS_FILE;
+    process.env.RUN_E2E = '1';
+    process.env.VELOCETTY_E2E_PRESS_FILE = requestFile;
+    try {
+      startShortcutProbe();
+
+      // A press blocks on this channel, and the page has no other way to know
+      // the main process handled it, so it must be armed before any request.
+      expect(registeredChannels).toContain(E2E_COMPLETION_BARRIER_CHANNEL);
+    } finally {
+      unwatchFile(requestFile);
+      rmSync(directory, {force: true, recursive: true});
+      restoreEnv('RUN_E2E', previousRunE2E);
+      restoreEnv('VELOCETTY_E2E_PRESS_FILE', previousPressFile);
+    }
+  });
+
+  test('a run that is not the end-to-end lane arms nothing', () => {
+    const registeredChannels: string[] = [];
+    getElectronMock().ipcMain.on = (channel) => {
+      registeredChannels.push(channel);
+    };
+    const previousRunE2E = process.env.RUN_E2E;
+    delete process.env.RUN_E2E;
+    try {
+      startShortcutProbe();
+
+      // The probe is dormant in a shipped build: no channel, no watcher.
+      expect(registeredChannels).toEqual([]);
+    } finally {
+      restoreEnv('RUN_E2E', previousRunE2E);
+    }
   });
 });

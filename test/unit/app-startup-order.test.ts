@@ -6,6 +6,7 @@ import path from 'node:path';
 const readSource = async (workspaceRelativePath: string) =>
   await fs.readFile(path.join(process.cwd(), workspaceRelativePath), 'utf8');
 
+/** Returns the index of `needle`, failing the test when it is absent. */
 const indexOfOrThrow = (source: string, needle: string): number => {
   const index = source.indexOf(needle);
   if (index === -1) {

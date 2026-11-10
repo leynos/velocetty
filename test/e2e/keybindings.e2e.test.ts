@@ -189,7 +189,10 @@ e2eTest(
         // the commands emitted while it dispatches the key event, so `unbound`
         // means this press emitted none: the binding itself is gone rather
         // than a marker an earlier press might have left behind. The edited
-        // chord then runs its command exactly once.
+        // chord then runs its command exactly once. Each earlier press also
+        // waited for its command's main-process completion before replying, so
+        // the delta below cannot be supplied by a marker that press left in
+        // flight.
         const executedBeforeReplacement = app.count(commandExecutedMarker(command));
         await pressWithoutCommand({app, shortcuts: [E2E_PROBE_SHORTCUT]});
         await pressUntilExecuted({app, command, shortcut: editedShortcut});

@@ -55,6 +55,7 @@ const expectActionable = (diagnostics: readonly configValidationDiagnostic[]): v
 const sortedEntries = (keymaps: UserKeymaps) =>
   Object.entries(keymaps).toSorted(([left], [right]) => left.localeCompare(right));
 
+/** Rebuilds the map with its keys in reverse order, preserving every value. */
 const withEntriesInReverse = (keymaps: UserKeymaps): UserKeymaps =>
   Object.fromEntries(Object.entries(keymaps).toReversed());
 

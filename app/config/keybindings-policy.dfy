@@ -13,6 +13,17 @@
 // TypeScript tests use `toEqual` to match, and
 // `test/unit/keybindings-policy.test.ts` pins the fresh-object behaviour so
 // the correspondence cannot drift silently.
+//
+// Value equality is the structural relation over plain objects whose own
+// enumerable values are strings or arrays of strings: two keymaps are equal
+// exactly when they bind the same command ids to equal shortcuts, independent
+// of insertion order or object identity. The empty map binds no commands, so
+// every empty map is that same value; `emptyUserKeymaps()` is therefore one
+// value, not a new one per call. The codec
+// (`app/config/keybindings-codec.ts`) admits only this shape. Nothing
+// mechanically relates this model to the TypeScript representation, so the
+// relation is a trusted assumption, and the bounded TypeScript tests are
+// evidence for the histories they run rather than a refinement proof.
 // ---------------------------------------------------------------------------
 
 datatype Option<T> = None | Some(value: T)

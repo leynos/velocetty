@@ -20,6 +20,14 @@
  * module. The replay tests are bounded evidence, not a proof: the exhaustive
  * histories and the fast-check histories cover the transitions, while the
  * Dafny lemmas are what establish the property for every history.
+ *
+ * This change accepts that boundary rather than verifying it. Nothing here
+ * mechanically relates the TypeScript object model to the model's opaque value,
+ * and the TypeScript tests only pin this implementation against the stated
+ * relation for the histories they run. Removing the assumption would need a
+ * checked refinement between the two representations; until one exists, the
+ * Dafny lemmas are trusted for every history in the model, and the bridge
+ * between model and code is the part that is not proved.
  */
 
 /** User keybindings, opaque to the proof. */

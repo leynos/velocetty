@@ -222,6 +222,7 @@ afterEach(() => {
  */
 let entryEvaluations = 0;
 
+/** Runs the entry point afresh for one command line. */
 const runEntryPoint = async (args: string[]): Promise<void> => {
   process.argv = ['electron', ...args];
   process.exitCode = 0;

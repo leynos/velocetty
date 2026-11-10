@@ -1328,9 +1328,15 @@ inside `dispatchEvent`, so the record covers exactly the press being
 dispatched: a command from an earlier press, however late its IPC message
 arrives, is attributed to that earlier press or to none. A scenario can
 therefore assert both that a binding is gone and that a press ran the command
-it expected, without inferring either from a marker count. A file replaces
-standard input because Electron on Windows never delivers piped input to the
-main process. The file is read only when `RUN_E2E=1`.
+it expected, without inferring either from a marker count. Completion is
+attributed the same way: after the dispatch the page blocks on a synchronous
+round-trip to the main process on the probe's own barrier channel, so the
+command's handler has run, and the marker it printed is in the output, before
+the probe replies. A marker can therefore never arrive after the reply of the
+press that caused it, and a count taken around one press cannot be moved by an
+earlier press. A file replaces standard input because Electron on Windows never
+delivers piped input to the main process. The file is read only when
+`RUN_E2E=1`.
 
 - Keep a marker on one line. Parsing is line-oriented, and a wrapped marker is
   never matched.

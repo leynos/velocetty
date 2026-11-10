@@ -13,6 +13,14 @@ import {getRuntimePluginSettings} from './runtime/plugin-runtime';
 import {installCLI} from './utils/cli-install';
 import * as systemContextMenu from './utils/system-context-menu';
 
+/**
+ * Resolves the message the golden-path demo command announces.
+ *
+ * The runtime plugin settings may carry a user-supplied message, so the
+ * bundled default is the fallback rather than an empty notification.
+ *
+ * @returns The configured message, or the bundled default when none is set.
+ */
 const getGoldenPathNotificationMessage = () => {
   const runtimeSettings = getRuntimePluginSettings(getConfig(), GOLDEN_PATH_PLUGIN_ID);
   const configuredMessage = runtimeSettings.message;

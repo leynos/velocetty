@@ -103,6 +103,11 @@ export const launchApp = async (
     },
     stdio: ['ignore', 'pipe', 'pipe']
   });
+  /**
+   * Collects one child-process output chunk for the marker assertions.
+   *
+   * @param chunk - A buffer of combined standard output and error.
+   */
   const append = (chunk: Buffer) => {
     output += chunk.toString();
   };
@@ -387,9 +392,13 @@ type PressRequest = Readonly<{
  * produced. A press that produced some other command is a failure rather than
  * a retry, because the binding under test is then simply wrong, and a command
  * that an earlier press emitted late is attributed to that earlier press or to
- * none at all. One press therefore cannot run its command twice, and the
- * marker it printed is already in the captured output, because the probe's
- * reply is written after it on the same stream.
+ * none at all. One press therefore cannot run its command twice. Completion
+ * does not depend on timing either: the page blocks on a synchronous
+ * round-trip to the main process before the probe replies, so the command's
+ * handler has run, and the marker it printed is in the captured output, by the
+ * time a reply to that press exists. A marker in the output therefore belongs
+ * to a press that has already replied, and a count taken after a reply cannot
+ * be moved by an earlier press.
  */
 export const pressUntilExecuted = async ({app, command, shortcut}: PressRequest): Promise<void> => {
   let lastVerdict: ProbeReply['verdict'] = 'unanswered';

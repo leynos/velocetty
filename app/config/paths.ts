@@ -128,6 +128,12 @@ const darwinKeys = path.join(keymapPath, 'darwin.json');
 const win32Keys = path.join(keymapPath, 'win32.json');
 const linuxKeys = path.join(keymapPath, 'linux.json');
 
+/**
+ * Resolves the bundled keymap that supplies the platform's default shortcuts.
+ *
+ * @returns The keymap file for the host platform, defaulting to the macOS map
+ * on a platform this build does not package one for.
+ */
 const defaultPlatformKeyPath = () => {
   switch (process.platform) {
     case 'darwin': {

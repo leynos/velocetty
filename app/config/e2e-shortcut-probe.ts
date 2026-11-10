@@ -24,11 +24,26 @@
  */
 import * as fs from 'node:fs';
 
-import {BrowserWindow, type WebContents} from 'electron';
+import {BrowserWindow, ipcMain, type WebContents} from 'electron';
 
 import {isString} from '../utils/runtime-guards';
 import {emitE2EMarker, isE2ERun} from './e2e-keymap-probe';
 import {parseShortcut, toKeyPress, type KeyPress} from './e2e-shortcut-chord';
+
+/**
+ * The channel a press uses to wait until the main process has handled it.
+ *
+ * The renderer turns a press into commands and sends each one to the main
+ * process over IPC, so the command itself runs after the key event returns. A
+ * synchronous round-trip on this channel is answered only after main has
+ * handled the messages this renderer sent before it, which makes it a
+ * completion barrier rather than a delay: once the page's `sendSync` returns,
+ * the command's main-process handler has run.
+ *
+ * The probe owns both ends, and the channel carries no data, so it is inert
+ * unless the end-to-end lane started the probe.
+ */
+export const E2E_COMPLETION_BARRIER_CHANNEL = 'velocetty-e2e-press-complete';
 
 /** The shape of the reply the page returns for a pressed chord. */
 type EvaluateReply = Readonly<{
@@ -63,6 +78,13 @@ const targetWindow = (): BrowserWindow | undefined =>
  * emitted by this press. A command from an earlier press whose IPC message
  * arrives late is not recorded here, and so cannot be counted for this one.
  *
+ * After the dispatch the expression blocks on a synchronous round-trip to the
+ * main process. Every press therefore observes the same ordering: by the time
+ * the page returns, the main process has handled the command message this
+ * press sent and run its handler. A marker that handler prints is in the
+ * output before the probe reports the press, so a scenario counting markers
+ * around a press cannot be satisfied by a command that has not run yet.
+ *
  * @returns The expression, which evaluates to `null` when the page has no body
  * to press on yet, or to the command identifiers this press emitted.
  */
@@ -93,6 +115,9 @@ const pressExpression = (press: KeyPress): string => {
   } finally {
     ipc.send = send;
   }
+  // Restored first, so the barrier round-trip is never mistaken for a press
+  // message. The handler it waits for is registered by the probe in main.
+  ipc.sendSync(${JSON.stringify(E2E_COMPLETION_BARRIER_CHANNEL)});
   return commands;
 })()`;
 };
@@ -145,10 +170,11 @@ const pressInPage = async (contents: WebContents, press: KeyPress): Promise<read
  * Presses one chord and reports the command it emitted, if any.
  *
  * The command is attributable because it is captured while the key event is
- * dispatched. `unbound` means the page accepted the press and emitted no
- * command, which is how a scenario proves a binding is gone; the harness
- * separately counts the marker the main process prints when it executes the
- * reported command.
+ * dispatched, and its completion is attributable because the page returns only
+ * after main has handled it. `unbound` means the page accepted the press and
+ * emitted no command, which is how a scenario proves a binding is gone; the
+ * harness separately counts the marker the main process prints when it
+ * executes the reported command.
  */
 const pressAndObserve = async (window: BrowserWindow, press: KeyPress): Promise<ShortcutOutcome> => {
   const commands = await pressInPage(window.webContents, press);
@@ -274,6 +300,12 @@ export const startShortcutProbe = (): void => {
   if (file === undefined) {
     return;
   }
+
+  // The page answers the barrier only after main has handled the messages the
+  // press sent, so this handler is what gives a press its completion ordering.
+  ipcMain.on(E2E_COMPLETION_BARRIER_CHANNEL, (event) => {
+    event.returnValue = true;
+  });
 
   let offset = 0;
   let pending: Promise<void> = Promise.resolve();

@@ -76,7 +76,11 @@ directory, and the two changes interact through the active configuration tree:
   Velocetty creates nothing in the Hyper directory.
 - When both trees hold a `config.json5`, the Velocetty copy wins and a
   notification names the ignored copy. Merging the two by hand is the only way
-  to keep settings from both.
+  to keep settings from both. Merge shortcuts by hand as well when the
+  Velocetty directory already has a `keybindings.json5`: that file takes
+  precedence, so `keymaps` added only to the merged `config.json5` are ignored.
+  Add the Hyper-tree shortcuts to the existing file instead, keeping every
+  binding already there.
 - `plugins/` and `plugins/local/` are resolved from the tree that supplied the
   configuration, so a plugin directory beside the Hyper configuration stays in
   effect until the configuration moves. Moving the configuration means moving

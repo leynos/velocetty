@@ -15,7 +15,7 @@ import {mkdirpSync} from 'fs-extra';
 import {statSync} from 'node:fs';
 import path from 'node:path';
 
-import type {parsedConfig, configOptions} from '@shared/types/config';
+import type {parsedConfig, configOptions, ColorMap} from '@shared/types/config';
 import {isJsonObject} from './utils/runtime-guards';
 
 import {createConfigMetrics} from './config/config-metrics';
@@ -77,7 +77,7 @@ const keybindingsService = createKeybindingsService({
   store: keybindingsStore
 });
 
-const {_import, getDefaultConfig} = createConfigImportModule({
+const {_import} = createConfigImportModule({
   _init,
   keybindings: {reload: keybindingsService.reload, start: keybindingsService.start},
   notify,
@@ -529,22 +529,27 @@ export {get as getWin, recordState as winRecord, defaults as windowDefaults} fro
 /**
  * Fills the colours the decorated configuration leaves unset.
  *
- * The terminal needs a colour for every xterm CSS slot, so the bundled
- * defaults supply any the user did not override.
+ * The terminal needs a colour for every xterm CSS slot, so the palette the
+ * configuration import applied supplies any the user did not override. The
+ * palette is a parameter rather than a fresh bundled-file read: decoration
+ * happens whenever a window or the preferences editor opens, and those must
+ * not depend on a second read of a file the import already read.
  *
  * @param decoratedConfig - The configuration to complete, mutated in place.
+ * @param appliedColors - The colours the applied configuration supplies;
+ *   absent or partial when the bundled config could not be read.
  * @returns The same configuration with a full colour map.
  *
  * @example
  * ```ts
- * fixConfigDefaults({colors: {}} as configOptions).colors.black; // the bundled default
+ * fixConfigDefaults({colors: {}} as configOptions, {black: '#000'}).colors.black; // '#000'
  * ```
  */
-export const fixConfigDefaults = (decoratedConfig: configOptions) =>
+export const fixConfigDefaults = (decoratedConfig: configOptions, appliedColors?: Partial<ColorMap>) =>
   // A bundled config that could not be read or parsed has no `config` section,
-  // so the defaults are absent rather than merely incomplete. Keep the user's
+  // so the palette is absent rather than merely incomplete. Keep the user's
   // own colours instead of dereferencing `undefined`.
-  applyConfigDefaults(decoratedConfig, getDefaultConfig().defaults.config?.colors);
+  applyConfigDefaults(decoratedConfig, appliedColors);
 
 /**
  * Rewrites legacy hterm CSS selectors to their current equivalents.

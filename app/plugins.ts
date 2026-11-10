@@ -337,7 +337,11 @@ function getPaths() {
 // expose to renderer
 export {getPaths};
 
-// get paths from renderer
+/**
+ * Reports the plugin directories the renderer needs to resolve modules.
+ *
+ * @returns The installed-plugin directory and the local-plugin directory.
+ */
 export const getBasePaths = () => {
   return {path: pluginPath, localPath};
 };
@@ -354,6 +358,12 @@ export const getBasePaths = () => {
 function requirePlugins(): any[] {
   const {plugins: plugins_, localPlugins} = paths;
 
+  /**
+   * Requires one plugin module, reporting why it was skipped when it fails.
+   *
+   * @param path_ - Absolute path of the plugin directory.
+   * @returns The loaded module, or `undefined` when it cannot be used.
+   */
   const load = (path_: string) => {
     let mod: AppPluginModule;
     try {
@@ -507,8 +517,12 @@ export const getDecoratedEnv = (baseEnv: NodeJS.ProcessEnv) => {
 export const getDecoratedConfig = (profile: string) => {
   ensureRuntimeDefaultsPersisted();
   const baseConfig = config.getProfileConfig(profile);
+  // The palette the import applied is what decoration falls back to. Copying
+  // it keeps a plugin that edits the configuration in place from also
+  // removing the defaults, and avoids a second read of the bundled file.
+  const appliedColors = {...baseConfig.colors};
   const decoratedConfig = decorateObject(baseConfig, 'decorateConfig');
-  const fixedConfig = config.fixConfigDefaults(decoratedConfig);
+  const fixedConfig = config.fixConfigDefaults(decoratedConfig, appliedColors);
   const translatedConfig = config.htermConfigTranslate(fixedConfig);
   return translatedConfig;
 };

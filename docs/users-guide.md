@@ -89,11 +89,9 @@ mode, so none of the three arguments reaches the report.
 ### Moving an existing configuration
 
 1. Quit Velocetty.
-2. Check whether the Velocetty directory already holds a `config.json5`.
-   - If the active file is already in the Velocetty directory, there is
-     nothing to move.
+2. Check what each directory holds.
    - If both trees hold a configuration file, merge the Hyper-tree file into
-     the Velocetty copy by hand. The Velocetty copy wins at start-up, so
+     the Velocetty copy by hand. The Velocetty copy is the active file, so
      overwriting it would discard the settings Velocetty is already using.
      Preserve plugins from both copies while merging:
      - Combine the `plugins` list, which names installed plugins, and the
@@ -104,12 +102,43 @@ mode, so none of the three arguments reaches the report.
        `localPlugins`, so no list entry points at a missing folder.
      - Copy `schema.json` from the Hyper directory if the Velocetty directory
        has none.
-   - Otherwise, move the active configuration file into the Velocetty
-     directory. If the Hyper directory holds `config.json5`, move it under
-     that name; if it holds only the older `hyper.json`, move that file and
-     rename it to `config.json5`. Also move `schema.json` and the `plugins/`
-     directory, and create the Velocetty directory if it does not exist yet.
+     - Merge the shortcuts too, as described below. Shortcuts copied only into
+       the merged `config.json5` are ignored once the Velocetty directory has
+       a `keybindings.json5`.
+   - If only the Velocetty directory holds a configuration file, there is
+     nothing to move.
+   - If only the Hyper directory holds one, move the active configuration
+     file into the Velocetty directory. If the Hyper directory holds
+     `config.json5`, move it under that name; if it holds only the older
+     `hyper.json`, move that file and rename it to `config.json5`. Also move
+     `schema.json` and the `plugins/` directory, and create the Velocetty
+     directory if it does not exist yet.
 3. Start Velocetty again.
+
+#### Shortcuts when both trees have a configuration
+
+The two files bind shortcuts differently, so merge them rather than choosing
+one. `keybindings.json5` is the file Velocetty applies; `keymaps` inside
+`config.json5` seeds it only when it does not exist yet.
+
+- If the Velocetty directory already has a `keybindings.json5`, open it and
+  add the Hyper-tree shortcuts to it by hand. Keep every binding already there:
+  the file wins over any `keymaps` in the merged configuration, so bindings
+  left only in `config.json5` would silently stop applying. For a command both
+  files bind, list the legacy shortcut alongside the existing ones:
+
+   ```json5
+   {
+     // Already in Velocetty, plus the Hyper-tree binding.
+     'window:new': ['ctrl+shift+n', 'cmd+n'],
+   }
+   ```
+
+   Do not replace the existing value with the Hyper-tree one; a shortcut that
+   is no longer listed stops working.
+- If it does not exist yet, merging the `keymaps` sections of both
+  `config.json5` files is enough. The first start-up copies the merged
+  `keymaps` into a new `keybindings.json5`, and later edits go there.
 
 Do not move the other files in the Hyper directory. They are Electron's
 application state (window layout, caches, preferences), not configuration.
