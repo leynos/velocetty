@@ -62,7 +62,8 @@ test('a startup failure is reported and turns into a failing exit code', async (
   const catchIndex = indexOfOrThrow(entrySource, '} catch (error) {');
   const catchBlock = entrySource.slice(catchIndex);
 
-  expect(catchBlock).toContain("console.error('Failed to start Hyper.', error);");
+  // The bounded description, not the raw error: a message may quote a path.
+  expect(catchBlock).toContain("console.error('Failed to start Hyper.', describeError(error));");
   expect(catchBlock).toContain('process.exitCode = 1;');
   expect(catchBlock).toContain('app.quit();');
 });

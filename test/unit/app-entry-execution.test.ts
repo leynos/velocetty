@@ -258,10 +258,31 @@ describe('the startup branch', () => {
 
     expect(output.lines).toHaveLength(1);
     expect(output.lines[0]).toContain('ERROR Failed to start Hyper.');
-    expect(output.lines[0]).toContain('config unavailable');
+    // The entry point logs the bounded `{code?, name}` description rather than
+    // the thrown value, so the error's own message stays out of the log.
+    expect(output.lines[0]).not.toContain('config unavailable');
     // The app must not have reached its own start import after the failure.
     expect(trace.labels).toEqual([]);
     expect(process.exitCode).toBe(1);
     expect(quits).toBe(1);
+  });
+
+  test.serial('a startup failure does not log the path its error quotes', async () => {
+    const sensitivePath = '/home/ada/.config/Velocetty/PRIVATE_TOKEN/config.json5';
+    activeConfigStub = {
+      setup: () => {
+        throw Object.assign(new Error(`ENOENT: no such file or directory, '${sensitivePath}'`), {code: 'ENOENT'});
+      }
+    };
+
+    await runEntryPoint(['--no-sandbox']);
+
+    // A real launch records this line for support, so it must name the errno
+    // vocabulary without repeating the configuration path or the token in it.
+    expect(output.lines).toHaveLength(1);
+    expect(output.lines[0]).toContain('ERROR Failed to start Hyper.');
+    expect(output.lines[0]).not.toContain(sensitivePath);
+    expect(output.lines[0]).not.toContain('PRIVATE_TOKEN');
+    expect(process.exitCode).toBe(1);
   });
 });

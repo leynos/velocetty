@@ -4,6 +4,7 @@ import {app} from 'electron';
 import packageMetadata from './package.json' with {type: 'json'};
 import {startShortcutProbe} from './config/e2e-shortcut-probe.js';
 import {cfgPath, configTree, keybindingsPath} from './config/paths.js';
+import {describeError} from './utils/error-code.js';
 
 const informationalArguments = ['--help', '-v', '--version'];
 const requestedArgument = process.argv[1];
@@ -32,7 +33,9 @@ if (requestedArgument && informationalArguments.includes(requestedArgument)) {
 
     await import('./start.js');
   } catch (error) {
-    console.error('Failed to start Hyper.', error);
+    // The bounded description keeps a failed start-up diagnosable without
+    // repeating a path or a secret the error message may quote.
+    console.error('Failed to start Hyper.', describeError(error));
     process.exitCode = 1;
     app.quit();
   }
