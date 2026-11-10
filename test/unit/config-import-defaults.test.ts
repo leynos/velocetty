@@ -54,7 +54,7 @@ const bundledDefaultCases = [
   }
 ];
 
-test('getDefaultConfig neither notifies nor re-reads, before or after start-up', async () => {
+test('getDefaultConfig reports a fault without notifying, before and after start-up', async () => {
   for (const {announces, description, expected, fault, seed} of bundledDefaultCases) {
     const errorMock = mock<typeof console.error>(() => {});
     const harness = await createConfigImportHarness({error: errorMock});
