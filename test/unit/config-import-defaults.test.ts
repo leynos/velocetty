@@ -106,6 +106,9 @@ test('a usable default query is cached and reused by start-up', async () => {
     writeFileSync(harness.mockPaths.defaultCfg, '{plugins: "not-an-array"}', 'utf8');
     harness._import('startup');
 
+    // Start-up consumed the cached payload, not the file broken mid-run, so
+    // the command that acts on the defaults cannot disagree with the query.
+    expect(harness.initMock.mock.calls[0]?.[1]).toEqual(first.defaults);
     expect(harness.getDefaultConfig()).toEqual(first);
   } finally {
     harness.cleanup();
@@ -130,6 +133,9 @@ test('a faulted default query is not cached, so a repaired file is re-read', asy
 
     harness._import('startup');
 
+    // Start-up re-read the repaired file rather than reusing the faulted
+    // fallback, so recovery does not depend on a query running first.
+    expect(harness.initMock.mock.calls[0]?.[1]).toEqual(recovered.defaults);
     expect(harness.getDefaultConfig()).toEqual(recovered);
   } finally {
     harness.cleanup();
@@ -208,6 +214,13 @@ test('a faulted platform keymap query is not cached, so a repaired file is re-re
     // Both shipped files are artefacts a repair can fix during the same run,
     // so a faulted platform keymap must not pin the process to empty defaults.
     writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), `{'window:new': 'ctrl+alt+shift+n'}`, 'utf8');
+    harness._import('startup');
+
+    // Start-up reads the repaired platform keymap directly: no query has to
+    // run first for the fresh bindings to reach the merged configuration.
+    expect(harness.initMock.mock.calls[0]?.[1]).toMatchObject({
+      keymaps: {'window:new': 'ctrl+alt+shift+n'}
+    });
     const recovered = harness.getDefaultConfig();
     expect(recovered.platformKeymapFault).toBe(false);
     expect(recovered.defaults.keymaps).toEqual({'window:new': 'ctrl+alt+shift+n'});
