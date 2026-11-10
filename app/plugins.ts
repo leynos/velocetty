@@ -342,6 +342,15 @@ export const getBasePaths = () => {
   return {path: pluginPath, localPath};
 };
 
+/**
+ * Loads every configured plugin module, skipping the ones that fail.
+ *
+ * A module that does not expose an extension API, or that throws while being
+ * required, is reported and left out rather than aborting the rest: one
+ * broken third-party plugin must not stop the window from opening.
+ *
+ * @returns The loaded modules, in configuration order.
+ */
 function requirePlugins(): any[] {
   const {plugins: plugins_, localPlugins} = paths;
 

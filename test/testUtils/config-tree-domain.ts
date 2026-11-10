@@ -229,6 +229,7 @@ const MASKS: readonly number[] = Array.from({length: 32}, (_unused, mask) => mas
 
 const DEVELOPMENT_STATES: readonly boolean[] = [false, true];
 
+/** Expands one platform fixture into its flag, XDG, and development-state cases. */
 const casesForFixture = (fixture: PlatformFixture): ConfigTreeCase[] =>
   xdgStates.flatMap((xdgState) =>
     DEVELOPMENT_STATES.flatMap((developmentEnabled) =>

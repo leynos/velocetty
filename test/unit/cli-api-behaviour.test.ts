@@ -137,6 +137,7 @@ const readConfigContents = (state: CliHarnessState): string => {
  * case.
  */
 const buildFsModule = (state: CliHarnessState) => {
+  /** Answers the harness's existence check for one candidate path. */
   const pathExists = (candidatePath: string) =>
     state.existingPaths ? state.existingPaths.has(candidatePath) : state.fsExistsSyncResult;
 

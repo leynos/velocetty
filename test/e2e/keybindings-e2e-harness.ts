@@ -40,6 +40,7 @@ const configFileNames = new Set([
   'keybindings.schema.json'
 ]);
 
+/** Waits for `ms` before resolving, so a poll loop can yield. */
 export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const developmentAppLaunchArgs =

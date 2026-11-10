@@ -100,6 +100,7 @@ const pressAndObserve = async (window: BrowserWindow, press: KeyPress): Promise<
   const observed = new Promise<CommandId | undefined>((resolve) => {
     settle = resolve;
   });
+  /** Resolves this press's observation with the command it ran, if any. */
   const listener = (command: CommandId) => settle?.(command);
   window.rpc.on('command', listener);
   try {

@@ -57,6 +57,15 @@ const assertPluginName = (pluginName: string): string => {
   return normalizedPluginName;
 };
 
+/**
+ * Refuses a configuration the command cannot safely read.
+ *
+ * An inaccessible path and an absent one fail differently on purpose: telling
+ * the user the file is missing would send them to recreate one that is already
+ * there, so each outcome names the remedy that matches it.
+ *
+ * @returns `true` when the configuration path is present and inspectable.
+ */
 const checkConfig = () => {
   // A permission or I/O fault is not absence: telling the user the file is
   // missing would send them to recreate one that is already there.

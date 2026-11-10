@@ -64,6 +64,7 @@ const expectedKeymaps = (defaults: Record<string, Binding>, user: Record<string,
 const layerKeymaps = (defaults: Record<string, Binding>, user: Record<string, Binding>, isSwapped = false) =>
   mapKeys(isSwapped ? {...user, ...defaults} : {...defaults, ...user});
 
+/** True when at least one command appears in both layers. */
 const hasOverlap = ([defaults, user]: readonly [Record<string, Binding>, Record<string, Binding>]) =>
   Object.keys(defaults).some((command) => Object.hasOwn(user, command));
 

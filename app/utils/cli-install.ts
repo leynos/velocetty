@@ -22,6 +22,15 @@ const sudoExec = promisify(sudoPrompt.exec);
 /** The `ln` invocation the elevated fallback runs, without its `sudo` prefix. */
 const lnCommand = `ln -sf "${cliScriptPath}" "${cliLinkPath}"`;
 
+/**
+ * Reports whether the command-line link already points at this CLI script.
+ *
+ * Only an established absence counts as not installed. Any other failure is
+ * rethrown, so a permission or I/O fault is never mistaken for a missing link
+ * that the installer could safely create again.
+ *
+ * @returns `true` when the link resolves to the bundled script.
+ */
 const checkInstall = async (): Promise<boolean> => {
   try {
     return (await readLink(cliLinkPath)) === cliScriptPath;

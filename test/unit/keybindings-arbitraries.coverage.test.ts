@@ -29,9 +29,11 @@ const classify = (binding: string | string[]): BindingClass => {
   return binding.length === 0 ? 'empty-array' : 'array';
 };
 
+/** The fraction of samples that satisfy `predicate`. */
 const shareOf = (samples: readonly UserKeymaps[], predicate: (keymaps: UserKeymaps) => boolean): number =>
   samples.filter((keymaps) => predicate(keymaps)).length / samples.length;
 
+/** The fraction of samples holding at least one binding of `bindingClass`. */
 const hasBindingClass = (samples: readonly UserKeymaps[], bindingClass: BindingClass): number =>
   shareOf(samples, (keymaps) => bindingsOf(keymaps).some((binding) => classify(binding) === bindingClass));
 

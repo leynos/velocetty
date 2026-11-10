@@ -62,6 +62,7 @@ const errorFor = (outcome: CallOutcome): Error | undefined => {
 
 /** A filesystem slice whose two calls answer from the supplied outcomes. */
 const fakeFileSystem = (stat: CallOutcome, lstat: CallOutcome): PathProbeFileSystem => {
+  /** Answers one call with the outcome's value, or throws its error. */
   const answer = (outcome: CallOutcome) => {
     const error = errorFor(outcome);
     if (error !== undefined) {

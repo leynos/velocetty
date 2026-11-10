@@ -24,8 +24,10 @@ const createReporter = () => {
   };
 };
 
+/** The most recent notice, or `undefined` when none was reported. */
 const lastNotice = (notices: readonly KeybindingsNotice[]): KeybindingsNotice | undefined => notices.at(-1);
 
+/** The notices that report an invalid file, in the order they arrived. */
 const invalidFileNotices = (notices: readonly KeybindingsNotice[]) =>
   notices.filter((notice) => notice.kind === 'invalid-file');
 
