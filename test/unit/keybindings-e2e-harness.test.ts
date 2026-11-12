@@ -7,7 +7,12 @@
  */
 import {expect, test} from 'bun:test';
 
-import {commandExecutedMarker, pressUntilExecuted, pressWithoutCommand} from '../e2e/keybindings-e2e-harness';
+import {
+  commandExecutedMarker,
+  executedByPressMarker,
+  pressUntilExecuted,
+  pressWithoutCommand
+} from '../e2e/keybindings-e2e-harness';
 
 /** The verdicts a scripted probe can report for a request. */
 type ProbeVerdict = 'pressed' | 'unbound' | 'rejected' | 'failed' | 'unanswered';
@@ -268,12 +273,12 @@ test('an old marker cannot stand in for a press whose command never ran', async 
   expect(app.sent()).toBe(1);
 });
 
-test('a command that lands only after its press replied does not satisfy that press', async () => {
-  // The old shortcut's command arrives while the next press is being sent, so
-  // the marker exists by the time the harness looks — but it names the earlier
-  // press. Crediting it to the press under test would accept a binding that ran
-  // nothing, and the reply already said the press was handled, so the scenario
-  // must fail instead of pressing again.
+test('a command that lands during a later press is not credited to it', async () => {
+  // Two presses of the same chord. The first emits the command but never runs
+  // it during its own press; its handler lands while the second press is being
+  // sent, so the output holds a marker by the time the second wait looks. That
+  // marker names the first press, and crediting it to the second would accept
+  // a binding that ran nothing.
   const app = createFakeApp(
     () => 'pressed',
     new Set(),
@@ -282,10 +287,18 @@ test('a command that lands only after its press replied does not satisfy that pr
     (ordinal) => (ordinal === 1 ? 2 : undefined)
   );
 
-  expect(await rejectionMessage(pressUntilExecuted({app, command: 'window:new', shortcut: 'ctrl+n'}))).toMatch(
-    /Timed out waiting for the command marker/
-  );
-  expect(app.sent()).toBe(1);
+  // The first press fails, because its own command did not run under its token.
+  // Awaiting it before starting the second is what puts the first command's
+  // execution inside the second press's window.
+  const firstPress = await rejectionMessage(pressUntilExecuted({app, command: 'window:new', shortcut: 'ctrl+n'}));
+  const secondPress = await rejectionMessage(pressUntilExecuted({app, command: 'window:new', shortcut: 'ctrl+n'}));
+
+  expect(firstPress).toMatch(/Timed out waiting for the command marker/);
+  // The second press saw the first press's execution arrive and rejected it.
+  expect(secondPress).toMatch(/Timed out waiting for the command marker/);
+  expect(app.sent()).toBe(2);
+  expect(app.count(executedByPressMarker({ordinal: 1, command: 'window:new'}))).toBe(1);
+  expect(app.count(executedByPressMarker({ordinal: 2, command: 'window:new'}))).toBe(0);
 });
 
 test('a press the probe never answers fails instead of being repeated', async () => {
