@@ -18,6 +18,7 @@ import type {configOptions} from '@shared/types/config';
 
 import * as config from './config';
 import {describeError, errorCode} from './utils/error-code';
+import {pluginLoadFailureText} from './utils/plugin-failure';
 import {isFunction, isObject} from './utils/runtime-guards';
 import {plugs} from './config/paths';
 import notify from './notify';
@@ -130,6 +131,13 @@ function patchModuleLoad() {
   // SAFETY: Node exposes the internal loader on `node:module`; this wrapper preserves its call signature.
   const Module = pluginRequire('node:module') as ModuleWithLoader;
   const originalLoad = Module._load;
+  /**
+   * Serves the Hyper module specifiers a plugin may still require.
+   *
+   * The deprecated specifiers resolve to this app's own React and to `Object`,
+   * which keeps an old plugin loadable without giving it a second copy of the
+   * renderer's libraries. Everything else reaches the loader unchanged.
+   */
   Module._load = function _load(modulePath: string, parent?: NodeJS.Module | null, isMain?: boolean) {
     // PLEASE NOTE: Code changes here, also need to be changed in
     // lib/utils/plugins.js
@@ -171,6 +179,12 @@ function checkDeprecatedExtendKeymaps() {
 
 let updating = false;
 
+/**
+ * Installs the plugins the user's configuration lists.
+ *
+ * One update runs at a time: a request that arrives while another is in flight
+ * only reports that, rather than starting a competing install.
+ */
 function updatePlugins({force = false} = {}) {
   if (updating) {
     return notify('Plugin update in progress');
@@ -232,6 +246,13 @@ function getPluginVersions() {
   });
 }
 
+/**
+ * Unloads every loaded plugin before its modules are re-read.
+ *
+ * The unload hooks run first so a plugin releases what it registered while its
+ * code is still in memory, then the require cache entries under the plugin
+ * directories are dropped so the next load reads the new files.
+ */
 function clearCache() {
   // trigger unload hooks
   modules.forEach((mod) => {
@@ -273,6 +294,12 @@ if (cache.get('hyper.plugins') !== id || process.env.HYPER_FORCE_UPDATE) {
   }
 })();
 
+/**
+ * Writes the dependency manifest the plugin installer reads.
+ *
+ * The manifest is generated from the active configuration's plugin lists, so
+ * the installer sees exactly the plugins the app is configured to load.
+ */
 function syncPackageJSON() {
   const dependencies = toDependencies(plugins);
   const pkg = {
@@ -389,18 +416,18 @@ function requirePlugins(): any[] {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         mod._version = pluginRequire(path.resolve(path_, 'package.json')).version;
       } catch {
-        console.warn(`No package.json found in ${path_}`);
+        console.warn(`No package.json found in the "${path.basename(path_)}" plugin directory.`);
       }
       console.log(`Plugin ${mod._name} (${mod._version}) loaded.`);
 
       return mod;
     } catch (error) {
       const code = errorCode(error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const failure = pluginLoadFailureText(path.basename(path_), error);
       if (code === 'MODULE_NOT_FOUND') {
-        console.warn(`Plugin error while loading "${path.basename(path_)}" (${path_}): ${errorMessage}`);
+        console.warn(failure);
       } else {
-        notify('Plugin error!', `Plugin "${path.basename(path_)}" failed to load (${errorMessage})`, {
+        notify('Plugin error!', failure, {
           category: 'thrown',
           error,
           operation: 'plugin-load'

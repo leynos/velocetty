@@ -184,7 +184,7 @@ export const commandExecutedMarker = (command: string) => new RegExp(`\\[e2e\\] 
  * names the press that ran the command rather than only the command. An
  * earlier press's command landing late therefore cannot satisfy it.
  */
-export const executedByPressMarker = (ordinal: number, command: string) =>
+export const executedByPressMarker = ({ordinal, command}: ExecutedByPressRequest) =>
   new RegExp(`\\[e2e\\] command-executed ${command} press=#${ordinal}\\b`);
 
 const pressAttempts = 20;
@@ -389,6 +389,11 @@ type PressRequest = Readonly<{
   shortcut: string;
 }>;
 
+type ExecutedByPressRequest = Readonly<{
+  ordinal: number;
+  command: string;
+}>;
+
 /**
  * Waits for the marker the command handler prints for one press.
  *
@@ -403,7 +408,7 @@ const requireCommandExecuted = async ({
   command,
   ordinal
 }: Readonly<{app: LaunchedApp; command: string; ordinal: number}>): Promise<void> => {
-  const matcher = executedByPressMarker(ordinal, command);
+  const matcher = executedByPressMarker({ordinal, command});
   await app.waitFor({description: `${command} to run for request #${ordinal}`, matcher});
   const runs = app.count(matcher);
   if (runs !== 1) {

@@ -370,9 +370,18 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
    * would shadow the user's real configuration instead of migrating it. An
    * unreadable path is left alone for the same reason: the file may already
    * exist, and writing over it would replace a configuration we could not read.
+   *
+   * A faulted bundled config is left alone too. Its fallback is what the app
+   * runs with until the installation is repaired, and writing that degraded
+   * template into a new `config.json5` would make it the user's permanent
+   * configuration: the file is bootstrapped only once, so a later start-up
+   * with a valid bundled config would never replace it. Leaving the file
+   * absent lets that repair take effect by creating it from valid defaults.
    */
-  const canBootstrapUserConfig = (): boolean =>
-    pathDeps.configInspection === 'ok' && path.resolve(pathDeps.cfgDir) === path.resolve(pathDeps.velocettyDir);
+  const canBootstrapUserConfig = (bundledDefaultsFellBack: boolean): boolean =>
+    !bundledDefaultsFellBack &&
+    pathDeps.configInspection === 'ok' &&
+    path.resolve(pathDeps.cfgDir) === path.resolve(pathDeps.velocettyDir);
 
   /**
    * Reads the bundled defaults and merges the platform keymap.
@@ -522,7 +531,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     }
     const defaultCfg = defaults.config;
     const bootstrapped =
-      phase === 'startup' && canBootstrapUserConfig()
+      phase === 'startup' && canBootstrapUserConfig(defaults.usedFallback)
         ? ensureUserConfigFile(createBootstrapTemplate(defaultCfg))
         : false;
 

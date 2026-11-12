@@ -56,7 +56,10 @@ export type DebuggerCommandParams = Readonly<{expression: string; returnByValue:
  */
 export type DebuggerCommandReply = Readonly<{
   result?: Readonly<{value?: unknown}>;
-  exceptionDetails?: Readonly<{text?: string}>;
+  exceptionDetails?: Readonly<{
+    text?: string;
+    exception?: Readonly<{description?: string}>;
+  }>;
 }>;
 
 /**

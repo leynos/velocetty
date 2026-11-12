@@ -1,3 +1,10 @@
+/** @file The `velocetty` command-line tool and its subcommands. */
+/*
+ * Every subcommand runs from here: it parses the arguments, starts or contacts
+ * the running app, and reports the outcome as console output and an exit code.
+ * This is a terminal program, so it writes to the console directly rather than
+ * through the app's notification sink.
+ */
 // This is a CLI tool, using console is OK
 /* eslint no-console: 0 */
 import {spawn, exec} from 'node:child_process';

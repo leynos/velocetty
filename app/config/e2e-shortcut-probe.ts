@@ -45,10 +45,19 @@ import {parseShortcut, toKeyPress, type KeyPress} from './e2e-shortcut-chord';
  */
 export const E2E_COMPLETION_BARRIER_CHANNEL = 'velocetty-e2e-press-complete';
 
-/** The shape of the reply the page returns for a pressed chord. */
+/**
+ * The shape of the reply the page returns for a pressed chord.
+ *
+ * `text` is a fixed token such as `Uncaught` when the expression throws; the
+ * thrown value's own description, which is what names the failure, is carried
+ * on `exception.description`.
+ */
 type EvaluateReply = Readonly<{
   result?: Readonly<{value?: unknown}>;
-  exceptionDetails?: Readonly<{text?: string}>;
+  exceptionDetails?: Readonly<{
+    text?: string;
+    exception?: Readonly<{description?: string}>;
+  }>;
 }>;
 
 /** How often the request file is checked for new lines. */
@@ -161,7 +170,11 @@ const pressInPage = async (contents: WebContents, press: KeyPress): Promise<read
     returnByValue: true
   });
   if (reply.exceptionDetails !== undefined) {
-    throw new Error(`The page could not be instrumented: ${reply.exceptionDetails.text ?? 'unknown error'}`);
+    const {exception, text} = reply.exceptionDetails;
+    // The protocol puts the thrown message on the exception and leaves `text`
+    // as a generic token, so the description is the only field that says what
+    // actually went wrong.
+    throw new Error(`The page could not be instrumented: ${exception?.description ?? text ?? 'unknown error'}`);
   }
   return classifyCommands(reply.result?.value);
 };

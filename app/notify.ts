@@ -1,3 +1,10 @@
+/** @file The app's single entry point for showing a desktop notification. */
+/*
+ * Callers pass user-facing text and, when a failure is being reported, bounded
+ * context for the log. The notification itself carries the full text; the log
+ * line records that it appeared plus the operation, category, and bounded error
+ * description, so a command identifier or a path cannot reach the log.
+ */
 import {app, Notification} from 'electron';
 
 import {icon} from './config/paths';

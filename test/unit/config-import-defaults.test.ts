@@ -161,16 +161,16 @@ test('start-up after a repaired default-config fault applies the repaired file',
 });
 
 // The safe fallback is the configuration a faulted bundled file leaves in
-// effect. Start-up both applies it and writes it into a new `config.json5`, so
-// the user's file describes what the app is actually running with rather than
-// plugin defaults it could not read. The fault is announced once, so the
-// fallback is visible rather than silent.
+// effect, and start-up applies it. It must not be written to `config.json5`:
+// that file is bootstrapped once, so a degraded template persisted now would
+// stay the user's configuration after the installation was repaired. The fault
+// is still announced once, so the fallback is visible rather than silent.
 const fallbackBootstrapCases = [
   {description: 'unreadable', seed: undefined},
   {description: 'invalid', seed: '{plugins: "not-an-array"}'}
 ] as const;
 
-test('start-up with a faulted bundled default bootstraps the applied fallback', async () => {
+test('start-up with a faulted bundled default applies the fallback without persisting it', async () => {
   for (const {description, seed} of fallbackBootstrapCases) {
     const harness = await createConfigImportHarness({error: mock<typeof console.error>(() => {})});
     try {
@@ -180,8 +180,31 @@ test('start-up with a faulted bundled default bootstraps the applied fallback', 
 
       const fallback = {plugins: [], localPlugins: [], keymaps: {}};
       expect(harness.initMock.mock.calls[0]?.[1], description).toEqual(fallback);
-      expect(JSON5.parse(fsExtra.readFileSync(harness.mockPaths.cfgPath, 'utf8')), description).toEqual(fallback);
+      // Leaving the file absent is what lets a repaired installation create it
+      // from valid defaults, which the next test exercises.
+      expect(fsExtra.existsSync(harness.mockPaths.cfgPath), description).toBe(false);
       expect(bundledDefaultNotices(harness.notifyMock), description).toHaveLength(1);
+    } finally {
+      harness.cleanup();
+    }
+  }
+});
+
+test('a repaired bundled default bootstraps the user config on a later start-up', async () => {
+  for (const {description, seed} of fallbackBootstrapCases) {
+    const harness = await createConfigImportHarness({error: mock<typeof console.error>(() => {})});
+    try {
+      seedBundledFiles(harness, seed);
+      harness._import('startup');
+      expect(fsExtra.existsSync(harness.mockPaths.cfgPath), description).toBe(false);
+
+      // Repairing the shipped file is all a user has to do: the faulted run
+      // persisted nothing, so this start-up writes valid defaults.
+      writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
+      harness._import('startup');
+
+      const expected = {...ensureObject(JSON5.parse(sharedDefaultConfigFixture)), keymaps: {}};
+      expect(JSON5.parse(fsExtra.readFileSync(harness.mockPaths.cfgPath, 'utf8')), description).toEqual(expected);
     } finally {
       harness.cleanup();
     }

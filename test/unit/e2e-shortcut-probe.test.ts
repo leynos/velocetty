@@ -252,10 +252,25 @@ describe('what a press established', () => {
 });
 
 describe('a page that cannot be instrumented', () => {
-  test('an evaluation exception fails the press', async () => {
-    installWindow(replyingSession({exceptionDetails: {text: 'ipcRenderer is unavailable in the page'}}));
+  test('an evaluation exception fails the press with the thrown description', async () => {
+    // This is the shape the protocol actually sends: `text` is a generic
+    // token, and the message that names the failure is on the exception.
+    installWindow(
+      replyingSession({
+        exceptionDetails: {
+          text: 'Uncaught',
+          exception: {description: 'Error: ipcRenderer is unavailable in the page'}
+        }
+      })
+    );
 
     await expect(sendShortcut('ctrl+n')).rejects.toThrow('ipcRenderer is unavailable in the page');
+  });
+
+  test('an exception with no description still fails with the generic token', async () => {
+    installWindow(replyingSession({exceptionDetails: {text: 'Uncaught'}}));
+
+    await expect(sendShortcut('ctrl+n')).rejects.toThrow('The page could not be instrumented: Uncaught');
   });
 
   test('a result that is not an array fails rather than reporting no command', async () => {
