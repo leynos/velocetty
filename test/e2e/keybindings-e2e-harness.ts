@@ -426,12 +426,11 @@ const requireCommandExecuted = async ({
  *
  * Attribution does not depend on timing: the probe records the command emitted
  * while the key event is dispatched, so a reply names the command *this* press
- * produced. Its synchronous completion barrier then makes the main process run
- * that command's handler before the press returns, so no earlier press's
- * command is left pending to land under this press's token. A press that
- * produced some other command is a failure rather than a retry, because the
- * binding under test is then simply wrong. One press therefore cannot run its
- * command twice.
+ * produced. The token travels with that command message, so even a command
+ * whose handler lands while a later press is running prints the token of the
+ * press that sent it. A press that produced some other command is a failure
+ * rather than a retry, because the binding under test is then simply wrong. One
+ * press therefore cannot run its command twice.
  *
  * Execution is established separately from emission. The command handler
  * prints the press's token, and this helper waits for that token, so a press
