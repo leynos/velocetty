@@ -3,6 +3,15 @@ import {expect, test} from 'bun:test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+/**
+ * Reads a source file relative to the repository root.
+ *
+ * The ordering contract is expressed in the entry point's own text, so the
+ * test inspects the shipped source rather than a reimplementation of it.
+ *
+ * @param workspaceRelativePath - The path from the repository root.
+ * @returns The file's contents.
+ */
 const readSource = async (workspaceRelativePath: string) =>
   await fs.readFile(path.join(process.cwd(), workspaceRelativePath), 'utf8');
 
@@ -64,7 +73,13 @@ test('a startup failure is reported and turns into a failing exit code', async (
   const catchBlock = entrySource.slice(catchIndex);
 
   // The bounded description, not the raw error: a message may quote a path.
-  expect(catchBlock).toContain("console.error('Failed to start Hyper.', describeError(error));");
+  // The fixed stage and category let support tell a start-up failure apart from
+  // the same error reported elsewhere.
+  expect(catchBlock).toContain("console.error('Failed to start Hyper.', {");
+  expect(catchBlock).toContain('...describeError(error),');
+  expect(catchBlock).toContain("category: 'thrown',");
+  expect(catchBlock).toContain("operation: 'startup'");
+  expect(catchBlock).not.toContain('console.error(error)');
   expect(catchBlock).toContain('process.exitCode = 1;');
   expect(catchBlock).toContain('app.quit();');
 });

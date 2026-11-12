@@ -1,7 +1,7 @@
 import {app, Notification} from 'electron';
 
 import {icon} from './config/paths';
-import {logNotificationShown} from './utils/notification-log';
+import {logNotificationShown, type NotificationDetails} from './utils/notification-log';
 
 /**
  * Shows a desktop notification, or defers it until Electron is ready.
@@ -11,9 +11,9 @@ import {logNotificationShown} from './utils/notification-log';
  *
  * @param title - The notification title.
  * @param body - The message body; empty when the title says enough.
- * @param details - Extra context, including an error to record in the log.
+ * @param details - Bounded log context, including an error to describe.
  */
-export default function notify(title: string, body = '', details: {error?: unknown} = {}) {
+export default function notify(title: string, body = '', details: NotificationDetails = {}) {
   logNotificationShown(details);
   if (app.isReady()) {
     _createNotification(title, body);

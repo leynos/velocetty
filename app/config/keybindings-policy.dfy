@@ -20,10 +20,13 @@
 // of insertion order or object identity. The empty map binds no commands, so
 // every empty map is that same value; `emptyUserKeymaps()` is therefore one
 // value, not a new one per call. The codec
-// (`app/config/keybindings-codec.ts`) admits only this shape. Nothing
-// mechanically relates this model to the TypeScript representation, so the
-// relation is a trusted assumption, and the bounded TypeScript tests are
-// evidence for the histories they run rather than a refinement proof.
+// (`app/config/keybindings-codec.ts`) admits only this shape. A TypeScript
+// oracle (`sameKeymaps` in `test/unit/keybindings-policy.test.ts`) states the
+// same relation, and its tests check the model's empty map and the replay
+// result against it. Nothing mechanically relates the model to the TypeScript
+// representation, so the relation remains a trusted assumption, and those
+// bounded tests are evidence for the histories they run rather than a
+// refinement proof.
 // ---------------------------------------------------------------------------
 
 datatype Option<T> = None | Some(value: T)

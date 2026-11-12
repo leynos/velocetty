@@ -158,6 +158,16 @@ const buildFsModule = (state: CliHarnessState) => {
   };
 };
 
+/**
+ * Builds an HTTP-client double that records what the CLI asked the registry.
+ *
+ * The double returns the version list the harness configured, or rejects with
+ * its configured error, so a test can assert both the request and the CLI's
+ * failure handling without making a network call.
+ *
+ * @param state - The harness state holding the scripted reply.
+ * @returns A `got`-shaped client for the CLI to call.
+ */
 const buildGotClient = (state: CliHarnessState) => ({
   get: (url: string, requestOptions: GotRequestOptions) => {
     state.requestedUrls.push(url);

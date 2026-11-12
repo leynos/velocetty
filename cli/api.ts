@@ -203,6 +203,16 @@ const packageName = (value: string): PackageName => {
 
 const currentModuleDirectory = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Selects the path dialect that matches the target platform.
+ *
+ * The CLI resolves configuration paths for the platform it is acting on,
+ * which a test can vary independently of the host, so the choice is made from
+ * the injected platform rather than from `process.platform`.
+ *
+ * @param platform - The platform whose paths are being resolved.
+ * @returns `path.win32` for Windows, otherwise `path.posix`.
+ */
 const getPlatformPath = (platform: NodeJS.Platform) => (platform === 'win32' ? path.win32 : path.posix);
 
 const resolveDependencies = (options: CliApiOptions = {}): CliApiDependencies => ({
@@ -348,6 +358,22 @@ type NormalizedCliConfig = Omit<ParsedCliConfig, 'plugins' | 'localPlugins'> & {
   localPlugins: PluginSpecifier[];
 };
 
+/**
+ * Derives the npm package name from a plugin specifier.
+ *
+ * A specifier may name a version with `@` and a git ref with `#`; neither
+ * belongs in the package name the registry is asked about. A scoped name
+ * keeps its leading `@` and encodes the separating slash, which is the form
+ * the registry API expects for a scoped package.
+ *
+ * @param plugin - A validated plugin specifier.
+ * @returns The registry package name.
+ *
+ * @example
+ * ```ts
+ * getPackageName(pluginSpecifier('hyper-solarized#v1.2.0')); // 'hyper-solarized'
+ * ```
+ */
 function getPackageName(plugin: PluginSpecifier): PackageName {
   const isScoped = plugin[0] === '@';
   const nameWithoutVersion = plugin.split('#')[0];

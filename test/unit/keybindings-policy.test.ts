@@ -20,6 +20,33 @@ import {
 } from '../../app/config/keybindings-policy';
 import {KEYBINDINGS_PROPERTY_SEED, keymapsArb} from '../testUtils/keybindings-arbitraries';
 
+/** A canonical rendering of a keymap under the model's value relation. */
+const canonicalKeymaps = (keymaps: UserKeymaps): string =>
+  JSON.stringify(Object.entries(keymaps).toSorted(([left], [right]) => left.localeCompare(right)));
+
+/**
+ * Compares two keymaps by the value relation the proof model uses.
+ *
+ * The Dafny model declares `UserKeymaps(==)` as an opaque value type, so its
+ * contracts compare bindings, not object identity. This oracle states the same
+ * relation in TypeScript: equal command ids bound to equal shortcuts,
+ * independent of insertion order, with shortcut-array order still significant.
+ * Tests use it to check the implementation against the model rather than
+ * relying on a reference comparison.
+ *
+ * @param left - One keymap.
+ * @param right - The keymap to compare with.
+ * @returns Whether both bind the same commands to the same shortcuts.
+ *
+ * @example
+ * ```ts
+ * sameKeymaps({'window:new': 'ctrl+n'}, {'window:new': 'ctrl+n'}); // true
+ * sameKeymaps(emptyUserKeymaps(), emptyUserKeymaps()); // true
+ * ```
+ */
+const sameKeymaps = (left: UserKeymaps, right: UserKeymaps): boolean =>
+  canonicalKeymaps(left) === canonicalKeymaps(right);
+
 const seeds: UserKeymaps = {'window:new': 'ctrl+alt+shift+n'};
 const other: UserKeymaps = {'pane:split': ['ctrl+shift+d', 'ctrl+shift+e']};
 
@@ -215,6 +242,35 @@ describe('KB-POL-1 observation transitions', () => {
     // assertions above use `toEqual` for that reason.
     expect(first).not.toBe(second);
     expect(first).toEqual(second);
+  });
+
+  test('the model’s empty map is the single empty value under structural equality', () => {
+    const specified = specLatestAccepted([{kind: 'missing'}]);
+
+    // `specLatestAccepted` returns the model's `emptyUserKeymaps()`. Exercising
+    // the oracle on it checks the empty-map assumption itself, not just the
+    // two fresh objects the previous test compares.
+    expect(specified).not.toBeNull();
+    expect(sameKeymaps(specified ?? {}, emptyUserKeymaps())).toBe(true);
+  });
+
+  test('value equality is order-independent and binding-sensitive', () => {
+    const forward: UserKeymaps = {'pane:split': 'ctrl+shift+d', 'window:new': ['ctrl+n']};
+    const reversed: UserKeymaps = {'window:new': ['ctrl+n'], 'pane:split': 'ctrl+shift+d'};
+
+    expect(sameKeymaps(forward, reversed)).toBe(true);
+    expect(sameKeymaps(forward, {'pane:split': 'ctrl+shift+d'})).toBe(false);
+    expect(sameKeymaps(forward, {'pane:split': 'ctrl+shift+e', 'window:new': ['ctrl+n']})).toBe(false);
+  });
+
+  test('value equality survives rebuilding a generated keymap in reverse order', () => {
+    fc.assert(
+      fc.property(keymapsArb, (keymaps) => {
+        const rebuilt = Object.fromEntries(Object.entries(keymaps).toReversed());
+        expect(sameKeymaps(keymaps, rebuilt)).toBe(true);
+      }),
+      {seed: KEYBINDINGS_PROPERTY_SEED}
+    );
   });
 });
 

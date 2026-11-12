@@ -35,6 +35,12 @@ const parseOrThrow = (text: string) => {
 
 const invalidTextArb = textDocArb.filter((text) => parseKeybindingsText(text, SOURCE).kind === 'invalid');
 
+/**
+ * Starts a keybindings service over an in-memory store holding `initialText`.
+ *
+ * @param initialText - The file contents the store begins with.
+ * @returns The started service, its store, and the notice kinds it reported.
+ */
 const startService = (initialText: string) => {
   const store = createMemoryKeybindingsStore();
   store.setText(initialText);

@@ -305,7 +305,7 @@ describe('the startup branch', () => {
     // can carry the message or the path into the log.
     const [message, details] = output.records[0]?.args ?? [];
     expect(message).toBe('Failed to start Hyper.');
-    expect(details).toEqual({code: 'ENOENT', name: 'Error'});
+    expect(details).toEqual({category: 'thrown', code: 'ENOENT', name: 'Error', operation: 'startup'});
     expect(process.exitCode).toBe(1);
   });
 
@@ -322,7 +322,7 @@ describe('the startup branch', () => {
     await runEntryPoint(['--no-sandbox']);
 
     const [, details] = output.records[0]?.args ?? [];
-    expect(details).toEqual({name: 'Error'});
+    expect(details).toEqual({category: 'thrown', name: 'Error', operation: 'startup'});
     // Checked over the raw tuples as well, so a nested field cannot hide the
     // value from a flattened-text assertion.
     expect(JSON.stringify(output.records)).not.toContain('PRIVATE_TOKEN');

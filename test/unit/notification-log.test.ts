@@ -54,8 +54,16 @@ describe('logNotificationShown', () => {
     logNotificationShown({error}, sinks);
 
     expect(info).toEqual(['[Notification] Notification shown.']);
-    expect(errors).toEqual([['[Notification]', {code: 'ENOENT', name: 'Error'}]]);
+    expect(errors).toEqual([['[Notification]', {error: {code: 'ENOENT', name: 'Error'}}]]);
     expect(JSON.stringify([info, errors])).not.toContain(USER_PATH);
+  });
+
+  test('records the bounded operation and category without an error', () => {
+    const {errors, sinks} = createSinks();
+
+    logNotificationShown({category: 'invalid-return', operation: 'plugin-decoration'}, sinks);
+
+    expect(errors).toEqual([['[Notification]', {category: 'invalid-return', operation: 'plugin-decoration'}]]);
   });
 
   test('drops a path smuggled through the code or the name', () => {
@@ -65,7 +73,7 @@ describe('logNotificationShown', () => {
     logNotificationShown({error}, sinks);
 
     // Both fields are writable, so neither may pass a path through unchanged.
-    expect(errors).toEqual([['[Notification]', {name: 'Error'}]]);
+    expect(errors).toEqual([['[Notification]', {error: {name: 'Error'}}]]);
     expect(JSON.stringify(errors)).not.toContain(USER_PATH);
   });
 
@@ -74,7 +82,7 @@ describe('logNotificationShown', () => {
 
     logNotificationShown({error: COMMAND_ID}, sinks);
 
-    expect(errors).toEqual([['[Notification]', {name: 'UnknownError'}]]);
+    expect(errors).toEqual([['[Notification]', {error: {name: 'UnknownError'}}]]);
     expect(JSON.stringify(errors)).not.toContain(COMMAND_ID);
   });
 });
@@ -123,7 +131,7 @@ describe('notify', () => {
     expect(logged).not.toContain(COMMAND_ID);
     expect(logged).not.toContain(USER_PATH);
     expect(logSpy).toHaveBeenCalledWith('[Notification] Notification shown.');
-    expect(errorSpy).toHaveBeenCalledWith('[Notification]', {code: 'EACCES', name: 'Error'});
+    expect(errorSpy).toHaveBeenCalledWith('[Notification]', {error: {code: 'EACCES', name: 'Error'}});
   });
 
   test('drops an errno-shaped secret through the production path', async () => {
@@ -141,6 +149,6 @@ describe('notify', () => {
     expect(logged).not.toContain(SENSITIVE_TOKEN);
     expect(logged).not.toContain(COMMAND_ID);
     expect(logged).not.toContain(USER_PATH);
-    expect(errorSpy).toHaveBeenCalledWith('[Notification]', {name: 'Error'});
+    expect(errorSpy).toHaveBeenCalledWith('[Notification]', {error: {name: 'Error'}});
   });
 });

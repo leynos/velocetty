@@ -52,6 +52,12 @@ const expectActionable = (diagnostics: readonly configValidationDiagnostic[]): v
   }
 };
 
+/**
+ * Lists a keymap's entries in key order, so comparisons are order-independent.
+ *
+ * @param keymaps - The keymap to list.
+ * @returns Its entries sorted by command identifier.
+ */
 const sortedEntries = (keymaps: UserKeymaps) =>
   Object.entries(keymaps).toSorted(([left], [right]) => left.localeCompare(right));
 

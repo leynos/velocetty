@@ -21,6 +21,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 
 import {isJsonObject, isString} from '../../app/utils/runtime-guards';
+import {createPage} from '../testUtils/e2e-shortcut-probe-page';
 import {
   type DebuggerCommandReply,
   getElectronMock,
@@ -36,77 +37,12 @@ const {E2E_COMPLETION_BARRIER_CHANNEL, sendShortcut, startShortcutProbe} = await
   '../../app/config/e2e-shortcut-probe'
 );
 
-/** One message the page's RPC client sent. */
-type SentMessage = Readonly<{channel: string; payload: unknown}>;
-
-/** The page's IPC double and the key events the probe dispatched into it. */
-type Page = Readonly<{
-  barrierChannels: string[];
-  /** Whether the probe's `send` wrapper was already restored at each barrier. */
-  barrierSawRestoredSend: boolean[];
-  context: vm.Context;
-  eventInits: unknown[];
-  ipc: {send: (channel: string, payload: unknown) => void; sendSync: (channel: string) => boolean};
-  originalSend: (channel: string, payload: unknown) => void;
-  sent: SentMessage[];
-}>;
-
 /** The expression a `Runtime.evaluate` request carries, validated rather than cast. */
 const expressionOf = (params: unknown): string => {
   if (!isJsonObject(params) || !isString(params['expression'])) {
     throw new TypeError('The probe did not send a Runtime.evaluate expression.');
   }
   return params['expression'];
-};
-
-/**
- * A page whose `window.require('electron')` returns the test's IPC double.
- *
- * `duringDispatch` runs inside `dispatchEvent`, so whatever it sends goes
- * through the wrapper the probe installed for the press.
- */
-const createPage = ({
-  duringDispatch = () => {}
-}: Readonly<{duringDispatch?: (send: (channel: string, payload: unknown) => void) => void}> = {}): Page => {
-  const sent: SentMessage[] = [];
-  const barrierChannels: string[] = [];
-  const barrierSawRestoredSend: boolean[] = [];
-  const originalSend = (channel: string, payload: unknown) => {
-    sent.push({channel, payload});
-  };
-  const ipc = {
-    send: originalSend,
-    // The probe waits for main on this channel after every dispatch.
-    sendSync: (channel: string) => {
-      barrierChannels.push(channel);
-      barrierSawRestoredSend.push(ipc.send === originalSend);
-      return true;
-    }
-  };
-  const eventInits: unknown[] = [];
-  // A body element is the element the renderer's keyboard library listens on;
-  // a page without one cannot be pressed, which `document.body === null` maps.
-  const body = {
-    dispatchEvent: (event: unknown) => {
-      duringDispatch(ipc.send);
-      return event !== undefined;
-    }
-  };
-  /** Records the fields the probe builds so the key press itself is visible. */
-  class FakeKeyboardEvent {
-    readonly type: string;
-
-    constructor(type: string, init: unknown) {
-      this.type = type;
-      eventInits.push({init, type});
-    }
-  }
-  const context = vm.createContext({
-    document: {body},
-    KeyboardEvent: FakeKeyboardEvent,
-    window: {require: () => ({ipcRenderer: ipc})}
-  });
-  return {barrierChannels, barrierSawRestoredSend, context, eventInits, ipc, originalSend, sent};
 };
 
 /** A page with no body to press on yet, which is what a loading window has. */
@@ -225,6 +161,64 @@ describe('what a press established', () => {
     // recorded as a message the press sent.
     expect(page.barrierSawRestoredSend).toEqual([true]);
     expect(page.sent).toHaveLength(1);
+  });
+
+  test('main handles the command only after the barrier begins, before the press reports', async () => {
+    const handled: Array<{barrierAlreadyBegun: boolean; command: string}> = [];
+    const page = createPage({
+      duringDispatch: (send) => send('window-uid', {data: 'window:new', ev: 'command'}),
+      onMainHandle: (message, {barrierAlreadyBegun}) => {
+        const {payload} = message;
+        if (isJsonObject(payload) && payload['ev'] === 'command' && isString(payload['data'])) {
+          handled.push({barrierAlreadyBegun, command: payload['data']});
+        }
+      }
+    });
+    installWindow(evaluatingSession(page.context));
+
+    expect(await sendShortcut('ctrl+n')).toEqual({command: 'window:new', kind: 'pressed'});
+    // The double defers handling until the barrier drains its queue, so this
+    // states the production ordering: dispatch emits the command, main runs
+    // its handler during the synchronous round-trip, and only then does the
+    // probe report the press.
+    expect(handled).toEqual([{barrierAlreadyBegun: true, command: 'window:new'}]);
+    expect(page.barrierChannels).toEqual([E2E_COMPLETION_BARRIER_CHANNEL]);
+  });
+
+  test('a command main handles late is not credited to the next press', async () => {
+    const handled: string[] = [];
+    let dispatches = 0;
+    let deferred: string | undefined;
+    const page = createPage({
+      duringDispatch: (send) => {
+        dispatches += 1;
+        // Only the first press emits; the second is an unbound press.
+        if (dispatches === 1) send('window-uid', {data: 'window:new', ev: 'command'});
+      },
+      onMainHandle: (message) => {
+        const {payload} = message;
+        if (isJsonObject(payload) && isString(payload['data'])) {
+          // Main has not run this handler yet: it runs at the next barrier.
+          deferred = payload['data'];
+        }
+      },
+      onBarrier: () => {
+        if (deferred !== undefined) {
+          handled.push(deferred);
+          deferred = undefined;
+        }
+      }
+    });
+    installWindow(evaluatingSession(page.context));
+
+    expect(await sendShortcut('ctrl+n')).toEqual({command: 'window:new', kind: 'pressed'});
+    // The first press's command had not run when that press reported.
+    expect(handled).toEqual([]);
+    // The late handler runs during the second press's barrier. That press
+    // emitted nothing, so it is unbound and the command stays attributed to
+    // the press that emitted it.
+    expect(await sendShortcut('ctrl+n')).toEqual({kind: 'unbound'});
+    expect(handled).toEqual(['window:new']);
   });
 
   test('a page with no body cannot be pressed', async () => {

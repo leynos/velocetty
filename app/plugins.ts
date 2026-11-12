@@ -17,7 +17,7 @@ import type {IpcMainWithCommands} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
 
 import * as config from './config';
-import {errorCode} from './utils/error-code';
+import {describeError, errorCode} from './utils/error-code';
 import {isFunction, isObject} from './utils/runtime-guards';
 import {plugs} from './config/paths';
 import notify from './notify';
@@ -86,7 +86,13 @@ const ensureRuntimeDefaultsPersisted = () => {
     ensureRuntimePluginSettingsPersisted();
     runtimePluginDefaultsPersisted = true;
   } catch (error) {
-    console.warn('Failed to persist runtime plugin settings defaults.', error);
+    // The raw value may quote a settings path; the bounded description still
+    // says which fixed category of failure occurred.
+    console.warn('Failed to persist runtime plugin settings defaults.', {
+      category: 'thrown',
+      error: describeError(error),
+      operation: 'plugin-settings'
+    });
   }
 };
 
@@ -176,7 +182,7 @@ function updatePlugins({force = false} = {}) {
     updating = false;
 
     if (err) {
-      notify('Error updating plugins.', err, {error: err});
+      notify('Error updating plugins.', err, {category: 'thrown', error: err, operation: 'plugin-load'});
     } else {
       // flag successful plugin update
       cache.set('hyper.plugins', id_);
@@ -394,7 +400,11 @@ function requirePlugins(): any[] {
       if (code === 'MODULE_NOT_FOUND') {
         console.warn(`Plugin error while loading "${path.basename(path_)}" (${path_}): ${errorMessage}`);
       } else {
-        notify('Plugin error!', `Plugin "${path.basename(path_)}" failed to load (${errorMessage})`, {error});
+        notify('Plugin error!', `Plugin "${path.basename(path_)}" failed to load (${errorMessage})`, {
+          category: 'thrown',
+          error,
+          operation: 'plugin-load'
+        });
       }
     }
   };
@@ -412,7 +422,9 @@ export const onApp = (app_: App) => {
         plugin.onApp(app_);
       } catch (error) {
         notify('Plugin error!', `"${plugin._name}" has encountered an error. Check Developer Tools for details.`, {
-          error: error
+          category: 'thrown',
+          error,
+          operation: 'plugin-hook'
         });
       }
     }
@@ -426,7 +438,9 @@ export const onWindowClass = (win: BrowserWindow) => {
         plugin.onWindowClass(win);
       } catch (error) {
         notify('Plugin error!', `"${plugin._name}" has encountered an error. Check Developer Tools for details.`, {
-          error: error
+          category: 'thrown',
+          error,
+          operation: 'plugin-hook'
         });
       }
     }
@@ -440,7 +454,9 @@ export const onWindow = (win: BrowserWindow) => {
         plugin.onWindow(win);
       } catch (error) {
         notify('Plugin error!', `"${plugin._name}" has encountered an error. Check Developer Tools for details.`, {
-          error: error
+          category: 'thrown',
+          error,
+          operation: 'plugin-hook'
         });
       }
     }
@@ -453,18 +469,27 @@ function decorateEntity(base: any, key: string, type: 'object' | 'function') {
   let decorated = base;
   modules.forEach((plugin) => {
     if (plugin[key]) {
-      let res;
+      let res: unknown;
       try {
         res = plugin[key](decorated);
       } catch (error) {
-        notify('Plugin error!', `"${plugin._name}" when decorating ${key}`, {error: error});
+        notify('Plugin error!', `"${plugin._name}" when decorating ${key}`, {
+          category: 'thrown',
+          error,
+          operation: 'plugin-decoration'
+        });
         return;
       }
       const matchesExpectedType = type === 'object' ? isObject(res) : isFunction(res);
       if (res && matchesExpectedType) {
         decorated = res;
       } else {
-        notify('Plugin error!', `"${plugin._name}": invalid return type for \`${key}\``);
+        // The user-facing text names the plugin and hook; the log records only
+        // the bounded category, because a plugin's name may be user data.
+        notify('Plugin error!', `"${plugin._name}": invalid return type for \`${key}\``, {
+          category: 'invalid-return',
+          operation: 'plugin-decoration'
+        });
       }
     }
   });
@@ -493,7 +518,9 @@ export const getDeprecatedConfig = () => {
       configTmp = plugin.decorateConfig(structuredClone(baseConfig));
     } catch (error) {
       notify('Plugin error!', `"${plugin._name}" has encountered an error. Check Developer Tools for details.`, {
-        error: error
+        category: 'thrown',
+        error,
+        operation: 'plugin-decoration'
       });
       return;
     }
@@ -514,17 +541,30 @@ export const getDecoratedEnv = (baseEnv: NodeJS.ProcessEnv) => {
   return decorateObject(baseEnv, 'decorateEnv');
 };
 
+/**
+ * Returns the effective configuration for one profile.
+ *
+ * The profile's merged configuration is decorated by every plugin, completed
+ * with the palette the import applied, and translated from the legacy hterm
+ * CSS selectors. Decoration reads no bundled file, so opening a window cannot
+ * be affected by a later read fault.
+ *
+ * @param profile - The profile name to resolve.
+ * @returns The decorated and translated configuration.
+ *
+ * @example
+ * ```ts
+ * getDecoratedConfig('default').colors.black; // the effective black
+ * ```
+ */
 export const getDecoratedConfig = (profile: string) => {
   ensureRuntimeDefaultsPersisted();
-  const baseConfig = config.getProfileConfig(profile);
-  // The palette the import applied is what decoration falls back to. Copying
-  // it keeps a plugin that edits the configuration in place from also
-  // removing the defaults, and avoids a second read of the bundled file.
-  const appliedColors = {...baseConfig.colors};
-  const decoratedConfig = decorateObject(baseConfig, 'decorateConfig');
-  const fixedConfig = config.fixConfigDefaults(decoratedConfig, appliedColors);
-  const translatedConfig = config.htermConfigTranslate(fixedConfig);
-  return translatedConfig;
+  // The composition helper copies the imported palette before decoration, so
+  // in-place plugin edits cannot remove the colours decoration falls back to.
+  const fixedConfig = config.decorateProfileConfig(profile, (baseConfig) =>
+    decorateObject(baseConfig, 'decorateConfig')
+  );
+  return config.htermConfigTranslate(fixedConfig);
 };
 
 export const getDecoratedKeymaps = () => {

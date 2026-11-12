@@ -4411,6 +4411,57 @@ string-parameter callback signature dropped the module to 10.00, and `cs`
 for both copies. Hosted run 42590867706 then passed all four builds, both E2E
 lanes, and the CodeScene check on head `023ba123`.
 
+### EP-J: review-round repairs for head `3c6bfc42`
+
+Review `5842629285` reported three errors and six warnings. Each error is
+addressed at the boundary it names, and the warnings are either repaired or
+dispositioned against a tracked issue.
+
+- **Unit Architecture (error).** `readStamp` hid every `statSync` failure as
+  absence, so two failed inspections compared equal and readiness skipped
+  reconciliation. The stamp is now a three-state value — `present`, `absent`,
+  `unreadable` — in `app/config/watched-file-stamp.ts`. `stampsMatch` never
+  treats an unreadable stamp as equal, so a failed inspection reconciles.
+  `createWatchedFileReconciler` captures the stamps after the import and
+  reports whether any file now differs; `_watch` wires it as `reconcileOnReady`.
+  `test/unit/watched-file-stamp.test.ts` tables the states, both failure
+  kinds, a non-`Error` throw, and the reconciler's unchanged, moved, appeared,
+  and failed cases.
+- **Configuration decoration (error/warning).** The palette composition moved
+  into `decorateProfileConfig` in `app/config.ts`, which copies the imported
+  palette before decoration and passes it to `fixConfigDefaults` as the
+  fallback. `getDecoratedConfig` calls it, so decoration never re-reads a
+  bundled file. `test/unit/config-composition.test.ts` runs through
+  `createWatchHarness`: it completes a partial imported palette, shows a plugin
+  that deletes `black` still leaves the imported `#123456` (deliberately unlike
+  the fallback), and shows a later bundled-read fault cannot change a second
+  decoration. A fourth case reads `app/plugins.ts` and pins the call site,
+  because that module patches `Module._load` and constructs the plugin store as
+  it loads.
+- **Completion barrier (errors).** The probe test double now queues every
+  `send` and drains the queue through `onMainHandle` only after
+  `sendSync(E2E_COMPLETION_BARRIER_CHANNEL)` records that the barrier began.
+  One test asserts the command is handled after the barrier begins and before
+  the press reports; another defers an earlier command and shows a later,
+  unbound press does not take credit for it.
+- **Observability (warning).** `NotificationDetails` carries a bounded
+  `category` (`invalid-return`, `thrown`) and `operation` (`plugin-decoration`,
+  `plugin-hook`, `plugin-load`, `plugin-settings`, `startup`); `describeError`
+  supplies only an errno code and a known name. `app/index.mts` records
+  `category: 'thrown'` and `operation: 'startup'` for a failed start-up, and
+  `app/plugins.ts` attaches the same fields at every notification site.
+- **Developer documentation (warning).** `docs/developers-guide.md` now
+  describes `decorateProfileConfig`'s copied palette and its fallback order,
+  and the span-operation list begins with `startup`.
+- **Property/proof (warning).** `test/unit/keybindings-policy.test.ts` states
+  the model's value relation as the `sameKeymaps` oracle and checks the model's
+  empty map and a generated keymap rebuilt in reverse order against it. The
+  `.dfy` header records that the relation is still a trusted assumption.
+- **Domain Architecture (warning).** Deferred: atomic create-if-absent
+  bootstrap is issue `#270`. A seed still decides from an earlier read, and
+  making the write atomic changes the store port and the policy's bootstrap
+  contract, which is wider than this review round.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -4974,3 +5025,12 @@ requires it. Any adjustment is recorded in `Decision log`.
     raw console argument tuples and asserts the bounded description object
     (`{code: 'ENOENT', name: 'Error'}`) directly, plus a case where a sensitive
     path is carried in the error's `code` field and must be dropped.
+- 2026-11-12 (review-round repairs for `3c6bfc42`): review `5842629285` is
+  answered at each boundary it names; EP-J records the details. The stamp is a
+  three-state value so a failed inspection reconciles instead of comparing
+  equal, palette composition moved behind `decorateProfileConfig` and is tested
+  through the watch harness plus the plugin call site, the probe test double
+  now defers main's handling until the completion barrier, and notification
+  logs carry bounded `category` and `operation` fields. Docstrings were added
+  to every function this round touched, and the `sameKeymaps` oracle states the
+  proof model's value relation. The atomic bootstrap remains deferred to `#270`.

@@ -34,8 +34,14 @@ if (requestedArgument && informationalArguments.includes(requestedArgument)) {
     await import('./start.js');
   } catch (error) {
     // The bounded description keeps a failed start-up diagnosable without
-    // repeating a path or a secret the error message may quote.
-    console.error('Failed to start Hyper.', describeError(error));
+    // repeating a path or a secret the error message may quote. The stage and
+    // category are fixed tokens, so support can tell a start-up failure from
+    // the same error reported elsewhere.
+    console.error('Failed to start Hyper.', {
+      ...describeError(error),
+      category: 'thrown',
+      operation: 'startup'
+    });
     process.exitCode = 1;
     app.quit();
   }

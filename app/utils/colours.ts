@@ -44,6 +44,12 @@ const colorList = [
  */
 export function getColorMap(colors: ColorMap): ColorMap;
 export function getColorMap(colors: readonly string[]): Record<string, string>;
+/**
+ * Accepts either supported colour shape and normalizes it to named slots.
+ *
+ * @param colors - A colour map, or the legacy positional list.
+ * @returns The map unchanged, or the list's named slots.
+ */
 export function getColorMap(colors: ColorMap | readonly string[]): ColorMap | Record<string, string> {
   if (isColorMap(colors)) {
     return colors;

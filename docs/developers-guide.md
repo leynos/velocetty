@@ -364,12 +364,20 @@ wires them together.
   main-process API only.
 - **`fixConfigDefaults`** (`app/config/fix-config-defaults.ts`): completes the
   decorated configuration's colour map. `withDefaultColors` in
-  `app/utils/colours.ts` layers the bundled defaults underneath the user's
-  colours, so a partial user map keeps its own values and gains the rest. When
-  the bundled config could not be read, the last-resort palette stands in and
-  the user's colours still win. The composition root supplies
-  `getDefaultConfig().defaults.config?.colors`, and the pure function is tested
-  without Electron.
+  `app/utils/colours.ts` layers the supplied palette underneath the colours it
+  is completing, so a partial map keeps its own values and gains the rest. When
+  the supplied palette is absent, the last-resort palette stands in and the
+  map's own colours still win.
+- **`decorateProfileConfig`** (`app/config.ts`): the composition root's
+  decoration entry point, called by `getDecoratedConfig`. It reads the
+  profile's merged configuration, copies `config.colors` before the plugin
+  decoration runs, passes that copy to `fixConfigDefaults` as the fallback
+  palette, and returns the completed configuration. The copy is the palette the
+  import applied, which already reflects the user's configuration; a plugin
+  that removes a colour therefore falls back to the imported value, then to the
+  last-resort palette, rather than to a fresh read. Decoration never re-reads
+  the bundled file, so a read fault after start-up cannot change the colours of
+  an open window.
 - **Import and export APIs** (`app/config/keybindings.ts`):
   `importKeybindings` validates the text and writes it through the store. It
   never changes the in-memory shortcuts; the next reload applies the file. A
@@ -454,12 +462,12 @@ records are shown wrapped here. Its fields mean:
 - `category` is `permission` for `EPERM` and `EACCES`, `busy` for `EBUSY`, and
   `other` for anything else. `exhausted` marks the attempt that ended the
   write, so a retry that later succeeds emits only `exhausted=false` events.
-- A span's `operation` is `reload`, `watcher-dispatch`, `keybindings-read`, or
-  `keybindings-write`; its `outcome` is `applied`, `fallback`, or `thrown` for
-  the import operations and `present`, `missing`, `unreadable`, `written`, or
-  `failed` for the storage operations. `ms` is the elapsed time rounded to a
-  whole millisecond, so a span line is a completion record rather than an
-  in-progress marker.
+- A span's `operation` is `startup`, `reload`, `watcher-dispatch`,
+  `keybindings-read`, or `keybindings-write`; its `outcome` is `applied`,
+  `fallback`, or `thrown` for the import operations and `present`, `missing`,
+  `unreadable`, `written`, or `failed` for the storage operations. `ms` is the
+  elapsed time rounded to a whole millisecond, so a span line is a completion
+  record rather than an in-progress marker.
 
 `createConfigMetrics`, `createImportRecorder`, and `createConfigSpanRecorder`
 live in `app/config/config-metrics.ts`, `app/config/config-observability.ts`,
