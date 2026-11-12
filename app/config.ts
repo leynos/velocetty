@@ -22,7 +22,7 @@ import {createImportRecorder, type ImportRecord} from './config/config-observabi
 import {createConfigSpanRecorder} from './config/config-spans';
 import {emitE2EMarker, formatKeymapsMarker, type E2EKeymapStatus} from './config/e2e-keymap-probe';
 import {fixConfigDefaults as applyConfigDefaults} from './config/fix-config-defaults';
-import {createConfigImportModule} from './config/import';
+import {createConfigImportModule, type ConfigImportResult} from './config/import';
 import {shouldAnnounceReload, type ConfigImportReport} from './config/import-report';
 import {_init} from './config/init';
 import {createKeybindingsService} from './config/keybindings';
@@ -48,7 +48,12 @@ import {
 } from './config/paths';
 import notify from './notify';
 import {closeWatcherAtShutdown, createConfigWatcher, type WatcherEvent, type WatcherHandle} from './config/watcher';
-import {createWatchedFileReconciler} from './config/watched-file-stamp';
+import {
+  captureWatchedFileStamps,
+  createWatchedFileReconciler,
+  refreshWatchedFileStamps,
+  type WatchedFileStamps
+} from './config/watched-file-stamp';
 
 const metrics = createConfigMetrics();
 
@@ -110,6 +115,9 @@ const CONFIG_DEBOUNCE_MS = 100;
 const watchers: Function[] = [];
 let cfg: parsedConfig | undefined;
 let configWatcher: {readonly close: () => Promise<void>} | undefined;
+
+/** The files the watcher covers, resolved once because they never change. */
+const watchedFiles = [path.resolve(cfgPath), path.resolve(keybindingsPath)];
 
 /**
  * Returns the configuration the last import applied.
@@ -258,19 +266,46 @@ const reloadConfiguration = () => {
   emitKeymapsMarker(report);
 };
 
-/** Starts the configuration watcher once; later calls are no-ops. */
-const _watch = () => {
+/**
+ * The watched files this start-up import wrote itself.
+ *
+ * The baseline is captured before the import, so a file start-up creates looks
+ * changed even though the application holds exactly what was written. The
+ * import reports the two creations it can perform, and only those are
+ * refreshed. A concurrent writer landing after our own write is the remaining
+ * window, and it is the same cross-process replace `#270` tracks.
+ *
+ * @param imported - The result of the start-up import.
+ * @returns The absolute paths of the files the import created.
+ */
+const writtenWatchedFiles = (imported: ConfigImportResult): readonly string[] => {
+  const written: string[] = [];
+  if (imported.bootstrapped) {
+    written.push(path.resolve(cfgPath));
+  }
+  if (imported.keybindings.kind === 'applied' && imported.keybindings.origin === 'seeded') {
+    written.push(path.resolve(keybindingsPath));
+  }
+  return written;
+};
+
+/**
+ * Starts the configuration watcher once; later calls are no-ops.
+ *
+ * @param startupStamps - The file identities captured before the start-up
+ *   import, with the files that import wrote refreshed to what it wrote.
+ */
+const _watch = (startupStamps: WatchedFileStamps) => {
   if (configWatcher !== undefined) {
     return;
   }
 
-  const watchedFiles = [path.resolve(cfgPath), path.resolve(keybindingsPath)];
   const watchedDirectories = [...new Set(watchedFiles.map((fileName) => path.dirname(fileName)))];
   // Chokidar's initial scan suppresses events for the files it finds, so a
   // save that lands mid-scan would otherwise wait for the next edit. The
-  // reconciler remembers what the start-up import saw and reports a moved or
-  // unreadable file, so readiness never silently keeps a stale configuration.
-  const reconcileOnReady = createWatchedFileReconciler(watchedFiles);
+  // reconciler compares against the baseline taken before the import read the
+  // files, so a save that landed between that read and now is still seen.
+  const reconcileOnReady = createWatchedFileReconciler(startupStamps);
 
   configWatcher = createConfigWatcher<ReturnType<typeof setTimeout>>({
     cancel: (timer) => clearTimeout(timer),
@@ -466,6 +501,10 @@ export const getKeymaps = () => {
 export const setup = () => {
   const finishSpan = spans.begin('startup');
   let imported: ReturnType<typeof _import>;
+  // Captured before the import reads anything: a save that lands between that
+  // read and the watcher's baseline must still look like a change, or the app
+  // would keep content the file no longer holds and the scan would hide it.
+  let startupStamps = captureWatchedFileStamps(watchedFiles);
   try {
     // Count the attempt before any preparation runs: a failure while creating
     // the tree or clearing a stale temporary file is still a start-up attempt,
@@ -496,7 +535,8 @@ export const setup = () => {
     Object.assign(record, {fallbackBasis: 'defaults' as const});
   }
   recorder.recordImport(record);
-  _watch();
+  startupStamps = refreshWatchedFileStamps(startupStamps, writtenWatchedFiles(imported));
+  _watch(startupStamps);
   checkDeprecatedConfig();
   emitE2EMarker(`[e2e] keybindings-path ${keybindingsPath}`);
   emitE2EMarker(`[e2e] config-path ${cfgPath}`);

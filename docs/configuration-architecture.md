@@ -133,8 +133,13 @@ stop future reloads.
 Chokidar's initial scan can miss a file that changed after the start-up import
 but before the watcher became ready. On readiness, `createConfigWatcher` calls
 `reconcileOnReady`; the composition root compares each file's `mtimeMs` and
-`size` with the values it recorded after the import and runs one catch-up
-reload only when a file moved.
+`size` with the baseline it captured *before* the import read them, and runs one
+catch-up reload only when a file moved. Capturing before the read is what makes
+a save landing after that read visible; capturing afterwards would record the
+file's new identity while the application still held the old content. The files
+start-up itself writes — a bootstrapped `config.json5` or a seeded
+`keybindings.json5` — are then re-read into the baseline, so first run holds
+exactly what it wrote and stays quiet.
 
 ### Observability
 

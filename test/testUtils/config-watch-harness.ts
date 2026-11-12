@@ -5,6 +5,7 @@
  * spec to keep both files within the repository's file-size limit.
  */
 import {mock} from 'bun:test';
+import path from 'node:path';
 
 import type {ConfigImportReport} from '../../app/config/import-report';
 import type {KeybindingsLoadOutcome} from '../../app/config/keybindings';
@@ -42,25 +43,32 @@ export const makeParsedConfig = (keymaps: Record<string, string[]>): parsedConfi
 /** Stands in for the `open` adapter, which the composition root only calls. */
 const openModuleFactory = () => ({default: () => true});
 
+/** The resolved configuration paths the harness presents to the composition root. */
+type HarnessPaths = Readonly<{
+  readonly cfgDir: string;
+  readonly cfgPath: string;
+  readonly keybindingsPath: string;
+}>;
+
 /** Stands in for the resolved paths, so no test reads the real home directory. */
-const pathsModuleFactory = () => ({
-  cfgDir: '/tmp',
-  cfgPath: '/tmp/config.json5',
+const pathsModuleFactory = ({cfgDir, cfgPath, keybindingsPath}: HarnessPaths) => ({
+  cfgDir,
+  cfgPath,
   // The composition root names the active tree in every import record.
   configTree: 'velocetty',
   // The stub paths are always readable, so start-up may bootstrap as before.
   configInspection: 'ok',
-  defaultCfg: '/tmp/config-default.json',
-  defaultPlatformKeyPath: () => '/tmp/linux.json',
-  keybindingsDir: '/tmp',
-  keybindingsPath: '/tmp/keybindings.json5',
+  defaultCfg: path.join(cfgDir, 'config-default.json'),
+  defaultPlatformKeyPath: () => path.join(cfgDir, 'linux.json'),
+  keybindingsDir: cfgDir,
+  keybindingsPath,
   keybindingsSchemaFile: 'keybindings.schema.json',
-  keybindingsSchemaPath: '/tmp/keybindings.schema.json',
-  plugs: {base: '/tmp/plugins', local: '/tmp/plugins/local'},
+  keybindingsSchemaPath: path.join(cfgDir, 'keybindings.schema.json'),
+  plugs: {base: path.join(cfgDir, 'plugins'), local: path.join(cfgDir, 'plugins', 'local')},
   schemaFile: 'schema.json',
-  schemaPath: '/tmp/schema.json',
+  schemaPath: path.join(cfgDir, 'schema.json'),
   shadowedConfigPaths: ['/home/user/.hyper/config.json5'],
-  velocettyDir: '/tmp'
+  velocettyDir: cfgDir
 });
 /** Stands in for the window-state store, which the composition root only wires. */
 const windowsModuleFactory = () => ({defaults: {}, get: () => ({}), recordState: () => {}});
@@ -88,18 +96,39 @@ export type WatchHarness = {
   readonly configModule: typeof import('../../app/config.ts');
   readonly importMock: ReturnType<typeof mock>;
   readonly callOrder: string[];
+  /** The config file the composition root watches and stamps. */
+  readonly cfgPath: string;
+  /** The keybindings file the composition root watches and stamps. */
+  readonly keybindingsPath: string;
   readonly notifyMock: ReturnType<typeof mock>;
   readonly storeCleanupMock: ReturnType<typeof mock>;
   readonly subscriberMock: ReturnType<typeof mock>;
   readonly watchMock: ReturnType<typeof mock>;
   readonly watcherMock: WatchMock;
   readonly emit: (request: EmitRequest) => void;
+  /** Completes chokidar's initial scan, which triggers readiness reconciliation. */
+  readonly emitReady: () => void;
   /** Makes the next stale-file cleanup throw, to exercise preparation failure. */
   readonly setCleanupError: (error: unknown) => void;
   readonly setReport: (report: ConfigImportReport) => void;
   readonly setConfig: (config: parsedConfig) => void;
   readonly setOutcome: (outcome: KeybindingsLoadOutcome) => void;
+  /** Declares whether the start-up import created the config file. */
+  readonly setBootstrapped: (bootstrapped: boolean) => void;
 };
+
+/** Options for a harness instance; the default directory keeps older tests unchanged. */
+export type WatchHarnessOptions = Readonly<{
+  /** Directory the composition root treats as the Velocetty tree. */
+  readonly configDir?: string;
+  /**
+   * Runs inside the importer, before it returns.
+   *
+   * A test uses this to land a filesystem change at the exact point the import
+   * has read the files but the composition root has not yet started watching.
+   */
+  readonly onImport?: (phase: string) => void;
+}>;
 
 /** The watcher events the configuration module subscribes to. */
 type WatchEvent = 'add' | 'change' | 'unlink';
@@ -111,7 +140,9 @@ type WatchHandler = (eventPath: string) => void;
 type WatchMock = {
   close: ReturnType<typeof mock>;
   getWatched: () => Record<string, string[]>;
-  on: ReturnType<typeof mock<(...args: [event: WatchEvent, handler: WatchHandler]) => WatchMock>>;
+  // Readiness uses a zero-argument listener, so the event name is widened
+  // beyond the file events the reload path subscribes to.
+  on: ReturnType<typeof mock<(...args: [event: string, handler: WatchHandler]) => WatchMock>>;
 };
 
 /**
@@ -132,8 +163,11 @@ const outcomeFor = (report: ConfigImportReport): KeybindingsLoadOutcome =>
       };
 
 /** Imports a fresh `app/config.ts` instance over mocked chokidar and electron. */
-export const createWatchHarness = async (): Promise<WatchHarness> => {
+export const createWatchHarness = async (options: WatchHarnessOptions = {}): Promise<WatchHarness> => {
   mock.restore();
+  const cfgDir = options.configDir ?? '/tmp';
+  const cfgPath = path.join(cfgDir, 'config.json5');
+  const keybindingsPath = path.join(cfgDir, 'keybindings.json5');
   // These stand-ins ignore their arguments; recording them without naming their
   // types keeps the harness free to assert on whatever the module passes.
   const callOrder: string[] = [];
@@ -148,7 +182,7 @@ export const createWatchHarness = async (): Promise<WatchHarness> => {
   const watcherMock: WatchMock = {
     close: mock(async () => {}),
     getWatched: () => ({'/tmp': ['config.json5', 'keybindings.json5']}),
-    on: mock((..._args: [event: WatchEvent, handler: WatchHandler]) => watcherMock)
+    on: mock((..._args: [event: string, handler: WatchHandler]) => watcherMock)
   };
   const watchMock = mock((_paths: string[], _options?: unknown) => watcherMock);
 
@@ -158,9 +192,12 @@ export const createWatchHarness = async (): Promise<WatchHarness> => {
   // can exercise causes the report vocabulary cannot express, such as an
   // unreadable keybindings file.
   let currentOutcome: KeybindingsLoadOutcome | undefined;
+  let currentBootstrapped = false;
   const importMock = mock((..._args: unknown[]) => {
     callOrder.push('import');
+    options.onImport?.(String(_args[0]));
     return {
+      bootstrapped: currentBootstrapped,
       config: currentConfig,
       keybindings: currentOutcome ?? outcomeFor(currentReport),
       report: currentReport
@@ -193,7 +230,10 @@ export const createWatchHarness = async (): Promise<WatchHarness> => {
     specifier: '../../app/config/keybindings-store'
   });
   registerAppModuleMock({factory: openModuleFactory, specifier: '../../app/config/open'});
-  registerAppModuleMock({factory: pathsModuleFactory, specifier: '../../app/config/paths'});
+  registerAppModuleMock({
+    factory: () => pathsModuleFactory({cfgDir, cfgPath, keybindingsPath}),
+    specifier: '../../app/config/paths'
+  });
   registerAppModuleMock({factory: windowsModuleFactory, specifier: '../../app/config/windows'});
   registerAppModuleMock({factory: () => ({default: notifyMock}), specifier: '../../app/notify'});
   // `app/utils/colours` is deliberately left real: it is a leaf module, and a
@@ -211,12 +251,25 @@ export const createWatchHarness = async (): Promise<WatchHarness> => {
     }
   };
 
+  /** Completes the initial scan the way chokidar does, with no path argument. */
+  const emitReady = () => {
+    const handlers = watcherMock.on.mock.calls.filter(([name]) => name === 'ready').map(([, handler]) => handler);
+    for (const handler of handlers) {
+      // SAFETY: the 'ready' subscription is chokidar's zero-argument listener,
+      // which the widened `WatchMock` event signature cannot express.
+      (handler as () => void)();
+    }
+  };
+
   return {
     appOnMock,
     callOrder,
+    cfgPath,
     configModule,
     emit,
+    emitReady,
     importMock,
+    keybindingsPath,
     notifyMock,
     storeCleanupMock,
     setCleanupError: (error) => {
@@ -227,6 +280,9 @@ export const createWatchHarness = async (): Promise<WatchHarness> => {
     },
     setOutcome: (outcome) => {
       currentOutcome = outcome;
+    },
+    setBootstrapped: (bootstrapped) => {
+      currentBootstrapped = bootstrapped;
     },
     setReport: (report) => {
       currentReport = report;

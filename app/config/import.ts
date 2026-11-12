@@ -36,9 +36,17 @@ export type ConfigImportKeybindings = {
   readonly reload: () => KeybindingsLoadOutcome;
 };
 
-type ConfigImportResult = {
+export type ConfigImportResult = {
   readonly config: parsedConfig;
   readonly report: ConfigImportReport;
+  /**
+   * Whether this start-up created `config.json5`.
+   *
+   * The caller captures the watcher baseline before the import, so it needs to
+   * know which files the import wrote itself; those are the only changes the
+   * baseline should not treat as a concurrent edit.
+   */
+  readonly bootstrapped: boolean;
   /**
    * What the keybindings service decided, passed through unflattened so the
    * caller can report its `origin`, `basis`, and `cause` without re-deriving
@@ -165,7 +173,7 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
     if (loaded.fallbackCause !== undefined) {
       Object.assign(report, {configCause: loaded.fallbackCause});
     }
-    return {config, keybindings: outcome, report};
+    return {bootstrapped: loaded.bootstrapped, config, keybindings: outcome, report};
   };
 
   return {_import, getDefaultConfig: sources.getDefaultConfig};

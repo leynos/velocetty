@@ -6,6 +6,14 @@
  * could go unreconciled. A stamp therefore records an inspection failure as
  * its own state, and an unknown identity never compares equal to anything,
  * including another unknown one.
+ *
+ * The baseline is captured before the start-up import reads the files, not
+ * after it. Capturing afterwards would let a save that lands between the
+ * import's read and the capture describe the file's new identity while the
+ * application holds the old content, so the scan would see no difference and
+ * the change would never be reconciled. Capturing first can only cost a
+ * redundant reload; it cannot miss one. Files start-up itself wrote are then
+ * refreshed, and that exception is stated at the call site.
  */
 import {statSync} from 'node:fs';
 
@@ -16,6 +24,9 @@ export type WatchedFileStamp =
   | Readonly<{kind: 'present'; mtimeMs: number; size: number}>
   | Readonly<{kind: 'absent'}>
   | Readonly<{kind: 'unreadable'}>;
+
+/** Every watched file's identity at the moment the baseline was captured. */
+export type WatchedFileStamps = ReadonlyMap<string, WatchedFileStamp>;
 
 /** The file-inspection call the stamp reader uses; injectable so a test can script it. */
 export type StatFile = (filePath: string) => Readonly<{mtimeMs: number; size: number}>;
@@ -76,36 +87,85 @@ export const stampsMatch = (before: WatchedFileStamp, after: WatchedFileStamp): 
 };
 
 /**
+ * Reads every watched file's identity now.
+ *
+ * The caller captures this before the start-up import reads the files, so the
+ * baseline can only be older than what the import applied.
+ *
+ * @param fileNames - The absolute paths the watcher covers.
+ * @param statFile - The inspection call; defaults to `statSync`.
+ * @returns Each file's identity, keyed by path.
+ *
+ * @example
+ * ```ts
+ * const stamps = captureWatchedFileStamps(['/tmp/config.json5']);
+ * stamps.get('/tmp/config.json5'); // {kind: 'present', mtimeMs: 12, size: 34}
+ * ```
+ */
+export const captureWatchedFileStamps = (
+  fileNames: readonly string[],
+  statFile: StatFile = statSync
+): WatchedFileStamps => new Map(fileNames.map((fileName) => [fileName, readWatchedFileStamp(fileName, statFile)]));
+
+/**
+ * Re-reads named files, keeping every other stamp as it was.
+ *
+ * Start-up writes `config.json5` and `keybindings.json5` itself, and the
+ * application holds that written content, so the files it just wrote are the
+ * one difference the baseline must not reconcile. Each such file is re-read
+ * after the import, which is safe precisely because the caller wrote it.
+ *
+ * @param stamps - The baseline captured before the import.
+ * @param fileNames - The watched files the import itself wrote.
+ * @param statFile - The inspection call; defaults to `statSync`.
+ * @returns A baseline in which those files describe what the import wrote.
+ *
+ * @example
+ * ```ts
+ * const written = refreshWatchedFileStamps(stamps, ['/tmp/keybindings.json5']);
+ * written.get('/tmp/keybindings.json5'); // the seeded file
+ * ```
+ */
+export const refreshWatchedFileStamps = (
+  stamps: WatchedFileStamps,
+  fileNames: readonly string[],
+  statFile: StatFile = statSync
+): WatchedFileStamps => {
+  const refreshed = new Map(stamps);
+  for (const fileName of fileNames) {
+    refreshed.set(fileName, readWatchedFileStamp(fileName, statFile));
+  }
+  return refreshed;
+};
+
+/**
  * Builds the readiness predicate that decides whether to reload once.
  *
  * Chokidar suppresses events for files it finds during its initial scan, so a
  * save that lands mid-scan would otherwise wait for the next edit. The
  * returned predicate answers the watcher's readiness callback: it compares
- * each watched file against the reading taken when it was constructed, just
- * after the start-up import.
+ * each watched file against the baseline the caller captured before the
+ * start-up import.
  *
  * A file that cannot be inspected counts as changed. That costs one reload
  * when a file is genuinely unreadable, and avoids silently keeping a stale
  * configuration when the inspection itself is what failed.
  *
- * @param fileNames - The absolute paths the watcher covers.
+ * @param baseline - The identity recorded before the start-up import, with any
+ *   file the import wrote refreshed to what it wrote.
  * @param statFile - The inspection call; defaults to `statSync`.
  * @returns A predicate that is true when at least one watched file moved.
  *
  * @example
  * ```ts
- * const reconcile = createWatchedFileReconciler(['/tmp/config.json5']);
+ * const reconcile = createWatchedFileReconciler(captureWatchedFileStamps(['/tmp/config.json5']));
  * reconcile(); // false when the file is unchanged
  * ```
  */
 export const createWatchedFileReconciler = (
-  fileNames: readonly string[],
+  baseline: WatchedFileStamps,
   statFile: StatFile = statSync
 ): (() => boolean) => {
-  const stampsAfterImport = new Map(fileNames.map((fileName) => [fileName, readWatchedFileStamp(fileName, statFile)]));
-  return () =>
-    fileNames.some((fileName) => {
-      const before = stampsAfterImport.get(fileName) ?? {kind: 'absent' as const};
-      return !stampsMatch(before, readWatchedFileStamp(fileName, statFile));
-    });
+  const entries = [...baseline];
+  return () => entries.some(([fileName, before]) => !stampsMatch(before, readWatchedFileStamp(fileName, statFile)));
 };

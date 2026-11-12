@@ -9,8 +9,10 @@
 import {describe, expect, test} from 'bun:test';
 
 import {
+  captureWatchedFileStamps,
   createWatchedFileReconciler,
   readWatchedFileStamp,
+  refreshWatchedFileStamps,
   stampsMatch,
   type StatFile
 } from '../../app/config/watched-file-stamp';
@@ -40,7 +42,8 @@ const scripted = (readings: StatFile[]) => {
     }
     return next(filePath);
   };
-  return createWatchedFileReconciler(['/tmp/config.json5'], stat);
+  const baseline = captureWatchedFileStamps(['/tmp/config.json5'], stat);
+  return createWatchedFileReconciler(baseline, stat);
 };
 
 describe('readWatchedFileStamp', () => {
@@ -82,6 +85,62 @@ describe('stampsMatch', () => {
     expect(stampsMatch({kind: 'unreadable'}, {kind: 'absent'})).toBe(false);
     expect(stampsMatch({kind: 'absent'}, {kind: 'unreadable'})).toBe(false);
     expect(stampsMatch({kind: 'present', mtimeMs: 12, size: 34}, {kind: 'unreadable'})).toBe(false);
+  });
+});
+
+describe('captureWatchedFileStamps', () => {
+  test('reads every named file once and keys it by path', () => {
+    const seen: string[] = [];
+    const stat: StatFile = (filePath) => {
+      seen.push(filePath);
+      return reading(1, 2);
+    };
+
+    const stamps = captureWatchedFileStamps(['/tmp/a.json5', '/tmp/b.json5'], stat);
+
+    expect(seen).toEqual(['/tmp/a.json5', '/tmp/b.json5']);
+    expect([...stamps.keys()]).toEqual(['/tmp/a.json5', '/tmp/b.json5']);
+    expect(stamps.get('/tmp/a.json5')).toEqual({kind: 'present', mtimeMs: 1, size: 2});
+  });
+});
+
+describe('refreshWatchedFileStamps', () => {
+  test('re-reads only the files the import wrote', () => {
+    const seen: string[] = [];
+    const stat: StatFile = (filePath) => {
+      seen.push(filePath);
+      return reading(2, 3);
+    };
+    const baseline = new Map([
+      ['/tmp/config.json5', {kind: 'present' as const, mtimeMs: 1, size: 1}],
+      ['/tmp/keybindings.json5', {kind: 'absent' as const}]
+    ]);
+
+    const refreshed = refreshWatchedFileStamps(baseline, ['/tmp/keybindings.json5'], stat);
+
+    // The file the import did not write keeps the identity it had before the
+    // import, so a concurrent edit to it still reconciles.
+    expect(seen).toEqual(['/tmp/keybindings.json5']);
+    expect(refreshed.get('/tmp/config.json5')).toEqual({kind: 'present', mtimeMs: 1, size: 1});
+    expect(refreshed.get('/tmp/keybindings.json5')).toEqual({kind: 'present', mtimeMs: 2, size: 3});
+  });
+
+  test('a file start-up seeded is not reconciled against the pre-import baseline', () => {
+    // The baseline is captured first, so the seeded file reads as absent there;
+    // refreshing it after the import is what keeps first run quiet.
+    const scriptedReadings = [throwingStat('ENOENT'), () => reading(2, 3), () => reading(2, 3)];
+    const script: StatFile = (filePath) => {
+      const next = scriptedReadings.shift();
+      if (next === undefined) {
+        throw new Error('The test scripted fewer inspections than the code performed.');
+      }
+      return next(filePath);
+    };
+
+    const beforeImport = captureWatchedFileStamps(['/tmp/keybindings.json5'], script);
+    const afterImport = refreshWatchedFileStamps(beforeImport, ['/tmp/keybindings.json5'], script);
+
+    expect(createWatchedFileReconciler(afterImport, script)()).toBe(false);
   });
 });
 
