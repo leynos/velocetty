@@ -7,7 +7,7 @@
  */
 import {expect, test} from 'bun:test';
 
-import {pressUntilExecuted, pressWithoutCommand} from '../e2e/keybindings-e2e-harness';
+import {commandExecutedMarker, pressUntilExecuted, pressWithoutCommand} from '../e2e/keybindings-e2e-harness';
 
 /** The verdicts a scripted probe can report for a request. */
 type ProbeVerdict = 'pressed' | 'unbound' | 'rejected' | 'failed' | 'unanswered';
@@ -69,12 +69,27 @@ const answerWait = (
   return scriptedReply(wait.ordinal, wait.verdict, wait.command);
 };
 
+/** Whether the wait names a request rather than a command marker. */
+const namesRequest = (matcher: RegExp): boolean => /#\d+ /.test(matcher.source);
+
+/**
+ * An execution script in which no press's command ever runs.
+ *
+ * Presses are numbered from one, so no press ever matches the ordinal returned
+ * here. A script that names an ordinal is what models a command that does run.
+ */
+const neverExecutes = (): number | undefined => 0;
+
 /**
  * A launched-app stand-in whose probe verdicts come from a script.
  *
  * `send` mirrors the real launcher by attaching an ordinal to each request, and
- * `waitFor` only answers a wait that names that request. `count` reports the
- * command markers the script says the presses produced.
+ * `waitFor` only answers a wait that names that request. A `pressed` reply does
+ * not by itself run the command: `executesAt` says which press's `send` runs
+ * the handler, and that handler prints a marker naming the press whose command
+ * it is. Returning `undefined` models a press whose command was captured but
+ * never ran; naming a later press models a handler that lands after the press
+ * that emitted the command has already reported.
  *
  * An ordinal in `lateReplies` models a probe that reaches the request only after
  * the harness's first, shorter wait has expired: that wait times out, and the
@@ -88,26 +103,46 @@ const createFakeApp = (
   verdictFor: (ordinal: number) => ProbeVerdict,
   lateReplies: ReadonlySet<number> = new Set(),
   command = 'window:new',
-  markersBefore = 0
+  markersBefore = 0,
+  executesAt: (ordinal: number) => number | undefined = (ordinal) =>
+    verdictFor(ordinal) === 'pressed' ? ordinal : undefined
 ) => {
-  let commandRuns = markersBefore;
+  const printed = Array.from({length: markersBefore}, () => `[e2e] command-executed ${command} press=#0`);
   let ordinalsSent = 0;
   const waitsByOrdinal = new Map<number, number>();
+  /** Prints the marker the handler for one press's command emits. */
+  const printExecution = (ordinal: number) => {
+    printed.push(`[e2e] command-executed ${command} press=#${ordinal}`);
+  };
+  /** Runs every command whose handler lands while this press is being sent. */
+  const runDeferred = (ordinal: number) => {
+    for (let earlier = 1; earlier <= ordinalsSent; earlier += 1) {
+      if (executesAt(earlier) === ordinal) {
+        printExecution(earlier);
+      }
+    }
+  };
   const app = {
-    count: () => commandRuns,
-    output: () => '',
+    count: (matcher: RegExp) => printed.filter((line) => matcher.test(line)).length,
+    output: () => printed.join('\n'),
     send: () => {
       ordinalsSent += 1;
-      const verdict = verdictFor(ordinalsSent);
-      if (verdict === 'pressed') {
-        commandRuns += 1;
-      }
+      runDeferred(ordinalsSent);
       return ordinalsSent;
     },
     /** How many requests the harness appended, so a repeat can be detected. */
     sent: () => ordinalsSent,
     stop: async () => {},
     waitFor: async ({matcher}: Readonly<{matcher: RegExp}>): Promise<string> => {
+      // A marker wait names no request, so it is answered from the printed
+      // lines rather than from the scripted probe replies.
+      if (!namesRequest(matcher)) {
+        const marker = printed.find((line) => matcher.test(line));
+        if (marker === undefined) {
+          throw new Error(`Timed out waiting for the command marker: ${matcher.source}`);
+        }
+        return marker;
+      }
       const ordinal = ordinalOf(matcher);
       const waits = countWait(waitsByOrdinal, ordinal);
       // A reply from an earlier press of the same chord, which a chord-only
@@ -199,13 +234,59 @@ test(
     // command, not that this one did.
     const app = createFakeApp(() => 'unbound', new Set(), 'window:new', 1);
 
-    expect(app.count()).toBe(1);
+    expect(app.count(commandExecutedMarker('window:new'))).toBe(1);
     expect(await rejectionMessage(pressUntilExecuted({app, command: 'window:new', shortcut: 'ctrl+n'}))).toMatch(
       /never executed window:new/
     );
   },
   pressRetryBudgetMs
 );
+
+test('a pressed reply alone does not prove the command ran', async () => {
+  // The press emitted the command but main never ran its handler, so no marker
+  // names this press. Accepting the reply's verdict would report a scenario as
+  // passing on an emission alone.
+  const app = createFakeApp(() => 'pressed', new Set(), 'window:new', 0, neverExecutes);
+
+  expect(await rejectionMessage(pressUntilExecuted({app, command: 'window:new', shortcut: 'ctrl+n'}))).toMatch(
+    /Timed out waiting for the command marker/
+  );
+  // The press was handled, so repeating it could run the command twice.
+  expect(app.sent()).toBe(1);
+});
+
+test('an old marker cannot stand in for a press whose command never ran', async () => {
+  // The earlier binding executed before the file was edited, so the output
+  // already holds its marker, and the edited press emits the same command
+  // without main ever running it. Only the marker naming this press may count,
+  // which is what keeps the old marker from masking the missing execution.
+  const app = createFakeApp(() => 'pressed', new Set(), 'window:new', 1, neverExecutes);
+
+  expect(await rejectionMessage(pressUntilExecuted({app, command: 'window:new', shortcut: 'ctrl+n'}))).toMatch(
+    /Timed out waiting for the command marker/
+  );
+  expect(app.sent()).toBe(1);
+});
+
+test('a command that lands only after its press replied does not satisfy that press', async () => {
+  // The old shortcut's command arrives while the next press is being sent, so
+  // the marker exists by the time the harness looks — but it names the earlier
+  // press. Crediting it to the press under test would accept a binding that ran
+  // nothing, and the reply already said the press was handled, so the scenario
+  // must fail instead of pressing again.
+  const app = createFakeApp(
+    () => 'pressed',
+    new Set(),
+    'window:new',
+    0,
+    (ordinal) => (ordinal === 1 ? 2 : undefined)
+  );
+
+  expect(await rejectionMessage(pressUntilExecuted({app, command: 'window:new', shortcut: 'ctrl+n'}))).toMatch(
+    /Timed out waiting for the command marker/
+  );
+  expect(app.sent()).toBe(1);
+});
 
 test('a press the probe never answers fails instead of being repeated', async () => {
   // The request stays in the probe's file, so sending another would press the

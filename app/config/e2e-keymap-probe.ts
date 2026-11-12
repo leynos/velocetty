@@ -35,6 +35,42 @@ export const emitE2EMarker = (line: string): void => {
 export type E2EKeymapStatus = 'applied' | 'kept';
 
 /**
+ * The request token of the press whose command is being dispatched.
+ *
+ * The lane writes `#<ordinal>` before each chord and the probe repeats that
+ * token in its reply, so the same token on the command marker is what lets a
+ * scenario prove that this press, not an earlier one, ran the command. It is
+ * cleared as soon as the press returns, so a marker printed outside a press
+ * keeps its original, untagged shape.
+ */
+let currentPressToken: string | undefined;
+
+/** Records the request token of the press now being handled, if any. */
+export const setCurrentPressToken = (token: string | undefined): void => {
+  currentPressToken = token;
+};
+
+/**
+ * Formats the marker a command handler prints when it runs.
+ *
+ * The token is appended only while a press is being handled: the harness can
+ * then require the marker for the exact request it sent, rather than accepting
+ * any marker for the command, which a late press could have printed.
+ *
+ * @example
+ * ```ts
+ * setCurrentPressToken('#7');
+ * formatCommandExecutedMarker('window:new'); // '[e2e] command-executed window:new press=#7'
+ * setCurrentPressToken(undefined);
+ * formatCommandExecutedMarker('window:new'); // '[e2e] command-executed window:new'
+ * ```
+ */
+export const formatCommandExecutedMarker = (command: string): string =>
+  currentPressToken === undefined
+    ? `[e2e] command-executed ${command}`
+    : `[e2e] command-executed ${command} press=${currentPressToken}`;
+
+/**
  * Formats the keymaps marker for one reload.
  *
  * @example

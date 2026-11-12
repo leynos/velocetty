@@ -175,7 +175,17 @@ export const probeMarker = ({shortcut, status}: ProbeMarkerRequest) =>
   new RegExp(`\\[e2e\\] keymaps-active status=${status} window:new=${shortcut.replaceAll('+', String.raw`\+`)}`);
 
 /** The `[e2e]` line a command handler prints when the lane has driven it. */
-export const commandExecutedMarker = (command: string) => new RegExp(`\\[e2e\\] command-executed ${command}`);
+export const commandExecutedMarker = (command: string) => new RegExp(`\\[e2e\\] command-executed ${command}\\b`);
+
+/**
+ * The `[e2e]` line a command handler prints for one press of the lane.
+ *
+ * The handler repeats the request token the press carried, so this marker
+ * names the press that ran the command rather than only the command. An
+ * earlier press's command landing late therefore cannot satisfy it.
+ */
+export const executedByPressMarker = (ordinal: number, command: string) =>
+  new RegExp(`\\[e2e\\] command-executed ${command} press=#${ordinal}\\b`);
 
 const pressAttempts = 20;
 const pressIntervalMs = 1000;
@@ -380,7 +390,29 @@ type PressRequest = Readonly<{
 }>;
 
 /**
- * Presses a chord until the press itself emits the expected command.
+ * Waits for the marker the command handler prints for one press.
+ *
+ * The page's reply says only that the press emitted the command; it does not
+ * say that main ran it. The handler's marker repeats the press's request token,
+ * so waiting for that token is what proves this press executed the command.
+ * Exactly one marker is accepted: a second would mean one press ran its
+ * command twice, which the lane must not report as success.
+ */
+const requireCommandExecuted = async ({
+  app,
+  command,
+  ordinal
+}: Readonly<{app: LaunchedApp; command: string; ordinal: number}>): Promise<void> => {
+  const matcher = executedByPressMarker(ordinal, command);
+  await app.waitFor({description: `${command} to run for request #${ordinal}`, matcher});
+  const runs = app.count(matcher);
+  if (runs !== 1) {
+    throw new Error(`The press for request #${ordinal} ran ${command} ${runs} times. Output:\n${app.output()}`);
+  }
+};
+
+/**
+ * Presses a chord until the press itself emits and executes the command.
  *
  * The renderer binds its key listeners asynchronously after a reload, so the
  * first press can arrive before anything is listening and report `unbound`.
@@ -392,13 +424,12 @@ type PressRequest = Readonly<{
  * produced. A press that produced some other command is a failure rather than
  * a retry, because the binding under test is then simply wrong, and a command
  * that an earlier press emitted late is attributed to that earlier press or to
- * none at all. One press therefore cannot run its command twice. Completion
- * does not depend on timing either: the page blocks on a synchronous
- * round-trip to the main process before the probe replies, so the command's
- * handler has run, and the marker it printed is in the captured output, by the
- * time a reply to that press exists. A marker in the output therefore belongs
- * to a press that has already replied, and a count taken after a reply cannot
- * be moved by an earlier press.
+ * none at all. One press therefore cannot run its command twice.
+ *
+ * Execution is established separately from emission. The command handler
+ * prints the press's token, and this helper waits for that token, so a press
+ * whose command was captured but never run fails here rather than being
+ * credited by a marker some other press left in the output.
  */
 export const pressUntilExecuted = async ({app, command, shortcut}: PressRequest): Promise<void> => {
   let lastVerdict: ProbeReply['verdict'] = 'unanswered';
@@ -410,6 +441,7 @@ export const pressUntilExecuted = async ({app, command, shortcut}: PressRequest)
       throw new Error(`The ${shortcut} shortcut ran ${reply.command}, not ${command}. Output:\n${app.output()}`);
     }
     if (reply.verdict === 'pressed') {
+      await requireCommandExecuted({app, command, ordinal});
       return;
     }
     await sleep(retryIntervalMs);

@@ -27,7 +27,7 @@ import * as fs from 'node:fs';
 import {BrowserWindow, ipcMain, type WebContents} from 'electron';
 
 import {isString} from '../utils/runtime-guards';
-import {emitE2EMarker, isE2ERun} from './e2e-keymap-probe';
+import {emitE2EMarker, isE2ERun, setCurrentPressToken} from './e2e-keymap-probe';
 import {parseShortcut, toKeyPress, type KeyPress} from './e2e-shortcut-chord';
 
 /**
@@ -245,6 +245,9 @@ const parseRequest = (line: string): ProbeRequest => {
 /** Presses one request and reports its outcome under the request's token. */
 const pressLine = async (line: string): Promise<void> => {
   const {replyPrefix, shortcut} = parseRequest(line);
+  // The command handler runs while this press's message is handled, so the
+  // token set here is the one its marker prints.
+  setCurrentPressToken(replyPrefix.trim() === '' ? undefined : replyPrefix.trim());
   try {
     const outcome = await sendShortcut(shortcut);
     // The command travels in the reply so a scenario can require the press to
@@ -253,6 +256,9 @@ const pressLine = async (line: string): Promise<void> => {
     emitE2EMarker(`[e2e] shortcut-probe ${outcome.kind} ${replyPrefix}${shortcut}${detail}`);
   } catch (error) {
     emitE2EMarker(`[e2e] shortcut-probe failed ${replyPrefix}${shortcut}: ${String(error)}`);
+  } finally {
+    // A marker printed after the press must not be attributed to it.
+    setCurrentPressToken(undefined);
   }
 };
 
