@@ -351,6 +351,12 @@ wires them together.
 - **`ConfigImportNotify`** (`app/config/import-report.ts`): the notification
   port `(title, body?, details?)`, so the loader and importer never import
   Electron's notifier directly.
+- **`canBootstrapUserConfig`** (`app/config/import-sources.ts`): whether a
+  start-up may create `config.json5`. An active Hyper tree, an unreadable
+  active path, and a bundled default config that fell back to the safe defaults
+  all suppress it. The fallback is applied for that run, but writing it would
+  make a degraded template the user's permanent configuration, so a later
+  start-up with a repaired installation still bootstraps the file.
 - **`createConfigWatcher`** (`app/config/watcher.ts`): coalesces a burst of
   directory events into one complete reload. It takes an injected `handle`,
   `fileNames`, `debounceMs`, `schedule`, `cancel`, and `onReload`, plus optional

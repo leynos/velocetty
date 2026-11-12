@@ -93,18 +93,8 @@ mode, so none of the three arguments reaches the report.
    - If both trees hold a configuration file, merge the Hyper-tree file into
      the Velocetty copy by hand. The Velocetty copy is the active file, so
      overwriting it would discard the settings Velocetty is already using.
-     Preserve plugins from both copies while merging:
-     - Combine the `plugins` list, which names installed plugins, and the
-       `localPlugins` list, which names directories under `plugins/local/`,
-       dropping duplicates if a plugin appears in both files.
-     - Merge the `plugins/` directories as well: copy any plugin folder the
-       Velocetty tree lacks, including the `plugins/local/` folders named by
-       `localPlugins`, so no list entry points at a missing folder.
-     - Copy `schema.json` from the Hyper directory if the Velocetty directory
-       has none.
-     - Merge the shortcuts too, as described below. Shortcuts copied only into
-       the merged `config.json5` are ignored once the Velocetty directory has
-       a `keybindings.json5`.
+     [Merging two configurations](#merging-two-configurations) lists what to
+     preserve.
    - If only the Velocetty directory holds a configuration file, there is
      nothing to move.
    - If only the Hyper directory holds one, move the active configuration
@@ -114,6 +104,24 @@ mode, so none of the three arguments reaches the report.
      `schema.json` and the `plugins/` directory, and create the Velocetty
      directory if it does not exist yet.
 3. Start Velocetty again.
+
+#### Merging two configurations
+
+Merging keeps the settings from both copies. Work through these steps while
+merging the Hyper-tree file into the Velocetty copy:
+
+1. Combine the `plugins` list, which names installed plugins, and the
+   `localPlugins` list, which names directories under `plugins/local/`,
+   dropping duplicates if a plugin appears in both files.
+2. Merge the `plugins/` directories as well: copy any plugin folder the
+   Velocetty tree lacks, including the `plugins/local/` folders named by
+   `localPlugins`, so no list entry points at a missing folder.
+3. Copy `schema.json` from the Hyper directory if the Velocetty directory has
+   none.
+4. Merge the shortcuts too, as described in [Shortcuts when both trees have a
+   configuration](#shortcuts-when-both-trees-have-a-configuration). Shortcuts
+   copied only into the merged `config.json5` are ignored once the Velocetty
+   directory has a `keybindings.json5`.
 
 #### Shortcuts when both trees have a configuration
 

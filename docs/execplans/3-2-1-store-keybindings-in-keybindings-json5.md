@@ -1406,6 +1406,41 @@ design and the notification the user sees.
     missing documentation on a named declaration: no production function in
     the diff lacks a docstring.
 
+- [x] (2026-11-12 20:59Z) Closed the remaining blocking review row on the
+  end-to-end harness and worked through the rest of the pre-merge table.
+  - `f99423fc` separates emission from execution. The probe records the request
+    token of the press it is handling, the command handler prints that token in
+    its marker, and the harness waits for the marker that names the exact
+    request it sent. Three unit regressions pin the behaviour and each fails
+    against the previous harness: a pressed reply with no execution marker, an
+    old marker standing in for a press whose command never ran, and a command
+    that lands only after its press replied.
+  - The `config.json5` bootstrap is now suppressed when the bundled default
+    config fell back to the safe defaults. The fallback is still applied for
+    that run, but persisting it would make a degraded template the user's
+    permanent file, because the bootstrap happens once. A second test starts up
+    again after the shipped file is repaired and checks that the file is then
+    created from the valid defaults. The cross-process create-if-absent race
+    remains the deferred overwrite risk in #270.
+  - The probe reads `exceptionDetails.exception.description` before falling
+    back to `text`, so an instrumentation failure reports the thrown message
+    rather than the protocol's `Uncaught` token.
+  - Plugin load failures now reach the notification body and the console line
+    through `pluginLoadFailureText`, which carries the plugin's directory name
+    and a bounded errno code only. Tests cover a path-quoting message, a code
+    that is not an errno, and a thrown non-error.
+  - `app/notify.ts` and `cli/index.ts` carry module headers, the users' guide
+    moves the merge steps into their own section, the migration guide names
+    both `keybindings.json5` locations explicitly, and four legacy functions in
+    `app/plugins.ts` gained docstrings.
+  - Docstring coverage, re-measured with the compiler-API scan described above:
+    435 eligible functions in the changed files, 286 documented, 65.75%. Every
+    remaining gap is an anonymous callback. No named declaration in the changed
+    non-test files lacks a docstring. The hosted check skipped analysis on the
+    previous head, so its own percentage is still unverified there.
+  - #274 tracks replacing the trusted TypeScript–Dafny correspondence with a
+    mechanical check.
+
 ## Surprises & discoveries
 
 - Observation: `typos.toml` is generated from a shared dictionary fetched from

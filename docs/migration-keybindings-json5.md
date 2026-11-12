@@ -86,8 +86,9 @@ directory, and the two changes interact through the active configuration tree:
   effect until the configuration moves. Moving the configuration means moving
   `plugins/` and `schema.json` with it, and merging plugin lists when both
   trees declare plugins.
-- `keybindings.json5` always lives in the Velocetty directory, or beside a
-  development-mode configuration, whichever tree that configuration came from.
+- `keybindings.json5` always lives in the Velocetty directory. A
+  development-mode configuration is the one exception: its `keybindings.json5`
+  sits beside that configuration file.
 
 The [users' guide](users-guide.md#moving-an-existing-configuration) gives the
 step-by-step move, including how to preserve plugins when configurations from
