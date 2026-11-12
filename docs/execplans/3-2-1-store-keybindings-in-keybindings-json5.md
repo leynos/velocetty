@@ -4544,6 +4544,46 @@ with the reason recorded.
   figure is that method's, not an analyser figure; the method is stated
   alongside the number so it can be reproduced.
 
+### EP-L: review-round repairs for head `16a98af0`
+
+Review `6838251558` raised three findings. Each is closed at the boundary it
+names, and each new test was mutation-checked against the defect it describes.
+
+- **Start-up baseline timing.** The watcher's baseline stamps were captured
+  after the start-up import had read its sources, so a save that landed between
+  that read and the capture recorded the file's new identity while the app held
+  the old content, and the change was never reloaded. The baseline is now taken
+  before the import, and only the files start-up wrote itself — a bootstrapped
+  `config.json5`, or a `keybindings.json5` applied from the seed — are re-read
+  into it afterwards. The residual window, another writer saving while the
+  import writes, is attributed to `#270` in the commit and the architecture
+  note. Five tests in `test/unit/config-watch-readiness.test.ts` drive the real
+  composition over temporary files. Mutations: restoring the post-import
+  capture fails the save-between-read-and-capture test; skipping the
+  reconcile-on-ready pass fails the save-after-import test and the queued-burst
+  test; dropping the re-read of a seeded file fails the seeded-keybindings
+  test.
+- **Press-token attribution.** `currentPressToken` was a process-global that
+  the probe set for the duration of a press, so a command whose IPC message
+  landed while a later press was in flight printed the later press's token and
+  could be credited to a press that ran nothing. The token now travels with the
+  command message: the page wrapper tags the command payload it captures, and
+  the RPC listener binds that token only around the synchronous dispatch of
+  that one message, restoring the previous value afterwards. Mutations:
+  removing the tagging in the page fails four probe tests, including the one
+  that handles the first press's command during the second press; removing the
+  binding in `app/rpc.ts` fails the RPC test that asserts a tagged command
+  prints its own token and a following untagged command prints none.
+- **Plugin log privacy.** Successful loads printed the plugin's directory name
+  and manifest version, and failure lines repeated the name. Console sinks now
+  number the plugin by its position in the configured list; notifications keep
+  the name, because their reader chose it and must act on it. The load path
+  moved to `app/plugins-load.ts` with resolution and sinks injected, so
+  `test/unit/plugin-loader.test.ts` exercises the production code — including
+  both console sinks — against a plugin whose name and version would be
+  conspicuous in any log, for the successful, missing-manifest, missing-module,
+  throwing-module and no-extension paths.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
