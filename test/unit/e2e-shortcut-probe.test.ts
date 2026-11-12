@@ -21,7 +21,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 
 import {isJsonObject, isString} from '../../app/utils/runtime-guards';
-import {createPage} from '../testUtils/e2e-shortcut-probe-page';
+import {createPage, type SentMessage} from '../testUtils/e2e-shortcut-probe-page';
 import {
   type DebuggerCommandReply,
   getElectronMock,
@@ -43,6 +43,19 @@ const expressionOf = (params: unknown): string => {
     throw new TypeError('The probe did not send a Runtime.evaluate expression.');
   }
   return params['expression'];
+};
+
+/** The command id a sent message carries, or `undefined` when it runs none. */
+const commandOf = (message: SentMessage): string | undefined => {
+  const {payload} = message;
+  if (!isJsonObject(payload)) {
+    return undefined;
+  }
+  if (payload['ev'] !== 'command') {
+    return undefined;
+  }
+  const {data} = payload;
+  return isString(data) ? data : undefined;
 };
 
 /** A page with no body to press on yet, which is what a loading window has. */
@@ -168,9 +181,9 @@ describe('what a press established', () => {
     const page = createPage({
       duringDispatch: (send) => send('window-uid', {data: 'window:new', ev: 'command'}),
       onMainHandle: (message, {barrierAlreadyBegun}) => {
-        const {payload} = message;
-        if (isJsonObject(payload) && payload['ev'] === 'command' && isString(payload['data'])) {
-          handled.push({barrierAlreadyBegun, command: payload['data']});
+        const command = commandOf(message);
+        if (command !== undefined) {
+          handled.push({barrierAlreadyBegun, command});
         }
       }
     });
@@ -196,11 +209,8 @@ describe('what a press established', () => {
         if (dispatches === 1) send('window-uid', {data: 'window:new', ev: 'command'});
       },
       onMainHandle: (message) => {
-        const {payload} = message;
-        if (isJsonObject(payload) && isString(payload['data'])) {
-          // Main has not run this handler yet: it runs at the next barrier.
-          deferred = payload['data'];
-        }
+        // Main has not run this handler yet: it runs at the next barrier.
+        deferred = commandOf(message);
       },
       onBarrier: () => {
         if (deferred !== undefined) {
