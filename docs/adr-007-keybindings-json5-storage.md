@@ -100,7 +100,10 @@ unchanged. Export returns the stored text unchanged when it is valid. When the
 stored text is invalid, export reports it as invalid, with diagnostics, rather
 than inventing content. The application writes canonical text (sorted keys,
 two-space JSON5, a header comment) only when it creates the file during
-first-run bootstrap.
+first-run bootstrap. That create is decided from an earlier observation and is
+not atomic against another process: a file created in between is replaced
+rather than kept, which [#270](https://github.com/leynos/velocetty/issues/270)
+tracks.
 
 Last known good is held in memory for the session. It is the most recent state
 accepted from disk. A missing file is accepted as "no overrides". An invalid or

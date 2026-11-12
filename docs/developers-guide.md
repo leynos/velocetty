@@ -278,7 +278,10 @@ When touching keybinding storage:
   and only while `keybindings.json5` is missing, existing user keymaps may be
   copied there once; after that, `keybindings.json5` is the source of truth. A
   reload never copies, so a file deleted during a session stays deleted until
-  the next start.
+  the next start. The create is decided from an earlier observation and is not
+  atomic against another process: a file created in between is replaced rather
+  than kept, which [#270](https://github.com/leynos/velocetty/issues/270)
+  tracks.
 - Keep `keybindings.json5` JSON5-compatible, including comments and trailing
   commas.
 - Preserve the last known good in-memory keybindings if `keybindings.json5`

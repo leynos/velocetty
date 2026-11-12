@@ -310,6 +310,35 @@ counterpart:
 - [x] Unit tests exercise the service against domain-shaped fakes and the
   adapter against a fake filesystem.
 
+## KEYMAP-004 Make the start-up bootstrap create atomic
+
+Status: Open  
+Owner: @leynos  
+Last updated: 2026-11-12  
+Issue: [#270](https://github.com/leynos/velocetty/issues/270)
+
+### KEYMAP-004 summary
+
+- Start-up decides whether it may create `keybindings.json5` from an
+  observation taken earlier, then writes the content through a temporary
+  sibling and a rename. The rename replaces any file that appeared in between
+  rather than keeping it.
+- The policy model proves the decision, not the write: KB-POL-2 in
+  `app/config/keybindings-policy.dfy` states that a seed follows an observation
+  of a missing file, and says nothing about the state of the directory when the
+  rename runs.
+- Single-process behaviour is covered by the bootstrap tests. The
+  cross-process race is deferred, and the ADR, the configuration architecture
+  note, the developer guide, and the pull request describe the decision rather
+  than claiming the write itself is create-if-absent.
+
+### KEYMAP-004 exit criteria
+
+- The bootstrap either leaves a file another process created intact or reports
+  a bounded failure, through an atomic create-if-absent primitive.
+- A regression creates the file between the observation and the write and
+  asserts that its content survives.
+
 ## WINARM64-001 Track Windows aarch64 CI enablement after Bun support lands
 
 Status: Open  

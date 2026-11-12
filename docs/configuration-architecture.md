@@ -44,10 +44,12 @@ _Table 1: Configuration components._
   active user keymaps or leaves them alone. An invalid or unreadable file never
   clears working shortcuts;
 - **bootstrap**: `decideBootstrap` decides whether a start-up may create
-  `keybindings.json5`, and with what content. Only a missing file may be
-  written. It seeds the legacy keymaps when they parsed, `{}` when the legacy
-  config is empty or was just created, and nothing when the legacy config is
-  invalid or the source fell back to defaults.
+  `keybindings.json5`, and with what content. Only a file the last observation
+  found missing may be written; the create itself is not atomic against another
+  process, which [#270](https://github.com/leynos/velocetty/issues/270) tracks.
+  It seeds the legacy keymaps when they parsed, `{}` when the legacy config is
+  empty or was just created, and nothing when the legacy config is invalid or
+  the source fell back to defaults.
 
 Both are LemmaScript contracts in `app/config/keybindings-policy.dfy`. The
 module is pure by construction: no Electron import, no `node:fs`, no clock. The
