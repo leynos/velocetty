@@ -4497,6 +4497,53 @@ dispositioned against a tracked issue.
   making the write atomic changes the store port and the policy's bootstrap
   contract, which is wider than this review round.
 
+### EP-K: reconciliation-round repairs for head `6e632f15`
+
+CodeRabbit's answer to the pre-merge reconciliation left five rows open. Each
+is now closed at the surface it names, or left open against a tracked issue
+with the reason recorded.
+
+- **Testing (Overall), delayed-command regression.** The earlier test sent one
+  press and asserted that a delayed marker failed it, so it never exercised the
+  interleaving it described. `test/unit/keybindings-e2e-harness.test.ts` now
+  presses the chord twice: the first press's handler lands while the second
+  press is being sent, so its marker is already in the output when the second
+  wait looks, and only a marker naming the second press may count. Both presses
+  time out and `app.sent()` is two. Replacing
+  `executedByPressMarker({ordinal, command})` with the token-less
+  `commandExecutedMarker(command)` in that helper was tried as a mutation and
+  failed the new test, so the assertion detects the defect it names.
+- **Ordering at the IPC boundary.** `pressUntilExecuted`'s docblock now
+  attributes ordering to the probe's synchronous completion barrier, not to the
+  test double's shape: the barrier makes main drain the press before the reply
+  returns, so an earlier command cannot land under a later token. The hosted
+  Linux fast-lane E2E job passed on `95327fed` with this mechanism in place;
+  the double is not offered as proof of it.
+- **Observability, plugin log privacy.** `app/plugins.ts` printed
+  `path.basename(path_)` and, for a missing module, the raw error text. Both
+  console lines now identify the plugin by position in the configured list
+  (`pluginFailureLogText`, `pluginMetadataWarning` in
+  `app/utils/plugin-failure.ts`), keeping only a recognized errno code. The
+  notification still names the plugin, because its reader chose the name and
+  must act on it. `test/unit/plugin-load-failure-text.test.ts` covers both
+  sinks and asserts that neither path nor directory name appears.
+- **Domain Architecture, bootstrap wording.**
+  `docs/adr-007-keybindings-json5-storage.md`,
+  `docs/configuration-architecture.md` and `docs/developers-guide.md` now say
+  the write's decision comes from an earlier observation and is not atomic
+  against another process, citing `#270`. `docs/tracking-issues.md` gains
+  `KEYMAP-004`, which records what the policy proof does not cover and the
+  regression that would close it.
+- **Module-Level Documentation.** The saved assessment named `app/notify.ts`
+  and `cli/index.ts`; both carry `@file` headers at this head, as does
+  `scripts/check-package-boundaries.mjs`. Re-measured rather than assumed.
+- **Docstring Coverage.** The committed scan counts function-like declarations
+  of cyclomatic complexity two or more, with any JSDoc block. At this head it
+  reports 437 eligible, 288 documented (65.90 %), and all 149 gaps are
+  anonymous callbacks, which have no declaration to document. The reported
+  figure is that method's, not an analyser figure; the method is stated
+  alongside the number so it can be reproduced.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
