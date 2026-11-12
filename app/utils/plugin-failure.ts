@@ -4,8 +4,13 @@
  * loading it can quote that directory's path. Neither the notification body
  * nor the console line may repeat it: the notification is user-facing text
  * that is also copied into support reports, and the console line is read by
- * whoever has the terminal. Both take the plugin's directory name, which
- * identifies it, plus a fixed failure token.
+ * whoever has the terminal.
+ *
+ * The two sinks identify the plugin differently. A notification names it,
+ * because the reader has to act on it and already chose that name. A console
+ * line numbers it instead: the name is arbitrary user text, so a log gets a
+ * position in the configured list, which is bounded and still points at the
+ * entry to fix.
  */
 import {describeError} from './error-code';
 
@@ -35,3 +40,41 @@ export const pluginLoadFailureText = (pluginName: string, error: unknown): strin
     ? `Plugin "${pluginName}" failed to load.`
     : `Plugin "${pluginName}" failed to load (${code}).`;
 };
+
+/**
+ * Describes a plugin load failure for the console, without its name or path.
+ *
+ * The number is the plugin's position in the configured list, counted from
+ * one, which is enough to find the entry without repeating user text. The
+ * failure token follows the same rule as the notification: an errno code when
+ * the error carries a bounded one, and nothing otherwise.
+ *
+ * @param ordinal - The plugin's position in the configured list, from one.
+ * @param error - The value the load threw.
+ * @returns A sentence numbering the plugin, with a code when one is bounded.
+ *
+ * @example
+ * ```ts
+ * pluginFailureLogText(3, Object.assign(new Error('ENOENT: /home/ada/secret'), {code: 'ENOENT'}));
+ * // 'Plugin 3 failed to load (ENOENT).'
+ * pluginFailureLogText(4, new Error('nope'));
+ * // 'Plugin 4 failed to load.'
+ * ```
+ */
+export const pluginFailureLogText = (ordinal: number, error: unknown): string => {
+  const {code} = describeError(error);
+  return code === undefined ? `Plugin ${ordinal} failed to load.` : `Plugin ${ordinal} failed to load (${code}).`;
+};
+
+/**
+ * Says a plugin directory has no package metadata, without naming it.
+ *
+ * @param ordinal - The plugin's position in the configured list, from one.
+ * @returns A console sentence that identifies the plugin by position.
+ *
+ * @example
+ * ```ts
+ * pluginMetadataWarning(3); // 'No package.json found for plugin 3.'
+ * ```
+ */
+export const pluginMetadataWarning = (ordinal: number): string => `No package.json found for plugin ${ordinal}.`;

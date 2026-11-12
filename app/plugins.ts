@@ -18,7 +18,7 @@ import type {configOptions} from '@shared/types/config';
 
 import * as config from './config';
 import {describeError, errorCode} from './utils/error-code';
-import {pluginLoadFailureText} from './utils/plugin-failure';
+import {pluginFailureLogText, pluginLoadFailureText, pluginMetadataWarning} from './utils/plugin-failure';
 import {isFunction, isObject} from './utils/runtime-guards';
 import {plugs} from './config/paths';
 import notify from './notify';
@@ -395,9 +395,10 @@ function requirePlugins(): any[] {
    * Requires one plugin module, reporting why it was skipped when it fails.
    *
    * @param path_ - Absolute path of the plugin directory.
+   * @param ordinal - The plugin's position in the configured list, from one.
    * @returns The loaded module, or `undefined` when it cannot be used.
    */
-  const load = (path_: string) => {
+  const load = (path_: string, ordinal: number) => {
     let mod: AppPluginModule;
     try {
       mod = pluginRequire(path_);
@@ -416,7 +417,7 @@ function requirePlugins(): any[] {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         mod._version = pluginRequire(path.resolve(path_, 'package.json')).version;
       } catch {
-        console.warn(`No package.json found in the "${path.basename(path_)}" plugin directory.`);
+        console.warn(pluginMetadataWarning(ordinal));
       }
       console.log(`Plugin ${mod._name} (${mod._version}) loaded.`);
 
@@ -425,7 +426,10 @@ function requirePlugins(): any[] {
       const code = errorCode(error);
       const failure = pluginLoadFailureText(path.basename(path_), error);
       if (code === 'MODULE_NOT_FOUND') {
-        console.warn(failure);
+        // A missing module is common enough to stay quiet in the UI, so the
+        // console line is the only report; it numbers the plugin rather than
+        // repeating the directory name the configuration supplied.
+        console.warn(pluginFailureLogText(ordinal, error));
       } else {
         notify('Plugin error!', failure, {
           category: 'thrown',
@@ -436,8 +440,8 @@ function requirePlugins(): any[] {
     }
   };
 
-  return [...plugins_, ...localPlugins].flatMap((pluginPath) => {
-    const value = load(pluginPath);
+  return [...plugins_, ...localPlugins].flatMap((pluginPath, index) => {
+    const value = load(pluginPath, index + 1);
     return value ? [value] : [];
   });
 }
