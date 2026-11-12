@@ -4561,8 +4561,7 @@ names, and each new test was mutation-checked against the defect it describes.
   composition over temporary files. Mutations: restoring the post-import
   capture fails the save-between-read-and-capture test; skipping the
   reconcile-on-ready pass fails the save-after-import test and the queued-burst
-  test; dropping the re-read of a seeded file fails the seeded-keybindings
-  test.
+  test; dropping the re-read of a seeded file fails the seeded-keybindings test.
 - **Press-token attribution.** `currentPressToken` was a process-global that
   the probe set for the duration of a press, so a command whose IPC message
   landed while a later press was in flight printed the later press's token and
