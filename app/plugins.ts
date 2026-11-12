@@ -17,11 +17,11 @@ import type {IpcMainWithCommands} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
 
 import * as config from './config';
-import {describeError, errorCode} from './utils/error-code';
-import {pluginFailureLogText, pluginLoadFailureText, pluginMetadataWarning} from './utils/plugin-failure';
+import {describeError} from './utils/error-code';
 import {isFunction, isObject} from './utils/runtime-guards';
 import {plugs} from './config/paths';
 import notify from './notify';
+import {createPluginLoader} from './plugins-load';
 import {availableExtensions} from './plugins/extensions';
 import {install} from './plugins/install';
 import {
@@ -379,71 +379,27 @@ export const getBasePaths = () => {
   return {path: pluginPath, localPath};
 };
 
+/** Loads one configured plugin list, keeping the modules that expose an API. */
+const loadPlugins = createPluginLoader<AppPluginModule>({
+  availableExtensions,
+  log: (message) => console.log(message),
+  notify: (title, body, details) => notify(title, body, details),
+  // The plugin directory is the resolution root, so a plugin's own dependency
+  // tree is resolved from where it was installed rather than the app's.
+  // SAFETY: `pluginRequire` is Node's `require`, which types its result as
+  // `any`; the loader only writes the two bookkeeping fields it owns.
+  requireModule: <Module>(request: string) => pluginRequire(request) as Module,
+  warn: (message) => console.warn(message)
+});
+
 /**
  * Loads every configured plugin module, skipping the ones that fail.
- *
- * A module that does not expose an extension API, or that throws while being
- * required, is reported and left out rather than aborting the rest: one
- * broken third-party plugin must not stop the window from opening.
  *
  * @returns The loaded modules, in configuration order.
  */
 function requirePlugins(): any[] {
   const {plugins: plugins_, localPlugins} = paths;
-
-  /**
-   * Requires one plugin module, reporting why it was skipped when it fails.
-   *
-   * @param path_ - Absolute path of the plugin directory.
-   * @param ordinal - The plugin's position in the configured list, from one.
-   * @returns The loaded module, or `undefined` when it cannot be used.
-   */
-  const load = (path_: string, ordinal: number) => {
-    let mod: AppPluginModule;
-    try {
-      mod = pluginRequire(path_);
-      const exposed = Object.keys(mod).some((key) => availableExtensions.has(key));
-      if (!exposed) {
-        notify(
-          'Plugin error!',
-          `${`Plugin "${path.basename(path_)}" does not expose any `}Hyper extension API methods`
-        );
-        return;
-      }
-
-      // populate the name for internal errors here
-      mod._name = path.basename(path_);
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        mod._version = pluginRequire(path.resolve(path_, 'package.json')).version;
-      } catch {
-        console.warn(pluginMetadataWarning(ordinal));
-      }
-      console.log(`Plugin ${mod._name} (${mod._version}) loaded.`);
-
-      return mod;
-    } catch (error) {
-      const code = errorCode(error);
-      const failure = pluginLoadFailureText(path.basename(path_), error);
-      if (code === 'MODULE_NOT_FOUND') {
-        // A missing module is common enough to stay quiet in the UI, so the
-        // console line is the only report; it numbers the plugin rather than
-        // repeating the directory name the configuration supplied.
-        console.warn(pluginFailureLogText(ordinal, error));
-      } else {
-        notify('Plugin error!', failure, {
-          category: 'thrown',
-          error,
-          operation: 'plugin-load'
-        });
-      }
-    }
-  };
-
-  return [...plugins_, ...localPlugins].flatMap((pluginPath, index) => {
-    const value = load(pluginPath, index + 1);
-    return value ? [value] : [];
-  });
+  return loadPlugins([...plugins_, ...localPlugins]);
 }
 
 export const onApp = (app_: App) => {

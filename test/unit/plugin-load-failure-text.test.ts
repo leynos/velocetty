@@ -1,7 +1,12 @@
 /** @file Verifies plugin load failure text carries no path and no raw message. */
 import {expect, test} from 'bun:test';
 
-import {pluginFailureLogText, pluginLoadFailureText, pluginMetadataWarning} from '../../app/utils/plugin-failure';
+import {
+  pluginFailureLogText,
+  pluginLoadedText,
+  pluginLoadFailureText,
+  pluginMetadataWarning
+} from '../../app/utils/plugin-failure';
 
 /**
  * An error whose message quotes the plugin's path, as a load failure can.
@@ -61,4 +66,12 @@ test('a missing package.json is reported by position, not by directory', () => {
 
   expect(text).toBe('No package.json found for plugin 3.');
   expect(text).not.toContain('/');
+});
+
+test('a successful load is reported by position, not by name or version', () => {
+  const text = pluginLoadedText(2);
+
+  expect(text).toBe('Plugin 2 loaded.');
+  expect(text).not.toContain('/');
+  expect(text).not.toContain('hyper-cwd');
 });

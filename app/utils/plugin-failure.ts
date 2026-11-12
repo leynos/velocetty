@@ -78,3 +78,20 @@ export const pluginFailureLogText = (ordinal: number, error: unknown): string =>
  * ```
  */
 export const pluginMetadataWarning = (ordinal: number): string => `No package.json found for plugin ${ordinal}.`;
+
+/**
+ * Says a plugin loaded, identifying it by position rather than name.
+ *
+ * The directory name and the version both come from the configured plugin, so
+ * neither belongs in a console line: the position locates the entry in the
+ * list the user can edit, and carries no user text.
+ *
+ * @param ordinal - The plugin's position in the configured list, from one.
+ * @returns A console sentence that identifies the plugin by position.
+ *
+ * @example
+ * ```ts
+ * pluginLoadedText(3); // 'Plugin 3 loaded.'
+ * ```
+ */
+export const pluginLoadedText = (ordinal: number): string => `Plugin ${ordinal} loaded.`;
