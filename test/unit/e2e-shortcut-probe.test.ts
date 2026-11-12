@@ -58,6 +58,21 @@ const commandOf = (message: SentMessage): string | undefined => {
   return isString(data) ? data : undefined;
 };
 
+/** The press token a sent message carries, so attribution can be asserted. */
+const pressTokenOf = (message: SentMessage): string | null => {
+  const {payload} = message;
+  if (!isJsonObject(payload)) {
+    throw new TypeError('The probe sent a message without an object payload.');
+  }
+  const pressToken = payload['pressToken'];
+  if (pressToken === null || isString(pressToken)) {
+    return pressToken;
+  }
+  // A command always carries a token, `null` when its request had none, so a
+  // missing or exotic one means the probe stopped tagging what it sends.
+  throw new TypeError(`The probe sent a command with no usable press token: ${String(pressToken)}`);
+};
+
 /** A page with no body to press on yet, which is what a loading window has. */
 const pageWithoutBody = (): vm.Context =>
   vm.createContext({
@@ -112,7 +127,9 @@ describe('what a press established', () => {
     expect(await sendShortcut('ctrl+n')).toEqual({command: 'window:new', kind: 'pressed'});
     // The press really reached the window's RPC channel; the probe only
     // observed the message, so the command still ran in the main process.
-    expect(page.sent).toEqual([{channel: 'window-uid', payload: {data: 'window:new', ev: 'command'}}]);
+    expect(page.sent).toEqual([
+      {channel: 'window-uid', payload: {data: 'window:new', ev: 'command', pressToken: null}}
+    ]);
     // The key event carries the chord, so the press is the one the lane asked
     // for rather than an unmodified keydown.
     expect(page.eventInits).toEqual([
@@ -229,6 +246,71 @@ describe('what a press established', () => {
     // the press that emitted it.
     expect(await sendShortcut('ctrl+n')).toEqual({kind: 'unbound'});
     expect(handled).toEqual(['window:new']);
+  });
+
+  test('a command carries the token of the press that sent it', async () => {
+    const page = createPage({
+      duringDispatch: (send) => send('window-uid', {data: 'window:new', ev: 'command'})
+    });
+    installWindow(evaluatingSession(page.context));
+
+    expect(await sendShortcut('ctrl+n', '#7')).toEqual({command: 'window:new', kind: 'pressed'});
+    // The token rides with the command, so main can attribute the marker the
+    // handler prints without holding state of its own across presses.
+    expect(page.sent.map((message) => pressTokenOf(message))).toEqual(['#7']);
+  });
+
+  test('a press without a token sends an untagged command', async () => {
+    const page = createPage({
+      duringDispatch: (send) => send('window-uid', {data: 'window:new', ev: 'command'})
+    });
+    installWindow(evaluatingSession(page.context));
+
+    expect(await sendShortcut('ctrl+n')).toEqual({command: 'window:new', kind: 'pressed'});
+    // A bare chord, as a handwritten request writes it, produces the marker
+    // shape a press outside the lane has always produced.
+    expect(page.sent.map((message) => pressTokenOf(message))).toEqual([null]);
+  });
+
+  test('an event that is not a command is sent unmodified', async () => {
+    const page = createPage({duringDispatch: (send) => send('window-uid', {data: 'window:new', ev: 'edit'})});
+    installWindow(evaluatingSession(page.context));
+
+    expect(await sendShortcut('ctrl+n', '#7')).toEqual({kind: 'unbound'});
+    // Only a command is tagged; other renderer events are none of the probe's
+    // business and must reach main exactly as the renderer sent them.
+    expect(page.sent).toEqual([{channel: 'window-uid', payload: {data: 'window:new', ev: 'edit'}}]);
+  });
+
+  test('a command handled during a later press keeps the earlier press token', async () => {
+    const delivered: SentMessage[] = [];
+    let presses = 0;
+    let deferred: SentMessage | undefined;
+    const page = createPage({
+      duringDispatch: (send) => {
+        presses += 1;
+        // Only the first press emits; the second is an unbound press.
+        if (presses === 1) send('window-uid', {data: 'window:new', ev: 'command'});
+      },
+      onMainHandle: (message) => {
+        deferred = message;
+      },
+      onBarrier: () => {
+        if (deferred !== undefined) {
+          delivered.push(deferred);
+          deferred = undefined;
+        }
+      }
+    });
+    installWindow(evaluatingSession(page.context));
+
+    expect(await sendShortcut('ctrl+n', '#1')).toEqual({command: 'window:new', kind: 'pressed'});
+    expect(await sendShortcut('ctrl+n', '#2')).toEqual({kind: 'unbound'});
+
+    // The first press's command is handled while the second press is running,
+    // and it still names the first press. Holding a token for the duration of a
+    // press instead would have credited this command to the second press.
+    expect(delivered.map((message) => pressTokenOf(message))).toEqual(['#1']);
   });
 
   test('a page with no body cannot be pressed', async () => {

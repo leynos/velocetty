@@ -1351,9 +1351,13 @@ round-trip to the main process on the probe's own barrier channel, so the
 command's handler has run, and the marker it printed is in the output, before
 the probe replies. A marker can therefore never arrive after the reply of the
 press that caused it, and a count taken around one press cannot be moved by an
-earlier press. A file replaces standard input because Electron on Windows never
-delivers piped input to the main process. The file is read only when
-`RUN_E2E=1`.
+earlier press. Execution is attributed by the command message itself: the probe
+adds the request's token to the command it captures, and the main-process RPC
+listener binds that token only while it dispatches that one command, so a
+handler that runs while a later press is in flight still prints the token of
+the press that sent it, and a message without a token prints none. A file
+replaces standard input because Electron on Windows never delivers piped input
+to the main process. The file is read only when `RUN_E2E=1`.
 
 - Keep a marker on one line. Parsing is line-oriented, and a wrapped marker is
   never matched.

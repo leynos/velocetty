@@ -8,6 +8,9 @@ import {v4 as uuidv4} from 'uuid';
 
 import type {FilterNever, MainEvents, RendererEvents, TypedEmitter} from '@shared/types/common';
 
+import {withPressToken} from './config/e2e-keymap-probe';
+import {isString} from './utils/runtime-guards';
+
 type RpcServerWindow = {
   readonly profileName: string;
   readonly isDestroyed: () => boolean;
@@ -90,8 +93,17 @@ export class Server {
 
   ipcListener = <U extends keyof MainEvents>(
     _event: Electron.IpcMainEvent,
-    {ev, data}: {ev: U; data?: MainEvents[U]}
-  ) => this.emitMainEvent(ev, data);
+    {ev, data, pressToken}: {ev: U; data?: MainEvents[U]; pressToken?: unknown}
+  ) => {
+    // Only the end-to-end lane's page wrapper tags a command, so the token is
+    // absent for every message a real renderer sends. It is parsed here because
+    // it arrives over IPC. Binding it around this synchronous dispatch is what
+    // makes a command handler's marker name the press that sent *this* command;
+    // a command whose message lands while a later press runs keeps its own
+    // token instead of borrowing the later press's.
+    const token = isString(pressToken) ? pressToken : undefined;
+    return withPressToken(token, () => this.emitMainEvent(ev, data));
+  };
 
   on = <U extends keyof MainEvents>(ev: U, fn: (arg0: MainEvents[U]) => void) => {
     this.emitter.on(ev, fn);

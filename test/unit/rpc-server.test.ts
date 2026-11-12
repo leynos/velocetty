@@ -5,6 +5,8 @@ import {afterEach, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 
 import {asCommandId} from '@shared/types/commands';
 
+import {formatCommandExecutedMarker} from '../../app/config/e2e-keymap-probe';
+
 import {getElectronMock, registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
 import {importFresh} from '../testUtils/import-fresh';
 import {registerModuleMock} from '../testUtils/mock-module';
@@ -91,6 +93,56 @@ test('routes renderer-to-main events through typed listeners', () => {
   server.ipcListener(unusedIpcMainEvent, {ev: 'command', data: asCommandId('tab:new')});
 
   expect(commandListener).toHaveBeenCalledWith('tab:new');
+
+  server.destroy();
+});
+
+test('a command carrying a press token prints that token, and leaves none behind', () => {
+  const {win} = createWindowStub();
+  const server = new Server(win);
+  const markers: string[] = [];
+  server.on('command', (command) => markers.push(formatCommandExecutedMarker(command)));
+
+  // The first press's command lands while the second press is running, and it
+  // still prints its own token: attribution comes from the message, not from
+  // whichever press happens to be current.
+  server.ipcListener(unusedIpcMainEvent, {
+    ev: 'command',
+    data: asCommandId('window:new'),
+    pressToken: '#1'
+  });
+  server.ipcListener(unusedIpcMainEvent, {
+    ev: 'command',
+    data: asCommandId('window:new'),
+    pressToken: '#2'
+  });
+  // A message with no token, which is every message a real renderer sends, is
+  // untagged: the previous press's token must not survive its dispatch.
+  server.ipcListener(unusedIpcMainEvent, {ev: 'command', data: asCommandId('window:new')});
+
+  expect(markers).toEqual([
+    '[e2e] command-executed window:new press=#1',
+    '[e2e] command-executed window:new press=#2',
+    '[e2e] command-executed window:new'
+  ]);
+
+  server.destroy();
+});
+
+test('a press token that is not a string is ignored rather than echoed', () => {
+  const {win} = createWindowStub();
+  const server = new Server(win);
+  const markers: string[] = [];
+  server.on('command', (command) => markers.push(formatCommandExecutedMarker(command)));
+
+  // The token arrives over IPC, so it is parsed rather than trusted.
+  server.ipcListener(unusedIpcMainEvent, {
+    ev: 'command',
+    data: asCommandId('window:new'),
+    pressToken: 42
+  });
+
+  expect(markers).toEqual(['[e2e] command-executed window:new']);
 
   server.destroy();
 });

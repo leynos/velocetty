@@ -27,7 +27,7 @@ import * as fs from 'node:fs';
 import {BrowserWindow, ipcMain, type WebContents} from 'electron';
 
 import {isString} from '../utils/runtime-guards';
-import {emitE2EMarker, isE2ERun, setCurrentPressToken} from './e2e-keymap-probe';
+import {emitE2EMarker, isE2ERun} from './e2e-keymap-probe';
 import {parseShortcut, toKeyPress, type KeyPress} from './e2e-shortcut-chord';
 
 /**
@@ -94,11 +94,21 @@ const targetWindow = (): BrowserWindow | undefined =>
  * output before the probe reports the press, so a scenario counting markers
  * around a press cannot be satisfied by a command that has not run yet.
  *
+ * The command message also carries the caller's token. Attribution cannot rest
+ * on the probe's own state: a command whose handler lands while a later press
+ * is being sent would otherwise print the later press's token, so the token
+ * travels with the command it belongs to and main binds it only while running
+ * that command's handler.
+ *
+ * @param press - The chord fields to dispatch.
+ * @param pressToken - The caller's request token, or `undefined` for none.
  * @returns The expression, which evaluates to `null` when the page has no body
  * to press on yet, or to the command identifiers this press emitted.
  */
-const pressExpression = (press: KeyPress): string => {
+const pressExpression = (press: KeyPress, pressToken: string | undefined): string => {
   const eventInit = JSON.stringify({...press, bubbles: true, cancelable: true});
+  // The token is data, not code, so it is embedded as a JSON literal.
+  const tokenLiteral = JSON.stringify(pressToken ?? null);
   return `(() => {
   const body = document.body;
   if (body === null) return null;
@@ -116,6 +126,9 @@ const pressExpression = (press: KeyPress): string => {
     const payload = args[0];
     if (payload !== null && typeof payload === 'object' && payload.ev === 'command' && typeof payload.data === 'string') {
       commands.push(payload.data);
+      // The token rides with the command, so main attributes this command's
+      // marker to the press that sent it rather than to a later press.
+      args[0] = {...payload, pressToken: ${tokenLiteral}};
     }
     return send.call(this, channel, ...args);
   };
@@ -160,13 +173,17 @@ const classifyCommands = (value: unknown): readonly string[] | undefined => {
  * @returns The commands the press emitted, or `undefined` when the page had no
  * body to press on.
  */
-const pressInPage = async (contents: WebContents, press: KeyPress): Promise<readonly string[] | undefined> => {
+const pressInPage = async (
+  contents: WebContents,
+  press: KeyPress,
+  pressToken: string | undefined
+): Promise<readonly string[] | undefined> => {
   // A second `attach` throws, so an already-attached session is reused.
   if (!contents.debugger.isAttached()) {
     contents.debugger.attach('1.3');
   }
   const reply: EvaluateReply = await contents.debugger.sendCommand('Runtime.evaluate', {
-    expression: pressExpression(press),
+    expression: pressExpression(press, pressToken),
     returnByValue: true
   });
   if (reply.exceptionDetails !== undefined) {
@@ -189,8 +206,12 @@ const pressInPage = async (contents: WebContents, press: KeyPress): Promise<read
  * harness separately counts the marker the main process prints when it
  * executes the reported command.
  */
-const pressAndObserve = async (window: BrowserWindow, press: KeyPress): Promise<ShortcutOutcome> => {
-  const commands = await pressInPage(window.webContents, press);
+const pressAndObserve = async (
+  window: BrowserWindow,
+  press: KeyPress,
+  pressToken: string | undefined
+): Promise<ShortcutOutcome> => {
+  const commands = await pressInPage(window.webContents, press, pressToken);
   if (commands === undefined) {
     return {kind: 'rejected'};
   }
@@ -204,6 +225,9 @@ const pressAndObserve = async (window: BrowserWindow, press: KeyPress): Promise<
 /**
  * Presses one chord in the window the user is looking at.
  *
+ * @param text - The chord to press.
+ * @param pressToken - The caller's request token, which travels with any
+ * command the press emits so the marker it prints names this press.
  * @returns `pressed` with the command the chord emitted, `unbound` when the
  * page accepted it but emitted no command, and `rejected` when there was no
  * page to press on or the chord was not understood.
@@ -211,16 +235,17 @@ const pressAndObserve = async (window: BrowserWindow, press: KeyPress): Promise<
  * @example
  * ```ts
  * await sendShortcut('ctrl+alt+shift+n'); // {kind: 'pressed', command: 'window:new'}
+ * await sendShortcut('ctrl+alt+shift+n', '#7'); // its marker names request #7
  * ```
  */
-export const sendShortcut = async (text: string): Promise<ShortcutOutcome> => {
+export const sendShortcut = async (text: string, pressToken?: string): Promise<ShortcutOutcome> => {
   const chord = parseShortcut(text);
   const window = targetWindow();
   const press = chord === undefined ? undefined : toKeyPress(chord);
   if (press === undefined || window === undefined) {
     return {kind: 'rejected'};
   }
-  return pressAndObserve(window, press);
+  return pressAndObserve(window, press, pressToken);
 };
 
 /**
@@ -258,20 +283,18 @@ const parseRequest = (line: string): ProbeRequest => {
 /** Presses one request and reports its outcome under the request's token. */
 const pressLine = async (line: string): Promise<void> => {
   const {replyPrefix, shortcut} = parseRequest(line);
-  // The command handler runs while this press's message is handled, so the
-  // token set here is the one its marker prints.
-  setCurrentPressToken(replyPrefix.trim() === '' ? undefined : replyPrefix.trim());
+  const token = replyPrefix.trim();
   try {
-    const outcome = await sendShortcut(shortcut);
+    // The token travels with the command the press emits, so it is not held
+    // here: a command from an earlier press that lands during this one keeps
+    // its own token rather than borrowing this press's.
+    const outcome = await sendShortcut(shortcut, token === '' ? undefined : token);
     // The command travels in the reply so a scenario can require the press to
     // have run the command it expected, not merely some command.
     const detail = outcome.kind === 'pressed' ? ` command=${outcome.command}` : '';
     emitE2EMarker(`[e2e] shortcut-probe ${outcome.kind} ${replyPrefix}${shortcut}${detail}`);
   } catch (error) {
     emitE2EMarker(`[e2e] shortcut-probe failed ${replyPrefix}${shortcut}: ${String(error)}`);
-  } finally {
-    // A marker printed after the press must not be attributed to it.
-    setCurrentPressToken(undefined);
   }
 };
 

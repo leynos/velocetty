@@ -39,15 +39,43 @@ export type E2EKeymapStatus = 'applied' | 'kept';
  *
  * The lane writes `#<ordinal>` before each chord and the probe repeats that
  * token in its reply, so the same token on the command marker is what lets a
- * scenario prove that this press, not an earlier one, ran the command. It is
- * cleared as soon as the press returns, so a marker printed outside a press
- * keeps its original, untagged shape.
+ * scenario prove that this press, not an earlier one, ran the command. The
+ * token travels with the command message rather than with the press that is
+ * sending, so a command whose handler lands while a later press is running
+ * still prints its own token, and a message that carries none keeps the
+ * original, untagged shape.
  */
 let currentPressToken: string | undefined;
 
-/** Records the request token of the press now being handled, if any. */
-export const setCurrentPressToken = (token: string | undefined): void => {
+/**
+ * Runs `handle` with `token` as the current press token, then restores it.
+ *
+ * The token belongs to the message being handled, not to whichever press the
+ * probe happens to be sending, so binding it around the synchronous dispatch
+ * is what attributes the marker a command handler prints to the press that
+ * sent that command. Restoring rather than clearing keeps a nested dispatch
+ * honest, and an untagged message runs with no token at all.
+ *
+ * @param token - The token the message carried, or `undefined` when it had none.
+ * @param handle - The synchronous work that may print a marker.
+ * @returns Whatever `handle` returns.
+ *
+ * @example
+ * ```ts
+ * withPressToken('#7', () => formatCommandExecutedMarker('window:new'));
+ * // '[e2e] command-executed window:new press=#7'
+ * withPressToken(undefined, () => formatCommandExecutedMarker('window:new'));
+ * // '[e2e] command-executed window:new'
+ * ```
+ */
+export const withPressToken = <Value>(token: string | undefined, handle: () => Value): Value => {
+  const previous = currentPressToken;
   currentPressToken = token;
+  try {
+    return handle();
+  } finally {
+    currentPressToken = previous;
+  }
 };
 
 /**
@@ -59,10 +87,10 @@ export const setCurrentPressToken = (token: string | undefined): void => {
  *
  * @example
  * ```ts
- * setCurrentPressToken('#7');
- * formatCommandExecutedMarker('window:new'); // '[e2e] command-executed window:new press=#7'
- * setCurrentPressToken(undefined);
- * formatCommandExecutedMarker('window:new'); // '[e2e] command-executed window:new'
+ * withPressToken('#7', () => formatCommandExecutedMarker('window:new'));
+ * // '[e2e] command-executed window:new press=#7'
+ * withPressToken(undefined, () => formatCommandExecutedMarker('window:new'));
+ * // '[e2e] command-executed window:new'
  * ```
  */
 export const formatCommandExecutedMarker = (command: string): string =>
