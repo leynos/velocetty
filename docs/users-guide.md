@@ -122,6 +122,10 @@ merging the Hyper-tree file into the Velocetty copy:
    configuration](#shortcuts-when-both-trees-have-a-configuration). Shortcuts
    copied only into the merged `config.json5` are ignored once the Velocetty
    directory has a `keybindings.json5`.
+5. Copy the other settings from the Hyper-tree file, such as the shell, font,
+   colours, and profiles, into the Velocetty file. Where both files set the
+   same key, decide which value to keep. Velocetty reads only the copy in its
+   own directory, so a setting left behind in the Hyper-tree file has no effect.
 
 #### Shortcuts when both trees have a configuration
 

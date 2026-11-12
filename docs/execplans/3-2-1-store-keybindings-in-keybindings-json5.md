@@ -4546,7 +4546,7 @@ with the reason recorded.
 
 ### EP-L: review-round repairs for head `16a98af0`
 
-Review `6838251558` raised three findings. Each is closed at the boundary it
+Review `6838251558` raised four findings. Each is closed at the boundary it
 names, and each new test was mutation-checked against the defect it describes.
 
 - **Start-up baseline timing.** The watcher's baseline stamps were captured
@@ -4582,6 +4582,12 @@ names, and each new test was mutation-checked against the defect it describes.
   both console sinks — against a plugin whose name and version would be
   conspicuous in any log, for the successful, missing-manifest, missing-module,
   throwing-module and no-extension paths.
+- **Users' guide merge steps.** The steps said merging "keeps the settings from
+  both copies", then covered only plugins, `schema.json`, and shortcuts, so a
+  reader following them would leave the shell, font, colours, and profiles in
+  the Hyper-tree file, where Velocetty ignores them. A fifth step now says to
+  copy those settings into the Velocetty file and to decide any key both files
+  set. Documentation only; no code or test changed.
 
 ## Interfaces and dependencies
 
