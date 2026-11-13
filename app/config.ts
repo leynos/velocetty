@@ -82,8 +82,14 @@ const keybindingsService = createKeybindingsService({
   store: keybindingsStore
 });
 
+/** Whether the opt-in start-up trace is enabled for this process. */
+const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPORT === '1';
+
 const {_import} = createConfigImportModule({
   _init,
+  // The environment is read here, at the composition root, so the import
+  // modules below take the flag as a dependency and stay testable without it.
+  isDebugEnabled: isConfigImportDebugEnabled,
   keybindings: {reload: keybindingsService.reload, start: keybindingsService.start},
   notify,
   paths: {
