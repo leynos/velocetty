@@ -85,13 +85,43 @@ const deferredMigration = (outcome: KeybindingsLoadOutcome): boolean =>
   outcome.kind === 'kept' && outcome.cause === 'deferred';
 
 /**
+ * The bootstrapped `config.json5`, when the import went on to apply it.
+ *
+ * A write that could not be read back left the application on defaults, so the
+ * file's content is not in effect and must not be settled.
+ */
+const bootstrappedConfigFile = (loaded: LoadedSources, paths: ConfigImportPaths): WrittenWatchedFile | undefined => {
+  if (!loaded.bootstrapped) {
+    return undefined;
+  }
+  if (loaded.appliedConfigText === undefined) {
+    return undefined;
+  }
+  return {path: path.resolve(paths.cfgPath), text: loaded.appliedConfigText};
+};
+
+/** The seeded `keybindings.json5`, when the service's write landed. */
+const seededKeybindingsFile = (
+  outcome: KeybindingsLoadOutcome,
+  paths: ConfigImportPaths
+): WrittenWatchedFile | undefined => {
+  if (outcome.kind !== 'applied') {
+    return undefined;
+  }
+  if (outcome.origin !== 'seeded') {
+    return undefined;
+  }
+  if (outcome.writtenText === undefined) {
+    return undefined;
+  }
+  return {path: path.resolve(paths.keybindingsPath), text: outcome.writtenText};
+};
+
+/**
  * The files a start-up import wrote, paired with the text it applied.
  *
- * A bootstrapped `config.json5` is listed only when the import went on to read
- * and apply it: a write that could not be read back left the application on
- * defaults, so the file's content is not in effect and must not be settled. A
- * seeded `keybindings.json5` is listed only when the write succeeded, and the
- * service supplies the exact text it wrote.
+ * Each entry names a file whose content the application holds, so a watcher
+ * baseline may settle it. The service supplies the exact text it wrote.
  *
  * @example
  * ```ts
@@ -103,16 +133,10 @@ const writtenStartupFiles = (
   loaded: LoadedSources,
   outcome: KeybindingsLoadOutcome,
   paths: ConfigImportPaths
-): readonly WrittenWatchedFile[] => {
-  const written: WrittenWatchedFile[] = [];
-  if (loaded.bootstrapped && loaded.appliedConfigText !== undefined) {
-    written.push({path: path.resolve(paths.cfgPath), text: loaded.appliedConfigText});
-  }
-  if (outcome.kind === 'applied' && outcome.origin === 'seeded' && outcome.writtenText !== undefined) {
-    written.push({path: path.resolve(paths.keybindingsPath), text: outcome.writtenText});
-  }
-  return written;
-};
+): readonly WrittenWatchedFile[] =>
+  [bootstrappedConfigFile(loaded, paths), seededKeybindingsFile(outcome, paths)].filter(
+    (file): file is WrittenWatchedFile => file !== undefined
+  );
 
 /** Maps a service outcome onto the report vocabulary. */
 const keybindingsStatus = (outcome: KeybindingsLoadOutcome): ConfigImportReport['keybindings'] => {

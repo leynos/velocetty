@@ -77,15 +77,17 @@ test('seeds keybindings.json5 from legacy keymaps when the new file is missing',
     writeFileSync(harness.mockPaths.cfgPath, userConfigWithKeymaps(`{'window:close': ['ctrl+w', 'alt+w']}`), 'utf8');
     const configBefore = snapshotConfigBytes(harness.mockPaths);
 
-    const {config, report} = harness._import('startup');
+    const {config, report, writtenFiles} = harness._import('startup');
+    const seededText = readFileSync(harness.mockPaths.keybindingsPath, 'utf8');
 
-    expect(JSON5.parse(readFileSync(harness.mockPaths.keybindingsPath, 'utf8'))).toEqual({
-      'window:close': ['ctrl+w', 'alt+w']
-    });
+    expect(JSON5.parse(seededText)).toEqual({'window:close': ['ctrl+w', 'alt+w']});
     expect(config.keymaps).toEqual({'window:close': ['ctrl+w', 'alt+w']});
     expect(configBytesUnchanged(harness.mockPaths, configBefore)).toBe(true);
     expect(report).toEqual({config: 'applied', keybindings: 'applied'});
     expect(harness.notifyMock.mock.calls[0]?.[0]).toBe('Shortcuts moved to keybindings.json5');
+    // The seeded file is the one start-up wrote, so the watcher baseline may
+    // settle it, but only against the text this import actually applied.
+    expect(writtenFiles).toEqual([{path: harness.mockPaths.keybindingsPath, text: seededText}]);
   } finally {
     harness.cleanup();
   }
@@ -98,13 +100,15 @@ test('does not announce a completed migration when the seed write fails', async 
     mkdirpSync(harness.mockPaths.cfgDir);
     writeFileSync(harness.mockPaths.cfgPath, userConfigWithKeymaps(`{'window:close': 'ctrl+w'}`), 'utf8');
 
-    const {config, report} = harness._import('startup');
+    const {config, report, writtenFiles} = harness._import('startup');
 
     // The seed still applies in memory, so the session keeps the shortcuts...
     expect(config.keymaps).toEqual({'window:close': ['ctrl+w']});
     expect(report).toEqual({config: 'applied', keybindings: 'applied'});
     // ...but nothing was migrated on disk, so only the failure is reported.
     expect(existsSync(harness.mockPaths.keybindingsPath)).toBe(false);
+    // Nothing landed, so there is no written file for the baseline to settle.
+    expect(writtenFiles).toEqual([]);
     const titles = harness.notifyMock.mock.calls.map((call) => call[0]);
     expect(titles.some((title) => title.includes("Couldn't create a keybindings file"))).toBe(true);
     expect(titles).not.toContain('Shortcuts moved to keybindings.json5');

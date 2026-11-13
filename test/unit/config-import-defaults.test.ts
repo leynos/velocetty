@@ -144,13 +144,18 @@ test('start-up after a repaired default-config fault applies the repaired file',
       expect(faulted.failure, description).toBe(seed === undefined ? 'read' : 'parse');
       writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
 
-      harness._import('startup');
+      const {writtenFiles} = harness._import('startup');
 
       const expected = {...ensureObject(JSON5.parse(sharedDefaultConfigFixture)), keymaps: {}};
       expect(harness.initMock.mock.calls[0]?.[1], description).toEqual(expected);
       // The bootstrapped file carries the repaired defaults, without the
       // platform keymaps that belong in `keybindings.json5`.
-      expect(JSON5.parse(fsExtra.readFileSync(harness.mockPaths.cfgPath, 'utf8')), description).toEqual(expected);
+      const bootstrappedText = fsExtra.readFileSync(harness.mockPaths.cfgPath, 'utf8');
+      expect(JSON5.parse(bootstrappedText), description).toEqual(expected);
+      // The baseline may settle the file start-up created, but only against
+      // the text this import read back and applied. A fresh bootstrap also
+      // seeds `keybindings.json5`, so the list is not only this entry.
+      expect(writtenFiles, description).toContainEqual({path: harness.mockPaths.cfgPath, text: bootstrappedText});
       // The fault is gone, so start-up neither announced nor logged one.
       expect(bundledDefaultNotices(harness.notifyMock), description).toEqual([]);
       expect(harness.getDefaultConfig().failure, description).toBeUndefined();
@@ -176,13 +181,15 @@ test('start-up with a faulted bundled default applies the fallback without persi
     try {
       seedBundledFiles(harness, seed);
 
-      harness._import('startup');
+      const {writtenFiles} = harness._import('startup');
 
       const fallback = {plugins: [], localPlugins: [], keymaps: {}};
       expect(harness.initMock.mock.calls[0]?.[1], description).toEqual(fallback);
       // Leaving the file absent is what lets a repaired installation create it
       // from valid defaults, which the next test exercises.
       expect(fsExtra.existsSync(harness.mockPaths.cfgPath), description).toBe(false);
+      // Start-up wrote nothing, so there is no file for the baseline to settle.
+      expect(writtenFiles, description).toEqual([]);
       expect(bundledDefaultNotices(harness.notifyMock), description).toHaveLength(1);
     } finally {
       harness.cleanup();

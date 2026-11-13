@@ -115,14 +115,14 @@ export type WatchHarness = {
   readonly setConfig: (config: parsedConfig) => void;
   readonly setOutcome: (outcome: KeybindingsLoadOutcome) => void;
   /**
-   * Declares whether the start-up import created the config file, and the text
-   * it applied from it.
+   * Declares the files the start-up import reports it wrote, with the text it
+   * applied from each.
    *
-   * The text defaults to `undefined`, which means the stub reports no written
-   * file: a test that wants the composition root to settle the bootstrapped
-   * file must state what the import applied.
+   * A test that wants the composition root to settle a written file states the
+   * file and text here. The default is empty, which reports that start-up wrote
+   * nothing: the stub never derives this list from the keybindings outcome.
    */
-  readonly setBootstrapped: (bootstrapped: boolean, appliedText?: string) => void;
+  readonly setWrittenFiles: (files: readonly WrittenWatchedFile[]) => void;
 };
 
 /** Options for a harness instance; the default directory keeps older tests unchanged. */
@@ -200,25 +200,8 @@ export const createWatchHarness = async (options: WatchHarnessOptions = {}): Pro
   // can exercise causes the report vocabulary cannot express, such as an
   // unreadable keybindings file.
   let currentOutcome: KeybindingsLoadOutcome | undefined;
-  let currentBootstrapped = false;
-  let currentBootstrappedText: string | undefined;
-  /**
-   * The files the stub importer reports it wrote.
-   *
-   * Derived the same way the real importer derives them, so a test only states
-   * what the import did: the text it bootstrapped with, and the text the
-   * keybindings service seeded.
-   */
-  const writtenFilesFor = (outcome: KeybindingsLoadOutcome): readonly WrittenWatchedFile[] => {
-    const written: WrittenWatchedFile[] = [];
-    if (currentBootstrapped && currentBootstrappedText !== undefined) {
-      written.push({path: path.resolve(cfgPath), text: currentBootstrappedText});
-    }
-    if (outcome.kind === 'applied' && outcome.origin === 'seeded' && outcome.writtenText !== undefined) {
-      written.push({path: path.resolve(keybindingsPath), text: outcome.writtenText});
-    }
-    return written;
-  };
+  /** The files the stub importer reports it wrote; empty unless a test says otherwise. */
+  let currentWrittenFiles: readonly WrittenWatchedFile[] = [];
   const importMock = mock((..._args: unknown[]) => {
     callOrder.push('import');
     options.onImport?.(String(_args[0]));
@@ -227,7 +210,7 @@ export const createWatchHarness = async (options: WatchHarnessOptions = {}): Pro
       config: currentConfig,
       keybindings: outcome,
       report: currentReport,
-      writtenFiles: writtenFilesFor(outcome)
+      writtenFiles: currentWrittenFiles
     };
   });
 
@@ -308,9 +291,8 @@ export const createWatchHarness = async (options: WatchHarnessOptions = {}): Pro
     setOutcome: (outcome) => {
       currentOutcome = outcome;
     },
-    setBootstrapped: (bootstrapped, appliedText) => {
-      currentBootstrapped = bootstrapped;
-      currentBootstrappedText = appliedText;
+    setWrittenFiles: (files) => {
+      currentWrittenFiles = files;
     },
     setReport: (report) => {
       currentReport = report;

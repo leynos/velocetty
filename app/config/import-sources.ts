@@ -153,6 +153,23 @@ const cloneRawConfig = (config: rawConfig): rawConfig => structuredClone(config)
 /** Whether the opt-in start-up trace is enabled for this process. */
 const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPORT === '1';
 
+/** Records why the user config fell back, when the cause is known. */
+const recordFallbackCause = (sources: LoadedSources, result: LoadedConfig): void => {
+  // Added only when the fallback has a known cause, never as `undefined`.
+  if (result.failure !== undefined) {
+    Object.assign(sources, {fallbackCause: result.failure});
+  }
+};
+
+/** Records the bootstrapped text, so readiness can settle the file it wrote. */
+const recordAppliedConfigText = (sources: LoadedSources, bootstrapped: boolean, result: LoadedConfig): void => {
+  // Only a file start-up created itself may be settled later, and only while
+  // it still holds this text; a file the user already had is not ours.
+  if (bootstrapped && result.appliedText !== undefined) {
+    Object.assign(sources, {appliedConfigText: result.appliedText});
+  }
+};
+
 /**
  * Creates the loader for the bundled defaults and the user config.
  *
@@ -531,16 +548,36 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     }
   };
 
+  /** Creates the directories and schema a start-up import needs. */
+  const prepareStartupFiles = (): void => {
+    if (isDebugEnabled()) {
+      warnFn('[config-import] Initializing config import using app-local JSON5 helpers.');
+    }
+    // init plugin directories if not present
+    fileSystem.mkdirpSync(pathDeps.plugs.base);
+    fileSystem.mkdirpSync(pathDeps.plugs.local);
+    ensureSchemaFile();
+  };
+
+  /** Whether this start-up created `config.json5`, creating it when it may. */
+  const bootstrapUserConfigFor = (
+    phase: ConfigImportPhase,
+    defaults: LoadedDefaults,
+    defaultCfg: rawConfig
+  ): boolean => {
+    if (phase !== 'startup') {
+      return false;
+    }
+    if (!canBootstrapUserConfig(defaults.usedFallback)) {
+      return false;
+    }
+    return ensureUserConfigFile(createBootstrapTemplate(defaultCfg));
+  };
+
   /** Reads both layers, creating files only during a start-up import. */
   const load = (phase: ConfigImportPhase): LoadedSources => {
     if (phase === 'startup') {
-      if (isDebugEnabled()) {
-        warnFn('[config-import] Initializing config import using app-local JSON5 helpers.');
-      }
-      // init plugin directories if not present
-      fileSystem.mkdirpSync(pathDeps.plugs.base);
-      fileSystem.mkdirpSync(pathDeps.plugs.local);
-      ensureSchemaFile();
+      prepareStartupFiles();
     }
 
     const defaults = readDefaults();
@@ -548,10 +585,7 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
       announceDefaultFaults(defaults);
     }
     const defaultCfg = defaults.config;
-    const bootstrapped =
-      phase === 'startup' && canBootstrapUserConfig(defaults.usedFallback)
-        ? ensureUserConfigFile(createBootstrapTemplate(defaultCfg))
-        : false;
+    const bootstrapped = bootstrapUserConfigFor(phase, defaults, defaultCfg);
 
     const userConfigResult = loadUserConfig(defaultCfg);
     const sources: LoadedSources = {
@@ -560,15 +594,8 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
       usedFallback: userConfigResult.usedFallback,
       userCfg: cloneRawConfig(userConfigResult.config)
     };
-    // Added only when the fallback has a known cause, never as `undefined`.
-    if (userConfigResult.failure !== undefined) {
-      Object.assign(sources, {fallbackCause: userConfigResult.failure});
-    }
-    // Only a file start-up created itself may be settled later, and only while
-    // it still holds this text; a file the user already had is not ours.
-    if (bootstrapped && userConfigResult.appliedText !== undefined) {
-      Object.assign(sources, {appliedConfigText: userConfigResult.appliedText});
-    }
+    recordFallbackCause(sources, userConfigResult);
+    recordAppliedConfigText(sources, bootstrapped, userConfigResult);
     return sources;
   };
 

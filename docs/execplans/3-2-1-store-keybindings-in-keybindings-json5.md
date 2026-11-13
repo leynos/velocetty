@@ -1453,6 +1453,18 @@ design and the notification the user sees.
   - Regression tests cover an external edit after the config bootstrap and
     after the keybindings seed; both reload and notify.
 
+- [x] (2026-11-13 09:18Z) Cleared the CodeScene delta findings on head
+  `9608fd5c` (see EP-O).
+  - `writtenStartupFiles` splits into `bootstrappedConfigFile` and
+    `seededKeybindingsFile`, composed by filtering `undefined`;
+    `createConfigSourceLoader.load` delegates directory preparation, bootstrap,
+    fallback cause, and applied text to named helpers.
+  - The watch harness takes the written files as state
+    (`setWrittenFiles`) instead of deriving them from the outcome, and the four
+    written-file readiness tests share one table-driven case list.
+  - Production assertions now pin `writtenFiles` in the keybindings seed and
+    failed-seed tests and in the repaired-default bootstrap and fallback tests.
+
 ## Surprises & discoveries
 
 - Observation: `typos.toml` is generated from a shared dictionary fetched from
@@ -4675,6 +4687,44 @@ the text matches, retained when it differs, unreadable, or gone) and in
 bootstrap, and after the seed, both reload and notify). The clean first-run
 cases keep their existing assertions.
 
+### EP-O: CodeScene repairs for head `9608fd5c`
+
+The hosted `CodeScene Code Health Review` failed the first head carrying EP-N
+with four findings: Code Duplication in
+`test/unit/config-watch-readiness.test.ts` (9.39), Complex Method in
+`createConfigSourceLoader.load` (9.69), Complex Conditional in the harness's
+`writtenFilesFor` (9.69), and an advisory Complex Conditional in
+`writtenStartupFiles` (10.00 down to 9.69). Each was a structure the EP-N
+plumbing introduced, so the repair reshapes that plumbing rather than adjusting
+the rules.
+
+`writtenStartupFiles` is now a composition. `bootstrappedConfigFile` returns
+the config entry or `undefined` after two guard clauses, and
+`seededKeybindingsFile` does the same for the seeded file; the composer filters
+the undefined slots, so it carries no conditional of its own. The behaviour is
+unchanged: only a bootstrapped file whose applied text is known and only a seed
+whose write landed produce entries.
+
+`createConfigSourceLoader.load` delegates its four concerns to
+`prepareStartupFiles`, `bootstrapUserConfigFor`, `recordFallbackCause`, and
+`recordAppliedConfigText`. Each helper keeps one branch, so `load` reads as the
+sequence of steps it performs.
+
+The watch harness no longer derives the written files from the keybindings
+outcome. `setWrittenFiles` stores the list directly, which removes the mirrored
+derivation and its complex conditional; a test states exactly what the stub
+importer reports, and the default remains empty. The four written-file
+readiness tests became one table of cases over (`config.json5` bootstrapped,
+`keybindings.json5` seeded) times (untouched, replaced after the write), with
+one shared body asserting the phase list and subscriber count. The two earlier
+readiness tests, which do not involve a written file, are unchanged.
+
+Because the harness no longer exercises the production derivation, two import
+suites now assert `writtenFiles` directly: the keybindings seed test pins the
+seeded text, the failed-seed test pins an empty list, the repaired-default test
+pins the bootstrapped config entry by `toContainEqual` (a fresh bootstrap also
+seeds `keybindings.json5`), and the fallback test pins an empty list.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -5253,3 +5303,8 @@ requires it. Any adjustment is recorded in `Decision log`.
   the pre-import identity and readiness reloads. The applied text is threaded
   from `loadUserConfig` and the keybindings seed into `writtenFiles`, which
   replaces the `bootstrapped` flag on `ConfigImportResult`.
+- 2026-11-13 (CodeScene repairs for `9608fd5c`): the EP-N plumbing is
+  restructured without behaviour change; EP-O records the four findings and the
+  split helpers, the harness's explicit written-file state, the table-driven
+  readiness cases, and the production `writtenFiles` assertions that replace
+  the harness's mirrored derivation.
