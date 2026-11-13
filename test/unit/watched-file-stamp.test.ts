@@ -172,24 +172,27 @@ describe('settleWatchedFileStamps', () => {
     expect(settled.get('/tmp/keybindings.json5')).toEqual({kind: 'absent'});
   });
 
-  test('keeps the pre-import identity when the file is gone', () => {
+  test('settles a written file that has since been deleted to an unknown identity', () => {
     const seenReads: string[] = [];
     const readFile: ReadWatchedFile = (filePath) => {
       seenReads.push(filePath);
       return '{}\n';
     };
+    const stat = throwingStat('ENOENT');
 
     const settled = settleWatchedFileStamps(
       beforeImport,
       [{path: '/tmp/keybindings.json5', text: '{}\n'}],
       readFile,
-      throwingStat('ENOENT')
+      stat
     );
 
-    // Nothing to compare with, so the read is skipped and the earlier identity
-    // stands; readiness sees the file as present and reloads.
+    // Nothing to compare with, so the read is skipped. The file start-up seeded
+    // was absent before the import too, so keeping that identity would make the
+    // deletion invisible; the unknown identity makes readiness reload.
     expect(seenReads).toEqual([]);
-    expect(settled.get('/tmp/keybindings.json5')).toEqual({kind: 'absent'});
+    expect(settled.get('/tmp/keybindings.json5')).toEqual({kind: 'unreadable'});
+    expect(createWatchedFileReconciler(settled, stat)()).toBe(true);
   });
 
   test('a file start-up seeded is not reconciled against the pre-import baseline', () => {

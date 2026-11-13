@@ -125,20 +125,28 @@ export type ReadWatchedFile = (filePath: string) => string;
  * application applied, which is the one failure this settlement exists to
  * prevent.
  *
+ * A file that is no longer there is settled to an unknown identity rather than
+ * left at its pre-import one. Start-up writes these files only when they were
+ * absent, so the pre-import identity is "absent" too: keeping it would let the
+ * deletion of the file start-up just created match the baseline and never be
+ * reconciled.
+ *
  * @param file - The written path and the text the import applied.
  * @param readFile - The text reader.
  * @param statFile - The inspection call.
- * @returns The file's current identity, or `undefined` when it cannot be
- *   verified as still holding the applied text.
+ * @returns The file's current identity, an unknown identity when it is gone,
+ *   or `undefined` when it is present but no longer holds the applied text.
  */
-const verifiedWrittenStamp = (
+const settledWrittenStamp = (
   {path: filePath, text}: WrittenWatchedFile,
   readFile: ReadWatchedFile,
   statFile: StatFile
 ): WatchedFileStamp | undefined => {
   const stamp = readWatchedFileStamp(filePath, statFile);
   if (stamp.kind !== 'present') {
-    return undefined;
+    // An unknown identity never compares equal, so readiness reloads and the
+    // user's deletion takes effect instead of being read as our own write.
+    return {kind: 'unreadable'};
   }
   try {
     return readFile(filePath) === text ? stamp : undefined;
@@ -158,7 +166,9 @@ const verifiedWrittenStamp = (
  * deploy, a crash truncating it — leaves the identity describing content the
  * application never applied, and readiness would compare the file against
  * itself and skip the reload. Such a file keeps the pre-import identity, so
- * the difference stays visible and readiness reloads.
+ * the difference stays visible and readiness reloads. A file that has since
+ * been deleted is settled to an unknown identity for the same reason: its
+ * pre-import identity is also "absent", and the deletion must still reload.
  *
  * @param stamps - The baseline captured before the import.
  * @param writtenFiles - The files the import created and the text it applied.
@@ -180,7 +190,7 @@ export const settleWatchedFileStamps = (
 ): WatchedFileStamps => {
   const settled = new Map(stamps);
   for (const writtenFile of writtenFiles) {
-    const stamp = verifiedWrittenStamp(writtenFile, readFile, statFile);
+    const stamp = settledWrittenStamp(writtenFile, readFile, statFile);
     if (stamp !== undefined) {
       settled.set(writtenFile.path, stamp);
     }
