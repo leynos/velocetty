@@ -9,6 +9,7 @@ import path from 'node:path';
 
 import type {ConfigImportReport} from '../../app/config/import-report';
 import type {KeybindingsLoadOutcome} from '../../app/config/keybindings';
+import type {WrittenWatchedFile} from '../../app/config/watched-file-stamp';
 import type {parsedConfig, rawConfig} from '@shared/types/config';
 import {_init} from '../../app/config/init';
 import {getElectronMock, registerElectronMock, resetElectronMock} from './electron-path';
@@ -113,8 +114,15 @@ export type WatchHarness = {
   readonly setReport: (report: ConfigImportReport) => void;
   readonly setConfig: (config: parsedConfig) => void;
   readonly setOutcome: (outcome: KeybindingsLoadOutcome) => void;
-  /** Declares whether the start-up import created the config file. */
-  readonly setBootstrapped: (bootstrapped: boolean) => void;
+  /**
+   * Declares whether the start-up import created the config file, and the text
+   * it applied from it.
+   *
+   * The text defaults to `undefined`, which means the stub reports no written
+   * file: a test that wants the composition root to settle the bootstrapped
+   * file must state what the import applied.
+   */
+  readonly setBootstrapped: (bootstrapped: boolean, appliedText?: string) => void;
 };
 
 /** Options for a harness instance; the default directory keeps older tests unchanged. */
@@ -193,14 +201,33 @@ export const createWatchHarness = async (options: WatchHarnessOptions = {}): Pro
   // unreadable keybindings file.
   let currentOutcome: KeybindingsLoadOutcome | undefined;
   let currentBootstrapped = false;
+  let currentBootstrappedText: string | undefined;
+  /**
+   * The files the stub importer reports it wrote.
+   *
+   * Derived the same way the real importer derives them, so a test only states
+   * what the import did: the text it bootstrapped with, and the text the
+   * keybindings service seeded.
+   */
+  const writtenFilesFor = (outcome: KeybindingsLoadOutcome): readonly WrittenWatchedFile[] => {
+    const written: WrittenWatchedFile[] = [];
+    if (currentBootstrapped && currentBootstrappedText !== undefined) {
+      written.push({path: path.resolve(cfgPath), text: currentBootstrappedText});
+    }
+    if (outcome.kind === 'applied' && outcome.origin === 'seeded' && outcome.writtenText !== undefined) {
+      written.push({path: path.resolve(keybindingsPath), text: outcome.writtenText});
+    }
+    return written;
+  };
   const importMock = mock((..._args: unknown[]) => {
     callOrder.push('import');
     options.onImport?.(String(_args[0]));
+    const outcome = currentOutcome ?? outcomeFor(currentReport);
     return {
-      bootstrapped: currentBootstrapped,
       config: currentConfig,
-      keybindings: currentOutcome ?? outcomeFor(currentReport),
-      report: currentReport
+      keybindings: outcome,
+      report: currentReport,
+      writtenFiles: writtenFilesFor(outcome)
     };
   });
 
@@ -281,8 +308,9 @@ export const createWatchHarness = async (options: WatchHarnessOptions = {}): Pro
     setOutcome: (outcome) => {
       currentOutcome = outcome;
     },
-    setBootstrapped: (bootstrapped) => {
+    setBootstrapped: (bootstrapped, appliedText) => {
       currentBootstrapped = bootstrapped;
+      currentBootstrappedText = appliedText;
     },
     setReport: (report) => {
       currentReport = report;

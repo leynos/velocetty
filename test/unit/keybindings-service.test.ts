@@ -53,7 +53,14 @@ describe('start', () => {
 
     const outcome = service.start({keymaps: KEYMAPS_A, kind: 'parsed-keymaps'});
 
-    expect(outcome).toEqual({keymaps: KEYMAPS_A, kind: 'applied', origin: 'seeded'});
+    // The applied text travels with the outcome so the caller can settle the
+    // watcher baseline against what the file actually holds.
+    expect(outcome).toEqual({
+      keymaps: KEYMAPS_A,
+      kind: 'applied',
+      origin: 'seeded',
+      writtenText: serializeKeybindings(KEYMAPS_A)
+    });
     expect(store.writtenTexts()).toEqual([serializeKeybindings(KEYMAPS_A)]);
     expect(notices).toEqual([]);
   });
@@ -63,7 +70,7 @@ describe('start', () => {
 
     const outcome = service.start({kind: 'parsed-empty'});
 
-    expect(outcome).toEqual({keymaps: {}, kind: 'applied', origin: 'seeded'});
+    expect(outcome).toEqual({keymaps: {}, kind: 'applied', origin: 'seeded', writtenText: serializeKeybindings({})});
     expect(store.writtenTexts()).toEqual([serializeKeybindings({})]);
   });
 

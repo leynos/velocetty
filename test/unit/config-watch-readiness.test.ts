@@ -152,7 +152,8 @@ test.serial('a config file start-up bootstrapped is not reconciled', async () =>
       }
     });
     try {
-      harness.setBootstrapped(true);
+      // The import created the file with BEFORE and applied that same text.
+      harness.setBootstrapped(true, BEFORE);
 
       harness.configModule.setup();
       harness.emitReady();
@@ -182,7 +183,7 @@ test.serial('a keybindings file start-up seeded is not reconciled', async () => 
       }
     });
     try {
-      harness.setOutcome({keymaps: {}, kind: 'applied', origin: 'seeded'});
+      harness.setOutcome({keymaps: {}, kind: 'applied', origin: 'seeded', writtenText: '{}\n'});
 
       harness.configModule.setup();
       harness.configModule.subscribe(harness.subscriberMock);
@@ -191,6 +192,75 @@ test.serial('a keybindings file start-up seeded is not reconciled', async () => 
 
       expect(phases(harness)).toEqual(['startup']);
       expect(harness.subscriberMock).not.toHaveBeenCalled();
+    } finally {
+      closeWatcher(harness);
+      mock.restore();
+    }
+  });
+});
+
+test.serial('an external edit to the bootstrapped config is reconciled', async () => {
+  await withConfigDir(async (dir) => {
+    const cfgPath = path.join(dir, 'config.json5');
+    const harness = await createWatchHarness({
+      configDir: dir,
+      // Start-up writes BEFORE and applies it; another process replaces the
+      // file before the composition root settles the baseline.
+      onImport: (phase) => {
+        if (phase === 'startup') {
+          writeFileSync(cfgPath, BEFORE);
+          writeFileSync(cfgPath, AFTER);
+        }
+      }
+    });
+    try {
+      harness.setBootstrapped(true, BEFORE);
+
+      harness.configModule.setup();
+      harness.configModule.subscribe(harness.subscriberMock);
+      // What the reload will apply once readiness notices the replacement.
+      harness.setConfig(makeParsedConfig({'window:new': ['ctrl+shift+n']}));
+
+      harness.emitReady();
+      await settle();
+
+      // Settling on the replacement's identity would compare the file against
+      // itself, leaving the application on BEFORE until the next save.
+      expect(phases(harness)).toEqual(['startup', 'reload']);
+      expect(harness.subscriberMock).toHaveBeenCalledTimes(1);
+      expect(harness.notifyMock).toHaveBeenCalledWith('Configuration updated', 'Configuration reloaded!');
+    } finally {
+      closeWatcher(harness);
+      mock.restore();
+    }
+  });
+});
+
+test.serial('an external edit to the seeded keybindings is reconciled', async () => {
+  await withConfigDir(async (dir) => {
+    const keybindingsPath = path.join(dir, 'keybindings.json5');
+    await writeFile(path.join(dir, 'config.json5'), BEFORE);
+    const harness = await createWatchHarness({
+      configDir: dir,
+      // The service seeds the file, then a dotfile deploy replaces it before
+      // the composition root settles the baseline.
+      onImport: (phase) => {
+        if (phase === 'startup') {
+          writeFileSync(keybindingsPath, '{}\n');
+          writeFileSync(keybindingsPath, AFTER);
+        }
+      }
+    });
+    try {
+      harness.setOutcome({keymaps: {}, kind: 'applied', origin: 'seeded', writtenText: '{}\n'});
+
+      harness.configModule.setup();
+      harness.configModule.subscribe(harness.subscriberMock);
+      harness.emitReady();
+      await settle();
+
+      expect(phases(harness)).toEqual(['startup', 'reload']);
+      expect(harness.subscriberMock).toHaveBeenCalledTimes(1);
     } finally {
       closeWatcher(harness);
       mock.restore();

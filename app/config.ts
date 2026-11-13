@@ -22,7 +22,7 @@ import {createImportRecorder, type ImportRecord} from './config/config-observabi
 import {createConfigSpanRecorder} from './config/config-spans';
 import {emitE2EMarker, formatKeymapsMarker, type E2EKeymapStatus} from './config/e2e-keymap-probe';
 import {fixConfigDefaults as applyConfigDefaults} from './config/fix-config-defaults';
-import {createConfigImportModule, type ConfigImportResult} from './config/import';
+import {createConfigImportModule} from './config/import';
 import {shouldAnnounceReload, type ConfigImportReport} from './config/import-report';
 import {_init} from './config/init';
 import {createKeybindingsService} from './config/keybindings';
@@ -51,7 +51,7 @@ import {closeWatcherAtShutdown, createConfigWatcher, type WatcherEvent, type Wat
 import {
   captureWatchedFileStamps,
   createWatchedFileReconciler,
-  refreshWatchedFileStamps,
+  settleWatchedFileStamps,
   type WatchedFileStamps
 } from './config/watched-file-stamp';
 
@@ -267,33 +267,10 @@ const reloadConfiguration = () => {
 };
 
 /**
- * The watched files this start-up import wrote itself.
- *
- * The baseline is captured before the import, so a file start-up creates looks
- * changed even though the application holds exactly what was written. The
- * import reports the two creations it can perform, and only those are
- * refreshed. A concurrent writer landing after our own write is the remaining
- * window, and it is the same cross-process replace `#270` tracks.
- *
- * @param imported - The result of the start-up import.
- * @returns The absolute paths of the files the import created.
- */
-const writtenWatchedFiles = (imported: ConfigImportResult): readonly string[] => {
-  const written: string[] = [];
-  if (imported.bootstrapped) {
-    written.push(path.resolve(cfgPath));
-  }
-  if (imported.keybindings.kind === 'applied' && imported.keybindings.origin === 'seeded') {
-    written.push(path.resolve(keybindingsPath));
-  }
-  return written;
-};
-
-/**
  * Starts the configuration watcher once; later calls are no-ops.
  *
  * @param startupStamps - The file identities captured before the start-up
- *   import, with the files that import wrote refreshed to what it wrote.
+ *   import, with the files that import wrote settled to what it applied.
  */
 const _watch = (startupStamps: WatchedFileStamps) => {
   if (configWatcher !== undefined) {
@@ -535,7 +512,10 @@ export const setup = () => {
     Object.assign(record, {fallbackBasis: 'defaults' as const});
   }
   recorder.recordImport(record);
-  startupStamps = refreshWatchedFileStamps(startupStamps, writtenWatchedFiles(imported));
+  // Adopt a written file's identity only while it still holds the text just
+  // applied; a concurrent writer that got there first keeps the pre-import
+  // identity, so readiness reloads instead of keeping stale content.
+  startupStamps = settleWatchedFileStamps(startupStamps, imported.writtenFiles);
   _watch(startupStamps);
   checkDeprecatedConfig();
   emitE2EMarker(`[e2e] keybindings-path ${keybindingsPath}`);

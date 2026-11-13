@@ -21,10 +21,12 @@ import {
   type ConfigImportFileSystem,
   type ConfigImportPaths,
   type ConfigImportPhase,
-  type ConfigSourceLoaderDependencies
+  type ConfigSourceLoaderDependencies,
+  type LoadedSources
 } from './import-sources';
 import type {KeybindingsLoadOutcome} from './keybindings-ports';
 import type {LegacyKeymapsSource} from './keybindings-policy';
+import type {WrittenWatchedFile} from './watched-file-stamp';
 
 export {shouldAnnounceReload} from './import-report';
 export type {ConfigImportReport} from './import-report';
@@ -40,13 +42,15 @@ export type ConfigImportResult = {
   readonly config: parsedConfig;
   readonly report: ConfigImportReport;
   /**
-   * Whether this start-up created `config.json5`.
+   * The files this import created, with the exact text it applied.
    *
-   * The caller captures the watcher baseline before the import, so it needs to
-   * know which files the import wrote itself; those are the only changes the
-   * baseline should not treat as a concurrent edit.
+   * The caller captures the watcher baseline before the import, so a file the
+   * import wrote itself looks changed even though the application holds its
+   * content. These entries are the only changes the baseline may settle, and
+   * only while each file still holds the text listed here. Reload writes
+   * nothing, so it always returns an empty list.
    */
-  readonly bootstrapped: boolean;
+  readonly writtenFiles: readonly WrittenWatchedFile[];
   /**
    * What the keybindings service decided, passed through unflattened so the
    * caller can report its `origin`, `basis`, and `cause` without re-deriving
@@ -79,6 +83,36 @@ const keptExistingFile = (outcome: KeybindingsLoadOutcome): boolean =>
 /** True when start-up left the legacy keymaps where they were, pending a fix. */
 const deferredMigration = (outcome: KeybindingsLoadOutcome): boolean =>
   outcome.kind === 'kept' && outcome.cause === 'deferred';
+
+/**
+ * The files a start-up import wrote, paired with the text it applied.
+ *
+ * A bootstrapped `config.json5` is listed only when the import went on to read
+ * and apply it: a write that could not be read back left the application on
+ * defaults, so the file's content is not in effect and must not be settled. A
+ * seeded `keybindings.json5` is listed only when the write succeeded, and the
+ * service supplies the exact text it wrote.
+ *
+ * @example
+ * ```ts
+ * writtenStartupFiles({bootstrapped: true, appliedConfigText: '{}\n', …}, outcome, paths);
+ * // [{path: '/home/user/.config/Velocetty/config.json5', text: '{}\n'}]
+ * ```
+ */
+const writtenStartupFiles = (
+  loaded: LoadedSources,
+  outcome: KeybindingsLoadOutcome,
+  paths: ConfigImportPaths
+): readonly WrittenWatchedFile[] => {
+  const written: WrittenWatchedFile[] = [];
+  if (loaded.bootstrapped && loaded.appliedConfigText !== undefined) {
+    written.push({path: path.resolve(paths.cfgPath), text: loaded.appliedConfigText});
+  }
+  if (outcome.kind === 'applied' && outcome.origin === 'seeded' && outcome.writtenText !== undefined) {
+    written.push({path: path.resolve(paths.keybindingsPath), text: outcome.writtenText});
+  }
+  return written;
+};
 
 /** Maps a service outcome onto the report vocabulary. */
 const keybindingsStatus = (outcome: KeybindingsLoadOutcome): ConfigImportReport['keybindings'] => {
@@ -173,7 +207,9 @@ export const createConfigImportModule = (dependencies: ConfigImportDependencies)
     if (loaded.fallbackCause !== undefined) {
       Object.assign(report, {configCause: loaded.fallbackCause});
     }
-    return {bootstrapped: loaded.bootstrapped, config, keybindings: outcome, report};
+    // A reload writes nothing, so only a start-up import can have files to settle.
+    const writtenFiles = phase === 'startup' ? writtenStartupFiles(loaded, outcome, dependencies.paths) : [];
+    return {config, keybindings: outcome, report, writtenFiles};
   };
 
   return {_import, getDefaultConfig: sources.getDefaultConfig};

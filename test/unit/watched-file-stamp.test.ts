@@ -12,8 +12,9 @@ import {
   captureWatchedFileStamps,
   createWatchedFileReconciler,
   readWatchedFileStamp,
-  refreshWatchedFileStamps,
+  settleWatchedFileStamps,
   stampsMatch,
+  type ReadWatchedFile,
   type StatFile
 } from '../../app/config/watched-file-stamp';
 
@@ -30,6 +31,17 @@ const throwingStat =
 /** A stat call that throws a value which is not an error at all. */
 const throwingNonErrorStat: StatFile = () => {
   throw 'permission denied';
+};
+
+/** A text reader that always returns the text it was built with. */
+const readText =
+  (text: string): ReadWatchedFile =>
+  () =>
+    text;
+
+/** A text reader that fails the way an unreadable file does. */
+const unreadableRead: ReadWatchedFile = () => {
+  throw Object.assign(new Error('denied'), {code: 'EACCES'});
 };
 
 /** A single-path reconciler whose inspection results are scripted in order. */
@@ -104,30 +116,85 @@ describe('captureWatchedFileStamps', () => {
   });
 });
 
-describe('refreshWatchedFileStamps', () => {
-  test('re-reads only the files the import wrote', () => {
+describe('settleWatchedFileStamps', () => {
+  /** A baseline in which the seeded file is absent and the user's config exists. */
+  const beforeImport = new Map([
+    ['/tmp/config.json5', {kind: 'present' as const, mtimeMs: 1, size: 1}],
+    ['/tmp/keybindings.json5', {kind: 'absent' as const}]
+  ]);
+
+  test('adopts a written file that still holds the applied text', () => {
     const seen: string[] = [];
     const stat: StatFile = (filePath) => {
       seen.push(filePath);
       return reading(2, 3);
     };
-    const baseline = new Map([
-      ['/tmp/config.json5', {kind: 'present' as const, mtimeMs: 1, size: 1}],
-      ['/tmp/keybindings.json5', {kind: 'absent' as const}]
-    ]);
 
-    const refreshed = refreshWatchedFileStamps(baseline, ['/tmp/keybindings.json5'], stat);
+    const settled = settleWatchedFileStamps(
+      beforeImport,
+      [{path: '/tmp/keybindings.json5', text: '{}\n'}],
+      readText('{}\n'),
+      stat
+    );
 
     // The file the import did not write keeps the identity it had before the
     // import, so a concurrent edit to it still reconciles.
     expect(seen).toEqual(['/tmp/keybindings.json5']);
-    expect(refreshed.get('/tmp/config.json5')).toEqual({kind: 'present', mtimeMs: 1, size: 1});
-    expect(refreshed.get('/tmp/keybindings.json5')).toEqual({kind: 'present', mtimeMs: 2, size: 3});
+    expect(settled.get('/tmp/config.json5')).toEqual({kind: 'present', mtimeMs: 1, size: 1});
+    expect(settled.get('/tmp/keybindings.json5')).toEqual({kind: 'present', mtimeMs: 2, size: 3});
+  });
+
+  test('keeps the pre-import identity when the file no longer holds the applied text', () => {
+    const stat: StatFile = () => reading(2, 3);
+
+    const settled = settleWatchedFileStamps(
+      beforeImport,
+      [{path: '/tmp/keybindings.json5', text: '{}\n'}],
+      readText('{"window:new": ["ctrl+n"]}\n'),
+      stat
+    );
+
+    // The identity on disk describes content the import never applied. Keeping
+    // the older identity is what makes readiness reload rather than compare the
+    // file against itself.
+    expect(settled.get('/tmp/keybindings.json5')).toEqual({kind: 'absent'});
+    expect(createWatchedFileReconciler(settled, stat)()).toBe(true);
+  });
+
+  test('keeps the pre-import identity when the file cannot be read', () => {
+    const settled = settleWatchedFileStamps(
+      beforeImport,
+      [{path: '/tmp/keybindings.json5', text: '{}\n'}],
+      unreadableRead,
+      () => reading(2, 3)
+    );
+
+    expect(settled.get('/tmp/keybindings.json5')).toEqual({kind: 'absent'});
+  });
+
+  test('keeps the pre-import identity when the file is gone', () => {
+    const seenReads: string[] = [];
+    const readFile: ReadWatchedFile = (filePath) => {
+      seenReads.push(filePath);
+      return '{}\n';
+    };
+
+    const settled = settleWatchedFileStamps(
+      beforeImport,
+      [{path: '/tmp/keybindings.json5', text: '{}\n'}],
+      readFile,
+      throwingStat('ENOENT')
+    );
+
+    // Nothing to compare with, so the read is skipped and the earlier identity
+    // stands; readiness sees the file as present and reloads.
+    expect(seenReads).toEqual([]);
+    expect(settled.get('/tmp/keybindings.json5')).toEqual({kind: 'absent'});
   });
 
   test('a file start-up seeded is not reconciled against the pre-import baseline', () => {
     // The baseline is captured first, so the seeded file reads as absent there;
-    // refreshing it after the import is what keeps first run quiet.
+    // settling it after the import is what keeps first run quiet.
     const scriptedReadings = [throwingStat('ENOENT'), () => reading(2, 3), () => reading(2, 3)];
     const script: StatFile = (filePath) => {
       const next = scriptedReadings.shift();
@@ -137,10 +204,15 @@ describe('refreshWatchedFileStamps', () => {
       return next(filePath);
     };
 
-    const beforeImport = captureWatchedFileStamps(['/tmp/keybindings.json5'], script);
-    const afterImport = refreshWatchedFileStamps(beforeImport, ['/tmp/keybindings.json5'], script);
+    const baseline = captureWatchedFileStamps(['/tmp/keybindings.json5'], script);
+    const settled = settleWatchedFileStamps(
+      baseline,
+      [{path: '/tmp/keybindings.json5', text: '{}\n'}],
+      readText('{}\n'),
+      script
+    );
 
-    expect(createWatchedFileReconciler(afterImport, script)()).toBe(false);
+    expect(createWatchedFileReconciler(settled, script)()).toBe(false);
   });
 });
 

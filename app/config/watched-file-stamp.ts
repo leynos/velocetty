@@ -12,10 +12,12 @@
  * import's read and the capture describe the file's new identity while the
  * application holds the old content, so the scan would see no difference and
  * the change would never be reconciled. Capturing first can only cost a
- * redundant reload; it cannot miss one. Files start-up itself wrote are then
- * refreshed, and that exception is stated at the call site.
+ * redundant reload; it cannot miss one. A file start-up itself wrote is then
+ * settled against the text the import applied: its new identity is adopted
+ * only while the file still holds that text, so an edit landing in between
+ * keeps the earlier identity and is still reconciled.
  */
-import {statSync} from 'node:fs';
+import {readFileSync, statSync} from 'node:fs';
 
 import {errorCode} from '../utils/error-code';
 
@@ -66,7 +68,7 @@ export const readWatchedFileStamp = (filePath: string, statFile: StatFile = stat
  * unreadable reading matches nothing, so a reconciliation that could not
  * inspect the file reloads rather than assuming nothing changed.
  *
- * @param before - The identity recorded after the start-up import.
+ * @param before - The identity the baseline holds for the file.
  * @param after - The identity read at readiness.
  * @returns Whether the two readings describe the same state.
  *
@@ -107,35 +109,83 @@ export const captureWatchedFileStamps = (
   statFile: StatFile = statSync
 ): WatchedFileStamps => new Map(fileNames.map((fileName) => [fileName, readWatchedFileStamp(fileName, statFile)]));
 
+/** A file the start-up import wrote, with the exact text the import applied. */
+export type WrittenWatchedFile = Readonly<{path: string; text: string}>;
+
+/** Reads a file's text; injectable so a test can script the comparison. */
+export type ReadWatchedFile = (filePath: string) => string;
+
 /**
- * Re-reads named files, keeping every other stamp as it was.
+ * Reads a written file's identity, but only while it still holds our text.
  *
- * Start-up writes `config.json5` and `keybindings.json5` itself, and the
- * application holds that written content, so the files it just wrote are the
- * one difference the baseline must not reconcile. Each such file is re-read
- * after the import, which is safe precisely because the caller wrote it.
+ * The inspection comes before the read on purpose. An edit that lands between
+ * them makes the comparison fail, so no identity is adopted; an edit that lands
+ * after the read leaves an identity readiness will see as newer. Reading first
+ * would let an edit slip between the two and be recorded as the content the
+ * application applied, which is the one failure this settlement exists to
+ * prevent.
+ *
+ * @param file - The written path and the text the import applied.
+ * @param readFile - The text reader.
+ * @param statFile - The inspection call.
+ * @returns The file's current identity, or `undefined` when it cannot be
+ *   verified as still holding the applied text.
+ */
+const verifiedWrittenStamp = (
+  {path: filePath, text}: WrittenWatchedFile,
+  readFile: ReadWatchedFile,
+  statFile: StatFile
+): WatchedFileStamp | undefined => {
+  const stamp = readWatchedFileStamp(filePath, statFile);
+  if (stamp.kind !== 'present') {
+    return undefined;
+  }
+  try {
+    return readFile(filePath) === text ? stamp : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Settles the baseline for the files start-up wrote, without hiding a later edit.
+ *
+ * Start-up creates `config.json5` and `keybindings.json5` itself, and the
+ * application holds that written content, so those files are the one
+ * difference the baseline must not reconcile. Adopting their identity is only
+ * safe while each file still holds the text the import applied. Anything that
+ * changed the file in between — another process replacing it, a dotfile
+ * deploy, a crash truncating it — leaves the identity describing content the
+ * application never applied, and readiness would compare the file against
+ * itself and skip the reload. Such a file keeps the pre-import identity, so
+ * the difference stays visible and readiness reloads.
  *
  * @param stamps - The baseline captured before the import.
- * @param fileNames - The watched files the import itself wrote.
+ * @param writtenFiles - The files the import created and the text it applied.
+ * @param readFile - The text reader; defaults to `readFileSync` as UTF-8.
  * @param statFile - The inspection call; defaults to `statSync`.
- * @returns A baseline in which those files describe what the import wrote.
+ * @returns The baseline, with only verified written files re-stamped.
  *
  * @example
  * ```ts
- * const written = refreshWatchedFileStamps(stamps, ['/tmp/keybindings.json5']);
- * written.get('/tmp/keybindings.json5'); // the seeded file
+ * const settled = settleWatchedFileStamps(stamps, [{path: '/tmp/keybindings.json5', text: '{}\n'}]);
+ * settled.get('/tmp/keybindings.json5'); // the seeded file's identity
  * ```
  */
-export const refreshWatchedFileStamps = (
+export const settleWatchedFileStamps = (
   stamps: WatchedFileStamps,
-  fileNames: readonly string[],
+  writtenFiles: readonly WrittenWatchedFile[],
+  readFile: ReadWatchedFile = (filePath) => readFileSync(filePath, 'utf8'),
   statFile: StatFile = statSync
 ): WatchedFileStamps => {
-  const refreshed = new Map(stamps);
-  for (const fileName of fileNames) {
-    refreshed.set(fileName, readWatchedFileStamp(fileName, statFile));
+  const settled = new Map(stamps);
+  for (const writtenFile of writtenFiles) {
+    const stamp = verifiedWrittenStamp(writtenFile, readFile, statFile);
+    if (stamp !== undefined) {
+      settled.set(writtenFile.path, stamp);
+    }
   }
-  return refreshed;
+  return settled;
 };
 
 /**
@@ -152,7 +202,7 @@ export const refreshWatchedFileStamps = (
  * configuration when the inspection itself is what failed.
  *
  * @param baseline - The identity recorded before the start-up import, with any
- *   file the import wrote refreshed to what it wrote.
+ *   file the import wrote settled to what it applied.
  * @param statFile - The inspection call; defaults to `statSync`.
  * @returns A predicate that is true when at least one watched file moved.
  *

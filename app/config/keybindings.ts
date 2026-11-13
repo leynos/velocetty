@@ -202,7 +202,8 @@ export const createKeybindingsService = (dependencies: {
 
   /** Writes the seed and applies it, reporting how far the migration got. */
   const seedFile = (decision: SeedDecision): KeybindingsLoadOutcome => {
-    const writeOutcome = store.write(codec.serialize(decision.keymaps));
+    const text = codec.serialize(decision.keymaps);
+    const writeOutcome = store.write(text);
     hasUnsavedSeed = writeOutcome.kind === 'failed';
     if (writeOutcome.kind === 'failed') {
       report({failure: writeOutcome.failure, kind: 'seed-failed'});
@@ -213,7 +214,17 @@ export const createKeybindingsService = (dependencies: {
     }
     lastShownDiagnostics = '';
     applyObservation(observation);
-    return {keymaps: exposedKeymaps(), kind: 'applied', origin: seedOrigin(writeOutcome)};
+    const outcome: KeybindingsLoadOutcome = {
+      keymaps: exposedKeymaps(),
+      kind: 'applied',
+      origin: seedOrigin(writeOutcome)
+    };
+    // Reported only when the write landed; an unsaved seed leaves nothing on
+    // disk for the caller to compare against.
+    if (writeOutcome.kind === 'written') {
+      Object.assign(outcome, {writtenText: text});
+    }
+    return outcome;
   };
 
   /**

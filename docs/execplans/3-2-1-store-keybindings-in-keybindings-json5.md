@@ -1441,6 +1441,18 @@ design and the notification the user sees.
   - #274 tracks replacing the trusted TypeScript–Dafny correspondence with a
     mechanical check.
 
+- [x] (2026-11-13 08:39Z) Settled the readiness baseline against the text the
+  import applied, closing CodeRabbit `4560958579` (see EP-N).
+  - `settleWatchedFileStamps` replaces `refreshWatchedFileStamps`, and a
+    written file's new identity is adopted only while the file still holds the
+    text the import applied; see EP-N for the ordering argument and the
+    rejected alternatives.
+  - `ConfigImportResult` now reports `writtenFiles` instead of `bootstrapped`;
+    `loadUserConfig` retains the applied config text, and the keybindings
+    service reports the text it seeded as `writtenText`.
+  - Regression tests cover an external edit after the config bootstrap and
+    after the keybindings seed; both reload and notify.
+
 ## Surprises & discoveries
 
 - Observation: `typos.toml` is generated from a shared dictionary fetched from
@@ -4623,6 +4635,46 @@ missed. Fixture directories, manifest keys and path assertions are now built
 with `path`, and the console-privacy pattern matches the account and directory
 names rather than a path separator.
 
+### EP-N: review-round repairs for head `a0b0bcd7`
+
+CodeRabbit's incremental review (`4560958579`) found that the readiness
+baseline was settled by re-reading the files start-up wrote, rather than by
+checking they still held the text the import applied. If another process
+replaced a bootstrapped `config.json5` or a seeded `keybindings.json5` between
+the import's own write and that re-read, the baseline adopted the replacement's
+identity while `cfg` still held the imported content. Readiness then compared
+the file against itself, found no difference, and skipped the reload, so the
+external edit was ignored until the next save. The finding applies to both
+files.
+
+The repair threads the applied text through the import. `loadUserConfig`
+retains the text it parsed and `load` exposes it as `appliedConfigText` only
+when it bootstrapped the file. The keybindings service reports the exact text
+it seeded as `writtenText`, present only when the write landed. `_import`
+combines both into `writtenFiles`, replacing the old `bootstrapped` flag in
+`ConfigImportResult`; a reload returns an empty list because it writes nothing.
+`settleWatchedFileStamps` then adopts a written file's identity only while the
+file still holds the applied text, and otherwise keeps the pre-import identity
+so readiness reloads.
+
+The inspection is taken before the text read on purpose. An edit landing
+between them makes the comparison fail, and an edit landing after the read
+leaves an identity readiness sees as newer; reading first would let an edit
+slip between the two and be recorded as applied content, which is the failure
+being repaired. The worst case of the chosen order is one redundant reload.
+
+The alternatives the review suggested were rejected. Keeping the pre-import
+stamps unconditionally, or forcing one readiness reload for written files,
+would raise "Configuration updated" on every first launch, because
+`shouldAnnounceReload` is true for a reload that applies. Both would also
+contradict the existing tests that require an untouched first run to stay quiet.
+
+Regression coverage is in `test/unit/watched-file-stamp.test.ts` (adopted when
+the text matches, retained when it differs, unreadable, or gone) and in
+`test/unit/config-watch-readiness.test.ts` (an external edit after the
+bootstrap, and after the seed, both reload and notify). The clean first-run
+cases keep their existing assertions.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -5195,3 +5247,9 @@ requires it. Any adjustment is recorded in `Decision log`.
   logs carry bounded `category` and `operation` fields. Docstrings were added
   to every function this round touched, and the `sameKeymaps` oracle states the
   proof model's value relation. The atomic bootstrap remains deferred to `#270`.
+- 2026-11-13 (readiness-baseline settlement): CodeRabbit `4560958579` is
+  answered in EP-N. A file start-up wrote is settled only while it still holds
+  the text the import applied, so an edit landing before the settlement keeps
+  the pre-import identity and readiness reloads. The applied text is threaded
+  from `loadUserConfig` and the keybindings seed into `writtenFiles`, which
+  replaces the `bootstrapped` flag on `ConfigImportResult`.

@@ -61,6 +61,14 @@ export type ConfigImportFileSystem = Pick<
 type LoadedConfig = {
   config: rawConfig;
   diagnostics: configValidationDiagnostic[];
+  /**
+   * The text of `config.json5` this payload was read from.
+   *
+   * Present only when the payload applied, never when it fell back: a fallback
+   * describes defaults rather than the file, so claiming the file's text was
+   * applied would be false.
+   */
+  appliedText?: string;
   /** Present only when the payload is a fallback, naming why it fell back. */
   failure?: ConfigFallbackCause;
   usedFallback: boolean;
@@ -105,6 +113,14 @@ export type LoadedSources = {
   readonly userCfg: rawConfig;
   readonly defaultCfg: rawConfig;
   readonly bootstrapped: boolean;
+  /**
+   * The text start-up bootstrapped and then applied, when it did both.
+   *
+   * Only a bootstrapped file needs this: it is the text the watcher baseline
+   * may adopt, and only while the file on disk still holds it. A file the user
+   * already had is never settled, because start-up did not write it.
+   */
+  readonly appliedConfigText?: string;
   /** Why the user config fell back; absent when it applied. */
   readonly fallbackCause?: ConfigFallbackCause;
   readonly usedFallback: boolean;
@@ -317,15 +333,17 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
   const loadUserConfig = (defaultConfigFallback: rawConfig): LoadedConfig => {
     const filePath = pathDeps.cfgPath;
     try {
-      const userCfgResult = parseRawConfig({
-        filePath,
-        rawContent: fileSystem.readFileSync(pathDeps.cfgPath, 'utf8')
-      });
+      // Retained beyond the parse: a bootstrapped file's content is what the
+      // watcher baseline may adopt, so it must be the text actually applied
+      // rather than a later read of whatever the file holds by then.
+      const rawContent = fileSystem.readFileSync(pathDeps.cfgPath, 'utf8');
+      const userCfgResult = parseRawConfig({filePath, rawContent});
       if (userCfgResult.usedFallback) {
         reportDiagnostics(warnFn, 'User config diagnostics.', userCfgResult.diagnostics);
       }
       if (!userCfgResult.usedFallback && userCfgResult.value !== null) {
         return {
+          appliedText: rawContent,
           config: userCfgResult.value,
           diagnostics: userCfgResult.diagnostics,
           usedFallback: false
@@ -545,6 +563,11 @@ export const createConfigSourceLoader = (dependencies: ConfigSourceLoaderDepende
     // Added only when the fallback has a known cause, never as `undefined`.
     if (userConfigResult.failure !== undefined) {
       Object.assign(sources, {fallbackCause: userConfigResult.failure});
+    }
+    // Only a file start-up created itself may be settled later, and only while
+    // it still holds this text; a file the user already had is not ours.
+    if (bootstrapped && userConfigResult.appliedText !== undefined) {
+      Object.assign(sources, {appliedConfigText: userConfigResult.appliedText});
     }
     return sources;
   };

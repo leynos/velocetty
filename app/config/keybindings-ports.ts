@@ -102,6 +102,15 @@ export type KeybindingsLoadOutcome =
        * could not be written, so nothing was migrated on disk.
        */
       readonly origin: 'file' | 'missing' | 'seeded' | 'seeded-unsaved';
+      /**
+       * The exact text this call wrote, present only when it seeded the file.
+       *
+       * The composition root settles the watcher baseline for a file start-up
+       * created, and it may only adopt the file's identity while the file
+       * still holds the text that was applied. An unsaved seed wrote nothing,
+       * so it reports no text.
+       */
+      readonly writtenText?: string;
     }
   | {
       readonly kind: 'kept';
