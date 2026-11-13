@@ -80,7 +80,7 @@ byte-stable, which is the check that would have caught this before pushing.
 
 Every supported rule in Oxlint's Unicorn recommended profile and every rule in
 the `ai-deslop` recommended profile is listed explicitly in
-[`.oxlintrc.json`](../.oxlintrc.json). Oxlint's accumulating-spread rule is
+[`.oxlintrc.json`](../../.oxlintrc.json). Oxlint's accumulating-spread rule is
 also enabled as recommended by Deslop. All Oxlint categories are off, so an
 upstream category change cannot silently add or remove rules. Type-aware
 analysis is enabled for the recommended rules that require it.
@@ -106,13 +106,13 @@ Three rules are disabled globally for documented contract or plug-in conflicts:
   `null` resets a value, and the public session and configuration types include
   nullable values. Replacing these values with `undefined` would change
   configuration merging or serialized messages. See the
-  [layering contract](../app/config/layering.ts#L48), [session types](../shared/src/types/common.ts#L40),
-  and [configuration types](../shared/src/types/config.ts#L56).
+  [layering contract](../../app/config/layering.ts#L48), [session types](../../shared/src/types/common.ts#L40),
+  and [configuration types](../../shared/src/types/config.ts#L56).
 - `deslop/no-unknown-parameters`: the transport guidance requires untrusted IPC
   responses to enter the transport boundary as `unknown` and be validated with
   Zod before reaching application code. This rule rejects that required
   boundary parameter type. See
-  [transport abstraction practice](developers-guide.md#transport-abstraction-practice).
+  [transport abstraction practice](../developers-guide.md#transport-abstraction-practice).
 - `deslop/no-reflect-apply`: this directly conflicts with
   `unicorn/prefer-reflect-apply`; the Unicorn rule takes precedence.
 
@@ -127,14 +127,14 @@ rule remains active for other code.
 `unicorn/number-literal-case` is disabled only for two files because Biome's
 existing formatter writes hexadecimal digits in lowercase, while this rule
 requires uppercase digits. The conflict is limited to
-[the ELF header checks](../bin/mksnapshot-wrapper.js#L40) and
-[the Unicode escape bound](../app/runtime/plugin-runtime-json5-parser.ts#L331).
+[the ELF header checks](../../bin/mksnapshot-wrapper.js#L40) and
+[the Unicode escape bound](../../app/runtime/plugin-runtime-json5-parser.ts#L331).
 
 The snapshot loader models module exports as `SnapshotModuleExport` and module
 definitions using the `electron-link` callback contract, so its dynamic module
 cache retains a concrete type without widening exports to `unknown`. The
 snapshot bootstrap requirement is recorded in the
-[esbuild migration ADR](adr-002-replace-webpack-babel-with-esbuild.md#required-plugin-and-bespoke-transform-analysis).
+[esbuild migration ADR](adr-0002-replace-webpack-babel-with-esbuild.md#required-plugin-and-bespoke-transform-analysis).
 
 When a construct is reported by both plug-ins, its implementation must satisfy
 both rules; if their preferred forms conflict, the Unicorn form takes
@@ -200,12 +200,12 @@ Hyper, a mistyped directory — gained a stack trace framing the report in the
 CLI's own internals. `cli/index.ts` now throws an `ExpectedFailureError` for
 those three and prints only its message, keeping the stack for unexpected
 defects. The named subclass, discriminated with `instanceof`, follows the
-[`InvalidSessionExtraOptionsError`](../app/ui/window.ts#L33) that separates the
-same two cases for the renderer.
+[`InvalidSessionExtraOptionsError`](../../app/ui/window.ts#L33) that separates
+the same two cases for the renderer.
 
 The general lesson is that a green local gate set is evidence about the
 projects it compiles and nothing more. The
-[developers' guide](developers-guide.md#local-gates-do-not-cover-the-whole-build-surface)
+[developers' guide](../developers-guide.md#local-gates-do-not-cover-the-whole-build-surface)
 lists the omitted projects and the commands that cover them.
 
 ## Addendum: the emitted-file leak and the mirrored rules
@@ -363,7 +363,7 @@ was evidence about the lane, not about the app.
 
 ## References
 
-- [Developers' guide: formatting and linting](developers-guide.md#formatting-and-linting)
+- [Developers' guide: formatting and linting](../developers-guide.md#formatting-and-linting)
 - [Oxlint plug-ins](https://oxc.rs/docs/guide/usage/linter/plugins.html)
 - [`ai-deslop`](https://github.com/maharshi365/deslop)
 - [Model pull request](https://github.com/leynos/simulacat-core/pull/121)

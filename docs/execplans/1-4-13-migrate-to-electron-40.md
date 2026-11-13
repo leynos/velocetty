@@ -20,8 +20,8 @@ Electron 40, and `docs/roadmap.md` marks `1.4.13` done.
 ## Constraints
 
 - Follow Architecture Decision Record (ADR) 004 from
-  `docs/adr-004-update-electron-40.md`: staged runtime upgrades remain the
-  governing approach and this milestone is the final Electron 40 step.
+  `docs/adrs/adr-0004-update-electron-40.md`: staged runtime upgrades remain
+  the governing approach and this milestone is the final Electron 40 step.
 - Preserve existing Make targets and npm/bun script entry points used by local
   development and Continuous Integration (CI).
 - Maintain native module functionality for `node-pty` and associated rebuild
@@ -173,7 +173,8 @@ Node baseline `24.11.1` in `.github/workflows/nodejs.yml`.
 Relevant source-of-truth documents for this implementation:
 
 - `docs/roadmap.md`: task status and completion tracking for `1.4.13`.
-- `docs/adr-004-update-electron-40.md`: accepted staged path and risk framing.
+- `docs/adrs/adr-0004-update-electron-40.md`: accepted staged path and risk
+  framing.
 - `docs/developers-guide.md`: developer practice that must reflect migration
   changes.
 - `docs/velocetty-design.md`: host migration constraint to avoid locking new

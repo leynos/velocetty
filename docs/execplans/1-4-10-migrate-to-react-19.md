@@ -11,10 +11,10 @@ No `PLANS.md` exists in this repository, so this plan stands alone.
 ## Purpose / Big picture
 
 Upgrade the renderer React stack from 18.3 to React 19 in line with
-`docs/adr-003-update-react-19.md`. Success means the Electron renderer builds
-and tests pass with React 19, React 19-compatible dependencies, and updated
-project documentation. A developer should be able to run the standard gates and
-see all required commands complete successfully.
+`docs/adrs/adr-0003-update-react-19.md`. Success means the Electron renderer
+builds and tests pass with React 19, React 19-compatible dependencies, and
+updated project documentation. A developer should be able to run the standard
+gates and see all required commands complete successfully.
 
 ## Constraints
 
@@ -121,8 +121,9 @@ using `createRoot`. React and React DOM versions are defined in two places:
 `lib/utils/plugins.ts` with a mirrored implementation in `app/plugins.js`.
 React build settings live in `babel.config.json` and `tsconfig.base.json`, both
 already configured for the new JSX transform. The product and architecture
-context for this upgrade is documented in `docs/adr-003-update-react-19.md`,
-`docs/velocetty-design.md`, and `docs/velocetty-hyper-codebase.md`.
+context for this upgrade is documented in
+`docs/adrs/adr-0003-update-react-19.md`, `docs/velocetty-design.md`, and
+`docs/velocetty-hyper-codebase.md`.
 
 ## Plan of work
 

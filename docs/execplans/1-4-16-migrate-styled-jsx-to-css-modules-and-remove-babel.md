@@ -8,7 +8,7 @@
 - Invariants: Preserve renderer behaviour, style scoping, and packaging
   outputs while migration is in flight.
 - Cross-links: `docs/roadmap.md`,
-  `docs/adr-002-replace-webpack-babel-with-esbuild.md`,
+  `docs/adrs/adr-0002-replace-webpack-babel-with-esbuild.md`,
   `docs/developers-guide.md`, `build/esbuild/run-esbuild.ts`,
   `build/esbuild/esbuild-plugins/styled-jsx-babel-bridge-plugin.ts`, and
   `typings/styled-jsx.d.ts`.

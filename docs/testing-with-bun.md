@@ -7,7 +7,7 @@
 - Invariants: Keep guidance aligned with Bun versions and repository test
   commands.
 - Cross-links: [Developers' guide](developers-guide.md) and
-  [ADR 001](adr-001-replace-ava-with-bun-test.md).
+  [ADR 001](adrs/adr-0001-replace-ava-with-bun-test.md).
 
 ## What Bun’s test runner is (and what it isn’t)
 
