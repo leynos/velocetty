@@ -4835,6 +4835,32 @@ review and the hosted checks.
   and the hosted checks. `#270` and `#274` remain the tracked follow-ups and
   are not described as fixed.
 
+### EP-R: reconciliation for review `6866753325` (third round)
+
+The follow-up at `39fd6913` returned four items. Three are code changes here;
+the fourth is hosted verification that stays with the queued review.
+
+- Readiness is now exercised through the real importer.
+  `test/unit/config-watch-readiness-import.test.ts` runs `runStartupImport`
+  over the import harness's temporary workspace, replaces a bootstrapped
+  `config.json5` and a seeded `keybindings.json5` after the start-up write and
+  before settlement, and asserts both that readiness reconciles and that the
+  reload applies the external bytes. An untouched start-up settles both files
+  and reconciles nothing.
+- The command paths now assert their ports.
+  `test/unit/keybindings-service-command-ports.test.ts` records the codec,
+  store, and reporter calls: the seed serializes through the codec before
+  writing its text, import validates with the request label and writes
+  verbatim, a failed import write reports `import-failed`, and export peeks,
+  validates under the store label, and never writes. Behavioural assertions are
+  retained.
+- The `targetPath` constructor comment now names every path the walk brands:
+  the starting candidate, a link target, the resolved target, and the temporary
+  sibling of a replacement.
+- Docstring Coverage, the final-head builds, display-capable E2E, and the
+  security checks stay with the queued review `3ca15efc` and the hosted runs.
+  `#270` and `#274` remain open follow-ups and are not described as fixed.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -5431,3 +5457,7 @@ requires it. Any adjustment is recorded in `Decision log`.
 - 2026-11-13 (reconciliation for `5897187151`): the applied-state wording, the
   start-up sequence extraction, the readiness content assertions, the export
   query assertions, and the `TargetPath` guarantee are recorded in EP-Q.
+- 2026-11-14 (reconciliation for `6866753325`): real-importer readiness cases,
+  command-path port assertions, and the corrected `targetPath` constructor
+  comment are recorded in EP-R. Docstring Coverage and the final hosted checks
+  remain with the queued review `3ca15efc`.

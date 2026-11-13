@@ -33,16 +33,20 @@ const TEMPORARY_SEQUENCE = /^\d+\.\d+$/;
 /**
  * A path that came from this adapter's own replacement walk.
  *
- * Only `targetPath` builds one, and the walk hands it either the configured
- * path as its starting point or a link target it has just read. The brand
- * therefore stops a caller from passing an arbitrary string where a path this
- * adapter is about to write has to go; it does not assert that the path is
+ * Only `targetPath` builds one. The walk brands the configured path as its
+ * starting point, each link target it reads, the resolved target it settles on,
+ * and the temporary sibling a replacement is written to. The brand therefore
+ * stops a caller from passing an arbitrary string where a path this adapter is
+ * about to inspect or write has to go; it does not assert that the path is
  * fully resolved, because the walk brands intermediate candidates too. The
  * brand is compile-time only: the filesystem still receives the plain string.
  */
 type TargetPath = string & {readonly __brand: 'TargetPath'};
 
-/** Brands a path this adapter resolved; the only constructor of {@link TargetPath}. */
+/**
+ * Brands a path this adapter is about to inspect or write: a walk candidate, a
+ * resolved target, or the temporary sibling of a replacement.
+ */
 const targetPath = (value: string): TargetPath => {
   // SAFETY: This constructor is the only source of replacement-target brands.
   return value as TargetPath;
