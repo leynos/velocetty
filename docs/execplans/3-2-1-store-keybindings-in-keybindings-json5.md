@@ -4742,6 +4742,64 @@ outstanding `CHANGES_REQUESTED` verdict belongs to `a0b0bcd7`; its single
 finding was answered in `9608fd5c` and CodeRabbit marked the thread resolved,
 so the review of the current head is what reconciles the decision.
 
+### EP-P: pre-merge repairs for review `5897187151`
+
+The review of `05c92656` left one inline finding and two failed pre-merge rows.
+The finding is fixed and both rows are answered in code rather than argued.
+
+The finding said a file start-up seeded and another process then deleted would
+keep its pre-import `absent` identity, so readiness would compare it against
+itself and never reload. `settledWrittenStamp` now returns an unknown identity
+whenever the written file is not present, and an unknown identity never
+compares equal, so the deletion reloads. The regression test states both the
+settled stamp and the reconciler's verdict (`536174f4`).
+
+The Unit Architecture row is valid: this branch had grown `app/config.ts` from
+186 to 605 lines, added a 625-line `import-sources.ts`, and left
+`keybindings-store.ts` at 415, all past the repository's 400-line limit. The
+repair is a sequence of behaviour-preserving splits, each gated on its own:
+
+- `import-sources.ts` became a read-only defaults query, a start-up bootstrap
+  command, a fault-notice unit, and a fault-logging unit, leaving the file as
+  composition (`f7cef6eb`). The `process.env.DEBUG_CONFIG_IMPORT` read moved to
+  `app/config.ts`, which passes the flag in (`50f3c4b3`), and the bootstrap
+  template was hoisted so it is built once (`186011ed`).
+- `app/config.ts` became composition only: the applied state, the read-only
+  queries, and the watcher each moved to their own module (`e2a48d7f`).
+- `keybindings-store.ts` kept the atomic write and symlink resolution; rename
+  retries and the reporting wrapper moved out (`5aed5dfe`).
+- E2E marker emission moved behind an injected sink that the composition root
+  binds, with a test proving a normal start-up emits no marker (`c7a1d09d`).
+  The shortcut probe stays in `app/`, because the E2E lane launches the
+  production bundle and the probe must be in it; it is already gated by the
+  lane flag and by the request-file variable.
+- Item 2's environment rule is applied to the probe as well (`5eba7613`).
+  `createMarkerSink` takes the lane predicate, `app/config.ts` exports
+  `isE2ERun` and the bound `emitE2EMarker`, and `startShortcutProbe` takes the
+  lane flag, the sink, and the request file as parameters, so neither it nor
+  the sink reads the environment.
+- Item 6 needed no new code: `config-import-json5.test.ts` already asserts that
+  `getDefaultConfig` performs no write, notification, or initialization;
+  `keybindings-store.test.ts` asserts that `peek` records no span or warning;
+  and `keybindings-service.test.ts` asserts that `exportKeybindings` attempts
+  no write and shows no notice.
+
+The Developer Documentation row is answered by a documentation-only commit
+(`c2f08313`) naming `createPluginLoader`, the watched-file stamp module and its
+tri-state, `describeError`, `boundedErrorCode`, `logNotificationShown`,
+`ensureSchemaFiles`, the E2E chord and probe helpers, and
+`bin/generate-dafny.mjs`, with architecture-document sections for the plugin
+loader, the stamp reconciliation, the applied state, and the store seams.
+
+`CodeScene Code Health Review` then failed the head on String Heavy Function
+Arguments in `keybindings-store.ts` (9.69, 43 % of arguments), a rule that the
+retry and reporting split had exposed by leaving the module mostly path-shaped.
+The vetted replacement target is now a `TargetPath` brand built only by
+`targetPath`, the shape the repository already uses for `ConfigPath`
+(`8582e5e3`); `cs review` reports 10.00. The candidate then passes every local
+gate: format, format check, typecheck, lint, 931 tests in 104 files, spelling,
+Dafny proofs, Markdown lint, and Mermaid validation.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -5330,3 +5388,8 @@ requires it. Any adjustment is recorded in `Decision log`.
   `E2E-KB-0` marker timeout on macOS. CodeRabbit paused automatic reviews for
   the head, so one request is queued as `990ed249` and the stale
   `CHANGES_REQUESTED` from `a0b0bcd7` waits on that review.
+- 2026-11-13 (pre-merge repairs for `5897187151`): the deleted-file
+  settlement, the import and configuration-root splits, the keybindings-store
+  split, the injected E2E marker sink and shortcut-probe dependencies, the
+  `TargetPath` brand, and the developer and architecture documentation are
+  recorded in EP-P.

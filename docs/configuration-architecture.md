@@ -222,12 +222,14 @@ held, but it cannot carry a path, a command identifier, or a shortcut. The sink
 and the clock are injected, so the record shape is tested without Electron or
 real time.
 
-The end-to-end markers go through `e2e-marker-sink.ts`. `emitE2EMarker` writes
-a line only when `RUN_E2E === '1'`, and `silentMarkerSink` drops every line for
-a caller with no stream to report to; `e2e-keymap-probe.ts` re-exports the sink
-and formats the keymaps and command markers. The composition root supplies the
-live sink, and the watcher runtime takes it as a parameter rather than reading
-the environment itself, so a shipped build prints no marker.
+The end-to-end markers go through `e2e-marker-sink.ts`. `createMarkerSink`
+builds a sink that writes a line only while the lane flag holds, and
+`silentMarkerSink` drops every line for a caller with no stream to report to.
+The composition root in `app/config.ts` is the one place that reads `RUN_E2E`:
+it exports `isE2ERun` and the bound `emitE2EMarker`, and the watcher runtime,
+the command handlers, and the shortcut probe all take the sink as a parameter
+rather than inspecting the environment themselves. A shipped build therefore
+prints no marker.
 
 ## Data flow
 

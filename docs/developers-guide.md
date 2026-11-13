@@ -1597,13 +1597,17 @@ reports `pressed`, `unbound`, or `rejected`. `withPressToken` in
 dispatch, so the marker a handler prints names the press that sent the command
 rather than a later one.
 
-Markers are written through `app/config/e2e-marker-sink.ts`. `emitE2EMarker`
-prints only when `RUN_E2E === '1'`, and `silentMarkerSink` discards every line
-for callers with no stream to report to. The probe shortcut `ctrl+alt+shift+n`
-is bound by no shipped keymap, which `test/unit/e2e-keymap-probe.test.ts`
-enforces; a marker reporting it can therefore only have come from the user's
-file. `test/unit/e2e-marker-sink.test.ts` proves the other half: a normal
-start-up, with the lane flag unset, emits no `[e2e]` line at all.
+Markers are written through `app/config/e2e-marker-sink.ts`. `createMarkerSink`
+builds a sink that prints only while the lane flag holds, and
+`silentMarkerSink` discards every line for callers with no stream to report to.
+`app/config.ts` is the one place that reads `RUN_E2E`: it exports `isE2ERun`
+and the bound `emitE2EMarker`. `startShortcutProbe` takes the lane flag, the
+sink, and the request file as parameters, so it is dormant in a shipped build
+without reading the environment. The probe shortcut `ctrl+alt+shift+n` is bound
+by no shipped keymap, which `test/unit/e2e-keymap-probe.test.ts` enforces; a
+marker reporting it can therefore only have come from the user's file.
+`test/unit/e2e-marker-sink.test.ts` proves both halves: the sink is silent
+while the flag is false, and a normal start-up emits no `[e2e]` line at all.
 
 ## Default test gate
 
