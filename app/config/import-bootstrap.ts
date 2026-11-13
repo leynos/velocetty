@@ -36,6 +36,30 @@ export type ImportBootstrap = {
 };
 
 /**
+ * Builds the template written to a missing `config.json5`.
+ *
+ * The platform keymap stays in the loaded defaults because it seeds the
+ * runtime configuration, but it is left out of the bootstrap file: shortcuts
+ * belong in `keybindings.json5`, so a copy here would be ignored on every
+ * later launch and reported to the user as an ignored setting.
+ *
+ * It captures nothing from the factory, so it is defined once here rather than
+ * recreated on every call.
+ *
+ * @example
+ * ```ts
+ * createBootstrapTemplate({keymaps: {'window:new': ['ctrl+n']}});
+ * // {keymaps: {}}
+ * ```
+ */
+const createBootstrapTemplate = (defaults: rawConfig): rawConfig => {
+  // Clearing the legacy key is the point: a bootstrap file must not carry
+  // shortcuts that `keybindings.json5` will supersede on the next launch.
+  // oxlint-disable-next-line typescript/no-deprecated -- The template owns this key.
+  return {...cloneRawConfig(defaults), keymaps: {}};
+};
+
+/**
  * Creates the start-up bootstrap command.
  *
  * Directories, schema copies, and the `config.json5` template are written here
@@ -94,27 +118,6 @@ export const createImportBootstrap = (dependencies: ImportBootstrapDependencies)
     if (results.some(({kind}) => kind === 'failed')) {
       notifyFn("Couldn't update config schema metadata. Config editor validation may be stale.");
     }
-  };
-
-  /**
-   * Builds the template written to a missing `config.json5`.
-   *
-   * The platform keymap stays in the loaded defaults because it seeds the
-   * runtime configuration, but it is left out of the bootstrap file: shortcuts
-   * belong in `keybindings.json5`, so a copy here would be ignored on every
-   * later launch and reported to the user as an ignored setting.
-   *
-   * @example
-   * ```ts
-   * createBootstrapTemplate({keymaps: {'window:new': ['ctrl+n']}});
-   * // {keymaps: {}}
-   * ```
-   */
-  const createBootstrapTemplate = (defaults: rawConfig): rawConfig => {
-    // Clearing the legacy key is the point: a bootstrap file must not carry
-    // shortcuts that `keybindings.json5` will supersede on the next launch.
-    // oxlint-disable-next-line typescript/no-deprecated -- The template owns this key.
-    return {...cloneRawConfig(defaults), keymaps: {}};
   };
 
   /**
