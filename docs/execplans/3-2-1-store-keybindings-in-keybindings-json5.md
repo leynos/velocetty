@@ -4725,6 +4725,23 @@ seeded text, the failed-seed test pins an empty list, the repaired-default test
 pins the bootstrapped config entry by `toContainEqual` (a fresh bootstrap also
 seeds `keybindings.json5`), and the fallback test pins an empty list.
 
+The repair landed as `6f477c33` and the hosted `CodeScene Code Health Review`
+then passed the head and approved it. `build (macos-latest)` failed its first
+attempt in `E2E-KB-0`, which timed out after 10 s waiting for the
+`[e2e] config-watcher-ready` marker on a cold launch while the other six E2E
+tests in that run passed, and that marker is emitted by
+`ConfigWatcherOptions.onReady` before `reconcileOnReady` runs, so it cannot be
+delayed by this commit; the failed job was rerun and passed. `build
+(ubuntu-latest)`, `build (windows-2022)`, `build-linux-aarch64`, and `Gecko
+Security Review` also pass.
+
+CodeRabbit reported `Review paused` for `6f477c33`, its automatic pause after a
+number of reviewed commits, so that head has no review yet. One request was
+queued for it (`comenq` id `990ed249`) rather than posted directly. The
+outstanding `CHANGES_REQUESTED` verdict belongs to `a0b0bcd7`; its single
+finding was answered in `9608fd5c` and CodeRabbit marked the thread resolved, so
+the review of the current head is what reconciles the decision.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -5308,3 +5325,8 @@ requires it. Any adjustment is recorded in `Decision log`.
   split helpers, the harness's explicit written-file state, the table-driven
   readiness cases, and the production `writtenFiles` assertions that replace
   the harness's mirrored derivation.
+- 2026-11-13 (hosted outcome for `6f477c33`): CodeScene passes and approves the
+  head; every other hosted check is green after a rerun of a cold-launch
+  `E2E-KB-0` marker timeout on macOS. CodeRabbit paused automatic reviews for
+  the head, so one request is queued as `990ed249` and the stale
+  `CHANGES_REQUESTED` from `a0b0bcd7` waits on that review.
