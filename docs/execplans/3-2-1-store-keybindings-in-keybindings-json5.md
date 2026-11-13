@@ -4572,7 +4572,12 @@ names, and each new test was mutation-checked against the defect it describes.
   removing the tagging in the page fails four probe tests, including the one
   that handles the first press's command during the second press; removing the
   binding in `app/rpc.ts` fails the RPC test that asserts a tagged command
-  prints its own token and a following untagged command prints none.
+  prints its own token and a following untagged command prints none. CodeRabbit
+  `4558030182` asked for the harness side as well: a press whose handler lands
+  after the probe replied. The fake app can now withhold a marker until the
+  harness waits for it, and the new case asserts the wait succeeds without a
+  second press. Removing the marker wait from `pressUntilExecuted` fails four
+  harness tests, the new one among them.
 - **Plugin log privacy.** Successful loads printed the plugin's directory name
   and manifest version, and failure lines repeated the name. Console sinks now
   number the plugin by its position in the configured list; notifications keep

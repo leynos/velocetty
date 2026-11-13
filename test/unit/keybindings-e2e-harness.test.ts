@@ -26,6 +26,12 @@ const ordinalOf = (matcher: RegExp): number => {
   return Number(match[1]);
 };
 
+/** Extracts the press ordinal a command marker names, or `null` for any other wait. */
+const markerOrdinalOf = (matcher: RegExp): number | null => {
+  const match = /press=#(\d+)/.exec(matcher.source);
+  return match?.[1] === undefined ? null : Number(match[1]);
+};
+
 /** The line a scripted probe prints for a request it answered, newline included. */
 const scriptedReply = (ordinal: number, verdict: ProbeVerdict, command: string): string =>
   verdict === 'pressed'
@@ -103,6 +109,8 @@ const neverExecutes = (): number | undefined => 0;
  * `command` is the command the scripted probe attributes to each `pressed`
  * reply, so a test can model a press that ran some other binding's command.
  * `markersBefore` seeds the output with command markers an earlier press left.
+ * An ordinal in `markersOnWait` models a handler that lands after the probe
+ * replied: its marker is printed only when the harness starts waiting for it.
  */
 const createFakeApp = (
   verdictFor: (ordinal: number) => ProbeVerdict,
@@ -110,7 +118,8 @@ const createFakeApp = (
   command = 'window:new',
   markersBefore = 0,
   executesAt: (ordinal: number) => number | undefined = (ordinal) =>
-    verdictFor(ordinal) === 'pressed' ? ordinal : undefined
+    verdictFor(ordinal) === 'pressed' ? ordinal : undefined,
+  markersOnWait: ReadonlySet<number> = new Set()
 ) => {
   const printed = Array.from({length: markersBefore}, () => `[e2e] command-executed ${command} press=#0`);
   let ordinalsSent = 0;
@@ -127,6 +136,20 @@ const createFakeApp = (
       }
     }
   };
+  /**
+   * Prints a marker the script withheld until the harness waited for it.
+   *
+   * Nothing is in the output when the wait begins, so a helper that counts
+   * markers at reply time sees none; the marker appears while the wait polls.
+   */
+  const releaseWithheldMarker = (matcher: RegExp): string | undefined => {
+    const ordinal = markerOrdinalOf(matcher);
+    if (ordinal === null || !markersOnWait.has(ordinal)) {
+      return undefined;
+    }
+    printExecution(ordinal);
+    return printed.find((line) => matcher.test(line));
+  };
   const app = {
     count: (matcher: RegExp) => printed.filter((line) => matcher.test(line)).length,
     output: () => printed.join('\n'),
@@ -142,7 +165,7 @@ const createFakeApp = (
       // A marker wait names no request, so it is answered from the printed
       // lines rather than from the scripted probe replies.
       if (!namesRequest(matcher)) {
-        const marker = printed.find((line) => matcher.test(line));
+        const marker = printed.find((line) => matcher.test(line)) ?? releaseWithheldMarker(matcher);
         if (marker === undefined) {
           throw new Error(`Timed out waiting for the command marker: ${matcher.source}`);
         }
@@ -299,6 +322,18 @@ test('a command that lands during a later press is not credited to it', async ()
   expect(app.sent()).toBe(2);
   expect(app.count(executedByPressMarker({ordinal: 1, command: 'window:new'}))).toBe(1);
   expect(app.count(executedByPressMarker({ordinal: 2, command: 'window:new'}))).toBe(0);
+});
+
+test('a command whose handler lands after the reply is waited for, not re-pressed', async () => {
+  // The probe answers `pressed` and main runs the command only afterwards, so
+  // the output holds no marker when that reply arrives. The harness must wait
+  // for the press's own marker rather than give up and press again, which would
+  // run the command twice. Waiting is what lets a delayed handler count.
+  const app = createFakeApp(() => 'pressed', new Set(), 'window:new', 0, neverExecutes, new Set([1]));
+
+  expect(await rejectionMessage(pressUntilExecuted({app, command: 'window:new', shortcut: 'ctrl+n'}))).toBeNull();
+  expect(app.sent()).toBe(1);
+  expect(app.count(executedByPressMarker({ordinal: 1, command: 'window:new'}))).toBe(1);
 });
 
 test('a press the probe never answers fails instead of being repeated', async () => {
