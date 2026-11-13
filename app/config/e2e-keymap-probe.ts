@@ -11,25 +11,9 @@ export const E2E_KEYMAP_PROBE = 'window:new';
 /** The shortcut the E2E scenarios write; no shipped keymap may contain it. */
 export const E2E_PROBE_SHORTCUT = 'ctrl+alt+shift+n';
 
-/** Whether this process was started by the end-to-end lane. */
-export const isE2ERun = (): boolean => process.env.RUN_E2E === '1';
-
-/**
- * Writes a marker line only when the end-to-end lane is running.
- *
- * The marker stream is the lane's only observation surface: the test reads the
- * child process's standard output, so every assertion is a line printed here.
- *
- * @example
- * ```ts
- * emitE2EMarker('[e2e] renderer-ready'); // prints only under RUN_E2E=1
- * ```
- */
-export const emitE2EMarker = (line: string): void => {
-  if (isE2ERun()) {
-    console.log(line);
-  }
-};
+// The marker stream lives in `e2e-marker-sink`; it is re-exported here so this
+// probe's importers keep naming the lane's markers through one specifier.
+export {emitE2EMarker, isE2ERun} from './e2e-marker-sink';
 
 /** The reload status vocabulary the marker reports. */
 export type E2EKeymapStatus = 'applied' | 'kept';

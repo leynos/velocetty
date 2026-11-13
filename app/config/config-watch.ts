@@ -16,7 +16,8 @@ import type {ConfigWarningNotifier} from './config-queries';
 import {checkDeprecatedConfig} from './config-queries';
 import type {ImportRecord, ImportRecorder} from './config-observability';
 import {getCurrentConfig, setCurrentConfig} from './current-config';
-import {emitE2EMarker, formatKeymapsMarker, type E2EKeymapStatus} from './e2e-keymap-probe';
+import {formatKeymapsMarker, type E2EKeymapStatus} from './e2e-keymap-probe';
+import type {E2EMarkerSink} from './e2e-marker-sink';
 import type {ConfigImportResult} from './import';
 import {shouldAnnounceReload, type ConfigImportReport, type ConfigSourceKind} from './import-report';
 import {createConfigWatcher, type WatcherEvent, type WatcherHandle} from './watcher';
@@ -32,15 +33,16 @@ const keymapStatus = (report: ConfigImportReport): E2EKeymapStatus =>
  * Reports the probe binding the E2E lane asserts on after every reload.
  *
  * @param report - What the import that just finished decided.
+ * @param marker - Receives the line when the lane is running.
  *
  * @example
  * ```ts
- * emitKeymapsMarker({config: 'applied', keybindings: 'applied'});
+ * emitKeymapsMarker({config: 'applied', keybindings: 'applied'}, emitE2EMarker);
  * // logs the `[e2e] keymaps` marker for the keymaps now in effect
  * ```
  */
-export const emitKeymapsMarker = (report: ConfigImportReport) => {
-  emitE2EMarker(formatKeymapsMarker(keymapStatus(report), getCurrentConfig().keymaps));
+export const emitKeymapsMarker = (report: ConfigImportReport, marker: E2EMarkerSink) => {
+  marker(formatKeymapsMarker(keymapStatus(report), getCurrentConfig().keymaps));
 };
 
 /** Wraps chokidar in the adapter the watcher debounces over. */
@@ -85,6 +87,8 @@ export type ConfigWatchDependencies = {
   readonly spans: ConfigSpanRecorder;
   readonly metrics: ConfigMetrics;
   readonly notify: ConfigWarningNotifier;
+  /** Receives the E2E markers a reload reports; the composition root chooses it. */
+  readonly reportMarker: E2EMarkerSink;
   /** The tree that supplied the active configuration, named in every record. */
   readonly configTree: ConfigSourceKind;
   /** Absolute paths of the files a reload must react to. */
@@ -111,12 +115,12 @@ export type ConfigWatchRuntime = {
  *
  * @example
  * ```ts
- * const runtime = createConfigWatchRuntime({importConfiguration, recorder, spans, metrics, notify, configTree, watchedFiles});
+ * const runtime = createConfigWatchRuntime({importConfiguration, recorder, spans, metrics, notify, reportMarker, configTree, watchedFiles});
  * const watcher = runtime.watch(startupStamps);
  * ```
  */
 export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies): ConfigWatchRuntime => {
-  const {importConfiguration, recorder, spans, metrics, notify, configTree, watchedFiles} = dependencies;
+  const {importConfiguration, recorder, spans, metrics, notify, reportMarker, configTree, watchedFiles} = dependencies;
   const watchers: Function[] = [];
   let configWatcher: {readonly close: () => Promise<void>} | undefined;
 
@@ -157,7 +161,7 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
       fn();
     });
     checkDeprecatedConfig(notify);
-    emitKeymapsMarker(report);
+    emitKeymapsMarker(report, reportMarker);
   };
 
   /**
@@ -184,7 +188,7 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
       fileNames: watchedFiles,
       handle: createChokidarHandle(watchedDirectories),
       metrics,
-      onReady: () => emitE2EMarker('[e2e] config-watcher-ready'),
+      onReady: () => reportMarker('[e2e] config-watcher-ready'),
       /** Re-reads when a file changed, or could not be inspected, during the scan. */
       reconcileOnReady,
       /** Re-imports on a debounced change; the watcher catches whatever it throws. */

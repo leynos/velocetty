@@ -116,6 +116,7 @@ const configWatch = createConfigWatchRuntime({
   metrics,
   notify,
   recorder,
+  reportMarker: emitE2EMarker,
   spans,
   watchedFiles
 });
@@ -199,7 +200,7 @@ export const setup = () => {
   checkDeprecatedConfig(notify);
   emitE2EMarker(`[e2e] keybindings-path ${keybindingsPath}`);
   emitE2EMarker(`[e2e] config-path ${cfgPath}`);
-  emitKeymapsMarker(report);
+  emitKeymapsMarker(report, emitE2EMarker);
 };
 
 export {
