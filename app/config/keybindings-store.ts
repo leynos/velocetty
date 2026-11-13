@@ -30,11 +30,26 @@ const MAX_SYMLINK_HOPS = 40;
 /** The `<pid>.<counter>` middle segment of a temporary file name. */
 const TEMPORARY_SEQUENCE = /^\d+\.\d+$/;
 
+/**
+ * A path this adapter has vetted as a replacement target.
+ *
+ * Only `targetPath` builds one, so a path that never went through symlink
+ * resolution cannot be written to by mistake. The brand is compile-time only:
+ * the filesystem still receives the plain string.
+ */
+type TargetPath = string & {readonly __brand: 'TargetPath'};
+
+/** Brands a path this adapter resolved; the only constructor of {@link TargetPath}. */
+const targetPath = (value: string): TargetPath => {
+  // SAFETY: This constructor is the only source of replacement-target brands.
+  return value as TargetPath;
+};
+
 /** One replacement: the resolved target, its temporary sibling, and the mode to keep. */
 type ReplacementPlan = Readonly<{
   readonly mode: number | undefined;
-  readonly target: string;
-  readonly temporaryPath: string;
+  readonly target: TargetPath;
+  readonly temporaryPath: TargetPath;
 }>;
 
 /** A vetted replacement target, or the refused attempt the caller must report. */
@@ -48,7 +63,7 @@ type PreparedWrite =
  * A write is only safe against a path known not to be a symlink, or genuinely
  * absent; anything else fails closed rather than replacing a link.
  */
-type TargetResolution = Readonly<{kind: 'resolved'; path: string}> | Readonly<{kind: 'unresolved'; error: unknown}>;
+type TargetResolution = Readonly<{kind: 'resolved'; path: TargetPath}> | Readonly<{kind: 'unresolved'; error: unknown}>;
 
 /**
  * Creates the filesystem adapter behind `KeybindingsStore`.
@@ -104,7 +119,7 @@ export const createFileKeybindingsStore = (
    * reached. A cycle, an over-long chain, or an inspection error fails closed,
    * because such a path is not a writable target.
    */
-  const followLinks = (candidate: string, hops: number): TargetResolution => {
+  const followLinks = (candidate: TargetPath, hops: number): TargetResolution => {
     let isLink: boolean;
     try {
       isLink = fileSystem.lstatSync(candidate).isSymbolicLink();
@@ -126,23 +141,25 @@ export const createFileKeybindingsStore = (
     } catch (error) {
       return {kind: 'unresolved', error};
     }
-    return followLinks(path.resolve(path.dirname(candidate), linkTarget), hops + 1);
+    // A relative link target is relative to the directory holding the link.
+    const nextCandidate = targetPath(path.resolve(path.dirname(candidate), linkTarget));
+    return followLinks(nextCandidate, hops + 1);
   };
 
   /** The symlink's target when there is one, so the link itself survives. */
   const resolveTarget = (): TargetResolution => {
     try {
-      return {kind: 'resolved', path: fileSystem.realpathSync(options.filePath)};
+      return {kind: 'resolved', path: targetPath(fileSystem.realpathSync(options.filePath))};
     } catch (error) {
       // Only a dangling chain can be resolved by hand; a cycle or an
       // unreadable component is reported by `realpathSync` and must not be
       // guessed at.
-      return errorCode(error) === 'ENOENT' ? followLinks(options.filePath, 0) : {kind: 'unresolved', error};
+      return errorCode(error) === 'ENOENT' ? followLinks(targetPath(options.filePath), 0) : {kind: 'unresolved', error};
     }
   };
 
   /** The mode a replacement must keep, when the target already exists. */
-  const modeOf = (target: string): number | undefined => {
+  const modeOf = (target: TargetPath): number | undefined => {
     try {
       return fileSystem.statSync(target).mode & 0o777;
     } catch {
@@ -156,9 +173,11 @@ export const createFileKeybindingsStore = (
    * The counter makes a name unique within the process, so a failed attempt's
    * leftover cannot be mistaken for the next attempt's file.
    */
-  const planReplacement = (target: string): ReplacementPlan => {
+  const planReplacement = (target: TargetPath): ReplacementPlan => {
     temporaryCounter += 1;
-    const temporaryPath = path.join(path.dirname(target), `.${fileName}.${process.pid}.${temporaryCounter}.tmp`);
+    const temporaryPath = targetPath(
+      path.join(path.dirname(target), `.${fileName}.${process.pid}.${temporaryCounter}.tmp`)
+    );
     return {mode: modeOf(target), target, temporaryPath};
   };
 
