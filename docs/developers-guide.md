@@ -7,7 +7,7 @@
 - Invariants: Keep Makefile targets and validation steps aligned with
   Continuous Integration (CI) and tooling changes.
 - Cross-links: [Testing with Bun](testing-with-bun.md),
-  [ADR 001](adr-001-replace-ava-with-bun-test.md), [ADR 002](adr-002-replace-webpack-babel-with-esbuild.md),
+  [ADR 001](adrs/adr-0001-replace-ava-with-bun-test.md), [ADR 002](adrs/adr-0002-replace-webpack-babel-with-esbuild.md),
   and [Roadmap](roadmap.md).
 
 This guide captures the development practices specific to the Velocetty
@@ -731,7 +731,7 @@ install it with `bun install -g markdownlint-cli2` so it is on `PATH`.
 Biome owns formatting and general lint rules. Oxlint adds the recommended
 Unicorn and `ai-deslop` rule sets; `make lint` runs both linters and the
 package boundary check. The exact rule list, pins, and the documented `null`
-exception are recorded in [ADR 006](adr-006-oxlint-plugin-strategy.md).
+exception are recorded in [ADR 006](adrs/adr-0006-oxlint-plugin-strategy.md).
 
 Run the standard gates before opening a pull request:
 

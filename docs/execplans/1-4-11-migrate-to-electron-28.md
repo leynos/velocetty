@@ -19,7 +19,7 @@ and roadmap item `1.4.11` is marked done.
 ## Constraints
 
 - Follow Architecture Decision Record (ADR)-004 staged migration path from
-  `docs/adr-004-update-electron-40.md`: Electron 22 → 28 → 34 → 40.
+  `docs/adrs/adr-0004-update-electron-40.md`: Electron 22 → 28 → 34 → 40.
 - Preserve existing script and Make target names.
 - Maintain native module functionality (`node-pty`) after the upgrade.
 - Ensure documentation stays wrapped to 80 columns and code blocks to 120

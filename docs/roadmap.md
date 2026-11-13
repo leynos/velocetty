@@ -107,8 +107,8 @@ Scope notes:
 - [x] 1.4.12. Migrate to Electron 34 (see adr-004)
 - [x] 1.4.13. Migrate to Electron 40 (see adr-004). See
   [velocetty-design.md](velocetty-design.md) §Host migration: Electron to Tauri
-  and [adr-004-update-electron-40.md](adr-004-update-electron-40.md) §Phase 3:
-  Electron 40 validation.
+  and [adrs/adr-0004-update-electron-40.md](adrs/adr-0004-update-electron-40.md)
+  §Phase 3: Electron 40 validation.
   - [x] Align runtime anchors (`electron`, `electron-mksnapshot`,
     `@types/node`, rebuild target, and CI Node baseline).
   - [x] Success criteria: `bun install`, `make build`, `make check-fmt`,
@@ -123,9 +123,9 @@ Scope notes:
   - [x] Success criteria: `bun install`, `make build`, `make check-fmt`,
     `make lint`, and `make test` pass after cut-over.
 - [x] 1.4.15. Restore cross-architecture CI reliability for host platforms.
-  See [adr-004-update-electron-40.md](adr-004-update-electron-40.md) §Phase 3:
-  Electron 40 validation and [developers-guide.md](developers-guide.md)
-  §Electron runtime alignment.
+  See [adrs/adr-0004-update-electron-40.md](adrs/adr-0004-update-electron-40.md)
+  §Phase 3: Electron 40 validation and
+  [developers-guide.md](developers-guide.md) §Electron runtime alignment.
   - [x] Retire armv7 CI lanes and release artefact targets, and replace required
     Linux ARM coverage with Linux aarch64.
   - [x] Resolve Linux aarch64 CI failures across install, build, lint, and test
@@ -145,7 +145,7 @@ Scope notes:
     in CI or explicitly tracked as blocked with a documented mitigation path.
 - [x] 1.4.16. Publish the styled-jsx-to-CSS-Modules migration approach and
   inventory for Babel removal. Requires 1.4.14. See
-  [adr-002-replace-webpack-babel-with-esbuild.md](adr-002-replace-webpack-babel-with-esbuild.md)
+  [adrs/adr-0002-replace-webpack-babel-with-esbuild.md](adrs/adr-0002-replace-webpack-babel-with-esbuild.md)
   §Required plugin and bespoke-transform analysis, and
   [1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md](execplans/1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md).
   - [x] Document all `styled-jsx` callsites and classify by migration pattern
@@ -167,7 +167,7 @@ Scope notes:
     style behaviour remains stable in unit and end-to-end checks.
 - [x] 1.4.18. Remove styled-jsx bridge tooling and bridge-only Babel
   dependencies after migration parity is complete. Requires 1.4.17. See
-  [adr-002-replace-webpack-babel-with-esbuild.md](adr-002-replace-webpack-babel-with-esbuild.md)
+  [adrs/adr-0002-replace-webpack-babel-with-esbuild.md](adrs/adr-0002-replace-webpack-babel-with-esbuild.md)
   §Validation gaps and required testing coverage.
   - [x] Remove bridge integration from `build/esbuild/run-esbuild.ts` and
     remove bridge implementation files/constants.
@@ -518,7 +518,7 @@ changes remain in section 7 and are out of scope here.
   - [ ] Success criteria: no crashes, and WebGL usage stays under the maximum.
 - [x] 9.2.3. Implement Architecture Decision Record 005 (ADR-005) layered
   end-to-end (E2E) strategy (Option C). See
-  [ADR 005](adr-005-enhance-e2e-testing-strategy.md).
+  [ADR 005](adrs/adr-0005-enhance-e2e-testing-strategy.md).
   - [x] Keep fast-lane pull request checks in Bun with renderer readiness and
     critical console error assertions.
   - [x] Add a deep Playwright Test lane under Node.js with an interaction-path

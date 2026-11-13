@@ -53,9 +53,9 @@ Primary references and why they matter:
 
 - `docs/roadmap.md` (`1.4.15`): defines the exact macOS checklist and success
   criteria wording.
-- `docs/adr-004-update-electron-40.md` (Architecture Decision Record (ADR) 004,
-  Phase 3): requires Electron 40 validation, including macOS packaging
-  verification.
+- `docs/adrs/adr-0004-update-electron-40.md` (Architecture Decision Record
+  (ADR) 004, Phase 3): requires Electron 40 validation, including macOS
+  packaging verification.
 - `docs/developers-guide.md` (Electron runtime alignment): defines required
   alignment between Electron, Node, native rebuild tooling, and CI settings.
 - `docs/velocetty-hyper-codebase.md`: records CI architecture intent (matrix

@@ -6,7 +6,7 @@
   the first step in the incremental React 19 migration.
 - Invariants: Maintain the ExecPlan structure, keep validation outcomes
   current, and record decisions as they occur.
-- Cross-links: `docs/roadmap.md`, `docs/adr-003-update-react-19.md`,
+- Cross-links: `docs/roadmap.md`, `docs/adrs/adr-0003-update-react-19.md`,
   `docs/developers-guide.md`, `docs/velocetty-hyper-codebase.md`.
 
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,

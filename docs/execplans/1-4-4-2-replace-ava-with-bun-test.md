@@ -5,7 +5,7 @@
 - Purpose: Track execution steps, risks, and decisions for migrating tests to
   Bun.
 - Invariants: Keep progress, risks, and decision log current during execution.
-- Cross-links: [ADR 001](../adr-001-replace-ava-with-bun-test.md),
+- Cross-links: [ADR 001](../adrs/adr-0001-replace-ava-with-bun-test.md),
   [Testing with Bun](../testing-with-bun.md), and
   [Developers' guide](../developers-guide.md).
 
@@ -30,7 +30,7 @@ is marked done.
 
 ## Constraints
 
-- Follow `../adr-001-replace-ava-with-bun-test.md` and
+- Follow `../adrs/adr-0001-replace-ava-with-bun-test.md` and
   `../testing-with-bun.md` for runner selection and behaviour.
 - Use Bun for JavaScript/TypeScript commands and prefer Makefile targets
   for validation (`make check-fmt`, `make lint`, `make test`).
