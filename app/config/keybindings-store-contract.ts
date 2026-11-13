@@ -7,7 +7,31 @@
  */
 import type {ConfigMetrics} from './config-metrics';
 import type {ConfigSpanRecorder} from './config-spans';
-import type {KeybindingsReadOutcome} from './keybindings-ports';
+import type {KeybindingsReadOutcome, KeybindingsStorageFailure} from './keybindings-ports';
+
+/** The errno codes with a dedicated port category; adding one is data, not a new disjunct. */
+const STORAGE_FAILURES = new Map<string, KeybindingsStorageFailure>([
+  ['EACCES', 'permission'],
+  ['EPERM', 'permission'],
+  ['EROFS', 'permission'],
+  ['ENOENT', 'missing']
+]);
+
+/**
+ * Maps a raw errno code onto the port's bounded failure vocabulary.
+ *
+ * The adapter keeps the raw error for its own decision, but every port outcome
+ * and log field goes through this one mapping, so an errno the vocabulary does
+ * not name cannot be reported as anything more specific than `other`.
+ *
+ * @example
+ * ```ts
+ * storageFailure('EACCES'); // 'permission'
+ * storageFailure('EIO'); // 'other'
+ * ```
+ */
+export const storageFailure = (code: string | undefined): KeybindingsStorageFailure =>
+  (code === undefined ? undefined : STORAGE_FAILURES.get(code)) ?? 'other';
 
 /**
  * A read result paired with the raw error the port deliberately hides.
