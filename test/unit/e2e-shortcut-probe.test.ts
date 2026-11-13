@@ -104,15 +104,6 @@ const installWindow = (session: ReturnType<typeof evaluatingSession> | ReturnTyp
   });
 };
 
-/** Restores one environment variable to the value it had before a test. */
-function restoreEnv(name: string, value: string | undefined): void {
-  if (value === undefined) {
-    delete process.env[name];
-  } else {
-    process.env[name] = value;
-  }
-}
-
 afterEach(() => {
   resetElectronMock();
 });
@@ -395,12 +386,10 @@ describe('starting the probe', () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'velocetty-probe-'));
     const requestFile = path.join(directory, 'requests.txt');
     writeFileSync(requestFile, '', 'utf8');
-    const previousRunE2E = process.env.RUN_E2E;
-    const previousPressFile = process.env.VELOCETTY_E2E_PRESS_FILE;
-    process.env.RUN_E2E = '1';
-    process.env.VELOCETTY_E2E_PRESS_FILE = requestFile;
     try {
-      startShortcutProbe();
+      // The composition root resolves these from the environment; the probe
+      // takes them as parameters and never reads the environment itself.
+      startShortcutProbe({isLaneRunning: true, marker: () => {}, requestFile});
 
       // A press blocks on this channel, and the page has no other way to know
       // the main process handled it, so it must be armed before any request.
@@ -408,8 +397,6 @@ describe('starting the probe', () => {
     } finally {
       unwatchFile(requestFile);
       rmSync(directory, {force: true, recursive: true});
-      restoreEnv('RUN_E2E', previousRunE2E);
-      restoreEnv('VELOCETTY_E2E_PRESS_FILE', previousPressFile);
     }
   });
 
@@ -418,15 +405,10 @@ describe('starting the probe', () => {
     getElectronMock().ipcMain.on = (channel) => {
       registeredChannels.push(channel);
     };
-    const previousRunE2E = process.env.RUN_E2E;
-    delete process.env.RUN_E2E;
-    try {
-      startShortcutProbe();
 
-      // The probe is dormant in a shipped build: no channel, no watcher.
-      expect(registeredChannels).toEqual([]);
-    } finally {
-      restoreEnv('RUN_E2E', previousRunE2E);
-    }
+    startShortcutProbe({isLaneRunning: false, marker: () => {}, requestFile: '/tmp/unused-requests.txt'});
+
+    // The probe is dormant in a shipped build: no channel, no watcher.
+    expect(registeredChannels).toEqual([]);
   });
 });

@@ -27,9 +27,15 @@ if (requestedArgument && informationalArguments.includes(requestedArgument)) {
     // to sit relative to a statement in a lower module.
     const config = await import('./config.js');
     config.setup();
-    // Dormant outside the end-to-end lane: the probe reads requests only when
-    // `RUN_E2E=1`, and only from the file `VELOCETTY_E2E_PRESS_FILE` names.
-    startShortcutProbe();
+    // Dormant outside the end-to-end lane: the probe arms only when the lane is
+    // running, and reads requests only from the file the harness names here.
+    // The lane flag and marker stream come from the configuration composition
+    // root, so the probe itself never inspects the environment.
+    startShortcutProbe({
+      isLaneRunning: config.isE2ERun(),
+      marker: config.emitE2EMarker,
+      requestFile: process.env.VELOCETTY_E2E_PRESS_FILE
+    });
 
     await import('./start.js');
   } catch (error) {

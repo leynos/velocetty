@@ -19,15 +19,15 @@
  * has no console and never delivers piped standard input to the main process,
  * so a stdin channel there would silently press nothing.
  *
- * It is dormant outside `RUN_E2E=1`, so a shipped build never reads a request
- * file and never synthesizes key events.
+ * The composition root arms it only when the end-to-end lane is running, so a
+ * shipped build never reads a request file and never synthesizes key events.
  */
 import * as fs from 'node:fs';
 
 import {BrowserWindow, ipcMain, type WebContents} from 'electron';
 
 import {isString} from '../utils/runtime-guards';
-import {emitE2EMarker, isE2ERun} from './e2e-keymap-probe';
+import type {E2EMarkerSink} from './e2e-marker-sink';
 import {parseShortcut, toKeyPress, type KeyPress} from './e2e-shortcut-chord';
 
 /**
@@ -281,7 +281,7 @@ const parseRequest = (line: string): ProbeRequest => {
 };
 
 /** Presses one request and reports its outcome under the request's token. */
-const pressLine = async (line: string): Promise<void> => {
+const pressLine = async (line: string, marker: E2EMarkerSink): Promise<void> => {
   const {replyPrefix, shortcut} = parseRequest(line);
   const token = replyPrefix.trim();
   try {
@@ -292,16 +292,10 @@ const pressLine = async (line: string): Promise<void> => {
     // The command travels in the reply so a scenario can require the press to
     // have run the command it expected, not merely some command.
     const detail = outcome.kind === 'pressed' ? ` command=${outcome.command}` : '';
-    emitE2EMarker(`[e2e] shortcut-probe ${outcome.kind} ${replyPrefix}${shortcut}${detail}`);
+    marker(`[e2e] shortcut-probe ${outcome.kind} ${replyPrefix}${shortcut}${detail}`);
   } catch (error) {
-    emitE2EMarker(`[e2e] shortcut-probe failed ${replyPrefix}${shortcut}: ${String(error)}`);
+    marker(`[e2e] shortcut-probe failed ${replyPrefix}${shortcut}: ${String(error)}`);
   }
-};
-
-/** The request file the harness named, if it named one. */
-const requestFile = (): string | undefined => {
-  const file = process.env.VELOCETTY_E2E_PRESS_FILE;
-  return file === undefined || file.length === 0 ? undefined : file;
 };
 
 /**
@@ -312,7 +306,7 @@ const requestFile = (): string | undefined => {
  *
  * @returns The offset the next read should start from.
  */
-const pressAppendedLines = async (file: string, offset: number): Promise<number> => {
+const pressAppendedLines = async (file: string, offset: number, marker: E2EMarkerSink): Promise<number> => {
   const contents = await fs.promises.readFile(file, 'utf8').catch(() => '');
   const fresh = contents.slice(offset);
   const lastBreak = fresh.lastIndexOf('\n');
@@ -321,10 +315,20 @@ const pressAppendedLines = async (file: string, offset: number): Promise<number>
   }
   for (const line of fresh.slice(0, lastBreak).split('\n')) {
     if (line.trim().length > 0) {
-      await pressLine(line);
+      await pressLine(line, marker);
     }
   }
   return offset + lastBreak + 1;
+};
+
+/** What the composition root supplies so the probe reads no environment itself. */
+export type ShortcutProbeDependencies = {
+  /** Whether the end-to-end lane started this process. */
+  readonly isLaneRunning: boolean;
+  /** Receives the probe's marker lines; silent outside the lane. */
+  readonly marker: E2EMarkerSink;
+  /** The request file the harness named, or `undefined` when it named none. */
+  readonly requestFile: string | undefined;
 };
 
 /**
@@ -333,12 +337,21 @@ const pressAppendedLines = async (file: string, offset: number): Promise<number>
  * The harness owns the write side, so this is a command channel rather than a
  * user interface: a line is a request to press that chord. Lines are pressed
  * in order, so a burst of writes cannot interleave two presses.
+ *
+ * @param dependencies - The lane flag, marker sink, and request file the
+ *   composition root resolved from the environment.
+ *
+ * @example
+ * ```ts
+ * startShortcutProbe({isLaneRunning: true, marker, requestFile: '/tmp/requests.txt'});
+ * // arms nothing when `isLaneRunning` is false
+ * ```
  */
-export const startShortcutProbe = (): void => {
-  if (!isE2ERun()) {
+export const startShortcutProbe = ({isLaneRunning, marker, requestFile}: ShortcutProbeDependencies): void => {
+  if (!isLaneRunning) {
     return;
   }
-  const file = requestFile();
+  const file = requestFile;
   if (file === undefined) {
     return;
   }
@@ -353,7 +366,7 @@ export const startShortcutProbe = (): void => {
   let pending: Promise<void> = Promise.resolve();
   fs.watchFile(file, {interval: pollIntervalMs}, () => {
     pending = pending.then(async () => {
-      offset = await pressAppendedLines(file, offset);
+      offset = await pressAppendedLines(file, offset, marker);
     });
   });
 };

@@ -11,10 +11,6 @@ export const E2E_KEYMAP_PROBE = 'window:new';
 /** The shortcut the E2E scenarios write; no shipped keymap may contain it. */
 export const E2E_PROBE_SHORTCUT = 'ctrl+alt+shift+n';
 
-// The marker stream lives in `e2e-marker-sink`; it is re-exported here so this
-// probe's importers keep naming the lane's markers through one specifier.
-export {emitE2EMarker, isE2ERun} from './e2e-marker-sink';
-
 /** The reload status vocabulary the marker reports. */
 export type E2EKeymapStatus = 'applied' | 'kept';
 

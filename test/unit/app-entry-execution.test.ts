@@ -131,7 +131,12 @@ const registerEntryStubs = (): void => {
     setup: () => {
       requireActiveConfigStub().setup();
     },
-    getDefaultProfile: () => 'default'
+    getDefaultProfile: () => 'default',
+    // The entry point hands these to the shortcut probe, which takes them as
+    // parameters instead of reading the environment. A shipped build is not
+    // the lane, so the stub answers exactly what a real launch would.
+    isE2ERun: () => false,
+    emitE2EMarker: () => {}
   }));
   registerModuleMock(packageJsonStubPath, () => ({
     ...packageMetadata,

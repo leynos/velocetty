@@ -2,9 +2,9 @@
  * @file Proves the end-to-end marker sink stays silent outside the lane.
  *
  * The lane reads the application's standard output, so a marker printed by a
- * normal run would corrupt every assertion it makes. The sink checks the lane
- * flag itself, and the composition root receives it explicitly, so these tests
- * pin both the sink's behaviour and the start-up path that uses it.
+ * normal run would corrupt every assertion it makes. The composition root
+ * decides whether the lane is running and hands the sink that decision, so
+ * these tests pin the sink's behaviour and the start-up path that uses it.
  *
  * Cross-links:
  * - Source: `app/config/e2e-marker-sink.ts`
@@ -17,7 +17,7 @@ import {mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 
-import {emitE2EMarker, silentMarkerSink} from '../../app/config/e2e-marker-sink';
+import {createMarkerSink, silentMarkerSink} from '../../app/config/e2e-marker-sink';
 import {createWatchHarness, settle} from '../testUtils/config-watch-harness';
 
 /** Restores one environment variable to the value it had before a test. */
@@ -60,33 +60,52 @@ test('silentMarkerSink writes nothing to the marker stream', () => {
   }
 });
 
-test.serial('emitE2EMarker stays silent when the lane flag is unset', () => {
-  const previousRunE2E = process.env.RUN_E2E;
+test('a marker sink stays silent while the lane flag is false', () => {
   const logSpy = spyOn(console, 'log').mockImplementation(() => {});
-  delete process.env.RUN_E2E;
   try {
-    emitE2EMarker('[e2e] renderer-ready');
+    const marker = createMarkerSink(
+      () => false,
+      (line) => console.log(line)
+    );
+    marker('[e2e] renderer-ready');
 
     // A normal run prints no marker, so the lane's stream stays uncontaminated.
     expect(logSpy.mock.calls).toEqual([]);
   } finally {
-    restoreEnv('RUN_E2E', previousRunE2E);
     logSpy.mockRestore();
   }
 });
 
-test.serial('emitE2EMarker writes the marker line once in the lane', () => {
-  const previousRunE2E = process.env.RUN_E2E;
+test('a marker sink writes the marker line once while the lane runs', () => {
   const logSpy = spyOn(console, 'log').mockImplementation(() => {});
-  process.env.RUN_E2E = '1';
   try {
-    emitE2EMarker('[e2e] renderer-ready');
+    const marker = createMarkerSink(
+      () => true,
+      (line) => console.log(line)
+    );
+    marker('[e2e] renderer-ready');
 
     expect(logSpy.mock.calls).toEqual([['[e2e] renderer-ready']]);
   } finally {
-    restoreEnv('RUN_E2E', previousRunE2E);
     logSpy.mockRestore();
   }
+});
+
+test('a marker sink reads the lane flag per line, not once at construction', () => {
+  const lines: string[] = [];
+  let isLaneRunning = false;
+  const marker = createMarkerSink(
+    () => isLaneRunning,
+    (line) => lines.push(line)
+  );
+
+  marker('[e2e] before');
+  isLaneRunning = true;
+  marker('[e2e] after');
+
+  // A test that starts the lane after loading the composition root still has to
+  // observe the markers it prints.
+  expect(lines).toEqual(['[e2e] after']);
 });
 
 test.serial('a normal start-up emits no marker line', async () => {

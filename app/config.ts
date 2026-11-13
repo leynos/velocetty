@@ -19,7 +19,7 @@ import {checkDeprecatedConfig} from './config/config-queries';
 import {createConfigSpanRecorder} from './config/config-spans';
 import {createConfigWatchRuntime, emitKeymapsMarker} from './config/config-watch';
 import {setCurrentConfig} from './config/current-config';
-import {emitE2EMarker} from './config/e2e-keymap-probe';
+import {createMarkerSink, type E2EMarkerSink} from './config/e2e-marker-sink';
 import {createConfigImportModule} from './config/import';
 import {_init} from './config/init';
 import {createKeybindingsService} from './config/keybindings';
@@ -72,6 +72,27 @@ const keybindingsService = createKeybindingsService({
   report: createKeybindingsNotifier(notify),
   store: keybindingsStore
 });
+
+/**
+ * Whether the end-to-end lane started this process.
+ *
+ * Read here, at the composition root, so the modules that report markers take
+ * a sink and never inspect the environment themselves.
+ *
+ * @example
+ * ```ts
+ * RUN_E2E=1 isE2ERun(); // true
+ * ```
+ */
+export const isE2ERun = (): boolean => process.env.RUN_E2E === '1';
+
+/**
+ * The marker stream the end-to-end lane observes.
+ *
+ * Silent in a shipped build: no marker line reaches standard output unless the
+ * lane started this process.
+ */
+export const emitE2EMarker: E2EMarkerSink = createMarkerSink(isE2ERun, (line) => console.log(line));
 
 /** Whether the opt-in start-up trace is enabled for this process. */
 const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPORT === '1';

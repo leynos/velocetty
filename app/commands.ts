@@ -3,9 +3,9 @@ import {app, Menu} from 'electron';
 import type {BrowserWindow} from 'electron';
 import type {CommandId} from '@shared/types/commands';
 import {isString} from './utils/runtime-guards';
-import {emitE2EMarker, formatCommandExecutedMarker} from './config/e2e-keymap-probe';
+import {formatCommandExecutedMarker} from './config/e2e-keymap-probe';
 
-import {openConfig, getConfig} from './config';
+import {emitE2EMarker, openConfig, getConfig} from './config';
 import {asProfileId} from './utils/shared-ids';
 import {updatePlugins} from './plugins';
 import {GOLDEN_PATH_COMMAND_ID, GOLDEN_PATH_PLUGIN_ID, goldenPathSettingsDefaults} from './runtime/golden-path-demo';
