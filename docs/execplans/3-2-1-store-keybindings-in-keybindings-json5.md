@@ -4731,16 +4731,16 @@ attempt in `E2E-KB-0`, which timed out after 10 s waiting for the
 `[e2e] config-watcher-ready` marker on a cold launch while the other six E2E
 tests in that run passed, and that marker is emitted by
 `ConfigWatcherOptions.onReady` before `reconcileOnReady` runs, so it cannot be
-delayed by this commit; the failed job was rerun and passed. `build
-(ubuntu-latest)`, `build (windows-2022)`, `build-linux-aarch64`, and `Gecko
-Security Review` also pass.
+delayed by this commit; the failed job was rerun and passed.
+`build (ubuntu-latest)`, `build (windows-2022)`, `build-linux-aarch64`, and
+`Gecko Security Review` also pass.
 
 CodeRabbit reported `Review paused` for `6f477c33`, its automatic pause after a
 number of reviewed commits, so that head has no review yet. One request was
 queued for it (`comenq` id `990ed249`) rather than posted directly. The
 outstanding `CHANGES_REQUESTED` verdict belongs to `a0b0bcd7`; its single
-finding was answered in `9608fd5c` and CodeRabbit marked the thread resolved, so
-the review of the current head is what reconciles the decision.
+finding was answered in `9608fd5c` and CodeRabbit marked the thread resolved,
+so the review of the current head is what reconciles the decision.
 
 ## Interfaces and dependencies
 
