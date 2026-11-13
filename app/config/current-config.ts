@@ -2,8 +2,9 @@
 /*
  * This module is the single owner of the applied configuration. Queries and
  * the reload watcher both read it directly rather than through the composition
- * root, so neither has to be wired back to the module that built them. Only
- * the composition root writes it, once an import has produced a whole config.
+ * root, so neither has to be wired back to the module that built them. The
+ * start-up command and the reload path both write it, each only once an import
+ * has produced a whole config.
  */
 import type {parsedConfig} from '@shared/types/config';
 

@@ -113,6 +113,14 @@ export type WatchHarness = {
   readonly setCleanupError: (error: unknown) => void;
   readonly setReport: (report: ConfigImportReport) => void;
   readonly setConfig: (config: parsedConfig) => void;
+  /**
+   * Makes the stub importer answer with `config` for one phase only.
+   *
+   * A test that must observe what a reload applied sets the reload config to
+   * what an import of the file's current content would produce, while the
+   * start-up config stays what the original read produced.
+   */
+  readonly setConfigForPhase: (phase: string, config: parsedConfig) => void;
   readonly setOutcome: (outcome: KeybindingsLoadOutcome) => void;
   /**
    * Declares the files the start-up import reports it wrote, with the text it
@@ -195,6 +203,8 @@ export const createWatchHarness = async (options: WatchHarnessOptions = {}): Pro
   const watchMock = mock((_paths: string[], _options?: unknown) => watcherMock);
 
   let currentConfig = makeParsedConfig({'window:new': ['ctrl+n']});
+  /** Configs that override `currentConfig` for one named phase. */
+  const phaseConfigs = new Map<string, parsedConfig>();
   let currentReport: ConfigImportReport = {config: 'applied', keybindings: 'applied'};
   // An explicit outcome overrides the one derived from the report, so a test
   // can exercise causes the report vocabulary cannot express, such as an
@@ -207,7 +217,7 @@ export const createWatchHarness = async (options: WatchHarnessOptions = {}): Pro
     options.onImport?.(String(_args[0]));
     const outcome = currentOutcome ?? outcomeFor(currentReport);
     return {
-      config: currentConfig,
+      config: phaseConfigs.get(String(_args[0])) ?? currentConfig,
       keybindings: outcome,
       report: currentReport,
       writtenFiles: currentWrittenFiles
@@ -287,6 +297,9 @@ export const createWatchHarness = async (options: WatchHarnessOptions = {}): Pro
     },
     setConfig: (config) => {
       currentConfig = config;
+    },
+    setConfigForPhase: (phase, config) => {
+      phaseConfigs.set(phase, config);
     },
     setOutcome: (outcome) => {
       currentOutcome = outcome;

@@ -184,33 +184,36 @@ settles to an unknown identity, so both differences still reconcile.
 
 ### Watched-file stamps
 
-`watched-file-stamp.ts` sits between the importer and the watcher. The
-composition root captures the baseline before `_import('startup')` runs, passes
-the files that import wrote to `settleWatchedFileStamps`, and hands the settled
-baseline to the watcher runtime's `watch` method. `readWatchedFileStamp`
-records a tri-state identity — `present` with size and modification time,
-`absent` for `ENOENT`, and `unreadable` for any other failure — and
-`stampsMatch` treats an unknown identity as never equal to anything, including
-another unknown one. The third state exists because reading every failure as
-"absent" let two failures compare equal, so a save during a failing inspection
-could go unreconciled. `captureWatchedFileStamps` reads the whole set, and
-`createWatchedFileReconciler` turns the baseline into the readiness predicate.
+`watched-file-stamp.ts` sits between the importer and the watcher.
+`startup-import.ts` runs the sequence around it: it captures the baseline
+before the start-up import reads anything, prepares the tree, runs the import,
+and passes the files that import wrote to `settleWatchedFileStamps`. The
+composition root then hands the settled baseline to the watcher runtime's
+`watch` method. `readWatchedFileStamp` records a tri-state identity — `present`
+with size and modification time, `absent` for `ENOENT`, and `unreadable` for
+any other failure — and `stampsMatch` treats an unknown identity as never equal
+to anything, including another unknown one. The third state exists because
+reading every failure as "absent" let two failures compare equal, so a save
+during a failing inspection could go unreconciled. `captureWatchedFileStamps`
+reads the whole set, and `createWatchedFileReconciler` turns the baseline into
+the readiness predicate.
 
 ### Applied state and queries
 
 The configuration root is split so that storage, reading, and watching are not
 owned by the module that wires them. `current-config.ts` is the single owner of
-the applied configuration: only the composition root writes it, once an import
-has produced a whole config, and `getCurrentConfig` throws rather than returning
-`undefined`, so a caller that runs before `setup()` fails loudly.
-`config-queries.ts` is the read surface — the profile, keymap, plugin, and
-deprecation queries plus the decoration helpers — and reads the applied state
-directly, so a window that opens after a reload sees the configuration in
-effect. `config-watch.ts` owns the subscriber list, the reload command, the
-chokidar adapter, and the readiness reconciliation; the importer and the
-recorder, span, metric, notification, and marker sinks arrive as explicit
-parameters. `app/config.ts` keeps only the composition: it builds the adapters
-and the start-up command and re-exports the query surface.
+the applied configuration: the start-up command and the reload path each store
+what their import produced, and no other module writes it, so
+`getCurrentConfig` throws rather than returning `undefined` and a caller that
+runs before `setup()` fails loudly. `config-queries.ts` is the read surface —
+the profile, keymap, plugin, and deprecation queries plus the decoration
+helpers — and reads the applied state directly, so a window that opens after a
+reload sees the configuration in effect. `config-watch.ts` owns the subscriber
+list, the reload command, the chokidar adapter, and the readiness
+reconciliation; the importer and the recorder, span, metric, notification, and
+marker sinks arrive as explicit parameters. `app/config.ts` keeps only the
+composition: it builds the adapters and the start-up command and re-exports the
+query surface.
 
 ### Observability
 

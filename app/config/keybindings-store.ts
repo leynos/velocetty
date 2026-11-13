@@ -31,11 +31,14 @@ const MAX_SYMLINK_HOPS = 40;
 const TEMPORARY_SEQUENCE = /^\d+\.\d+$/;
 
 /**
- * A path this adapter has vetted as a replacement target.
+ * A path that came from this adapter's own replacement walk.
  *
- * Only `targetPath` builds one, so a path that never went through symlink
- * resolution cannot be written to by mistake. The brand is compile-time only:
- * the filesystem still receives the plain string.
+ * Only `targetPath` builds one, and the walk hands it either the configured
+ * path as its starting point or a link target it has just read. The brand
+ * therefore stops a caller from passing an arbitrary string where a path this
+ * adapter is about to write has to go; it does not assert that the path is
+ * fully resolved, because the walk brands intermediate candidates too. The
+ * brand is compile-time only: the filesystem still receives the plain string.
  */
 type TargetPath = string & {readonly __brand: 'TargetPath'};
 

@@ -43,6 +43,7 @@ import {
   velocettyDir
 } from './config/paths';
 import notify from './notify';
+import {runStartupImport, type StartupImportOutcome} from './config/startup-import';
 import {closeWatcherAtShutdown} from './config/watcher';
 import {captureWatchedFileStamps, settleWatchedFileStamps} from './config/watched-file-stamp';
 
@@ -171,24 +172,28 @@ export const subscribe = configWatch.subscribe;
  */
 export const setup = () => {
   const finishSpan = spans.begin('startup');
-  let imported: ReturnType<typeof _import>;
-  // Captured before the import reads anything: a save that lands between that
-  // read and the watcher's baseline must still look like a change, or the app
-  // would keep content the file no longer holds and the scan would hide it.
-  let startupStamps = captureWatchedFileStamps(watchedFiles);
+  let outcome: StartupImportOutcome;
   try {
     // Count the attempt before any preparation runs: a failure while creating
     // the tree or clearing a stale temporary file is still a start-up attempt,
     // and the failure record below would otherwise describe an uncounted one.
     recorder.beginImport({phase: 'startup'});
-    // The Velocetty tree holds new configuration files, so it must exist before
-    // the importer copies schemas or seeds `keybindings.json5` into it.
-    mkdirpSync(velocettyDir);
-    // A crashed write can leave a temporary file behind. Start-up is the only
-    // phase that may remove it, and the edge owns that cleanup immediately
-    // before the seed decision reads the file.
-    keybindingsStore.removeStaleTemporaryFiles();
-    imported = _import('startup');
+    outcome = runStartupImport({
+      // The ordering lives in the start-up unit: it captures before the import
+      // reads and settles only afterwards.
+      captureStamps: () => captureWatchedFileStamps(watchedFiles),
+      prepare: () => {
+        // The Velocetty tree holds new configuration files, so it must exist
+        // before the importer copies schemas or seeds `keybindings.json5`.
+        mkdirpSync(velocettyDir);
+        // A crashed write can leave a temporary file behind. Start-up is the
+        // only phase that may remove it, and the edge owns that cleanup
+        // immediately before the seed decision reads the file.
+        keybindingsStore.removeStaleTemporaryFiles();
+      },
+      importConfiguration: () => _import('startup'),
+      settleStamps: settleWatchedFileStamps
+    });
   } catch (error) {
     // A start-up crash is otherwise invisible: no per-file outcome exists, so
     // it needs the same bounded failure record a thrown reload gets.
@@ -196,21 +201,23 @@ export const setup = () => {
     recorder.recordImportFailure({cause: 'thrown', phase: 'startup'});
     throw error;
   }
-  const {config, keybindings: outcome, report} = imported;
+  const {config, keybindings, report} = outcome.imported;
   finishSpan(report.config === 'fallback' ? 'fallback' : 'applied');
   setCurrentConfig(config);
   // Start-up never shows "Configuration updated", so the record states that
   // rather than leaving the field absent.
-  const record: ImportRecord = {announced: false, configSource: configTree, outcome, phase: 'startup', report};
+  const record: ImportRecord = {
+    announced: false,
+    configSource: configTree,
+    outcome: keybindings,
+    phase: 'startup',
+    report
+  };
   if (report.config === 'fallback') {
     Object.assign(record, {fallbackBasis: 'defaults' as const});
   }
   recorder.recordImport(record);
-  // Adopt a written file's identity only while it still holds the text just
-  // applied; a concurrent writer that got there first keeps the pre-import
-  // identity, so readiness reloads instead of keeping stale content.
-  startupStamps = settleWatchedFileStamps(startupStamps, imported.writtenFiles);
-  const configurationWatcher = configWatch.watch(startupStamps);
+  const configurationWatcher = configWatch.watch(outcome.startupStamps);
   if (configurationWatcher !== undefined) {
     app.on('before-quit', () => {
       // A failed release is already counted; logging its bounded shape keeps a

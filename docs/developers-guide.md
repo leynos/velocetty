@@ -703,11 +703,16 @@ start-up.
 The configuration root is now composition rather than storage. The read-only
 queries — `getConfig`, `getProfiles`, `getKeymaps`, `getPlugins`, and the
 decoration helpers — live in `app/config/config-queries.ts`, while
-`app/config/current-config.ts` is the single owner of the applied configuration
-and throws when queried before start-up has stored one. `app/config.ts` keeps
-the wiring: it builds the adapters, runs the start-up command, and re-exports
-the query surface, so neither the queries nor the watcher has to be wired back
-to the module that constructed them.
+`app/config/current-config.ts` is the single owner of the applied
+configuration: the start-up command and the reload path each store the config
+their import produced, and `getCurrentConfig` throws when queried before
+start-up has stored one. `app/config.ts` keeps the wiring: it builds the
+adapters, runs the start-up command, and re-exports the query surface, so
+neither the queries nor the watcher has to be wired back to the module that
+constructed them. `app/config/startup-import.ts` owns the order that command
+runs in — capture the watched files' stamps, prepare the tree, import, then
+settle the files the import wrote — so the composition root cannot reorder it
+by accident and the sequence is tested directly.
 
 ## Visible-only WebGL rendering practice
 

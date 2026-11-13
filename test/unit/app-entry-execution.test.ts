@@ -264,6 +264,9 @@ describe('the startup branch', () => {
     // `config.setup()` must precede the start import: modules below it read the
     // configuration while their own bodies run, so the order is the contract.
     expect(trace.labels).toEqual(['configuration.setup', 'app.start']);
+    // Nothing at all is printed, marker lines included: the entry point hands
+    // the configuration root's sink to the probe rather than writing markers
+    // of its own, so a normal launch cannot contaminate the lane's stream.
     expect(output.lines).toEqual([]);
     expect(quits).toBe(0);
     expect(process.exitCode).toBe(0);

@@ -4800,6 +4800,41 @@ The vetted replacement target is now a `TargetPath` brand built only by
 gate: format, format check, typecheck, lint, 931 tests in 104 files, spelling,
 Dafny proofs, Markdown lint, and Mermaid validation.
 
+### EP-Q: reconciliation for review `5897187151` (second round)
+
+The pre-merge follow-up at `226a7b3a` returned seven items. Five needed code or
+documentation; the other two are verification asks that stay with the queued
+review and the hosted checks.
+
+- The applied-state wording was wrong in three places. `config-watch.ts` stores
+  the config a reload applied, as well as start-up storing its own, so
+  `current-config.ts`, `docs/configuration-architecture.md`, and
+  `docs/developers-guide.md` now say that both import paths write the state and
+  that no other module does.
+- The start-up ordering moved out of the composition root into
+  `app/config/startup-import.ts`. `runStartupImport` captures the stamps,
+  prepares the tree, runs the import, and settles only the files the import
+  wrote, so `app/config.ts` now only builds the collaborators. The law has
+  direct tests in `test/unit/startup-import.test.ts`: the call order,
+  settlement against the captured baseline rather than the post-import
+  filesystem, and a thrown import skipping settlement.
+- The readiness cases now assert applied content, not only the reload count.
+  The harness can answer per phase, so a reconciled case ends on the keymaps a
+  reload of the external text produces, and a quiet first run keeps exactly
+  what start-up applied.
+- `keybindings-service.test.ts` asserts that the missing and unreadable export
+  paths attempt no write and report no notice, and a new example drives the
+  service through an injected codec so the applied keymaps provably come from
+  the port rather than the real codec.
+- The `TargetPath` comment overstated the brand: the walk brands its starting
+  candidate and intermediate link targets as well as fully resolved paths. The
+  comment now states the real guarantee — only this adapter's walk produces
+  one, so a caller cannot pass an arbitrary string into a write — and makes no
+  claim that the path is resolved.
+- Docstring Coverage and the hosted security result stay with the queued review
+  and the hosted checks. `#270` and `#274` remain the tracked follow-ups and
+  are not described as fixed.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -5393,3 +5428,6 @@ requires it. Any adjustment is recorded in `Decision log`.
   split, the injected E2E marker sink and shortcut-probe dependencies, the
   `TargetPath` brand, and the developer and architecture documentation are
   recorded in EP-P.
+- 2026-11-13 (reconciliation for `5897187151`): the applied-state wording, the
+  start-up sequence extraction, the readiness content assertions, the export
+  query assertions, and the `TargetPath` guarantee are recorded in EP-Q.

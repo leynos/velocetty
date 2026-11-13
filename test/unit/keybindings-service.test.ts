@@ -317,16 +317,39 @@ describe('exportKeybindings', () => {
   });
 
   test('reports a missing file', () => {
-    const {service} = setup();
+    const {notices, service, store} = setup();
 
     expect(service.exportKeybindings()).toEqual({kind: 'missing'});
+    // Export is a query over what is stored: it neither writes nor reports.
+    expect(store.writeAttempts()).toBe(0);
+    expect(notices).toEqual([]);
   });
 
   test('reports an unreadable file', () => {
-    const {service, store} = setup();
+    const {notices, service, store} = setup();
     store.setUnreadable('permission');
 
     expect(service.exportKeybindings()).toEqual({failure: 'permission', kind: 'unreadable'});
+    expect(store.writeAttempts()).toBe(0);
+    expect(notices).toEqual([]);
+  });
+
+  test('takes the keymaps it applies from the injected codec', () => {
+    // The codec port is a driven dependency, so a fake parse must be what the
+    // service believes the file said, not an artefact of the real codec.
+    const store = createMemoryKeybindingsStore();
+    store.setText('the fake codec ignores this text');
+    const reporter = createReporter();
+    const codec = {
+      parse: () => ({keymaps: KEYMAPS_A, kind: 'ok' as const}),
+      serialize: () => 'unused'
+    };
+    const service = createKeybindingsService({codec, report: reporter.report, store});
+
+    service.start({kind: 'parsed-empty'});
+    service.reload();
+
+    expect(service.active()).toEqual(KEYMAPS_A);
   });
 });
 

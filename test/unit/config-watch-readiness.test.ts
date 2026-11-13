@@ -215,10 +215,14 @@ for (const testCase of writtenFileCases) {
       try {
         harness.setWrittenFiles([{path: writtenPath, text: testCase.writtenText}]);
 
+        // Each phase answers with the config an import of the file's current
+        // content would produce: start-up read the original text, and a reload
+        // after the external save reads the replacement.
+        harness.setConfigForPhase('startup', makeParsedConfig({'window:new': ['ctrl+n']}));
+        harness.setConfigForPhase('reload', makeParsedConfig({'window:new': ['ctrl+shift+n']}));
+
         harness.configModule.setup();
         harness.configModule.subscribe(harness.subscriberMock);
-        // What a reload would apply once readiness notices a replacement.
-        harness.setConfig(makeParsedConfig({'window:new': ['ctrl+shift+n']}));
 
         harness.emitReady();
         await settle();
@@ -226,6 +230,11 @@ for (const testCase of writtenFileCases) {
         const expectedPhases = testCase.isReconciled ? ['startup', 'reload'] : ['startup'];
         expect(phases(harness)).toEqual(expectedPhases);
         expect(harness.subscriberMock).toHaveBeenCalledTimes(testCase.isReconciled ? 1 : 0);
+        // Applied state, not just the reload count: the reconciled cases must
+        // end on the content the external save left, and a quiet first run must
+        // still hold exactly what start-up applied.
+        const expectedKeymaps = testCase.isReconciled ? {'window:new': ['ctrl+shift+n']} : {'window:new': ['ctrl+n']};
+        expect(harness.configModule.getKeymaps()).toEqual(expectedKeymaps);
       } finally {
         closeWatcher(harness);
         mock.restore();
