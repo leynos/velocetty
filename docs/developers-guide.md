@@ -600,6 +600,115 @@ The following features are explicitly deferred:
   `docs/tracking-issues.md`.
 - **Workspace-level overrides**: Will be implemented in a future milestone.
 
+## Internal module seams
+
+These modules are the seams a test drives directly rather than through the
+whole application. Their collaborators — module resolution, filesystem
+inspection, sinks, and applied state — differ, but each seam is small enough to
+exercise without Electron or a real clock.
+
+### Plugin loading
+
+`createPluginLoader` in `app/plugins-load.ts` builds the loader for one
+configured list of plugin directories. Its dependencies are
+`availableExtensions` (the extension names any one of which makes a module a
+usable plugin), `requireModule` (module resolution rooted at the plugin
+directory), and the `log`, `warn`, and `notify` sinks. A module that exposes no
+extension API, or that throws while being required, is reported and left out
+rather than aborting the rest: one broken third-party plugin must not stop the
+window from opening.
+
+The loader writes to a console sink only through its numbered-position rule. A
+plugin is identified by its 1-based position in the configured list, never by
+its directory name or manifest version, because both are user text that would
+otherwise be copied into a log. The list is the installed plugins followed by
+the local plugins, so the second entry is still "plugin 2" when the first
+failed to load. A notification is the deliberate exception: it names the plugin
+by its basename, because the user has to find that entry in their configuration
+to fix it.
+
+`test/unit/plugin-loader.test.ts` drives the loader without module mocking. It
+passes a scripted `requireModule` backed by a `Map` from specifier to exports
+(an `Error` value is thrown to stand for a load failure) and captures `log`,
+`warn`, and `notify` in arrays. Each assertion is therefore a value the loader
+produced, not a process-global it mutated.
+
+### Readiness reconciliation
+
+`app/config/watched-file-stamp.ts` owns the comparison that catches a save
+landing during the watcher's initial scan, when chokidar suppresses events for
+files it finds. `readWatchedFileStamp` reads one file's identity as a tri-state
+stamp: `present` with its size and modification time, `absent` when the only
+failure is `ENOENT`, or `unreadable` for any other inspection failure.
+`captureWatchedFileStamps` reads every watched file, `stampsMatch` compares a
+baseline against a fresh reading, `createWatchedFileReconciler` turns the
+baseline into the predicate the watcher asks on readiness, and
+`settleWatchedFileStamps` reconciles the baseline itself.
+
+An unknown identity never compares equal, including to another unknown one. Two
+failed inspections that were both read as "absent" used to match, which let a
+save that landed while inspection was failing go unreconciled; the third state
+is what prevents that. The cost is one redundant reload when a file is
+genuinely unreadable, which is the safe direction.
+
+The baseline is captured *before* the start-up import reads the files, not
+after it. Capturing afterwards could describe a file's new identity while the
+application still holds the old text, so the scan would see no difference and
+the change would never be reconciled. Capturing first can only cost a reload.
+
+A file that start-up itself wrote — a bootstrapped `config.json5` or a seeded
+`keybindings.json5` — is settled to its new identity only while it still holds
+the exact text the import applied. An edit that landed in between keeps the
+earlier identity, so readiness still sees the difference. A start-up-written
+file that has since been deleted settles to an unknown identity: its pre-import
+identity is also `absent`, and keeping it would let the deletion match and
+never reconcile. Readiness reloads when at least one watched file moved or
+could not be inspected.
+[Configuration architecture](configuration-architecture.md) describes where the
+stamps sit between the importer and the watcher.
+
+### Bounded logging
+
+`boundedErrorCode` and `describeError` in `app/utils/error-code.ts`, and
+`logNotificationShown` in `app/utils/notification-log.ts`, are the shared route
+from a failure to a log line. Their rule is that a log carries a bounded
+failure category or errno code, and never a filesystem path or a raw error
+message.
+
+`boundedErrorCode` keeps an error's `code` only when it names a known Node
+errno, so a crafted or path-bearing string is dropped. `describeError` adds the
+constructor name, again only from the standard built-in names, and reports
+`UnknownError` for a non-`Error` value. `logNotificationShown` writes a fixed
+marker plus, when the caller supplied them, the operation, the category, and
+that bounded description; it never prints the notification's title or body.
+
+Two reasons drive the rule. A closed vocabulary keeps records countable for
+aggregation, and user-facing text can repeat a path, quote the user's file, or
+name a command they wrote. The full text stays in the notification, where the
+person who must act on it can read it.
+
+### Schema copy
+
+`ensureSchemaFiles` in `app/config/schema-copy.ts` copies the bundled JSON
+schemas beside the configuration files that use them. Its one policy rule is
+about the legacy tree: new copies always go to the Velocetty tree, and the
+legacy Hyper tree is refreshed only when a copy of that name is already there.
+Upgrading a Hyper install therefore never creates a new file in it. The
+destination directory is created first, and a failed copy is returned rather
+than thrown, so a stale schema degrades editor validation without stopping
+start-up.
+
+### Command execution
+
+The configuration root is now composition rather than storage. The read-only
+queries — `getConfig`, `getProfiles`, `getKeymaps`, `getPlugins`, and the
+decoration helpers — live in `app/config/config-queries.ts`, while
+`app/config/current-config.ts` is the single owner of the applied configuration
+and throws when queried before start-up has stored one. `app/config.ts` keeps
+the wiring: it builds the adapters, runs the start-up command, and re-exports
+the query surface, so neither the queries nor the watcher has to be wired back
+to the module that constructed them.
+
 ## Visible-only WebGL rendering practice
 
 Roadmap item `2.1.1` introduces visible-only WebGL allocation. Follow these
@@ -1305,6 +1414,19 @@ the solver before starting.
   decision in the verified module and the I/O in an adapter that passes the
   observed outcome in.
 
+### Dafny generation
+
+`bin/generate-dafny.mjs` is the wrapper that regeneration goes through. It runs
+`lsc gen --backend=dafny` from the local `node_modules/.bin/lsc`, then prepends
+each generated `.dfy.gen` with a header derived from that TypeScript source's
+own `@file` summary and path, because `lsc gen` writes only a one-line
+provenance comment. `bin/prove.sh` runs the wrapper before verification to
+reject stale artefacts, and again afterwards, because `lsc check` rewrites the
+artefacts without the header. Editing a verified module is a two-step catch-up:
+`bunx lsc regen --backend=dafny <source.ts>` is the supported way to bring the
+`.dfy` back in step, and `make prove` regenerates the `.dfy.gen` artefacts
+through this wrapper and verifies them.
+
 ### End-to-end (E2E) tests (layered strategy)
 
 End-to-end tests are split into two lanes and require packaged binaries in
@@ -1461,6 +1583,27 @@ interaction and reporting.
 
 Before either lane, build packaged artefacts with `bun run dist` if they do not
 already exist.
+
+### End-to-end probe helpers
+
+The E2E helpers are split so their spelling and attribution rules can be tested
+without a running Electron process. `parseShortcut` in
+`app/config/e2e-shortcut-chord.ts` turns `ctrl+alt+shift+n`-style text into a
+chord, rejecting anything that is not a modifier list plus a final key.
+`sendShortcut` in `app/config/e2e-shortcut-probe.ts` dispatches that chord into
+the focused window's page, or the newest window when none is focused, and
+reports `pressed`, `unbound`, or `rejected`. `withPressToken` in
+`app/config/e2e-keymap-probe.ts` binds the request token around a command
+dispatch, so the marker a handler prints names the press that sent the command
+rather than a later one.
+
+Markers are written through `app/config/e2e-marker-sink.ts`. `emitE2EMarker`
+prints only when `RUN_E2E === '1'`, and `silentMarkerSink` discards every line
+for callers with no stream to report to. The probe shortcut `ctrl+alt+shift+n`
+is bound by no shipped keymap, which `test/unit/e2e-keymap-probe.test.ts`
+enforces; a marker reporting it can therefore only have come from the user's
+file. `test/unit/e2e-marker-sink.test.ts` proves the other half: a normal
+start-up, with the lane flag unset, emits no `[e2e]` line at all.
 
 ## Default test gate
 
