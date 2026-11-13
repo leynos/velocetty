@@ -4589,6 +4589,35 @@ names, and each new test was mutation-checked against the defect it describes.
   copy those settings into the Velocetty file and to decide any key both files
   set. Documentation only; no code or test changed.
 
+### EP-M: hosted start-up regression for head `0a9e1a75`
+
+The plugin-log privacy repair in EP-L moved the loader into
+`app/plugins-load.ts` and, in doing so, left the `const loadPlugins` binding
+below the module-level `let modules = requirePlugins();` call. `requirePlugins`
+is a hoisted function declaration, so it ran while the module body was still
+being evaluated and read `loadPlugins` inside its temporal dead zone. Every
+Electron start-up threw
+`ReferenceError: Cannot access 'loadPlugins' before initialization`, which
+`app/index.mts` caught and reported as `Failed to start Hyper.`; the macOS and
+Ubuntu end-to-end lanes, and therefore all three Node CI build jobs, went red
+on that head.
+
+No unit test could see it: none of them evaluate `app/plugins.ts`, because
+loading that module patches `Module._load`. The guard is now a source-order
+test in `test/unit/app-startup-order.test.ts` that fails if the loader
+declaration ever moves below the first call. Local reproduction, before and
+after the repair, used the development target under
+`--ozone-platform=headless`: the failing candidate printed `keymaps-active` and
+then the start-up failure; the repaired one reaches `[e2e] renderer-ready`.
+
+The same head also failed two Windows unit tests in
+`test/unit/plugin-loader.test.ts`. Their fixtures were literal POSIX paths, and
+the loader resolves each manifest with `path.resolve`, which roots a drive-less
+absolute path on the current drive under Windows, so the scripted registry
+missed. Fixture directories, manifest keys and path assertions are now built
+with `path`, and the console-privacy pattern matches the account and directory
+names rather than a path separator.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.

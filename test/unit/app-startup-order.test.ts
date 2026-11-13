@@ -38,6 +38,20 @@ test('the entry point initializes the configuration before loading the app', asy
   expect(setupIndex).toBeLessThan(startImportIndex);
 });
 
+test('the plugin loader exists before the module-level plugin load runs', async () => {
+  // `app/plugins.ts` loads the configured plugins while its own module body is
+  // still being evaluated. `requirePlugins` is a hoisted function declaration,
+  // so a `const` loader declared below that call site is in its temporal dead
+  // zone and the whole start-up fails with a `ReferenceError`. No unit test can
+  // see that: none of them evaluate this module, because loading it patches
+  // `Module._load`. Pinning the order in the source is the cheap guard.
+  const pluginSource = await readSource('app/plugins.ts');
+  const loaderIndex = indexOfOrThrow(pluginSource, 'const loadPlugins = createPluginLoader');
+  const initialLoadIndex = indexOfOrThrow(pluginSource, 'let modules = requirePlugins();');
+
+  expect(loaderIndex).toBeLessThan(initialLoadIndex);
+});
+
 test('the entry point answers every informational argument the same way', async () => {
   // These arguments must short-circuit before `config.setup()` and before
   // `./start.js`. If one ever fell through to the startup path it would launch a

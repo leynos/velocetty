@@ -97,6 +97,26 @@ const ensureRuntimeDefaultsPersisted = () => {
   }
 };
 
+/**
+ * Loads one configured plugin list, keeping the modules that expose an API.
+ *
+ * Declared above the module-level `requirePlugins()` call below: that call runs
+ * while this module is still being evaluated, and a `const` declared after it
+ * would be in its temporal dead zone. The whole start-up path fails with a
+ * `ReferenceError` when that happens, which no mocked unit test can see.
+ */
+const loadPlugins = createPluginLoader<AppPluginModule>({
+  availableExtensions,
+  log: (message) => console.log(message),
+  notify: (title, body, details) => notify(title, body, details),
+  // The plugin directory is the resolution root, so a plugin's own dependency
+  // tree is resolved from where it was installed rather than the app's.
+  // SAFETY: `pluginRequire` is Node's `require`, which types its result as
+  // `any`; the loader only writes the two bookkeeping fields it owns.
+  requireModule: <Module>(request: string) => pluginRequire(request) as Module,
+  warn: (message) => console.warn(message)
+});
+
 // caches
 let plugins = config.getPlugins();
 let paths = getPaths();
@@ -378,19 +398,6 @@ export {getPaths};
 export const getBasePaths = () => {
   return {path: pluginPath, localPath};
 };
-
-/** Loads one configured plugin list, keeping the modules that expose an API. */
-const loadPlugins = createPluginLoader<AppPluginModule>({
-  availableExtensions,
-  log: (message) => console.log(message),
-  notify: (title, body, details) => notify(title, body, details),
-  // The plugin directory is the resolution root, so a plugin's own dependency
-  // tree is resolved from where it was installed rather than the app's.
-  // SAFETY: `pluginRequire` is Node's `require`, which types its result as
-  // `any`; the loader only writes the two bookkeeping fields it owns.
-  requireModule: <Module>(request: string) => pluginRequire(request) as Module,
-  warn: (message) => console.warn(message)
-});
 
 /**
  * Loads every configured plugin module, skipping the ones that fail.

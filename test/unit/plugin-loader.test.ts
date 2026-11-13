@@ -7,13 +7,26 @@
  * the version are user text that would otherwise be copied into a log.
  */
 import {expect, test} from 'bun:test';
+import path from 'node:path';
 
 import {createPluginLoader, type PluginModule} from '../../app/plugins-load';
 import type {NotificationDetails} from '../../app/utils/notification-log';
 
-/** A directory name and version that must never reach the console. */
-const PLUGIN_PATH = '/home/ada/secret-projects/super-secret-plugin';
+/*
+ * The loader resolves each plugin's manifest with `path.resolve`, so every
+ * fixture path is resolved the same way. A literal `/home/ada/...` string is
+ * rooted differently by the two platforms, and a registry keyed by the literal
+ * text then misses on Windows even though the code is correct.
+ */
+
+/** A directory and version that must never reach the console. */
+const PLUGIN_DIRECTORY = path.resolve('/home/ada/secret-projects/super-secret-plugin');
+const LOCAL_PLUGIN_DIRECTORY = path.resolve('/home/ada/secret-projects/local-only');
+const INSTALLED_PLUGIN_DIRECTORY = path.resolve('/installed/first');
 const PLUGIN_VERSION = '0.0.0-private';
+
+/** The manifest request the loader makes for a plugin directory. */
+const manifestOf = (pluginDirectory: string) => path.resolve(pluginDirectory, 'package.json');
 
 /** The shapes a scripted `require` request may resolve to. */
 type RegistryEntry =
@@ -69,8 +82,14 @@ const createLoader = (registry: ReadonlyMap<string, RegistryEntry>) => {
   return {load, logs, notifications, warnings};
 };
 
-/** The user text a console line must never carry. */
-const SENSITIVE_TEXT = /super-secret-plugin|0\.0\.0-private|\/home\/ada/;
+/**
+ * The user text a console line must never carry.
+ *
+ * The path fragment is matched by the directory and account names rather than
+ * by a separator, so the same assertion holds whichever separator the platform
+ * resolved into the fixture.
+ */
+const SENSITIVE_TEXT = /super-secret-plugin|0\.0\.0-private|ada/;
 
 /** Everything the loader wrote to a console sink, as one searchable string. */
 const consoleText = (loads: {logs: string[]; warnings: string[]}) => JSON.stringify([loads.logs, loads.warnings]);
@@ -78,12 +97,12 @@ const consoleText = (loads: {logs: string[]; warnings: string[]}) => JSON.string
 test('a successful load reports the plugin by position, never by name or version', () => {
   const {load, logs, notifications, warnings} = createLoader(
     registryOf(
-      [PLUGIN_PATH, {decorateConfig: (config: string) => config}],
-      [`${PLUGIN_PATH}/package.json`, {version: PLUGIN_VERSION}]
+      [PLUGIN_DIRECTORY, {decorateConfig: (config: string) => config}],
+      [manifestOf(PLUGIN_DIRECTORY), {version: PLUGIN_VERSION}]
     )
   );
 
-  const [plugin] = load([PLUGIN_PATH]);
+  const [plugin] = load([PLUGIN_DIRECTORY]);
 
   expect(logs).toEqual(['Plugin 1 loaded.']);
   expect(warnings).toEqual([]);
@@ -97,10 +116,10 @@ test('a successful load reports the plugin by position, never by name or version
 
 test('a missing manifest warns by position and still loads the plugin', () => {
   const {load, logs, notifications, warnings} = createLoader(
-    registryOf([PLUGIN_PATH, {decorateConfig: (config: string) => config}])
+    registryOf([PLUGIN_DIRECTORY, {decorateConfig: (config: string) => config}])
   );
 
-  const [plugin] = load([PLUGIN_PATH]);
+  const [plugin] = load([PLUGIN_DIRECTORY]);
 
   expect(warnings).toEqual(['No package.json found for plugin 1.']);
   expect(logs).toEqual(['Plugin 1 loaded.']);
@@ -112,7 +131,7 @@ test('a missing manifest warns by position and still loads the plugin', () => {
 test('a missing module warns by position and shows no notification', () => {
   const {load, logs, notifications, warnings} = createLoader(registryOf());
 
-  const loaded = load([PLUGIN_PATH]);
+  const loaded = load([PLUGIN_DIRECTORY]);
 
   expect(loaded).toEqual([]);
   expect(warnings).toEqual(['Plugin 1 failed to load.']);
@@ -122,10 +141,10 @@ test('a missing module warns by position and shows no notification', () => {
 });
 
 test('a module that throws while loading is notified by name and logged nowhere', () => {
-  const failure = Object.assign(new Error(`EACCES: open ${PLUGIN_PATH}/index.js`), {code: 'EACCES'});
-  const {load, logs, notifications, warnings} = createLoader(registryOf([PLUGIN_PATH, failure]));
+  const failure = Object.assign(new Error(`EACCES: open ${path.join(PLUGIN_DIRECTORY, 'index.js')}`), {code: 'EACCES'});
+  const {load, logs, notifications, warnings} = createLoader(registryOf([PLUGIN_DIRECTORY, failure]));
 
-  const loaded = load([PLUGIN_PATH]);
+  const loaded = load([PLUGIN_DIRECTORY]);
 
   expect(loaded).toEqual([]);
   expect(logs).toEqual([]);
@@ -142,9 +161,9 @@ test('a module that throws while loading is notified by name and logged nowhere'
 });
 
 test('a module exposing no extension API is notified by name and logged nowhere', () => {
-  const {load, logs, notifications, warnings} = createLoader(registryOf([PLUGIN_PATH, {notAPlugin: true}]));
+  const {load, logs, notifications, warnings} = createLoader(registryOf([PLUGIN_DIRECTORY, {notAPlugin: true}]));
 
-  const loaded = load([PLUGIN_PATH]);
+  const loaded = load([PLUGIN_DIRECTORY]);
 
   expect(loaded).toEqual([]);
   expect(notifications).toEqual([
@@ -158,15 +177,14 @@ test('a module exposing no extension API is notified by name and logged nowhere'
 });
 
 test('positions count across the installed and local lists', () => {
-  const localPath = '/home/ada/secret-projects/local-only';
   const {load, warnings} = createLoader(
     registryOf(
-      [localPath, {decorateConfig: (config: string) => config}],
-      [`${localPath}/package.json`, {version: PLUGIN_VERSION}]
+      [LOCAL_PLUGIN_DIRECTORY, {decorateConfig: (config: string) => config}],
+      [manifestOf(LOCAL_PLUGIN_DIRECTORY), {version: PLUGIN_VERSION}]
     )
   );
 
-  const loaded = load(['/installed/first', localPath]);
+  const loaded = load([INSTALLED_PLUGIN_DIRECTORY, LOCAL_PLUGIN_DIRECTORY]);
 
   // Two entries were configured, so the local plugin is second even though the
   // installed one failed to load.
