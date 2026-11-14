@@ -4934,6 +4934,21 @@ in the source before they were changed, and both were real.
   baseline accounted for the change the reconciler reported, so the test passed
   against the defect. A regression test for one file's settlement must watch
   that file alone.
+- The settlement fix is now also driven through the real importer, as
+  CodeRabbit asked: "reconciles the deletion of a seeded keybindings file" in
+  `test/unit/config-watch-readiness-import.test.ts` seeds the keybindings file
+  from the user's legacy `keymaps`, deletes it where the composition root
+  settles the baseline, and asserts that readiness reconciles, that the reload
+  applies the resulting map, and that it does not recreate the file. It fails
+  when settlement keeps the pre-import identity of a file it can no longer read.
+- Finding recorded while writing that test: the effective map after start-up is
+  the platform keymaps, because `replaceLegacyKeymaps` in
+  `app/config/import-defaults.ts` overwrites the bundled legacy `keymaps` with
+  the platform ones before they are classified. A binding seeded from the
+  bundled defaults is therefore indistinguishable from the platform default and
+  cannot show a deletion. The regression seeds through the user's
+  `config.json5`, whose legacy keymaps survive into the seeded file, so
+  deleting it visibly reverts the command to the platform binding.
 
 The saved Unit Architecture failure is not claimed as resolved. Its EP-P
 decision stands, and the row now needs the fresh assessment that the queued
@@ -5547,4 +5562,6 @@ requires it. Any adjustment is recorded in `Decision log`.
 - 2026-11-14 (reply round for `5903007885`): the registration identity, the
   copied dispatch audience, and the unknown identity for unverifiable written
   files are recorded in EP-T, with the test-strength lesson from the first
-  interleaving draft.
+  interleaving draft and the real-importer deletion regression, including why
+  its seed must come from the user's legacy keymaps rather than the bundled
+  defaults.

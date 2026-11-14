@@ -14,7 +14,7 @@
  * - Importer: `app/config/import.ts`
  */
 import {expect, test} from 'bun:test';
-import {writeFileSync} from 'node:fs';
+import {existsSync, rmSync, writeFileSync} from 'node:fs';
 
 import type {ConfigImportResult} from '../../app/config/import';
 import {runStartupImport} from '../../app/config/startup-import';
@@ -126,6 +126,49 @@ for (const testCase of externalWriteCases) {
     }
   });
 }
+
+test('reconciles the deletion of a seeded keybindings file', async () => {
+  const harness = await createConfigImportHarness();
+  try {
+    // The user's legacy binding is what start-up migrates into the seeded file,
+    // so its disappearance is visible: the platform binding for the same
+    // command is what the reload falls back to.
+    writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
+    writeFileSync(
+      harness.mockPaths.cfgPath,
+      `{
+  config: {defaultProfile: 'default', profiles: [{name: 'default', config: {}}]},
+  plugins: [],
+  localPlugins: [],
+  keymaps: {'window:new': ['ctrl+shift+n']}
+}`,
+      'utf8'
+    );
+    writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), '{"window:new": ["ctrl+n"]}', 'utf8');
+    writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+    const watchedFiles = [harness.mockPaths.cfgPath, harness.mockPaths.keybindingsPath];
+
+    const outcome = runStartup(harness, watchedFiles, (imported) => {
+      expect(imported.writtenFiles.map((file) => file.path)).toContain(harness.mockPaths.keybindingsPath);
+      // The user deletes the file start-up seeded, before readiness looks. Its
+      // pre-import identity is "absent" as well, so keeping that identity would
+      // compare equal and skip the reload that applies the deletion.
+      rmSync(harness.mockPaths.keybindingsPath);
+    });
+
+    expect(outcome.imported.config.keymaps).toEqual({'window:new': ['ctrl+shift+n']});
+    expect(createWatchedFileReconciler(outcome.startupStamps)()).toBe(true);
+
+    const reloaded = harness._import('reload');
+
+    // The deletion reaches the running configuration: the seeded binding is
+    // gone, the platform default is back, and reload did not recreate the file.
+    expect(reloaded.config.keymaps).toEqual({'window:new': ['ctrl+n']});
+    expect(existsSync(harness.mockPaths.keybindingsPath)).toBe(false);
+  } finally {
+    harness.cleanup();
+  }
+});
 
 test('leaves an untouched start-up quiet', async () => {
   const harness = await createConfigImportHarness();
