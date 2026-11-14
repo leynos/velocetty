@@ -7,7 +7,8 @@
  * these tests pin the sink's behaviour and the start-up path that uses it.
  *
  * Cross-links:
- * - Source: `app/config/e2e-marker-sink.ts`
+ * - Sources: `app/config/e2e-marker-sink.ts`, `app/config/marker-channel.ts`
+ * - Reporter: `app/commands/window-new.ts`
  * - Composition root: `app/config.ts`
  * - Harness: `test/testUtils/config-watch-harness.ts`
  */
@@ -18,6 +19,8 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 
 import {createMarkerSink, silentMarkerSink} from '../../app/config/e2e-marker-sink';
+import {installMarkerSink} from '../../app/config/marker-channel';
+import {createWindowNewHandler} from '../../app/commands/window-new';
 import {createWatchHarness, settle} from '../testUtils/config-watch-harness';
 
 /** Restores one environment variable to the value it had before a test. */
@@ -131,4 +134,35 @@ test.serial('a normal start-up emits no marker line', async () => {
       mock.restore();
     }
   });
+});
+
+test('the window:new handler reports no marker until a sink is installed', () => {
+  const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    const openWindow = mock(() => {});
+    createWindowNewHandler(openWindow)();
+
+    // The opener is deferred to the next tick, so the handler ran to its end;
+    // the lane's channel still has nowhere to print, because no entry point
+    // installed a sink.
+    expect(openWindow).not.toHaveBeenCalled();
+    const markerLines = logSpy.mock.calls.map(([line]) => String(line)).filter((line) => line.includes('[e2e]'));
+    expect(markerLines).toEqual([]);
+  } finally {
+    logSpy.mockRestore();
+  }
+});
+
+test('the window:new handler reports its marker once the lane installs a sink', () => {
+  const lines: string[] = [];
+  installMarkerSink((line) => lines.push(line));
+  try {
+    createWindowNewHandler(() => {})();
+
+    // The handler names itself, because the lane asserts on the command having
+    // run rather than on the configuration that bound it.
+    expect(lines).toEqual(['[e2e] command-executed window:new']);
+  } finally {
+    installMarkerSink(silentMarkerSink);
+  }
 });

@@ -24,18 +24,44 @@ const indexOfOrThrow = (source: string, needle: string): number => {
   return index;
 };
 
-test('the entry point initializes the configuration before loading the app', async () => {
+test('the start-up sequence initializes the configuration before loading the app', async () => {
   // Two modules read the configuration while their own module body runs:
   // `app/plugins.ts` resolves the plugin and local-plugin lists, and
   // `app/session.ts` reads `useConpty`. Node evaluates a required module as
   // soon as it is required, so `config.setup()` has to happen above the import
   // of `./start.js`. It cannot live inside `./start.js` instead, because every
-  // statement in that file runs after its own imports have been evaluated.
-  const entrySource = await readSource('app/index.mts');
-  const setupIndex = indexOfOrThrow(entrySource, 'config.setup();');
-  const startImportIndex = indexOfOrThrow(entrySource, "await import('./start.js')");
+  // statement in that file runs after its own imports have been evaluated. Both
+  // entry points run this sequence, so the ordering is pinned where it lives.
+  const startupSource = await readSource('app/startup.mts');
+  const setupIndex = indexOfOrThrow(startupSource, 'config.setup();');
+  const startImportIndex = indexOfOrThrow(startupSource, "await import('./start.js')");
 
   expect(setupIndex).toBeLessThan(startImportIndex);
+});
+
+test('both entry points start the application through the shared sequence', async () => {
+  // The shipped entry point and the lane's entry point must run the same
+  // start-up, so a change to one cannot leave the other behind.
+  for (const entryPath of ['app/index.mts', 'app/e2e-entry.mts']) {
+    const entrySource = await readSource(entryPath);
+    expect(entrySource).toContain("from './startup.mjs'");
+    expect(entrySource).toContain('startApplication');
+  }
+});
+
+test('only the lane entry point carries the lane instrumentation', async () => {
+  // The shipped entry point must not install a marker sink or read the lane's
+  // request file, so a normal launch has no way to print a marker or arm the
+  // probe. The lane's own entry point is where both belong.
+  const shippedSource = await readSource('app/index.mts');
+  expect(shippedSource).not.toContain('e2e-shortcut-probe');
+  expect(shippedSource).not.toContain('VELOCETTY_E2E_PRESS_FILE');
+  expect(shippedSource).not.toContain('installMarkerSink');
+
+  const laneSource = await readSource('app/e2e-entry.mts');
+  expect(laneSource).toContain('installMarkerSink');
+  expect(laneSource).toContain('startShortcutProbe');
+  expect(laneSource).toContain('VELOCETTY_E2E_PRESS_FILE');
 });
 
 test('the plugin loader exists before the module-level plugin load runs', async () => {
@@ -81,10 +107,11 @@ test('the informational branch reports the version, the argument contract and th
 test('a startup failure is reported and turns into a failing exit code', async () => {
   // The catch block is the only thing standing between a broken `config.setup()`
   // and an Electron process that exits 0 with no window, so both halves of the
-  // contract are pinned: the diagnostic and the non-zero status.
-  const entrySource = await readSource('app/index.mts');
-  const catchIndex = indexOfOrThrow(entrySource, '} catch (error) {');
-  const catchBlock = entrySource.slice(catchIndex);
+  // contract are pinned: the diagnostic and the non-zero status. Both entry
+  // points run it through the shared start-up sequence.
+  const startupSource = await readSource('app/startup.mts');
+  const catchIndex = indexOfOrThrow(startupSource, '} catch (error) {');
+  const catchBlock = startupSource.slice(catchIndex);
 
   // The bounded description, not the raw error: a message may quote a path.
   // The fixed stage and category let support tell a start-up failure apart from

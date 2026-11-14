@@ -348,6 +348,10 @@ test('getDefaultConfig performs zero writes through the injected filesystem', as
     expect(existsSync(harness.mockPaths.plugs.local)).toBe(false);
     expect(existsSync(path.join(harness.mockPaths.cfgDir, harness.mockPaths.schemaFile))).toBe(false);
     expect(existsSync(harness.mockPaths.cfgPath)).toBe(false);
+    // The query announces nothing either: a read that notified the user would
+    // make a diagnostics path indistinguishable from an import that changed
+    // their files.
+    expect(harness.notifyMock).not.toHaveBeenCalled();
   } finally {
     harness.cleanup();
   }

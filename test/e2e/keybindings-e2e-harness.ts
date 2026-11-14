@@ -45,8 +45,8 @@ export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve
 
 const developmentAppLaunchArgs =
   process.platform === 'linux' && (process.env.CI === 'true' || process.env.ELECTRON_DISABLE_SANDBOX === '1')
-    ? ['node_modules/electron/cli.js', '--no-sandbox', '--disable-setuid-sandbox', 'dist/app']
-    : ['node_modules/electron/cli.js', 'dist/app'];
+    ? ['node_modules/electron/cli.js', '--no-sandbox', '--disable-setuid-sandbox', 'dist/app/e2e-entry.mjs']
+    : ['node_modules/electron/cli.js', 'dist/app/e2e-entry.mjs'];
 
 /** One output line to wait for, with a label used in failure messages. */
 type MarkerWait = Readonly<{

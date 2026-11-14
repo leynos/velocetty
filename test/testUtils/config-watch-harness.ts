@@ -14,6 +14,7 @@ import type {parsedConfig, rawConfig} from '@shared/types/config';
 import {_init} from '../../app/config/init';
 import {getElectronMock, registerElectronMock, resetElectronMock} from './electron-path';
 import {registerModuleMock} from './mock-module';
+import {createPathsModuleStub} from './paths-module-stub';
 
 let moduleInstanceCounter = 0;
 
@@ -52,25 +53,11 @@ type HarnessPaths = Readonly<{
 }>;
 
 /** Stands in for the resolved paths, so no test reads the real home directory. */
-const pathsModuleFactory = ({cfgDir, cfgPath, keybindingsPath}: HarnessPaths) => ({
-  cfgDir,
-  cfgPath,
-  // The composition root names the active tree in every import record.
-  configTree: 'velocetty',
-  // The stub paths are always readable, so start-up may bootstrap as before.
-  configInspection: 'ok',
-  defaultCfg: path.join(cfgDir, 'config-default.json'),
-  defaultPlatformKeyPath: () => path.join(cfgDir, 'linux.json'),
-  keybindingsDir: cfgDir,
-  keybindingsPath,
-  keybindingsSchemaFile: 'keybindings.schema.json',
-  keybindingsSchemaPath: path.join(cfgDir, 'keybindings.schema.json'),
-  plugs: {base: path.join(cfgDir, 'plugins'), local: path.join(cfgDir, 'plugins', 'local')},
-  schemaFile: 'schema.json',
-  schemaPath: path.join(cfgDir, 'schema.json'),
-  shadowedConfigPaths: ['/home/user/.hyper/config.json5'],
-  velocettyDir: cfgDir
-});
+const pathsModuleFactory = ({cfgDir, cfgPath, keybindingsPath}: HarnessPaths) =>
+  // Complete rather than tailored to this root: the mock registry is shared by
+  // every suite in the test process, so a partial stub leaks to later importers.
+  createPathsModuleStub({cfgDir, cfgPath, keybindingsPath});
+
 /** Stands in for the window-state store, which the composition root only wires. */
 const windowsModuleFactory = () => ({defaults: {}, get: () => ({}), recordState: () => {}});
 

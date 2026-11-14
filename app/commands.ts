@@ -2,10 +2,10 @@
 import {app, Menu} from 'electron';
 import type {BrowserWindow} from 'electron';
 import type {CommandId} from '@shared/types/commands';
+import {createWindowNewHandler} from './commands/window-new';
 import {isString} from './utils/runtime-guards';
-import {formatCommandExecutedMarker} from './config/e2e-keymap-probe';
 
-import {emitE2EMarker, openConfig, getConfig} from './config';
+import {openConfig, getConfig} from './config';
 import {asProfileId} from './utils/shared-ids';
 import {updatePlugins} from './plugins';
 import {GOLDEN_PATH_COMMAND_ID, GOLDEN_PATH_PLUGIN_ID, goldenPathSettingsDefaults} from './runtime/golden-path-demo';
@@ -31,15 +31,7 @@ const getGoldenPathNotificationMessage = () => {
 };
 
 const commands = {
-  'window:new': () => {
-    // The end-to-end lane asserts on the command having run, so the marker
-    // belongs to the handler rather than to the configuration that bound it.
-    // It carries the press's token, so a scenario can tell this press's
-    // execution from an earlier press's command landing late.
-    emitE2EMarker(formatCommandExecutedMarker('window:new'));
-    // If window is created on the same tick, it will consume event too
-    setTimeout(app.createWindow, 0);
-  },
+  'window:new': createWindowNewHandler(() => app.createWindow()),
   'tab:new': (focusedWindow) => {
     if (focusedWindow) {
       focusedWindow.rpc.emit('termgroup add req', {});

@@ -4954,6 +4954,50 @@ The saved Unit Architecture failure is not claimed as resolved. Its EP-P
 decision stands, and the row now needs the fresh assessment that the queued
 review will provide.
 
+### EP-U: Unit Architecture repairs for head `54f0da5e`
+
+The fresh review of `54f0da5e` left one error-level row, Unit Architecture,
+with a concrete resolution: no shipped unit may carry end-to-end
+instrumentation, and the instrumentation belongs to an entry point only the
+lane starts. The earlier EP-P decision kept the probe in `app/` and reached it
+from `app/index.mts` behind the lane flag; this round replaces that wiring.
+
+- `app/config/marker-channel.ts` is the neutral channel units report through.
+  It holds one `installedSink`, defaulting to `silentMarkerSink`, and exports
+  `installMarkerSink` and `reportMarker`. Nothing reads the environment there.
+- `app/startup.mts` holds the start-up sequence both entry points share:
+  import the configuration root, run `setup()`, run an optional callback, then
+  import `./start.js`, with the same bounded error record and exit code as
+  before.
+- `app/index.mts` keeps only the informational-argument branch and calls
+  `startApplication()`. It no longer imports the shortcut probe, starts it, or
+  reads `VELOCETTY_E2E_PRESS_FILE`.
+- `app/e2e-entry.mts` is the lane's entry point. It installs
+  `createMarkerSink(() => process.env.RUN_E2E === '1', console.log)` before
+  start-up runs, and starts the probe from `startApplication`'s callback with
+  the request file named in the environment. Both E2E suites launch
+  `dist/app/e2e-entry.mjs`, and `bin/ensure-e2e-dev-target.mjs` requires it.
+- `app/config.ts` composes and wires only. `emitE2EMarker` is gone; its
+  emissions and the watcher's dependency now call `reportMarker`, which is
+  silent unless an entry point installed a sink. `isE2ERun` remains, because
+  the RPC server reports renderer errors under the lane and receives the answer
+  as a dependency.
+- `app/commands/window-new.ts` holds the `window:new` handler with its window
+  opener injected. `app/commands.ts` evaluates its table against Electron while
+  its own body runs, so a unit test cannot import it; the extracted handler lets
+  `test/unit/e2e-marker-sink.test.ts` drive the same code with a stand-in and
+  observe the channel. Two tests pin it: no `[e2e]` line and a deferred opener
+  without a sink, and `[e2e] command-executed window:new` once the lane
+  installs one.
+- Lesson recorded for later rounds: `mock.module` registrations are shared by
+  every suite in one `bun test` process, so a partial stub of
+  `app/config/paths` leaks to later importers as a `SyntaxError` about a
+  missing export. The stubs in `test/testUtils/config-watch-harness.ts` and
+  `test/unit/notification-log.test.ts` now build the complete surface from
+  `test/testUtils/paths-module-stub.ts`. Importing `app/commands.ts` itself
+  stays unreliable across suites for the same reason, which is why the handler
+  was extracted instead of mocked around.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -5565,3 +5609,7 @@ requires it. Any adjustment is recorded in `Decision log`.
   interleaving draft and the real-importer deletion regression, including why
   its seed must come from the user's legacy keymaps rather than the bundled
   defaults.
+- 2026-11-14 (Unit Architecture repairs for `54f0da5e`): the marker channel,
+  the shared start-up sequence, the separate lane entry point, the extracted
+  `window:new` handler with its command-side tests, and the complete
+  `app/config/paths` stub are recorded in EP-U.

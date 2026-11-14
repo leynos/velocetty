@@ -1449,7 +1449,8 @@ Fast lane (required on pull requests):
 - Supports `E2E_DEBUG=1` for verbose launch logs and `E2E_CAPTURE=1` for
   screenshot capture.
 
-Main-process `[e2e]` markers are single stdout lines, emitted only when
+Main-process `[e2e]` markers are single stdout lines, emitted only when the
+lane's entry point has installed a printing sink, which it does only when
 `RUN_E2E=1`. Bun tests match them with a `waitFor` helper and a description, so
 a timeout names the marker that never arrived. Existing markers include
 `renderer-ready`, `keybindings-path <path>`, `config-path <path>`,
@@ -1605,14 +1606,22 @@ rather than a later one.
 Markers are written through `app/config/e2e-marker-sink.ts`. `createMarkerSink`
 builds a sink that prints only while the lane flag holds, and
 `silentMarkerSink` discards every line for callers with no stream to report to.
-`app/config.ts` is the one place that reads `RUN_E2E`: it exports `isE2ERun`
-and the bound `emitE2EMarker`. `startShortcutProbe` takes the lane flag, the
-sink, and the request file as parameters, so it is dormant in a shipped build
-without reading the environment. The probe shortcut `ctrl+alt+shift+n` is bound
-by no shipped keymap, which `test/unit/e2e-keymap-probe.test.ts` enforces; a
-marker reporting it can therefore only have come from the user's file.
-`test/unit/e2e-marker-sink.test.ts` proves both halves: the sink is silent
-while the flag is false, and a normal start-up emits no `[e2e]` line at all.
+Units report through the channel in `app/config/marker-channel.ts`, which drops
+every line until an entry point installs a sink. Only the lane's entry point,
+`app/e2e-entry.mts`, installs one, and only it reads `VELOCETTY_E2E_PRESS_FILE`
+and starts `startShortcutProbe`; the shipped entry point, `app/index.mts`, does
+neither, and both share the start-up sequence in `app/startup.mts`.
+`startShortcutProbe` takes the lane flag, the sink, and the request file as
+parameters, so it is dormant in a shipped build without reading the environment.
+`app/config.ts` still exports `isE2ERun` for the RPC server, which reports
+renderer errors only under the lane; the composition root supplies it as a
+dependency. The probe shortcut `ctrl+alt+shift+n` is bound by no shipped
+keymap, which `test/unit/e2e-keymap-probe.test.ts` enforces; a marker reporting
+it can therefore only have come from the user's file.
+`test/unit/e2e-marker-sink.test.ts` proves the sink is silent while the flag is
+false, that a normal start-up emits no `[e2e]` line at all, and that the
+`window:new` handler in `app/commands/window-new.ts` prints nothing until the
+lane installs a sink and its command marker once it has.
 
 ## Default test gate
 

@@ -132,11 +132,11 @@ const registerEntryStubs = (): void => {
       requireActiveConfigStub().setup();
     },
     getDefaultProfile: () => 'default',
-    // The entry point hands these to the shortcut probe, which takes them as
-    // parameters instead of reading the environment. A shipped build is not
-    // the lane, so the stub answers exactly what a real launch would.
-    isE2ERun: () => false,
-    emitE2EMarker: () => {}
+    // The entry point itself asks the configuration for nothing beyond
+    // `setup`; the extra export is here because Bun maps this `.js` key onto
+    // the shared `app/config.ts` entry, so another suite's import of that
+    // module is answered by this stub too.
+    isE2ERun: () => false
   }));
   registerModuleMock(packageJsonStubPath, () => ({
     ...packageMetadata,
@@ -264,9 +264,9 @@ describe('the startup branch', () => {
     // `config.setup()` must precede the start import: modules below it read the
     // configuration while their own bodies run, so the order is the contract.
     expect(trace.labels).toEqual(['configuration.setup', 'app.start']);
-    // Nothing at all is printed, marker lines included: the entry point hands
-    // the configuration root's sink to the probe rather than writing markers
-    // of its own, so a normal launch cannot contaminate the lane's stream.
+    // Nothing at all is printed, marker lines included: the entry point starts
+    // the shared sequence without installing a marker sink, so a normal launch
+    // cannot contaminate the lane's stream.
     expect(output.lines).toEqual([]);
     expect(quits).toBe(0);
     expect(process.exitCode).toBe(0);

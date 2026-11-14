@@ -8,6 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {logNotificationShown, type NotificationLogSinks} from '../../app/utils/notification-log';
 import {importFresh} from '../testUtils/import-fresh';
 import {registerModuleMock} from '../testUtils/mock-module';
+import {createPathsModuleStub} from '../testUtils/paths-module-stub';
 
 // App code resolves Electron from `app/node_modules`, so the bare specifier
 // alone would leave the real module in place.
@@ -21,7 +22,9 @@ const USER_PATH = '/home/ada/private/notes.txt';
 const SENSITIVE_TOKEN = 'PRIVATE_TOKEN';
 
 /** The paths module stub, which only needs to expose the icon the notifier uses. */
-const pathsMock = () => ({icon: '/tmp/icon.png'});
+// Complete rather than `{icon}` alone: the mock registry is shared by every
+// suite in the test process, so a partial stub leaks to later importers.
+const pathsMock = () => createPathsModuleStub({icon: '/tmp/icon.png'});
 
 /** Captures both sinks so a test can inspect exactly what reached the log. */
 const createSinks = () => {

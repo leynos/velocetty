@@ -19,10 +19,10 @@ import {checkDeprecatedConfig} from './config/config-queries';
 import {createConfigSpanRecorder} from './config/config-spans';
 import {createConfigWatchRuntime, emitKeymapsMarker} from './config/config-watch';
 import {setCurrentConfig} from './config/current-config';
-import {createMarkerSink, type E2EMarkerSink} from './config/e2e-marker-sink';
 import {createConfigImportModule} from './config/import';
 import {_init} from './config/init';
 import {createKeybindingsService} from './config/keybindings';
+import {reportMarker} from './config/marker-channel';
 import {keybindingsCodec} from './config/keybindings-codec';
 import {createKeybindingsNotifier} from './config/keybindings-notifier';
 import {createFileKeybindingsStore} from './config/keybindings-store';
@@ -77,8 +77,9 @@ const keybindingsService = createKeybindingsService({
 /**
  * Whether the end-to-end lane started this process.
  *
- * Read here, at the composition root, so the modules that report markers take
- * a sink and never inspect the environment themselves.
+ * Read here, at the composition root, so a unit that behaves differently under
+ * the lane — the RPC server reporting renderer errors — receives the answer as
+ * a dependency instead of inspecting the environment itself.
  *
  * @example
  * ```ts
@@ -86,14 +87,6 @@ const keybindingsService = createKeybindingsService({
  * ```
  */
 export const isE2ERun = (): boolean => process.env.RUN_E2E === '1';
-
-/**
- * The marker stream the end-to-end lane observes.
- *
- * Silent in a shipped build: no marker line reaches standard output unless the
- * lane started this process.
- */
-export const emitE2EMarker: E2EMarkerSink = createMarkerSink(isE2ERun, (line) => console.log(line));
 
 /** Whether the opt-in start-up trace is enabled for this process. */
 const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPORT === '1';
@@ -138,7 +131,7 @@ const configWatch = createConfigWatchRuntime({
   metrics,
   notify,
   recorder,
-  reportMarker: emitE2EMarker,
+  reportMarker,
   spans,
   watchedFiles
 });
@@ -226,9 +219,11 @@ export const setup = () => {
     });
   }
   checkDeprecatedConfig(notify);
-  emitE2EMarker(`[e2e] keybindings-path ${keybindingsPath}`);
-  emitE2EMarker(`[e2e] config-path ${cfgPath}`);
-  emitKeymapsMarker(report, emitE2EMarker);
+  // Silent unless the entry point that runs the lane installed a sink, so a
+  // shipped build reports the start-up paths to nobody.
+  reportMarker(`[e2e] keybindings-path ${keybindingsPath}`);
+  reportMarker(`[e2e] config-path ${cfgPath}`);
+  emitKeymapsMarker(report, reportMarker);
 };
 
 export {

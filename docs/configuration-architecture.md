@@ -228,11 +228,15 @@ real time.
 The end-to-end markers go through `e2e-marker-sink.ts`. `createMarkerSink`
 builds a sink that writes a line only while the lane flag holds, and
 `silentMarkerSink` drops every line for a caller with no stream to report to.
-The composition root in `app/config.ts` is the one place that reads `RUN_E2E`:
-it exports `isE2ERun` and the bound `emitE2EMarker`, and the watcher runtime,
-the command handlers, and the shortcut probe all take the sink as a parameter
-rather than inspecting the environment themselves. A shipped build therefore
-prints no marker.
+Units report to the channel in `marker-channel.ts`, which discards every line
+until an entry point installs a sink. Only the lane's entry point,
+`app/e2e-entry.mts`, installs one, and it also starts the shortcut probe; the
+shipped entry point, `app/index.mts`, neither installs a sink nor reads the
+lane's environment, and both entry points run the shared start-up sequence in
+`app/startup.mts`. The composition root in `app/config.ts` composes and wires
+only; it still exports `isE2ERun`, which the RPC server receives as a
+dependency so it can report renderer errors under the lane. A shipped build
+therefore prints no marker.
 
 ## Data flow
 
