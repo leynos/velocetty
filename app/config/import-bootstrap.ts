@@ -177,14 +177,30 @@ export const createImportBootstrap = (dependencies: ImportBootstrapDependencies)
     return ensureUserConfigFile(createBootstrapTemplate(defaultCfg));
   };
 
+  /**
+   * Creates one plugin directory, reporting a failure without abandoning the
+   * rest of start-up.
+   *
+   * The two plugin trees and the schema copy are independent: a directory the
+   * user cannot create degrades plugin loading, but it must not stop the other
+   * directory being attempted or leave the schema stale as well.
+   */
+  const ensurePluginDirectory = (directory: string): void => {
+    try {
+      fileSystem.mkdirpSync(directory);
+    } catch (error) {
+      errorFn('[config-import] Failed to create plugin directory.', {code: boundedErrorCode(error)});
+    }
+  };
+
   /** Creates the directories and schema a start-up import needs. */
   const prepareStartupFiles = (): void => {
     if (isDebugEnabled()) {
       warnFn('[config-import] Initializing config import using app-local JSON5 helpers.');
     }
     // init plugin directories if not present
-    fileSystem.mkdirpSync(pathDeps.plugs.base);
-    fileSystem.mkdirpSync(pathDeps.plugs.local);
+    ensurePluginDirectory(pathDeps.plugs.base);
+    ensurePluginDirectory(pathDeps.plugs.local);
     ensureSchemaFile();
   };
 

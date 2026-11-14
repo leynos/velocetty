@@ -42,7 +42,7 @@ export class Server {
   win: RpcServerWindow;
   id!: string;
 
-  constructor(win: RpcServerWindow) {
+  constructor(win: RpcServerWindow, isE2ERun: () => boolean) {
     // eslint-disable-next-line unicorn/prefer-event-target -- `TypedEmitter` exposes EventEmitter's typed `on`, `once`, and removal contract.
     this.rawEmitter = new EventEmitter();
     this.emitter = this.rawEmitter;
@@ -58,7 +58,9 @@ export class Server {
 
     ipcMain.on(uid, this.ipcListener);
 
-    const shouldReportE2E = process.env.RUN_E2E === '1';
+    // The lane flag is injected by the composition root, so this module never
+    // reads the environment; a test can report as the lane without one.
+    const shouldReportE2E = isE2ERun();
 
     // we intentionally subscribe to `on` instead of `once`
     // to support reloading the window and re-initializing
@@ -139,8 +141,8 @@ export class Server {
   }
 }
 
-const createRPC = (win: BrowserWindow) => {
-  return new Server(win);
+const createRPC = (win: BrowserWindow, isE2ERun: () => boolean) => {
+  return new Server(win, isE2ERun);
 };
 
 export default createRPC;

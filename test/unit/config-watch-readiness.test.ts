@@ -139,6 +139,58 @@ test.serial('an untouched start-up reconciles nothing', async () => {
   });
 });
 
+test.serial('releasing one subscriber twice leaves the others subscribed', async () => {
+  await withConfigDir(async (dir) => {
+    await writeFile(path.join(dir, 'config.json5'), BEFORE);
+    const harness = await createWatchHarness({configDir: dir});
+    try {
+      harness.configModule.setup();
+      const notified: string[] = [];
+      const unsubscribe = harness.configModule.subscribe(() => notified.push('released'));
+      harness.configModule.subscribe(() => notified.push('kept'));
+      unsubscribe();
+      // Teardown can run twice. The second call must not detach the subscriber
+      // that is still registered.
+      unsubscribe();
+
+      harness.emit({event: 'change', eventPath: harness.cfgPath});
+      await settle();
+
+      expect(notified).toEqual(['kept']);
+    } finally {
+      closeWatcher(harness);
+      mock.restore();
+    }
+  });
+});
+
+test.serial('a subscriber that releases itself does not silence the ones after it', async () => {
+  await withConfigDir(async (dir) => {
+    await writeFile(path.join(dir, 'config.json5'), BEFORE);
+    const harness = await createWatchHarness({configDir: dir});
+    try {
+      harness.configModule.setup();
+      const notified: string[] = [];
+      let release: (() => void) | undefined;
+      release = harness.configModule.subscribe(() => {
+        notified.push('self-releasing');
+        release?.();
+      });
+      harness.configModule.subscribe(() => notified.push('after'));
+
+      harness.emit({event: 'change', eventPath: harness.cfgPath});
+      await settle();
+
+      // The first subscriber ran and dropped itself; the one behind it still
+      // had to be notified.
+      expect(notified).toEqual(['self-releasing', 'after']);
+    } finally {
+      closeWatcher(harness);
+      mock.restore();
+    }
+  });
+});
+
 /** A watched file a start-up import writes, and where its content ends up. */
 type WrittenFileCase = Readonly<{
   /** Test name, which states the file and whether the case reconciles. */

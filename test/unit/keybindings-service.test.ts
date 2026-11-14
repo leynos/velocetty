@@ -334,22 +334,27 @@ describe('exportKeybindings', () => {
     expect(notices).toEqual([]);
   });
 
-  test('takes the keymaps it applies from the injected codec', () => {
+  test('takes the keymaps each operation applies from the injected codec', () => {
     // The codec port is a driven dependency, so a fake parse must be what the
-    // service believes the file said, not an artefact of the real codec.
+    // service believes the file said, not an artefact of the real codec. The
+    // answer changes between the two operations, so neither can pass by
+    // reusing what the other read.
     const store = createMemoryKeybindingsStore();
     store.setText('the fake codec ignores this text');
     const reporter = createReporter();
+    let parsedKeymaps = KEYMAPS_A;
     const codec = {
-      parse: () => ({keymaps: KEYMAPS_A, kind: 'ok' as const}),
+      parse: () => ({keymaps: parsedKeymaps, kind: 'ok' as const}),
       serialize: () => 'unused'
     };
     const service = createKeybindingsService({codec, report: reporter.report, store});
 
     service.start({kind: 'parsed-empty'});
-    service.reload();
-
     expect(service.active()).toEqual(KEYMAPS_A);
+
+    parsedKeymaps = KEYMAPS_B;
+    service.reload();
+    expect(service.active()).toEqual(KEYMAPS_B);
   });
 });
 

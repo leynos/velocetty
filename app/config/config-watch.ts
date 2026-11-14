@@ -121,7 +121,7 @@ export type ConfigWatchRuntime = {
  */
 export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies): ConfigWatchRuntime => {
   const {importConfiguration, recorder, spans, metrics, notify, reportMarker, configTree, watchedFiles} = dependencies;
-  const watchers: Function[] = [];
+  const watchers = new Set<Function>();
   let configWatcher: {readonly close: () => Promise<void>} | undefined;
 
   /**
@@ -157,9 +157,12 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
     if (announced) {
       notify('Configuration updated', 'Configuration reloaded!');
     }
-    watchers.forEach((fn) => {
-      fn();
-    });
+    // A subscriber may release itself while it is being notified. Iterating the
+    // set directly tolerates that: removing the callback being visited still
+    // leaves the ones after it to be notified.
+    for (const notifySubscriber of watchers) {
+      notifySubscriber();
+    }
     checkDeprecatedConfig(notify);
     emitKeymapsMarker(report, reportMarker);
   };
@@ -204,7 +207,9 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
    * Registers a callback that runs after every applied reload.
    *
    * Returns an unsubscribe function, so a caller that is torn down does not keep
-   * receiving reloads.
+   * receiving reloads. Releasing the same registration twice is harmless: the
+   * second call removes nothing, so a teardown that runs twice cannot detach
+   * another subscriber.
    *
    * @example
    * ```ts
@@ -213,9 +218,11 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
    * ```
    */
   const subscribe = (fn: Function) => {
-    watchers.push(fn);
+    watchers.add(fn);
+    // Removing an entry that is already gone is a no-op, so a teardown that
+    // runs twice cannot detach anything else.
     return () => {
-      watchers.splice(watchers.indexOf(fn), 1);
+      watchers.delete(fn);
     };
   };
 

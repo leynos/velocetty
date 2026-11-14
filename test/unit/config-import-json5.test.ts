@@ -1,5 +1,5 @@
 /** @file Verifies JSON5 config import and startup bootstrap without legacy migration. */
-import {expect, test} from 'bun:test';
+import {expect, mock, test} from 'bun:test';
 
 import path from 'node:path';
 
@@ -270,6 +270,46 @@ test('getDefaultConfig reads the defaults without writing', async () => {
     expect(result2).toEqual(result);
     expect(result2).not.toBe(result);
     expect(harness.initMock).not.toHaveBeenCalled();
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('a plugin directory that cannot be created does not abandon the other start-up writes', async () => {
+  const errorMock = mock<typeof console.error>(() => {});
+  const attemptedDirectories: string[] = [];
+  const refusingFileSystem: ConfigImportFileSystem = {
+    ...fsExtra,
+    mkdirpSync: (directory) => {
+      attemptedDirectories.push(directory);
+      if (path.basename(directory) === 'plugins') {
+        // An unwritable configuration tree refuses the outer plugin directory
+        // first; the nested one and the schema copies are separate attempts.
+        throw Object.assign(new Error('permission denied'), {code: 'EACCES'});
+      }
+      fsExtra.mkdirpSync(directory);
+    }
+  };
+  const harness = await createConfigImportHarness({error: errorMock, fs: refusingFileSystem});
+  try {
+    writeFileSync(harness.mockPaths.defaultCfg, sharedDefaultConfigFixture, 'utf8');
+    writeFileSync(harness.mockPaths.defaultPlatformKeyPath(), `{"window:new": ["ctrl+n"]}`, 'utf8');
+    writeFileSync(harness.mockPaths.schemaPath, '{"title":"schema"}', 'utf8');
+    writeFileSync(harness.mockPaths.keybindingsSchemaPath, '{"title":"keybindings schema"}', 'utf8');
+
+    harness._import('startup');
+
+    // Both plugin trees were attempted, in order, so refusing the first did
+    // not skip the second.
+    expect(attemptedDirectories.filter((directory) => directory.startsWith(harness.mockPaths.plugs.base))).toEqual([
+      harness.mockPaths.plugs.base,
+      harness.mockPaths.plugs.local
+    ]);
+    // The schema copies still landed, and the refusal was reported on its own
+    // in the bounded shape the other import faults use.
+    expect(existsSync(path.join(harness.mockPaths.velocettyDir, harness.mockPaths.schemaFile))).toBe(true);
+    expect(existsSync(path.join(harness.mockPaths.velocettyDir, harness.mockPaths.keybindingsSchemaFile))).toBe(true);
+    expect(errorMock).toHaveBeenCalledWith('[config-import] Failed to create plugin directory.', {code: 'EACCES'});
   } finally {
     harness.cleanup();
   }

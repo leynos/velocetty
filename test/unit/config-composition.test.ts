@@ -113,6 +113,28 @@ test.serial('a later bundled-file read fault cannot change the decorated colours
   }
 });
 
+test.serial('a decorator that edits a nested setting in place cannot change the applied configuration', async () => {
+  const harness = await createWatchHarness();
+  try {
+    harness.setConfig(configWithPalette({black: '#123456'}));
+    harness.configModule.setup();
+
+    const decorated = harness.configModule.decorateProfileConfig('default', (baseConfig) => {
+      // A decorator is plugin code. Editing the map it is handed, rather than
+      // returning a new one, is exactly what must not reach applied state.
+      baseConfig.colors.red = '#654321';
+      return baseConfig;
+    });
+
+    // The decorator's own edit still takes effect on the configuration it
+    // hands back; only the process-wide applied copy is protected.
+    expect(decorated.colors.red).toBe('#654321');
+    expect(harness.configModule.getProfileConfig('default').colors.red).toBeUndefined();
+  } finally {
+    mock.restore();
+  }
+});
+
 test('the plugin integration takes its palette from the composition root', async () => {
   const pluginsSource = await readPluginsSource();
 

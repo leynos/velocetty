@@ -16,7 +16,7 @@ import type {sessionExtraOptions} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
 import {asCommandId, asProfileId, asRendererUid, asSessionId} from '../utils/shared-ids';
 import {execCommand} from '../commands';
-import {getDefaultProfile} from '../config';
+import {getDefaultProfile, isE2ERun} from '../config';
 import {icon, homeDirectory} from '../config/paths';
 import fetchNotifications from '../notifications';
 import notify from '../notify';
@@ -120,7 +120,7 @@ export function newWindow(
   app.plugins.onWindowClass(window);
   window.uid = classOpts.uid;
 
-  const rpc = createRPC(window);
+  const rpc = createRPC(window, isE2ERun);
   const sessions = new Map<string, Session>();
 
   const updateBackgroundColor = () => {

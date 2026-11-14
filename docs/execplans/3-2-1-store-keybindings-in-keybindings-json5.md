@@ -4861,6 +4861,47 @@ the fourth is hosted verification that stays with the queued review.
   security checks stay with the queued review `3ca15efc` and the hosted runs.
   `#270` and `#274` remain open follow-ups and are not described as fixed.
 
+### EP-S: review-round repairs for review `5903007885` (fourth round)
+
+The review of `f54a8daf` returned five inline findings and the Unit
+Architecture pre-merge row. Each finding was verified against the current
+source before it was changed; all five were valid.
+
+- `decorateProfileConfig` clones the profile configuration before the hook
+  runs. `getProfileConfig` copies only the top level, so a decorator that
+  edited a nested setting in place reached the applied configuration and
+  changed what every later window reads. The palette copy still happens first,
+  so a removed colour still falls back to the imported one. A composition test
+  mutates the colours map inside a decorator and asserts the applied config is
+  unchanged.
+- A released subscriber is released once. The old cleanup used
+  `splice(indexOf(fn), 1)`, so a second call removed the last subscriber in the
+  list instead. It now records its own release and only removes its own
+  registration.
+- Reload notification walks a snapshot of the subscriber list. A subscriber
+  that released itself while being notified shifted the list under `forEach`
+  and skipped its neighbour.
+- Each plugin directory is created independently. `prepareStartupFiles`
+  reported a failed `mkdirpSync` by throwing, which skipped the second
+  directory and the schema copies and aborted start-up; the factory's own
+  docstring already promised that faults are reported rather than thrown. Each
+  failure is now one `[config-import] Failed to create plugin directory.` line
+  with the bounded errno code, and the remaining writes still run.
+- The injected-codec example changes the codec's answer between `start` and
+  `reload`, so each operation is shown to apply its own parse result rather
+  than a cached one.
+- The Unit Architecture row's item 2 is now applied: `app/rpc.ts` takes the
+  lane predicate from the composition root instead of reading `RUN_E2E`, and
+  `test/unit/rpc-server.test.ts` covers both the reporting and the silent case.
+  Items 1 and 3 keep the EP-P decision: the marker sink is injected and silent
+  outside the lane, one test proves a normal start-up emits nothing, and the
+  shortcut probe stays in `app/` because the lane launches the production
+  bundle.
+
+Each new regression test was run against the unfixed source first: the two
+subscriber cases, the decorator-clone case, and the plugin-directory case all
+fail without their repair.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -5461,3 +5502,8 @@ requires it. Any adjustment is recorded in `Decision log`.
   command-path port assertions, and the corrected `targetPath` constructor
   comment are recorded in EP-R. Docstring Coverage and the final hosted checks
   remain with the queued review `3ca15efc`.
+- 2026-11-14 (repairs for `5903007885`): the decorator clone, the idempotent
+  unsubscribe, the snapshot notification walk, the independent plugin
+  directories, the injected-codec example, and the injected E2E lane flag are
+  recorded in EP-S. The remaining Unit Architecture rows keep the EP-P
+  decision, with its reasons restated there.

@@ -1,7 +1,7 @@
 /** @file Verifies main-process RPC server lifecycle and IPC routing. */
 import {EventEmitter} from 'node:events';
 
-import {afterEach, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import {beforeAll, beforeEach, expect, mock, spyOn, test} from 'bun:test';
 
 import {asCommandId} from '@shared/types/commands';
 
@@ -50,6 +50,12 @@ const createWindowStub = () => {
   };
 };
 
+/**
+ * The lane flag a unit test supplies: the end-to-end lane is not running, and
+ * the server must not read the environment to decide that.
+ */
+const LANE_NOT_RUNNING = () => false;
+
 let Server: typeof import('../../app/rpc').Server;
 
 beforeAll(async () => {
@@ -66,13 +72,9 @@ beforeEach(() => {
   ipcMainRemoveListenerMock.mockClear();
 });
 
-afterEach(() => {
-  delete process.env.RUN_E2E;
-});
-
 test('registers IPC channel and emits init after renderer loads', () => {
   const {win, webContents} = createWindowStub();
-  const server = new Server(win);
+  const server = new Server(win, LANE_NOT_RUNNING);
 
   expect(ipcMainOnMock).toHaveBeenCalledWith(server.id, expect.any(Function));
 
@@ -83,9 +85,43 @@ test('registers IPC channel and emits init after renderer loads', () => {
   server.destroy();
 });
 
+test('reports renderer readiness when the injected lane flag is set', () => {
+  const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    const {win, webContents} = createWindowStub();
+    const server = new Server(win, () => true);
+
+    webContents.emit('did-finish-load');
+
+    // The readiness marker is the lane's evidence that the page loaded, and it
+    // comes from the injected flag rather than from the process environment.
+    expect(logSpy).toHaveBeenCalledWith('[e2e] renderer-ready');
+    server.destroy();
+  } finally {
+    logSpy.mockRestore();
+  }
+});
+
+test('stays silent when the injected lane flag is clear', () => {
+  const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    const {win, webContents} = createWindowStub();
+    const server = new Server(win, LANE_NOT_RUNNING);
+
+    webContents.emit('did-finish-load');
+
+    // Only this marker is asserted: other suites share the console, so an
+    // unrelated line must not be mistaken for the lane reporting readiness.
+    expect(logSpy.mock.calls).not.toContainEqual(['[e2e] renderer-ready']);
+    server.destroy();
+  } finally {
+    logSpy.mockRestore();
+  }
+});
+
 test('routes renderer-to-main events through typed listeners', () => {
   const {win} = createWindowStub();
-  const server = new Server(win);
+  const server = new Server(win, LANE_NOT_RUNNING);
 
   const commandListener = mock((_command: string) => {});
   server.on('command', commandListener);
@@ -99,7 +135,7 @@ test('routes renderer-to-main events through typed listeners', () => {
 
 test('a command carrying a press token prints that token, and leaves none behind', () => {
   const {win} = createWindowStub();
-  const server = new Server(win);
+  const server = new Server(win, LANE_NOT_RUNNING);
   const markers: string[] = [];
   server.on('command', (command) => markers.push(formatCommandExecutedMarker(command)));
 
@@ -131,7 +167,7 @@ test('a command carrying a press token prints that token, and leaves none behind
 
 test('a press token that is not a string is ignored rather than echoed', () => {
   const {win} = createWindowStub();
-  const server = new Server(win);
+  const server = new Server(win, LANE_NOT_RUNNING);
   const markers: string[] = [];
   server.on('command', (command) => markers.push(formatCommandExecutedMarker(command)));
 
@@ -149,7 +185,7 @@ test('a press token that is not a string is ignored rather than echoed', () => {
 
 test('emits events to renderer only while window is alive', () => {
   const {win, webContents, setDestroyed} = createWindowStub();
-  const server = new Server(win);
+  const server = new Server(win, LANE_NOT_RUNNING);
 
   expect(server.emit('reload')).toBe(true);
   expect(webContents.send).toHaveBeenCalledWith(server.id, {ch: 'reload', data: undefined});
@@ -162,7 +198,7 @@ test('emits events to renderer only while window is alive', () => {
 
 test('destroy removes listeners from emitter, webContents, and ipcMain', () => {
   const {win, webContents} = createWindowStub();
-  const server = new Server(win);
+  const server = new Server(win, LANE_NOT_RUNNING);
 
   const listener = mock(() => {});
   server.on('close', listener);

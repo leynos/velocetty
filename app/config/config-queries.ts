@@ -234,6 +234,11 @@ export const fixConfigDefaults = (decoratedConfig: configOptions, appliedColors?
  * second read of the bundled file would let a later read fault change the
  * colours of an already-running window.
  *
+ * The configuration itself is cloned before the decorator sees it.
+ * `getProfileConfig` copies only the top level, so its nested settings still
+ * alias the applied configuration; a decorator is plugin code and must not be
+ * able to rewrite what every later window reads.
+ *
  * @param profileName - The profile to decorate.
  * @param decorate - The plugin decoration to apply first.
  * @returns The decorated configuration with a complete colour map.
@@ -247,7 +252,7 @@ export const decorateProfileConfig = (
   profileName: string,
   decorate: (decoratedConfig: configOptions) => configOptions
 ): configOptions => {
-  const baseConfig = getProfileConfig(profileName);
+  const baseConfig = structuredClone(getProfileConfig(profileName));
   const appliedColors = {...baseConfig.colors};
   return fixConfigDefaults(decorate(baseConfig), appliedColors);
 };
