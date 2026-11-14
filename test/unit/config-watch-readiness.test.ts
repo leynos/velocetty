@@ -191,6 +191,95 @@ test.serial('a subscriber that releases itself does not silence the ones after i
   });
 });
 
+test.serial('a stale cleanup cannot detach a later registration of the same callback', async () => {
+  await withConfigDir(async (dir) => {
+    await writeFile(path.join(dir, 'config.json5'), BEFORE);
+    const harness = await createWatchHarness({configDir: dir});
+    try {
+      harness.configModule.setup();
+      const notified: string[] = [];
+      const callback = () => notified.push('callback');
+      const staleCleanup = harness.configModule.subscribe(callback);
+      staleCleanup();
+      // The same callback is subscribed again. The old cleanup belongs to the
+      // registration it was handed, so calling it a third time must not remove
+      // this new one.
+      harness.configModule.subscribe(callback);
+      staleCleanup();
+
+      harness.emit({event: 'change', eventPath: harness.cfgPath});
+      await settle();
+
+      expect(notified).toEqual(['callback']);
+    } finally {
+      closeWatcher(harness);
+      mock.restore();
+    }
+  });
+});
+
+test.serial('a subscriber registered during dispatch waits for the next reload', async () => {
+  await withConfigDir(async (dir) => {
+    await writeFile(path.join(dir, 'config.json5'), BEFORE);
+    const harness = await createWatchHarness({configDir: dir});
+    try {
+      harness.configModule.setup();
+      const notified: string[] = [];
+      const registerLate = () => {
+        notified.push('first');
+        if (!notified.includes('late-added')) {
+          notified.push('late-added');
+          harness.configModule.subscribe(() => notified.push('late'));
+        }
+      };
+      harness.configModule.subscribe(registerLate);
+
+      harness.emit({event: 'change', eventPath: harness.cfgPath});
+      await settle();
+      // The round's audience was fixed before it began, so the new subscriber
+      // was not called by the reload that created it.
+      expect(notified).toEqual(['first', 'late-added']);
+
+      harness.emit({event: 'change', eventPath: harness.cfgPath});
+      await settle();
+      expect(notified).toEqual(['first', 'late-added', 'first', 'late']);
+    } finally {
+      closeWatcher(harness);
+      mock.restore();
+    }
+  });
+});
+
+test.serial('a subscriber released during dispatch is still notified in that round', async () => {
+  await withConfigDir(async (dir) => {
+    await writeFile(path.join(dir, 'config.json5'), BEFORE);
+    const harness = await createWatchHarness({configDir: dir});
+    try {
+      harness.configModule.setup();
+      const notified: string[] = [];
+      let releaseSecond: (() => void) | undefined;
+      harness.configModule.subscribe(() => {
+        notified.push('first');
+        releaseSecond?.();
+      });
+      releaseSecond = harness.configModule.subscribe(() => notified.push('second'));
+
+      harness.emit({event: 'change', eventPath: harness.cfgPath});
+      await settle();
+      // The snapshot already included the second subscriber, so dropping it
+      // mid-dispatch takes effect from the next reload rather than skipping it.
+      expect(notified).toEqual(['first', 'second']);
+
+      harness.emit({event: 'change', eventPath: harness.cfgPath});
+      await settle();
+      expect(notified).toEqual(['first', 'second', 'first']);
+    } finally {
+      closeWatcher(harness);
+      mock.restore();
+    }
+  });
+});
+
 /** A watched file a start-up import writes, and where its content ends up. */
 type WrittenFileCase = Readonly<{
   /** Test name, which states the file and whether the case reconciles. */

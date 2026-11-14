@@ -14,8 +14,9 @@
  * the change would never be reconciled. Capturing first can only cost a
  * redundant reload; it cannot miss one. A file start-up itself wrote is then
  * settled against the text the import applied: its new identity is adopted
- * only while the file still holds that text, so an edit landing in between
- * keeps the earlier identity and is still reconciled.
+ * only while the file still holds that text. Anything else — an edit landing
+ * in between, a read that failed, or the file being deleted again — settles to
+ * an unknown identity, so it is still reconciled.
  */
 import {readFileSync, statSync} from 'node:fs';
 
@@ -125,23 +126,24 @@ export type ReadWatchedFile = (filePath: string) => string;
  * application applied, which is the one failure this settlement exists to
  * prevent.
  *
- * A file that is no longer there is settled to an unknown identity rather than
- * left at its pre-import one. Start-up writes these files only when they were
- * absent, so the pre-import identity is "absent" too: keeping it would let the
- * deletion of the file start-up just created match the baseline and never be
- * reconciled.
+ * A file whose content cannot be verified is settled to an unknown identity
+ * rather than left at its pre-import one. Start-up writes these files only
+ * when they were absent, so the pre-import identity is "absent" too: keeping
+ * it would let a file that changed in between — including one deleted again
+ * before readiness — match the baseline and never be reconciled. The same
+ * applies when the file is gone or unreadable at this point.
  *
  * @param file - The written path and the text the import applied.
  * @param readFile - The text reader.
  * @param statFile - The inspection call.
- * @returns The file's current identity, an unknown identity when it is gone,
- *   or `undefined` when it is present but no longer holds the applied text.
+ * @returns The file's current identity, or an unknown identity when it no
+ *   longer holds the applied text, cannot be read, or is not there.
  */
 const settledWrittenStamp = (
   {path: filePath, text}: WrittenWatchedFile,
   readFile: ReadWatchedFile,
   statFile: StatFile
-): WatchedFileStamp | undefined => {
+): WatchedFileStamp => {
   const stamp = readWatchedFileStamp(filePath, statFile);
   if (stamp.kind !== 'present') {
     // An unknown identity never compares equal, so readiness reloads and the
@@ -149,9 +151,11 @@ const settledWrittenStamp = (
     return {kind: 'unreadable'};
   }
   try {
-    return readFile(filePath) === text ? stamp : undefined;
+    // Only content the application actually holds may have its identity
+    // adopted; anything else leaves the file's state unknown to us.
+    return readFile(filePath) === text ? stamp : {kind: 'unreadable'};
   } catch {
-    return undefined;
+    return {kind: 'unreadable'};
   }
 };
 
@@ -165,10 +169,11 @@ const settledWrittenStamp = (
  * changed the file in between — another process replacing it, a dotfile
  * deploy, a crash truncating it — leaves the identity describing content the
  * application never applied, and readiness would compare the file against
- * itself and skip the reload. Such a file keeps the pre-import identity, so
- * the difference stays visible and readiness reloads. A file that has since
- * been deleted is settled to an unknown identity for the same reason: its
- * pre-import identity is also "absent", and the deletion must still reload.
+ * itself and skip the reload. Such a file is settled to an unknown identity,
+ * which never compares equal, so the difference stays visible and readiness
+ * reloads. A file that has since been deleted, or cannot be read, is settled
+ * the same way: its pre-import identity is also "absent", so keeping it would
+ * make the deletion invisible.
  *
  * @param stamps - The baseline captured before the import.
  * @param writtenFiles - The files the import created and the text it applied.
@@ -190,10 +195,7 @@ export const settleWatchedFileStamps = (
 ): WatchedFileStamps => {
   const settled = new Map(stamps);
   for (const writtenFile of writtenFiles) {
-    const stamp = settledWrittenStamp(writtenFile, readFile, statFile);
-    if (stamp !== undefined) {
-      settled.set(writtenFile.path, stamp);
-    }
+    settled.set(writtenFile.path, settledWrittenStamp(writtenFile, readFile, statFile));
   }
   return settled;
 };

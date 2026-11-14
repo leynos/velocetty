@@ -121,7 +121,10 @@ export type ConfigWatchRuntime = {
  */
 export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies): ConfigWatchRuntime => {
   const {importConfiguration, recorder, spans, metrics, notify, reportMarker, configTree, watchedFiles} = dependencies;
-  const watchers = new Set<Function>();
+  // The registration, not the callback, is a subscriber's identity. Keying by
+  // callback would let a stale cleanup remove a later registration of the same
+  // function, which is how a torn-down component could silence its successor.
+  const watchers = new Set<Readonly<{notify: Function}>>();
   let configWatcher: {readonly close: () => Promise<void>} | undefined;
 
   /**
@@ -157,10 +160,11 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
     if (announced) {
       notify('Configuration updated', 'Configuration reloaded!');
     }
-    // A subscriber may release itself while it is being notified. Iterating the
-    // set directly tolerates that: removing the callback being visited still
-    // leaves the ones after it to be notified.
-    for (const notifySubscriber of watchers) {
+    // The round's audience is fixed before the first callback runs: a
+    // subscriber that releases another one, or registers a new one, must not
+    // change who is notified while this dispatch is in progress.
+    const subscribersToNotify = new Set(watchers);
+    for (const {notify: notifySubscriber} of subscribersToNotify) {
       notifySubscriber();
     }
     checkDeprecatedConfig(notify);
@@ -207,9 +211,9 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
    * Registers a callback that runs after every applied reload.
    *
    * Returns an unsubscribe function, so a caller that is torn down does not keep
-   * receiving reloads. Releasing the same registration twice is harmless: the
-   * second call removes nothing, so a teardown that runs twice cannot detach
-   * another subscriber.
+   * receiving reloads. The cleanup removes the registration it was handed and
+   * nothing else, so releasing it twice, or releasing it after the same
+   * callback has been subscribed again, cannot detach another subscriber.
    *
    * @example
    * ```ts
@@ -218,11 +222,10 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
    * ```
    */
   const subscribe = (fn: Function) => {
-    watchers.add(fn);
-    // Removing an entry that is already gone is a no-op, so a teardown that
-    // runs twice cannot detach anything else.
+    const registration = {notify: fn};
+    watchers.add(registration);
     return () => {
-      watchers.delete(fn);
+      watchers.delete(registration);
     };
   };
 

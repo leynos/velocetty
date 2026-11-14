@@ -4902,6 +4902,43 @@ Each new regression test was run against the unfixed source first: the two
 subscriber cases, the decorator-clone case, and the plugin-directory case all
 fail without their repair.
 
+### EP-T: reply-round repairs for review `5903007885` (fifth round)
+
+CodeRabbit's reply to the EP-S dispositions accepted the decoration, directory,
+codec, and RPC repairs and reported two remaining defects. Both were verified
+in the source before they were changed, and both were real.
+
+- A subscriber's identity is its registration, not its callback. Deleting the
+  callback meant a cleanup kept by a torn-down component would remove a later
+  subscription of the same function. Each `subscribe` now adds its own
+  `{notify}` registration and the cleanup removes that registration only. Test:
+  "a stale cleanup cannot detach a later registration of the same callback",
+  which fails when the cleanup scans for a matching callback.
+- The reload dispatch walks a copy of the registration set. Iterating the live
+  set let a subscriber that registered another one have it called inside the
+  same round, and let a subscriber that released a later one remove it from a
+  round that had already begun. Both directions now wait for the next reload or
+  finish the current one. Tests: "a subscriber registered during dispatch waits
+  for the next reload" and "a subscriber released during dispatch is still
+  notified in that round"; both fail against live iteration.
+- A written file whose applied text cannot be verified is settled to an
+  unknown identity instead of keeping the pre-import one. Start-up creates
+  those files, so their pre-import identity is `absent`; a file that was
+  replaced and then deleted before readiness matched that baseline and skipped
+  the reconciliation reload, leaving the seeded keybindings applied. The four
+  settlement tests now cover unverifiable text, an unreadable file, and the
+  mismatch-then-deletion and unreadable-then-deletion interleavings, and all
+  four fail against the previous settlement.
+- Lesson recorded for later rounds: the first draft of the interleaving test
+  watched both a pre-existing file and the seeded one. The pre-existing file's
+  baseline accounted for the change the reconciler reported, so the test passed
+  against the defect. A regression test for one file's settlement must watch
+  that file alone.
+
+The saved Unit Architecture failure is not claimed as resolved. Its EP-P
+decision stands, and the row now needs the fresh assessment that the queued
+review will provide.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -5507,3 +5544,7 @@ requires it. Any adjustment is recorded in `Decision log`.
   directories, the injected-codec example, and the injected E2E lane flag are
   recorded in EP-S. The remaining Unit Architecture rows keep the EP-P
   decision, with its reasons restated there.
+- 2026-11-14 (reply round for `5903007885`): the registration identity, the
+  copied dispatch audience, and the unknown identity for unverifiable written
+  files are recorded in EP-T, with the test-strength lesson from the first
+  interleaving draft.

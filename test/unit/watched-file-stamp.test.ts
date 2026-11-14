@@ -144,7 +144,7 @@ describe('settleWatchedFileStamps', () => {
     expect(settled.get('/tmp/keybindings.json5')).toEqual({kind: 'present', mtimeMs: 2, size: 3});
   });
 
-  test('keeps the pre-import identity when the file no longer holds the applied text', () => {
+  test('settles a file that no longer holds the applied text to an unknown identity', () => {
     const stat: StatFile = () => reading(2, 3);
 
     const settled = settleWatchedFileStamps(
@@ -154,14 +154,14 @@ describe('settleWatchedFileStamps', () => {
       stat
     );
 
-    // The identity on disk describes content the import never applied. Keeping
-    // the older identity is what makes readiness reload rather than compare the
+    // The identity on disk describes content the import never applied. An
+    // unknown identity is what makes readiness reload rather than compare the
     // file against itself.
-    expect(settled.get('/tmp/keybindings.json5')).toEqual({kind: 'absent'});
+    expect(settled.get('/tmp/keybindings.json5')).toEqual({kind: 'unreadable'});
     expect(createWatchedFileReconciler(settled, stat)()).toBe(true);
   });
 
-  test('keeps the pre-import identity when the file cannot be read', () => {
+  test('settles a file it cannot read to an unknown identity', () => {
     const settled = settleWatchedFileStamps(
       beforeImport,
       [{path: '/tmp/keybindings.json5', text: '{}\n'}],
@@ -169,7 +169,53 @@ describe('settleWatchedFileStamps', () => {
       () => reading(2, 3)
     );
 
-    expect(settled.get('/tmp/keybindings.json5')).toEqual({kind: 'absent'});
+    expect(settled.get('/tmp/keybindings.json5')).toEqual({kind: 'unreadable'});
+  });
+
+  test('reconciles a changed seeded file that was deleted before readiness', () => {
+    // Only the seeded file is watched, so nothing else can account for the
+    // change the reconciler reports.
+    const seededOnly = new Map([['/tmp/keybindings.json5', {kind: 'absent' as const}]]);
+    const beforeReadiness = [() => reading(2, 3), throwingStat('ENOENT')];
+    const stat: StatFile = (filePath) => {
+      const next = beforeReadiness.shift();
+      if (next === undefined) {
+        throw new Error('The test scripted fewer inspections than the code performed.');
+      }
+      return next(filePath);
+    };
+    const settled = settleWatchedFileStamps(
+      seededOnly,
+      [{path: '/tmp/keybindings.json5', text: '{}\n'}],
+      // Someone else replaced the file, so its content is not what we applied.
+      readText('{"window:new": ["ctrl+n"]}\n'),
+      stat
+    );
+
+    // The deletion must still reload. Had the mismatch kept the pre-import
+    // identity, the deleted file's "absent" reading would have matched it and
+    // the stale seeded keybindings would have stayed applied.
+    expect(createWatchedFileReconciler(settled, stat)()).toBe(true);
+  });
+
+  test('reconciles an unreadable seeded file that was deleted before readiness', () => {
+    const seededOnly = new Map([['/tmp/keybindings.json5', {kind: 'absent' as const}]]);
+    const beforeReadiness = [() => reading(2, 3), throwingStat('ENOENT')];
+    const stat: StatFile = (filePath) => {
+      const next = beforeReadiness.shift();
+      if (next === undefined) {
+        throw new Error('The test scripted fewer inspections than the code performed.');
+      }
+      return next(filePath);
+    };
+    const settled = settleWatchedFileStamps(
+      seededOnly,
+      [{path: '/tmp/keybindings.json5', text: '{}\n'}],
+      unreadableRead,
+      stat
+    );
+
+    expect(createWatchedFileReconciler(settled, stat)()).toBe(true);
   });
 
   test('settles a written file that has since been deleted to an unknown identity', () => {
