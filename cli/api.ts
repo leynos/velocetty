@@ -23,6 +23,12 @@ import {z} from 'zod';
 import {isNumber, isObject, isString} from '@shared/types/guards';
 import type {JsonValue} from '@shared/types/json';
 import {parseJson5StrictWithSchema, stringifyJson5} from '@shared/config/json5-config';
+import {
+  type ConfigInspection,
+  type ConfigLocations,
+  createPathProbe,
+  resolveConfigLocations
+} from '@shared/config/config-tree';
 
 /** Branded type for plugin specifiers (e.g., 'hyper-plugin', '@scope/plugin@1.0.0') */
 type PluginSpecifier = string & {readonly __brand: 'PluginSpecifier'};
@@ -40,9 +46,20 @@ type PackageName = string & {readonly __brand: 'PackageName'};
  */
 type CliApiFsModule = {
   existsSync(target: string): boolean;
+  lstatSync(target: string): CliApiPathEntry;
   readFileSync(target: string, encoding: 'utf8'): string;
+  statSync(target: string): CliApiPathEntry;
   writeFileSync(target: string, contents: string, encoding: 'utf8'): void;
 };
+
+/**
+ * What a successful `stat` or `lstat` proves to the probe.
+ *
+ * The probe distinguishes throw from no-throw and reads nothing else, so the
+ * slice names that single fact rather than exposing Node's `Stats`, which a
+ * double would have to reproduce field by field.
+ */
+type CliApiPathEntry = object;
 
 /**
  * The slice of the HTTP client this module depends on.
@@ -96,6 +113,8 @@ type CliRuntimeConfig = {
   readonly homeDirectory: string;
   readonly moduleDirectory: string;
   readonly configPath: string;
+  /** Whether the resolved config path could be inspected at all. */
+  readonly configInspection: ConfigInspection;
 };
 
 type CliApiContext = CliApiDependencies & CliRuntimeConfig;
@@ -106,13 +125,6 @@ const npmRegistryResponseSchema = z.object({
 });
 
 type NpmRegistryResponse = z.infer<typeof npmRegistryResponseSchema>;
-
-type ApplicationDirectoryInput = {
-  readonly appData: string | undefined;
-  readonly env: Pick<CliApiEnvironment, 'XDG_CONFIG_HOME'>;
-  readonly homeDirectory: string;
-  readonly platform: NodeJS.Platform;
-};
 
 type ConfigPathInput = {
   readonly appData: string | undefined;
@@ -128,6 +140,14 @@ type ConfigPathInput = {
  */
 export type CliApi = {
   readonly configPath: string;
+  /**
+   * Whether the resolved config path could be inspected.
+   *
+   * `inaccessible` means an error that does not establish absence, such as a
+   * permission or I/O fault: the file may exist, so the CLI reports that it
+   * cannot be read rather than that it is missing.
+   */
+  readonly configInspection: ConfigInspection;
   /** Returns `true` when the resolved config file exists on disk. */
   exists: () => boolean;
   /**
@@ -181,10 +201,18 @@ const packageName = (value: string): PackageName => {
   return value as PackageName;
 };
 
-const configFileName = 'config.json5';
-const legacyConfigFileName = 'hyper.json';
 const currentModuleDirectory = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Selects the path dialect that matches the target platform.
+ *
+ * The CLI resolves configuration paths for the platform it is acting on,
+ * which a test can vary independently of the host, so the choice is made from
+ * the injected platform rather than from `process.platform`.
+ *
+ * @param platform - The platform whose paths are being resolved.
+ * @returns `path.win32` for Windows, otherwise `path.posix`.
+ */
 const getPlatformPath = (platform: NodeJS.Platform) => (platform === 'win32' ? path.win32 : path.posix);
 
 const resolveDependencies = (options: CliApiOptions = {}): CliApiDependencies => ({
@@ -204,16 +232,19 @@ const resolveRuntimeConfig = (dependencies: CliApiDependencies, options: CliApiO
   const appData = options.appData ?? dependencies.env.APPDATA;
   const moduleDirectory = options.moduleDirectory ?? currentModuleDirectory;
 
+  const resolvedConfig = resolveConfigPath({
+    appData,
+    env: dependencies.env,
+    fsModule: dependencies.fsModule,
+    homeDirectory,
+    moduleDirectory,
+    platform: dependencies.platform
+  });
+
   return {
     appData,
-    configPath: resolveConfigPath({
-      appData,
-      env: dependencies.env,
-      fsModule: dependencies.fsModule,
-      homeDirectory,
-      moduleDirectory,
-      platform: dependencies.platform
-    }),
+    configInspection: resolvedConfig.inspection,
+    configPath: resolvedConfig.path,
     homeDirectory,
     moduleDirectory
   };
@@ -229,6 +260,16 @@ const resolveCliApiContext = (options: CliApiOptions = {}): CliApiContext => {
   };
 };
 
+/**
+ * Normalizes the configured application-data directory.
+ *
+ * A missing, empty, or whitespace-only value means "use the platform
+ * default", so it is treated as absent rather than passed through as a
+ * directory name that cannot exist.
+ *
+ * @param appData - The value read from the configuration, if any.
+ * @returns The configured path, or `undefined` when it is unusable.
+ */
 const normalizeConfiguredAppData = (appData: string | undefined): string | undefined => {
   if (!isString(appData)) {
     return undefined;
@@ -237,25 +278,27 @@ const normalizeConfiguredAppData = (appData: string | undefined): string | undef
   return appData.trim() ? appData : undefined;
 };
 
-// If the user defines XDG_CONFIG_HOME they definitely want their config there,
-// otherwise use the home directory in linux/mac and userdata in windows.
-const resolveApplicationDirectory = ({appData, env, homeDirectory, platform}: ApplicationDirectoryInput): string => {
-  const platformPath = getPlatformPath(platform);
-  const configuredXdgConfigHome = env.XDG_CONFIG_HOME;
-  if (configuredXdgConfigHome) {
-    return platformPath.join(configuredXdgConfigHome, 'Hyper');
-  }
-
-  if (platform === 'win32') {
-    return platformPath.join(
-      normalizeConfiguredAppData(appData) ?? platformPath.join(homeDirectory, 'AppData', 'Roaming'),
-      'Hyper'
-    );
-  }
-
-  return platformPath.join(homeDirectory, '.config', 'Hyper');
-};
-
+/**
+ * Resolves the CLI's active `config.json5` with the shared resolver.
+ *
+ * The CLI is on the `@shared` side of the package boundary, so it cannot import
+ * the app copy. KB-PATH-2 keeps the two resolvers identical. Its relation to
+ * the main process's inputs differs only in what it can observe:
+ *
+ * - the development flag is `NODE_ENV !== 'production'`;
+ * - the development directory is the repository root relative to this module;
+ * - `APPDATA` stands in for Electron's `appData`, with a home-based default;
+ * - `sameFile` compares joined paths, because this slice cannot call `realpath`.
+ *
+ * The probe still distinguishes a dangling symlink from an absent file, so a
+ * dotfiles-managed configuration the CLI cannot follow is not mistaken for a
+ * missing one and shadowed by a file the application would ignore. It also
+ * reports a permission or I/O fault, which reaches the caller as
+ * `inspection: 'inaccessible'` so the CLI can say why it cannot read the file
+ * instead of claiming it does not exist.
+ *
+ * These differences are recorded in `docs/tracking-issues.md`.
+ */
 const resolveConfigPath = ({
   appData,
   env,
@@ -263,38 +306,31 @@ const resolveConfigPath = ({
   homeDirectory,
   moduleDirectory,
   platform
-}: ConfigPathInput): string => {
+}: ConfigPathInput): ConfigLocations['config'] => {
   const platformPath = getPlatformPath(platform);
-  const applicationDirectory = resolveApplicationDirectory({
-    appData,
-    env,
+  const appDataDirectory =
+    normalizeConfiguredAppData(appData) ?? platformPath.join(homeDirectory, 'AppData', 'Roaming');
+
+  const locations = resolveConfigLocations({
+    platform,
+    xdgConfigHome: env.XDG_CONFIG_HOME,
     homeDirectory,
-    platform
+    appDataDirectory,
+    hyperUserDataDirectory: platformPath.join(appDataDirectory, 'Hyper'),
+    development: {
+      enabled: env.NODE_ENV !== 'production',
+      directory: platformPath.join(moduleDirectory, '..')
+    },
+    // The shared probe, not a local copy: the application and the CLI must
+    // classify a dangling symlink, a permission fault, and an absent file the
+    // same way, or KB-PATH-2's parity would stop meaning what it claims.
+    probe: createPathProbe(fsModule),
+    // The CLI's narrow filesystem slice cannot call `realpath`, so identical
+    // joined paths are the strongest equality it can establish.
+    sameFile: (left, right) => left === right
   });
-  const devConfigFileName = platformPath.join(moduleDirectory, '..', configFileName);
-  const devLegacyConfigFileName = platformPath.join(moduleDirectory, '..', legacyConfigFileName);
 
-  if (env.NODE_ENV !== 'production') {
-    if (fsModule.existsSync(devConfigFileName)) {
-      return devConfigFileName;
-    }
-
-    if (fsModule.existsSync(devLegacyConfigFileName)) {
-      return devLegacyConfigFileName;
-    }
-  }
-
-  const configPath = platformPath.join(applicationDirectory, configFileName);
-  if (fsModule.existsSync(configPath)) {
-    return configPath;
-  }
-
-  const legacyConfigPath = platformPath.join(applicationDirectory, legacyConfigFileName);
-  if (fsModule.existsSync(legacyConfigPath)) {
-    return legacyConfigPath;
-  }
-
-  return configPath;
+  return locations.config;
 };
 
 const pluginNameSchema = z.string().refine((value) => value.trim().length > 0, {
@@ -322,6 +358,22 @@ type NormalizedCliConfig = Omit<ParsedCliConfig, 'plugins' | 'localPlugins'> & {
   localPlugins: PluginSpecifier[];
 };
 
+/**
+ * Derives the npm package name from a plugin specifier.
+ *
+ * A specifier may name a version with `@` and a git ref with `#`; neither
+ * belongs in the package name the registry is asked about. A scoped name
+ * keeps its leading `@` and encodes the separating slash, which is the form
+ * the registry API expects for a scoped package.
+ *
+ * @param plugin - A validated plugin specifier.
+ * @returns The registry package name.
+ *
+ * @example
+ * ```ts
+ * getPackageName(pluginSpecifier('hyper-solarized#v1.2.0')); // 'hyper-solarized'
+ * ```
+ */
 function getPackageName(plugin: PluginSpecifier): PackageName {
   const isScoped = plugin[0] === '@';
   const nameWithoutVersion = plugin.split('#')[0];
@@ -420,7 +472,23 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
   const context = resolveCliApiContext(options);
   const {configPath} = context;
 
-  const getFileContents = () => context.fsModule.readFileSync(configPath, 'utf8');
+  /**
+   * Reads the active config.
+   *
+   * An unreadable path is refused here rather than left to `readFileSync`: the
+   * raw `EACCES` names the operation but not the configuration the user meant,
+   * and a caller that saw only "file not found" would send them looking for a
+   * file that may well be there.
+   */
+  const getFileContents = () => {
+    if (context.configInspection === 'inaccessible') {
+      throw new Error(
+        `Config file could not be inspected because it is not accessible: ${configPath}. ` +
+          'Check that the file and its directory are readable, then retry.'
+      );
+    }
+    return context.fsModule.readFileSync(configPath, 'utf8');
+  };
 
   const normalizeParsedConfig = (config: ParsedCliConfig): NormalizedCliConfig => {
     return {
@@ -525,6 +593,12 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
     save(config);
   };
 
+  /**
+   * Formats the installed plugins one per line.
+   *
+   * @returns The plugin names, or `false` when none are installed, so the
+   * command reports its empty case rather than printing a blank line.
+   */
   const list = () => {
     const plugins = getPlugins();
     if (plugins.length > 0) {
@@ -533,13 +607,25 @@ export const createCliApi = (options: CliApiOptions = {}): CliApi => {
     return false;
   };
 
-  return {configPath, exists, existsOnNpm, install, isInstalled, list, uninstall};
+  return {
+    configInspection: context.configInspection,
+    configPath,
+    exists,
+    existsOnNpm,
+    install,
+    isInstalled,
+    list,
+    uninstall
+  };
 };
 
 const defaultCliApi = createCliApi();
 
 /** Resolved Hyper config path for the default CLI API instance. */
 export const configPath = defaultCliApi.configPath;
+
+/** Whether the default CLI config path could be inspected. */
+export const configInspection = defaultCliApi.configInspection;
 
 /** Returns `true` when the default CLI config file exists on disk. */
 export const exists = defaultCliApi.exists;

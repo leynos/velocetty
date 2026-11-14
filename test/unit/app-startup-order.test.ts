@@ -3,9 +3,19 @@ import {expect, test} from 'bun:test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+/**
+ * Reads a source file relative to the repository root.
+ *
+ * The ordering contract is expressed in the entry point's own text, so the
+ * test inspects the shipped source rather than a reimplementation of it.
+ *
+ * @param workspaceRelativePath - The path from the repository root.
+ * @returns The file's contents.
+ */
 const readSource = async (workspaceRelativePath: string) =>
   await fs.readFile(path.join(process.cwd(), workspaceRelativePath), 'utf8');
 
+/** Returns the index of `needle`, failing the test when it is absent. */
 const indexOfOrThrow = (source: string, needle: string): number => {
   const index = source.indexOf(needle);
   if (index === -1) {
@@ -28,6 +38,20 @@ test('the entry point initializes the configuration before loading the app', asy
   expect(setupIndex).toBeLessThan(startImportIndex);
 });
 
+test('the plugin loader exists before the module-level plugin load runs', async () => {
+  // `app/plugins.ts` loads the configured plugins while its own module body is
+  // still being evaluated. `requirePlugins` is a hoisted function declaration,
+  // so a `const` loader declared below that call site is in its temporal dead
+  // zone and the whole start-up fails with a `ReferenceError`. No unit test can
+  // see that: none of them evaluate this module, because loading it patches
+  // `Module._load`. Pinning the order in the source is the cheap guard.
+  const pluginSource = await readSource('app/plugins.ts');
+  const loaderIndex = indexOfOrThrow(pluginSource, 'const loadPlugins = createPluginLoader');
+  const initialLoadIndex = indexOfOrThrow(pluginSource, 'let modules = requirePlugins();');
+
+  expect(loaderIndex).toBeLessThan(initialLoadIndex);
+});
+
 test('the entry point answers every informational argument the same way', async () => {
   // These arguments must short-circuit before `config.setup()` and before
   // `./start.js`. If one ever fell through to the startup path it would launch a
@@ -39,8 +63,8 @@ test('the entry point answers every informational argument the same way', async 
   expect(entrySource).toContain('app.quit();');
 });
 
-test('the informational branch reports the version, the argument contract and the config path', async () => {
-  // The three lines are the entire user-visible output of `--help`. Losing one
+test('the informational branch reports the version, the argument contract and the resolved paths', async () => {
+  // These lines are the entire user-visible output of `--help`. Losing one
   // is silent at runtime: the process still exits 0 with partial guidance.
   const entrySource = await readSource('app/index.mts');
 
@@ -50,6 +74,8 @@ test('the informational branch reports the version, the argument contract and th
   expect(entrySource).toMatch(/Hyper version \$\{packageMetadata\.version\}/);
   expect(entrySource).toContain('Hyper does not accept any command line arguments.');
   expect(entrySource).toMatch(/Hyper configuration file located at: \$\{cfgPath\}/);
+  expect(entrySource).toMatch(/Hyper keybindings file located at: \$\{keybindingsPath\}/);
+  expect(entrySource).toMatch(/Hyper configuration tree in use: \$\{configTree\}/);
 });
 
 test('a startup failure is reported and turns into a failing exit code', async () => {
@@ -60,7 +86,14 @@ test('a startup failure is reported and turns into a failing exit code', async (
   const catchIndex = indexOfOrThrow(entrySource, '} catch (error) {');
   const catchBlock = entrySource.slice(catchIndex);
 
-  expect(catchBlock).toContain("console.error('Failed to start Hyper.', error);");
+  // The bounded description, not the raw error: a message may quote a path.
+  // The fixed stage and category let support tell a start-up failure apart from
+  // the same error reported elsewhere.
+  expect(catchBlock).toContain("console.error('Failed to start Hyper.', {");
+  expect(catchBlock).toContain('...describeError(error),');
+  expect(catchBlock).toContain("category: 'thrown',");
+  expect(catchBlock).toContain("operation: 'startup'");
+  expect(catchBlock).not.toContain('console.error(error)');
   expect(catchBlock).toContain('process.exitCode = 1;');
   expect(catchBlock).toContain('app.quit();');
 });

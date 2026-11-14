@@ -131,7 +131,12 @@ const registerEntryStubs = (): void => {
     setup: () => {
       requireActiveConfigStub().setup();
     },
-    getDefaultProfile: () => 'default'
+    getDefaultProfile: () => 'default',
+    // The entry point hands these to the shortcut probe, which takes them as
+    // parameters instead of reading the environment. A shipped build is not
+    // the lane, so the stub answers exactly what a real launch would.
+    isE2ERun: () => false,
+    emitE2EMarker: () => {}
   }));
   registerModuleMock(packageJsonStubPath, () => ({
     ...packageMetadata,
@@ -143,19 +148,35 @@ const registerEntryStubs = (): void => {
   });
 };
 
-/** The console output a single entry-point evaluation produced. */
-type CapturedOutput = {readonly lines: string[]};
+/** One console call as the entry point made it, with its arguments unflattened. */
+type ConsoleRecord = Readonly<{readonly args: readonly unknown[]; readonly stream: 'log' | 'error'}>;
 
-/** Collects the entry point's console output instead of printing it. */
+/** The console output a single entry-point evaluation produced. */
+type CapturedOutput = {
+  readonly lines: string[];
+  readonly records: ConsoleRecord[];
+};
+
+/**
+ * Collects the entry point's console output instead of printing it.
+ *
+ * Both the flattened text and the raw argument tuples are kept: the text suits
+ * presence assertions, while `records` lets a test inspect a structured
+ * argument such as the bounded error description without `String` collapsing
+ * its fields into one line.
+ */
 const captureConsole = (): CapturedOutput => {
   const lines: string[] = [];
+  const records: ConsoleRecord[] = [];
   console.log = (...args: unknown[]) => {
+    records.push({args, stream: 'log'});
     lines.push(args.map(String).join(' '));
   };
   console.error = (...args: unknown[]) => {
+    records.push({args, stream: 'error'});
     lines.push(`ERROR ${args.map(String).join(' ')}`);
   };
-  return {lines};
+  return {lines, records};
 };
 
 const originalArgv = process.argv;
@@ -206,6 +227,7 @@ afterEach(() => {
  */
 let entryEvaluations = 0;
 
+/** Runs the entry point afresh for one command line. */
 const runEntryPoint = async (args: string[]): Promise<void> => {
   process.argv = ['electron', ...args];
   process.exitCode = 0;
@@ -222,10 +244,12 @@ describe('the informational argument branch', () => {
 
       // Order matters: the diagnostics are printed before the process is asked
       // to quit, so a run that quit first would emit nothing a user could read.
-      expect(output.lines).toHaveLength(3);
+      expect(output.lines).toHaveLength(5);
       expect(output.lines[0]).toMatch(/^Hyper version \d/);
       expect(output.lines[1]).toContain('Hyper does not accept any command line arguments.');
       expect(output.lines[2]).toMatch(/^Hyper configuration file located at: /);
+      expect(output.lines[3]).toMatch(/^Hyper keybindings file located at: /);
+      expect(output.lines[4]).toMatch(/^Hyper configuration tree in use: /);
       expect(trace.labels).toEqual([]);
       expect(quits).toBe(1);
       expect(process.exitCode).toBe(0);
@@ -240,6 +264,9 @@ describe('the startup branch', () => {
     // `config.setup()` must precede the start import: modules below it read the
     // configuration while their own bodies run, so the order is the contract.
     expect(trace.labels).toEqual(['configuration.setup', 'app.start']);
+    // Nothing at all is printed, marker lines included: the entry point hands
+    // the configuration root's sink to the probe rather than writing markers
+    // of its own, so a normal launch cannot contaminate the lane's stream.
     expect(output.lines).toEqual([]);
     expect(quits).toBe(0);
     expect(process.exitCode).toBe(0);
@@ -256,10 +283,57 @@ describe('the startup branch', () => {
 
     expect(output.lines).toHaveLength(1);
     expect(output.lines[0]).toContain('ERROR Failed to start Hyper.');
-    expect(output.lines[0]).toContain('config unavailable');
+    // The entry point logs the bounded `{code?, name}` description rather than
+    // the thrown value, so the error's own message stays out of the log.
+    expect(output.lines[0]).not.toContain('config unavailable');
     // The app must not have reached its own start import after the failure.
     expect(trace.labels).toEqual([]);
     expect(process.exitCode).toBe(1);
     expect(quits).toBe(1);
+  });
+
+  test.serial('a startup failure does not log the path its error quotes', async () => {
+    const sensitivePath = '/home/ada/.config/Velocetty/PRIVATE_TOKEN/config.json5';
+    activeConfigStub = {
+      setup: () => {
+        throw Object.assign(new Error(`ENOENT: no such file or directory, '${sensitivePath}'`), {code: 'ENOENT'});
+      }
+    };
+
+    await runEntryPoint(['--no-sandbox']);
+
+    // A real launch records this line for support, so it must name the errno
+    // vocabulary without repeating the configuration path or the token in it.
+    expect(output.lines).toHaveLength(1);
+    expect(output.lines[0]).toContain('ERROR Failed to start Hyper.');
+    expect(output.lines[0]).not.toContain(sensitivePath);
+    expect(output.lines[0]).not.toContain('PRIVATE_TOKEN');
+    // Inspect the structured argument itself, not its `String` rendering: the
+    // second argument is exactly the bounded description, so no extra field
+    // can carry the message or the path into the log.
+    const [message, details] = output.records[0]?.args ?? [];
+    expect(message).toBe('Failed to start Hyper.');
+    expect(details).toEqual({category: 'thrown', code: 'ENOENT', name: 'Error', operation: 'startup'});
+    expect(process.exitCode).toBe(1);
+  });
+
+  test.serial('a startup failure drops a sensitive value carried in an error field', async () => {
+    const sensitivePath = '/home/ada/.config/Velocetty/PRIVATE_TOKEN/config.json5';
+    activeConfigStub = {
+      setup: () => {
+        // A crafted `code` is the interesting field: it is the one the helper
+        // copies, so it must survive only when it names a real errno.
+        throw Object.assign(new Error('read failed'), {code: sensitivePath});
+      }
+    };
+
+    await runEntryPoint(['--no-sandbox']);
+
+    const [, details] = output.records[0]?.args ?? [];
+    expect(details).toEqual({category: 'thrown', name: 'Error', operation: 'startup'});
+    // Checked over the raw tuples as well, so a nested field cannot hide the
+    // value from a flattened-text assertion.
+    expect(JSON.stringify(output.records)).not.toContain('PRIVATE_TOKEN');
+    expect(process.exitCode).toBe(1);
   });
 });

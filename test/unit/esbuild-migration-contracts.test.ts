@@ -246,7 +246,10 @@ test('plugin validation: renderer externals map to legacy runtime require paths'
   });
   expect(reactBundleOutput.includes('"react"') || reactBundleOutput.includes("'react'")).toBe(true);
   expect(reactBundleOutput.includes('rendererRequire')).toBe(true);
-});
+  // Two esbuild builds take about four seconds alone, and the suite runs the
+  // file's tests concurrently with each other, so the default five-second
+  // budget expires on a loaded host before either build finishes.
+}, 20_000);
 
 test('plugin validation: ignored imports remain unresolved externals', async () => {
   expect(shouldIgnoreImportPath('spawn-sync')).toBe(true);

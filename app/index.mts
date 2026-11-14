@@ -2,7 +2,9 @@
 import {app} from 'electron';
 
 import packageMetadata from './package.json' with {type: 'json'};
-import {cfgPath} from './config/paths.js';
+import {startShortcutProbe} from './config/e2e-shortcut-probe.js';
+import {cfgPath, configTree, keybindingsPath} from './config/paths.js';
+import {describeError} from './utils/error-code.js';
 
 const informationalArguments = ['--help', '-v', '--version'];
 const requestedArgument = process.argv[1];
@@ -11,6 +13,8 @@ if (requestedArgument && informationalArguments.includes(requestedArgument)) {
   console.log(`Hyper version ${packageMetadata.version}`);
   console.log('Hyper does not accept any command line arguments. Please modify the config file instead.');
   console.log(`Hyper configuration file located at: ${cfgPath}`);
+  console.log(`Hyper keybindings file located at: ${keybindingsPath}`);
+  console.log(`Hyper configuration tree in use: ${configTree}`);
   app.quit();
 } else {
   try {
@@ -23,10 +27,27 @@ if (requestedArgument && informationalArguments.includes(requestedArgument)) {
     // to sit relative to a statement in a lower module.
     const config = await import('./config.js');
     config.setup();
+    // Dormant outside the end-to-end lane: the probe arms only when the lane is
+    // running, and reads requests only from the file the harness names here.
+    // The lane flag and marker stream come from the configuration composition
+    // root, so the probe itself never inspects the environment.
+    startShortcutProbe({
+      isLaneRunning: config.isE2ERun(),
+      marker: config.emitE2EMarker,
+      requestFile: process.env.VELOCETTY_E2E_PRESS_FILE
+    });
 
     await import('./start.js');
   } catch (error) {
-    console.error('Failed to start Hyper.', error);
+    // The bounded description keeps a failed start-up diagnosable without
+    // repeating a path or a secret the error message may quote. The stage and
+    // category are fixed tokens, so support can tell a start-up failure from
+    // the same error reported elsewhere.
+    console.error('Failed to start Hyper.', {
+      ...describeError(error),
+      category: 'thrown',
+      operation: 'startup'
+    });
     process.exitCode = 1;
     app.quit();
   }

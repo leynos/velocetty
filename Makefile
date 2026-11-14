@@ -1,5 +1,5 @@
 .PHONY: all fmt check-fmt typecheck lint test coverage build build-fast \
-	clean markdownlint nixie spelling
+	clean markdownlint nixie spelling prove
 
 MDLINT ?= markdownlint-cli2
 # `make fmt` and `make check-fmt` call mdtablefix directly. `--git` selects the
@@ -18,7 +18,7 @@ TYPOS_CONFIG_BUILDER = $(UV_ENV) $(UV) tool run --python 3.14 --from \
 	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
 	typos-config-builder
 
-all: check-fmt typecheck lint test spelling
+all: check-fmt typecheck lint test spelling prove
 
 fmt:
 	bun run fmt
@@ -38,6 +38,9 @@ lint:
 
 test:
 	bun run test:unit:run
+
+prove:
+	./bin/prove.sh
 
 coverage:
 	bun run test:coverage

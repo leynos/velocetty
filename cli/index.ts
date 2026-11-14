@@ -1,3 +1,10 @@
+/** @file The `velocetty` command-line tool and its subcommands. */
+/*
+ * Every subcommand runs from here: it parses the arguments, starts or contacts
+ * the running app, and reports the outcome as console output and an exit code.
+ * This is a terminal program, so it writes to the console directly rather than
+ * through the app's notification sink.
+ */
 // This is a CLI tool, using console is OK
 /* eslint no-console: 0 */
 import {spawn, exec} from 'node:child_process';
@@ -49,6 +56,13 @@ const completeCommand = (): void => {
   commandPromise = Promise.resolve();
 };
 
+/**
+ * Rejects a blank plugin name before it reaches npm or the filesystem.
+ *
+ * @param pluginName - The name typed on the command line.
+ * @returns The trimmed name.
+ * @throws {ExpectedFailureError} When the name is empty or whitespace only.
+ */
 const assertPluginName = (pluginName: string): string => {
   const normalizedPluginName = pluginName.trim();
   if (!normalizedPluginName) {
@@ -57,7 +71,26 @@ const assertPluginName = (pluginName: string): string => {
   return normalizedPluginName;
 };
 
+/**
+ * Refuses a configuration the command cannot safely read.
+ *
+ * An inaccessible path and an absent one fail differently on purpose: telling
+ * the user the file is missing would send them to recreate one that is already
+ * there, so each outcome names the remedy that matches it.
+ *
+ * @returns `true` when the configuration path is present and inspectable.
+ */
 const checkConfig = () => {
+  // A permission or I/O fault is not absence: telling the user the file is
+  // missing would send them to recreate one that is already there.
+  if (api.configInspection === 'inaccessible') {
+    throw new ExpectedFailureError(
+      chalk.red(
+        `Error! Config file could not be read: ${api.configPath}\n` +
+          'Check that the file and its directory are readable, then retry.'
+      )
+    );
+  }
   if (api.exists()) {
     return true;
   }

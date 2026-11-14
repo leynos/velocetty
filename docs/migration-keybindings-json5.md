@@ -1,0 +1,105 @@
+# Migration to `keybindings.json5`
+
+This document describes the migration of keyboard shortcuts from the `keymaps`
+key of Hyper's active configuration file (`config.json5`, or the legacy
+`hyper.json`) to the separate `keybindings.json5` file. It covers the storage
+location, the conditional start-up migration, precedence, hot reload, and the
+difference between deleting the file and writing an empty object. It is a
+migration note; the users' guide remains the detailed manual.
+
+## Target release
+
+The migration applies from Velocetty 4.0.0, the first stable release after the
+inherited `4.0.0-canary.5` version recorded in `package.json`. Velocetty has
+not yet published a numbered release, so the maintainer owns the final version
+number; if the release is renumbered, this target moves with it rather than
+naming the inherited Hyper version.
+
+## What changes
+
+- Keyboard shortcuts move from the active legacy configuration file's `keymaps`
+  entry (`config.json5`, or the legacy `hyper.json`) to a separate
+  `keybindings.json5` file. The legacy key is not deleted from that file;
+  Velocetty simply stops reading it once the new file exists.
+- `keybindings.json5` lives in the Velocetty configuration directory. On every
+  platform, an absolute `XDG_CONFIG_HOME` takes precedence, and the directory
+  is created beneath it. Otherwise:
+  - Linux and macOS: `~/.config/Velocetty`.
+  - Windows: `%APPDATA%\Velocetty`.
+
+  A development build that uses a development-mode `config.json5` or
+  `hyper.json` keeps `keybindings.json5` beside that file instead, so
+  development builds edit the file next to the configuration they are actually
+  using rather than the user-wide Velocetty copy.
+- Start-up migration is conditional. It runs only when `keybindings.json5`
+  does not exist. A valid `keymaps` value is copied into the new file, and
+  Velocetty never rewrites the legacy configuration file, so its comments and
+  formatting are preserved. When that file holds no `keymaps`, the new file is
+  created with an empty object. If it cannot be parsed, or its `keymaps` value
+  is invalid, migration is postponed to a later start rather than seeding an
+  empty file. If the new file cannot be written, Velocetty reports the failure,
+  applies the valid legacy shortcuts for that session without persisting them,
+  and retries the migration on the next start.
+- Once `keybindings.json5` exists, it is the source of truth. The legacy
+  `keymaps` key is ignored; when it holds a valid `keymaps` value, a
+  notification states that `keybindings.json5` takes precedence.
+- Changes are hot-reloaded. Saving `keybindings.json5` applies the new
+  shortcuts within a fraction of a second, without a restart. Unsaved edits
+  have no effect.
+- While Velocetty is running, deleting the file and writing `{}` both return
+  to the platform defaults, but they differ after the next start:
+  - `{}` is an explicit empty set of user overrides. It persists, so the
+    platform defaults remain in effect on later starts.
+  - Deleting the file is not a durable reset. On the next start Velocetty
+    recreates the file when it can classify the legacy configuration. If the
+    legacy configuration file still holds valid `keymaps`, those shortcuts are
+    migrated again; if it holds none, the recreated file is `{}`. If that file
+    cannot be parsed, recreation is postponed, as described above.
+- Invalid and unreadable files never remove working shortcuts during a
+  session:
+  - During hot reload, the shortcuts already in effect stay in effect, and a
+    notification names the first problem. A later valid save is applied.
+  - At start-up there is no previous session to fall back to, so Velocetty
+    starts with the platform defaults and shows the same kind of
+    notification. The file is left in place rather than overwritten.
+  - An unreadable file, for example because of file permissions, is treated
+    the same way.
+
+## Configuration directory and plugins
+
+The same migration moves the rest of the configuration to a Velocetty-named
+directory, and the two changes interact through the active configuration tree:
+
+- `config.json5` is resolved from the Velocetty directory first, then from the
+  Hyper directory as `config.json5` or the older `hyper.json`. An existing
+  Hyper configuration therefore keeps working without being moved, and
+  Velocetty creates nothing in the Hyper directory.
+- When both trees hold a `config.json5`, the Velocetty copy wins and a
+  notification names the ignored copy. Merging the two by hand is the only way
+  to keep settings from both. Merge shortcuts by hand as well when the
+  Velocetty directory already has a `keybindings.json5`: that file takes
+  precedence, so `keymaps` added only to the merged `config.json5` are ignored.
+  Add the Hyper-tree shortcuts to the existing file instead, keeping every
+  binding already there.
+- `plugins/` and `plugins/local/` are resolved from the tree that supplied the
+  configuration, so a plugin directory beside the Hyper configuration stays in
+  effect until the configuration moves. Moving the configuration means moving
+  `plugins/` and `schema.json` with it, and merging plugin lists when both
+  trees declare plugins.
+- `keybindings.json5` always lives in the Velocetty directory. A
+  development-mode configuration is the one exception: its `keybindings.json5`
+  sits beside that configuration file.
+
+The [users' guide](users-guide.md#moving-an-existing-configuration) gives the
+step-by-step move, including how to preserve plugins when configurations from
+both trees are merged.
+
+## Detailed instructions
+
+Step-by-step instructions, including the file format and shortcut syntax, are
+in the [users' guide](users-guide.md). Running the application executable with
+`--help`, `-v`, or `--version` prints the resolved `keybindings.json5` path,
+the configuration path, and the configuration tree in use, without starting the
+terminal, so the report shows which files an installation actually reads. The
+installed `hyper` launcher is the plugin command-line interface and does not
+print this report; the users' guide gives the per-platform executable paths.

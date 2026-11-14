@@ -6,9 +6,11 @@
   the Velocetty repository.
 - Invariants: Keep Makefile targets and validation steps aligned with
   Continuous Integration (CI) and tooling changes.
-- Cross-links: [Testing with Bun](testing-with-bun.md),
-  [ADR 001](adr-001-replace-ava-with-bun-test.md), [ADR 002](adr-002-replace-webpack-babel-with-esbuild.md),
-  and [Roadmap](roadmap.md).
+- Cross-links:
+  - [Testing with Bun](testing-with-bun.md)
+  - [ADR 001](adr-001-replace-ava-with-bun-test.md)
+  - [ADR 002](adr-002-replace-webpack-babel-with-esbuild.md)
+  - [Roadmap](roadmap.md)
 
 This guide captures the development practices specific to the Velocetty
 repository. It is intentionally concise and focused on the steps developers
@@ -115,7 +117,14 @@ also materializes runtime-resolvable modules under `dist/app/`. Use
 adapters/constants for main-process runtime dependencies.
 
 Boundary validation is enforced by `bun run check:boundaries`, which runs as
-part of `bun run lint` and therefore `make lint`.
+part of `bun run lint` and therefore `make lint`. That check also rejects a
+runtime `@shared/*` import in `app/`, where the alias has no runtime
+counterpart. It classifies both `import type {X}` and `import {type X}` as
+type-only and accepts them, because `app/tsconfig.build.json` sets
+`verbatimModuleSyntax` to `false` and the clause is erased. A mixed clause such
+as `import {type X, y}` keeps a runtime import for `y` and is rejected. A
+`shared` value that `app/` needs at run time belongs in an app-local adapter, as
+`app/utils/runtime-guards.ts` does.
 
 Follow-up hardening tracked in `docs/tracking-issues.md`:
 
@@ -192,6 +201,8 @@ for active configuration files:
 - Parse and write `config.json5` as JSON5 (including comments and trailing
   commas).
 - Do not rely on `.hyper.js` migration; legacy migration paths were removed.
+- Persist user keybinding overrides in `keybindings.json5`, not inside
+  `config.json5`.
 - Persist runtime plugin settings under `config.plugins.<plugin-id>` in
   `config.json5`.
 - Keep config-validation diagnostics structured with required fields:
@@ -201,10 +212,21 @@ for active configuration files:
   `config.json5`; avoid full-file canonical rewrites for targeted runtime
   settings updates.
 
-`shared/schemas/schema.json` and `app/config/schema.json` are generated, but
-tracked. `bun run generate-schema` derives them from the types in
-`typings/config.d.ts`; `bun install` regenerates them from `postinstall`. Keep
-the committed copies in step with the source types, because CI regenerates on
+The config schema (`shared/schemas/schema.json`, copied to
+`app/config/schema.json`) and the keybindings schema
+(`shared/schemas/keybindings.schema.json`, copied to
+`app/config/keybindings.schema.json`) are generated, but tracked. `bun install`
+regenerates them from `postinstall`, and `bun run generate-schema` runs the
+same chain by hand:
+
+1. `typescript-json-schema` derives the config schema from the types in
+   `typings/config.d.ts`;
+2. `bin/generate-keybindings-schema.ts` derives the keybindings schema from
+   `keybindingsJsonSchema()` in `app/config/keybindings-codec.ts`, so editors
+   and the runtime cannot drift apart;
+3. `bin/sync-shared-schema.mjs` copies both schemas into `app/config/`.
+
+Keep the committed copies in step with their sources, because CI regenerates on
 checkout: a stale file passes locally and then changes under the build.
 `typescript-json-schema` names each definition after the TypeScript type it
 came from, so renaming a type in `typings/` or `shared/src/types/` rewrites the
@@ -232,6 +254,50 @@ Merge semantics:
 - **Objects**: deep merge (nested properties recursively merged).
 - **Arrays**: replace (user array completely replaces default array).
 
+Keybindings follow a parallel layering model:
+
+1. **Core defaults** (`app/keymaps/<platform>.json`)
+2. **Plugin defaults** (runtime contributions, not persisted)
+3. **User overrides** (`keybindings.json5`)
+
+The current merge does not yet match that order.
+`mergeRuntimePluginKeybindings()` in `app/runtime/plugin-runtime.ts` spreads
+the runtime contributions first and the resolved keymaps second, so core
+defaults override plugin defaults. Legacy `decorateKeymaps` hooks then run over
+the merged map and can modify user bindings. `KEYMAP-001` in
+[Tracking issues](tracking-issues.md) tracks aligning the merge with the order
+above.
+
+[Configuration architecture](configuration-architecture.md) describes the
+modules that carry this out, the start-up and reload data flow, and the
+verified policy boundary.
+
+When touching keybinding storage:
+
+- Treat `config.json5.keymaps` as a legacy bootstrap source only. At start-up,
+  and only while `keybindings.json5` is missing, existing user keymaps may be
+  copied there once; after that, `keybindings.json5` is the source of truth. A
+  reload never copies, so a file deleted during a session stays deleted until
+  the next start. The create is decided from an earlier observation and is not
+  atomic against another process: a file created in between is replaced rather
+  than kept, which [#270](https://github.com/leynos/velocetty/issues/270)
+  tracks.
+- Keep `keybindings.json5` JSON5-compatible, including comments and trailing
+  commas.
+- Preserve the last known good in-memory keybindings if `keybindings.json5`
+  becomes invalid during hot reload, and surface structured diagnostics rather
+  than clearing active shortcuts.
+- Extend the tests named in `docs/configuration-architecture.md` when the file
+  format or reload behaviour changes. The codec, service, store, watcher,
+  layering, and tree-resolution claims each have a named test file there.
+- Keep `app/config/keybindings-policy.ts` pure. It is verified by `make prove`.
+  The guards in `bin/prove.sh` police the proof, not the TypeScript: they
+  reject Dafny trust constructs other than the admitted `emptyUserKeymaps`
+  axiom and require a positive verifier summary per listed source. They never
+  inspect TypeScript function bodies, so a green proof does not establish that
+  an `extern` body such as `emptyUserKeymaps` is pure. Keeping Electron,
+  filesystem, and clock access out of the policy is still a review duty.
+
 Use `resolveConfigLayers()` from `app/config/layering.ts` to resolve the
 effective configuration:
 
@@ -245,6 +311,181 @@ const runtimeOverrides = {} as Partial<configOptions>;
 
 const effectiveConfig = resolveConfigLayers(defaults, userConfig, runtimeOverrides);
 ```
+
+### Keybindings storage internals
+
+The storage path is split into a pure verified policy, an adapter store, a
+service, an importer, and a watcher; the composition root in `app/config.ts`
+wires them together.
+
+- **`KeybindingsStore`** (`app/config/keybindings-ports.ts`): the driven port
+  for the file, exposing a short `label`, `read()`, `peek()`, and `write(text)`.
+  `read()` records a `keybindings-read` span and warns on failure, while
+  `peek()` performs the same read with no span and no warning;
+  `exportKeybindings` uses `peek()` because export is a query that must not add
+  noise to the read telemetry. The port carries no filesystem path and no raw
+  error, so a caller cannot persist through anything but the port.
+  `createFileKeybindingsStore` in `app/config/keybindings-store.ts` supplies
+  the filesystem implementation, which replaces the file through a temporary
+  sibling and fails closed on an unresolvable symlink chain.
+- **`createKeybindingsService`** (`app/config/keybindings.ts`): owns the
+  last-known-good state and the reload, start, import, and export operations.
+  It takes a `codec`, a `KeybindingsReporter`, and a `KeybindingsStore`, so
+  parsing, reporting, and storage are all supplied by the caller.
+- **`KeybindingsReporter`** (`app/config/keybindings-ports.ts`): the closure
+  the service calls with one bounded notice per event.
+  `createKeybindingsNotifier` in `app/config/keybindings-notifier.ts` is the
+  edge implementation, and it composes the sentences a user reads.
+- **`ConfigImportKeybindings`** (`app/config/import.ts`): the type of the
+  `keybindings` option accepted by `createConfigImportModule`, that is, the
+  `{reload, start}` pairing the importer calls.
+- **`ConfigImportResult`** (`app/config/import.ts`): what `_import` returns —
+  the parsed `config`, the coarse `ConfigImportReport`, and the unflattened
+  `KeybindingsLoadOutcome`. The outcome keeps `origin`, `basis`, and `cause`
+  available, so the composition root can report the migration without
+  re-deriving it from the coarser report vocabulary.
+- **`KeybindingsLoadOutcome`** (`app/config/keybindings-ports.ts`): the
+  discriminated union of `applied` (with `origin`) and `kept` (with `basis`,
+  `cause`, and `diagnostics`) results that `start` and `reload` return.
+- **`ConfigImportPaths.keybindingsPath`** (`app/config/import-sources.ts`): the
+  single resolved path of `keybindings.json5`. The sibling `keybindingsDir`,
+  `keybindingsSchemaFile`, and `keybindingsSchemaPath` fields describe where
+  the schema copy belongs.
+- **`ConfigImportNotify`** (`app/config/import-report.ts`): the notification
+  port `(title, body?, details?)`, so the loader and importer never import
+  Electron's notifier directly.
+- **`canBootstrapUserConfig`** (`app/config/import-sources.ts`): whether a
+  start-up may create `config.json5`. An active Hyper tree, an unreadable
+  active path, and a bundled default config that fell back to the safe defaults
+  all suppress it. The fallback is applied for that run, but writing it would
+  make a degraded template the user's permanent configuration, so a later
+  start-up with a repaired installation still bootstraps the file.
+- **`createConfigWatcher`** (`app/config/watcher.ts`): coalesces a burst of
+  directory events into one complete reload. It takes an injected `handle`,
+  `fileNames`, `debounceMs`, `schedule`, `cancel`, and `onReload`, plus optional
+  `metrics`, `onReady`, `reconcileOnReady`, `spans`, and `warn`.
+- **Composition root** (`app/config.ts`): creates the store, the codec, and the
+  notifier, and calls `removeStaleTemporaryFiles()` itself at start-up. Stale
+  temporary cleanup is therefore a start-up decision of the root, not part of
+  the service's contract. It also exports `importKeybindings` and
+  `exportKeybindings`, the two entry points a future IPC layer will call
+  (roadmap items 4.2.2 and 5.1.2). No IPC caller exists yet: the exports are a
+  main-process API only.
+- **`fixConfigDefaults`** (`app/config/fix-config-defaults.ts`): completes the
+  decorated configuration's colour map. `withDefaultColors` in
+  `app/utils/colours.ts` layers the supplied palette underneath the colours it
+  is completing, so a partial map keeps its own values and gains the rest. When
+  the supplied palette is absent, the last-resort palette stands in and the
+  map's own colours still win.
+- **`decorateProfileConfig`** (`app/config.ts`): the composition root's
+  decoration entry point, called by `getDecoratedConfig`. It reads the
+  profile's merged configuration, copies `config.colors` before the plugin
+  decoration runs, passes that copy to `fixConfigDefaults` as the fallback
+  palette, and returns the completed configuration. The copy is the palette the
+  import applied, which already reflects the user's configuration; a plugin
+  that removes a colour therefore falls back to the imported value, then to the
+  last-resort palette, rather than to a fresh read. Decoration never re-reads
+  the bundled file, so a read fault after start-up cannot change the colours of
+  an open window.
+- **Import and export APIs** (`app/config/keybindings.ts`):
+  `importKeybindings` validates the text and writes it through the store. It
+  never changes the in-memory shortcuts; the next reload applies the file. A
+  successful write clears the unsaved-seed flag. A failed write reports
+  `failed` and keeps the flag, so a seed that never persisted is retried at the
+  next start. Valid text is stored verbatim: import does not re-serialize it,
+  and the active keymaps change on the next reload rather than at the moment of
+  import. `exportKeybindings` is a query: it reads through `peek()`, adding no
+  read span and no warning, and returns the stored text unchanged rather than
+  re-serializing it.
+- **`resolveConfigLocations`** (`app/config/config-tree.ts`): the pure selector
+  behind `paths.ts`. It takes the platform, the environment paths, the
+  development override, and the `probe` and `sameFile` predicates, and returns
+  the active file, the creation path, the Velocetty directory, the
+  `keybindingsPath`, and the shadowed candidates. The probe distinguishes
+  presence, a broken link, absence, and `inaccessible`; an unreadable active
+  path is reported with `inspection: 'inaccessible'`, which tells start-up to
+  keep the defaults rather than bootstrap a file that may already exist.
+  `shared/src/config/config-tree.ts` mirrors it for the CLI, and a parity test
+  keeps the two copies in step.
+
+Injecting these dependencies keeps the service, importer, and watcher testable
+in `bun test` without Electron, a real clock, or a real filesystem. See
+[Configuration architecture](configuration-architecture.md) for the data flow.
+
+### Configuration health signals
+
+Each import attempt emits one attempt line and exactly one bounded record on
+`console.info`. An attempt that throws instead emits its bounded
+`import failure` record on `console.warn`, so a reader filtering for
+`console.info` must not assume every attempt produced a decision record. Each
+completed operation emits one span line, and each refused atomic-write rename
+or watcher failure emits one record on `console.warn`. All of them carry only
+values from a closed vocabulary, so neither a path, a command identifier, nor a
+shortcut can leak into a log.
+
+```text
+[config] import attempt phase=reload
+[config] import decision phase=reload config=applied configSource=velocetty
+  keybindings=applied origin=file announced=true
+  attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0,writeFailures:0,watcherFailures:0
+[config] span operation=reload outcome=applied ms=2
+[config] span operation=watcher-dispatch outcome=applied ms=2
+[config] import failure phase=reload cause=thrown
+  attempts:2,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0,writeFailures:0,watcherFailures:0
+[config] keybindings rename attempt=1 category=busy exhausted=false
+```
+
+The attempt line is written before the import runs, so an import that throws
+before it can report anything is still counted. A reload that throws before it
+can report a per-file outcome emits the failure record instead of a decision
+record: there is no outcome to describe, and claiming one would invent
+evidence. The error itself is still reported by the watcher after the failure
+record is written.
+
+The decision record is one line, with the counter snapshot appended; long
+records are shown wrapped here. Its fields mean:
+
+- `phase` is `startup` for the first import and `reload` for a watched change.
+- `config` is `applied`, or `fallback` when `config.json5` could not be read or
+  parsed and the bundled defaults filled in. A fallback carries `cause=parse`
+  when the file was read but rejected, and `cause=read` when it could not be
+  read at all.
+- `configSource` is `development`, `velocetty`, or `hyper`, naming the tree the
+  active configuration file came from. A fallback adds `fallbackBasis=defaults`
+  so a record never leaves the replacement source implicit.
+- `keybindings` is `applied` with an `origin` (`file`, `missing`, `seeded`, or
+  `seeded-unsaved`), or `kept` with the surviving `basis` (`last-known-good` or
+  `empty`) and the `cause` (`invalid`, `unreadable`, or `deferred`). A parse
+  failure, a read failure, and a deferred bootstrap are therefore three
+  distinct records rather than one indistinguishable "kept".
+- `announced` records whether "Configuration updated" was shown. A suppressed
+  notice still leaves its decision in the record.
+- `attempts` counts imports, `applies` counts keybindings files put into
+  effect, `parseFailures` and `readFailures` separate invalid content from an
+  unreadable file, `fallbacks` counts imports that used the bundled defaults,
+  `importFailures` counts imports that threw, `retries` counts refused rename
+  attempts, `writeFailures` counts every failed `keybindings.json5` write
+  including a bootstrap seed and a refused replacement target, and
+  `watcherFailures` counts a watcher handle error and a failing watcher close.
+  All counters are cumulative for the process lifetime.
+- `category` is `permission` for `EPERM` and `EACCES`, `busy` for `EBUSY`, and
+  `other` for anything else. `exhausted` marks the attempt that ended the
+  write, so a retry that later succeeds emits only `exhausted=false` events.
+- A span's `operation` is `startup`, `reload`, `watcher-dispatch`,
+  `keybindings-read`, or `keybindings-write`; its `outcome` is `applied`,
+  `fallback`, or `thrown` for the import operations and `present`, `missing`,
+  `unreadable`, `written`, or `failed` for the storage operations. `ms` is the
+  elapsed time rounded to a whole millisecond, so a span line is a completion
+  record rather than an in-progress marker.
+
+`createConfigMetrics`, `createImportRecorder`, and `createConfigSpanRecorder`
+live in `app/config/config-metrics.ts`, `app/config/config-observability.ts`,
+and `app/config/config-spans.ts`. The metrics factory is an in-memory counter
+tally that takes no sink; the import and span recorders take their sink as a
+parameter, and the span recorder also takes its clock, so a test can assert the
+exact text, counters, and elapsed times without Electron. A seeded migration
+that could not be written is recorded as `origin=seeded-unsaved`; it applies in
+memory, but the counter line and the record do not claim a completed migration.
 
 ### Reloadability classification
 
@@ -358,6 +599,120 @@ The following features are explicitly deferred:
 - **WebGL renderer hot-reload**: Tracked under CONFIG-001 in
   `docs/tracking-issues.md`.
 - **Workspace-level overrides**: Will be implemented in a future milestone.
+
+## Internal module seams
+
+These modules are the seams a test drives directly rather than through the
+whole application. Their collaborators — module resolution, filesystem
+inspection, sinks, and applied state — differ, but each seam is small enough to
+exercise without Electron or a real clock.
+
+### Plugin loading
+
+`createPluginLoader` in `app/plugins-load.ts` builds the loader for one
+configured list of plugin directories. Its dependencies are
+`availableExtensions` (the extension names any one of which makes a module a
+usable plugin), `requireModule` (module resolution rooted at the plugin
+directory), and the `log`, `warn`, and `notify` sinks. A module that exposes no
+extension API, or that throws while being required, is reported and left out
+rather than aborting the rest: one broken third-party plugin must not stop the
+window from opening.
+
+The loader writes to a console sink only through its numbered-position rule. A
+plugin is identified by its 1-based position in the configured list, never by
+its directory name or manifest version, because both are user text that would
+otherwise be copied into a log. The list is the installed plugins followed by
+the local plugins, so the second entry is still "plugin 2" when the first
+failed to load. A notification is the deliberate exception: it names the plugin
+by its basename, because the user has to find that entry in their configuration
+to fix it.
+
+`test/unit/plugin-loader.test.ts` drives the loader without module mocking. It
+passes a scripted `requireModule` backed by a `Map` from specifier to exports
+(an `Error` value is thrown to stand for a load failure) and captures `log`,
+`warn`, and `notify` in arrays. Each assertion is therefore a value the loader
+produced, not a process-global it mutated.
+
+### Readiness reconciliation
+
+`app/config/watched-file-stamp.ts` owns the comparison that catches a save
+landing during the watcher's initial scan, when chokidar suppresses events for
+files it finds. `readWatchedFileStamp` reads one file's identity as a tri-state
+stamp: `present` with its size and modification time, `absent` when the only
+failure is `ENOENT`, or `unreadable` for any other inspection failure.
+`captureWatchedFileStamps` reads every watched file, `stampsMatch` compares a
+baseline against a fresh reading, `createWatchedFileReconciler` turns the
+baseline into the predicate the watcher asks on readiness, and
+`settleWatchedFileStamps` reconciles the baseline itself.
+
+An unknown identity never compares equal, including to another unknown one. Two
+failed inspections that were both read as "absent" used to match, which let a
+save that landed while inspection was failing go unreconciled; the third state
+is what prevents that. The cost is one redundant reload when a file is
+genuinely unreadable, which is the safe direction.
+
+The baseline is captured *before* the start-up import reads the files, not
+after it. Capturing afterwards could describe a file's new identity while the
+application still holds the old text, so the scan would see no difference and
+the change would never be reconciled. Capturing first can only cost a reload.
+
+A file that start-up itself wrote — a bootstrapped `config.json5` or a seeded
+`keybindings.json5` — is settled to its new identity only while it still holds
+the exact text the import applied. An edit that landed in between keeps the
+earlier identity, so readiness still sees the difference. A start-up-written
+file that has since been deleted settles to an unknown identity: its pre-import
+identity is also `absent`, and keeping it would let the deletion match and
+never reconcile. Readiness reloads when at least one watched file moved or
+could not be inspected.
+[Configuration architecture](configuration-architecture.md) describes where the
+stamps sit between the importer and the watcher.
+
+### Bounded logging
+
+`boundedErrorCode` and `describeError` in `app/utils/error-code.ts`, and
+`logNotificationShown` in `app/utils/notification-log.ts`, are the shared route
+from a failure to a log line. Their rule is that a log carries a bounded
+failure category or errno code, and never a filesystem path or a raw error
+message.
+
+`boundedErrorCode` keeps an error's `code` only when it names a known Node
+errno, so a crafted or path-bearing string is dropped. `describeError` adds the
+constructor name, again only from the standard built-in names, and reports
+`UnknownError` for a non-`Error` value. `logNotificationShown` writes a fixed
+marker plus, when the caller supplied them, the operation, the category, and
+that bounded description; it never prints the notification's title or body.
+
+Two reasons drive the rule. A closed vocabulary keeps records countable for
+aggregation, and user-facing text can repeat a path, quote the user's file, or
+name a command they wrote. The full text stays in the notification, where the
+person who must act on it can read it.
+
+### Schema copy
+
+`ensureSchemaFiles` in `app/config/schema-copy.ts` copies the bundled JSON
+schemas beside the configuration files that use them. Its one policy rule is
+about the legacy tree: new copies always go to the Velocetty tree, and the
+legacy Hyper tree is refreshed only when a copy of that name is already there.
+Upgrading a Hyper install therefore never creates a new file in it. The
+destination directory is created first, and a failed copy is returned rather
+than thrown, so a stale schema degrades editor validation without stopping
+start-up.
+
+### Command execution
+
+The configuration root is now composition rather than storage. The read-only
+queries — `getConfig`, `getProfiles`, `getKeymaps`, `getPlugins`, and the
+decoration helpers — live in `app/config/config-queries.ts`, while
+`app/config/current-config.ts` is the single owner of the applied
+configuration: the start-up command and the reload path each store the config
+their import produced, and `getCurrentConfig` throws when queried before
+start-up has stored one. `app/config.ts` keeps the wiring: it builds the
+adapters, runs the start-up command, and re-exports the query surface, so
+neither the queries nor the watcher has to be wired back to the module that
+constructed them. `app/config/startup-import.ts` owns the order that command
+runs in — capture the watched files' stamps, prepare the tree, import, then
+settle the files the import wrote — so the composition root cannot reorder it
+by accident and the sequence is tested directly.
 
 ## Visible-only WebGL rendering practice
 
@@ -617,6 +972,21 @@ Linux runtime reliability baseline after roadmap item `1.4.15` Linux scope:
 - For Linux aarch64 native-module rebuild reliability, run `bun install`
   before other gates and keep `npm_config_node_gyp` pointed at the workspace
   `node-gyp` entrypoint in CI jobs that rebuild native modules.
+
+### RPM packaging baseline on RPM 6 hosts
+
+Ubuntu 26.04, and therefore the current `ubuntu-latest` runner, ships RPM 6.
+RPM 6 ignores the legacy `BuildRoot:` spec tag, so rpmbuild reads its own
+default buildroot instead of the directory fpm staged the payload in, finds no
+files, and aborts. fpm only passes `--buildroot` from 1.16.0 onwards, so Linux
+package builds keep:
+
+- `Gemfile` and `Gemfile.lock` pinned to fpm 1.16.0, installed with the Bundler
+  version recorded under `BUNDLED WITH` in the lock file.
+- `USE_SYSTEM_FPM=1` in the build job, so electron-builder uses that binstub
+  instead of downloading its own bundled fpm 1.9.3.
+- No explicit `rpm.compression` in `electron-builder.json`; fpm's gzip default
+  is accepted by RPM 6.
 
 Windows runtime reliability baseline after roadmap item `1.4.15` Windows scope:
 
@@ -995,6 +1365,73 @@ Suites that rely on timer or logger seams must not mutate global state during
 test execution; instead, provide test-doubles through the module's public
 interface.
 
+### Property tests (fast-check)
+
+Property suites use `fast-check` and the `.property.test.ts` suffix, so the
+normal `make test` gate runs them.
+
+- Put shared arbitraries in `test/testUtils/` and export a fixed seed, as
+  `keybindings-arbitraries.ts` does with `KEYBINDINGS_PROPERTY_SEED`. A fixed
+  seed keeps failures reproducible; pass `seed` to `fc.assert` and `fc.sample`.
+- Every arbitrary needs a non-vacuity guard. A `.coverage.test.ts` file samples
+  the arbitrary and asserts that each interesting class occurs in more than
+  five per cent of samples. A law over an arbitrary that never produces the
+  interesting case proves nothing.
+- Keep generators small: bound string lengths, key counts, and event counts, so
+  a shrunk counterexample stays readable.
+- Never let a property depend on a real clock, a real file, or real timers.
+  Inject the scheduler, the handle, or the store, as
+  `config-watcher.property.test.ts` and `keybindings-service.property.test.ts`
+  do.
+- When a property fails, record the printed seed in the commit message or the
+  ExecPlan so the failure can be replayed.
+
+### Proofs (LemmaScript)
+
+`make prove` runs `./bin/prove.sh`, which verifies each source listed in
+`LemmaScript-files.txt` through the pinned `node_modules/.bin/lsc` with
+`check --backend=dafny`. Run `bun install` first: with no `node_modules`, a bare
+`bunx lsc` resolves the unrelated npm package named `lsc` and fails with
+`Command not found!`. The script says so rather than leaving the wrong-tool
+error to be diagnosed. The `dotnet tool` Dafny package ships no solver, so
+install Z3 4.12.1 where Dafny looks for it, as
+`~/.dotnet/tools/z3/bin/z3-4.12.1` beside the tool shim or as `z3` on `PATH`;
+otherwise the first source fails with `Z3 is not found`. The script checks for
+the solver before starting.
+
+- The script refuses a vacuous pass. It fails on an empty file list, on an
+  entry whose timeout exceeds 60 seconds (Dafny 4.11 is expected; `lsc` would
+  otherwise downgrade the entry to a generation check), on `extern` calls except
+  `emptyUserKeymaps`, which is admitted only on its exact declaration line,
+  and when it sees fewer positive verifier summaries than sources listed, so
+  one cached or combined run cannot stand in for the rest. This is a guard
+  against silent weakening, not a proof that Dafny, `lsc`, or the abstraction
+  is sound; those remain the trusted foundation.
+- Hand-authored contracts live in the `.dfy` beside the verified module. The
+  `.dfy.gen` artefact is regenerated deterministically. Keep the `.dfy` and add
+  clauses; review the regenerated diff as additions-only, so a contract that
+  silently weakened would be visible.
+- After editing a verified module, run
+  `bunx lsc regen --backend=dafny <source.ts>`, then `make prove`. Never delete
+  the `.dfy`: `lsc gen` refuses to rewrite a `.dfy` whose generated body no
+  longer matches, and `lsc regen` is the supported way to catch up.
+- The verified module must stay pure. If a decision needs I/O, keep the
+  decision in the verified module and the I/O in an adapter that passes the
+  observed outcome in.
+
+### Dafny generation
+
+`bin/generate-dafny.mjs` is the wrapper that regeneration goes through. It runs
+`lsc gen --backend=dafny` from the local `node_modules/.bin/lsc`, then prepends
+each generated `.dfy.gen` with a header derived from that TypeScript source's
+own `@file` summary and path, because `lsc gen` writes only a one-line
+provenance comment. `bin/prove.sh` runs the wrapper before verification to
+reject stale artefacts, and again afterwards, because `lsc check` rewrites the
+artefacts without the header. Editing a verified module is a two-step catch-up:
+`bunx lsc regen --backend=dafny <source.ts>` is the supported way to bring the
+`.dfy` back in step, and `make prove` regenerates the `.dfy.gen` artefacts
+through this wrapper and verifies them.
+
 ### End-to-end (E2E) tests (layered strategy)
 
 End-to-end tests are split into two lanes and require packaged binaries in
@@ -1011,6 +1448,53 @@ Fast lane (required on pull requests):
   additional stability window bounded by remaining test-timeout budget.
 - Supports `E2E_DEBUG=1` for verbose launch logs and `E2E_CAPTURE=1` for
   screenshot capture.
+
+Main-process `[e2e]` markers are single stdout lines, emitted only when
+`RUN_E2E=1`. Bun tests match them with a `waitFor` helper and a description, so
+a timeout names the marker that never arrived. Existing markers include
+`renderer-ready`, `keybindings-path <path>`, `config-path <path>`,
+`config-watcher-ready`,
+`keymaps-active status=<applied|kept> window:new=<shortcuts>`, and
+`command-executed <command>`.
+
+The `command-executed` marker is printed by the command handler itself, so it
+proves a shortcut ran its command rather than merely that the configuration
+declared it. The suite presses a shortcut by appending one chord per line to
+the request file named by `VELOCETTY_E2E_PRESS_FILE`. The E2E-only probe at
+`app/config/e2e-shortcut-probe.ts` polls that file and dispatches a
+`KeyboardEvent` into the page, which is the boundary a real keypress crosses
+before it reaches the renderer keymap. While the event is dispatched, the probe
+records the commands the renderer sends on the window's command channel, so its
+reply names the command *that* press emitted (`pressed`), reports that the
+press emitted none (`unbound`), or reports that it found no page to press on
+(`rejected`). The redux effects middleware runs a command effect synchronously
+inside `dispatchEvent`, so the record covers exactly the press being
+dispatched: a command from an earlier press, however late its IPC message
+arrives, is attributed to that earlier press or to none. A scenario can
+therefore assert both that a binding is gone and that a press ran the command
+it expected, without inferring either from a marker count. Completion is
+attributed the same way: after the dispatch the page blocks on a synchronous
+round-trip to the main process on the probe's own barrier channel, so the
+command's handler has run, and the marker it printed is in the output, before
+the probe replies. A marker can therefore never arrive after the reply of the
+press that caused it, and a count taken around one press cannot be moved by an
+earlier press. Execution is attributed by the command message itself: the probe
+adds the request's token to the command it captures, and the main-process RPC
+listener binds that token only while it dispatches that one command, so a
+handler that runs while a later press is in flight still prints the token of
+the press that sent it, and a message without a token prints none. A file
+replaces standard input because Electron on Windows never delivers piped input
+to the main process. The file is read only when `RUN_E2E=1`.
+
+- Keep a marker on one line. Parsing is line-oriented, and a wrapped marker is
+  never matched.
+- Never log a marker unconditionally; gate it on `RUN_E2E === '1'` so production
+  logs stay clean.
+- When adding a marker, add the assertion that consumes it in the same change,
+  and keep the marker text stable once a test depends on it.
+- `test/e2e/keybindings.e2e.test.ts` covers the configuration markers. It needs
+  `bun run test:e2e:prepare` first, then `bun run test:e2e:run`, which sets
+  `RUN_E2E=1`. Without that variable the suite skips rather than fails.
 
 Deep lane (scheduled and release validation):
 
@@ -1104,6 +1588,31 @@ interaction and reporting.
 
 Before either lane, build packaged artefacts with `bun run dist` if they do not
 already exist.
+
+### End-to-end probe helpers
+
+The E2E helpers are split so their spelling and attribution rules can be tested
+without a running Electron process. `parseShortcut` in
+`app/config/e2e-shortcut-chord.ts` turns `ctrl+alt+shift+n`-style text into a
+chord, rejecting anything that is not a modifier list plus a final key.
+`sendShortcut` in `app/config/e2e-shortcut-probe.ts` dispatches that chord into
+the focused window's page, or the newest window when none is focused, and
+reports `pressed`, `unbound`, or `rejected`. `withPressToken` in
+`app/config/e2e-keymap-probe.ts` binds the request token around a command
+dispatch, so the marker a handler prints names the press that sent the command
+rather than a later one.
+
+Markers are written through `app/config/e2e-marker-sink.ts`. `createMarkerSink`
+builds a sink that prints only while the lane flag holds, and
+`silentMarkerSink` discards every line for callers with no stream to report to.
+`app/config.ts` is the one place that reads `RUN_E2E`: it exports `isE2ERun`
+and the bound `emitE2EMarker`. `startShortcutProbe` takes the lane flag, the
+sink, and the request file as parameters, so it is dormant in a shipped build
+without reading the environment. The probe shortcut `ctrl+alt+shift+n` is bound
+by no shipped keymap, which `test/unit/e2e-keymap-probe.test.ts` enforces; a
+marker reporting it can therefore only have come from the user's file.
+`test/unit/e2e-marker-sink.test.ts` proves both halves: the sink is silent
+while the flag is false, and a normal start-up emits no `[e2e]` line at all.
 
 ## Default test gate
 

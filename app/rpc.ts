@@ -8,6 +8,9 @@ import {v4 as uuidv4} from 'uuid';
 
 import type {FilterNever, MainEvents, RendererEvents, TypedEmitter} from '@shared/types/common';
 
+import {withPressToken} from './config/e2e-keymap-probe';
+import {isString} from './utils/runtime-guards';
+
 type RpcServerWindow = {
   readonly profileName: string;
   readonly isDestroyed: () => boolean;
@@ -39,7 +42,7 @@ export class Server {
   win: RpcServerWindow;
   id!: string;
 
-  constructor(win: RpcServerWindow) {
+  constructor(win: RpcServerWindow, isE2ERun: () => boolean) {
     // eslint-disable-next-line unicorn/prefer-event-target -- `TypedEmitter` exposes EventEmitter's typed `on`, `once`, and removal contract.
     this.rawEmitter = new EventEmitter();
     this.emitter = this.rawEmitter;
@@ -55,7 +58,9 @@ export class Server {
 
     ipcMain.on(uid, this.ipcListener);
 
-    const shouldReportE2E = process.env.RUN_E2E === '1';
+    // The lane flag is injected by the composition root, so this module never
+    // reads the environment; a test can report as the lane without one.
+    const shouldReportE2E = isE2ERun();
 
     // we intentionally subscribe to `on` instead of `once`
     // to support reloading the window and re-initializing
@@ -90,8 +95,17 @@ export class Server {
 
   ipcListener = <U extends keyof MainEvents>(
     _event: Electron.IpcMainEvent,
-    {ev, data}: {ev: U; data?: MainEvents[U]}
-  ) => this.emitMainEvent(ev, data);
+    {ev, data, pressToken}: {ev: U; data?: MainEvents[U]; pressToken?: unknown}
+  ) => {
+    // Only the end-to-end lane's page wrapper tags a command, so the token is
+    // absent for every message a real renderer sends. It is parsed here because
+    // it arrives over IPC. Binding it around this synchronous dispatch is what
+    // makes a command handler's marker name the press that sent *this* command;
+    // a command whose message lands while a later press runs keeps its own
+    // token instead of borrowing the later press's.
+    const token = isString(pressToken) ? pressToken : undefined;
+    return withPressToken(token, () => this.emitMainEvent(ev, data));
+  };
 
   on = <U extends keyof MainEvents>(ev: U, fn: (arg0: MainEvents[U]) => void) => {
     this.emitter.on(ev, fn);
@@ -127,8 +141,8 @@ export class Server {
   }
 }
 
-const createRPC = (win: BrowserWindow) => {
-  return new Server(win);
+const createRPC = (win: BrowserWindow, isE2ERun: () => boolean) => {
+  return new Server(win, isE2ERun);
 };
 
 export default createRPC;

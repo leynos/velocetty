@@ -3,8 +3,9 @@ import {app, Menu} from 'electron';
 import type {BrowserWindow} from 'electron';
 import type {CommandId} from '@shared/types/commands';
 import {isString} from './utils/runtime-guards';
+import {formatCommandExecutedMarker} from './config/e2e-keymap-probe';
 
-import {openConfig, getConfig} from './config';
+import {emitE2EMarker, openConfig, getConfig} from './config';
 import {asProfileId} from './utils/shared-ids';
 import {updatePlugins} from './plugins';
 import {GOLDEN_PATH_COMMAND_ID, GOLDEN_PATH_PLUGIN_ID, goldenPathSettingsDefaults} from './runtime/golden-path-demo';
@@ -12,6 +13,14 @@ import {getRuntimePluginSettings} from './runtime/plugin-runtime';
 import {installCLI} from './utils/cli-install';
 import * as systemContextMenu from './utils/system-context-menu';
 
+/**
+ * Resolves the message the golden-path demo command announces.
+ *
+ * The runtime plugin settings may carry a user-supplied message, so the
+ * bundled default is the fallback rather than an empty notification.
+ *
+ * @returns The configured message, or the bundled default when none is set.
+ */
 const getGoldenPathNotificationMessage = () => {
   const runtimeSettings = getRuntimePluginSettings(getConfig(), GOLDEN_PATH_PLUGIN_ID);
   const configuredMessage = runtimeSettings.message;
@@ -23,6 +32,11 @@ const getGoldenPathNotificationMessage = () => {
 
 const commands = {
   'window:new': () => {
+    // The end-to-end lane asserts on the command having run, so the marker
+    // belongs to the handler rather than to the configuration that bound it.
+    // It carries the press's token, so a scenario can tell this press's
+    // execution from an earlier press's command landing late.
+    emitE2EMarker(formatCommandExecutedMarker('window:new'));
     // If window is created on the same tick, it will consume event too
     setTimeout(app.createWindow, 0);
   },
