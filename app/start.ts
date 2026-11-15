@@ -10,12 +10,15 @@ import parseUrl from 'parse-url';
 import {isString} from './utils/runtime-guards';
 import type {VelocettyRuntimeGlobals} from '../typings/runtime-globals';
 
+import {createCommandDispatcher, createCommandTable} from './commands';
 import * as config from './config';
 import * as AppMenu from './menus/menu';
 import * as plugins from './plugins';
+import {getGoldenPathNotificationMessage} from './runtime/golden-path-message';
 import {newWindow} from './ui/window';
 import {installCLI} from './utils/cli-install';
 import {configureGpuMode} from './utils/configure-gpu';
+import * as systemContextMenu from './utils/system-context-menu';
 import * as windowUtils from './utils/window-utils';
 
 remoteInitialize();
@@ -170,7 +173,7 @@ app.on('ready', () =>
           [startX, startY] = config.windowDefaults.windowPosition;
         }
 
-        const hwin = newWindow({width, height, x: startX, y: startY}, cfg, fn, profileName);
+        const hwin = newWindow({width, height, x: startX, y: startY}, cfg, execCommand, fn, profileName);
         windowSet.add(hwin);
         void hwin.loadURL(url);
 
@@ -182,6 +185,32 @@ app.on('ready', () =>
 
         return hwin;
       }
+
+      // Every command's side effect is wired here, at the composition root: the
+      // table itself imports no Electron module, no configuration query, and no
+      // plugin runtime. The marker sink comes from the module `setup` handed
+      // the entry point's sink to, so only the lane's entry point reports the
+      // commands its presses execute.
+      const execCommand = createCommandDispatcher(
+        createCommandTable({
+          addSystemContextMenu: systemContextMenu.add,
+          getGoldenPathMessage: getGoldenPathNotificationMessage,
+          installCLI: () => void installCLI(true),
+          isHamburgerMenuEnabled: () =>
+            process.platform !== 'darwin' && ['', true].includes(config.getConfig().showHamburgerMenu),
+          markerSink: config.getMarkerSink(),
+          openConfig: () => void config.openConfig(),
+          openWindow: (profileName) => {
+            createWindow(undefined, undefined, profileName);
+          },
+          popupApplicationMenu: () => {
+            Menu.getApplicationMenu()?.popup({x: 25, y: 22});
+          },
+          profileNames: config.getConfig().profiles.map((profile) => profile.name),
+          removeSystemContextMenu: systemContextMenu.remove,
+          updatePlugins: plugins.updatePlugins
+        })
+      );
 
       // when opening create a new window
       createWindow();
@@ -205,7 +234,7 @@ app.on('ready', () =>
       });
 
       const makeMenu = () => {
-        const menu = plugins.decorateMenu(AppMenu.createMenu(plugins.getLoadedPluginVersions));
+        const menu = plugins.decorateMenu(AppMenu.createMenu(plugins.getLoadedPluginVersions, execCommand));
 
         // If we're on Mac make a Dock Menu
         if (process.platform === 'darwin' && app.dock) {

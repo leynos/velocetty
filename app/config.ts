@@ -14,15 +14,15 @@ import {mkdirpSync} from 'fs-extra';
 import path from 'node:path';
 
 import {createConfigMetrics} from './config/config-metrics';
-import {createImportRecorder, type ImportRecord} from './config/config-observability';
+import {createImportRecorder} from './config/config-observability';
 import {checkDeprecatedConfig} from './config/config-queries';
 import {createConfigSpanRecorder} from './config/config-spans';
-import {createConfigWatchRuntime, emitKeymapsMarker} from './config/config-watch';
+import {createConfigWatchRuntime, emitKeymapsMarker, type ConfigWatchRuntime} from './config/config-watch';
 import {setCurrentConfig} from './config/current-config';
+import {silentMarkerSink, type E2EMarkerSink} from './config/e2e-marker-sink';
 import {createConfigImportModule} from './config/import';
 import {_init} from './config/init';
 import {createKeybindingsService} from './config/keybindings';
-import {reportMarker} from './config/marker-channel';
 import {keybindingsCodec} from './config/keybindings-codec';
 import {createKeybindingsNotifier} from './config/keybindings-notifier';
 import {createFileKeybindingsStore} from './config/keybindings-store';
@@ -43,7 +43,7 @@ import {
   velocettyDir
 } from './config/paths';
 import notify from './notify';
-import {runStartupImport, type StartupImportOutcome} from './config/startup-import';
+import {runStartupSession} from './config/startup-session';
 import {closeWatcherAtShutdown} from './config/watcher';
 import {captureWatchedFileStamps, settleWatchedFileStamps} from './config/watched-file-stamp';
 
@@ -125,16 +125,26 @@ export const exportKeybindings = keybindingsService.exportKeybindings;
 /** The files the watcher covers, resolved once because they never change. */
 const watchedFiles = [path.resolve(cfgPath), path.resolve(keybindingsPath)];
 
-const configWatch = createConfigWatchRuntime({
-  configTree,
-  importConfiguration: _import,
-  metrics,
-  notify,
-  recorder,
-  reportMarker,
-  spans,
-  watchedFiles
-});
+/** The marker sink this process reports through; the entry point chooses it in `setup`. */
+let activeMarkerSink: E2EMarkerSink = silentMarkerSink;
+
+/** The watcher runtime `setup` built, which `subscribe` registers callbacks with. */
+let activeWatch: ConfigWatchRuntime | undefined;
+
+/**
+ * The marker sink this process reports through.
+ *
+ * The entry point chooses the sink and hands it to `setup`, which passes it to
+ * every unit that reports a marker. A process whose entry point supplied none
+ * keeps `silentMarkerSink`, so a shipped build prints no marker at all.
+ *
+ * @example
+ * ```ts
+ * const sink = getMarkerSink();
+ * sink('[e2e] config-watcher-ready'); // written only under the lane's sink
+ * ```
+ */
+export const getMarkerSink = (): E2EMarkerSink => activeMarkerSink;
 
 /**
  * Registers a callback that runs after every applied reload.
@@ -142,13 +152,28 @@ const configWatch = createConfigWatchRuntime({
  * Returns an unsubscribe function, so a caller that is torn down does not keep
  * receiving reloads.
  *
+ * `setup` builds the watcher runtime, because the marker sink it reports
+ * through arrives with it, so a subscription made before start-up has nothing
+ * to register with: no reload can run yet.
+ *
  * @example
  * ```ts
  * const unsubscribe = subscribe(() => render());
  * unsubscribe(); // the callback no longer runs
  * ```
  */
-export const subscribe = configWatch.subscribe;
+export const subscribe = (fn: Function): (() => void) => {
+  if (activeWatch === undefined) {
+    throw new Error('config.subscribe() was called before config.setup().');
+  }
+  return activeWatch.subscribe(fn);
+};
+
+/** What `setup` needs from the entry point that starts this process. */
+export type ConfigurationSetupOptions = Readonly<{
+  /** Receives every marker the composition root reports; defaults to silence. */
+  readonly markerSink?: E2EMarkerSink;
+}>;
 
 /**
  * Runs the start-up import, then starts watching for configuration changes.
@@ -163,54 +188,42 @@ export const subscribe = configWatch.subscribe;
  * setup(); // the application is now reading and watching its configuration
  * ```
  */
-export const setup = () => {
-  const finishSpan = spans.begin('startup');
-  let outcome: StartupImportOutcome;
-  try {
-    // Count the attempt before any preparation runs: a failure while creating
-    // the tree or clearing a stale temporary file is still a start-up attempt,
-    // and the failure record below would otherwise describe an uncounted one.
-    recorder.beginImport({phase: 'startup'});
-    outcome = runStartupImport({
-      // The ordering lives in the start-up unit: it captures before the import
-      // reads and settles only afterwards.
-      captureStamps: () => captureWatchedFileStamps(watchedFiles),
-      prepare: () => {
-        // The Velocetty tree holds new configuration files, so it must exist
-        // before the importer copies schemas or seeds `keybindings.json5`.
-        mkdirpSync(velocettyDir);
-        // A crashed write can leave a temporary file behind. Start-up is the
-        // only phase that may remove it, and the edge owns that cleanup
-        // immediately before the seed decision reads the file.
-        keybindingsStore.removeStaleTemporaryFiles();
-      },
-      importConfiguration: () => _import('startup'),
-      settleStamps: settleWatchedFileStamps
-    });
-  } catch (error) {
-    // A start-up crash is otherwise invisible: no per-file outcome exists, so
-    // it needs the same bounded failure record a thrown reload gets.
-    finishSpan('thrown');
-    recorder.recordImportFailure({cause: 'thrown', phase: 'startup'});
-    throw error;
-  }
-  const {config, keybindings, report} = outcome.imported;
-  finishSpan(report.config === 'fallback' ? 'fallback' : 'applied');
-  setCurrentConfig(config);
-  // Start-up never shows "Configuration updated", so the record states that
-  // rather than leaving the field absent.
-  const record: ImportRecord = {
-    announced: false,
+export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions = {}) => {
+  activeMarkerSink = markerSink;
+  const configWatch = createConfigWatchRuntime({
+    configTree,
+    importConfiguration: _import,
+    metrics,
+    notify,
+    recorder,
+    markerSink,
+    spans,
+    watchedFiles
+  });
+  // The span and the record belong to the start-up session, which takes its
+  // sinks as dependencies; this root only supplies the adapters and applies
+  // the state the session reports.
+  const {imported, startupStamps} = runStartupSession({
+    // The ordering lives in the start-up unit: it captures before the import
+    // reads and settles only afterwards.
+    captureStamps: () => captureWatchedFileStamps(watchedFiles),
     configSource: configTree,
-    outcome: keybindings,
-    phase: 'startup',
-    report
-  };
-  if (report.config === 'fallback') {
-    Object.assign(record, {fallbackBasis: 'defaults' as const});
-  }
-  recorder.recordImport(record);
-  const configurationWatcher = configWatch.watch(outcome.startupStamps);
+    importConfiguration: () => _import('startup'),
+    prepare: () => {
+      // The Velocetty tree holds new configuration files, so it must exist
+      // before the importer copies schemas or seeds `keybindings.json5`.
+      mkdirpSync(velocettyDir);
+      // A crashed write can leave a temporary file behind. Start-up is the
+      // only phase that may remove it, and the edge owns that cleanup
+      // immediately before the seed decision reads the file.
+      keybindingsStore.removeStaleTemporaryFiles();
+    },
+    recorder,
+    settleStamps: settleWatchedFileStamps,
+    spans
+  });
+  setCurrentConfig(imported.config);
+  const configurationWatcher = configWatch.watch(startupStamps);
   if (configurationWatcher !== undefined) {
     app.on('before-quit', () => {
       // A failed release is already counted; logging its bounded shape keeps a
@@ -219,11 +232,12 @@ export const setup = () => {
     });
   }
   checkDeprecatedConfig(notify);
-  // Silent unless the entry point that runs the lane installed a sink, so a
-  // shipped build reports the start-up paths to nobody.
-  reportMarker(`[e2e] keybindings-path ${keybindingsPath}`);
-  reportMarker(`[e2e] config-path ${cfgPath}`);
-  emitKeymapsMarker(report, reportMarker);
+  // The sink the entry point supplied: silent for a shipped build, the lane's
+  // stream when the lane's entry point started this process.
+  markerSink(`[e2e] keybindings-path ${keybindingsPath}`);
+  markerSink(`[e2e] config-path ${cfgPath}`);
+  emitKeymapsMarker(imported.report, markerSink);
+  activeWatch = configWatch;
 };
 
 export {

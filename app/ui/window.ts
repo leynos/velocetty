@@ -15,7 +15,7 @@ import {z} from 'zod';
 import type {sessionExtraOptions} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
 import {asCommandId, asProfileId, asRendererUid, asSessionId} from '../utils/shared-ids';
-import {execCommand} from '../commands';
+import type {CommandDispatcher} from '../commands';
 import {getDefaultProfile, isE2ERun} from '../config';
 import {icon, homeDirectory} from '../config/paths';
 import fetchNotifications from '../notifications';
@@ -83,6 +83,7 @@ const handleDroppedURL = (url: string) => {
 export function newWindow(
   options_: BrowserWindowConstructorOptions,
   cfg: configOptions,
+  execCommand: CommandDispatcher,
   fn?: (win: BrowserWindow) => void,
   profileName: string = getDefaultProfile()
 ): BrowserWindow {
@@ -319,7 +320,7 @@ export function newWindow(
     void shell.openExternal(url);
   });
   rpc.on('open context menu', (selection) => {
-    Menu.buildFromTemplate(contextMenuTemplate(selection)).popup({window});
+    Menu.buildFromTemplate(contextMenuTemplate(selection, execCommand)).popup({window});
   });
   rpc.on('open hamburger menu', ({x, y}) => {
     Menu.getApplicationMenu()?.popup({x: Math.ceil(x), y: Math.ceil(y)});

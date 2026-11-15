@@ -1606,22 +1606,32 @@ rather than a later one.
 Markers are written through `app/config/e2e-marker-sink.ts`. `createMarkerSink`
 builds a sink that prints only while the lane flag holds, and
 `silentMarkerSink` discards every line for callers with no stream to report to.
-Units report through the channel in `app/config/marker-channel.ts`, which drops
-every line until an entry point installs a sink. Only the lane's entry point,
-`app/e2e-entry.mts`, installs one, and only it reads `VELOCETTY_E2E_PRESS_FILE`
-and starts `startShortcutProbe`; the shipped entry point, `app/index.mts`, does
-neither, and both share the start-up sequence in `app/startup.mts`.
-`startShortcutProbe` takes the lane flag, the sink, and the request file as
-parameters, so it is dormant in a shipped build without reading the environment.
-`app/config.ts` still exports `isE2ERun` for the RPC server, which reports
-renderer errors only under the lane; the composition root supplies it as a
-dependency. The probe shortcut `ctrl+alt+shift+n` is bound by no shipped
-keymap, which `test/unit/e2e-keymap-probe.test.ts` enforces; a marker reporting
-it can therefore only have come from the user's file.
+There is no process-wide channel: the entry point builds the sink, passes it to
+`startApplication` in `app/startup.mts`, and receives it back through
+`config.setup({markerSink})` and `getMarkerSink`. Units take the sink as a
+parameter — the command table in `app/commands.ts`, the `window:new` handler in
+`app/commands/window-new.ts`, and the configuration watcher — so none of them
+can report a marker a shipped build did not ask for. Only the lane's entry
+point, `app/e2e-entry.mts`, supplies a sink that prints; the shipped entry
+point, `app/index.mts`, passes nothing and keeps `silentMarkerSink`. Only the
+lane's entry point reads `VELOCETTY_E2E_PRESS_FILE` and starts
+`startShortcutProbe`, which takes the lane flag, the sink, and the request file
+as parameters, so it is dormant in a shipped build without reading the
+environment.
+
+The RPC server is the one exception. `app/rpc.ts` receives `isE2ERun` as a
+dependency and reads it once at construction; when the lane flag was set it
+prints `[e2e] renderer-ready` after each load and logs high-severity renderer
+messages as `[e2e][renderer-error]` directly to standard output, bypassing the
+marker sink. A shipped build prints those lines only when `RUN_E2E=1` is set.
+
+The probe shortcut `ctrl+alt+shift+n` is bound by no shipped keymap, which
+`test/unit/e2e-keymap-probe.test.ts` enforces; a marker reporting it can
+therefore only have come from the user's file.
 `test/unit/e2e-marker-sink.test.ts` proves the sink is silent while the flag is
 false, that a normal start-up emits no `[e2e]` line at all, and that the
-`window:new` handler in `app/commands/window-new.ts` prints nothing until the
-lane installs a sink and its command marker once it has.
+`window:new` handler writes nothing to a silent sink and writes its command
+marker to the sink it is given.
 
 ## Default test gate
 

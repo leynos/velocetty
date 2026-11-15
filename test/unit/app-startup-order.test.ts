@@ -33,7 +33,7 @@ test('the start-up sequence initializes the configuration before loading the app
   // statement in that file runs after its own imports have been evaluated. Both
   // entry points run this sequence, so the ordering is pinned where it lives.
   const startupSource = await readSource('app/startup.mts');
-  const setupIndex = indexOfOrThrow(startupSource, 'config.setup();');
+  const setupIndex = indexOfOrThrow(startupSource, 'config.setup({markerSink});');
   const startImportIndex = indexOfOrThrow(startupSource, "await import('./start.js')");
 
   expect(setupIndex).toBeLessThan(startImportIndex);
@@ -50,18 +50,21 @@ test('both entry points start the application through the shared sequence', asyn
 });
 
 test('only the lane entry point carries the lane instrumentation', async () => {
-  // The shipped entry point must not install a marker sink or read the lane's
+  // The shipped entry point must not build a marker sink or read the lane's
   // request file, so a normal launch has no way to print a marker or arm the
-  // probe. The lane's own entry point is where both belong.
+  // probe. The sink is chosen by the entry point and handed to the shared
+  // start-up sequence, so the two entry points differ in exactly one argument.
   const shippedSource = await readSource('app/index.mts');
   expect(shippedSource).not.toContain('e2e-shortcut-probe');
   expect(shippedSource).not.toContain('VELOCETTY_E2E_PRESS_FILE');
-  expect(shippedSource).not.toContain('installMarkerSink');
+  expect(shippedSource).not.toContain('createMarkerSink');
+  expect(shippedSource).toContain('await startApplication();');
 
   const laneSource = await readSource('app/e2e-entry.mts');
-  expect(laneSource).toContain('installMarkerSink');
+  expect(laneSource).toContain('createMarkerSink');
   expect(laneSource).toContain('startShortcutProbe');
   expect(laneSource).toContain('VELOCETTY_E2E_PRESS_FILE');
+  expect(laneSource).toContain('markerSink,');
 });
 
 test('the plugin loader exists before the module-level plugin load runs', async () => {

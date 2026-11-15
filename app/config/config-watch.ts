@@ -88,7 +88,7 @@ export type ConfigWatchDependencies = {
   readonly metrics: ConfigMetrics;
   readonly notify: ConfigWarningNotifier;
   /** Receives the E2E markers a reload reports; the composition root chooses it. */
-  readonly reportMarker: E2EMarkerSink;
+  readonly markerSink: E2EMarkerSink;
   /** The tree that supplied the active configuration, named in every record. */
   readonly configTree: ConfigSourceKind;
   /** Absolute paths of the files a reload must react to. */
@@ -115,12 +115,12 @@ export type ConfigWatchRuntime = {
  *
  * @example
  * ```ts
- * const runtime = createConfigWatchRuntime({importConfiguration, recorder, spans, metrics, notify, reportMarker, configTree, watchedFiles});
+ * const runtime = createConfigWatchRuntime({importConfiguration, recorder, spans, metrics, notify, markerSink, configTree, watchedFiles});
  * const watcher = runtime.watch(startupStamps);
  * ```
  */
 export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies): ConfigWatchRuntime => {
-  const {importConfiguration, recorder, spans, metrics, notify, reportMarker, configTree, watchedFiles} = dependencies;
+  const {importConfiguration, recorder, spans, metrics, notify, markerSink, configTree, watchedFiles} = dependencies;
   // The registration, not the callback, is a subscriber's identity. Keying by
   // callback would let a stale cleanup remove a later registration of the same
   // function, which is how a torn-down component could silence its successor.
@@ -168,7 +168,7 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
       notifySubscriber();
     }
     checkDeprecatedConfig(notify);
-    emitKeymapsMarker(report, reportMarker);
+    emitKeymapsMarker(report, markerSink);
   };
 
   /**
@@ -195,7 +195,7 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
       fileNames: watchedFiles,
       handle: createChokidarHandle(watchedDirectories),
       metrics,
-      onReady: () => reportMarker('[e2e] config-watcher-ready'),
+      onReady: () => markerSink('[e2e] config-watcher-ready'),
       /** Re-reads when a file changed, or could not be inspected, during the scan. */
       reconcileOnReady,
       /** Re-imports on a debounced change; the watcher catches whatever it throws. */

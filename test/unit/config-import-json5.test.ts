@@ -350,8 +350,11 @@ test('getDefaultConfig performs zero writes through the injected filesystem', as
     expect(existsSync(harness.mockPaths.cfgPath)).toBe(false);
     // The query announces nothing either: a read that notified the user would
     // make a diagnostics path indistinguishable from an import that changed
-    // their files.
+    // their files. It also applies nothing and warns nowhere, so a query can
+    // never be mistaken for the start-up command that acts on the same files.
     expect(harness.notifyMock).not.toHaveBeenCalled();
+    expect(harness.warnMock).not.toHaveBeenCalled();
+    expect(harness.initMock).not.toHaveBeenCalled();
   } finally {
     harness.cleanup();
   }

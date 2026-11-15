@@ -340,9 +340,33 @@ describe('atomic keybindings file store', () => {
     });
     expect(unreadable.peek()).toEqual({failure: 'permission', kind: 'unreadable'});
 
-    // Export is a query, so it must stay out of the read telemetry entirely.
+    // Every primitive a write path would need records its call and then
+    // refuses, so a query that started one would fail the assertion below.
+    const writeCalls: string[] = [];
+    const refuseWrite = (name: string): never => {
+      writeCalls.push(name);
+      throw errorWithCode('EACCES');
+    };
+    const readOnly = createFileKeybindingsStore({
+      filePath,
+      fs: {
+        ...realFileSystem(),
+        chmodSync: () => refuseWrite('chmod'),
+        openSync: () => refuseWrite('open'),
+        renameSync: () => refuseWrite('rename'),
+        unlinkSync: () => refuseWrite('unlink'),
+        writeSync: () => refuseWrite('write')
+      },
+      spans,
+      warn
+    });
+    expect(readOnly.peek()).toEqual({kind: 'present', text: '{}'});
+
+    // Export is a query, so it must stay out of the read telemetry entirely
+    // and must not reach any primitive that could change the file.
     expect(finished).toEqual([]);
     expect(warn).not.toHaveBeenCalled();
+    expect(writeCalls).toEqual([]);
   });
 
   test('records a write span for a success and each refusal path', () => {

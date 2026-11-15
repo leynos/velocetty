@@ -1,36 +1,36 @@
-/** @file The `window:new` handler, with its window opener supplied by the caller. */
+/** @file The `window:new` handler, with its window opener and marker sink supplied by the caller. */
 /*
- * `app/commands.ts` evaluates its table against Electron while its own module
- * body runs, so a unit test cannot import it to reach one handler. The handler
- * lives here instead and takes the window opener as a parameter: the table
- * passes Electron's opener, and a test passes a stand-in and observes the
- * marker channel on its own.
+ * The handler takes both collaborators as parameters, so it can be exercised
+ * without Electron and without a process-wide channel. The command table
+ * supplies the opener the composition root wired, and the sink the entry point
+ * chose: the shipped entry point supplies `silentMarkerSink`, and only the
+ * lane's entry point supplies a sink that writes.
  */
 import {formatCommandExecutedMarker} from '../config/e2e-keymap-probe';
-import {reportMarker} from '../config/marker-channel';
+import type {E2EMarkerSink} from '../config/e2e-marker-sink';
 
 /**
  * Builds the handler that opens a new window.
  *
  * @param openWindow - Opens the window; supplied by the caller so the handler
  * can be exercised without Electron.
+ * @param markerSink - Receives the marker line describing the execution; the
+ * caller's own sink decides whether the line is written anywhere.
  *
  * @example
  * ```ts
- * const handler = createWindowNewHandler(() => app.createWindow());
- * handler(); // reports `[e2e] command-executed window:new`, then opens a window
+ * const handler = createWindowNewHandler(() => app.createWindow(), silentMarkerSink);
+ * handler(); // reports `[e2e] command-executed window:new` to the sink, then opens a window
  * ```
  */
 export const createWindowNewHandler =
-  (openWindow: () => void): (() => void) =>
+  (openWindow: () => void, markerSink: E2EMarkerSink): (() => void) =>
   (): void => {
     // The end-to-end lane asserts on the command having run, so the marker
     // belongs to the handler rather than to the configuration that bound it.
     // It carries the press's token, so a scenario can tell this press's
-    // execution from an earlier press's command landing late. It goes to the
-    // marker channel, whose sink only the lane's entry point installs, so a
-    // shipped build has nothing to print to.
-    reportMarker(formatCommandExecutedMarker('window:new'));
+    // execution from an earlier press's command landing late.
+    markerSink(formatCommandExecutedMarker('window:new'));
     // A window created on the same tick would consume the triggering event, so
     // the opener waits until the event has been delivered.
     setTimeout(openWindow, 0);

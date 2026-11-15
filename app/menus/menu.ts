@@ -2,7 +2,7 @@
 import {app, dialog, Menu, nativeImage} from 'electron';
 
 // Utilities
-import {execCommand} from '../commands';
+import type {CommandDispatcher} from '../commands';
 import {getConfig} from '../config';
 import {icon} from '../config/paths';
 import {getDecoratedKeymaps} from '../plugins';
@@ -40,7 +40,10 @@ const formatLatencySummary = (metrics: RuntimeLatencyMetrics) => {
   )}ms, last ${metrics.lastMs.toFixed(2)}ms (n=${metrics.sampleCount})`;
 };
 
-export const createMenu = (getLoadedPluginVersions: () => {name: string; version: string}[]) => {
+export const createMenu = (
+  getLoadedPluginVersions: () => {name: string; version: string}[],
+  execCommand: CommandDispatcher
+) => {
   const config = getConfig();
   // We take only first shortcut in array for each command
   const allCommandKeys = getDecoratedKeymaps();

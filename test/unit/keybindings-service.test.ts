@@ -298,10 +298,15 @@ describe('exportKeybindings', () => {
   test('returns the stored text verbatim', () => {
     const {notices, service, store} = setup(VALID_TEXT);
     service.start({kind: 'parsed-empty'});
+    const activeBeforeExport = service.active();
 
     expect(service.exportKeybindings()).toEqual({kind: 'stored', text: VALID_TEXT});
+    // Export neither writes nor reports, and it changes no state: the keymaps
+    // in effect are still the ones start-up applied.
     expect(store.writeAttempts()).toBe(0);
+    expect(store.writtenTexts()).toEqual([]);
     expect(notices).toEqual([]);
+    expect(service.active()).toEqual(activeBeforeExport);
   });
 
   test('returns invalid text with diagnostics', () => {

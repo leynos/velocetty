@@ -1,7 +1,26 @@
 /** @file The start-up sequence shared by the production and lane entry points. */
 import {app} from 'electron';
 
+import {silentMarkerSink, type E2EMarkerSink} from './config/e2e-marker-sink.js';
 import {describeError} from './utils/error-code.js';
+
+/** What an entry point supplies to the shared start-up sequence. */
+export type StartApplicationOptions = Readonly<{
+  /**
+   * Runs once the configuration is available and before the main process
+   * modules load. The lane's entry point starts its instrumentation here; a
+   * shipped build passes nothing.
+   */
+  readonly afterConfigurationSetup?: () => void;
+  /**
+   * Receives every marker this process reports.
+   *
+   * The entry point owns the decision, so no unit below it inspects the lane's
+   * environment: a shipped build leaves this at `silentMarkerSink`, and only
+   * the lane's entry point passes a sink that writes.
+   */
+  readonly markerSink?: E2EMarkerSink;
+}>;
 
 /**
  * Initializes the configuration, then loads the main process modules.
@@ -14,19 +33,21 @@ import {describeError} from './utils/error-code.js';
  * explicit instead of depending on where an import happens to sit relative to a
  * statement in a lower module.
  *
- * @param afterConfigurationSetup - Runs once the configuration is available and
- * before the main process modules load. The lane's entry point starts its
- * instrumentation here; a shipped build passes nothing.
+ * @param options - The marker sink this process reports through, and the
+ * instrumentation to run once the configuration is available.
  *
  * @example
  * ```ts
- * await startApplication(); // an ordinary launch
+ * await startApplication(); // an ordinary launch, silent marker sink
  * ```
  */
-export const startApplication = async (afterConfigurationSetup?: () => void): Promise<void> => {
+export const startApplication = async ({
+  afterConfigurationSetup,
+  markerSink = silentMarkerSink
+}: StartApplicationOptions = {}): Promise<void> => {
   try {
     const config = await import('./config.js');
-    config.setup();
+    config.setup({markerSink});
     afterConfigurationSetup?.();
 
     await import('./start.js');

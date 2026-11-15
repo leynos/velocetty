@@ -4965,6 +4965,8 @@ from `app/index.mts` behind the lane flag; this round replaces that wiring.
 - `app/config/marker-channel.ts` is the neutral channel units report through.
   It holds one `installedSink`, defaulting to `silentMarkerSink`, and exports
   `installMarkerSink` and `reportMarker`. Nothing reads the environment there.
+  **Superseded by EP-V**: that module held process-wide mutable state, so the
+  next round removed it and passes the sink as a dependency instead.
 - `app/startup.mts` holds the start-up sequence both entry points share:
   import the configuration root, run `setup()`, run an optional callback, then
   import `./start.js`, with the same bounded error record and exit code as
@@ -4981,14 +4983,19 @@ from `app/index.mts` behind the lane flag; this round replaces that wiring.
   emissions and the watcher's dependency now call `reportMarker`, which is
   silent unless an entry point installed a sink. `isE2ERun` remains, because
   the RPC server reports renderer errors under the lane and receives the answer
-  as a dependency.
+  as a dependency. **Superseded by EP-V**: the sink is now a dependency of the
+  watcher and of the command table, and the composition root exposes the one it
+  chose through `getMarkerSink()`.
 - `app/commands/window-new.ts` holds the `window:new` handler with its window
   opener injected. `app/commands.ts` evaluates its table against Electron while
   its own body runs, so a unit test cannot import it; the extracted handler lets
   `test/unit/e2e-marker-sink.test.ts` drive the same code with a stand-in and
   observe the channel. Two tests pin it: no `[e2e]` line and a deferred opener
   without a sink, and `[e2e] command-executed window:new` once the lane
-  installs one.
+  installs one. **Superseded by EP-V**: the table is now built by a factory
+  over injected dependencies, so the table itself is importable in a test
+  process and `test/unit/command-table.test.ts` covers every command over
+  doubles.
 - Lesson recorded for later rounds: `mock.module` registrations are shared by
   every suite in one `bun test` process, so a partial stub of
   `app/config/paths` leaks to later importers as a `SyntaxError` about a
@@ -4996,7 +5003,63 @@ from `app/index.mts` behind the lane flag; this round replaces that wiring.
   `test/unit/notification-log.test.ts` now build the complete surface from
   `test/testUtils/paths-module-stub.ts`. Importing `app/commands.ts` itself
   stays unreliable across suites for the same reason, which is why the handler
-  was extracted instead of mocked around.
+  was extracted instead of mocked around. **Superseded by EP-V**: the table no
+  longer imports the configuration, the plugin runtime, or Electron for value,
+  so importing it is safe and the hazard no longer applies to it.
+
+### EP-V: sink injection for review `5908601602` (head `a8d19b84`)
+
+The review that followed `a8d19b84` accepted the lane's separation but rejected
+the mechanism: `app/config/marker-channel.ts` was a module-level `let` that any
+unit could import and write to, which is hidden shared state rather than an
+injected collaborator. Its Unit Architecture row and one inline documentation
+finding asked for the same repair from two directions. This round replaces the
+channel with a dependency the composition root owns, and proves each command
+over doubles.
+
+- `app/config/marker-channel.ts` is deleted. `app/config.ts` owns the choice:
+  it holds `activeMarkerSink`, defaulting to `silentMarkerSink`, sets it from
+  `setup({markerSink})`, and exposes it through `getMarkerSink()`. The watcher
+  runtime takes the sink as `markerSink`, so `app/config.ts` no longer imports
+  `reportMarker` and no longer reports the path and keymap lines itself.
+- `subscribe` now throws when it runs before `setup()`, because the watch
+  runtime exists only after `setup()` builds it. Every caller already ran after
+  set-up: `app/plugins.ts` and `app/ui/window.ts` subscribe, and both are
+  loaded only when `app/start.js` is imported, which `startApplication` does
+  after `config.setup()`. The message names the ordering rather than failing
+  obscurely.
+- `app/startup.mts` takes `markerSink` in `StartApplicationOptions` and passes
+  it into `config.setup({markerSink})`. `app/index.mts` and the packaged entry
+  pass nothing, so the shipped build reports to `silentMarkerSink`; only
+  `app/e2e-entry.mts` supplies `createMarkerSink(isLaneRunning, console.log)`.
+- `app/commands.ts` is now a factory over an injected `CommandDependencies`
+  record: window opener, marker sink, configuration opener, plugin update, CLI
+  install, both system context-menu calls, the application-menu popup, the
+  golden-path message, the profile names, and the Hamburger predicate. It keeps
+  no value import from Electron, `app/config`, or `app/plugins`, so a test
+  process can import it. `app/start.ts` is the composition root that supplies
+  the real adapters, including `config.getMarkerSink()`.
+- `app/commands/window-new.ts` takes the sink as its second parameter and
+  reports through it. `app/runtime/golden-path-message.ts` keeps the
+  configuration query that the golden-path command needs, so the table receives
+  a resolved message instead of reading the configuration.
+- `app/config/startup-session.ts` takes the presentation of the start-up import
+  out of `setup()`: it owns the attempt count, the span, the bounded failure
+  record, the applied or fallback finish, and the record itself, with the
+  importer, stamps, recorder, and span recorder supplied by the caller.
+- `test/unit/command-table.test.ts` builds the table over recording doubles and
+  asserts the one double each command calls, plus that `window:new` writes its
+  marker and defers its opener. `test/unit/e2e-marker-sink.test.ts` passes an
+  explicit sink instead of installing one. `getDefaultConfig`, `store.peek`, and
+  `exportKeybindings` tests now also assert that they cause no notification
+  and no write.
+- `docs/configuration-architecture.md` and `docs/developers-guide.md` describe
+  the injected route. Both state the one exception the inline finding named:
+  `app/rpc.ts` prints `[e2e] renderer-ready` and `[e2e][renderer-error]`
+  directly, because it decides once, when it is constructed, whether the lane
+  flag was set, and never consults the sink.
+- Behaviour is unchanged. The shipped build writes no marker line, the lane
+  writes the same lines as before, and the command surface is identical.
 
 ## Interfaces and dependencies
 
@@ -5613,3 +5676,7 @@ requires it. Any adjustment is recorded in `Decision log`.
   the shared start-up sequence, the separate lane entry point, the extracted
   `window:new` handler with its command-side tests, and the complete
   `app/config/paths` stub are recorded in EP-U.
+- 2026-11-15 (Unit Architecture repairs for `a8d19b84`): the deleted marker
+  channel, the injected sink, the command-table factory with its per-command
+  tests, the extracted start-up session, and the `app/rpc.ts` documentation
+  exception are recorded in EP-V.

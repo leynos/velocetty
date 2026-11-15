@@ -7,7 +7,7 @@
  * these tests pin the sink's behaviour and the start-up path that uses it.
  *
  * Cross-links:
- * - Sources: `app/config/e2e-marker-sink.ts`, `app/config/marker-channel.ts`
+ * - Sources: `app/config/e2e-marker-sink.ts`, `app/startup.mts`
  * - Reporter: `app/commands/window-new.ts`
  * - Composition root: `app/config.ts`
  * - Harness: `test/testUtils/config-watch-harness.ts`
@@ -19,7 +19,6 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 
 import {createMarkerSink, silentMarkerSink} from '../../app/config/e2e-marker-sink';
-import {installMarkerSink} from '../../app/config/marker-channel';
 import {createWindowNewHandler} from '../../app/commands/window-new';
 import {createWatchHarness, settle} from '../testUtils/config-watch-harness';
 
@@ -136,15 +135,15 @@ test.serial('a normal start-up emits no marker line', async () => {
   });
 });
 
-test('the window:new handler reports no marker until a sink is installed', () => {
+test('the window:new handler writes nothing to a silent sink', () => {
   const logSpy = spyOn(console, 'log').mockImplementation(() => {});
   try {
     const openWindow = mock(() => {});
-    createWindowNewHandler(openWindow)();
+    createWindowNewHandler(openWindow, silentMarkerSink)();
 
     // The opener is deferred to the next tick, so the handler ran to its end;
-    // the lane's channel still has nowhere to print, because no entry point
-    // installed a sink.
+    // the shipped build's sink still writes nothing, because a normal launch
+    // passes no sink that prints.
     expect(openWindow).not.toHaveBeenCalled();
     const markerLines = logSpy.mock.calls.map(([line]) => String(line)).filter((line) => line.includes('[e2e]'));
     expect(markerLines).toEqual([]);
@@ -153,16 +152,14 @@ test('the window:new handler reports no marker until a sink is installed', () =>
   }
 });
 
-test('the window:new handler reports its marker once the lane installs a sink', () => {
+test('the window:new handler reports its marker to the sink it is given', () => {
   const lines: string[] = [];
-  installMarkerSink((line) => lines.push(line));
-  try {
-    createWindowNewHandler(() => {})();
+  createWindowNewHandler(
+    () => {},
+    (line) => lines.push(line)
+  )();
 
-    // The handler names itself, because the lane asserts on the command having
-    // run rather than on the configuration that bound it.
-    expect(lines).toEqual(['[e2e] command-executed window:new']);
-  } finally {
-    installMarkerSink(silentMarkerSink);
-  }
+  // The handler names itself, because the lane asserts on the command having
+  // run rather than on the configuration that bound it.
+  expect(lines).toEqual(['[e2e] command-executed window:new']);
 });

@@ -228,15 +228,25 @@ real time.
 The end-to-end markers go through `e2e-marker-sink.ts`. `createMarkerSink`
 builds a sink that writes a line only while the lane flag holds, and
 `silentMarkerSink` drops every line for a caller with no stream to report to.
-Units report to the channel in `marker-channel.ts`, which discards every line
-until an entry point installs a sink. Only the lane's entry point,
-`app/e2e-entry.mts`, installs one, and it also starts the shortcut probe; the
-shipped entry point, `app/index.mts`, neither installs a sink nor reads the
-lane's environment, and both entry points run the shared start-up sequence in
-`app/startup.mts`. The composition root in `app/config.ts` composes and wires
-only; it still exports `isE2ERun`, which the RPC server receives as a
-dependency so it can report renderer errors under the lane. A shipped build
-therefore prints no marker.
+There is no process-wide channel: the entry point chooses the sink and passes
+it to `startApplication` in `app/startup.mts`, which hands it to
+`config.setup({markerSink})`. The composition root passes it to
+`createConfigWatchRuntime`, reports the start-up path markers through it, and
+re-exposes it through `getMarkerSink` so `app/start.ts` gives the command table
+the same sink. Only the lane's entry point, `app/e2e-entry.mts`, supplies a
+sink that writes, and only it reads `VELOCETTY_E2E_PRESS_FILE` and starts the
+shortcut probe; the shipped entry point, `app/index.mts`, passes nothing and so
+keeps `silentMarkerSink`, and both entry points run the shared start-up
+sequence in `app/startup.mts`.
+
+One marker path does not go through the sink. The RPC server in `app/rpc.ts`
+receives `isE2ERun` as a dependency and reads it once, when the server is
+constructed. When it was constructed with the lane flag set, it prints
+`[e2e] renderer-ready` after each load and logs high-severity renderer console
+messages as `[e2e][renderer-error]` lines directly to standard output. A
+shipped build therefore prints those lines only when `RUN_E2E=1` is set, and
+every other marker stays silent unless the lane's entry point supplied a
+writing sink.
 
 ## Data flow
 
