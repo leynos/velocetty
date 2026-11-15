@@ -5109,6 +5109,40 @@ round closes both concerns and leaves the command surface identical.
 - Behaviour is unchanged. The shipped build prints no marker, the lane prints
   the same lines, and no command identifier was added or removed.
 
+### EP-X: packaged-lane regression found by hosted CI (head `97c500ca`)
+
+Hosted CI on `97c500ca` failed `build (ubuntu-latest)` and
+`build (windows-2022)` in the fast-lane E2E test `launches the packaged app`,
+with `Packaged Electron did not emit [e2e] renderer-ready within 25000ms`. The
+marker had been missing, not late: the packaged build runs `index.mjs`, and
+EP-W had left `app/index.mts` passing no sink, so the composition root fell
+back to `silentMarkerSink`. Before EP-W the packaged build printed the line
+because `app/rpc.ts` read `RUN_E2E` itself; removing that read moved the
+decision to the entry point but only `app/e2e-entry.mts` was given one.
+
+The development-app E2E test passed throughout, because it launches
+`dist/app/e2e-entry.mjs`, not the packaged binary. That asymmetry is what hid
+the fault locally: the packaged build is itself what the lane packages, so the
+shipped entry point cannot be silent.
+
+- `app/index.mts` builds a sink with `createMarkerSink` over
+  `process.env.RUN_E2E === '1'` and passes it to `startApplication`. An
+  ordinary launch still prints nothing, because the sink discards every line.
+  The shortcut probe and `VELOCETTY_E2E_PRESS_FILE` stay exclusive to
+  `app/e2e-entry.mts`.
+- `test/unit/app-startup-order.test.ts` asserted the opposite contract — that
+  the shipped entry point contains no `createMarkerSink` and calls
+  `startApplication()` with no argument. That assertion is inverted to pin the
+  sink the packaged lane needs, while still forbidding the probe and the
+  request file.
+- `test/unit/app-entry-execution.test.ts` keeps the sink its start stub
+  receives and drives it directly, so one case proves a lane launch prints a
+  marker and another proves a launch outside the lane prints nothing.
+- The doc comments in `app/startup.mts`, `app/e2e-entry.mts`, `app/start.ts`,
+  `app/rpc.ts`, `app/commands.ts`, `app/commands/window-new.ts`, and
+  `app/ui/window.ts` no longer claim that only the lane's entry point builds a
+  sink, and both guides say so as well.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.

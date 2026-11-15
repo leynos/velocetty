@@ -28,6 +28,8 @@ import {afterEach, beforeEach, describe, expect, test} from 'bun:test';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
 
+import type {E2EMarkerSink} from '../../app/config/e2e-marker-sink';
+import type {StartMainProcessOptions} from '../../app/start';
 import {getElectronMock, registerElectronMock} from '../testUtils/electron-path';
 import {importFresh} from '../testUtils/import-fresh';
 import {registerModuleMock} from '../testUtils/mock-module';
@@ -86,14 +88,21 @@ const requireActiveConfigStub = (): ConfigSetupStub => {
 type EntryTrace = {
   readonly labels: string[];
   readonly appStart: () => number;
+  readonly captureMarkerSink: (sink: E2EMarkerSink) => void;
+  readonly markerSink: () => E2EMarkerSink | undefined;
 };
 
 /** A private trace, so a case cannot read another case's calls. */
 const createTrace = (): EntryTrace => {
   const labels: string[] = [];
+  let captured: E2EMarkerSink | undefined;
   return {
     labels,
-    appStart: () => labels.push('app.start')
+    appStart: () => labels.push('app.start'),
+    captureMarkerSink: (sink) => {
+      captured = sink;
+    },
+    markerSink: () => captured
   };
 };
 
@@ -138,10 +147,13 @@ const registerEntryStubs = (): void => {
     default: packageMetadata
   }));
   // The start-up sequence calls the exported function rather than relying on
-  // the module body's side effects, so the stub answers with that function and
-  // records the call the shared sequence makes.
+  // the module body's side effects, so the stub answers with that function,
+  // records the call the shared sequence makes, and keeps the sink it was
+  // handed: the sink is the entry point's only output channel, so a case has to
+  // be able to drive it directly.
   registerModuleMock(startStubPath, () => ({
-    startMainProcess: () => {
+    startMainProcess: (options: StartMainProcessOptions) => {
+      trace.captureMarkerSink(options.markerSink);
       trace.appStart();
     }
   }));
@@ -263,12 +275,41 @@ describe('the startup branch', () => {
     // `config.setup()` must precede the start import: modules below it read the
     // configuration while their own bodies run, so the order is the contract.
     expect(trace.labels).toEqual(['configuration.setup', 'app.start']);
-    // Nothing at all is printed, marker lines included: the entry point starts
-    // the shared sequence without installing a marker sink, so a normal launch
-    // cannot contaminate the lane's stream.
+    // Nothing at all is printed, marker lines included: the sink the entry
+    // point installed discards every line while the lane flag is unset, so a
+    // normal launch cannot contaminate the lane's stream.
     expect(output.lines).toEqual([]);
     expect(quits).toBe(0);
     expect(process.exitCode).toBe(0);
+  });
+
+  test.serial('a lane launch reports the markers its sink receives', async () => {
+    // The packaged build is what the end-to-end lane launches, so this entry
+    // point has to produce markers too. Its sink reads the flag per line, which
+    // is why the case can set it after the entry point was evaluated.
+    process.env.RUN_E2E = '1';
+    try {
+      await runEntryPoint(['--no-sandbox']);
+      const sink = trace.markerSink();
+      if (!sink) {
+        throw new Error('The entry point did not hand a marker sink to the main process.');
+      }
+      sink('[e2e] renderer-ready');
+      expect(output.lines).toEqual(['[e2e] renderer-ready']);
+    } finally {
+      delete process.env.RUN_E2E;
+    }
+  });
+
+  test.serial('a launch outside the lane discards the markers its sink receives', async () => {
+    delete process.env.RUN_E2E;
+    await runEntryPoint(['--no-sandbox']);
+    const sink = trace.markerSink();
+    if (!sink) {
+      throw new Error('The entry point did not hand a marker sink to the main process.');
+    }
+    sink('[e2e] renderer-ready');
+    expect(output.lines).toEqual([]);
   });
 
   test.serial('a throwing startup dependency is reported and turns into a failing exit code', async () => {

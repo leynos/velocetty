@@ -49,16 +49,17 @@ test('both entry points start the application through the shared sequence', asyn
   }
 });
 
-test('only the lane entry point carries the lane instrumentation', async () => {
-  // The shipped entry point must not build a marker sink or read the lane's
-  // request file, so a normal launch has no way to print a marker or arm the
-  // probe. The sink is chosen by the entry point and handed to the shared
-  // start-up sequence, so the two entry points differ in exactly one argument.
+test('the shipped entry point selects a sink but arms no lane instrumentation', async () => {
+  // The packaged build is what the end-to-end lane launches, so the shipped
+  // entry point must choose a marker sink from the lane flag: leaving it silent
+  // made the packaged smoke test wait for a marker that could never arrive. The
+  // shortcut probe and the request file stay out of it.
   const shippedSource = await readSource('app/index.mts');
   expect(shippedSource).not.toContain('e2e-shortcut-probe');
   expect(shippedSource).not.toContain('VELOCETTY_E2E_PRESS_FILE');
-  expect(shippedSource).not.toContain('createMarkerSink');
-  expect(shippedSource).toContain('await startApplication();');
+  expect(shippedSource).toContain('createMarkerSink');
+  expect(shippedSource).toContain("process.env.RUN_E2E === '1'");
+  expect(shippedSource).toContain('startApplication({markerSink})');
 
   const laneSource = await readSource('app/e2e-entry.mts');
   expect(laneSource).toContain('createMarkerSink');

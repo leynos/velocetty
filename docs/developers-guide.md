@@ -1672,19 +1672,20 @@ There is no process-wide channel: the entry point builds the sink, passes it to
 `app/commands.ts`, the `window:new` handler in `app/commands/window-new.ts`,
 the configuration watcher, the RPC server in `app/rpc.ts` (through `createRPC`
 from `app/ui/window.ts`), and every window `newWindow` creates — so none of
-them can report a marker a shipped build did not ask for. Only the lane's entry
-point, `app/e2e-entry.mts`, supplies a sink that prints; the shipped entry
-point, `app/index.mts`, passes nothing and keeps `silentMarkerSink`. Only the
-lane's entry point reads `VELOCETTY_E2E_PRESS_FILE` and starts
-`startShortcutProbe`, which takes the lane flag, the sink, and the request file
-as parameters, so it is dormant in a shipped build without reading the
-environment.
+them can report a marker a launch did not ask for. Both entry points select the
+sink from the same lane flag: `app/index.mts` builds one with
+`createMarkerSink` and `RUN_E2E`, because the packaged build is what the lane
+launches, and `app/e2e-entry.mts` adds the shortcut probe. A launch without the
+flag prints nothing. Only `app/e2e-entry.mts` reads `VELOCETTY_E2E_PRESS_FILE`
+and starts `startShortcutProbe`, which takes the lane flag, the sink, and the
+request file as parameters, so it is dormant in a shipped build without reading
+the environment.
 
 The RPC server reports `[e2e] renderer-ready` after each load and a
 high-severity renderer message as `[e2e][renderer-error]`, both through the
-sink it was given. A shipped build therefore prints neither, because its sink is
-`silentMarkerSink`. Nothing on that path reads the environment or writes to
-the console directly.
+sink it was given. A launch outside the lane therefore prints neither, because
+its sink discards every line. Nothing on that path reads the environment or
+writes to the console directly; only the entry points do.
 
 The probe shortcut `ctrl+alt+shift+n` is bound by no shipped keymap, which
 `test/unit/e2e-keymap-probe.test.ts` enforces; a marker reporting it can

@@ -2,9 +2,10 @@
 /*
  * The lane observes the application through its standard output and presses key
  * chords by appending them to a request file. Both channels are decided here, in
- * the entry point that only the lane starts, so the shipped entry point and the
- * units it loads never inspect the lane's environment: a normal launch passes
- * `silentMarkerSink` and reads no request file.
+ * the entry point that only the lane starts, so the units below it never inspect
+ * the lane's environment. The shipped entry point selects the same marker sink
+ * from the same flag, because the packaged build is what the lane packages; only
+ * this entry point starts the shortcut probe and reads a request file.
  */
 import {createMarkerSink} from './config/e2e-marker-sink.js';
 import {startShortcutProbe} from './config/e2e-shortcut-probe.js';

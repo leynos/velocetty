@@ -3,8 +3,8 @@
  * The handler takes both collaborators as parameters, so it can be exercised
  * without Electron and without a process-wide channel. The command table
  * supplies the opener the composition root wired, and the sink the entry point
- * chose: the shipped entry point supplies `silentMarkerSink`, and only the
- * lane's entry point supplies a sink that writes.
+ * chose: outside the lane that sink writes nothing, and inside it every mark it
+ * receives reaches the lane's stream.
  */
 import {formatCommandExecutedMarker} from '../config/e2e-keymap-probe';
 import type {E2EMarkerSink} from '../config/e2e-marker-sink';

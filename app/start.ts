@@ -137,7 +137,8 @@ export type StartMainProcessOptions = Readonly<{
    * Receives every marker the main process reports.
    *
    * The entry point chose it before start-up ran, so this module never reads
-   * the lane's environment: a shipped build supplies `silentMarkerSink`.
+   * the lane's environment: a launch outside the lane supplies a sink that
+   * discards every line.
    */
   readonly markerSink: E2EMarkerSink;
 }>;
@@ -218,8 +219,8 @@ export const startMainProcess = ({markerSink}: StartMainProcessOptions): void =>
         // Every command's side effect is wired here, at the composition root: the
         // table itself imports no Electron module, no configuration query, and no
         // plugin runtime. The marker sink comes from the module `setup` handed
-        // the entry point's sink to, so only the lane's entry point reports the
-        // commands its presses execute.
+        // the entry point's sink to, so the commands the lane's presses execute
+        // are reported only while the lane runs.
         const execCommand = createCommandDispatcher(
           createCommandTable({
             addSystemContextMenu: systemContextMenu.add,

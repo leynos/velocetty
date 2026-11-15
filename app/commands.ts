@@ -4,8 +4,8 @@
  * effect it can perform arrives as a dependency, so a test can build a table
  * over doubles and assert exactly what a command did. The composition root,
  * `app/start.ts`, supplies the real adapters, including the marker sink the
- * entry point chose, so the shipped build reports its command markers to
- * `silentMarkerSink` and only the lane's entry point reports them to a stream.
+ * entry point chose, so a launch outside the lane reports no command marker and
+ * a lane launch reports them to the stream the entry point selected.
  */
 import type {BrowserWindow} from 'electron';
 import type {CommandId} from '@shared/types/commands';

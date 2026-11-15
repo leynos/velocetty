@@ -251,18 +251,20 @@ it to `startApplication` in `app/startup.mts`, which hands it to
 `config.setup({markerSink})` and to `startMainProcess({markerSink})` in
 `app/start.ts`. The configuration root passes it to `createConfigWatchRuntime`
 and reports the start-up path markers through it, while the main process gives
-the same sink to the command table and to every window it creates. Only the
-lane's entry point, `app/e2e-entry.mts`, supplies a sink that writes, and only
-it reads `VELOCETTY_E2E_PRESS_FILE` and starts the shortcut probe; the shipped
-entry point, `app/index.mts`, passes nothing and so keeps `silentMarkerSink`,
-and both entry points run the shared start-up sequence in `app/startup.mts`.
+the same sink to the command table and to every window it creates. Both entry
+points select a sink from the same lane flag, and both run the shared start-up
+sequence in `app/startup.mts`. The packaged build is itself what the lane
+launches, so `app/index.mts` cannot leave the sink silent: it builds one with
+`createMarkerSink` and `RUN_E2E`, which writes nothing in an ordinary launch
+and writes every line in a lane run. Only `app/e2e-entry.mts` starts the
+shortcut probe and reads `VELOCETTY_E2E_PRESS_FILE`.
 
 Every marker takes that route. The RPC server in `app/rpc.ts` receives the sink
 as a dependency — through `createRPC` from `app/ui/window.ts` — and reports
 `[e2e] renderer-ready` after each load and high-severity renderer messages as
-`[e2e][renderer-error]` through it. A shipped build prints neither, because its
-sink is `silentMarkerSink`, and no unit on the path reads the environment or
-writes to the console directly.
+`[e2e][renderer-error]` through it. A launch outside the lane prints neither,
+because its sink discards every line, and no unit on the path reads the
+environment or writes to the console directly; only the two entry points do.
 
 ## Data flow
 

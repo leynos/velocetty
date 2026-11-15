@@ -87,8 +87,8 @@ const handleDroppedURL = (url: string) => {
  * @param options_ - The window constructor options the caller chose.
  * @param cfg - The decorated configuration for the window's profile.
  * @param execCommand - The dispatcher the window and its menus send commands to.
- * @param markerSink - Receives the renderer markers; `silentMarkerSink` in a
- *   shipped build, the lane's sink when the lane's entry point started us.
+ * @param markerSink - Receives the renderer markers; it discards them outside
+ *   the lane and writes them when the lane started this process.
  * @param fn - Runs once the window exists, before it is returned.
  * @param profileName - The profile whose configuration the window uses.
  * @returns The window, ready to load its page.

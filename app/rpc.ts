@@ -60,8 +60,8 @@ export class Server {
     ipcMain.on(uid, this.ipcListener);
 
     // The sink is injected by the composition root, so this module never reads
-    // the environment: a shipped build passes `silentMarkerSink` and prints
-    // nothing, while the lane's entry point passes a sink that writes.
+    // the environment: a launch outside the lane passes a sink that discards
+    // every line, while a lane launch passes one that writes.
     //
     // we intentionally subscribe to `on` instead of `once`
     // to support reloading the window and re-initializing

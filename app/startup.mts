@@ -16,8 +16,8 @@ export type StartApplicationOptions = Readonly<{
    * Receives every marker this process reports.
    *
    * The entry point owns the decision, so no unit below it inspects the lane's
-   * environment: a shipped build leaves this at `silentMarkerSink`, and only
-   * the lane's entry point passes a sink that writes.
+   * environment: both entry points select a sink from the lane flag, and a
+   * launch outside the lane writes nothing.
    */
   readonly markerSink?: E2EMarkerSink;
 }>;
