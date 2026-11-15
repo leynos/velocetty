@@ -10,7 +10,7 @@ import parseUrl from 'parse-url';
 import {isString} from './utils/runtime-guards';
 import type {VelocettyRuntimeGlobals} from '../typings/runtime-globals';
 
-import {createCommandDispatcher, createCommandTable} from './commands';
+import {createCommandTable, createReloadableDispatcher} from './commands';
 import * as config from './config';
 import type {E2EMarkerSink} from './config/e2e-marker-sink';
 import * as AppMenu from './menus/menu';
@@ -221,7 +221,14 @@ export const startMainProcess = ({markerSink}: StartMainProcessOptions): void =>
         // plugin runtime. The marker sink comes from the module `setup` handed
         // the entry point's sink to, so the commands the lane's presses execute
         // are reported only while the lane runs.
-        const execCommand = createCommandDispatcher(
+        //
+        // The profiles are read on every build rather than once, because
+        // `makeMenu` rebuilds this table below: the menu is built from the
+        // current profiles, so a profile the user adds during a session must
+        // reach the table its menu entry dispatches into. `execCommand` keeps one
+        // identity across those rebuilds, so a window opened earlier still
+        // reaches the current table.
+        const buildCommandTable = () =>
           createCommandTable({
             addSystemContextMenu: systemContextMenu.add,
             getGoldenPathMessage: getGoldenPathNotificationMessage,
@@ -239,8 +246,10 @@ export const startMainProcess = ({markerSink}: StartMainProcessOptions): void =>
             profileNames: config.getConfig().profiles.map((profile) => profile.name),
             removeSystemContextMenu: systemContextMenu.remove,
             updatePlugins: plugins.updatePlugins
-          })
-        );
+          });
+
+        const commands = createReloadableDispatcher(buildCommandTable());
+        const execCommand = commands.dispatch;
 
         // when opening create a new window
         createWindow();
@@ -264,6 +273,10 @@ export const startMainProcess = ({markerSink}: StartMainProcessOptions): void =>
         });
 
         const makeMenu = () => {
+          // Rebuild the table first: the menu below is built from the current
+          // profiles, so each `window:new:<profile>` entry it adds must already
+          // resolve to a handler.
+          commands.refresh(buildCommandTable());
           const menu = plugins.decorateMenu(AppMenu.createMenu(plugins.getLoadedPluginVersions, execCommand));
 
           // If we're on Mac make a Dock Menu

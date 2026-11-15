@@ -274,3 +274,45 @@ export const createCommandDispatcher =
   (command: CommandId, focusedWindow?: BrowserWindow): void => {
     table[command]?.(focusedWindow);
   };
+
+/** A dispatcher over a command table the composition root can replace. */
+export interface ReloadableDispatcher {
+  /** Runs one named command against the focused window when there is one. */
+  readonly dispatch: CommandDispatcher;
+  /** Replaces the table the next dispatch reads. */
+  readonly refresh: (table: CommandTable) => void;
+}
+
+/**
+ * Builds a dispatcher whose table can be replaced without changing identity.
+ *
+ * The application menu is rebuilt from the current profiles whenever the
+ * configuration changes, so the command table must be rebuilt with it: a
+ * profile the user adds during a session gets a `window:new:<profile>` menu
+ * entry, and that entry reaches nothing unless the table the menu dispatches
+ * into defines the command. Handing every holder the same `dispatch` function
+ * means a window opened before the change still reaches the rebuilt table.
+ *
+ * @param initialTable - The table the first dispatch reads.
+ * @returns The stable dispatcher, and the function that replaces its table.
+ *
+ * @example
+ * ```ts
+ * const commands = createReloadableDispatcher(createCommandTable(deps));
+ * commands.dispatch(asCommandId('window:new:work')); // not defined yet
+ * commands.refresh(createCommandTable({...deps, profileNames: ['work']}));
+ * commands.dispatch(asCommandId('window:new:work')); // now defined
+ * ```
+ */
+export const createReloadableDispatcher = (initialTable: CommandTable): ReloadableDispatcher => {
+  let table = initialTable;
+
+  return {
+    dispatch: (command, focusedWindow) => {
+      table[command]?.(focusedWindow);
+    },
+    refresh: (nextTable) => {
+      table = nextTable;
+    }
+  };
+};

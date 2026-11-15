@@ -15,7 +15,7 @@ import {expect, mock, test} from 'bun:test';
 
 import type {BrowserWindow} from 'electron';
 import type {CommandDependencies} from '../../app/commands';
-import {createCommandDispatcher, createCommandTable} from '../../app/commands';
+import {createCommandDispatcher, createCommandTable, createReloadableDispatcher} from '../../app/commands';
 import {GOLDEN_PATH_COMMAND_ID} from '../../app/runtime/golden-path-demo';
 import {asCommandId, asProfileId} from '../../app/utils/shared-ids';
 
@@ -278,6 +278,26 @@ test('each profile gets its own window, tab, and split commands', async () => {
     ['split request vertical', {profile: asProfileId('work')}],
     ['split request horizontal', {profile: asProfileId('work')}]
   ]);
+});
+
+test('a reloadable dispatcher reaches a table rebuilt for a profile added mid-session', async () => {
+  const before = createHarness();
+  const rebuilt = createHarness({profileNames: ['default', 'work', 'ops']});
+  const commands = createReloadableDispatcher(before.table);
+  // A window opened before the configuration changed holds this reference: it
+  // must still reach the rebuilt table, which is why the dispatcher keeps one
+  // identity across rebuilds.
+  const dispatch = commands.dispatch;
+
+  dispatch(asCommandId('window:new:ops'));
+  await settleOpeners();
+  expect(before.openWindow).not.toHaveBeenCalled();
+
+  commands.refresh(rebuilt.table);
+  dispatch(asCommandId('window:new:ops'));
+  await settleOpeners();
+
+  expect(rebuilt.openWindow.mock.calls).toEqual([['ops']]);
 });
 
 test('the dispatcher runs a known command and ignores an unknown one', () => {

@@ -5143,6 +5143,35 @@ shipped entry point cannot be silent.
   `app/ui/window.ts` no longer claim that only the lane's entry point builds a
   sink, and both guides say so as well.
 
+### EP-Y: profile commands after a configuration reload (review `5912141183`)
+
+CodeRabbit review `5912141183` raised one valid finding on head `4b660022`:
+`app/start.ts` read `config.getConfig().profiles` once, when the dispatcher was
+built, so the `window:new:<profile>`, `tab:new:<profile>`,
+`pane:splitRight:<profile>` and `pane:splitDown:<profile>` handlers existed
+only for the profiles present at start-up. `makeMenu` rebuilds the application
+menu from the *current* profiles on every configuration change, and the
+configuration registry marks `profiles` as live, so a profile added during a
+session produced a menu entry whose command identifier the dispatcher ignored.
+The click did nothing.
+
+The snapshot predates this branch — the base commit read it at module
+evaluation, which was even earlier — but the line is in this diff, so the
+repair lands here.
+
+- `app/commands.ts` gains `createReloadableDispatcher(initialTable)`, returning
+  the stable `dispatch` function and a `refresh` that replaces the table the
+  next dispatch reads.
+- `app/start.ts` turns the dependency object into `buildCommandTable()` and
+  holds `commands = createReloadableDispatcher(buildCommandTable())`.
+  `makeMenu` calls `commands.refresh(buildCommandTable())` before it builds the
+  menu, so the profile list the menu reads and the handlers it dispatches into
+  come from the same configuration. Windows opened earlier keep the dispatcher
+  they were given, and that dispatcher now reaches the rebuilt table.
+- `test/unit/command-table.test.ts` dispatches `window:new:ops` against a table
+  built without `ops`, refreshes with a table that includes it, and asserts the
+  captured dispatcher reference opens the `ops` window.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.

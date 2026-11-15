@@ -743,6 +743,13 @@ object and returns a `CommandTable`, an index signature that yields a
 not answer. `createCommandDispatcher(table)` wraps that table in the
 `CommandDispatcher` the rest of the main process calls: it looks a command up
 and ignores an identifier the table does not define.
+`createReloadableDispatcher(initialTable)` does the same, and also returns a
+`refresh` function that replaces the table without changing the dispatcher's
+identity. `app/start.ts` rebuilds the table whenever it rebuilds the
+application menu, because the menu is built from the current profiles: a
+profile the user adds during a session then reaches both the menu entry and the
+handler behind it, while a window opened earlier still reaches the rebuilt
+table through the dispatcher it already holds.
 
 `CommandDependencies` is the complete list of what a handler may reach outside
 itself: `openWindow` (optionally for a profile), `markerSink`, `openConfig`,
