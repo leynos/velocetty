@@ -1,3 +1,13 @@
+/** @file Builds the application menu, including its About and plugin dialogs. */
+/*
+ * The menu is assembled from the per-platform builders under `app/menus/menus/`
+ * and from the decorated keymaps the configuration layer resolved. Every item
+ * that runs a command calls the `CommandDispatcher` this module receives as a
+ * parameter: the composition root, `app/start.ts`, builds that dispatcher over
+ * the command table, so the menu cannot reach a handler by importing one. The
+ * same module also builds and installs the menu through `buildMenu`, which the
+ * composition root calls again on every configuration reload.
+ */
 // Packages
 import {app, dialog, Menu, nativeImage} from 'electron';
 

@@ -131,21 +131,20 @@ const registerEntryStubs = (): void => {
     setup: () => {
       requireActiveConfigStub().setup();
     },
-    getDefaultProfile: () => 'default',
-    // The entry point itself asks the configuration for nothing beyond
-    // `setup`; the extra export is here because Bun maps this `.js` key onto
-    // the shared `app/config.ts` entry, so another suite's import of that
-    // module is answered by this stub too.
-    isE2ERun: () => false
+    getDefaultProfile: () => 'default'
   }));
   registerModuleMock(packageJsonStubPath, () => ({
     ...packageMetadata,
     default: packageMetadata
   }));
-  registerModuleMock(startStubPath, () => {
-    trace.appStart();
-    return {};
-  });
+  // The start-up sequence calls the exported function rather than relying on
+  // the module body's side effects, so the stub answers with that function and
+  // records the call the shared sequence makes.
+  registerModuleMock(startStubPath, () => ({
+    startMainProcess: () => {
+      trace.appStart();
+    }
+  }));
 };
 
 /** One console call as the entry point made it, with its arguments unflattened. */

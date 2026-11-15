@@ -5061,6 +5061,54 @@ over doubles.
 - Behaviour is unchanged. The shipped build writes no marker line, the lane
   writes the same lines as before, and the command surface is identical.
 
+### EP-W: review-round repairs for `5910280443` (head `6b34167f`)
+
+The review on `6b34167f` failed three pre-merge rows. The Unit Architecture row
+accepted the sink injection but rejected the last two process-wide hops:
+`getMarkerSink()` re-exposed the sink as module state, and `app/rpc.ts` still
+received a lane flag it read once and then wrote to the console directly. The
+Developer Documentation and Module-Level Documentation rows asked for the
+command boundary to be described where a maintainer will look for it. This
+round closes both concerns and leaves the command surface identical.
+
+- `app/config.ts` no longer holds `activeMarkerSink` or exports
+  `getMarkerSink()`. `setup({markerSink})` still receives the sink, because the
+  watcher and the start-up path markers are reported from inside the
+  configuration root, but the root keeps no channel for another module to read.
+- `app/start.ts` exports `startMainProcess({markerSink})` instead of registering
+  its `ready` handler at module evaluation. `startApplication` imports the
+  module, then calls the function with the sink it was given, so the command
+  table and every window receive the sink as an explicit parameter.
+- `app/rpc.ts` takes an `E2EMarkerSink` instead of an `isE2ERun` callback and
+  reports `[e2e] renderer-ready` and `[e2e][renderer-error]` through it. A
+  shipped build passes `silentMarkerSink`, so it prints neither line, exactly
+  as before; the exception the earlier rounds documented is gone.
+- `app/ui/window.ts` drops the `isE2ERun` import from the configuration root
+  and takes the sink as `newWindow`'s fourth parameter, passing it to
+  `createRPC`. `app/config.ts` no longer exports `isE2ERun`; the lane's flag is
+  read only by `app/e2e-entry.mts`, which builds the sink that carries it.
+- `emitKeymapsMarker(report, keymaps, marker)` takes the applied keymaps as a
+  parameter instead of calling `getCurrentConfig()`. Both callers — the reload
+  path and `setup` — pass the config the import they just finished produced.
+- `test/unit/rpc-server.test.ts` injects a recording sink and asserts that the
+  readiness and high-severity renderer lines reach it, that a lower-level
+  message does not, and that `silentMarkerSink` reports nothing. The command
+  table tests are unchanged, since they already inject every dependency.
+  `test/unit/app-entry-execution.test.ts` answers the start stub with
+  `startMainProcess` and drops the `isE2ERun` stub.
+- `app/menus/menu.ts` gains a `/** @file */` block stating that it builds the
+  application menu over the dispatcher the composition root passes in.
+- `docs/developers-guide.md` gains a "Command dispatch" section
+  (`createCommandTable`, `createCommandDispatcher`, every `CommandDependencies`
+  field, and why the dispatcher is injected), renames the misnamed "Command
+  execution" section to "Configuration composition", lists the six
+  configuration modules with a one-line responsibility each, and states the new
+  `newWindow`, `createMenu`, and `contextMenuTemplate` signatures.
+  `docs/configuration-architecture.md` mirrors the command-dispatch boundary
+  and records that every marker now takes the sink.
+- Behaviour is unchanged. The shipped build prints no marker, the lane prints
+  the same lines, and no command identifier was added or removed.
+
 ## Interfaces and dependencies
 
 The development dependencies are `fast-check@^4.10.2` and `lemmascript@0.6.5`.
@@ -5680,3 +5728,8 @@ requires it. Any adjustment is recorded in `Decision log`.
   channel, the injected sink, the command-table factory with its per-command
   tests, the extracted start-up session, and the `app/rpc.ts` documentation
   exception are recorded in EP-V.
+- 2026-11-15 (reconciliation for `6b34167f`): the removal of `getMarkerSink`
+  and `isE2ERun`, the `startMainProcess` entry that takes the sink as a
+  parameter, the sink-injected RPC server with its recording-sink tests, the
+  parameterized `emitKeymapsMarker`, and the new command-dispatch and
+  configuration-composition documentation are recorded in EP-W.

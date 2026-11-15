@@ -50,7 +50,11 @@ export const startApplication = async ({
     config.setup({markerSink});
     afterConfigurationSetup?.();
 
-    await import('./start.js');
+    // The main process takes the sink as an explicit argument, so the command
+    // table and every window report through the sink this entry point chose
+    // rather than through a channel the configuration root would have to hold.
+    const {startMainProcess} = await import('./start.js');
+    startMainProcess({markerSink});
   } catch (error) {
     // The bounded description keeps a failed start-up diagnosable without
     // repeating a path or a secret the error message may quote. The stage and

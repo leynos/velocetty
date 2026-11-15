@@ -215,6 +215,24 @@ marker sinks arrive as explicit parameters. `app/config.ts` keeps only the
 composition: it builds the adapters and the start-up command and re-exports the
 query surface.
 
+### Command dispatch boundary
+
+The applied configuration reaches the main process the same way: through
+explicit parameters rather than a module-level channel. `app/start.ts` exports
+`startMainProcess({markerSink})`, which the shared start-up sequence calls once
+`config.setup()` has run, so the window, menu, and command wiring all happen
+after the configuration exists. Inside that function the composition root
+builds the command table with `createCommandTable(dependencies)`, where
+`CommandDependencies` supplies every side effect a handler may perform —
+opening a window, opening the configuration, updating plugins, installing the
+CLI, the context-menu adapters, the application-menu popup, the golden-path
+message, the profile names, the Hamburger-menu query, and the marker sink.
+`createCommandDispatcher(table)` turns that table into the `CommandDispatcher`
+handed to `newWindow`, `createMenu`, and `contextMenuTemplate`; none of them
+imports a handler, and none of them reads the configuration root for a command
+it can be given. [The developers' guide](developers-guide.md#command-dispatch)
+describes the same boundary from the test side.
+
 ### Observability
 
 `config-metrics.ts` holds the counters, `config-observability.ts` turns one
@@ -230,23 +248,21 @@ builds a sink that writes a line only while the lane flag holds, and
 `silentMarkerSink` drops every line for a caller with no stream to report to.
 There is no process-wide channel: the entry point chooses the sink and passes
 it to `startApplication` in `app/startup.mts`, which hands it to
-`config.setup({markerSink})`. The composition root passes it to
-`createConfigWatchRuntime`, reports the start-up path markers through it, and
-re-exposes it through `getMarkerSink` so `app/start.ts` gives the command table
-the same sink. Only the lane's entry point, `app/e2e-entry.mts`, supplies a
-sink that writes, and only it reads `VELOCETTY_E2E_PRESS_FILE` and starts the
-shortcut probe; the shipped entry point, `app/index.mts`, passes nothing and so
-keeps `silentMarkerSink`, and both entry points run the shared start-up
-sequence in `app/startup.mts`.
+`config.setup({markerSink})` and to `startMainProcess({markerSink})` in
+`app/start.ts`. The configuration root passes it to `createConfigWatchRuntime`
+and reports the start-up path markers through it, while the main process gives
+the same sink to the command table and to every window it creates. Only the
+lane's entry point, `app/e2e-entry.mts`, supplies a sink that writes, and only
+it reads `VELOCETTY_E2E_PRESS_FILE` and starts the shortcut probe; the shipped
+entry point, `app/index.mts`, passes nothing and so keeps `silentMarkerSink`,
+and both entry points run the shared start-up sequence in `app/startup.mts`.
 
-One marker path does not go through the sink. The RPC server in `app/rpc.ts`
-receives `isE2ERun` as a dependency and reads it once, when the server is
-constructed. When it was constructed with the lane flag set, it prints
-`[e2e] renderer-ready` after each load and logs high-severity renderer console
-messages as `[e2e][renderer-error]` lines directly to standard output. A
-shipped build therefore prints those lines only when `RUN_E2E=1` is set, and
-every other marker stays silent unless the lane's entry point supplied a
-writing sink.
+Every marker takes that route. The RPC server in `app/rpc.ts` receives the sink
+as a dependency — through `createRPC` from `app/ui/window.ts` — and reports
+`[e2e] renderer-ready` after each load and high-severity renderer messages as
+`[e2e][renderer-error]` through it. A shipped build prints neither, because its
+sink is `silentMarkerSink`, and no unit on the path reads the environment or
+writes to the console directly.
 
 ## Data flow
 

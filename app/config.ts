@@ -74,20 +74,6 @@ const keybindingsService = createKeybindingsService({
   store: keybindingsStore
 });
 
-/**
- * Whether the end-to-end lane started this process.
- *
- * Read here, at the composition root, so a unit that behaves differently under
- * the lane — the RPC server reporting renderer errors — receives the answer as
- * a dependency instead of inspecting the environment itself.
- *
- * @example
- * ```ts
- * RUN_E2E=1 isE2ERun(); // true
- * ```
- */
-export const isE2ERun = (): boolean => process.env.RUN_E2E === '1';
-
 /** Whether the opt-in start-up trace is enabled for this process. */
 const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPORT === '1';
 
@@ -125,26 +111,8 @@ export const exportKeybindings = keybindingsService.exportKeybindings;
 /** The files the watcher covers, resolved once because they never change. */
 const watchedFiles = [path.resolve(cfgPath), path.resolve(keybindingsPath)];
 
-/** The marker sink this process reports through; the entry point chooses it in `setup`. */
-let activeMarkerSink: E2EMarkerSink = silentMarkerSink;
-
 /** The watcher runtime `setup` built, which `subscribe` registers callbacks with. */
 let activeWatch: ConfigWatchRuntime | undefined;
-
-/**
- * The marker sink this process reports through.
- *
- * The entry point chooses the sink and hands it to `setup`, which passes it to
- * every unit that reports a marker. A process whose entry point supplied none
- * keeps `silentMarkerSink`, so a shipped build prints no marker at all.
- *
- * @example
- * ```ts
- * const sink = getMarkerSink();
- * sink('[e2e] config-watcher-ready'); // written only under the lane's sink
- * ```
- */
-export const getMarkerSink = (): E2EMarkerSink => activeMarkerSink;
 
 /**
  * Registers a callback that runs after every applied reload.
@@ -189,7 +157,6 @@ export type ConfigurationSetupOptions = Readonly<{
  * ```
  */
 export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions = {}) => {
-  activeMarkerSink = markerSink;
   const configWatch = createConfigWatchRuntime({
     configTree,
     importConfiguration: _import,
@@ -236,7 +203,7 @@ export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions
   // stream when the lane's entry point started this process.
   markerSink(`[e2e] keybindings-path ${keybindingsPath}`);
   markerSink(`[e2e] config-path ${cfgPath}`);
-  emitKeymapsMarker(imported.report, markerSink);
+  emitKeymapsMarker(imported.report, imported.config.keymaps, markerSink);
   activeWatch = configWatch;
 };
 

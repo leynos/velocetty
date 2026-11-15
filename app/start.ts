@@ -12,6 +12,7 @@ import type {VelocettyRuntimeGlobals} from '../typings/runtime-globals';
 
 import {createCommandDispatcher, createCommandTable} from './commands';
 import * as config from './config';
+import type {E2EMarkerSink} from './config/e2e-marker-sink';
 import * as AppMenu from './menus/menu';
 import * as plugins from './plugins';
 import {getGoldenPathNotificationMessage} from './runtime/golden-path-message';
@@ -130,148 +131,177 @@ async function installDevExtensions(isDev_: boolean) {
   return results;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-misused-promises
-app.on('ready', () =>
-  installDevExtensions(isDev)
-    .then(() => {
-      function createWindow(
-        fn?: (win: BrowserWindow) => void,
-        options: {size?: [number, number]; position?: [number, number]} = {},
-        profileName: string = config.getDefaultProfile()
-      ) {
-        const cfg = plugins.getDecoratedConfig(profileName);
+/** What the shared start-up sequence supplies once the configuration is ready. */
+export type StartMainProcessOptions = Readonly<{
+  /**
+   * Receives every marker the main process reports.
+   *
+   * The entry point chose it before start-up ran, so this module never reads
+   * the lane's environment: a shipped build supplies `silentMarkerSink`.
+   */
+  readonly markerSink: E2EMarkerSink;
+}>;
 
-        const winSet = config.getWin();
-        let [startX, startY] = winSet.position;
+/**
+ * Starts the main process: windows, menus, commands, and lifecycle wiring.
+ *
+ * Called by `startApplication` in `app/startup.mts` after the configuration is
+ * initialized, because the modules this file imports read it during their own
+ * evaluation. The marker sink arrives here as a parameter rather than from a
+ * module-level channel, so the command table and every window it opens report
+ * through the sink the entry point chose.
+ *
+ * @param options - The sink this process reports through.
+ *
+ * @example
+ * ```ts
+ * startMainProcess({markerSink: silentMarkerSink}); // an ordinary launch
+ * ```
+ */
+export const startMainProcess = ({markerSink}: StartMainProcessOptions): void => {
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises
+  app.on('ready', () =>
+    installDevExtensions(isDev)
+      .then(() => {
+        function createWindow(
+          fn?: (win: BrowserWindow) => void,
+          options: {size?: [number, number]; position?: [number, number]} = {},
+          profileName: string = config.getDefaultProfile()
+        ) {
+          const cfg = plugins.getDecoratedConfig(profileName);
 
-        const [width, height] = options.size ?? cfg.windowSize ?? winSet.size;
+          const winSet = config.getWin();
+          let [startX, startY] = winSet.position;
 
-        const winPos = options.position;
+          const [width, height] = options.size ?? cfg.windowSize ?? winSet.size;
 
-        // Open the new window roughly the height of the header away from the
-        // previous window. This also ensures in multi monitor setups that the
-        // new terminal is on the correct screen.
-        const focusedWindow = BrowserWindow.getFocusedWindow() || app.getLastFocusedWindow();
-        // In case of options defaults position and size, we should ignore the focusedWindow.
-        if (winPos !== undefined) {
-          [startX, startY] = winPos;
-        } else if (focusedWindow) {
-          const points = focusedWindow.getPosition();
-          const currentScreen = screen.getDisplayNearestPoint({
-            x: points[0],
-            y: points[1]
+          const winPos = options.position;
+
+          // Open the new window roughly the height of the header away from the
+          // previous window. This also ensures in multi monitor setups that the
+          // new terminal is on the correct screen.
+          const focusedWindow = BrowserWindow.getFocusedWindow() || app.getLastFocusedWindow();
+          // In case of options defaults position and size, we should ignore the focusedWindow.
+          if (winPos !== undefined) {
+            [startX, startY] = winPos;
+          } else if (focusedWindow) {
+            const points = focusedWindow.getPosition();
+            const currentScreen = screen.getDisplayNearestPoint({
+              x: points[0],
+              y: points[1]
+            });
+
+            const biggestX = points[0] + 100 + width - currentScreen.bounds.x;
+            const biggestY = points[1] + 100 + height - currentScreen.bounds.y;
+
+            startX = biggestX > currentScreen.size.width ? 50 : points[0] + 34;
+            startY = biggestY > currentScreen.size.height ? 50 : points[1] + 34;
+          }
+
+          if (!windowUtils.positionIsValid([startX, startY])) {
+            [startX, startY] = config.windowDefaults.windowPosition;
+          }
+
+          const hwin = newWindow({width, height, x: startX, y: startY}, cfg, execCommand, markerSink, fn, profileName);
+          windowSet.add(hwin);
+          void hwin.loadURL(url);
+
+          // the window can be closed by the browser process itself
+          hwin.on('close', () => {
+            hwin.clean();
+            windowSet.delete(hwin);
           });
 
-          const biggestX = points[0] + 100 + width - currentScreen.bounds.x;
-          const biggestY = points[1] + 100 + height - currentScreen.bounds.y;
-
-          startX = biggestX > currentScreen.size.width ? 50 : points[0] + 34;
-          startY = biggestY > currentScreen.size.height ? 50 : points[1] + 34;
+          return hwin;
         }
 
-        if (!windowUtils.positionIsValid([startX, startY])) {
-          [startX, startY] = config.windowDefaults.windowPosition;
-        }
+        // Every command's side effect is wired here, at the composition root: the
+        // table itself imports no Electron module, no configuration query, and no
+        // plugin runtime. The marker sink comes from the module `setup` handed
+        // the entry point's sink to, so only the lane's entry point reports the
+        // commands its presses execute.
+        const execCommand = createCommandDispatcher(
+          createCommandTable({
+            addSystemContextMenu: systemContextMenu.add,
+            getGoldenPathMessage: getGoldenPathNotificationMessage,
+            installCLI: () => void installCLI(true),
+            isHamburgerMenuEnabled: () =>
+              process.platform !== 'darwin' && ['', true].includes(config.getConfig().showHamburgerMenu),
+            markerSink,
+            openConfig: () => void config.openConfig(),
+            openWindow: (profileName) => {
+              createWindow(undefined, undefined, profileName);
+            },
+            popupApplicationMenu: () => {
+              Menu.getApplicationMenu()?.popup({x: 25, y: 22});
+            },
+            profileNames: config.getConfig().profiles.map((profile) => profile.name),
+            removeSystemContextMenu: systemContextMenu.remove,
+            updatePlugins: plugins.updatePlugins
+          })
+        );
 
-        const hwin = newWindow({width, height, x: startX, y: startY}, cfg, execCommand, fn, profileName);
-        windowSet.add(hwin);
-        void hwin.loadURL(url);
+        // when opening create a new window
+        createWindow();
 
-        // the window can be closed by the browser process itself
-        hwin.on('close', () => {
-          hwin.clean();
-          windowSet.delete(hwin);
+        // expose to plugins
+        app.createWindow = createWindow;
+
+        // mac only. when the dock icon is clicked
+        // and we don't have any active windows open,
+        // we open one
+        app.on('activate', () => {
+          if (windowSet.size === 0) {
+            createWindow();
+          }
         });
 
-        return hwin;
-      }
+        app.on('window-all-closed', () => {
+          if (process.platform !== 'darwin') {
+            app.quit();
+          }
+        });
 
-      // Every command's side effect is wired here, at the composition root: the
-      // table itself imports no Electron module, no configuration query, and no
-      // plugin runtime. The marker sink comes from the module `setup` handed
-      // the entry point's sink to, so only the lane's entry point reports the
-      // commands its presses execute.
-      const execCommand = createCommandDispatcher(
-        createCommandTable({
-          addSystemContextMenu: systemContextMenu.add,
-          getGoldenPathMessage: getGoldenPathNotificationMessage,
-          installCLI: () => void installCLI(true),
-          isHamburgerMenuEnabled: () =>
-            process.platform !== 'darwin' && ['', true].includes(config.getConfig().showHamburgerMenu),
-          markerSink: config.getMarkerSink(),
-          openConfig: () => void config.openConfig(),
-          openWindow: (profileName) => {
-            createWindow(undefined, undefined, profileName);
-          },
-          popupApplicationMenu: () => {
-            Menu.getApplicationMenu()?.popup({x: 25, y: 22});
-          },
-          profileNames: config.getConfig().profiles.map((profile) => profile.name),
-          removeSystemContextMenu: systemContextMenu.remove,
-          updatePlugins: plugins.updatePlugins
-        })
-      );
+        const makeMenu = () => {
+          const menu = plugins.decorateMenu(AppMenu.createMenu(plugins.getLoadedPluginVersions, execCommand));
 
-      // when opening create a new window
-      createWindow();
-
-      // expose to plugins
-      app.createWindow = createWindow;
-
-      // mac only. when the dock icon is clicked
-      // and we don't have any active windows open,
-      // we open one
-      app.on('activate', () => {
-        if (windowSet.size === 0) {
-          createWindow();
-        }
-      });
-
-      app.on('window-all-closed', () => {
-        if (process.platform !== 'darwin') {
-          app.quit();
-        }
-      });
-
-      const makeMenu = () => {
-        const menu = plugins.decorateMenu(AppMenu.createMenu(plugins.getLoadedPluginVersions, execCommand));
-
-        // If we're on Mac make a Dock Menu
-        if (process.platform === 'darwin' && app.dock) {
-          const dockMenu = Menu.buildFromTemplate([
-            {
-              label: 'New Window',
-              click() {
-                createWindow();
+          // If we're on Mac make a Dock Menu
+          if (process.platform === 'darwin' && app.dock) {
+            const dockMenu = Menu.buildFromTemplate([
+              {
+                label: 'New Window',
+                click() {
+                  createWindow();
+                }
               }
-            }
-          ]);
-          app.dock.setMenu(dockMenu);
-        }
+            ]);
+            app.dock.setMenu(dockMenu);
+          }
 
-        Menu.setApplicationMenu(AppMenu.buildMenu(menu));
-      };
+          Menu.setApplicationMenu(AppMenu.buildMenu(menu));
+        };
 
-      plugins.onApp(app);
-      makeMenu();
-      plugins.subscribe(plugins.onApp.bind(undefined, app));
-      config.subscribe(makeMenu);
-      if (!isDev) {
-        // check if should be set/removed as default ssh protocol client
-        if (config.getConfig().defaultSSHApp && !app.isDefaultProtocolClient('ssh')) {
-          console.log('Setting Hyper as default client for ssh:// protocol');
-          app.setAsDefaultProtocolClient('ssh');
-        } else if (!config.getConfig().defaultSSHApp && app.isDefaultProtocolClient('ssh')) {
-          console.log('Removing Hyper from default client for ssh:// protocol');
-          app.removeAsDefaultProtocolClient('ssh');
+        plugins.onApp(app);
+        makeMenu();
+        plugins.subscribe(plugins.onApp.bind(undefined, app));
+        config.subscribe(makeMenu);
+        if (!isDev) {
+          // check if should be set/removed as default ssh protocol client
+          if (config.getConfig().defaultSSHApp && !app.isDefaultProtocolClient('ssh')) {
+            console.log('Setting Hyper as default client for ssh:// protocol');
+            app.setAsDefaultProtocolClient('ssh');
+          } else if (!config.getConfig().defaultSSHApp && app.isDefaultProtocolClient('ssh')) {
+            console.log('Removing Hyper from default client for ssh:// protocol');
+            app.removeAsDefaultProtocolClient('ssh');
+          }
+          void installCLI(false);
         }
-        void installCLI(false);
-      }
-    })
-    .catch((error) => {
-      console.error('Error while loading devtools extensions', error);
-    })
-);
+      })
+      .catch((error) => {
+        console.error('Error while loading devtools extensions', error);
+      })
+  );
+};
 
 /**
  * Get last focused BrowserWindow or create new if none and callback

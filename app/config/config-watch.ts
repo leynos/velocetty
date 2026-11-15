@@ -15,7 +15,7 @@ import type {ConfigSpanRecorder} from './config-spans';
 import type {ConfigWarningNotifier} from './config-queries';
 import {checkDeprecatedConfig} from './config-queries';
 import type {ImportRecord, ImportRecorder} from './config-observability';
-import {getCurrentConfig, setCurrentConfig} from './current-config';
+import {setCurrentConfig} from './current-config';
 import {formatKeymapsMarker, type E2EKeymapStatus} from './e2e-keymap-probe';
 import type {E2EMarkerSink} from './e2e-marker-sink';
 import type {ConfigImportResult} from './import';
@@ -32,17 +32,26 @@ const keymapStatus = (report: ConfigImportReport): E2EKeymapStatus =>
 /**
  * Reports the probe binding the E2E lane asserts on after every reload.
  *
+ * The keymaps arrive as a parameter rather than being read from the applied
+ * configuration, so the marker names exactly the config the import that just
+ * finished produced, and the unit can be exercised without a stored config.
+ *
  * @param report - What the import that just finished decided.
+ * @param keymaps - The keymaps that import applied.
  * @param marker - Receives the line when the lane is running.
  *
  * @example
  * ```ts
- * emitKeymapsMarker({config: 'applied', keybindings: 'applied'}, emitE2EMarker);
+ * emitKeymapsMarker({config: 'applied', keybindings: 'applied'}, {'window:new': []}, emitE2EMarker);
  * // logs the `[e2e] keymaps` marker for the keymaps now in effect
  * ```
  */
-export const emitKeymapsMarker = (report: ConfigImportReport, marker: E2EMarkerSink) => {
-  marker(formatKeymapsMarker(keymapStatus(report), getCurrentConfig().keymaps));
+export const emitKeymapsMarker = (
+  report: ConfigImportReport,
+  keymaps: Readonly<Record<string, readonly string[]>>,
+  marker: E2EMarkerSink
+) => {
+  marker(formatKeymapsMarker(keymapStatus(report), keymaps));
 };
 
 /** Wraps chokidar in the adapter the watcher debounces over. */
@@ -168,7 +177,7 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
       notifySubscriber();
     }
     checkDeprecatedConfig(notify);
-    emitKeymapsMarker(report, markerSink);
+    emitKeymapsMarker(report, config.keymaps, markerSink);
   };
 
   /**

@@ -8,6 +8,7 @@ import {v4 as uuidv4} from 'uuid';
 
 import type {FilterNever, MainEvents, RendererEvents, TypedEmitter} from '@shared/types/common';
 
+import type {E2EMarkerSink} from './config/e2e-marker-sink';
 import {withPressToken} from './config/e2e-keymap-probe';
 import {isString} from './utils/runtime-guards';
 
@@ -42,7 +43,7 @@ export class Server {
   win: RpcServerWindow;
   id!: string;
 
-  constructor(win: RpcServerWindow, isE2ERun: () => boolean) {
+  constructor(win: RpcServerWindow, markerSink: E2EMarkerSink) {
     // eslint-disable-next-line unicorn/prefer-event-target -- `TypedEmitter` exposes EventEmitter's typed `on`, `once`, and removal contract.
     this.rawEmitter = new EventEmitter();
     this.emitter = this.rawEmitter;
@@ -58,27 +59,23 @@ export class Server {
 
     ipcMain.on(uid, this.ipcListener);
 
-    // The lane flag is injected by the composition root, so this module never
-    // reads the environment; a test can report as the lane without one.
-    const shouldReportE2E = isE2ERun();
-
+    // The sink is injected by the composition root, so this module never reads
+    // the environment: a shipped build passes `silentMarkerSink` and prints
+    // nothing, while the lane's entry point passes a sink that writes.
+    //
     // we intentionally subscribe to `on` instead of `once`
     // to support reloading the window and re-initializing
     // the channel
     this.wc.on('did-finish-load', () => {
-      if (shouldReportE2E) {
-        console.log('[e2e] renderer-ready');
-      }
+      markerSink('[e2e] renderer-ready');
       this.wc.send('init', uid, win.profileName);
     });
 
-    if (shouldReportE2E) {
-      this.wc.on('console-message', (_event, level, message, line, sourceId) => {
-        if (level >= 3) {
-          console.error(`[e2e][renderer-error] ${sourceId}:${line} ${message}`);
-        }
-      });
-    }
+    this.wc.on('console-message', (_event, level, message, line, sourceId) => {
+      if (level >= 3) {
+        markerSink(`[e2e][renderer-error] ${sourceId}:${line} ${message}`);
+      }
+    });
   }
 
   get wc() {
@@ -141,8 +138,8 @@ export class Server {
   }
 }
 
-const createRPC = (win: BrowserWindow, isE2ERun: () => boolean) => {
-  return new Server(win, isE2ERun);
+const createRPC = (win: BrowserWindow, markerSink: E2EMarkerSink) => {
+  return new Server(win, markerSink);
 };
 
 export default createRPC;

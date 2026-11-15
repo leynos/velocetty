@@ -698,7 +698,7 @@ destination directory is created first, and a failed copy is returned rather
 than thrown, so a stale schema degrades editor validation without stopping
 start-up.
 
-### Command execution
+### Configuration composition
 
 The configuration root is now composition rather than storage. The read-only
 queries — `getConfig`, `getProfiles`, `getKeymaps`, `getPlugins`, and the
@@ -713,6 +713,65 @@ constructed them. `app/config/startup-import.ts` owns the order that command
 runs in — capture the watched files' stamps, prepare the tree, import, then
 settle the files the import wrote — so the composition root cannot reorder it
 by accident and the sequence is tested directly.
+
+Six further modules sit behind that root, each with one responsibility:
+
+- `app/config/startup-session.ts` records one start-up import: the span it ran
+  in and the bounded record it emitted.
+- `app/config/import-bootstrap.ts` performs the start-up writes — plugin
+  directories, schema copies, and the `config.json5` bootstrap — that a reload
+  must never repeat.
+- `app/config/import-defaults.ts` reads the bundled defaults and the shipped
+  platform keymap without creating, copying, or announcing anything.
+- `app/config/import-faults.ts` announces a bundled-file fault to the user at
+  most once per process.
+- `app/config/keybindings-store-reporting.ts` turns the keybindings store's
+  bounded results into spans, warnings, and the write-failure counter.
+- `app/config/keybindings-rename-retry.ts` holds the retry policy for renaming
+  a temporary keybindings file into place, for the platforms that briefly
+  refuse the rename.
+
+[Configuration architecture](configuration-architecture.md) places each of them
+between the importer, the store, and the observability sinks.
+
+### Command dispatch
+
+`app/commands.ts` builds the application's command table rather than exporting
+one. `createCommandTable(dependencies)` takes a single `CommandDependencies`
+object and returns a `CommandTable`, an index signature that yields a
+`CommandHandler` or `undefined` for a command identifier the application does
+not answer. `createCommandDispatcher(table)` wraps that table in the
+`CommandDispatcher` the rest of the main process calls: it looks a command up
+and ignores an identifier the table does not define.
+
+`CommandDependencies` is the complete list of what a handler may reach outside
+itself: `openWindow` (optionally for a profile), `markerSink`, `openConfig`,
+`updatePlugins`, `installCLI`, `addSystemContextMenu`,
+`removeSystemContextMenu`, `popupApplicationMenu`, `getGoldenPathMessage`,
+`profileNames`, and `isHamburgerMenuEnabled`. A handler imports no Electron
+module, no configuration query, and no plugin runtime; the composition root,
+`app/start.ts`, supplies the real adapters instead. That is why the dispatcher
+is injected rather than module-level: a table built over doubles can be
+asserted in a test process with no application around it, and a command that
+reaches around its dependencies fails there rather than in a packaged build.
+`test/unit/command-table.test.ts` builds the table this way and checks each
+command's effect, including the ordered effects of a command that performs more
+than one.
+
+The dispatcher reaches every surface that runs a command:
+
+- `newWindow(options_, cfg, execCommand, markerSink, fn?, profileName)` in
+  `app/ui/window.ts` wires the window's `command` RPC listener and its context
+  menu to the dispatcher.
+- `createMenu(getLoadedPluginVersions, execCommand)` in `app/menus/menu.ts`
+  passes it to the menu builders under `app/menus/menus/`.
+- `contextMenuTemplate(selection, execCommand)` in `app/ui/contextmenu.ts`
+  builds the shell and edit submenus over it.
+
+`app/config/config-watch.ts` reports the keymaps marker through
+`emitKeymapsMarker(report, keymaps, marker)`. The applied keymaps arrive as a
+parameter, so the line names the configuration the import that just finished
+produced rather than whatever state happens to be stored.
 
 ## Visible-only WebGL rendering practice
 
@@ -1607,11 +1666,13 @@ Markers are written through `app/config/e2e-marker-sink.ts`. `createMarkerSink`
 builds a sink that prints only while the lane flag holds, and
 `silentMarkerSink` discards every line for callers with no stream to report to.
 There is no process-wide channel: the entry point builds the sink, passes it to
-`startApplication` in `app/startup.mts`, and receives it back through
-`config.setup({markerSink})` and `getMarkerSink`. Units take the sink as a
-parameter — the command table in `app/commands.ts`, the `window:new` handler in
-`app/commands/window-new.ts`, and the configuration watcher — so none of them
-can report a marker a shipped build did not ask for. Only the lane's entry
+`startApplication` in `app/startup.mts`, which hands it to
+`config.setup({markerSink})` and to `startMainProcess({markerSink})` in
+`app/start.ts`. Units take the sink as a parameter — the command table in
+`app/commands.ts`, the `window:new` handler in `app/commands/window-new.ts`,
+the configuration watcher, the RPC server in `app/rpc.ts` (through `createRPC`
+from `app/ui/window.ts`), and every window `newWindow` creates — so none of
+them can report a marker a shipped build did not ask for. Only the lane's entry
 point, `app/e2e-entry.mts`, supplies a sink that prints; the shipped entry
 point, `app/index.mts`, passes nothing and keeps `silentMarkerSink`. Only the
 lane's entry point reads `VELOCETTY_E2E_PRESS_FILE` and starts
@@ -1619,11 +1680,11 @@ lane's entry point reads `VELOCETTY_E2E_PRESS_FILE` and starts
 as parameters, so it is dormant in a shipped build without reading the
 environment.
 
-The RPC server is the one exception. `app/rpc.ts` receives `isE2ERun` as a
-dependency and reads it once at construction; when the lane flag was set it
-prints `[e2e] renderer-ready` after each load and logs high-severity renderer
-messages as `[e2e][renderer-error]` directly to standard output, bypassing the
-marker sink. A shipped build prints those lines only when `RUN_E2E=1` is set.
+The RPC server reports `[e2e] renderer-ready` after each load and a
+high-severity renderer message as `[e2e][renderer-error]`, both through the
+sink it was given. A shipped build therefore prints neither, because its sink is
+`silentMarkerSink`. Nothing on that path reads the environment or writes to
+the console directly.
 
 The probe shortcut `ctrl+alt+shift+n` is bound by no shipped keymap, which
 `test/unit/e2e-keymap-probe.test.ts` enforces; a marker reporting it can
