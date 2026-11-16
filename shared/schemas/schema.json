@@ -627,7 +627,7 @@
           }
         ]
       },
-      "description": "Example\n'window:devtools': 'cmd+alt+o',",
+      "description": "Shortcut overrides, read once at start-up to seed `keybindings.json5`.",
       "type": "object"
     },
     "localPlugins": {
