@@ -444,7 +444,7 @@ JSON-Schema-like `settingsSchema`. `app/runtime/plugin-runtime.ts` exports
 `app/runtime/golden-path-message.ts` reads settings in the main process.
 `lib/utils/plugins.ts` `resolveRuntimePluginSettings` reads them in the
 renderer. `app/runtime/plugin-runtime-json5-roundtrip.ts` patches
-`config.plugins.<id>` text-preservingly through an 839-line hand-written parser
+`config.plugins.<id>` text-preservingly through an 839-line handwritten parser
 (`plugin-runtime-json5-parser.ts`). Its `pluginId(value)` brand validates
 nothing.
 
@@ -534,7 +534,7 @@ Requirements:
   other namespace, in memory or in file bytes. A malformed namespace affects
   only its own plugin. (Roadmap success criterion.)
 - `REQ-PRESERVE`: plugin-settings writes keep unrelated text, never happen at
-  start-up or reload, and never happen when the file is unparseable.
+  start-up or reload, and never happen when the file is unparsable.
   (Developers' guide; 3.2.1 principle.)
 - `REQ-HEX`: pure policy is separate from ports and adapters.
 - `REQ-DOCS`: the users' guide, developers' guide, configuration architecture,
@@ -623,7 +623,7 @@ inputs never reach the policy.
   `config.plugins[i][k]` changed. Every byte outside the replaced or inserted
   span is unchanged.
 - `INV-NO-WRITE-INVALID` (`REQ-PRESERVE`): a missing, unreadable, or
-  unparseable file gives a refused outcome, and the bytes stay unchanged.
+  unparsable file gives a refused outcome, and the bytes stay unchanged.
 - `INV-ATOMIC` (`REQ-PRESERVE`): if the write fails at any step before the
   rename, the original bytes are intact and no temporary file remains.
 - `INV-NO-IMPLICIT-WRITE` (`REQ-PRESERVE`): start-up and reload perform no
@@ -796,7 +796,7 @@ Feature: Plugin settings persist under namespaced keys
     When Velocetty starts and a golden-path setting is written
     Then a diagnostic names "Com.Example" and its text is still in the file
 
-  Scenario: Writes refuse on an unparseable file
+  Scenario: Writes refuse on an unparsable file
     Given config.json5 contains a syntax error
     When the golden-path handle sets tabPrefix
     Then the outcome is refused and the file bytes are unchanged
@@ -985,7 +985,7 @@ handle. Write `test/e2e/plugin-settings.e2e.test.ts` covering the BDD
 scenarios at application level. One scenario runs three launches: defaults
 with no write; then set, relaunch, and persisted; then the bytes of a
 `com.example.other` entry with comments unchanged. Others cover a wrong kind,
-a malformed namespace with `fontSize` preserved, and an unparseable file
+a malformed namespace with `fontSize` preserved, and an unparsable file
 refusing the write. Assert on markers, file bytes, and modification time, not
 on screenshots. Run `bun run test:e2e:fast` locally (headless recipe) and
 confirm that the CI fast lane picks up the new file, because `test:e2e:run`
