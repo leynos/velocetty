@@ -28,9 +28,9 @@
     system: JSON5 and layering).
   - `docs/velocetty-product-requirements-document.md` (§3, command system and
     keybinding management).
-  - `docs/adr-007-keybindings-json5-storage.md` (this item's architectural
+  - `docs/adrs/adr-0007-keybindings-json5-storage.md` (this item's architectural
     decision record (ADR), accepted 2026-10-30) and
-    `docs/adr-008-velocetty-configuration-directory.md` (the configuration
+    `docs/adrs/adr-0008-velocetty-configuration-directory.md` (the configuration
     tree, accepted 2026-10-30).
   - `docs/developers-guide.md` (§Configuration format practice,
     §Configuration layering and reloadability practice, §Tests).
@@ -4445,7 +4445,7 @@ outcome for both copies and asserts they classify identically;
 case; `config-tree.test.ts` asserts the resolver's precedence, `exists`, and
 `shadowed` rules; `config-import-json5.test.ts` proves start-up creates no file
 for an inaccessible path; `cli-api-behaviour.test.ts` covers the CLI path and
-error. `docs/adr-008-velocetty-configuration-directory.md`,
+error. `docs/adrs/adr-0008-velocetty-configuration-directory.md`,
 `docs/tracking-issues.md`, `docs/configuration-architecture.md`, and
 `docs/developers-guide.md` record the four-state contract.
 
@@ -4552,7 +4552,7 @@ with the reason recorded.
   must act on it. `test/unit/plugin-load-failure-text.test.ts` covers both
   sinks and asserts that neither path nor directory name appears.
 - **Domain Architecture, bootstrap wording.**
-  `docs/adr-007-keybindings-json5-storage.md`,
+  `docs/adrs/adr-0007-keybindings-json5-storage.md`,
   `docs/configuration-architecture.md` and `docs/developers-guide.md` now say
   the write's decision comes from an earlier observation and is not atomic
   against another process, citing `#270`. `docs/tracking-issues.md` gains

@@ -10,8 +10,8 @@
   module `app/config/keybindings-policy.ts` stays free of Electron, filesystem,
   and clock access.
 - Cross-links:
-  - [ADR 007](adr-007-keybindings-json5-storage.md)
-  - [ADR 008](adr-008-velocetty-configuration-directory.md)
+  - [ADR 007](adrs/adr-0007-keybindings-json5-storage.md)
+  - [ADR 008](adrs/adr-0008-velocetty-configuration-directory.md)
   - [Users' guide](users-guide.md)
   - [Developers' guide](developers-guide.md)
 

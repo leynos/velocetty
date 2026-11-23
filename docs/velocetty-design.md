@@ -774,7 +774,7 @@ export interface Keybinding {
 
 The interface above is the runtime model, not the stored format.
 `keybindings.json5` stores the map recorded in
-[ADR 007](adr-007-keybindings-json5-storage.md): a JSON5 object whose keys are
+[ADR 007](adrs/adr-0007-keybindings-json5-storage.md): a JSON5 object whose keys are
 command identifiers and whose values are one shortcut string or an array of
 them. The map is the format every consumer already expects, so loading is a
 plain merge with no adapter. It evolves additively: a later version may widen
@@ -887,7 +887,7 @@ The editor provides:
 - Reset a command binding to default.
 
 - Export/import as JSON5, in the storage format of
-  [ADR 007](adr-007-keybindings-json5-storage.md).
+  [ADR 007](adrs/adr-0007-keybindings-json5-storage.md).
 
 
 
@@ -954,7 +954,7 @@ product name):
 ### Implemented storage and resolution (roadmap 3.2.1)
 
 The paths above were delivered by roadmap `3.2.1` as
-[ADR 008](adr-008-velocetty-configuration-directory.md). The Velocetty tree is
+[ADR 008](adrs/adr-0008-velocetty-configuration-directory.md). The Velocetty tree is
 created at start-up. `keybindings.json5` lives there, except that a development
 build with an active development-mode `config.json5` or `hyper.json` keeps it
 beside that file.
@@ -971,7 +971,7 @@ beside that file.
 - The Hyper tree remains readable and is never used for a new configuration
   file. A Hyper-tree `schema.json` is refreshed only if it already exists.
 
-Storage format, per [ADR 007](adr-007-keybindings-json5-storage.md), is the
+Storage format, per [ADR 007](adrs/adr-0007-keybindings-json5-storage.md), is the
 Hyper-compatible map: command identifier to one shortcut string or an array of
 them. `[]` unbinds a command's default, `{}` resets the file, and `$schema` is
 validated as a string and then ignored. Import and export are verbatim:

@@ -141,7 +141,7 @@ Last updated: 2026-10-30
   `createPathProbe`, because they cannot share a concrete filesystem module,
   and KB-PATH-3 compares the two classifications.
 - Recorded as a known risk in
-  [ADR 008](adr-008-velocetty-configuration-directory.md).
+  [ADR 008](adrs/adr-0008-velocetty-configuration-directory.md).
 
 ### CONFIG-003 exit criteria
 
@@ -180,7 +180,7 @@ Last updated: 2026-10-30
 - A one-time migration moves or imports existing application state without
   losing window layout or preferences.
 - The users' guide and
-  [ADR 008](adr-008-velocetty-configuration-directory.md) are updated.
+  [ADR 008](adrs/adr-0008-velocetty-configuration-directory.md) are updated.
 
 ## KEYMAP-001 Align plugin keybinding precedence with the design
 
@@ -198,7 +198,7 @@ Last updated: 2026-10-30
   (`app/runtime/plugin-runtime.ts`), so core defaults beat plugin defaults.
   Legacy `decorateKeymaps` hooks then run after user overrides
   (`app/plugins.ts`), so a plugin can change or remove a user's binding.
-- [ADR 007](adr-007-keybindings-json5-storage.md) records this as a known
+- [ADR 007](adrs/adr-0007-keybindings-json5-storage.md) records this as a known
   limitation. Roadmap item `4.2.1` owns the full precedence rules.
 - Users are told about the `decorateKeymaps` effect in the
   [users' guide](users-guide.md).
