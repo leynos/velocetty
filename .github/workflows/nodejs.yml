@@ -14,6 +14,11 @@ defaults:
 env:
   NODE_VERSION: 24.11.1
   MERMAN_CLI_VERSION: '0.7.0'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     if: github.event_name == 'push' || github.event_name == 'pull_request'
