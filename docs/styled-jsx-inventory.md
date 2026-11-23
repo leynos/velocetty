@@ -201,5 +201,5 @@ for complete details.
 
 - ExecPlan:
   `docs/execplans/1-4-16-styled-jsx-to-css-modules-migration-approach-and-inventory.md`
-- ADR-002: `docs/adr-002-replace-webpack-babel-with-esbuild.md`
+- ADR-002: `docs/adrs/adr-0002-replace-webpack-babel-with-esbuild.md`
 - Developers' Guide: `docs/developers-guide.md` §CSS Modules conventions

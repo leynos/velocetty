@@ -240,8 +240,8 @@ files were:
 
 The design context is already settled. `docs/velocetty-design.md` defines the
 renderer styling model as CSS Modules plus CSS custom properties for dynamic
-values. `docs/adr-002-replace-webpack-babel-with-esbuild.md` identifies the
-bridge as a temporary migration aid and requires removal once parity is
+values. `docs/adrs/adr-0002-replace-webpack-babel-with-esbuild.md` identifies
+the bridge as a temporary migration aid and requires removal once parity is
 complete. `docs/velocetty-hyper-codebase.md` still describes the bridge-era
 architecture, which is useful as background but is not a required deliverable
 for this roadmap item unless implementation would otherwise leave development

@@ -31,8 +31,8 @@ Success is observable when:
 
 ## Constraints
 
-- Keep alignment with `docs/adr-004-update-electron-40.md` Phase 3 validation
-  and `docs/developers-guide.md` runtime-alignment guidance.
+- Keep alignment with `docs/adrs/adr-0004-update-electron-40.md` Phase 3
+  validation and `docs/developers-guide.md` runtime-alignment guidance.
 - Keep runtime anchors coherent (`electron`, `electron-mksnapshot`,
   `@types/node`, `bin/rebuild-node-pty.cjs`, and CI `NODE_VERSION`) whenever
   touched.
@@ -330,7 +330,7 @@ Primary files in scope:
 - `docs/roadmap.md`
   - `1.4.15` contains Linux checklist items that must be marked done on
     completion of this feature slice.
-- `docs/adr-004-update-electron-40.md`
+- `docs/adrs/adr-0004-update-electron-40.md`
   - Provides the Electron 40 validation context this work must preserve.
 - `docs/installing-aarch64.md`
   - Serves as Linux aarch64 troubleshooting guidance and should stay accurate if

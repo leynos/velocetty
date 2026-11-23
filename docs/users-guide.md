@@ -10,8 +10,8 @@
 - Cross-links:
   - [Configuration architecture](configuration-architecture.md)
   - [Developers' guide](developers-guide.md)
-  - [ADR 007](adr-007-keybindings-json5-storage.md)
-  - [ADR 008](adr-008-velocetty-configuration-directory.md)
+  - [ADR 007](adrs/adr-0007-keybindings-json5-storage.md)
+  - [ADR 008](adrs/adr-0008-velocetty-configuration-directory.md)
 
 ## Where configuration lives
 

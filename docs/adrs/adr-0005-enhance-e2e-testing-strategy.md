@@ -160,7 +160,7 @@ supported in Playwright's own runner. The layered approach improves confidence
 where risk is highest, without forcing every pull request through a slow,
 high-variance E2E path.[^2][^3]
 
-[^1]: [Developers' guide](developers-guide.md)
+[^1]: [Developers' guide](../developers-guide.md)
 [^2]: <https://bun.com/docs/test>
 [^3]: <https://playwright.dev/docs/test-intro>
 [^4]: <https://www.browserstack.com/guide/bun-playwright>
