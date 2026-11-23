@@ -255,8 +255,11 @@ export type rawConfig = {
    */
   localPlugins?: string[];
   /**
-   * Example
-   * 'window:devtools': 'cmd+alt+o',
+   * Shortcut overrides, read once at start-up to seed `keybindings.json5`.
+   *
+   * @deprecated Put shortcuts in `keybindings.json5` instead. This key is
+   * ignored whenever that file exists, and it is no longer read on reload.
+   * Example: 'window:devtools': 'cmd+alt+o',
    */
   keymaps?: {[k: string]: string | string[]};
 };

@@ -41,8 +41,8 @@ const macCiFallbackStabilityTimeoutMs = 5000;
 const e2eTimeoutHeadroomMs = 1500;
 const developmentAppLaunchArgs =
   process.platform === 'linux' && (process.env.CI === 'true' || process.env.ELECTRON_DISABLE_SANDBOX === '1')
-    ? ['node_modules/electron/cli.js', '--no-sandbox', '--disable-setuid-sandbox', 'dist/app']
-    : ['node_modules/electron/cli.js', 'dist/app'];
+    ? ['node_modules/electron/cli.js', '--no-sandbox', '--disable-setuid-sandbox', 'dist/app/e2e-entry.mjs']
+    : ['node_modules/electron/cli.js', 'dist/app/e2e-entry.mjs'];
 const shouldCapture = process.env.E2E_CAPTURE === '1';
 const debugE2E = process.env.E2E_DEBUG === '1';
 const driverOverride = process.env.E2E_DRIVER;

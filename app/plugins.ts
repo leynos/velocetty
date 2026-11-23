@@ -17,9 +17,11 @@ import type {IpcMainWithCommands} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
 
 import * as config from './config';
-import {isFunction, isObject, isString} from './utils/runtime-guards';
+import {describeError} from './utils/error-code';
+import {isFunction, isObject} from './utils/runtime-guards';
 import {plugs} from './config/paths';
 import notify from './notify';
+import {createPluginLoader} from './plugins-load';
 import {availableExtensions} from './plugins/extensions';
 import {install} from './plugins/install';
 import {
@@ -85,9 +87,35 @@ const ensureRuntimeDefaultsPersisted = () => {
     ensureRuntimePluginSettingsPersisted();
     runtimePluginDefaultsPersisted = true;
   } catch (error) {
-    console.warn('Failed to persist runtime plugin settings defaults.', error);
+    // The raw value may quote a settings path; the bounded description still
+    // says which fixed category of failure occurred.
+    console.warn('Failed to persist runtime plugin settings defaults.', {
+      category: 'thrown',
+      error: describeError(error),
+      operation: 'plugin-settings'
+    });
   }
 };
+
+/**
+ * Loads one configured plugin list, keeping the modules that expose an API.
+ *
+ * Declared above the module-level `requirePlugins()` call below: that call runs
+ * while this module is still being evaluated, and a `const` declared after it
+ * would be in its temporal dead zone. The whole start-up path fails with a
+ * `ReferenceError` when that happens, which no mocked unit test can see.
+ */
+const loadPlugins = createPluginLoader<AppPluginModule>({
+  availableExtensions,
+  log: (message) => console.log(message),
+  notify: (title, body, details) => notify(title, body, details),
+  // The plugin directory is the resolution root, so a plugin's own dependency
+  // tree is resolved from where it was installed rather than the app's.
+  // SAFETY: `pluginRequire` is Node's `require`, which types its result as
+  // `any`; the loader only writes the two bookkeeping fields it owns.
+  requireModule: <Module>(request: string) => pluginRequire(request) as Module,
+  warn: (message) => console.warn(message)
+});
 
 // caches
 let plugins = config.getPlugins();
@@ -123,6 +151,13 @@ function patchModuleLoad() {
   // SAFETY: Node exposes the internal loader on `node:module`; this wrapper preserves its call signature.
   const Module = pluginRequire('node:module') as ModuleWithLoader;
   const originalLoad = Module._load;
+  /**
+   * Serves the Hyper module specifiers a plugin may still require.
+   *
+   * The deprecated specifiers resolve to this app's own React and to `Object`,
+   * which keeps an old plugin loadable without giving it a second copy of the
+   * renderer's libraries. Everything else reaches the loader unchanged.
+   */
   Module._load = function _load(modulePath: string, parent?: NodeJS.Module | null, isMain?: boolean) {
     // PLEASE NOTE: Code changes here, also need to be changed in
     // lib/utils/plugins.js
@@ -164,6 +199,12 @@ function checkDeprecatedExtendKeymaps() {
 
 let updating = false;
 
+/**
+ * Installs the plugins the user's configuration lists.
+ *
+ * One update runs at a time: a request that arrives while another is in flight
+ * only reports that, rather than starting a competing install.
+ */
 function updatePlugins({force = false} = {}) {
   if (updating) {
     return notify('Plugin update in progress');
@@ -175,7 +216,7 @@ function updatePlugins({force = false} = {}) {
     updating = false;
 
     if (err) {
-      notify('Error updating plugins.', err, {error: err});
+      notify('Error updating plugins.', err, {category: 'thrown', error: err, operation: 'plugin-load'});
     } else {
       // flag successful plugin update
       cache.set('hyper.plugins', id_);
@@ -225,6 +266,13 @@ function getPluginVersions() {
   });
 }
 
+/**
+ * Unloads every loaded plugin before its modules are re-read.
+ *
+ * The unload hooks run first so a plugin releases what it registered while its
+ * code is still in memory, then the require cache entries under the plugin
+ * directories are dropped so the next load reads the new files.
+ */
 function clearCache() {
   // trigger unload hooks
   modules.forEach((mod) => {
@@ -266,6 +314,12 @@ if (cache.get('hyper.plugins') !== id || process.env.HYPER_FORCE_UPDATE) {
   }
 })();
 
+/**
+ * Writes the dependency manifest the plugin installer reads.
+ *
+ * The manifest is generated from the active configuration's plugin lists, so
+ * the installer sees exactly the plugins the app is configured to load.
+ */
 function syncPackageJSON() {
   const dependencies = toDependencies(plugins);
   const pkg = {
@@ -336,53 +390,23 @@ function getPaths() {
 // expose to renderer
 export {getPaths};
 
-// get paths from renderer
+/**
+ * Reports the plugin directories the renderer needs to resolve modules.
+ *
+ * @returns The installed-plugin directory and the local-plugin directory.
+ */
 export const getBasePaths = () => {
   return {path: pluginPath, localPath};
 };
 
+/**
+ * Loads every configured plugin module, skipping the ones that fail.
+ *
+ * @returns The loaded modules, in configuration order.
+ */
 function requirePlugins(): any[] {
   const {plugins: plugins_, localPlugins} = paths;
-
-  const load = (path_: string) => {
-    let mod: AppPluginModule;
-    try {
-      mod = pluginRequire(path_);
-      const exposed = Object.keys(mod).some((key) => availableExtensions.has(key));
-      if (!exposed) {
-        notify(
-          'Plugin error!',
-          `${`Plugin "${path.basename(path_)}" does not expose any `}Hyper extension API methods`
-        );
-        return;
-      }
-
-      // populate the name for internal errors here
-      mod._name = path.basename(path_);
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        mod._version = pluginRequire(path.resolve(path_, 'package.json')).version;
-      } catch {
-        console.warn(`No package.json found in ${path_}`);
-      }
-      console.log(`Plugin ${mod._name} (${mod._version}) loaded.`);
-
-      return mod;
-    } catch (error) {
-      const errorCode = isObject(error) && 'code' in error && isString(error.code) ? error.code : undefined;
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorCode === 'MODULE_NOT_FOUND') {
-        console.warn(`Plugin error while loading "${path.basename(path_)}" (${path_}): ${errorMessage}`);
-      } else {
-        notify('Plugin error!', `Plugin "${path.basename(path_)}" failed to load (${errorMessage})`, {error});
-      }
-    }
-  };
-
-  return [...plugins_, ...localPlugins].flatMap((pluginPath) => {
-    const value = load(pluginPath);
-    return value ? [value] : [];
-  });
+  return loadPlugins([...plugins_, ...localPlugins]);
 }
 
 export const onApp = (app_: App) => {
@@ -392,7 +416,9 @@ export const onApp = (app_: App) => {
         plugin.onApp(app_);
       } catch (error) {
         notify('Plugin error!', `"${plugin._name}" has encountered an error. Check Developer Tools for details.`, {
-          error: error
+          category: 'thrown',
+          error,
+          operation: 'plugin-hook'
         });
       }
     }
@@ -406,7 +432,9 @@ export const onWindowClass = (win: BrowserWindow) => {
         plugin.onWindowClass(win);
       } catch (error) {
         notify('Plugin error!', `"${plugin._name}" has encountered an error. Check Developer Tools for details.`, {
-          error: error
+          category: 'thrown',
+          error,
+          operation: 'plugin-hook'
         });
       }
     }
@@ -420,7 +448,9 @@ export const onWindow = (win: BrowserWindow) => {
         plugin.onWindow(win);
       } catch (error) {
         notify('Plugin error!', `"${plugin._name}" has encountered an error. Check Developer Tools for details.`, {
-          error: error
+          category: 'thrown',
+          error,
+          operation: 'plugin-hook'
         });
       }
     }
@@ -433,18 +463,27 @@ function decorateEntity(base: any, key: string, type: 'object' | 'function') {
   let decorated = base;
   modules.forEach((plugin) => {
     if (plugin[key]) {
-      let res;
+      let res: unknown;
       try {
         res = plugin[key](decorated);
       } catch (error) {
-        notify('Plugin error!', `"${plugin._name}" when decorating ${key}`, {error: error});
+        notify('Plugin error!', `"${plugin._name}" when decorating ${key}`, {
+          category: 'thrown',
+          error,
+          operation: 'plugin-decoration'
+        });
         return;
       }
       const matchesExpectedType = type === 'object' ? isObject(res) : isFunction(res);
       if (res && matchesExpectedType) {
         decorated = res;
       } else {
-        notify('Plugin error!', `"${plugin._name}": invalid return type for \`${key}\``);
+        // The user-facing text names the plugin and hook; the log records only
+        // the bounded category, because a plugin's name may be user data.
+        notify('Plugin error!', `"${plugin._name}": invalid return type for \`${key}\``, {
+          category: 'invalid-return',
+          operation: 'plugin-decoration'
+        });
       }
     }
   });
@@ -473,7 +512,9 @@ export const getDeprecatedConfig = () => {
       configTmp = plugin.decorateConfig(structuredClone(baseConfig));
     } catch (error) {
       notify('Plugin error!', `"${plugin._name}" has encountered an error. Check Developer Tools for details.`, {
-        error: error
+        category: 'thrown',
+        error,
+        operation: 'plugin-decoration'
       });
       return;
     }
@@ -494,13 +535,30 @@ export const getDecoratedEnv = (baseEnv: NodeJS.ProcessEnv) => {
   return decorateObject(baseEnv, 'decorateEnv');
 };
 
+/**
+ * Returns the effective configuration for one profile.
+ *
+ * The profile's merged configuration is decorated by every plugin, completed
+ * with the palette the import applied, and translated from the legacy hterm
+ * CSS selectors. Decoration reads no bundled file, so opening a window cannot
+ * be affected by a later read fault.
+ *
+ * @param profile - The profile name to resolve.
+ * @returns The decorated and translated configuration.
+ *
+ * @example
+ * ```ts
+ * getDecoratedConfig('default').colors.black; // the effective black
+ * ```
+ */
 export const getDecoratedConfig = (profile: string) => {
   ensureRuntimeDefaultsPersisted();
-  const baseConfig = config.getProfileConfig(profile);
-  const decoratedConfig = decorateObject(baseConfig, 'decorateConfig');
-  const fixedConfig = config.fixConfigDefaults(decoratedConfig);
-  const translatedConfig = config.htermConfigTranslate(fixedConfig);
-  return translatedConfig;
+  // The composition helper copies the imported palette before decoration, so
+  // in-place plugin edits cannot remove the colours decoration falls back to.
+  const fixedConfig = config.decorateProfileConfig(profile, (baseConfig) =>
+    decorateObject(baseConfig, 'decorateConfig')
+  );
+  return config.htermConfigTranslate(fixedConfig);
 };
 
 export const getDecoratedKeymaps = () => {
