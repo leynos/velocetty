@@ -77,7 +77,8 @@ export type CommandDependencies = Readonly<{
  * @example
  * ```ts
  * const table = createCommandTable({openWindow, markerSink, ...adapters});
- * table['window:preferences']?.(); // calls `openConfig`
+ * table['window:openConfigFile']?.(); // calls `openConfig`
+ * table['window:preferences']?.(); // calls `openSettingsWindow`
  * ```
  */
 export const createCommandTable = (dependencies: CommandDependencies): CommandTable => {

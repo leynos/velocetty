@@ -70,6 +70,23 @@ export const shouldAnnounceReload = (report: ConfigImportReport): boolean => {
 };
 
 /**
+ * Decides whether a reload is announced to the user.
+ *
+ * A reload the application wrote itself updates the renderer silently: the
+ * user just made that change in the settings tab, and announcing it as an
+ * external update would be noise.
+ *
+ * @param report - What the import decided.
+ * @param isSelfWrite - Whether the settings writer produced the change.
+ * @returns True only when the import applied and the app did not write it.
+ *
+ * @example
+ * shouldNotifyReload({config: 'applied', keybindings: 'applied'}, true); // false
+ */
+export const shouldNotifyReload = (report: ConfigImportReport, isSelfWrite: boolean): boolean =>
+  shouldAnnounceReload(report) && !isSelfWrite;
+
+/**
  * Describes the keybindings half of a decision in that outcome's own terms.
  *
  * `applied` names where the keymaps came from, and `kept` names both the basis

@@ -10,6 +10,8 @@
 
 import {readFileSync} from 'node:fs';
 
+import type {JsonObject} from '@shared/types/json';
+
 import {app} from 'electron';
 
 import {mkdirpSync} from 'fs-extra';
@@ -48,6 +50,7 @@ import {
   velocettyDir
 } from './config/paths';
 import notify from './notify';
+import {isJsonObject} from './utils/runtime-guards';
 import {runStartupSession} from './config/startup-session';
 import {closeWatcherAtShutdown} from './config/watcher';
 import {captureWatchedFileStamps, settleWatchedFileStamps} from './config/watched-file-stamp';
@@ -162,7 +165,10 @@ export type ConfigurationSetupOptions = Readonly<{
  * ```
  */
 /** The bundled defaults, as the settings service reports them. */
-export const getConfigDefaults = (): JsonObject => getDefaultConfig().config ?? {};
+export const getConfigDefaults = (): JsonObject => {
+  const {defaults} = getDefaultConfig();
+  return isJsonObject(defaults.config) ? defaults.config : {};
+};
 
 /** Reads the active configuration file, or null when it cannot be read. */
 const readActiveConfigText = (): string | null => {

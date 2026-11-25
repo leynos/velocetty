@@ -9,14 +9,12 @@
 
 import {useEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 
-import {formatValue, type SettingValue} from '@shared/settings/coerce';
 import {buildCorePanelModel, coreKeyFromSettingId, type CoreSettingKey} from '@shared/settings/core-catalogue';
 import {keyRequiresRestart} from '@shared/constants/config-reloadability';
 import type {PanelField} from '@shared/settings/panel-model';
 import {normalizeSearchText, searchFieldIndices} from '@shared/settings/search';
 import {SETTING_CATEGORY_IDS, type SettingCategoryId} from '@shared/settings/panel-model';
 import type {SettingsFileStatus, SettingsSnapshot} from '@shared/settings/protocol';
-import type {JsonValue} from '@shared/types/json';
 import type {SettingsCategorySelection} from '@shared/constants/settings-tab';
 
 import {describeFieldError, formatResultCount} from '../i18n';

@@ -7,7 +7,6 @@
  * never reaches back into the composition root, and the baseline stamps and
  * reload callback arrive as explicit parameters.
  */
-import chokidar from 'chokidar';
 import path from 'node:path';
 
 import type {ConfigMetrics} from './config-metrics';
@@ -18,9 +17,10 @@ import type {ImportRecord, ImportRecorder} from './config-observability';
 import {setCurrentConfig} from './current-config';
 import {formatKeymapsMarker, type E2EKeymapStatus} from './e2e-keymap-probe';
 import type {E2EMarkerSink} from './e2e-marker-sink';
+import {createChokidarHandle} from './chokidar-handle';
 import type {ConfigImportResult} from './import';
-import {shouldAnnounceReload, type ConfigImportReport, type ConfigSourceKind} from './import-report';
-import {createConfigWatcher, type WatcherEvent, type WatcherHandle} from './watcher';
+import {shouldNotifyReload, type ConfigImportReport, type ConfigSourceKind} from './import-report';
+import {createConfigWatcher} from './watcher';
 import {createWatchedFileReconciler, type WatchedFileStamps} from './watched-file-stamp';
 
 const CONFIG_DEBOUNCE_MS = 100;
@@ -54,40 +54,6 @@ export const emitKeymapsMarker = (
   marker(formatKeymapsMarker(keymapStatus(report), keymaps));
 };
 
-/** Wraps chokidar in the adapter the watcher debounces over. */
-const createChokidarHandle = (directories: readonly string[]): WatcherHandle => {
-  const watcher = chokidar.watch([...directories], {depth: 0, ignoreInitial: true});
-  /** Subscribes one listener to a single chokidar event name. */
-  const on = (event: WatcherEvent, listener: (eventPath: string) => void) => {
-    switch (event) {
-      case 'add': {
-        watcher.on('add', listener);
-        break;
-      }
-      case 'change': {
-        watcher.on('change', listener);
-        break;
-      }
-      case 'unlink': {
-        watcher.on('unlink', listener);
-        break;
-      }
-    }
-  };
-
-  return {
-    close: async () => watcher.close(),
-    on,
-    onError: (listener) => {
-      // SAFETY: chokidar's error event emits the error as its only argument.
-      watcher.on('error', (error: unknown) => listener(error));
-    },
-    onReady: (listener) => {
-      watcher.on('ready', listener);
-    }
-  };
-};
-
 /** The collaborators the watcher runtime needs from the composition root. */
 export type ConfigWatchDependencies = {
   /** Re-runs the configuration import; the watcher never constructs it itself. */
@@ -111,19 +77,6 @@ export type ConfigWatchDependencies = {
   /** Allocates the snapshot revision a completed reload makes visible. */
   readonly onReloaded?: () => void;
 };
-
-/**
- * Decides whether a reload is announced to the user.
- *
- * @param report - What the import decided.
- * @param isSelfWrite - Whether the settings writer produced the change.
- * @returns True only when the import applied and the app did not write it.
- *
- * @example
- * shouldNotifyReload({config: 'applied', keybindings: 'applied'}, true); // false
- */
-export const shouldNotifyReload = (report: ConfigImportReport, isSelfWrite: boolean): boolean =>
-  shouldAnnounceReload(report) && !isSelfWrite;
 
 /** The reload and watching surface one composition root exposes. */
 export type ConfigWatchRuntime = {

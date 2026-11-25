@@ -3,18 +3,19 @@
  *
  * This exercises AXIOM-WATCH: chokidar reports an atomic rename replacement as
  * a change or an add, and the trailing debounce collapses a save's event storm
- * into one reload. The settings-specific part — a self-written file reloads
- * without announcing itself — is decided by `shouldNotifyReload`, tested here
- * as a table.
+ * into one reload. The adapter under test is the production one, so the test
+ * proves the wiring the application ships rather than its own copy of it. The
+ * settings-specific part — a self-written file reloads without announcing
+ * itself — is decided by `shouldNotifyReload`, tested here as a table.
  */
 import {describe, expect, test} from 'bun:test';
-import chokidar from 'chokidar';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import {shouldNotifyReload} from '../../app/config/config-watch';
-import {createConfigWatcher, type WatcherHandle} from '../../app/config/watcher';
+import {createChokidarHandle} from '../../app/config/chokidar-handle';
+import {shouldNotifyReload} from '../../app/config/import-report';
+import {createConfigWatcher} from '../../app/config/watcher';
 
 const waitFor = async (predicate: () => boolean, timeoutMilliseconds = 5000): Promise<void> => {
   const deadline = Date.now() + timeoutMilliseconds;
@@ -38,28 +39,12 @@ const withTemporaryDirectory = async (run: (directory: string) => Promise<void>)
 type Probe = {reloads: number; isReady: boolean};
 
 const startWatch = async (filePath: string): Promise<{probe: Probe; close: () => Promise<void>}> => {
-  const watcher = chokidar.watch(filePath, {ignoreInitial: true});
-  const handle: WatcherHandle = {
-    close: async () => {
-      await watcher.close();
-    },
-    on: (event, listener) => {
-      watcher.on(event, listener);
-    },
-    onError: (listener) => {
-      // SAFETY: chokidar's error event emits the error as its only argument.
-      watcher.on('error', (error: unknown) => listener(error));
-    },
-    onReady: (listener) => {
-      watcher.on('ready', listener);
-    }
-  };
   const probe: Probe = {reloads: 0, isReady: false};
   const debounced = createConfigWatcher<ReturnType<typeof setTimeout>>({
     cancel: (timer) => clearTimeout(timer),
     debounceMs: 20,
     fileNames: [filePath],
-    handle,
+    handle: createChokidarHandle([path.dirname(filePath)]),
     onReady: () => {
       probe.isReady = true;
     },

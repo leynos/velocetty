@@ -2026,3 +2026,13 @@ patches (D20), the field-machine shape (D21), search non-vacuity (D22), the
 JSON5 module split (D23), the synchronous plugin path (D24), the surface
 layering and gate (D25), the field store (D26), and the textual numeric control
 (D27). The Outcomes section records what the lane cost and what remains.
+
+2026-11-25: rebased onto `main` at `6078e4ee`, which had restructured the
+configuration composition root, moved ADRs to `docs/adrs/` with four-digit
+numbers, and refreshed the documentation style guide. The settings ADR is now
+[ADR 009](../adrs/adr-0009-settings-tab-hosting-and-persistence.md); the
+users' guide adds a settings section to the existing guide rather than
+replacing it; the chokidar adapter moved into
+`app/config/chokidar-handle.ts` so the real adapter can be exercised without
+Electron; and `getConfigDefaults` reads the bundled `defaults.config` the
+upstream query now returns.
