@@ -8,6 +8,8 @@
  * without Electron.
  */
 
+import {readFileSync} from 'node:fs';
+
 import {app} from 'electron';
 
 import {mkdirpSync} from 'fs-extra';
@@ -21,6 +23,9 @@ import {createConfigWatchRuntime, emitKeymapsMarker, type ConfigWatchRuntime} fr
 import {setCurrentConfig} from './config/current-config';
 import {silentMarkerSink, type E2EMarkerSink} from './config/e2e-marker-sink';
 import {createConfigImportModule} from './config/import';
+import {sweepTemporaryFiles} from './config/config-file-writer';
+import {createNodeConfigFileSystem} from './config/node-config-file-port';
+import {getLastWrittenTextHash, hashConfigText, nextConfigRevision} from './config/config-write-state';
 import {_init} from './config/init';
 import {createKeybindingsService} from './config/keybindings';
 import {keybindingsCodec} from './config/keybindings-codec';
@@ -77,7 +82,7 @@ const keybindingsService = createKeybindingsService({
 /** Whether the opt-in start-up trace is enabled for this process. */
 const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPORT === '1';
 
-const {_import} = createConfigImportModule({
+const {_import, getDefaultConfig} = createConfigImportModule({
   _init,
   // The environment is read here, at the composition root, so the import
   // modules below take the flag as a dependency and stay testable without it.
@@ -156,6 +161,24 @@ export type ConfigurationSetupOptions = Readonly<{
  * setup(); // the application is now reading and watching its configuration
  * ```
  */
+/** The bundled defaults, as the settings service reports them. */
+export const getConfigDefaults = (): JsonObject => getDefaultConfig().config ?? {};
+
+/** Reads the active configuration file, or null when it cannot be read. */
+const readActiveConfigText = (): string | null => {
+  try {
+    return readFileSync(cfgPath, 'utf8');
+  } catch {
+    return null;
+  }
+};
+
+/** Reports whether the pending reload was caused by the settings writer. */
+const isSelfWriteReload = (): boolean => {
+  const text = readActiveConfigText();
+  return text !== null && getLastWrittenTextHash() === hashConfigText(text);
+};
+
 export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions = {}) => {
   const configWatch = createConfigWatchRuntime({
     configTree,
@@ -165,7 +188,9 @@ export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions
     recorder,
     markerSink,
     spans,
-    watchedFiles
+    watchedFiles,
+    isSelfWriteReload,
+    onReloaded: nextConfigRevision
   });
   // The span and the record belong to the start-up session, which takes its
   // sinks as dependencies; this root only supplies the adapters and applies
@@ -180,6 +205,13 @@ export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions
       // The Velocetty tree holds new configuration files, so it must exist
       // before the importer copies schemas or seeds `keybindings.json5`.
       mkdirpSync(velocettyDir);
+      // A crashed write can leave a sibling temporary file beside the config;
+      // start-up is the only phase that removes it.
+      try {
+        sweepTemporaryFiles(createNodeConfigFileSystem(), cfgDir);
+      } catch {
+        // The directory may not exist yet; the first write creates it.
+      }
       // A crashed write can leave a temporary file behind. Start-up is the
       // only phase that may remove it, and the edge owns that cleanup
       // immediately before the seed decision reads the file.

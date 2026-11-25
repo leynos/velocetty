@@ -210,7 +210,7 @@ terminal's column and row count did not change.
 - [x] (2026-11-25) EP-M1: settings domain core and proofs.
 - [x] (2026-11-25) EP-M2: JSON5 scanner relocation and comment-preserving edit
       operations.
-- [ ] EP-M3: config file writer, settings service, and IPC.
+- [x] (2026-11-25) EP-M3: config file writer, settings service, and IPC.
 - [ ] EP-M4: settings tab shell, tab strip, input gating, and navigation.
 - [ ] EP-M5: editing, inline validation, and reset flows.
 - [ ] EP-M6: end-to-end coverage.
@@ -321,6 +321,22 @@ terminal's column and row count did not change.
 - Observation (EP-M2): the roundtrip rewrite preserved every existing
   expectation, including the exact comment-preserving text asserted by
   `runtime-plugin-settings.test.ts`.
+- Observation (EP-M3): chokidar with default options emits `add` for the file
+  that already exists at start-up. Watching `add` to catch rename-based
+  replacement therefore produced a reload and a notification on launch. Impact:
+  the watcher is created with `ignoreInitial: true`.
+- Observation (EP-M3): the plugin runtime persists during module evaluation,
+  so it cannot await the writer's retry backoff. Impact: the writer exposes
+  `writeConfigEditSync`, which runs the same single synchronous critical
+  section once and reports a retryable failure as `io-error` (D24).
+- Observation (EP-M3): a whole-file `safeParseRawConfig` gate would have made
+  a file that is invalid on one key impossible to fix from the UI, because
+  every write left the other diagnostic in place. Impact: the writer filters
+  schema diagnostics to the edited key's subtree, which is the D15 rule.
+- Observation (EP-M3): under heavy host load the pre-existing 5 s timeout in
+  `test/unit/esbuild-migration-contracts.test.ts` fails intermittently; its
+  bundler calls are unrelated to these files and the suite passes with
+  `--timeout 30000` (648 pass, 0 fail). CI runners are not under that load.
 
 ## Decision log
 
@@ -534,6 +550,16 @@ terminal's column and row count did not change.
      snapshot refresh reconciles the committed value.
   Every union and phase literal is also bound to a typed local before use, as
   the observation above explains. Date/Author: 2026-11-25.
+- Decision D24 (new, EP-M3): plugin settings persistence stays synchronous
+  and goes through the same writer via `writeConfigEditSync`, one single-pass
+  critical section per write. The plugin runtime's keys are not in the core
+  write policy - the runtime owns that namespace - so its guard allows any
+  plugin key; the writer still re-parses the candidate, compares the value it
+  meant to write, and applies the schema check to the plugin's subtree, so a
+  malformed document is refused rather than overwritten. The alternative,
+  making the runtime and `app/plugins.ts` asynchronous, would change start-up
+  ordering for a persistence path that already runs before any window exists.
+  Date/Author: 2026-11-25.
 - Decision D23 (new, EP-M2): the JSON5 editing code is split by
   responsibility inside `app/config/json5/`: `parser.ts` plus its scanning
   modules, `document-scan.ts` for span recovery and path resolution,
@@ -1590,6 +1616,44 @@ EP-M2 (2026-11-25):
   bound.
 - Not covered here: the writer's re-parse-and-compare step (EP-M3) is what
   turns these edits into a safe write; the editor itself only returns text.
+
+EP-M3 (2026-11-25):
+
+- Writer: `app/config/config-file-writer.ts` owns every main-process
+  read-modify-write, with `writeConfigEdit` (retrying) and
+  `writeConfigEditSync` (single pass). It resolves the real path, re-reads,
+  refuses a non-object root or `config`, edits, re-parses and compares the
+  value, filters schema diagnostics to the edited subtree, writes a sibling
+  temporary file with the original mode, fsyncs, renames, and fsyncs the
+  directory. `EBUSY`, `EPERM`, and `EACCES` retry up to three times with
+  backoff. `sweepTemporaryFiles` runs from `config.setup()`.
+- State: `app/config/config-write-state.ts` holds the monotonic revision and
+  the hash of the last self-written text.
+- Service: `app/settings/settings-service.ts` reports snapshots and performs
+  writes and resets, enforcing the legacy `hyper.json` read-only rule and the
+  schema-invalid fix-one-key rule.
+- IPC: `app/settings/settings-ipc.ts` validates the target and value before
+  calling the service; `IpcCommands`, `lib/transport/ipc-schemas.ts`, and
+  `app/start.ts` are wired. The renderer response schemas are covered by
+  `test/unit/ipc-schemas.test.ts`.
+- Watcher: `app/config/config-watcher.ts` extracts the trailing debounce and
+  the self-write notification rule; `app/config.ts` now watches `change` and
+  `add` with `ignoreInitial`, and bumps the revision on every reload.
+- Plugin runtime: both persistence paths call the writer instead of
+  `writeFileSync`; `plugin-runtime-settings` tests now drive an in-memory
+  file-system port.
+- Tests: `config-file-writer.test.ts` (15, including an async property that
+  invalid values never reach the file, a concurrent-writer property, and a
+  deliberately broken writer that loses an update),
+  `config-file-writer-fs.test.ts` (4: mode, symlink, read-only directory,
+  sweep), `config-watch-integration.test.ts` (3: self-write silence, external
+  announcement, burst collapse), `settings-service-behaviour.test.ts` (12),
+  `config-load-regression.test.ts` (2), and the write-policy half of the parity
+  suite.
+- Gates: `make check-fmt`, `make lint`, `make typecheck`, `make proofs`,
+  `bun run build:packages`, and `bunx tsgo --project app/tsconfig.build.json`
+  clean; `bun test --concurrent --isolate --timeout 30000 test/unit` reports
+  648 pass, 0 fail.
 
 Design review summary (2026-10-29), recorded for traceability. Three expert
 lenses reviewed the first draft. Blocking findings and their resolutions: naive

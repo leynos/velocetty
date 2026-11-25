@@ -17,11 +17,12 @@ import type {
   mergeRuntimePluginKeybindings as mergeRuntimePluginKeybindingsType,
   setRuntimePluginEnabledPersisted as setRuntimePluginEnabledPersistedType
 } from '../../app/runtime/plugin-runtime';
+import {createMemoryConfigFileSystem, type MemoryConfigFileSystem} from '../testUtils/config-file-port';
 import {registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
 import {importFresh} from '../testUtils/import-fresh';
 
-type ReadTextFile = (path: string, encoding: BufferEncoding) => string;
-type WriteTextFile = (path: string, content: string, encoding: BufferEncoding) => void;
+const CONFIG_PATH = '/tmp/config.json5';
+const WINDOWS_CONFIG_PATH = String.raw`C:\Users\tester\AppData\Roaming\Hyper\config.json5`;
 
 let ensureRuntimePluginSettingsPersisted: typeof ensureRuntimePluginSettingsPersistedType;
 let detectKeybindingConflicts: typeof detectKeybindingConflictsType;
@@ -49,18 +50,14 @@ beforeAll(async () => {
   ));
 });
 
-const createReadWritePair = (initialContent: string) => {
-  let currentContent = initialContent;
-  const writes: string[] = [];
+const createReadWritePair = (initialContent: string, filePath = CONFIG_PATH) => {
+  const fileSystem = createMemoryConfigFileSystem();
+  fileSystem.setFile(filePath, initialContent);
 
   return {
-    readFile: (_path: string, _encoding: BufferEncoding) => currentContent,
-    writeFile: (_path: string, content: string, _encoding: BufferEncoding) => {
-      currentContent = content;
-      writes.push(content);
-    },
-    getContent: () => currentContent,
-    getWrites: () => writes
+    fileSystem,
+    getContent: () => fileSystem.readFile(filePath) ?? '',
+    getWrites: () => fileSystem.writes.map((write) => write.text)
   };
 };
 
@@ -72,15 +69,15 @@ const ensureJsonObject = (value: unknown) => {
 };
 
 const assertParseErrorBehaviour = <T>(
-  invoke: (deps: {readFile: ReadTextFile; writeFile: WriteTextFile}) => T,
+  invoke: (deps: {fileSystem: MemoryConfigFileSystem}) => T,
   expectedResult: T,
   expectedErrorMessage: string
 ): void => {
   const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
   try {
-    const {readFile, writeFile, getWrites} = createReadWritePair('{config:');
+    const {fileSystem, getWrites} = createReadWritePair('{config:');
 
-    const persisted = invoke({readFile, writeFile});
+    const persisted = invoke({fileSystem});
 
     expect(persisted).toEqual(expectedResult);
     expect(getWrites()).toHaveLength(0);
@@ -119,7 +116,7 @@ const withProcessPlatform = async <T>(platform: NodeJS.Platform, action: () => P
 };
 
 test('ensureRuntimePluginSettingsPersisted writes missing defaults to config.plugins namespace', () => {
-  const {readFile, writeFile, getContent, getWrites} = createReadWritePair(`{
+  const {fileSystem, getContent, getWrites} = createReadWritePair(`{
     config: {
       defaultProfile: 'default',
       profiles: [{name: 'default', config: {}}],
@@ -129,7 +126,7 @@ test('ensureRuntimePluginSettingsPersisted writes missing defaults to config.plu
     keymaps: {},
   }`);
 
-  const namespace = ensureRuntimePluginSettingsPersisted({configFilePath: '/tmp/config.json5', readFile, writeFile});
+  const namespace = ensureRuntimePluginSettingsPersisted({configFilePath: CONFIG_PATH, fileSystem});
 
   expect(getWrites()).toHaveLength(1);
   expect(namespace[GOLDEN_PATH_PLUGIN_ID]).toEqual(goldenPathSettingsDefaults);
@@ -149,17 +146,19 @@ test('runtime plugin settings import remains safe on Windows when config paths r
       '../../app/runtime/plugin-runtime',
       'runtime_plugin_settings_windows_user_data'
     );
-    const {readFile, writeFile} = createReadWritePair(`{
+    const {fileSystem} = createReadWritePair(
+      `{
       config: {},
       plugins: [],
       localPlugins: [],
       keymaps: {},
-    }`);
+    }`,
+      WINDOWS_CONFIG_PATH
+    );
 
     const namespace = runtimePluginModule.ensureRuntimePluginSettingsPersisted({
-      configFilePath: 'C:\\Users\\tester\\AppData\\Roaming\\Hyper\\config.json5',
-      readFile,
-      writeFile
+      configFilePath: WINDOWS_CONFIG_PATH,
+      fileSystem
     });
 
     expect(namespace[GOLDEN_PATH_PLUGIN_ID]).toEqual(goldenPathSettingsDefaults);
@@ -167,7 +166,7 @@ test('runtime plugin settings import remains safe on Windows when config paths r
 });
 
 test('ensureRuntimePluginSettingsPersisted is idempotent after defaults are written', () => {
-  const {readFile, writeFile, getContent, getWrites} = createReadWritePair(`{
+  const {fileSystem, getContent, getWrites} = createReadWritePair(`{
     config: {
       defaultProfile: 'default',
       profiles: [{name: 'default', config: {}}],
@@ -178,16 +177,14 @@ test('ensureRuntimePluginSettingsPersisted is idempotent after defaults are writ
   }`);
 
   const firstNamespace = ensureRuntimePluginSettingsPersisted({
-    configFilePath: '/tmp/config.json5',
-    readFile,
-    writeFile
+    configFilePath: CONFIG_PATH,
+    fileSystem
   });
   const firstContent = getContent();
 
   const secondNamespace = ensureRuntimePluginSettingsPersisted({
-    configFilePath: '/tmp/config.json5',
-    readFile,
-    writeFile
+    configFilePath: CONFIG_PATH,
+    fileSystem
   });
   const secondContent = getContent();
 
@@ -197,7 +194,7 @@ test('ensureRuntimePluginSettingsPersisted is idempotent after defaults are writ
 });
 
 test('setRuntimePluginEnabledPersisted updates enabled flag in JSON5 namespace', () => {
-  const {readFile, writeFile, getContent, getWrites} = createReadWritePair(`{
+  const {fileSystem, getContent, getWrites} = createReadWritePair(`{
     config: {
       plugins: {
         "${GOLDEN_PATH_PLUGIN_ID}": {enabled: true, message: "demo"}
@@ -206,9 +203,8 @@ test('setRuntimePluginEnabledPersisted updates enabled flag in JSON5 namespace',
   }`);
 
   const updated = setRuntimePluginEnabledPersisted(GOLDEN_PATH_PLUGIN_ID, false, {
-    configFilePath: '/tmp/config.json5',
-    readFile,
-    writeFile
+    configFilePath: CONFIG_PATH,
+    fileSystem
   });
 
   expect(updated.enabled).toBe(false);
@@ -234,9 +230,9 @@ test('ensureRuntimePluginSettingsPersisted preserves unchanged comments and form
   localPlugins: [],
   keymaps: {},
 }`;
-  const {readFile, writeFile, getContent, getWrites} = createReadWritePair(initialContent);
+  const {fileSystem, getContent, getWrites} = createReadWritePair(initialContent);
 
-  ensureRuntimePluginSettingsPersisted({configFilePath: '/tmp/config.json5', readFile, writeFile});
+  ensureRuntimePluginSettingsPersisted({configFilePath: CONFIG_PATH, fileSystem});
 
   expect(getWrites()).toHaveLength(1);
   expect(getContent()).toBe(`{
@@ -274,12 +270,11 @@ test('setRuntimePluginEnabledPersisted preserves unrelated plugin formatting', (
     },
   },
 }`;
-  const {readFile, writeFile, getContent, getWrites} = createReadWritePair(initialContent);
+  const {fileSystem, getContent, getWrites} = createReadWritePair(initialContent);
 
   setRuntimePluginEnabledPersisted(GOLDEN_PATH_PLUGIN_ID, false, {
-    configFilePath: '/tmp/config.json5',
-    readFile,
-    writeFile
+    configFilePath: CONFIG_PATH,
+    fileSystem
   });
 
   expect(getWrites()).toHaveLength(1);
@@ -300,8 +295,7 @@ test('setRuntimePluginEnabledPersisted preserves unrelated plugin formatting', (
 
 test('ensureRuntimePluginSettingsPersisted does not write on parse errors', () => {
   assertParseErrorBehaviour(
-    ({readFile, writeFile}) =>
-      ensureRuntimePluginSettingsPersisted({configFilePath: '/tmp/config.json5', readFile, writeFile}),
+    ({fileSystem}) => ensureRuntimePluginSettingsPersisted({configFilePath: CONFIG_PATH, fileSystem}),
     {},
     'Failed to parse runtime plugin config at "/tmp/config.json5". Returning empty namespace.'
   );
@@ -309,11 +303,10 @@ test('ensureRuntimePluginSettingsPersisted does not write on parse errors', () =
 
 test('setRuntimePluginEnabledPersisted returns fallback settings on parse errors', () => {
   assertParseErrorBehaviour(
-    ({readFile, writeFile}) =>
+    ({fileSystem}) =>
       setRuntimePluginEnabledPersisted(GOLDEN_PATH_PLUGIN_ID, false, {
-        configFilePath: '/tmp/config.json5',
-        readFile,
-        writeFile
+        configFilePath: CONFIG_PATH,
+        fileSystem
       }),
     {...goldenPathSettingsDefaults, enabled: false},
     'Failed to parse runtime plugin config at "/tmp/config.json5". Returning fallback settings.'

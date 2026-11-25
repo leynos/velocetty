@@ -19,8 +19,10 @@ import {
   type CoreCatalogueEntry
 } from '@shared/settings/core-catalogue';
 import type {ControlDescriptor} from '@shared/settings/panel-model';
+import {isColourValue} from '@shared/settings/coerce';
+import {SETTINGS_WRITE_POLICY, checkWritePolicy} from '../../app/settings/settings-write-policy';
 import {isString} from '@shared/types/guards';
-import {isJsonObject, type JsonObject} from '@shared/types/json';
+import {isJsonObject, type JsonObject, type JsonValue} from '@shared/types/json';
 
 const SCHEMA_PATH = 'shared/schemas/schema.json';
 
@@ -188,5 +190,89 @@ describe('settings catalogue parity', () => {
     );
     const catalogueOrder = CORE_SETTINGS_CATALOGUE.map((entry) => `core:${entry.key}`);
     expect(modelOrder).toEqual(catalogueOrder);
+  });
+});
+
+describe('settings write policy parity', () => {
+  test('the policy covers exactly the catalogue keys', () => {
+    expect(Object.keys(SETTINGS_WRITE_POLICY).toSorted()).toEqual([...CORE_SETTING_KEYS].toSorted());
+  });
+
+  test('every policy rule mirrors its catalogue control', () => {
+    const mismatches: string[] = [];
+    for (const entry of CORE_SETTINGS_CATALOGUE) {
+      const rule = SETTINGS_WRITE_POLICY[entry.key];
+      // The policy names a boolean value; the control names the widget that
+      // edits it, so a boolean rule corresponds to a toggle.
+      const policyKind = rule.kind === 'boolean' ? 'toggle' : rule.kind;
+      if (policyKind !== entry.control.kind) {
+        mismatches.push(`${entry.key}: policy ${policyKind}, control ${entry.control.kind}`);
+        continue;
+      }
+      const boundsDiffer =
+        rule.kind === 'number' &&
+        entry.control.kind === 'number' &&
+        (rule.minimum !== entry.control.minimum ||
+          rule.maximum !== entry.control.maximum ||
+          rule.isInteger !== entry.control.isInteger);
+      if (boundsDiffer) {
+        mismatches.push(`${entry.key}: number rule differs`);
+      }
+      const optionsDiffer =
+        rule.kind === 'select' &&
+        entry.control.kind === 'select' &&
+        rule.options.join('|') !== entry.control.options.join('|');
+      if (optionsDiffer) {
+        mismatches.push(`${entry.key}: options differ`);
+      }
+    }
+    expect(mismatches).toEqual([]);
+  });
+
+  test('the policy rejects keys the catalogue does not expose', () => {
+    expect(checkWritePolicy('colors', {black: '#000000'})).toHaveLength(1);
+    expect(checkWritePolicy('notASetting', 1)).toHaveLength(1);
+  });
+
+  test('the policy accepts exactly the colours the renderer accepts', () => {
+    const candidates = ['#abc', '#AABBCC', '#aabbccdd', '#ab', 'rgb(1, 2, 3)', 'rgba(0, 0, 0, 0.5)', 'tomato', ''];
+    const observed = candidates.map((candidate) => checkWritePolicy('backgroundColor', candidate).length === 0);
+    expect(observed).toEqual(candidates.map((candidate) => isColourValue(candidate)));
+  });
+
+  test('the policy agrees with coercion on representative values', () => {
+    const cases: readonly {readonly key: string; readonly value: JsonValue}[] = [
+      {key: 'fontSize', value: 16},
+      {key: 'fontSize', value: -3},
+      {key: 'fontSize', value: 101},
+      {key: 'fontSize', value: 'big'},
+      {key: 'cursorBlink', value: true},
+      {key: 'cursorBlink', value: 'true'},
+      {key: 'cursorShape', value: 'BEAM'},
+      {key: 'cursorShape', value: 'beam'},
+      {key: 'updateChannel', value: 'canary'},
+      {key: 'updateChannel', value: 'beta'},
+      {key: 'webGLRendererMaxContexts', value: 4},
+      {key: 'webGLRendererMaxContexts', value: 4.5},
+      {key: 'shell', value: '/bin/zsh'},
+      {key: 'shell', value: ''}
+    ];
+    const observed = cases.map(({key, value}) => checkWritePolicy(key, value).length === 0);
+    expect(observed).toEqual([
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false
+    ]);
   });
 });

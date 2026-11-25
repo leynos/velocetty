@@ -102,7 +102,28 @@ export type ConfigWatchDependencies = {
   readonly configTree: ConfigSourceKind;
   /** Absolute paths of the files a reload must react to. */
   readonly watchedFiles: readonly string[];
+  /**
+   * Reports whether the file now on disk is the one the settings writer just
+   * wrote. Such a reload updates the renderer but is not announced as an
+   * external change.
+   */
+  readonly isSelfWriteReload?: () => boolean;
+  /** Allocates the snapshot revision a completed reload makes visible. */
+  readonly onReloaded?: () => void;
 };
+
+/**
+ * Decides whether a reload is announced to the user.
+ *
+ * @param report - What the import decided.
+ * @param isSelfWrite - Whether the settings writer produced the change.
+ * @returns True only when the import applied and the app did not write it.
+ *
+ * @example
+ * shouldNotifyReload({config: 'applied', keybindings: 'applied'}, true); // false
+ */
+export const shouldNotifyReload = (report: ConfigImportReport, isSelfWrite: boolean): boolean =>
+  shouldAnnounceReload(report) && !isSelfWrite;
 
 /** The reload and watching surface one composition root exposes. */
 export type ConfigWatchRuntime = {
@@ -130,6 +151,8 @@ export type ConfigWatchRuntime = {
  */
 export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies): ConfigWatchRuntime => {
   const {importConfiguration, recorder, spans, metrics, notify, markerSink, configTree, watchedFiles} = dependencies;
+  const isSelfWriteReload = dependencies.isSelfWriteReload ?? (() => false);
+  const onReloaded = dependencies.onReloaded ?? (() => {});
   // The registration, not the callback, is a subscriber's identity. Keying by
   // callback would let a stale cleanup remove a later registration of the same
   // function, which is how a torn-down component could silence its successor.
@@ -160,7 +183,8 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
     const {config, keybindings: outcome, report} = imported;
     finishSpan(report.config === 'fallback' ? 'fallback' : 'applied');
     setCurrentConfig(config);
-    const announced = shouldAnnounceReload(report);
+    onReloaded();
+    const announced = shouldNotifyReload(report, isSelfWriteReload());
     const record: ImportRecord = {announced, configSource: configTree, outcome, phase: 'reload', report};
     if (report.config === 'fallback') {
       Object.assign(record, {fallbackBasis: 'defaults' as const});

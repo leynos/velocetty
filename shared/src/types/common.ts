@@ -7,6 +7,8 @@ import type parseUrl from 'parse-url';
 
 import type {CommandDefinition, CommandId} from './commands';
 import type {configOptions} from './config';
+import type {JsonValue} from './json';
+import type {SettingTarget, SettingsSnapshot, SettingsWriteOutcome} from '../settings/protocol';
 
 /** Branded identifier for session entities. */
 export type SessionId = string & {readonly brand: 'SessionId'};
@@ -196,6 +198,9 @@ export type IpcCommands = {
   'clipboard.readFilePaths': () => string[];
   'clipboard.readText': () => string;
   'clipboard.writeText': (text: string) => void;
+  'settings:getSnapshot': () => SettingsSnapshot;
+  'settings:setValue': (target: SettingTarget, value: JsonValue) => SettingsWriteOutcome;
+  'settings:resetValue': (target: SettingTarget) => SettingsWriteOutcome;
 };
 
 /**

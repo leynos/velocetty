@@ -31,6 +31,11 @@ remoteInitialize();
 // ahead of it because it registers the remote module before any window loads.
 
 import {registerClipboardIpcHandlers} from './clipboard';
+import {defaultWriterState} from './config/config-file-writer';
+import {createNodeConfigFileSystem} from './config/node-config-file-port';
+import {cfgPath} from './config/paths';
+import {registerSettingsIpcHandlers} from './settings/settings-ipc';
+import {createSettingsService} from './settings/settings-service';
 
 const windowSet = new Set<BrowserWindow>();
 type VelocettyRuntimeGlobal = typeof globalThis & VelocettyRuntimeGlobals;
@@ -42,6 +47,26 @@ type VelocettyRuntimeGlobal = typeof globalThis & VelocettyRuntimeGlobals;
 
 // Register before any window loads so renderers can paste from first paint.
 registerClipboardIpcHandlers();
+
+// The settings tab reads and writes the user's config through one service and
+// one writer; register it before any window loads for the same reason.
+const configFileSystem = createNodeConfigFileSystem();
+registerSettingsIpcHandlers(
+  createSettingsService({
+    filePath: cfgPath,
+    fileSystem: configFileSystem,
+    writer: {
+      fileSystem: configFileSystem,
+      sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+      log: (message) => console.error(message),
+      platform: process.platform,
+      processId: () => process.pid,
+      ...defaultWriterState
+    },
+    defaults: config.getConfigDefaults(),
+    getDefaultProfileName: config.getDefaultProfile
+  })
+);
 
 // expose to plugins
 app.config = config;

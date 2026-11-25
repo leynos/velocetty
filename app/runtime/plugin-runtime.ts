@@ -1,13 +1,17 @@
 /** @file Runtime plugin manifest evaluation and JSON5-backed settings persistence. */
-import {readFileSync, writeFileSync} from 'node:fs';
-
 import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
+import {
+  defaultWriterState,
+  writeConfigEditSync,
+  type ConfigFileSystemPort,
+  type ConfigWriterDependencies
+} from '../config/config-file-writer';
+import {createNodeConfigFileSystem} from '../config/node-config-file-port';
 import {cfgPath} from '../config/paths';
 import type {JsonObject} from '@shared/types/json';
 import {isBoolean, isJsonObject} from '../utils/runtime-guards';
 import {
-  applyPluginSettingsPatches,
   json5Document,
   pluginId as toPluginId,
   parseConfigJson5Strict,
@@ -23,12 +27,9 @@ export type KeybindingConflict = {
   readonly keys: string;
   readonly commands: readonly string[];
 };
-type ReadTextFile = (path: string, encoding: BufferEncoding) => string;
-type WriteTextFile = (path: string, content: string, encoding: BufferEncoding) => void;
 type PersistenceOptions = {
   configFilePath?: string;
-  readFile?: ReadTextFile;
-  writeFile?: WriteTextFile;
+  fileSystem?: ConfigFileSystemPort;
 };
 
 const cloneValue = <T>(value: T): T => structuredClone(value);
@@ -75,9 +76,47 @@ const getOrInitPluginsNamespace = (cfg: rawConfig): RuntimePluginSettingsNamespa
   return pluginsNamespace;
 };
 
-const resolvePersistenceOptions = (options: PersistenceOptions = {}) => {
-  const {configFilePath = getDefaultConfigPath(), readFile = readFileSync, writeFile = writeFileSync} = options;
-  return {configFilePath, readFile, writeFile};
+const resolvePersistenceOptions = (options: PersistenceOptions = {}) => ({
+  configFilePath: options.configFilePath ?? getDefaultConfigPath(),
+  fileSystem: options.fileSystem ?? createNodeConfigFileSystem()
+});
+
+const writerDependenciesFor = (fileSystem: ConfigFileSystemPort): ConfigWriterDependencies => ({
+  fileSystem,
+  sleep: async () => {
+    // The synchronous entry point never waits, so there is no backoff to run.
+  },
+  log: (message) => {
+    console.error(message);
+  },
+  platform: process.platform,
+  processId: () => process.pid,
+  ...defaultWriterState
+});
+
+/**
+ * Persists one plugin's settings through the single config writer.
+ *
+ * The plugin keys are not part of the core write policy: the plugin runtime
+ * owns that namespace, and the writer still re-parses and validates the
+ * result, so a malformed document is refused rather than overwritten.
+ */
+const persistPluginSettings = (
+  fileSystem: ConfigFileSystemPort,
+  configFilePath: string,
+  pluginId: string,
+  settings: JsonObject,
+  failureMessage: string
+): void => {
+  const outcome = writeConfigEditSync(
+    writerDependenciesFor(fileSystem),
+    configFilePath,
+    {kind: 'set', path: ['config', 'plugins', pluginId], value: settings},
+    {checkPolicy: () => []}
+  );
+  if (outcome.kind !== 'written') {
+    console.error(failureMessage);
+  }
 };
 
 const isRuntimePluginManifestEnabled = (
@@ -186,9 +225,9 @@ export const detectKeybindingConflicts = (keymaps: Record<string, string[]>): re
 export const ensureRuntimePluginSettingsPersisted = (
   options: PersistenceOptions = {}
 ): RuntimePluginSettingsNamespace => {
-  const {configFilePath, readFile, writeFile} = resolvePersistenceOptions(options);
+  const {configFilePath, fileSystem} = resolvePersistenceOptions(options);
   try {
-    const rawConfigText = readFile(configFilePath, 'utf8');
+    const rawConfigText = fileSystem.readText(configFilePath);
     const rawConfig = parseConfigJson5Strict(json5Document(rawConfigText));
     if (!rawConfig) {
       console.error(`Failed to parse runtime plugin config at "${configFilePath}". Returning empty namespace.`);
@@ -208,15 +247,14 @@ export const ensureRuntimePluginSettingsPersisted = (
       }
     });
 
-    if (patches.length > 0) {
-      const patchedContent = applyPluginSettingsPatches(json5Document(rawConfigText), patches);
-      if (patchedContent) {
-        writeFile(configFilePath, patchedContent, 'utf8');
-      } else {
-        console.error(
-          `Failed to apply runtime plugin settings patch for "${configFilePath}". Skipping write to preserve user formatting.`
-        );
-      }
+    for (const patch of patches) {
+      persistPluginSettings(
+        fileSystem,
+        configFilePath,
+        patch.pluginId.value,
+        patch.settings,
+        `Failed to apply runtime plugin settings patch for "${configFilePath}". Skipping write to preserve user formatting.`
+      );
     }
 
     return namespace;
@@ -238,12 +276,12 @@ export const setRuntimePluginEnabledPersisted = (
   enabled: boolean,
   options: PersistenceOptions = {}
 ): JsonObject => {
-  const {configFilePath, readFile, writeFile} = resolvePersistenceOptions(options);
+  const {configFilePath, fileSystem} = resolvePersistenceOptions(options);
   const manifestDefaults = findRuntimePluginManifest(pluginId)?.settingsDefaults ?? {};
   const fallbackSettings = merge({}, manifestDefaults, {enabled}) satisfies JsonObject;
 
   try {
-    const rawConfigText = readFile(configFilePath, 'utf8');
+    const rawConfigText = fileSystem.readText(configFilePath);
     const rawConfig = parseConfigJson5Strict(json5Document(rawConfigText));
     if (!rawConfig) {
       console.error(`Failed to parse runtime plugin config at "${configFilePath}". Returning fallback settings.`);
@@ -257,16 +295,13 @@ export const setRuntimePluginEnabledPersisted = (
 
     if (!isEqual(existing, merged)) {
       namespace[pluginId] = merged;
-      const patchedContent = applyPluginSettingsPatches(json5Document(rawConfigText), [
-        {pluginId: toPluginId(pluginId), settings: merged}
-      ]);
-      if (patchedContent) {
-        writeFile(configFilePath, patchedContent, 'utf8');
-      } else {
-        console.error(
-          `Failed to apply runtime plugin enabled patch for "${configFilePath}". Skipping write to preserve user formatting.`
-        );
-      }
+      persistPluginSettings(
+        fileSystem,
+        configFilePath,
+        pluginId,
+        merged,
+        `Failed to apply runtime plugin enabled patch for "${configFilePath}". Skipping write to preserve user formatting.`
+      );
     }
 
     return merged;

@@ -1,0 +1,127 @@
+/**
+ * @file Integration test for the config watcher and the real file system.
+ *
+ * This exercises AXIOM-WATCH: chokidar reports an atomic rename replacement as
+ * a change or an add, and the trailing debounce collapses a save's event storm
+ * into one reload. The settings-specific part — a self-written file reloads
+ * without announcing itself — is decided by `shouldNotifyReload`, tested here
+ * as a table.
+ */
+import {describe, expect, test} from 'bun:test';
+import chokidar from 'chokidar';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
+import {shouldNotifyReload} from '../../app/config/config-watch';
+import {createConfigWatcher, type WatcherHandle} from '../../app/config/watcher';
+
+const waitFor = async (predicate: () => boolean, timeoutMilliseconds = 5000): Promise<void> => {
+  const deadline = Date.now() + timeoutMilliseconds;
+  while (!predicate()) {
+    if (Date.now() > deadline) {
+      throw new Error('condition not met before the timeout');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+};
+
+const withTemporaryDirectory = async (run: (directory: string) => Promise<void>): Promise<void> => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'velocetty-config-watch-'));
+  try {
+    await run(directory);
+  } finally {
+    await fs.rm(directory, {recursive: true, force: true});
+  }
+};
+
+type Probe = {reloads: number; isReady: boolean};
+
+const startWatch = async (filePath: string): Promise<{probe: Probe; close: () => Promise<void>}> => {
+  const watcher = chokidar.watch(filePath, {ignoreInitial: true});
+  const handle: WatcherHandle = {
+    close: async () => {
+      await watcher.close();
+    },
+    on: (event, listener) => {
+      watcher.on(event, listener);
+    },
+    onError: (listener) => {
+      // SAFETY: chokidar's error event emits the error as its only argument.
+      watcher.on('error', (error: unknown) => listener(error));
+    },
+    onReady: (listener) => {
+      watcher.on('ready', listener);
+    }
+  };
+  const probe: Probe = {reloads: 0, isReady: false};
+  const debounced = createConfigWatcher<ReturnType<typeof setTimeout>>({
+    cancel: (timer) => clearTimeout(timer),
+    debounceMs: 20,
+    fileNames: [filePath],
+    handle,
+    onReady: () => {
+      probe.isReady = true;
+    },
+    onReload: () => {
+      probe.reloads += 1;
+    },
+    schedule: (callback, delayMs) => setTimeout(callback, delayMs)
+  });
+  await waitFor(() => probe.isReady);
+  return {probe, close: () => debounced.close()};
+};
+
+const atomicReplace = async (directory: string, filePath: string, text: string): Promise<void> => {
+  const temporaryPath = path.join(directory, '.tmp-replacement');
+  await fs.writeFile(temporaryPath, text);
+  await fs.rename(temporaryPath, filePath);
+};
+
+describe('config watcher integration', () => {
+  test('an atomic replacement reloads exactly once', async () => {
+    await withTemporaryDirectory(async (directory) => {
+      const filePath = path.join(directory, 'config.json5');
+      await fs.writeFile(filePath, '{config: {fontSize: 14}}');
+      const {probe, close} = await startWatch(filePath);
+
+      await atomicReplace(directory, filePath, '{config: {fontSize: 16}}');
+      await waitFor(() => probe.reloads === 1);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      expect(probe.reloads).toBe(1);
+      await close();
+    });
+  });
+
+  test('a burst of writes collapses into one reload', async () => {
+    await withTemporaryDirectory(async (directory) => {
+      const filePath = path.join(directory, 'config.json5');
+      await fs.writeFile(filePath, '{config: {fontSize: 14}}');
+      const {probe, close} = await startWatch(filePath);
+
+      for (let index = 0; index < 4; index += 1) {
+        await atomicReplace(directory, filePath, `{config: {fontSize: ${16 + index}}}`);
+      }
+      await waitFor(() => probe.reloads >= 1);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      expect(probe.reloads).toBe(1);
+      await close();
+    });
+  });
+});
+
+describe('shouldNotifyReload', () => {
+  test('an applied external change is announced', () => {
+    expect(shouldNotifyReload({config: 'applied', keybindings: 'applied'}, false)).toBe(true);
+  });
+
+  test('a self-written change reloads without an announcement', () => {
+    expect(shouldNotifyReload({config: 'applied', keybindings: 'applied'}, true)).toBe(false);
+  });
+
+  test('a fallback is never announced, whoever wrote it', () => {
+    expect(shouldNotifyReload({config: 'fallback', keybindings: 'applied'}, false)).toBe(false);
+  });
+});
