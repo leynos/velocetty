@@ -307,10 +307,20 @@ Linux aarch64.
 
 ### EP-M6 status detail
 
-`test/e2e-deep/command-dispatch.e2e.ts` exists and typechecks. It drives the
-three acceptance steps: the search shortcut opens the search box with each
-press retried and logged, the close button closes it, and `cat -v` plus Escape
-then Enter leaves `^[` in the terminal buffer.
+The deep lane was dispatched on this branch with `gh workflow run nodejs.yml`
+(the job's `workflow_dispatch` trigger), which is the only way to exercise it
+outside a scheduled run. It failed in the **Build packaged app** step:
+electron-builder's `rpmbuild` exited 1 and reported no further diagnostic, so
+no test executed. The failure is in Linux packaging on the runner, before the
+scenario starts, and is unrelated to the dispatcher — the same action's
+`build-linux-aarch64` job passes on this branch, and `make build-fast` produces
+`dist/linux-unpacked/hyper` locally.
+
+`test/e2e-deep/command-dispatch.e2e.ts` therefore still has no executed
+evidence. It exists and typechecks. It drives the three acceptance steps: the
+search shortcut opens the search box with each press retried and logged, the
+close button closes it, and `cat -v` plus Escape then Enter leaves `^[` in the
+terminal buffer.
 
 It could not be run on this host. A packaged build succeeded (`make build-fast`
 produced `dist/linux-unpacked/hyper`), but every deep-lane scenario fails
