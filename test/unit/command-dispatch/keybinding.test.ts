@@ -65,7 +65,9 @@ const createMousetrap = () => {
   let resets = 0;
   const instance: MousetrapLike = {
     bind: (keys, callback) => {
-      bindings.set(keys, [...(bindings.get(keys) ?? []), callback]);
+      // SAFETY: the test only ever constructs events of this looser shape and
+      // the binder reads nothing a real `KeyboardEvent` would add.
+      bindings.set(keys, [...(bindings.get(keys) ?? []), callback as BoundHandler]);
     },
     reset: () => {
       resets += 1;

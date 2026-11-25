@@ -169,7 +169,7 @@ const runFromSource = async (
 
   if (source === 'keybinding') {
     await workspace.binder.reload();
-    const shortcut = KEYMAP[commandId];
+    const shortcut = Object.entries(KEYMAP).find(([id]) => id === commandId)?.[1];
     if (!shortcut) {
       throw new Error(`No shortcut is bound to ${commandId}`);
     }
