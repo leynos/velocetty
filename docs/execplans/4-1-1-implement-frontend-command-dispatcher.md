@@ -312,7 +312,24 @@ The deep lane was dispatched on this branch with `gh workflow run nodejs.yml`
 outside a scheduled run. It failed in the **Build packaged app** step:
 electron-builder's `rpmbuild` exited 1 and reported no further diagnostic, so
 no test executed. The failure is in Linux packaging on the runner, before the
-scenario starts, and is unrelated to the dispatcher — the same action's
+scenario starts, and it is neither caused by this branch nor new:
+
+- Reproduced locally with `bun bin/run-electron-builder.mjs`. The real message,
+  which electron-builder swallows, is
+  `fpm-1.9.3-2.3.1-linux-x86_64/lib/ruby/bin.real/ruby: error while loading
+  shared libraries: libcrypt.so.1: cannot open shared object file`.
+  The bundled `fpm` ships a Ruby linked against `libcrypt.so.1`, which current
+  glibc-based images no longer provide.
+- Every scheduled `nodejs.yml` run for the last five weeks fails the same job
+  the same way: 45221055334 (2026-11-23), 43884159557 (2026-11-16), 42637154866
+  (2026-11-09), 41459653039 (2026-11-02), 40318221722 (2026-10-26). All report
+  `e2e-deep-linux :: failure`, and the 2026-11-23 log shows the identical
+  `rpmbuild failed (exit code 1)` from the same `fpm` binary.
+
+The deep-lane acceptance gate has therefore been unavailable repository-wide
+for a month. Restoring it means upgrading or replacing electron-builder's `fpm`
+(the `libcrypt.so.1` dependency is the blocker), which is packaging
+infrastructure outside this item's scope. The same action's
 `build-linux-aarch64` job passes on this branch, and `make build-fast` produces
 `dist/linux-unpacked/hyper` locally.
 
