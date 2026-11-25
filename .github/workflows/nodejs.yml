@@ -249,7 +249,10 @@ jobs:
 
   e2e-deep-linux:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/canary'
-    runs-on: ubuntu-latest
+    # Pinned, not `-latest`: this Playwright release has no Chromium build for
+    # ubuntu26.04, and `ubuntu-latest` moved there. A pinned image also stops
+    # the lane drifting under us for reasons unrelated to the application.
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
