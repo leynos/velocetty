@@ -255,8 +255,29 @@ Populating context keys belongs to 4.2.1.
   both the plugin facade and the keybinding binder, so no earlier subset
   compiles, and every commit must be green. The riskier parts are still
   separable by file for a revert.
-- [ ] EP-M6 end-to-end scenario.
-- [ ] EP-M7 documentation and roadmap closure.
+- [ ] EP-M6 end-to-end scenario: file written, local run blocked.
+- [ ] EP-M7 documentation and roadmap closure: in progress.
+
+### EP-M6 status detail
+
+`test/e2e-deep/command-dispatch.e2e.ts` exists and typechecks. It drives the
+three acceptance steps: the search shortcut opens the search box with each
+press retried and logged, the close button closes it, and `cat -v` plus Escape
+then Enter leaves `^[` in the terminal buffer.
+
+It could not be run on this host. A packaged build succeeded (`make build-fast`
+produced `dist/linux-unpacked/hyper`), but every deep-lane scenario fails
+before launching with
+`ReferenceError: exports is not defined in ES module scope` from
+`test/e2e/electron-e2e-helpers.ts`. That failure reproduces with the
+pre-existing `terminal-input-path.e2e.ts`, so it is an environment fault on
+this workstation (Node 22.23.4), not a defect in the new scenario.
+
+Separately, the `e2e-deep-linux` CI job is gated to `schedule`,
+`workflow_dispatch`, and pushes to `master`/`canary` — it does not run on a
+pull request, so it will not report on this branch. EP-M6's acceptance evidence
+is therefore outstanding; the scenario is committed for the deep lane and must
+be confirmed by a scheduled or post-merge run.
 
 ## Surprises & discoveries
 

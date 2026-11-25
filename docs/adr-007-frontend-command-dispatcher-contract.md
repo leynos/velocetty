@@ -2,7 +2,10 @@
 
 ## Status
 
-Proposed.
+Accepted (2026-11-25): the dispatcher shipped as a thin interpreter over one
+proved invocation machine, with a discriminated result union, routing by
+handler presence, pending execution-gate semantics, source-aware enablement, and
+`null` normalization for absent arguments.
 
 ## Date
 

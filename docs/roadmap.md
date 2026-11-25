@@ -262,12 +262,13 @@ Scope notes:
 
 ### 4.1. Command dispatcher and execution paths
 
-- [ ] 4.1.1. Implement the command dispatcher in the frontend. Requires 1.2.1.
+- [x] 4.1.1. Implement the command dispatcher in the frontend. Requires 1.2.1.
   See [velocetty-design.md](velocetty-design.md) §Command registry and
-  dispatcher.
-  - [ ] Validate arguments against schemas before invocation.
-  - [ ] Support cancellation via `AbortSignal`.
-  - [ ] Success criteria: commands invoked from UI, keybindings, and plugins all
+  dispatcher, and
+  [command-dispatch-architecture.md](command-dispatch-architecture.md).
+  - [x] Validate arguments against schemas before invocation.
+  - [x] Support cancellation via `AbortSignal`.
+  - [x] Success criteria: commands invoked from UI, keybindings, and plugins all
     follow the same path.
 - [ ] 4.1.2. Implement backend command registry and permission checks. Requires
   1.1.2 and 1.2.1. See [velocetty-design.md](velocetty-design.md) §Command
