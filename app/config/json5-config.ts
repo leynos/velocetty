@@ -207,6 +207,31 @@ const describeConfigOptionsIssue = (config: unknown): DiagnosticError => {
   });
 };
 
+/**
+ * Validates a `config` object against the generated schema.
+ *
+ * Unlike the load path, every issue is reported rather than the first: the
+ * settings tab shows the complete list so a user can fix them together.
+ * Paths are JSON Pointers prefixed with `/config`, matching the diagnostics
+ * the load path produces.
+ *
+ * @param value - The candidate `config` object.
+ * @returns Every schema issue, or an empty list when the object is valid.
+ *
+ * @example
+ * validateConfigOptions({fontSize: 'big'})[0]?.path; // '/config/fontSize'
+ */
+export const validateConfigOptions = (value: unknown): configValidationDiagnostic[] => {
+  if (configOptionsValidator(value)) {
+    return [];
+  }
+  return (configOptionsValidator.errors ?? []).map((issue) => ({
+    path: `/config${issue.instancePath}`,
+    message: issue.message ?? 'Configuration options do not match the supported schema.',
+    suggestedFix: 'Set configuration option values to match the documented types.'
+  }));
+};
+
 export const validateRawConfig = (value: unknown): ParseResult<JsonObject> => {
   if (!isRecord(value)) {
     return {

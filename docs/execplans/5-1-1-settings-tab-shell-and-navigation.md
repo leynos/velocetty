@@ -208,7 +208,8 @@ terminal's column and row count did not change.
 - [x] (2026-11-25) User approval of the plan.
 - [x] (2026-11-25) EP-M0: proof and property tooling prototype and CI policy.
 - [x] (2026-11-25) EP-M1: settings domain core and proofs.
-- [ ] EP-M2: JSON5 scanner relocation and comment-preserving edit operations.
+- [x] (2026-11-25) EP-M2: JSON5 scanner relocation and comment-preserving edit
+      operations.
 - [ ] EP-M3: config file writer, settings service, and IPC.
 - [ ] EP-M4: settings tab shell, tab strip, input gating, and navigation.
 - [ ] EP-M5: editing, inline validation, and reset flows.
@@ -307,6 +308,19 @@ terminal's column and row count did not change.
 - Observation (EP-M1): `switch` on `event.kind` cannot combine cases
   (fall-through is rejected as `not a declared union`). Impact: `edit` and
   `revert` have separate branches.
+- Observation (EP-M2): the scanner's `valueEndIndex` points at the terminating
+  delimiter, so it includes trailing whitespace and any trailing same-line
+  comment. Replacing a value or inserting a separating comma at that index
+  would delete the comment. Impact: `document-scan.ts` recovers the true value
+  end by scanning the span and skipping strings and comments.
+- Observation (EP-M2): splitting the 839-line scanner into nine modules kept
+  the public API byte-for-byte: a differential harness compared the old and new
+  parser over 11,046 documents (handwritten seeds, 8,000 mutations, and 3,000
+  random inputs) with no difference in ranges, property lists, key lookups,
+  line probes, skip results, or exception shapes.
+- Observation (EP-M2): the roundtrip rewrite preserved every existing
+  expectation, including the exact comment-preserving text asserted by
+  `runtime-plugin-settings.test.ts`.
 
 ## Decision log
 
@@ -520,6 +534,19 @@ terminal's column and row count did not change.
      snapshot refresh reconciles the committed value.
   Every union and phase literal is also bound to a typed local before use, as
   the observation above explains. Date/Author: 2026-11-25.
+- Decision D23 (new, EP-M2): the JSON5 editing code is split by
+  responsibility inside `app/config/json5/`: `parser.ts` plus its scanning
+  modules, `document-scan.ts` for span recovery and path resolution,
+  `document-format.ts` for spelling new text, `document-edit.ts` for set,
+  `document-remove.ts` for remove, and `document-result.ts` for the shared
+  result types. `index.ts` is the only public entry. The plan named one
+  `document-edit.ts`; six small modules fit the 400-line rule without a
+  400-line exception, and the public contract (`setPropertyAtPath`,
+  `removePropertyAtPath`) is unchanged. A comment inside a replaced or removed
+  value belongs to that value's span and is removed with it; a trailing
+  same-line comment belongs to a removed property and is removed with it (D4).
+  Only comments outside the span are guaranteed to survive, which is what the
+  locality properties assert. Date/Author: 2026-11-25.
 - Decision D22 (new, EP-M1): search non-vacuity is established by the mirrored
   property suite and by rejecting seeded mutations, not by Dafny witness lemmas.
   `haystackMatchesTokens` bottoms out in the axiomatized `StringIndexOf`,
@@ -1540,6 +1567,29 @@ EP-M1 (2026-11-25):
 - Not covered here: the gateway-permutation half of INV-FIELD-STALE and
   PROP-CONVERGE need the field store and a gateway double, which arrive in
   EP-M5.
+
+EP-M2 (2026-11-25):
+
+- The 839-line scanner is now nine modules under `app/config/json5/`:
+  `characters.ts` (59), `keys.ts` (59), `lexer.ts` (215), `object-scanner.ts`
+  (315), `parser.ts` (134), `parsing-state.ts` (97), `property-list.ts` (198),
+  `types.ts` (68), and `index.ts`. The two `app/runtime/` scanner files are
+  deleted; imports in `plugin-runtime-json5-roundtrip.ts` and its test moved
+  with them.
+- The edit surface is `document-scan.ts`, `document-format.ts`,
+  `document-edit.ts`, `document-remove.ts`, and `document-result.ts`, exported
+  through `index.ts`. `applyPluginSettingsPatches` now calls
+  `setPropertyAtPath`; no compatibility shim remains.
+- Tests: `test/unit/json5-document-edit.test.ts` (17 named examples) and
+  `test/unit/json5-document-edit.property.test.ts` (6 properties). Fixtures
+  live in `test/fixtures/json5-config/`. The property suite passed at
+  `FAST_CHECK_NUM_RUNS=1000` (17 tests, 41,231 assertions across the four
+  property files). The plugin persistence suites pass unchanged (24 tests).
+- The oxlint `unicorn/number-literal-case` override now names
+  `app/config/json5/lexer.ts`, and ADR 006 links to the moved Unicode escape
+  bound.
+- Not covered here: the writer's re-parse-and-compare step (EP-M3) is what
+  turns these edits into a safe write; the editor itself only returns text.
 
 Design review summary (2026-10-29), recorded for traceability. Three expert
 lenses reviewed the first draft. Blocking findings and their resolutions: naive

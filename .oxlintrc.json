@@ -178,7 +178,7 @@
   },
   "overrides": [
     {
-      "files": ["bin/mksnapshot-wrapper.js", "app/runtime/plugin-runtime-json5-parser.ts"],
+      "files": ["bin/mksnapshot-wrapper.js", "app/config/json5/lexer.ts"],
       "rules": {
         "unicorn/number-literal-case": "off"
       }

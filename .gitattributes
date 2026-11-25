@@ -11,3 +11,4 @@
 bin/* linguist-vendored
 *.dfy text eol=lf
 *.dfy.gen text eol=lf
+test/fixtures/json5-config/crlf.json5 text eol=crlf

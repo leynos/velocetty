@@ -128,7 +128,7 @@ rule remains active for other code.
 existing formatter writes hexadecimal digits in lowercase, while this rule
 requires uppercase digits. The conflict is limited to
 [the ELF header checks](../../bin/mksnapshot-wrapper.js#L40) and
-[the Unicode escape bound](../../app/runtime/plugin-runtime-json5-parser.ts#L331).
+[the Unicode escape bound](../../app/config/json5/lexer.ts#L182).
 
 The snapshot loader models module exports as `SnapshotModuleExport` and module
 definitions using the `electron-link` callback contract, so its dynamic module
