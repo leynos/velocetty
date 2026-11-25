@@ -1369,7 +1369,7 @@ Feature: Editing core settings
     And the field shows the default with no modified indicator
     And focus moves to the "Font size" control
 
-  Scenario: Unparseable user config
+  Scenario: Unparsable user config
     Given config.json5 contains a syntax error
     Then a banner explains that settings cannot be saved until the file is fixed
     And edits are disabled

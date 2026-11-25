@@ -165,7 +165,7 @@ has seen, which is what makes an out-of-order outcome harmless.
 - **Missing** — values are empty; the first write reports `config-file-missing`
   rather than creating a file. The banner explains that a change will be
   written once a file exists.
-- **Unparseable** — the tab is read-only with a banner naming the problem.
+- **Unparsable** — the tab is read-only with a banner naming the problem.
 - **Invalid** — every diagnostic is shown; only the diagnosed keys are
   editable, so the file can be repaired one key at a time.
 - **Legacy `hyper.json`** — read-only, with a banner naming the real path, so
