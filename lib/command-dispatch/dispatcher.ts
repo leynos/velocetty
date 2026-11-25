@@ -37,6 +37,7 @@ import type {
   CommandInvocationError,
   CommandResult
 } from '@shared/types/commands';
+import {isObject} from '@shared/types/guards';
 import type {JsonValue} from '@shared/types/json';
 import {
   initialState,
@@ -105,6 +106,16 @@ const invalidArgs = (commandId: CommandInvocation['id'], message: string): Comma
  * binding validate against `type: ['object', 'null']`.
  */
 const normalizeArgs = (args: JsonValue | undefined): JsonValue => args ?? null;
+
+const deepFreeze = <TValue>(value: TValue): TValue => {
+  if (isObject(value) && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const nested of Object.values(value)) {
+      deepFreeze(nested);
+    }
+  }
+  return value;
+};
 
 /** The one place the interpreter consults the proved machine. */
 const transition = (state: MachineState, event: MachineEvent) => step(state, event);
@@ -240,7 +251,10 @@ export const createCommandDispatcher = <TContext>(
     options: CommandDispatchOptions = {},
     context?: TContext
   ): Promise<CommandResult> => {
-    const args = normalizeArgs(invocation.args);
+    // A private snapshot, taken once: a deferred execution gate leaves the
+    // caller holding the same object, and mutating it after admission would
+    // otherwise hand the handler arguments the schema never approved.
+    const args = deepFreeze(structuredClone(normalizeArgs(invocation.args)));
     const signal = options.signal;
     const commandId = invocation.id;
 

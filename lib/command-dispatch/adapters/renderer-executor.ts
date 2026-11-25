@@ -58,6 +58,14 @@ export const createRendererExecutor = (
   ): ExecutionStart => {
     const handler = dependencies.getHandler(invocation.id);
     if (!handler) {
+      // The route was admitted with no handler, so `args` must be `null`. A
+      // handler registered or removed between admission and execution would
+      // otherwise emit a host command that silently dropped validated
+      // arguments; refusing keeps the two routes' contracts intact. The
+      // dispatcher turns this throw into a settled failure.
+      if (args !== null) {
+        throw new TypeError(`Host command ${invocation.id} cannot carry arguments`);
+      }
       dependencies.emitHostCommand(invocation.id);
       return {kind: 'hostEmitted'};
     }
