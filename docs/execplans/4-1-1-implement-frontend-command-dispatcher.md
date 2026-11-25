@@ -223,11 +223,22 @@ Populating context keys belongs to 4.2.1.
 - [x] (2026-11-25) User approved the plan; status moved to APPROVED.
 - [x] (2026-11-25) EP-M0 baseline: `bun install` succeeded in 57 s and
   Dafny 4.11.0 was already installed at `~/.local/bin/dafny`. All four gates
-  passed on the untouched tree: `make check-fmt` (1 s), `make typecheck`
-  (2 s), `make lint` (6 s), `make test` (9 s, 508 pass, 0 fail, 2,236
-  `expect()` calls, 64 files). Logs are in `/tmp/{check-fmt,typecheck,lint,test}-velocetty-4-1-1-implement-frontend-command-dispatcher.out`.
-- [ ] EP-M1 registry refactor.
-- [ ] EP-M2 verified invocation machine.
+  passed on the untouched tree: `make check-fmt` (1 s), `make typecheck` (2 s),
+  `make lint` (6 s), `make test` (9 s, 508 pass, 0 fail, 2,236 `expect()`
+  calls, 64 files). Logs are in
+  `/tmp/{check-fmt,typecheck,lint,test}-velocetty-4-1-1-implement-frontend-command-dispatcher.out`.
+- [x] (2026-11-25) EP-M1 registry refactor (commit `a1f813e3`, with the
+  regenerated `typos.toml` in `c89d1224`). `lib/command-registry.ts` went from
+  396 to 259 lines. Ajv moved to `lib/command-registry-validation.ts`, which
+  primes a validator at registration and caches a schema-compile failure as an
+  `INVALID_COMMAND_SCHEMA` verdict. The `editor:search-close` handler and its
+  thunk moved to `lib/commands/search-close.ts`. The compatibility aliases and
+  their stub entries were deleted; they had no production callers. Gates:
+  check-fmt, typecheck, lint and 507 tests passed.
+- [x] (2026-11-25) EP-M2 verified invocation machine, first pass. The machine
+  and its 33-obligation Dafny proof verify with `0 errors`; two seeded faults
+  (absorption, gate-index reporting) were observed to break the proof and were
+  then reset.
 - [ ] EP-M3 shared contract and registry extensions.
 - [ ] EP-M4 dispatcher interpreter and driven adapters.
 - [ ] EP-M5 driving adapters and composition.
@@ -411,6 +422,33 @@ Populating context keys belongs to 4.2.1.
   is declined. Each is kept short and points to ADR-007 rather than repeating
   it. Rationale: the task brief explicitly requires the users' guide and a
   component architecture document. Date/Author: 2026-10-29, planning agent.
+- D-17 (new, from the EP-M2 spike). Decision: the machine's `idle` action is
+  named `idle`, not `none`; `ReportedOutcome` is spelled as seven flat string
+  literals rather than `MachineOutcome | 'pending'`; and the machine uses no
+  local factory helpers. Rationale: all three are LemmaScript constraints found
+  by probing, not preferences. `none` is emitted as `Action.None`, which
+  collides with Dafny's empty-optional constructor. LemmaScript turns each
+  named literal union into its own Dafny datatype and cannot unify `A` with
+  `A | 'b'`, so `outcomeOf` maps explicitly and its union is flat. A local
+  arrow function returning a record literal is not lifted, so the interpreter
+  constructs record literals at the return site. Date/Author: 2026-11-25,
+  implementation.
+- D-18 (new, from the EP-M2 spike). Decision: the Dafny release archive is
+  `dafny-4.11.0-x64-ubuntu-22.04.zip`, not the `...-ubuntu-20.04.zip` named in
+  the original plan, pinned by SHA-256
+  `a46a9ff7cdd720f7955854c78e95df13f4cfe6b80691b05f8654fe19e8267179`. Its
+  layout is `dafny/dafny` under the extraction root. Rationale: the plan's
+  filename does not exist on the release; the published asset set was read from
+  the GitHub release page and the checksum computed from the downloaded
+  archive. Date/Author: 2026-11-25, implementation.
+- D-19 (new). Decision: the `editor:search-close` handler is registered during
+  `createCommandRegistryModule`, not only by the singleton's export block.
+  Rationale: the plan says "registered by the registry singleton's setup", and
+  the factory *is* that setup. Registering in the factory keeps
+  `command-registry.test.ts` and `command-registry-compat.test.ts` passing
+  unchanged in substance, which the same milestone requires, and keeps
+  `closeSearch` and `focusActiveTerm` injectable for tests. Date/Author:
+  2026-11-25, implementation.
 
 ## Outcomes & retrospective
 
