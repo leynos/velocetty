@@ -3,9 +3,19 @@ import {expect, test} from 'bun:test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+/**
+ * Reads a source file relative to the repository root.
+ *
+ * The ordering contract is expressed in the entry point's own text, so the
+ * test inspects the shipped source rather than a reimplementation of it.
+ *
+ * @param workspaceRelativePath - The path from the repository root.
+ * @returns The file's contents.
+ */
 const readSource = async (workspaceRelativePath: string) =>
   await fs.readFile(path.join(process.cwd(), workspaceRelativePath), 'utf8');
 
+/** Returns the index of `needle`, failing the test when it is absent. */
 const indexOfOrThrow = (source: string, needle: string): number => {
   const index = source.indexOf(needle);
   if (index === -1) {
@@ -14,18 +24,62 @@ const indexOfOrThrow = (source: string, needle: string): number => {
   return index;
 };
 
-test('the entry point initializes the configuration before loading the app', async () => {
+test('the start-up sequence initializes the configuration before loading the app', async () => {
   // Two modules read the configuration while their own module body runs:
   // `app/plugins.ts` resolves the plugin and local-plugin lists, and
   // `app/session.ts` reads `useConpty`. Node evaluates a required module as
   // soon as it is required, so `config.setup()` has to happen above the import
   // of `./start.js`. It cannot live inside `./start.js` instead, because every
-  // statement in that file runs after its own imports have been evaluated.
-  const entrySource = await readSource('app/index.mts');
-  const setupIndex = indexOfOrThrow(entrySource, 'config.setup();');
-  const startImportIndex = indexOfOrThrow(entrySource, "await import('./start.js')");
+  // statement in that file runs after its own imports have been evaluated. Both
+  // entry points run this sequence, so the ordering is pinned where it lives.
+  const startupSource = await readSource('app/startup.mts');
+  const setupIndex = indexOfOrThrow(startupSource, 'config.setup({markerSink});');
+  const startImportIndex = indexOfOrThrow(startupSource, "await import('./start.js')");
 
   expect(setupIndex).toBeLessThan(startImportIndex);
+});
+
+test('both entry points start the application through the shared sequence', async () => {
+  // The shipped entry point and the lane's entry point must run the same
+  // start-up, so a change to one cannot leave the other behind.
+  for (const entryPath of ['app/index.mts', 'app/e2e-entry.mts']) {
+    const entrySource = await readSource(entryPath);
+    expect(entrySource).toContain("from './startup.mjs'");
+    expect(entrySource).toContain('startApplication');
+  }
+});
+
+test('the shipped entry point selects a sink but arms no lane instrumentation', async () => {
+  // The packaged build is what the end-to-end lane launches, so the shipped
+  // entry point must choose a marker sink from the lane flag: leaving it silent
+  // made the packaged smoke test wait for a marker that could never arrive. The
+  // shortcut probe and the request file stay out of it.
+  const shippedSource = await readSource('app/index.mts');
+  expect(shippedSource).not.toContain('e2e-shortcut-probe');
+  expect(shippedSource).not.toContain('VELOCETTY_E2E_PRESS_FILE');
+  expect(shippedSource).toContain('createMarkerSink');
+  expect(shippedSource).toContain("process.env.RUN_E2E === '1'");
+  expect(shippedSource).toContain('startApplication({markerSink})');
+
+  const laneSource = await readSource('app/e2e-entry.mts');
+  expect(laneSource).toContain('createMarkerSink');
+  expect(laneSource).toContain('startShortcutProbe');
+  expect(laneSource).toContain('VELOCETTY_E2E_PRESS_FILE');
+  expect(laneSource).toContain('markerSink,');
+});
+
+test('the plugin loader exists before the module-level plugin load runs', async () => {
+  // `app/plugins.ts` loads the configured plugins while its own module body is
+  // still being evaluated. `requirePlugins` is a hoisted function declaration,
+  // so a `const` loader declared below that call site is in its temporal dead
+  // zone and the whole start-up fails with a `ReferenceError`. No unit test can
+  // see that: none of them evaluate this module, because loading it patches
+  // `Module._load`. Pinning the order in the source is the cheap guard.
+  const pluginSource = await readSource('app/plugins.ts');
+  const loaderIndex = indexOfOrThrow(pluginSource, 'const loadPlugins = createPluginLoader');
+  const initialLoadIndex = indexOfOrThrow(pluginSource, 'let modules = requirePlugins();');
+
+  expect(loaderIndex).toBeLessThan(initialLoadIndex);
 });
 
 test('the entry point answers every informational argument the same way', async () => {
@@ -39,8 +93,8 @@ test('the entry point answers every informational argument the same way', async 
   expect(entrySource).toContain('app.quit();');
 });
 
-test('the informational branch reports the version, the argument contract and the config path', async () => {
-  // The three lines are the entire user-visible output of `--help`. Losing one
+test('the informational branch reports the version, the argument contract and the resolved paths', async () => {
+  // These lines are the entire user-visible output of `--help`. Losing one
   // is silent at runtime: the process still exits 0 with partial guidance.
   const entrySource = await readSource('app/index.mts');
 
@@ -50,17 +104,27 @@ test('the informational branch reports the version, the argument contract and th
   expect(entrySource).toMatch(/Hyper version \$\{packageMetadata\.version\}/);
   expect(entrySource).toContain('Hyper does not accept any command line arguments.');
   expect(entrySource).toMatch(/Hyper configuration file located at: \$\{cfgPath\}/);
+  expect(entrySource).toMatch(/Hyper keybindings file located at: \$\{keybindingsPath\}/);
+  expect(entrySource).toMatch(/Hyper configuration tree in use: \$\{configTree\}/);
 });
 
 test('a startup failure is reported and turns into a failing exit code', async () => {
   // The catch block is the only thing standing between a broken `config.setup()`
   // and an Electron process that exits 0 with no window, so both halves of the
-  // contract are pinned: the diagnostic and the non-zero status.
-  const entrySource = await readSource('app/index.mts');
-  const catchIndex = indexOfOrThrow(entrySource, '} catch (error) {');
-  const catchBlock = entrySource.slice(catchIndex);
+  // contract are pinned: the diagnostic and the non-zero status. Both entry
+  // points run it through the shared start-up sequence.
+  const startupSource = await readSource('app/startup.mts');
+  const catchIndex = indexOfOrThrow(startupSource, '} catch (error) {');
+  const catchBlock = startupSource.slice(catchIndex);
 
-  expect(catchBlock).toContain("console.error('Failed to start Hyper.', error);");
+  // The bounded description, not the raw error: a message may quote a path.
+  // The fixed stage and category let support tell a start-up failure apart from
+  // the same error reported elsewhere.
+  expect(catchBlock).toContain("console.error('Failed to start Hyper.', {");
+  expect(catchBlock).toContain('...describeError(error),');
+  expect(catchBlock).toContain("category: 'thrown',");
+  expect(catchBlock).toContain("operation: 'startup'");
+  expect(catchBlock).not.toContain('console.error(error)');
   expect(catchBlock).toContain('process.exitCode = 1;');
   expect(catchBlock).toContain('app.quit();');
 });

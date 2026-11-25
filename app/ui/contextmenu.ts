@@ -1,7 +1,7 @@
 /** @file Builds context menu templates for terminal selections. */
 import type {MenuItemConstructorOptions} from 'electron';
 
-import {execCommand} from '../commands';
+import type {CommandDispatcher} from '../commands';
 import {getProfiles} from '../config';
 import editMenu from '../menus/menus/edit';
 import shellMenu from '../menus/menus/shell';
@@ -28,7 +28,7 @@ const filterCutCopy = (selection: string, menuItem: MenuItemConstructorOptions) 
   return menuItem;
 };
 
-const contextMenuTemplate = (selection: string) => {
+const contextMenuTemplate = (selection: string, execCommand: CommandDispatcher) => {
   const commandKeys = getCommandKeys(getDecoratedKeymaps());
   const _shell = shellMenu(
     commandKeys,

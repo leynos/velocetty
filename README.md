@@ -62,6 +62,9 @@ For full details, see [docs/roadmap.md][roadmap].
 Velocetty is not yet available for general use. Development builds can be
 created by following the contribution instructions below.
 
+User-facing documentation, including where configuration files live and how to
+customize keyboard shortcuts, is in the [users' guide][users-guide].
+
 ## Contribute
 
 Bun is required for local development. Install it from [Bun][bun].
@@ -116,4 +119,5 @@ Copyright (c) 2018 Vercel, Inc.
 [bun]: https://bun.sh/
 [hyper]: https://github.com/vercel/hyper
 [roadmap]: docs/roadmap.md
+[users-guide]: docs/users-guide.md
 [vercel]: https://vercel.com

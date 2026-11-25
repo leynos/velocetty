@@ -1,0 +1,6 @@
+{
+  // Comments and trailing commas are part of the format.
+  'window:new': ['ctrl+n', 'ctrl+shift+n'],
+  'window:close': 'ctrl+w',
+  'pane:split': [],
+}

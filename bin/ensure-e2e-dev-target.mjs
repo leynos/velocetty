@@ -15,6 +15,7 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDirectory, '..');
 const requiredTargetFiles = [
   'dist/app/index.mjs',
+  'dist/app/e2e-entry.mjs',
   'dist/app/index.html',
   'dist/app/package.json',
   'dist/app/renderer/bundle.js'

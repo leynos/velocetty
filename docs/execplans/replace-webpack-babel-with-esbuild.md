@@ -6,7 +6,7 @@
   esbuild as required by Architecture Decision Record (ADR) 002.
 - Invariants: Keep build outputs, packaging artefacts, and runtime behaviour
   equivalent while migration work is in flight.
-- Cross-links: `docs/adr-002-replace-webpack-babel-with-esbuild.md`,
+- Cross-links: `docs/adrs/adr-0002-replace-webpack-babel-with-esbuild.md`,
   `docs/developers-guide.md`, `docs/roadmap.md`, `docs/velocetty-design.md`,
   `docs/velocetty-hyper-codebase.md`, and
   `docs/velocetty-product-requirements-document.md`.

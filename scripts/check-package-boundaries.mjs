@@ -68,9 +68,63 @@ const extractStaticImportSpecifier = (node) => {
   return node.moduleSpecifier.text;
 };
 
-const isDynamicImportCall = (node) =>
-  ts.isCallExpression(node) && node.arguments.length === 1 && node.expression.kind === ts.SyntaxKind.ImportKeyword;
+/** Whether an import clause binds anything that exists at runtime. */
+const hasValueImportBinding = (clause) => {
+  if (clause.name !== undefined) {
+    return true;
+  }
 
+  if (clause.namedBindings === undefined) {
+    return false;
+  }
+
+  if (ts.isNamespaceImport(clause.namedBindings)) {
+    return true;
+  }
+
+  return clause.namedBindings.elements.some((element) => !element.isTypeOnly);
+};
+
+/** Whether an export clause re-exports anything that exists at runtime. */
+const hasValueExportBinding = (node) => {
+  if (node.exportClause === undefined || ts.isNamespaceExport(node.exportClause)) {
+    return true;
+  }
+
+  return node.exportClause.elements.some((element) => !element.isTypeOnly);
+};
+
+/**
+ * Reports whether a static import or re-export is erased at compile time.
+ *
+ * `verbatimModuleSyntax` is off in every build here, so a clause that binds
+ * only types is erased whether or not the clause itself says `type`:
+ * `import type {A} from 'x'` and `import {type A} from 'x'` both disappear.
+ * A mixed clause such as `import {type A, b} from 'x'` keeps a runtime import
+ * for `b`, so only clauses with no value binding count as type-only.
+ */
+const isTypeOnlyStaticImportOrExport = (node) => {
+  if (ts.isImportDeclaration(node)) {
+    const clause = node.importClause;
+    return clause !== undefined && (clause.isTypeOnly || !hasValueImportBinding(clause));
+  }
+
+  return ts.isExportDeclaration(node) && (node.isTypeOnly || !hasValueExportBinding(node));
+};
+
+/**
+ * Whether a call is a dynamic `import()`, with or without an import attribute.
+ *
+ * `import('x')` and `import('x', {with: {type: 'json'}})` both name their
+ * module in the first argument; the two-argument form must not be skipped.
+ */
+const isDynamicImportCall = (node) =>
+  ts.isCallExpression(node) &&
+  node.arguments.length > 0 &&
+  node.arguments.length <= 2 &&
+  node.expression.kind === ts.SyntaxKind.ImportKeyword;
+
+/** Whether a call is a single-argument `require('x')` from CommonJS. */
 const isCommonJsRequireCall = (node) =>
   ts.isCallExpression(node) &&
   node.arguments.length === 1 &&
@@ -90,37 +144,45 @@ const extractDynamicImportSpecifier = (node) => {
   return firstArgument.text;
 };
 
-const pushSpecifierIfPresent = (importSpecifiers, specifier) => {
+/**
+ * Records a specifier when the node named one, keeping its type-only flag.
+ *
+ * Extraction returns `null` for calls and declarations that name no module, so
+ * this is the single place that decides whether there is anything to record.
+ */
+const pushSpecifierIfPresent = (imports, specifier, isTypeOnly = false) => {
   if (specifier !== null) {
-    importSpecifiers.push(specifier);
+    imports.push({isTypeOnly, specifier});
   }
 };
 
-const handleImportExportNode = (node, importSpecifiers) => {
+/** Records the specifier of a static `import`/`export` declaration, if it names one. */
+const handleImportExportNode = (node, imports) => {
   const staticImportSpecifier = extractStaticImportSpecifier(node);
-  pushSpecifierIfPresent(importSpecifiers, staticImportSpecifier);
+  pushSpecifierIfPresent(imports, staticImportSpecifier, isTypeOnlyStaticImportOrExport(node));
 };
 
-const handleCallExpressionNode = (node, importSpecifiers) => {
+/** Records the specifier of a dynamic `import()` call, if it names one. */
+const handleCallExpressionNode = (node, imports) => {
   const dynamicImportSpecifier = extractDynamicImportSpecifier(node);
-  pushSpecifierIfPresent(importSpecifiers, dynamicImportSpecifier);
+  pushSpecifierIfPresent(imports, dynamicImportSpecifier);
 };
 
 const readImports = (filePath) => {
   const source = readFileSync(filePath, 'utf8');
   const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, getScriptKind(filePath));
-  const importSpecifiers = [];
+  const imports = [];
 
   const visit = (node) => {
-    handleImportExportNode(node, importSpecifiers);
-    handleCallExpressionNode(node, importSpecifiers);
+    handleImportExportNode(node, imports);
+    handleCallExpressionNode(node, imports);
 
     ts.forEachChild(node, visit);
   };
 
   visit(sourceFile);
 
-  return importSpecifiers;
+  return imports;
 };
 
 const collectFiles = (directoryPath, output = []) => {
@@ -188,11 +250,23 @@ const isBareDisallowedRootSpecifier = (importSpecifier, disallowedRoots) => {
   return disallowedRoots.some((root) => importSpecifier === root || importSpecifier.startsWith(`${root}/`));
 };
 
+/** Whether a specifier is, or sits under, one of the forbidden aliases. */
 const isDisallowedAliasSpecifier = (importSpecifier, disallowedAliases) =>
   disallowedAliases.some((aliasPrefix) => {
     const aliasRoot = aliasPrefix.endsWith('/') ? aliasPrefix.slice(0, -1) : aliasPrefix;
     return importSpecifier === aliasRoot || importSpecifier.startsWith(aliasPrefix);
   });
+
+/**
+ * `app/` is compiled by `tsgo` into `dist/app`, where the `@shared/*` alias
+ * has no runtime counterpart, so a value import type-checks and then throws
+ * `MODULE_NOT_FOUND` in the packaged application. Only `tsgo`-compiled app
+ * code is affected; the renderer and CLI bundles alias `@shared` themselves.
+ */
+const isAppSharedRuntimeImport = (filePath, importSpecifier, isTypeOnly) =>
+  toNormalizedRelativePath(filePath).startsWith('app/') &&
+  !isTypeOnly &&
+  isDisallowedAliasSpecifier(importSpecifier, ['@shared/']);
 
 const violations = [];
 
@@ -205,7 +279,7 @@ for (const roots of Object.values(layerDefinitions)) {
       }
 
       const rules = layerRules[layer];
-      for (const importSpecifier of readImports(filePath)) {
+      for (const {isTypeOnly, specifier: importSpecifier} of readImports(filePath)) {
         if (isAllowedImportException(filePath, importSpecifier)) {
           continue;
         }
@@ -213,12 +287,14 @@ for (const roots of Object.values(layerDefinitions)) {
         const aliasViolation = isDisallowedAliasSpecifier(importSpecifier, rules.disallowedAliases);
         const relativeViolation = resolvesToDisallowedRoot(filePath, importSpecifier, rules.disallowedRoots);
         const bareRootViolation = isBareDisallowedRootSpecifier(importSpecifier, rules.disallowedRoots);
+        const sharedRuntimeViolation = isAppSharedRuntimeImport(filePath, importSpecifier, isTypeOnly);
 
-        if (aliasViolation || relativeViolation || bareRootViolation) {
+        if (aliasViolation || relativeViolation || bareRootViolation || sharedRuntimeViolation) {
           violations.push({
             file: path.relative(rootDir, filePath),
             importSpecifier,
-            layer
+            layer,
+            reason: sharedRuntimeViolation ? 'runtime `@shared/*` import in app/' : null
           });
         }
       }
@@ -229,7 +305,8 @@ for (const roots of Object.values(layerDefinitions)) {
 if (violations.length > 0) {
   console.error('Package boundary violations found:');
   for (const violation of violations) {
-    console.error(`- [${violation.layer}] ${violation.file}: ${violation.importSpecifier}`);
+    const suffix = violation.reason === null ? '' : ` (${violation.reason})`;
+    console.error(`- [${violation.layer}] ${violation.file}: ${violation.importSpecifier}${suffix}`);
   }
   process.exit(1);
 }
