@@ -146,6 +146,10 @@ field because the renderer and main process ship in one build.
 - LemmaScript's Dafny translation is faithful for the fragment the proofs use
   (strings, `split`, `includes`, arrays, records, discriminated unions,
   integers). Case folding happens outside the proved functions.
+- The generated search model axiomatizes `StringSplit` (JavaScript's
+  `String.prototype.split` with a literal separator) with bounds on the part
+  count and part length. `bin/prove.sh` admits that exact declaration, and
+  `emptyUserKeymaps`, as the only axioms a listed proof may use.
 - `useSyncExternalStore` re-renders after notifications and reads the latest
   snapshot.
 

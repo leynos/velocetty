@@ -15,9 +15,16 @@ readonly max_timeout_seconds=60
 readonly policy_source='app/config/keybindings-policy.ts'
 readonly expected_dafny_prefix='4.11.'
 readonly lsc_bin='node_modules/.bin/lsc'
-# The one admitted axiom, matched exactly so a forbidden construct cannot hide
-# on a line that merely mentions this function.
-readonly trusted_axiom_line='function {:axiom} emptyUserKeymaps(): UserKeymaps'
+# The admitted axioms, matched exactly so a forbidden construct cannot hide on
+# a line that merely mentions one. `emptyUserKeymaps` models a keybindings file
+# with no keymaps; `StringSplit` is LemmaScript's model of
+# `String.prototype.split` with a literal separator, carrying the separator and
+# part-count bounds the search proof relies on. Every other trust construct
+# makes a proof vacuous.
+readonly trusted_axiom_lines=(
+  'function {:axiom} emptyUserKeymaps(): UserKeymaps'
+  'function {:axiom} StringSplit(s: string, d: string): seq<string>'
+)
 # Dafny accepts whitespace around an attribute's colon and name, so the axiom
 # pattern must too; otherwise `{:axiom }` would slip past the guard.
 # Braces are written as `[{]`/`[}]` so the same pattern is valid in both
@@ -173,10 +180,11 @@ check_forbidden_trust_constructs() {
     # `emptyUserKeymaps` is the single admitted axiom; every other trust
     # construct makes the proof vacuous.
     local offending
-    offending="$(printf '%s\n' "$matches" | sed -E 's/^[^:]+:[0-9]+://' | grep -vxF "$trusted_axiom_line" || true)"
+    offending="$(printf '%s\n' "$matches" | sed -E 's/^[^:]+:[0-9]+://' |
+      grep -vxF -f <(printf '%s\n' "${trusted_axiom_lines[@]}") || true)"
     if [[ -n "$offending" ]]; then
       printf '%s\n' "$offending" >&2
-      fail "Forbidden Dafny trust construct found; only emptyUserKeymaps may be an axiom."
+      fail "Forbidden Dafny trust construct found; only the admitted axioms may be used."
     fi
   fi
 }

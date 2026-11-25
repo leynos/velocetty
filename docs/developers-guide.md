@@ -1878,10 +1878,16 @@ file has two artefacts:
 
 - Add every verified file to `LemmaScript-files.txt` (one path per line; the
   batch reader does not accept comments).
-- `make proofs` runs `lsc check --backend=dafny` over that list.
-- `make proofs-fresh` regenerates each artefact in place, compares it with the
-  committed copy, and restores the committed copy. It runs as part of
-  `make lint`.
+- `make proofs` is an alias for `make prove`, which runs `bin/prove.sh`:
+  it regenerates through `bin/generate-dafny.mjs`, refuses a vacuous run, and
+  verifies the list with `lsc check --backend=dafny`.
+- `make proofs-fresh` regenerates each artefact through
+  `bin/generate-dafny.mjs`, compares it with the committed copy, and restores
+  the committed copy. It runs as part of `make lint`.
+- `bin/prove.sh` rejects every Dafny trust construct except two exact
+  declarations: `emptyUserKeymaps` and LemmaScript's `StringSplit` model of
+  `String.prototype.split`. A proof that needs another axiom must extend that
+  admitted list deliberately, with a stated justification.
 - After editing an annotated `.ts`, run
   `bunx lsc regen --backend=dafny <file>` — never delete the `.dfy` and run
   `gen`, which discards every proof.

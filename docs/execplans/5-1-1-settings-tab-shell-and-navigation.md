@@ -579,8 +579,10 @@ terminal's column and row count did not change.
   `make proofs-fresh` regenerates through it and `make proofs` is an alias for
   `make prove`; `*.dfy.base` and `*.dfy.merged` are ignored because they are
   `lsc regen` merge state, never artefacts. The advisory `proofs.yml` installs
-  Z3 alongside Dafny, as `bin/prove.sh` requires the pinned solver. Date:
-  2026-11-26.
+  Z3 alongside Dafny, as `bin/prove.sh` requires the pinned solver. The trust
+  scan now admits LemmaScript's `StringSplit` axiom as well as
+  `emptyUserKeymaps`, because the search proof models `String.prototype.split`;
+  no other axiom is allowed. Date: 2026-11-26.
 - Decision D26 (new, EP-M5): per-field edit state lives in a ref-backed store
   (`lib/settings/field-store.ts`) read through `useSyncExternalStore`, exactly
   as D7 requires. Writes issue in submission order (the IPC order) and outcomes
