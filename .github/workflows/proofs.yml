@@ -1,0 +1,62 @@
+name: Proofs
+
+# Runs on every pull request with no path filter. A path filter would leave
+# this check "pending" on pull requests that touch no verified file, and a
+# pending check blocks a merge just as firmly as a failing one.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # Pinned by version and digest so a re-tagged release cannot silently change
+  # what the proof gate runs. Dafny needs the .NET 8 runtime, which the
+  # ubuntu-latest image provides.
+  DAFNY_VERSION: 4.11.0
+  DAFNY_ARCHIVE: dafny-4.11.0-x64-ubuntu-22.04.zip
+  DAFNY_SHA256: a46a9ff7cdd720f7955854c78e95df13f4cfe6b80691b05f8654fe19e8267179
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - name: Use Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: package.json
+      - name: Cache Dafny
+        id: cache-dafny
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.local/share/dafny
+          key: dafny-${{ env.DAFNY_VERSION }}-${{ env.DAFNY_SHA256 }}
+      - name: Install Dafny
+        if: steps.cache-dafny.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          archive="${RUNNER_TEMP}/${DAFNY_ARCHIVE}"
+          curl --fail --silent --show-error --location \
+            --output "${archive}" \
+            "https://github.com/dafny-lang/dafny/releases/download/v${DAFNY_VERSION}/${DAFNY_ARCHIVE}"
+          echo "${DAFNY_SHA256}  ${archive}" | sha256sum --check --strict
+          mkdir -p "${HOME}/.local/share/dafny"
+          unzip -q "${archive}" -d "${HOME}/.local/share/dafny"
+      - name: Put Dafny on PATH
+        run: |
+          set -euo pipefail
+          dafny_root="$(dirname "$(find "${HOME}/.local/share/dafny" -maxdepth 3 -name dafny -type f | head -n 1)")"
+          echo "${dafny_root}" >> "${GITHUB_PATH}"
+      - name: Install dependencies
+        # The proof gate needs the LemmaScript toolchain only, so skip the
+        # heavy postinstall (Electron rebuild and V8 snapshot generation).
+        run: bun install --ignore-scripts
+      - name: Prove
+        run: make proofs

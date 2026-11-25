@@ -3,6 +3,8 @@
 
 [files]
 extend-exclude = [
+    "*.dfy",
+    "*.dfy.gen",
     ".git",
     ".hypothesis",
     ".pytest_cache",

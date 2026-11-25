@@ -24,4 +24,9 @@ ignore = [
 exclude = [
   # This standalone upstream bundle is marked as vendored in .gitattributes.
   "bin/rimraf-standalone.js",
+  # Dafny artefacts generated from annotated TypeScript. The `.dfy.gen` file is
+  # regenerated wholesale by `lsc`, and identifiers such as `i_state_gate` are
+  # the tool's own naming, not prose this repository owns.
+  "*.dfy",
+  "*.dfy.gen",
 ]

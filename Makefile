@@ -61,3 +61,20 @@ nixie:
 	# CI currently requires --no-sandbox; remove once nixie supports
 	# environment variable control for this option
 	nixie --no-sandbox
+
+# Formal verification of the dispatcher's invocation machine. Not part of
+# `make all`: Dafny is a host tool, and CI installs it from a pinned archive.
+DAFNY_VERSION_PREFIX = 4.11.
+DAFNY ?= dafny
+LSC ?= node_modules/.bin/lsc
+
+proofs: # Prove the annotated policy modules with LemmaScript and Dafny
+	@command -v $(DAFNY) >/dev/null 2>&1 || { \
+		echo "dafny not found; install Dafny 4.11 (see docs/developers-guide.md)"; \
+		exit 1; \
+	}
+	@case "$$($(DAFNY) --version)" in \
+		$(DAFNY_VERSION_PREFIX)*) ;; \
+		*) echo "expected Dafny $(DAFNY_VERSION_PREFIX)x, got $$($(DAFNY) --version)"; exit 1 ;; \
+	esac
+	$(LSC) check --backend=dafny
