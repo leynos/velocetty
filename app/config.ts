@@ -1,186 +1,225 @@
+/** @file Composition root: resolves the config tree and wires import, keybindings, and reload. */
+/*
+ * This module builds the adapters and hands each collaborator its dependencies
+ * explicitly. The applied configuration state, the read-only queries, and the
+ * file watcher live in `app/config/`, so this file keeps only the wiring and
+ * the public entry point. The adapters take filesystem, clock, and
+ * notification dependencies as parameters, so the modules below stay testable
+ * without Electron.
+ */
+
 import {app} from 'electron';
 
-import chokidar from 'chokidar';
+import {mkdirpSync} from 'fs-extra';
+import path from 'node:path';
 
-import type {parsedConfig, configOptions} from '@shared/types/config';
-import {isJsonObject} from './utils/runtime-guards';
-
+import {createConfigMetrics} from './config/config-metrics';
+import {createImportRecorder} from './config/config-observability';
+import {checkDeprecatedConfig} from './config/config-queries';
+import {createConfigSpanRecorder} from './config/config-spans';
+import {createConfigWatchRuntime, emitKeymapsMarker, type ConfigWatchRuntime} from './config/config-watch';
+import {setCurrentConfig} from './config/current-config';
+import {silentMarkerSink, type E2EMarkerSink} from './config/e2e-marker-sink';
 import {createConfigImportModule} from './config/import';
 import {_init} from './config/init';
-import _openConfig from './config/open';
-import {cfgPath, cfgDir, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath} from './config/paths';
+import {createKeybindingsService} from './config/keybindings';
+import {keybindingsCodec} from './config/keybindings-codec';
+import {createKeybindingsNotifier} from './config/keybindings-notifier';
+import {createFileKeybindingsStore} from './config/keybindings-store';
+import {
+  cfgPath,
+  cfgDir,
+  configInspection,
+  configTree,
+  defaultCfg,
+  defaultPlatformKeyPath,
+  keybindingsPath,
+  keybindingsSchemaFile,
+  keybindingsSchemaPath,
+  plugs,
+  schemaFile,
+  schemaPath,
+  shadowedConfigPaths,
+  velocettyDir
+} from './config/paths';
 import notify from './notify';
-import {getColorMap} from './utils/colours';
+import {runStartupSession} from './config/startup-session';
+import {closeWatcherAtShutdown} from './config/watcher';
+import {captureWatchedFileStamps, settleWatchedFileStamps} from './config/watched-file-stamp';
 
-const {_import, getDefaultConfig} = createConfigImportModule({
-  _init,
-  notify,
-  paths: {cfgDir, cfgPath, defaultCfg, defaultPlatformKeyPath, plugs, schemaFile, schemaPath}
+const metrics = createConfigMetrics();
+
+const recorder = createImportRecorder({
+  metrics,
+  sink: {info: (line) => console.info(line), warn: (line) => console.warn(line)}
 });
 
-const watchers: Function[] = [];
-let cfg: parsedConfig | undefined;
-let _watcher: chokidar.FSWatcher | undefined;
+const spans = createConfigSpanRecorder({
+  now: () => performance.now(),
+  sink: {info: (line) => console.info(line), warn: (line) => console.warn(line)}
+});
 
-const getCurrentConfig = (): parsedConfig => {
-  if (cfg === undefined) {
-    throw new Error('Configuration has not been initialized');
+// The adapters are built once, at module load, exactly as before the ports
+// were split: only the start-up *command* is deferred to `setup()`, so a
+// query made earlier still works and still performs no start-up side effects.
+const keybindingsStore = createFileKeybindingsStore({
+  filePath: keybindingsPath,
+  metrics,
+  onRetry: recorder.recordRenameRetry,
+  spans
+});
+const keybindingsService = createKeybindingsService({
+  codec: keybindingsCodec,
+  report: createKeybindingsNotifier(notify),
+  store: keybindingsStore
+});
+
+/** Whether the opt-in start-up trace is enabled for this process. */
+const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPORT === '1';
+
+const {_import} = createConfigImportModule({
+  _init,
+  // The environment is read here, at the composition root, so the import
+  // modules below take the flag as a dependency and stay testable without it.
+  isDebugEnabled: isConfigImportDebugEnabled,
+  keybindings: {reload: keybindingsService.reload, start: keybindingsService.start},
+  notify,
+  paths: {
+    cfgDir,
+    cfgPath,
+    configInspection,
+    defaultCfg,
+    defaultPlatformKeyPath,
+    keybindingsDir: path.dirname(keybindingsPath),
+    keybindingsPath,
+    keybindingsSchemaFile,
+    keybindingsSchemaPath,
+    plugs,
+    schemaFile,
+    schemaPath,
+    shadowedConfigPaths,
+    velocettyDir
   }
+});
 
-  return cfg;
+/** Imports keybindings text verbatim; the active keymaps change on the next reload. */
+export const importKeybindings = keybindingsService.importKeybindings;
+
+/** Reports the stored keybindings text without writing, notifying, or changing state. */
+export const exportKeybindings = keybindingsService.exportKeybindings;
+
+/** The files the watcher covers, resolved once because they never change. */
+const watchedFiles = [path.resolve(cfgPath), path.resolve(keybindingsPath)];
+
+/** The watcher runtime `setup` built, which `subscribe` registers callbacks with. */
+let activeWatch: ConfigWatchRuntime | undefined;
+
+/**
+ * Registers a callback that runs after every applied reload.
+ *
+ * Returns an unsubscribe function, so a caller that is torn down does not keep
+ * receiving reloads.
+ *
+ * `setup` builds the watcher runtime, because the marker sink it reports
+ * through arrives with it, so a subscription made before start-up has nothing
+ * to register with: no reload can run yet.
+ *
+ * @example
+ * ```ts
+ * const unsubscribe = subscribe(() => render());
+ * unsubscribe(); // the callback no longer runs
+ * ```
+ */
+export const subscribe = (fn: Function): (() => void) => {
+  if (activeWatch === undefined) {
+    throw new Error('config.subscribe() was called before config.setup().');
+  }
+  return activeWatch.subscribe(fn);
 };
 
-export const getDeprecatedCSS = (config: configOptions) => {
-  const deprecated: string[] = [];
-  const deprecatedCSS = ['x-screen', 'x-row', 'cursor-node', '::selection'];
-  deprecatedCSS.forEach((css) => {
-    if (config.css.includes(css) || config.termCSS.includes(css)) {
-      deprecated.push(css);
-    }
+/** What `setup` needs from the entry point that starts this process. */
+export type ConfigurationSetupOptions = Readonly<{
+  /** Receives every marker the composition root reports; defaults to silence. */
+  readonly markerSink?: E2EMarkerSink;
+}>;
+
+/**
+ * Runs the start-up import, then starts watching for configuration changes.
+ *
+ * Counts the attempt, creates the Velocetty tree, clears a stale temporary
+ * keybindings file, and records the import before any watcher can fire, so the
+ * first reload sees a complete state. Counting first means a failure during
+ * preparation is still reported as a start-up attempt.
+ *
+ * @example
+ * ```ts
+ * setup(); // the application is now reading and watching its configuration
+ * ```
+ */
+export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions = {}) => {
+  const configWatch = createConfigWatchRuntime({
+    configTree,
+    importConfiguration: _import,
+    metrics,
+    notify,
+    recorder,
+    markerSink,
+    spans,
+    watchedFiles
   });
-  return deprecated;
-};
-
-const checkDeprecatedConfig = () => {
-  if (cfg === undefined) {
-    return;
-  }
-  const deprecated = getDeprecatedCSS(cfg.config);
-  if (deprecated.length === 0) {
-    return;
-  }
-  const deprecatedStr = deprecated.join(', ');
-  notify('Configuration warning', `Your configuration uses some deprecated CSS classes (${deprecatedStr})`);
-};
-
-const _watch = () => {
-  if (_watcher !== undefined) {
-    return;
-  }
-
-  const onChange = () => {
-    // Need to wait 100ms to ensure that write is complete
-    setTimeout(() => {
-      cfg = _import();
-      notify('Configuration updated', 'Hyper configuration reloaded!');
-      watchers.forEach((fn) => {
-        fn();
-      });
-      checkDeprecatedConfig();
-    }, 100);
-  };
-
-  _watcher = chokidar.watch(cfgPath);
-  _watcher.on('change', onChange);
-  _watcher.on('error', (error) => {
-    console.error('error watching config', error);
+  // The span and the record belong to the start-up session, which takes its
+  // sinks as dependencies; this root only supplies the adapters and applies
+  // the state the session reports.
+  const {imported, startupStamps} = runStartupSession({
+    // The ordering lives in the start-up unit: it captures before the import
+    // reads and settles only afterwards.
+    captureStamps: () => captureWatchedFileStamps(watchedFiles),
+    configSource: configTree,
+    importConfiguration: () => _import('startup'),
+    prepare: () => {
+      // The Velocetty tree holds new configuration files, so it must exist
+      // before the importer copies schemas or seeds `keybindings.json5`.
+      mkdirpSync(velocettyDir);
+      // A crashed write can leave a temporary file behind. Start-up is the
+      // only phase that may remove it, and the edge owns that cleanup
+      // immediately before the seed decision reads the file.
+      keybindingsStore.removeStaleTemporaryFiles();
+    },
+    recorder,
+    settleStamps: settleWatchedFileStamps,
+    spans
   });
-
-  app.on('before-quit', () => {
-    const watcher = _watcher;
-    if (watcher && Object.keys(watcher.getWatched()).length > 0) {
-      watcher.close().catch((error) => {
-        console.warn(error);
-      });
-    }
-  });
-};
-
-export const subscribe = (fn: Function) => {
-  watchers.push(fn);
-  return () => {
-    watchers.splice(watchers.indexOf(fn), 1);
-  };
-};
-
-export const getConfigDir = () => {
-  // expose config directory to load plugin from the right place
-  return cfgDir;
-};
-
-export const getDefaultProfile = () => {
-  const {config} = getCurrentConfig();
-  return config.defaultProfile || config.profiles[0]?.name || 'default';
-};
-
-// get config for the default profile, keeping it for backward compatibility
-export const getConfig = () => {
-  return getProfileConfig(getDefaultProfile());
-};
-
-export const getProfiles = () => {
-  return getCurrentConfig().config.profiles;
-};
-
-/** The settings a profile is allowed to override in the root configuration. */
-type ProfileOverrideKey = keyof configOptions['profiles'][number]['config'];
-
-export const getProfileConfig = (profileName: string): configOptions => {
-  const {profiles, defaultProfile, ...baseConfig} = getCurrentConfig().config;
-  const profileConfig = profiles.find((candidate) => candidate.name === profileName)?.config ?? {};
-  const merged: configOptions = {...baseConfig, defaultProfile, profiles};
-
-  // A profile overrides only the settings it names. Object-valued settings
-  // (`colors`, `env`, `modifierKeys`) merge with the base so a profile can
-  // recolour one entry; every other setting replaces the base value outright.
-  // SAFETY: `profileConfig` is a `Partial<profileConfigOptions>`, so every
-  // enumerable key it carries is a profile setting; `Object.keys` only loses
-  // that fact because it widens the key type to `string`.
-  for (const key of Object.keys(profileConfig) as ProfileOverrideKey[]) {
-    const baseValue = merged[key];
-    const overrideValue = profileConfig[key];
-    const mergedValue =
-      isJsonObject(baseValue) && isJsonObject(overrideValue) ? {...baseValue, ...overrideValue} : overrideValue;
-    Object.assign(merged, {[key]: mergedValue});
+  setCurrentConfig(imported.config);
+  const configurationWatcher = configWatch.watch(startupStamps);
+  if (configurationWatcher !== undefined) {
+    app.on('before-quit', () => {
+      // A failed release is already counted; logging its bounded shape keeps a
+      // configuration path out of the shutdown log.
+      closeWatcherAtShutdown(configurationWatcher, (line, details) => console.warn(line, details));
+    });
   }
-
-  return merged;
+  checkDeprecatedConfig(notify);
+  // The sink the entry point supplied: silent for a shipped build, the lane's
+  // stream when the lane's entry point started this process.
+  markerSink(`[e2e] keybindings-path ${keybindingsPath}`);
+  markerSink(`[e2e] config-path ${cfgPath}`);
+  emitKeymapsMarker(imported.report, imported.config.keymaps, markerSink);
+  activeWatch = configWatch;
 };
 
-export const openConfig = () => {
-  return _openConfig();
-};
-
-export const getPlugins = () => {
-  const currentConfig = getCurrentConfig();
-  return {
-    plugins: currentConfig.plugins,
-    localPlugins: currentConfig.localPlugins
-  };
-};
-
-export const getKeymaps = () => {
-  return getCurrentConfig().keymaps;
-};
-
-export const setup = () => {
-  cfg = _import();
-  _watch();
-  checkDeprecatedConfig();
-};
+export {
+  decorateProfileConfig,
+  fixConfigDefaults,
+  getConfig,
+  getConfigDir,
+  getDefaultProfile,
+  getDeprecatedCSS,
+  getKeymaps,
+  getPlugins,
+  getProfileConfig,
+  getProfiles,
+  htermConfigTranslate,
+  openConfig
+} from './config/config-queries';
 
 export {get as getWin, recordState as winRecord, defaults as windowDefaults} from './config/windows';
-
-export const fixConfigDefaults = (decoratedConfig: configOptions) => {
-  const defaultConfig = getDefaultConfig().config!;
-  const colorOverrides = getColorMap(decoratedConfig.colors);
-  // We must have default colours for xterm css.
-  decoratedConfig.colors = {...defaultConfig.colors, ...colorOverrides};
-  return decoratedConfig;
-};
-
-export const htermConfigTranslate = (config: configOptions) => {
-  const cssReplacements = {
-    'x-screen x-row([ {.[])': '.xterm-rows > div$1',
-    '.cursor-node([ {.[])': '.terminal-cursor$1',
-    '::selection([ {.[])': '.terminal .xterm-selection div$1',
-    'x-screen a([ {.[])': '.terminal a$1',
-    'x-row a([ {.[])': '.terminal a$1'
-  };
-  Object.entries(cssReplacements).forEach(([pattern, newvalue]) => {
-    const searchvalue = new RegExp(pattern, 'g');
-    config.css = config.css.replace(searchvalue, newvalue);
-    config.termCSS = config.termCSS.replace(searchvalue, newvalue);
-  });
-  return config;
-};

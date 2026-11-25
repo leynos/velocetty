@@ -7,10 +7,9 @@
 - Invariants: The proved machine stays a pure function with no imports, timers,
   or clock reads; every command source uses the one dispatcher; the interpreter
   remains the only code that consults the machine.
-- Cross-links: [ADR 007](adr-007-frontend-command-dispatcher-contract.md),
-  [Developers' guide](developers-guide.md),
-  [Technical design](velocetty-design.md), and
-  [Users' guide](users-guide.md).
+- Cross-links: [ADR 009](adrs/adr-0009-frontend-command-dispatcher-contract.md),
+  [Developers' guide](developers-guide.md), [Technical design](velocetty-design.md),
+  and [Users' guide](users-guide.md).
 
 ## Purpose and trust boundary
 
@@ -282,15 +281,24 @@ the tree in `CommandDispatcherProvider`.
 
 ## Verification
 
-`make proofs` runs LemmaScript (`node_modules/.bin/lsc check --backend=dafny`)
-over the modules listed in `LemmaScript-files.txt`, which currently names only
-`lib/command-dispatch/policy/invocation-machine.ts`. The target requires Dafny
-4.11.x and verifies the generated Dafny. The proof reports 33 verified
-obligations and 0 errors. It is not part of `make all`, because Dafny is a host
-tool; `.github/workflows/proofs.yml` installs a pinned Dafny archive and runs
-the target on every pull request.
+`make prove` runs `./bin/prove.sh`, which verifies every source listed in
+`LemmaScript-files.txt` through the pinned
+`node_modules/.bin/lsc check --backend=dafny`. The list holds a source path and
+a timeout per line, and it currently names `test/proofs/sample.ts`,
+`app/config/keybindings-policy.ts`, and
+`lib/command-dispatch/policy/invocation-machine.ts`. Run `bun install` first;
+the script needs `node_modules/.bin/lsc`. It also requires Dafny 4.11.x and Z3
+4.12.1 where Dafny looks for its solver, and it reports
+`Dafny program verifier finished with N verified, 0 errors`.
 
-The proved obligations are:
+`prove` is part of `make all`. The script refuses a vacuous pass: it fails on
+an empty list, on a timeout above 60 seconds, on a policy source that exists
+but is not listed, on a forbidden trust construct other than the single
+`emptyUserKeymaps` axiom, on fewer verifier summaries than listed sources, and
+on stale generated `.dfy.gen` artefacts.
+
+The invocation machine's proof carries 33 verified obligations, with 0 errors.
+They are:
 
 - admission gates are evaluated in index order, and a refusal names the first
   gate that refused;
@@ -335,8 +343,9 @@ Residual gaps:
 - A plugin middleware that swallows `UI_COMMAND_EXEC` leaves the invocation
   pending unless the caller passed a signal. This is a documented consequence
   of the execution gate's semantics, not a defect.
-- Context keys are not populated yet (roadmap item 4.2.1), so a `defaultWhen`
-  that references one evaluates against an empty service.
+- Nothing populates context keys yet, so a `defaultWhen` that references one
+  evaluates against an empty service and disables the command for the
+  affordance sources. No current definition sets `defaultWhen`.
 - Backend permission checks and backend cancellation tokens belong to roadmap
   item 4.1.2 and are not part of this dispatcher.
 - The deep end-to-end lane scripts the user-visible path; it is supporting
@@ -345,4 +354,4 @@ Residual gaps:
 The rationale for the contract shape — the result union, routing by handler
 presence, pending gate semantics, source-aware enablement, and `null`
 normalization — is recorded in
-[ADR 007](adr-007-frontend-command-dispatcher-contract.md).
+[ADR 009](adrs/adr-0009-frontend-command-dispatcher-contract.md).

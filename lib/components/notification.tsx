@@ -114,9 +114,13 @@ const useNotification = (props: NotificationProps, ref: NotificationRef, timer?:
 
   const setDismissTimer = useCallback(() => {
     if (isNumber(dismissAfter)) {
+      // SAFETY: the seam and the global agree on behaviour; they name
+      // different handle unions only because both Node and DOM timer
+      // declarations are in scope. The handle is never inspected, only passed
+      // back to `clearTimeout`.
       dismissTimer.current = setTimeout(() => {
         handleDismiss();
-      }, dismissAfter);
+      }, dismissAfter) as ReturnType<TimerSeam['setTimeout']>;
     }
   }, [dismissAfter, handleDismiss, setTimeout]);
 

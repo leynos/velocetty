@@ -29,7 +29,7 @@ And when tracking/developer documents are updated:
 ## Constraints
 
 - Follow Architecture Decision Record (ADR)-004 staged migration path from
-  `docs/adr-004-update-electron-40.md`: 22 → 28 → 34 → 40.
+  `docs/adrs/adr-0004-update-electron-40.md`: 22 → 28 → 34 → 40.
 - Preserve existing script and Make target names.
 - Maintain native module functionality (`node-pty`) after the upgrade.
 - Ensure documentation remains wrapped to 80 columns and code blocks to 120

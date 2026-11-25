@@ -1,1 +1,3 @@
-lib/command-dispatch/policy/invocation-machine.ts
+test/proofs/sample.ts 30
+app/config/keybindings-policy.ts 30
+lib/command-dispatch/policy/invocation-machine.ts 30

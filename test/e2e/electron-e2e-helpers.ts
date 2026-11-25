@@ -4,13 +4,20 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import type {ConsoleMessage} from 'playwright';
-import {isObject, isString} from '@shared/types/guards';
+import {removeDirectoryWithRetry} from './cleanup-retry';
 
 type ResolveLaunchConfigOptions = Readonly<{
   platform?: NodeJS.Platform;
   ci?: string;
   electronDisableSandbox?: string;
   baseDir?: string;
+}>;
+
+/** One file to write into a configuration tree. */
+type SeedFileRequest = Readonly<{
+  configDir: string;
+  contents: string;
+  fileName: string;
 }>;
 
 type IsolatedE2EEnvironment = Readonly<{
@@ -21,18 +28,23 @@ type IsolatedE2EEnvironment = Readonly<{
    * variables whose value is `undefined`, and `process.env` may contain them.
    */
   env: Record<string, string>;
+  /** The temporary home every configuration tree resolves under. */
+  tempHome: string;
+  /** The Velocetty configuration tree inside the temporary home. */
+  velocettyConfigDir: string;
+  /** The legacy Hyper configuration tree inside the temporary home. */
+  hyperConfigDir: string;
+  /**
+   * Writes one file into a configuration tree before launch.
+   *
+   * Creates the tree when the file needs it, so a seeded Hyper tree exists
+   * without the application ever creating one.
+   */
+  seedFile: (request: SeedFileRequest) => Promise<string>;
   cleanup: () => Promise<void>;
 }>;
 
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
-
-type RemoveDirectoryWithRetryOptions = Readonly<{
-  maxAttempts?: number;
-  baseDelayMs?: number;
-  isWindows?: boolean;
-  removeDirectory?: (directory: string) => Promise<void>;
-  sleepFn?: (ms: number) => Promise<void>;
-}>;
 
 type ReadActiveTerminalBufferOptions = Readonly<{
   lineLimit?: number;
@@ -60,55 +72,6 @@ const assertNever = (value: never): never => {
 };
 
 const defaultNonCriticalRendererErrorPatterns = [/Download the React DevTools/i, /DevTools failed to load source map/i];
-const windowsRetriableCleanupErrorCodes = new Set(['EBUSY', 'EPERM', 'ENOTEMPTY']);
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-const removeDirectoryRecursive = async (directory: string) => {
-  await fs.rm(directory, {recursive: true, force: true});
-};
-
-const isRetriableCleanupError = (error: unknown, isWindows: boolean) => {
-  if (!isWindows) {
-    return false;
-  }
-
-  if (!isObject(error) || !('code' in error)) {
-    return false;
-  }
-  const code = error.code;
-  return isString(code) && windowsRetriableCleanupErrorCodes.has(code);
-};
-
-export const removeDirectoryWithRetry = async (directory: string, options: RemoveDirectoryWithRetryOptions = {}) => {
-  const maxAttempts = options.maxAttempts ?? 5;
-  const baseDelayMs = options.baseDelayMs ?? 100;
-  const isWindows = options.isWindows ?? process.platform === 'win32';
-  const removeDirectory = options.removeDirectory ?? removeDirectoryRecursive;
-  const sleepFn = options.sleepFn ?? sleep;
-
-  if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
-    throw new RangeError('removeDirectoryWithRetry maxAttempts must be an integer greater than 0.');
-  }
-
-  if (!Number.isFinite(baseDelayMs) || baseDelayMs <= 0) {
-    throw new RangeError('removeDirectoryWithRetry baseDelayMs must be a finite number greater than 0.');
-  }
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      await removeDirectory(directory);
-      return;
-    } catch (error) {
-      if (attempt >= maxAttempts || !isRetriableCleanupError(error, isWindows)) {
-        throw error;
-      }
-
-      const delayMs = baseDelayMs * 2 ** (attempt - 1);
-      await sleepFn(delayMs);
-    }
-  }
-};
 
 export const isNonCriticalRendererError = (
   text: string,
@@ -128,6 +91,14 @@ export const extractRendererErrorMessage = (line: string) => {
 
   const payload = line.slice(markerIndex + marker.length).trim();
   return payload.replace(/^\S+:\d+\s+/, '');
+};
+
+/** Writes one file into a configuration tree, creating the tree on demand. */
+const seedFile = async ({configDir, contents, fileName}: SeedFileRequest) => {
+  await fs.mkdir(configDir, {recursive: true});
+  const filePath = path.join(configDir, fileName);
+  await fs.writeFile(filePath, contents, 'utf8');
+  return filePath;
 };
 
 /**
@@ -155,8 +126,13 @@ export const createIsolatedE2EEnvironment = async (): Promise<IsolatedE2EEnviron
     APPDATA: appData,
     LOCALAPPDATA: localAppData
   } satisfies Record<string, string>;
+
   return {
     env,
+    tempHome,
+    velocettyConfigDir: path.join(tempHome, 'Velocetty'),
+    hyperConfigDir: path.join(tempHome, 'Hyper'),
+    seedFile,
     cleanup: async () => {
       await removeDirectoryWithRetry(tempHome);
     }

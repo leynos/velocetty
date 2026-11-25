@@ -1,368 +1,240 @@
-/** @file Imports and normalizes user and default configuration files. */
-import {copySync, existsSync, mkdirpSync, readFileSync, writeFileSync} from 'fs-extra';
+/** @file Composes config sources, the keybindings service, and migration notices. */
+/*
+ * The importer is the only place that knows both configuration files. It
+ * classifies the legacy keymaps, drives the keybindings service through the
+ * right phase, and reports what each file did so the application can decide
+ * whether "Configuration updated" is honest.
+ */
 import path from 'node:path';
-import {z} from 'zod';
 
-import type {configValidationDiagnostic, parsedConfig, rawConfig} from '@shared/types/config';
-import {isJsonValue} from '../utils/runtime-guards';
-import {parseJson5WithSchemaDiagnostics, safeParseRawConfig, stringifyJson5, type ParseSchema} from './json5-config';
+import type {parsedConfig, rawConfig} from '@shared/types/config';
+import {
+  classifyLegacyKeymaps,
+  createKeybindingsNotices,
+  type LegacyKeymapsClassification,
+  readLegacyKeymaps,
+  replaceLegacyKeymaps
+} from './import-keybindings';
+import type {ConfigImportNotify, ConfigImportReport} from './import-report';
+import {
+  createConfigSourceLoader,
+  type ConfigImportFileSystem,
+  type ConfigImportPaths,
+  type ConfigImportPhase,
+  type ConfigSourceLoaderDependencies,
+  type LoadedSources
+} from './import-sources';
+import type {KeybindingsLoadOutcome} from './keybindings-ports';
+import type {LegacyKeymapsSource} from './keybindings-policy';
+import type {WrittenWatchedFile} from './watched-file-stamp';
 
-type LoadedConfig = {
-  config: rawConfig;
-  diagnostics: configValidationDiagnostic[];
+export {shouldAnnounceReload} from './import-report';
+export type {ConfigImportReport} from './import-report';
+export type {ConfigImportPaths, ConfigImportPhase} from './import-sources';
+
+/** The keybindings service as the importer sees it. */
+export type ConfigImportKeybindings = {
+  readonly start: (legacy: LegacyKeymapsSource) => KeybindingsLoadOutcome;
+  readonly reload: () => KeybindingsLoadOutcome;
 };
 
-type ConfigImportNotify = (title: string, body?: string, details?: {error?: unknown}) => void;
+export type ConfigImportResult = {
+  readonly config: parsedConfig;
+  readonly report: ConfigImportReport;
+  /**
+   * The files this import created, with the exact text it applied.
+   *
+   * The caller captures the watcher baseline before the import, so a file the
+   * import wrote itself looks changed even though the application holds its
+   * content. These entries are the only changes the baseline may settle, and
+   * only while each file still holds the text listed here. Reload writes
+   * nothing, so it always returns an empty list.
+   */
+  readonly writtenFiles: readonly WrittenWatchedFile[];
+  /**
+   * What the keybindings service decided, passed through unflattened so the
+   * caller can report its `origin`, `basis`, and `cause` without re-deriving
+   * them from the coarser report vocabulary.
+   */
+  readonly keybindings: KeybindingsLoadOutcome;
+};
+
 type ConfigInit = (userCfg: rawConfig, defaultCfg: rawConfig, notify: ConfigImportNotify) => parsedConfig;
-
-export type ConfigImportPaths = {
-  cfgDir: string;
-  cfgPath: string;
-  defaultCfg: string;
-  defaultPlatformKeyPath: () => string;
-  plugs: {
-    base: string;
-    local: string;
-  };
-  schemaFile: string;
-  schemaPath: string;
-};
 
 type ConfigImportDependencies = {
   _init: ConfigInit;
-  notify: (title: string, body?: string, details?: {error?: unknown}) => void;
+  keybindings: ConfigImportKeybindings;
+  notify: ConfigImportNotify;
   paths: ConfigImportPaths;
+  fs?: ConfigImportFileSystem;
+  isDebugEnabled?: () => boolean;
   warn?: typeof console.warn;
+  error?: typeof console.error;
 };
 
-/** A file path used to identify a config artefact in diagnostics. */
-type ConfigFilePath = {
-  readonly path: string;
-};
+/** True when the service created a brand-new file from the legacy keymaps. */
+const seededFreshFile = (outcome: KeybindingsLoadOutcome): boolean =>
+  outcome.kind === 'applied' && outcome.origin === 'seeded';
 
-/** Bundles the raw text and originating file path of a config source. */
-type ConfigSource = {
-  readonly filePath: ConfigFilePath;
-  readonly rawContent: string;
-};
+/** True when the service kept a `keybindings.json5` the user already had. */
+const keptExistingFile = (outcome: KeybindingsLoadOutcome): boolean =>
+  outcome.kind === 'applied' && outcome.origin === 'file';
 
-const defaultRawConfigFallback: rawConfig = {
-  plugins: [],
-  localPlugins: [],
-  keymaps: {}
-} as const;
-
-/** Creates an isolated copy of a raw config payload for safe mutation. */
-const cloneRawConfig = (config: rawConfig): rawConfig => structuredClone(config);
-
-const keymapValueSchema = z.union([z.string(), z.array(z.string())]);
-const keymapRecordSchema = z.record(z.string(), keymapValueSchema);
-
-const keymapSchema: ParseSchema<Record<string, string | string[]>> = {
-  safeParse: (value) => {
-    const parsed = keymapRecordSchema.safeParse(value);
-    if (!parsed.success) {
-      return {
-        success: false,
-        error: parsed.error
-      };
-    }
-
-    return {success: true, data: parsed.data};
-  }
-};
-
-const rawConfigSchema: ParseSchema<rawConfig> = {
-  safeParse: (value) => safeParseRawConfig(value)
-};
-
-const rawConfigDiagnosticHints = {
-  '/': {
-    docHint: 'Top-level config payload object.',
-    defaultHint: '{}'
-  },
-  '/config': {
-    docHint: 'Root terminal configuration object.',
-    defaultHint: '{}'
-  },
-  '/plugins': {
-    docHint: 'List of plugins to fetch and install from npm.',
-    defaultHint: '[]'
-  },
-  '/localPlugins': {
-    docHint: 'List of local plugin directories to load in development.',
-    defaultHint: '[]'
-  },
-  '/keymaps': {
-    docHint: 'Command keymap overrides as strings or string arrays.',
-    defaultHint: '{}'
-  }
-} as const;
-
-const keymapDiagnosticHints = {
-  '/': {
-    docHint: 'Keymap entries map command ids to keybinding strings or arrays.',
-    defaultHint: '{}'
-  }
-} as const;
-
-const reportDiagnostics = (
-  warnFn: typeof console.warn,
-  context: string,
-  source: ConfigFilePath,
-  diagnostics: configValidationDiagnostic[]
-) => {
-  if (diagnostics.length === 0) {
-    return;
-  }
-  warnFn(`[config-import] ${context}`, {source: source.path, diagnostics});
-};
+/** True when start-up left the legacy keymaps where they were, pending a fix. */
+const deferredMigration = (outcome: KeybindingsLoadOutcome): boolean =>
+  outcome.kind === 'kept' && outcome.cause === 'deferred';
 
 /**
- * Parses JSON5 config text into a validated raw config payload.
+ * The bootstrapped `config.json5`, when the import went on to apply it.
  *
- * Returns parsed payload plus structured diagnostics when fallback is used.
+ * A write that could not be read back left the application on defaults, so the
+ * file's content is not in effect and must not be settled.
  */
-type ConfigParseOptions<T> = {
-  readonly schema: ParseSchema<T>;
-  readonly fallback: T;
-  readonly itemType: string;
-  readonly diagnosticHints: Record<string, {docHint?: string; defaultHint?: string}>;
-};
-
-const parseConfigSource = <T>(source: ConfigSource, options: ConfigParseOptions<T>) =>
-  parseJson5WithSchemaDiagnostics({
-    raw: source.rawContent,
-    source: source.filePath.path,
-    schema: options.schema,
-    fallback: options.fallback,
-    itemType: options.itemType,
-    diagnosticHints: options.diagnosticHints
-  });
-
-const parseRawConfig = (source: ConfigSource) =>
-  parseConfigSource(source, {
-    schema: rawConfigSchema,
-    fallback: null,
-    itemType: 'config',
-    diagnosticHints: rawConfigDiagnosticHints
-  });
-
-/**
- * Parses JSON5 keymap text and validates that each entry is a string or string array.
- *
- * Returns parsed keymaps plus diagnostics when fallback is used.
- */
-const parseKeymapConfig = (source: ConfigSource) =>
-  parseConfigSource(source, {
-    schema: keymapSchema,
-    fallback: {},
-    itemType: 'keymap',
-    diagnosticHints: keymapDiagnosticHints
-  });
-
-/** Serializes config using deterministic JSON5 formatting for stable snapshots. */
-const stringifyConfig = (config: rawConfig): string => {
-  if (!isJsonValue(config)) {
-    throw new TypeError('Config values must be JSON-compatible before serialization.');
+const bootstrappedConfigFile = (loaded: LoadedSources, paths: ConfigImportPaths): WrittenWatchedFile | undefined => {
+  if (!loaded.bootstrapped) {
+    return undefined;
   }
-  return stringifyJson5(config);
+  if (loaded.appliedConfigText === undefined) {
+    return undefined;
+  }
+  return {path: path.resolve(paths.cfgPath), text: loaded.appliedConfigText};
 };
 
-const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPORT === '1';
+/** The seeded `keybindings.json5`, when the service's write landed. */
+const seededKeybindingsFile = (
+  outcome: KeybindingsLoadOutcome,
+  paths: ConfigImportPaths
+): WrittenWatchedFile | undefined => {
+  if (outcome.kind !== 'applied') {
+    return undefined;
+  }
+  if (outcome.origin !== 'seeded') {
+    return undefined;
+  }
+  if (outcome.writtenText === undefined) {
+    return undefined;
+  }
+  return {path: path.resolve(paths.keybindingsPath), text: outcome.writtenText};
+};
 
 /**
- * Copies the bundled JSON schema into the user config directory.
+ * The files a start-up import wrote, paired with the text it applied.
  *
- * Logs and notifies when copying fails so schema-backed editor metadata issues
- * are visible to users.
+ * Each entry names a file whose content the application holds, so a watcher
+ * baseline may settle it. The service supplies the exact text it wrote.
+ *
+ * @example
+ * ```ts
+ * writtenStartupFiles({bootstrapped: true, appliedConfigText: '{}\n', …}, outcome, paths);
+ * // [{path: '/home/user/.config/Velocetty/config.json5', text: '{}\n'}]
+ * ```
+ */
+const writtenStartupFiles = (
+  loaded: LoadedSources,
+  outcome: KeybindingsLoadOutcome,
+  paths: ConfigImportPaths
+): readonly WrittenWatchedFile[] =>
+  [bootstrappedConfigFile(loaded, paths), seededKeybindingsFile(outcome, paths)].filter(
+    (file): file is WrittenWatchedFile => file !== undefined
+  );
+
+/** Maps a service outcome onto the report vocabulary. */
+const keybindingsStatus = (outcome: KeybindingsLoadOutcome): ConfigImportReport['keybindings'] => {
+  if (outcome.kind === 'applied') {
+    return 'applied';
+  }
+  return outcome.cause === 'deferred' ? 'unchanged' : 'kept';
+};
+
+/**
+ * Creates the configuration importer.
+ *
+ * `_import('startup')` may create directories, copy schemas, and seed
+ * `keybindings.json5`; `_import('reload')` writes nothing at all.
+ *
+ * @example
+ * ```ts
+ * const importer = createConfigImportModule({_init, keybindings, notify, paths});
+ * const {config, keybindings: outcome, report} = importer._import('reload');
+ * ```
  */
 export const createConfigImportModule = (dependencies: ConfigImportDependencies) => {
-  const {_init: initConfig, notify: notifyFn} = dependencies;
-  const warnFn = dependencies.warn ?? console.warn;
-  const pathDeps = dependencies.paths;
-  let defaultConfig: rawConfig | undefined;
+  const {_init: initConfig, keybindings, notify: notifyFn} = dependencies;
+  // A Hyper tree's active file is `hyper.json`, so the notices must name the
+  // file the user actually has rather than assuming `config.json5`.
+  const notices = createKeybindingsNotices(notifyFn, path.basename(dependencies.paths.cfgPath));
+  const sourceOptions: ConfigSourceLoaderDependencies = {notify: notifyFn, paths: dependencies.paths};
+  // Assigned only when supplied: `exactOptionalPropertyTypes` forbids `undefined`.
+  if (dependencies.warn !== undefined) {
+    sourceOptions.warn = dependencies.warn;
+  }
+  if (dependencies.error !== undefined) {
+    sourceOptions.error = dependencies.error;
+  }
+  if (dependencies.fs !== undefined) {
+    sourceOptions.fs = dependencies.fs;
+  }
+  if (dependencies.isDebugEnabled !== undefined) {
+    sourceOptions.isDebugEnabled = dependencies.isDebugEnabled;
+  }
+  const sources = createConfigSourceLoader(sourceOptions);
 
-  const notifyWithPrimaryDiagnostic = (baseMessage: string, diagnostics: configValidationDiagnostic[]) => {
-    const primaryDiagnostic = diagnostics.at(0);
-    if (!primaryDiagnostic) {
-      notifyFn(baseMessage);
+  /** Shows the migration notices appropriate to what the service did. */
+  const reportKeybindings = (outcome: KeybindingsLoadOutcome, classification: LegacyKeymapsClassification) => {
+    if (seededFreshFile(outcome)) {
+      notices.announceSeeded();
       return;
     }
-
-    const docHint = primaryDiagnostic.docHint ? ` Hint: ${primaryDiagnostic.docHint}.` : '';
-    const defaultHint = primaryDiagnostic.defaultHint ? ` Default: ${primaryDiagnostic.defaultHint}.` : '';
-    notifyFn(
-      `${baseMessage} ${primaryDiagnostic.path}: ${primaryDiagnostic.message} Suggested fix: ${primaryDiagnostic.suggestedFix}.${docHint}${defaultHint}`
-    );
-  };
-
-  const ensureSchemaFile = () => {
-    const destinationPath = path.resolve(pathDeps.cfgDir, pathDeps.schemaFile);
-    try {
-      copySync(pathDeps.schemaPath, destinationPath, {overwrite: true});
-    } catch (error) {
-      console.error(
-        `[config-import] Failed to copy schema file from "${pathDeps.schemaPath}" to "${destinationPath}".`,
-        error
-      );
-      notifyFn("Couldn't update config schema metadata. Config editor validation may be stale.");
+    // "Fix the keymaps to migrate them" is only true when start-up actually
+    // deferred the migration. An existing file wins over the legacy keymaps,
+    // so telling the user to fix them there would promise a migration that
+    // cannot happen.
+    if (deferredMigration(outcome) && classification.legacy.kind === 'parsed-invalid') {
+      notices.announceDeferred(classification.diagnostics);
+    }
+    if (keptExistingFile(outcome) && classification.legacy.kind === 'parsed-keymaps') {
+      notices.announceLegacyIgnored();
     }
   };
 
   /**
-   * Bootstraps the user config file from the provided default template.
+   * Runs one import and reports what each file did.
    *
-   * When writing fails, emits contextual error logs and notifies the user.
+   * Start-up may create directories, refresh schemas, seed
+   * `keybindings.json5`, and bootstrap `config.json5`. Reload writes nothing.
+   * The result carries the parsed `config`, the coarse per-file `report` the
+   * composition root uses to decide whether "Configuration updated" is honest,
+   * and the unflattened `keybindings` outcome so the caller can report its
+   * `origin`, `basis`, and `cause` without re-deriving them.
    */
-  const ensureUserConfigFile = (defaultConfigTemplate: rawConfig) => {
-    if (existsSync(pathDeps.cfgPath)) {
-      return;
+  const _import = (phase: ConfigImportPhase): ConfigImportResult => {
+    const loaded = sources.load(phase);
+    if (phase === 'startup') {
+      notices.announceShadowed(dependencies.paths.shadowedConfigPaths);
     }
+    const classification = classifyLegacyKeymaps({
+      bootstrapped: loaded.bootstrapped,
+      keymaps: readLegacyKeymaps(loaded.userCfg),
+      source: dependencies.paths.cfgPath,
+      usedFallback: loaded.usedFallback
+    });
+    const outcome = phase === 'startup' ? keybindings.start(classification.legacy) : keybindings.reload();
+    reportKeybindings(outcome, classification);
+    replaceLegacyKeymaps(loaded.userCfg, outcome.keymaps);
 
-    warnFn(
-      `[config-import] User config file missing at "${pathDeps.cfgPath}". Bootstrapping from default config template.`
-    );
-    try {
-      writeFileSync(pathDeps.cfgPath, stringifyConfig(defaultConfigTemplate), 'utf8');
-    } catch (error) {
-      console.error(`[config-import] Failed to write bootstrapped user config at "${pathDeps.cfgPath}".`, error);
-      notifyFn("Couldn't create a user config file. Check permissions and available disk space.");
-    }
-  };
-
-  const loadDefaultConfig = (): LoadedConfig => {
-    let defaultCfgRaw = '{}';
-    try {
-      defaultCfgRaw = readFileSync(pathDeps.defaultCfg, 'utf8');
-    } catch (error) {
-      console.error(`[config-import] Failed to read bundled default config at "${pathDeps.defaultCfg}".`, error);
-    }
-
-    const filePath: ConfigFilePath = {path: pathDeps.defaultCfg};
-    const parsedDefaultConfigResult = parseRawConfig({filePath, rawContent: defaultCfgRaw});
-    if (parsedDefaultConfigResult.usedFallback) {
-      reportDiagnostics(warnFn, 'Bundled default config diagnostics.', filePath, parsedDefaultConfigResult.diagnostics);
-    }
-
-    if (!parsedDefaultConfigResult.usedFallback && parsedDefaultConfigResult.value !== null) {
-      return {
-        config: parsedDefaultConfigResult.value,
-        diagnostics: parsedDefaultConfigResult.diagnostics
-      };
-    }
-
-    console.error(
-      `[config-import] Failed to parse bundled default config at "${pathDeps.defaultCfg}". Using safe fallback defaults.`
-    );
-    notifyWithPrimaryDiagnostic(
-      "Couldn't parse the bundled default config. Falling back to safe defaults.",
-      parsedDefaultConfigResult.diagnostics
-    );
-    return {
-      config: cloneRawConfig(defaultRawConfigFallback),
-      diagnostics: parsedDefaultConfigResult.diagnostics
+    const config = initConfig(loaded.userCfg, loaded.defaultCfg, notifyFn);
+    const report: ConfigImportReport = {
+      config: loaded.usedFallback ? 'fallback' : 'applied',
+      keybindings: keybindingsStatus(outcome)
     };
-  };
-
-  const loadPlatformKeymap = (): Record<string, string | string[]> => {
-    const platformKeyPath = pathDeps.defaultPlatformKeyPath();
-    const filePath: ConfigFilePath = {path: platformKeyPath};
-    let content = '{}';
-    try {
-      content = readFileSync(platformKeyPath, 'utf8');
-    } catch (error) {
-      console.error(`[config-import] Failed to read platform keymap at "${platformKeyPath}".`, error);
+    // A fallback with no known cause still reports the fallback itself.
+    if (loaded.fallbackCause !== undefined) {
+      Object.assign(report, {configCause: loaded.fallbackCause});
     }
-
-    const keymapResult = parseKeymapConfig({filePath, rawContent: content});
-    if (keymapResult.usedFallback) {
-      reportDiagnostics(warnFn, 'Platform keymap diagnostics.', filePath, keymapResult.diagnostics);
-    }
-    return keymapResult.value;
+    // A reload writes nothing, so only a start-up import can have files to settle.
+    const writtenFiles = phase === 'startup' ? writtenStartupFiles(loaded, outcome, dependencies.paths) : [];
+    return {config, keybindings: outcome, report, writtenFiles};
   };
 
-  const loadUserConfig = (defaultConfigFallback: rawConfig): LoadedConfig => {
-    const filePath: ConfigFilePath = {path: pathDeps.cfgPath};
-    try {
-      const userCfgResult = parseRawConfig({filePath, rawContent: readFileSync(pathDeps.cfgPath, 'utf8')});
-      if (userCfgResult.usedFallback) {
-        reportDiagnostics(warnFn, 'User config diagnostics.', filePath, userCfgResult.diagnostics);
-      }
-      if (!userCfgResult.usedFallback && userCfgResult.value !== null) {
-        return {
-          config: userCfgResult.value,
-          diagnostics: userCfgResult.diagnostics
-        };
-      }
-
-      warnFn(
-        `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
-      );
-      notifyWithPrimaryDiagnostic(
-        "Couldn't parse config file. Using default config instead.",
-        userCfgResult.diagnostics
-      );
-      return {
-        config: cloneRawConfig(defaultConfigFallback),
-        diagnostics: userCfgResult.diagnostics
-      };
-    } catch (error) {
-      console.error(`[config-import] Failed to read or parse user config at "${pathDeps.cfgPath}".`, error);
-      warnFn(
-        `[config-import] Using default config fallback after user config parse failure. userPath="${pathDeps.cfgPath}" defaultPath="${pathDeps.defaultCfg}"`
-      );
-      notifyWithPrimaryDiagnostic("Couldn't parse config file. Using default config instead.", []);
-      return {
-        config: cloneRawConfig(defaultConfigFallback),
-        diagnostics: []
-      };
-    }
-  };
-
-  const _importConf = () => {
-    if (isConfigImportDebugEnabled()) {
-      warnFn('[config-import] Initializing config import using app-local JSON5 helpers.');
-    }
-    // init plugin directories if not present
-    mkdirpSync(pathDeps.plugs.base);
-    mkdirpSync(pathDeps.plugs.local);
-    ensureSchemaFile();
-
-    const {config: _defaultCfg} = loadDefaultConfig();
-
-    ensureUserConfigFile(_defaultCfg);
-
-    _defaultCfg.keymaps = loadPlatformKeymap();
-
-    const {config: userCfg} = loadUserConfig(_defaultCfg);
-
-    return {userCfg, defaultCfg: _defaultCfg};
-  };
-
-  const _import = () => {
-    const imported = _importConf();
-    defaultConfig = imported.defaultCfg;
-    const result = initConfig(imported.userCfg, imported.defaultCfg, notifyFn);
-    return result;
-  };
-
-  /**
-   * Returns the cached default config payload.
-   *
-   * When `_import` has not run yet, this method lazily calls `_importConf` to
-   * initialize `defaultConfig`. That initialization performs filesystem side
-   * effects:
-   * - plugin directory creation (`mkdirpSync`)
-   * - schema copy into the config directory (`ensureSchemaFile`)
-   * - user config bootstrapping when missing (`ensureUserConfigFile`)
-   */
-  const getDefaultConfig = () => {
-    if (!defaultConfig) {
-      defaultConfig = _importConf().defaultCfg;
-    }
-    return defaultConfig;
-  };
-
-  return {_import, getDefaultConfig};
+  return {_import, getDefaultConfig: sources.getDefaultConfig};
 };

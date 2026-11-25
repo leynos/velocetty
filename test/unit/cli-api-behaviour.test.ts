@@ -3,6 +3,7 @@ import {expect, test} from 'bun:test';
 import {isObject, isString} from '@shared/types/guards';
 
 import JSON5 from 'json5';
+import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -33,6 +34,7 @@ type GotRequestOptions = {
 
 type CliHarnessOptions = {
   readonly appData?: string;
+  readonly brokenLinkPaths?: Set<string>;
   readonly configData?: ConfigData;
   readonly env?: {
     APPDATA?: string;
@@ -46,14 +48,24 @@ type CliHarnessOptions = {
   readonly gotVersions?: unknown;
   readonly hasReadFileSyncOverride?: boolean;
   readonly homeDirectory?: string;
+  /**
+   * Paths whose `stat` and `lstat` fail, so the probe reports a fault rather
+   * than absence. `inaccessibleCode` picks the code, which defaults to
+   * `EACCES`.
+   */
+  readonly inaccessibleCode?: string;
+  readonly inaccessiblePaths?: Set<string>;
   readonly moduleDirectory?: string;
   readonly platform?: NodeJS.Platform;
   readonly registryUrl?: string;
 };
 
 type CliHarnessState = {
+  brokenLinkPaths: Set<string>;
   configData: ConfigData;
   existingPaths: Set<string> | null;
+  inaccessibleCode: string;
+  inaccessiblePaths: Set<string>;
   fsExistsSyncResult: boolean;
   fsReadFileSyncCallCount: number;
   fsReadFileSyncValue: unknown;
@@ -77,12 +89,44 @@ const CLI_DIRECTORY = path.join(TEST_DIRECTORY, '..', '..', 'cli');
 const isConfigPayload = (value: unknown): value is {plugins: unknown; localPlugins: unknown} =>
   isObject(value) && 'plugins' in value && 'localPlugins' in value;
 
+/** Parses persisted config, failing on a payload without both plugin lists. */
 const parseConfigData = (contents: string): ConfigData => {
   const value = JSON5.parse(contents);
   if (!isConfigPayload(value)) {
     throw new TypeError('Expected persisted config to contain plugins and localPlugins.');
   }
   return {plugins: value.plugins, localPlugins: value.localPlugins};
+};
+
+/** Node's stat calls throw for a missing entry rather than returning a value. */
+const throwMissing = (candidatePath: string): never => {
+  throw Object.assign(new Error(`ENOENT: no such file or directory, '${candidatePath}'`), {code: 'ENOENT'});
+};
+
+/** A fault carries the code the probe classifies, unlike `throwMissing`. */
+const throwInaccessible = (candidatePath: string, code: string): never => {
+  throw Object.assign(new Error(`${code}: cannot inspect '${candidatePath}'`), {code});
+};
+
+/** Stands in for `fs.Stats`: the probe checks only that the call succeeded. */
+const PATH_ENTRY = {};
+
+/** Answers one stat or lstat call: a fault, an entry, or genuine absence. */
+const answerStat = (state: CliHarnessState, candidatePath: string, isPresent: boolean) => {
+  if (state.inaccessiblePaths.has(candidatePath)) {
+    return throwInaccessible(candidatePath, state.inaccessibleCode);
+  }
+  return isPresent ? PATH_ENTRY : throwMissing(candidatePath);
+};
+
+/** Produces the contents the harness was configured to read. */
+const readConfigContents = (state: CliHarnessState): string => {
+  state.fsReadFileSyncCallCount += 1;
+  const contents = state.hasReadFileSyncOverride ? state.fsReadFileSyncValue : JSON.stringify(state.configData);
+  if (!isString(contents)) {
+    throw new TypeError('Expected the read-file override to be a string.');
+  }
+  return contents;
 };
 
 /**
@@ -93,28 +137,37 @@ const parseConfigData = (contents: string): ConfigData => {
  * comments, and a non-string would be a broken fixture rather than a valid
  * case.
  */
-const buildFsModule = (state: CliHarnessState) => ({
-  existsSync: (candidatePath: string) => {
-    if (state.existingPaths) {
-      return state.existingPaths.has(candidatePath);
-    }
-    return state.fsExistsSyncResult;
-  },
-  readFileSync: (_target: string, _encoding: 'utf8') => {
-    state.fsReadFileSyncCallCount += 1;
-    const contents = state.hasReadFileSyncOverride ? state.fsReadFileSyncValue : JSON.stringify(state.configData);
-    if (!isString(contents)) {
-      throw new TypeError('Expected the read-file override to be a string.');
-    }
-    return contents;
-  },
-  writeFileSync: (_target: string, contents: string, _encoding: 'utf8') => {
-    const parsed = parseConfigData(contents);
-    state.savedConfigs.push(parsed);
-    state.configData = parsed;
-  }
-});
+const buildFsModule = (state: CliHarnessState) => {
+  /** Answers the harness's existence check for one candidate path. */
+  const pathExists = (candidatePath: string) =>
+    state.existingPaths ? state.existingPaths.has(candidatePath) : state.fsExistsSyncResult;
 
+  return {
+    existsSync: pathExists,
+    // A dangling symlink resolves for `lstat` but not for `stat`, which is the
+    // distinction the probe relies on. A permission fault fails both calls.
+    lstatSync: (candidatePath: string) =>
+      answerStat(state, candidatePath, pathExists(candidatePath) || state.brokenLinkPaths.has(candidatePath)),
+    readFileSync: (_target: string, _encoding: 'utf8') => readConfigContents(state),
+    statSync: (candidatePath: string) => answerStat(state, candidatePath, pathExists(candidatePath)),
+    writeFileSync: (_target: string, contents: string, _encoding: 'utf8') => {
+      const parsed = parseConfigData(contents);
+      state.savedConfigs.push(parsed);
+      state.configData = parsed;
+    }
+  };
+};
+
+/**
+ * Builds an HTTP-client double that records what the CLI asked the registry.
+ *
+ * The double returns the version list the harness configured, or rejects with
+ * its configured error, so a test can assert both the request and the CLI's
+ * failure handling without making a network call.
+ *
+ * @param state - The harness state holding the scripted reply.
+ * @returns A `got`-shaped client for the CLI to call.
+ */
 const buildGotClient = (state: CliHarnessState) => ({
   get: (url: string, requestOptions: GotRequestOptions) => {
     state.requestedUrls.push(url);
@@ -126,10 +179,14 @@ const buildGotClient = (state: CliHarnessState) => ({
   }
 });
 
+/** Builds the CLI API context with inert filesystem and registry doubles. */
 const createCliHarness = (options: CliHarnessOptions = {}): CliHarness => {
   const state: CliHarnessState = {
+    brokenLinkPaths: options.brokenLinkPaths ?? new Set(),
     configData: options.configData ?? {plugins: [], localPlugins: []},
     existingPaths: options.existingPaths ?? null,
+    inaccessibleCode: options.inaccessibleCode ?? 'EACCES',
+    inaccessiblePaths: options.inaccessiblePaths ?? new Set(),
     fsExistsSyncResult: options.fsExistsSyncResult ?? true,
     fsReadFileSyncCallCount: 0,
     fsReadFileSyncValue: options.fsReadFileSyncValue,
@@ -425,6 +482,130 @@ test.each([
 
   expect(api.configPath).toBe(expectedPath);
   expect(api.exists()).toBe(true);
+});
+
+test('configPath creates in the Velocetty tree when nothing exists', () => {
+  const expectedPath = path.join('/tmp/velocetty-xdg', 'Velocetty', 'config.json5');
+  const {api} = createCliHarness({
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: '/tmp/velocetty-xdg'},
+    existingPaths: new Set()
+  });
+
+  expect(api.configPath).toBe(expectedPath);
+  expect(api.exists()).toBe(false);
+});
+
+test('configPath prefers the Velocetty tree when both trees hold a config', () => {
+  const velocettyPath = path.join('/tmp/velocetty-xdg', 'Velocetty', 'config.json5');
+  const hyperPath = path.join('/tmp/velocetty-xdg', 'Hyper', 'config.json5');
+  const {api} = createCliHarness({
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: '/tmp/velocetty-xdg'},
+    existingPaths: new Set([velocettyPath, hyperPath])
+  });
+
+  expect(api.configPath).toBe(velocettyPath);
+  expect(api.exists()).toBe(true);
+});
+
+test('configPath keeps a dangling Velocetty link ahead of a readable Hyper config', () => {
+  const velocettyPath = path.join('/tmp/velocetty-xdg', 'Velocetty', 'config.json5');
+  const hyperPath = path.join('/tmp/velocetty-xdg', 'Hyper', 'config.json5');
+  const {api} = createCliHarness({
+    brokenLinkPaths: new Set([velocettyPath]),
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: '/tmp/velocetty-xdg'},
+    existingPaths: new Set([hyperPath])
+  });
+
+  // The Velocetty file is dotfiles-managed and only its target is missing.
+  // Falling through to Hyper would have the CLI write a file the application
+  // ignores, so the dangling link must still win.
+  expect(api.configPath).toBe(velocettyPath);
+});
+
+test('configPath reports an inaccessible Velocetty config instead of falling through to Hyper', () => {
+  const velocettyPath = path.join('/tmp/velocetty-xdg', 'Velocetty', 'config.json5');
+  const hyperPath = path.join('/tmp/velocetty-xdg', 'Hyper', 'config.json5');
+  const {api} = createCliHarness({
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: '/tmp/velocetty-xdg'},
+    existingPaths: new Set([hyperPath]),
+    inaccessiblePaths: new Set([velocettyPath])
+  });
+
+  // A permission fault means the file may exist. Reporting the Hyper copy
+  // instead would read a different configuration than the application does.
+  expect(api.configPath).toBe(velocettyPath);
+  expect(api.configInspection).toBe('inaccessible');
+});
+
+test('a config path whose inspection fails for another reason is inaccessible, not absent', () => {
+  const velocettyPath = path.join('/tmp/velocetty-xdg', 'Velocetty', 'config.json5');
+  const {api} = createCliHarness({
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: '/tmp/velocetty-xdg'},
+    existingPaths: new Set(),
+    inaccessibleCode: 'ELOOP',
+    inaccessiblePaths: new Set([velocettyPath])
+  });
+
+  // Only `ENOENT` and `ENOTDIR` establish absence, so a symlink loop leaves
+  // presence unresolved: the CLI reports the path it could not inspect rather
+  // than falling through to a copy the application would not read.
+  expect(api.configPath).toBe(velocettyPath);
+  expect(api.configInspection).toBe('inaccessible');
+});
+
+test('an inaccessible config read names accessibility rather than absence', () => {
+  const velocettyPath = path.join('/tmp/velocetty-xdg', 'Velocetty', 'config.json5');
+  const {api} = createCliHarness({
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: '/tmp/velocetty-xdg'},
+    inaccessiblePaths: new Set([velocettyPath])
+  });
+
+  expect(() => api.list()).toThrow(
+    `Config file could not be inspected because it is not accessible: ${velocettyPath}.`
+  );
+});
+
+test('configPath ignores a relative XDG_CONFIG_HOME on Linux', () => {
+  const homeDirectory = '/home/dana';
+  const {api} = createCliHarness({
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: 'relative'},
+    existingPaths: new Set(),
+    homeDirectory,
+    platform: 'linux'
+  });
+
+  expect(api.configPath).toBe(path.posix.join(homeDirectory, '.config', 'Velocetty', 'config.json5'));
+});
+
+test.each([
+  {label: 'when APPDATA is unset', appData: undefined, homeDirectory: 'C:\\Users\\erin'},
+  {label: 'when APPDATA is blank', appData: '   ', homeDirectory: 'C:\\Users\\frank'}
+])('configPath creates under the home-directory APPDATA path $label', ({appData, homeDirectory}) => {
+  const expectedPath = path.win32.join(homeDirectory, 'AppData', 'Roaming', 'Velocetty', 'config.json5');
+  const {api} = createCliHarness({
+    appData,
+    env: {NODE_ENV: 'production'},
+    existingPaths: new Set(),
+    homeDirectory,
+    platform: 'win32'
+  });
+
+  expect(api.configPath).toBe(expectedPath);
+});
+
+test('the not-found path names the Velocetty creation path', () => {
+  const cliIndexSource = readFileSync(path.join(CLI_DIRECTORY, 'index.ts'), 'utf8');
+  const expectedPath = path.join('/tmp/velocetty-xdg', 'Velocetty', 'config.json5');
+  const {api} = createCliHarness({
+    env: {NODE_ENV: 'production', XDG_CONFIG_HOME: '/tmp/velocetty-xdg'},
+    existingPaths: new Set()
+  });
+
+  // `checkConfig` interpolates `api.configPath`, so the message the user sees
+  // is only correct while the resolver's creation path stays in Velocetty.
+  expect(cliIndexSource).toMatch(/Config file not found: \$\{api\.configPath\}/);
+  expect(api.exists()).toBe(false);
+  expect(api.configPath).toBe(expectedPath);
 });
 
 test('createCliApi() keeps request and config state isolated per instance', async () => {

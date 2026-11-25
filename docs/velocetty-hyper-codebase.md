@@ -239,6 +239,10 @@ flowchart LR
 | Menu System          | `app/menus/`                             | Application menus with platform-specific variants        |
 | Keymaps              | `app/keymaps/`                           | Platform-specific keyboard shortcut definitions          |
 
+See [Configuration architecture](configuration-architecture.md) for the
+components inside the configuration subsystem, their ports, and the verified
+policy boundary.
+
 ##### Core technical approach
 
 ###### Technology Stack

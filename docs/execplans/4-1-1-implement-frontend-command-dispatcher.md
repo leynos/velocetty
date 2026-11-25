@@ -188,7 +188,7 @@ Populating context keys belongs to 4.2.1.
 - Risk: once 4.2.1 populates context keys, a command with `defaultWhen` could
   be disabled for an affordance source for longer than users expect. Severity:
   low. Likelihood: medium. Mitigation: no current definition sets
-  `defaultWhen`. ADR-007 and the users' guide state the rule, and a disabled
+  `defaultWhen`. ADR-0009 and the users' guide state the rule, and a disabled
   keybinding passes the key through instead of swallowing it.
 - Risk: legacy plugin handlers written for keybindings assume an event
   argument, and now receive `undefined` when invoked from a UI control or
@@ -244,7 +244,7 @@ Populating context keys belongs to 4.2.1.
   `8ba14fc8`). `CommandResult` is a discriminated union; `UICommandExecAction`
   carries `source` and `args`; the registry validates results;
   `editor:search-close` declares a schema admitting `null`, which is the Escape
-  guard. ADR-007 records D-3, D-5, D-6, D-7, D-11 and D-14. 559 tests passed.
+  guard. ADR-0009 records D-3, D-5, D-6, D-7, D-11 and D-14. 559 tests passed.
 - [x] (2026-11-25) EP-M4 dispatcher interpreter and driven adapters (commit
   `0fda9589`). 595 tests passed; 33 proof obligations verified; the boundary
   script was negative-tested against a `react-redux` import and against any
@@ -346,10 +346,10 @@ be confirmed by a scheduled or post-merge run.
   `{ok: boolean; result?; error?; cancelled?}`. Rationale: the sketch admits
   illegal states, such as `ok: true` with an `error`. The union makes them
   unrepresentable and gives exhaustive `switch` checking. This deviates from
-  `docs/velocetty-design.md` lines 532-550 and is recorded in ADR-007. ADR-007
-  also maps the union onto the protobuf `CommandResult` sketch, so that 4.1.2
-  extends that message rather than flattening the union. Date/Author:
-  2026-10-29, planning agent.
+  `docs/velocetty-design.md` lines 532-550 and is recorded in ADR-0009.
+  ADR-0009 also maps the union onto the protobuf `CommandResult` sketch, so
+  that 4.1.2 extends that message rather than flattening the union.
+  Date/Author: 2026-10-29, planning agent.
 - D-4 (revised after review). Decision: do not write keymap-derived
   definitions into the registry. Instead, the catalogue adapter resolves
   `registry.get(id)`, falling back to a host stub (`kind: 'backend'`, no
@@ -390,7 +390,7 @@ be confirmed by a scheduled or post-merge run.
   `executeCommand` likewise ignores `when`. Every source still runs the same
   machine; the source only changes which verdict the enablement gate computes.
   Until 4.2.1 populates context keys, any `defaultWhen` that references a key
-  evaluates against an empty service. ADR-007 records this. Date/Author:
+  evaluates against an empty service. ADR-0009 records this. Date/Author:
   2026-10-29, panel (Wafflecat, Doggylump).
 - D-8. Decision: an abort during execution settles the invocation as
   `cancelled` at once, and any later handler outcome is discarded. A late
@@ -453,7 +453,7 @@ be confirmed by a scheduled or post-merge run.
   leaked Redux into the core. Date/Author: 2026-10-29, panel (Pandalump).
 - D-16 (new). Decision: retain both requested documents, the users' guide
   and the component architecture document. The panel's suggestion to defer them
-  is declined. Each is kept short and points to ADR-007 rather than repeating
+  is declined. Each is kept short and points to ADR-0009 rather than repeating
   it. Rationale: the task brief explicitly requires the users' guide and a
   component architecture document. Date/Author: 2026-10-29, planning agent.
 - D-17 (new, from the EP-M2 spike). Decision: the machine's `idle` action is
@@ -576,7 +576,7 @@ MCP tools (`codegraph_get_callers`, `codegraph_analyze_impact`) before editing
 Relevant documents: `docs/developers-guide.md` (sections "Command registry
 practice", "Context key and `when` practice", and "Unit tests (Bun)"),
 `docs/testing-with-bun.md`, `docs/adr-005-enhance-e2e-testing-strategy.md`,
-`docs/adr-006-oxlint-plugin-strategy.md` (the layout to copy for ADR-007),
+`docs/adr-006-oxlint-plugin-strategy.md` (the layout to copy for ADR-0009),
 `docs/documentation-style-guide.md`, and `PLUGINS.md` §Register a handler for
 your commands.
 
@@ -619,13 +619,13 @@ RM-4.1.1-B  -> TDD-CANCEL    -> EP-M2 -> invocation-machine.dfy::SettlesAtMostOn
 RM-4.1.1-B  -> TDD-CANCEL    -> EP-M4 -> cancellation.property.test.ts::interpreter matches machine
 RM-4.1.1-SC -> PRD-DISP-SINGLE, TDD-PRINC-CMD -> EP-M5 -> convergence.test.ts::sources share one path
 RM-4.1.1-SC -> PRD-DISP-SINGLE -> EP-M6 -> command-dispatch.e2e.ts::keybinding, button, and Escape
-TDD-DISP-API (deviation D-3) -> ADR-007 -> EP-M3 -> shared result union
-TDD-DISP-PATH (refinement D-7) -> ADR-007 -> EP-M2 -> machine enablement gate per source
+TDD-DISP-API (deviation D-3) -> ADR-0009 -> EP-M3 -> shared result union
+TDD-DISP-PATH (refinement D-7) -> ADR-0009 -> EP-M2 -> machine enablement gate per source
 ```
 
 Deviations proposed with this plan, for approval: D-3 changes the result shape
 in `TDD-DISP-API`. D-7 makes the enablement gate depend on the source, which
-refines `TDD-DISP-PATH`. EP-M3 records both in ADR-007, and EP-M7 updates
+refines `TDD-DISP-PATH`. EP-M3 records both in ADR-0009, and EP-M7 updates
 `docs/velocetty-design.md` to reference it.
 
 ## Verification plan
@@ -984,7 +984,7 @@ each milestone boundary, push the branch, update `Progress` and
     {"type": ["object", "null"], "properties": {"uid": {"type": "string", "minLength": 1}}, "additionalProperties": false}
     ```
 
-  - `docs/adr-007-frontend-command-dispatcher-contract.md` is added with
+  - `docs/adrs/adr-0009-frontend-command-dispatcher-contract.md` is added with
     status `Proposed`, recording D-3, D-5, D-6, D-7, D-11, and D-14.
 - Requirements and gaps: `RM-4.1.1-A` and `TDD-DISP-API` (with D-3).
 - Acceptance evidence:
@@ -996,7 +996,7 @@ each milestone boundary, push the branch, update `Progress` and
     `(event, dispatch)`.
   - The gate line plus `make proofs` passes.
 - Conformance check:
-  - D-3 is recorded in ADR-007.
+  - D-3 is recorded in ADR-0009.
   - There is no IPC change.
   - The `PLUGINS.md` contracts still hold.
 - Recovery: revert the milestone commits.
@@ -1031,7 +1031,7 @@ each milestone boundary, push the branch, update `Progress` and
   - The core imports only ports, `@shared/types/*`, and the machine; the
     boundary script enforces this.
   - The core uses no timer or clock (also enforced by the boundary script).
-  - The result union matches ADR-007.
+  - The result union matches ADR-0009.
 - Recovery: revert the milestone commits. Nothing calls the dispatcher yet.
 - Remaining gaps: the sources still use the old path.
 - Compatibility decision: none.
@@ -1133,12 +1133,12 @@ old path.
 
 - Outcome:
   - `docs/velocetty-design.md` §Command registry and dispatcher describes the
-    implemented pipeline and references ADR-007. ADR-007 moves to
+    implemented pipeline and references ADR-0009. ADR-0009 moves to
     `Accepted (<date>): <summary>`.
   - A new component architecture document,
     `docs/command-dispatch-architecture.md`, has a module header. It covers
     the machine, the interpreter, the ports, the adapters, the composition,
-    and the sequence of one invocation, and points to ADR-007 for the
+    and the sequence of one invocation, and points to ADR-0009 for the
     rationale.
   - `docs/developers-guide.md` changes:
     - It gains a "Command dispatcher practice" section after "Command
@@ -1166,7 +1166,7 @@ old path.
 - Acceptance evidence: `make markdownlint`, `make nixie`, `make spelling`,
   and the gate line plus `make proofs` all pass.
 - Conformance check: every decision in `Decision log` is reflected in
-  ADR-007 or the design document, and every trace link resolves to an existing
+  ADR-0009 or the design document, and every trace link resolves to an existing
   test or proof.
 - Recovery: documentation-only commits, each revertible on its own.
 - Remaining gaps for 4.1.1: none. Handed on to later items:
@@ -1588,7 +1588,7 @@ E2E (1 file): `test/e2e-deep/command-dispatch.e2e.ts`.
 
 Documentation (7 files):
 
-- `docs/adr-007-frontend-command-dispatcher-contract.md`;
+- `docs/adrs/adr-0009-frontend-command-dispatcher-contract.md`;
 - `docs/command-dispatch-architecture.md`;
 - `docs/velocetty-design.md`;
 - `docs/developers-guide.md`;

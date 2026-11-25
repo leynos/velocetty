@@ -15,8 +15,9 @@ import {z} from 'zod';
 import type {sessionExtraOptions} from '@shared/types/common';
 import type {configOptions} from '@shared/types/config';
 import {asCommandId, asProfileId, asRendererUid, asSessionId} from '../utils/shared-ids';
-import {execCommand} from '../commands';
+import type {CommandDispatcher} from '../commands';
 import {getDefaultProfile} from '../config';
+import type {E2EMarkerSink} from '../config/e2e-marker-sink';
 import {icon, homeDirectory} from '../config/paths';
 import fetchNotifications from '../notifications';
 import notify from '../notify';
@@ -80,9 +81,28 @@ const handleDroppedURL = (url: string) => {
   }
 };
 
+/**
+ * Creates a window and the RPC server that serves it.
+ *
+ * @param options_ - The window constructor options the caller chose.
+ * @param cfg - The decorated configuration for the window's profile.
+ * @param execCommand - The dispatcher the window and its menus send commands to.
+ * @param markerSink - Receives the renderer markers; it discards them outside
+ *   the lane and writes them when the lane started this process.
+ * @param fn - Runs once the window exists, before it is returned.
+ * @param profileName - The profile whose configuration the window uses.
+ * @returns The window, ready to load its page.
+ *
+ * @example
+ * ```ts
+ * newWindow({width, height}, cfg, execCommand, silentMarkerSink);
+ * ```
+ */
 export function newWindow(
   options_: BrowserWindowConstructorOptions,
   cfg: configOptions,
+  execCommand: CommandDispatcher,
+  markerSink: E2EMarkerSink,
   fn?: (win: BrowserWindow) => void,
   profileName: string = getDefaultProfile()
 ): BrowserWindow {
@@ -120,7 +140,7 @@ export function newWindow(
   app.plugins.onWindowClass(window);
   window.uid = classOpts.uid;
 
-  const rpc = createRPC(window);
+  const rpc = createRPC(window, markerSink);
   const sessions = new Map<string, Session>();
 
   const updateBackgroundColor = () => {
@@ -319,7 +339,7 @@ export function newWindow(
     void shell.openExternal(url);
   });
   rpc.on('open context menu', (selection) => {
-    Menu.buildFromTemplate(contextMenuTemplate(selection)).popup({window});
+    Menu.buildFromTemplate(contextMenuTemplate(selection, execCommand)).popup({window});
   });
   rpc.on('open hamburger menu', ({x, y}) => {
     Menu.getApplicationMenu()?.popup({x: Math.ceil(x), y: Math.ceil(y)});

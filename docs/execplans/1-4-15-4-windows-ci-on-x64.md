@@ -54,7 +54,7 @@ Out of scope:
 Primary files and why they matter:
 
 - `docs/roadmap.md` (`1.4.15`): exact Windows checklist and success criteria.
-- `docs/adr-004-update-electron-40.md` (Phase 3): Electron 40 validation
+- `docs/adrs/adr-0004-update-electron-40.md` (Phase 3): Electron 40 validation
   guardrail.
 - `docs/developers-guide.md` (`Electron runtime alignment`): required runtime,
   Node, and native-module alignment, plus existing Linux/macOS CI baselines.

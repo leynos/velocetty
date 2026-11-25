@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 007: Frontend command dispatcher contract
+# Architectural decision record (ADR) 0009: Frontend command dispatcher contract
 
 ## Status
 

@@ -166,6 +166,11 @@ this.terms.registerCommands({
 })
 ```
 
+The `e` parameter is the keyboard event only when a keybinding triggered the
+command, as in this example. It is `undefined` when a UI control or another
+plugin ran the command through `invokeCommand`, so guard before calling
+`e.preventDefault()`.
+
 ##### Main process
 
 If there is no handler in the renderer process for an existing command, an
@@ -185,15 +190,17 @@ Plugins can run any registered command through
 dispatcher's result, a union on `status`:
 
 ```js
-const result = await this.terms.invokeCommand('pane:maximize', null);
+async runCommand() {
+  const result = await this.terms.invokeCommand('pane:maximize', null);
 
-if (result.status === 'ok') {
-  // result.value holds the handler's JSON result, when it returned one.
-} else if (result.status === 'error') {
-  // result.error carries a code, commandId, and message.
-} else {
-  // result.status === 'cancelled'; result.stage is 'before-execution' or
-  // 'during-execution'.
+  if (result.status === 'ok') {
+    // result.value holds the handler's JSON result, when it returned one.
+  } else if (result.status === 'error') {
+    // result.error carries a code, commandId, and message.
+  } else {
+    // result.status === 'cancelled'; result.stage is 'before-execution' or
+    // 'during-execution'.
+  }
 }
 ```
 
@@ -212,15 +219,19 @@ aborts. Pass a signal when you await a result; otherwise a middleware that
 never runs the effect leaves the call pending indefinitely:
 
 ```js
-const controller = new AbortController();
-const result = await this.terms.invokeCommand('editor:search-close', {uid}, {
-  signal: controller.signal
-});
+async closeSearch(uid) {
+  const controller = new AbortController();
+  const result = await this.terms.invokeCommand('editor:search-close', {uid}, {
+    signal: controller.signal
+  });
+  return result;
+}
 ```
 
-`registerCommands` handlers still receive `(event, dispatch)`, but `event` is
-`undefined` when the command was invoked from a UI control or another plugin
-rather than a keybinding. Guard before using it.
+`registerCommands` handlers still receive `(event, dispatch)`, so existing
+plugins keep working; see
+[Register a handler for your commands](#register-a-handler-for-your-commands)
+for when `event` is present.
 
 ### Menu
 
