@@ -16,6 +16,7 @@ import {asCommandId, type CommandId} from '@shared/types/commands';
 import type {HyperState, HyperProps, HyperDispatch} from '../../typings/hyper';
 import * as uiActions from '../actions/ui';
 import {getRegisteredKeys, getCommandHandler, shouldPreventDefault} from '../command-registry';
+import type {RendererCommandHandler} from '../command-registry-handlers';
 import type Terms from '../components/terms';
 import {transport} from '../transport';
 import {connect} from '../utils/plugins';
@@ -150,8 +151,8 @@ const mapStateToProps = (state: HyperState) => {
 
 const mapDispatchToProps = (dispatch: HyperDispatch) => {
   return {
-    execCommand: (command: CommandId, fn: ((e: unknown, dispatch: HyperDispatch) => void) | undefined, e: unknown) => {
-      dispatch(uiActions.execCommand(command, fn, e));
+    execCommand: (command: CommandId, handler: RendererCommandHandler | undefined, triggerEvent: Event) => {
+      dispatch(uiActions.execCommand(command, handler, triggerEvent));
     }
   };
 };

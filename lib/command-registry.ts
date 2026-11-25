@@ -1,7 +1,11 @@
 /** @file Command registry and validation helpers for renderer command dispatch. */
 import type {RendererCommandTransport} from '@shared/types/transport';
-import type {HyperDispatch} from '../typings/hyper';
 import type {CloseSearchAction} from './commands/search-close';
+import {
+  type LegacyCommandHandler,
+  type RendererCommandHandler,
+  toRendererCommandHandler
+} from './command-registry-handlers';
 import type {IpcCommands} from '@shared/types/common';
 import {
   asCommandId,
@@ -19,10 +23,8 @@ import {
 } from './commands/search-close';
 import {createCommandSchemaValidator} from './command-registry-validation';
 
-export type CommandHandler = (event: unknown, dispatch: HyperDispatch) => void;
-
 interface RegisteredCommand extends CommandDefinition {
-  handler?: CommandHandler;
+  handler?: RendererCommandHandler;
 }
 
 type CommandRegistryDependencies = {
@@ -82,7 +84,7 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
   // first keypress.
   const schemaValidator = createCommandSchemaValidator({getDefinition});
 
-  const upsertCommand = (definition: CommandDefinition, handler?: CommandHandler) => {
+  const upsertCommand = (definition: CommandDefinition, handler?: RendererCommandHandler) => {
     const existingCommand = registry.get(definition.id);
 
     registry.set(definition.id, {
@@ -106,9 +108,13 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
     return registry.delete(commandKey);
   };
 
-  const assignLegacyHandler = (commandId: CommandId, handler: CommandHandler) => {
+  const assignHandler = (commandId: CommandId, handler: RendererCommandHandler) => {
     const definition = registry.get(commandId) ?? createLegacyDefinition(commandId);
     upsertCommand(definition, handler);
+  };
+
+  const assignLegacyHandler = (commandId: CommandId, handler: LegacyCommandHandler) => {
+    assignHandler(commandId, toRendererCommandHandler(handler));
   };
 
   const syncRuntimePluginCommands = (runtimeCommands: CommandDefinition[]) => {
@@ -135,6 +141,9 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
   const validateArgs = (commandId: CommandId | string, args: unknown): CommandValidationResult =>
     schemaValidator.validateArgs(commandId, args);
 
+  const validateResult = (commandId: CommandId | string, value: unknown): CommandValidationResult =>
+    schemaValidator.validateResult(commandId, value);
+
   const get = (commandId: CommandId | string) => getDefinition(asCommandId(commandId));
 
   const list = () => {
@@ -152,7 +161,7 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
   // Optional, not merely `| undefined`: callers legitimately reach this with no
   // argument when a plugin set has not been assembled, and the guard below is
   // what makes that a no-op. Declaring the parameter required contradicted it.
-  const registerCommandHandlers = (cmds?: Partial<Record<string, CommandHandler>>) => {
+  const registerCommandHandlers = (cmds?: Partial<Record<string, LegacyCommandHandler>>) => {
     if (!cmds) {
       return;
     }
@@ -191,14 +200,15 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
   });
   assignLegacyHandler(asCommandId(SEARCH_CLOSE_COMMAND_ID), createSearchCloseHandler(dependencies));
 
-  const commandRegistry: CommandRegistry<CommandHandler> = {
+  const commandRegistry: CommandRegistry<RendererCommandHandler> = {
     register: upsertCommand,
     update: upsertCommand,
     remove,
     get,
     list,
     has,
-    validateArgs
+    validateArgs,
+    validateResult
   };
 
   return {
@@ -212,7 +222,8 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
     registerCommandHandlers,
     remove,
     update: upsertCommand,
-    validateArgs
+    validateArgs,
+    validateResult
   };
 };
 
@@ -233,10 +244,10 @@ const commandRegistryModule = createCommandRegistryModule({
 });
 
 /** Core CRUD and validation API. */
-export const {validateArgs, register, update, remove, get, list, has} = commandRegistryModule;
+export const {validateArgs, validateResult, register, update, remove, get, list, has} = commandRegistryModule;
 
 /** Public `CommandRegistry<CommandHandler>` entry point with CRUD and validation APIs. */
-export const commandRegistry: CommandRegistry<CommandHandler> = commandRegistryModule.commandRegistry;
+export const commandRegistry: CommandRegistry<RendererCommandHandler> = commandRegistryModule.commandRegistry;
 
 /** Async key resolution, handler management, and bulk registration. */
 export const {getRegisteredKeys, registerCommandHandlers, getCommandHandler} = commandRegistryModule;

@@ -6,6 +6,8 @@ import {isString} from '@shared/types/guards';
 import {isJsonObject, type JsonObject} from '@shared/types/json';
 import {goldenPathCommandDefinition, GOLDEN_PATH_COMMAND_ID} from '@shared/runtime/golden-path-demo';
 import {asCommandInvoker} from '../testUtils/command-transport';
+import {createRendererCommandRequest} from '../testUtils/renderer-command-request';
+import type {HyperDispatch} from '../../typings/hyper';
 
 const TEST_COMMAND_PREFIX = 'test:command-registry';
 
@@ -173,16 +175,32 @@ test('getRegisteredKeys synchronizes runtime plugin command registrations', asyn
   }
 });
 
-test('registerCommandHandlers merges new handlers into registry', async () => {
+test('registerCommandHandlers adapts legacy handlers to the request shape', async () => {
   const harness = await createCommandRegistryTestHarness();
   try {
     const commandName = `test:command:${Date.now()}`;
-    const commandHandlers = {
-      [commandName]: noopCommandHandler
-    };
-    harness.registerCommandHandlers(commandHandlers);
+    harness.registerCommandHandlers({[commandName]: noopCommandHandler});
 
-    expect(harness.getCommandHandler(commandName)).toBe(noopCommandHandler);
+    const handler = harness.getCommandHandler(commandName);
+    expect(handler).toBeFunction();
+
+    // The stored handler is an adapter, so identity is not the contract. What
+    // matters is that the legacy handler still receives the event and the
+    // dispatch function it always did.
+    const received: unknown[] = [];
+    const dispatch = mock<HyperDispatch>(() => {});
+    const triggerEvent = Object.assign(new Event('keydown'), {catched: true});
+    harness.registerCommandHandlers({
+      [commandName]: (event, innerDispatch) => {
+        received.push(event, innerDispatch);
+      }
+    });
+
+    await harness.getCommandHandler(commandName)?.(
+      createRendererCommandRequest({commandId: commandName, dispatch, triggerEvent})
+    );
+
+    expect(received).toEqual([triggerEvent, dispatch]);
     expect(harness.getCommandHandler('editor:search-close')).toBeFunction();
   } finally {
     harness.cleanup();

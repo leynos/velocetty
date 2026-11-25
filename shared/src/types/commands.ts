@@ -1,5 +1,5 @@
 /** @file Shared command contracts for metadata, schemas, and validation outcomes. */
-import type {JsonObject} from './json';
+import type {JsonObject, JsonValue} from './json';
 
 /** Stable identifier used across keymaps, menus, dispatchers, and handlers. */
 declare const commandIdBrand: unique symbol;
@@ -90,4 +90,76 @@ export interface CommandRegistry<THandler = unknown> {
   list(): CommandDefinition[];
   has(commandId: CommandId): boolean;
   validateArgs(commandId: CommandId, args: unknown): CommandValidationResult;
+  validateResult(commandId: CommandId, value: unknown): CommandValidationResult;
+}
+
+/**
+ * Where an invocation came from.
+ *
+ * The source selects which enablement verdict applies: the affordance sources
+ * (`keybinding`, `palette`, `menu`, `ui`) honour `defaultWhen`, while `plugin`
+ * and `remote` do not. It is never a security boundary; permission checks
+ * belong to the backend.
+ */
+export type CommandInvocationSource = 'keybinding' | 'palette' | 'menu' | 'ui' | 'plugin' | 'remote';
+
+/** One request to run one command. */
+export interface CommandInvocation<TArgs extends JsonValue = JsonValue> {
+  readonly id: CommandId;
+  /** Absent arguments are normalized to `null` before validation. */
+  readonly args?: TArgs;
+  readonly source: CommandInvocationSource;
+}
+
+/**
+ * Why an invocation failed.
+ *
+ * Consumers must treat an unrecognized code as a generic failure: 4.1.2 adds a
+ * permission code, and older remote clients must still decode results.
+ */
+export type CommandInvocationErrorCode =
+  | CommandValidationErrorCode
+  | 'COMMAND_DISABLED'
+  | 'INVALID_WHEN_EXPRESSION'
+  | 'COMMAND_EXECUTION_FAILED';
+
+/** A structured, serializable invocation failure. */
+export interface CommandInvocationError {
+  readonly code: CommandInvocationErrorCode;
+  readonly commandId: CommandId;
+  readonly message: string;
+  readonly issues?: readonly CommandValidationIssue[];
+}
+
+/** `before-execution` guarantees no handler ran and nothing was emitted to the host. */
+export type CommandCancellationStage = 'before-execution' | 'during-execution';
+
+/**
+ * How an invocation ended.
+ *
+ * A discriminated union rather than a `{ok, result, error, cancelled}` record:
+ * the record shape admits illegal states such as `ok` together with an error,
+ * and a union gives exhaustive checking at every call site.
+ */
+export type CommandResult<TResult extends JsonValue = JsonValue> =
+  | {readonly status: 'ok'; readonly value?: TResult}
+  | {readonly status: 'error'; readonly error: CommandInvocationError}
+  | {readonly status: 'cancelled'; readonly stage: CommandCancellationStage};
+
+/** Options a caller may pass when invoking a command. */
+export interface CommandDispatchOptions {
+  readonly signal?: AbortSignal;
+}
+
+/**
+ * The one way the renderer executes a command.
+ *
+ * `invoke` never rejects. `TResult` is unchecked unless the definition declares
+ * a `resultSchema`.
+ */
+export interface CommandDispatcher<TOptions extends CommandDispatchOptions = CommandDispatchOptions> {
+  invoke<TArgs extends JsonValue = JsonValue, TResult extends JsonValue = JsonValue>(
+    invocation: CommandInvocation<TArgs>,
+    options?: TOptions
+  ): Promise<CommandResult<TResult>>;
 }

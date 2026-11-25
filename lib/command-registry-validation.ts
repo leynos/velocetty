@@ -49,6 +49,8 @@ export interface CommandSchemaValidator {
   forget(commandId: CommandId): void;
   /** Validates arguments, reporting a missing command as `COMMAND_NOT_FOUND`. */
   validateArgs(commandId: CommandId | string, args: unknown): CommandValidationResult;
+  /** Validates a handler result against `resultSchema`, when one is declared. */
+  validateResult(commandId: CommandId | string, value: unknown): CommandValidationResult;
 }
 
 export interface CommandSchemaValidatorDependencies {
@@ -82,20 +84,41 @@ const toSchemaError = (
   message
 });
 
-const toArgsError = (commandId: CommandId, issues: CommandValidationIssue[]): CommandValidationError => ({
-  code: 'INVALID_COMMAND_ARGS',
+/** Per-target wording, so one validation path serves both schemas. */
+interface TargetNouns {
+  readonly schemaProperty: 'argsSchema' | 'resultSchema';
+  readonly errorCode: 'INVALID_COMMAND_ARGS' | 'INVALID_COMMAND_RESULT';
+  readonly payloadName: string;
+}
+
+const TARGET_NOUNS: Record<CommandValidationTarget, TargetNouns> = {
+  args: {schemaProperty: 'argsSchema', errorCode: 'INVALID_COMMAND_ARGS', payloadName: 'args'},
+  result: {schemaProperty: 'resultSchema', errorCode: 'INVALID_COMMAND_RESULT', payloadName: 'result'}
+};
+
+const toPayloadError = (
+  commandId: CommandId,
+  target: CommandValidationTarget,
+  issues: CommandValidationIssue[]
+): CommandValidationError => ({
+  code: TARGET_NOUNS[target].errorCode,
   commandId,
-  target: 'args',
-  message: `Invalid args for command: ${commandId}`,
+  target,
+  message: `Invalid ${TARGET_NOUNS[target].payloadName} for command: ${commandId}`,
   issues
 });
 
-/** Creates a schema validator that caches one compiled Ajv validator per command. */
+/** One cache key per (target, command) pair; the two schemas are distinct. */
+const cacheKey = (commandId: CommandId, target: CommandValidationTarget): string => `${target}\u0000${commandId}`;
+
+/** Creates a schema validator that caches one compiled Ajv validator per command and target. */
 export const createCommandSchemaValidator = (
   dependencies: CommandSchemaValidatorDependencies
 ): CommandSchemaValidator => {
   const ajv = new Ajv({allErrors: true});
-  const compiledByCommandId = new Map<CommandId, CompiledSchema>();
+  // Keyed by target as well as command: a command may declare both schemas,
+  // and they are different schemas.
+  const compiledByKey = new Map<string, CompiledSchema>();
 
   const compile = (commandId: CommandId, schema: CommandSchema): CompiledSchema => {
     try {
@@ -107,30 +130,44 @@ export const createCommandSchemaValidator = (
     }
   };
 
-  const compiledFor = (commandId: CommandId, schema: CommandSchema): CompiledSchema => {
-    const cached = compiledByCommandId.get(commandId);
+  const compiledFor = (
+    commandId: CommandId,
+    target: CommandValidationTarget,
+    schema: CommandSchema
+  ): CompiledSchema => {
+    const key = cacheKey(commandId, target);
+    const cached = compiledByKey.get(key);
     if (cached) {
       return cached;
     }
 
     const fresh = compile(commandId, schema);
-    compiledByCommandId.set(commandId, fresh);
+    compiledByKey.set(key, fresh);
     return fresh;
   };
 
   const prime = (commandId: CommandId): void => {
-    compiledByCommandId.delete(commandId);
+    compiledByKey.delete(cacheKey(commandId, 'args'));
+    compiledByKey.delete(cacheKey(commandId, 'result'));
     const definition = dependencies.getDefinition(commandId);
     if (definition?.argsSchema) {
-      compiledByCommandId.set(commandId, compile(commandId, definition.argsSchema));
+      compiledByKey.set(cacheKey(commandId, 'args'), compile(commandId, definition.argsSchema));
+    }
+    if (definition?.resultSchema) {
+      compiledByKey.set(cacheKey(commandId, 'result'), compile(commandId, definition.resultSchema));
     }
   };
 
   const forget = (commandId: CommandId): void => {
-    compiledByCommandId.delete(commandId);
+    compiledByKey.delete(cacheKey(commandId, 'args'));
+    compiledByKey.delete(cacheKey(commandId, 'result'));
   };
 
-  const validateArgs = (commandId: CommandId | string, args: unknown): CommandValidationResult => {
+  const validateTarget = (
+    commandId: CommandId | string,
+    target: CommandValidationTarget,
+    payload: unknown
+  ): CommandValidationResult => {
     const commandKey = asCommandId(commandId);
     const definition = dependencies.getDefinition(commandKey);
     if (!definition) {
@@ -139,27 +176,33 @@ export const createCommandSchemaValidator = (
         error: {
           code: 'COMMAND_NOT_FOUND',
           commandId: commandKey,
-          target: 'args',
-          message: `Cannot validate args for unknown command: ${commandKey}`
+          target,
+          message: `Cannot validate ${TARGET_NOUNS[target].payloadName} for unknown command: ${commandKey}`
         }
       };
     }
 
-    if (!definition.argsSchema) {
-      return {ok: true, value: args};
+    const schema = definition[TARGET_NOUNS[target].schemaProperty];
+    if (!schema) {
+      return {ok: true, value: payload};
     }
 
-    const compiled = compiledFor(commandKey, definition.argsSchema);
+    const compiled = compiledFor(commandKey, target, schema);
     if (compiled.kind === 'invalidSchema') {
-      return {ok: false, error: toSchemaError(commandKey, 'args', compiled.message)};
+      return {ok: false, error: toSchemaError(commandKey, target, compiled.message)};
     }
 
-    if (compiled.validate(args)) {
-      return {ok: true, value: args};
+    if (compiled.validate(payload)) {
+      return {ok: true, value: payload};
     }
 
-    return {ok: false, error: toArgsError(commandKey, serializeAjvErrors(compiled.validate.errors))};
+    return {ok: false, error: toPayloadError(commandKey, target, serializeAjvErrors(compiled.validate.errors))};
   };
 
-  return {prime, forget, validateArgs};
+  return {
+    prime,
+    forget,
+    validateArgs: (commandId, args) => validateTarget(commandId, 'args', args),
+    validateResult: (commandId, value) => validateTarget(commandId, 'result', value)
+  };
 };

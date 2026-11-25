@@ -34,6 +34,7 @@ import type {CommandDefinition} from '@shared/types/commands';
 import type {HyperDispatch, HyperState} from '../../typings/hyper';
 import {closeSearchAction} from '../../lib/commands/search-close';
 import rootReducer from '../../lib/reducers';
+import {createRendererCommandRequest} from '../testUtils/renderer-command-request';
 
 type SearchCloseThunk = (dispatch: HyperDispatch, getState: () => HyperState) => void;
 
@@ -135,7 +136,7 @@ test('registerCommandHandlers ignores undefined input without mutating the regis
  */
 const dispatchSearchClose = async (harness: CommandRegistryCompatHarness) => {
   const dispatch = mock<HyperDispatch>(() => {});
-  harness.getCommandHandler('editor:search-close')?.('event-payload', dispatch);
+  harness.getCommandHandler('editor:search-close')?.(createRendererCommandRequest({dispatch}));
 
   expect(dispatch).toHaveBeenCalledTimes(1);
   const dispatchedThunk = dispatch.mock.calls[0]?.[0];
@@ -199,9 +200,11 @@ test('legacy search-close handler does not dispatch when session search is inact
   try {
     const dispatch = mock<HyperDispatch>(() => {});
     const innerDispatch = mock<HyperDispatch>(() => {});
-    const keyEvent = {catched: true};
+    const keyEvent = Object.assign(new Event('keydown'), {catched: true});
 
-    harness.getCommandHandler('editor:search-close')?.(keyEvent, dispatch);
+    harness.getCommandHandler('editor:search-close')?.(
+      createRendererCommandRequest({dispatch, triggerEvent: keyEvent})
+    );
 
     expect(dispatch).toHaveBeenCalledTimes(1);
     const dispatchedThunk = dispatch.mock.calls[0]?.[0];
