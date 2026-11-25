@@ -519,8 +519,8 @@ terminal's column and row count did not change.
   Renderer and main ship in one build, so the protocol needs no versioning.
   Date/Author: 2026-10-29.
 - Decision D18: record D1 to D4, D12 to D17, and the rejected alternatives in a
-  new ADR, `docs/adrs/adr-0009-settings-tab-hosting-and-persistence.md`, referenced
-  from the design document. Date/Author: 2026-10-29.
+  new ADR, `docs/adrs/adr-0009-settings-tab-hosting-and-persistence.md`,
+  referenced from the design document. Date/Author: 2026-10-29.
 - Decision D19: the plan is delivered on one branch with frequent commits.
   If the reviewer prefers, it can be split at plateau boundaries into a stack
   of pull requests (EP-M0 to EP-M2, EP-M3, EP-M4 to EP-M6, EP-M7) without
@@ -1231,11 +1231,11 @@ notes in `docs/developers-guide.md` (E2E section).
 
 ### EP-M7: documentation, ADR, and roadmap closure
 
-1. `docs/adrs/adr-0009-settings-tab-hosting-and-persistence.md` in the style-guide
-   ADR format: D1 to D4, D12 to D17, trusted assumptions, and the rejected
-   alternatives (settings window, draft-then-save, all editor state in Redux,
-   tightening the load schema, and the schema-annotated `x-ui` catalogue as the
-   recommended direction for 5.2.1).
+1. `docs/adrs/adr-0009-settings-tab-hosting-and-persistence.md` in the
+   style-guide ADR format: D1 to D4, D12 to D17, trusted assumptions, and the
+   rejected alternatives (settings window, draft-then-save, all editor state in
+   Redux, tightening the load schema, and the schema-annotated `x-ui` catalogue
+   as the recommended direction for 5.2.1).
 2. `docs/velocetty-design.md` §"Settings tab and plugin settings panels":
    summarize the implemented shell, link ADR 009, and list deferred work.
 3. `docs/settings-tab-architecture.md`: component architecture (domain ring,
@@ -1814,9 +1814,9 @@ EP-M6 (2026-11-25):
 
 EP-M7 (2026-11-25):
 
-- `docs/adrs/adr-0009-settings-tab-hosting-and-persistence.md` records the hosting,
-  persistence, validation, and protocol decisions, the rejected alternatives,
-  the trusted assumptions, and the residual risks.
+- `docs/adrs/adr-0009-settings-tab-hosting-and-persistence.md` records the
+  hosting, persistence, validation, and protocol decisions, the rejected
+  alternatives, the trusted assumptions, and the residual risks.
 - `docs/settings-tab-architecture.md` describes the layers, the domain ring, the
   renderer ports and store, the single writer's algorithm, the edit operations,
   the protocol and file states, and maps each proof and property suite to its
@@ -2030,9 +2030,8 @@ layering and gate (D25), the field store (D26), and the textual numeric control
 2026-11-25: rebased onto `main` at `6078e4ee`, which had restructured the
 configuration composition root, moved ADRs to `docs/adrs/` with four-digit
 numbers, and refreshed the documentation style guide. The settings ADR is now
-[ADR 009](../adrs/adr-0009-settings-tab-hosting-and-persistence.md); the
-users' guide adds a settings section to the existing guide rather than
-replacing it; the chokidar adapter moved into
-`app/config/chokidar-handle.ts` so the real adapter can be exercised without
-Electron; and `getConfigDefaults` reads the bundled `defaults.config` the
-upstream query now returns.
+[ADR 009](../adrs/adr-0009-settings-tab-hosting-and-persistence.md); the users'
+guide adds a settings section to the existing guide rather than replacing it;
+the chokidar adapter moved into `app/config/chokidar-handle.ts` so the real
+adapter can be exercised without Electron; and `getConfigDefaults` reads the
+bundled `defaults.config` the upstream query now returns.

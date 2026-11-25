@@ -1125,8 +1125,8 @@ The settings UI should surface which settings require restart.
 ### Implementation status
 
 The settings shell described in this section is implemented, with the decisions
-recorded in [ADR 009](adrs/adr-0009-settings-tab-hosting-and-persistence.md) and the
-component layout in
+recorded in [ADR 009](adrs/adr-0009-settings-tab-hosting-and-persistence.md)
+and the component layout in
 [settings-tab-architecture.md](settings-tab-architecture.md).
 
 What ships today:

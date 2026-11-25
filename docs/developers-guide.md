@@ -1803,8 +1803,9 @@ pattern has two layers:
 
 The settings tab is described in
 [settings-tab-architecture.md](settings-tab-architecture.md), and the decisions
-behind it are in [ADR 009](adrs/adr-0009-settings-tab-hosting-and-persistence.md).
-Three rules matter when changing it.
+behind it are in
+[ADR 009](adrs/adr-0009-settings-tab-hosting-and-persistence.md). Three rules
+matter when changing it.
 
 ### One writer, one activation path
 

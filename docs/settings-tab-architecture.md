@@ -3,8 +3,8 @@
 This document describes how the settings tab is put together: the layers, the
 one write path, the protocol between the renderer and the main process, and the
 proofs and tests that guard each part. The decisions behind it are recorded in
-[ADR 009](adrs/adr-0009-settings-tab-hosting-and-persistence.md), and the delivery
-plan is
+[ADR 009](adrs/adr-0009-settings-tab-hosting-and-persistence.md), and the
+delivery plan is
 [the 5.1.1 ExecPlan](execplans/5-1-1-settings-tab-shell-and-navigation.md).
 
 ## Layers
