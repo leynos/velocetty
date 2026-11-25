@@ -27,6 +27,8 @@ import {
 import {asRendererUid, asSessionId} from '@shared/types/common';
 import type {RendererFallbackReason, RendererRuntimeMetrics, RendererType, RendererUid} from '@shared/types/common';
 import {isNumber} from '@shared/types/guards';
+import {CommandDispatcherContext} from '../command-dispatch/inbound/command-dispatcher-provider';
+import {requestSearchClose} from '../command-dispatch/inbound/search-close';
 import terms from '../terms';
 import {transport} from '../transport';
 import {useTranslation} from '../hooks/use-translation';
@@ -254,6 +256,8 @@ export default class Term extends React.PureComponent<
   webglAddon: WebglAddon | null;
   ligaturesAddon: LigaturesAddon | null;
   static rendererTypes: Partial<Record<RendererUid, RendererType>> = {};
+  static contextType = CommandDispatcherContext;
+  declare context: React.ContextType<typeof CommandDispatcherContext>;
   term!: Terminal;
   resizeObserver?: ResizeObserver;
   resizeTimeout?: NodeJS.Timeout;
@@ -654,6 +658,11 @@ export default class Term extends React.PureComponent<
       ...this.state.searchOptions,
       decorations: this.searchDecorations
     });
+  };
+
+  /** The close button runs a command; the command owns the state change. */
+  requestSearchClose = () => {
+    requestSearchClose(this.context, this.props.uid, this.closeSearchBox);
   };
 
   closeSearchBox = () => {
@@ -1256,7 +1265,7 @@ export default class Term extends React.PureComponent<
           <TranslatedSearchBox
             next={this.searchNext}
             prev={this.searchPrevious}
-            close={this.closeSearchBox}
+            close={this.requestSearchClose}
             caseSensitive={this.state.searchOptions.caseSensitive}
             wholeWord={this.state.searchOptions.wholeWord}
             regex={this.state.searchOptions.regex}

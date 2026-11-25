@@ -95,7 +95,6 @@ const buildHyperProps = (overrides: Partial<HyperProps> = {}): HyperProps => ({
   maximized: false,
   fullScreen: false,
   lastConfigUpdate: 1,
-  execCommand: () => {},
   ...overrides
 });
 

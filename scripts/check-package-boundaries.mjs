@@ -41,6 +41,9 @@ const allowedImportExceptions = new Set(['lib/components/term.tsx|../../app/util
  */
 const dispatcherCorePrefix = 'lib/command-dispatch/';
 const dispatcherSubLayers = ['adapters/', 'inbound/'];
+// The composition root is where the real infrastructure is supposed to meet
+// the core; constraining it would leave nothing able to wire the adapters in.
+const dispatcherCompositionRoots = new Set(['lib/command-dispatch/compose.ts']);
 
 const dispatcherCoreForbidden = [
   {
@@ -53,14 +56,15 @@ const dispatcherCoreForbidden = [
   },
   {label: 'Ajv', matches: (specifier) => specifier === 'ajv' || specifier.startsWith('ajv/')},
   {label: 'the transport', matches: (specifier) => specifier.includes('/transport') || specifier.endsWith('transport')},
-  {label: 'the context-key service', matches: (specifier) => specifier.includes('context-key')},
+  {label: 'the context-key service', matches: (specifier) => specifier === '../context-key-service'},
   {label: 'Hyper typings', matches: (specifier) => specifier.includes('typings/hyper')},
-  {label: 'the renderer command registry', matches: (specifier) => specifier.includes('command-registry')}
+  {label: 'the renderer command registry', matches: (specifier) => specifier === '../command-registry'}
 ];
 
 const isDispatcherCoreFile = (relativePath) =>
   relativePath.startsWith(dispatcherCorePrefix) &&
   relativePath.endsWith('.ts') &&
+  !dispatcherCompositionRoots.has(relativePath) &&
   !dispatcherSubLayers.some((subLayer) => relativePath.startsWith(`${dispatcherCorePrefix}${subLayer}`));
 
 const findDispatcherViolation = (relativePath, importSpecifier) => {

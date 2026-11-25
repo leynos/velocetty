@@ -21,12 +21,8 @@ import {
   UI_ENTER_FULLSCREEN,
   UI_LEAVE_FULLSCREEN,
   UI_OPEN_SSH_URL,
-  UI_CONTEXTMENU_OPEN,
-  UI_COMMAND_EXEC
+  UI_CONTEXTMENU_OPEN
 } from '@shared/constants/ui';
-import type {CommandId, CommandInvocationSource} from '@shared/types/commands';
-import type {JsonValue} from '@shared/types/json';
-import {NEVER_ABORTS_SIGNAL, type RendererCommandHandler} from '../command-registry-handlers';
 import type {HyperState, HyperDispatch, HyperActions, ITermGroups} from '../../typings/hyper';
 import {getRootGroups} from '../selectors';
 import {isExecutable} from '../utils/file';
@@ -328,37 +324,4 @@ export function openSSH(parsedUrl: ReturnType<typeof parseUrl>) {
       }
     });
   };
-}
-
-export function execCommand(
-  command: CommandId,
-  handler: RendererCommandHandler | undefined,
-  triggerEvent: Event | undefined,
-  source: CommandInvocationSource = 'keybinding',
-  args: JsonValue = null
-) {
-  return (dispatch: HyperDispatch) =>
-    dispatch({
-      type: UI_COMMAND_EXEC,
-      command,
-      source,
-      args,
-      effect() {
-        if (handler) {
-          // Interim bridge: the dispatcher replaces this path in EP-M5. Until
-          // then the handler still receives the same request shape, so a
-          // legacy plugin handler sees exactly the event and dispatch it did
-          // before.
-          void handler({
-            invocation: {id: command, args, source},
-            args,
-            signal: NEVER_ABORTS_SIGNAL,
-            dispatch,
-            triggerEvent
-          });
-        } else {
-          transport.emit('command', command);
-        }
-      }
-    });
 }

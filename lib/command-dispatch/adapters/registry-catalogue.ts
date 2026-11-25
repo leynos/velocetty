@@ -55,40 +55,45 @@ const hostStub = (id: CommandId): CommandDefinition => ({
   metadata: {title: id}
 });
 
+const notFound = (id: CommandId, target: 'args' | 'result'): CommandValidationResult => ({
+  ok: false,
+  error: {
+    code: 'COMMAND_NOT_FOUND',
+    commandId: id,
+    target,
+    message: `Cannot validate ${target} for unknown command: ${id}`
+  }
+});
+
 /** Builds the catalogue over the registry and the keymap snapshot. */
 export const createRegistryCatalogue = (dependencies: RegistryCatalogueDependencies): CommandCatalogue => {
+  const isBoundButUndefined = (id: CommandId): boolean =>
+    !dependencies.registry.get(id) && dependencies.getBoundKeymapCommandIds().has(id);
+
   const resolve = (id: CommandId): CommandDefinition | undefined =>
-    dependencies.registry.get(id) ?? (dependencies.getBoundKeymapCommandIds().has(id) ? hostStub(id) : undefined);
+    dependencies.registry.get(id) ?? (isBoundButUndefined(id) ? hostStub(id) : undefined);
+
+  /** Delegates to the registry, or reports the command as unknown. */
+  const requireDefinition = (
+    id: CommandId,
+    target: 'args' | 'result',
+    validate: () => CommandValidationResult
+  ): CommandValidationResult => (resolve(id) ? validate() : notFound(id, target));
 
   return {
     get: (id) => resolve(asCommandId(id)),
     validateArgs: (id, args: JsonValue) => {
-      if (!resolve(id)) {
-        return {
-          ok: false,
-          error: {
-            code: 'COMMAND_NOT_FOUND',
-            commandId: id,
-            target: 'args',
-            message: `Cannot validate args for unknown command: ${id}`
-          }
-        };
+      // A keymap-bound command with no registry definition is a host command
+      // with no declared schema, so any value passes here. The interpreter's
+      // route gate is what restricts a host command to `null` arguments.
+      if (isBoundButUndefined(id)) {
+        return {ok: true, value: args};
       }
-      return dependencies.registry.validateArgs(id, args);
+      return requireDefinition(id, 'args', () => dependencies.registry.validateArgs(id, args));
     },
-    validateResult: (id, value) => {
-      if (!resolve(id)) {
-        return {
-          ok: false,
-          error: {
-            code: 'COMMAND_NOT_FOUND',
-            commandId: id,
-            target: 'result',
-            message: `Cannot validate result for unknown command: ${id}`
-          }
-        };
-      }
-      return dependencies.registry.validateResult(id, value);
-    }
+    validateResult: (id, value) =>
+      isBoundButUndefined(id)
+        ? {ok: true, value}
+        : requireDefinition(id, 'result', () => dependencies.registry.validateResult(id, value))
   };
 };
