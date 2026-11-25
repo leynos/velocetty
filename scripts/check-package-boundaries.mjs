@@ -30,6 +30,58 @@ const layerRules = {
 
 const allowedImportExceptions = new Set(['lib/components/term.tsx|../../app/utils/renderer-utils']);
 
+/**
+ * Extra rules inside the frontend layer for the command dispatcher.
+ *
+ * The dispatcher's core must stay a pure interpreter: if it could reach React,
+ * Redux, Ajv, the transport, the context-key service, Hyper typings, or a DOM
+ * event type, the proof in `policy/invocation-machine.dfy` would stop describing
+ * the code that actually runs. Adapters and inbound adapters are where those
+ * dependencies belong, so only the core is constrained.
+ */
+const dispatcherCorePrefix = 'lib/command-dispatch/';
+const dispatcherSubLayers = ['adapters/', 'inbound/'];
+
+const dispatcherCoreForbidden = [
+  {
+    label: 'React',
+    matches: (specifier) => specifier === 'react' || specifier.startsWith('react/') || specifier === 'react-dom'
+  },
+  {
+    label: 'Redux',
+    matches: (specifier) => specifier === 'redux' || specifier.startsWith('redux/') || specifier === 'react-redux'
+  },
+  {label: 'Ajv', matches: (specifier) => specifier === 'ajv' || specifier.startsWith('ajv/')},
+  {label: 'the transport', matches: (specifier) => specifier.includes('/transport') || specifier.endsWith('transport')},
+  {label: 'the context-key service', matches: (specifier) => specifier.includes('context-key')},
+  {label: 'Hyper typings', matches: (specifier) => specifier.includes('typings/hyper')},
+  {label: 'the renderer command registry', matches: (specifier) => specifier.includes('command-registry')}
+];
+
+const isDispatcherCoreFile = (relativePath) =>
+  relativePath.startsWith(dispatcherCorePrefix) &&
+  relativePath.endsWith('.ts') &&
+  !dispatcherSubLayers.some((subLayer) => relativePath.startsWith(`${dispatcherCorePrefix}${subLayer}`));
+
+const findDispatcherViolation = (relativePath, importSpecifier) => {
+  if (!isDispatcherCoreFile(relativePath)) {
+    return null;
+  }
+
+  const forbidden = dispatcherCoreForbidden.find((rule) => rule.matches(importSpecifier));
+  if (forbidden) {
+    return `the dispatcher core must not import ${forbidden.label}`;
+  }
+
+  // The policy module is the proved core and must be a leaf: it imports nothing
+  // at all, so the Dafny model has no unmodelled dependencies.
+  if (relativePath.startsWith(`${dispatcherCorePrefix}policy/`)) {
+    return 'the policy module must import nothing';
+  }
+
+  return null;
+};
+
 const toNormalizedRelativePath = (filePath) => path.relative(rootDir, filePath).replaceAll('\\', '/');
 
 const isAllowedImportException = (filePath, importSpecifier) =>
@@ -205,7 +257,18 @@ for (const roots of Object.values(layerDefinitions)) {
       }
 
       const rules = layerRules[layer];
+      const relativePath = toNormalizedRelativePath(filePath);
       for (const importSpecifier of readImports(filePath)) {
+        const dispatcherViolation = findDispatcherViolation(relativePath, importSpecifier);
+        if (dispatcherViolation) {
+          violations.push({
+            file: relativePath,
+            importSpecifier,
+            layer: dispatcherViolation
+          });
+          continue;
+        }
+
         if (isAllowedImportException(filePath, importSpecifier)) {
           continue;
         }
