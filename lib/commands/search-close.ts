@@ -22,6 +22,7 @@
  * - `../shared/src/types/commands.ts` declares the argument schema contract.
  */
 import type {HyperDispatch, HyperState} from '../../typings/hyper';
+import type {RendererCommandRequest} from '../command-registry-handlers';
 import {SESSION_SEARCH} from '@shared/constants/sessions';
 import {asSessionId} from '@shared/types/common';
 import {isBoolean, isObject, isString} from '@shared/types/guards';
@@ -109,14 +110,21 @@ export interface SearchCloseHandlerDependencies {
 }
 
 /**
- * Builds the legacy `(event, dispatch)` handler the registry stores for
- * `editor:search-close`.
+ * Builds the renderer handler the registry stores for `editor:search-close`.
+ *
+ * Request-shaped rather than legacy, because the command takes arguments: the
+ * search box close button names a session, and a legacy `(event, dispatch)`
+ * handler has nowhere to receive it. `null` arguments mean the active session.
  *
  * Both collaborators are injected rather than reached through globals, so the
  * registry keeps its single seam for tests and this module stays pure.
  */
 export const createSearchCloseHandler =
-  (dependencies: SearchCloseHandlerDependencies) => (event: unknown, dispatch: HyperDispatch) => {
-    dispatch(dependencies.closeSearch(undefined, isSearchKeyEvent(event) ? event : undefined));
+  (dependencies: SearchCloseHandlerDependencies) =>
+  (request: RendererCommandRequest): undefined => {
+    const triggerEvent = request.triggerEvent;
+    const keyEvent = isSearchKeyEvent(triggerEvent) ? triggerEvent : undefined;
+    request.dispatch(dependencies.closeSearch(searchCloseUid(request.args), keyEvent));
     dependencies.focusActiveTerm();
+    return undefined;
   };

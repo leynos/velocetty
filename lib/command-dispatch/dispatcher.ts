@@ -311,7 +311,25 @@ export const createCommandDispatcher = <TContext>(
       );
     };
 
+    /**
+     * Runs one action. An adapter throwing is an infrastructure failure, not a
+     * caller error: it settles the invocation as a structured failure instead
+     * of rejecting a promise the contract says never rejects.
+     */
     const perform = (action: MachineAction): void => {
+      try {
+        performAction(action);
+      } catch (error) {
+        ports.logger.warn('command dispatcher adapter threw', {
+          commandId,
+          reason: error instanceof Error ? error.message : String(error)
+        });
+        gateError = failure('COMMAND_EXECUTION_FAILED');
+        advance({kind: 'gateFailed'});
+      }
+    };
+
+    const performAction = (action: MachineAction): void => {
       switch (action.kind) {
         case 'evaluateGate': {
           const verdict = evaluateGate(ports, action.gate, invocation, args);

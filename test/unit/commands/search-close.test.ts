@@ -36,6 +36,7 @@ import {
 } from '../../../lib/commands/search-close';
 import {createCommandSchemaValidator} from '../../../lib/command-registry-validation';
 import rootReducer from '../../../lib/reducers';
+import {createRendererCommandRequest} from '../../testUtils/renderer-command-request';
 import type {HyperDispatch, HyperState} from '../../../typings/hyper';
 
 const SEARCH_CLOSE_DEFINITION: CommandDefinition = {
@@ -132,7 +133,7 @@ test('the handler closes the requested session and restores terminal focus', () 
   const handler = createSearchCloseHandler({closeSearch: closeSearchAction, focusActiveTerm});
   const dispatch = mock<HyperDispatch>(() => {});
 
-  handler(undefined, dispatch);
+  handler(createRendererCommandRequest({args: null, dispatch}));
 
   const innerDispatch = runDispatchedThunk(dispatch, true);
   expect(dispatch).toHaveBeenCalledTimes(1);
@@ -147,9 +148,9 @@ test('the handler releases the key when no search box is open', () => {
   const handler = createSearchCloseHandler({closeSearch: closeSearchAction, focusActiveTerm});
 
   const dispatch = mock<HyperDispatch>(() => {});
-  const keyEvent = {catched: true};
+  const keyEvent = Object.assign(new Event('keydown', {cancelable: true}), {catched: true});
 
-  handler(keyEvent, dispatch);
+  handler(createRendererCommandRequest({args: null, dispatch, triggerEvent: keyEvent}));
 
   const innerDispatch = runDispatchedThunk(dispatch, false);
   expect(dispatch).toHaveBeenCalledTimes(1);

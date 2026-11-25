@@ -36,16 +36,22 @@ import type {RendererExecutionContext} from '../adapters/renderer-executor';
  * instance; rejecting a non-plain prototype here is what keeps the promise that
  * plugin arguments are serializable.
  */
-const isTransferableJsonValue = (value: unknown): value is JsonValue => {
-  if (Array.isArray(value)) {
-    return value.every((item: unknown) => isTransferableJsonValue(item));
-  }
-  if (isJsonObject(value)) {
+const isTransferableJsonValue = (value: unknown, seen: Set<object> = new Set()): value is JsonValue => {
+  if (Array.isArray(value) || isJsonObject(value)) {
+    // A cycle is not JSON: reject it here rather than recursing until the
+    // stack overflows, which would escape as an unhandled exception.
+    if (seen.has(value)) {
+      return false;
+    }
+    seen.add(value);
+    if (Array.isArray(value)) {
+      return value.every((item: unknown) => isTransferableJsonValue(item, seen));
+    }
     const prototype = Object.getPrototypeOf(value);
     if (prototype !== Object.prototype && prototype !== null) {
       return false;
     }
-    return Object.values(value).every((item: unknown) => isTransferableJsonValue(item));
+    return Object.values(value).every((item: unknown) => isTransferableJsonValue(item, seen));
   }
   return isJsonValue(value);
 };

@@ -316,11 +316,11 @@ shortcut that uses `command` is meaningful on macOS and inert elsewhere.
 
 ## Commands and keybindings
 
-Velocetty treats every action as a command. A keyboard shortcut, the close
-button on the search box, and a plugin that asks to run a command all take the
-same route: the command dispatcher resolves the command, checks it, and runs
-it. One route means a shortcut and a button cannot disagree about what a
-command does.
+Velocetty treats every action as a command. Keyboard shortcuts, the close
+button on the search box, and plugins that ask to run a command are routed
+through the command dispatcher: it resolves the command, checks it, and runs
+it. Remaining menus and buttons still call their handlers directly and are
+being migrated; they are listed under roadmap item 4.3.2.
 
 ### Refused shortcuts pass the key through
 

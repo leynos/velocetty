@@ -104,11 +104,28 @@ const checkSchemaNode = (schema: JsonObject, path: string): SchemaCheck => {
       return {ok: false, message: `"properties" must be an object at ${path}`};
     }
     for (const [name, child] of Object.entries(properties)) {
-      const childCheck = checkSchemaNode(isJsonObject(child) ? child : {}, `${path}/properties/${name}`);
+      if (!isJsonObject(child)) {
+        return {ok: false, message: `Property schema for "${name}" must be an object at ${path}`};
+      }
+      const childCheck = checkSchemaNode(child, `${path}/properties/${name}`);
       if (!childCheck.ok) {
         return childCheck;
       }
     }
+  }
+
+  for (const keyword of ['minLength', 'maxLength', 'minimum', 'maximum']) {
+    if (has(schema, keyword) && !isNumber(schema[keyword])) {
+      return {ok: false, message: `"${keyword}" must be a number at ${path}`};
+    }
+  }
+  for (const keyword of ['required', 'enum']) {
+    if (has(schema, keyword) && !Array.isArray(schema[keyword])) {
+      return {ok: false, message: `"${keyword}" must be an array at ${path}`};
+    }
+  }
+  if (has(schema, 'additionalProperties') && schema['additionalProperties'] !== false) {
+    return {ok: false, message: `"additionalProperties" is supported only as false at ${path}`};
   }
 
   const items = schema['items'];
@@ -146,6 +163,32 @@ const matchesType = (declared: string, value: JsonValue): boolean => {
   return declared === actual;
 };
 
+/**
+ * Structural equality for JSON values.
+ *
+ * Compares object members by key rather than by serialized text, so a schema
+ * constant written with a different key order still matches.
+ */
+const jsonEquals = (left: JsonValue, right: JsonValue): boolean => {
+  if (left === right) {
+    return true;
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+      return false;
+    }
+    return left.every((item, index) => jsonEquals(item, right.at(index) ?? null));
+  }
+  if (!isJsonObject(left) || !isJsonObject(right)) {
+    return false;
+  }
+  const leftKeys = Object.keys(left);
+  if (leftKeys.length !== Object.keys(right).length) {
+    return false;
+  }
+  return leftKeys.every((key) => has(right, key) && jsonEquals(left[key], right[key]));
+};
+
 /** Accumulates issues while walking one value against one schema. */
 interface Walk {
   readonly issues: CommandValidationIssue[];
@@ -181,21 +224,23 @@ const walkNode = (schema: JsonObject, value: JsonValue, instancePath: string, sc
   }
 
   const constValue = schema['const'];
-  if (has(schema, 'const') && JSON.stringify(constValue) !== JSON.stringify(value)) {
+  if (has(schema, 'const') && !jsonEquals(constValue, value)) {
     report(walk, 'const', instancePath, `${schemaPath}/const`, `should be equal to ${describe(constValue)}`);
   }
 
   const enumValues = asJsonList(schema['enum']);
   if (enumValues.length > 0) {
-    const permitted = enumValues.some((candidate) => JSON.stringify(candidate) === JSON.stringify(value));
+    const permitted = enumValues.some((candidate) => jsonEquals(candidate, value));
     if (!permitted) {
       report(walk, 'enum', instancePath, `${schemaPath}/enum`, 'should be equal to one of the allowed values');
     }
   }
 
   if (isString(value)) {
+    // JSON Schema counts characters, not UTF-16 code units.
+    const characterCount = [...value].length;
     const minLength = schema['minLength'];
-    if (isNumber(minLength) && value.length < minLength) {
+    if (isNumber(minLength) && characterCount < minLength) {
       report(
         walk,
         'minLength',
@@ -205,7 +250,7 @@ const walkNode = (schema: JsonObject, value: JsonValue, instancePath: string, sc
       );
     }
     const maxLength = schema['maxLength'];
-    if (isNumber(maxLength) && value.length > maxLength) {
+    if (isNumber(maxLength) && characterCount > maxLength) {
       report(
         walk,
         'maxLength',
@@ -244,13 +289,13 @@ const walkNode = (schema: JsonObject, value: JsonValue, instancePath: string, sc
   const properties = schema['properties'];
   const known = isJsonObject(properties) ? properties : {};
   for (const name of asStringList(schema['required'])) {
-    if (!(name in value)) {
+    if (!Object.hasOwn(value, name)) {
       report(walk, 'required', instancePath, `${schemaPath}/required`, `should have required property '${name}'`);
     }
   }
 
   for (const [name, childSchema] of Object.entries(known)) {
-    if (!(name in value) || !isJsonObject(childSchema)) {
+    if (!Object.hasOwn(value, name) || !isJsonObject(childSchema)) {
       continue;
     }
     walkNode(childSchema, value[name], `${instancePath}/${name}`, `${schemaPath}/properties/${name}`, walk);
@@ -258,7 +303,7 @@ const walkNode = (schema: JsonObject, value: JsonValue, instancePath: string, sc
 
   if (schema['additionalProperties'] === false) {
     for (const name of Object.keys(value)) {
-      if (!(name in known)) {
+      if (!Object.hasOwn(known, name)) {
         report(
           walk,
           'additionalProperties',

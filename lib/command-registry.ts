@@ -198,7 +198,7 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
     },
     argsSchema: cloneSchema(SEARCH_CLOSE_ARGS_SCHEMA)
   });
-  assignLegacyHandler(asCommandId(SEARCH_CLOSE_COMMAND_ID), createSearchCloseHandler(dependencies));
+  assignHandler(asCommandId(SEARCH_CLOSE_COMMAND_ID), createSearchCloseHandler(dependencies));
 
   const commandRegistry: CommandRegistry<RendererCommandHandler> = {
     register: upsertCommand,

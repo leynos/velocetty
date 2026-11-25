@@ -136,7 +136,7 @@ test('registerCommandHandlers ignores undefined input without mutating the regis
  */
 const dispatchSearchClose = async (harness: CommandRegistryCompatHarness) => {
   const dispatch = mock<HyperDispatch>(() => {});
-  harness.getCommandHandler('editor:search-close')?.(createRendererCommandRequest({dispatch}));
+  harness.getCommandHandler('editor:search-close')?.(createRendererCommandRequest({args: null, dispatch}));
 
   expect(dispatch).toHaveBeenCalledTimes(1);
   const dispatchedThunk = dispatch.mock.calls[0]?.[0];
