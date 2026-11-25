@@ -28,10 +28,10 @@ This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: DRAFT (revised after community-of-experts review; awaiting approval)
+Status: APPROVED (2026-11-25)
 
-Approval gate: this plan must be explicitly approved by the user before any
-implementation milestone (EP-M0 onwards) begins. Silence is not approval.
+Approval gate: approved by the user on 2026-11-25; implementation milestones
+(EP-M0 onwards) may proceed.
 
 ## Purpose / big picture
 
@@ -205,7 +205,7 @@ terminal's column and row count did not change.
   accessibility). Verdict: proceed with conditions.
 - [x] (2026-10-29) Plan revised to address every review finding (see
   `Decision log` D1 to D19 and the revision note).
-- [ ] User approval of the plan.
+- [x] (2026-11-25) User approval of the plan.
 - [ ] EP-M0: proof and property tooling prototype and CI policy.
 - [ ] EP-M1: settings domain core and proofs.
 - [ ] EP-M2: JSON5 scanner relocation and comment-preserving edit operations.
