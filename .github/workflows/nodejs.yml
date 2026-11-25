@@ -299,6 +299,12 @@ jobs:
         with:
           run: bun run test:e2e:deep
         env:
+          # Node 24 strips TypeScript types natively and loads `.ts` as ESM.
+          # Playwright's transform emits CommonJS for a project without
+          # `"type": "module"`, so the two collide with
+          # `ReferenceError: exports is not defined in ES module scope`.
+          # Node 22 does not strip types, which is why this only fails in CI.
+          NODE_OPTIONS: --no-experimental-strip-types
           DEBUG: pw:browser*
           ELECTRON_ENABLE_LOGGING: '1'
           ELECTRON_ENABLE_STACK_DUMPING: '1'
