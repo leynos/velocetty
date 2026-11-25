@@ -2,19 +2,22 @@
  * @file JSON Schema validation for command arguments and results.
  *
  * Responsibilities:
- * - Compile one Ajv validator per declared command schema, once, when the
- *   command is registered rather than on the first invocation.
+ * - Check one declared command schema, once, when the command is registered
+ *   rather than on the first invocation.
  * - Report every validation failure as a structured, serializable issue list.
  * - Distinguish a payload that violates its schema from a schema that cannot
  *   be compiled at all, because the two need different operator responses.
  *
  * Invariants:
- * - A schema is compiled at most once per registration; `prime` replaces any
+ * - A schema is checked at most once per registration; `prime` replaces any
  *   cached verdict, so re-registering a changed schema never serves a stale
- *   validator.
- * - A schema that fails to compile is cached as a failure, so every later
+ *   verdict.
+ * - A schema that fails its own check is cached as a failure, so every later
  *   validation of that command reports `INVALID_COMMAND_SCHEMA` rather than
  *   throwing at an unpredictable moment.
+ *
+ * Validation is interpreted, not generated: `./command-schema-validator.ts`
+ * explains why the renderer cannot use Ajv's code generation.
  *
  * Usage:
  * - Construct one validator per registry with `createCommandSchemaValidator`,
@@ -24,7 +27,7 @@
  * Related modules:
  * - `./command-registry.ts` owns the definitions and drives this module.
  */
-import Ajv, {type ErrorObject, type ValidateFunction} from 'ajv';
+import {checkSchema, validateAgainstSchema} from './command-schema-validator';
 import {
   asCommandId,
   type CommandDefinition,
@@ -35,12 +38,9 @@ import {
   type CommandValidationResult,
   type CommandValidationTarget
 } from '@shared/types/commands';
-import {isJsonObject} from '@shared/types/json';
 
-/** The outcome of compiling one command's schema, cached for its lifetime. */
-type CompiledSchema =
-  | {readonly kind: 'compiled'; readonly validate: ValidateFunction}
-  | {readonly kind: 'invalidSchema'; readonly message: string};
+/** The outcome of checking one command's schema, cached for its lifetime. */
+type CompiledSchema = {readonly kind: 'usable'} | {readonly kind: 'invalidSchema'; readonly message: string};
 
 export interface CommandSchemaValidator {
   /** Compiles the command's schema now, replacing any cached verdict. */
@@ -57,18 +57,6 @@ export interface CommandSchemaValidatorDependencies {
   /** Resolves the definition whose `argsSchema` should govern the payload. */
   getDefinition(commandId: CommandId): CommandDefinition | undefined;
 }
-
-/** Accepts an optional path string and normalizes it to a guaranteed string. */
-const asIssuePath = (value: string | undefined): string => value ?? '';
-
-const serializeAjvErrors = (errors: ErrorObject[] | null | undefined): CommandValidationIssue[] =>
-  (errors ?? []).map((error) => ({
-    instancePath: asIssuePath(error.dataPath),
-    schemaPath: asIssuePath(error.schemaPath),
-    keyword: error.keyword,
-    message: error.message ?? 'Schema validation failed',
-    params: isJsonObject(error.params) ? error.params : {}
-  }));
 
 const describeSchemaFailure = (cause: unknown, commandId: CommandId): string =>
   cause instanceof Error ? cause.message : `Invalid schema for command: ${commandId}`;
@@ -111,24 +99,22 @@ const toPayloadError = (
 /** One cache key per (target, command) pair; the two schemas are distinct. */
 const cacheKey = (commandId: CommandId, target: CommandValidationTarget): string => `${target}\u0000${commandId}`;
 
-/** Creates a schema validator that caches one compiled Ajv validator per command and target. */
+/**
+ * Checks a schema once, then caches the verdict: a schema defect must report
+ * the same error every time it is validated, not only on the first attempt.
+ */
+const compile = (schema: CommandSchema): CompiledSchema => {
+  const check = checkSchema(schema);
+  return check.ok ? {kind: 'usable'} : {kind: 'invalidSchema', message: check.message};
+};
+
+/** Creates a schema validator that caches one verdict per command and target. */
 export const createCommandSchemaValidator = (
   dependencies: CommandSchemaValidatorDependencies
 ): CommandSchemaValidator => {
-  const ajv = new Ajv({allErrors: true});
   // Keyed by target as well as command: a command may declare both schemas,
   // and they are different schemas.
   const compiledByKey = new Map<string, CompiledSchema>();
-
-  const compile = (commandId: CommandId, schema: CommandSchema): CompiledSchema => {
-    try {
-      return {kind: 'compiled', validate: ajv.compile(schema)};
-    } catch (error) {
-      // Cache the failure: an invalid schema must report the same error every
-      // time it is validated, not only on the first attempt.
-      return {kind: 'invalidSchema', message: describeSchemaFailure(error, commandId)};
-    }
-  };
 
   const compiledFor = (
     commandId: CommandId,
@@ -141,7 +127,7 @@ export const createCommandSchemaValidator = (
       return cached;
     }
 
-    const fresh = compile(commandId, schema);
+    const fresh = compile(schema);
     compiledByKey.set(key, fresh);
     return fresh;
   };
@@ -151,10 +137,10 @@ export const createCommandSchemaValidator = (
     compiledByKey.delete(cacheKey(commandId, 'result'));
     const definition = dependencies.getDefinition(commandId);
     if (definition?.argsSchema) {
-      compiledByKey.set(cacheKey(commandId, 'args'), compile(commandId, definition.argsSchema));
+      compiledByKey.set(cacheKey(commandId, 'args'), compile(definition.argsSchema));
     }
     if (definition?.resultSchema) {
-      compiledByKey.set(cacheKey(commandId, 'result'), compile(commandId, definition.resultSchema));
+      compiledByKey.set(cacheKey(commandId, 'result'), compile(definition.resultSchema));
     }
   };
 
@@ -192,11 +178,12 @@ export const createCommandSchemaValidator = (
       return {ok: false, error: toSchemaError(commandKey, target, compiled.message)};
     }
 
-    if (compiled.validate(payload)) {
+    const issues = validateAgainstSchema(schema, payload);
+    if (issues.length === 0) {
       return {ok: true, value: payload};
     }
 
-    return {ok: false, error: toPayloadError(commandKey, target, serializeAjvErrors(compiled.validate.errors))};
+    return {ok: false, error: toPayloadError(commandKey, target, issues)};
   };
 
   return {

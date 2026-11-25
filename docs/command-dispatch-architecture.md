@@ -35,9 +35,9 @@ surrounds it:
   Redux, and the transport. The inbound adapters touch Mousetrap and React.
   None of that is proved; it is tested or reviewed.
 - **Trusted.** Argument and result validation is JSON Schema validation through
-  Ajv, reached through the registry. The machine decides when validation runs
-  and what a failure means, not whether Ajv implements a schema keyword
-  correctly.
+  the command-schema interpreter, reached through the registry. The machine
+  decides when validation runs and what a failure means, not whether the
+  interpreter implements a schema keyword correctly.
 - **Trusted.** The host process is outside this boundary. Admitting an
   invocation is not a permission check; backend permission checking remains a
   separate concern.
@@ -335,9 +335,9 @@ bun test --concurrent test/unit/command-dispatch/
 
 Residual gaps:
 
-- Nothing proves the adapters, React, Redux, the transport, Mousetrap, or Ajv.
-  Their behaviour is taken as given; the machine governs only when they are
-  consulted and what their answers mean.
+- Nothing proves the adapters, React, Redux, the transport, Mousetrap, or the
+  command-schema interpreter. Their behaviour is taken as given; the machine
+  governs only when they are consulted and what their answers mean.
 - Nothing proves the interpreter feeds the machine faithfully. The structural
   test narrows the gap; it does not close it.
 - A plugin middleware that swallows `UI_COMMAND_EXEC` leaves the invocation
