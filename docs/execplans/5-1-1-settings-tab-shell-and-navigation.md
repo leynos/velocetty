@@ -206,7 +206,7 @@ terminal's column and row count did not change.
 - [x] (2026-10-29) Plan revised to address every review finding (see
   `Decision log` D1 to D19 and the revision note).
 - [x] (2026-11-25) User approval of the plan.
-- [ ] EP-M0: proof and property tooling prototype and CI policy.
+- [x] (2026-11-25) EP-M0: proof and property tooling prototype and CI policy.
 - [ ] EP-M1: settings domain core and proofs.
 - [ ] EP-M2: JSON5 scanner relocation and comment-preserving edit operations.
 - [ ] EP-M3: config file writer, settings service, and IPC.
@@ -267,6 +267,22 @@ terminal's column and row count did not change.
   architecture document. Impact: EP-M7 creates both.
 - Observation: `fast-check` and LemmaScript are absent; Dafny 4.11.0 and
   .NET 8 are installed on the development host. Impact: EP-M0.
+- Observation (EP-M0): LemmaScript 0.6.12 drops a record type's generic
+  parameters from the generated Dafny datatype (`datatype Box = Box(value: V)`)
+  while generic discriminated unions are emitted correctly. Evidence: `lsc gen`
+  on `prototype-proof.ts` reported `Wrong number of type arguments` and
+  `type parameter is not declared`. Impact: a local toolchain patch
+  (`patches/lemmascript@0.6.12.patch`) propagates `typeParams` through
+  `extractRecord`; see D20. Without it the field-state proof cannot be generic
+  over the value type.
+- Observation (EP-M0): the `LemmaScript-files.txt` batch reader does not skip
+  `#` comments, and the generated artefact replaces the `.ts` suffix (`foo.ts` →
+  `foo.dfy.gen`). Impact: the list holds file paths only, and the freshness
+  checker maps suffixes itself.
+- Observation (EP-M0): `lsc gen` resolves types through the repository's
+  TypeScript configuration, so regenerating from a copy in a temporary
+  directory produced different output than regenerating in place. Impact: the
+  freshness checker regenerates in place and restores the committed artefact.
 
 ## Decision log
 
@@ -443,6 +459,22 @@ terminal's column and row count did not change.
   If the reviewer prefers, it can be split at plateau boundaries into a stack
   of pull requests (EP-M0 to EP-M2, EP-M3, EP-M4 to EP-M6, EP-M7) without
   changing the plan. Date/Author: 2026-10-29.
+- Decision D20 (new, EP-M0): LemmaScript 0.6.12 is patched locally through
+  Bun's `patchedDependencies` (`patches/lemmascript@0.6.12.patch`) so that a
+  record type's generic parameters survive extraction. Without the patch a
+  generic record emits `datatype Box = Box(value: V)` and Dafny rejects every
+  signature that mentions `Box<V>`, which blocks the field-state proof's
+  generic value type. The patch is three lines in the shipped build output:
+  `extractRecord` accepts a `typeParams` argument and copies it onto the record
+  declaration, and `extractTypeDecl` passes it. Rationale for a patch rather
+  than the alternatives: rendering a monomorphic instance loses the genericity
+  D9 claims; shadowing the state record with `//@ declare-type` introduces a
+  proof/production divergence that could drift; reshaping the production state
+  into a discriminated union to suit the prover is design driven by tooling.
+  The version is pinned exactly (D10), so the patch cannot drift under a silent
+  upgrade. The upstream fix belongs in LemmaScript and should be offered there;
+  ADR 007 records the patch as a trusted toolchain assumption. Date/Author:
+  2026-11-25.
 
 ## Outcomes & retrospective
 
@@ -1386,6 +1418,36 @@ gate fails midway, fix and rerun the whole sequence from `make check-fmt`.
 To be filled during implementation: red-stage transcripts, proof verifier
 summaries, seeded-mutation rejection transcripts, property classification
 output, and E2E logs.
+
+EP-M0 (2026-11-25):
+
+- Dependencies: `fast-check@4.11.0` (caret) and `lemmascript@0.6.12` (exact)
+  added as development dependencies; `bun.lock` updated.
+- Prototype: `shared/src/settings/prototype-proof.ts` exercised `split(' ')`,
+  `includes`, a `for` loop with invariants, a string-union phase type, a
+  record, and a generic type parameter through a record. `make proofs` reported
+  `Dafny program verifier finished with 7 verified, 0 errors` in 5.1 s. The
+  prototype and its `.dfy`/`.dfy.gen` artefacts were then deleted, keeping the
+  tooling.
+- Freshness: `make proofs-fresh` passed on the committed generation and, with
+  a `// hand edit` line appended to the `.dfy.gen`, reported the differing line
+  and failed with a regeneration instruction. The hand edit was restored
+  afterwards.
+- Local patch: `patches/lemmascript@0.6.12.patch`, registered under
+  `patchedDependencies` (D20).
+- CI: `.github/workflows/proofs.yml` installs Dafny 4.11.0 with a cached
+  `dotnet tool install`, runs `make proofs` and `make proofs-fresh`, and is
+  path-filtered to the proof surface. It is advisory per D11.
+- `make lint` now runs `make proofs-fresh`; `make proofs` is separate so a
+  missing Dafny does not block the ordinary lint gate.
+- `test/testUtils/fast-check-runs.ts` reads `FAST_CHECK_NUM_RUNS` (default
+  200) and `test/unit/fast-check-runs.test.ts` proves it under
+  `bun test --concurrent --isolate`.
+- Baseline gates on the branch before EP-M1: `make check-fmt`, `make lint`,
+  `make typecheck`, `make spelling` clean; `make test` reported 512 pass and
+  one pre-existing timing-sensitive failure in
+  `test/unit/esbuild-migration-contracts.test.ts` (a 5 s timeout under
+  concurrent load) that passes when run alone.
 
 Design review summary (2026-10-29), recorded for traceability. Three expert
 lenses reviewed the first draft. Blocking findings and their resolutions: naive

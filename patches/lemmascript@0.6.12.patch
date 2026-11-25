@@ -1,0 +1,31 @@
+diff --git a/tools/dist/extract.js b/tools/dist/extract.js
+index 48a907445afc4f106ca89466833b77d01422c1b4..64cebcb5cca104f3ee6bfba877569745a671702f 100644
+--- a/tools/dist/extract.js
++++ b/tools/dist/extract.js
+@@ -1132,7 +1132,7 @@ function extractTypeDecl(decl, extraDecls) {
+         return { name, typeParams: tpField, kind: "alias", aliasOf: `${typeToString(elem)}[]` };
+     }
+     if (type.isObject() || type.isIntersection())
+-        return extractRecord(name, type, decl, undefined, extraDecls);
++        return extractRecord(name, type, decl, undefined, extraDecls, tpField);
+     // Primitive type alias: type TaskId = number → alias
+     const tsType = typeToString(type);
+     if (tsType !== name)
+@@ -1159,7 +1159,7 @@ function extractInterface(decl, extraDecls) {
+     }
+     return extractRecord(decl.getName(), decl.getType(), decl, overrides, extraDecls);
+ }
+-function extractRecord(name, type, locationNode, overrides, extraDecls) {
++function extractRecord(name, type, locationNode, overrides, extraDecls, typeParams) {
+     const props = type.getProperties();
+     if (props.length === 0)
+         return null;
+@@ -1211,7 +1211,7 @@ function extractRecord(name, type, locationNode, overrides, extraDecls) {
+         }
+         fields.push({ name: prop.getName(), tsType, ...optionalKey });
+     }
+-    return { name, kind: "record", fields };
++    return { name, kind: "record", fields, ...(typeParams?.length ? { typeParams } : {}) };
+ }
+ function findDiscriminant(members) {
+     if (members.length === 0)

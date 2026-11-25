@@ -1,5 +1,5 @@
 .PHONY: all fmt check-fmt typecheck lint test coverage build build-fast \
-	clean markdownlint nixie spelling prove
+	clean markdownlint nixie spelling prove proofs proofs-fresh
 
 MDLINT ?= markdownlint-cli2
 # `make fmt` and `make check-fmt` call mdtablefix directly. `--git` selects the
@@ -17,6 +17,11 @@ TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.3
 TYPOS_CONFIG_BUILDER = $(UV_ENV) $(UV) tool run --python 3.14 --from \
 	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
 	typos-config-builder
+# One annotated TypeScript file per line, optionally followed by a Dafny
+# timeout and extra flags. Comments (#) and blank lines are ignored.
+PROOF_LIST ?= LemmaScript-files.txt
+PROOF_FILES = $(shell sed -e 's/\#.*//' -e 's/^[[:space:]]*//' \
+	-e 's/[[:space:]].*$$//' -e '/^$$/d' $(PROOF_LIST) 2>/dev/null)
 
 all: check-fmt typecheck lint test spelling prove
 
@@ -34,6 +39,7 @@ typecheck:
 
 lint:
 	bun run lint
+	@$(MAKE) --no-print-directory proofs-fresh
 	@if command -v actionlint >/dev/null 2>&1; then actionlint; else echo "actionlint not installed; skipping"; fi
 
 test:
@@ -64,3 +70,13 @@ nixie:
 	# CI currently requires --no-sandbox; remove once nixie supports
 	# environment variable control for this option
 	nixie --no-sandbox
+
+proofs: # Verify the annotated proofs with LemmaScript and the Dafny backend
+	@if [ -z "$(PROOF_FILES)" ]; then \
+		echo "No files listed in $(PROOF_LIST); skipping proof verification."; \
+	else \
+		bunx lsc check --backend=dafny; \
+	fi
+
+proofs-fresh: # Reject a hand-edited or stale generated Dafny artefact
+	bun scripts/check-proof-freshness.mjs
