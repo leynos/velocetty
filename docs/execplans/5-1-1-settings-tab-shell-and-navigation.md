@@ -663,6 +663,16 @@ What cost the most:
 - Host contention made the shared 5 s bundler timeout in
   `esbuild-migration-contracts.test.ts` flaky; the unit suite is green with
   `--timeout 30000`.
+- The rebase onto `main` at `6078e4ee` cost a second integration pass: the
+  configuration composition root, the ADR numbering, the documentation style
+  guide, and the proof toolchain had all changed under the branch. The final
+  candidate re-runs every gate: 1,174 unit tests, `make prove` (sample 1,
+  keybindings policy 8, search 8, field state 9; zero errors), the packaged
+  settings-tab deep E2E, formatting, type checking, lint, spelling, Markdown,
+  and Mermaid validation. The upstream terminal-input deep spec cannot launch
+  on a host without a display because its launcher has no headless flag; it
+  runs under Xvfb in CI, and the settings spec exercises the same launch path
+  with `--ozone-platform=headless`.
 
 Known follow-ups, unchanged from the plan:
 
