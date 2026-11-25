@@ -170,8 +170,11 @@ registry APIs. Follow these rules for command-system changes:
   and return structured `CommandValidationError` objects with `code`,
   `commandId`, and schema `issues`.
 - Preserve compatibility surfaces used by current runtime/plugin paths
-  (`registerCommandHandlers`, `getCommandHandler`, and `getRegisteredKeys`)
-  until dispatcher migration milestones replace those entry points.
+  (`registerCommandHandlers`, `getCommandHandler`, and `getRegisteredKeys`).
+  The dispatcher migration is complete: these remain the registry's storage and
+  lookup surface, and `lib/command-dispatch/` reads them through its adapters,
+  but every keybinding, UI control, and plugin invocation now runs through the
+  dispatcher. Do not add a second execution path.
 - Use `detectKeybindingConflicts(...)` in `app/runtime/plugin-runtime.ts` when
   testing exact shortcut collisions after precedence merges; the helper reports
   deterministic conflicts for remaining duplicate shortcuts.
@@ -183,6 +186,51 @@ registry APIs. Follow these rules for command-system changes:
 - Add or update precedence/conflict coverage in
   `test/unit/runtime-plugin-settings.test.ts` when changing runtime keybinding
   merge or conflict-detection behaviour.
+
+## Command dispatcher practice
+
+Roadmap item `4.1.1` makes `lib/command-dispatch/` the renderer's only path
+from an invocation to a command handler. Follow these rules when adding or
+changing commands:
+
+- Register the command in `lib/command-registry.ts`, or through a plugin's
+  `registerCommands`, with a stable identifier, `metadata.title`, `kind`, and
+  the argument and result schemas it needs. The dispatcher resolves it through
+  the registry catalogue; do not add a parallel execution path for a new source.
+- Write renderer handlers against `RendererCommandRequest` from
+  `lib/command-registry-handlers.ts`. A handler receives the `invocation`, the
+  normalized `args`, `signal`, `dispatch`, and `triggerEvent`, and returns
+  `JsonValue | undefined` or a promise of one. Legacy `(event, dispatch)`
+  handlers keep working through `toRendererCommandHandler`.
+- Accept `request.signal` in any handler that can be cancelled, and stop
+  cooperatively: check `signal.aborted` between steps, pass the signal to
+  fetches, and return promptly. The dispatcher settles the invocation as soon
+  as the signal aborts; it cannot stop the handler's work for it.
+- Declare optional arguments as nullable. Absent arguments are normalized to
+  `null` before validation, so a command that may run without arguments declares
+  `type: ['object', 'null']`; `SEARCH_CLOSE_ARGS_SCHEMA` in
+  `lib/commands/search-close.ts` is the worked example. A schema that admits
+  only `object` rejects every keybinding that binds the command without
+  arguments, which is why Escape needs the `null` arm.
+- Invoke commands from UI code through `useCommandInvoker()` from
+  `lib/command-dispatch/inbound/command-dispatcher-provider.tsx`. The hook fixes
+  `source` to `ui`, so a component cannot claim another source, and it
+  resolves a structured failure outside the provider rather than throwing.
+- Test through the dispatcher's ports.
+  `test/testUtils/command-dispatcher-fakes.ts` supplies in-memory fakes for the
+  five ports and records the machine trace. Do not use `mock.module` for
+  dispatcher suites: the ports exist so a test can inject a seam, and a
+  process-wide module mock defeats that isolation.
+- Property tests must set an explicit `numRuns` and a per-test timeout, and
+  must not use timers. `cancellation.property.test.ts` uses `RUNS = 200` and a
+  30-second timeout; ordering comes from `fc.scheduler()`, not from sleeping.
+- Run the focused stress suite with
+  `bun test --concurrent test/unit/command-dispatch/` before relying on the
+  default `make test` result.
+
+See [Command dispatch architecture](command-dispatch-architecture.md) for the
+component map and [ADR 007](adr-007-frontend-command-dispatcher-contract.md)
+for the contract's rationale.
 
 ## Configuration format practice
 
@@ -995,6 +1043,17 @@ Suites that rely on timer or logger seams must not mutate global state during
 test execution; instead, provide test-doubles through the module's public
 interface.
 
+For the command dispatcher suites, use the focused explicit-concurrency stress
+run:
+
+```bash
+bun test --concurrent test/unit/command-dispatch/
+```
+
+The suites inject in-memory fakes for the five dispatcher ports instead of
+mocking modules, so the directory is safe under explicit concurrency. Property
+tests set their own run counts and per-test timeouts.
+
 ### End-to-end (E2E) tests (layered strategy)
 
 End-to-end tests are split into two lanes and require packaged binaries in
@@ -1104,6 +1163,33 @@ interaction and reporting.
 
 Before either lane, build packaged artefacts with `bun run dist` if they do not
 already exist.
+
+### Proofs
+
+`make proofs` formally verifies the annotated policy modules. It runs
+`node_modules/.bin/lsc check --backend=dafny` (LemmaScript) over the files
+listed in `LemmaScript-files.txt` at the repository root, currently only
+`lib/command-dispatch/policy/invocation-machine.ts`, and verifies the generated
+Dafny.
+
+The target requires Dafny 4.11.x: it checks `dafny --version` against
+`DAFNY_VERSION_PREFIX = 4.11.` before doing any work. Install Dafny 4.11 from
+its release archive, which needs the .NET 8 runtime, and put `dafny` on `PATH`.
+The archive and its SHA-256 are pinned in `.github/workflows/proofs.yml`, which
+installs the tool and runs `make proofs` on every pull request.
+
+The target is not part of `make all`, because Dafny is a host tool rather than
+a repository dependency. A successful run reports
+`Dafny program verifier finished with N verified, 0 errors`.
+
+When adding a proved module, list it in `LemmaScript-files.txt` and keep it
+free of imports, timers, and clock reads, so it stays a total function that
+LemmaScript can translate. Annotate the obligations with `//@ verify` and
+`//@ requires` or `//@ ensures` comments, as `invocation-machine.ts` does.
+
+`make proofs` checks the machine; the fast-check properties in
+`test/unit/command-dispatch/` check that the asynchronous interpreter refines
+it. Run both when changing the machine or the dispatcher.
 
 ## Default test gate
 
