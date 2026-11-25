@@ -7,6 +7,7 @@
 import {describe, expect, test} from 'bun:test';
 import JSON5 from 'json5';
 import fc from 'fast-check';
+import path from 'node:path';
 
 import {
   lastPathSegment,
@@ -194,12 +195,16 @@ describe('config writer', () => {
 
   test('sweeps only its own temporary files', () => {
     const harness = createHarness();
-    harness.port.setFile('/home/user/.config/Hyper/keep.json5', '{}');
-    harness.port.setFile(`/home/user/.config/Hyper/${TEMPORARY_FILE_PREFIX}1-1`, '{}');
-    harness.port.setFile(`/home/user/.config/Hyper/${TEMPORARY_FILE_PREFIX}1-2`, '{}');
+    // The port keys files the way the writer builds paths, which is the
+    // platform's own separator on Windows.
+    const directory = path.join('/home/user/.config/Hyper');
+    const keep = path.join(directory, 'keep.json5');
+    harness.port.setFile(keep, '{}');
+    harness.port.setFile(path.join(directory, `${TEMPORARY_FILE_PREFIX}1-1`), '{}');
+    harness.port.setFile(path.join(directory, `${TEMPORARY_FILE_PREFIX}1-2`), '{}');
 
-    expect(sweepTemporaryFiles(harness.port, '/home/user/.config/Hyper')).toBe(2);
-    expect([...harness.port.files.keys()]).toEqual(['/home/user/.config/Hyper/keep.json5']);
+    expect(sweepTemporaryFiles(harness.port, directory)).toBe(2);
+    expect([...harness.port.files.keys()]).toEqual([keep]);
   });
 
   test('concurrent writers never lose an update', async () => {

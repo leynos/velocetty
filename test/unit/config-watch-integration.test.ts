@@ -14,6 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {createChokidarHandle} from '../../app/config/chokidar-handle';
+import {errorCode} from '../../app/utils/error-code';
 import {shouldNotifyReload} from '../../app/config/import-report';
 import {createConfigWatcher} from '../../app/config/watcher';
 
@@ -57,10 +58,31 @@ const startWatch = async (filePath: string): Promise<{probe: Probe; close: () =>
   return {probe, close: () => debounced.close()};
 };
 
+const RETRYABLE_RENAME_CODES = new Set(['EBUSY', 'EPERM', 'EACCES']);
+const RENAME_ATTEMPTS = 20;
+const RENAME_RETRY_MS = 50;
+
+const renameWithRetry = async (from: string, to: string): Promise<void> => {
+  for (let attempt = 1; attempt <= RENAME_ATTEMPTS; attempt += 1) {
+    try {
+      await fs.rename(from, to);
+      return;
+    } catch (error) {
+      // Windows hands a transient EPERM to a rename over a file another
+      // process has open. The production writer retries the same codes.
+      const isRetryable = RETRYABLE_RENAME_CODES.has(errorCode(error) ?? '');
+      if (!isRetryable || attempt === RENAME_ATTEMPTS) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, RENAME_RETRY_MS));
+    }
+  }
+};
+
 const atomicReplace = async (directory: string, filePath: string, text: string): Promise<void> => {
   const temporaryPath = path.join(directory, '.tmp-replacement');
   await fs.writeFile(temporaryPath, text);
-  await fs.rename(temporaryPath, filePath);
+  await renameWithRetry(temporaryPath, filePath);
 };
 
 describe('config watcher integration', () => {

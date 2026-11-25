@@ -69,8 +69,12 @@ describe('config writer on a real file system', () => {
       const outcome = await setFontSize(writerDependencies(), filePath, 16);
 
       expect(outcome.kind).toBe('written');
-      const stats = await fs.stat(filePath);
-      expect(stats.mode & 0o777).toBe(0o640);
+      // Windows reports synthesized permission bits, so only a POSIX file
+      // system can prove that the original mode survived the rename.
+      if (process.platform !== 'win32') {
+        const stats = await fs.stat(filePath);
+        expect(stats.mode & 0o777).toBe(0o640);
+      }
       expect(await fs.readFile(filePath, 'utf8')).toContain('fontSize: 16');
     });
   });
