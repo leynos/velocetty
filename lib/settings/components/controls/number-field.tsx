@@ -10,8 +10,10 @@ import {keyHandlerFor, type FieldControlProps} from './types';
 type NumberControlProps = FieldControlProps & {readonly control: Extract<ControlDescriptor, {kind: 'number'}>};
 
 /**
- * Renders a number input. Enter commits, Escape reverts, and blur commits —
- * the behaviour the product scenarios describe.
+ * Renders a numeric field. The input is textual on purpose: the browser's
+ * number input silently discards letters, so a user typing `abc` would see no
+ * error at all. The write policy and the local coercion are the validators.
+ * Enter commits, Escape reverts, and blur commits, as the scenarios describe.
  *
  * @param props - The shared props plus the numeric bounds.
  * @returns The number input.
@@ -19,12 +21,9 @@ type NumberControlProps = FieldControlProps & {readonly control: Extract<Control
 export const NumberField = (props: NumberControlProps): ReactElement<ComponentProps<'input'>> => (
   <input
     id={props.controlId}
-    type="number"
+    type="text"
     className={styles.control}
     inputMode={props.control.isInteger ? 'numeric' : 'decimal'}
-    step={props.control.step}
-    min={props.control.minimum}
-    max={props.control.maximum}
     value={props.draft}
     disabled={props.isDisabled}
     aria-invalid={props.hasErrors}

@@ -124,7 +124,7 @@ describe('settings view', () => {
   test('renders rows with values and modified markers', async () => {
     await render({});
     expect(document.body.textContent).toContain('Font size');
-    const input = document.querySelector<HTMLInputElement>('input[type="number"]');
+    const input = document.querySelector<HTMLInputElement>('#core-fontSize-control');
     expect(input?.value).toBe('14');
     const reset = [...document.querySelectorAll('button')].find(
       (candidate) => candidate.getAttribute('aria-label') === 'Reset Font size to default'

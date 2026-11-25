@@ -214,7 +214,7 @@ terminal's column and row count did not change.
 - [x] (2026-11-25) EP-M4: settings tab shell, tab strip, input gating, and
       navigation.
 - [x] (2026-11-25) EP-M5: editing, inline validation, and reset flows.
-- [ ] EP-M6: end-to-end coverage.
+- [x] (2026-11-25) EP-M6: end-to-end coverage.
 - [ ] EP-M7: documentation, ADR, and roadmap closure.
 
 ## Surprises & discoveries
@@ -562,6 +562,13 @@ terminal's column and row count did not change.
      snapshot refresh reconciles the committed value.
   Every union and phase literal is also bound to a typed local before use, as
   the observation above explains. Date/Author: 2026-11-25.
+- Decision D27 (new, EP-M6): numeric controls use a textual `<input>` with
+  `inputMode` rather than `type="number"`. The browser's number input refuses
+  letters, so the product scenario "typing `abc` shows 'Enter a number' and
+  leaves the file unchanged" would be unreachable, and the E2E cannot type an
+  invalid value into it. Validation stays where the plan put it: local coercion
+  for feedback and the main-process write policy as the authority. Date/Author:
+  2026-11-25.
 - Decision D26 (new, EP-M5): per-field edit state lives in a ref-backed store
   (`lib/settings/field-store.ts`) read through `useSyncExternalStore`, exactly
   as D7 requires. Writes issue in submission order (the IPC order) and outcomes
@@ -1748,6 +1755,34 @@ EP-M5 (2026-11-25):
   clean; `bun test --concurrent --isolate --timeout 30000 test/unit` reports
   702 pass, 0 fail across 89 files.
 - Not covered here: the packaged-app E2E spec is EP-M6.
+
+EP-M6 (2026-11-25):
+
+- `test/e2e-deep/settings-tab.e2e.ts` seeds an isolated `config.json5` with a
+  sentinel comment, launches the packaged app, records the PTY size with
+  `stty size`, opens settings from the preferences shortcut, checks the search
+  box focus and the seeded value, returns to the terminal and asserts the size
+  is unchanged, then edits `fontSize` to 16, enters `abc`, and resets the
+  field, asserting the exact file contents and the surviving comment at each
+  step.
+- Local invocation (no display):
+
+  ```bash
+  ELECTRON_DISABLE_SANDBOX=1 E2E_OZONE_HEADLESS=1 \
+    bun ./node_modules/playwright/cli.js test \
+    -c playwright.e2e.config.ts test/e2e-deep/settings-tab.e2e.ts
+  ```
+
+  Three consecutive runs passed (4.7 s, 4.2 s, 3.8 s).
+- The run found and fixed three defects the unit lane could not: the `tsgo`
+  return-statement hazard above, a missing header offset on the settings
+  surface, and a `type="number"` field that made the invalid-input scenario
+  unreachable.
+- Gates: `make check-fmt`, `make lint`, `make typecheck`,
+  `bun run build:packages`, and `bunx tsgo --project app/tsconfig.build.json`
+  clean; `bun test --concurrent --isolate --timeout 30000 test/unit` reports
+  702 pass, 0 fail.
+- Not covered here: documentation and roadmap closure are EP-M7.
 
 Design review summary (2026-10-29), recorded for traceability. Three expert
 lenses reviewed the first draft. Blocking findings and their resolutions: naive

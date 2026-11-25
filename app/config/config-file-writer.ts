@@ -139,11 +139,10 @@ const applyEdit = (text: string, edit: ConfigEditRequest) => {
 
 const parseDocument = (text: string): JsonValue | null => {
   try {
-    return (
-      // SAFETY: JSON5.parse produces only JSON5 primitives, arrays, and
-      // objects, which is exactly the `JsonValue` union.
-      JSON5.parse(text) as JsonValue
-    );
+    // `JSON5.parse` produces only JSON5 primitives, arrays, and objects, which
+    // is exactly the `JsonValue` union.
+    const parsed: JsonValue = JSON5.parse(text);
+    return parsed;
   } catch {
     return null;
   }
