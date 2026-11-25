@@ -26,7 +26,7 @@ This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: APPROVED
 
 The status moves through DRAFT, APPROVED (after explicit user approval), IN
 PROGRESS, and COMPLETE. BLOCKED is used whenever a tolerance is breached or a
@@ -220,8 +220,12 @@ Populating context keys belongs to 4.2.1.
   blocking finding; see `Decision log` D-6 and D-11 to D-16.
 - [x] (2026-10-29) Pushed the branch and opened draft pull request
   [#252](https://github.com/leynos/velocetty/pull/252).
-- [ ] User approval.
-- [ ] EP-M0 baseline.
+- [x] (2026-11-25) User approved the plan; status moved to APPROVED.
+- [x] (2026-11-25) EP-M0 baseline: `bun install` succeeded in 57 s and
+  Dafny 4.11.0 was already installed at `~/.local/bin/dafny`. All four gates
+  passed on the untouched tree: `make check-fmt` (1 s), `make typecheck`
+  (2 s), `make lint` (6 s), `make test` (9 s, 508 pass, 0 fail, 2,236
+  `expect()` calls, 64 files). Logs are in `/tmp/{check-fmt,typecheck,lint,test}-velocetty-4-1-1-implement-frontend-command-dispatcher.out`.
 - [ ] EP-M1 registry refactor.
 - [ ] EP-M2 verified invocation machine.
 - [ ] EP-M3 shared contract and registry extensions.
