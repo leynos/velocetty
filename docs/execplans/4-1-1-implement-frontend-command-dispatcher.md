@@ -286,14 +286,24 @@ Two consequences, both real:
   search box.
 - Unit tests do not see this, because Bun has no CSP.
 
-This needs a design decision rather than a patch, so it is escalated under the
-plan's interface tolerance. The options are:
+Resolved by the third consideration below: `lib/command-schema-validator.ts`
+interprets the keyword subset these schemas use and emits the same issue shape,
+so callers and the wire format are unchanged. A schema using any other keyword
+is reported as `INVALID_COMMAND_SCHEMA` rather than silently ignored. Ajv stays
+as the oracle the property test compares the interpreter against, which also
+removes a dependency-policy violation: `ajv` is a development dependency and
+had been bundled into the renderer.
+
+The options weighed were:
 
 - precompile standalone validators at build time (`ajv` code generation with
   `source: true`, emitted as ordinary functions) and load those in the renderer;
 - replace Ajv in the renderer with a validator that does not generate code;
 - allow `unsafe-eval` in the renderer CSP, which weakens the application's
-  security posture and is not recommended.
+  security posture and was rejected.
+
+After the change, CI's four build jobs pass on Ubuntu, macOS, Windows, and
+Linux aarch64.
 
 ### EP-M6 status detail
 
