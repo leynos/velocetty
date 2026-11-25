@@ -146,14 +146,17 @@ After this change, a user or maintainer can observe the following:
   Severity: high. Likelihood: certain at the time of writing. Mitigation: D-1
   option (d) lets the decision and tracking work, which is what the success
   criterion measures, land first.
-- Risk: renderer console errors may not reach the E2E output at all, because
-  `app/rpc.ts:70-75` reads Electron's deprecated positional `level` argument
-  and Electron 44's typings only offer `(event, details)`. If `level` is
-  `undefined`, `level >= 3` is false and every error is silently dropped, which
-  would make any console-based CSP check vacuous. Severity: high. Likelihood:
-  medium. Mitigation: EP-M0 runs a seeded CSP fault on the unmodified tree to
-  see whether the error appears; EP-M3 moves the listener to
-  `details.level === 'error'` with a unit test either way.
+- Risk: renderer console errors may stop reaching the E2E output, because
+  `app/rpc.ts` reads Electron's positional `level` argument through a local
+  listener type. Electron deprecated the positional arguments in 35 and removes
+  them in 47 (Electron's `docs/breaking-changes.md`); `main` is on Electron
+  `^45.2.1`, where they still work. Once `level` is `undefined`, `level >= 3`
+  is false and every error is silently dropped, which would make any
+  console-based CSP check vacuous, and the local type hides the change from the
+  compiler. Tracked as #293. Severity: high. Likelihood: certain at the
+  Electron 47 upgrade, low before it. Mitigation: EP-M0 runs a seeded CSP fault
+  on the unmodified tree to see whether the error appears; EP-M3 moves the
+  listener to `details.level === 'error'` with a unit test either way.
 - Risk: `'self'` on a `file://` page matches any `file:` URL in Chromium, so
   an injected `<script src="file:///tmp/x.js">` would still be allowed.
   Severity: medium. Likelihood: low (no HTML-injection sink is known).
@@ -200,6 +203,12 @@ After this change, a user or maintainer can observe the following:
 - [x] (2026-10-29 19:30Z) Community-of-experts review (Electron security,
   verification, TypeScript architecture, product and compatibility) and
   revision. See the revision note.
+- [x] (2026-11-25) Raised GitHub issues for the main concerns at the
+  maintainer's request: #289 (CSP `'unsafe-inline'`), #290 (retired Hyper class
+  names), #291 (inert `termCSS`), #292 (sixel WebAssembly under the CSP;
+  related to #237), and #293 (deprecated `console-message` arguments), all
+  sub-issues of tracking issue #294 ("Track prerequisites for roadmap item
+  1.4.19"). Re-verified each concern against `main` at `6078e4ee`.
 - [ ] Maintainer approval of the plan and decisions D-1, D-3, D-4, and D-8.
 - [ ] EP-M0: baseline evidence, including the seeded CSP visibility check and
   the sixel check.
@@ -822,12 +831,15 @@ roadmap item.
 - Red: add `test/unit/tracking-issues-register.test.ts` enumerating the IDs
   below; it fails because the entries do not exist.
 - Green: create a GitHub milestone "1.4.19 follow-up review" whose due date
-  is the earliest `Review by` date, open one issue per entry in
-  `leynos/velocetty` with `gh issue create --milestone`, authenticated as
-  `leynos`, and record the numbers. In `docs/tracking-issues.md`, document a new
-  `Review by:` field (a date, 90 days after the implementation date and
-  written absolutely, "or" an event trigger, whichever comes first; new entries
-  must have it, backfilling older entries is optional), then add:
+  is the earliest `Review by` date. Reuse the existing issues where they match
+  an entry (#289 for the script policy, #290 for `CSSCOMPAT-001`, #291 for
+  `CSSCOMPAT-002`, #292 for `CSP-003` or the D-8 outcome) and add them to the
+  milestone; open one new issue per remaining entry in `leynos/velocetty` with
+  `gh issue create --milestone`, authenticated as `leynos`, attach each as a
+  sub-issue of #294, and record the numbers. In `docs/tracking-issues.md`,
+  document a new `Review by:` field (a date, 90 days after the implementation
+  date and written absolutely, "or" an event trigger, whichever comes first;
+  new entries must have it, backfilling older entries is optional), then add:
   - `CSP-001` Add `style-src` to the renderer CSP. Blockers per D-3.
     Mitigation: no style restriction today; script policy tightened.
     Trigger: a change to `webPreferences` or the plugin runtime. Exit: own
@@ -1288,3 +1300,8 @@ export const findCspViolations: (messages: readonly string[]) => readonly string
   split it into two PRs; adopted D-1 option (d); corrected D-5's rationale;
   made review dates event-or-date with a GitHub milestone. Remaining work is
   unchanged in intent: approval, then EP-M0.
+- 2026-11-25: recorded GitHub issues #289 to #293 and tracking issue #294,
+  raised at the maintainer's request. Corrected the console-forwarding risk:
+  `main` is now on Electron 45, where the positional `console-message`
+  arguments still work; Electron 47 removes them. EP-M2 now reuses these issues
+  instead of opening duplicates. No change to scope or decisions.
