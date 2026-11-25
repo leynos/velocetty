@@ -2,17 +2,18 @@
 /**
  * @file Verifies that every committed `.dfy.gen` matches a fresh generation.
  *
- * LemmaScript's `.dfy.gen` files are generated artefacts. Nobody may edit them
- * by hand: a hand edit changes the merge base that `lsc regen` uses and can
- * silently discard proof work. This check regenerates each listed file and
- * compares the result with the committed copy, restoring the committed copy
- * afterwards so the working tree is unchanged whether the check passes or
- * fails.
+ * `bin/generate-dafny.mjs` is the project's generator: it runs `lsc gen` and
+ * prepends each source's module header. This check regenerates every listed
+ * artefact through that wrapper, compares the result with the committed copy,
+ * and restores the committed copy afterwards so the working tree is unchanged
+ * whether the check passes or fails. Generating through the wrapper matters:
+ * a raw `lsc gen` omits the header the shipped artefact carries, so comparing
+ * against it would fail every file rather than a stale one.
  *
  * Run through `make proofs-fresh`, which `make lint` invokes.
  */
 import {existsSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
-import {spawnSync} from 'node:child_process';
+import {execFileSync} from 'node:child_process';
 
 const proofListPath = 'LemmaScript-files.txt';
 const rootDir = process.cwd();
@@ -38,42 +39,6 @@ const parseProofList = (text) =>
  * @returns {string} The artefact path.
  */
 const artefactPath = (sourcePath, suffix) => `${sourcePath.replace(/\.ts$/, '')}${suffix}`;
-
-/**
- * Regenerates one proof artefact and reports whether it matches the commit.
- *
- * @param {string} sourcePath - Repository-relative TypeScript path.
- * @returns {{isFresh: boolean, expected: string, actual: string}} The verdict
- * and both generations for reporting.
- */
-const checkOne = (sourcePath) => {
-  const genPath = artefactPath(sourcePath, '.dfy.gen');
-  const basePath = artefactPath(sourcePath, '.dfy.base');
-  const mergedPath = artefactPath(sourcePath, '.dfy.merged');
-  const hadBase = existsSync(basePath);
-  const hadMerged = existsSync(mergedPath);
-  const expected = readFileSync(genPath, 'utf8');
-  const result = spawnSync('bunx', ['lsc', 'gen', '--backend=dafny', sourcePath], {
-    cwd: rootDir,
-    encoding: 'utf8'
-  });
-  if (result.status !== 0) {
-    writeFileSync(genPath, expected);
-    throw new Error(`lsc gen failed for ${sourcePath}:\n${result.stderr}${result.stdout}`);
-  }
-  const actual = readFileSync(genPath, 'utf8');
-  // A differing generation makes `gen` archive the previous one as a merge
-  // base. Remove only files this run created, so a pending `regen` merge in
-  // the working tree is never damaged.
-  if (!hadBase) {
-    rmSync(basePath, {force: true});
-  }
-  if (!hadMerged) {
-    rmSync(mergedPath, {force: true});
-  }
-  writeFileSync(genPath, expected);
-  return {isFresh: expected === actual, expected, actual};
-};
 
 /**
  * Prints the first differing lines, numbered, for a stale artefact.
@@ -104,15 +69,61 @@ if (proofFiles.length === 0) {
   process.exit(0);
 }
 
-let failed = false;
-for (const sourcePath of proofFiles) {
-  const {isFresh, expected, actual} = checkOne(sourcePath);
-  if (!isFresh) {
-    failed = true;
-    reportMismatch(artefactPath(sourcePath, '.dfy.gen'), expected, actual);
-    console.error(`Regenerate it with 'bunx lsc regen --backend=dafny ${sourcePath}'.`);
+/** The committed generation of every listed artefact, keyed by its path. */
+const committed = new Map(
+  proofFiles.map((sourcePath) => {
+    const genPath = artefactPath(sourcePath, '.dfy.gen');
+    return [genPath, readFileSync(genPath, 'utf8')];
+  })
+);
+
+// `lsc gen` archives a differing previous generation as a merge base. Remember
+// which of those files existed first, so only this run's leftovers are removed
+// and a pending `regen` merge in the working tree is never damaged.
+const auxiliaryPaths = proofFiles.flatMap((sourcePath) => [
+  artefactPath(sourcePath, '.dfy.base'),
+  artefactPath(sourcePath, '.dfy.merged')
+]);
+const preexistingAuxiliary = new Set(auxiliaryPaths.filter((candidate) => existsSync(candidate)));
+
+/**
+ * Puts every committed artefact back and removes only this run's leftovers.
+ *
+ * Runs on both paths: a failed generation must not leave a half-rewritten
+ * artefact or a stray merge base behind for the next gate to trip over.
+ */
+const restoreCommitted = () => {
+  for (const [genPath, text] of committed) {
+    writeFileSync(genPath, text);
+  }
+  for (const candidate of auxiliaryPaths) {
+    if (!preexistingAuxiliary.has(candidate)) {
+      rmSync(candidate, {force: true});
+    }
+  }
+};
+
+let generationFailed = false;
+try {
+  execFileSync('bun', ['bin/generate-dafny.mjs'], {cwd: rootDir, encoding: 'utf8', stdio: 'pipe'});
+} catch (error) {
+  generationFailed = true;
+  console.error(`bun bin/generate-dafny.mjs failed:\n${error.stderr ?? ''}${error.stdout ?? ''}`);
+}
+
+let failed = generationFailed;
+if (!generationFailed) {
+  for (const [genPath, expected] of committed) {
+    const actual = readFileSync(genPath, 'utf8');
+    if (expected !== actual) {
+      failed = true;
+      reportMismatch(genPath, expected, actual);
+      console.error(`Regenerate it with 'bun bin/generate-dafny.mjs' and commit the result.`);
+    }
   }
 }
+
+restoreCommitted();
 
 if (failed) {
   process.exit(1);

@@ -349,6 +349,11 @@ terminal's column and row count did not change.
 - Observation (EP-M4): the renderer actions import the Electron transport at
   module evaluation, so a suite that exercises them must register the transport
   mock at module scope and import the actions dynamically.
+- Observation (rebased candidate): the rebased `main` already ships a proof
+  toolchain: `bin/prove.sh` guards against vacuous success, and
+  `bin/generate-dafny.mjs` prepends each source's `@file` header to its
+  `.dfy.gen`. A raw `lsc gen` omits that header, so comparing against it marks
+  every artefact stale. Impact: D28.
 
 ## Decision log
 
@@ -569,6 +574,13 @@ terminal's column and row count did not change.
   invalid value into it. Validation stays where the plan put it: local coercion
   for feedback and the main-process write policy as the authority. Date/Author:
   2026-11-25.
+- Decision D28 (rebased candidate, revised D11): the upstream proof toolchain
+  is the single verifier. `bin/generate-dafny.mjs` is the only generator, so
+  `make proofs-fresh` regenerates through it and `make proofs` is an alias for
+  `make prove`; `*.dfy.base` and `*.dfy.merged` are ignored because they are
+  `lsc regen` merge state, never artefacts. The advisory `proofs.yml` installs
+  Z3 alongside Dafny, as `bin/prove.sh` requires the pinned solver. Date:
+  2026-11-26.
 - Decision D26 (new, EP-M5): per-field edit state lives in a ref-backed store
   (`lib/settings/field-store.ts`) read through `useSyncExternalStore`, exactly
   as D7 requires. Writes issue in submission order (the IPC order) and outcomes
@@ -2035,3 +2047,8 @@ guide adds a settings section to the existing guide rather than replacing it;
 the chokidar adapter moved into `app/config/chokidar-handle.ts` so the real
 adapter can be exercised without Electron; and `getConfigDefaults` reads the
 bundled `defaults.config` the upstream query now returns.
+
+2026-11-26: the rebase also brought upstream's proof toolchain (D28).
+`make proofs-fresh` now regenerates through `bin/generate-dafny.mjs`, both
+settings artefacts carry the project header, `make proofs` aliases
+`make prove`, and the proof workflow installs Z3 beside Dafny.

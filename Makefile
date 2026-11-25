@@ -71,12 +71,7 @@ nixie:
 	# environment variable control for this option
 	nixie --no-sandbox
 
-proofs: # Verify the annotated proofs with LemmaScript and the Dafny backend
-	@if [ -z "$(PROOF_FILES)" ]; then \
-		echo "No files listed in $(PROOF_LIST); skipping proof verification."; \
-	else \
-		bunx lsc check --backend=dafny; \
-	fi
+proofs: prove # Alias for `prove`, kept for the ExecPlan's documented commands
 
 proofs-fresh: # Reject a hand-edited or stale generated Dafny artefact
 	bun scripts/check-proof-freshness.mjs
