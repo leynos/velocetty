@@ -235,13 +235,26 @@ Populating context keys belongs to 4.2.1.
   thunk moved to `lib/commands/search-close.ts`. The compatibility aliases and
   their stub entries were deleted; they had no production callers. Gates:
   check-fmt, typecheck, lint and 507 tests passed.
-- [x] (2026-11-25) EP-M2 verified invocation machine, first pass. The machine
-  and its 33-obligation Dafny proof verify with `0 errors`; two seeded faults
-  (absorption, gate-index reporting) were observed to break the proof and were
-  then reset.
-- [ ] EP-M3 shared contract and registry extensions.
-- [ ] EP-M4 dispatcher interpreter and driven adapters.
-- [ ] EP-M5 driving adapters and composition.
+- [x] (2026-11-25) EP-M2 verified invocation machine (commit `c03657b6`, with
+  the proof gate in `b9b095e5`). The machine and its 33-obligation Dafny proof
+  verify with `0 errors`; two seeded faults (absorption, gate-index reporting)
+  were observed to break the proof and were then reset. The second survived the
+  first contract, which is why `failedGate` is now pinned to `state.gate`.
+- [x] (2026-11-25) EP-M3 shared contract and registry extensions (commit
+  `8ba14fc8`). `CommandResult` is a discriminated union; `UICommandExecAction`
+  carries `source` and `args`; the registry validates results;
+  `editor:search-close` declares a schema admitting `null`, which is the Escape
+  guard. ADR-007 records D-3, D-5, D-6, D-7, D-11 and D-14. 559 tests passed.
+- [x] (2026-11-25) EP-M4 dispatcher interpreter and driven adapters (commit
+  `0fda9589`). 595 tests passed; 33 proof obligations verified; the boundary
+  script was negative-tested against a `react-redux` import and against any
+  import at all from the policy module.
+- [x] (2026-11-25) EP-M5 composition and inbound adapters (commit `5e8fd2ff`).
+  628 tests passed; 33 proof obligations verified. The four-way commit split
+  the plan asked for was collapsed into one: the composition root references
+  both the plugin facade and the keybinding binder, so no earlier subset
+  compiles, and every commit must be green. The riskier parts are still
+  separable by file for a revert.
 - [ ] EP-M6 end-to-end scenario.
 - [ ] EP-M7 documentation and roadmap closure.
 
