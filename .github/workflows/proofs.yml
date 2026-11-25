@@ -19,7 +19,7 @@ env:
   DAFNY_VERSION: 4.11.0
 jobs:
   dafny:
-    # Advisory while the proof suite settles; see ADR 007. Promote to a
+    # Advisory while the proof suite settles; see ADR 009. Promote to a
     # required check after two green weeks.
     runs-on: ubuntu-latest
     steps:

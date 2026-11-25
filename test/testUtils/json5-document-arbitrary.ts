@@ -177,7 +177,11 @@ export const printDocument = (config: JsonObject, style: Json5Style): Json5Docum
 const primitiveArbitrary: fc.Arbitrary<JsonValue> = fc.oneof(
   fc.boolean(),
   fc.integer({min: -1000, max: 1000}),
-  fc.double({min: -1000, max: 1000, noNaN: true, noDefaultInfinity: true}),
+  fc
+    .double({min: -1000, max: 1000, noNaN: true, noDefaultInfinity: true})
+    // Negative zero prints and parses as zero; normalise it here so a value
+    // comparison is about the document, not about a signed zero.
+    .map((value) => (Object.is(value, -0) ? 0 : value)),
   fc.string({maxLength: 12}),
   fc.constant(null)
 );

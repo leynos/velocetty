@@ -1798,3 +1798,119 @@ pattern has two layers:
    documented wrapper component that calls `useTranslation()` directly. This is
    an intentional exception to the hook-based pattern for historical
    compatibility; new code should prefer the `useSearchBoxLabels` approach.
+
+## Settings tab practice
+
+The settings tab is described in
+[settings-tab-architecture.md](settings-tab-architecture.md), and the decisions
+behind it are in [ADR 009](adrs/adr-0009-settings-tab-hosting-and-persistence.md).
+Three rules matter when changing it.
+
+### One writer, one activation path
+
+- The only code that may change the user's config file is
+  `app/config/config-file-writer.ts`. Do not call `writeFile` on the config
+  path anywhere else; route a new writer through the writer module.
+- The only way to change the active tab is `activateTab(uid)` in
+  `lib/actions/tab-strip.ts`. Do not dispatch `setActiveGroup` directly for a
+  user-facing tab change; the settings slice relies on the strip's ordering.
+- The renderer reads settings only through `SettingsGateway`. Do not import
+  `ipcRenderer` in a settings component.
+
+### Adding a core setting
+
+1. Add the key to `CORE_SETTINGS_CATALOGUE` in
+   `shared/src/settings/core-catalogue.ts` with its category and control. If it
+   cannot be edited safely (a structured value, a union, free-form code), add
+   it to `EXCLUDED_CONFIG_KEYS` with a reason instead. A parity test fails
+   until every schema property is decided.
+2. Add the label to `settingLabels` in `lib/settings/i18n/index.ts`. The table
+   is typed `Record<CoreSettingKey, string>`, so a missing label is a compile
+   error. Add a description if the setting needs one.
+3. Add the write rule to `SETTINGS_WRITE_POLICY` in
+   `app/settings/settings-write-policy.ts`. Bounds are write-time and UI-only;
+   never add them to the load schema, which must keep accepting every file that
+   loads today.
+4. Run `make test`. The parity suite compares the catalogue, the controls, the
+   schema types, the enum options, and the policy bounds.
+
+### The active surface
+
+While the settings tab is active, `execCommand` drops every command outside the
+allow-list in `lib/settings/surface-command-gate.ts`, and the key handler skips
+`preventDefault` so native editing works in the fields. A new command that must
+work there needs an entry in that allow-list; a test drives every command in
+the three platform keymaps.
+
+Terminals are never hidden with `display: none`. The terminal and settings
+layers keep an explicit width and height, and the inactive layer is moved
+offscreen by changing `left` only, because a size change would fire the
+terminal's `ResizeObserver` and refit the PTY.
+
+## Property tests and proofs practice
+
+### `fast-check`
+
+Property suites live in `test/unit/*.property.test.ts` and take their run count
+from `test/testUtils/fast-check-runs.ts`:
+
+```ts
+import {fastCheckRunCount} from '../testUtils/fast-check-runs';
+
+fc.assert(property, {numRuns: fastCheckRunCount()});
+```
+
+`FAST_CHECK_NUM_RUNS` defaults to 200 in the shared gate and is raised to 1,000
+for milestone acceptance runs. Prefer a relation over an example: round trips,
+oracles, metamorphic composition, and model-based sequences. A suite that
+asserts a classification (for example "at least 20 % of runs have a non-empty
+result") must say why in a comment next to the assertion.
+
+### LemmaScript and Dafny
+
+Annotated sources carry `//@` comments and stay the shipped code. Each listed
+file has two artefacts:
+
+- `foo.dfy.gen` is generated; never edit it.
+- `foo.dfy` is the proof: generated code plus handwritten lemmas, witnesses,
+  and assertions. `lsc check` requires the difference to be additions only.
+
+- Add every verified file to `LemmaScript-files.txt` (one path per line; the
+  batch reader does not accept comments).
+- `make proofs` runs `lsc check --backend=dafny` over that list.
+- `make proofs-fresh` regenerates each artefact in place, compares it with the
+  committed copy, and restores the committed copy. It runs as part of
+  `make lint`.
+- After editing an annotated `.ts`, run
+  `bunx lsc regen --backend=dafny <file>` — never delete the `.dfy` and run
+  `gen`, which discards every proof.
+- `//@ assume` is never an acceptable fix for a failing obligation. Restructure
+  the code, tighten a `requires`, or prove a helper lemma in the `.dfy`.
+- Mark every helper used in a specification with `//@ verify` as well as
+  `//@ pure`; once a file has one verified function, only marked functions are
+  extracted.
+- LemmaScript 0.6.12 is pinned exactly and patched locally
+  (`patches/lemmascript@0.6.12.patch`) so generic record types and generic
+  union lookups work. Keep the version pin when changing proofs.
+
+### A compiled-output hazard
+
+`tsgo` emits a parenthesized `return` whose first line is a comment as `return`
+with the expression on the next line. Automatic semicolon insertion then makes
+the function return `undefined` and the expression dead code. Unit tests run
+the TypeScript source and cannot see this; a packaged build can.
+
+```ts
+// Avoid: the emitted JavaScript returns undefined.
+return (
+  // comment
+  expression
+);
+
+// Prefer: assign first, then return.
+const value = expression;
+return value;
+```
+
+This is why the deep E2E lane runs the packaged app: it is the only gate that
+executes the emitted JavaScript.

@@ -215,7 +215,7 @@ terminal's column and row count did not change.
       navigation.
 - [x] (2026-11-25) EP-M5: editing, inline validation, and reset flows.
 - [x] (2026-11-25) EP-M6: end-to-end coverage.
-- [ ] EP-M7: documentation, ADR, and roadmap closure.
+- [x] (2026-11-25) EP-M7: documentation, ADR, and roadmap closure.
 
 ## Surprises & discoveries
 
@@ -419,7 +419,7 @@ terminal's column and row count did not change.
   catalogue is one file and is split by category only if it passes 400 lines.
   Rationale: the intermediate model is cheap now and avoids reworking the
   search, field state, and IPC contracts for plugin panels. The schema
-  annotation alternative (`x-ui` JSDoc tags) is recorded in ADR 007 for 5.2.1.
+  annotation alternative (`x-ui` JSDoc tags) is recorded in ADR 009 for 5.2.1.
   Date/Author: 2026-10-29.
 - Decision D6 (revised): search splits the normalized query on spaces, ignores
   empty tokens, treats the exact token `@modified` as a filter rather than a
@@ -519,7 +519,7 @@ terminal's column and row count did not change.
   Renderer and main ship in one build, so the protocol needs no versioning.
   Date/Author: 2026-10-29.
 - Decision D18: record D1 to D4, D12 to D17, and the rejected alternatives in a
-  new ADR, `docs/adr-007-settings-tab-hosting-and-persistence.md`, referenced
+  new ADR, `docs/adrs/adr-0009-settings-tab-hosting-and-persistence.md`, referenced
   from the design document. Date/Author: 2026-10-29.
 - Decision D19: the plan is delivered on one branch with frequent commits.
   If the reviewer prefers, it can be split at plateau boundaries into a stack
@@ -539,7 +539,7 @@ terminal's column and row count did not change.
   into a discriminated union to suit the prover is design driven by tooling.
   The version is pinned exactly (D10), so the patch cannot drift under a silent
   upgrade. The upstream fix belongs in LemmaScript and should be offered there;
-  ADR 007 records the patch as a trusted toolchain assumption. EP-M1 extended
+  ADR 009 records the patch as a trusted toolchain assumption. EP-M1 extended
   the same patch with a second, independent fix: the transform looks a union
   declaration up by the name as written, so a generic union
   (`FieldEvent<V, E>`) is reported as "not a declared union". The patch applies
@@ -625,13 +625,41 @@ terminal's column and row count did not change.
 
 ## Outcomes & retrospective
 
-Not started. To be completed at each milestone boundary and at the end. Known
-follow-up candidates already identified: wiring
-`resolveConfigLayers`/`createReloadHandler` into the production load path;
-per-key graceful degradation in `loadUserConfig` instead of whole-file
-fallback; per-key `docHint`/`defaultHint` diagnostics; editors for excluded
-structured keys; profile-level editing; translated descriptions; migration from
-legacy `hyper.json`.
+Delivered (2026-11-25). All eight milestones are complete: a pure settings
+domain with two Dafny-verified state machines, a relocated and split JSON5
+scanner with comment-preserving set and remove, a single atomic config writer
+with a settings service and IPC, a settings tab in the existing tab strip with
+an active-surface model and command gating, per-field editing with inline
+validation and reset, a packaged-app deep E2E spec, and the documentation.
+
+What went well:
+
+- The riskiest logic is pure and separately proved or property-tested. The
+  proofs found nothing late because the contracts were written with the code.
+- The deep E2E lane earned its cost: it found three defects no unit test could
+  see (a `tsgo` return-statement emission hazard, a missing header offset, and
+  a number input that discarded invalid text).
+- One writer and one activation path kept the integration small: every caller
+  goes through `activateTab` and `config-file-writer`.
+
+What cost the most:
+
+- LemmaScript's emitter needed two local patches and a strict discipline about
+  typed locals. The Dafny backend is a tech preview; budget for it.
+- Host contention made the shared 5 s bundler timeout in
+  `esbuild-migration-contracts.test.ts` flaky; the unit suite is green with
+  `--timeout 30000`.
+
+Known follow-ups, unchanged from the plan:
+
+- Wire `resolveConfigLayers`/`createReloadHandler` into the production load
+  path.
+- Per-key graceful degradation in `loadUserConfig` instead of whole-file
+  fallback.
+- Per-key `docHint`/`defaultHint` diagnostics.
+- Editors for the excluded structured keys, and profile-level editing.
+- Translated descriptions, and migration from legacy `hyper.json`.
+- Offer the two LemmaScript fixes upstream.
 
 ## Context and orientation
 
@@ -968,7 +996,7 @@ Obligations:
   `test/unit/settings-tab-terminal-preservation.test.tsx`.
 
 Proof hygiene: no `//@ assume` is permitted in the proof files; any
-`//@ extern` must be listed in ADR 007 and the architecture document as a
+`//@ extern` must be listed in ADR 009 and the architecture document as a
 trusted assumption. `lsc check` enforces that each `.dfy` differs from its
 `.dfy.gen` by additions only.
 
@@ -1203,13 +1231,13 @@ notes in `docs/developers-guide.md` (E2E section).
 
 ### EP-M7: documentation, ADR, and roadmap closure
 
-1. `docs/adr-007-settings-tab-hosting-and-persistence.md` in the style-guide
+1. `docs/adrs/adr-0009-settings-tab-hosting-and-persistence.md` in the style-guide
    ADR format: D1 to D4, D12 to D17, trusted assumptions, and the rejected
    alternatives (settings window, draft-then-save, all editor state in Redux,
    tightening the load schema, and the schema-annotated `x-ui` catalogue as the
    recommended direction for 5.2.1).
 2. `docs/velocetty-design.md` §"Settings tab and plugin settings panels":
-   summarize the implemented shell, link ADR 007, and list deferred work.
+   summarize the implemented shell, link ADR 009, and list deferred work.
 3. `docs/settings-tab-architecture.md`: component architecture (domain ring,
    ports, adapters, IPC contract, snapshot shape, write algorithm, active
    surface and input gating, trusted assumptions, proof inventory).
@@ -1784,6 +1812,31 @@ EP-M6 (2026-11-25):
   702 pass, 0 fail.
 - Not covered here: documentation and roadmap closure are EP-M7.
 
+EP-M7 (2026-11-25):
+
+- `docs/adrs/adr-0009-settings-tab-hosting-and-persistence.md` records the hosting,
+  persistence, validation, and protocol decisions, the rejected alternatives,
+  the trusted assumptions, and the residual risks.
+- `docs/settings-tab-architecture.md` describes the layers, the domain ring, the
+  renderer ports and store, the single writer's algorithm, the edit operations,
+  the protocol and file states, and maps each proof and property suite to its
+  claim.
+- `docs/developers-guide.md` gains "Settings tab practice" (one writer, one
+  activation path, how to add a setting, the active-surface allow-list) and
+  "Property tests and proofs practice" (fast-check conventions,
+  `FAST_CHECK_NUM_RUNS`, the LemmaScript workflow and pin, and the `tsgo`
+  return-statement hazard).
+- `docs/users-guide.md` is new: opening settings, tab navigation, categories,
+  search and `@modified`, editing, validation, reset, restart-required
+  settings, and the four config-file states.
+- `docs/velocetty-design.md` gains an implementation-status section with the
+  shipped scope, links to ADR 009 and the architecture document, and the
+  deferred list.
+- `docs/roadmap.md` item 5.1.1 is checked, with corrected links to the actual
+  design and PRD headings.
+- Gates: `make markdownlint` (which includes `make spelling`),
+  `make check-fmt`, and `make nixie` clean.
+
 Design review summary (2026-10-29), recorded for traceability. Three expert
 lenses reviewed the first draft. Blocking findings and their resolutions: naive
 CSS hiding would resize PTYs and leak keystrokes to the hidden shell (D1
@@ -1965,3 +2018,11 @@ generic-union lookup (D20); the field machine's shape adjustments (D21); and
 the search non-vacuity approach (D22). The proof targets verify with zero
 errors, nine seeded mutations are each rejected, and the full unit suite is
 green.
+
+2026-11-25: EP-M2 through EP-M7 completed. The scanner split, the editor, the
+writer, the service, the IPC, the tab strip, the editing UI, the deep E2E, and
+the documentation are in place. Recorded during implementation: the LemmaScript
+patches (D20), the field-machine shape (D21), search non-vacuity (D22), the
+JSON5 module split (D23), the synchronous plugin path (D24), the surface
+layering and gate (D25), the field store (D26), and the textual numeric control
+(D27). The Outcomes section records what the lane cost and what remains.
