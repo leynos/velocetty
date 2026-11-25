@@ -258,6 +258,43 @@ Populating context keys belongs to 4.2.1.
 - [ ] EP-M6 end-to-end scenario: file written, local run blocked.
 - [ ] EP-M7 documentation and roadmap closure: in progress.
 
+### Blocking discovery: Ajv cannot compile validators in the renderer
+
+The fast-lane E2E fails on every platform with two critical renderer errors:
+
+```plaintext
+Error compiling schema, function code: var refVal1 = refVal[1]; ...
+schemaPath: '#/definitions/nonNegativeInteger/type'
+```
+
+Ajv 6 implements JSON Schema by generating JavaScript and running it through
+`new Function`. The packaged renderer's Content Security Policy forbids
+`unsafe-eval`, so every `ajv.compile` call logs that message with
+`console.error` and then throws.
+
+EP-M1 made the registry compile a validator eagerly at registration, so the
+failure moved from "silently returns `INVALID_COMMAND_SCHEMA` the first time a
+schema-bearing command is used" to "two console errors during start-up". The
+E2E gate treats any renderer `console.error` as critical.
+
+Two consequences, both real:
+
+- The start-up noise is a symptom; the underlying problem is that argument
+  validation does not work at all in the packaged renderer. Any command with an
+  `argsSchema`, including `editor:search-close`, would be refused with
+  `INVALID_COMMAND_SCHEMA` in the shipped app, so Escape would stop closing the
+  search box.
+- Unit tests do not see this, because Bun has no CSP.
+
+This needs a design decision rather than a patch, so it is escalated under the
+plan's interface tolerance. The options are:
+
+- precompile standalone validators at build time (`ajv` code generation with
+  `source: true`, emitted as ordinary functions) and load those in the renderer;
+- replace Ajv in the renderer with a validator that does not generate code;
+- allow `unsafe-eval` in the renderer CSP, which weakens the application's
+  security posture and is not recommended.
+
 ### EP-M6 status detail
 
 `test/e2e-deep/command-dispatch.e2e.ts` exists and typechecks. It drives the
