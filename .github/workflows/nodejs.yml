@@ -286,6 +286,11 @@ jobs:
         uses: ./.github/actions/build-packaged-app
         with:
           gh_token: ${{ secrets.GITHUB_TOKEN }}
+          # The deep lane launches `dist/linux-unpacked/hyper`, so the RPM and
+          # DEB packages are not needed. Skipping them also sidesteps a failure
+          # in electron-builder's bundled fpm, whose Ruby is linked against
+          # `libcrypt.so.1`, which current runners no longer provide.
+          electron_builder_args: '--dir'
       - name: Run deep-lane E2E tests
         uses: GabrielBB/xvfb-action@b706e4e27b14669b486812790492dc50ca16b465 # v1.7
         with:
