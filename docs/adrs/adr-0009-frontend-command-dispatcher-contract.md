@@ -134,9 +134,34 @@ rejected: an admission fold expressed as `findIndex` with a comment, and a
 separate settlement reducer that risked becoming a parallel model of the code
 it claimed to describe.
 
-The machine imports nothing and reads no clock. `make proofs` verifies it with
+The machine imports nothing and reads no clock. `make prove` verifies it with
 LemmaScript and Dafny; `fast-check` properties then check that the asynchronous
 interpreter refines the proved machine.
+
+### Schema validation does not generate code
+
+Argument and result validation is JSON Schema, interpreted by
+`lib/command-schema-validator.ts` over the keyword subset these schemas use.
+
+Ajv would be the obvious choice and is what the registry used, but Ajv
+implements JSON Schema by generating JavaScript and running it through
+`new Function`. The packaged renderer's Content Security Policy forbids
+`unsafe-eval`, so every `ajv.compile` logs
+`Error compiling schema, function code: …` and throws. That is a known Ajv
+limitation, reported upstream
+([ajv#551](https://github.com/ajv-validator/ajv/issues/551)) and observed in
+other Electron and extension projects
+([eslint#19635](https://github.com/eslint/eslint/issues/19635)). The practical
+effect here was that no command declaring a schema could ever validate in the
+shipped application, so `editor:search-close` would have been refused and
+Escape would have stopped closing the search box.
+
+Two alternatives were rejected: precompiling standalone validators at build
+time adds a generation step and a second artefact to keep in step, and allowing
+`unsafe-eval` would weaken the renderer's posture for every script, not just
+validation. Interpreting the subset keeps one implementation, and Ajv remains
+the oracle the property tests compare it against — which also keeps `ajv`, a
+development dependency, out of the renderer bundle.
 
 ## Consequences
 
