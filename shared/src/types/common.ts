@@ -152,6 +152,7 @@ export type RendererEvents = {
   'split request vertical': {activeUid?: SessionId; profile?: ProfileId};
   'termgroup add req': {activeUid?: SessionId; profile?: ProfileId};
   'termgroup close req': never;
+  'settings open req': never;
   'session add': Session;
   'session data': string;
   'session exit': {uid: SessionId};

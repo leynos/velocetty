@@ -45,6 +45,11 @@ export type CommandDependencies = Readonly<{
   readonly markerSink: E2EMarkerSink;
   /** Opens the user's configuration file for editing. */
   readonly openConfig: () => void;
+  /**
+   * Creates a window and asks it to open the settings tab once its renderer has
+   * loaded. Used when the preferences command runs with no window focused.
+   */
+  readonly openSettingsWindow: () => void;
   /** Re-reads the installed plugin list. */
   readonly updatePlugins: () => void;
   /** Installs the command-line helper. */
@@ -83,6 +88,7 @@ export const createCommandTable = (dependencies: CommandDependencies): CommandTa
     isHamburgerMenuEnabled,
     markerSink,
     openConfig,
+    openSettingsWindow,
     openWindow,
     popupApplicationMenu,
     profileNames,
@@ -108,7 +114,14 @@ export const createCommandTable = (dependencies: CommandDependencies): CommandTa
     'pane:close': (focusedWindow) => {
       focusedWindow?.rpc.emit('termgroup close req');
     },
-    'window:preferences': () => {
+    'window:preferences': (focusedWindow) => {
+      if (focusedWindow) {
+        focusedWindow.rpc.emit('settings open req');
+        return;
+      }
+      openSettingsWindow();
+    },
+    'window:openConfigFile': () => {
       openConfig();
     },
     'editor:clearBuffer': (focusedWindow) => {

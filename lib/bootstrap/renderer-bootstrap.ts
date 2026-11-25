@@ -83,6 +83,7 @@ type BootstrapActionModules = {
     | 'leaveFullScreen'
   >;
   updaterActions: Pick<typeof import('../actions/updater'), 'updateAvailable'>;
+  settingsTabActions: Pick<typeof import('../actions/tab-strip'), 'openSettingsTab'>;
 };
 
 type WindowLike = WindowGlobalsLike &
@@ -248,6 +249,9 @@ const registerRendererTransportEventHandlers = (
   });
   register('termgroup close req', () => {
     store.dispatch(actions.termGroupActions.exitActiveTermGroup());
+  });
+  register('settings open req', () => {
+    store.dispatch(actions.settingsTabActions.openSettingsTab());
   });
   register('session clear req', () => {
     store.dispatch(actions.sessionActions.clearActiveSession());

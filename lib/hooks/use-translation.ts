@@ -13,7 +13,8 @@ const headerLabelDefaults = {
   useRegex: 'Use Regular Expression',
   previousMatch: 'Previous Match',
   nextMatch: 'Next Match',
-  close: 'Close'
+  close: 'Close',
+  settingsTab: 'Settings'
 } as const;
 
 type TranslationKey = keyof typeof headerLabelDefaults;

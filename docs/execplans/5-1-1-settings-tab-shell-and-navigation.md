@@ -211,7 +211,8 @@ terminal's column and row count did not change.
 - [x] (2026-11-25) EP-M2: JSON5 scanner relocation and comment-preserving edit
       operations.
 - [x] (2026-11-25) EP-M3: config file writer, settings service, and IPC.
-- [ ] EP-M4: settings tab shell, tab strip, input gating, and navigation.
+- [x] (2026-11-25) EP-M4: settings tab shell, tab strip, input gating, and
+      navigation.
 - [ ] EP-M5: editing, inline validation, and reset flows.
 - [ ] EP-M6: end-to-end coverage.
 - [ ] EP-M7: documentation, ADR, and roadmap closure.
@@ -337,6 +338,17 @@ terminal's column and row count did not change.
   `test/unit/esbuild-migration-contracts.test.ts` fails intermittently; its
   bundler calls are unrelated to these files and the suite passes with
   `--timeout 30000` (648 pass, 0 fail). CI runners are not under that load.
+- Observation (EP-M4): Biome's accessibility rules reject `role="searchbox"` on
+  an `<input type="search">` and `role="status"` on a `<p>`. Impact: the view
+  uses the semantic elements, which carry those implicit roles, and the tests
+  query the elements rather than the attributes.
+- Observation (EP-M4): a structural window type for the preferences request
+  cannot stay assignable to `BrowserWindow`, whose `webContents.once` is an
+  overloaded method. Impact: `app/commands.ts` narrows a window with a small
+  adapter (`rpc`, `whenLoaded`) and the helper takes that shape (D25).
+- Observation (EP-M4): the renderer actions import the Electron transport at
+  module evaluation, so a suite that exercises them must register the transport
+  mock at module scope and import the actions dynamically.
 
 ## Decision log
 
@@ -550,6 +562,17 @@ terminal's column and row count did not change.
      snapshot refresh reconciles the committed value.
   Every union and phase literal is also bound to a typed local before use, as
   the observation above explains. Date/Author: 2026-11-25.
+- Decision D25 (new, EP-M4): the settings surface is a sibling layer of the
+  terminal layer inside `.hyperMain`. Both layers are absolutely positioned
+  with an explicit width and height, and the inactive one is moved offscreen by
+  changing `left` only, so activating settings never changes a terminal's size
+  and never fires its ResizeObserver. The terminal layer is marked `inert`
+  while settings is active. The tab title is translated in
+  `HeaderWithTranslation`, because selectors cannot call hooks. A gated command
+  is dropped by `execCommand` before any handler or main-process fallback runs,
+  and the key handler skips `preventDefault` for it, so native input editing
+  works in the settings fields; `pane:close` closes the settings tab instead.
+  Date/Author: 2026-11-25.
 - Decision D24 (new, EP-M3): plugin settings persistence stays synchronous
   and goes through the same writer via `writeConfigEditSync`, one single-pass
   critical section per write. The plugin runtime's keys are not in the core
@@ -1654,6 +1677,40 @@ EP-M3 (2026-11-25):
   `bun run build:packages`, and `bunx tsgo --project app/tsconfig.build.json`
   clean; `bun test --concurrent --isolate --timeout 30000 test/unit` reports
   648 pass, 0 fail.
+
+EP-M4 (2026-11-25):
+
+- Tab strip: `lib/selectors/tab-strip.ts` (`selectTabStrip`,
+  `selectActiveSurface`), `lib/actions/tab-strip.ts` (`activateTab`,
+  `openSettingsTab`, `closeSettingsTab`), `lib/reducers/settings-tab.ts`
+  registered in the root reducer, and `ITab.tabType` plus a `tabType` field on
+  the tab-decoration contexts. `changeTab`, `closeTab`, `moveLeft`,
+  `moveRight`, and `moveTo` all route through the strip.
+- Input gate: `lib/settings/surface-command-gate.ts` holds the global
+  allow-list; `execCommand` drops gated commands and closes the settings tab on
+  `pane:close`; `hyper.tsx` skips `preventDefault` for a gated command.
+- Surfaces: `hyper.tsx` renders the terminal and settings layers, toggles the
+  offscreen class and `inert`, restores terminal focus on return, and mounts
+  `lib/containers/settings.tsx` only while the tab is open.
+- Preferences: `app/settings/open-settings.ts` sends `settings open req` to the
+  focused window, or creates a window and waits for `did-finish-load`;
+  `app/commands.ts` adds `window:openConfigFile` for the old behaviour. The
+  event is registered in `RendererEvents` and the renderer bootstrap.
+- UI: `lib/settings/ports.ts`, the transport adapter,
+  `lib/i18n/create-translator.ts` (with `HeaderWithTranslation` using it),
+  `lib/settings/i18n/`, `lib/settings/components/settings-view.tsx` (with its
+  CSS module), `lib/settings/hooks/use-settings-editor.ts`, and the container.
+- Tests added: `settings-tab-slice` (6), `settings-tab-strip` (9, real store),
+  `settings-tab-input-gating` (5, every platform keymap command),
+  `settings-tab-terminal-preservation` (3), `settings-tab-shell-behaviour` (7),
+  `preferences-opens-settings` (2), `create-translator` (3), plus the bootstrap
+  listener-list update.
+- Gates: `make check-fmt`, `make lint`, `make typecheck`,
+  `bun run build:packages`, and `bunx tsgo --project app/tsconfig.build.json`
+  clean; `bun test --concurrent --isolate --timeout 30000 test/unit` reports
+  683 pass, 0 fail across 86 files.
+- Not covered here: editing controls, inline validation, and reset flows are
+  EP-M5; the rows are read-only at this milestone.
 
 Design review summary (2026-10-29), recorded for traceability. Three expert
 lenses reviewed the first draft. Blocking findings and their resolutions: naive

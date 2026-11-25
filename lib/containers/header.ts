@@ -15,39 +15,20 @@
  *   is required.
  */
 import React from 'react';
-import {createSelector} from 'reselect';
+
+import {SETTINGS_TAB_UID} from '@shared/constants/settings-tab';
 
 import type {HyperState, HyperDispatch, ITab} from '../../typings/hyper';
 import {closeTab, changeTab, maximize, openHamburgerMenu, unmaximize, minimize, close} from '../actions/header';
 import {requestTermGroup} from '../actions/term-groups';
 import Header from '../components/header';
 import {useTranslation} from '../hooks/use-translation';
-import {getRootGroups} from '../selectors';
+import {selectTabStrip} from '../selectors/tab-strip';
 import {connect} from '../utils/plugins';
 
 const isMac = /Mac/.test(navigator.userAgent);
 
-const getSessions = ({sessions}: HyperState) => sessions.sessions;
-const getActiveRootGroup = ({termGroups}: HyperState) => termGroups.activeRootGroup;
-const getActiveSessions = ({termGroups}: HyperState) => termGroups.activeSessions;
-const getActivityMarkers = ({ui}: HyperState) => ui.activityMarkers;
-const getTabs = createSelector(
-  [getSessions, getRootGroups, getActiveSessions, getActiveRootGroup, getActivityMarkers],
-  (sessions, rootGroups, activeSessions, activeRootGroup, activityMarkers) =>
-    rootGroups.map((t): ITab => {
-      // A freshly added root group can render once before its first session
-      // arrives, so the tab falls back to untitled and inactive. `activeSessions`
-      // records a uid per live root group; the lookup into `sessions` is what
-      // can still miss.
-      const session = sessions[activeSessions[t.uid]];
-      return {
-        uid: t.uid,
-        title: session?.title ?? '',
-        isActive: t.uid === activeRootGroup,
-        hasActivity: session ? (activityMarkers[session.uid] ?? false) : false
-      };
-    })
-);
+const getTabs = (state: HyperState): ITab[] => selectTabStrip(state);
 
 const mapStateToProps = (state: HyperState) => {
   return {
@@ -104,9 +85,13 @@ const mapDispatchToProps = (dispatch: HyperDispatch) => {
 
 export const HeaderWithTranslation = (props: HeaderConnectedProps) => {
   const t = useTranslation();
+  // Selectors cannot call hooks, so the settings tab's title is translated
+  // here rather than in `selectTabStrip`.
+  const tabs = props.tabs.map((tab) => (tab.uid === SETTINGS_TAB_UID ? {...tab, title: t('settingsTab')} : tab));
 
   return React.createElement(Header, {
     ...props,
+    tabs,
     openMenuAria: t('openMenu'),
     minimizeWindowAria: t('minimizeWindow'),
     maximizeWindowAria: t('maximizeWindow'),

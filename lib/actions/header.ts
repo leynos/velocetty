@@ -1,3 +1,4 @@
+import {SETTINGS_TAB_UID} from '@shared/constants/settings-tab';
 import {CLOSE_TAB, CHANGE_TAB} from '@shared/constants/tabs';
 import {
   UI_WINDOW_MAXIMIZE,
@@ -9,6 +10,7 @@ import {
 import type {HyperDispatch} from '../../typings/hyper';
 import {transport} from '../transport';
 
+import {activateSettingsTab, closeSettingsTab} from './tab-strip';
 import {userExitTermGroup, setActiveGroup} from './term-groups';
 
 export function closeTab(uid: string) {
@@ -17,6 +19,10 @@ export function closeTab(uid: string) {
       type: CLOSE_TAB,
       uid,
       effect() {
+        if (uid === SETTINGS_TAB_UID) {
+          dispatch(closeSettingsTab());
+          return;
+        }
         dispatch(userExitTermGroup(uid));
       }
     });
@@ -29,6 +35,10 @@ export function changeTab(uid: string) {
       type: CHANGE_TAB,
       uid,
       effect() {
+        if (uid === SETTINGS_TAB_UID) {
+          dispatch(activateSettingsTab());
+          return;
+        }
         dispatch(setActiveGroup(uid));
       }
     });

@@ -17,6 +17,7 @@ import HyperContainer from './containers/hyper';
 import rpc from './rpc';
 import {transport} from './transport';
 import configureStore from './store/configure-store';
+import * as settingsTabActions from './actions/tab-strip';
 import * as config from './utils/config';
 import {getBase64FileData} from './utils/file';
 import * as plugins from './utils/plugins';
@@ -33,6 +34,7 @@ startRendererApplication({
     loadConfig,
     reloadConfig,
     sessionActions,
+    settingsTabActions,
     termGroupActions,
     uiActions,
     updaterActions

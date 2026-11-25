@@ -21,6 +21,7 @@
 import {mock} from 'bun:test';
 
 import {INIT} from '@shared/constants';
+import {SETTINGS_TAB_OPEN} from '@shared/constants/settings-tab';
 import {CONFIG_LOAD, CONFIG_RELOAD} from '@shared/constants/config';
 import type {configOptions} from '@shared/types/config';
 import {NOTIFICATION_MESSAGE} from '@shared/constants/notifications';
@@ -52,7 +53,7 @@ import {
   UI_WINDOW_MOVE
 } from '@shared/constants/ui';
 import {UPDATE_AVAILABLE} from '@shared/constants/updater';
-import {asSessionId, type Session} from '@shared/types/common';
+import {asSessionId, type Session, type SessionId} from '@shared/types/common';
 import {isFunction} from '@shared/types/guards';
 import type {AddNotificationParams, UpdateAvailableParams} from '../../lib/bootstrap/renderer-bootstrap';
 import type {HyperActions, HyperDispatch} from '../../typings/hyper';
@@ -79,7 +80,8 @@ type FixtureState = ReturnType<typeof createFixtureState>;
 const createFixtureState = () => ({
   ui: {bellSoundURL: 'sound.wav', bellSound: 'abc', bell: 'SOUND'},
   sessions: {activeUid: 'session-0', sessions: {}},
-  termGroups: {termGroups: {}, activeSessions: {}, activeRootGroup: null}
+  termGroups: {termGroups: {}, activeSessions: {}, activeRootGroup: null},
+  settingsTab: {isOpen: false, isActive: false, query: '', selectedCategory: 'all'}
 });
 
 type Thunk = (dispatch: (action: unknown) => void, getState: () => FixtureState) => void;
@@ -240,17 +242,19 @@ const termGroupActions = {
   // Written out rather than built by `thunk`: the production creator returns
   // the dispatched session-exit action, and `BootstrapActionModules` names that
   // exact type, so the shape has to match branch for branch.
-  ptyExitTermGroup: (uid: string) => (dispatch: HyperDispatch) => {
-    record('ptyExitTermGroup', [uid]);
-    return dispatch({
-      type: SESSION_PTY_EXIT,
-      uid: asSessionId(uid),
-      effect() {
-        // The real effect also closes the window when no sessions remain; the
-        // wiring under test never invokes it, so it stays empty here.
-      }
-    });
-  }
+  ptyExitTermGroup:
+    (uid: string) =>
+    (dispatch: HyperDispatch): {type: typeof SESSION_PTY_EXIT; uid: SessionId; effect: () => void} => {
+      record('ptyExitTermGroup', [uid]);
+      return dispatch({
+        type: SESSION_PTY_EXIT,
+        uid: asSessionId(uid),
+        effect() {
+          // The real effect also closes the window when no sessions remain; the
+          // wiring under test never invokes it, so it stays empty here.
+        }
+      });
+    }
 };
 
 const uiActions = {
@@ -300,8 +304,13 @@ const reloadConfig = action('reloadConfig', (config: configOptions) => ({type: C
 /** `lib/actions/index.ts` returns a thunk, and the ready handler dispatches it. */
 const init = thunk('init', () => ({type: INIT}));
 
+const settingsTabActions = {
+  openSettingsTab: action('openSettingsTab', () => ({type: SETTINGS_TAB_OPEN}))
+};
+
 export const createBootstrapActions = () => ({
   addNotificationMessage,
+  settingsTabActions,
   init,
   loadConfig,
   reloadConfig,

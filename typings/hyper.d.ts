@@ -166,6 +166,7 @@ export type HyperState = {
   ui: uiState;
   sessions: sessionState;
   termGroups: ITermState;
+  settingsTab: SettingsTabState;
 };
 
 import type {UIActions} from './constants/ui';
@@ -176,6 +177,7 @@ import type {UpdateActions} from './constants/updater';
 import type {TermGroupActions} from './constants/term-groups';
 import type {InitActions} from './constants';
 import type {TabActions} from './constants/tabs';
+import type {SettingsTabActions, SettingsTabState} from './constants/settings-tab';
 
 export type HyperActions = (
   | UIActions
@@ -186,6 +188,7 @@ export type HyperActions = (
   | TermGroupActions
   | InitActions
   | TabActions
+  | SettingsTabActions
 ) & {effect?: () => void};
 
 export type HyperDispatch = ThunkDispatch<HyperState, undefined, HyperActions>;
@@ -241,6 +244,8 @@ export type ITab = {
   title: string;
   isActive: boolean;
   hasActivity: boolean;
+  /** Distinguishes the singleton settings tab from terminal tabs. */
+  tabType?: 'terminal' | 'settings';
 };
 
 export type TabsProps = {

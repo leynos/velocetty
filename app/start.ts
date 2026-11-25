@@ -262,6 +262,12 @@ export const startMainProcess = ({markerSink}: StartMainProcessOptions): void =>
               process.platform !== 'darwin' && ['', true].includes(config.getConfig().showHamburgerMenu),
             markerSink,
             openConfig: () => void config.openConfig(),
+            openSettingsWindow: () => {
+              const created = createWindow();
+              created.webContents.once('did-finish-load', () => {
+                created.rpc.emit('settings open req');
+              });
+            },
             openWindow: (profileName) => {
               createWindow(undefined, undefined, profileName);
             },
