@@ -24,6 +24,25 @@ import * as config from './utils/config';
 import {getBase64FileData} from './utils/file';
 import * as plugins from './utils/plugins';
 
+/**
+ * The one Mousetrap instance for the document.
+ *
+ * Created on first use and reused: every call to `Mousetrap(document.body)`
+ * returns a new instance, so handing a fresh one to each keymap reload would
+ * leave the previous instance's handlers bound and fire every shortcut twice.
+ */
+let mousetrapInstance: ReturnType<typeof Mousetrap> | null = null;
+const memoiseMousetrap = () => {
+  if (!mousetrapInstance) {
+    mousetrapInstance = Mousetrap(document.body);
+    mousetrapInstance.stopCallback = () => {
+      // All events should be intercepted even if focus is in an input/textarea
+      return false;
+    };
+  }
+  return mousetrapInstance;
+};
+
 const mountElement = document.querySelector('#mount');
 if (!mountElement) {
   throw new Error('Expected renderer mount element with id "mount".');
@@ -49,14 +68,7 @@ startRendererApplication({
     const bundle = composeRendererDispatcher({
       dispatch: store.dispatch,
       emitHostCommand: (id) => transport.emit('command', id),
-      getMousetrap: () => {
-        const instance = Mousetrap(document.body);
-        instance.stopCallback = () => {
-          // All events should be intercepted even if focus is in an input/textarea
-          return false;
-        };
-        return instance;
-      }
+      getMousetrap: memoiseMousetrap
     });
 
     const root = createRoot(mountElement);

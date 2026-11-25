@@ -532,7 +532,10 @@ e2eTest(
         );
       }
 
-      expect(context.outputTracker.extractCriticalRendererErrors()).toHaveLength(0);
+      // Print the messages on failure: the renderer's error text only reaches
+      // this process's stdout, never the CI log, so an empty assertion would
+      // report a count and no cause.
+      expect(context.outputTracker.extractCriticalRendererErrors()).toEqual([]);
     } finally {
       await cleanupTestContext(context);
     }
