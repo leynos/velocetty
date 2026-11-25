@@ -1,6 +1,7 @@
 /** @file Command registry and validation helpers for renderer command dispatch. */
 import type {RendererCommandTransport} from '@shared/types/transport';
-import type {HyperDispatch, HyperState} from '../typings/hyper';
+import type {HyperDispatch} from '../typings/hyper';
+import type {CloseSearchAction} from './commands/search-close';
 import type {IpcCommands} from '@shared/types/common';
 import {
   asCommandId,
@@ -8,15 +9,15 @@ import {
   type CommandId,
   type CommandOrderingComparator,
   type CommandRegistry,
-  type CommandValidationError,
-  type CommandValidationIssue,
   type CommandValidationResult
 } from '@shared/types/commands';
-import {SESSION_SEARCH} from '@shared/constants/sessions';
-import {asSessionId} from '@shared/types/common';
-import Ajv, {type ErrorObject, type ValidateFunction} from 'ajv';
-import {isBoolean, isObject} from '@shared/types/guards';
-import {isJsonObject} from '@shared/types/json';
+import {
+  closeSearchAction,
+  createSearchCloseHandler,
+  SEARCH_CLOSE_ARGS_SCHEMA,
+  SEARCH_CLOSE_COMMAND_ID
+} from './commands/search-close';
+import {createCommandSchemaValidator} from './command-registry-validation';
 
 export type CommandHandler = (event: unknown, dispatch: HyperDispatch) => void;
 
@@ -25,10 +26,7 @@ interface RegisteredCommand extends CommandDefinition {
 }
 
 type CommandRegistryDependencies = {
-  closeSearch: (
-    uid?: string,
-    keyEvent?: {catched?: boolean}
-  ) => (dispatch: HyperDispatch, getState: () => HyperState) => void;
+  closeSearch: CloseSearchAction;
   focusActiveTerm: () => void;
   transport: Pick<RendererCommandTransport, 'invoke'>;
 };
@@ -58,32 +56,6 @@ const createLegacyDefinition = (id: CommandId): CommandDefinition => ({
   }
 });
 
-export const closeSearchAction = (uid?: string, keyEvent?: {catched?: boolean}) => {
-  return (dispatch: HyperDispatch, getState: () => HyperState) => {
-    const targetUid = uid ?? getState().sessions.activeUid;
-    if (!targetUid) {
-      // No active session yet — propagate the key event and bail.
-      if (keyEvent) {
-        keyEvent.catched = false;
-      }
-      return;
-    }
-
-    if (getState().sessions.sessions[targetUid]?.search) {
-      dispatch({
-        type: SESSION_SEARCH,
-        uid: asSessionId(targetUid),
-        value: false
-      });
-      return;
-    }
-
-    if (keyEvent) {
-      keyEvent.catched = false;
-    }
-  };
-};
-
 const cloneCommandDefinition = (command: RegisteredCommand): CommandDefinition => ({
   id: command.id,
   metadata: {
@@ -96,28 +68,19 @@ const cloneCommandDefinition = (command: RegisteredCommand): CommandDefinition =
   resultSchema: cloneSchema(command.resultSchema)
 });
 
-/** Accepts an optional path string and normalizes it to a guaranteed string. */
-const asIssuePath = (value: string | undefined): string => value ?? '';
-
-const serializeAjvErrors = (errors: ErrorObject[] | null | undefined): CommandValidationIssue[] =>
-  (errors ?? []).map((error) => {
-    return {
-      instancePath: asIssuePath(error.dataPath),
-      schemaPath: asIssuePath(error.schemaPath),
-      keyword: error.keyword,
-      message: error.message ?? 'Schema validation failed',
-      params: isJsonObject(error.params) ? error.params : {}
-    };
-  });
-
-const isSearchKeyEvent = (candidate: unknown): candidate is {catched?: boolean} =>
-  isObject(candidate) && (!('catched' in candidate) || isBoolean(candidate.catched));
-
 export const createCommandRegistryModule = (dependencies: CommandRegistryDependencies) => {
-  const ajv = new Ajv({allErrors: true});
-  const validatorsByCommandId = new Map<CommandId, ValidateFunction>();
   const registry = new Map<CommandId, RegisteredCommand>();
   const runtimeManagedCommands = new Set<CommandId>();
+
+  const getDefinition = (commandId: CommandId): CommandDefinition | undefined => {
+    const command = registry.get(commandId);
+    return command ? cloneCommandDefinition(command) : undefined;
+  };
+
+  // The validator is primed from the upsert path and forgets on removal, so a
+  // schema is compiled once when its command is registered rather than on the
+  // first keypress.
+  const schemaValidator = createCommandSchemaValidator({getDefinition});
 
   const upsertCommand = (definition: CommandDefinition, handler?: CommandHandler) => {
     const existingCommand = registry.get(definition.id);
@@ -134,12 +97,12 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
       handler: handler ?? existingCommand?.handler
     });
 
-    validatorsByCommandId.delete(definition.id);
+    schemaValidator.prime(definition.id);
   };
 
   const remove = (commandId: CommandId | string) => {
     const commandKey = asCommandId(commandId);
-    validatorsByCommandId.delete(commandKey);
+    schemaValidator.forget(commandKey);
     return registry.delete(commandKey);
   };
 
@@ -169,66 +132,10 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
     });
   };
 
-  const validateArgs = (commandId: CommandId | string, args: unknown): CommandValidationResult => {
-    const commandKey = asCommandId(commandId);
-    const command = registry.get(commandKey);
-    if (!command) {
-      const error: CommandValidationError = {
-        code: 'COMMAND_NOT_FOUND',
-        commandId: commandKey,
-        target: 'args',
-        message: `Cannot validate args for unknown command: ${commandKey}`
-      };
-      return {
-        ok: false,
-        error
-      };
-    }
+  const validateArgs = (commandId: CommandId | string, args: unknown): CommandValidationResult =>
+    schemaValidator.validateArgs(commandId, args);
 
-    if (!command.argsSchema) {
-      return {ok: true, value: args};
-    }
-
-    try {
-      let validator = validatorsByCommandId.get(commandKey);
-      if (!validator) {
-        validator = ajv.compile(command.argsSchema);
-        validatorsByCommandId.set(commandKey, validator);
-      }
-
-      if (validator(args)) {
-        return {ok: true, value: args};
-      }
-
-      const error: CommandValidationError = {
-        code: 'INVALID_COMMAND_ARGS',
-        commandId: commandKey,
-        target: 'args',
-        message: `Invalid args for command: ${commandKey}`,
-        issues: serializeAjvErrors(validator.errors)
-      };
-      return {
-        ok: false,
-        error
-      };
-    } catch (error) {
-      const validationError: CommandValidationError = {
-        code: 'INVALID_COMMAND_SCHEMA',
-        commandId: commandKey,
-        target: 'args',
-        message: error instanceof Error ? error.message : `Invalid schema for command: ${commandKey}`
-      };
-      return {
-        ok: false,
-        error: validationError
-      };
-    }
-  };
-
-  const get = (commandId: CommandId | string) => {
-    const command = registry.get(asCommandId(commandId));
-    return command ? cloneCommandDefinition(command) : undefined;
-  };
+  const get = (commandId: CommandId | string) => getDefinition(asCommandId(commandId));
 
   const list = () => {
     return [...registry.values()].map((definition) => cloneCommandDefinition(definition)).toSorted(compareByCommandId);
@@ -274,31 +181,19 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
     return result;
   };
 
-  assignLegacyHandler(asCommandId('editor:search-close'), (e, dispatch) => {
-    dispatch(dependencies.closeSearch(undefined, isSearchKeyEvent(e) ? e : undefined));
-    dependencies.focusActiveTerm();
+  upsertCommand({
+    id: asCommandId(SEARCH_CLOSE_COMMAND_ID),
+    kind: 'frontend',
+    metadata: {
+      title: 'Close Search'
+    },
+    argsSchema: cloneSchema(SEARCH_CLOSE_ARGS_SCHEMA)
   });
-
-  const register = upsertCommand;
-  const update = upsertCommand;
-  const registerCommand = register;
-  const createCommand = register;
-  const updateCommand = update;
-  const replaceCommand = update;
-  const removeCommand = remove;
-  const deleteCommand = remove;
-  const getCommand = get;
-  const getCommandDefinition = get;
-  const listCommands = list;
-  const enumerateCommands = list;
-  const hasCommand = has;
-  const hasCommandDefinition = has;
-  const validateCommandArgs = validateArgs;
-  const validateCommandArgsFor = validateArgs;
+  assignLegacyHandler(asCommandId(SEARCH_CLOSE_COMMAND_ID), createSearchCloseHandler(dependencies));
 
   const commandRegistry: CommandRegistry<CommandHandler> = {
-    register,
-    update,
+    register: upsertCommand,
+    update: upsertCommand,
     remove,
     get,
     list,
@@ -308,30 +203,16 @@ export const createCommandRegistryModule = (dependencies: CommandRegistryDepende
 
   return {
     commandRegistry,
-    createCommand,
-    deleteCommand,
-    enumerateCommands,
     get,
-    getCommand,
-    getCommandDefinition,
     getCommandHandler,
     getRegisteredKeys,
     has,
-    hasCommand,
-    hasCommandDefinition,
     list,
-    listCommands,
-    register,
-    registerCommand,
+    register: upsertCommand,
     registerCommandHandlers,
     remove,
-    removeCommand,
-    replaceCommand,
-    update,
-    updateCommand,
-    validateArgs,
-    validateCommandArgs,
-    validateCommandArgsFor
+    update: upsertCommand,
+    validateArgs
   };
 };
 
@@ -359,24 +240,6 @@ export const commandRegistry: CommandRegistry<CommandHandler> = commandRegistryM
 
 /** Async key resolution, handler management, and bulk registration. */
 export const {getRegisteredKeys, registerCommandHandlers, getCommandHandler} = commandRegistryModule;
-
-/** Compat aliases — retained for call sites that use legacy command-verb naming. */
-export const {
-  registerCommand,
-  createCommand,
-  updateCommand,
-  replaceCommand,
-  removeCommand,
-  deleteCommand,
-  getCommand,
-  getCommandDefinition,
-  listCommands,
-  enumerateCommands,
-  hasCommand,
-  hasCommandDefinition,
-  validateCommandArgs,
-  validateCommandArgsFor
-} = commandRegistryModule;
 
 // Some commands are directly executed by Electron menuItem role.
 // They should not be prevented to reach Electron.
