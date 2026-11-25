@@ -29,3 +29,52 @@ index 48a907445afc4f106ca89466833b77d01422c1b4..64cebcb5cca104f3ee6bfba877569745
  }
  function findDiscriminant(members) {
      if (members.length === 0)
+diff --git a/tools/dist/transform.js b/tools/dist/transform.js
+index 6e3ec266c7bfdd3082e2d337a6f4664f37c4d631..7252335376ca480dd481b789dfaba89f9836b62f 100644
+--- a/tools/dist/transform.js
++++ b/tools/dist/transform.js
+@@ -1253,7 +1253,7 @@ function lowerExpr(e, binds) {
+             // Path scrutinees (e.g. `m.content`) get a synthesized hint derived
+             // from the last field/var name so the binder reads naturally.
+             const scrutinee = lowerExpr(e.scrutinee, binds);
+-            const decl = declOf(_typeDecls, e.typeName);
++            const decl = declOf(_typeDecls, tyBaseName(e.typeName));
+             const isSynthArrayUnion = decl?.discriminant === "__isArray__";
+             const varName = e.scrutinee.kind === "var" ? e.scrutinee.name : undefined;
+             const pathHint = varName ?? scrutineeHint(e.scrutinee);
+@@ -1979,7 +1979,7 @@ function transformStmt(s, typeDecls) {
+  *  and delegates body transformation to the caller-provided function.
+  *  Returns null if any body transformation returns null (pure path abort). */
+ function buildMatchArms(cases, varName, typeName, typeDecls, transformBody) {
+-    const decl = declOf(typeDecls, typeName);
++    const decl = declOf(typeDecls, tyBaseName(typeName));
+     if (!decl || (decl.kind !== "string-union" && decl.kind !== "discriminated-union")) {
+         throw new Error(`match type ${typeName} is not a declared union`);
+     }
+@@ -2014,7 +2014,7 @@ function buildLiteralMatchArms(cases, transformBody) {
+     return arms;
+ }
+ function emitMatchStmt(scrutinee, typeName, cases, fallthrough, typeDecls) {
+-    const decl = declOf(typeDecls, typeName);
++    const decl = declOf(typeDecls, tyBaseName(typeName));
+     // Synth array-unions (discriminant "__isArray__") have single-field variants
+     // ArrayBranch(arr) / NonArrayBranch(val). The matched arm refers to the
+     // scrutinee by its bare name/path (`content`, `m.content`), not `.arr`, so
+@@ -2083,7 +2083,7 @@ function replaceVarInTStmts(stmts, oldName, newName, newTy) {
+ }
+ /** If the chain has matched all variants but one, return that remaining variant. */
+ function remainingVariant(typeName, cases, typeDecls) {
+-    const decl = declOf(typeDecls, typeName);
++    const decl = declOf(typeDecls, tyBaseName(typeName));
+     if (!decl?.variants)
+         return null;
+     const matched = new Set(cases.map(c => c.variant));
+@@ -2390,7 +2390,7 @@ function transformPureSwitch(s, typeDecls) {
+ }
+ function transformPureMatch(chain, typeDecls) {
+     const cases = chain.cases.map(c => ({ name: c.variant, body: c.body }));
+-    const decl = declOf(typeDecls, chain.typeName);
++    const decl = declOf(typeDecls, tyBaseName(chain.typeName));
+     // Synth array-unions have single-field variants and user code refers to the
+     // scrutinee by its bare name, not field-accessed. See emitMatchStmt for
+     // the statement-level counterpart of this substitution.

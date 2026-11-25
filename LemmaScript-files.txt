@@ -1,2 +1,4 @@
 test/proofs/sample.ts 30
 app/config/keybindings-policy.ts 30
+shared/src/settings/search.ts
+shared/src/settings/field-state.ts

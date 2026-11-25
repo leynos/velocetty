@@ -207,7 +207,7 @@ terminal's column and row count did not change.
   `Decision log` D1 to D19 and the revision note).
 - [x] (2026-11-25) User approval of the plan.
 - [x] (2026-11-25) EP-M0: proof and property tooling prototype and CI policy.
-- [ ] EP-M1: settings domain core and proofs.
+- [x] (2026-11-25) EP-M1: settings domain core and proofs.
 - [ ] EP-M2: JSON5 scanner relocation and comment-preserving edit operations.
 - [ ] EP-M3: config file writer, settings service, and IPC.
 - [ ] EP-M4: settings tab shell, tab strip, input gating, and navigation.
@@ -283,6 +283,30 @@ terminal's column and row count did not change.
   TypeScript configuration, so regenerating from a copy in a temporary
   directory produced different output than regenerating in place. Impact: the
   freshness checker regenerates in place and restores the committed artefact.
+- Observation (EP-M1): LemmaScript 0.6.12 cannot lower a discriminant match or
+  comparison on a *generic* union: the transform looks the declaration up by
+  the name as written (`FieldEvent<V, E>`) and fails with
+  `match type … is not a declared union`. The toolchain ships `tyBaseName` for
+  exactly this lookup, so the local patch slices the generic arguments at the
+  five lookup sites. Impact: D20 now covers two patches.
+- Observation (EP-M1): the Dafny emitter resolves literals only against a
+  declared type. An inline `{kind: 'none'}` or a phase literal inside a record
+  update emits a string or a tuple and does not typecheck; a typed local
+  (`const phase: FieldPhase = 'idle'`) emits the constructor correctly. Impact:
+  every union and phase literal in the verified core is bound to a typed local
+  first, which is why `field-state.ts` reads the way it does.
+- Observation (EP-M1): a union variant with no fields breaks construction
+  (`Eff<V>.None`), while a variant with a field emits correctly (`none(-1)`).
+  Impact: `FieldEffect`'s `none` variant carries the unused request id `-1`.
+- Observation (EP-M1): `StringIndexOf` is an axiomatized leaf, so Dafny cannot
+  evaluate `haystackMatchesTokens` on concrete inputs. Non-vacuity witnesses
+  for the search predicate are therefore not provable inside Dafny; the
+  mirrored property suite and the rejected seeded mutations provide that
+  evidence instead (D22). The field-state witnesses do verify and are committed
+  in `field-state.dfy`.
+- Observation (EP-M1): `switch` on `event.kind` cannot combine cases
+  (fall-through is rejected as `not a declared union`). Impact: `edit` and
+  `revert` have separate branches.
 
 ## Decision log
 
@@ -473,8 +497,38 @@ terminal's column and row count did not change.
   into a discriminated union to suit the prover is design driven by tooling.
   The version is pinned exactly (D10), so the patch cannot drift under a silent
   upgrade. The upstream fix belongs in LemmaScript and should be offered there;
-  ADR 007 records the patch as a trusted toolchain assumption. Date/Author:
-  2026-11-25.
+  ADR 007 records the patch as a trusted toolchain assumption. EP-M1 extended
+  the same patch with a second, independent fix: the transform looks a union
+  declaration up by the name as written, so a generic union
+  (`FieldEvent<V, E>`) is reported as "not a declared union". The patch applies
+  the toolchain's own `tyBaseName` slice at the five lookup sites. Both fixes
+  are in `patches/lemmascript@0.6.12.patch`. Date/Author: 2026-11-25.
+- Decision D21 (new, EP-M1): the verified field machine departs from the
+  illustrative types in three small ways, forced by the emitter and recorded
+  here so reviewers can check the trade-off.
+  1. `FieldEffect` has no fieldless variant: `none` carries `requestId: -1`.
+     A fieldless union constructor is emitted as `Eff<V>.None`, which does not
+     compile.
+  2. `FieldOutcomeResult` uses `applied`, `denied`, and `errored` rather than
+     `applied`, `rejected`, and `failed`. Dafny resolves constructors by name,
+     and sharing `rejected`/`failed` with `FieldPhase` made the union
+     assignment ambiguous; `failurePhaseOf` maps outcome to phase.
+  3. A locally invalid submission clears `pendingRequestId`. Keeping the
+     pending id would either break "saving exactly while a request is pending"
+     (INV-FIELD-WF) or hide the local error; clearing it keeps the invariant
+     and the error visible. The in-flight write still lands, and the next
+     snapshot refresh reconciles the committed value.
+  Every union and phase literal is also bound to a typed local before use, as
+  the observation above explains. Date/Author: 2026-11-25.
+- Decision D22 (new, EP-M1): search non-vacuity is established by the mirrored
+  property suite and by rejecting seeded mutations, not by Dafny witness lemmas.
+  `haystackMatchesTokens` bottoms out in the axiomatized `StringIndexOf`,
+  whose contract is soundness-only, so Dafny cannot evaluate the predicate on
+  concrete strings; every attempted witness lemma was unprovable. The mutation
+  table in `Artefacts and notes` shows the proof rejects an ignored `@modified`
+  filter, an ignored token list, a first-match short circuit, and a reversed
+  traversal, which is the property the witnesses were meant to protect.
+  Date/Author: 2026-11-25.
 
 ## Outcomes & retrospective
 
@@ -1434,7 +1488,8 @@ EP-M0 (2026-11-25):
   and failed with a regeneration instruction. The hand edit was restored
   afterwards.
 - Local patch: `patches/lemmascript@0.6.12.patch`, registered under
-  `patchedDependencies` (D20).
+  `patchedDependencies` (D20). It carries the generic-record fix in
+  `extract.js` and the generic-union lookup fix in `transform.js`.
 - CI: `.github/workflows/proofs.yml` installs Dafny 4.11.0 with a cached
   `dotnet tool install`, runs `make proofs` and `make proofs-fresh`, and is
   path-filtered to the proof surface. It is advisory per D11.
@@ -1448,6 +1503,43 @@ EP-M0 (2026-11-25):
   one pre-existing timing-sensitive failure in
   `test/unit/esbuild-migration-contracts.test.ts` (a 5 s timeout under
   concurrent load) that passes when run alone.
+
+EP-M1 (2026-11-25):
+
+- Domain modules in `shared/src/settings/`: `panel-model.ts`,
+  `core-catalogue.ts` (31 editable keys across six categories, 18 documented
+  exclusions), `search.ts`, `coerce.ts`, `field-state.ts`, and `protocol.ts`.
+- Proofs: `make proofs` reports
+  `search.dfy … 8 verified, 0 errors` and
+  `field-state.dfy … 9 verified, 0 errors`. The field-state `.dfy` carries the
+  five phase witnesses (`witness_idle` … `witness_failed`).
+- Seeded mutations, each applied alone to a copy and then discarded:
+
+  ```plaintext
+  mutation                          intent          verdict
+  search-ignore-modified            soundness       REJECTED: loop invariant not maintained
+  search-ignore-tokens              soundness       REJECTED: loop invariant not maintained
+  search-stop-first                 completeness    REJECTED: postcondition on return path
+  search-reverse-order              order           REJECTED: invariant not established
+  field-pending-after-applied       well-formedness REJECTED: postcondition on return path
+  field-accept-any-outcome          stale outcome   REJECTED: postcondition on return path
+  field-stuck-saving                no stuck state  REJECTED: postcondition on return path
+  field-clobber-draft               no clobber      REJECTED: postcondition on return path
+  field-wrong-effect-id             write value     REJECTED: postcondition on return path
+  ```
+
+- Property suites (default 200 runs): conversion (`66 pass`) covers search
+  composition, whitespace folding, per-category counting, the modified filter,
+  coercion round-trips, and generated event sequences. Classification checks in
+  the suites require at least 20 % non-empty and 20 % excluding search results
+  (INV-SEARCH-*), 25 % accepted and rejected coercions (INV-COERCE), and 10 %
+  each for stale outcomes, dirty refreshes, and error phases (INV-FIELD-*).
+- Gates: `make check-fmt`, `make typecheck`, `make lint`, `make spelling`,
+  `bun run build:packages`, and `make proofs` clean; `make test` reports 579
+  pass, 0 fail across 72 files.
+- Not covered here: the gateway-permutation half of INV-FIELD-STALE and
+  PROP-CONVERGE need the field store and a gateway double, which arrive in
+  EP-M5.
 
 Design review summary (2026-10-29), recorded for traceability. Three expert
 lenses reviewed the first draft. Blocking findings and their resolutions: naive
@@ -1622,3 +1714,11 @@ load-path regression corpus; the fast-lane E2E extension and the per-category
 catalogue files were dropped. Tolerances were raised to 95 files and 8,000
 lines to match the revised estimate. Remaining work is unchanged in order:
 EP-M0 to EP-M7, after user approval.
+
+2026-11-25: EP-M0 and EP-M1 completed. EP-M0 proved the toolchain, then deleted
+its prototype. EP-M1 delivered the pure settings domain and both proofs.
+Findings recorded during implementation: the LemmaScript patch now also fixes
+generic-union lookup (D20); the field machine's shape adjustments (D21); and
+the search non-vacuity approach (D22). The proof targets verify with zero
+errors, nine seeded mutations are each rejected, and the full unit suite is
+green.
