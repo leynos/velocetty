@@ -15,7 +15,10 @@ import {
   type SettingsCategorySelection
 } from '@shared/constants/settings-tab';
 
+import {buildCorePanelModel, coreKeyFromSettingId, type CoreSettingKey} from '@shared/settings/core-catalogue';
+
 import {SettingsView, type SettingsViewStrings} from '../settings/components/settings-view';
+import {createFieldStore, type FieldDefinition} from '../settings/field-store';
 import {
   categoryLabel,
   settingDescription,
@@ -54,6 +57,45 @@ const bannerFor = (status: SettingsFileStatus | null, loadError: string | null):
   }
 };
 
+const FIELD_DEFINITIONS: readonly FieldDefinition[] = buildCorePanelModel().sections.flatMap((section) =>
+  section.fields.flatMap((field): FieldDefinition[] => {
+    const key = coreKeyFromSettingId(field.id);
+    return key === undefined ? [] : [{id: field.id, target: {scope: 'core', key}, control: field.control}];
+  })
+);
+
+/**
+ * Explains why a row cannot be edited in the file's current state.
+ *
+ * @param key - The setting key.
+ * @param status - The file status, or null before the first load.
+ * @returns A reason, or undefined when the row is editable.
+ */
+const disabledReasonFor = (key: CoreSettingKey, status: SettingsFileStatus | null): string | undefined => {
+  if (status === null) {
+    return undefined;
+  }
+  switch (status.kind) {
+    case 'ok':
+    case 'missing': {
+      return undefined;
+    }
+    case 'legacy-json': {
+      return settingsStrings.legacyRow;
+    }
+    case 'unparseable': {
+      return settingsStrings.unparseableRow;
+    }
+    case 'invalid': {
+      const keyPath = `/config/${key}`;
+      const ownsDiagnostic = status.diagnostics.some(
+        (diagnostic) => diagnostic.path === keyPath || diagnostic.path.startsWith(`${keyPath}/`)
+      );
+      return ownsDiagnostic ? undefined : settingsStrings.invalidRow;
+    }
+  }
+};
+
 const viewStrings: SettingsViewStrings = {
   title: settingsStrings.title,
   search: settingsStrings.search,
@@ -71,14 +113,17 @@ const Settings = (props: SettingsConnectedProps) => {
   // helpers themselves are stable module functions.
   useSettingsTranslation();
   const gateway = useMemo(() => createTransportSettingsGateway(transport), []);
+  const fieldStore = useMemo(() => createFieldStore({gateway, fields: FIELD_DEFINITIONS}), [gateway]);
   const editor = useSettingsEditor({
     gateway,
+    fieldStore,
     query: props.query,
     selectedCategory: props.selectedCategory,
     labelFor: settingLabel,
     descriptionFor: settingDescription,
     categoryLabelFor: categoryLabel,
-    allSettingsLabel: settingsStrings.allSettings
+    allSettingsLabel: settingsStrings.allSettings,
+    disabledReasonFor
   });
 
   return (

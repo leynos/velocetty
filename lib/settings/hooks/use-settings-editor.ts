@@ -7,11 +7,11 @@
  * search core in `shared/src/settings/search.ts`.
  */
 
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 
 import {formatValue, type SettingValue} from '@shared/settings/coerce';
-import {isBoolean, isNumber, isString} from '@shared/types/guards';
 import {buildCorePanelModel, coreKeyFromSettingId, type CoreSettingKey} from '@shared/settings/core-catalogue';
+import {keyRequiresRestart} from '@shared/constants/config-reloadability';
 import type {PanelField} from '@shared/settings/panel-model';
 import {normalizeSearchText, searchFieldIndices} from '@shared/settings/search';
 import {SETTING_CATEGORY_IDS, type SettingCategoryId} from '@shared/settings/panel-model';
@@ -19,19 +19,23 @@ import type {SettingsFileStatus, SettingsSnapshot} from '@shared/settings/protoc
 import type {JsonValue} from '@shared/types/json';
 import type {SettingsCategorySelection} from '@shared/constants/settings-tab';
 
-import {formatResultCount} from '../i18n';
+import {describeFieldError, formatResultCount} from '../i18n';
+import type {FieldStore, FieldStoreSnapshot} from '../field-store';
 import type {SettingsGateway} from '../ports';
-import type {SettingsCategory, SettingsRow, SettingsSection} from '../components/settings-view';
+import type {SettingsCategory, SettingsSection} from '../components/settings-view';
+import type {SettingRowProps} from '../components/setting-row';
 
 /** Arguments for the settings editor hook. */
 export type SettingsEditorArguments = {
   readonly gateway: SettingsGateway;
+  readonly fieldStore: FieldStore;
   readonly query: string;
   readonly selectedCategory: SettingsCategorySelection;
   readonly labelFor: (key: CoreSettingKey) => string;
   readonly descriptionFor: (key: CoreSettingKey) => string | undefined;
   readonly categoryLabelFor: (category: SettingCategoryId) => string;
   readonly allSettingsLabel: string;
+  readonly disabledReasonFor: (key: CoreSettingKey, status: SettingsFileStatus | null) => string | undefined;
 };
 
 /** What the settings view renders. */
@@ -53,13 +57,6 @@ type FieldEntry = {
 };
 
 const ALL_CATEGORIES = -1;
-
-const asSettingValue = (value: JsonValue | undefined): SettingValue | undefined => {
-  if (isString(value) || isNumber(value) || isBoolean(value)) {
-    return value;
-  }
-  return undefined;
-};
 
 const haystackFor = (entry: Omit<FieldEntry, 'haystack'>, label: string, description: string | undefined): string =>
   normalizeSearchText([label, entry.key, description ?? ''].join(' '));
@@ -90,29 +87,51 @@ const sectionIndexFor = (entries: readonly FieldEntry[], selectedCategory: Setti
   );
 };
 
+type Mutable<T> = {-readonly [K in keyof T]: T[K]};
+
 const rowFor = (
   entry: FieldEntry,
   snapshot: SettingsSnapshot | null,
+  fields: FieldStoreSnapshot,
   arguments_: SettingsEditorArguments
-): SettingsRow => {
-  const stored = snapshot?.userValues[entry.key];
+): SettingRowProps => {
+  const state = fields.fields.get(entry.field.id);
   const description = arguments_.descriptionFor(entry.key);
-  const row: SettingsRow = {
+  const isDisabledReason = arguments_.disabledReasonFor(entry.key, snapshot?.fileStatus ?? null);
+  const errors = (state?.errors ?? []).map((error) => describeFieldError(error));
+  const base: Mutable<SettingRowProps> = {
     id: entry.field.id,
     label: arguments_.labelFor(entry.key),
-    value: formatValue(entry.field.control, asSettingValue(stored)),
-    isModified: snapshot !== null && Object.hasOwn(snapshot.userValues, entry.key)
+    control: entry.field.control,
+    draft: state?.draft ?? '',
+    phase: state?.phase ?? 'idle',
+    errors,
+    isModified: state !== undefined && state.committed !== undefined,
+    isDisabled: isDisabledReason !== undefined,
+    isProfileOverridden: snapshot?.profileOverriddenKeys.includes(entry.key) ?? false,
+    requiresRestart: keyRequiresRestart(entry.key),
+    onChange: (draft) => arguments_.fieldStore.setDraft(entry.field.id, draft),
+    onCommit: () => arguments_.fieldStore.submit(entry.field.id),
+    onRevert: () => arguments_.fieldStore.revert(entry.field.id),
+    onReset: () => arguments_.fieldStore.reset(entry.field.id)
   };
-  return description === undefined ? row : {...row, description};
+  if (description !== undefined) {
+    base.description = description;
+  }
+  if (isDisabledReason !== undefined) {
+    base.disabledReason = isDisabledReason;
+  }
+  return base;
 };
 
 const groupSections = (
   entries: readonly FieldEntry[],
   matches: readonly number[],
   snapshot: SettingsSnapshot | null,
+  fields: FieldStoreSnapshot,
   arguments_: SettingsEditorArguments
 ): readonly SettingsSection[] => {
-  const rowsByCategory = new Map<SettingCategoryId, SettingsRow[]>();
+  const rowsByCategory = new Map<SettingCategoryId, SettingRowProps[]>();
   const matched = new Set(matches);
   entries.forEach((entry, index) => {
     if (!matched.has(index)) {
@@ -120,7 +139,7 @@ const groupSections = (
     }
     const category = SETTING_CATEGORY_IDS[entry.categoryIndex];
     const rows = rowsByCategory.get(category) ?? [];
-    rows.push(rowFor(entry, snapshot, arguments_));
+    rows.push(rowFor(entry, snapshot, fields, arguments_));
     rowsByCategory.set(category, rows);
   });
   return [...rowsByCategory].map(([category, rows]) => ({
@@ -145,6 +164,14 @@ export const useSettingsEditor = (arguments_: SettingsEditorArguments): Settings
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const latestRevision = useRef(-1);
+  const fieldStore = arguments_.fieldStore;
+  const fieldSnapshot = useSyncExternalStore(fieldStore.subscribe, fieldStore.getSnapshot, fieldStore.getSnapshot);
+
+  useEffect(() => {
+    if (snapshot !== null) {
+      fieldStore.refresh(snapshot);
+    }
+  }, [snapshot, fieldStore]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -199,7 +226,7 @@ export const useSettingsEditor = (arguments_: SettingsEditorArguments): Settings
       }))
     ];
     return {
-      sections: groupSections(entries, matches, snapshot, arguments_),
+      sections: groupSections(entries, matches, snapshot, fieldSnapshot, arguments_),
       categories,
       resultCount: matches.length,
       statusMessage: formatResultCount(matches.length),
@@ -207,5 +234,5 @@ export const useSettingsEditor = (arguments_: SettingsEditorArguments): Settings
       isLoading,
       loadError
     };
-  }, [entries, snapshot, isLoading, loadError, arguments_.query, arguments_.selectedCategory]);
+  }, [entries, snapshot, fieldSnapshot, isLoading, loadError, arguments_.query, arguments_.selectedCategory]);
 };

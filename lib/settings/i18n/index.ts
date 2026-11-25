@@ -9,6 +9,8 @@
 
 import {createTranslator} from '../../i18n/create-translator';
 
+import type {FieldError} from '../field-store';
+
 import type {CoreSettingKey} from '@shared/settings/core-catalogue';
 import type {SettingCategoryId} from '@shared/settings/panel-model';
 
@@ -95,6 +97,9 @@ export const settingsStrings = {
   clearFilters: 'Clear search and category',
   openConfigFile: 'Open config file',
   unparseableBanner: 'The config file has a syntax error, so settings cannot be saved until it is fixed.',
+  legacyRow: 'The legacy hyper.json file is read-only here.',
+  unparseableRow: 'Fix the config file syntax before saving.',
+  invalidRow: 'Fix the other invalid settings first.',
   invalidBanner: 'The config file has invalid values. Fix the highlighted settings, or open the file.',
   legacyBanner: 'This configuration uses the legacy hyper.json file, which the settings tab cannot change.',
   missingBanner: 'No config file exists yet; settings will be written to one when you change a value.',
@@ -136,4 +141,51 @@ export const useSettingsTranslation = (): SettingsTranslation => {
     description: (key) => settingDescriptions[key],
     category: (id) => categoryLabels[id]
   };
+};
+
+/**
+ * Turns a field error into a message a user can act on.
+ *
+ * A main-process diagnostic carries its own message and fix, so those win; a
+ * local coercion failure is named by its reason code.
+ *
+ * @param error - The field error to describe.
+ * @returns The message for the row.
+ *
+ * @example
+ * describeFieldError({code: 'not-a-number'}); // 'Enter a number'
+ */
+export const describeFieldError = (error: FieldError): string => {
+  if (error.message !== undefined && error.message.trim().length > 0) {
+    return error.suggestedFix === undefined ? error.message : `${error.message} ${error.suggestedFix}`;
+  }
+  switch (error.code) {
+    case 'empty': {
+      return 'Enter a value';
+    }
+    case 'not-a-number': {
+      return 'Enter a number';
+    }
+    case 'not-an-integer': {
+      return 'Enter a whole number';
+    }
+    case 'below-minimum': {
+      return error.minimum === undefined ? 'Enter a larger number' : `Enter ${error.minimum} or more`;
+    }
+    case 'above-maximum': {
+      return error.maximum === undefined ? 'Enter a smaller number' : `Enter ${error.maximum} or less`;
+    }
+    case 'not-an-option': {
+      return 'Choose a supported value';
+    }
+    case 'not-a-colour': {
+      return 'Enter a colour such as #1a2b3c';
+    }
+    case 'rejected': {
+      return 'The config change was rejected';
+    }
+    case 'failed': {
+      return 'The config file could not be written';
+    }
+  }
 };

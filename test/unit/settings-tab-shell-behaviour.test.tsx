@@ -30,25 +30,42 @@ const strings: SettingsViewProps['strings'] = {
   modified: 'Changed'
 };
 
+const row = (
+  overrides: Partial<SettingsViewProps['sections'][number]['rows'][number]>
+): SettingsViewProps['sections'][number]['rows'][number] => ({
+  id: 'core:fontSize',
+  label: 'Font size',
+  control: {kind: 'number', minimum: 6, maximum: 100, step: 1, isInteger: false},
+  draft: '14',
+  phase: 'idle',
+  errors: [],
+  isModified: false,
+  isDisabled: false,
+  isProfileOverridden: false,
+  requiresRestart: false,
+  onChange: () => {},
+  onCommit: () => {},
+  onRevert: () => {},
+  onReset: () => {},
+  ...overrides
+});
+
 const baseProps: SettingsViewProps = {
   strings,
   sections: [
     {
       category: 'appearance',
       label: 'Appearance',
-      rows: [
-        {id: 'core:fontSize', label: 'Font size', description: 'Text size.', value: '14', isModified: true},
-        {id: 'core:fontFamily', label: 'Font family', value: 'Menlo', isModified: false}
-      ]
+      rows: [row({id: 'core:fontSize', label: 'Font size', description: 'Text size.', draft: '14', isModified: true})]
     }
   ],
   categories: [
-    {id: 'all', label: 'All settings', count: 2},
-    {id: 'appearance', label: 'Appearance', count: 2}
+    {id: 'all', label: 'All settings', count: 1},
+    {id: 'appearance', label: 'Appearance', count: 1}
   ],
   query: '',
   selectedCategory: 'all',
-  resultCount: 2,
+  resultCount: 1,
   statusMessage: '2 settings',
   banner: null,
   isActive: true,
@@ -101,14 +118,18 @@ describe('settings view', () => {
   test('marks the selected category current', async () => {
     await render({selectedCategory: 'appearance'});
     const current = [...document.querySelectorAll('[aria-current="true"]')].map((node) => node.textContent);
-    expect(current).toEqual(['Appearance2']);
+    expect(current).toEqual(['Appearance1']);
   });
 
   test('renders rows with values and modified markers', async () => {
     await render({});
     expect(document.body.textContent).toContain('Font size');
-    expect(document.body.textContent).toContain('14');
-    expect(document.body.textContent).toContain('Changed');
+    const input = document.querySelector<HTMLInputElement>('input[type="number"]');
+    expect(input?.value).toBe('14');
+    const reset = [...document.querySelectorAll('button')].find(
+      (candidate) => candidate.getAttribute('aria-label') === 'Reset Font size to default'
+    );
+    expect(reset).toBeDefined();
   });
 
   test('the empty state offers one clear action', async () => {

@@ -213,7 +213,7 @@ terminal's column and row count did not change.
 - [x] (2026-11-25) EP-M3: config file writer, settings service, and IPC.
 - [x] (2026-11-25) EP-M4: settings tab shell, tab strip, input gating, and
       navigation.
-- [ ] EP-M5: editing, inline validation, and reset flows.
+- [x] (2026-11-25) EP-M5: editing, inline validation, and reset flows.
 - [ ] EP-M6: end-to-end coverage.
 - [ ] EP-M7: documentation, ADR, and roadmap closure.
 
@@ -562,6 +562,16 @@ terminal's column and row count did not change.
      snapshot refresh reconciles the committed value.
   Every union and phase literal is also bound to a typed local before use, as
   the observation above explains. Date/Author: 2026-11-25.
+- Decision D26 (new, EP-M5): per-field edit state lives in a ref-backed store
+  (`lib/settings/field-store.ts`) read through `useSyncExternalStore`, exactly
+  as D7 requires. Writes issue in submission order (the IPC order) and outcomes
+  may be delivered in any order; the store ignores an outcome whose request id
+  is not the pending one and applies the newest snapshot on success. Errors are
+  `{code, message?, suggestedFix?, minimum?, maximum?}`: a main-process
+  diagnostic's own text wins, and a local coercion failure is described from
+  its reason code by the translation layer. Row controls bind
+  `aria-describedby` to the description, the disabled reason, and the error
+  list, and reset returns focus to the control. Date/Author: 2026-11-25.
 - Decision D25 (new, EP-M4): the settings surface is a sibling layer of the
   terminal layer inside `.hyperMain`. Both layers are absolutely positioned
   with an explicit width and height, and the inactive one is moved offscreen by
@@ -1711,6 +1721,33 @@ EP-M4 (2026-11-25):
   683 pass, 0 fail across 86 files.
 - Not covered here: editing controls, inline validation, and reset flows are
   EP-M5; the rows are read-only at this milestone.
+
+EP-M5 (2026-11-25):
+
+- `lib/settings/field-store.ts` runs `stepField` outside React, executes its
+  effects in submission order, ignores stale outcomes, refreshes every field
+  when a snapshot arrives, and exposes `whenIdle` for tests.
+- Controls in `lib/settings/components/controls/`: toggle (commit on change),
+  select (commit on change), number and text (Enter commits, Escape reverts,
+  blur commits), and colour (text input with a swatch preview).
+  `lib/settings/components/setting-row.tsx` adds the label, description,
+  modified indicator, reset button labelled with the setting name, inline
+  errors, the disabled explanation, the profile-override note, and the
+  `InlineRestartWarning` for restart-classified keys.
+- `use-settings-editor` subscribes to the store and builds the rows; the
+  container creates one store per gateway and computes the per-key disabled
+  reason from the file status (legacy, cannot-parse, or invalid elsewhere).
+- Tests: `settings-field-store` (9 scenarios: apply, reject, revert, reset,
+  stale outcome, dirty refresh, transport failure), `settings-controls` (9
+  keyboard and accessibility cases), and `settings-convergence.property`
+  (model-based convergence over the real service and writer with outcomes
+  delivered in a generated order; at least 10 % of runs reorder and at least 10
+  % include a reset).
+- Gates: `make check-fmt`, `make lint`, `make typecheck`,
+  `bun run build:packages`, and `bunx tsgo --project app/tsconfig.build.json`
+  clean; `bun test --concurrent --isolate --timeout 30000 test/unit` reports
+  702 pass, 0 fail across 89 files.
+- Not covered here: the packaged-app E2E spec is EP-M6.
 
 Design review summary (2026-10-29), recorded for traceability. Three expert
 lenses reviewed the first draft. Blocking findings and their resolutions: naive

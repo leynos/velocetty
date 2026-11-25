@@ -14,25 +14,18 @@
 import {useEffect, useRef} from 'react';
 import type {ReactElement} from 'react';
 
+import {SettingRow, type SettingRowProps} from './setting-row';
+
 import * as styles from './settings-view.module.css';
 
 import type {SettingsCategorySelection} from '@shared/constants/settings-tab';
 import type {SettingCategoryId} from '@shared/settings/panel-model';
 
-/** One row in the results region. */
-export type SettingsRow = {
-  readonly id: string;
-  readonly label: string;
-  readonly description?: string;
-  readonly value: string;
-  readonly isModified: boolean;
-};
-
 /** One group of rows under a category heading. */
 export type SettingsSection = {
   readonly category: SettingCategoryId;
   readonly label: string;
-  readonly rows: readonly SettingsRow[];
+  readonly rows: readonly SettingRowProps[];
 };
 
 /** One entry in the category navigation. */
@@ -159,14 +152,7 @@ export const SettingsView = (props: SettingsViewProps): ReactElement => {
               <ul className={styles.rows}>
                 {section.rows.map((row) => (
                   <li key={row.id} className={styles.row}>
-                    <div className={styles.rowText}>
-                      <span className={styles.rowLabel}>{row.label}</span>
-                      {row.description !== undefined && (
-                        <span className={styles.rowDescription}>{row.description}</span>
-                      )}
-                    </div>
-                    <span className={styles.rowValue}>{row.value}</span>
-                    {row.isModified && <span className={styles.modified}>{strings.modified}</span>}
+                    <SettingRow {...row} />
                   </li>
                 ))}
               </ul>
