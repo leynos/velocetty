@@ -147,7 +147,7 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-delivered change is **167 non-Plan files** and **16,117 net non-generated
+delivered change is **167 non-Plan files** and **16,121 net non-generated
 lines**. The excess is recorded here as the escalation the tolerance requires,
 and the maintainer's acceptance of the raised counts is requested before merge.
 
@@ -2306,8 +2306,8 @@ non-generated lines; maintainer acceptance is still requested and not assumed.
    (413) exceeded the 400-line limit. The rejection line moved to
    `lib/settings/rejection-line.ts` with its own suite, and the store suite
    keeps one end-to-end assertion; both files are back under the limit.
-3. The scope count is corrected to **167 non-Plan files** and **16,117 net
-   non-generated lines** at `663ae745`. Maintainer acceptance of this deviation
+3. The scope count is corrected to **167 non-Plan files** and **16,121 net
+   non-generated lines** at `b13da2ef`. Maintainer acceptance of this deviation
    is requested in the Tolerance deviation section and has not been granted.
 
 Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and nixie clean;
