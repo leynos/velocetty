@@ -667,8 +667,11 @@ export default class Term extends React.PureComponent<
 
   closeSearchBox = () => {
     this.props.onCloseSearch();
+    // `clearDecorations()` clears the active decoration too. The published
+    // typings for xterm-addon-search 0.13 declare `clearActiveDecoration()`,
+    // but the shipped runtime does not implement it, so calling it threw and
+    // aborted the teardown before the search results were reset.
     this.searchAddon.clearDecorations();
-    this.searchAddon.clearActiveDecoration();
     this.setState((state) => ({
       ...state,
       searchResults: undefined
