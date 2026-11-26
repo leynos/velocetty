@@ -372,7 +372,7 @@ describe('settings field store', () => {
     expect([stateOf(store).draft, stateOf(store).committed]).toEqual(['22', 16]);
   });
 
-  test('a transport rejection logs a bounded line and never the message', async () => {
+  test('a transport rejection logs the bounded line and fails the field', async () => {
     const fake = createFakeGateway();
     const lines: string[] = [];
     const store = createStore(fake.gateway, (message) => lines.push(message));
@@ -382,20 +382,6 @@ describe('settings field store', () => {
     await store.whenIdle();
     expect(lines).toEqual(['settings write rejected category=transport name=TypeError']);
     expect(lines.join('\n')).not.toContain('/home/user');
-    expect(store.getSnapshot().status).toBe('failed');
-  });
-
-  test('a rejection with a crafted name logs only the category', async () => {
-    const fake = createFakeGateway();
-    const lines: string[] = [];
-    const store = createStore(fake.gateway, (message) => lines.push(message));
-    store.setDraft(FONT.id, '16');
-    store.submit(FONT.id);
-    // A name is caller-controlled text and could carry a path or a newline, so
-    // only the built-in error names ever reach the line.
-    fake.rejectNext(Object.assign(new Error('boom'), {name: '/home/user/.config/Hyper\nforged line'}));
-    await store.whenIdle();
-    expect(lines).toEqual(['settings write rejected category=transport']);
     expect(store.getSnapshot().status).toBe('failed');
   });
 

@@ -108,6 +108,34 @@ const removeSpans = (doc: string, spans: readonly Span[]): string => {
   return text;
 };
 
+/**
+ * The comma that separates `property` from the next one, when it lies outside
+ * `span`.
+ *
+ * A property on its own line can still have its comma on a later line, after
+ * a comment or a line break. Deleting only the property's line would then
+ * leave a leading comma and produce invalid JSON5, so the comma is removed as
+ * a span of its own and the intervening comment stays.
+ */
+const separatorOutsideSpan = (
+  doc: string,
+  parser: Json5Parser,
+  property: Json5ObjectProperty,
+  span: Span
+): Span | null => {
+  if (!property.hasTrailingComma) {
+    return null;
+  }
+  const comma = parser.skipWhitespaceAndComments({
+    startIndex: valueTextEnd(doc, property),
+    limitIndex: doc.length
+  });
+  if (doc[comma] !== ',' || (comma >= span.startIndex && comma < span.endIndex)) {
+    return null;
+  }
+  return {startIndex: comma, endIndex: comma + 1};
+};
+
 const removalSpans = (
   doc: string,
   parser: Json5Parser,
@@ -115,7 +143,11 @@ const removalSpans = (
   property: Json5ObjectProperty
 ): readonly Span[] => {
   const ownLine = ownLineSpan(doc, parser, property);
-  return ownLine ? [ownLine] : inlineSpans(doc, parser, properties, property);
+  if (ownLine) {
+    const comma = separatorOutsideSpan(doc, parser, property, ownLine);
+    return comma ? [ownLine, comma] : [ownLine];
+  }
+  return inlineSpans(doc, parser, properties, property);
 };
 
 const removeProperty = (doc: string, parentRange: Json5ObjectRange, key: PropertyKey): DocumentEditResult => {
