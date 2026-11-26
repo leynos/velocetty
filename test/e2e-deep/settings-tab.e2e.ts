@@ -203,6 +203,14 @@ const exerciseEdits = async (window: Page, configPath: string, seededText: strin
   await expect(window.locator('#core-fontSize-control')).toHaveAttribute('aria-invalid', 'true');
   expect(await readConfig(configPath)).toBe(beforeInvalid);
 
+  // The plan's observable-success scenario also names scrollback: an invalid
+  // value there is refused the same way and leaves the file untouched.
+  const scrollback = window.locator('#core-scrollback-control');
+  await scrollback.fill('abc');
+  await scrollback.press('Enter');
+  await expect(window.locator('#core-scrollback-errors')).toContainText('Enter a number');
+  expect(await readConfig(configPath)).toBe(beforeInvalid);
+
   // Reset removes the key and keeps the comment. A pointer click proves the
   // results area is not covered by the fixed header; the row control's
   // keyboard path is covered by the unit suite.
