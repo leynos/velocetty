@@ -147,7 +147,7 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-delivered change is **167 non-Plan files** and **16,121 net non-generated
+delivered change is **167 non-Plan files** and **16,136 net non-generated
 lines**. The excess is recorded here as the escalation the tolerance requires,
 and the maintainer's acceptance of the raised counts is requested before merge.
 
@@ -2306,11 +2306,23 @@ non-generated lines; maintainer acceptance is still requested and not assumed.
    (413) exceeded the 400-line limit. The rejection line moved to
    `lib/settings/rejection-line.ts` with its own suite, and the store suite
    keeps one end-to-end assertion; both files are back under the limit.
-3. The scope count is corrected to **167 non-Plan files** and **16,121 net
-   non-generated lines** at `b13da2ef`. Maintainer acceptance of this deviation
+3. The scope count is corrected to **167 non-Plan files** and **16,136 net
+   non-generated lines** at `ffd3835c`. Maintainer acceptance of this deviation
    is requested in the Tolerance deviation section and has not been granted.
 
 Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and nixie clean;
 1,299 unit tests across 145 files with zero failures; proofs 1 + 8 + 9 + 11
 with zero errors and fresh artefacts; packaged settings deep E2E passing;
 `cs delta origin/main` reporting no new issue.
+
+2026-11-26: eleventh round, the keyboard-evidence gap the completeness
+assessment named. The plan requires Tab order and keyboard access to Reset,
+and the unit suite could only assert focusability and DOM order because Happy
+DOM does not implement sequential focus navigation. The packaged deep E2E now
+presses Tab from the font-size control to its Reset button, asserts the button
+holds focus, activates it with Enter, and asserts focus returns to the control;
+it also checks that the inactive settings layer is `inert` and that focusing a
+control inside it leaves `document.activeElement` elsewhere. The reset step
+restores a valid draft first, because the preceding invalid-value check leaves
+the row without a Reset button. Recorded count: 167 non-Plan files and 16,136
+net non-generated lines at `ffd3835c`.
