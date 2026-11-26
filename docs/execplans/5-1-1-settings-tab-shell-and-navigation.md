@@ -147,7 +147,7 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-delivered change is **150 non-Plan files** and **13,187 net non-generated
+delivered change is **150 non-Plan files** and **13,336 net non-generated
 lines**. The excess is recorded here as the escalation the tolerance requires,
 and the maintainer's acceptance of the raised counts is requested before merge.
 
@@ -2115,7 +2115,7 @@ disabled-row behaviour, category-label search, inline diagnostics, and pointer
 access in the packaged app. The proofs gained a grounded `StringSplit` axiom,
 transition-based reachability lemmas (search 9, field state 11 verified), and a
 per-summary positive-count guard; D22 now names the opaque `Seq.All` boundary.
-The scope tolerance is exceeded (150 non-Plan files, 13,187 net lines); the
+The scope tolerance is exceeded (150 non-Plan files, 13,336 net lines); the
 deviation and its reasons are recorded under Tolerances for maintainer
 acceptance.
 
@@ -2155,3 +2155,12 @@ invalid and refused-reset classifications are asserted at their thresholds;
 `field-state.ts` is 400 lines; and the packaged E2E compares the complete file
 text after the edit and after the reset, not only the parsed value. Final
 candidate: 1,212 unit tests.
+
+2026-11-26: fifth assessment repair round. The field store now publishes the
+newest file snapshot it has seen, including the one carried by an applied
+write, and the editor hook builds the panel from it. Changed markers, reset
+buttons, `@modified`, and the invalid banner update before the watcher reload,
+with a regression that renders the hook and applies a write without a reload.
+Convergence now asserts the exact invalid draft, checks refused-reset drafts
+against the run's candidate values, classifies actual service outcomes, and
+counts runs containing resets. Final candidate: 1,213 unit tests.

@@ -22,6 +22,8 @@ import {
   type SettingsEditorArguments
 } from '../../lib/settings/hooks/settings-editor-model';
 import {useSettingsSnapshot, type SettingsSnapshotState} from '../../lib/settings/hooks/use-settings-snapshot';
+import {useSettingsEditor, type SettingsEditor} from '../../lib/settings/hooks/use-settings-editor';
+import {createFieldStore, type FieldDefinition} from '../../lib/settings/field-store';
 import type {FieldStore, FieldStoreSnapshot} from '../../lib/settings/field-store';
 import type {SettingsGateway} from '../../lib/settings/ports';
 import {setupHappyDom} from '../testUtils/happy-dom';
@@ -76,7 +78,7 @@ const createRecordingGateway = () => {
 };
 
 const fieldStoreDouble = (): FieldStore => ({
-  getSnapshot: (): FieldStoreSnapshot => ({fields: new Map(), status: 'idle'}),
+  getSnapshot: (): FieldStoreSnapshot => ({fields: new Map(), status: 'idle', settingsSnapshot: null}),
   refresh: () => {},
   reset: () => {},
   revert: () => {},
@@ -105,7 +107,7 @@ const panelOf = (snapshot: SettingsSnapshot, query: string) => {
   return buildSettingsPanel({
     arguments_,
     entries,
-    fields: {fields: new Map(), status: 'idle'},
+    fields: {fields: new Map(), status: 'idle', settingsSnapshot: null},
     query,
     selectedCategory: 'all',
     snapshot
@@ -176,6 +178,66 @@ describe('useSettingsSnapshot', () => {
   });
 });
 
+describe('useSettingsEditor', () => {
+  test('an applied write updates the panel before a watcher reload', async () => {
+    const field: FieldDefinition = {
+      id: 'core:fontSize',
+      target: {scope: 'core', key: 'fontSize'},
+      control: {kind: 'number', minimum: 6, maximum: 100, step: 1, isInteger: false}
+    };
+    const pending: {resolve: (outcome: SettingsWriteOutcome) => void}[] = [];
+    const gateway: SettingsGateway = {
+      getSnapshot: async () => snapshotOf(1),
+      resetValue: () =>
+        new Promise<SettingsWriteOutcome>((resolve) => {
+          pending.push({resolve});
+        }),
+      setValue: () =>
+        new Promise<SettingsWriteOutcome>((resolve) => {
+          pending.push({resolve});
+        }),
+      subscribe: () => () => {}
+    };
+    const fieldStore = createFieldStore({gateway, fields: [field]});
+    const arguments_ = editorArguments({fieldStore, gateway});
+    let editor: SettingsEditor | null = null;
+    const current = (): SettingsEditor | null => editor;
+    const Probe = ({query}: {readonly query: string}) => {
+      editor = useSettingsEditor({...arguments_, query});
+      return null;
+    };
+
+    await act(async () => {
+      root?.render(<Probe query="" />);
+    });
+    await act(async () => {
+      fieldStore.refresh(await gateway.getSnapshot(new AbortController().signal));
+    });
+    const row = () =>
+      current()
+        ?.sections.flatMap((section) => section.rows)
+        .find((candidate) => candidate.id === field.id);
+    expect(row()?.isModified).toBe(false);
+
+    await act(async () => {
+      fieldStore.setDraft(field.id, '16');
+      fieldStore.submit(field.id);
+    });
+    await act(async () => {
+      pending.shift()?.resolve({kind: 'applied', snapshot: snapshotOf(2, {fontSize: 16})});
+      await fieldStore.whenIdle();
+    });
+
+    expect(row()?.isModified).toBe(true);
+    expect(row()?.draft).toBe('16');
+
+    await act(async () => {
+      root?.render(<Probe query="@modified" />);
+    });
+    expect(current()?.resultCount).toBe(1);
+  });
+});
+
 describe('buildSettingsPanel', () => {
   test('@modified lists only keys present in the user config file', () => {
     const panel = panelOf(snapshotOf(1, {fontSize: 16}), '@modified');
@@ -200,7 +262,7 @@ describe('buildSettingsPanel', () => {
       return buildSettingsPanel({
         arguments_,
         entries: buildFieldEntries(arguments_),
-        fields: {fields: new Map(), status},
+        fields: {fields: new Map(), status, settingsSnapshot: null},
         query: '',
         selectedCategory: 'all',
         snapshot: snapshotOf(1)

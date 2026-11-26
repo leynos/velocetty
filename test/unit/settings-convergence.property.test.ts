@@ -55,9 +55,12 @@ type AppliedOps = {
   /** The draft the store should show once everything has settled. */
   readonly expectedDraft: ReadonlyMap<string, string>;
   /** Fields whose final action was a local validation refusal. */
-  readonly errorFields: ReadonlySet<string>;
+  readonly invalidFields: ReadonlySet<string>;
+  /** Fields whose final reset was refused because the key was absent. */
+  readonly refusedFields: ReadonlySet<string>;
   readonly invalidActions: number;
   readonly refusedResets: number;
+  readonly candidateDrafts: ReadonlyMap<string, ReadonlySet<string>>;
 };
 
 const fieldArbitrary = fc.constantFrom(FONT_SIZE, SHELL);
@@ -121,9 +124,16 @@ const createHarness = () => {
     getDefaultProfileName: () => 'default'
   });
   const pending: Pending[] = [];
+  const outcomes: SettingsWriteOutcome[] = [];
   const defer = (outcome: Promise<SettingsWriteOutcome>): Promise<SettingsWriteOutcome> =>
     new Promise((resolve) => {
-      pending.push({outcome, resolve});
+      pending.push({
+        outcome: outcome.then((result) => {
+          outcomes.push(result);
+          return result;
+        }),
+        resolve
+      });
     });
   const gateway: SettingsGateway = {
     getSnapshot: async (): Promise<SettingsSnapshot> => service.getSnapshot(),
@@ -146,7 +156,7 @@ const createHarness = () => {
       item.resolve(await item.outcome);
     }
   };
-  return {port, service, store, pending, externalWrite, flushOldest};
+  return {port, service, store, pending, outcomes, externalWrite, flushOldest};
 };
 
 const configOf = (port: ReturnType<typeof createMemoryConfigFileSystem>): Record<string, JsonValue> => {
@@ -192,11 +202,19 @@ const applyReset = (store: FieldStore, expected: Map<string, JsonValue>, op: Res
 type Model = {
   readonly expected: Map<string, JsonValue>;
   readonly expectedDraft: Map<string, string>;
-  readonly errorFields: Set<string>;
+  readonly invalidFields: Set<string>;
+  readonly refusedFields: Set<string>;
+  readonly candidateDrafts: Map<string, Set<string>>;
   resets: number;
   externals: number;
   invalidActions: number;
   refusedResets: number;
+};
+
+const rememberDraft = (model: Model, field: string, draft: string): void => {
+  const drafts = model.candidateDrafts.get(field) ?? new Set<string>();
+  drafts.add(draft);
+  model.candidateDrafts.set(field, drafts);
 };
 
 const applyExternalAction = (harness: ReturnType<typeof createHarness>, action: ExternalOp, model: Model): void => {
@@ -205,18 +223,26 @@ const applyExternalAction = (harness: ReturnType<typeof createHarness>, action: 
     return;
   }
   model.externals += 1;
+  rememberDraft(model, action.field, action.draft);
   harness.externalWrite(action.field, value);
   model.expected.set(action.field, value);
-  model.expectedDraft.set(action.field, action.draft);
+  // A dirty error draft is preserved by the refresh, so only a clean field
+  // takes the external value into its box.
+  if (!model.invalidFields.has(action.field) && !model.refusedFields.has(action.field)) {
+    model.expectedDraft.set(action.field, action.draft);
+  }
 };
 
 const applyResetAction = (harness: ReturnType<typeof createHarness>, action: ResetOp, model: Model): void => {
   model.resets += 1;
+  rememberDraft(model, action.field, `${defaultFor(action.field)}`);
   if (model.expected.has(action.field)) {
     model.expectedDraft.set(action.field, `${defaultFor(action.field)}`);
-    model.errorFields.delete(action.field);
+    model.invalidFields.delete(action.field);
+    model.refusedFields.delete(action.field);
   } else {
-    model.errorFields.add(action.field);
+    model.invalidFields.delete(action.field);
+    model.refusedFields.add(action.field);
     model.refusedResets += 1;
     model.expectedDraft.set(action.field, model.expectedDraft.get(action.field) ?? `${defaultFor(action.field)}`);
   }
@@ -225,11 +251,13 @@ const applyResetAction = (harness: ReturnType<typeof createHarness>, action: Res
 
 const applySubmitAction = (harness: ReturnType<typeof createHarness>, action: SubmitOp, model: Model): void => {
   model.expectedDraft.set(action.field, action.draft);
+  rememberDraft(model, action.field, action.draft);
   if (coercedDraft(action.field, action.draft) === undefined) {
-    model.errorFields.add(action.field);
+    model.invalidFields.add(action.field);
     model.invalidActions += 1;
   } else {
-    model.errorFields.delete(action.field);
+    model.invalidFields.delete(action.field);
+    model.refusedFields.delete(action.field);
   }
   applySubmit(harness.store, model.expected, action);
 };
@@ -241,7 +269,9 @@ const applyActions = async (
   const model: Model = {
     expected: new Map<string, JsonValue>(),
     expectedDraft: new Map<string, string>(),
-    errorFields: new Set<string>(),
+    invalidFields: new Set<string>(),
+    refusedFields: new Set<string>(),
+    candidateDrafts: new Map<string, Set<string>>(),
     resets: 0,
     externals: 0,
     invalidActions: 0,
@@ -273,7 +303,9 @@ const applyActions = async (
     resets: model.resets,
     externals: model.externals,
     expectedDraft: model.expectedDraft,
-    errorFields: model.errorFields,
+    invalidFields: model.invalidFields,
+    refusedFields: model.refusedFields,
+    candidateDrafts: model.candidateDrafts,
     invalidActions: model.invalidActions,
     refusedResets: model.refusedResets
   };
@@ -294,24 +326,60 @@ const flushInOrder = async (harness: ReturnType<typeof createHarness>, keys: rea
 
 const defaultFor = (field: string): JsonValue => (field === FONT_SIZE ? 12 : '/bin/bash');
 
-const expectFieldSettled = (harness: ReturnType<typeof createHarness>, applied: AppliedOps, field: string): void => {
+const expectCommittedValue = (
+  harness: ReturnType<typeof createHarness>,
+  applied: AppliedOps,
+  field: string,
+  expectedValue: JsonValue
+): void => {
   const state = harness.store.getSnapshot().fields.get(`core:${field}`);
-  const expectedValue = applied.expected.get(field) ?? defaultFor(field);
   expect(configOf(harness.port)[field] ?? null).toEqual(applied.expected.get(field) ?? null);
   expect(state?.committed ?? defaultFor(field)).toEqual(expectedValue);
+};
 
+const expectInvalidDraft = (harness: ReturnType<typeof createHarness>, applied: AppliedOps, field: string): void => {
+  const state = harness.store.getSnapshot().fields.get(`core:${field}`);
+  expect(state?.draft).toBe(applied.expectedDraft.get(field));
+  expect(state?.errors.length).toBeGreaterThan(0);
+};
+
+const expectRefusedDraft = (harness: ReturnType<typeof createHarness>, applied: AppliedOps, field: string): void => {
+  const state = harness.store.getSnapshot().fields.get(`core:${field}`);
+  expect(state?.errors.length).toBeGreaterThan(0);
+  const candidates = applied.candidateDrafts.get(field) ?? new Set<string>();
+  expect(candidates.has(state?.draft ?? '')).toBe(true);
+};
+
+const expectCleanDraft = (
+  harness: ReturnType<typeof createHarness>,
+  applied: AppliedOps,
+  field: string,
+  expectedValue: JsonValue
+): void => {
+  const state = harness.store.getSnapshot().fields.get(`core:${field}`);
+  expect(state?.errors).toEqual([]);
   const draft = applied.expectedDraft.get(field);
-  if (draft !== undefined && !applied.errorFields.has(field)) {
-    // Delivery order can leave the draft at the typed text or at the final
-    // committed value; either is a settled display, never an older value.
-    const settledDrafts: readonly (string | undefined)[] = [draft, `${expectedValue}`];
-    expect(settledDrafts).toContain(state?.draft);
+  if (draft === undefined) {
+    return;
   }
-  if (applied.errorFields.has(field)) {
-    expect(state?.errors.length).toBeGreaterThan(0);
-  } else {
-    expect(state?.errors).toEqual([]);
+  // Delivery order can leave the draft at the typed text or at the final
+  // committed value; either is a settled display, never an older value.
+  const settledDrafts: readonly (string | undefined)[] = [draft, `${expectedValue}`];
+  expect(settledDrafts).toContain(state?.draft);
+};
+
+const expectFieldSettled = (harness: ReturnType<typeof createHarness>, applied: AppliedOps, field: string): void => {
+  const expectedValue = applied.expected.get(field) ?? defaultFor(field);
+  expectCommittedValue(harness, applied, field, expectedValue);
+  if (applied.invalidFields.has(field)) {
+    expectInvalidDraft(harness, applied, field);
+    return;
   }
+  if (applied.refusedFields.has(field)) {
+    expectRefusedDraft(harness, applied, field);
+    return;
+  }
+  expectCleanDraft(harness, applied, field, expectedValue);
 };
 
 const expectSettled = (harness: ReturnType<typeof createHarness>, applied: AppliedOps): void => {
@@ -328,6 +396,8 @@ describe('settings convergence', () => {
     let externalRuns = 0;
     let invalidRuns = 0;
     let refusedRuns = 0;
+    let resetRuns = 0;
+    let serviceFailureRuns = 0;
 
     await fc.assert(
       fc.asyncProperty(actionsArbitrary, keysArbitrary, async (actions, keys) => {
@@ -345,6 +415,12 @@ describe('settings convergence', () => {
         if (applied.refusedResets > 0) {
           refusedRuns += 1;
         }
+        if (applied.resets > 0) {
+          resetRuns += 1;
+        }
+        if (harness.outcomes.some((outcome) => outcome.kind !== 'applied')) {
+          serviceFailureRuns += 1;
+        }
         const wasReordered = await flushInOrder(harness, keys);
         await harness.store.whenIdle();
         expectSettled(harness, applied);
@@ -360,5 +436,7 @@ describe('settings convergence', () => {
     expect(externalRuns / runs).toBeGreaterThan(0.1);
     expect(invalidRuns / runs).toBeGreaterThanOrEqual(0.1);
     expect(refusedRuns / runs).toBeGreaterThanOrEqual(0.1);
+    expect(resetRuns / runs).toBeGreaterThanOrEqual(0.1);
+    expect(serviceFailureRuns / runs).toBeGreaterThanOrEqual(0.1);
   });
 });

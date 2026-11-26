@@ -51,18 +51,21 @@ const useFieldSnapshot = (fieldStore: FieldStore, snapshot: SettingsSnapshot | n
 export const useSettingsEditor = (arguments_: SettingsEditorArguments): SettingsEditor => {
   const {snapshot, isLoading, loadError} = useSettingsSnapshot(arguments_.gateway);
   const fields = useFieldSnapshot(arguments_.fieldStore, snapshot);
+  // An applied write carries a newer snapshot than the last watcher reload, so
+  // the panel's changed markers and `@modified` filter follow it immediately.
+  const panelSnapshot = fields.settingsSnapshot ?? snapshot;
   const entries = useMemo(() => buildFieldEntries(arguments_), [arguments_.labelFor, arguments_.descriptionFor]);
   const panel = useMemo(
     () =>
       buildSettingsPanel({
         entries,
-        snapshot,
+        snapshot: panelSnapshot,
         fields,
         query: arguments_.query,
         selectedCategory: arguments_.selectedCategory,
         arguments_
       }),
-    [entries, snapshot, fields, arguments_.query, arguments_.selectedCategory]
+    [entries, panelSnapshot, fields, arguments_.query, arguments_.selectedCategory]
   );
   return {...panel, isLoading, loadError};
 };

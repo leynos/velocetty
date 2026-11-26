@@ -55,6 +55,12 @@ export type FieldStoreSnapshot = {
    * screen reader is not told "saved" before anything was saved.
    */
   readonly status: FieldStatus;
+  /**
+   * The newest file snapshot the store has seen, including one carried by an
+   * applied write. The panel uses it for changed markers and `@modified`
+   * before the watcher's reload arrives.
+   */
+  readonly settingsSnapshot: SettingsSnapshot | null;
 };
 
 /** The store's public surface. */
@@ -159,7 +165,7 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
     fields.map((field) => [field.id, initialFieldState<SettingValue, FieldError>(undefined, '')])
   );
   let status: FieldStatus = 'idle';
-  let snapshot: FieldStoreSnapshot = {fields: states, status};
+  let snapshot: FieldStoreSnapshot = {fields: states, status, settingsSnapshot: null};
   const listeners = new Set<() => void>();
   let inFlight = 0;
   let lastRevision = -1;
@@ -167,7 +173,7 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
   let idleWaiters: (() => void)[] = [];
 
   const publish = (): void => {
-    snapshot = {fields: new Map(states), status};
+    snapshot = {fields: new Map(states), status, settingsSnapshot: latestSnapshot};
     for (const listener of listeners) {
       listener();
     }
