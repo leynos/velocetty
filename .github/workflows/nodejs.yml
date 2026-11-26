@@ -294,15 +294,21 @@ jobs:
           # in electron-builder's bundled fpm, whose Ruby is linked against
           # `libcrypt.so.1`, which current runners no longer provide.
           electron_builder_args: '--dir'
+      - name: Install Xvfb
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends xvfb
       - name: Run deep-lane E2E tests
-        uses: GabrielBB/xvfb-action@b706e4e27b14669b486812790492dc50ca16b465 # v1.7
-        with:
-          run: bun run test:e2e:deep
+        # Plain `run:` under `xvfb-run` rather than a wrapper action: the
+        # wrapper gave no way to prove which environment the test process
+        # actually received, and two `NODE_OPTIONS` experiments were
+        # inconclusive because of it. As a normal step, `env:` reaches the
+        # process by construction.
+        run: xvfb-run --auto-servernum bun run test:e2e:deep
         env:
           DEBUG: pw:browser*
           ELECTRON_ENABLE_LOGGING: '1'
           ELECTRON_ENABLE_STACK_DUMPING: '1'
           SHELL: /bin/bash
+          NODE_OPTIONS: --no-experimental-detect-module
       - name: Upload deep-lane E2E artefacts
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
