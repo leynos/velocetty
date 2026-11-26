@@ -147,7 +147,7 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-delivered change is **167 non-Plan files** and **16,168 net non-generated
+delivered change is **167 non-Plan files** and **16,246 net non-generated
 lines**. The excess is recorded here as the escalation the tolerance requires,
 and the maintainer's acceptance of the raised counts is requested before merge.
 
@@ -2306,8 +2306,8 @@ non-generated lines; maintainer acceptance is still requested and not assumed.
    (413) exceeded the 400-line limit. The rejection line moved to
    `lib/settings/rejection-line.ts` with its own suite, and the store suite
    keeps one end-to-end assertion; both files are back under the limit.
-3. The scope count is corrected to **167 non-Plan files** and **16,168 net
-   non-generated lines** at `92ba2d9a`. Maintainer acceptance of this deviation
+3. The scope count is corrected to **167 non-Plan files** and **16,246 net
+   non-generated lines** at `5d6c6a43`. Maintainer acceptance of this deviation
    is requested in the Tolerance deviation section and has not been granted.
 
 Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and nixie clean;
@@ -2346,3 +2346,30 @@ the real viewport, asserting the parsed document and the surviving comment. The
 second insertion changes the layout around the key, so exact text is asserted
 only for the first reset. Recorded count: 167 non-Plan files and 16,168 net
 non-generated lines at `92ba2d9a`.
+
+2026-11-26: fourteenth round, the three findings from the formal review that
+followed the assessment confirmations.
+
+1. **Colour validation now matches the consumer.** Both validators accepted a
+   decimal RGB channel such as `rgb(1.5, 2, 3)`, but `lib/components/term.tsx`
+   calls `Color(value)` from the pinned `color` package, whose parser rejects
+   that form, so saving such a background colour made the terminal-option
+   update throw. Both validators now accept an integer or a percentage per
+   channel and keep a decimal alpha, which is exactly what the parser takes.
+   The parity suite asserts every accepted value parses through `Color` and
+   that the decimal-channel form is refused; the rejection tests fail against
+   the old pattern.
+2. **A newer failure keeps its banner.** `useSettingsSnapshot` now remembers
+   the load that owns the displayed error, so an older success cannot clear a
+   newer failure. The sequence (load 2 fails, load 1 succeeds) is covered and
+   fails against the old settlement.
+3. **The negative contract fixture is an empty object.** With
+   `{ignored: true}`, making the required flag optional would still trigger
+   excess-property checking, so the `@ts-expect-error` would stay satisfied and
+   the contract would silently weaken.
+
+Recorded count: 167 non-Plan files and 16,246 net non-generated lines at
+`5d6c6a43`. Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and
+nixie clean; 1,301 unit tests across 145 files with zero failures; the four
+proof summaries verify 1, 8, 9 and 11 programs with zero errors and fresh
+artefacts; `make build-fast` clean; the packaged settings deep E2E passing.
