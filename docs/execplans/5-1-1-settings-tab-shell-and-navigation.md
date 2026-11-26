@@ -2316,9 +2316,9 @@ with zero errors and fresh artefacts; packaged settings deep E2E passing;
 `cs delta origin/main` reporting no new issue.
 
 2026-11-26: eleventh round, the keyboard-evidence gap the completeness
-assessment named. The plan requires Tab order and keyboard access to Reset,
-and the unit suite could only assert focusability and DOM order because Happy
-DOM does not implement sequential focus navigation. The packaged deep E2E now
+assessment named. The plan requires Tab order and keyboard access to Reset, and
+the unit suite could only assert focusability and DOM order because Happy DOM
+does not implement sequential focus navigation. The packaged deep E2E now
 presses Tab from the font-size control to its Reset button, asserts the button
 holds focus, activates it with Enter, and asserts focus returns to the control;
 it also checks that the inactive settings layer is `inert` and that focusing a
