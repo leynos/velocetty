@@ -147,7 +147,7 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-delivered change is **167 non-Plan files** and **16,246 net non-generated
+delivered change is **167 non-Plan files** and **16,376 net non-generated
 lines**. The excess is recorded here as the escalation the tolerance requires,
 and the maintainer's acceptance of the raised counts is requested before merge.
 
@@ -2306,8 +2306,8 @@ non-generated lines; maintainer acceptance is still requested and not assumed.
    (413) exceeded the 400-line limit. The rejection line moved to
    `lib/settings/rejection-line.ts` with its own suite, and the store suite
    keeps one end-to-end assertion; both files are back under the limit.
-3. The scope count is corrected to **167 non-Plan files** and **16,246 net
-   non-generated lines** at `5d6c6a43`. Maintainer acceptance of this deviation
+3. The scope count is corrected to **167 non-Plan files** and **16,376 net
+   non-generated lines** at `8dc8cd44`. Maintainer acceptance of this deviation
    is requested in the Tolerance deviation section and has not been granted.
 
 Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and nixie clean;
@@ -2371,5 +2371,28 @@ followed the assessment confirmations.
 Recorded count: 167 non-Plan files and 16,246 net non-generated lines at
 `5d6c6a43`. Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and
 nixie clean; 1,301 unit tests across 145 files with zero failures; the four
+proof summaries verify 1, 8, 9 and 11 programs with zero errors and fresh
+artefacts; `make build-fast` clean; the packaged settings deep E2E passing.
+
+2026-11-26: fifteenth round, the refreshed pre-merge table's one error and two
+warnings.
+
+1. **Snapshot reads are total.** A `stat` failure other than ENOENT used to
+   throw out of `getSnapshot`, so a permission problem surfaced as an exception
+   instead of a file state. `readConfigFile` now maps it to the same
+   `unparseable` state as an unreadable file. A write's precheck therefore
+   refuses with `user-config-unparseable` rather than throwing; the service
+   test asserts the state, refusal, counter, and untouched file, and a direct
+   `observeSettingsWrite` test keeps the unexpected-throw branch covered.
+2. **The transport encoding has its own module.** `transportSafeValues` moved
+   from `settings-service.ts` to `app/settings/transport-values.ts` with a
+   dedicated suite; the service keeps only its ports and composition.
+3. **The Proofs workflow is documented.** `docs/developers-guide.md` now names
+   its path filters, pinned Dafny version, cache, Z3 installation and recorded
+   checksum, and the two commands it runs.
+
+Recorded count: 169 non-Plan files and 16,376 net non-generated lines at
+`8dc8cd44`. Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and
+nixie clean; 1,305 unit tests across 146 files with zero failures; the four
 proof summaries verify 1, 8, 9 and 11 programs with zero errors and fresh
 artefacts; `make build-fast` clean; the packaged settings deep E2E passing.
