@@ -108,21 +108,24 @@ const removeSpans = (doc: string, spans: readonly Span[]): string => {
   return text;
 };
 
+/** The inputs that locate the comma after a property relative to its line. */
+type SeparatorRequest = {
+  readonly doc: string;
+  readonly parser: Json5Parser;
+  readonly property: Json5ObjectProperty;
+  readonly span: Span;
+};
+
 /**
- * The comma that separates `property` from the next one, when it lies outside
- * `span`.
+ * The comma that separates a property from the next one, when it lies outside
+ * the property's own span.
  *
- * A property on its own line can still have its comma on a later line, after
- * a comment or a line break. Deleting only the property's line would then
- * leave a leading comma and produce invalid JSON5, so the comma is removed as
- * a span of its own and the intervening comment stays.
+ * A property on its own line can still have its comma on a later line, after a
+ * comment or a line break. Deleting only the property's line would then leave
+ * a leading comma and produce invalid JSON5, so the comma is removed as a span
+ * of its own and the intervening comment stays.
  */
-const separatorOutsideSpan = (
-  doc: string,
-  parser: Json5Parser,
-  property: Json5ObjectProperty,
-  span: Span
-): Span | null => {
+const separatorOutsideSpan = ({doc, parser, property, span}: SeparatorRequest): Span | null => {
   if (!property.hasTrailingComma) {
     return null;
   }
@@ -130,10 +133,11 @@ const separatorOutsideSpan = (
     startIndex: valueTextEnd(doc, property),
     limitIndex: doc.length
   });
-  if (doc[comma] !== ',' || (comma >= span.startIndex && comma < span.endIndex)) {
+  if (doc[comma] !== ',') {
     return null;
   }
-  return {startIndex: comma, endIndex: comma + 1};
+  const isOutside = comma < span.startIndex || comma >= span.endIndex;
+  return isOutside ? {startIndex: comma, endIndex: comma + 1} : null;
 };
 
 const removalSpans = (
@@ -144,7 +148,7 @@ const removalSpans = (
 ): readonly Span[] => {
   const ownLine = ownLineSpan(doc, parser, property);
   if (ownLine) {
-    const comma = separatorOutsideSpan(doc, parser, property, ownLine);
+    const comma = separatorOutsideSpan({doc, parser, property, span: ownLine});
     return comma ? [ownLine, comma] : [ownLine];
   }
   return inlineSpans(doc, parser, properties, property);
