@@ -147,7 +147,7 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-delivered change is **150 non-Plan files** and **13,078 net non-generated
+delivered change is **150 non-Plan files** and **13,187 net non-generated
 lines**. The excess is recorded here as the escalation the tolerance requires,
 and the maintainer's acceptance of the raised counts is requested before merge.
 
@@ -2115,7 +2115,7 @@ disabled-row behaviour, category-label search, inline diagnostics, and pointer
 access in the packaged app. The proofs gained a grounded `StringSplit` axiom,
 transition-based reachability lemmas (search 9, field state 11 verified), and a
 per-summary positive-count guard; D22 now names the opaque `Seq.All` boundary.
-The scope tolerance is exceeded (150 non-Plan files, 13,078 net lines); the
+The scope tolerance is exceeded (150 non-Plan files, 13,187 net lines); the
 deviation and its reasons are recorded under Tolerances for maintainer
 acceptance.
 
@@ -2142,5 +2142,16 @@ resets, models the settled display and per-field errors, and classifies
 reordered, reset, external, rejected, and invalid runs. The search oracle
 reimplements normalization over arbitrary strings and runs the filter over
 arbitrary-case and whitespace noise, and dropping either the `@modified` filter
-or case folding fails it. Final candidate: 1,211 unit tests; proofs unchanged
+or case folding fails it. Final candidate: 1,212 unit tests; proofs unchanged
 at 1 + 8 + 9 + 11 with zero errors.
+
+2026-11-26: fourth assessment repair round. A write that settles after a newer
+external snapshot now reconciles the clean field with that newest snapshot
+instead of leaving the older value on screen, with the exact sequence
+regression-tested, and a genuinely newer dirty draft is preserved. The
+transport rejection path now rejects the older promise after the newer request
+succeeds. Convergence delivery is interleaved through flush actions and the
+invalid and refused-reset classifications are asserted at their thresholds;
+`field-state.ts` is 400 lines; and the packaged E2E compares the complete file
+text after the edit and after the reset, not only the parsed value. Final
+candidate: 1,212 unit tests.

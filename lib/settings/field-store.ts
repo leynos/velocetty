@@ -163,6 +163,7 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
   const listeners = new Set<() => void>();
   let inFlight = 0;
   let lastRevision = -1;
+  let latestSnapshot: SettingsSnapshot | null = null;
   let idleWaiters: (() => void)[] = [];
 
   const publish = (): void => {
@@ -223,14 +224,22 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
     effect: FieldEffect<SettingValue>,
     outcome: SettingsWriteOutcome
   ): void => {
+    const isCurrent = states.get(definition.id)?.pendingRequestId === effect.requestId;
     recordOutcomeStatus(definition, effect, outcome);
     apply(definition, outcomeEvent(effect.requestId, outcome));
-    if (outcome.kind === 'applied') {
-      // Every applied write carries the file's snapshot. `refresh` rejects an
-      // older revision, so a late answer for a superseded request can never
-      // move the display backwards; it can only advance it to the file state
-      // that request actually produced.
+    if (outcome.kind !== 'applied') {
+      return;
+    }
+    if (outcome.snapshot.revision >= lastRevision) {
       refresh(outcome.snapshot);
+      return;
+    }
+    // A newer snapshot (an external reload, say) was already applied while this
+    // write was pending. Settling the field made it clean, so reconcile its
+    // committed value and draft with that newest snapshot rather than leaving
+    // the older write's value on screen.
+    if (latestSnapshot !== null) {
+      refresh(latestSnapshot);
     }
   };
 
@@ -268,6 +277,7 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
       return;
     }
     lastRevision = next.revision;
+    latestSnapshot = next;
     for (const field of fields) {
       const committed = committedValueOf(next, field.target);
       apply(field, {kind: 'refresh', committed, draft: formatValue(field.control, committed)});

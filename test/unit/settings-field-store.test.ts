@@ -36,26 +36,34 @@ type Call =
   | {readonly kind: 'set'; readonly target: SettingTarget; readonly value: unknown}
   | {readonly kind: 'reset'; readonly target: SettingTarget};
 
-type Deferred = {readonly resolve: (outcome: SettingsWriteOutcome) => void};
+type Deferred = {
+  readonly resolve: (outcome: SettingsWriteOutcome) => void;
+  readonly reject: (error: Error) => void;
+};
 
 type FakeGateway = {
   readonly gateway: SettingsGateway;
   readonly calls: Call[];
   readonly pending: Deferred[];
   readonly resolveNext: (outcome: SettingsWriteOutcome) => void;
+  readonly rejectNext: (error: Error) => void;
 };
 
 const createFakeGateway = (): FakeGateway => {
   const calls: Call[] = [];
   const pending: Deferred[] = [];
   const queue = (outcome?: SettingsWriteOutcome): Promise<SettingsWriteOutcome> =>
-    new Promise((resolve) => {
-      pending.push({resolve});
+    new Promise((resolve, reject) => {
+      pending.push({resolve, reject});
       void outcome;
     });
   return {
     calls,
     pending,
+    rejectNext: (error) => {
+      const next = pending.shift();
+      next?.reject(error);
+    },
     resolveNext: (outcome) => {
       const next = pending.shift();
       next?.resolve(outcome);
@@ -255,7 +263,7 @@ describe('settings field store', () => {
     expect(fake.calls).toEqual([]);
   });
 
-  test('a stale transport failure does not overwrite a newer success', async () => {
+  test('a stale transport rejection does not overwrite a newer success', async () => {
     const fake = createFakeGateway();
     const store = createStore(fake.gateway);
     store.refresh(snapshotWith({fontSize: 14}));
@@ -265,13 +273,36 @@ describe('settings field store', () => {
     store.setDraft(FONT.id, '20');
     store.submit(FONT.id);
 
-    fake.resolveNext({kind: 'failed', reason: 'io-error'});
+    // The newer request succeeds first; the older promise then rejects.
+    fake.pending[1]?.resolve({kind: 'applied', snapshot: snapshotWith({fontSize: 20}, 2)});
     await Promise.resolve();
-    expect(store.getSnapshot().status).toBe('saving');
-
-    fake.resolveNext({kind: 'applied', snapshot: snapshotWith({fontSize: 20}, 2)});
+    fake.rejectNext(new Error('transport failed'));
     await store.whenIdle();
+
     expect(store.getSnapshot().status).toBe('saved');
+    expect(stateOf(store).errors).toEqual([]);
+    expect(stateOf(store).committed).toBe(20);
+  });
+
+  test('a newer external snapshot wins over an older applied write', async () => {
+    const fake = createFakeGateway();
+    const store = createStore(fake.gateway);
+    store.refresh(snapshotWith({fontSize: 14}));
+
+    store.setDraft(FONT.id, '16');
+    store.submit(FONT.id);
+    // An external reload at revision 3, while the write is still pending.
+    store.refresh(snapshotWith({fontSize: 20}, 3));
+    expect(stateOf(store).draft).toBe('16');
+
+    // The write's own answer carries revision 2, older than the reload.
+    fake.resolveNext({kind: 'applied', snapshot: snapshotWith({fontSize: 16}, 2)});
+    await store.whenIdle();
+
+    // The field is clean now, so it must show the newest file value, not the
+    // older write it settled from.
+    expect(stateOf(store).committed).toBe(20);
+    expect(stateOf(store).draft).toBe('20');
   });
 
   test('a refused write reports failure', async () => {

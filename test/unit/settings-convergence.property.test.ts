@@ -56,6 +56,8 @@ type AppliedOps = {
   readonly expectedDraft: ReadonlyMap<string, string>;
   /** Fields whose final action was a local validation refusal. */
   readonly errorFields: ReadonlySet<string>;
+  readonly invalidActions: number;
+  readonly refusedResets: number;
 };
 
 const fieldArbitrary = fc.constantFrom(FONT_SIZE, SHELL);
@@ -72,7 +74,16 @@ const externalArbitrary: fc.Arbitrary<ExternalOp> = fc.record({
   field: fieldArbitrary,
   draft: validDraftArbitrary
 });
-const actionArbitrary: fc.Arbitrary<Op | ExternalOp> = fc.oneof(submitArbitrary, resetArbitrary, externalArbitrary);
+type FlushOp = {readonly kind: 'flush'};
+type Action = Op | ExternalOp | FlushOp;
+
+const flushArbitrary: fc.Arbitrary<FlushOp> = fc.record({kind: fc.constant('flush' as const)});
+const actionArbitrary: fc.Arbitrary<Action> = fc.oneof(
+  submitArbitrary,
+  resetArbitrary,
+  externalArbitrary,
+  flushArbitrary
+);
 
 type Pending = {
   readonly outcome: Promise<SettingsWriteOutcome>;
@@ -129,7 +140,13 @@ const createHarness = () => {
     bumpRevision();
     store.refresh(service.getSnapshot());
   };
-  return {port, service, store, pending, externalWrite};
+  const flushOldest = async (): Promise<void> => {
+    const item = pending.shift();
+    if (item !== undefined) {
+      item.resolve(await item.outcome);
+    }
+  };
+  return {port, service, store, pending, externalWrite, flushOldest};
 };
 
 const configOf = (port: ReturnType<typeof createMemoryConfigFileSystem>): Record<string, JsonValue> => {
@@ -172,44 +189,94 @@ const applyReset = (store: FieldStore, expected: Map<string, JsonValue>, op: Res
   expected.delete(op.field);
 };
 
-const applyActions = (harness: ReturnType<typeof createHarness>, actions: readonly (Op | ExternalOp)[]): AppliedOps => {
-  const expected = new Map<string, JsonValue>();
-  const expectedDraft = new Map<string, string>();
-  const errorFields = new Set<string>();
-  let resets = 0;
-  let externals = 0;
-  for (const action of actions) {
-    if (action.kind === 'external') {
-      const value = coercedDraft(action.field, action.draft);
-      if (value !== undefined) {
-        externals += 1;
-        harness.externalWrite(action.field, value);
-        expected.set(action.field, value);
-        expectedDraft.set(action.field, action.draft);
-      }
-      continue;
-    }
-    if (action.kind === 'reset') {
-      resets += 1;
-      if (expected.has(action.field)) {
-        expectedDraft.set(action.field, `${defaultFor(action.field)}`);
-        errorFields.delete(action.field);
-      } else {
-        errorFields.add(action.field);
-        expectedDraft.set(action.field, expectedDraft.get(action.field) ?? `${defaultFor(action.field)}`);
-      }
-      applyReset(harness.store, expected, action);
-      continue;
-    }
-    expectedDraft.set(action.field, action.draft);
-    if (coercedDraft(action.field, action.draft) === undefined) {
-      errorFields.add(action.field);
-    } else {
-      errorFields.delete(action.field);
-    }
-    applySubmit(harness.store, expected, action);
+type Model = {
+  readonly expected: Map<string, JsonValue>;
+  readonly expectedDraft: Map<string, string>;
+  readonly errorFields: Set<string>;
+  resets: number;
+  externals: number;
+  invalidActions: number;
+  refusedResets: number;
+};
+
+const applyExternalAction = (harness: ReturnType<typeof createHarness>, action: ExternalOp, model: Model): void => {
+  const value = coercedDraft(action.field, action.draft);
+  if (value === undefined) {
+    return;
   }
-  return {expected, resets, externals, expectedDraft, errorFields};
+  model.externals += 1;
+  harness.externalWrite(action.field, value);
+  model.expected.set(action.field, value);
+  model.expectedDraft.set(action.field, action.draft);
+};
+
+const applyResetAction = (harness: ReturnType<typeof createHarness>, action: ResetOp, model: Model): void => {
+  model.resets += 1;
+  if (model.expected.has(action.field)) {
+    model.expectedDraft.set(action.field, `${defaultFor(action.field)}`);
+    model.errorFields.delete(action.field);
+  } else {
+    model.errorFields.add(action.field);
+    model.refusedResets += 1;
+    model.expectedDraft.set(action.field, model.expectedDraft.get(action.field) ?? `${defaultFor(action.field)}`);
+  }
+  applyReset(harness.store, model.expected, action);
+};
+
+const applySubmitAction = (harness: ReturnType<typeof createHarness>, action: SubmitOp, model: Model): void => {
+  model.expectedDraft.set(action.field, action.draft);
+  if (coercedDraft(action.field, action.draft) === undefined) {
+    model.errorFields.add(action.field);
+    model.invalidActions += 1;
+  } else {
+    model.errorFields.delete(action.field);
+  }
+  applySubmit(harness.store, model.expected, action);
+};
+
+const applyActions = async (
+  harness: ReturnType<typeof createHarness>,
+  actions: readonly Action[]
+): Promise<AppliedOps> => {
+  const model: Model = {
+    expected: new Map<string, JsonValue>(),
+    expectedDraft: new Map<string, string>(),
+    errorFields: new Set<string>(),
+    resets: 0,
+    externals: 0,
+    invalidActions: 0,
+    refusedResets: 0
+  };
+  for (const action of actions) {
+    switch (action.kind) {
+      case 'flush': {
+        // Deliver the oldest write's answer in the middle of the session.
+        await harness.flushOldest();
+        break;
+      }
+      case 'external': {
+        applyExternalAction(harness, action, model);
+        break;
+      }
+      case 'reset': {
+        applyResetAction(harness, action, model);
+        break;
+      }
+      case 'submit': {
+        applySubmitAction(harness, action, model);
+        break;
+      }
+    }
+  }
+  return {
+    expected: model.expected,
+    resets: model.resets,
+    externals: model.externals,
+    expectedDraft: model.expectedDraft,
+    errorFields: model.errorFields,
+    invalidActions: model.invalidActions,
+    refusedResets: model.refusedResets
+  };
 };
 
 const flushInOrder = async (harness: ReturnType<typeof createHarness>, keys: readonly number[]): Promise<boolean> => {
@@ -259,22 +326,24 @@ describe('settings convergence', () => {
     let reordered = 0;
     let resets = 0;
     let externalRuns = 0;
-    let rejected = 0;
+    let invalidRuns = 0;
+    let refusedRuns = 0;
 
     await fc.assert(
       fc.asyncProperty(actionsArbitrary, keysArbitrary, async (actions, keys) => {
         runs += 1;
         const harness = createHarness();
         harness.store.refresh(harness.service.getSnapshot());
-        const applied = applyActions(harness, actions);
+        const applied = await applyActions(harness, actions);
         resets += applied.resets;
         if (applied.externals > 0) {
           externalRuns += 1;
         }
-        if (
-          actions.some((action) => action.kind === 'submit' && coercedDraft(action.field, action.draft) === undefined)
-        ) {
-          rejected += 1;
+        if (applied.invalidActions > 0) {
+          invalidRuns += 1;
+        }
+        if (applied.refusedResets > 0) {
+          refusedRuns += 1;
         }
         const wasReordered = await flushInOrder(harness, keys);
         await harness.store.whenIdle();
@@ -289,5 +358,7 @@ describe('settings convergence', () => {
     expect(reordered / runs).toBeGreaterThanOrEqual(0.1);
     expect(resets / runs).toBeGreaterThan(0.1);
     expect(externalRuns / runs).toBeGreaterThan(0.1);
+    expect(invalidRuns / runs).toBeGreaterThanOrEqual(0.1);
+    expect(refusedRuns / runs).toBeGreaterThanOrEqual(0.1);
   });
 });

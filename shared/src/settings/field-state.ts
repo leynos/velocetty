@@ -1,16 +1,10 @@
 /**
  * @file The per-field state machine for editing one setting.
  *
- * One field moves between `idle`, `invalid`, `saving`, `rejected`, and
- * `failed`. `stepField` is pure: it returns the next state plus at most one
- * effect, which the owning store runs after applying the state. That is why a
- * React reducer cannot duplicate a write in StrictMode.
- *
- * The transition carries a LemmaScript contract
- * (`shared/src/settings/field-state.dfy`): a lost pending id would wedge a
- * field in `saving`, and a stale outcome would discard a newer edit. Every
- * union and phase literal is bound to a typed local because the Dafny emitter
- * only resolves a literal against a declared type.
+ * `stepField` is pure: it returns the next state plus at most one effect, which
+ * the owning store runs. The transition carries a LemmaScript contract
+ * (`shared/src/settings/field-state.dfy`); every union and phase literal is
+ * bound to a typed local for the Dafny emitter.
  */
 
 /** The phase one field is in. */
@@ -87,7 +81,6 @@ export const initialFieldState = <V, E>(committed: V | undefined, draft: string)
  * Reports whether a state satisfies the machine's invariants: saving exactly
  * while a request is pending, the pending id older than the next, ids starting
  * at one, and errors present exactly in an error phase.
- *
  * @param state - The state to check.
  * @returns True when the state satisfies every invariant.
  *
@@ -113,9 +106,6 @@ export function wellFormed<V, E>(state: FieldState<V, E>): boolean {
  *
  * @param result - The outcome reported by the main process.
  * @returns `rejected` for a refusal and `failed` for a transport failure.
- *
- * @example
- * failurePhaseOf('denied'); // 'rejected'
  */
 export function failurePhaseOf(result: FieldOutcomeResult): FieldPhase {
   //@ verify
@@ -136,9 +126,6 @@ export function failurePhaseOf(result: FieldOutcomeResult): FieldPhase {
  *
  * @param phase - The current phase.
  * @returns `saving` when the field is saving, otherwise `idle`.
- *
- * @example
- * settledPhase('saving'); // 'saving'
  * settledPhase('rejected'); // 'idle'
  */
 export function settledPhase(phase: FieldPhase): FieldPhase {
@@ -165,14 +152,8 @@ export function isRefreshEvent<V, E>(event: FieldEvent<V, E>): boolean {
 }
 
 /**
- * The committed value an event leaves behind.
- *
- * Only a refresh replaces the committed value; every other event preserves it,
- * which is what lets the contract state the refresh direction.
- *
- * @param event - The event being applied.
- * @param fallback - The committed value the state already holds.
- * @returns The event's committed value for a refresh, otherwise the fallback.
+ * The committed value an event leaves behind: the refresh's value, otherwise
+ * the fallback.
  */
 export function refreshCommitted<V, E>(event: FieldEvent<V, E>, fallback: V | undefined): V | undefined {
   //@ verify
