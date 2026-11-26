@@ -268,21 +268,23 @@ const exerciseEdits = async (window: Page, configPath: string, seededText: strin
   await expect(window.locator('#core-scrollback-errors')).toContainText('Enter a number');
   expect(await readConfig(configPath)).toBe(beforeInvalid);
 
-  // Restore a valid draft so the row offers its Reset button again.
-  await window.locator('#core-fontSize-control').fill('16');
-  await window.locator('#core-fontSize-control').press('Enter');
-  await expect.poll(async () => readConfig(configPath), {timeout: fileTimeoutMs}).toContain('fontSize: 16');
-
-  // The keyboard reaches the Reset button from its control, activates it, and
-  // the control takes focus back afterwards.
   const resetButton = window.getByRole('button', {name: 'Reset Font size to default'});
-  await window.locator('#core-fontSize-control').focus();
-  await window.keyboard.press('Tab');
-  await expect(resetButton).toBeFocused();
-  await resetButton.scrollIntoViewIfNeeded();
-  await expect(resetButton).toBeInViewport();
-  await window.keyboard.press('Enter');
-  await expect.poll(async () => readConfig(configPath), {timeout: fileTimeoutMs}).not.toContain('fontSize');
+  const restoreAndReset = async (activate: () => Promise<void>): Promise<void> => {
+    await window.locator('#core-fontSize-control').fill('16');
+    await window.locator('#core-fontSize-control').press('Enter');
+    await expect.poll(async () => readConfig(configPath), {timeout: fileTimeoutMs}).toContain('fontSize: 16');
+    await activate();
+    await expect.poll(async () => readConfig(configPath), {timeout: fileTimeoutMs}).not.toContain('fontSize');
+  };
+
+  // The keyboard reaches the button from its control, activates it, and the
+  // control takes focus back afterwards.
+  await restoreAndReset(async () => {
+    await window.locator('#core-fontSize-control').focus();
+    await window.keyboard.press('Tab');
+    await expect(resetButton).toBeFocused();
+    await window.keyboard.press('Enter');
+  });
   await expect(window.locator('#core-fontSize-control')).toBeFocused();
   const afterReset = await readConfig(configPath);
   // Exact text: the key's value is removed and nothing else changes. The
@@ -290,6 +292,19 @@ const exerciseEdits = async (window: Page, configPath: string, seededText: strin
   expect(afterReset).toBe(seededText.replace('    fontSize: 14,', '    '));
   expect(JSON5.parse(afterReset)).toEqual(expectedConfig());
   expect(afterReset).toContain(SENTINEL);
+
+  // A pointer can also reach the button: scroll it into view in the real
+  // viewport and click it, so a fixed header covering the row would fail.
+  // The second insertion changes the layout around the key, so this pass
+  // asserts the parsed document and the surviving comment, not exact text.
+  await restoreAndReset(async () => {
+    await resetButton.scrollIntoViewIfNeeded();
+    await expect(resetButton).toBeInViewport();
+    await resetButton.click();
+  });
+  const afterPointerReset = await readConfig(configPath);
+  expect(JSON5.parse(afterPointerReset)).toEqual(expectedConfig());
+  expect(afterPointerReset).toContain(SENTINEL);
 };
 
 test('settings tab edits, validates, and resets the config file', async ({page: _page}, testInfo) => {
