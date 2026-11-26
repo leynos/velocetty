@@ -49,6 +49,16 @@ function isRefreshEvent<V, E>(event: FieldEvent<V, E>): bool
   event.refresh?
 }
 
+function refreshCommitted<V, E>(event: FieldEvent<V, E>, fallback: Option<V>): Option<V>
+{
+  match event {
+    case refresh(i_event_committed, i_event_draft) =>
+      i_event_committed
+    case _ =>
+      fallback
+  }
+}
+
 function isSubmitEvent<V, E>(event: FieldEvent<V, E>): bool
 {
   event.submit?
@@ -173,6 +183,8 @@ lemma stepField_ensures<V, E>(state: FieldState<V, E>, event: FieldEvent<V, E>)
   ensures (stepField(state, event).effect.reset? ==> event.reset?)
   ensures (effectCarriesSubmitted(stepField(state, event).effect, event) || !(hasWriteEffect(stepField(state, event).effect)))
   ensures ((!stepField(state, event).effect.none?) ==> (effectRequestId(stepField(state, event).effect) == stepField(state, event).state.pendingRequestId))
+  ensures (stepField(state, event).state.committed == refreshCommitted(event, state.committed))
+  ensures (event.reset? ==> stepField(state, event).effect.reset?)
 {
 }
 

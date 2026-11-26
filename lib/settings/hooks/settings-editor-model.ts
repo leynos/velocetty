@@ -230,6 +230,34 @@ const buildCategories = (counts: CategoryCounts): readonly SettingsCategory[] =>
   }))
 ];
 
+/** The sentence the live region carries for the store's last action. */
+const statusPhrase = (snapshot: FieldStoreSnapshot): string => {
+  switch (snapshot.status) {
+    case 'idle': {
+      return '';
+    }
+    case 'saving': {
+      return 'Saving.';
+    }
+    case 'saved': {
+      return 'Saved.';
+    }
+    case 'reset': {
+      return 'Reset to the default value.';
+    }
+    case 'failed': {
+      return 'The change could not be saved.';
+    }
+  }
+};
+
+/** The result count plus any save, reset, or failure status. */
+const statusMessageFor = (matches: number, fields: FieldStoreSnapshot): string => {
+  const phrase = statusPhrase(fields);
+  const count = formatResultCount(matches);
+  return phrase === '' ? count : `${count}. ${phrase}`;
+};
+
 /**
  * Derives the sections, categories, and counts for one render.
  *
@@ -251,7 +279,7 @@ export const buildSettingsPanel = (request: SettingsPanelRequest): SettingsPanel
     sections: groupSections({entries, matches, snapshot, fields, arguments_}),
     categories: buildCategories({query: normalizedQuery, searchFields, arguments_}),
     resultCount: matches.length,
-    statusMessage: formatResultCount(matches.length),
+    statusMessage: statusMessageFor(matches.length, fields),
     fileStatus: snapshot?.fileStatus ?? null
   };
 };

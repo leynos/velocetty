@@ -39,12 +39,11 @@ const FIELDS: readonly FieldDefinition[] = [
   }
 ];
 
-type ExternalOp = {readonly kind: 'external'};
+type ExternalOp = {readonly kind: 'external'; readonly field: string; readonly draft: string};
 
 type Op =
   | {readonly kind: 'submit'; readonly field: string; readonly draft: string}
-  | {readonly kind: 'reset'; readonly field: string}
-  | ExternalOp;
+  | {readonly kind: 'reset'; readonly field: string};
 
 type SubmitOp = Extract<Op, {kind: 'submit'}>;
 type ResetOp = Extract<Op, {kind: 'reset'}>;
@@ -64,8 +63,13 @@ const submitArbitrary = fc.record({
   draft: draftArbitrary
 });
 const resetArbitrary = fc.record({kind: fc.constant('reset' as const), field: fieldArbitrary});
-const externalArbitrary: fc.Arbitrary<ExternalOp> = fc.record({kind: fc.constant('external' as const)});
-const opArbitrary: fc.Arbitrary<Op> = fc.oneof(submitArbitrary, resetArbitrary, externalArbitrary);
+const externalArbitrary: fc.Arbitrary<ExternalOp> = fc.record({
+  kind: fc.constant('external' as const),
+  field: fieldArbitrary,
+  draft: validDraftArbitrary
+});
+const opArbitrary: fc.Arbitrary<Op> = fc.oneof(submitArbitrary, resetArbitrary);
+const externalsArbitrary = fc.array(externalArbitrary, {maxLength: 3});
 
 type Pending = {
   readonly outcome: Promise<SettingsWriteOutcome>;
@@ -114,7 +118,15 @@ const createHarness = () => {
     subscribe: () => () => {}
   };
   const store: FieldStore = createFieldStore({gateway, fields: FIELDS});
-  return {port, service, store, pending};
+  const bumpRevision = (): void => {
+    revision += 1;
+  };
+  const externalWrite = (field: string, value: JsonValue): void => {
+    port.setFile(CONFIG_PATH, JSON5.stringify({config: {...configOf(port), [field]: value}}));
+    bumpRevision();
+    store.refresh(service.getSnapshot());
+  };
+  return {port, service, store, pending, externalWrite};
 };
 
 const configOf = (port: ReturnType<typeof createMemoryConfigFileSystem>): Record<string, JsonValue> => {
@@ -157,18 +169,30 @@ const applyReset = (store: FieldStore, expected: Map<string, JsonValue>, op: Res
   expected.delete(op.field);
 };
 
-const applyOps = (harness: ReturnType<typeof createHarness>, ops: readonly Op[]): AppliedOps => {
-  const expected = new Map<string, JsonValue>();
-  let resets = 0;
-  let externals = 0;
-  for (const op of ops) {
-    if (op.kind === 'external') {
-      // An unrelated reload must not disturb a pending draft or the expected
-      // file contents; it only re-reads the file the service already holds.
-      externals += 1;
-      harness.store.refresh(harness.service.getSnapshot());
+const applyExternals = (
+  harness: ReturnType<typeof createHarness>,
+  externals: readonly ExternalOp[],
+  expected: Map<string, JsonValue>
+): void => {
+  for (const external of externals) {
+    const value = coercedDraft(external.field, external.draft);
+    if (value === undefined) {
       continue;
     }
+    harness.externalWrite(external.field, value);
+    expected.set(external.field, value);
+  }
+};
+
+const applyOps = (
+  harness: ReturnType<typeof createHarness>,
+  externals: readonly ExternalOp[],
+  ops: readonly Op[]
+): AppliedOps => {
+  const expected = new Map<string, JsonValue>();
+  applyExternals(harness, externals, expected);
+  let resets = 0;
+  for (const op of ops) {
     if (op.kind === 'reset') {
       resets += 1;
       applyReset(harness.store, expected, op);
@@ -176,7 +200,7 @@ const applyOps = (harness: ReturnType<typeof createHarness>, ops: readonly Op[])
     }
     applySubmit(harness.store, expected, op);
   }
-  return {expected, resets, externals};
+  return {expected, resets, externals: externals.length};
 };
 
 const flushInOrder = async (harness: ReturnType<typeof createHarness>, keys: readonly number[]): Promise<boolean> => {
@@ -192,13 +216,16 @@ const flushInOrder = async (harness: ReturnType<typeof createHarness>, keys: rea
   return order.some((value, index) => value !== index);
 };
 
-const expectSettledFile = (
-  port: ReturnType<typeof createMemoryConfigFileSystem>,
-  expected: ReadonlyMap<string, JsonValue>
-): void => {
-  const written = configOf(port);
+const defaultFor = (field: string): JsonValue => (field === FONT_SIZE ? 12 : '/bin/bash');
+
+const expectSettled = (harness: ReturnType<typeof createHarness>, expected: ReadonlyMap<string, JsonValue>): void => {
+  const written = configOf(harness.port);
   for (const field of [FONT_SIZE, SHELL]) {
     expect(written[field] ?? null).toEqual(expected.get(field) ?? null);
+    // The display settles on the file's effective value (or the default when
+    // the key was reset), even when an invalid draft stays visible in the box.
+    const state = harness.store.getSnapshot().fields.get(`core:${field}`);
+    expect(state?.committed ?? defaultFor(field)).toEqual(expected.get(field) ?? defaultFor(field));
   }
 };
 
@@ -207,19 +234,25 @@ describe('settings convergence', () => {
     let runs = 0;
     let reordered = 0;
     let resets = 0;
-    let externals = 0;
+    let externalRuns = 0;
+    let rejected = 0;
 
     await fc.assert(
-      fc.asyncProperty(opsArbitrary, keysArbitrary, async (ops, keys) => {
+      fc.asyncProperty(externalsArbitrary, opsArbitrary, keysArbitrary, async (externals, ops, keys) => {
         runs += 1;
         const harness = createHarness();
         harness.store.refresh(harness.service.getSnapshot());
-        const applied = applyOps(harness, ops);
+        const applied = applyOps(harness, externals, ops);
         resets += applied.resets;
-        externals += applied.externals;
+        if (externals.length > 0) {
+          externalRuns += 1;
+        }
+        if (ops.some((op) => op.kind === 'submit' && coercedDraft(op.field, op.draft) === undefined)) {
+          rejected += 1;
+        }
         const wasReordered = await flushInOrder(harness, keys);
         await harness.store.whenIdle();
-        expectSettledFile(harness.port, applied.expected);
+        expectSettled(harness, applied.expected);
         if (wasReordered) {
           reordered += 1;
         }
@@ -229,6 +262,6 @@ describe('settings convergence', () => {
 
     expect(reordered / runs).toBeGreaterThanOrEqual(0.1);
     expect(resets / runs).toBeGreaterThan(0.1);
-    expect(externals / runs).toBeGreaterThan(0.1);
+    expect(externalRuns / runs).toBeGreaterThan(0.1);
   });
 });

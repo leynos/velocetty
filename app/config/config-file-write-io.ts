@@ -128,10 +128,14 @@ export const writeFileAtomically = (request: ConfigFileWriteRequest): void => {
     throw error;
   }
   if (platform !== 'win32') {
-    // A failure here leaves the new text visible but not proven durable, so it
-    // is reported rather than swallowed. The writer's retry re-reads the file
-    // and applies the same value again, which is idempotent.
-    fileSystem.fsyncDirectory(asConfigFilePath(path.dirname(targetPath)));
+    try {
+      fileSystem.fsyncDirectory(asConfigFilePath(path.dirname(targetPath)));
+    } catch {
+      // The rename has already made the new text visible. Reporting failure
+      // would make a set retry re-apply an edit and a reset retry remove an
+      // already-absent key, turning a correct file into an `edit-failed`.
+      // Durability across a crash is attempted, not treated as write success.
+    }
   }
 };
 

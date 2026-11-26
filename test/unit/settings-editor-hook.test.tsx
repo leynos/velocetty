@@ -76,7 +76,7 @@ const createRecordingGateway = () => {
 };
 
 const fieldStoreDouble = (): FieldStore => ({
-  getSnapshot: (): FieldStoreSnapshot => ({fields: new Map()}),
+  getSnapshot: (): FieldStoreSnapshot => ({fields: new Map(), status: 'idle'}),
   refresh: () => {},
   reset: () => {},
   revert: () => {},
@@ -105,7 +105,7 @@ const panelOf = (snapshot: SettingsSnapshot, query: string) => {
   return buildSettingsPanel({
     arguments_,
     entries,
-    fields: {fields: new Map()},
+    fields: {fields: new Map(), status: 'idle'},
     query,
     selectedCategory: 'all',
     snapshot
@@ -192,6 +192,26 @@ describe('buildSettingsPanel', () => {
     expect(panel.resultCount).toBeGreaterThan(0);
     expect(panel.sections.every((section) => section.category === 'appearance')).toBe(true);
     expect(panel.sections.flatMap((section) => section.rows)).not.toHaveLength(0);
+  });
+
+  test('the live region announces save, reset, failure, and nothing at rest', () => {
+    const messageFor = (status: 'idle' | 'saving' | 'saved' | 'reset' | 'failed') => {
+      const arguments_ = editorArguments();
+      return buildSettingsPanel({
+        arguments_,
+        entries: buildFieldEntries(arguments_),
+        fields: {fields: new Map(), status},
+        query: '',
+        selectedCategory: 'all',
+        snapshot: snapshotOf(1)
+      }).statusMessage;
+    };
+
+    expect(messageFor('idle')).not.toContain('Saved');
+    expect(messageFor('saved')).toContain('Saved.');
+    expect(messageFor('reset')).toContain('Reset to the default value.');
+    expect(messageFor('failed')).toContain('could not be saved');
+    expect(messageFor('saving')).toContain('Saving.');
   });
 
   test('the changed marker follows the user file, not the effective value', () => {

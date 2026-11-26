@@ -147,7 +147,7 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-delivered change is **148 non-Plan files** and **12,493 net non-generated
+delivered change is **150 non-Plan files** and **12,896 net non-generated
 lines**. The excess is recorded here as the escalation the tolerance requires,
 and the maintainer's acceptance of the raised counts is requested before merge.
 
@@ -894,23 +894,19 @@ Axioms (trusted, not verified):
 Obligations:
 
 - Obligation INV-SEARCH-SOUND: every field returned by `searchFieldIndices`
-  satisfies the query semantics of D6 (every non-empty, non-`@modified` token
-  is a substring of its haystack; it is modified when `@modified` is present;
-  it is in the selected category unless the selection is "all"). Method: formal
-  proof (LemmaScript, Dafny backend) plus mirrored `fast-check` property.
-  Rationale: wrong filtering silently hides settings, and the composed
-  parse-and-filter is pure string and array logic inside the supported
-  fragment. Domain: all query strings, all haystack arrays, all modified-flag
-  and category arrays of equal length, all selections. Artefact:
-  `shared/src/settings/search.ts` (annotated), `shared/src/settings/search.dfy`,
-  `test/unit/settings-search.property.test.ts`. Evidence: `make proofs`
-  reports the module verified with zero errors; the property test passes.
-  Non-vacuity: equal-length witnesses (empty, singleton, mixed) are recorded as
-  Dafny lemmas; seeded mutations "treat `@modified` as an ordinary substring"
-  and "replace `every` with `some`" must each make Dafny report a failing
-  postcondition and the property test produce a counterexample; generator
-  classification must show at least 20% of runs with a non-empty result and at
-  least 20% with an excluded element.
+  satisfies `fieldMatchesQuery`. The formal claim is deliberately narrowed to
+  selection relative to that predicate: the Dafny proof covers the loop, range,
+  order, soundness, and completeness, while `StringSplit` is tied to the
+  recursive `splitSpec`, so tokenization is grounded in the input but the
+  JavaScript `split` implementation remains a trusted axiom. The D6 semantics
+  themselves (tokens, `@modified`, category) are checked independently by
+  `test/unit/settings-search-oracle.property.test.ts`, which compares the
+  filter with a reference matcher written with `split` and `includes` and
+  shares no helper with the implementation. Domain: all query strings, haystack
+  arrays, equal-length flag and category arrays, and selections. Non-vacuity:
+  the oracle mutation "drop the `@modified` filter" fails the oracle property;
+  generator classification requires at least 20% of runs with a non-empty
+  result and at least 20% with an excluded element.
 - Obligation INV-SEARCH-COMPLETE: every field that satisfies the query
   semantics is returned. Same method and artefacts. Non-vacuity: seeded
   mutation "stop after the first match" must be rejected.
@@ -947,20 +943,23 @@ Obligations:
   carrying the pending id (any result) leads to a non-`saving` phase. Method:
   proof. Non-vacuity: seeded mutation "stay in saving after `failed`" must be
   rejected.
-- Obligation INV-FIELD-NO-CLOBBER: a `refresh` event updates the committed
-  value and replaces the draft only when the field is clean (not dirty and no
-  request pending); a dirty or saving field keeps its draft. Method: proof plus
-  model-based test. Non-vacuity: seeded mutation "always replace the draft on
-  refresh" must be rejected; the model test classifies at least 10% of runs
-  with a refresh arriving while dirty.
+- Obligation INV-FIELD-NO-CLOBBER: the proof states
+  `\result.state.committed === refreshCommitted(event, state.committed)`, so
+  every non-refresh event preserves the committed value and only a refresh
+  takes the event's; a refresh replaces the draft only when the field is clean
+  (not dirty and no request pending). Method: proof plus model-based test.
+  Non-vacuity: seeded mutation "always replace the draft on refresh" and the
+  mutation "drop the refresh committed update" must both be rejected; the model
+  test classifies at least 10% of runs with a refresh arriving while dirty.
 - Obligation INV-FIELD-WRITE-VALUE: `stepField` emits a `write` effect only
   for a `submit` event carrying a successful coercion, and the effect carries
-  exactly that coerced value and the new pending id; a `reset` event emits a
-  `reset` effect with the new pending id. The value is a type parameter, so the
+  exactly that coerced value and the new pending id; the proof also states
+  `event.kind === 'reset' ==> \result.effect.kind === 'reset'`, so a reset
+  event always emits a reset effect. The value is a type parameter, so the
   proof is generic over values. Method: proof; the end-to-end pairing (sent
   value equals the coercion of the draft at submit time) is covered by
-  PROP-CONVERGE. Non-vacuity: seeded mutation "emit the previous draft's value"
-  must be rejected.
+  PROP-CONVERGE. Non-vacuity: seeded mutations "emit the previous draft's
+  value" and "drop the reset effect" must each be rejected.
 - Obligation PROP-CONVERGE: for any generated sequence of user actions (edit,
   submit, reset, external file change) on a few fields, with the real
   `createSettingsService` over an in-memory file port and a gateway that delays
@@ -2113,6 +2112,19 @@ disabled-row behaviour, category-label search, inline diagnostics, and pointer
 access in the packaged app. The proofs gained a grounded `StringSplit` axiom,
 transition-based reachability lemmas (search 9, field state 11 verified), and a
 per-summary positive-count guard; D22 now names the opaque `Seq.All` boundary.
-The scope tolerance is exceeded (148 non-Plan files, 12,493 net lines); the
+The scope tolerance is exceeded (150 non-Plan files, 12,896 net lines); the
 deviation and its reasons are recorded under Tolerances for maintainer
 acceptance.
+
+2026-11-26: second assessment repair round. The live region now announces save,
+reset, pending, and failure status from the store; mixed invalid files report
+top-level and config diagnostics together; a post-rename directory-fsync
+failure is treated as success because the rename already occurred; and the
+scope of the formal search claim is narrowed to selection relative to
+`fieldMatchesQuery`, with an independent `split`/`includes` oracle and its
+`@modified` mutation. The field contract now states the refresh-committed and
+reset-effect directions, and both mutations are rejected by Dafny. The
+convergence property applies real external writes before the session, asserts
+the settled display, and classifies reordered, reset, external, and rejected
+runs; removing the store's revision guard fails its test. Final candidate:
+1,205 unit tests and proofs 1 + 8 + 9 + 11 with zero errors.

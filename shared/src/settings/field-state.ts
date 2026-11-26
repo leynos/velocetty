@@ -165,6 +165,25 @@ export function isRefreshEvent<V, E>(event: FieldEvent<V, E>): boolean {
 }
 
 /**
+ * The committed value an event leaves behind.
+ *
+ * Only a refresh replaces the committed value; every other event preserves it,
+ * which is what lets the contract state the refresh direction.
+ *
+ * @param event - The event being applied.
+ * @param fallback - The committed value the state already holds.
+ * @returns The event's committed value for a refresh, otherwise the fallback.
+ */
+export function refreshCommitted<V, E>(event: FieldEvent<V, E>, fallback: V | undefined): V | undefined {
+  //@ verify
+  //@ pure
+  if (event.kind === 'refresh') {
+    return event.committed;
+  }
+  return fallback;
+}
+
+/**
  * Reports whether an event is a submit.
  *
  * @param event - The event to classify.
@@ -317,6 +336,8 @@ export function stepField<V, E>(state: FieldState<V, E>, event: FieldEvent<V, E>
   //@ ensures \result.effect.kind === 'reset' ==> event.kind === 'reset'
   //@ ensures effectCarriesSubmitted(\result.effect, event) || !hasWriteEffect(\result.effect)
   //@ ensures \result.effect.kind !== 'none' ==> effectRequestId(\result.effect) === \result.state.pendingRequestId
+  //@ ensures \result.state.committed === refreshCommitted(event, state.committed)
+  //@ ensures event.kind === 'reset' ==> \result.effect.kind === 'reset'
   const noEffect: FieldEffect<V> = {kind: 'none', requestId: -1};
   switch (event.kind) {
     case 'edit': {

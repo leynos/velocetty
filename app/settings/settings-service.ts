@@ -18,7 +18,7 @@ import {
   type ConfigWriterDependencies,
   writeConfigEdit
 } from '../config/config-file-writer';
-import {validateConfigOptions, validateRawConfig} from '../config/json5-config';
+import {isKeymapConfig, isStringArray, validateConfigOptions} from '../config/json5-config';
 import {isJsonObject, isString} from '../utils/runtime-guards';
 import {checkWritePolicy, isWritableSettingKey} from './settings-write-policy';
 
@@ -80,39 +80,63 @@ const parseDiagnostics = (error: unknown): readonly configValidationDiagnostic[]
 const userValuesOf = (parsed: JsonValue): JsonObject =>
   isJsonObject(parsed) && isJsonObject(parsed.config) ? parsed.config : {};
 
-/** Rebuilds the diagnostic a `validateRawConfig` failure carries, when present. */
-const diagnosticOf = (error: Error): configValidationDiagnostic | undefined => {
-  if (!('diagnostic' in error)) {
-    return undefined;
+/** One top-level field check: a diagnostic, or null when the field is valid. */
+type RawFieldCheck = (parsed: JsonObject) => configValidationDiagnostic | null;
+
+const configFieldProblem: RawFieldCheck = (parsed) =>
+  Object.hasOwn(parsed, 'config') && !isJsonObject(parsed.config)
+    ? diagnostic('/config', 'Expected `config` to be an object.', 'Set `config` to an object value.')
+    : null;
+
+const stringArrayProblem =
+  (field: 'plugins' | 'localPlugins'): RawFieldCheck =>
+  (parsed) =>
+    Object.hasOwn(parsed, field) && !isStringArray(parsed[field])
+      ? diagnostic(
+          `/${field}`,
+          `Expected \`${field}\` to be an array of strings when present.`,
+          `Set \`${field}\` to an array of plugin names, for example ['plugin-name'].`
+        )
+      : null;
+
+const keymapFieldProblem: RawFieldCheck = (parsed) =>
+  Object.hasOwn(parsed, 'keymaps') && !isKeymapConfig(parsed.keymaps)
+    ? diagnostic(
+        '/keymaps',
+        'Expected `keymaps` values to be strings or string arrays when present.',
+        'Set `keymaps` entries to keybinding strings or string arrays.'
+      )
+    : null;
+
+const RAW_FIELD_CHECKS: readonly RawFieldCheck[] = [
+  configFieldProblem,
+  stringArrayProblem('plugins'),
+  stringArrayProblem('localPlugins'),
+  keymapFieldProblem
+];
+
+/** Every top-level field the load path checks, in one diagnostic list. */
+const topLevelDiagnostics = (parsed: JsonValue): readonly configValidationDiagnostic[] => {
+  if (!isJsonObject(parsed)) {
+    return [diagnostic('/', 'Expected config payload to be an object.', 'Set the root config value to an object.')];
   }
-  const {diagnostic: value} = error;
-  if (!isJsonObject(value)) {
-    return undefined;
+  const problems: configValidationDiagnostic[] = [];
+  for (const check of RAW_FIELD_CHECKS) {
+    const problem = check(parsed);
+    if (problem !== null) {
+      problems.push(problem);
+    }
   }
-  const {path, message, suggestedFix} = value;
-  if (!isString(path)) {
-    return undefined;
-  }
-  if (!isString(message)) {
-    return undefined;
-  }
-  if (!isString(suggestedFix)) {
-    return undefined;
-  }
-  return {path, message, suggestedFix};
+  return problems;
 };
 
-/** The first top-level failure the load path would reject, if any. */
-const topLevelDiagnosticOf = (parsed: JsonValue): configValidationDiagnostic | undefined => {
-  const validation = validateRawConfig(parsed);
-  if (validation.success) {
-    return undefined;
+/** The complete diagnostic list, including every `config` schema issue. */
+const diagnosticsOf = (parsed: JsonValue): readonly configValidationDiagnostic[] => {
+  const problems = [...topLevelDiagnostics(parsed)];
+  if (isJsonObject(parsed) && isJsonObject(parsed.config)) {
+    problems.push(...validateConfigOptions(parsed.config));
   }
-  const diagnostic = diagnosticOf(validation.error);
-  if (diagnostic === undefined || diagnostic.path.startsWith('/config')) {
-    return undefined;
-  }
-  return diagnostic;
+  return problems;
 };
 
 const readConfigFile = (dependencies: SettingsServiceDependencies): FileRead => {
@@ -140,27 +164,14 @@ const readConfigFile = (dependencies: SettingsServiceDependencies): FileRead => 
     return {kind: 'legacy', userValues};
   }
   // The load path validates the whole raw config, including the top-level
-  // plugin and keymap fields. Report a top-level failure here too, or the tab
-  // would accept edits while the application is running on defaults.
-  const topLevel = topLevelDiagnosticOf(parsed);
-  if (topLevel !== undefined) {
-    return {kind: 'invalid', userValues, diagnostics: [topLevel]};
-  }
-  if (!isJsonObject(parsed) || !isJsonObject(parsed.config)) {
-    return {
-      kind: 'invalid',
-      userValues,
-      diagnostics: [diagnostic('/config', 'Expected `config` to be an object.', 'Set `config` to an object value.')]
-    };
-  }
-  const diagnostics = validateConfig(parsed.config);
+  // plugin and keymap fields. Report every problem here too: returning only the
+  // first would hide a key the user is allowed to repair.
+  const diagnostics = diagnosticsOf(parsed);
   if (diagnostics.length > 0) {
     return {kind: 'invalid', userValues, diagnostics};
   }
   return {kind: 'ok', userValues};
 };
-
-const validateConfig = (config: JsonObject): readonly configValidationDiagnostic[] => validateConfigOptions(config);
 
 const statusOf = (read: FileRead): SettingsFileStatus => {
   switch (read.kind) {

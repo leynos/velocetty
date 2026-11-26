@@ -44,9 +44,17 @@ export type FieldDefinition = {
   readonly control: ControlDescriptor;
 };
 
+/** What the last completed write or reset did, for the live region. */
+export type FieldStatus = 'idle' | 'saving' | 'saved' | 'reset' | 'failed';
+
 /** The immutable view of the field map components subscribe to. */
 export type FieldStoreSnapshot = {
   readonly fields: ReadonlyMap<string, FieldState<SettingValue, FieldError>>;
+  /**
+   * The outcome of the most recent action. A fresh store reports `idle`, so a
+   * screen reader is not told "saved" before anything was saved.
+   */
+  readonly status: FieldStatus;
 };
 
 /** The store's public surface. */
@@ -150,14 +158,15 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
   let states = new Map<string, FieldState<SettingValue, FieldError>>(
     fields.map((field) => [field.id, initialFieldState<SettingValue, FieldError>(undefined, '')])
   );
-  let snapshot: FieldStoreSnapshot = {fields: states};
+  let status: FieldStatus = 'idle';
+  let snapshot: FieldStoreSnapshot = {fields: states, status};
   const listeners = new Set<() => void>();
   let inFlight = 0;
   let lastRevision = -1;
   let idleWaiters: (() => void)[] = [];
 
   const publish = (): void => {
-    snapshot = {fields: new Map(states)};
+    snapshot = {fields: new Map(states), status};
     for (const listener of listeners) {
       listener();
     }
@@ -188,29 +197,58 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
     return result.effect;
   };
 
+  /** Records an answer that arrived while its request was still current. */
+  const recordOutcomeStatus = (
+    definition: FieldDefinition,
+    effect: FieldEffect<SettingValue>,
+    outcome: SettingsWriteOutcome
+  ): void => {
+    if (states.get(definition.id)?.pendingRequestId !== effect.requestId) {
+      return;
+    }
+    status = outcome.kind === 'applied' ? (effect.kind === 'reset' ? 'reset' : 'saved') : 'failed';
+  };
+
+  /** Applies one answer from the gateway. */
+  const settleOutcome = (
+    definition: FieldDefinition,
+    effect: FieldEffect<SettingValue>,
+    outcome: SettingsWriteOutcome
+  ): void => {
+    recordOutcomeStatus(definition, effect, outcome);
+    apply(definition, outcomeEvent(effect.requestId, outcome));
+    if (outcome.kind === 'applied') {
+      // Every applied write carries the file's snapshot. `refresh` rejects an
+      // older revision, so a late answer for a superseded request can never
+      // move the display backwards; it can only advance it to the file state
+      // that request actually produced.
+      refresh(outcome.snapshot);
+    }
+  };
+
+  /** Applies a transport failure to the field. */
+  const failOutcome = (definition: FieldDefinition, effect: FieldEffect<SettingValue>): void => {
+    status = 'failed';
+    apply(definition, outcomeEvent(effect.requestId, {kind: 'failed', reason: 'io-error'}));
+  };
+
   const runEffect = (definition: FieldDefinition, effect: FieldEffect<SettingValue>): void => {
     if (effect.kind === 'none') {
       return;
     }
     inFlight += 1;
+    status = 'saving';
+    publish();
     const request =
       effect.kind === 'write'
         ? gateway.setValue(definition.target, effect.value)
         : gateway.resetValue(definition.target);
     void request
       .then((outcome) => {
-        // An answer for a superseded request must not refresh the snapshot:
-        // a newer submission already owns the display.
-        const isCurrent = states.get(definition.id)?.pendingRequestId === effect.requestId;
-        apply(definition, outcomeEvent(effect.requestId, outcome));
-        if (outcome.kind === 'applied' && isCurrent) {
-          // Applying the outcome also refreshes every field's committed value,
-          // so a reset that removed one key updates the others' modified flags.
-          refresh(outcome.snapshot);
-        }
+        settleOutcome(definition, effect, outcome);
       })
       .catch(() => {
-        apply(definition, outcomeEvent(effect.requestId, {kind: 'failed', reason: 'io-error'}));
+        failOutcome(definition, effect);
       })
       .finally(settle);
   };
@@ -251,6 +289,10 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
     setDraft: (id, draft) => {
       const definition = definitions.get(id);
       if (definition !== undefined) {
+        if (status !== 'idle') {
+          status = 'idle';
+          publish();
+        }
         apply(definition, {kind: 'edit', draft});
       }
     },

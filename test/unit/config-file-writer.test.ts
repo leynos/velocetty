@@ -183,6 +183,17 @@ describe('config writer', () => {
     expect(harness.port.readFile(CONFIG_PATH)).toBe('{config: {}}');
   });
 
+  test('a directory fsync failure after the rename still reports success', async () => {
+    const harness = createHarness();
+    harness.port.setFile(CONFIG_PATH, '{config: {fontSize: 14}}');
+    harness.port.queueFault('fsyncDirectory', 'EIO');
+
+    const outcome = await set(harness, 16);
+
+    expect(outcome).toMatchObject({kind: 'written', revision: 1});
+    expect(JSON5.parse(harness.port.readFile(CONFIG_PATH) ?? '')).toEqual({config: {fontSize: 16}});
+  });
+
   test('a failed rename leaves no temporary file behind', async () => {
     const harness = createHarness();
     harness.port.setFile(CONFIG_PATH, '{config: {}}');

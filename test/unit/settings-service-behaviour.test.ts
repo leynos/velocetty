@@ -188,6 +188,25 @@ describe('settings snapshot', () => {
     expectReadOnly(harness, CONFIG_PATH, '{config: {}, plugins: "nope"}');
   });
 
+  test('reports every problem in a mixed invalid file', async () => {
+    const harness = createHarness();
+    harness.port.setFile(CONFIG_PATH, '{config: {scrollback: "lots"}, plugins: "nope"}');
+
+    const snapshot = harness.service.getSnapshot();
+
+    expect(snapshot.fileStatus.kind).toBe('invalid');
+    if (snapshot.fileStatus.kind !== 'invalid') {
+      return;
+    }
+    expect(snapshot.fileStatus.diagnostics.map((item) => item.path).toSorted()).toEqual([
+      '/config/scrollback',
+      '/plugins'
+    ]);
+    // The diagnosed key remains repairable even though another top-level
+    // field is also invalid.
+    expect(await harness.service.setValue(target('scrollback'), 1000)).toMatchObject({kind: 'applied'});
+  });
+
   test('reports a legacy hyper.json as read-only', () => {
     const harness = createHarness(LEGACY_PATH);
     harness.port.setFile(LEGACY_PATH, '{"config": {"fontSize": 14}}');
