@@ -26,7 +26,7 @@ This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: APPROVED
+Status: COMPLETE
 
 The status moves through DRAFT, APPROVED (after explicit user approval), IN
 PROGRESS, and COMPLETE. BLOCKED is used whenever a tolerance is breached or a
@@ -255,8 +255,14 @@ Populating context keys belongs to 4.2.1.
   both the plugin facade and the keybinding binder, so no earlier subset
   compiles, and every commit must be green. The riskier parts are still
   separable by file for a revert.
-- [ ] EP-M6 end-to-end scenario: file written, local run blocked.
-- [ ] EP-M7 documentation and roadmap closure: in progress.
+- [x] (2026-11-26) EP-M6 end-to-end scenario passing in CI. The deep lane was
+  unblocked by four fixes, each found by dispatching the workflow and reading
+  what broke next: build only the unpacked app (`--dir`) so packaging no longer
+  invokes the broken `fpm`; pin the runner to `ubuntu-24.04`; run the
+  Playwright CLI under Bun rather than Node; and drop a
+  `clearActiveDecoration()` call the shipped xterm addon does not implement.
+  The scenario passed on run 45733926731 with 2 tests, 0 failures.
+- [x] (2026-11-26) EP-M7 documentation and roadmap closure; status COMPLETE.
 
 ### Blocking discovery: Ajv cannot compile validators in the renderer
 
