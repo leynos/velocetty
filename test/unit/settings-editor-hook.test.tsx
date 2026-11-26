@@ -134,36 +134,43 @@ afterEach(() => {
   cleanup = null;
 });
 
+/** Reads the newest hook state the probe observed. */
+type ProbeReader = () => SettingsSnapshotState | null;
+
+/** Mounts a probe for the snapshot hook and returns its latest state. */
+const mountSnapshotProbe = async (gateway: SettingsGateway): Promise<ProbeReader> => {
+  let latest: SettingsSnapshotState | null = null;
+  const Probe = () => {
+    latest = useSettingsSnapshot(gateway);
+    return null;
+  };
+  await act(async () => {
+    root?.render(<Probe />);
+  });
+  return () => latest;
+};
+
+/** Runs one state change inside React's act boundary. */
+const settle = async (change: () => void): Promise<void> => {
+  await act(async () => {
+    change();
+  });
+};
+
 describe('useSettingsSnapshot', () => {
   test('a late older revision does not replace a newer snapshot', async () => {
     const recording = createRecordingGateway();
-    let latest: SettingsSnapshotState | null = null;
-    const current = (): SettingsSnapshotState | null => latest;
-
-    const Probe = () => {
-      latest = useSettingsSnapshot(recording.gateway);
-      return null;
-    };
-
-    await act(async () => {
-      root?.render(<Probe />);
-    });
+    const current = await mountSnapshotProbe(recording.gateway);
     expect(recording.loads).toHaveLength(1);
 
-    await act(async () => {
-      recording.notifyChange();
-    });
+    await settle(() => recording.notifyChange());
     expect(recording.loads).toHaveLength(2);
 
     // The newer load settles first; the older one must not win afterwards.
-    await act(async () => {
-      recording.loads[1]?.resolve(snapshotOf(2, {fontSize: 16}));
-    });
+    await settle(() => recording.loads[1]?.resolve(snapshotOf(2, {fontSize: 16})));
     expect(current()?.snapshot?.revision).toBe(2);
 
-    await act(async () => {
-      recording.loads[0]?.resolve(snapshotOf(1, {fontSize: 12}));
-    });
+    await settle(() => recording.loads[0]?.resolve(snapshotOf(1, {fontSize: 12})));
     expect(current()?.snapshot?.revision).toBe(2);
     expect(current()?.snapshot?.userValues).toEqual({fontSize: 16});
   });

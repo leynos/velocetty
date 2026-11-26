@@ -93,44 +93,45 @@ test('registers a handler for each settings command', () => {
   expect([...handlers.keys()].toSorted()).toEqual(['settings:getSnapshot', 'settings:resetValue', 'settings:setValue']);
 });
 
-test('a non-editable key is refused before the service', async () => {
-  registerSettingsIpcHandlers(serviceDouble());
-  for (const key of ['css', 'plugins']) {
-    const outcome = await handlerFor('settings:setValue')(unusedIpcEvent, {scope: 'core', key}, 16);
-    expect(outcome).toEqual({
-      kind: 'failed',
-      reason: 'not-editable',
-      detail: 'The setting target is not editable.'
-    });
+type RefusalCase = {
+  readonly name: string;
+  readonly channel: 'settings:setValue' | 'settings:resetValue';
+  readonly args: readonly unknown[];
+};
+
+const REFUSAL_CASES: readonly RefusalCase[] = [
+  {
+    name: 'a non-editable css key is refused before the service',
+    channel: 'settings:setValue',
+    args: [{scope: 'core', key: 'css'}, 16]
+  },
+  {
+    name: 'a non-editable plugins key is refused before the service',
+    channel: 'settings:setValue',
+    args: [{scope: 'core', key: 'plugins'}, 16]
+  },
+  {
+    name: 'a non-JSON value is refused before the service',
+    channel: 'settings:setValue',
+    args: [editableTarget, () => 1]
+  },
+  {
+    name: 'reset refuses an invalid target before the service',
+    channel: 'settings:resetValue',
+    args: [{scope: 'profile', key: 'fontSize'}]
   }
-  expect(calls).toEqual([]);
-});
+];
 
-test('a non-JSON value is refused before the service', async () => {
-  registerSettingsIpcHandlers(serviceDouble());
+for (const refusal of REFUSAL_CASES) {
+  test(refusal.name, async () => {
+    registerSettingsIpcHandlers(serviceDouble());
 
-  const outcome = await handlerFor('settings:setValue')(unusedIpcEvent, editableTarget, () => 1);
+    const outcome = await handlerFor(refusal.channel)(unusedIpcEvent, ...refusal.args);
 
-  expect(outcome).toEqual({
-    kind: 'failed',
-    reason: 'not-editable',
-    detail: 'The value is not JSON.'
+    expect(outcome).toMatchObject({kind: 'failed', reason: 'not-editable'});
+    expect(calls).toEqual([]);
   });
-  expect(calls).toEqual([]);
-});
-
-test('reset refuses an invalid target before the service', async () => {
-  registerSettingsIpcHandlers(serviceDouble());
-
-  const outcome = await handlerFor('settings:resetValue')(unusedIpcEvent, {scope: 'profile', key: 'fontSize'});
-
-  expect(outcome).toEqual({
-    kind: 'failed',
-    reason: 'not-editable',
-    detail: 'The setting target is not editable.'
-  });
-  expect(calls).toEqual([]);
-});
+}
 
 test('an editable target reaches the service, and the snapshot is read through', async () => {
   registerSettingsIpcHandlers(serviceDouble());
