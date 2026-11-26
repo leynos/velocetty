@@ -147,7 +147,7 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-delivered change is **164 non-Plan files** and **15,884 net non-generated
+delivered change is **167 non-Plan files** and **16,117 net non-generated
 lines**. The excess is recorded here as the escalation the tolerance requires,
 and the maintainer's acceptance of the raised counts is requested before merge.
 
@@ -2291,3 +2291,26 @@ fails without it:
 
 The recorded scope count is corrected to 164 non-Plan files and 15,884 net
 non-generated lines; maintainer acceptance is still requested and not assumed.
+
+2026-11-26: tenth repair round, from the second completeness follow-up on
+`99b496a2`. Three items; each is fixed and covered:
+
+1. An own-line property whose separating comma sits on a later line, after a
+   comment or a line break, used to leave a leading comma and an invalid
+   document, so the writer refused the reset. `removalSpans` now deletes that
+   comma as its own span when it lies outside the property's line, keeping any
+   comment before it. `test/unit/json5-own-line-remove.test.ts` covers the
+   cases with and without the comment, at the document edit and through the
+   writer, and all four tests fail against the old code.
+2. `lib/settings/field-store.ts` (409) and `test/unit/settings-field-store.ts`
+   (413) exceeded the 400-line limit. The rejection line moved to
+   `lib/settings/rejection-line.ts` with its own suite, and the store suite
+   keeps one end-to-end assertion; both files are back under the limit.
+3. The scope count is corrected to **167 non-Plan files** and **16,117 net
+   non-generated lines** at `663ae745`. Maintainer acceptance of this deviation
+   is requested in the Tolerance deviation section and has not been granted.
+
+Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and nixie clean;
+1,299 unit tests across 145 files with zero failures; proofs 1 + 8 + 9 + 11
+with zero errors and fresh artefacts; packaged settings deep E2E passing;
+`cs delta origin/main` reporting no new issue.
