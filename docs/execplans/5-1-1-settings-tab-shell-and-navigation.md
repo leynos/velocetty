@@ -147,7 +147,7 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-delivered change is **167 non-Plan files** and **16,136 net non-generated
+delivered change is **167 non-Plan files** and **16,153 net non-generated
 lines**. The excess is recorded here as the escalation the tolerance requires,
 and the maintainer's acceptance of the raised counts is requested before merge.
 
@@ -2306,8 +2306,8 @@ non-generated lines; maintainer acceptance is still requested and not assumed.
    (413) exceeded the 400-line limit. The rejection line moved to
    `lib/settings/rejection-line.ts` with its own suite, and the store suite
    keeps one end-to-end assertion; both files are back under the limit.
-3. The scope count is corrected to **167 non-Plan files** and **16,136 net
-   non-generated lines** at `ffd3835c`. Maintainer acceptance of this deviation
+3. The scope count is corrected to **167 non-Plan files** and **16,153 net
+   non-generated lines** at `c5e88430`. Maintainer acceptance of this deviation
    is requested in the Tolerance deviation section and has not been granted.
 
 Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and nixie clean;
@@ -2326,3 +2326,13 @@ control inside it leaves `document.activeElement` elsewhere. The reset step
 restores a valid draft first, because the preceding invalid-value check leaves
 the row without a Reset button. Recorded count: 167 non-Plan files and 16,136
 net non-generated lines at `ffd3835c`.
+
+2026-11-26: twelfth round, a Windows CI flake the new integration scenario
+exposed. `config watcher integration` failed on Windows with two reloads for
+the burst scenario. Chokidar delivers a rename after the caller's own `rename`
+promise resolves, so on a loaded runner the four events can straddle the 100 ms
+production window; two reloads are then correct platform behaviour, and the old
+assertion measured the runner's scheduling rather than the debounce. The burst
+scenario now states its own 750 ms window and settles past it, while the
+single-replacement scenario keeps the production 100 ms. Recorded count: 167
+non-Plan files and 16,153 net non-generated lines at `c5e88430`.
