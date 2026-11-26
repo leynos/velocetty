@@ -303,6 +303,13 @@ jobs:
           ELECTRON_ENABLE_LOGGING: '1'
           ELECTRON_ENABLE_STACK_DUMPING: '1'
           SHELL: /bin/bash
+          # Node's module *detection* reads an ambiguous `.ts` file's own
+          # `import`/`export` syntax and loads it as ESM. Playwright, seeing no
+          # `"type": "module"`, transpiles the same file to CommonJS, so the two
+          # collide with `exports is not defined in ES module scope`. Turning
+          # detection off makes Node treat those files as CommonJS, which is
+          # what Playwright emitted.
+          NODE_OPTIONS: --no-experimental-detect-module
       - name: Upload deep-lane E2E artefacts
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
