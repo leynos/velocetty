@@ -252,7 +252,7 @@ describe('config writer', () => {
         expect(outcome.kind).toBe('refused');
         expect(harness.port.writes).toHaveLength(0);
       }),
-      {numRuns: Math.min(fastCheckRunCount(), 50)}
+      {numRuns: fastCheckRunCount()}
     );
   });
 });

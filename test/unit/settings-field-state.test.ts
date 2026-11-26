@@ -196,10 +196,12 @@ describe('refreshing', () => {
     expect(state.phase).toBe('saving');
   });
 
-  test('a refresh can clear a stale error phase', () => {
+  test('a refresh keeps a dirty invalid draft and its error', () => {
     const invalid = stepField(committed(14), UNCOERCED).state;
+    expect(invalid.isDirty).toBe(true);
     const {state} = stepField(invalid, refresh(14, '14'));
-    expect(state.phase).toBe('idle');
-    expect(state.errors).toEqual([]);
+    expect(state.phase).toBe('invalid');
+    expect(state.draft).toBe(invalid.draft);
+    expect(state.errors).toEqual(invalid.errors);
   });
 });

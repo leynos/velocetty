@@ -27,8 +27,20 @@ function StringIndexOfFromN(s: string, sub: string, from: nat): int
   else StringIndexOfFromN(s, sub, from + 1)
 }
 
+// The reference split: the parts between literal separators, as JavaScript's
+// `String.prototype.split` produces them. Relating the axiom to this function
+// grounds tokenization in the input rather than only bounding part counts.
+function splitSpec(s: string, d: string): seq<string>
+  requires |d| > 0
+  decreases |s|
+{
+  var i := StringIndexOf(s, d);
+  if i < 0 then [s] else [s[..i]] + splitSpec(s[i + |d|..], d)
+}
+
 function {:axiom} StringSplit(s: string, d: string): seq<string>
   requires |d| > 0
+  ensures StringSplit(s, d) == splitSpec(s, d)
   ensures |StringSplit(s, d)| >= 1
   ensures |StringSplit(s, d)| <= |s| + 1
   ensures forall k :: 0 <= k < |StringSplit(s, d)| ==> |StringSplit(s, d)[k]| <= |s|

@@ -85,7 +85,6 @@ type RowView = {
   readonly draft: string;
   readonly phase: FieldPhase;
   readonly errors: readonly string[];
-  readonly isModified: boolean;
 };
 
 type FieldHandlers = Pick<SettingRowProps, 'onChange' | 'onCommit' | 'onRevert' | 'onReset'>;
@@ -94,8 +93,12 @@ type Mutable<T> = {-readonly [K in keyof T]: T[K]};
 
 const ALL_CATEGORIES = -1;
 
-const haystackFor = (entry: Omit<FieldEntry, 'haystack'>, label: string, description: string | undefined): string =>
-  normalizeSearchText([label, entry.key, description ?? ''].join(' '));
+const haystackFor = (
+  entry: Omit<FieldEntry, 'haystack'>,
+  label: string,
+  description: string | undefined,
+  categoryLabel: string
+): string => normalizeSearchText([label, entry.key, description ?? '', categoryLabel].join(' '));
 
 /**
  * Builds one search entry per catalogue field, in model order.
@@ -113,7 +116,8 @@ export const buildFieldEntries = (arguments_: SettingsEditorArguments): readonly
       const entry = {field, key, categoryIndex};
       const label = field.label.kind === 'key' ? arguments_.labelFor(key) : field.label.text;
       const description = arguments_.descriptionFor(key);
-      return [{...entry, haystack: haystackFor(entry, label, description)}];
+      const categoryLabel = arguments_.categoryLabelFor(SETTING_CATEGORY_IDS[categoryIndex]);
+      return [{...entry, haystack: haystackFor(entry, label, description, categoryLabel)}];
     })
   );
 
@@ -130,9 +134,19 @@ const sectionIndexFor = (entries: readonly FieldEntry[], selectedCategory: Setti
 const rowViewOf = (state: FieldState<SettingValue, FieldError> | undefined): RowView => ({
   draft: state?.draft ?? '',
   phase: state?.phase ?? 'idle',
-  errors: (state?.errors ?? []).map((error) => describeFieldError(error)),
-  isModified: state !== undefined && state.committed !== undefined
+  errors: (state?.errors ?? []).map((error) => describeFieldError(error))
 });
+
+/** The schema diagnostics that name one setting key. */
+const diagnosticsFor = (snapshot: SettingsSnapshot | null, key: CoreSettingKey): readonly string[] => {
+  if (snapshot?.fileStatus.kind !== 'invalid') {
+    return [];
+  }
+  const keyPath = `/config/${key}`;
+  return snapshot.fileStatus.diagnostics
+    .filter((diagnostic) => diagnostic.path === keyPath || diagnostic.path.startsWith(`${keyPath}/`))
+    .map((diagnostic) => diagnostic.message);
+};
 
 const handlersFor = (fieldStore: FieldStore, id: string): FieldHandlers => ({
   onChange: (draft) => fieldStore.setDraft(id, draft),
@@ -162,11 +176,15 @@ const rowFor = (
   arguments_: SettingsEditorArguments
 ): SettingRowProps => {
   const disabledReason = arguments_.disabledReasonFor(entry.key, snapshot?.fileStatus ?? null);
+  const isModified = snapshot !== null && Object.hasOwn(snapshot.userValues, entry.key);
+  const view = rowViewOf(fields.fields.get(entry.field.id));
   const base: Mutable<SettingRowProps> = {
     id: entry.field.id,
     label: arguments_.labelFor(entry.key),
     control: entry.field.control,
-    ...rowViewOf(fields.fields.get(entry.field.id)),
+    ...view,
+    errors: [...view.errors, ...diagnosticsFor(snapshot, entry.key)],
+    isModified,
     isDisabled: disabledReason !== undefined,
     isProfileOverridden: snapshot?.profileOverriddenKeys.includes(entry.key) ?? false,
     requiresRestart: keyRequiresRestart(entry.key),

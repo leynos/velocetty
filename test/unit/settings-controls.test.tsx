@@ -138,12 +138,14 @@ describe('settings row controls', () => {
     expect({drafts, commits}).toEqual({drafts: ['true'], commits: 1});
   });
 
-  test('errors mark the control invalid and describe it', async () => {
+  test('errors mark the control invalid, announce themselves, and describe it', async () => {
     await render(baseProps({errors: ['Enter a number']}));
     const field = input();
     expect(field.getAttribute('aria-invalid')).toBe('true');
     expect(field.getAttribute('aria-describedby')).toContain('core-fontSize-errors');
     expect(document.body.textContent).toContain('Enter a number');
+    const errors = document.querySelector('#core-fontSize-errors');
+    expect(errors?.getAttribute('role')).toBe('alert');
   });
 
   test('reset is labelled with the setting and returns focus to its control', async () => {
@@ -166,10 +168,17 @@ describe('settings row controls', () => {
     expect(document.body.textContent).toContain('Fix the other invalid settings first.');
   });
 
-  test('a restart-required change warns that a restart is needed', async () => {
-    await render(baseProps({requiresRestart: true, isModified: true, draft: 'canary'}));
-    const alert = document.querySelector('[role="alert"]');
-    expect(alert?.textContent).toContain('after restarting');
+  test('a restart-required setting always says a restart is needed', async () => {
+    await render(baseProps({requiresRestart: true, isModified: false, draft: 'canary'}));
+    expect(document.body.textContent).toContain('after restarting');
+  });
+
+  test('a disabled row also disables its reset button', async () => {
+    await render(baseProps({isDisabled: true, disabledReason: 'No config file exists yet.', isModified: true}));
+    const reset = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (candidate) => candidate.getAttribute('aria-label') === 'Reset Font size to default'
+    );
+    expect(reset?.disabled).toBe(true);
   });
 
   test('Tab moves from the control to the reset button', async () => {

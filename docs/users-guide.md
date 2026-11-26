@@ -221,8 +221,8 @@ If nothing matches, a **Clear search and category** button resets both filters.
   field. Press `Escape` to put the old value back.
 - A setting that differs from its default shows a **Changed** marker.
 
-Some settings take effect immediately; others need a restart and show a warning
-when you change them.
+Some settings take effect immediately; others say that they take effect after a
+restart.
 
 The default profile can override a setting. When it does, the row says so,
 because changing the base value then has no visible effect until the profile
@@ -268,7 +268,8 @@ quoting, and line endings elsewhere in the file are preserved.
   the tab is read-only and names the file. Rename it to `config.json5` to use
   the settings tab.
 - **No config file.** If no config file exists yet, the tab still shows the
-  defaults. Changing a value reports that there is no file to write.
+  defaults but disables editing and explains that there is no file to write.
+  Open the file or restart Velocetty to create one.
 
 ## Keyboard shortcuts
 

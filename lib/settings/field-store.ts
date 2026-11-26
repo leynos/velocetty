@@ -125,10 +125,13 @@ const isScalarValue = (value: unknown): value is SettingValue => {
 
 const committedValueOf = (snapshot: SettingsSnapshot, target: SettingTarget): SettingValue | undefined => {
   const stored = snapshot.userValues[target.key];
-  if (!isScalarValue(stored)) {
-    return undefined;
+  if (isScalarValue(stored)) {
+    return stored;
   }
-  return stored;
+  // An unset key displays its effective default. File presence is tracked
+  // separately, so the row can still say the value is not customised.
+  const fallback = snapshot.defaultValues[target.key];
+  return isScalarValue(fallback) ? fallback : undefined;
 };
 
 /**
@@ -150,6 +153,7 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
   let snapshot: FieldStoreSnapshot = {fields: states};
   const listeners = new Set<() => void>();
   let inFlight = 0;
+  let lastRevision = -1;
   let idleWaiters: (() => void)[] = [];
 
   const publish = (): void => {
@@ -195,8 +199,11 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
         : gateway.resetValue(definition.target);
     void request
       .then((outcome) => {
+        // An answer for a superseded request must not refresh the snapshot:
+        // a newer submission already owns the display.
+        const isCurrent = states.get(definition.id)?.pendingRequestId === effect.requestId;
         apply(definition, outcomeEvent(effect.requestId, outcome));
-        if (outcome.kind === 'applied') {
+        if (outcome.kind === 'applied' && isCurrent) {
           // Applying the outcome also refreshes every field's committed value,
           // so a reset that removed one key updates the others' modified flags.
           refresh(outcome.snapshot);
@@ -209,6 +216,10 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
   };
 
   const refresh = (next: SettingsSnapshot): void => {
+    if (next.revision < lastRevision) {
+      return;
+    }
+    lastRevision = next.revision;
     for (const field of fields) {
       const committed = committedValueOf(next, field.target);
       apply(field, {kind: 'refresh', committed, draft: formatValue(field.control, committed)});

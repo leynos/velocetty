@@ -18,8 +18,8 @@ import {
   type ConfigWriterDependencies,
   writeConfigEdit
 } from '../config/config-file-writer';
-import {validateConfigOptions} from '../config/json5-config';
-import {isJsonObject} from '../utils/runtime-guards';
+import {validateConfigOptions, validateRawConfig} from '../config/json5-config';
+import {isJsonObject, isString} from '../utils/runtime-guards';
 import {checkWritePolicy, isWritableSettingKey} from './settings-write-policy';
 
 import type {configValidationDiagnostic} from '@shared/types/config';
@@ -80,6 +80,41 @@ const parseDiagnostics = (error: unknown): readonly configValidationDiagnostic[]
 const userValuesOf = (parsed: JsonValue): JsonObject =>
   isJsonObject(parsed) && isJsonObject(parsed.config) ? parsed.config : {};
 
+/** Rebuilds the diagnostic a `validateRawConfig` failure carries, when present. */
+const diagnosticOf = (error: Error): configValidationDiagnostic | undefined => {
+  if (!('diagnostic' in error)) {
+    return undefined;
+  }
+  const {diagnostic: value} = error;
+  if (!isJsonObject(value)) {
+    return undefined;
+  }
+  const {path, message, suggestedFix} = value;
+  if (!isString(path)) {
+    return undefined;
+  }
+  if (!isString(message)) {
+    return undefined;
+  }
+  if (!isString(suggestedFix)) {
+    return undefined;
+  }
+  return {path, message, suggestedFix};
+};
+
+/** The first top-level failure the load path would reject, if any. */
+const topLevelDiagnosticOf = (parsed: JsonValue): configValidationDiagnostic | undefined => {
+  const validation = validateRawConfig(parsed);
+  if (validation.success) {
+    return undefined;
+  }
+  const diagnostic = diagnosticOf(validation.error);
+  if (diagnostic === undefined || diagnostic.path.startsWith('/config')) {
+    return undefined;
+  }
+  return diagnostic;
+};
+
 const readConfigFile = (dependencies: SettingsServiceDependencies): FileRead => {
   if (dependencies.fileSystem.stat(asConfigFilePath(dependencies.filePath)) === null) {
     return {kind: 'missing'};
@@ -103,6 +138,13 @@ const readConfigFile = (dependencies: SettingsServiceDependencies): FileRead => 
   const userValues = userValuesOf(parsed);
   if (isLegacyPath(dependencies.filePath)) {
     return {kind: 'legacy', userValues};
+  }
+  // The load path validates the whole raw config, including the top-level
+  // plugin and keymap fields. Report a top-level failure here too, or the tab
+  // would accept edits while the application is running on defaults.
+  const topLevel = topLevelDiagnosticOf(parsed);
+  if (topLevel !== undefined) {
+    return {kind: 'invalid', userValues, diagnostics: [topLevel]};
   }
   if (!isJsonObject(parsed) || !isJsonObject(parsed.config)) {
     return {

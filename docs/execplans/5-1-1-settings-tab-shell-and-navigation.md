@@ -144,6 +144,30 @@ terminal's column and row count did not change.
 - Ambiguity: if implementation evidence contradicts a decision in
   `Decision log`, stop and present the options.
 
+### Tolerance deviation (2026-11-26)
+
+The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
+delivered change is **148 non-Plan files** and **12,493 net non-generated
+lines**. The excess is recorded here as the escalation the tolerance requires,
+and the maintainer's acceptance of the raised counts is requested before merge.
+
+Reasons for the excess:
+
+- The rebase onto `main` at `6078e4ee` brought a restructured configuration
+  composition root, a relocated ADR set, a new proof toolchain, and a refreshed
+  documentation style; reconciling them added files and tests the approved
+  estimate could not know about.
+- The hosted CodeScene gate required decomposition of the writer, scanner,
+  renderer hook, row, reducer, policy, and coercion modules, which created new
+  cohesive modules rather than growing existing files.
+- The assessment-repair round added sixteen glue-layer tests (snapshot
+  ordering, `@modified`, IPC refusals, gateway abort, read-only snapshots,
+  compile contracts, zero-verification refusal, defaults, draft preservation,
+  stale outcomes) and the 4.0.0 migration note.
+
+No new runtime or development dependency was added beyond the pre-approved
+`fast-check` and `lemmascript`. No plugin-facing hook signature changed.
+
 ## Risks
 
 - Risk: plugins decorate tabs and may override the settings tab title or
@@ -300,12 +324,13 @@ terminal's column and row count did not change.
 - Observation (EP-M1): a union variant with no fields breaks construction
   (`Eff<V>.None`), while a variant with a field emits correctly (`none(-1)`).
   Impact: `FieldEffect`'s `none` variant carries the unused request id `-1`.
-- Observation (EP-M1): `StringIndexOf` is an axiomatized leaf, so Dafny cannot
-  evaluate `haystackMatchesTokens` on concrete inputs. Non-vacuity witnesses
-  for the search predicate are therefore not provable inside Dafny; the
-  mirrored property suite and the rejected seeded mutations provide that
-  evidence instead (D22). The field-state witnesses do verify and are committed
-  in `field-state.dfy`.
+- Observation (EP-M1): `haystackMatchesTokens` lifts its check to
+  `Std.Collections.Seq.All` and tokenizes through the `StringSplit` axiom, both
+  of which the verifier treats as opaque, so it cannot evaluate the predicate
+  on concrete inputs. Non-vacuity witnesses for the search predicate are
+  therefore not provable inside Dafny; the mirrored property suite and the
+  rejected seeded mutations provide that evidence instead (D22). The
+  field-state witnesses do verify and are committed in `field-state.dfy`.
 - Observation (EP-M1): `switch` on `event.kind` cannot combine cases
   (fall-through is rejected as `not a declared union`). Impact: `edit` and
   `revert` have separate branches.
@@ -627,15 +652,19 @@ terminal's column and row count did not change.
   same-line comment belongs to a removed property and is removed with it (D4).
   Only comments outside the span are guaranteed to survive, which is what the
   locality properties assert. Date/Author: 2026-11-25.
-- Decision D22 (new, EP-M1): search non-vacuity is established by the mirrored
-  property suite and by rejecting seeded mutations, not by Dafny witness lemmas.
-  `haystackMatchesTokens` bottoms out in the axiomatized `StringIndexOf`,
-  whose contract is soundness-only, so Dafny cannot evaluate the predicate on
-  concrete strings; every attempted witness lemma was unprovable. The mutation
-  table in `Artefacts and notes` shows the proof rejects an ignored `@modified`
-  filter, an ignored token list, a first-match short circuit, and a reversed
-  traversal, which is the property the witnesses were meant to protect.
-  Date/Author: 2026-11-25.
+- Decision D22 (revised 2026-11-26): search non-vacuity is established by the
+  mirrored property suite and by rejecting seeded mutations, not by Dafny
+  witness lemmas. `haystackMatchesTokens` lifts to `Std.Collections.Seq.All`
+  and tokenizes through the `StringSplit` axiom; both are opaque to the
+  verifier, so it cannot reduce the predicate on concrete strings and every
+  attempted witness lemma was unprovable. `StringIndexOf` itself has a
+  recursive body and is not an axiom. The mutation table in
+  `Artefacts and notes` shows the proof rejects an ignored `@modified` filter,
+  an ignored token list, a first-match short circuit, and a reversed traversal,
+  which is the property the witnesses were meant to protect. `StringSplit` now
+  carries an `ensures` equating it to a recursive `splitSpec`, so tokenization
+  is grounded in the input rather than only bounded by part counts.
+  Date/Author: 2026-11-25, revised 2026-11-26.
 
 ## Outcomes & retrospective
 
@@ -667,7 +696,7 @@ What cost the most:
   configuration composition root, the ADR numbering, the documentation style
   guide, and the proof toolchain had all changed under the branch. The final
   candidate re-runs every gate: 1,174 unit tests, `make prove` (sample 1,
-  keybindings policy 8, search 8, field state 9; zero errors), the packaged
+  keybindings policy 8, search 9, field state 11; zero errors), the packaged
   settings-tab deep E2E, formatting, type checking, lint, spelling, Markdown,
   and Mermaid validation. The upstream terminal-input deep spec cannot launch
   on a host without a display because its launcher has no headless flag; it
@@ -2071,7 +2100,19 @@ verified predicate, renderer hook, scanner, writer, and tests were decomposed
 until the local `cs delta` and the hosted quality gate both pass. Fourteen
 glue-layer tests were added (snapshot revision ordering, `@modified`, IPC
 refusals, gateway abort, read-only snapshots, and compile-time contracts).
-Final candidate: 1,189 unit tests, proofs 1 + 8 + 8 + 9 with zero errors, the
+Final candidate: 1,198 unit tests, proofs 1 + 8 + 9 + 11 with zero errors, the
 packaged settings deep E2E, and every static gate clean. The field machine
 keeps one dated CodeScene directive because its Dafny contract proves it as a
 single transition.
+
+2026-11-26: assessment repair round. The ExecPlan and proof assessments named
+real glue defects, all repaired with regression tests: draft preservation
+across an in-flight write, effective defaults, stale-outcome and stale-revision
+rejection, whole-file validation, exact mode preservation, missing-file and
+disabled-row behaviour, category-label search, inline diagnostics, and pointer
+access in the packaged app. The proofs gained a grounded `StringSplit` axiom,
+transition-based reachability lemmas (search 9, field state 11 verified), and a
+per-summary positive-count guard; D22 now names the opaque `Seq.All` boundary.
+The scope tolerance is exceeded (148 non-Plan files, 12,493 net lines); the
+deviation and its reasons are recorded under Tolerances for maintainer
+acceptance.

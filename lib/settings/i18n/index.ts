@@ -100,9 +100,11 @@ export const settingsStrings = {
   legacyRow: 'The legacy hyper.json file is read-only here.',
   unparseableRow: 'Fix the config file syntax before saving.',
   invalidRow: 'Fix the other invalid settings first.',
+  missingRow: 'No config file exists yet, so this setting cannot be saved.',
   invalidBanner: 'The config file has invalid values. Fix the highlighted settings, or open the file.',
   legacyBanner: 'This configuration uses the legacy hyper.json file, which the settings tab cannot change.',
-  missingBanner: 'No config file exists yet; settings will be written to one when you change a value.',
+  missingBanner:
+    'No config file exists yet, so settings cannot be saved from this tab. Open the file to create it, or restart Velocetty.',
   modifiedNote: 'Changed from the default.'
 } as const;
 

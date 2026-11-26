@@ -186,6 +186,22 @@ describe('buildSettingsPanel', () => {
     expect(panel.resultCount).toBeLessThan(buildFieldEntries(editorArguments()).length);
   });
 
+  test('search matches the category label, as the plan requires', () => {
+    const panel = panelOf(snapshotOf(1), 'appearance');
+
+    expect(panel.resultCount).toBeGreaterThan(0);
+    expect(panel.sections.every((section) => section.category === 'appearance')).toBe(true);
+    expect(panel.sections.flatMap((section) => section.rows)).not.toHaveLength(0);
+  });
+
+  test('the changed marker follows the user file, not the effective value', () => {
+    const changedRows = panelOf(snapshotOf(1, {fontSize: 16}), '').sections.flatMap((section) => section.rows);
+    const unchangedRows = panelOf(snapshotOf(1), '').sections.flatMap((section) => section.rows);
+
+    expect(changedRows.find((row) => row.id === 'core:fontSize')?.isModified).toBe(true);
+    expect(unchangedRows.find((row) => row.id === 'core:fontSize')?.isModified).toBe(false);
+  });
+
   test('category counts sum to the all-settings count', () => {
     const panel = panelOf(snapshotOf(1, {fontSize: 16}), '');
     const allCount = panel.categories.find((category) => category.id === 'all')?.count ?? -1;

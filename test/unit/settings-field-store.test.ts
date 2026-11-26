@@ -150,8 +150,63 @@ describe('settings field store', () => {
 
     fake.resolveNext({kind: 'applied', snapshot: snapshotWith({}, 2)});
     await store.whenIdle();
-    expect(stateOf(store).committed).toBeUndefined();
-    expect(stateOf(store).draft).toBe('');
+    expect(stateOf(store).committed).toBe(12);
+    expect(stateOf(store).draft).toBe('12');
+  });
+
+  test('an unset setting displays its effective default', () => {
+    const fake = createFakeGateway();
+    const store = createStore(fake.gateway);
+    store.refresh(snapshotWith({}));
+    expect(stateOf(store).committed).toBe(12);
+    expect(stateOf(store).draft).toBe('12');
+    expect(stateOf(store, SHELL.id).draft).toBe('/bin/bash');
+  });
+
+  test('a newer draft survives the applied outcome of an older write', async () => {
+    const fake = createFakeGateway();
+    const store = createStore(fake.gateway);
+    store.refresh(snapshotWith({fontSize: 14}));
+    store.setDraft(FONT.id, '16');
+    store.submit(FONT.id);
+    store.setDraft(FONT.id, '18');
+
+    fake.resolveNext({kind: 'applied', snapshot: snapshotWith({fontSize: 16}, 2)});
+    await store.whenIdle();
+
+    expect(stateOf(store).draft).toBe('18');
+    expect(stateOf(store).isDirty).toBe(true);
+    expect(stateOf(store).committed).toBe(16);
+  });
+
+  test('a stale successful outcome does not refresh the newer value', async () => {
+    const fake = createFakeGateway();
+    const store = createStore(fake.gateway);
+    store.refresh(snapshotWith({fontSize: 14}));
+
+    store.setDraft(FONT.id, '16');
+    store.submit(FONT.id);
+    store.setDraft(FONT.id, '20');
+    store.submit(FONT.id);
+
+    // The first request's answer arrives after the second submission.
+    fake.resolveNext({kind: 'applied', snapshot: snapshotWith({fontSize: 16}, 2)});
+    await Promise.resolve();
+    expect(stateOf(store).committed).toBe(14);
+    expect(stateOf(store).draft).toBe('20');
+
+    fake.resolveNext({kind: 'applied', snapshot: snapshotWith({fontSize: 20}, 3)});
+    await store.whenIdle();
+    expect(stateOf(store).committed).toBe(20);
+    expect(stateOf(store).draft).toBe('20');
+  });
+
+  test('an older snapshot revision is ignored', () => {
+    const fake = createFakeGateway();
+    const store = createStore(fake.gateway);
+    store.refresh(snapshotWith({fontSize: 16}, 3));
+    store.refresh(snapshotWith({fontSize: 12}, 2));
+    expect(stateOf(store).committed).toBe(16);
   });
 
   test('a rejected write shows the main process diagnostic', async () => {

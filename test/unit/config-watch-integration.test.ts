@@ -43,7 +43,7 @@ const startWatch = async (filePath: string): Promise<{probe: Probe; close: () =>
   const probe: Probe = {reloads: 0, isReady: false};
   const debounced = createConfigWatcher<ReturnType<typeof setTimeout>>({
     cancel: (timer) => clearTimeout(timer),
-    debounceMs: 20,
+    debounceMs: 100,
     fileNames: [filePath],
     handle: createChokidarHandle([path.dirname(filePath)]),
     onReady: () => {
@@ -92,9 +92,16 @@ const atomicReplace = async ({directory, filePath, text}: AtomicReplacement): Pr
 };
 
 const burstOfAtomicReplaces = async ({directory, filePath}: WatchLocation): Promise<void> => {
-  for (let index = 0; index < 4; index += 1) {
-    await atomicReplace({directory, filePath, text: `{config: {fontSize: ${16 + index}}}`});
-  }
+  // Write every temporary sibling first, then rename them together: awaiting
+  // each replacement in turn let a loaded CI runner spread the events past the
+  // debounce and legitimately produce two reloads.
+  const replacements = [0, 1, 2, 3].map((index) => ({
+    from: path.join(directory, `.tmp-burst-${index}`),
+    text: `{config: {fontSize: ${16 + index}}}`,
+    to: filePath
+  }));
+  await Promise.all(replacements.map(({from, text}) => fs.writeFile(from, text)));
+  await Promise.all(replacements.map(({from, to}) => renameWithRetry({from, to})));
 };
 
 type WatchScenario = {
@@ -109,13 +116,13 @@ const WATCH_SCENARIOS: readonly WatchScenario[] = [
     name: 'an atomic replacement reloads exactly once',
     change: ({directory, filePath}) => atomicReplace({directory, filePath, text: '{config: {fontSize: 16}}'}),
     isFirstReload: (probe) => probe.reloads === 1,
-    settleMilliseconds: 150
+    settleMilliseconds: 300
   },
   {
     name: 'a burst of writes collapses into one reload',
     change: burstOfAtomicReplaces,
     isFirstReload: (probe) => probe.reloads >= 1,
-    settleMilliseconds: 200
+    settleMilliseconds: 400
   }
 ];
 

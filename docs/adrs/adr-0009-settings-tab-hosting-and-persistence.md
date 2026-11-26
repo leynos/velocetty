@@ -148,8 +148,17 @@ field because the renderer and main process ship in one build.
   integers). Case folding happens outside the proved functions.
 - The generated search model axiomatizes `StringSplit` (JavaScript's
   `String.prototype.split` with a literal separator) with bounds on the part
-  count and part length. `bin/prove.sh` admits that exact declaration, and
-  `emptyUserKeymaps`, as the only axioms a listed proof may use.
+  count and part length, tied by an `ensures` to the recursive `splitSpec` so
+  the parts are related to the input. `bin/prove.sh` admits that exact
+  declaration, and `emptyUserKeymaps`, as the only axioms a listed proof may
+  use. The search non-vacuity evidence is the property suite and seeded
+  mutations, because `Std.Collections.Seq.All` and the `StringSplit` axiom are
+  opaque to evaluation on concrete strings.
+- The proofs are generic in the value type, but the settings domain instantiates
+  it only with `string | number | boolean`, where the proof's structural `===`
+  and JavaScript's reference equality agree. Request identifiers are JavaScript
+  numbers; the monotonicity contract holds within the safe-integer range, which
+  the store cannot exhaust.
 - `useSyncExternalStore` re-renders after notifications and reads the latest
   snapshot.
 

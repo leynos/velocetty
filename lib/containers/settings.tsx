@@ -49,7 +49,8 @@ const bannerFor = (status: SettingsFileStatus | null, loadError: string | null):
       return settingsStrings.unparseableBanner;
     }
     case 'invalid': {
-      return settingsStrings.invalidBanner;
+      const problems = status.diagnostics.map((diagnostic) => `${diagnostic.path}: ${diagnostic.message}`);
+      return [settingsStrings.invalidBanner, ...problems].join(' ');
     }
     case 'legacy-json': {
       return settingsStrings.legacyBanner;
@@ -76,9 +77,11 @@ const disabledReasonFor = (key: CoreSettingKey, status: SettingsFileStatus | nul
     return undefined;
   }
   switch (status.kind) {
-    case 'ok':
-    case 'missing': {
+    case 'ok': {
       return undefined;
+    }
+    case 'missing': {
+      return settingsStrings.missingRow;
     }
     case 'legacy-json': {
       return settingsStrings.legacyRow;

@@ -124,18 +124,18 @@ function stepField<V(==), E(==)>(state: FieldState<V, E>, event: FieldEvent<V, E
       var requestId := state.nextRequestId;
       if i_event_submission.coerced? then
         var phase_2 := FieldPhase.saving;
-        var next_2 := state.(phase := phase_2, errors := [], isDirty := true, pendingRequestId := requestId, nextRequestId := (requestId + 1));
+        var next_2 := state.(phase := phase_2, errors := [], isDirty := false, pendingRequestId := requestId, nextRequestId := (requestId + 1));
         var effect := write(requestId, i_event_submission.value);
         StepResult(next_2, effect)
       else
         var phase := FieldPhase.invalid;
         var errors := (if (|i_event_submission.errors| > 0) then i_event_submission.errors else [i_event_fallbackError]);
-        var next := state.(phase := phase, errors := errors, pendingRequestId := -1);
+        var next := state.(phase := phase, errors := errors, isDirty := true, pendingRequestId := -1);
         StepResult(next, noEffect)
     case reset =>
       var requestId := state.nextRequestId;
       var phase := FieldPhase.saving;
-      var next := state.(phase := phase, errors := [], pendingRequestId := requestId, nextRequestId := (requestId + 1));
+      var next := state.(phase := phase, errors := [], isDirty := false, pendingRequestId := requestId, nextRequestId := (requestId + 1));
       var effect := FieldEffect.reset(requestId);
       StepResult(next, effect)
     case outcome(i_event_requestId, i_event_result, i_event_errors, i_event_fallbackError) =>
@@ -144,12 +144,12 @@ function stepField<V(==), E(==)>(state: FieldState<V, E>, event: FieldEvent<V, E
       else
         if i_event_result.applied? then
           var phase_3 := FieldPhase.idle;
-          var next_3 := state.(phase := phase_3, errors := [], isDirty := false, pendingRequestId := -1);
+          var next_3 := state.(phase := phase_3, errors := [], pendingRequestId := -1);
           StepResult(next_3, noEffect)
         else
           var phase := failurePhaseOf(i_event_result);
           var errors := (if (|i_event_errors| > 0) then i_event_errors else [i_event_fallbackError]);
-          var next := state.(phase := phase, errors := errors, pendingRequestId := -1);
+          var next := state.(phase := phase, errors := errors, isDirty := true, pendingRequestId := -1);
           StepResult(next, noEffect)
     case refresh(i_event_committed, i_event_draft) =>
       if (state.isDirty || (state.pendingRequestId >= 0)) then
@@ -199,6 +199,31 @@ function rejectedWitness(): FieldState<int, int> {
 
 function failedWitness(): FieldState<int, int> {
   FieldState(failed, None, "x", true, [0], -1, 2)
+}
+
+// ── Reachability witnesses ──────────────────────────────────
+// The functions above show well-formedness is satisfiable in every phase.
+// These lemmas show the documented transitions actually reach the saving and
+// idle phases from the state a store starts in.
+
+lemma reachable_saving()
+{
+  var initial: FieldState<int, int> := FieldState(idle, None, "", false, [], -1, 1);
+  var submit: FieldEvent<int, int> := submit(coerced(1), 0);
+  var next := stepField(initial, submit).state;
+  assert wellFormed(next);
+  assert next.phase.saving?;
+}
+
+lemma reachable_idle_after_applied()
+{
+  var initial: FieldState<int, int> := FieldState(idle, None, "", false, [], -1, 1);
+  var submit: FieldEvent<int, int> := submit(coerced(1), 0);
+  var saving := stepField(initial, submit).state;
+  var outcome: FieldEvent<int, int> := outcome(1, applied, [], 0);
+  var next := stepField(saving, outcome).state;
+  assert wellFormed(next);
+  assert next.phase.idle?;
 }
 
 lemma witness_idle()

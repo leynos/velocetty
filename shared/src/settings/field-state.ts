@@ -3,20 +3,14 @@
  *
  * One field moves between `idle`, `invalid`, `saving`, `rejected`, and
  * `failed`. `stepField` is pure: it returns the next state plus at most one
- * effect and never performs the effect itself. The store that owns the field
- * runs the effect after applying the state, which is why a React reducer
- * cannot duplicate a write in development StrictMode.
+ * effect, which the owning store runs after applying the state. That is why a
+ * React reducer cannot duplicate a write in StrictMode.
  *
- * `stepField` carries a LemmaScript contract
- * (`shared/src/settings/field-state.dfy`). The transition is the part a
- * sampled test cannot cover: a lost pending id would wedge a field in
- * `saving`, and a stale outcome that overwrote a newer one would silently
- * discard a user's edit.
- *
- * Every union literal and phase literal in the verified core is bound to a
- * typed local first. LemmaScript's Dafny emitter only resolves a literal
- * against its declared type when the value has one; inline literals are
- * emitted as strings or tuples and do not typecheck.
+ * The transition carries a LemmaScript contract
+ * (`shared/src/settings/field-state.dfy`): a lost pending id would wedge a
+ * field in `saving`, and a stale outcome would discard a newer edit. Every
+ * union and phase literal is bound to a typed local because the Dafny emitter
+ * only resolves a literal against a declared type.
  */
 
 /** The phase one field is in. */
@@ -90,11 +84,9 @@ export const initialFieldState = <V, E>(committed: V | undefined, draft: string)
 });
 
 /**
- * Reports whether a field state satisfies the machine's invariants.
- *
- * A state is well formed when it is saving exactly while a request is
- * pending, the pending request is older than the next one, request ids start
- * at one, and errors are non-empty exactly in an error phase.
+ * Reports whether a state satisfies the machine's invariants: saving exactly
+ * while a request is pending, the pending id older than the next, ids starting
+ * at one, and errors present exactly in an error phase.
  *
  * @param state - The state to check.
  * @returns True when the state satisfies every invariant.
@@ -165,9 +157,6 @@ export function settledPhase(phase: FieldPhase): FieldPhase {
  *
  * @param event - The event to classify.
  * @returns True for a refresh event.
- *
- * @example
- * isRefreshEvent({kind: 'reset'}); // false
  */
 export function isRefreshEvent<V, E>(event: FieldEvent<V, E>): boolean {
   //@ verify
@@ -180,9 +169,6 @@ export function isRefreshEvent<V, E>(event: FieldEvent<V, E>): boolean {
  *
  * @param event - The event to classify.
  * @returns True for a submit event.
- *
- * @example
- * isSubmitEvent({kind: 'edit', draft: 'x'}); // false
  */
 export function isSubmitEvent<V, E>(event: FieldEvent<V, E>): boolean {
   //@ verify
@@ -196,9 +182,6 @@ export function isSubmitEvent<V, E>(event: FieldEvent<V, E>): boolean {
  * @param event - The event to classify.
  * @param pendingRequestId - The id the field is waiting for.
  * @returns True when the event is the outcome for that request.
- *
- * @example
- * isCurrentOutcome({kind: 'reset'}, 1); // false
  */
 export function isCurrentOutcome<V, E>(event: FieldEvent<V, E>, pendingRequestId: number): boolean {
   //@ verify
@@ -354,7 +337,7 @@ export function stepField<V, E>(state: FieldState<V, E>, event: FieldEvent<V, E>
           ...state,
           phase,
           errors: [],
-          isDirty: true,
+          isDirty: false,
           pendingRequestId: requestId,
           nextRequestId: requestId + 1
         };
@@ -363,7 +346,7 @@ export function stepField<V, E>(state: FieldState<V, E>, event: FieldEvent<V, E>
       }
       const phase: FieldPhase = 'invalid';
       const errors: readonly E[] = event.submission.errors.length > 0 ? event.submission.errors : [event.fallbackError];
-      const next: FieldState<V, E> = {...state, phase, errors, pendingRequestId: -1};
+      const next: FieldState<V, E> = {...state, phase, errors, isDirty: true, pendingRequestId: -1};
       return {state: next, effect: noEffect};
     }
     case 'reset': {
@@ -373,6 +356,7 @@ export function stepField<V, E>(state: FieldState<V, E>, event: FieldEvent<V, E>
         ...state,
         phase,
         errors: [],
+        isDirty: false,
         pendingRequestId: requestId,
         nextRequestId: requestId + 1
       };
@@ -385,12 +369,14 @@ export function stepField<V, E>(state: FieldState<V, E>, event: FieldEvent<V, E>
       }
       if (event.result === 'applied') {
         const phase: FieldPhase = 'idle';
-        const next: FieldState<V, E> = {...state, phase, errors: [], isDirty: false, pendingRequestId: -1};
+        // An edit made while the write was in flight stays dirty, so the
+        // following refresh keeps the newer draft instead of replacing it.
+        const next: FieldState<V, E> = {...state, phase, errors: [], pendingRequestId: -1};
         return {state: next, effect: noEffect};
       }
       const phase: FieldPhase = failurePhaseOf(event.result);
       const errors: readonly E[] = event.errors.length > 0 ? event.errors : [event.fallbackError];
-      const next: FieldState<V, E> = {...state, phase, errors, pendingRequestId: -1};
+      const next: FieldState<V, E> = {...state, phase, errors, isDirty: true, pendingRequestId: -1};
       return {state: next, effect: noEffect};
     }
     case 'refresh': {

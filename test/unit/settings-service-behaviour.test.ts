@@ -170,6 +170,24 @@ describe('settings snapshot', () => {
     expectReadOnly(harness, CONFIG_PATH, '{config: {scrollback: "lots", fontSize: "big"}}');
   });
 
+  test('reports a top-level field the load path rejects', async () => {
+    const harness = createHarness();
+    harness.port.setFile(CONFIG_PATH, '{config: {}, plugins: "nope"}');
+
+    const snapshot = harness.service.getSnapshot();
+
+    expect(snapshot.fileStatus.kind).toBe('invalid');
+    if (snapshot.fileStatus.kind !== 'invalid') {
+      return;
+    }
+    expect(snapshot.fileStatus.diagnostics.map((item) => item.path)).toEqual(['/plugins']);
+    expect(await harness.service.setValue(target('fontSize'), 16)).toEqual({
+      kind: 'failed',
+      reason: 'user-config-invalid'
+    });
+    expectReadOnly(harness, CONFIG_PATH, '{config: {}, plugins: "nope"}');
+  });
+
   test('reports a legacy hyper.json as read-only', () => {
     const harness = createHarness(LEGACY_PATH);
     harness.port.setFile(LEGACY_PATH, '{"config": {"fontSize": 14}}');

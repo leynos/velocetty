@@ -35,6 +35,10 @@ export const createNodeConfigFileSystem = (): ConfigFileSystemPort => ({
   },
   writeFile: (filePath, text, mode) => {
     fs.writeFileSync(filePath, text, {encoding: 'utf8', mode});
+    // `writeFileSync` masks the requested mode with the process umask. The
+    // replacement must carry the original file's exact permissions, so set
+    // them again after creation.
+    fs.chmodSync(filePath, mode);
   },
   fsyncFile: (filePath) => {
     const descriptor = fs.openSync(filePath, 'r+');

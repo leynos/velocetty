@@ -190,25 +190,31 @@ check_forbidden_trust_constructs() {
 }
 
 run_verification() {
-  local output verified summaries expected
+  local output counts count summaries expected
   if ! output="$("$lsc_bin" check --backend=dafny 2>&1)"; then
     printf '%s\n' "$output" >&2
     fail "LemmaScript verification failed."
   fi
   printf '%s\n' "$output"
 
-  verified="$(printf '%s\n' "$output" |
-    grep -oE 'Dafny program verifier finished with [0-9]+ verified, 0 errors' |
-    tail -n 1 |
-    grep -oE '[0-9]+' |
-    head -n 1 || true)"
-  [[ -n "$verified" ]] || fail "The verifier output did not report 'Dafny program verifier finished with <N> verified, 0 errors'."
-  ((verified >= 1)) || fail "The verifier reported zero verified programs."
+  # Every summary must report at least one verified program. Checking only the
+  # last count would let an earlier source verify nothing while a later one
+  # supplies the positive total.
+  counts="$(printf '%s\n' "$output" |
+    grep -oE 'finished with [0-9]+ verified, 0 errors' |
+    grep -oE 'finished with [0-9]+' |
+    grep -oE '[0-9]+' || true)"
+  [[ -n "$counts" ]] || fail "The verifier output did not report 'Dafny program verifier finished with <N> verified, 0 errors'."
+  while IFS= read -r count; do
+    [[ -n "$count" ]] || continue
+    if ((count < 1)); then
+      fail "A verifier summary reported zero verified programs; refusing a vacuous result."
+    fi
+  done <<<"$counts"
 
-  # Every listed source must report a positive summary. A combined or cached
-  # run that prints one summary for several sources would otherwise pass.
-  summaries="$(printf '%s\n' "$output" |
-    grep -cE 'Dafny program verifier finished with [0-9]+ verified, 0 errors' || true)"
+  # Every listed source must report its own summary. A combined or cached run
+  # that prints one summary for several sources would otherwise pass.
+  summaries="$(printf '%s\n' "$counts" | grep -c . || true)"
   expected="$(read_entries | wc -l)"
   ((summaries >= expected)) ||
     fail "Only ${summaries} verifier summaries for ${expected} listed sources; not every proof ran."

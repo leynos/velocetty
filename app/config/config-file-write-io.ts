@@ -128,6 +128,9 @@ export const writeFileAtomically = (request: ConfigFileWriteRequest): void => {
     throw error;
   }
   if (platform !== 'win32') {
+    // A failure here leaves the new text visible but not proven durable, so it
+    // is reported rather than swallowed. The writer's retry re-reads the file
+    // and applies the same value again, which is idempotent.
     fileSystem.fsyncDirectory(asConfigFilePath(path.dirname(targetPath)));
   }
 };

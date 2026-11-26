@@ -9,6 +9,7 @@
  * that resized the PTY would have broken a running session.
  */
 import fs from 'node:fs/promises';
+import JSON5 from 'json5';
 import path from 'node:path';
 
 import {_electron} from 'playwright';
@@ -33,6 +34,20 @@ const fileTimeoutMs = 15_000;
 const closeTimeoutMs = 5000;
 
 const SENTINEL = '// velocetty-e2e-sentinel: keep this comment';
+// The golden-path plugin persists its defaults at start-up, so the exact
+// document includes that namespace alongside the core setting.
+const GOLDEN_PATH_SETTINGS = {
+  enabled: true,
+  message: 'Golden path plugin command invoked.',
+  tabPrefix: 'GP'
+};
+const expectedConfig = (fontSize?: number) => {
+  const plugins = {'velocetty.golden-path-demo': GOLDEN_PATH_SETTINGS};
+  if (fontSize === undefined) {
+    return {config: {plugins}};
+  }
+  return {config: {fontSize, plugins}};
+};
 const SEEDED_CONFIG = `{
   ${SENTINEL}
   config: {
@@ -113,6 +128,42 @@ const readTerminalSize = async (window: Page) => {
   return size;
 };
 
+/** Exercises the seeded field: edit, invalid value, and reset. */
+const exerciseEdits = async (window: Page, configPath: string): Promise<void> => {
+  // Browsing shows the seeded value from the file.
+  await expect(window.locator('#core-fontSize-control')).toHaveValue('14');
+
+  // A valid edit is written and the sentinel comment survives. The parsed
+  // document is asserted exactly, not by a substring: the writer must change
+  // only the edited value.
+  await window.locator('#core-fontSize-control').fill('16');
+  await window.locator('#core-fontSize-control').press('Enter');
+  await expect.poll(async () => readConfig(configPath), {timeout: fileTimeoutMs}).toContain('fontSize: 16');
+  const afterEdit = await readConfig(configPath);
+  expect(JSON5.parse(afterEdit)).toEqual(expectedConfig(16));
+  expect(afterEdit).toContain(SENTINEL);
+
+  // An invalid value shows an inline error and leaves the file untouched.
+  const beforeInvalid = await readConfig(configPath);
+  await window.locator('#core-fontSize-control').fill('abc');
+  await window.locator('#core-fontSize-control').press('Enter');
+  await expect(window.locator('#core-fontSize-errors')).toContainText('Enter a number');
+  await expect(window.locator('#core-fontSize-control')).toHaveAttribute('aria-invalid', 'true');
+  expect(await readConfig(configPath)).toBe(beforeInvalid);
+
+  // Reset removes the key and keeps the comment. A pointer click proves the
+  // results area is not covered by the fixed header; the row control's
+  // keyboard path is covered by the unit suite.
+  const resetButton = window.getByRole('button', {name: 'Reset Font size to default'});
+  await resetButton.scrollIntoViewIfNeeded();
+  await expect(resetButton).toBeInViewport();
+  await resetButton.click();
+  await expect.poll(async () => readConfig(configPath), {timeout: fileTimeoutMs}).not.toContain('fontSize');
+  const afterReset = await readConfig(configPath);
+  expect(JSON5.parse(afterReset)).toEqual(expectedConfig());
+  expect(afterReset).toContain(SENTINEL);
+};
+
 test('settings tab edits, validates, and resets the config file', async ({page: _page}, testInfo) => {
   const isolatedEnvironment = await createIsolatedE2EEnvironment();
   const configPath = configPathFor(isolatedEnvironment);
@@ -141,50 +192,48 @@ test('settings tab edits, validates, and resets the config file', async ({page: 
     // tab appears rather than assuming the first one was bound.
     const preferencesShortcut = process.platform === 'darwin' ? 'Meta+,' : 'Control+,';
     const settingsTab = window.locator('header li', {hasText: 'Settings'});
-    await expect
-      .poll(
-        async () => {
-          await window.keyboard.press(preferencesShortcut);
-          return settingsTab.count();
-        },
-        {timeout: 15_000, intervals: [500]}
-      )
-      .toBeGreaterThan(0);
+    const searchInput = window.locator('input[type="search"]');
+    // The key bindings register asynchronously at start-up, so press until the
+    // search box actually holds focus; a visible tab alone is not proof that
+    // the activation reached the renderer.
+    const openSettings = async (): Promise<void> => {
+      await expect
+        .poll(
+          async () => {
+            if ((await searchInput.count()) === 0) {
+              await window.keyboard.press(preferencesShortcut);
+              return false;
+            }
+            if (!(await searchInput.evaluate((node) => node === document.activeElement))) {
+              await window.keyboard.press(preferencesShortcut);
+              return false;
+            }
+            return true;
+          },
+          {timeout: 15_000, intervals: [500]}
+        )
+        .toBe(true);
+    };
+    await openSettings();
     await expect(settingsTab).toBeVisible();
-    await expect(window.locator('input[type="search"]')).toBeFocused();
+
+    // Headless ozone gives the window a very small content box in which the
+    // Settings tab itself sits at the edge. Use a normal desktop size for the
+    // pointer round trip; the panel scrolls either way.
+    await app.evaluate(({BrowserWindow}) => {
+      const [main] = BrowserWindow.getAllWindows();
+      main.setSize(1000, 800);
+    });
+    await searchInput.click();
 
     // Opening settings never resized the running terminal.
     await window.locator('header li').first().click();
     const sizeAfterVisit = await readTerminalSize(window);
     expect(sizeAfterVisit).toBe(sizeBefore);
-    await settingsTab.click();
-    await expect(window.locator('input[type="search"]')).toBeFocused();
+    await openSettings();
+    await expect(settingsTab).toBeVisible();
 
-    // Browsing shows the seeded value from the file.
-    await expect(window.locator('#core-fontSize-control')).toHaveValue('14');
-
-    // A valid edit is written and the sentinel comment survives.
-    await window.locator('#core-fontSize-control').fill('16');
-    await window.locator('#core-fontSize-control').press('Enter');
-    await expect.poll(async () => readConfig(configPath), {timeout: fileTimeoutMs}).toContain('fontSize: 16');
-    expect(await readConfig(configPath)).toContain(SENTINEL);
-
-    // An invalid value shows an inline error and leaves the file untouched.
-    const beforeInvalid = await readConfig(configPath);
-    await window.locator('#core-fontSize-control').fill('abc');
-    await window.locator('#core-fontSize-control').press('Enter');
-    await expect(window.locator('#core-fontSize-errors')).toContainText('Enter a number');
-    await expect(window.locator('#core-fontSize-control')).toHaveAttribute('aria-invalid', 'true');
-    expect(await readConfig(configPath)).toBe(beforeInvalid);
-
-    // Reset removes the key and keeps the comment.
-    // Activated by keyboard, which is also the accessibility path a keyboard
-    // user takes; the fixed header overlays the results' pointer area.
-    const resetButton = window.getByRole('button', {name: 'Reset Font size to default'});
-    await resetButton.focus();
-    await window.keyboard.press('Enter');
-    await expect.poll(async () => readConfig(configPath), {timeout: fileTimeoutMs}).not.toContain('fontSize');
-    expect(await readConfig(configPath)).toContain(SENTINEL);
+    await exerciseEdits(window, configPath);
 
     expect(monitor.criticalErrors).toHaveLength(0);
   } finally {

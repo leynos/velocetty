@@ -39,9 +39,12 @@ const FIELDS: readonly FieldDefinition[] = [
   }
 ];
 
+type ExternalOp = {readonly kind: 'external'};
+
 type Op =
   | {readonly kind: 'submit'; readonly field: string; readonly draft: string}
-  | {readonly kind: 'reset'; readonly field: string};
+  | {readonly kind: 'reset'; readonly field: string}
+  | ExternalOp;
 
 type SubmitOp = Extract<Op, {kind: 'submit'}>;
 type ResetOp = Extract<Op, {kind: 'reset'}>;
@@ -49,6 +52,7 @@ type ResetOp = Extract<Op, {kind: 'reset'}>;
 type AppliedOps = {
   readonly expected: ReadonlyMap<string, JsonValue>;
   readonly resets: number;
+  readonly externals: number;
 };
 
 const fieldArbitrary = fc.constantFrom(FONT_SIZE, SHELL);
@@ -60,7 +64,8 @@ const submitArbitrary = fc.record({
   draft: draftArbitrary
 });
 const resetArbitrary = fc.record({kind: fc.constant('reset' as const), field: fieldArbitrary});
-const opArbitrary: fc.Arbitrary<Op> = fc.oneof(submitArbitrary, resetArbitrary);
+const externalArbitrary: fc.Arbitrary<ExternalOp> = fc.record({kind: fc.constant('external' as const)});
+const opArbitrary: fc.Arbitrary<Op> = fc.oneof(submitArbitrary, resetArbitrary, externalArbitrary);
 
 type Pending = {
   readonly outcome: Promise<SettingsWriteOutcome>;
@@ -152,18 +157,26 @@ const applyReset = (store: FieldStore, expected: Map<string, JsonValue>, op: Res
   expected.delete(op.field);
 };
 
-const applyOps = (store: FieldStore, ops: readonly Op[]): AppliedOps => {
+const applyOps = (harness: ReturnType<typeof createHarness>, ops: readonly Op[]): AppliedOps => {
   const expected = new Map<string, JsonValue>();
   let resets = 0;
+  let externals = 0;
   for (const op of ops) {
-    if (op.kind === 'reset') {
-      resets += 1;
-      applyReset(store, expected, op);
+    if (op.kind === 'external') {
+      // An unrelated reload must not disturb a pending draft or the expected
+      // file contents; it only re-reads the file the service already holds.
+      externals += 1;
+      harness.store.refresh(harness.service.getSnapshot());
       continue;
     }
-    applySubmit(store, expected, op);
+    if (op.kind === 'reset') {
+      resets += 1;
+      applyReset(harness.store, expected, op);
+      continue;
+    }
+    applySubmit(harness.store, expected, op);
   }
-  return {expected, resets};
+  return {expected, resets, externals};
 };
 
 const flushInOrder = async (harness: ReturnType<typeof createHarness>, keys: readonly number[]): Promise<boolean> => {
@@ -194,14 +207,16 @@ describe('settings convergence', () => {
     let runs = 0;
     let reordered = 0;
     let resets = 0;
+    let externals = 0;
 
     await fc.assert(
       fc.asyncProperty(opsArbitrary, keysArbitrary, async (ops, keys) => {
         runs += 1;
         const harness = createHarness();
         harness.store.refresh(harness.service.getSnapshot());
-        const applied = applyOps(harness.store, ops);
+        const applied = applyOps(harness, ops);
         resets += applied.resets;
+        externals += applied.externals;
         const wasReordered = await flushInOrder(harness, keys);
         await harness.store.whenIdle();
         expectSettledFile(harness.port, applied.expected);
@@ -209,10 +224,11 @@ describe('settings convergence', () => {
           reordered += 1;
         }
       }),
-      {numRuns: Math.min(fastCheckRunCount(), 100)}
+      {numRuns: fastCheckRunCount()}
     );
 
     expect(reordered / runs).toBeGreaterThanOrEqual(0.1);
     expect(resets / runs).toBeGreaterThan(0.1);
+    expect(externals / runs).toBeGreaterThan(0.1);
   });
 });

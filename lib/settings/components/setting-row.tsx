@@ -133,7 +133,7 @@ const RowNotes = (props: RowNotesProps): ReactElement => (
       </p>
     )}
     {props.errors.length > 0 && (
-      <p className={styles.error} id={props.errorsId}>
+      <p className={styles.error} id={props.errorsId} role="alert">
         {props.errors.join(' ')}
       </p>
     )}
@@ -143,6 +143,7 @@ const RowNotes = (props: RowNotesProps): ReactElement => (
 type RowActionsProps = {
   readonly label: string;
   readonly controlId: string;
+  readonly isDisabled: boolean;
   readonly isModified: boolean;
   readonly requiresRestart: boolean;
   readonly onReset: () => void;
@@ -156,14 +157,20 @@ const RowActions = (props: RowActionsProps): ReactElement => {
   return (
     <div className={styles.actions}>
       {props.isModified && (
-        <button type="button" className={styles.reset} aria-label={`Reset ${props.label} to default`} onClick={reset}>
+        <button
+          type="button"
+          className={styles.reset}
+          aria-label={`Reset ${props.label} to default`}
+          disabled={props.isDisabled}
+          onClick={reset}
+        >
           Reset
         </button>
       )}
       <InlineRestartWarning
         classification={props.requiresRestart ? 'restart' : 'live'}
-        show={props.requiresRestart && props.isModified}
-        message="This change takes effect after restarting."
+        show={props.requiresRestart}
+        message="This setting takes effect after restarting."
       />
     </div>
   );
@@ -200,6 +207,7 @@ const RowControl = (props: RowControlProps): ReactElement => {
       <RowActions
         label={row.label}
         controlId={props.ids.control}
+        isDisabled={row.isDisabled}
         isModified={row.isModified}
         requiresRestart={row.requiresRestart}
         onReset={row.onReset}
