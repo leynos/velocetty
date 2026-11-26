@@ -20,8 +20,9 @@ import {
 } from '../config/config-file-writer';
 import {isKeymapConfig, isStringArray, validateConfigOptions} from '../config/json5-config';
 import {observeSettingsWrite, type ConfigSpanRecorder} from '../config/config-spans';
-import {isJsonObject, isNumber} from '../utils/runtime-guards';
+import {isJsonObject} from '../utils/runtime-guards';
 import {checkWritePolicy, isWritableSettingKey} from './settings-write-policy';
+import {transportSafeValues} from './transport-values';
 
 import type {ConfigMetrics} from '../config/config-metrics';
 import type {configValidationDiagnostic} from '@shared/types/config';
@@ -145,18 +146,31 @@ const diagnosticsOf = (parsed: JsonValue): readonly configValidationDiagnostic[]
   return problems;
 };
 
+/** The read result for a file that exists but cannot be read or stat'ed. */
+const unreadableFile = (): FileRead => ({
+  kind: 'unparseable',
+  diagnostics: [diagnostic('/', 'The config file could not be read.', 'Check the file permissions.')]
+});
+
 const readConfigFile = (dependencies: SettingsServiceDependencies): FileRead => {
-  if (dependencies.fileSystem.stat(asConfigFilePath(dependencies.filePath)) === null) {
+  const filePath = asConfigFilePath(dependencies.filePath);
+  let isPresent: boolean;
+  try {
+    isPresent = dependencies.fileSystem.stat(filePath) !== null;
+  } catch {
+    // `getSnapshot` must answer with a file state, not throw: the renderer
+    // needs the tab and its diagnostic, and a `stat` failure such as EACCES is
+    // the same user-visible condition as an unreadable file.
+    return unreadableFile();
+  }
+  if (!isPresent) {
     return {kind: 'missing'};
   }
   let text: string;
   try {
-    text = dependencies.fileSystem.readText(asConfigFilePath(dependencies.filePath));
+    text = dependencies.fileSystem.readText(filePath);
   } catch {
-    return {
-      kind: 'unparseable',
-      diagnostics: [diagnostic('/', 'The config file could not be read.', 'Check the file permissions.')]
-    };
+    return unreadableFile();
   }
   let parsed: JsonValue;
   try {
@@ -223,61 +237,6 @@ const profileOverriddenKeys = (userValues: JsonObject, defaultProfileName: strin
 
 const concernsKey = (item: configValidationDiagnostic, key: string): boolean =>
   item.path === `/config/${key}` || item.path.startsWith(`/config/${key}/`);
-
-/**
- * Replaces numbers JSON cannot carry with the JSON5 text that denotes them.
- *
- * `JSON5.parse` accepts `NaN` and `Infinity`, but the renderer validates the
- * snapshot with a JSON schema, which rejects a payload containing either. Such
- * a file must still load: the tab is where the user repairs the value, and a
- * rejected snapshot would hide the row and its diagnostic. The textual form
- * keeps the key present, so the row stays editable and resettable, while the
- * diagnostics reported beside it are still derived from the parsed file.
- *
- * @param value - A value parsed from the user's file.
- * @returns The value with every non-finite number replaced by its JSON5 text.
- *
- * @example
- * ```ts
- * transportSafeValue({fontSize: NaN}); // {fontSize: 'NaN'}
- * transportSafeValue([Infinity, 16]); // ['Infinity', 16]
- * ```
- */
-const transportSafeValue = (value: JsonValue): JsonValue => {
-  if (isNumber(value)) {
-    return Number.isFinite(value) ? value : JSON5.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    return value.map((entry) => transportSafeValue(entry));
-  }
-  if (isJsonObject(value)) {
-    const encoded: JsonObject = {};
-    for (const [key, entry] of Object.entries(value)) {
-      encoded[key] = transportSafeValue(entry);
-    }
-    return encoded;
-  }
-  return value;
-};
-
-/**
- * Encodes the user's `config` object for the transport.
- *
- * @param values - The `config` object parsed from the file.
- * @returns A copy safe for the renderer's JSON schema.
- *
- * @example
- * ```ts
- * transportSafeValues({fontSize: NaN}); // {fontSize: 'NaN'}
- * ```
- */
-const transportSafeValues = (values: JsonObject): JsonObject => {
-  const encoded: JsonObject = {};
-  for (const [key, value] of Object.entries(values)) {
-    encoded[key] = transportSafeValue(value);
-  }
-  return encoded;
-};
 
 const refusedOutcome = (reason: SettingsWriteFailure): SettingsWriteOutcome => ({kind: 'failed', reason});
 

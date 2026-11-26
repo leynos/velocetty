@@ -1970,6 +1970,24 @@ file has two artefacts:
   (`patches/lemmascript@0.6.12.patch`) so generic record types and generic
   union lookups work. Keep the version pin when changing proofs.
 
+### The Proofs workflow
+
+`.github/workflows/proofs.yml` runs on a pull request only when a path it
+covers changes: `shared/src/settings/**`, `app/config/keybindings-policy.ts`,
+`test/proofs/**`, any `*.dfy` or `*.dfy.gen`, `LemmaScript-files.txt`, the
+`Makefile`, `bin/prove.sh`, `bin/generate-dafny.mjs`,
+`scripts/check-proof-freshness.mjs`, the LemmaScript patch, `package.json`,
+`bun.lock`, or the workflow itself. It can also be dispatched by hand.
+
+The job pins `DAFNY_VERSION: 4.11.0` and caches `~/.dotnet/tools` under that
+version. On a cache miss it installs Dafny with `dotnet tool install`, then
+downloads the Z3 4.12.1 release, checks its recorded SHA-256
+(`c5360fd157b0f861ec8780ba3e51e2197e9486798dc93cd878df69a4b0c2b7c5`), and
+installs the binary as `~/.dotnet/tools/z3/bin/z3` with a `z3-4.12.1` symlink,
+because the NuGet tool ships no solver. The job then runs `make proofs` and
+`make proofs-fresh`. It is advisory while the suite settles, as recorded in ADR
+009; treat a red run as a real failure and not as a flake.
+
 ### A compiled-output hazard
 
 `tsgo` emits a parenthesized `return` whose first line is a comment as `return`

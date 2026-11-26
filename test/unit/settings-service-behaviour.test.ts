@@ -350,21 +350,41 @@ describe('settings write observability', () => {
     expect([...rejected.spans, ...failed.spans]).toEqual([writeSpan('failed'), writeSpan('failed')]);
   });
 
-  test('an unexpected throw is counted, spanned failed, and rethrown', async () => {
+  test('a file whose stat fails is refused, counted, and spanned failed', async () => {
     const harness = harnessWithFile('{config: {fontSize: 14}}');
+    // The memory port fails one queued call, so each read gets its own fault.
     harness.port.queueFault('stat', 'EIO');
-    await expect(harness.service.setValue(target('fontSize'), 16)).rejects.toThrow('EIO');
+
+    // The read is total: the snapshot path needs a file state, and the write
+    // path turns the same failure into a refusal rather than an exception.
+    expect(harness.service.getSnapshot().fileStatus).toEqual({
+      kind: 'unparseable',
+      diagnostics: [
+        {
+          path: '/',
+          message: 'The config file could not be read.',
+          suggestedFix: 'Check the file permissions.'
+        }
+      ]
+    });
+    harness.port.queueFault('stat', 'EIO');
+    const outcome = await harness.service.setValue(target('fontSize'), 16);
+
+    expect(outcome.kind).not.toBe('applied');
     expect(harness.counters().settingsFailures).toBe(1);
-    expect(harness.refusals).toEqual(['settings write refused reason=io-error']);
+    expect(harness.refusals).toEqual(['settings write refused reason=user-config-unparseable']);
+    expect(harness.port.readFile(CONFIG_PATH)).toBe('{config: {fontSize: 14}}');
   });
 });
 
 describe('non-finite numbers in the user values', () => {
-  test('encodes top-level NaN and Infinity so the snapshot reaches the renderer', async () => {
+  test('encodes them so the snapshot reaches the renderer', async () => {
     const harness = harnessWithFile('{config: {fontSize: NaN, scrollback: Infinity}}');
 
     const snapshot = harness.service.getSnapshot();
 
+    // The plain mapper tests the nesting; this asserts the service applies it
+    // and that the diagnosed row still reaches the renderer and can be reset.
     expect(snapshot.userValues).toEqual({fontSize: 'NaN', scrollback: 'Infinity'});
     expect(USER_VALUES_SCHEMA.safeParse(snapshot.userValues).success).toBe(true);
     expect(snapshot.fileStatus.kind).toBe('invalid');
@@ -376,25 +396,8 @@ describe('non-finite numbers in the user values', () => {
       '/config/scrollback'
     ]);
 
-    // The diagnosed row stays resettable, which removes the bad value.
     const reset = await harness.service.resetValue(target('fontSize'));
     expect(reset.kind).toBe('applied');
     expect(harness.port.readFile(CONFIG_PATH)).not.toContain('fontSize');
-  });
-
-  test('encodes non-finite numbers nested in objects and arrays', () => {
-    const harness = harnessWithFile('{config: {profiles: [{name: "default", config: {fontSize: -Infinity}}]}}');
-
-    const snapshot = harness.service.getSnapshot();
-
-    expect(snapshot.userValues).toEqual({
-      profiles: [{name: 'default', config: {fontSize: '-Infinity'}}]
-    });
-    expect(USER_VALUES_SCHEMA.safeParse(snapshot.userValues).success).toBe(true);
-    expect(snapshot.fileStatus.kind).toBe('invalid');
-    if (snapshot.fileStatus.kind !== 'invalid') {
-      return;
-    }
-    expect(snapshot.fileStatus.diagnostics.map((item) => item.path)).toEqual(['/config/profiles/0/config/fontSize']);
   });
 });
