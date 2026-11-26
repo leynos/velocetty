@@ -385,6 +385,20 @@ describe('settings field store', () => {
     expect(store.getSnapshot().status).toBe('failed');
   });
 
+  test('a rejection with a crafted name logs only the category', async () => {
+    const fake = createFakeGateway();
+    const lines: string[] = [];
+    const store = createStore(fake.gateway, (message) => lines.push(message));
+    store.setDraft(FONT.id, '16');
+    store.submit(FONT.id);
+    // A name is caller-controlled text and could carry a path or a newline, so
+    // only the built-in error names ever reach the line.
+    fake.rejectNext(Object.assign(new Error('boom'), {name: '/home/user/.config/Hyper\nforged line'}));
+    await store.whenIdle();
+    expect(lines).toEqual(['settings write rejected category=transport']);
+    expect(store.getSnapshot().status).toBe('failed');
+  });
+
   test('a transport failure leaves a failure phase with a message', async () => {
     const fake = createFakeGateway();
     const store = createStore(fake.gateway);

@@ -147,7 +147,7 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-delivered change is **151 non-Plan files** and **13,398 net non-generated
+delivered change is **164 non-Plan files** and **15,884 net non-generated
 lines**. The excess is recorded here as the escalation the tolerance requires,
 and the maintainer's acceptance of the raised counts is requested before merge.
 
@@ -164,6 +164,9 @@ Reasons for the excess:
   ordering, `@modified`, IPC refusals, gateway abort, read-only snapshots,
   compile contracts, zero-verification refusal, defaults, draft preservation,
   stale outcomes) and the 4.0.0 migration note.
+- The hosted-review repair round added the settings observability seam
+  (`config-metrics.ts`, `config-spans.ts`, and their tests), nine focused
+  regression suites, and the documentation updates the review requested.
 
 No new runtime or development dependency was added beyond the pre-approved
 `fast-check` and `lemmascript`. No plugin-facing hook signature changed.
@@ -2260,3 +2263,31 @@ Node 22.23 needed a temporary, uncommitted substitution of the helper's
 `import.meta.url` base directory, because Node 22 evaluates Playwright's
 CommonJS transform of that file as ESM; the file is unchanged in the diff and
 CI runs Node 24.
+
+2026-11-26: ninth repair round, from the assessment follow-ups on `d955bc9f`.
+The completeness assessment named three in-scope defects and one documentation
+overclaim; all four are fixed, and each behaviour change has a regression that
+fails without it:
+
+1. Removing a JSON5 property no longer swallows a comment that sits between the
+   value and the following comma. The comma is deleted as its own span when
+   anything other than whitespace precedes it, mirroring the existing
+   preceding-separator rule. The property oracle now derives the surviving
+   comments from the removed key's own span instead of repeating the
+   implementation's comma search, so an implementation that hunts past a
+   comment fails the property.
+2. `split request horizontal`, `split request vertical`, `next pane req`, and
+   `prev pane req` now pass through `registerTerminalRequest`, so a main-menu
+   action cannot split or navigate the hidden terminal while settings owns the
+   surface.
+3. The field store's transport-rejection line carries a name only from the
+   built-in error names (`Error`, `EvalError`, `RangeError`, `ReferenceError`,
+   `SyntaxError`, `TypeError`, `URIError`). A crafted name holding a path or a
+   newline is dropped, with a regression.
+4. `shared/src/settings/search.dfy` now states its guarantee relative to
+   `fieldMatchesQuery` and names the sampled oracle that covers the
+   normalization boundary, instead of claiming a wrong filter cannot hide a
+   setting.
+
+The recorded scope count is corrected to 164 non-Plan files and 15,884 net
+non-generated lines; maintainer acceptance is still requested and not assumed.

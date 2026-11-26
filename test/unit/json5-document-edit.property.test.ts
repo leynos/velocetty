@@ -18,12 +18,7 @@ import {
   type DocumentEditResult,
   type Json5ObjectProperty
 } from '../../app/config/json5';
-import {
-  lineEndIndex,
-  scanTrailingCommentEnd,
-  terminatorLength,
-  valueTextEnd
-} from '../../app/config/json5/document-scan';
+import {scanTrailingCommentEnd, valueTextEnd} from '../../app/config/json5/document-scan';
 import {
   defaultStyle,
   json5DocumentArbitrary,
@@ -137,32 +132,24 @@ const editedDoc = (result: DocumentEditResult): string => {
 
 type RemovalSpan = {readonly before: string; readonly after: string; readonly key: string};
 
-type DocumentSpan = {readonly startIndex: number; readonly endIndex: number};
-
-/** The span a removal may delete for `property`; any preceding comma is separate. */
-const propertyRemovalSpan = (text: string, parser: Json5Parser, property: Json5ObjectProperty): DocumentSpan => {
+/**
+ * Every comment a removal must leave alone, with its multiplicity.
+ *
+ * A removal deletes the property's key, its value, and the trailing comment
+ * that shares the value's last line. A comment before the key, or one that
+ * starts after that trailing comment ends, belongs to the document and must
+ * survive. This is computed from the value's text end alone, not from wherever
+ * a comma happens to sit, so an implementation that swallows a comment while
+ * hunting for the separator fails here.
+ */
+const survivingComments = (text: string, property: Json5ObjectProperty): string[] => {
   const valueEnd = valueTextEnd(text, property);
   const trailingEnd = scanTrailingCommentEnd({doc: text, index: valueEnd});
-  const lineStart = parser.getLineStartIndex({index: property.keyStartIndex});
-  const lineEnd = lineEndIndex({doc: text, index: trailingEnd});
-  const isOwnLine =
-    /^[ \t]*$/.test(text.slice(lineStart, property.keyStartIndex)) && /^[ \t]*$/.test(text.slice(trailingEnd, lineEnd));
-  if (isOwnLine) {
-    return {startIndex: lineStart, endIndex: lineEnd + terminatorLength({doc: text, index: lineEnd})};
-  }
-  if (!property.hasTrailingComma) {
-    return {startIndex: property.keyStartIndex, endIndex: trailingEnd};
-  }
-  const comma = parser.skipWhitespaceAndComments({startIndex: valueEnd, limitIndex: text.length});
-  return {startIndex: property.keyStartIndex, endIndex: text[comma] === ',' ? comma + 1 : trailingEnd};
-};
-
-/** Comments that lie wholly outside `span`, with their multiplicity. */
-const commentsOutsideSpan = (text: string, span: DocumentSpan): string[] =>
-  commentRecordsOf(text)
-    .filter((record) => record.endIndex <= span.startIndex || record.startIndex >= span.endIndex)
+  return commentRecordsOf(text)
+    .filter((record) => record.endIndex <= property.keyStartIndex || record.startIndex >= trailingEnd)
     .map(({text: comment}) => comment)
     .toSorted();
+};
 
 const expectRemovalConfinedToConfig = ({before, after, key}: RemovalSpan): void => {
   const parser = new Json5Parser(before);
@@ -177,9 +164,8 @@ const expectRemovalConfinedToConfig = ({before, after, key}: RemovalSpan): void 
   // untouched.
   expect(after.startsWith(before.slice(0, configRange.openBraceIndex + 1))).toBe(true);
   expect(after.endsWith(before.slice(configRange.closeBraceIndex + 1))).toBe(true);
-  // Comments outside the removed property's span survive with their
-  // multiplicity; only a comment inside that span may disappear.
-  expect(commentsOf(after)).toEqual(commentsOutsideSpan(before, propertyRemovalSpan(before, parser, property)));
+  // Every comment survives except the removed property's own trailing comment.
+  expect(commentsOf(after)).toEqual(survivingComments(before, property));
 };
 
 const removeCases = fc

@@ -175,6 +175,16 @@ describe('removePropertyAtPath', () => {
     });
   }
 
+  test('keeps a comment between the removed value and its following comma', () => {
+    // The comma is on the next line, after a comment on its own line. Removing
+    // the property must delete that comma on its own rather than swallowing
+    // the comment on the way to it.
+    const doc = "{config:{fontSize:14\n/* keep */ , shell:'bash'}}";
+    const text = editedText(remove(doc, pathTo('fontSize')));
+    expect(text).toContain('/* keep */');
+    expect(JSON5.parse(text)).toEqual({config: {shell: 'bash'}});
+  });
+
   test('refuses a missing property', () => {
     expect(remove(DOC, pathTo('shell'))).toEqual({kind: 'refused', reason: 'path-not-found'});
   });

@@ -337,10 +337,13 @@ const registerRendererTransportEventHandlers = (
   register('termgroup add req', ({activeUid, profile}) => {
     store.dispatch(actions.termGroupActions.requestTermGroup({activeUid, profile}));
   });
-  register('split request horizontal', ({activeUid, profile}) => {
+  // Splitting and pane navigation act on the terminal the settings tab hides,
+  // and their commands are gated on the settings surface. The main-process
+  // menu reaches these requests directly, so the same rule applies here.
+  registerTerminalRequest('split request horizontal', ({activeUid, profile}) => {
     store.dispatch(actions.termGroupActions.requestHorizontalSplit({activeUid, profile}));
   });
-  register('split request vertical', ({activeUid, profile}) => {
+  registerTerminalRequest('split request vertical', ({activeUid, profile}) => {
     store.dispatch(actions.termGroupActions.requestVerticalSplit({activeUid, profile}));
   });
   register('reset fontSize req', () => {
@@ -361,10 +364,10 @@ const registerRendererTransportEventHandlers = (
   register('move jump req', (index) => {
     store.dispatch(actions.uiActions.moveTo(index));
   });
-  register('next pane req', () => {
+  registerTerminalRequest('next pane req', () => {
     store.dispatch(actions.uiActions.moveToNextPane());
   });
-  register('prev pane req', () => {
+  registerTerminalRequest('prev pane req', () => {
     store.dispatch(actions.uiActions.moveToPreviousPane());
   });
   register('open file', ({path}) => {

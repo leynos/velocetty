@@ -353,6 +353,36 @@ describe('bootstrap transport event wiring', () => {
     expect(dispatchMock).not.toHaveBeenCalled();
   });
 
+  test('split and pane requests wait while settings owns the surface', () => {
+    clearDispatch();
+    setSettingsSurfaceActive(true);
+
+    getListener(TransportEvent.SplitHorizontal)({activeUid: 's-1', profile: 'default'});
+    getListener(TransportEvent.SplitVertical)({activeUid: 's-1', profile: 'default'});
+    getListener(TransportEvent.NextPaneReq)(null);
+    getListener(TransportEvent.PrevPaneReq)(null);
+
+    // None of these reaches the hidden terminal while the tab is in front.
+    expect(recordedCalls).toEqual([]);
+  });
+
+  test('split and pane requests run once the terminal owns the surface again', () => {
+    clearDispatch();
+    setSettingsSurfaceActive(false);
+
+    getListener(TransportEvent.SplitHorizontal)({activeUid: 's-1', profile: 'default'});
+    getListener(TransportEvent.SplitVertical)({activeUid: 's-1', profile: 'default'});
+    getListener(TransportEvent.NextPaneReq)(null);
+    getListener(TransportEvent.PrevPaneReq)(null);
+
+    expect(recordedCalls.map(({creator}) => creator)).toEqual([
+      'requestHorizontalSplit',
+      'requestVerticalSplit',
+      'moveToNextPane',
+      'moveToPreviousPane'
+    ]);
+  });
+
   test('session exit event dispatches PTY_EXIT_TERM_GROUP action', () => {
     clearDispatch();
 

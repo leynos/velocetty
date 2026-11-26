@@ -69,8 +69,19 @@ const inlineSpans = (
   const trailingEnd = scanTrailingCommentEnd({doc, index: valueEnd});
   if (property.hasTrailingComma) {
     const comma = parser.skipWhitespaceAndComments({startIndex: valueEnd, limitIndex: doc.length});
-    const end = doc[comma] === ',' ? comma + 1 : trailingEnd;
-    return [{startIndex: property.keyStartIndex, endIndex: end}];
+    if (doc[comma] !== ',') {
+      return [{startIndex: property.keyStartIndex, endIndex: trailingEnd}];
+    }
+    // A comment between the value and the following comma is on its own line
+    // or after the value, and it belongs to the document. Delete the comma on
+    // its own so the comment stays, exactly as for a preceding separator.
+    if (doc.slice(trailingEnd, comma).trim() !== '') {
+      return [
+        {startIndex: property.keyStartIndex, endIndex: trailingEnd},
+        {startIndex: comma, endIndex: comma + 1}
+      ];
+    }
+    return [{startIndex: property.keyStartIndex, endIndex: comma + 1}];
   }
   const separator = precedingSeparator(parser, doc, properties, property);
   if (separator === null) {

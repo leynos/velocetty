@@ -5,8 +5,12 @@
  * `searchFieldIndices` is the verified core of the settings search box. This
  * module proves that every index it returns matches `fieldMatchesQuery`, that
  * every matching index is returned, and that the result is strictly
- * increasing, so a wrong filter cannot silently hide a setting and the result
- * order follows the input model.
+ * increasing. The guarantee is relative to `fieldMatchesQuery`: selection is
+ * exactly the fields that predicate accepts, and the order follows the input
+ * model. The proof cannot show that the predicate itself matches a user's
+ * intent, so a wrong predicate can still hide a setting; the sampled oracle in
+ * `test/unit/settings-search-oracle.property.test.ts` covers that
+ * normalization boundary instead.
  *
  * This file is the generated model plus hand-authored additions. The generated
  * body comes from `shared/src/settings/search.ts`, the shipped TypeScript

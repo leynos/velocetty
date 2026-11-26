@@ -85,27 +85,47 @@ export type FieldStoreDependencies = {
 };
 
 /**
- * Names a rejection by a fixed category and, when known, the error's name.
+ * The error names a rejection line may carry, in the order it may carry them.
+ *
+ * An arbitrary `name` is attacker- and caller-controlled text: a rejection from
+ * the main process can put a path, a value, or a newline there, which would
+ * both leak data and let one event forge extra log lines. Only these built-in
+ * error names are recognised; anything else is reported without a name.
+ */
+const KNOWN_ERROR_NAMES: ReadonlySet<string> = new Set([
+  'Error',
+  'EvalError',
+  'RangeError',
+  'ReferenceError',
+  'SyntaxError',
+  'TypeError',
+  'URIError'
+]);
+
+/**
+ * Names a rejection by a fixed category and, when recognised, the error name.
  *
  * A thrown error's message can repeat a path, a value, or a fragment of the
  * user's file, and it crosses from the main process, so it stays out of the
- * log. The category is always the same token; the name is added only when the
- * rejected value carries one as a string.
+ * log. The category is always the same token; the name is added only when it is
+ * one of the built-in error names above, so no caller-supplied text can reach
+ * the line.
  *
  * @param error - Whatever the gateway's promise rejected with.
- * @returns The bounded category line, without the message.
+ * @returns The bounded category line, without the message or a foreign name.
  *
  * @example
  * ```ts
  * settingsRejectionLine(new TypeError('bad /home/ada'));
  * // 'settings write rejected category=transport name=TypeError'
- * settingsRejectionLine('nope'); // 'settings write rejected category=transport'
+ * settingsRejectionLine(Object.assign(new Error('x'), {name: '/home/ada\nforged'}));
+ * // 'settings write rejected category=transport'
  * ```
  */
 const settingsRejectionLine = (error: unknown): string => {
   const category = 'settings write rejected category=transport';
-  const name = isObject(error) && 'name' in error && isString(error.name) ? error.name : undefined;
-  return name === undefined ? category : `${category} name=${name}`;
+  const candidate = isObject(error) && 'name' in error && isString(error.name) ? error.name : undefined;
+  return candidate !== undefined && KNOWN_ERROR_NAMES.has(candidate) ? `${category} name=${candidate}` : category;
 };
 
 const FALLBACK_ERROR: FieldError = {code: 'failed'};
