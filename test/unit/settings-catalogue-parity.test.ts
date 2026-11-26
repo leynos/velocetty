@@ -7,6 +7,7 @@
  * find, which is exactly the failure this suite exists to prevent.
  */
 import {describe, expect, test} from 'bun:test';
+import Color from 'color';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -286,6 +287,9 @@ describe('settings write policy parity', () => {
       'rgb(255 0 0 / 50%)',
       'rgba(0, 0, 0, 0.5)',
       'rgba(1 2 3 / 50%)',
+      'rgb(50.5%, 0%, 50%)',
+      'rgb(1.5, 2, 3)',
+      'rgb(1.0, 2, 3)',
       'rgb(+)',
       'rgba(,,,)',
       'rgb(1, 2)',
@@ -298,10 +302,37 @@ describe('settings write policy parity', () => {
     expect(observed).toEqual(candidates.map((candidate) => isColourValue(candidate)));
   });
 
+  test('every accepted colour parses in the terminal it is written for', () => {
+    // `lib/components/term.tsx` builds `Color(value)` for the terminal
+    // options. A value both validators accept must not throw there, so this
+    // asserts against the consumer rather than only against the two copies.
+    const accepted = [
+      '#abc',
+      '#AABBCC',
+      '#aabbccdd',
+      'rgb(0, 0, 0)',
+      'rgb(255, 128, 0)',
+      'rgb(100%, 0%, 50%)',
+      'rgb(50.5%, 0%, 50%)',
+      'rgb(255 0 0)',
+      'rgb(255 0 0 / 50%)',
+      'rgba(0, 0, 0, 0.5)',
+      'rgba(0, 0, 0, 50%)',
+      'rgba(1 2 3 / 0.4)'
+    ];
+    for (const value of accepted) {
+      expect(() => Color(value).alpha()).not.toThrow();
+    }
+    // The consumer rejects a decimal channel, which the validators refuse too.
+    expect(() => Color('rgb(1.5, 2, 3)')).toThrow();
+  });
+
   test('the policy refuses malformed functional colours and keeps valid ones', () => {
     expect(checkWritePolicy('backgroundColor', 'rgb(+)')).toHaveLength(1);
     expect(checkWritePolicy('backgroundColor', 'rgba(,,,)')).toHaveLength(1);
     expect(checkWritePolicy('backgroundColor', 'rgb(1, 2)')).toHaveLength(1);
+    // A decimal channel is valid CSS but the terminal's parser throws on it.
+    expect(checkWritePolicy('backgroundColor', 'rgb(1.5, 2, 3)')).toHaveLength(1);
     expect(checkWritePolicy('backgroundColor', 'rgb(255, 0, 0)')).toHaveLength(0);
     expect(checkWritePolicy('backgroundColor', 'rgb(100%, 0%, 0%)')).toHaveLength(0);
     expect(checkWritePolicy('backgroundColor', 'rgba(0, 0, 0, 50%)')).toHaveLength(0);

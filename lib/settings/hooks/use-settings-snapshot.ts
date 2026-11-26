@@ -5,7 +5,9 @@
  * abort signal so a superseded answer is dropped. A lower revision is ignored
  * as well, because a late answer must not overwrite a newer one. Failures are
  * ordered too: whichever load was accepted last wins, so an older slow failure
- * cannot replace a newer success with an error banner.
+ * cannot replace a newer success with an error banner. A successful load also
+ * clears an error only when it started after the load that reported it, so an
+ * older success cannot silence a newer failure.
  */
 
 import {useEffect, useRef, useState} from 'react';
@@ -108,6 +110,10 @@ export const useSettingsSnapshot = (gateway: SettingsGateway): SettingsSnapshotS
   // snapshot a newer success just displayed with an error banner.
   const nextLoadId = useRef(0);
   const latestAcceptedLoadId = useRef(0);
+  // The load that reported the error currently on screen. Only a success from
+  // the same or a later load may clear it; an older success would otherwise
+  // hide a newer reload failure and show a stale snapshot without its banner.
+  const errorOwnerLoadId = useRef(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -121,7 +127,12 @@ export const useSettingsSnapshot = (gateway: SettingsGateway): SettingsSnapshotS
         setSnapshot(settlement.acceptedSnapshot);
       }
       if (settlement.error !== undefined) {
-        setLoadError(settlement.error);
+        if (settlement.error !== null) {
+          errorOwnerLoadId.current = loadId;
+          setLoadError(settlement.error);
+        } else if (loadId >= errorOwnerLoadId.current) {
+          setLoadError(null);
+        }
       }
       if (settlement.settlesLoading) {
         setIsLoading(false);

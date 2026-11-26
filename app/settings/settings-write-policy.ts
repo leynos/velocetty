@@ -20,15 +20,19 @@ import type {JsonValue} from '@shared/types/json';
 // may import only types from `shared/`. This mirrors `isColourValue` in
 // `shared/src/settings/coerce.ts`; the parity suite cross-checks the two.
 const HEX_COLOUR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-// A functional colour is a decimal number or a percentage per component. The
-// list must hold exactly three channels, optionally followed by an alpha as a
-// fourth comma-separated component or after a `/`. Anything else — `rgb(+)`,
-// `rgba(,,,)`, a missing channel — is not a colour the terminal can show.
-const COLOUR_COMPONENT = String.raw`[+-]?(?:\d+(?:\.\d+)?|\.\d+)%?`;
-const COMMA_CHANNELS = String.raw`${COLOUR_COMPONENT}(?:\s*,\s*${COLOUR_COMPONENT}){2}`;
-const SPACE_CHANNELS = String.raw`${COLOUR_COMPONENT}(?:\s+${COLOUR_COMPONENT}){2}`;
-const COMMA_WITH_ALPHA = String.raw`${COMMA_CHANNELS}\s*,\s*${COLOUR_COMPONENT}`;
-const SLASH_WITH_ALPHA = String.raw`${SPACE_CHANNELS}\s*\/\s*${COLOUR_COMPONENT}`;
+// The terminal parses a colour with `color-string`, which accepts an integer or
+// a percentage for each channel but rejects a decimal channel such as
+// `rgb(1.5, 2, 3)`; the alpha may be a decimal. Both validators therefore use
+// the same two component forms, so a value they accept cannot later throw in
+// `getTermOptions`. Anything else — `rgb(+)`, `rgba(,,,)`, a missing channel —
+// is not a colour the terminal can show.
+const COLOUR_DECIMAL = String.raw`\d+(?:\.\d+)?|\.\d+`;
+const COLOUR_CHANNEL = String.raw`[+-]?(?:\d+|(?:${COLOUR_DECIMAL})%)`;
+const COLOUR_ALPHA = `[+-]?(?:${COLOUR_DECIMAL})%?`;
+const COMMA_CHANNELS = String.raw`${COLOUR_CHANNEL}(?:\s*,\s*${COLOUR_CHANNEL}){2}`;
+const SPACE_CHANNELS = String.raw`${COLOUR_CHANNEL}(?:\s+${COLOUR_CHANNEL}){2}`;
+const COMMA_WITH_ALPHA = String.raw`${COMMA_CHANNELS}\s*,\s*${COLOUR_ALPHA}`;
+const SLASH_WITH_ALPHA = String.raw`${SPACE_CHANNELS}\s*\/\s*${COLOUR_ALPHA}`;
 const FUNCTIONAL_COLOUR = new RegExp(
   String.raw`^rgba?\(\s*(?:${COMMA_CHANNELS}|${SPACE_CHANNELS}|${COMMA_WITH_ALPHA}|${SLASH_WITH_ALPHA})\s*\)$`,
   'i'

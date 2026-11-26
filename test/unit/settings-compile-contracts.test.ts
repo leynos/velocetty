@@ -21,7 +21,10 @@ const everyKeyHasALabel: MissingLabel extends never ? true : false = true;
 const unbranded: SettingId = 'core:fontSize';
 
 // @ts-expect-error Every settings open request states whether it survives the initial session.
-const requestWithoutFlag: RendererEvents['settings open req'] = {ignored: true};
+// An empty object keeps the expected error tied to the missing required flag:
+// with an unrelated property, making the flag optional would still fail
+// excess-property checking and the contract would silently weaken.
+const requestWithoutFlag: RendererEvents['settings open req'] = {};
 
 const requestWithFlag: RendererEvents['settings open req'] = {keepThroughInitialSession: true};
 

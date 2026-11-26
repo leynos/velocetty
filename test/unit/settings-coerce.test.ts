@@ -112,7 +112,10 @@ describe('colour coercion', () => {
       'rgb(255 0 0 / 50%)',
       'rgba(0, 0, 0, 0.5)',
       'rgba(0, 0, 0, 50%)',
-      'rgba(1 2 3 / 0.4)'
+      'rgba(1 2 3 / 0.4)',
+      // A percentage channel may be fractional, and an integer may be signed.
+      'rgb(50.5%, 0%, 50%)',
+      'rgb(+1, 2, 3)'
     ];
     expect(accepted.map((raw) => isColourValue(raw))).toEqual(accepted.map(() => true));
     expect(accepted.map((raw) => coerceInput(COLOUR, raw))).toEqual(accepted.map((value) => ({ok: true, value})));
@@ -131,6 +134,10 @@ describe('colour coercion', () => {
       'rgb(1 2 3 4)',
       'rgb(a, b, c)',
       'rgb(1;2;3)',
+      // The terminal's parser rejects a decimal RGB channel.
+      'rgb(1.5, 2, 3)',
+      'rgba(1.5, 2, 3, 0.5)',
+      'rgb(1.0, 2, 3)',
       'tomato',
       'red;',
       'url(#x)'
