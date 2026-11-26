@@ -179,12 +179,21 @@ describe('useSettingsSnapshot', () => {
 });
 
 describe('useSettingsEditor', () => {
-  test('an applied write updates the panel before a watcher reload', async () => {
-    const field: FieldDefinition = {
-      id: 'core:fontSize',
-      target: {scope: 'core', key: 'fontSize'},
-      control: {kind: 'number', minimum: 6, maximum: 100, step: 1, isInteger: false}
-    };
+  const field: FieldDefinition = {
+    id: 'core:fontSize',
+    target: {scope: 'core', key: 'fontSize'},
+    control: {kind: 'number', minimum: 6, maximum: 100, step: 1, isInteger: false}
+  };
+
+  type HookHarness = {
+    readonly fieldStore: ReturnType<typeof createFieldStore>;
+    readonly pending: {resolve: (outcome: SettingsWriteOutcome) => void}[];
+    readonly current: () => SettingsEditor | null;
+    readonly row: () => ReturnType<SettingsEditor['sections'][number]['rows']['at']>;
+    readonly rerender: (query: string) => Promise<void>;
+  };
+
+  const mountEditor = async (): Promise<HookHarness> => {
     const pending: {resolve: (outcome: SettingsWriteOutcome) => void}[] = [];
     const gateway: SettingsGateway = {
       getSnapshot: async () => snapshotOf(1),
@@ -206,10 +215,12 @@ describe('useSettingsEditor', () => {
       editor = useSettingsEditor({...arguments_, query});
       return null;
     };
-
-    await act(async () => {
-      root?.render(<Probe query="" />);
-    });
+    const rerender = async (query: string): Promise<void> => {
+      await act(async () => {
+        root?.render(<Probe query={query} />);
+      });
+    };
+    await rerender('');
     await act(async () => {
       fieldStore.refresh(await gateway.getSnapshot(new AbortController().signal));
     });
@@ -217,24 +228,52 @@ describe('useSettingsEditor', () => {
       current()
         ?.sections.flatMap((section) => section.rows)
         .find((candidate) => candidate.id === field.id);
-    expect(row()?.isModified).toBe(false);
+    return {current, fieldStore, pending, rerender, row};
+  };
+
+  test('an applied edit updates the panel before a watcher reload', async () => {
+    const harness = await mountEditor();
+    expect(harness.row()?.isModified).toBe(false);
 
     await act(async () => {
-      fieldStore.setDraft(field.id, '16');
-      fieldStore.submit(field.id);
+      harness.fieldStore.setDraft(field.id, '16');
+      harness.fieldStore.submit(field.id);
     });
     await act(async () => {
-      pending.shift()?.resolve({kind: 'applied', snapshot: snapshotOf(2, {fontSize: 16})});
-      await fieldStore.whenIdle();
+      harness.pending.shift()?.resolve({kind: 'applied', snapshot: snapshotOf(2, {fontSize: 16})});
+      await harness.fieldStore.whenIdle();
     });
 
-    expect(row()?.isModified).toBe(true);
-    expect(row()?.draft).toBe('16');
+    expect(harness.row()?.isModified).toBe(true);
+    expect(harness.row()?.draft).toBe('16');
+    await harness.rerender('@modified');
+    expect(harness.current()?.resultCount).toBe(1);
+  });
+
+  test('a reset updates the panel before a watcher reload', async () => {
+    const harness = await mountEditor();
+    await act(async () => {
+      harness.fieldStore.setDraft(field.id, '16');
+      harness.fieldStore.submit(field.id);
+    });
+    await act(async () => {
+      harness.pending.shift()?.resolve({kind: 'applied', snapshot: snapshotOf(2, {fontSize: 16})});
+      await harness.fieldStore.whenIdle();
+    });
+    expect(harness.row()?.isModified).toBe(true);
 
     await act(async () => {
-      root?.render(<Probe query="@modified" />);
+      harness.fieldStore.reset(field.id);
     });
-    expect(current()?.resultCount).toBe(1);
+    await act(async () => {
+      harness.pending.shift()?.resolve({kind: 'applied', snapshot: snapshotOf(3)});
+      await harness.fieldStore.whenIdle();
+    });
+
+    await harness.rerender('');
+    expect(harness.row()?.isModified).toBe(false);
+    await harness.rerender('@modified');
+    expect(harness.current()?.resultCount).toBe(0);
   });
 });
 
