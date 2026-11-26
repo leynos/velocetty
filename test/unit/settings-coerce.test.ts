@@ -134,10 +134,15 @@ describe('colour coercion', () => {
       'rgb(1 2 3 4)',
       'rgb(a, b, c)',
       'rgb(1;2;3)',
-      // The terminal's parser rejects a decimal RGB channel.
+      // The terminal's parser rejects a decimal RGB channel, mixed units,
+      // and an uppercase function name.
       'rgb(1.5, 2, 3)',
       'rgba(1.5, 2, 3, 0.5)',
       'rgb(1.0, 2, 3)',
+      'rgb(50%, 2, 3)',
+      'rgb(1, 2%, 3%)',
+      'RGB(1, 2, 3)',
+      'Rgba(1, 2, 3, 0.5)',
       'tomato',
       'red;',
       'url(#x)'

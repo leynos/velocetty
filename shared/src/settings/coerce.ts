@@ -35,22 +35,20 @@ export type CoercionResult =
   | {readonly ok: false; readonly failure: CoercionFailure};
 
 const HEX_COLOUR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-// The terminal parses a colour with `color-string`, which accepts an integer or
-// a percentage for each channel but rejects a decimal channel such as
-// `rgb(1.5, 2, 3)`; the alpha may be a decimal. Both validators therefore use
-// the same two component forms, so a value they accept cannot later throw in
+// The terminal parses a colour with `color-string`, which accepts a lowercase
+// `rgb`/`rgba` function whose three channels share one unit: all integers or
+// all percentages. It rejects a decimal integer channel, mixed units, and an
+// uppercase function name, and the alpha may be a decimal or a percentage. Both
+// validators use this grammar, so a value they accept cannot later throw in
 // `getTermOptions`. Anything else — `rgb(+)`, `rgba(,,,)`, a missing channel —
 // is not a colour the terminal can show.
-const COLOUR_DECIMAL = String.raw`\d+(?:\.\d+)?|\.\d+`;
-const COLOUR_CHANNEL = String.raw`[+-]?(?:\d+|(?:${COLOUR_DECIMAL})%)`;
-const COLOUR_ALPHA = `[+-]?(?:${COLOUR_DECIMAL})%?`;
-const COMMA_CHANNELS = String.raw`${COLOUR_CHANNEL}(?:\s*,\s*${COLOUR_CHANNEL}){2}`;
-const SPACE_CHANNELS = String.raw`${COLOUR_CHANNEL}(?:\s+${COLOUR_CHANNEL}){2}`;
-const COMMA_WITH_ALPHA = String.raw`${COMMA_CHANNELS}\s*,\s*${COLOUR_ALPHA}`;
-const SLASH_WITH_ALPHA = String.raw`${SPACE_CHANNELS}\s*\/\s*${COLOUR_ALPHA}`;
+const COLOUR_INTEGER = String.raw`[+-]?\d+`;
+const COLOUR_PERCENTAGE = String.raw`[+-]?(?:\d+(?:\.\d+)?|\.\d+)%`;
+const COLOUR_ALPHA = String.raw`[+-]?(?:\d+(?:\.\d+)?|\.\d+)%?`;
+const COMMA_CHANNELS = String.raw`(?:${COLOUR_INTEGER}(?:\s*,\s*${COLOUR_INTEGER}){2}|${COLOUR_PERCENTAGE}(?:\s*,\s*${COLOUR_PERCENTAGE}){2})`;
+const SPACE_CHANNELS = String.raw`(?:${COLOUR_INTEGER}(?:\s+${COLOUR_INTEGER}){2}|${COLOUR_PERCENTAGE}(?:\s+${COLOUR_PERCENTAGE}){2})`;
 const FUNCTIONAL_COLOUR = new RegExp(
-  String.raw`^rgba?\(\s*(?:${COMMA_CHANNELS}|${SPACE_CHANNELS}|${COMMA_WITH_ALPHA}|${SLASH_WITH_ALPHA})\s*\)$`,
-  'i'
+  String.raw`^rgba?\(\s*(?:${COMMA_CHANNELS}|${SPACE_CHANNELS})(?:\s*[,/]\s*${COLOUR_ALPHA})?\s*\)$`
 );
 // `Number` also accepts `0x10`, `Infinity`, and `1_000`. A setting value is a
 // decimal number, so accept decimal syntax only; `Number.parseFloat` is worse

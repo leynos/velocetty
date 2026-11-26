@@ -8,6 +8,7 @@
  */
 import {describe, expect, test} from 'bun:test';
 import Color from 'color';
+import fc from 'fast-check';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -29,6 +30,7 @@ import {
   type WriteRule
 } from '../../app/settings/settings-write-policy';
 import {isString} from '@shared/types/guards';
+import {fastCheckRunCount} from '../testUtils/fast-check-runs';
 import {isJsonObject, type JsonObject, type JsonValue} from '@shared/types/json';
 
 const SCHEMA_PATH = 'shared/schemas/schema.json';
@@ -302,29 +304,49 @@ describe('settings write policy parity', () => {
     expect(observed).toEqual(candidates.map((candidate) => isColourValue(candidate)));
   });
 
-  test('every accepted colour parses in the terminal it is written for', () => {
+  test('every colour both validators accept parses in the terminal', () => {
     // `lib/components/term.tsx` builds `Color(value)` for the terminal
-    // options. A value both validators accept must not throw there, so this
-    // asserts against the consumer rather than only against the two copies.
-    const accepted = [
-      '#abc',
-      '#AABBCC',
-      '#aabbccdd',
-      'rgb(0, 0, 0)',
-      'rgb(255, 128, 0)',
-      'rgb(100%, 0%, 50%)',
-      'rgb(50.5%, 0%, 50%)',
-      'rgb(255 0 0)',
-      'rgb(255 0 0 / 50%)',
-      'rgba(0, 0, 0, 0.5)',
-      'rgba(0, 0, 0, 50%)',
-      'rgba(1 2 3 / 0.4)'
-    ];
-    for (const value of accepted) {
-      expect(() => Color(value).alpha()).not.toThrow();
-    }
-    // The consumer rejects a decimal channel, which the validators refuse too.
-    expect(() => Color('rgb(1.5, 2, 3)')).toThrow();
+    // options. This generates forms across the accepted grammar — unit class,
+    // separators, alpha, and function-name case — and asserts that whatever
+    // both validators accept is a colour the consumer can parse. A fixed list
+    // cannot cover that grammar, and the old pattern's mixed-unit and
+    // uppercase forms fail here.
+    const integer = fc.integer({min: -1, max: 256}).map(String);
+    const percentage = fc.oneof(
+      fc.integer({min: 0, max: 100}).map((value) => `${value}%`),
+      fc
+        .tuple(fc.integer({min: 0, max: 100}), fc.integer({min: 0, max: 9}))
+        .map(([whole, tenth]) => `${whole}.${tenth}%`)
+    );
+    const channel = (): fc.Arbitrary<string> => fc.oneof(integer, percentage);
+    const alpha = fc.oneof(
+      fc.integer({min: 0, max: 1}).map(String),
+      fc
+        .tuple(fc.integer({min: 0, max: 1}), fc.integer({min: 0, max: 99}))
+        .map(([whole, fraction]) => `${whole}.${fraction}`),
+      fc.integer({min: 0, max: 100}).map((value) => `${value}%`)
+    );
+    const commaBody = fc.tuple(channel(), channel(), channel()).map(([a, b, c]) => `${a}, ${b}, ${c}`);
+    const spaceBody = fc.tuple(channel(), channel(), channel()).map(([a, b, c]) => `${a} ${b} ${c}`);
+    const alphaTail = fc.option(fc.tuple(fc.constantFrom(', ', ' / ', '/'), alpha), {nil: undefined});
+    const functional = fc
+      .tuple(fc.constantFrom('rgb', 'rgba', 'RGB', 'Rgba'), fc.oneof(commaBody, spaceBody), alphaTail)
+      .map(([name, body, tail]) => {
+        const suffix = tail === undefined ? '' : `${tail[0]}${tail[1]}`;
+        return `${name}(${body}${suffix})`;
+      });
+    const hex = fc.stringMatching(/^#[0-9a-fA-F]{3}$/);
+
+    fc.assert(
+      fc.property(fc.oneof(functional, hex), (candidate) => {
+        if (!isColourValue(candidate)) {
+          return;
+        }
+        expect(checkWritePolicy('backgroundColor', candidate)).toHaveLength(0);
+        expect(() => Color(candidate).alpha()).not.toThrow();
+      }),
+      {numRuns: fastCheckRunCount()}
+    );
   });
 
   test('the policy refuses malformed functional colours and keeps valid ones', () => {
