@@ -224,6 +224,13 @@ const openSettingsAndVerifyTerminalSize = async (window: Page, sizeBefore: strin
   await window.locator('header li').first().click();
   const sizeAfterVisit = await readTerminalSize(window);
   expect(sizeAfterVisit).toBe(sizeBefore);
+  // The settings layer stays mounted but inactive, and `inert` must keep its
+  // controls out of the tab order and unable to take focus.
+  const inactiveFocus = await window.locator('#core-fontSize-control').evaluate((node) => {
+    node.focus();
+    return {hasInertAncestor: node.closest('[inert]') !== null, focused: document.activeElement === node};
+  });
+  expect(inactiveFocus).toEqual({hasInertAncestor: true, focused: false});
   await openSettings();
   await expect(settingsTab).toBeVisible();
 };
@@ -261,14 +268,22 @@ const exerciseEdits = async (window: Page, configPath: string, seededText: strin
   await expect(window.locator('#core-scrollback-errors')).toContainText('Enter a number');
   expect(await readConfig(configPath)).toBe(beforeInvalid);
 
-  // Reset removes the key and keeps the comment. A pointer click proves the
-  // results area is not covered by the fixed header; the row control's
-  // keyboard path is covered by the unit suite.
+  // Restore a valid draft so the row offers its Reset button again.
+  await window.locator('#core-fontSize-control').fill('16');
+  await window.locator('#core-fontSize-control').press('Enter');
+  await expect.poll(async () => readConfig(configPath), {timeout: fileTimeoutMs}).toContain('fontSize: 16');
+
+  // The keyboard reaches the Reset button from its control, activates it, and
+  // the control takes focus back afterwards.
   const resetButton = window.getByRole('button', {name: 'Reset Font size to default'});
+  await window.locator('#core-fontSize-control').focus();
+  await window.keyboard.press('Tab');
+  await expect(resetButton).toBeFocused();
   await resetButton.scrollIntoViewIfNeeded();
   await expect(resetButton).toBeInViewport();
-  await resetButton.click();
+  await window.keyboard.press('Enter');
   await expect.poll(async () => readConfig(configPath), {timeout: fileTimeoutMs}).not.toContain('fontSize');
+  await expect(window.locator('#core-fontSize-control')).toBeFocused();
   const afterReset = await readConfig(configPath);
   // Exact text: the key's value is removed and nothing else changes. The
   // removal leaves the line's indentation behind, as the edit core specifies.
