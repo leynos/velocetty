@@ -2064,3 +2064,14 @@ bundled `defaults.config` the upstream query now returns.
 `make proofs-fresh` now regenerates through `bin/generate-dafny.mjs`, both
 settings artefacts carry the project header, `make proofs` aliases
 `make prove`, and the proof workflow installs Z3 beside Dafny.
+
+2026-11-26: CodeScene cleanup on the rebased candidate. The hosted review
+reported 45 introduced regressions across 25 files; the production modules,
+verified predicate, renderer hook, scanner, writer, and tests were decomposed
+until the local `cs delta` and the hosted quality gate both pass. Fourteen
+glue-layer tests were added (snapshot revision ordering, `@modified`, IPC
+refusals, gateway abort, read-only snapshots, and compile-time contracts).
+Final candidate: 1,189 unit tests, proofs 1 + 8 + 8 + 9 with zero errors, the
+packaged settings deep E2E, and every static gate clean. The field machine
+keeps one dated CodeScene directive because its Dafny contract proves it as a
+single transition.
