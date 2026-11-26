@@ -67,6 +67,9 @@ export type ConfigFileSystemPort = {
   readonly fsyncDirectory: (directory: ConfigFilePath) => void;
 };
 
+/** Whether the replacement is known to survive a crash. */
+export type ConfigWriteDurability = 'confirmed' | 'unconfirmed';
+
 /** One atomic replacement of a config file's contents. */
 export type ConfigFileWriteRequest = {
   readonly fileSystem: ConfigFileSystemPort;
@@ -101,6 +104,7 @@ const temporaryPathFor = (targetPath: ConfigFilePath, processId: number): Config
  * removes the temporary file, and the original error is rethrown.
  *
  * @param request - The file-system port, target, text, and write identity.
+ * @returns `unconfirmed` when the directory fsync failed after the rename.
  *
  * @example
  * writeFileAtomically({
@@ -111,7 +115,7 @@ const temporaryPathFor = (targetPath: ConfigFilePath, processId: number): Config
  *   processId: 42
  * });
  */
-export const writeFileAtomically = (request: ConfigFileWriteRequest): void => {
+export const writeFileAtomically = (request: ConfigFileWriteRequest): ConfigWriteDurability => {
   const {fileSystem, targetPath, text, platform, processId} = request;
   const mode = fileSystem.stat(targetPath)?.mode ?? DEFAULT_MODE;
   const temporaryPath = temporaryPathFor(targetPath, processId);
@@ -133,10 +137,12 @@ export const writeFileAtomically = (request: ConfigFileWriteRequest): void => {
     } catch {
       // The rename has already made the new text visible. Reporting failure
       // would make a set retry re-apply an edit and a reset retry remove an
-      // already-absent key, turning a correct file into an `edit-failed`.
-      // Durability across a crash is attempted, not treated as write success.
+      // already-absent key, turning a correct file into an `edit-failed`; the
+      // caller records the write but reports that durability is unconfirmed.
+      return 'unconfirmed';
     }
   }
+  return 'confirmed';
 };
 
 /**

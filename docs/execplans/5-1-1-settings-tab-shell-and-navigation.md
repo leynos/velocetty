@@ -147,7 +147,7 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-delivered change is **150 non-Plan files** and **12,896 net non-generated
+delivered change is **150 non-Plan files** and **13,078 net non-generated
 lines**. The excess is recorded here as the escalation the tolerance requires,
 and the maintainer's acceptance of the raised counts is requested before merge.
 
@@ -899,14 +899,17 @@ Obligations:
   order, soundness, and completeness, while `StringSplit` is tied to the
   recursive `splitSpec`, so tokenization is grounded in the input but the
   JavaScript `split` implementation remains a trusted axiom. The D6 semantics
-  themselves (tokens, `@modified`, category) are checked independently by
-  `test/unit/settings-search-oracle.property.test.ts`, which compares the
-  filter with a reference matcher written with `split` and `includes` and
-  shares no helper with the implementation. Domain: all query strings, haystack
+  are checked independently by
+  `test/unit/settings-search-oracle.property.test.ts`: normalization is
+  compared with its own reimplementation over arbitrary strings, and the filter
+  is compared with a reference matcher written with `split` and `includes` over
+  arbitrary-case and whitespace noise, sharing no helper with the
+  implementation. The verified core receives normalized text exactly as the
+  production hook passes it. Domain: arbitrary strings, query strings, haystack
   arrays, equal-length flag and category arrays, and selections. Non-vacuity:
-  the oracle mutation "drop the `@modified` filter" fails the oracle property;
-  generator classification requires at least 20% of runs with a non-empty
-  result and at least 20% with an excluded element.
+  the oracle mutations "drop the `@modified` filter" and "drop case folding"
+  each fail the oracle property; generator classification requires at least 20%
+  of runs with a non-empty result and at least 20% with an excluded element.
 - Obligation INV-SEARCH-COMPLETE: every field that satisfies the query
   semantics is returned. Same method and artefacts. Non-vacuity: seeded
   mutation "stop after the first match" must be rejected.
@@ -2112,7 +2115,7 @@ disabled-row behaviour, category-label search, inline diagnostics, and pointer
 access in the packaged app. The proofs gained a grounded `StringSplit` axiom,
 transition-based reachability lemmas (search 9, field state 11 verified), and a
 per-summary positive-count guard; D22 now names the opaque `Seq.All` boundary.
-The scope tolerance is exceeded (150 non-Plan files, 12,896 net lines); the
+The scope tolerance is exceeded (150 non-Plan files, 13,078 net lines); the
 deviation and its reasons are recorded under Tolerances for maintainer
 acceptance.
 
@@ -2128,3 +2131,16 @@ convergence property applies real external writes before the session, asserts
 the settled display, and classifies reordered, reset, external, and rejected
 runs; removing the store's revision guard fails its test. Final candidate:
 1,205 unit tests and proofs 1 + 8 + 9 + 11 with zero errors.
+
+2026-11-26: third assessment repair round. Durability is now reported
+separately from success, so a directory-fsync failure leaves a written outcome
+with `durability: 'unconfirmed'` instead of claiming a durable write or
+retrying a completed edit. The live region distinguishes a local validation
+refusal, and a stale transport failure no longer overwrites a newer success.
+The convergence property interleaves real external writes with submissions and
+resets, models the settled display and per-field errors, and classifies
+reordered, reset, external, rejected, and invalid runs. The search oracle
+reimplements normalization over arbitrary strings and runs the filter over
+arbitrary-case and whitespace noise, and dropping either the `@modified` filter
+or case folding fails it. Final candidate: 1,211 unit tests; proofs unchanged
+at 1 + 8 + 9 + 11 with zero errors.

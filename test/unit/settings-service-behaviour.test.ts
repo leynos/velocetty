@@ -226,6 +226,18 @@ describe('settings writes', () => {
     });
   }
 
+  test('a post-rename fsync failure reports unconfirmed durability', async () => {
+    const harness = harnessWithFile('{config: {fontSize: 14}}');
+    harness.port.queueFault('fsyncDirectory', 'EIO');
+
+    const setOutcome = await harness.service.setValue(target('fontSize'), 16);
+    expect(setOutcome).toMatchObject({kind: 'applied', durability: 'unconfirmed'});
+
+    harness.port.queueFault('fsyncDirectory', 'EIO');
+    const resetOutcome = await harness.service.resetValue(target('fontSize'));
+    expect(resetOutcome).toMatchObject({kind: 'applied', durability: 'unconfirmed'});
+  });
+
   test('a policy violation is rejected with diagnostics and does not write', async () => {
     const harness = createHarness();
     harness.port.setFile(CONFIG_PATH, '{config: {}}');

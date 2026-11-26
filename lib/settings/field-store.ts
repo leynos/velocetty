@@ -45,7 +45,7 @@ export type FieldDefinition = {
 };
 
 /** What the last completed write or reset did, for the live region. */
-export type FieldStatus = 'idle' | 'saving' | 'saved' | 'reset' | 'failed';
+export type FieldStatus = 'idle' | 'invalid' | 'saving' | 'saved' | 'reset' | 'failed' | 'unconfirmed';
 
 /** The immutable view of the field map components subscribe to. */
 export type FieldStoreSnapshot = {
@@ -206,7 +206,15 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
     if (states.get(definition.id)?.pendingRequestId !== effect.requestId) {
       return;
     }
-    status = outcome.kind === 'applied' ? (effect.kind === 'reset' ? 'reset' : 'saved') : 'failed';
+    if (outcome.kind !== 'applied') {
+      status = 'failed';
+      return;
+    }
+    if (outcome.durability === 'unconfirmed') {
+      status = 'unconfirmed';
+      return;
+    }
+    status = effect.kind === 'reset' ? 'reset' : 'saved';
   };
 
   /** Applies one answer from the gateway. */
@@ -226,9 +234,11 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
     }
   };
 
-  /** Applies a transport failure to the field. */
+  /** Applies a transport failure to the field, unless a newer request owns it. */
   const failOutcome = (definition: FieldDefinition, effect: FieldEffect<SettingValue>): void => {
-    status = 'failed';
+    if (states.get(definition.id)?.pendingRequestId === effect.requestId) {
+      status = 'failed';
+    }
     apply(definition, outcomeEvent(effect.requestId, {kind: 'failed', reason: 'io-error'}));
   };
 
@@ -270,13 +280,23 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
       return;
     }
     const coercion = coerceInput(definition.control, state.draft);
-    const event: FieldEvent<SettingValue, FieldError> = coercion.ok
-      ? {kind: 'submit', submission: {kind: 'coerced', value: coercion.value}, fallbackError: FALLBACK_ERROR}
-      : {
-          kind: 'submit',
-          submission: {kind: 'uncoerced', errors: coercionErrors(coercion.failure)},
-          fallbackError: FALLBACK_ERROR
-        };
+    if (!coercion.ok) {
+      // A locally refused value never reaches the main process, so the polite
+      // live region has to hear about it from here.
+      status = 'invalid';
+      const event: FieldEvent<SettingValue, FieldError> = {
+        kind: 'submit',
+        submission: {kind: 'uncoerced', errors: coercionErrors(coercion.failure)},
+        fallbackError: FALLBACK_ERROR
+      };
+      apply(definition, event);
+      return;
+    }
+    const event: FieldEvent<SettingValue, FieldError> = {
+      kind: 'submit',
+      submission: {kind: 'coerced', value: coercion.value},
+      fallbackError: FALLBACK_ERROR
+    };
     runEffect(definition, apply(definition, event));
   };
 

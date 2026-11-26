@@ -195,7 +195,7 @@ describe('buildSettingsPanel', () => {
   });
 
   test('the live region announces save, reset, failure, and nothing at rest', () => {
-    const messageFor = (status: 'idle' | 'saving' | 'saved' | 'reset' | 'failed') => {
+    const messageFor = (status: 'idle' | 'invalid' | 'saving' | 'saved' | 'reset' | 'failed' | 'unconfirmed') => {
       const arguments_ = editorArguments();
       return buildSettingsPanel({
         arguments_,
@@ -212,6 +212,8 @@ describe('buildSettingsPanel', () => {
     expect(messageFor('reset')).toContain('Reset to the default value.');
     expect(messageFor('failed')).toContain('could not be saved');
     expect(messageFor('saving')).toContain('Saving.');
+    expect(messageFor('invalid')).toContain('not valid');
+    expect(messageFor('unconfirmed')).toContain('durable');
   });
 
   test('the changed marker follows the user file, not the effective value', () => {

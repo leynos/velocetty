@@ -269,7 +269,7 @@ export const createSettingsService = (dependencies: SettingsServiceDependencies)
       checkPolicy: (segments, value) => checkWritePolicy(lastPathSegment(segments), value)
     });
     if (outcome.kind === 'written') {
-      return {kind: 'applied', snapshot: getSnapshot()};
+      return {kind: 'applied', snapshot: getSnapshot(), durability: outcome.durability};
     }
     if (outcome.diagnostics !== undefined && outcome.diagnostics.length > 0) {
       return {kind: 'rejected', diagnostics: outcome.diagnostics};

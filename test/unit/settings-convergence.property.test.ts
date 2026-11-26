@@ -52,6 +52,10 @@ type AppliedOps = {
   readonly expected: ReadonlyMap<string, JsonValue>;
   readonly resets: number;
   readonly externals: number;
+  /** The draft the store should show once everything has settled. */
+  readonly expectedDraft: ReadonlyMap<string, string>;
+  /** Fields whose final action was a local validation refusal. */
+  readonly errorFields: ReadonlySet<string>;
 };
 
 const fieldArbitrary = fc.constantFrom(FONT_SIZE, SHELL);
@@ -68,8 +72,7 @@ const externalArbitrary: fc.Arbitrary<ExternalOp> = fc.record({
   field: fieldArbitrary,
   draft: validDraftArbitrary
 });
-const opArbitrary: fc.Arbitrary<Op> = fc.oneof(submitArbitrary, resetArbitrary);
-const externalsArbitrary = fc.array(externalArbitrary, {maxLength: 3});
+const actionArbitrary: fc.Arbitrary<Op | ExternalOp> = fc.oneof(submitArbitrary, resetArbitrary, externalArbitrary);
 
 type Pending = {
   readonly outcome: Promise<SettingsWriteOutcome>;
@@ -144,7 +147,7 @@ const coercedDraft = (field: string, draft: string): JsonValue | undefined => {
   return coercion.ok ? coercion.value : undefined;
 };
 
-const opsArbitrary = fc.array(opArbitrary, {maxLength: 8});
+const actionsArbitrary = fc.array(actionArbitrary, {maxLength: 10});
 const keysArbitrary = fc.array(fc.integer(), {maxLength: 8});
 
 const flushOrder = (size: number, keys: readonly number[]): number[] => {
@@ -169,38 +172,44 @@ const applyReset = (store: FieldStore, expected: Map<string, JsonValue>, op: Res
   expected.delete(op.field);
 };
 
-const applyExternals = (
-  harness: ReturnType<typeof createHarness>,
-  externals: readonly ExternalOp[],
-  expected: Map<string, JsonValue>
-): void => {
-  for (const external of externals) {
-    const value = coercedDraft(external.field, external.draft);
-    if (value === undefined) {
-      continue;
-    }
-    harness.externalWrite(external.field, value);
-    expected.set(external.field, value);
-  }
-};
-
-const applyOps = (
-  harness: ReturnType<typeof createHarness>,
-  externals: readonly ExternalOp[],
-  ops: readonly Op[]
-): AppliedOps => {
+const applyActions = (harness: ReturnType<typeof createHarness>, actions: readonly (Op | ExternalOp)[]): AppliedOps => {
   const expected = new Map<string, JsonValue>();
-  applyExternals(harness, externals, expected);
+  const expectedDraft = new Map<string, string>();
+  const errorFields = new Set<string>();
   let resets = 0;
-  for (const op of ops) {
-    if (op.kind === 'reset') {
-      resets += 1;
-      applyReset(harness.store, expected, op);
+  let externals = 0;
+  for (const action of actions) {
+    if (action.kind === 'external') {
+      const value = coercedDraft(action.field, action.draft);
+      if (value !== undefined) {
+        externals += 1;
+        harness.externalWrite(action.field, value);
+        expected.set(action.field, value);
+        expectedDraft.set(action.field, action.draft);
+      }
       continue;
     }
-    applySubmit(harness.store, expected, op);
+    if (action.kind === 'reset') {
+      resets += 1;
+      if (expected.has(action.field)) {
+        expectedDraft.set(action.field, `${defaultFor(action.field)}`);
+        errorFields.delete(action.field);
+      } else {
+        errorFields.add(action.field);
+        expectedDraft.set(action.field, expectedDraft.get(action.field) ?? `${defaultFor(action.field)}`);
+      }
+      applyReset(harness.store, expected, action);
+      continue;
+    }
+    expectedDraft.set(action.field, action.draft);
+    if (coercedDraft(action.field, action.draft) === undefined) {
+      errorFields.add(action.field);
+    } else {
+      errorFields.delete(action.field);
+    }
+    applySubmit(harness.store, expected, action);
   }
-  return {expected, resets, externals: externals.length};
+  return {expected, resets, externals, expectedDraft, errorFields};
 };
 
 const flushInOrder = async (harness: ReturnType<typeof createHarness>, keys: readonly number[]): Promise<boolean> => {
@@ -218,14 +227,29 @@ const flushInOrder = async (harness: ReturnType<typeof createHarness>, keys: rea
 
 const defaultFor = (field: string): JsonValue => (field === FONT_SIZE ? 12 : '/bin/bash');
 
-const expectSettled = (harness: ReturnType<typeof createHarness>, expected: ReadonlyMap<string, JsonValue>): void => {
-  const written = configOf(harness.port);
+const expectFieldSettled = (harness: ReturnType<typeof createHarness>, applied: AppliedOps, field: string): void => {
+  const state = harness.store.getSnapshot().fields.get(`core:${field}`);
+  const expectedValue = applied.expected.get(field) ?? defaultFor(field);
+  expect(configOf(harness.port)[field] ?? null).toEqual(applied.expected.get(field) ?? null);
+  expect(state?.committed ?? defaultFor(field)).toEqual(expectedValue);
+
+  const draft = applied.expectedDraft.get(field);
+  if (draft !== undefined && !applied.errorFields.has(field)) {
+    // Delivery order can leave the draft at the typed text or at the final
+    // committed value; either is a settled display, never an older value.
+    const settledDrafts: readonly (string | undefined)[] = [draft, `${expectedValue}`];
+    expect(settledDrafts).toContain(state?.draft);
+  }
+  if (applied.errorFields.has(field)) {
+    expect(state?.errors.length).toBeGreaterThan(0);
+  } else {
+    expect(state?.errors).toEqual([]);
+  }
+};
+
+const expectSettled = (harness: ReturnType<typeof createHarness>, applied: AppliedOps): void => {
   for (const field of [FONT_SIZE, SHELL]) {
-    expect(written[field] ?? null).toEqual(expected.get(field) ?? null);
-    // The display settles on the file's effective value (or the default when
-    // the key was reset), even when an invalid draft stays visible in the box.
-    const state = harness.store.getSnapshot().fields.get(`core:${field}`);
-    expect(state?.committed ?? defaultFor(field)).toEqual(expected.get(field) ?? defaultFor(field));
+    expectFieldSettled(harness, applied, field);
   }
 };
 
@@ -238,21 +262,23 @@ describe('settings convergence', () => {
     let rejected = 0;
 
     await fc.assert(
-      fc.asyncProperty(externalsArbitrary, opsArbitrary, keysArbitrary, async (externals, ops, keys) => {
+      fc.asyncProperty(actionsArbitrary, keysArbitrary, async (actions, keys) => {
         runs += 1;
         const harness = createHarness();
         harness.store.refresh(harness.service.getSnapshot());
-        const applied = applyOps(harness, externals, ops);
+        const applied = applyActions(harness, actions);
         resets += applied.resets;
-        if (externals.length > 0) {
+        if (applied.externals > 0) {
           externalRuns += 1;
         }
-        if (ops.some((op) => op.kind === 'submit' && coercedDraft(op.field, op.draft) === undefined)) {
+        if (
+          actions.some((action) => action.kind === 'submit' && coercedDraft(action.field, action.draft) === undefined)
+        ) {
           rejected += 1;
         }
         const wasReordered = await flushInOrder(harness, keys);
         await harness.store.whenIdle();
-        expectSettled(harness, applied.expected);
+        expectSettled(harness, applied);
         if (wasReordered) {
           reordered += 1;
         }

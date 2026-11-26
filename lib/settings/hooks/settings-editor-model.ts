@@ -248,6 +248,12 @@ const statusPhrase = (snapshot: FieldStoreSnapshot): string => {
     case 'failed': {
       return 'The change could not be saved.';
     }
+    case 'invalid': {
+      return 'The value is not valid, so nothing was saved.';
+    }
+    case 'unconfirmed': {
+      return 'Saved, but the write could not be confirmed as durable.';
+    }
   }
 };
 

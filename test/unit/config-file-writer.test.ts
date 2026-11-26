@@ -183,6 +183,15 @@ describe('config writer', () => {
     expect(harness.port.readFile(CONFIG_PATH)).toBe('{config: {}}');
   });
 
+  test('a set on a healthy file reports confirmed durability', async () => {
+    const harness = createHarness();
+    harness.port.setFile(CONFIG_PATH, '{config: {}}');
+
+    const outcome = await set(harness, 16);
+
+    expect(outcome).toMatchObject({kind: 'written', durability: 'confirmed'});
+  });
+
   test('a directory fsync failure after the rename still reports success', async () => {
     const harness = createHarness();
     harness.port.setFile(CONFIG_PATH, '{config: {fontSize: 14}}');
@@ -190,7 +199,7 @@ describe('config writer', () => {
 
     const outcome = await set(harness, 16);
 
-    expect(outcome).toMatchObject({kind: 'written', revision: 1});
+    expect(outcome).toMatchObject({kind: 'written', revision: 1, durability: 'unconfirmed'});
     expect(JSON5.parse(harness.port.readFile(CONFIG_PATH) ?? '')).toEqual({config: {fontSize: 16}});
   });
 

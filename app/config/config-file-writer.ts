@@ -20,7 +20,8 @@ import {
   asConfigFileText,
   writeFileAtomically,
   type ConfigFileSystemPort,
-  type ConfigFilePath
+  type ConfigFilePath,
+  type ConfigWriteDurability
 } from './config-file-write-io';
 import {currentConfigRevision, nextConfigRevision, recordWrittenText} from './config-write-state';
 import {
@@ -56,7 +57,12 @@ export type ConfigWriteGuard = {
 
 /** The result of one write. */
 export type ConfigWriteOutcome =
-  | {readonly kind: 'written'; readonly text: string; readonly revision: number}
+  | {
+      readonly kind: 'written';
+      readonly text: string;
+      readonly revision: number;
+      readonly durability: ConfigWriteDurability;
+    }
   | {
       readonly kind: 'refused';
       readonly reason: SettingsWriteFailure;
@@ -275,7 +281,7 @@ const attemptWrite = (
   if (edited.kind === 'refused') {
     return refused(edited.reason, edited.diagnostics);
   }
-  writeFileAtomically({
+  const durability = writeFileAtomically({
     fileSystem,
     targetPath,
     text: asConfigFileText(edited.value),
@@ -283,7 +289,7 @@ const attemptWrite = (
     processId: dependencies.processId()
   });
   dependencies.recordWrittenText(edited.value);
-  return {kind: 'written', text: edited.value, revision: dependencies.nextRevision()};
+  return {kind: 'written', text: edited.value, revision: dependencies.nextRevision(), durability};
 };
 
 /**

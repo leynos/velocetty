@@ -233,6 +233,47 @@ describe('settings field store', () => {
     expect(store.getSnapshot().status).toBe('idle');
   });
 
+  test('an unconfirmed durable write is announced as such', async () => {
+    const fake = createFakeGateway();
+    const store = createStore(fake.gateway);
+    store.refresh(snapshotWith({fontSize: 14}));
+    store.setDraft(FONT.id, '16');
+    store.submit(FONT.id);
+    fake.resolveNext({kind: 'applied', snapshot: snapshotWith({fontSize: 16}, 2), durability: 'unconfirmed'});
+    await store.whenIdle();
+    expect(store.getSnapshot().status).toBe('unconfirmed');
+  });
+
+  test('a locally invalid value announces itself without a write', () => {
+    const fake = createFakeGateway();
+    const store = createStore(fake.gateway);
+    store.refresh(snapshotWith({fontSize: 14}));
+    store.setDraft(FONT.id, 'abc');
+    store.submit(FONT.id);
+
+    expect(store.getSnapshot().status).toBe('invalid');
+    expect(fake.calls).toEqual([]);
+  });
+
+  test('a stale transport failure does not overwrite a newer success', async () => {
+    const fake = createFakeGateway();
+    const store = createStore(fake.gateway);
+    store.refresh(snapshotWith({fontSize: 14}));
+
+    store.setDraft(FONT.id, '16');
+    store.submit(FONT.id);
+    store.setDraft(FONT.id, '20');
+    store.submit(FONT.id);
+
+    fake.resolveNext({kind: 'failed', reason: 'io-error'});
+    await Promise.resolve();
+    expect(store.getSnapshot().status).toBe('saving');
+
+    fake.resolveNext({kind: 'applied', snapshot: snapshotWith({fontSize: 20}, 2)});
+    await store.whenIdle();
+    expect(store.getSnapshot().status).toBe('saved');
+  });
+
   test('a refused write reports failure', async () => {
     const fake = createFakeGateway();
     const store = createStore(fake.gateway);

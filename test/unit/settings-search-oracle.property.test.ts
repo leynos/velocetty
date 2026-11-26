@@ -14,7 +14,19 @@ import {normalizeSearchText, searchFieldIndices} from '@shared/settings/search';
 
 import {fastCheckRunCount} from '../testUtils/fast-check-runs';
 
-const WORDS = ['font', 'size', 'cursor', 'blink', 'colour', 'shell', '@modified'] as const;
+const WORDS = [
+  'font',
+  'size',
+  'cursor',
+  'blink',
+  'colour',
+  'shell',
+  '@modified',
+  '@modifiedly',
+  'FONT',
+  'Size',
+  'tab'
+] as const;
 const CATEGORY_COUNT = 3;
 const ALL = -1;
 
@@ -25,13 +37,25 @@ type Field = {
 };
 
 /**
+ * The D6 normalization written independently: lower-case, then fold every run
+ * of whitespace to one space and trim. This must not call the module's own
+ * helper; the point is to check it, not to repeat it.
+ */
+const referenceNormalize = (text: string): string =>
+  text
+    .toLowerCase()
+    .split(/\s+/u)
+    .filter((part) => part.length > 0)
+    .join(' ');
+
+/**
  * The D6 semantics written independently of the implementation.
  *
  * The function must not call `tokensOf`, `isModifiedQuery`, or any other
  * helper from the search module; it is the oracle, not a mirror of the code.
  */
 const referenceMatches = (query: string, fields: readonly Field[], selectedCategory: number): number[] => {
-  const parts = normalizeSearchText(query).split(' ');
+  const parts = referenceNormalize(query).split(' ');
   const tokens = parts.filter((part) => part.length > 0 && part !== '@modified');
   const modifiedOnly = parts.some((part) => part === '@modified');
   const matches: number[] = [];
@@ -50,26 +74,51 @@ const referenceMatches = (query: string, fields: readonly Field[], selectedCateg
 };
 
 const wordArb = fc.constantFrom(...WORDS);
-const haystackArb = fc.array(wordArb, {maxLength: 5}).map((words) => words.join(' '));
+const noiseArb = fc
+  .array(fc.constantFrom(' ', '\t', 'F', 'o', 'n', 't', '@', 'm', 'd', '-'), {maxLength: 12})
+  .map((characters) => characters.join(''));
+const haystackArb = fc
+  .tuple(fc.array(wordArb, {maxLength: 5}), noiseArb)
+  .map(([words, noise]) => `${words.join(' ')} ${noise}`);
 const fieldArb: fc.Arbitrary<Field> = fc.record({
   haystack: haystackArb,
   isModified: fc.boolean(),
   categoryIndex: fc.integer({min: 0, max: CATEGORY_COUNT - 1})
 });
 const fieldsArb = fc.array(fieldArb, {maxLength: 8});
-const queryArb = fc.array(wordArb, {maxLength: 3}).map((words) => words.join(' '));
+const queryArb = fc
+  .tuple(fc.array(wordArb, {maxLength: 3}), noiseArb)
+  .map(([words, noise]) => `${words.join(' ')} ${noise}`);
 const categoryArb = fc.integer({min: ALL, max: CATEGORY_COUNT - 1});
+
+test('normalization agrees with an independent implementation', () => {
+  const textArb = fc.string({maxLength: 24});
+  fc.assert(
+    fc.property(textArb, (text) => {
+      expect(normalizeSearchText(text)).toBe(referenceNormalize(text));
+    }),
+    {numRuns: fastCheckRunCount()}
+  );
+});
 
 describe('settings search oracle', () => {
   test('the verified filter agrees with the independent D6 matcher', () => {
     fc.assert(
       fc.property(fieldsArb, queryArb, categoryArb, (fields, query, category) => {
+        // The verified core takes normalized text, exactly as the production
+        // hook passes it; the reference matcher normalizes for itself.
         const searchFields = {
-          haystacks: fields.map((field) => field.haystack),
+          haystacks: fields.map((field) => referenceNormalize(field.haystack)),
           modifiedFlags: fields.map((field) => field.isModified),
           categoryIndices: fields.map((field) => field.categoryIndex)
         };
-        expect(searchFieldIndices(query, searchFields, category)).toEqual(referenceMatches(query, fields, category));
+        const normalizedFields = fields.map((field) => ({
+          ...field,
+          haystack: referenceNormalize(field.haystack)
+        }));
+        expect(searchFieldIndices(referenceNormalize(query), searchFields, category)).toEqual(
+          referenceMatches(query, normalizedFields, category)
+        );
       }),
       {numRuns: fastCheckRunCount()}
     );

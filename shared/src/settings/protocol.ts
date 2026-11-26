@@ -51,7 +51,12 @@ export type SettingsWriteFailure =
 
 /** The result of one write or reset. */
 export type SettingsWriteOutcome =
-  | {readonly kind: 'applied'; readonly snapshot: SettingsSnapshot}
+  | {
+      readonly kind: 'applied';
+      readonly snapshot: SettingsSnapshot;
+      /** Present when the writer could not confirm crash durability. */
+      readonly durability?: 'confirmed' | 'unconfirmed';
+    }
   | {readonly kind: 'rejected'; readonly diagnostics: readonly configValidationDiagnostic[]}
   | {readonly kind: 'failed'; readonly reason: SettingsWriteFailure; readonly detail?: string};
 
