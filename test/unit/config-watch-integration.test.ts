@@ -39,11 +39,17 @@ const withTemporaryDirectory = async (run: (directory: string) => Promise<void>)
 
 type Probe = {reloads: number; isReady: boolean};
 
-const startWatch = async (filePath: string): Promise<{probe: Probe; close: () => Promise<void>}> => {
+/** How long the watcher waits for a burst of events to stop before reloading. */
+const DEFAULT_DEBOUNCE_MS = 100;
+
+const startWatch = async (
+  filePath: string,
+  debounceMs = DEFAULT_DEBOUNCE_MS
+): Promise<{probe: Probe; close: () => Promise<void>}> => {
   const probe: Probe = {reloads: 0, isReady: false};
   const debounced = createConfigWatcher<ReturnType<typeof setTimeout>>({
     cancel: (timer) => clearTimeout(timer),
-    debounceMs: 100,
+    debounceMs,
     fileNames: [filePath],
     handle: createChokidarHandle([path.dirname(filePath)]),
     onReady: () => {
@@ -116,6 +122,16 @@ type WatchScenario = {
   readonly change: (location: WatchLocation) => Promise<void>;
   readonly isFirstReload: (probe: Probe) => boolean;
   readonly settleMilliseconds: number;
+  /**
+   * How long the watcher waits for the burst to stop before reloading.
+   *
+   * A scenario that produces several events needs a window wider than the
+   * gap between their deliveries. Chokidar delivers a rename on a loaded CI
+   * runner well after the caller's own `rename` promise resolved, so a window
+   * sized to the caller's speed would assert the runner's scheduling rather
+   * than the debounce.
+   */
+  readonly debounceMs?: number;
 };
 
 const WATCH_SCENARIOS: readonly WatchScenario[] = [
@@ -128,8 +144,9 @@ const WATCH_SCENARIOS: readonly WatchScenario[] = [
   {
     name: 'a burst of writes collapses into one reload',
     change: burstOfAtomicReplaces,
+    debounceMs: 750,
     isFirstReload: (probe) => probe.reloads >= 1,
-    settleMilliseconds: 400
+    settleMilliseconds: 1100
   }
 ];
 
@@ -137,7 +154,7 @@ const runWatchScenario = async (scenario: WatchScenario): Promise<void> => {
   await withTemporaryDirectory(async (directory) => {
     const filePath = path.join(directory, 'config.json5');
     await fs.writeFile(filePath, '{config: {fontSize: 14}}');
-    const {probe, close} = await startWatch(filePath);
+    const {probe, close} = await startWatch(filePath, scenario.debounceMs);
 
     try {
       await scenario.change({directory, filePath});
