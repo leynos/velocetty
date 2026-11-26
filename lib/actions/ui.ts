@@ -1,3 +1,11 @@
+/**
+ * @file UI action creators: tab and pane movement, window state, the command
+ * dispatcher, and the file and shell helpers the context menu uses.
+ *
+ * `activateTab` and `selectTabStrip` in the tab-strip selectors decide which
+ * surface is active; `execCommand` gates terminal-targeting commands while the
+ * settings tab is active, so typing in its fields never reaches a shell.
+ */
 import {stat} from 'node:fs';
 import type {Stats} from 'node:fs';
 

@@ -19,7 +19,9 @@ import {
   isStaleOutcome,
   stepField,
   wellFormed,
+  type FieldEffect,
   type FieldEvent,
+  type FieldPhase,
   type FieldState
 } from '@shared/settings/field-state';
 import {fastCheckRunCount} from '../testUtils/fast-check-runs';
@@ -61,6 +63,97 @@ const eventArb: fc.Arbitrary<Event> = fc.oneof(
   })
 );
 
+type StepContext = {
+  readonly state: State;
+  readonly event: Event;
+  readonly next: State;
+  readonly effect: FieldEffect<V>;
+};
+
+type WalkObservation = {
+  readonly hadStale: boolean;
+  readonly hadDirtyRefresh: boolean;
+  readonly hadError: boolean;
+};
+
+const ERROR_PHASES: ReadonlySet<FieldPhase> = new Set<FieldPhase>(['rejected', 'failed', 'invalid']);
+
+const eventSequencesArb = fc.array(eventArb, {minLength: 1, maxLength: 30});
+
+const expectWellFormedStep = ({state, next}: StepContext): void => {
+  expect(wellFormed(next)).toBe(true);
+  expect(next.nextRequestId).toBeGreaterThanOrEqual(state.nextRequestId);
+};
+
+const expectStaleOutcomeIgnored = ({state, event, next, effect}: StepContext): boolean => {
+  if (!isStaleOutcome(event, state.pendingRequestId)) {
+    return false;
+  }
+  expect(next).toEqual(state);
+  expect(effect.kind).toBe('none');
+  return true;
+};
+
+const expectCurrentOutcomeSettles = ({state, event, next}: StepContext): void => {
+  const isSaving = state.phase === 'saving';
+  if (isSaving && isCurrentOutcome(event, state.pendingRequestId)) {
+    expect(next.phase).not.toBe('saving');
+  }
+};
+
+const isRefreshBlocked = (state: State): boolean => state.isDirty || state.pendingRequestId >= 0;
+
+const expectRefreshKeepsDraft = ({state, event, next}: StepContext): boolean => {
+  if (!isRefreshEvent(event) || !isRefreshBlocked(state)) {
+    return false;
+  }
+  expect(next.draft).toBe(state.draft);
+  return true;
+};
+
+const expectWriteEffectMatchesSubmit = ({event, next, effect}: StepContext): void => {
+  if (!hasWriteEffect(effect)) {
+    return;
+  }
+  expect(event.kind).toBe('submit');
+  expect(effectCarriesSubmitted(effect, event)).toBe(true);
+  expect(effect.requestId).toBe(next.pendingRequestId);
+};
+
+const expectResetEffectMatchesReset = ({event, next, effect}: StepContext): void => {
+  if (!hasResetEffect(effect)) {
+    return;
+  }
+  expect(event.kind).toBe('reset');
+  expect(effect.requestId).toBe(next.pendingRequestId);
+};
+
+const observeStep = (observation: WalkObservation, context: StepContext): WalkObservation => {
+  expectWellFormedStep(context);
+  const hadStale = expectStaleOutcomeIgnored(context);
+  expectCurrentOutcomeSettles(context);
+  const hadDirtyRefresh = expectRefreshKeepsDraft(context);
+  expectWriteEffectMatchesSubmit(context);
+  expectResetEffectMatchesReset(context);
+  const hadError = ERROR_PHASES.has(context.next.phase);
+  return {
+    hadStale: observation.hadStale || hadStale,
+    hadDirtyRefresh: observation.hadDirtyRefresh || hadDirtyRefresh,
+    hadError: observation.hadError || hadError
+  };
+};
+
+const walkEvents = (events: readonly Event[]): WalkObservation => {
+  let state: State = initialFieldState<V, E>(NO_VALUE, '');
+  let observation: WalkObservation = {hadStale: false, hadDirtyRefresh: false, hadError: false};
+  for (const event of events) {
+    const {state: next, effect} = stepField(state, event);
+    observation = observeStep(observation, {state, event, next, effect});
+    state = next;
+  }
+  return observation;
+};
+
 describe('settings field-state properties', () => {
   test('generated event sequences preserve every machine invariant', () => {
     let runs = 0;
@@ -69,52 +162,12 @@ describe('settings field-state properties', () => {
     let runsWithError = 0;
 
     fc.assert(
-      fc.property(fc.array(eventArb, {minLength: 1, maxLength: 30}), (events) => {
+      fc.property(eventSequencesArb, (events) => {
         runs += 1;
-        let hadStale = false;
-        let hadDirtyRefresh = false;
-        let hadError = false;
-        let state: State = initialFieldState<V, E>(NO_VALUE, '');
-        for (const event of events) {
-          const {state: next, effect} = stepField(state, event);
-          expect(wellFormed(next)).toBe(true);
-          expect(next.nextRequestId).toBeGreaterThanOrEqual(state.nextRequestId);
-
-          if (isStaleOutcome(event, state.pendingRequestId)) {
-            hadStale = true;
-            expect(next).toEqual(state);
-            expect(effect.kind).toBe('none');
-          }
-          if (state.phase === 'saving' && isCurrentOutcome(event, state.pendingRequestId)) {
-            expect(next.phase).not.toBe('saving');
-          }
-          if (isRefreshEvent(event) && (state.isDirty || state.pendingRequestId >= 0)) {
-            hadDirtyRefresh = true;
-            expect(next.draft).toBe(state.draft);
-          }
-          if (hasWriteEffect(effect)) {
-            expect(event.kind).toBe('submit');
-            expect(effectCarriesSubmitted(effect, event)).toBe(true);
-            expect(effect.requestId).toBe(next.pendingRequestId);
-          }
-          if (hasResetEffect(effect)) {
-            expect(event.kind).toBe('reset');
-            expect(effect.requestId).toBe(next.pendingRequestId);
-          }
-          if (next.phase === 'rejected' || next.phase === 'failed' || next.phase === 'invalid') {
-            hadError = true;
-          }
-          state = next;
-        }
-        if (hadStale) {
-          runsWithStale += 1;
-        }
-        if (hadDirtyRefresh) {
-          runsWithDirtyRefresh += 1;
-        }
-        if (hadError) {
-          runsWithError += 1;
-        }
+        const observation = walkEvents(events);
+        runsWithStale += observation.hadStale ? 1 : 0;
+        runsWithDirtyRefresh += observation.hadDirtyRefresh ? 1 : 0;
+        runsWithError += observation.hadError ? 1 : 0;
       }),
       {numRuns: fastCheckRunCount()}
     );

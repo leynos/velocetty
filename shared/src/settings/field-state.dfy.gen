@@ -97,7 +97,20 @@ function effectRequestId<V>(effect: FieldEffect<V>): int
 
 function effectCarriesSubmitted<V(==), E(==)>(effect: FieldEffect<V>, event: FieldEvent<V, E>): bool
 {
-  (((effect.write? && event.submit?) && event.submission.coerced?) && (effect.value == event.submission.value))
+  match effect {
+    case write(i_effect_requestId, i_effect_value) =>
+      match event {
+        case submit(i_event_submission, i_event_fallbackError) =>
+          if (!i_event_submission.coerced?) then
+            false
+          else
+            (i_effect_value == i_event_submission.value)
+        case _ =>
+          false
+      }
+    case _ =>
+      false
+  }
 }
 
 function stepField<V(==), E(==)>(state: FieldState<V, E>, event: FieldEvent<V, E>): StepResult<V, E>

@@ -14,6 +14,7 @@ import {
   SETTINGS_TAB_CLOSE,
   SETTINGS_TAB_DEACTIVATE,
   SETTINGS_TAB_OPEN,
+  type SettingsCategorySelection,
   type SettingsTabActions,
   type SettingsTabState
 } from '@shared/constants/settings-tab';
@@ -28,6 +29,22 @@ const initialState: SettingsTabState = {
   selectedCategory: 'all'
 };
 
+const openTab = (state: SettingsTabState): SettingsTabState => ({...state, isOpen: true, isActive: true});
+
+const closeTab = (): SettingsTabState => initialState;
+
+const activateTab = (state: SettingsTabState): SettingsTabState => (state.isOpen ? {...state, isActive: true} : state);
+
+const deactivateTab = (state: SettingsTabState): SettingsTabState =>
+  state.isActive ? {...state, isActive: false} : state;
+
+const setQuery = (state: SettingsTabState, query: string): SettingsTabState => ({...state, query});
+
+const selectCategory = (state: SettingsTabState, category: SettingsCategorySelection): SettingsTabState => ({
+  ...state,
+  selectedCategory: category
+});
+
 const isSettingsTabAction = (action: HyperActions): action is SettingsTabActions =>
   action.type === SETTINGS_TAB_OPEN ||
   action.type === SETTINGS_TAB_CLOSE ||
@@ -39,22 +56,22 @@ const isSettingsTabAction = (action: HyperActions): action is SettingsTabActions
 const reduceSettingsTab = (state: SettingsTabState, action: SettingsTabActions): SettingsTabState => {
   switch (action.type) {
     case SETTINGS_TAB_OPEN: {
-      return {...state, isOpen: true, isActive: true};
+      return openTab(state);
     }
     case SETTINGS_TAB_CLOSE: {
-      return initialState;
+      return closeTab();
     }
     case SETTINGS_TAB_ACTIVATE: {
-      return state.isOpen ? {...state, isActive: true} : state;
+      return activateTab(state);
     }
     case SETTINGS_TAB_DEACTIVATE: {
-      return state.isActive ? {...state, isActive: false} : state;
+      return deactivateTab(state);
     }
     case SETTINGS_QUERY_SET: {
-      return {...state, query: action.query};
+      return setQuery(state, action.query);
     }
     case SETTINGS_CATEGORY_SELECT: {
-      return {...state, selectedCategory: action.category};
+      return selectCategory(state, action.category);
     }
   }
 };

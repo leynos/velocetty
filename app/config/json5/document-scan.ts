@@ -5,8 +5,12 @@
  * it includes trailing whitespace and a trailing same-line comment. These
  * helpers recover the true value end and resolve object ranges by path; both
  * the set and the remove edit need them.
+ *
+ * Positions and bounded windows travel as small typed objects so a bare index
+ * cannot be mistaken for the other end of a range.
  */
 
+import {isString} from '../../utils/runtime-guards';
 import type {Json5Parser} from './parser';
 import type {Json5ObjectProperty, Json5ObjectRange, PropertyKey} from './types';
 
@@ -19,23 +23,42 @@ export type DocumentRefusalReason = 'path-not-found' | 'duplicate-key' | 'config
 /** Branded parser input, shared by the edits that consume these helpers. */
 export type ScanDocument = string;
 
+/** A document and one position within it. */
+export type TextPosition = {readonly doc: string; readonly index: number};
+
+/** A document and the bounded window `[startIndex, limitIndex)` within it. */
+export type TextSpan = {readonly doc: string; readonly startIndex: number; readonly limitIndex: number};
+
 export const ROOT_KEY = 'config';
 
 export const isRefusal = (value: Json5ObjectRange | DocumentRefusalReason): value is DocumentRefusalReason =>
-  typeof value === 'string';
+  isString(value);
 
-export const lineEndIndex = (doc: string, fromIndex: number): number => {
-  let index = fromIndex;
-  while (index < doc.length && doc[index] !== '\n' && doc[index] !== '\r') {
+const isNewlineCharacter = (character: string | undefined): boolean => character === '\n' || character === '\r';
+
+const isQuoteCharacter = (character: string): boolean => character === '"' || character === "'";
+
+const isIndentationCharacter = (character: string): boolean => character === ' ' || character === '\t';
+
+// `\s` covers every whitespace JavaScript recognises, which is deliberately
+// broader than JSON5's own whitespace set for finding the value text.
+const valueWhitespacePattern = /\s/;
+
+/** Returns the index of the first line break at or after `position`. */
+export const lineEndIndex = (position: TextPosition): number => {
+  const {doc} = position;
+  let index = position.index;
+  while (index < doc.length && !isNewlineCharacter(doc[index])) {
     index += 1;
   }
   return index;
 };
 
 /** Scans past a quoted string, returning the index after its closing quote. */
-export const skipQuoted = (doc: string, quoteIndex: number, limitIndex: number): number => {
-  const quote = doc[quoteIndex];
-  let index = quoteIndex + 1;
+export const skipQuoted = (span: TextSpan): number => {
+  const {doc, startIndex, limitIndex} = span;
+  const quote = doc[startIndex];
+  let index = startIndex + 1;
   while (index < limitIndex) {
     if (doc[index] === '\\') {
       index += 2;
@@ -49,6 +72,22 @@ export const skipQuoted = (doc: string, quoteIndex: number, limitIndex: number):
   return limitIndex;
 };
 
+const blockCommentEnd = (span: TextSpan): number => {
+  const close = span.doc.indexOf('*/', span.startIndex + 2);
+  return close === -1 ? span.limitIndex : close + 2;
+};
+
+/** Returns the index after a comment starting at `span.startIndex`, if any. */
+const commentEndAt = (span: TextSpan): number | null => {
+  if (span.doc.startsWith('//', span.startIndex)) {
+    return lineEndIndex({doc: span.doc, index: span.startIndex});
+  }
+  if (span.doc.startsWith('/*', span.startIndex)) {
+    return blockCommentEnd(span);
+  }
+  return null;
+};
+
 /**
  * Finds the end of the value text inside a property span.
  *
@@ -57,25 +96,22 @@ export const skipQuoted = (doc: string, quoteIndex: number, limitIndex: number):
  * @returns The index just after the value's last character.
  */
 export const valueTextEnd = (doc: string, property: Json5ObjectProperty): number => {
+  const limitIndex = property.valueEndIndex;
   let index = property.valueStartIndex;
   let end = property.valueStartIndex;
-  while (index < property.valueEndIndex) {
+  while (index < limitIndex) {
     const character = doc.charAt(index);
-    if (character === '"' || character === "'") {
-      index = skipQuoted(doc, index, property.valueEndIndex);
+    if (isQuoteCharacter(character)) {
+      index = skipQuoted({doc, startIndex: index, limitIndex});
       end = index;
       continue;
     }
-    if (character === '/' && doc[index + 1] === '/') {
-      index = lineEndIndex(doc, index);
+    const commentEnd = character === '/' ? commentEndAt({doc, startIndex: index, limitIndex}) : null;
+    if (commentEnd !== null) {
+      index = commentEnd;
       continue;
     }
-    if (character === '/' && doc[index + 1] === '*') {
-      const close = doc.indexOf('*/', index + 2);
-      index = close === -1 ? property.valueEndIndex : close + 2;
-      continue;
-    }
-    if (!/\s/.test(character)) {
+    if (!valueWhitespacePattern.test(character)) {
       end = index + 1;
     }
     index += 1;
@@ -83,13 +119,15 @@ export const valueTextEnd = (doc: string, property: Json5ObjectProperty): number
   return end;
 };
 
-export const scanTrailingCommentEnd = (doc: string, fromIndex: number): number => {
-  let index = fromIndex;
-  while (doc[index] === ' ' || doc[index] === '\t') {
+/** Returns the index after a trailing same-line comment, or the scan start. */
+export const scanTrailingCommentEnd = (position: TextPosition): number => {
+  const {doc} = position;
+  let index = position.index;
+  while (isIndentationCharacter(doc[index])) {
     index += 1;
   }
   if (doc.startsWith('//', index)) {
-    return lineEndIndex(doc, index);
+    return lineEndIndex({doc, index});
   }
   if (doc.startsWith('/*', index)) {
     const close = doc.indexOf('*/', index + 2);
@@ -98,11 +136,12 @@ export const scanTrailingCommentEnd = (doc: string, fromIndex: number): number =
   return index;
 };
 
-export const terminatorLength = (doc: string, atIndex: number): number => {
-  if (doc.startsWith('\r\n', atIndex)) {
+/** Returns the length of the line terminator at `position`, or `0`. */
+export const terminatorLength = (position: TextPosition): number => {
+  if (position.doc.startsWith('\r\n', position.index)) {
     return 2;
   }
-  return doc[atIndex] === '\n' || doc[atIndex] === '\r' ? 1 : 0;
+  return isNewlineCharacter(position.doc[position.index]) ? 1 : 0;
 };
 
 export const findConfigRange = (parser: Json5Parser): Json5ObjectRange | DocumentRefusalReason => {
@@ -138,28 +177,33 @@ export const locateChild = (parser: Json5Parser, parentRange: Json5ObjectRange, 
   return {kind: 'found', property, range: parser.getObjectRangeForProperty(property)};
 };
 
+/** Resolves one segment below `parentRange` to the object range it names. */
+export const childObjectRange = (
+  parser: Json5Parser,
+  parentRange: Json5ObjectRange,
+  segment: PropertyKey
+): Json5ObjectRange | DocumentRefusalReason => {
+  const located = locateChild(parser, parentRange, segment);
+  if (located.kind === 'refused') {
+    return located.reason;
+  }
+  if (located.kind === 'missing') {
+    return 'path-not-found';
+  }
+  return located.range ?? 'config-not-object';
+};
+
 /** Resolves a path below `config` to the object range it names. */
 export const resolveObjectRange = (
   parser: Json5Parser,
   segments: PropertyPath
 ): Json5ObjectRange | DocumentRefusalReason => {
-  const configRange = findConfigRange(parser);
-  if (isRefusal(configRange)) {
-    return configRange;
-  }
-  let range = configRange;
+  let range = findConfigRange(parser);
   for (const segment of segments.slice(1)) {
-    const located = locateChild(parser, range, segment);
-    if (located.kind === 'refused') {
-      return located.reason;
+    if (isRefusal(range)) {
+      return range;
     }
-    if (located.kind === 'missing') {
-      return 'path-not-found';
-    }
-    if (located.range === null) {
-      return 'config-not-object';
-    }
-    range = located.range;
+    range = childObjectRange(parser, range, segment);
   }
   return range;
 };

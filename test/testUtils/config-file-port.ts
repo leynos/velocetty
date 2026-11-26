@@ -7,7 +7,7 @@
 
 import path from 'node:path';
 
-import type {ConfigFileSystemPort} from '../../app/config/config-file-writer';
+import {asConfigFilePath, type ConfigFileSystemPort} from '../../app/config/config-file-writer';
 
 type StoredFile = {text: string; mode: number};
 
@@ -79,7 +79,7 @@ export const createMemoryConfigFileSystem = (): MemoryConfigFileSystem => {
       if (!files.has(target)) {
         fail('ENOENT');
       }
-      return target;
+      return asConfigFilePath(target);
     },
     readText: (filePath) => {
       consumeFault('readText');

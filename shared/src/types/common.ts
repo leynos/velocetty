@@ -7,8 +7,7 @@ import type parseUrl from 'parse-url';
 
 import type {CommandDefinition, CommandId} from './commands';
 import type {configOptions} from './config';
-import type {JsonValue} from './json';
-import type {SettingTarget, SettingsSnapshot, SettingsWriteOutcome} from '../settings/protocol';
+import type {SettingsIpcCommands} from '../settings/protocol';
 
 /** Branded identifier for session entities. */
 export type SessionId = string & {readonly brand: 'SessionId'};
@@ -179,7 +178,7 @@ export interface TypedEmitter<Events> {
 type OptionalPromise<T> = T | Promise<T>;
 
 /** IPC command signatures available over Electron invoke handlers. */
-export type IpcCommands = {
+export type IpcCommands = SettingsIpcCommands & {
   'child_process.exec': (command: string, options: ExecOptions) => {stdout: string | Buffer; stderr: string | Buffer};
   'child_process.execFile': (
     file: string,
@@ -199,9 +198,6 @@ export type IpcCommands = {
   'clipboard.readFilePaths': () => string[];
   'clipboard.readText': () => string;
   'clipboard.writeText': (text: string) => void;
-  'settings:getSnapshot': () => SettingsSnapshot;
-  'settings:setValue': (target: SettingTarget, value: JsonValue) => SettingsWriteOutcome;
-  'settings:resetValue': (target: SettingTarget) => SettingsWriteOutcome;
 };
 
 /**

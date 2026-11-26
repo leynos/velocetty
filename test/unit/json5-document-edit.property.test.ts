@@ -27,7 +27,7 @@ import {
 } from '../testUtils/json5-document-arbitrary';
 import {fastCheckRunCount} from '../testUtils/fast-check-runs';
 
-import {isJsonObject, type JsonValue} from '@shared/types/json';
+import {isJsonObject, type JsonObject, type JsonValue} from '@shared/types/json';
 
 const CONFIG = propertyKey('config');
 const pathTo = (key: string) => [CONFIG, propertyKey(key)];
@@ -47,47 +47,73 @@ const deleteIn = (root: JsonValue, key: string): JsonValue => {
   return {...root, config};
 };
 
+type CommentScan = {readonly text: string; readonly endIndex: number};
+
+type ScanPosition = {readonly text: string; readonly index: number};
+
+const skipQuotedText = ({text, index: startIndex}: ScanPosition): number => {
+  const quote = text[startIndex];
+  let index = startIndex + 1;
+  while (index < text.length && text[index] !== quote) {
+    index += text[index] === '\\' ? 2 : 1;
+  }
+  return index + 1;
+};
+
+const scanLineComment = ({text, index}: ScanPosition): CommentScan => {
+  const newline = text.indexOf('\n', index);
+  const endIndex = newline === -1 ? text.length : newline;
+  return {text: text.slice(index, endIndex), endIndex};
+};
+
+const scanBlockComment = ({text, index}: ScanPosition): CommentScan => {
+  const closing = text.indexOf('*/', index + 2);
+  const endIndex = closing === -1 ? text.length : closing + 2;
+  return {text: text.slice(index, endIndex), endIndex};
+};
+
+const commentAt = ({text, index}: ScanPosition): CommentScan | undefined => {
+  if (text[index] !== '/') {
+    return undefined;
+  }
+  const marker = text[index + 1];
+  if (marker === '/') {
+    return scanLineComment({text, index});
+  }
+  if (marker === '*') {
+    return scanBlockComment({text, index});
+  }
+  return undefined;
+};
+
 const commentsOf = (text: string): string[] => {
   const comments: string[] = [];
   let index = 0;
   while (index < text.length) {
     const character = text[index];
     if (character === '"' || character === "'") {
-      const quote = character;
+      index = skipQuotedText({text, index});
+      continue;
+    }
+    const comment = commentAt({text, index});
+    if (comment === undefined) {
       index += 1;
-      while (index < text.length && text[index] !== quote) {
-        index += text[index] === '\\' ? 2 : 1;
-      }
-      index += 1;
       continue;
     }
-    if (character === '/' && text[index + 1] === '/') {
-      const end = text.indexOf('\n', index);
-      const stop = end === -1 ? text.length : end;
-      comments.push(text.slice(index, stop));
-      index = stop;
-      continue;
-    }
-    if (character === '/' && text[index + 1] === '*') {
-      const close = text.indexOf('*/', index + 2);
-      const stop = close === -1 ? text.length : close + 2;
-      comments.push(text.slice(index, stop));
-      index = stop;
-      continue;
-    }
-    index += 1;
+    comments.push(comment.text);
+    index = comment.endIndex;
   }
   return comments.toSorted();
 };
 
-const hasLoneLf = (text: string): boolean => {
-  for (let index = 0; index < text.length; index += 1) {
-    if (text[index] === '\n' && (index === 0 || text[index - 1] !== '\r')) {
-      return true;
-    }
-  }
-  return false;
-};
+// A newline is lone unless the segment before it ends with a carriage return.
+const hasLoneLf = (text: string): boolean =>
+  text
+    .split('\n')
+    .slice(0, -1)
+    .some((lineBefore) => !lineBefore.endsWith('\r'));
+
+const configOf = (root: JsonValue): JsonObject => (isJsonObject(root) && isJsonObject(root.config) ? root.config : {});
 
 const editedDoc = (result: DocumentEditResult): string => {
   if (result.kind !== 'edited') {
@@ -95,6 +121,29 @@ const editedDoc = (result: DocumentEditResult): string => {
   }
   return result.doc;
 };
+
+type RemovalSpan = {readonly before: string; readonly after: string; readonly key: string};
+
+const expectRemovalConfinedToConfig = ({before, after, key}: RemovalSpan): void => {
+  const parser = new Json5Parser(before);
+  const root = parser.findRootObjectRange();
+  const configProperty = root ? parser.getObjectProperty(root, 'config') : null;
+  const configRange = configProperty ? parser.getObjectRangeForProperty(configProperty) : null;
+  const property = configRange ? parser.getObjectProperty(configRange, key) : null;
+  if (configRange && property) {
+    // Everything before the config object and after its close brace is
+    // untouched; the comment check below covers the removed span.
+    expect(after.startsWith(before.slice(0, configRange.openBraceIndex + 1))).toBe(true);
+    expect(after.endsWith(before.slice(configRange.closeBraceIndex + 1))).toBe(true);
+  }
+  const remaining = commentsOf(after);
+  const original = commentsOf(before);
+  expect(remaining.every((comment) => original.includes(comment))).toBe(true);
+};
+
+const removeCases = fc
+  .tuple(json5DocumentArbitrary, fc.constantFrom('alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta'))
+  .map(([document, key]) => ({...document, key}));
 
 describe('JSON5 document edit properties', () => {
   test('a set produces exactly the intended value', () => {
@@ -148,17 +197,12 @@ describe('JSON5 document edit properties', () => {
   });
 
   test('a remove produces exactly the value without that key', () => {
-    const cases = fc
-      .tuple(json5DocumentArbitrary, fc.constantFrom('alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta'))
-      .map(([document, key]) => ({...document, key}));
     fc.assert(
-      fc.property(cases, ({text, key}) => {
-        // SAFETY: the generated document is a JSON object tree.
+      fc.property(removeCases, ({text, key}) => {
         // SAFETY: the generated document is a JSON object tree.
         const before = JSON5.parse(text) as JsonValue;
-        const config = isJsonObject(before) && isJsonObject(before.config) ? before.config : {};
         const result = removePropertyAtPath(json5Document(text), pathTo(key));
-        if (!Object.hasOwn(config, key)) {
+        if (!Object.hasOwn(configOf(before), key)) {
           expect(result).toEqual({kind: 'refused', reason: 'path-not-found'});
           return;
         }
@@ -167,21 +211,7 @@ describe('JSON5 document edit properties', () => {
         // Text before the removed property's line and after the config object is
         // untouched; no comment is invented, and no comment outside the removed
         // span disappears.
-        const parser = new Json5Parser(text);
-        const root = parser.findRootObjectRange();
-        const configProperty = root ? parser.getObjectProperty(root, 'config') : null;
-        const configRange = configProperty ? parser.getObjectRangeForProperty(configProperty) : null;
-        const property = configRange ? parser.getObjectProperty(configRange, key) : null;
-        if (configRange && property) {
-          // Everything before the config object and after its close brace is
-          // untouched, and no comment outside the removed property's own span
-          // disappears (checked below).
-          expect(after.startsWith(text.slice(0, configRange.openBraceIndex + 1))).toBe(true);
-          expect(after.endsWith(text.slice(configRange.closeBraceIndex + 1))).toBe(true);
-        }
-        const remaining = commentsOf(after);
-        const original = commentsOf(text);
-        expect(remaining.every((comment) => original.includes(comment))).toBe(true);
+        expectRemovalConfinedToConfig({before: text, after, key});
       }),
       {numRuns: fastCheckRunCount()}
     );

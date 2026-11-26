@@ -328,7 +328,9 @@ Scope notes:
   Settings tab + plugin settings panels. Decisions are recorded in
   [ADR 009](adrs/adr-0009-settings-tab-hosting-and-persistence.md) and the
   component layout in
-  [settings-tab-architecture.md](settings-tab-architecture.md).
+  [settings-tab-architecture.md](settings-tab-architecture.md). Existing users
+  are told what changed in
+  [migration-settings-tab.md](migration-settings-tab.md).
   - [x] Add search, categories, and reset-to-default flows.
   - [x] Surface validation errors inline.
   - [x] Success criteria: core settings are editable and validated in the UI.

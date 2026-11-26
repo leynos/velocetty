@@ -38,9 +38,11 @@ const categoryArb = fc.integer({min: ALL, max: CATEGORY_COUNT - 1});
 const search = (fields: readonly Field[], query: string, selectedCategory = ALL): number[] =>
   searchFieldIndices(
     query,
-    fields.map((field) => field.haystack),
-    fields.map((field) => field.isModified),
-    fields.map((field) => field.categoryIndex),
+    {
+      haystacks: fields.map((field) => field.haystack),
+      modifiedFlags: fields.map((field) => field.isModified),
+      categoryIndices: fields.map((field) => field.categoryIndex)
+    },
     selectedCategory
   );
 

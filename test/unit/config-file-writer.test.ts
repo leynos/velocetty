@@ -10,6 +10,7 @@ import fc from 'fast-check';
 import path from 'node:path';
 
 import {
+  asConfigFilePath,
   lastPathSegment,
   type ConfigWriteGuard,
   type ConfigWriterDependencies,
@@ -203,7 +204,7 @@ describe('config writer', () => {
     harness.port.setFile(path.join(directory, `${TEMPORARY_FILE_PREFIX}1-1`), '{}');
     harness.port.setFile(path.join(directory, `${TEMPORARY_FILE_PREFIX}1-2`), '{}');
 
-    expect(sweepTemporaryFiles(harness.port, directory)).toBe(2);
+    expect(sweepTemporaryFiles(harness.port, asConfigFilePath(directory))).toBe(2);
     expect([...harness.port.files.keys()]).toEqual([keep]);
   });
 

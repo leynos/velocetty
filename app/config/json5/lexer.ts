@@ -12,6 +12,7 @@
  *
  * Cross-links:
  * - `characters.ts` for character predicates.
+ * - `source-text.ts` for the branded document text the steps share.
  * - `keys.ts` for object-key parsing built on these scans.
  */
 import {
@@ -21,9 +22,11 @@ import {
   isWhitespaceCharacter,
   parserFailureSentinel
 } from './characters';
+import {sourceText, type SourceText} from './source-text';
 import type {IndexCursor, ParseRange} from './types';
 
 type AdvanceContext = {
+  readonly source: SourceText;
   readonly cursor: IndexCursor;
   readonly limitIndex: number;
 };
@@ -31,45 +34,49 @@ type AdvanceContext = {
 type SkipResult = {kind: 'advanced'; nextIndex: number} | {kind: 'invalid'} | {kind: 'none'};
 
 /** Skips a line comment and returns the index of its terminating line break. */
-export const skipLineComment = (raw: string, range: ParseRange): number => {
+export const skipLineComment = (source: SourceText, range: ParseRange): number => {
   let index = range.startIndex + 2;
-  while (index < range.limitIndex && !isLineTerminator(raw[index])) {
+  while (index < range.limitIndex && !isLineTerminator(source[index])) {
     index += 1;
   }
   return index;
 };
 
-const hasRoomForCommentEnd = (cursor: IndexCursor, limitIndex: number): boolean => cursor.index + 1 < limitIndex;
-
-const isBlockCommentEnd = (raw: string, cursor: IndexCursor): boolean =>
-  raw[cursor.index] === '*' && raw[cursor.index + 1] === '/';
+const isBlockCommentEnd = (source: SourceText, cursor: IndexCursor): boolean =>
+  source[cursor.index] === '*' && source[cursor.index + 1] === '/';
 
 /** Skips a C-style block comment, or returns the failure sentinel when unterminated. */
-export const skipBlockComment = (raw: string, range: ParseRange): number => {
-  // Skip the opening comment delimiter.
-  let index = range.startIndex + 2;
-  while (hasRoomForCommentEnd({index}, range.limitIndex) && !isBlockCommentEnd(raw, {index})) {
-    index += 1;
+export const skipBlockComment = (source: SourceText, range: ParseRange): number => {
+  for (let index = range.startIndex + 2; index + 1 < range.limitIndex; index += 1) {
+    if (isBlockCommentEnd(source, {index})) {
+      return index + 2;
+    }
   }
-  return hasRoomForCommentEnd({index}, range.limitIndex) ? index + 2 : parserFailureSentinel;
+  return parserFailureSentinel;
 };
 
-const tryAdvanceWhitespaceOrComment = (raw: string, ctx: AdvanceContext): SkipResult => {
-  const current = raw[ctx.cursor.index];
-  const next = raw[ctx.cursor.index + 1];
+const isLineCommentStart = (current: string, next: string | undefined): boolean => current === '/' && next === '/';
+
+const isBlockCommentStart = (current: string, next: string | undefined): boolean => current === '/' && next === '*';
+
+/** Advances over a block comment, or reports the unterminated-comment failure. */
+const advanceBlockComment = (ctx: AdvanceContext): SkipResult => {
+  const nextIndex = skipBlockComment(ctx.source, {startIndex: ctx.cursor.index, limitIndex: ctx.limitIndex});
+  return nextIndex === parserFailureSentinel ? {kind: 'invalid'} : {kind: 'advanced', nextIndex};
+};
+
+const tryAdvanceWhitespaceOrComment = (ctx: AdvanceContext): SkipResult => {
+  const current = ctx.source[ctx.cursor.index];
+  const next = ctx.source[ctx.cursor.index + 1];
   if (isWhitespaceCharacter(current)) {
     return {kind: 'advanced', nextIndex: ctx.cursor.index + 1};
   }
-  if (current === '/' && next === '/') {
-    const nextIndex = skipLineComment(raw, {startIndex: ctx.cursor.index, limitIndex: ctx.limitIndex});
+  if (isLineCommentStart(current, next)) {
+    const nextIndex = skipLineComment(ctx.source, {startIndex: ctx.cursor.index, limitIndex: ctx.limitIndex});
     return {kind: 'advanced', nextIndex};
   }
-  if (current === '/' && next === '*') {
-    const nextIndex = skipBlockComment(raw, {startIndex: ctx.cursor.index, limitIndex: ctx.limitIndex});
-    if (nextIndex === parserFailureSentinel) {
-      return {kind: 'invalid'};
-    }
-    return {kind: 'advanced', nextIndex};
+  if (isBlockCommentStart(current, next)) {
+    return advanceBlockComment(ctx);
   }
   return {kind: 'none'};
 };
@@ -81,9 +88,11 @@ const tryAdvanceWhitespaceOrComment = (raw: string, ctx: AdvanceContext): SkipRe
  * block comment is encountered.
  */
 export const skipWhitespaceAndComments = (raw: string, range: ParseRange): number => {
+  const source = sourceText(raw);
   let index = range.startIndex;
   while (index < range.limitIndex) {
-    const skipResult = tryAdvanceWhitespaceOrComment(raw, {
+    const skipResult = tryAdvanceWhitespaceOrComment({
+      source,
       cursor: {index},
       limitIndex: range.limitIndex
     });
@@ -99,35 +108,40 @@ export const skipWhitespaceAndComments = (raw: string, range: ParseRange): numbe
   return index;
 };
 
-/** Returns the index of the start of the line that contains `cursor.index`. */
-export const getLineStartIndex = (raw: string, cursor: IndexCursor): number => {
+const lineStartIndexFor = (source: SourceText, cursor: IndexCursor): number => {
   if (cursor.index === 0) {
     return 0;
   }
   for (let index = Math.max(0, cursor.index - 1); index >= 0; index -= 1) {
-    if (isLineTerminator(raw[index])) {
+    if (isLineTerminator(source[index])) {
       return index + 1;
     }
   }
   return 0;
 };
 
+/** Returns the index of the start of the line that contains `cursor.index`. */
+export const getLineStartIndex = (raw: string, cursor: IndexCursor): number =>
+  lineStartIndexFor(sourceText(raw), cursor);
+
 /** Returns the leading indentation (spaces/tabs) for the line at `cursor.index`. */
 export const getLineIndent = (raw: string, cursor: IndexCursor): string => {
-  const lineStartIndex = getLineStartIndex(raw, cursor);
+  const source = sourceText(raw);
+  const lineStartIndex = lineStartIndexFor(source, cursor);
   let index = lineStartIndex;
-  while (index < raw.length && isIndentationWhitespace(raw[index])) {
+  while (index < source.length && isIndentationWhitespace(source[index])) {
     index += 1;
   }
-  return raw.slice(lineStartIndex, index);
+  return source.slice(lineStartIndex, index);
 };
 
 /** Returns the index just past a quoted string, or `-1` when unterminated. */
 export const parseQuotedStringEnd = (raw: string, range: ParseRange): number => {
-  const quote = raw[range.startIndex];
+  const source = sourceText(raw);
+  const quote = source[range.startIndex];
   let index = range.startIndex + 1;
   while (index < range.limitIndex) {
-    const current = raw[index];
+    const current = source[index];
     if (current === '\\') {
       if (index + 1 >= range.limitIndex) {
         return -1;
@@ -144,8 +158,11 @@ export const parseQuotedStringEnd = (raw: string, range: ParseRange): number => 
 };
 
 /** Reads the code point at `cursor.index`, advancing by its UTF-16 length. */
-export const readCodePoint = (raw: string, cursor: IndexCursor): {character: string; nextIndex: number} | null => {
-  const codePoint = raw.codePointAt(cursor.index);
+export const readCodePoint = (
+  source: SourceText,
+  cursor: IndexCursor
+): {character: string; nextIndex: number} | null => {
+  const codePoint = source.codePointAt(cursor.index);
   if (codePoint === undefined) {
     return null;
   }
@@ -156,49 +173,56 @@ export const readCodePoint = (raw: string, cursor: IndexCursor): {character: str
   };
 };
 
-/** Parses a four-hex-digit or braced Unicode escape at `cursor.index`. */
-export const parseUnicodeEscapeCharacter = (
-  raw: string,
-  cursor: IndexCursor
-): {character: string; nextIndex: number} | null => {
-  if (raw[cursor.index] !== '\\' || raw[cursor.index + 1] !== 'u') {
-    return null;
-  }
+const isUnicodeEscapeStart = (source: SourceText, cursor: IndexCursor): boolean =>
+  source[cursor.index] === '\\' && source[cursor.index + 1] === 'u';
 
+/** Parses an ES6+ braced Unicode escape (`\u{...}`) at `cursor.index`. */
+const parseBracedEscape = (source: SourceText, cursor: IndexCursor): {character: string; nextIndex: number} | null => {
   // Intentional leniency: JSON5 (ES5.1) only requires a four-hex-digit
   // escape, but this parser also accepts ES6+ braced escapes for unquoted
   // identifier keys. Roundtrip parser tests cover this behaviour.
-  if (raw[cursor.index + 2] === '{') {
-    const hexStartIndex = cursor.index + 3;
-    const closeBraceIndex = raw.indexOf('}', hexStartIndex);
-    if (closeBraceIndex === -1) {
-      return null;
-    }
-    const codePointHex = raw.slice(hexStartIndex, closeBraceIndex);
-    if (!/^[0-9A-Fa-f]{1,6}$/.test(codePointHex)) {
-      return null;
-    }
-    const codePoint = Number.parseInt(codePointHex, 16);
-    if (codePoint > 0x10_ff_ff) {
-      return null;
-    }
-    return {
-      character: String.fromCodePoint(codePoint),
-      nextIndex: closeBraceIndex + 1
-    };
+  const hexStartIndex = cursor.index + 3;
+  const closeBraceIndex = source.indexOf('}', hexStartIndex);
+  if (closeBraceIndex === -1) {
+    return null;
   }
+  const codePointHex = source.slice(hexStartIndex, closeBraceIndex);
+  if (!/^[0-9A-Fa-f]{1,6}$/.test(codePointHex)) {
+    return null;
+  }
+  const codePoint = Number.parseInt(codePointHex, 16);
+  if (codePoint > 0x10_ff_ff) {
+    return null;
+  }
+  return {
+    character: String.fromCodePoint(codePoint),
+    nextIndex: closeBraceIndex + 1
+  };
+};
 
+/** Parses a four-hex-digit Unicode escape (`\uXXXX`) at `cursor.index`. */
+const parseFixedEscape = (source: SourceText, cursor: IndexCursor): {character: string; nextIndex: number} | null => {
   const hexStartIndex = cursor.index + 2;
   const hexEndIndex = hexStartIndex + 4;
-  const codeUnit = raw.slice(hexStartIndex, hexEndIndex);
+  const codeUnit = source.slice(hexStartIndex, hexEndIndex);
   if (!/^[0-9A-Fa-f]{4}$/.test(codeUnit)) {
     return null;
   }
-
   return {
     character: String.fromCodePoint(Number.parseInt(codeUnit, 16)),
     nextIndex: hexEndIndex
   };
+};
+
+/** Parses a four-hex-digit or braced Unicode escape at `cursor.index`. */
+export const parseUnicodeEscapeCharacter = (
+  source: SourceText,
+  cursor: IndexCursor
+): {character: string; nextIndex: number} | null => {
+  if (!isUnicodeEscapeStart(source, cursor)) {
+    return null;
+  }
+  return source[cursor.index + 2] === '{' ? parseBracedEscape(source, cursor) : parseFixedEscape(source, cursor);
 };
 
 /** Parses one identifier character, resolving Unicode escapes first. */
@@ -207,7 +231,8 @@ export const parseIdentifierCharacter = (
   cursor: IndexCursor,
   isStart: boolean
 ): {character: string; nextIndex: number} | null => {
-  const parsed = parseUnicodeEscapeCharacter(raw, cursor) ?? readCodePoint(raw, cursor);
+  const source = sourceText(raw);
+  const parsed = parseUnicodeEscapeCharacter(source, cursor) ?? readCodePoint(source, cursor);
   if (!parsed) {
     return null;
   }

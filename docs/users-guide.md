@@ -161,7 +161,12 @@ application state (window layout, caches, preferences), not configuration.
 
 Velocetty keeps your settings in `config.json5`. You can edit that file
 directly, as [Where configuration lives](#where-configuration-lives) explains,
-or use the settings tab for the settings it covers.
+or use the settings tab for the settings it covers. The tab edits the same
+`config.json5`, so an existing configuration, comments, and an external editor
+all keep working. A file that names the old `hyper.json` stays read-only in the
+tab until it is renamed. If you previously used **Preferences…** to open the
+file in an editor, see
+[Migrating to the settings tab](migration-settings-tab.md).
 
 ### Opening settings
 

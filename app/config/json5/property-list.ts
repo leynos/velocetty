@@ -13,6 +13,7 @@
  * - `keys.ts` for key token parsing.
  * - `object-scanner.ts` for value boundaries.
  * - `lexer.ts` for whitespace and comment skipping.
+ * - `source-text.ts` for the branded text the steps share.
  */
 import JSON5 from 'json5';
 
@@ -20,7 +21,8 @@ import {NON_VALUE_START_CHARS, parserFailureSentinel} from './characters';
 import {parseObjectKey} from './keys';
 import {skipWhitespaceAndComments} from './lexer';
 import {findPropertyValueEnd} from './object-scanner';
-import type {IndexCursor, Json5ObjectProperty, Json5ObjectRange, ParseRange} from './types';
+import {sourceText, type SourceText} from './source-text';
+import type {Json5ObjectProperty, Json5ObjectRange, ParseRange} from './types';
 
 type PropertyListState = {
   readonly hasParsedProperty: boolean;
@@ -29,33 +31,32 @@ type PropertyListState = {
 
 type Step<T> = {success: true; value: T} | {success: false};
 
-const readColonIndexAfterKey = (raw: string, range: ParseRange, keyEndIndex: number): Step<number> => {
-  const colonIndex = skipWhitespaceAndComments(raw, {startIndex: keyEndIndex, limitIndex: range.limitIndex});
-  if (colonIndex === parserFailureSentinel || raw[colonIndex] !== ':') {
+const isInvalidValueStart = (ch: string): boolean => NON_VALUE_START_CHARS.has(ch);
+
+const readColonIndexAfterKey = (source: SourceText, window: ParseRange): Step<number> => {
+  const colonIndex = skipWhitespaceAndComments(source, window);
+  if (colonIndex === parserFailureSentinel || source[colonIndex] !== ':') {
     return {success: false};
   }
   return {success: true, value: colonIndex};
 };
 
-const readValueStartIndexAfterColon = (raw: string, range: ParseRange, colonIndex: number): Step<number> => {
-  const valueStartIndex = skipWhitespaceAndComments(raw, {startIndex: colonIndex + 1, limitIndex: range.limitIndex});
-  if (valueStartIndex === parserFailureSentinel || valueStartIndex >= range.limitIndex) {
+const readValueStartIndexAfterColon = (source: SourceText, window: ParseRange): Step<number> => {
+  const valueStartIndex = skipWhitespaceAndComments(source, window);
+  if (valueStartIndex === parserFailureSentinel || valueStartIndex >= window.limitIndex) {
     return {success: false};
   }
-  const ch = raw[valueStartIndex];
-  if (isInvalidValueStart(ch)) return {success: false};
+  if (isInvalidValueStart(source[valueStartIndex])) return {success: false};
   return {success: true, value: valueStartIndex};
 };
 
-const isInvalidValueStart = (ch: string): boolean => NON_VALUE_START_CHARS.has(ch);
-
-const computeValueEndIndex = (raw: string, valueRange: ParseRange): Step<number> => {
-  const valueEndIndex = findPropertyValueEnd(raw, valueRange);
+const computeValueEndIndex = (source: SourceText, valueRange: ParseRange): Step<number> => {
+  const valueEndIndex = findPropertyValueEnd(source, valueRange);
   if (valueEndIndex === parserFailureSentinel) {
     return {success: false};
   }
   try {
-    JSON5.parse(raw.slice(valueRange.startIndex, valueEndIndex));
+    JSON5.parse(source.slice(valueRange.startIndex, valueEndIndex));
   } catch {
     return {success: false};
   }
@@ -63,15 +64,14 @@ const computeValueEndIndex = (raw: string, valueRange: ParseRange): Step<number>
 };
 
 const readAfterValue = (
-  raw: string,
-  range: ParseRange,
-  valueEndIndex: number
+  source: SourceText,
+  window: ParseRange
 ): Step<{afterValueIndex: number; hasTrailingComma: boolean; nextCursor: number}> => {
-  const afterValueIndex = skipWhitespaceAndComments(raw, {startIndex: valueEndIndex, limitIndex: range.limitIndex});
+  const afterValueIndex = skipWhitespaceAndComments(source, window);
   if (afterValueIndex === parserFailureSentinel) {
     return {success: false};
   }
-  const hasTrailingComma = raw[afterValueIndex] === ',';
+  const hasTrailingComma = source[afterValueIndex] === ',';
   return {
     success: true,
     value: {
@@ -83,25 +83,34 @@ const readAfterValue = (
 };
 
 const parseSingleProperty = (
-  raw: string,
+  source: SourceText,
   range: ParseRange
 ): {property: Json5ObjectProperty; nextCursor: number} | null => {
-  const parsedKey = parseObjectKey(raw, range);
+  const parsedKey = parseObjectKey(source, range);
   if (!parsedKey) return null;
 
-  const colonIndexStep = readColonIndexAfterKey(raw, range, parsedKey.endIndex);
+  const colonIndexStep = readColonIndexAfterKey(source, {
+    startIndex: parsedKey.endIndex,
+    limitIndex: range.limitIndex
+  });
   if (!colonIndexStep.success) return null;
 
-  const valueStartIndexStep = readValueStartIndexAfterColon(raw, range, colonIndexStep.value);
+  const valueStartIndexStep = readValueStartIndexAfterColon(source, {
+    startIndex: colonIndexStep.value + 1,
+    limitIndex: range.limitIndex
+  });
   if (!valueStartIndexStep.success) return null;
 
-  const valueEndIndexStep = computeValueEndIndex(raw, {
+  const valueEndIndexStep = computeValueEndIndex(source, {
     startIndex: valueStartIndexStep.value,
     limitIndex: range.limitIndex
   });
   if (!valueEndIndexStep.success) return null;
 
-  const afterValueStep = readAfterValue(raw, range, valueEndIndexStep.value);
+  const afterValueStep = readAfterValue(source, {
+    startIndex: valueEndIndexStep.value,
+    limitIndex: range.limitIndex
+  });
   if (!afterValueStep.success) return null;
 
   return {
@@ -117,15 +126,17 @@ const parseSingleProperty = (
 };
 
 const processObjectComma = (
-  raw: string,
-  cursor: IndexCursor,
-  limitIndex: number,
+  source: SourceText,
+  range: ParseRange,
   listState: PropertyListState
 ): {success: false} | {success: true; nextCursor: number; newState: PropertyListState} => {
   if (!listState.hasParsedProperty || listState.lastTokenWasComma) {
     return {success: false};
   }
-  const nextCursor = skipWhitespaceAndComments(raw, {startIndex: cursor.index + 1, limitIndex});
+  const nextCursor = skipWhitespaceAndComments(source, {
+    startIndex: range.startIndex + 1,
+    limitIndex: range.limitIndex
+  });
   if (nextCursor === parserFailureSentinel) {
     return {success: false};
   }
@@ -133,9 +144,8 @@ const processObjectComma = (
 };
 
 const processObjectProperty = (
-  raw: string,
-  cursor: IndexCursor,
-  limitIndex: number,
+  source: SourceText,
+  range: ParseRange,
   listState: PropertyListState
 ):
   | {success: false}
@@ -143,13 +153,13 @@ const processObjectProperty = (
   if (listState.hasParsedProperty && !listState.lastTokenWasComma) {
     return {success: false};
   }
-  const parsedProperty = parseSingleProperty(raw, {startIndex: cursor.index, limitIndex});
+  const parsedProperty = parseSingleProperty(source, range);
   if (!parsedProperty) {
     return {success: false};
   }
-  const nextCursor = skipWhitespaceAndComments(raw, {
+  const nextCursor = skipWhitespaceAndComments(source, {
     startIndex: parsedProperty.nextCursor,
-    limitIndex
+    limitIndex: range.limitIndex
   });
   if (nextCursor === parserFailureSentinel) {
     return {success: false};
@@ -168,8 +178,9 @@ const processObjectProperty = (
  * Returns `null` when token order is invalid or parsing fails.
  */
 export const parseObjectProperties = (raw: string, objectRange: Json5ObjectRange): Json5ObjectProperty[] | null => {
+  const source = sourceText(raw);
   const properties: Json5ObjectProperty[] = [];
-  let cursor = skipWhitespaceAndComments(raw, {
+  let cursor = skipWhitespaceAndComments(source, {
     startIndex: objectRange.openBraceIndex + 1,
     limitIndex: objectRange.closeBraceIndex
   });
@@ -179,15 +190,23 @@ export const parseObjectProperties = (raw: string, objectRange: Json5ObjectRange
   let listState: PropertyListState = {hasParsedProperty: false, lastTokenWasComma: false};
 
   while (cursor < objectRange.closeBraceIndex) {
-    if (raw[cursor] === ',') {
-      const result = processObjectComma(raw, {index: cursor}, objectRange.closeBraceIndex, listState);
+    if (source[cursor] === ',') {
+      const result = processObjectComma(
+        source,
+        {startIndex: cursor, limitIndex: objectRange.closeBraceIndex},
+        listState
+      );
       if (!result.success) return null;
       cursor = result.nextCursor;
       listState = result.newState;
       continue;
     }
 
-    const result = processObjectProperty(raw, {index: cursor}, objectRange.closeBraceIndex, listState);
+    const result = processObjectProperty(
+      source,
+      {startIndex: cursor, limitIndex: objectRange.closeBraceIndex},
+      listState
+    );
     if (!result.success) return null;
     properties.push(result.property);
     listState = result.newState;

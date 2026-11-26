@@ -12,7 +12,7 @@ import {createSettingsService, type SettingsService} from '../../app/settings/se
 import {createMemoryConfigFileSystem} from '../testUtils/config-file-port';
 
 import type {JsonObject} from '@shared/types/json';
-import type {SettingTarget} from '@shared/settings/protocol';
+import type {SettingTarget, SettingsSnapshot, SettingsWriteOutcome} from '@shared/settings/protocol';
 
 const CONFIG_PATH = '/home/user/.config/Hyper/config.json5';
 const LEGACY_PATH = '/home/user/.config/Hyper/hyper.json';
@@ -65,6 +65,54 @@ const createHarness = (filePath = CONFIG_PATH): Harness => {
   return {service, port, revision: () => revision};
 };
 
+const harnessWithFile = (text: string): Harness => {
+  const harness = createHarness();
+  harness.port.setFile(CONFIG_PATH, text);
+  return harness;
+};
+
+/** Asserts a read path wrote nothing and left the file's text alone. */
+const expectReadOnly = (harness: Harness, filePath: string, expectedText?: string): void => {
+  expect(harness.port.writes).toEqual([]);
+  expect(harness.port.readFile(filePath)).toBe(expectedText);
+};
+
+const appliedSnapshot = async (outcome: Promise<SettingsWriteOutcome>): Promise<SettingsSnapshot> => {
+  const result = await outcome;
+  expect(result.kind).toBe('applied');
+  if (result.kind !== 'applied') {
+    throw new Error(`expected an applied write, got ${result.kind}`);
+  }
+  return result.snapshot;
+};
+
+type AppliedWrite = {
+  readonly name: string;
+  readonly initialText: string;
+  readonly write: (service: SettingsService) => Promise<SettingsWriteOutcome>;
+  readonly assertSnapshot: (snapshot: SettingsSnapshot) => void;
+};
+
+const APPLIED_WRITE_SCENARIOS: readonly AppliedWrite[] = [
+  {
+    name: 'a valid edit applies and returns the new snapshot',
+    initialText: '{config: {fontSize: 14}}',
+    write: (service) => service.setValue(target('fontSize'), 16),
+    assertSnapshot: (snapshot) => {
+      expect(snapshot.userValues).toEqual({fontSize: 16});
+      expect(snapshot.revision).toBe(1);
+    }
+  },
+  {
+    name: 'a reset removes the key and reports it as no longer modified',
+    initialText: '{config: {fontSize: 14, shell: "zsh"}}',
+    write: (service) => service.resetValue(target('fontSize')),
+    assertSnapshot: (snapshot) => {
+      expect(snapshot.userValues).toEqual({shell: 'zsh'});
+    }
+  }
+];
+
 describe('settings snapshot', () => {
   test('reports the user values, the core defaults, and profile overrides', () => {
     const harness = createHarness();
@@ -81,6 +129,11 @@ describe('settings snapshot', () => {
     expect(snapshot.profileOverriddenKeys).toEqual(['fontSize']);
     expect(snapshot.filePath).toBe(CONFIG_PATH);
     expect(snapshot.revision).toBe(0);
+    expectReadOnly(
+      harness,
+      CONFIG_PATH,
+      '{config: {fontSize: 14, profiles: [{name: "default", config: {fontSize: 20}}]}}'
+    );
   });
 
   test('reports a missing file without inventing values', () => {
@@ -88,6 +141,7 @@ describe('settings snapshot', () => {
     const snapshot = harness.service.getSnapshot();
     expect(snapshot.fileStatus).toEqual({kind: 'missing'});
     expect(snapshot.userValues).toEqual({});
+    expectReadOnly(harness, CONFIG_PATH);
   });
 
   test('reports an unparseable file with a diagnostic', () => {
@@ -99,6 +153,7 @@ describe('settings snapshot', () => {
       return;
     }
     expect(snapshot.fileStatus.diagnostics.length).toBeGreaterThan(0);
+    expectReadOnly(harness, CONFIG_PATH, '{config: {');
   });
 
   test('reports a schema-invalid file with every diagnostic', () => {
@@ -112,29 +167,27 @@ describe('settings snapshot', () => {
     const paths = snapshot.fileStatus.diagnostics.map((item) => item.path).toSorted();
     expect(paths).toEqual(['/config/fontSize', '/config/scrollback']);
     expect(snapshot.userValues).toEqual({scrollback: 'lots', fontSize: 'big'});
+    expectReadOnly(harness, CONFIG_PATH, '{config: {scrollback: "lots", fontSize: "big"}}');
   });
 
   test('reports a legacy hyper.json as read-only', () => {
     const harness = createHarness(LEGACY_PATH);
     harness.port.setFile(LEGACY_PATH, '{"config": {"fontSize": 14}}');
     expect(harness.service.getSnapshot().fileStatus).toEqual({kind: 'legacy-json'});
+    expectReadOnly(harness, LEGACY_PATH, '{"config": {"fontSize": 14}}');
   });
 });
 
 describe('settings writes', () => {
-  test('a valid edit applies and returns the new snapshot', async () => {
-    const harness = createHarness();
-    harness.port.setFile(CONFIG_PATH, '{config: {fontSize: 14}}');
+  for (const scenario of APPLIED_WRITE_SCENARIOS) {
+    test(scenario.name, async () => {
+      const harness = harnessWithFile(scenario.initialText);
 
-    const outcome = await harness.service.setValue(target('fontSize'), 16);
+      const snapshot = await appliedSnapshot(scenario.write(harness.service));
 
-    expect(outcome.kind).toBe('applied');
-    if (outcome.kind !== 'applied') {
-      return;
-    }
-    expect(outcome.snapshot.userValues).toEqual({fontSize: 16});
-    expect(outcome.snapshot.revision).toBe(1);
-  });
+      scenario.assertSnapshot(snapshot);
+    });
+  }
 
   test('a policy violation is rejected with diagnostics and does not write', async () => {
     const harness = createHarness();
@@ -148,19 +201,6 @@ describe('settings writes', () => {
     }
     expect(outcome.diagnostics[0]?.path).toBe('/config/scrollback');
     expect(harness.port.writes).toHaveLength(0);
-  });
-
-  test('a reset removes the key and reports it as no longer modified', async () => {
-    const harness = createHarness();
-    harness.port.setFile(CONFIG_PATH, '{config: {fontSize: 14, shell: "zsh"}}');
-
-    const outcome = await harness.service.resetValue(target('fontSize'));
-
-    expect(outcome.kind).toBe('applied');
-    if (outcome.kind !== 'applied') {
-      return;
-    }
-    expect(outcome.snapshot.userValues).toEqual({shell: 'zsh'});
   });
 
   test('a missing file cannot be written', async () => {

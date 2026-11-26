@@ -114,6 +114,23 @@ const printArray = (values: readonly JsonValue[], depth: number, style: Json5Sty
   return `[${style.newline}${innerIndent}${items.join(`${style.newline}${innerIndent}`)}${style.newline}${outerIndent}]`;
 };
 
+type MemberLayout = {
+  readonly key: string;
+  readonly child: JsonValue;
+  readonly index: number;
+  readonly count: number;
+  readonly depth: number;
+  readonly style: Json5Style;
+};
+
+const printMember = ({key, child, index, count, depth, style}: MemberLayout): string => {
+  const isLast = index === count - 1;
+  const comma = !isLast || style.trailingComma ? ',' : '';
+  const before = style.commentBefore && index % 2 === 0 ? `/* property ${index} */ ` : '';
+  const after = style.commentAfter && index % 3 === 0 ? ' // trailing note' : '';
+  return `${before}${printKey(key, style)}: ${printValue(child, depth + 1, style)}${comma}${after}`;
+};
+
 const printObject = (value: JsonObject, depth: number, style: Json5Style): string => {
   const entries = Object.entries(value);
   if (entries.length === 0) {
@@ -121,13 +138,9 @@ const printObject = (value: JsonObject, depth: number, style: Json5Style): strin
   }
   const innerIndent = style.indent.repeat(depth + 1);
   const outerIndent = style.indent.repeat(depth);
-  const members = entries.map(([key, child], index) => {
-    const isLast = index === entries.length - 1;
-    const comma = !isLast || style.trailingComma ? ',' : '';
-    const before = style.commentBefore && index % 2 === 0 ? `/* property ${index} */ ` : '';
-    const after = style.commentAfter && index % 3 === 0 ? ' // trailing note' : '';
-    return `${before}${printKey(key, style)}: ${printValue(child, depth + 1, style)}${comma}${after}`;
-  });
+  const members = entries.map(([key, child], index) =>
+    printMember({key, child, index, count: entries.length, depth, style})
+  );
   const separator = style.inlinePairs ? ' ' : `${style.newline}${innerIndent}`;
   return `{${style.newline}${innerIndent}${members.join(separator)}${style.newline}${outerIndent}}`;
 };

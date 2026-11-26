@@ -54,3 +54,15 @@ export type SettingsWriteOutcome =
   | {readonly kind: 'applied'; readonly snapshot: SettingsSnapshot}
   | {readonly kind: 'rejected'; readonly diagnostics: readonly configValidationDiagnostic[]}
   | {readonly kind: 'failed'; readonly reason: SettingsWriteFailure; readonly detail?: string};
+
+/**
+ * The settings IPC command surface.
+ *
+ * Kept beside the protocol rather than in `types/common.ts` so the shared
+ * command map only has to carry the settings channel descriptions.
+ */
+export type SettingsIpcCommands = {
+  'settings:getSnapshot': () => SettingsSnapshot;
+  'settings:setValue': (target: SettingTarget, value: JsonValue) => SettingsWriteOutcome;
+  'settings:resetValue': (target: SettingTarget) => SettingsWriteOutcome;
+};

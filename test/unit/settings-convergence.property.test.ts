@@ -43,6 +43,14 @@ type Op =
   | {readonly kind: 'submit'; readonly field: string; readonly draft: string}
   | {readonly kind: 'reset'; readonly field: string};
 
+type SubmitOp = Extract<Op, {kind: 'submit'}>;
+type ResetOp = Extract<Op, {kind: 'reset'}>;
+
+type AppliedOps = {
+  readonly expected: ReadonlyMap<string, JsonValue>;
+  readonly resets: number;
+};
+
 const fieldArbitrary = fc.constantFrom(FONT_SIZE, SHELL);
 const validDraftArbitrary = fc.integer({min: 6, max: 100}).map(String);
 const draftArbitrary = fc.oneof(validDraftArbitrary, fc.constantFrom('abc', '', '-3'));
@@ -130,6 +138,57 @@ const flushOrder = (size: number, keys: readonly number[]): number[] => {
   return indices.toSorted((left, right) => (keys[left % keys.length] ?? 0) - (keys[right % keys.length] ?? 0));
 };
 
+const applySubmit = (store: FieldStore, expected: Map<string, JsonValue>, op: SubmitOp): void => {
+  store.setDraft(`core:${op.field}`, op.draft);
+  store.submit(`core:${op.field}`);
+  const coerced = coercedDraft(op.field, op.draft);
+  if (coerced !== undefined) {
+    expected.set(op.field, coerced);
+  }
+};
+
+const applyReset = (store: FieldStore, expected: Map<string, JsonValue>, op: ResetOp): void => {
+  store.reset(`core:${op.field}`);
+  expected.delete(op.field);
+};
+
+const applyOps = (store: FieldStore, ops: readonly Op[]): AppliedOps => {
+  const expected = new Map<string, JsonValue>();
+  let resets = 0;
+  for (const op of ops) {
+    if (op.kind === 'reset') {
+      resets += 1;
+      applyReset(store, expected, op);
+      continue;
+    }
+    applySubmit(store, expected, op);
+  }
+  return {expected, resets};
+};
+
+const flushInOrder = async (harness: ReturnType<typeof createHarness>, keys: readonly number[]): Promise<boolean> => {
+  const order = flushOrder(harness.pending.length, keys);
+  const entries = [...harness.pending.entries()];
+  for (const index of order) {
+    const entry = entries.find(([key]) => key === index);
+    if (entry !== undefined) {
+      const [, item] = entry;
+      item.resolve(await item.outcome);
+    }
+  }
+  return order.some((value, index) => value !== index);
+};
+
+const expectSettledFile = (
+  port: ReturnType<typeof createMemoryConfigFileSystem>,
+  expected: ReadonlyMap<string, JsonValue>
+): void => {
+  const written = configOf(port);
+  for (const field of [FONT_SIZE, SHELL]) {
+    expect(written[field] ?? null).toEqual(expected.get(field) ?? null);
+  }
+};
+
 describe('settings convergence', () => {
   test('the file settles on the last submission after out-of-order outcomes', async () => {
     let runs = 0;
@@ -141,40 +200,13 @@ describe('settings convergence', () => {
         runs += 1;
         const harness = createHarness();
         harness.store.refresh(harness.service.getSnapshot());
-        const expected = new Map<string, JsonValue>();
-
-        for (const op of ops) {
-          if (op.kind === 'reset') {
-            resets += 1;
-            harness.store.reset(`core:${op.field}`);
-            expected.delete(op.field);
-            continue;
-          }
-          harness.store.setDraft(`core:${op.field}`, op.draft);
-          harness.store.submit(`core:${op.field}`);
-          const coerced = coercedDraft(op.field, op.draft);
-          if (coerced !== undefined) {
-            expected.set(op.field, coerced);
-          }
-        }
-
-        const order = flushOrder(harness.pending.length, keys);
-        if (order.some((value, index) => value !== index)) {
-          reordered += 1;
-        }
-        const entries = [...harness.pending.entries()];
-        for (const index of order) {
-          const entry = entries.find(([key]) => key === index);
-          if (entry !== undefined) {
-            const [, item] = entry;
-            item.resolve(await item.outcome);
-          }
-        }
+        const applied = applyOps(harness.store, ops);
+        resets += applied.resets;
+        const wasReordered = await flushInOrder(harness, keys);
         await harness.store.whenIdle();
-
-        const written = configOf(harness.port);
-        for (const field of [FONT_SIZE, SHELL]) {
-          expect(written[field] ?? null).toEqual(expected.get(field) ?? null);
+        expectSettledFile(harness.port, applied.expected);
+        if (wasReordered) {
+          reordered += 1;
         }
       }),
       {numRuns: Math.min(fastCheckRunCount(), 100)}

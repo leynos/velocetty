@@ -62,7 +62,11 @@ const RETRYABLE_RENAME_CODES = new Set(['EBUSY', 'EPERM', 'EACCES']);
 const RENAME_ATTEMPTS = 20;
 const RENAME_RETRY_MS = 50;
 
-const renameWithRetry = async (from: string, to: string): Promise<void> => {
+type WatchLocation = {readonly directory: string; readonly filePath: string};
+
+type RenameRequest = {readonly from: string; readonly to: string};
+
+const renameWithRetry = async ({from, to}: RenameRequest): Promise<void> => {
   for (let attempt = 1; attempt <= RENAME_ATTEMPTS; attempt += 1) {
     try {
       await fs.rename(from, to);
@@ -79,44 +83,61 @@ const renameWithRetry = async (from: string, to: string): Promise<void> => {
   }
 };
 
-const atomicReplace = async (directory: string, filePath: string, text: string): Promise<void> => {
+type AtomicReplacement = WatchLocation & {readonly text: string};
+
+const atomicReplace = async ({directory, filePath, text}: AtomicReplacement): Promise<void> => {
   const temporaryPath = path.join(directory, '.tmp-replacement');
   await fs.writeFile(temporaryPath, text);
-  await renameWithRetry(temporaryPath, filePath);
+  await renameWithRetry({from: temporaryPath, to: filePath});
+};
+
+const burstOfAtomicReplaces = async ({directory, filePath}: WatchLocation): Promise<void> => {
+  for (let index = 0; index < 4; index += 1) {
+    await atomicReplace({directory, filePath, text: `{config: {fontSize: ${16 + index}}}`});
+  }
+};
+
+type WatchScenario = {
+  readonly name: string;
+  readonly change: (location: WatchLocation) => Promise<void>;
+  readonly isFirstReload: (probe: Probe) => boolean;
+  readonly settleMilliseconds: number;
+};
+
+const WATCH_SCENARIOS: readonly WatchScenario[] = [
+  {
+    name: 'an atomic replacement reloads exactly once',
+    change: ({directory, filePath}) => atomicReplace({directory, filePath, text: '{config: {fontSize: 16}}'}),
+    isFirstReload: (probe) => probe.reloads === 1,
+    settleMilliseconds: 150
+  },
+  {
+    name: 'a burst of writes collapses into one reload',
+    change: burstOfAtomicReplaces,
+    isFirstReload: (probe) => probe.reloads >= 1,
+    settleMilliseconds: 200
+  }
+];
+
+const runWatchScenario = async (scenario: WatchScenario): Promise<void> => {
+  await withTemporaryDirectory(async (directory) => {
+    const filePath = path.join(directory, 'config.json5');
+    await fs.writeFile(filePath, '{config: {fontSize: 14}}');
+    const {probe, close} = await startWatch(filePath);
+
+    await scenario.change({directory, filePath});
+    await waitFor(() => scenario.isFirstReload(probe));
+    await new Promise((resolve) => setTimeout(resolve, scenario.settleMilliseconds));
+
+    expect(probe.reloads).toBe(1);
+    await close();
+  });
 };
 
 describe('config watcher integration', () => {
-  test('an atomic replacement reloads exactly once', async () => {
-    await withTemporaryDirectory(async (directory) => {
-      const filePath = path.join(directory, 'config.json5');
-      await fs.writeFile(filePath, '{config: {fontSize: 14}}');
-      const {probe, close} = await startWatch(filePath);
-
-      await atomicReplace(directory, filePath, '{config: {fontSize: 16}}');
-      await waitFor(() => probe.reloads === 1);
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      expect(probe.reloads).toBe(1);
-      await close();
-    });
-  });
-
-  test('a burst of writes collapses into one reload', async () => {
-    await withTemporaryDirectory(async (directory) => {
-      const filePath = path.join(directory, 'config.json5');
-      await fs.writeFile(filePath, '{config: {fontSize: 14}}');
-      const {probe, close} = await startWatch(filePath);
-
-      for (let index = 0; index < 4; index += 1) {
-        await atomicReplace(directory, filePath, `{config: {fontSize: ${16 + index}}}`);
-      }
-      await waitFor(() => probe.reloads >= 1);
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      expect(probe.reloads).toBe(1);
-      await close();
-    });
-  });
+  for (const scenario of WATCH_SCENARIOS) {
+    test(scenario.name, () => runWatchScenario(scenario));
+  }
 });
 
 describe('shouldNotifyReload', () => {

@@ -44,9 +44,12 @@ export type SimpleWriteRule = {readonly kind: 'boolean' | 'text' | 'colour'};
 /** One key's write rule. */
 export type WriteRule = NumericWriteRule | SelectWriteRule | SimpleWriteRule;
 
+/** The bounds a numeric rule carries, before it is tagged with its kind. */
+type NumericRuleBounds = Omit<NumericWriteRule, 'kind'>;
+
 const CURSOR_STYLE_SETTING_KEY = 'cursorShape' as const;
 
-const number = (minimum: number, maximum: number, isInteger: boolean): NumericWriteRule => ({
+const number = ({minimum, maximum, isInteger}: NumericRuleBounds): NumericWriteRule => ({
   kind: 'number',
   minimum,
   maximum,
@@ -72,24 +75,24 @@ export const SETTINGS_WRITE_POLICY: Readonly<Record<CoreSettingKey, WriteRule>> 
   disableAutoUpdates: {kind: 'boolean'},
   disableLigatures: {kind: 'boolean'},
   fontFamily: {kind: 'text'},
-  fontSize: number(6, 100, false),
+  fontSize: number({minimum: 6, maximum: 100, isInteger: false}),
   foregroundColor: {kind: 'colour'},
   imageSupport: {kind: 'boolean'},
-  letterSpacing: number(-20, 50, false),
-  lineHeight: number(0.5, 5, false),
+  letterSpacing: number({minimum: -20, maximum: 50, isInteger: false}),
+  lineHeight: number({minimum: 0.5, maximum: 5, isInteger: false}),
   macOptionSelectionMode: {kind: 'text'},
   padding: {kind: 'text'},
   preserveCWD: {kind: 'boolean'},
   quickEdit: {kind: 'boolean'},
   screenReaderMode: {kind: 'boolean'},
-  scrollback: number(0, 100_000, false),
+  scrollback: number({minimum: 0, maximum: 100_000, isInteger: false}),
   selectionColor: {kind: 'colour'},
   shell: {kind: 'text'},
   uiFontFamily: {kind: 'text'},
   updateChannel: select(['canary', 'stable']),
   useConpty: {kind: 'boolean'},
   webGLRenderer: {kind: 'boolean'},
-  webGLRendererMaxContexts: number(1, 32, true),
+  webGLRendererMaxContexts: number({minimum: 1, maximum: 32, isInteger: true}),
   webLinksActivationKey: select(['', 'alt', 'ctrl', 'meta', 'shift']),
   workingDirectory: {kind: 'text'}
 };
@@ -108,56 +111,95 @@ const WRITABLE_KEYS: ReadonlySet<string> = new Set<string>(Object.keys(SETTINGS_
  */
 export const isWritableSettingKey = (key: string): key is CoreSettingKey => WRITABLE_KEYS.has(key);
 
-const diagnostic = (key: string, message: string, suggestedFix: string): configValidationDiagnostic => ({
-  path: `/config/${key}`,
-  message,
-  suggestedFix
-});
+/** One proposed write: the key, the rule it must satisfy, and the offered value. */
+type WriteCheck<Rule extends WriteRule = WriteRule> = {
+  readonly key: string;
+  readonly rule: Rule;
+  readonly value: JsonValue;
+};
 
-const checkNumber = (key: string, rule: NumericWriteRule, value: JsonValue): configValidationDiagnostic[] => {
+/** The refusal wording attached to a diagnostic. */
+type WriteRefusal = {
+  readonly message: string;
+  readonly suggestedFix: string;
+};
+
+const refuse = (check: WriteCheck, refusal: WriteRefusal): configValidationDiagnostic[] => [
+  {path: `/config/${check.key}`, ...refusal}
+];
+
+const checkBoolean = (check: WriteCheck<SimpleWriteRule>): configValidationDiagnostic[] => {
+  const {key, value} = check;
+  return isBoolean(value)
+    ? []
+    : refuse(check, {message: 'Expected true or false.', suggestedFix: `Set \`${key}\` to true or false.`});
+};
+
+const checkSelect = (check: WriteCheck<SelectWriteRule>): configValidationDiagnostic[] => {
+  const {key, rule, value} = check;
+  if (isString(value) && rule.options.includes(value)) {
+    return [];
+  }
+  const labels = rule.options.map((option) => (option === '' ? '(none)' : option)).join(', ');
+  return refuse(check, {
+    message: `Expected one of: ${labels}.`,
+    suggestedFix: `Choose a supported value for \`${key}\`.`
+  });
+};
+
+const checkNumber = (check: WriteCheck<NumericWriteRule>): configValidationDiagnostic[] => {
+  const {key, rule, value} = check;
   if (!isNumber(value) || !Number.isFinite(value)) {
-    return [diagnostic(key, 'Expected a number.', `Set \`${key}\` to a number.`)];
+    return refuse(check, {message: 'Expected a number.', suggestedFix: `Set \`${key}\` to a number.`});
   }
   if (rule.isInteger && !Number.isInteger(value)) {
-    return [diagnostic(key, 'Expected a whole number.', `Set \`${key}\` to a whole number.`)];
+    return refuse(check, {message: 'Expected a whole number.', suggestedFix: `Set \`${key}\` to a whole number.`});
   }
   if (value < rule.minimum) {
-    return [diagnostic(key, `Expected at least ${rule.minimum}.`, `Set \`${key}\` to ${rule.minimum} or more.`)];
+    return refuse(check, {
+      message: `Expected at least ${rule.minimum}.`,
+      suggestedFix: `Set \`${key}\` to ${rule.minimum} or more.`
+    });
   }
   if (value > rule.maximum) {
-    return [diagnostic(key, `Expected at most ${rule.maximum}.`, `Set \`${key}\` to ${rule.maximum} or less.`)];
+    return refuse(check, {
+      message: `Expected at most ${rule.maximum}.`,
+      suggestedFix: `Set \`${key}\` to ${rule.maximum} or less.`
+    });
   }
   return [];
 };
 
-const checkValue = (key: string, rule: WriteRule, value: JsonValue): configValidationDiagnostic[] => {
+const checkColour = (check: WriteCheck<SimpleWriteRule>): configValidationDiagnostic[] => {
+  const {key, value} = check;
+  return isString(value) && isColourValue(value)
+    ? []
+    : refuse(check, {message: 'Expected a colour value.', suggestedFix: `Set \`${key}\` to a colour such as #1a2b3c.`});
+};
+
+const checkText = (check: WriteCheck<SimpleWriteRule>): configValidationDiagnostic[] => {
+  const {key, value} = check;
+  return isString(value) && value.trim().length > 0
+    ? []
+    : refuse(check, {message: 'Expected non-empty text.', suggestedFix: `Set \`${key}\` to a non-empty string.`});
+};
+
+const checkValue = ({key, rule, value}: WriteCheck): configValidationDiagnostic[] => {
   switch (rule.kind) {
     case 'boolean': {
-      return isBoolean(value) ? [] : [diagnostic(key, 'Expected true or false.', `Set \`${key}\` to true or false.`)];
+      return checkBoolean({key, rule, value});
     }
     case 'select': {
-      return isString(value) && rule.options.includes(value)
-        ? []
-        : [
-            diagnostic(
-              key,
-              `Expected one of: ${rule.options.map((option) => (option === '' ? '(none)' : option)).join(', ')}.`,
-              `Choose a supported value for \`${key}\`.`
-            )
-          ];
+      return checkSelect({key, rule, value});
     }
     case 'number': {
-      return checkNumber(key, rule, value);
+      return checkNumber({key, rule, value});
     }
     case 'colour': {
-      return isString(value) && isColourValue(value)
-        ? []
-        : [diagnostic(key, 'Expected a colour value.', `Set \`${key}\` to a colour such as #1a2b3c.`)];
+      return checkColour({key, rule, value});
     }
     case 'text': {
-      return isString(value) && value.trim().length > 0
-        ? []
-        : [diagnostic(key, 'Expected non-empty text.', `Set \`${key}\` to a non-empty string.`)];
+      return checkText({key, rule, value});
     }
   }
 };
@@ -175,7 +217,13 @@ const checkValue = (key: string, rule: WriteRule, value: JsonValue): configValid
  */
 export const checkWritePolicy = (key: string, value: JsonValue): configValidationDiagnostic[] => {
   if (!isWritableSettingKey(key)) {
-    return [diagnostic(key, 'This setting is not editable here.', 'Edit it in the config file instead.')];
+    return [
+      {
+        path: `/config/${key}`,
+        message: 'This setting is not editable here.',
+        suggestedFix: 'Edit it in the config file instead.'
+      }
+    ];
   }
-  return checkValue(key, SETTINGS_WRITE_POLICY[key], value);
+  return checkValue({key, rule: SETTINGS_WRITE_POLICY[key], value});
 };

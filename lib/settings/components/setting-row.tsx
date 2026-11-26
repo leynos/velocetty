@@ -46,6 +46,31 @@ export type SettingRowProps = {
   readonly onReset: () => void;
 };
 
+/** The element ids that wire the row's label and notes to its control. */
+type RowIds = {
+  readonly control: string;
+  readonly description: string;
+  readonly errors: string;
+  readonly disabled: string;
+};
+
+const idsFor = (id: string): RowIds => {
+  const safeId = id.replaceAll(/[^a-zA-Z0-9_-]/gu, '-');
+  return {
+    control: `${safeId}-control`,
+    description: `${safeId}-description`,
+    errors: `${safeId}-errors`,
+    disabled: `${safeId}-disabled`
+  };
+};
+
+const describedByFor = (props: SettingRowProps, ids: RowIds): string => {
+  const description = props.description === undefined ? null : ids.description;
+  const disabled = props.isDisabled ? ids.disabled : null;
+  const errors = props.errors.length > 0 ? ids.errors : null;
+  return [description, disabled, errors].filter((id): id is string => id !== null).join(' ');
+};
+
 const renderControl = (props: SettingRowProps, controlProps: FieldControlProps): ReactElement => {
   switch (props.control.kind) {
     case 'toggle': {
@@ -66,6 +91,123 @@ const renderControl = (props: SettingRowProps, controlProps: FieldControlProps):
   }
 };
 
+type RowLabelProps = {
+  readonly label: string;
+  readonly description?: string;
+  readonly isProfileOverridden: boolean;
+  readonly controlId: string;
+  readonly descriptionId: string;
+};
+
+const RowLabel = (props: RowLabelProps): ReactElement => (
+  <div className={styles.labelBlock}>
+    <label className={styles.label} htmlFor={props.controlId}>
+      {props.label}
+    </label>
+    {props.description !== undefined && (
+      <p className={styles.description} id={props.descriptionId}>
+        {props.description}
+      </p>
+    )}
+    {props.isProfileOverridden && (
+      <p className={styles.note}>
+        The default profile overrides this setting, so a base change may have no visible effect.
+      </p>
+    )}
+  </div>
+);
+
+type RowNotesProps = {
+  readonly isDisabled: boolean;
+  readonly disabledReason?: string;
+  readonly errors: readonly string[];
+  readonly disabledId: string;
+  readonly errorsId: string;
+};
+
+const RowNotes = (props: RowNotesProps): ReactElement => (
+  <>
+    {props.isDisabled && props.disabledReason !== undefined && (
+      <p className={styles.note} id={props.disabledId}>
+        {props.disabledReason}
+      </p>
+    )}
+    {props.errors.length > 0 && (
+      <p className={styles.error} id={props.errorsId}>
+        {props.errors.join(' ')}
+      </p>
+    )}
+  </>
+);
+
+type RowActionsProps = {
+  readonly label: string;
+  readonly controlId: string;
+  readonly isModified: boolean;
+  readonly requiresRestart: boolean;
+  readonly onReset: () => void;
+};
+
+const RowActions = (props: RowActionsProps): ReactElement => {
+  const reset = (): void => {
+    props.onReset();
+    document.querySelector<HTMLElement>(`#${props.controlId}`)?.focus();
+  };
+  return (
+    <div className={styles.actions}>
+      {props.isModified && (
+        <button type="button" className={styles.reset} aria-label={`Reset ${props.label} to default`} onClick={reset}>
+          Reset
+        </button>
+      )}
+      <InlineRestartWarning
+        classification={props.requiresRestart ? 'restart' : 'live'}
+        show={props.requiresRestart && props.isModified}
+        message="This change takes effect after restarting."
+      />
+    </div>
+  );
+};
+
+type RowControlProps = {
+  readonly row: SettingRowProps;
+  readonly ids: RowIds;
+  readonly describedBy: string;
+};
+
+const RowControl = (props: RowControlProps): ReactElement => {
+  const {row} = props;
+  return (
+    <div className={styles.controlBlock}>
+      {renderControl(row, {
+        controlId: props.ids.control,
+        label: row.label,
+        draft: row.draft,
+        isDisabled: row.isDisabled,
+        hasErrors: row.errors.length > 0,
+        describedBy: props.describedBy,
+        onChange: row.onChange,
+        onCommit: row.onCommit,
+        onRevert: row.onRevert
+      })}
+      <RowNotes
+        isDisabled={row.isDisabled}
+        disabledReason={row.disabledReason}
+        errors={row.errors}
+        disabledId={props.ids.disabled}
+        errorsId={props.ids.errors}
+      />
+      <RowActions
+        label={row.label}
+        controlId={props.ids.control}
+        isModified={row.isModified}
+        requiresRestart={row.requiresRestart}
+        onReset={row.onReset}
+      />
+    </div>
+  );
+};
+
 /**
  * Renders one editable setting row.
  *
@@ -76,81 +218,17 @@ const renderControl = (props: SettingRowProps, controlProps: FieldControlProps):
  * <SettingRow {...row} />
  */
 export const SettingRow = (props: SettingRowProps): ReactElement => {
-  const safeId = props.id.replaceAll(/[^a-zA-Z0-9_-]/gu, '-');
-  const controlId = `${safeId}-control`;
-  const descriptionId = `${safeId}-description`;
-  const errorsId = `${safeId}-errors`;
-  const disabledId = `${safeId}-disabled`;
-  const describedBy = [
-    props.description === undefined ? null : descriptionId,
-    props.isDisabled ? disabledId : null,
-    props.errors.length > 0 ? errorsId : null
-  ]
-    .filter((entry): entry is string => entry !== null)
-    .join(' ');
-
-  const reset = (): void => {
-    props.onReset();
-    document.querySelector<HTMLElement>(`#${controlId}`)?.focus();
-  };
-
+  const ids = idsFor(props.id);
   return (
     <div className={styles.row} data-phase={props.phase}>
-      <div className={styles.labelBlock}>
-        <label className={styles.label} htmlFor={controlId}>
-          {props.label}
-        </label>
-        {props.description !== undefined && (
-          <p className={styles.description} id={descriptionId}>
-            {props.description}
-          </p>
-        )}
-        {props.isProfileOverridden && (
-          <p className={styles.note}>
-            The default profile overrides this setting, so a base change may have no visible effect.
-          </p>
-        )}
-      </div>
-      <div className={styles.controlBlock}>
-        {renderControl(props, {
-          controlId,
-          label: props.label,
-          draft: props.draft,
-          isDisabled: props.isDisabled,
-          hasErrors: props.errors.length > 0,
-          describedBy,
-          onChange: props.onChange,
-          onCommit: props.onCommit,
-          onRevert: props.onRevert
-        })}
-        {props.isDisabled && props.disabledReason !== undefined && (
-          <p className={styles.note} id={disabledId}>
-            {props.disabledReason}
-          </p>
-        )}
-        {props.errors.length > 0 && (
-          <p className={styles.error} id={errorsId}>
-            {props.errors.join(' ')}
-          </p>
-        )}
-        <div className={styles.actions}>
-          {props.isModified && (
-            <button
-              type="button"
-              className={styles.reset}
-              aria-label={`Reset ${props.label} to default`}
-              onClick={reset}
-            >
-              Reset
-            </button>
-          )}
-          <InlineRestartWarning
-            classification={props.requiresRestart ? 'restart' : 'live'}
-            show={props.requiresRestart && props.isModified}
-            message="This change takes effect after restarting."
-          />
-        </div>
-      </div>
+      <RowLabel
+        label={props.label}
+        description={props.description}
+        isProfileOverridden={props.isProfileOverridden}
+        controlId={ids.control}
+        descriptionId={ids.description}
+      />
+      <RowControl row={props} ids={ids} describedBy={describedByFor(props, ids)} />
     </div>
   );
 };

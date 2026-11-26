@@ -1,3 +1,9 @@
+/**
+ * @file Header action creators for tab selection, window controls, and the menu.
+ *
+ * Tab activation routes through `activateTab` in `lib/actions/ui.ts`, so the
+ * settings tab is selected and closed exactly like a terminal tab.
+ */
 import {SETTINGS_TAB_UID} from '@shared/constants/settings-tab';
 import {CLOSE_TAB, CHANGE_TAB} from '@shared/constants/tabs';
 import {

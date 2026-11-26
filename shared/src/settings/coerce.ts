@@ -68,13 +68,50 @@ const rejected = (reason: CoercionFailureReason, minimum?: number, maximum?: num
   return {ok: false, failure: {reason}};
 };
 
-const coerceNumber = (control: Extract<ControlDescriptor, {kind: 'number'}>, trimmed: string): CoercionResult => {
+/** A number control's bounds and integrality requirement. */
+type NumberControl = Extract<ControlDescriptor, {kind: 'number'}>;
+
+/** A select control's admitted options. */
+type SelectControl = Extract<ControlDescriptor, {kind: 'select'}>;
+
+/**
+ * One raw input, kept with the trimmed form each kind reads.
+ *
+ * Toggle and select match the text exactly as the control displayed it, while
+ * number, colour, and text trim first; carrying both forms keeps each helper
+ * from repeating the trim and keeps the distinction explicit.
+ */
+type RawText = {
+  readonly raw: string;
+  readonly trimmed: string;
+};
+
+const coerceToggle = ({raw}: RawText): CoercionResult => {
+  if (raw === 'true') {
+    return {ok: true, value: true};
+  }
+  if (raw === 'false') {
+    return {ok: true, value: false};
+  }
+  return rejected('not-an-option');
+};
+
+const coerceSelect = (control: SelectControl, {raw}: RawText): CoercionResult => {
+  if (control.options.includes(raw)) {
+    return {ok: true, value: raw};
+  }
+  return rejected(raw.length === 0 ? 'empty' : 'not-an-option');
+};
+
+const coerceNumber = (control: NumberControl, {trimmed}: RawText): CoercionResult => {
   if (trimmed.length === 0) {
     return rejected('empty');
   }
   if (!DECIMAL_NUMBER.test(trimmed)) {
     return rejected('not-a-number');
   }
+  // `Number` is applied exactly once so a value such as `-0` or `1e2` keeps
+  // the number the round-trip property compares against `Number(raw)`.
   const value = Number(trimmed);
   if (!Number.isFinite(value)) {
     return rejected('not-a-number');
@@ -91,12 +128,15 @@ const coerceNumber = (control: Extract<ControlDescriptor, {kind: 'number'}>, tri
   return {ok: true, value};
 };
 
-const coerceSelect = (control: Extract<ControlDescriptor, {kind: 'select'}>, raw: string): CoercionResult => {
-  if (control.options.includes(raw)) {
-    return {ok: true, value: raw};
+const coerceColour = ({trimmed}: RawText): CoercionResult => {
+  if (trimmed.length === 0) {
+    return rejected('empty');
   }
-  return rejected(raw.length === 0 ? 'empty' : 'not-an-option');
+  return isColourValue(trimmed) ? {ok: true, value: trimmed} : rejected('not-a-colour');
 };
+
+const coerceText = ({raw, trimmed}: RawText): CoercionResult =>
+  trimmed.length === 0 ? rejected('empty') : {ok: true, value: raw};
 
 /**
  * Coerces raw control text into a typed value.
@@ -112,31 +152,22 @@ const coerceSelect = (control: Extract<ControlDescriptor, {kind: 'select'}>, raw
  * // {ok: false, failure: {reason: 'not-a-number'}}
  */
 export const coerceInput = (control: ControlDescriptor, raw: string): CoercionResult => {
-  const trimmed = raw.trim();
+  const text: RawText = {raw, trimmed: raw.trim()};
   switch (control.kind) {
     case 'toggle': {
-      if (raw === 'true') {
-        return {ok: true, value: true};
-      }
-      if (raw === 'false') {
-        return {ok: true, value: false};
-      }
-      return rejected('not-an-option');
+      return coerceToggle(text);
     }
     case 'select': {
-      return coerceSelect(control, raw);
+      return coerceSelect(control, text);
     }
     case 'number': {
-      return coerceNumber(control, trimmed);
+      return coerceNumber(control, text);
     }
     case 'colour': {
-      if (trimmed.length === 0) {
-        return rejected('empty');
-      }
-      return isColourValue(trimmed) ? {ok: true, value: trimmed} : rejected('not-a-colour');
+      return coerceColour(text);
     }
     case 'text': {
-      return trimmed.length === 0 ? rejected('empty') : {ok: true, value: raw};
+      return coerceText(text);
     }
   }
 };

@@ -20,7 +20,13 @@ import {
 } from '@shared/settings/core-catalogue';
 import type {ControlDescriptor} from '@shared/settings/panel-model';
 import {isColourValue} from '@shared/settings/coerce';
-import {SETTINGS_WRITE_POLICY, checkWritePolicy} from '../../app/settings/settings-write-policy';
+import {
+  SETTINGS_WRITE_POLICY,
+  checkWritePolicy,
+  type NumericWriteRule,
+  type SelectWriteRule,
+  type WriteRule
+} from '../../app/settings/settings-write-policy';
 import {isString} from '@shared/types/guards';
 import {isJsonObject, type JsonObject, type JsonValue} from '@shared/types/json';
 
@@ -72,38 +78,75 @@ const isSelectControl = (control: ControlDescriptor): control is Extract<Control
 
 const catalogueByKey = new Map<string, CoreCatalogueEntry>(CORE_SETTINGS_CATALOGUE.map((entry) => [entry.key, entry]));
 
+type SchemaKindMatcher = (control: ControlDescriptor, enumOptions: readonly string[] | undefined) => boolean;
+
+const TEXTUAL_CONTROL_KINDS: ReadonlySet<ControlDescriptor['kind']> = new Set<ControlDescriptor['kind']>([
+  'text',
+  'colour',
+  'select'
+]);
+
+const hasSameOptions = (left: ReadonlySet<string>, right: ReadonlySet<string>): boolean =>
+  left.size === right.size && [...left].every((option) => right.has(option));
+
+const matchesEnumControl = (control: ControlDescriptor, enumOptions: readonly string[] | undefined): boolean => {
+  if (!isSelectControl(control) || enumOptions === undefined) {
+    return false;
+  }
+  return hasSameOptions(new Set(enumOptions), new Set(control.options));
+};
+
+const matchesNumberControl = (control: ControlDescriptor): boolean => isNumberControl(control) && !control.isInteger;
+
+const matchesIntegerControl = (control: ControlDescriptor): boolean => isNumberControl(control) && control.isInteger;
+
+const SCHEMA_KIND_MATCHERS: ReadonlyMap<string, SchemaKindMatcher> = new Map<string, SchemaKindMatcher>([
+  ['boolean', (control) => control.kind === 'toggle'],
+  ['string', (control) => TEXTUAL_CONTROL_KINDS.has(control.kind)],
+  ['number', (control) => matchesNumberControl(control)],
+  ['integer', (control) => matchesIntegerControl(control)],
+  ['enum', (control, enumOptions) => matchesEnumControl(control, enumOptions)]
+]);
+
 const matchesSchemaType = (
   kind: string,
   control: ControlDescriptor,
   enumOptions: readonly string[] | undefined
-): boolean => {
-  switch (kind) {
-    case 'boolean': {
-      return control.kind === 'toggle';
-    }
-    case 'string': {
-      return control.kind === 'text' || control.kind === 'colour' || control.kind === 'select';
-    }
-    case 'number': {
-      return isNumberControl(control) && !control.isInteger;
-    }
-    case 'integer': {
-      return isNumberControl(control) && control.isInteger;
-    }
-    case 'enum': {
-      if (!isSelectControl(control) || enumOptions === undefined) {
-        return false;
-      }
-      const schemaOptions = new Set(enumOptions);
-      const controlOptions = new Set(control.options);
-      return (
-        schemaOptions.size === controlOptions.size && [...schemaOptions].every((option) => controlOptions.has(option))
-      );
-    }
-    default: {
-      return false;
-    }
+): boolean => SCHEMA_KIND_MATCHERS.get(kind)?.(control, enumOptions) ?? false;
+
+type NumberControl = Extract<ControlDescriptor, {kind: 'number'}>;
+type SelectControl = Extract<ControlDescriptor, {kind: 'select'}>;
+
+const isNumberRule = (rule: WriteRule): rule is NumericWriteRule => rule.kind === 'number';
+
+const isSelectRule = (rule: WriteRule): rule is SelectWriteRule => rule.kind === 'select';
+
+const numberRuleDiffers = (rule: NumericWriteRule, control: NumberControl): boolean =>
+  rule.minimum !== control.minimum || rule.maximum !== control.maximum || rule.isInteger !== control.isInteger;
+
+const selectRuleDiffers = (rule: SelectWriteRule, control: SelectControl): boolean =>
+  rule.options.join('|') !== control.options.join('|');
+
+const ruleDetailMismatch = (rule: WriteRule, control: ControlDescriptor): string | undefined => {
+  if (isNumberRule(rule) && isNumberControl(control)) {
+    return numberRuleDiffers(rule, control) ? 'number rule differs' : undefined;
   }
+  if (isSelectRule(rule) && isSelectControl(control)) {
+    return selectRuleDiffers(rule, control) ? 'options differ' : undefined;
+  }
+  return undefined;
+};
+
+const policyMismatch = (entry: CoreCatalogueEntry): string | undefined => {
+  const rule = SETTINGS_WRITE_POLICY[entry.key];
+  // The policy names a boolean value; the control names the widget that
+  // edits it, so a boolean rule corresponds to a toggle.
+  const policyKind = rule.kind === 'boolean' ? 'toggle' : rule.kind;
+  if (policyKind !== entry.control.kind) {
+    return `${entry.key}: policy ${policyKind}, control ${entry.control.kind}`;
+  }
+  const detail = ruleDetailMismatch(rule, entry.control);
+  return detail === undefined ? undefined : `${entry.key}: ${detail}`;
 };
 
 describe('settings catalogue parity', () => {
@@ -199,33 +242,10 @@ describe('settings write policy parity', () => {
   });
 
   test('every policy rule mirrors its catalogue control', () => {
-    const mismatches: string[] = [];
-    for (const entry of CORE_SETTINGS_CATALOGUE) {
-      const rule = SETTINGS_WRITE_POLICY[entry.key];
-      // The policy names a boolean value; the control names the widget that
-      // edits it, so a boolean rule corresponds to a toggle.
-      const policyKind = rule.kind === 'boolean' ? 'toggle' : rule.kind;
-      if (policyKind !== entry.control.kind) {
-        mismatches.push(`${entry.key}: policy ${policyKind}, control ${entry.control.kind}`);
-        continue;
-      }
-      const boundsDiffer =
-        rule.kind === 'number' &&
-        entry.control.kind === 'number' &&
-        (rule.minimum !== entry.control.minimum ||
-          rule.maximum !== entry.control.maximum ||
-          rule.isInteger !== entry.control.isInteger);
-      if (boundsDiffer) {
-        mismatches.push(`${entry.key}: number rule differs`);
-      }
-      const optionsDiffer =
-        rule.kind === 'select' &&
-        entry.control.kind === 'select' &&
-        rule.options.join('|') !== entry.control.options.join('|');
-      if (optionsDiffer) {
-        mismatches.push(`${entry.key}: options differ`);
-      }
-    }
+    const mismatches = CORE_SETTINGS_CATALOGUE.flatMap((entry) => {
+      const mismatch = policyMismatch(entry);
+      return mismatch === undefined ? [] : [mismatch];
+    });
     expect(mismatches).toEqual([]);
   });
 

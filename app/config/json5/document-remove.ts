@@ -9,13 +9,14 @@
 import {type DocumentEditResult, type Json5Document, edited, refused} from './document-result';
 import {
   ROOT_KEY,
+  childObjectRange,
+  findConfigRange,
   isRefusal,
   lineEndIndex,
-  locateChild,
-  findConfigRange,
   scanTrailingCommentEnd,
   terminatorLength,
   valueTextEnd,
+  type DocumentRefusalReason,
   type PropertyPath
 } from './document-scan';
 import {Json5Parser} from './parser';
@@ -23,17 +24,20 @@ import type {Json5ObjectProperty, Json5ObjectRange, PropertyKey} from './types';
 
 type Span = {readonly startIndex: number; readonly endIndex: number};
 
+const hasOnlyIndentation = (doc: string, startIndex: number, endIndex: number): boolean =>
+  /^[ \t]*$/.test(doc.slice(startIndex, endIndex));
+
 const ownLineSpan = (doc: string, parser: Json5Parser, property: Json5ObjectProperty): Span | null => {
   const lineStart = parser.getLineStartIndex({index: property.keyStartIndex});
-  if (!/^[ \t]*$/.test(doc.slice(lineStart, property.keyStartIndex))) {
+  if (!hasOnlyIndentation(doc, lineStart, property.keyStartIndex)) {
     return null;
   }
-  const afterValue = scanTrailingCommentEnd(doc, valueTextEnd(doc, property));
-  const restEnd = lineEndIndex(doc, afterValue);
-  if (!/^[ \t]*$/.test(doc.slice(afterValue, restEnd))) {
+  const afterValue = scanTrailingCommentEnd({doc, index: valueTextEnd(doc, property)});
+  const restEnd = lineEndIndex({doc, index: afterValue});
+  if (!hasOnlyIndentation(doc, afterValue, restEnd)) {
     return null;
   }
-  return {startIndex: lineStart, endIndex: restEnd + terminatorLength(doc, restEnd)};
+  return {startIndex: lineStart, endIndex: restEnd + terminatorLength({doc, index: restEnd})};
 };
 
 const precedingSeparator = (
@@ -63,11 +67,14 @@ const inlineSpan = (
   const valueEnd = valueTextEnd(doc, property);
   if (property.hasTrailingComma) {
     const comma = parser.skipWhitespaceAndComments({startIndex: valueEnd, limitIndex: doc.length});
-    const end = doc[comma] === ',' ? comma + 1 : scanTrailingCommentEnd(doc, valueEnd);
+    const end = doc[comma] === ',' ? comma + 1 : scanTrailingCommentEnd({doc, index: valueEnd});
     return {startIndex: property.keyStartIndex, endIndex: end};
   }
   const separator = precedingSeparator(parser, doc, properties, property);
-  return {startIndex: separator ?? property.keyStartIndex, endIndex: scanTrailingCommentEnd(doc, valueEnd)};
+  return {
+    startIndex: separator ?? property.keyStartIndex,
+    endIndex: scanTrailingCommentEnd({doc, index: valueEnd})
+  };
 };
 
 const removeProperty = (doc: string, parentRange: Json5ObjectRange, key: PropertyKey): DocumentEditResult => {
@@ -88,6 +95,21 @@ const removeProperty = (doc: string, parentRange: Json5ObjectRange, key: Propert
   return edited(`${doc.slice(0, span.startIndex)}${doc.slice(span.endIndex)}`);
 };
 
+/** Resolves the object that holds the last segment of `segments`. */
+const resolveRemovalParent = (
+  parser: Json5Parser,
+  segments: PropertyPath
+): Json5ObjectRange | DocumentRefusalReason => {
+  let range = findConfigRange(parser);
+  for (const segment of segments.slice(0, -1)) {
+    if (isRefusal(range)) {
+      return range;
+    }
+    range = childObjectRange(parser, range, segment);
+  }
+  return range;
+};
+
 /**
  * Removes one property under `config`.
  *
@@ -106,27 +128,15 @@ export const removePropertyAtPath = (doc: Json5Document, path: PropertyPath): Do
   if (path.length < 2 || path[0]?.value !== ROOT_KEY) {
     return refused('path-not-found');
   }
+  const segments = path.slice(1);
+  const lastSegment = segments.at(-1);
+  if (!lastSegment) {
+    return refused('path-not-found');
+  }
   const parser = new Json5Parser(doc);
-  let parentRange = findConfigRange(parser);
+  const parentRange = resolveRemovalParent(parser, segments);
   if (isRefusal(parentRange)) {
     return refused(parentRange);
   }
-  const segments = path.slice(1);
-  for (const [offset, segment] of segments.entries()) {
-    if (offset === segments.length - 1) {
-      return removeProperty(doc, parentRange, segment);
-    }
-    const located = locateChild(parser, parentRange, segment);
-    if (located.kind === 'refused') {
-      return refused(located.reason);
-    }
-    if (located.kind === 'missing') {
-      return refused('path-not-found');
-    }
-    if (located.range === null) {
-      return refused('config-not-object');
-    }
-    parentRange = located.range;
-  }
-  return refused('path-not-found');
+  return removeProperty(doc, parentRange, lastSegment);
 };

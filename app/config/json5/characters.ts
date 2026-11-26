@@ -31,18 +31,21 @@ export const createInitialParsingState = (): ParsingState => ({
   inBlockComment: false
 });
 
+const whitespaceCharacters: ReadonlySet<string> = new Set([
+  ' ',
+  '\n',
+  '\r',
+  '\t',
+  '\u000B',
+  '\u000C',
+  '\uFEFF',
+  '\u2028',
+  '\u2029'
+]);
+
 /** Returns true when `character` is whitespace for JSON5 scanning. */
 export const isWhitespaceCharacter = (character: string): boolean =>
-  character === ' ' ||
-  character === '\n' ||
-  character === '\r' ||
-  character === '\t' ||
-  character === '\u000B' ||
-  character === '\u000C' ||
-  character === '\uFEFF' ||
-  character === '\u2028' ||
-  character === '\u2029' ||
-  unicodeSpaceSeparatorPattern.test(character);
+  whitespaceCharacters.has(character) || unicodeSpaceSeparatorPattern.test(character);
 
 /** Returns true when `character` is leading indentation (spaces or tabs). */
 export const isIndentationWhitespace = (character: string): boolean => character === ' ' || character === '\t';

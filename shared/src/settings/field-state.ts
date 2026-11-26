@@ -288,10 +288,16 @@ export function effectCarriesSubmitted<V, E>(effect: FieldEffect<V>, event: Fiel
   //@ pure
   //@ type V (==)
   //@ type E (==)
-  if (effect.kind === 'write' && event.kind === 'submit' && event.submission.kind === 'coerced') {
-    return effect.value === event.submission.value;
+  if (effect.kind !== 'write') {
+    return false;
   }
-  return false;
+  if (event.kind !== 'submit') {
+    return false;
+  }
+  if (event.submission.kind !== 'coerced') {
+    return false;
+  }
+  return effect.value === event.submission.value;
 }
 
 /**
@@ -309,6 +315,10 @@ export function effectCarriesSubmitted<V, E>(effect: FieldEffect<V>, event: Fiel
  * @example
  * const state = initialFieldState<number, string>(undefined, '');
  * stepField(state, {kind: 'edit', draft: '16'}).state.draft; // '16'
+ *
+ * @codescene(disable:"Complex Method", disable:"Large Method") Verified
+ * transition: the Dafny contract proves this function as one machine, and
+ * splitting its cases would fragment the model the proof names (2026-11-26).
  */
 export function stepField<V, E>(state: FieldState<V, E>, event: FieldEvent<V, E>): StepResult<V, E> {
   //@ verify

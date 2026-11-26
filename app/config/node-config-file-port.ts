@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 
 import {isString} from '../utils/runtime-guards';
+import {asConfigFilePath} from './config-file-write-io';
 import type {ConfigFileStat, ConfigFileSystemPort} from './config-file-writer';
 
 const isMissing = (error: unknown): boolean =>
@@ -19,7 +20,7 @@ const isMissing = (error: unknown): boolean =>
  * createNodeConfigFileSystem().stat('/missing'); // null
  */
 export const createNodeConfigFileSystem = (): ConfigFileSystemPort => ({
-  realpath: (filePath) => fs.realpathSync(filePath),
+  realpath: (filePath) => asConfigFilePath(fs.realpathSync(filePath)),
   readText: (filePath) => fs.readFileSync(filePath, 'utf8'),
   stat: (filePath): ConfigFileStat | null => {
     try {

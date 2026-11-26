@@ -39,6 +39,8 @@ function {:axiom} StringSplit(s: string, d: string): seq<string>
   ensures |StringSplit(s, d)| <= |s| + 1
   ensures forall k :: 0 <= k < |StringSplit(s, d)| ==> |StringSplit(s, d)[k]| <= |s|
 
+datatype SearchFields = SearchFields(haystacks: seq<string>, modifiedFlags: seq<bool>, categoryIndices: seq<int>)
+
 function tokensOf(query: string): seq<string>
 {
   Std.Collections.Seq.Filter((part: string) => ((|part| > 0) && (part != "@modified")), StringSplit(query, " "))
@@ -54,43 +56,42 @@ function haystackMatchesTokens(haystack: string, tokens: seq<string>): bool
   Std.Collections.Seq.All(tokens, (token: string) => (StringIndexOf(haystack, token) >= 0))
 }
 
-function fieldMatchesQuery(query: string, haystack: string, isModified: bool, categoryIndex: int, selectedCategory: int): bool
+function fieldMatchesQuery(query: string, haystack: string, isModified: bool, categoryMatches: bool): bool
 {
-  (((!(isModifiedQuery(query)) || isModified) && ((selectedCategory < 0) || (categoryIndex == selectedCategory))) && haystackMatchesTokens(haystack, tokensOf(query)))
+  if (isModifiedQuery(query) && !(isModified)) then
+    false
+  else
+    if !(categoryMatches) then
+      false
+    else
+      haystackMatchesTokens(haystack, tokensOf(query))
 }
 
-method searchFieldIndices(query: string, haystacks: seq<string>, modifiedFlags: seq<bool>, categoryIndices: seq<int>, selectedCategory: int) returns (res: seq<int>)
+method searchFieldIndices(query: string, fields: SearchFields, selectedCategory: int) returns (res: seq<int>)
   requires (|query| >= 0)
-  requires (|haystacks| == |modifiedFlags|)
-  requires (|haystacks| == |categoryIndices|)
-  ensures forall k: nat :: ((k < |res|) ==> ((0 <= res[k]) && (res[k] < |haystacks|)))
-  ensures forall k: nat :: ((k < |res|) ==> fieldMatchesQuery(query, haystacks[res[k]], modifiedFlags[res[k]], categoryIndices[res[k]], selectedCategory))
-  ensures forall j: nat :: ((j < |haystacks|) ==> fieldMatchesQuery(query, haystacks[j], modifiedFlags[j], categoryIndices[j], selectedCategory) ==> (j in res))
+  requires (|fields.haystacks| == |fields.modifiedFlags|)
+  requires (|fields.haystacks| == |fields.categoryIndices|)
+  ensures forall k: nat :: ((k < |res|) ==> ((0 <= res[k]) && (res[k] < |fields.haystacks|)))
+  ensures forall k: nat :: ((k < |res|) ==> fieldMatchesQuery(query, fields.haystacks[res[k]], fields.modifiedFlags[res[k]], ((selectedCategory < 0) || (fields.categoryIndices[res[k]] == selectedCategory))))
+  ensures forall j: nat :: ((j < |fields.haystacks|) ==> fieldMatchesQuery(query, fields.haystacks[j], fields.modifiedFlags[j], ((selectedCategory < 0) || (fields.categoryIndices[j] == selectedCategory))) ==> (j in res))
   ensures forall k: nat :: ((0 < k) ==> (k < |res|) ==> (res[(k - 1)] < res[k]))
 {
-  var i_t0 := tokensOf(query);
-  var tokens := i_t0;
-  var i_t1 := isModifiedQuery(query);
-  var modifiedOnly := i_t1;
   var result: seq<int> := [];
   var index := 0;
-  while (index < |haystacks|)
+  while (index < |fields.haystacks|)
     invariant (index >= 0)
-    invariant (index <= |haystacks|)
+    invariant (index <= |fields.haystacks|)
     invariant forall k: nat :: ((k < |result|) ==> ((0 <= result[k]) && (result[k] < index)))
-    invariant forall k: nat :: ((k < |result|) ==> (result[k] < |haystacks|) ==> (result[k] < |modifiedFlags|) ==> (result[k] < |categoryIndices|) ==> fieldMatchesQuery(query, haystacks[result[k]], modifiedFlags[result[k]], categoryIndices[result[k]], selectedCategory))
-    invariant forall j: nat :: ((j < index) ==> (j < |haystacks|) ==> (j < |modifiedFlags|) ==> (j < |categoryIndices|) ==> fieldMatchesQuery(query, haystacks[j], modifiedFlags[j], categoryIndices[j], selectedCategory) ==> (j in result))
+    invariant forall k: nat :: ((k < |result|) ==> (result[k] < |fields.haystacks|) ==> (result[k] < |fields.modifiedFlags|) ==> (result[k] < |fields.categoryIndices|) ==> fieldMatchesQuery(query, fields.haystacks[result[k]], fields.modifiedFlags[result[k]], ((selectedCategory < 0) || (fields.categoryIndices[result[k]] == selectedCategory))))
+    invariant forall j: nat :: ((j < index) ==> (j < |fields.haystacks|) ==> (j < |fields.modifiedFlags|) ==> (j < |fields.categoryIndices|) ==> fieldMatchesQuery(query, fields.haystacks[j], fields.modifiedFlags[j], ((selectedCategory < 0) || (fields.categoryIndices[j] == selectedCategory))) ==> (j in result))
     invariant forall k: nat :: ((0 < k) ==> (k < |result|) ==> (result[(k - 1)] < result[k]))
   {
-    var haystack := haystacks[index];
-    var isModified := modifiedFlags[index];
-    var categoryIndex := categoryIndices[index];
-    var i_branch0 := ((!(modifiedOnly) || isModified) && ((selectedCategory < 0) || (categoryIndex == selectedCategory)));
-    if i_branch0 {
-      var i_t2 := haystackMatchesTokens(haystack, tokens);
-      i_branch0 := i_t2;
-    }
-    if i_branch0 {
+    var haystack := fields.haystacks[index];
+    var isModified := fields.modifiedFlags[index];
+    var categoryIndex := fields.categoryIndices[index];
+    var categoryMatches := ((selectedCategory < 0) || (categoryIndex == selectedCategory));
+    var i_t0 := fieldMatchesQuery(query, haystack, isModified, categoryMatches);
+    if i_t0 {
       result := (result + [index]);
     }
     index := (index + 1);

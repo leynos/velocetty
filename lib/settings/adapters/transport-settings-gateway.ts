@@ -31,14 +31,17 @@ export const subscribeToConfigChange = (onChanged: () => void): (() => void) => 
  * `ipcRenderer.invoke` cannot be cancelled, so the abort signal only discards a
  * superseded result; a write the main process started still completes.
  *
- * @param transport - The renderer command transport.
+ * @param transport - The renderer command transport, of which only `invoke` is used.
  * @returns The settings gateway.
  *
  * @example
  * const gateway = createTransportSettingsGateway(transport);
  * await gateway.getSnapshot(new AbortController().signal);
  */
-export const createTransportSettingsGateway = (transport: RendererCommandTransport): SettingsGateway => ({
+/** The command transport surface the gateway needs; only invoke is used. */
+export type SettingsCommandTransport = Pick<RendererCommandTransport, 'invoke'>;
+
+export const createTransportSettingsGateway = (transport: SettingsCommandTransport): SettingsGateway => ({
   getSnapshot: async (signal) => {
     signal.throwIfAborted();
     const snapshot = await transport.invoke('settings:getSnapshot');

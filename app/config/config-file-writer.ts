@@ -4,21 +4,33 @@
  * Every main-process read-modify-write runs here, as one synchronous critical
  * section: resolve the real path, read fresh, refuse unless the root and
  * `config` are objects, apply one edit, re-parse and compare it with the
- * intended value, confirm the result still loads, apply the write policy and
- * schema, then write a sibling temporary file with the original mode, fsync it,
- * rename it over the real path, and fsync the directory.
+ * intended value, confirm the result still loads, and apply the write policy
+ * and schema. `config-file-write-io.ts` then replaces the file atomically with
+ * the validated text.
  *
  * Node runs that section to completion without interleaving, so two in-process
  * writers cannot lose an update. Only an external editor saving the same key at
  * the same instant can win, and then the watcher reloads the file.
  */
 
-import path from 'node:path';
-
 import JSON5 from 'json5';
 
+import {
+  asConfigFilePath,
+  asConfigFileText,
+  writeFileAtomically,
+  type ConfigFileSystemPort,
+  type ConfigFilePath
+} from './config-file-write-io';
 import {currentConfigRevision, nextConfigRevision, recordWrittenText} from './config-write-state';
-import {json5Document, propertyKey, removePropertyAtPath, setPropertyAtPath} from './json5';
+import {
+  json5Document,
+  propertyKey,
+  removePropertyAtPath,
+  setPropertyAtPath,
+  type DocumentEditResult,
+  type Json5Document
+} from './json5';
 import {validateConfigOptions} from './json5-config';
 import {isJsonObject, isString} from '../utils/runtime-guards';
 
@@ -26,26 +38,11 @@ import type {configValidationDiagnostic} from '@shared/types/config';
 import type {JsonValue} from '@shared/types/json';
 import type {SettingsWriteFailure} from '@shared/settings/protocol';
 
-/** Metadata the writer needs from the file system. */
-export type ConfigFileStat = {readonly mode: number};
-
-/**
- * The synchronous file-system operations the writer needs.
- *
- * Every method is synchronous so that the whole read-modify-write is one
- * critical section.
- */
-export type ConfigFileSystemPort = {
-  readonly realpath: (filePath: string) => string;
-  readonly readText: (filePath: string) => string;
-  readonly stat: (filePath: string) => ConfigFileStat | null;
-  readonly writeFile: (filePath: string, text: string, mode: number) => void;
-  readonly fsyncFile: (filePath: string) => void;
-  readonly rename: (fromPath: string, toPath: string) => void;
-  readonly unlink: (filePath: string) => void;
-  readonly readdir: (directory: string) => readonly string[];
-  readonly fsyncDirectory: (directory: string) => void;
-};
+// The port and the atomic replacement live in `config-file-write-io`; these
+// re-exports keep `config-file-writer` the documented surface for callers.
+export {sweepTemporaryFiles, TEMPORARY_FILE_PREFIX} from './config-file-write-io';
+export {asConfigFilePath, asConfigFileText} from './config-file-write-io';
+export type {ConfigFileStat, ConfigFileSystemPort, ConfigFilePath} from './config-file-write-io';
 
 /** One edit the writer may apply. */
 export type ConfigEditRequest =
@@ -78,13 +75,40 @@ export type ConfigWriterDependencies = {
   readonly recordWrittenText: (text: string) => void;
 };
 
-/** The prefix every temporary write file uses, so start-up can sweep them. */
-export const TEMPORARY_FILE_PREFIX = '.velocetty-config-write-';
-
-const DEFAULT_MODE = 0o600;
 const MAX_ATTEMPTS = 3;
 const RETRYABLE_CODES = new Set(['EBUSY', 'EPERM', 'EACCES']);
-let temporaryCounter = 0;
+
+/** A path from the document root to one edited property. */
+type ConfigPath = readonly string[];
+
+/** A step that either yields a value or refuses the write. */
+type StepOutcome<T> =
+  | {readonly kind: 'ok'; readonly value: T}
+  | {
+      readonly kind: 'refused';
+      readonly reason: SettingsWriteFailure;
+      readonly diagnostics?: readonly configValidationDiagnostic[];
+    };
+
+/** The file a write reads and then replaces. */
+type ConfigDocumentSource = {
+  readonly fileSystem: ConfigFileSystemPort;
+  readonly targetPath: ConfigFilePath;
+};
+
+/** One edit and the guard that vets it, applied to a loaded document. */
+type ConfigEditJob = {
+  readonly text: Json5Document;
+  readonly edit: ConfigEditRequest;
+  readonly guard: ConfigWriteGuard;
+};
+
+/** A candidate document and the checks that must pass before writing it. */
+type ConfigDiagnosticJob = {
+  readonly candidate: JsonValue;
+  readonly edit: ConfigEditRequest;
+  readonly guard: ConfigWriteGuard;
+};
 
 const refused = (
   reason: SettingsWriteFailure,
@@ -116,7 +140,7 @@ export const lastPathSegment = (segments: readonly string[]): string => {
   return last;
 };
 
-const valueAtPath = (root: JsonValue, segments: readonly string[]): JsonValue | undefined => {
+const valueAtPath = (root: JsonValue, segments: ConfigPath): JsonValue | undefined => {
   let current = root;
   for (const segment of segments) {
     if (!isJsonObject(current) || !Object.hasOwn(current, segment)) {
@@ -130,14 +154,12 @@ const valueAtPath = (root: JsonValue, segments: readonly string[]): JsonValue | 
 const concernsPath = (diagnostic: configValidationDiagnostic, keyPath: string): boolean =>
   diagnostic.path === keyPath || diagnostic.path.startsWith(`${keyPath}/`);
 
-const applyEdit = (text: string, edit: ConfigEditRequest) => {
+const applyEdit = (text: Json5Document, edit: ConfigEditRequest): DocumentEditResult => {
   const segments = edit.path.map((segment) => propertyKey(segment));
-  return edit.kind === 'set'
-    ? setPropertyAtPath(json5Document(text), segments, edit.value)
-    : removePropertyAtPath(json5Document(text), segments);
+  return edit.kind === 'set' ? setPropertyAtPath(text, segments, edit.value) : removePropertyAtPath(text, segments);
 };
 
-const parseDocument = (text: string): JsonValue | null => {
+const parseDocument = (text: Json5Document): JsonValue | null => {
   try {
     // `JSON5.parse` produces only JSON5 primitives, arrays, and objects, which
     // is exactly the `JsonValue` union.
@@ -148,37 +170,95 @@ const parseDocument = (text: string): JsonValue | null => {
   }
 };
 
-const temporaryPathFor = (target: string, processId: number): string => {
-  temporaryCounter += 1;
-  return path.join(path.dirname(target), `${TEMPORARY_FILE_PREFIX}${processId}-${temporaryCounter}`);
+/**
+ * Reads and parses a candidate document, refusing failure modes the writer
+ * cannot edit.
+ *
+ * @param source - The port and the resolved path to read.
+ * @returns The loaded document text, or the refusal that stops the write.
+ */
+const loadConfigDocument = (source: ConfigDocumentSource): StepOutcome<Json5Document> => {
+  const text = json5Document(source.fileSystem.readText(source.targetPath));
+  const root = parseDocument(text);
+  if (root === null) {
+    return {kind: 'refused', reason: 'user-config-unparseable'};
+  }
+  if (!isJsonObject(root)) {
+    return {kind: 'refused', reason: 'config-not-object'};
+  }
+  if (!isJsonObject(root.config)) {
+    return {kind: 'refused', reason: 'config-not-object'};
+  }
+  return {kind: 'ok', value: text};
 };
 
-const writeAtomically = (
-  fileSystem: ConfigFileSystemPort,
-  target: string,
-  text: string,
-  platform: NodeJS.Platform,
-  processId: number
-): void => {
-  const mode = fileSystem.stat(target)?.mode ?? DEFAULT_MODE;
-  const temporaryPath = temporaryPathFor(target, processId);
-  try {
-    fileSystem.writeFile(temporaryPath, text, mode);
-    fileSystem.fsyncFile(temporaryPath);
-    fileSystem.rename(temporaryPath, target);
-  } catch (error) {
-    try {
-      fileSystem.unlink(temporaryPath);
-    } catch {
-      // The temporary file may not exist; the original error is the useful one.
-    }
-    throw error;
+/**
+ * Checks the candidate against the intended effect of the edit.
+ *
+ * A set must round-trip to the same JSON value; a remove must leave no value at
+ * the path. Anything else means the edit did not apply as asked.
+ */
+const editValueMatches = (edit: ConfigEditRequest, appliedValue: JsonValue | undefined): boolean => {
+  if (edit.kind === 'set') {
+    return JSON.stringify(appliedValue) === JSON.stringify(edit.value);
   }
-  if (platform !== 'win32') {
-    fileSystem.fsyncDirectory(path.dirname(target));
-  }
+  return appliedValue === undefined;
 };
 
+/**
+ * Collects the policy and schema diagnostics that block this edit.
+ *
+ * The file may already be invalid elsewhere (D15); the edit is refused only
+ * when it leaves a problem at or below the key it touches, so a user can fix
+ * one diagnosed key at a time.
+ */
+const collectEditDiagnostics = (job: ConfigDiagnosticJob): readonly configValidationDiagnostic[] => {
+  const configValue = isJsonObject(job.candidate) ? job.candidate.config : {};
+  const keyPath = `/${job.edit.path.join('/')}`;
+  const schemaDiagnostics = validateConfigOptions(configValue).filter((diagnostic) =>
+    concernsPath(diagnostic, keyPath)
+  );
+  const policyDiagnostics: readonly configValidationDiagnostic[] =
+    job.edit.kind === 'set' ? job.guard.checkPolicy(job.edit.path, job.edit.value) : [];
+  return [...policyDiagnostics, ...schemaDiagnostics];
+};
+
+/**
+ * Applies one edit and verifies the result before it can be written.
+ *
+ * @param job - The loaded text, the edit, and its guard.
+ * @returns The edited document, or the refusal that stops the write.
+ */
+const applyCheckedEdit = (job: ConfigEditJob): StepOutcome<Json5Document> => {
+  const applied = applyEdit(job.text, job.edit);
+  if (applied.kind === 'refused') {
+    // A missing path is an edit failure for the writer's contract; the other
+    // two reasons map directly onto a write failure.
+    return {kind: 'refused', reason: applied.reason === 'path-not-found' ? 'edit-failed' : applied.reason};
+  }
+  const candidate = parseDocument(applied.doc);
+  if (candidate === null) {
+    return {kind: 'refused', reason: 'edit-failed'};
+  }
+  if (!editValueMatches(job.edit, valueAtPath(candidate, job.edit.path))) {
+    return {kind: 'refused', reason: 'edit-failed'};
+  }
+  const diagnostics = collectEditDiagnostics({candidate, edit: job.edit, guard: job.guard});
+  if (diagnostics.length > 0) {
+    return {kind: 'refused', reason: 'not-editable', diagnostics};
+  }
+  return {kind: 'ok', value: applied.doc};
+};
+
+/**
+ * Runs the whole critical section once, without retrying.
+ *
+ * @param dependencies - The injected ports and state hooks.
+ * @param filePath - The config file to edit.
+ * @param edit - The edit to apply.
+ * @param guard - The write-policy check for this edit.
+ * @returns The written text and revision, or a refusal.
+ */
 const attemptWrite = (
   dependencies: ConfigWriterDependencies,
   filePath: string,
@@ -186,52 +266,41 @@ const attemptWrite = (
   guard: ConfigWriteGuard
 ): ConfigWriteOutcome => {
   const {fileSystem} = dependencies;
-  const realPath = fileSystem.realpath(filePath);
-  const originalText = fileSystem.readText(realPath);
-  const original = parseDocument(originalText);
-  if (original === null) {
-    return refused('user-config-unparseable');
+  const targetPath = fileSystem.realpath(asConfigFilePath(filePath));
+  const loaded = loadConfigDocument({fileSystem, targetPath});
+  if (loaded.kind === 'refused') {
+    return refused(loaded.reason);
   }
-  if (!isJsonObject(original) || !isJsonObject(original.config)) {
-    return refused('config-not-object');
-  }
-
-  const edited = applyEdit(originalText, edit);
+  const edited = applyCheckedEdit({text: loaded.value, edit, guard});
   if (edited.kind === 'refused') {
-    // A missing path is an edit failure for the writer's contract; the other
-    // two reasons map directly onto a write failure.
-    return refused(edited.reason === 'path-not-found' ? 'edit-failed' : edited.reason);
+    return refused(edited.reason, edited.diagnostics);
   }
+  writeFileAtomically({
+    fileSystem,
+    targetPath,
+    text: asConfigFileText(edited.value),
+    platform: dependencies.platform,
+    processId: dependencies.processId()
+  });
+  dependencies.recordWrittenText(edited.value);
+  return {kind: 'written', text: edited.value, revision: dependencies.nextRevision()};
+};
 
-  const candidate = parseDocument(edited.doc);
-  if (candidate === null) {
-    return refused('edit-failed');
+/**
+ * Decides whether a failed attempt may be retried.
+ *
+ * @param code - The error code, when the failure carried one.
+ * @param attempt - The one-based number of the attempt that just failed.
+ * @returns True when another attempt is both safe and available.
+ */
+const shouldRetry = (code: string | undefined, attempt: number): boolean => {
+  if (code === undefined) {
+    return false;
   }
-  if (edit.kind === 'set') {
-    const applied = valueAtPath(candidate, edit.path);
-    if (JSON.stringify(applied) !== JSON.stringify(edit.value)) {
-      return refused('edit-failed');
-    }
-  } else if (valueAtPath(candidate, edit.path) !== undefined) {
-    return refused('edit-failed');
+  if (!RETRYABLE_CODES.has(code)) {
+    return false;
   }
-  // The file may already be invalid elsewhere (D15); the edit is refused only
-  // when it leaves a problem at or below the key it touches, so a user can fix
-  // one diagnosed key at a time.
-  const keyPath = `/${edit.path.join('/')}`;
-  const schemaDiagnostics = validateConfigOptions(isJsonObject(candidate) ? candidate.config : {}).filter(
-    (diagnostic) => concernsPath(diagnostic, keyPath)
-  );
-  const policyDiagnostics: readonly configValidationDiagnostic[] =
-    edit.kind === 'set' ? guard.checkPolicy(edit.path, edit.value) : [];
-  const diagnostics = [...policyDiagnostics, ...schemaDiagnostics];
-  if (diagnostics.length > 0) {
-    return refused('not-editable', diagnostics);
-  }
-
-  writeAtomically(fileSystem, realPath, edited.doc, dependencies.platform, dependencies.processId());
-  dependencies.recordWrittenText(edited.doc);
-  return {kind: 'written', text: edited.doc, revision: dependencies.nextRevision()};
+  return attempt < MAX_ATTEMPTS;
 };
 
 /**
@@ -267,7 +336,7 @@ export const writeConfigEdit = async (
       if (code === 'ENOENT') {
         return refused('config-file-missing');
       }
-      if (code === undefined || !RETRYABLE_CODES.has(code) || attempt === MAX_ATTEMPTS) {
+      if (!shouldRetry(code, attempt)) {
         dependencies.log(`config writer failed: ${String(error)}`);
         return refused('io-error');
       }
@@ -308,32 +377,6 @@ export const writeConfigEditSync = (
     dependencies.log(`config writer failed: ${String(error)}`);
     return refused('io-error');
   }
-};
-
-/**
- * Removes temporary files left by an interrupted write.
- *
- * @param fileSystem - The file-system port.
- * @param directory - The directory holding the config file.
- * @returns The number of files removed.
- *
- * @example
- * sweepTemporaryFiles(port, '/home/me/.config/Hyper'); // 0
- */
-export const sweepTemporaryFiles = (fileSystem: ConfigFileSystemPort, directory: string): number => {
-  let removed = 0;
-  for (const entry of fileSystem.readdir(directory)) {
-    if (!entry.startsWith(TEMPORARY_FILE_PREFIX)) {
-      continue;
-    }
-    try {
-      fileSystem.unlink(path.join(directory, entry));
-      removed += 1;
-    } catch {
-      // A concurrent sweep may have won; the leftover is harmless.
-    }
-  }
-  return removed;
 };
 
 /** The production dependency set, using the shared revision state. */

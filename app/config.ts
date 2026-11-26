@@ -25,7 +25,7 @@ import {createConfigWatchRuntime, emitKeymapsMarker, type ConfigWatchRuntime} fr
 import {setCurrentConfig} from './config/current-config';
 import {silentMarkerSink, type E2EMarkerSink} from './config/e2e-marker-sink';
 import {createConfigImportModule} from './config/import';
-import {sweepTemporaryFiles} from './config/config-file-writer';
+import {asConfigFilePath, sweepTemporaryFiles} from './config/config-file-writer';
 import {createNodeConfigFileSystem} from './config/node-config-file-port';
 import {getLastWrittenTextHash, hashConfigText, nextConfigRevision} from './config/config-write-state';
 import {_init} from './config/init';
@@ -214,7 +214,7 @@ export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions
       // A crashed write can leave a sibling temporary file beside the config;
       // start-up is the only phase that removes it.
       try {
-        sweepTemporaryFiles(createNodeConfigFileSystem(), cfgDir);
+        sweepTemporaryFiles(createNodeConfigFileSystem(), asConfigFilePath(cfgDir));
       } catch {
         // The directory may not exist yet; the first write creates it.
       }

@@ -67,36 +67,47 @@ export function haystackMatchesTokens(haystack: string, tokens: readonly string[
 /**
  * Reports whether one field satisfies the whole query.
  *
- * A field matches when the modified filter (if any) passes, its category is
- * the selected one (unless "all" is selected), and every token occurs in its
- * haystack.
+ * A field matches when the modified filter (if any) passes, its category
+ * filter passes, and every token occurs in its haystack. The category result
+ * arrives as a boolean because that is the form the verified search loop
+ * already holds, and it keeps the mathematical predicate to four arguments.
  *
  * @param query - A normalized query string.
  * @param haystack - Normalized searchable text for the field.
  * @param isModified - Whether the field is present in the user config file.
- * @param categoryIndex - The field's category index.
- * @param selectedCategory - The selected category index, or -1 for all.
+ * @param categoryMatches - Whether the field is in the selected category.
  * @returns True when the field belongs in the results.
  *
  * @example
- * fieldMatchesQuery('font', 'font size', false, 0, -1); // true
- * fieldMatchesQuery('@modified', 'font size', false, 0, -1); // false
+ * fieldMatchesQuery('font', 'font size', false, true); // true
+ * fieldMatchesQuery('@modified', 'font size', false, true); // false
  */
 export function fieldMatchesQuery(
   query: string,
   haystack: string,
   isModified: boolean,
-  categoryIndex: number,
-  selectedCategory: number
+  categoryMatches: boolean
 ): boolean {
   //@ verify
   //@ pure
-  return (
-    (!isModifiedQuery(query) || isModified) &&
-    (selectedCategory < 0 || categoryIndex === selectedCategory) &&
-    haystackMatchesTokens(haystack, tokensOf(query))
-  );
+  if (isModifiedQuery(query) && !isModified) {
+    return false;
+  }
+  if (!categoryMatches) {
+    return false;
+  }
+  return haystackMatchesTokens(haystack, tokensOf(query));
 }
+
+/** The parallel per-field arrays a search runs over. */
+export type SearchFields = Readonly<{
+  /** Normalized searchable text, one entry per field. */
+  readonly haystacks: readonly string[];
+  /** Whether each field is present in the user config file. */
+  readonly modifiedFlags: readonly boolean[];
+  /** The category index of each field. */
+  readonly categoryIndices: readonly number[];
+}>;
 
 /**
  * Returns the model indices that satisfy the query, in model order.
@@ -106,50 +117,39 @@ export function fieldMatchesQuery(
  * -1 for "all settings".
  *
  * @param query - A normalized query string.
- * @param haystacks - Normalized searchable text, one entry per field.
- * @param modifiedFlags - Whether each field is modified.
- * @param categoryIndices - The category index of each field.
+ * @param fields - The parallel per-field arrays to filter.
  * @param selectedCategory - The selected category index, or -1 for all.
  * @returns Strictly increasing indices of matching fields.
  *
  * @example
- * searchFieldIndices('font', ['font size', 'cursor shape'], [false, false], [0, 1], -1); // [0]
+ * ```ts
+ * searchFieldIndices('font', {haystacks: ['font size', 'cursor shape'], modifiedFlags: [false, false], categoryIndices: [0, 1]}, -1); // [0]
+ * ```
  */
-export function searchFieldIndices(
-  query: string,
-  haystacks: readonly string[],
-  modifiedFlags: readonly boolean[],
-  categoryIndices: readonly number[],
-  selectedCategory: number
-): number[] {
+export function searchFieldIndices(query: string, fields: SearchFields, selectedCategory: number): number[] {
   //@ verify
   //@ requires query.length >= 0
-  //@ requires haystacks.length === modifiedFlags.length
-  //@ requires haystacks.length === categoryIndices.length
-  //@ ensures forall(k: nat, k < \result.length ==> 0 <= \result[k] && \result[k] < haystacks.length)
-  //@ ensures forall(k: nat, k < \result.length ==> fieldMatchesQuery(query, haystacks[\result[k]], modifiedFlags[\result[k]], categoryIndices[\result[k]], selectedCategory))
-  //@ ensures forall(j: nat, j < haystacks.length && fieldMatchesQuery(query, haystacks[j], modifiedFlags[j], categoryIndices[j], selectedCategory) ==> \result.includes(j))
+  //@ requires fields.haystacks.length === fields.modifiedFlags.length
+  //@ requires fields.haystacks.length === fields.categoryIndices.length
+  //@ ensures forall(k: nat, k < \result.length ==> 0 <= \result[k] && \result[k] < fields.haystacks.length)
+  //@ ensures forall(k: nat, k < \result.length ==> fieldMatchesQuery(query, fields.haystacks[\result[k]], fields.modifiedFlags[\result[k]], selectedCategory < 0 || fields.categoryIndices[\result[k]] === selectedCategory))
+  //@ ensures forall(j: nat, j < fields.haystacks.length && fieldMatchesQuery(query, fields.haystacks[j], fields.modifiedFlags[j], selectedCategory < 0 || fields.categoryIndices[j] === selectedCategory) ==> \result.includes(j))
   //@ ensures forall(k: nat, 0 < k && k < \result.length ==> \result[k-1] < \result[k])
-  const tokens = tokensOf(query);
-  const modifiedOnly = isModifiedQuery(query);
   const result: number[] = [];
-  for (let index = 0; index < haystacks.length; index = index + 1) {
-    //@ invariant index >= 0 && index <= haystacks.length
+  for (let index = 0; index < fields.haystacks.length; index = index + 1) {
+    //@ invariant index >= 0 && index <= fields.haystacks.length
     //@ invariant forall(k: nat, k < result.length ==> 0 <= result[k] && result[k] < index)
-    //@ invariant forall(k: nat, k < result.length && result[k] < haystacks.length && result[k] < modifiedFlags.length && result[k] < categoryIndices.length ==> fieldMatchesQuery(query, haystacks[result[k]], modifiedFlags[result[k]], categoryIndices[result[k]], selectedCategory))
-    //@ invariant forall(j: nat, j < index && j < haystacks.length && j < modifiedFlags.length && j < categoryIndices.length && fieldMatchesQuery(query, haystacks[j], modifiedFlags[j], categoryIndices[j], selectedCategory) ==> result.includes(j))
+    //@ invariant forall(k: nat, k < result.length && result[k] < fields.haystacks.length && result[k] < fields.modifiedFlags.length && result[k] < fields.categoryIndices.length ==> fieldMatchesQuery(query, fields.haystacks[result[k]], fields.modifiedFlags[result[k]], selectedCategory < 0 || fields.categoryIndices[result[k]] === selectedCategory))
+    //@ invariant forall(j: nat, j < index && j < fields.haystacks.length && j < fields.modifiedFlags.length && j < fields.categoryIndices.length && fieldMatchesQuery(query, fields.haystacks[j], fields.modifiedFlags[j], selectedCategory < 0 || fields.categoryIndices[j] === selectedCategory) ==> result.includes(j))
     //@ invariant forall(k: nat, 0 < k && k < result.length ==> result[k-1] < result[k])
-    // SAFETY: the loop condition bounds `index` by `haystacks.length`.
-    const haystack = haystacks[index] as string;
+    // SAFETY: the loop condition bounds `index` by `fields.haystacks.length`.
+    const haystack = fields.haystacks[index] as string;
     // SAFETY: the preconditions make `modifiedFlags` as long as `haystacks`.
-    const isModified = modifiedFlags[index] as boolean;
+    const isModified = fields.modifiedFlags[index] as boolean;
     // SAFETY: the preconditions make `categoryIndices` as long as `haystacks`.
-    const categoryIndex = categoryIndices[index] as number;
-    if (
-      (!modifiedOnly || isModified) &&
-      (selectedCategory < 0 || categoryIndex === selectedCategory) &&
-      haystackMatchesTokens(haystack, tokens)
-    ) {
+    const categoryIndex = fields.categoryIndices[index] as number;
+    const categoryMatches = selectedCategory < 0 || categoryIndex === selectedCategory;
+    if (fieldMatchesQuery(query, haystack, isModified, categoryMatches)) {
       result.push(index);
     }
   }

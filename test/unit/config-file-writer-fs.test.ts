@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {
+  asConfigFilePath,
   lastPathSegment,
   type ConfigWriteGuard,
   type ConfigWriterDependencies,
@@ -124,7 +125,7 @@ describe('config writer on a real file system', () => {
       await fs.writeFile(keep, '{}');
       await fs.writeFile(stale, 'partial');
 
-      expect(sweepTemporaryFiles(createNodeConfigFileSystem(), directory)).toBe(1);
+      expect(sweepTemporaryFiles(createNodeConfigFileSystem(), asConfigFilePath(directory))).toBe(1);
       expect(await fs.readdir(directory)).toEqual(['config.json5']);
     });
   });

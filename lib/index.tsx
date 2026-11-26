@@ -1,3 +1,10 @@
+/**
+ * @file Renderer entry point.
+ *
+ * Mounts the Redux store and the application container, then starts the
+ * renderer bootstrap with the action groups it dispatches. Start-up order is
+ * load-config, then transport and plugin wiring, then first render.
+ */
 import './v8-snapshot-util';
 import './tailwind.css';
 import {webFrame} from 'electron';

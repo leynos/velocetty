@@ -3,6 +3,7 @@ import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
 import {
   defaultWriterState,
+  asConfigFilePath,
   writeConfigEditSync,
   type ConfigFileSystemPort,
   type ConfigWriterDependencies
@@ -94,6 +95,15 @@ const writerDependenciesFor = (fileSystem: ConfigFileSystemPort): ConfigWriterDe
   ...defaultWriterState
 });
 
+/** One plugin settings write, complete with the message a refusal reports. */
+type PluginSettingsPersistenceRequest = {
+  readonly fileSystem: ConfigFileSystemPort;
+  readonly configFilePath: string;
+  readonly pluginId: string;
+  readonly settings: JsonObject;
+  readonly failureMessage: string;
+};
+
 /**
  * Persists one plugin's settings through the single config writer.
  *
@@ -101,21 +111,15 @@ const writerDependenciesFor = (fileSystem: ConfigFileSystemPort): ConfigWriterDe
  * owns that namespace, and the writer still re-parses and validates the
  * result, so a malformed document is refused rather than overwritten.
  */
-const persistPluginSettings = (
-  fileSystem: ConfigFileSystemPort,
-  configFilePath: string,
-  pluginId: string,
-  settings: JsonObject,
-  failureMessage: string
-): void => {
+const persistPluginSettings = (request: PluginSettingsPersistenceRequest): void => {
   const outcome = writeConfigEditSync(
-    writerDependenciesFor(fileSystem),
-    configFilePath,
-    {kind: 'set', path: ['config', 'plugins', pluginId], value: settings},
+    writerDependenciesFor(request.fileSystem),
+    request.configFilePath,
+    {kind: 'set', path: ['config', 'plugins', request.pluginId], value: request.settings},
     {checkPolicy: () => []}
   );
   if (outcome.kind !== 'written') {
-    console.error(failureMessage);
+    console.error(request.failureMessage);
   }
 };
 
@@ -227,7 +231,7 @@ export const ensureRuntimePluginSettingsPersisted = (
 ): RuntimePluginSettingsNamespace => {
   const {configFilePath, fileSystem} = resolvePersistenceOptions(options);
   try {
-    const rawConfigText = fileSystem.readText(configFilePath);
+    const rawConfigText = fileSystem.readText(asConfigFilePath(configFilePath));
     const rawConfig = parseConfigJson5Strict(json5Document(rawConfigText));
     if (!rawConfig) {
       console.error(`Failed to parse runtime plugin config at "${configFilePath}". Returning empty namespace.`);
@@ -248,13 +252,13 @@ export const ensureRuntimePluginSettingsPersisted = (
     });
 
     for (const patch of patches) {
-      persistPluginSettings(
+      persistPluginSettings({
         fileSystem,
         configFilePath,
-        patch.pluginId.value,
-        patch.settings,
-        `Failed to apply runtime plugin settings patch for "${configFilePath}". Skipping write to preserve user formatting.`
-      );
+        pluginId: patch.pluginId.value,
+        settings: patch.settings,
+        failureMessage: `Failed to apply runtime plugin settings patch for "${configFilePath}". Skipping write to preserve user formatting.`
+      });
     }
 
     return namespace;
@@ -281,7 +285,7 @@ export const setRuntimePluginEnabledPersisted = (
   const fallbackSettings = merge({}, manifestDefaults, {enabled}) satisfies JsonObject;
 
   try {
-    const rawConfigText = fileSystem.readText(configFilePath);
+    const rawConfigText = fileSystem.readText(asConfigFilePath(configFilePath));
     const rawConfig = parseConfigJson5Strict(json5Document(rawConfigText));
     if (!rawConfig) {
       console.error(`Failed to parse runtime plugin config at "${configFilePath}". Returning fallback settings.`);
@@ -295,13 +299,13 @@ export const setRuntimePluginEnabledPersisted = (
 
     if (!isEqual(existing, merged)) {
       namespace[pluginId] = merged;
-      persistPluginSettings(
+      persistPluginSettings({
         fileSystem,
         configFilePath,
         pluginId,
-        merged,
-        `Failed to apply runtime plugin enabled patch for "${configFilePath}". Skipping write to preserve user formatting.`
-      );
+        settings: merged,
+        failureMessage: `Failed to apply runtime plugin enabled patch for "${configFilePath}". Skipping write to preserve user formatting.`
+      });
     }
 
     return merged;

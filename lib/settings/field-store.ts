@@ -113,12 +113,22 @@ const outcomeEvent = (requestId: number, outcome: SettingsWriteOutcome): FieldEv
   }
 };
 
-const committedValueOf = (snapshot: SettingsSnapshot, key: string): SettingValue | undefined => {
-  const stored = snapshot.userValues[key];
-  if (isString(stored) || isNumber(stored) || isBoolean(stored)) {
-    return stored;
+const isScalarValue = (value: unknown): value is SettingValue => {
+  if (isString(value)) {
+    return true;
   }
-  return undefined;
+  if (isNumber(value)) {
+    return true;
+  }
+  return isBoolean(value);
+};
+
+const committedValueOf = (snapshot: SettingsSnapshot, target: SettingTarget): SettingValue | undefined => {
+  const stored = snapshot.userValues[target.key];
+  if (!isScalarValue(stored)) {
+    return undefined;
+  }
+  return stored;
 };
 
 /**
@@ -160,21 +170,22 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
     }
   };
 
-  const apply = (id: string, event: FieldEvent<SettingValue, FieldError>): FieldEffect<SettingValue> => {
-    const state = states.get(id);
-    const definition = definitions.get(id);
-    if (state === undefined || definition === undefined) {
+  const apply = (
+    definition: FieldDefinition,
+    event: FieldEvent<SettingValue, FieldError>
+  ): FieldEffect<SettingValue> => {
+    const state = states.get(definition.id);
+    if (state === undefined) {
       return {kind: 'none', requestId: -1};
     }
     const result = stepField(state, event);
-    states = new Map(states).set(id, result.state);
+    states = new Map(states).set(definition.id, result.state);
     publish();
     return result.effect;
   };
 
-  const runEffect = (id: string, effect: FieldEffect<SettingValue>): void => {
-    const definition = definitions.get(id);
-    if (effect.kind === 'none' || definition === undefined) {
+  const runEffect = (definition: FieldDefinition, effect: FieldEffect<SettingValue>): void => {
+    if (effect.kind === 'none') {
       return;
     }
     inFlight += 1;
@@ -184,7 +195,7 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
         : gateway.resetValue(definition.target);
     void request
       .then((outcome) => {
-        apply(id, outcomeEvent(effect.requestId, outcome));
+        apply(definition, outcomeEvent(effect.requestId, outcome));
         if (outcome.kind === 'applied') {
           // Applying the outcome also refreshes every field's committed value,
           // so a reset that removed one key updates the others' modified flags.
@@ -192,22 +203,21 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
         }
       })
       .catch(() => {
-        apply(id, outcomeEvent(effect.requestId, {kind: 'failed', reason: 'io-error'}));
+        apply(definition, outcomeEvent(effect.requestId, {kind: 'failed', reason: 'io-error'}));
       })
       .finally(settle);
   };
 
   const refresh = (next: SettingsSnapshot): void => {
     for (const field of fields) {
-      const committed = committedValueOf(next, field.target.key);
-      apply(field.id, {kind: 'refresh', committed, draft: formatValue(field.control, committed)});
+      const committed = committedValueOf(next, field.target);
+      apply(field, {kind: 'refresh', committed, draft: formatValue(field.control, committed)});
     }
   };
 
-  const commit = (id: string): void => {
-    const state = states.get(id);
-    const definition = definitions.get(id);
-    if (state === undefined || definition === undefined) {
+  const commit = (definition: FieldDefinition): void => {
+    const state = states.get(definition.id);
+    if (state === undefined) {
       return;
     }
     const coercion = coerceInput(definition.control, state.draft);
@@ -218,7 +228,7 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
           submission: {kind: 'uncoerced', errors: coercionErrors(coercion.failure)},
           fallbackError: FALLBACK_ERROR
         };
-    runEffect(id, apply(id, event));
+    runEffect(definition, apply(definition, event));
   };
 
   return {
@@ -228,19 +238,29 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
     },
     getSnapshot: () => snapshot,
     setDraft: (id, draft) => {
-      apply(id, {kind: 'edit', draft});
-    },
-    submit: commit,
-    revert: (id) => {
-      const state = states.get(id);
       const definition = definitions.get(id);
-      if (state === undefined || definition === undefined) {
-        return;
+      if (definition !== undefined) {
+        apply(definition, {kind: 'edit', draft});
       }
-      apply(id, {kind: 'revert', draft: formatValue(definition.control, state.committed)});
+    },
+    submit: (id) => {
+      const definition = definitions.get(id);
+      if (definition !== undefined) {
+        commit(definition);
+      }
+    },
+    revert: (id) => {
+      const definition = definitions.get(id);
+      const state = states.get(id);
+      if (definition !== undefined && state !== undefined) {
+        apply(definition, {kind: 'revert', draft: formatValue(definition.control, state.committed)});
+      }
     },
     reset: (id) => {
-      runEffect(id, apply(id, {kind: 'reset'}));
+      const definition = definitions.get(id);
+      if (definition !== undefined) {
+        runEffect(definition, apply(definition, {kind: 'reset'}));
+      }
     },
     refresh,
     whenIdle: () => (inFlight === 0 ? Promise.resolve() : new Promise<void>((resolve) => idleWaiters.push(resolve)))

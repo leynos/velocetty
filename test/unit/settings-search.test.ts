@@ -13,8 +13,9 @@ const MODIFIED = [true, false, false, true, false];
 const CATEGORIES = [0, 1, 1, 2, 2];
 const ALL = -1;
 
-const search = (query: string, selectedCategory = ALL): number[] =>
-  searchFieldIndices(query, HAYSTACKS, MODIFIED, CATEGORIES, selectedCategory);
+const FIELDS = {haystacks: HAYSTACKS, modifiedFlags: MODIFIED, categoryIndices: CATEGORIES};
+
+const search = (query: string, selectedCategory = ALL): number[] => searchFieldIndices(query, FIELDS, selectedCategory);
 
 describe('tokensOf', () => {
   test('splits on spaces and drops empty tokens', () => {

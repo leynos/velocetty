@@ -12,6 +12,7 @@ import JSON5 from 'json5';
 
 import {
   lastPathSegment,
+  asConfigFilePath,
   type ConfigEditRequest,
   type ConfigFileSystemPort,
   type ConfigWriterDependencies,
@@ -80,12 +81,12 @@ const userValuesOf = (parsed: JsonValue): JsonObject =>
   isJsonObject(parsed) && isJsonObject(parsed.config) ? parsed.config : {};
 
 const readConfigFile = (dependencies: SettingsServiceDependencies): FileRead => {
-  if (dependencies.fileSystem.stat(dependencies.filePath) === null) {
+  if (dependencies.fileSystem.stat(asConfigFilePath(dependencies.filePath)) === null) {
     return {kind: 'missing'};
   }
   let text: string;
   try {
-    text = dependencies.fileSystem.readText(dependencies.filePath);
+    text = dependencies.fileSystem.readText(asConfigFilePath(dependencies.filePath));
   } catch {
     return {
       kind: 'unparseable',

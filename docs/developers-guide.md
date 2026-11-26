@@ -1884,6 +1884,10 @@ file has two artefacts:
 - `make proofs-fresh` regenerates each artefact through
   `bin/generate-dafny.mjs`, compares it with the committed copy, and restores
   the committed copy. It runs as part of `make lint`.
+- `make prove` needs Dafny 4.11.x on `PATH`
+  (`dotnet tool install --global dafny --version 4.11.0`) with Z3 4.12.1 beside
+  the `dafny` executable or on `PATH`. `make proofs-fresh` is Dafny-free, so
+  the ordinary lint gate does not need the verifier.
 - `bin/prove.sh` rejects every Dafny trust construct except two exact
   declarations: `emptyUserKeymaps` and LemmaScript's `StringSplit` model of
   `String.prototype.split`. A proof that needs another axiom must extend that
