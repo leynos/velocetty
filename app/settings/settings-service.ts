@@ -19,9 +19,11 @@ import {
   writeConfigEdit
 } from '../config/config-file-writer';
 import {isKeymapConfig, isStringArray, validateConfigOptions} from '../config/json5-config';
-import {isJsonObject, isString} from '../utils/runtime-guards';
+import {observeSettingsWrite, type ConfigSpanRecorder} from '../config/config-spans';
+import {isJsonObject, isNumber} from '../utils/runtime-guards';
 import {checkWritePolicy, isWritableSettingKey} from './settings-write-policy';
 
+import type {ConfigMetrics} from '../config/config-metrics';
 import type {configValidationDiagnostic} from '@shared/types/config';
 import type {JsonObject, JsonValue} from '@shared/types/json';
 import type {
@@ -41,6 +43,10 @@ export type SettingsServiceDependencies = {
   /** The built-in defaults, as they appear in `config-default.json`. */
   readonly defaults: JsonObject;
   readonly getDefaultProfileName: () => string;
+  /** The write observer: one span, the outcome counters, and one bounded line. */
+  readonly spans?: ConfigSpanRecorder;
+  readonly metrics?: Pick<ConfigMetrics, 'increment'>;
+  readonly log?: (message: string) => void;
 };
 
 /** The service the IPC layer calls. */
@@ -218,6 +224,61 @@ const profileOverriddenKeys = (userValues: JsonObject, defaultProfileName: strin
 const concernsKey = (item: configValidationDiagnostic, key: string): boolean =>
   item.path === `/config/${key}` || item.path.startsWith(`/config/${key}/`);
 
+/**
+ * Replaces numbers JSON cannot carry with the JSON5 text that denotes them.
+ *
+ * `JSON5.parse` accepts `NaN` and `Infinity`, but the renderer validates the
+ * snapshot with a JSON schema, which rejects a payload containing either. Such
+ * a file must still load: the tab is where the user repairs the value, and a
+ * rejected snapshot would hide the row and its diagnostic. The textual form
+ * keeps the key present, so the row stays editable and resettable, while the
+ * diagnostics reported beside it are still derived from the parsed file.
+ *
+ * @param value - A value parsed from the user's file.
+ * @returns The value with every non-finite number replaced by its JSON5 text.
+ *
+ * @example
+ * ```ts
+ * transportSafeValue({fontSize: NaN}); // {fontSize: 'NaN'}
+ * transportSafeValue([Infinity, 16]); // ['Infinity', 16]
+ * ```
+ */
+const transportSafeValue = (value: JsonValue): JsonValue => {
+  if (isNumber(value)) {
+    return Number.isFinite(value) ? value : JSON5.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => transportSafeValue(entry));
+  }
+  if (isJsonObject(value)) {
+    const encoded: JsonObject = {};
+    for (const [key, entry] of Object.entries(value)) {
+      encoded[key] = transportSafeValue(entry);
+    }
+    return encoded;
+  }
+  return value;
+};
+
+/**
+ * Encodes the user's `config` object for the transport.
+ *
+ * @param values - The `config` object parsed from the file.
+ * @returns A copy safe for the renderer's JSON schema.
+ *
+ * @example
+ * ```ts
+ * transportSafeValues({fontSize: NaN}); // {fontSize: 'NaN'}
+ * ```
+ */
+const transportSafeValues = (values: JsonObject): JsonObject => {
+  const encoded: JsonObject = {};
+  for (const [key, value] of Object.entries(values)) {
+    encoded[key] = transportSafeValue(value);
+  }
+  return encoded;
+};
+
 const refusedOutcome = (reason: SettingsWriteFailure): SettingsWriteOutcome => ({kind: 'failed', reason});
 
 type Precheck = {readonly kind: 'proceed'} | {readonly kind: 'refused'; readonly outcome: SettingsWriteOutcome};
@@ -225,19 +286,15 @@ type Precheck = {readonly kind: 'proceed'} | {readonly kind: 'refused'; readonly
 /**
  * Creates the settings service.
  *
- * @param dependencies - File-system, writer, and defaults.
+ * @param dependencies - File-system, writer, defaults, and the write observer.
  * @returns The service used by the IPC handlers.
- *
- * @example
- * const service = createSettingsService({filePath, fileSystem, writer, defaults, getDefaultProfileName});
- * service.getSnapshot().fileStatus.kind; // 'ok'
  */
 export const createSettingsService = (dependencies: SettingsServiceDependencies): SettingsService => {
   const snapshotOf = (read: FileRead): SettingsSnapshot => ({
     revision: dependencies.writer.currentRevision(),
     filePath: dependencies.filePath,
     fileStatus: statusOf(read),
-    userValues: 'userValues' in read ? read.userValues : {},
+    userValues: 'userValues' in read ? transportSafeValues(read.userValues) : {},
     defaultValues: coreDefaults(dependencies.defaults),
     profileOverriddenKeys: profileOverriddenKeys(
       'userValues' in read ? read.userValues : {},
@@ -277,25 +334,65 @@ export const createSettingsService = (dependencies: SettingsServiceDependencies)
     return refusedOutcome(outcome.reason);
   };
 
-  const setValue = async (target: SettingTarget, value: JsonValue): Promise<SettingsWriteOutcome> => {
-    const prechecked = precheck(target);
-    if (prechecked.kind === 'refused') {
-      return prechecked.outcome;
-    }
-    const policy = checkWritePolicy(target.key, value);
-    if (policy.length > 0) {
-      return {kind: 'rejected', diagnostics: policy};
-    }
-    return runWrite({kind: 'set', path: ['config', target.key], value});
+  /** The write at the tail of the queue, or `undefined` when the queue is idle. */
+  let pendingWrite: Promise<void> | undefined;
+
+  /**
+   * Runs one write after every write already submitted, preserving order.
+   *
+   * `writeConfigEdit` retries a busy file with a backoff, so a later write
+   * could otherwise reach the file first and an earlier retry then overwrite
+   * its value. A write submitted to an idle queue starts immediately, so the
+   * writer's synchronous critical section is unchanged in the common case.
+   */
+  const enqueueWrite = <T>(task: () => Promise<T>): Promise<T> => {
+    const started = pendingWrite === undefined ? task() : pendingWrite.then(task);
+    // A refused write releases the queue just as an applied one does: the next
+    // submission still runs, and the refusing caller sees its own outcome.
+    const settled = (async () => {
+      try {
+        await started;
+      } catch {
+        // The outcome is already reported through `started`; the queue only
+        // needs to know the write finished.
+      }
+    })();
+    pendingWrite = settled;
+    // Only the last write releases the queue; while a later write is waiting,
+    // it still starts after this one settles.
+    void settled.then(() => {
+      if (pendingWrite === settled) {
+        pendingWrite = undefined;
+      }
+    });
+    return started;
   };
 
-  const resetValue = async (target: SettingTarget): Promise<SettingsWriteOutcome> => {
-    const prechecked = precheck(target);
-    if (prechecked.kind === 'refused') {
-      return prechecked.outcome;
-    }
-    return runWrite({kind: 'remove', path: ['config', target.key]});
-  };
+  const setValue = (target: SettingTarget, value: JsonValue): Promise<SettingsWriteOutcome> =>
+    enqueueWrite(() =>
+      observeSettingsWrite(dependencies, async () => {
+        const prechecked = precheck(target);
+        if (prechecked.kind === 'refused') {
+          return prechecked.outcome;
+        }
+        const policy = checkWritePolicy(target.key, value);
+        if (policy.length > 0) {
+          return {kind: 'rejected', diagnostics: policy};
+        }
+        return runWrite({kind: 'set', path: ['config', target.key], value});
+      })
+    );
+
+  const resetValue = (target: SettingTarget): Promise<SettingsWriteOutcome> =>
+    enqueueWrite(() =>
+      observeSettingsWrite(dependencies, async () => {
+        const prechecked = precheck(target);
+        if (prechecked.kind === 'refused') {
+          return prechecked.outcome;
+        }
+        return runWrite({kind: 'remove', path: ['config', target.key]});
+      })
+    );
 
   return {getSnapshot, setValue, resetValue};
 };

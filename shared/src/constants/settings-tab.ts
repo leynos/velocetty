@@ -30,13 +30,19 @@ export type SettingsCategorySelection = 'all' | SettingCategoryId;
 export type SettingsTabState = {
   readonly isOpen: boolean;
   readonly isActive: boolean;
+  /**
+   * True while a programmatic open is waiting for the window's first
+   * `SESSION_ADD`. That one add leaves the tab active; every later add
+   * deactivates as usual.
+   */
+  readonly keepThroughInitialSession: boolean;
   readonly query: string;
   readonly selectedCategory: SettingsCategorySelection;
 };
 
 /** Actions the settings tab slice understands. */
 export type SettingsTabActions =
-  | {readonly type: typeof SETTINGS_TAB_OPEN}
+  | {readonly type: typeof SETTINGS_TAB_OPEN; readonly keepThroughInitialSession?: boolean}
   | {readonly type: typeof SETTINGS_TAB_CLOSE}
   | {readonly type: typeof SETTINGS_TAB_ACTIVATE}
   | {readonly type: typeof SETTINGS_TAB_DEACTIVATE}

@@ -20,8 +20,10 @@ const everyKeyHasALabel: MissingLabel extends never ? true : false = true;
 // @ts-expect-error A raw string is not a SettingId; the brand helper is required.
 const unbranded: SettingId = 'core:fontSize';
 
-// @ts-expect-error 'settings open req' is payload-free, so any payload fails.
-const requestWithPayload: RendererEvents['settings open req'] = {ignored: true};
+// @ts-expect-error Every settings open request states whether it survives the initial session.
+const requestWithoutFlag: RendererEvents['settings open req'] = {ignored: true};
+
+const requestWithFlag: RendererEvents['settings open req'] = {keepThroughInitialSession: true};
 
 describe('settings compile-time contracts', () => {
   test('every core setting has a label', () => {
@@ -32,7 +34,8 @@ describe('settings compile-time contracts', () => {
     expect(unbranded).toBe(settingId('core:fontSize'));
   });
 
-  test('the settings open request carries no payload', () => {
-    expect(requestWithPayload).toBeDefined();
+  test('the settings open request states whether it survives the initial session', () => {
+    expect(requestWithoutFlag).toBeDefined();
+    expect(requestWithFlag.keepThroughInitialSession).toBe(true);
   });
 });

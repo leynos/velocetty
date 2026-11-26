@@ -124,13 +124,24 @@ export const createHarness = () => {
     bumpRevision();
     store.refresh(service.getSnapshot());
   };
+  /**
+   * Waits until every submitted write has reached the file.
+   *
+   * The service serializes writes, so a write submitted before an external
+   * edit applies before that edit is modelled. Their answers are still
+   * delivered in the generated order later, which is the reordering this
+   * property exercises.
+   */
+  const settleWrites = async (): Promise<void> => {
+    await Promise.all(pending.map((item) => item.outcome));
+  };
   const flushOldest = async (): Promise<void> => {
     const item = pending.shift();
     if (item !== undefined) {
       item.resolve(await item.outcome);
     }
   };
-  return {port, service, store, pending, outcomes, externalWrite, flushOldest};
+  return {port, service, store, pending, outcomes, externalWrite, flushOldest, settleWrites};
 };
 
 const configOf = (port: ReturnType<typeof createMemoryConfigFileSystem>): Record<string, JsonValue> => {
@@ -249,6 +260,9 @@ export const applyActions = async (
         break;
       }
       case 'external': {
+        // An external edit is observed against the file the serialized writer
+        // has produced so far, so the writes already submitted settle first.
+        await harness.settleWrites();
         applyExternalAction(harness, action, model);
         break;
       }

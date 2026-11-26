@@ -11,6 +11,7 @@ import {
 import {createNodeConfigFileSystem} from '../config/node-config-file-port';
 import {cfgPath} from '../config/paths';
 import type {JsonObject} from '@shared/types/json';
+import {describeError} from '../utils/error-code';
 import {isBoolean, isJsonObject} from '../utils/runtime-guards';
 import {
   json5Document,
@@ -95,13 +96,14 @@ const writerDependenciesFor = (fileSystem: ConfigFileSystemPort): ConfigWriterDe
   ...defaultWriterState
 });
 
-/** One plugin settings write, complete with the message a refusal reports. */
+/** One plugin settings write, named by the persistence path a refusal reports. */
 type PluginSettingsPersistenceRequest = {
   readonly fileSystem: ConfigFileSystemPort;
   readonly configFilePath: string;
   readonly pluginId: string;
   readonly settings: JsonObject;
-  readonly failureMessage: string;
+  /** Names this persistence path in a refusal; it never carries a file path. */
+  readonly label: string;
 };
 
 /**
@@ -110,6 +112,9 @@ type PluginSettingsPersistenceRequest = {
  * The plugin keys are not part of the core write policy: the plugin runtime
  * owns that namespace, and the writer still re-parses and validates the
  * result, so a malformed document is refused rather than overwritten.
+ *
+ * A refusal is reported by the writer's own closed reason code rather than the
+ * file path, because the path names the user's home directory.
  */
 const persistPluginSettings = (request: PluginSettingsPersistenceRequest): void => {
   const outcome = writeConfigEditSync(
@@ -119,7 +124,7 @@ const persistPluginSettings = (request: PluginSettingsPersistenceRequest): void 
     {checkPolicy: () => []}
   );
   if (outcome.kind !== 'written') {
-    console.error(request.failureMessage);
+    console.error(`[runtime-plugins] ${request.label} was refused (reason=${outcome.reason}).`);
   }
 };
 
@@ -234,7 +239,7 @@ export const ensureRuntimePluginSettingsPersisted = (
     const rawConfigText = fileSystem.readText(asConfigFilePath(configFilePath));
     const rawConfig = parseConfigJson5Strict(json5Document(rawConfigText));
     if (!rawConfig) {
-      console.error(`Failed to parse runtime plugin config at "${configFilePath}". Returning empty namespace.`);
+      console.error('[runtime-plugins] Failed to parse the configuration. Returning empty namespace.');
       return {};
     }
     const namespace = getOrInitPluginsNamespace(rawConfig);
@@ -257,15 +262,15 @@ export const ensureRuntimePluginSettingsPersisted = (
         configFilePath,
         pluginId: patch.pluginId.value,
         settings: patch.settings,
-        failureMessage: `Failed to apply runtime plugin settings patch for "${configFilePath}". Skipping write to preserve user formatting.`
+        label: 'The runtime plugin settings patch'
       });
     }
 
     return namespace;
   } catch (error) {
     console.error(
-      `Failed to persist runtime plugin settings defaults from "${configFilePath}". Returning empty namespace.`,
-      error
+      '[runtime-plugins] Failed to persist the plugin settings defaults. Returning empty namespace.',
+      describeError(error)
     );
     return {};
   }
@@ -288,7 +293,7 @@ export const setRuntimePluginEnabledPersisted = (
     const rawConfigText = fileSystem.readText(asConfigFilePath(configFilePath));
     const rawConfig = parseConfigJson5Strict(json5Document(rawConfigText));
     if (!rawConfig) {
-      console.error(`Failed to parse runtime plugin config at "${configFilePath}". Returning fallback settings.`);
+      console.error('[runtime-plugins] Failed to parse the configuration. Returning fallback settings.');
       return fallbackSettings;
     }
 
@@ -304,15 +309,15 @@ export const setRuntimePluginEnabledPersisted = (
         configFilePath,
         pluginId,
         settings: merged,
-        failureMessage: `Failed to apply runtime plugin enabled patch for "${configFilePath}". Skipping write to preserve user formatting.`
+        label: 'The runtime plugin enabled patch'
       });
     }
 
     return merged;
   } catch (error) {
     console.error(
-      `Failed to persist runtime plugin enabled state for "${pluginId}" in "${configFilePath}". Returning fallback settings.`,
-      error
+      '[runtime-plugins] Failed to persist the plugin enabled state. Returning fallback settings.',
+      describeError(error)
     );
     return fallbackSettings;
   }

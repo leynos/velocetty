@@ -2350,7 +2350,8 @@ section, and
 
 
 
-- \[ ] 4.1. Settings tab shell with search, categories, and reset-to-default.
+- \[x] 4.1. Settings tab shell with search, categories, and
+  reset-to-default (delivered as roadmap 5.1.1).
 
 - \[ ] 4.2. Schema-driven plugin settings panels with namespaced persistence.
 

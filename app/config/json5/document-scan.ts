@@ -11,8 +11,9 @@
  */
 
 import {isString} from '../../utils/runtime-guards';
+import {isLineTerminator} from './characters';
 import type {Json5Parser} from './parser';
-import type {Json5ObjectProperty, Json5ObjectRange, PropertyKey} from './types';
+import {propertyKey, type Json5ObjectProperty, type Json5ObjectRange, type PropertyKey} from './types';
 
 /** A path from the document root to one property. */
 export type PropertyPath = readonly PropertyKey[];
@@ -34,7 +35,9 @@ export const ROOT_KEY = 'config';
 export const isRefusal = (value: Json5ObjectRange | DocumentRefusalReason): value is DocumentRefusalReason =>
   isString(value);
 
-const isNewlineCharacter = (character: string | undefined): boolean => character === '\n' || character === '\r';
+// JSON5 accepts every ECMAScript line terminator, so a comment may end at
+// U+2028 or U+2029 as well as at CR or LF.
+const isLineTerminatorAt = (doc: string, index: number): boolean => isLineTerminator(doc[index] ?? '');
 
 const isQuoteCharacter = (character: string): boolean => character === '"' || character === "'";
 
@@ -48,7 +51,7 @@ const valueWhitespacePattern = /\s/;
 export const lineEndIndex = (position: TextPosition): number => {
   const {doc} = position;
   let index = position.index;
-  while (index < doc.length && !isNewlineCharacter(doc[index])) {
+  while (index < doc.length && !isLineTerminatorAt(doc, index)) {
     index += 1;
   }
   return index;
@@ -138,22 +141,11 @@ export const scanTrailingCommentEnd = (position: TextPosition): number => {
 
 /** Returns the length of the line terminator at `position`, or `0`. */
 export const terminatorLength = (position: TextPosition): number => {
+  // CRLF is one terminator; every other recognised terminator spans one unit.
   if (position.doc.startsWith('\r\n', position.index)) {
     return 2;
   }
-  return isNewlineCharacter(position.doc[position.index]) ? 1 : 0;
-};
-
-export const findConfigRange = (parser: Json5Parser): Json5ObjectRange | DocumentRefusalReason => {
-  const root = parser.findRootObjectRange();
-  if (!root) {
-    return 'config-not-object';
-  }
-  const config = parser.getObjectProperty(root, ROOT_KEY);
-  if (!config) {
-    return 'path-not-found';
-  }
-  return parser.getObjectRangeForProperty(config) ?? 'config-not-object';
+  return isLineTerminatorAt(position.doc, position.index) ? 1 : 0;
 };
 
 export type LocatedChild =
@@ -175,6 +167,34 @@ export const locateChild = (parser: Json5Parser, parentRange: Json5ObjectRange, 
     return {kind: 'missing'};
   }
   return {kind: 'found', property, range: parser.getObjectRangeForProperty(property)};
+};
+
+/**
+ * Finds the object range of the root `config` member.
+ *
+ * A duplicated `config` key is refused rather than resolved to its first
+ * occurrence, so an edit can never silently target the wrong object.
+ *
+ * @param parser - The parser holding the document.
+ * @returns The object range, or the reason it cannot be resolved.
+ *
+ * @example
+ * findConfigRange(new Json5Parser('{config: {}}'));
+ * // {openBraceIndex: 9, closeBraceIndex: 10}
+ */
+export const findConfigRange = (parser: Json5Parser): Json5ObjectRange | DocumentRefusalReason => {
+  const root = parser.findRootObjectRange();
+  if (!root) {
+    return 'config-not-object';
+  }
+  const located = locateChild(parser, root, propertyKey(ROOT_KEY));
+  if (located.kind === 'refused') {
+    return located.reason;
+  }
+  if (located.kind === 'missing') {
+    return 'path-not-found';
+  }
+  return located.range ?? 'config-not-object';
 };
 
 /** Resolves one segment below `parentRange` to the object range it names. */

@@ -35,7 +35,19 @@ export type CoercionResult =
   | {readonly ok: false; readonly failure: CoercionFailure};
 
 const HEX_COLOUR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-const FUNCTIONAL_COLOUR = /^rgba?\(\s*[0-9.%\s,/+-]+\)$/i;
+// A functional colour is a decimal number or a percentage per component. The
+// list must hold exactly three channels, optionally followed by an alpha as a
+// fourth comma-separated component or after a `/`. Anything else — `rgb(+)`,
+// `rgba(,,,)`, a missing channel — is not a colour the terminal can show.
+const COLOUR_COMPONENT = String.raw`[+-]?(?:\d+(?:\.\d+)?|\.\d+)%?`;
+const COMMA_CHANNELS = String.raw`${COLOUR_COMPONENT}(?:\s*,\s*${COLOUR_COMPONENT}){2}`;
+const SPACE_CHANNELS = String.raw`${COLOUR_COMPONENT}(?:\s+${COLOUR_COMPONENT}){2}`;
+const COMMA_WITH_ALPHA = String.raw`${COMMA_CHANNELS}\s*,\s*${COLOUR_COMPONENT}`;
+const SLASH_WITH_ALPHA = String.raw`${SPACE_CHANNELS}\s*\/\s*${COLOUR_COMPONENT}`;
+const FUNCTIONAL_COLOUR = new RegExp(
+  String.raw`^rgba?\(\s*(?:${COMMA_CHANNELS}|${SPACE_CHANNELS}|${COMMA_WITH_ALPHA}|${SLASH_WITH_ALPHA})\s*\)$`,
+  'i'
+);
 // `Number` also accepts `0x10`, `Infinity`, and `1_000`. A setting value is a
 // decimal number, so accept decimal syntax only; `Number.parseFloat` is worse
 // still because it accepts a numeric prefix (`"12abc"` becomes 12).

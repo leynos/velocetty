@@ -6,7 +6,11 @@
  * `hyper.json`. Each scenario states what the settings tab is allowed to do.
  */
 import {describe, expect, test} from 'bun:test';
+import JSON5 from 'json5';
+import {z} from 'zod';
 
+import {createConfigMetrics, type ConfigCounters} from '../../app/config/config-metrics';
+import {createConfigSpanRecorder} from '../../app/config/config-spans';
 import type {ConfigWriterDependencies} from '../../app/config/config-file-writer';
 import {createSettingsService, type SettingsService} from '../../app/settings/settings-service';
 import {createMemoryConfigFileSystem} from '../testUtils/config-file-port';
@@ -16,6 +20,9 @@ import type {SettingTarget, SettingsSnapshot, SettingsWriteOutcome} from '@share
 
 const CONFIG_PATH = '/home/user/.config/Hyper/config.json5';
 const LEGACY_PATH = '/home/user/.config/Hyper/hyper.json';
+
+/** The renderer's schema for `userValues`, which rejects non-finite numbers. */
+const USER_VALUES_SCHEMA = z.record(z.string(), z.json());
 
 const DEFAULTS: JsonObject = {
   fontSize: 12,
@@ -30,12 +37,17 @@ const target = (key: SettingTarget['key']): SettingTarget => ({scope: 'core', ke
 type Harness = {
   readonly service: SettingsService;
   readonly port: ReturnType<typeof createMemoryConfigFileSystem>;
-  readonly revision: () => number;
+  readonly counters: () => ConfigCounters;
+  readonly spans: readonly string[];
+  readonly refusals: readonly string[];
 };
 
 const createHarness = (filePath = CONFIG_PATH): Harness => {
   const port = createMemoryConfigFileSystem();
   let revision = 0;
+  const metrics = createConfigMetrics();
+  const spans: string[] = [];
+  const refusals: string[] = [];
   const writer: ConfigWriterDependencies = {
     fileSystem: port,
     sleep: async () => {
@@ -60,9 +72,12 @@ const createHarness = (filePath = CONFIG_PATH): Harness => {
     fileSystem: port,
     writer,
     defaults: DEFAULTS,
-    getDefaultProfileName: () => 'default'
+    getDefaultProfileName: () => 'default',
+    metrics,
+    log: (line) => refusals.push(line),
+    spans: createConfigSpanRecorder({now: () => 0, sink: {info: (line) => spans.push(line), warn: () => {}}})
   });
-  return {service, port, revision: () => revision};
+  return {counters: () => metrics.snapshot(), port, refusals, service, spans};
 };
 
 const harnessWithFile = (text: string): Harness => {
@@ -228,14 +243,14 @@ describe('settings writes', () => {
 
   test('a post-rename fsync failure reports unconfirmed durability', async () => {
     const harness = harnessWithFile('{config: {fontSize: 14}}');
-    harness.port.queueFault('fsyncDirectory', 'EIO');
-
-    const setOutcome = await harness.service.setValue(target('fontSize'), 16);
-    expect(setOutcome).toMatchObject({kind: 'applied', durability: 'unconfirmed'});
-
-    harness.port.queueFault('fsyncDirectory', 'EIO');
-    const resetOutcome = await harness.service.resetValue(target('fontSize'));
-    expect(resetOutcome).toMatchObject({kind: 'applied', durability: 'unconfirmed'});
+    const writes = [
+      () => harness.service.setValue(target('fontSize'), 16),
+      () => harness.service.resetValue(target('fontSize'))
+    ];
+    for (const write of writes) {
+      harness.port.queueFault('fsyncDirectory', 'EIO');
+      expect(await write()).toMatchObject({kind: 'applied', durability: 'unconfirmed'});
+    }
   });
 
   test('a policy violation is rejected with diagnostics and does not write', async () => {
@@ -297,5 +312,89 @@ describe('settings writes', () => {
       kind: 'failed',
       reason: 'user-config-unparseable'
     });
+  });
+
+  test('a retrying write cannot be overtaken by a later write', async () => {
+    const harness = harnessWithFile('{config: {fontSize: 14}}');
+    // The first write's rename is busy once, so it sleeps before retrying.
+    harness.port.queueFault('rename', 'EBUSY');
+    const outcomes = await Promise.all([
+      harness.service.setValue(target('fontSize'), 16),
+      harness.service.setValue(target('fontSize'), 20)
+    ]);
+    expect(outcomes.map((outcome) => outcome.kind)).toEqual(['applied', 'applied']);
+    // Without the queue the first write's retry lands last and restores 16.
+    expect(JSON5.parse(harness.port.readFile(CONFIG_PATH) ?? '')).toEqual({config: {fontSize: 20}});
+  });
+});
+
+/** The exact span line the recorder receives for one finished write. */
+const writeSpan = (outcome: string): string => `[config] span operation=settings-write outcome=${outcome} ms=0`;
+describe('settings write observability', () => {
+  test('a set and a reset each count an apply, span applied, and log nothing', async () => {
+    const harness = harnessWithFile('{config: {fontSize: 14}}');
+    await harness.service.setValue(target('fontSize'), 16).then(() => harness.service.resetValue(target('fontSize')));
+    expect(harness.counters().settingsApplies).toBe(2);
+    expect(harness.spans).toEqual([writeSpan('applied'), writeSpan('applied')]);
+    expect(harness.refusals).toEqual([]);
+  });
+
+  test('a rejection or a failure counts its kind and logs the closed reason', async () => {
+    const rejected = harnessWithFile('{config: {}}');
+    const failed = createHarness();
+    await rejected.service.setValue(target('scrollback'), -3);
+    await failed.service.setValue(target('fontSize'), 16);
+    expect([rejected.counters().settingsRejections, failed.counters().settingsFailures]).toEqual([1, 1]);
+    expect(rejected.refusals).toEqual(['settings write refused reason=not-editable']);
+    expect(failed.refusals).toEqual(['settings write refused reason=config-file-missing']);
+    expect([...rejected.spans, ...failed.spans]).toEqual([writeSpan('failed'), writeSpan('failed')]);
+  });
+
+  test('an unexpected throw is counted, spanned failed, and rethrown', async () => {
+    const harness = harnessWithFile('{config: {fontSize: 14}}');
+    harness.port.queueFault('stat', 'EIO');
+    await expect(harness.service.setValue(target('fontSize'), 16)).rejects.toThrow('EIO');
+    expect(harness.counters().settingsFailures).toBe(1);
+    expect(harness.refusals).toEqual(['settings write refused reason=io-error']);
+  });
+});
+
+describe('non-finite numbers in the user values', () => {
+  test('encodes top-level NaN and Infinity so the snapshot reaches the renderer', async () => {
+    const harness = harnessWithFile('{config: {fontSize: NaN, scrollback: Infinity}}');
+
+    const snapshot = harness.service.getSnapshot();
+
+    expect(snapshot.userValues).toEqual({fontSize: 'NaN', scrollback: 'Infinity'});
+    expect(USER_VALUES_SCHEMA.safeParse(snapshot.userValues).success).toBe(true);
+    expect(snapshot.fileStatus.kind).toBe('invalid');
+    if (snapshot.fileStatus.kind !== 'invalid') {
+      return;
+    }
+    expect(snapshot.fileStatus.diagnostics.map((item) => item.path).toSorted()).toEqual([
+      '/config/fontSize',
+      '/config/scrollback'
+    ]);
+
+    // The diagnosed row stays resettable, which removes the bad value.
+    const reset = await harness.service.resetValue(target('fontSize'));
+    expect(reset.kind).toBe('applied');
+    expect(harness.port.readFile(CONFIG_PATH)).not.toContain('fontSize');
+  });
+
+  test('encodes non-finite numbers nested in objects and arrays', () => {
+    const harness = harnessWithFile('{config: {profiles: [{name: "default", config: {fontSize: -Infinity}}]}}');
+
+    const snapshot = harness.service.getSnapshot();
+
+    expect(snapshot.userValues).toEqual({
+      profiles: [{name: 'default', config: {fontSize: '-Infinity'}}]
+    });
+    expect(USER_VALUES_SCHEMA.safeParse(snapshot.userValues).success).toBe(true);
+    expect(snapshot.fileStatus.kind).toBe('invalid');
+    if (snapshot.fileStatus.kind !== 'invalid') {
+      return;
+    }
+    expect(snapshot.fileStatus.diagnostics.map((item) => item.path)).toEqual(['/config/profiles/0/config/fontSize']);
   });
 });

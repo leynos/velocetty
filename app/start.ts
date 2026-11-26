@@ -51,6 +51,8 @@ registerClipboardIpcHandlers();
 // The settings tab reads and writes the user's config through one service and
 // one writer; register it before any window loads for the same reason.
 const configFileSystem = createNodeConfigFileSystem();
+/** The one log adapter for this service, so every bounded line reaches the same sink. */
+const logSettingsLine = (message: string): void => console.error(message);
 registerSettingsIpcHandlers(
   createSettingsService({
     filePath: cfgPath,
@@ -58,13 +60,17 @@ registerSettingsIpcHandlers(
     writer: {
       fileSystem: configFileSystem,
       sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
-      log: (message) => console.error(message),
+      log: logSettingsLine,
+      metrics: config.configMetrics,
       platform: process.platform,
       processId: () => process.pid,
       ...defaultWriterState
     },
     defaults: config.getConfigDefaults(),
-    getDefaultProfileName: config.getDefaultProfile
+    getDefaultProfileName: config.getDefaultProfile,
+    spans: config.configSpans,
+    metrics: config.configMetrics,
+    log: logSettingsLine
   })
 );
 
@@ -265,7 +271,12 @@ export const startMainProcess = ({markerSink}: StartMainProcessOptions): void =>
             openSettingsWindow: () => {
               const created = createWindow();
               created.webContents.once('did-finish-load', () => {
-                created.rpc.emit('settings open req');
+                // This window opens with no terminal yet, and its initial one
+                // arrives after this request. The flag keeps the settings tab
+                // on screen through that one `session add`; without it the user
+                // would be shown a terminal instead of the preferences they
+                // asked for. A later new session still takes the surface back.
+                created.rpc.emit('settings open req', {keepThroughInitialSession: true});
               });
             },
             openWindow: (profileName) => {

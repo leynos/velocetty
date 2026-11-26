@@ -32,6 +32,10 @@ const isMac = /Mac/.test(navigator.userAgent);
 const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const mousetrap = useRef<MousetrapInstance | null>(null);
   const terms = useRef<Terms | null>(null);
+  // `attachKeyListeners` waits for the registry, so a later attach can start
+  // while an earlier one is still pending. The id lets the older call notice it
+  // has been superseded and skip binding keys that are already out of date.
+  const keyListenerRegistration = useRef(0);
 
   useEffect(() => {
     void attachKeyListeners();
@@ -62,6 +66,7 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
   };
 
   const attachKeyListeners = async () => {
+    const registrationId = ++keyListenerRegistration.current;
     if (mousetrap.current) {
       mousetrap.current.reset();
     } else {
@@ -74,6 +79,11 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
     }
 
     const keys = await getRegisteredKeys();
+    if (registrationId !== keyListenerRegistration.current) {
+      // A newer attachment (or unmount) superseded this one: binding now would
+      // restore stale keys over the newer set.
+      return;
+    }
     Object.keys(keys).forEach((commandKeys) => {
       mousetrap.current?.bind(
         commandKeys,
@@ -113,6 +123,9 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
 
   useEffect(() => {
     return () => {
+      // Invalidate any attachment still waiting on the registry, so it cannot
+      // bind keys into a reset mousetrap after the window has gone.
+      keyListenerRegistration.current += 1;
       mousetrap.current?.reset();
     };
   }, []);
@@ -137,6 +150,7 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
           {props.isSettingsOpen && (
             <div
               className={`${styles.surfaceLayer} ${props.isSettingsSurfaceActive ? '' : styles.surfaceLayerOffscreen}`}
+              inert={!props.isSettingsSurfaceActive}
             >
               <SettingsContainer isActive={props.isSettingsSurfaceActive} />
             </div>

@@ -151,7 +151,16 @@ export type RendererEvents = {
   'split request vertical': {activeUid?: SessionId; profile?: ProfileId};
   'termgroup add req': {activeUid?: SessionId; profile?: ProfileId};
   'termgroup close req': never;
-  'settings open req': never;
+  /**
+   * Asks the renderer to show the settings tab.
+   *
+   * `keepThroughInitialSession` marks a programmatic open in a freshly created
+   * window: the window's initial terminal arrives as a `session add` after this
+   * request, and that one add must not take the surface back. A user-initiated
+   * preferences open in an existing window omits it, so a later new session
+   * deactivates the tab as usual.
+   */
+  'settings open req': {keepThroughInitialSession: boolean};
   'session add': Session;
   'session data': string;
   'session exit': {uid: SessionId};

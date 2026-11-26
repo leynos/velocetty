@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import {expect, mock, spyOn, test} from 'bun:test';
 
-import {createWatchHarness, makeParsedConfig, settle} from '../testUtils/config-watch-harness';
+import {createWatchHarness, makeParsedConfig, settle, type WatchHarness} from '../testUtils/config-watch-harness';
 
 test.serial('setup watches the configuration directory once, filtered to both files', async () => {
   const harness = await createWatchHarness();
@@ -91,7 +91,7 @@ test.serial('an unreadable keybindings file is recorded and counted without noti
     expect(decisionLines[1]).toBe(
       '[config] import decision phase=reload config=applied configSource=velocetty keybindings=kept ' +
         'basis=last-known-good cause=unreadable announced=false ' +
-        'attempts:2,applies:1,parseFailures:0,readFailures:1,fallbacks:0,importFailures:0,retries:0,writeFailures:0,watcherFailures:0'
+        'attempts:2,applies:1,parseFailures:0,readFailures:1,fallbacks:0,importFailures:0,retries:0,writeFailures:0,watcherFailures:0,settingsApplies:0,settingsRejections:0,settingsFailures:0,settingsWriteRetries:0,settingsDurabilityUnconfirmed:0'
     );
     // The service owns the user-facing diagnostic; the watcher stays quiet and
     // still dispatches the reload to its subscribers.
@@ -120,7 +120,7 @@ test.serial('a thrown reload is counted, recorded, and still reported by the wat
 
     expect(warnSpy.mock.calls.map(([line]) => line)).toEqual([
       '[config] import failure phase=reload cause=thrown ' +
-        'attempts:2,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0,writeFailures:0,watcherFailures:0',
+        'attempts:2,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0,writeFailures:0,watcherFailures:0,settingsApplies:0,settingsRejections:0,settingsFailures:0,settingsWriteRetries:0,settingsDurabilityUnconfirmed:0',
       '[config-watcher] Configuration reload failed.'
     ]);
     expect(harness.notifyMock).not.toHaveBeenCalled();
@@ -131,59 +131,78 @@ test.serial('a thrown reload is counted, recorded, and still reported by the wat
   }
 });
 
-test.serial('a thrown startup import is counted, recorded, and rethrown', async () => {
+/** The one failure record start-up can write when an import never finishes. */
+const STARTUP_FAILURE_LINE =
+  '[config] import failure phase=startup cause=thrown ' +
+  'attempts:1,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0,writeFailures:0,watcherFailures:0,settingsApplies:0,settingsRejections:0,settingsFailures:0,settingsWriteRetries:0,settingsDurabilityUnconfirmed:0';
+
+type FailedStartup = Readonly<{
+  /** The error `setup()` must throw. */
+  readonly error: string | Error;
+  /** Makes start-up fail; each test states its own cause here. */
+  readonly prepare?: (harness: WatchHarness) => void;
+  /** Assertions specific to the cause, run while the doubles still record. */
+  readonly check?: (harness: WatchHarness) => void;
+}>;
+
+/**
+ * Runs a start-up that must fail and asserts the evidence it leaves.
+ *
+ * Start-up has no per-file outcome, so the failure record and the thrown span
+ * are the only evidence that the import ran at all. A failure during
+ * preparation writes the same pair even though the importer never ran, which
+ * is why both causes share this check.
+ *
+ * @param options - The error to expect, plus cause-specific preparation.
+ * @returns Nothing; every expectation is asserted here.
+ *
+ * @example
+ * await expectFailedStartup({error: 'boom', prepare: (h) => h.setCleanupError(new Error('boom'))});
+ */
+const expectFailedStartup = async ({error, prepare, check}: FailedStartup): Promise<void> => {
   const harness = await createWatchHarness();
   const infoSpy = spyOn(console, 'info').mockImplementation(() => {});
   const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
   try {
-    harness.importMock.mockImplementation(() => {
-      throw new Error('boom');
-    });
+    prepare?.(harness);
 
-    expect(() => harness.configModule.setup()).toThrow('boom');
+    expect(() => harness.configModule.setup()).toThrow(error);
 
-    // Start-up has no per-file outcome, so the failure record and the thrown
-    // span are the only evidence that the import ran at all.
-    expect(warnSpy.mock.calls.map(([line]) => line)).toEqual([
-      '[config] import failure phase=startup cause=thrown ' +
-        'attempts:1,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0,writeFailures:0,watcherFailures:0'
-    ]);
+    expect(warnSpy.mock.calls.map(([line]) => line)).toEqual([STARTUP_FAILURE_LINE]);
     expect(infoSpy.mock.calls.map(([line]) => line).filter((line) => line.startsWith('[config] span'))).toEqual([
       expect.stringMatching(/^\[config\] span operation=startup outcome=thrown ms=\d+$/)
     ]);
+    check?.(harness);
   } finally {
     infoSpy.mockRestore();
     warnSpy.mockRestore();
     mock.restore();
   }
+};
+
+test.serial('a thrown startup import is counted, recorded, and rethrown', async () => {
+  await expectFailedStartup({
+    error: 'boom',
+    prepare: (harness) => {
+      harness.importMock.mockImplementation(() => {
+        throw new Error('boom');
+      });
+    }
+  });
 });
 
 test.serial('a preparation failure is counted as a startup attempt and rethrown', async () => {
-  const harness = await createWatchHarness();
-  const infoSpy = spyOn(console, 'info').mockImplementation(() => {});
-  const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
-  try {
-    const failure = new Error('cleanup failed');
-    harness.setCleanupError(failure);
-
-    expect(() => harness.configModule.setup()).toThrow(failure);
-
-    // Preparation runs before the importer, so the attempt counter is the only
-    // evidence that start-up began; the failure record must still describe it.
-    expect(warnSpy.mock.calls.map(([line]) => line)).toEqual([
-      '[config] import failure phase=startup cause=thrown ' +
-        'attempts:1,applies:0,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0,writeFailures:0,watcherFailures:0'
-    ]);
-    expect(infoSpy.mock.calls.map(([line]) => line).filter((line) => line.startsWith('[config] span'))).toEqual([
-      expect.stringMatching(/^\[config\] span operation=startup outcome=thrown ms=\d+$/)
-    ]);
-    expect(harness.importMock).not.toHaveBeenCalled();
-    expect(harness.watchMock).not.toHaveBeenCalled();
-  } finally {
-    infoSpy.mockRestore();
-    warnSpy.mockRestore();
-    mock.restore();
-  }
+  const failure = new Error('cleanup failed');
+  await expectFailedStartup({
+    error: failure,
+    prepare: (harness) => harness.setCleanupError(failure),
+    check: (harness) => {
+      // Preparation runs before the importer, so the recorded order stops at
+      // the cleanup that threw: the attempt counter is the only evidence that
+      // start-up began, and no import followed it.
+      expect(harness.callOrder).toEqual(['cleanup']);
+    }
+  });
 });
 
 test.serial('a dispatched reload records both spans with the real outcome', async () => {

@@ -14,12 +14,12 @@ import type {ConfigSpanRecorder} from './config-spans';
 import type {ConfigWarningNotifier} from './config-queries';
 import {checkDeprecatedConfig} from './config-queries';
 import type {ImportRecord, ImportRecorder} from './config-observability';
-import {setCurrentConfig} from './current-config';
+import {getCurrentConfig, hasCurrentConfig, setCurrentConfig} from './current-config';
 import {formatKeymapsMarker, type E2EKeymapStatus} from './e2e-keymap-probe';
 import type {E2EMarkerSink} from './e2e-marker-sink';
 import {createChokidarHandle} from './chokidar-handle';
 import type {ConfigImportResult} from './import';
-import {shouldNotifyReload, type ConfigImportReport, type ConfigSourceKind} from './import-report';
+import {keymapsDiffer, shouldNotifyReload, type ConfigImportReport, type ConfigSourceKind} from './import-report';
 import {createConfigWatcher} from './watcher';
 import {createWatchedFileReconciler, type WatchedFileStamps} from './watched-file-stamp';
 
@@ -69,9 +69,9 @@ export type ConfigWatchDependencies = {
   /** Absolute paths of the files a reload must react to. */
   readonly watchedFiles: readonly string[];
   /**
-   * Reports whether the file now on disk is the one the settings writer just
-   * wrote. Such a reload updates the renderer but is not announced as an
-   * external change.
+   * Reports whether the config file now on disk is the one the settings writer
+   * just wrote. Such a reload updates the renderer silently, unless the same
+   * reload also applied a keybindings change.
    */
   readonly isSelfWriteReload?: () => boolean;
   /** Allocates the snapshot revision a completed reload makes visible. */
@@ -123,6 +123,9 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
    */
   const reloadConfiguration = () => {
     const finishSpan = spans.begin('reload');
+    // The keymaps in effect before this import, so a reload that only re-read
+    // an unchanged keybindings file is not mistaken for an external edit.
+    const keymapsBefore = hasCurrentConfig() ? getCurrentConfig().keymaps : undefined;
     let imported: ConfigImportResult;
     try {
       recorder.beginImport({phase: 'reload'});
@@ -137,7 +140,10 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
     finishSpan(report.config === 'fallback' ? 'fallback' : 'applied');
     setCurrentConfig(config);
     onReloaded();
-    const announced = shouldNotifyReload(report, isSelfWriteReload());
+    const announced = shouldNotifyReload(report, {
+      hasKeybindingsChange: keymapsDiffer(keymapsBefore, config.keymaps),
+      isSelfWrite: isSelfWriteReload()
+    });
     const record: ImportRecord = {announced, configSource: configTree, outcome, phase: 'reload', report};
     if (report.config === 'fallback') {
       Object.assign(record, {fallbackBasis: 'defaults' as const});

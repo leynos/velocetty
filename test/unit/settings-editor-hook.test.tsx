@@ -176,6 +176,47 @@ describe('useSettingsSnapshot', () => {
     expect(current()?.snapshot?.revision).toBe(2);
     expect(current()?.snapshot?.userValues).toEqual({fontSize: 16});
   });
+
+  test('an older failing load does not replace a newer success with an error', async () => {
+    const recording = createRecordingGateway();
+    const current = await mountSnapshotProbe(recording.gateway);
+    expect(recording.loads).toHaveLength(1);
+
+    await settle(() => recording.notifyChange());
+    expect(recording.loads).toHaveLength(2);
+
+    // The newer load succeeds and is shown; the older one fails afterwards.
+    await settle(() => recording.loads[1]?.resolve(snapshotOf(2, {fontSize: 16})));
+    expect(current()?.snapshot?.revision).toBe(2);
+    expect(current()?.loadError).toBeNull();
+
+    await settle(() => recording.loads[0]?.reject(new Error('stale failure')));
+
+    expect(current()?.snapshot?.revision).toBe(2);
+    expect(current()?.loadError).toBeNull();
+  });
+
+  test('a failing load with no newer accepted load still reports the error', async () => {
+    const recording = createRecordingGateway();
+    const current = await mountSnapshotProbe(recording.gateway);
+
+    await settle(() => recording.loads[0]?.reject(new Error('cannot read')));
+
+    expect(current()?.loadError).toBe('cannot read');
+    expect(current()?.isLoading).toBe(false);
+  });
+
+  test('a newer failing load reports even when an older load succeeded', async () => {
+    const recording = createRecordingGateway();
+    const current = await mountSnapshotProbe(recording.gateway);
+    await settle(() => recording.loads[0]?.resolve(snapshotOf(1)));
+
+    await settle(() => recording.notifyChange());
+    await settle(() => recording.loads[1]?.reject(new Error('newer failure')));
+
+    expect(current()?.snapshot?.revision).toBe(1);
+    expect(current()?.loadError).toBe('newer failure');
+  });
 });
 
 describe('useSettingsEditor', () => {

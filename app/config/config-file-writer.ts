@@ -33,8 +33,10 @@ import {
   type Json5Document
 } from './json5';
 import {validateConfigOptions} from './json5-config';
-import {isJsonObject, isString} from '../utils/runtime-guards';
+import {boundedErrorCode, describeError, errorCode} from '../utils/error-code';
+import {isJsonObject} from '../utils/runtime-guards';
 
+import type {ConfigMetrics} from './config-metrics';
 import type {configValidationDiagnostic} from '@shared/types/config';
 import type {JsonValue} from '@shared/types/json';
 import type {SettingsWriteFailure} from '@shared/settings/protocol';
@@ -79,6 +81,8 @@ export type ConfigWriterDependencies = {
   readonly nextRevision: () => number;
   readonly currentRevision: () => number;
   readonly recordWrittenText: (text: string) => void;
+  /** Counts this writer's retries and unconfirmed durabilities; optional for other callers. */
+  readonly metrics?: Pick<ConfigMetrics, 'increment'>;
 };
 
 const MAX_ATTEMPTS = 3;
@@ -126,8 +130,8 @@ const refused = (
   return {kind: 'refused', reason, diagnostics};
 };
 
-const errorCode = (error: unknown): string | undefined =>
-  error instanceof Error && 'code' in error && isString(error.code) ? error.code : undefined;
+/** Describes a failed write for the log: an errno and a category, never a message or path. */
+const describeFailure = (error: unknown): string => JSON.stringify(describeError(error));
 
 /**
  * Reads the last segment of a config path.
@@ -288,6 +292,12 @@ const attemptWrite = (
     platform: dependencies.platform,
     processId: dependencies.processId()
   });
+  if (durability === 'unconfirmed') {
+    // The rename is visible but the directory fsync failed, so a crash could
+    // still lose the text; the line names the condition, never a path.
+    dependencies.metrics?.increment('settingsDurabilityUnconfirmed');
+    dependencies.log('config writer durability=unconfirmed');
+  }
   dependencies.recordWrittenText(edited.value);
   return {kind: 'written', text: edited.value, revision: dependencies.nextRevision(), durability};
 };
@@ -299,15 +309,8 @@ const attemptWrite = (
  * @param attempt - The one-based number of the attempt that just failed.
  * @returns True when another attempt is both safe and available.
  */
-const shouldRetry = (code: string | undefined, attempt: number): boolean => {
-  if (code === undefined) {
-    return false;
-  }
-  if (!RETRYABLE_CODES.has(code)) {
-    return false;
-  }
-  return attempt < MAX_ATTEMPTS;
-};
+const shouldRetry = (code: string | undefined, attempt: number): boolean =>
+  code !== undefined && RETRYABLE_CODES.has(code) && attempt < MAX_ATTEMPTS;
 
 /**
  * Applies one edit to the config file.
@@ -343,9 +346,12 @@ export const writeConfigEdit = async (
         return refused('config-file-missing');
       }
       if (!shouldRetry(code, attempt)) {
-        dependencies.log(`config writer failed: ${String(error)}`);
+        dependencies.log(`config writer failed: ${describeFailure(error)}`);
         return refused('io-error');
       }
+      dependencies.metrics?.increment('settingsWriteRetries');
+      // Only the errno and the attempt number: a key, a path, and the text are user data.
+      dependencies.log(`config writer retry attempt=${attempt} code=${boundedErrorCode(error) ?? 'unknown'}`);
       await dependencies.sleep(attempt * 50);
     }
   }
@@ -380,7 +386,7 @@ export const writeConfigEditSync = (
     if (errorCode(error) === 'ENOENT') {
       return refused('config-file-missing');
     }
-    dependencies.log(`config writer failed: ${String(error)}`);
+    dependencies.log(`config writer failed: ${describeFailure(error)}`);
     return refused('io-error');
   }
 };

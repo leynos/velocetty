@@ -21,7 +21,7 @@
 import {mock} from 'bun:test';
 
 import {INIT} from '@shared/constants';
-import {SETTINGS_TAB_OPEN} from '@shared/constants/settings-tab';
+import {SETTINGS_TAB_CLOSE, SETTINGS_TAB_OPEN} from '@shared/constants/settings-tab';
 import {CONFIG_LOAD, CONFIG_RELOAD} from '@shared/constants/config';
 import type {configOptions} from '@shared/types/config';
 import {NOTIFICATION_MESSAGE} from '@shared/constants/notifications';
@@ -71,17 +71,39 @@ export type RecordedCall = {creator: string; args: unknown[]};
  */
 type FixtureState = ReturnType<typeof createFixtureState>;
 
+/** Whether the fixture reports the settings surface as owning input. */
+let settingsSurfaceActive = false;
+
+/**
+ * Sets the surface state the bootstrap listeners read.
+ *
+ * A handler that gates terminal requests consults `settingsTab.isActive` on
+ * every call, so a test can flip this between dispatches without rebuilding
+ * the fixture.
+ */
+export const setSettingsSurfaceActive = (isActive: boolean): void => {
+  settingsSurfaceActive = isActive;
+};
+
 /**
  * Builds the state the store double reports.
  *
  * The values are fixed for the same reason `now` is: the fixture's job is to
- * show which creator ran, and a changing state would only add noise.
+ * show which creator ran, and a changing state would only add noise. The one
+ * exception is the settings surface, which a gating test must be able to turn
+ * on.
  */
 const createFixtureState = () => ({
   ui: {bellSoundURL: 'sound.wav', bellSound: 'abc', bell: 'SOUND'},
   sessions: {activeUid: 'session-0', sessions: {}},
   termGroups: {termGroups: {}, activeSessions: {}, activeRootGroup: null},
-  settingsTab: {isOpen: false, isActive: false, query: '', selectedCategory: 'all'}
+  settingsTab: {
+    isOpen: settingsSurfaceActive,
+    isActive: settingsSurfaceActive,
+    keepThroughInitialSession: false,
+    query: '',
+    selectedCategory: 'all' as const
+  }
 });
 
 type Thunk = (dispatch: (action: unknown) => void, getState: () => FixtureState) => void;
@@ -305,7 +327,14 @@ const reloadConfig = action('reloadConfig', (config: configOptions) => ({type: C
 const init = thunk('init', () => ({type: INIT}));
 
 const settingsTabActions = {
-  openSettingsTab: action('openSettingsTab', () => ({type: SETTINGS_TAB_OPEN}))
+  openSettingsTab: action(
+    'openSettingsTab',
+    ({keepThroughInitialSession = false}: {readonly keepThroughInitialSession?: boolean} = {}) => ({
+      type: SETTINGS_TAB_OPEN,
+      keepThroughInitialSession
+    })
+  ),
+  closeSettingsTab: action('closeSettingsTab', () => ({type: SETTINGS_TAB_CLOSE}))
 };
 
 export const createBootstrapActions = () => ({
@@ -333,6 +362,7 @@ export const resetFixture = () => {
   dispatchMock.mockClear();
   pluginReloadCount = 0;
   recordedCalls.length = 0;
+  settingsSurfaceActive = false;
   transport.invoke.mockClear();
   transport.emit.mockClear();
   transport.off.mockClear();

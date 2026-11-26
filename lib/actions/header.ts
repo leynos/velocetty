@@ -1,8 +1,9 @@
 /**
  * @file Header action creators for tab selection, window controls, and the menu.
  *
- * Tab activation routes through `activateTab` in `lib/actions/ui.ts`, so the
- * settings tab is selected and closed exactly like a terminal tab.
+ * Tab activation routes through `activateTab` in `lib/actions/tab-strip.ts`, so
+ * the settings tab is selected exactly like a terminal tab without this module
+ * knowing which kind of tab a uid names.
  */
 import {SETTINGS_TAB_UID} from '@shared/constants/settings-tab';
 import {CLOSE_TAB, CHANGE_TAB} from '@shared/constants/tabs';
@@ -16,8 +17,8 @@ import {
 import type {HyperDispatch} from '../../typings/hyper';
 import {transport} from '../transport';
 
-import {activateSettingsTab, closeSettingsTab} from './tab-strip';
-import {userExitTermGroup, setActiveGroup} from './term-groups';
+import {activateTab, closeSettingsTab} from './tab-strip';
+import {userExitTermGroup} from './term-groups';
 
 export function closeTab(uid: string) {
   return (dispatch: HyperDispatch) => {
@@ -41,11 +42,9 @@ export function changeTab(uid: string) {
       type: CHANGE_TAB,
       uid,
       effect() {
-        if (uid === SETTINGS_TAB_UID) {
-          dispatch(activateSettingsTab());
-          return;
-        }
-        dispatch(setActiveGroup(uid));
+        // `activateTab` owns the "which kind of tab is this" decision, so the
+        // header cannot drift from the strip's other entry points.
+        dispatch(activateTab(uid));
       }
     });
   };

@@ -37,15 +37,19 @@ check-fmt:
 typecheck:
 	bun run check:types
 
-lint:
+lint: proofs-fresh
 	bun run lint
-	@$(MAKE) --no-print-directory proofs-fresh
 	@if command -v actionlint >/dev/null 2>&1; then actionlint; else echo "actionlint not installed; skipping"; fi
 
 test:
 	bun run test:unit:run
 
-prove:
+# `proofs-fresh` and `prove` both regenerate every `.dfy.gen` file, so under
+# `make -j` they would rewrite each other's inputs. A shared prerequisite makes
+# make run the freshness check once, before either consumer; unrelated targets
+# still run in parallel. `.NOTPARALLEL` cannot express this: given these two
+# targets as prerequisites, GNU make serializes only *their* prerequisites.
+prove: proofs-fresh
 	./bin/prove.sh
 
 coverage:

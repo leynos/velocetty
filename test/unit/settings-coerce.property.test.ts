@@ -9,56 +9,14 @@
 import {describe, expect, test} from 'bun:test';
 import fc from 'fast-check';
 
-import {coerceInput, formatValue, type SettingValue} from '@shared/settings/coerce';
+import {coerceInput, formatValue} from '@shared/settings/coerce';
 import type {ControlDescriptor} from '@shared/settings/panel-model';
 import {fastCheckRunCount} from '../testUtils/fast-check-runs';
+import {halves, numberCaseArb, otherCaseArb, type ControlCase} from '../testUtils/settings-coercion-arbitraries';
 
-const halves = (minimum: number, maximum: number): fc.Arbitrary<number> =>
-  fc.integer({min: minimum * 2, max: maximum * 2}).map((steps) => steps / 2);
-
-const NUMBER_CONTROLS: readonly ControlDescriptor[] = [
-  {kind: 'number', minimum: 6, maximum: 100, step: 0.5, isInteger: false},
-  {kind: 'number', minimum: -20, maximum: 50, step: 0.5, isInteger: false},
-  {kind: 'number', minimum: 1, maximum: 32, step: 1, isInteger: true}
-];
-
-const OTHER_CONTROLS: readonly ControlDescriptor[] = [
-  {kind: 'select', options: ['canary', 'stable']},
-  {kind: 'select', options: ['', 'alt', 'ctrl']},
-  {kind: 'toggle'},
-  {kind: 'colour'},
-  {kind: 'text'}
-];
-
-const valueFor = (control: ControlDescriptor): fc.Arbitrary<SettingValue> => {
-  switch (control.kind) {
-    case 'number': {
-      return control.isInteger
-        ? fc.integer({min: control.minimum, max: control.maximum})
-        : halves(control.minimum, control.maximum);
-    }
-    case 'select': {
-      return fc.constantFrom(...control.options);
-    }
-    case 'toggle': {
-      return fc.boolean();
-    }
-    case 'colour': {
-      return fc.constantFrom('#abc', '#AABBCC', '#aabbccdd', 'rgb(1, 2, 3)', 'rgba(1, 2, 3, 0.4)');
-    }
-    case 'text': {
-      return fc.string({minLength: 1}).filter((text) => text.trim().length > 0);
-    }
-  }
-};
-
-type ControlCase = {readonly control: ControlDescriptor; readonly value: SettingValue};
-
-const caseFor = (control: ControlDescriptor): fc.Arbitrary<ControlCase> =>
-  valueFor(control).map((value) => ({control, value}));
-
-const numberCaseArb = fc.constantFrom(...NUMBER_CONTROLS).chain(caseFor);
-const otherCaseArb = fc.constantFrom(...OTHER_CONTROLS).chain(caseFor);
+const COVERAGE_SAMPLE_COUNT = 2000;
+const COVERAGE_SEED = 20_261_126;
+const REQUIRED_SHARE = 0.05;
 
 describe('settings coercion properties', () => {
   test('every admitted number round-trips through its display text', () => {
@@ -103,5 +61,40 @@ describe('settings coercion properties', () => {
     );
     expect(accepted / runs).toBeGreaterThan(0.25);
     expect(rejected / runs).toBeGreaterThan(0.25);
+  });
+});
+
+describe('settings coercion arbitrary coverage', () => {
+  // A fixed seed makes this a reproducible guard: a generator change that
+  // starves a control family fails here instead of depending on chance.
+  const samples = fc.sample(fc.tuple(numberCaseArb, otherCaseArb), {
+    numRuns: COVERAGE_SAMPLE_COUNT,
+    seed: COVERAGE_SEED
+  });
+  const numericControls = samples.map(([numeric]) => numeric.control);
+  const nonNumericCases = samples.map(([, nonNumeric]) => nonNumeric);
+
+  /** The fraction of numeric samples that satisfy `predicate`. */
+  const numericShare = (predicate: (control: ControlDescriptor) => boolean): number =>
+    numericControls.filter((control) => predicate(control)).length / numericControls.length;
+
+  /** The fraction of non-numeric samples that satisfy `predicate`. */
+  const nonNumericShare = (predicate: (sample: ControlCase) => boolean): number =>
+    nonNumericCases.filter((sample) => predicate(sample)).length / nonNumericCases.length;
+
+  test('every control family and the empty select option is well represented', () => {
+    const shares = {
+      'fractional number controls': numericShare((control) => control.kind === 'number' && !control.isInteger),
+      'integer number controls': numericShare((control) => control.kind === 'number' && control.isInteger),
+      'select controls': nonNumericShare(({control}) => control.kind === 'select'),
+      'toggle controls': nonNumericShare(({control}) => control.kind === 'toggle'),
+      'colour controls': nonNumericShare(({control}) => control.kind === 'colour'),
+      'text controls': nonNumericShare(({control}) => control.kind === 'text'),
+      'the empty select option': nonNumericShare(({value}) => value === '')
+    };
+
+    for (const [label, share] of Object.entries(shares)) {
+      expect(`${label}: ${share > REQUIRED_SHARE ? 'covered' : 'sparse'}`).toBe(`${label}: covered`);
+    }
   });
 });

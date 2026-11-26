@@ -209,8 +209,8 @@ config key, the description, and the category, and every word you type must
 match.
 
 Type `@modified` on its own, or alongside other words, to show only the
-settings your config file changes. For example `@modified font` shows the font
-settings you have changed.
+settings your config file sets explicitly. For example `@modified font` shows
+the font settings that are present in your config file.
 
 If nothing matches, a **Clear search and category** button resets both filters.
 
@@ -219,7 +219,8 @@ If nothing matches, a **Clear search and category** button resets both filters.
 - Toggles and dropdowns apply as soon as you change them.
 - Text, number, and colour fields apply when you press `Enter` or leave the
   field. Press `Escape` to put the old value back.
-- A setting that differs from its default shows a **Changed** marker.
+- A setting that is explicitly present in `config.json5` shows a **Changed**
+  marker, even when its value equals the default.
 
 Some settings take effect immediately; others say that they take effect after a
 restart.
@@ -240,10 +241,10 @@ the interface accepts but the file cannot hold is refused with the reason.
 
 ### Resetting to the default
 
-A changed setting has a **Reset** button labelled with the setting's name, for
-example **Reset Font size to default**. Resetting removes the key from your
-config file, so the built-in default applies and any future change to that
-default reaches you.
+A setting that is explicitly present in your config file has a **Reset** button
+labelled with the setting's name, for example **Reset Font size to default**.
+Resetting removes the explicit override from your config file, so the built-in
+default applies and any future change to that default reaches you.
 
 ### Other settings, and the config file
 

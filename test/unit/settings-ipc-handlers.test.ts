@@ -123,7 +123,9 @@ const REFUSAL_CASES: readonly RefusalCase[] = [
 ];
 
 for (const refusal of REFUSAL_CASES) {
-  test(refusal.name, async () => {
+  // Serial: these cases share the module-level `calls` log, so running them
+  // concurrently would let one case observe another case's service call.
+  test.serial(refusal.name, async () => {
     registerSettingsIpcHandlers(serviceDouble());
 
     const outcome = await handlerFor(refusal.channel)(unusedIpcEvent, ...refusal.args);
@@ -133,7 +135,7 @@ for (const refusal of REFUSAL_CASES) {
   });
 }
 
-test('an editable target reaches the service, and the snapshot is read through', async () => {
+test.serial('an editable target reaches the service, and the snapshot is read through', async () => {
   registerSettingsIpcHandlers(serviceDouble());
 
   const outcome = await handlerFor('settings:setValue')(unusedIpcEvent, editableTarget, 16);

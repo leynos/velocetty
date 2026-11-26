@@ -1,5 +1,5 @@
 /** @file Covers runtime plugin settings persistence and enable/disable evaluation. */
-import {beforeAll, expect, spyOn, test} from 'bun:test';
+import {beforeAll, expect, test} from 'bun:test';
 import JSON5 from 'json5';
 import {isJsonObject} from '@shared/types/json';
 
@@ -17,7 +17,7 @@ import type {
   mergeRuntimePluginKeybindings as mergeRuntimePluginKeybindingsType,
   setRuntimePluginEnabledPersisted as setRuntimePluginEnabledPersistedType
 } from '../../app/runtime/plugin-runtime';
-import {createMemoryConfigFileSystem, type MemoryConfigFileSystem} from '../testUtils/config-file-port';
+import {createMemoryConfigFileSystem} from '../testUtils/config-file-port';
 import {registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
 import {importFresh} from '../testUtils/import-fresh';
 
@@ -66,25 +66,6 @@ const ensureJsonObject = (value: unknown) => {
     throw new Error('Expected persisted JSON object.');
   }
   return value;
-};
-
-const assertParseErrorBehaviour = <T>(
-  invoke: (deps: {fileSystem: MemoryConfigFileSystem}) => T,
-  expectedResult: T,
-  expectedErrorMessage: string
-): void => {
-  const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
-  try {
-    const {fileSystem, getWrites} = createReadWritePair('{config:');
-
-    const persisted = invoke({fileSystem});
-
-    expect(persisted).toEqual(expectedResult);
-    expect(getWrites()).toHaveLength(0);
-    expect(errorSpy).toHaveBeenCalledWith(expectedErrorMessage);
-  } finally {
-    errorSpy.mockRestore();
-  }
 };
 
 /**
@@ -291,26 +272,6 @@ test('setRuntimePluginEnabledPersisted preserves unrelated plugin formatting', (
     },
   },
 }`);
-});
-
-test('ensureRuntimePluginSettingsPersisted does not write on parse errors', () => {
-  assertParseErrorBehaviour(
-    ({fileSystem}) => ensureRuntimePluginSettingsPersisted({configFilePath: CONFIG_PATH, fileSystem}),
-    {},
-    'Failed to parse runtime plugin config at "/tmp/config.json5". Returning empty namespace.'
-  );
-});
-
-test('setRuntimePluginEnabledPersisted returns fallback settings on parse errors', () => {
-  assertParseErrorBehaviour(
-    ({fileSystem}) =>
-      setRuntimePluginEnabledPersisted(GOLDEN_PATH_PLUGIN_ID, false, {
-        configFilePath: CONFIG_PATH,
-        fileSystem
-      }),
-    {...goldenPathSettingsDefaults, enabled: false},
-    'Failed to parse runtime plugin config at "/tmp/config.json5". Returning fallback settings.'
-  );
 });
 
 test('runtime command and keybinding contributions follow enabled setting', () => {

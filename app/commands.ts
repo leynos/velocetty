@@ -48,6 +48,10 @@ export type CommandDependencies = Readonly<{
   /**
    * Creates a window and asks it to open the settings tab once its renderer has
    * loaded. Used when the preferences command runs with no window focused.
+   *
+   * The request keeps the tab active through the new window's initial terminal;
+   * otherwise that terminal's `session add` would immediately hide the tab and
+   * leave the user looking at a terminal.
    */
   readonly openSettingsWindow: () => void;
   /** Re-reads the installed plugin list. */
@@ -117,7 +121,9 @@ export const createCommandTable = (dependencies: CommandDependencies): CommandTa
     },
     'window:preferences': (focusedWindow) => {
       if (focusedWindow) {
-        focusedWindow.rpc.emit('settings open req');
+        // The window already has a terminal, so the user is choosing to leave
+        // it: the tab may be taken back by the next new session.
+        focusedWindow.rpc.emit('settings open req', {keepThroughInitialSession: false});
         return;
       }
       openSettingsWindow();

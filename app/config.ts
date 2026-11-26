@@ -67,6 +67,18 @@ const spans = createConfigSpanRecorder({
   sink: {info: (line) => console.info(line), warn: (line) => console.warn(line)}
 });
 
+/**
+ * The process-wide counter tally, shared with every module that reports events.
+ *
+ * Exported so the entry point hands the same instance to the settings service
+ * it builds; a second tally would make one session's counters two partial
+ * views of the same process.
+ */
+export const configMetrics = metrics;
+
+/** The process-wide span recorder, exported for the same reason as the tally. */
+export const configSpans = spans;
+
 // The adapters are built once, at module load, exactly as before the ports
 // were split: only the start-up *command* is deferred to `setup()`, so a
 // query made earlier still works and still performs no start-up side effects.
@@ -212,12 +224,10 @@ export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions
       // before the importer copies schemas or seeds `keybindings.json5`.
       mkdirpSync(velocettyDir);
       // A crashed write can leave a sibling temporary file beside the config;
-      // start-up is the only phase that removes it.
-      try {
-        sweepTemporaryFiles(createNodeConfigFileSystem(), asConfigFilePath(cfgDir));
-      } catch {
-        // The directory may not exist yet; the first write creates it.
-      }
+      // start-up is the only phase that removes it. The sweep reports its own
+      // bounded line, so a missing directory stays silent and a real failure
+      // still names its errno.
+      sweepTemporaryFiles(createNodeConfigFileSystem(), asConfigFilePath(cfgDir), (line) => console.warn(line));
       // A crashed write can leave a temporary file behind. Start-up is the
       // only phase that may remove it, and the edge owns that cleanup
       // immediately before the seed decision reads the file.

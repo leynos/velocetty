@@ -19,7 +19,7 @@ import {
   type FieldState
 } from '@shared/settings/field-state';
 import type {ControlDescriptor} from '@shared/settings/panel-model';
-import {isBoolean, isNumber, isString} from '@shared/types/guards';
+import {isBoolean, isNumber, isObject, isString} from '@shared/types/guards';
 import type {SettingsSnapshot, SettingsWriteOutcome, SettingTarget} from '@shared/settings/protocol';
 
 import type {SettingsGateway} from './ports';
@@ -80,6 +80,32 @@ export type FieldStore = {
 export type FieldStoreDependencies = {
   readonly gateway: SettingsGateway;
   readonly fields: readonly FieldDefinition[];
+  /** Receives one bounded line per transport rejection; defaults to `console.error`. */
+  readonly log?: (message: string) => void;
+};
+
+/**
+ * Names a rejection by a fixed category and, when known, the error's name.
+ *
+ * A thrown error's message can repeat a path, a value, or a fragment of the
+ * user's file, and it crosses from the main process, so it stays out of the
+ * log. The category is always the same token; the name is added only when the
+ * rejected value carries one as a string.
+ *
+ * @param error - Whatever the gateway's promise rejected with.
+ * @returns The bounded category line, without the message.
+ *
+ * @example
+ * ```ts
+ * settingsRejectionLine(new TypeError('bad /home/ada'));
+ * // 'settings write rejected category=transport name=TypeError'
+ * settingsRejectionLine('nope'); // 'settings write rejected category=transport'
+ * ```
+ */
+const settingsRejectionLine = (error: unknown): string => {
+  const category = 'settings write rejected category=transport';
+  const name = isObject(error) && 'name' in error && isString(error.name) ? error.name : undefined;
+  return name === undefined ? category : `${category} name=${name}`;
 };
 
 const FALLBACK_ERROR: FieldError = {code: 'failed'};
@@ -159,7 +185,11 @@ const committedValueOf = (snapshot: SettingsSnapshot, target: SettingTarget): Se
  * store.setDraft('core:fontSize', '16');
  * store.submit('core:fontSize');
  */
-export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): FieldStore => {
+export const createFieldStore = ({
+  gateway,
+  fields,
+  log = (message) => console.error(message)
+}: FieldStoreDependencies): FieldStore => {
   const definitions = new Map(fields.map((field) => [field.id, field]));
   let states = new Map<string, FieldState<SettingValue, FieldError>>(
     fields.map((field) => [field.id, initialFieldState<SettingValue, FieldError>(undefined, '')])
@@ -230,7 +260,6 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
     effect: FieldEffect<SettingValue>,
     outcome: SettingsWriteOutcome
   ): void => {
-    const isCurrent = states.get(definition.id)?.pendingRequestId === effect.requestId;
     recordOutcomeStatus(definition, effect, outcome);
     apply(definition, outcomeEvent(effect.requestId, outcome));
     if (outcome.kind !== 'applied') {
@@ -272,7 +301,10 @@ export const createFieldStore = ({gateway, fields}: FieldStoreDependencies): Fie
       .then((outcome) => {
         settleOutcome(definition, effect, outcome);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        // The outcome still reports the failure to the field; this line is the
+        // only evidence a session log can carry, so it stays bounded.
+        log(settingsRejectionLine(error));
         failOutcome(definition, effect);
       })
       .finally(settle);

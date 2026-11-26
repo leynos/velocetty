@@ -1328,6 +1328,8 @@ Feature: Settings tab shell and navigation
     Given no window is open
     When the preferences command runs
     Then a window is created and its settings tab is active
+    And the window's initial terminal does not take the surface back
+    But a session the user creates afterwards does make a terminal active
 
   Scenario: Returning to a terminal
     Given the settings tab is open and active
@@ -2173,3 +2175,88 @@ convergence model and harness moved to
 `test/testUtils/settings-convergence-model.ts` (355 lines), leaving the
 property file at 102 lines, both under the source limit. Final candidate: 1,214
 unit tests.
+
+2026-11-26: seventh review repair round (renderer/main command path, eight
+verified CodeRabbit findings). Each is a behaviour defect rather than a style
+point, so each carries a regression:
+
+1. A programmatic preferences open now survives the new window's initial
+   terminal. `settings open req` carries `{keepThroughInitialSession}`; the
+   slice records the request and the window's first `SESSION_ADD` consumes it
+   without taking the surface, while a user-initiated open and every later new
+   session still deactivate. Tests: `settings-tab-slice` (5 new transitions),
+   `settings-tab-strip` (2, real store), `command-table`, bootstrap.
+2. `lib/actions/header.ts` no longer routes by uid: `changeTab` dispatches
+   `activateTab` from `lib/actions/tab-strip.ts`, the single entry point.
+3. The bootstrap `termgroup close req` listener applies the `pane:close` rule
+   (close the settings tab, never the hidden terminal), and every main-process
+   terminal request (`session clear/move/del/break/stop/quit/tmux` and
+   `session search`/`search close`) is dropped while settings owns input.
+4. `lib/containers/hyper.tsx` tags each async key attachment and ignores one
+   that settles after a newer attachment or after unmount, and marks the
+   inactive settings layer `inert` like the terminal layer.
+5. The `config change` subscription moved to
+   `lib/transport/config-change-subscription.ts` and is injected into the
+   gateway, which no longer imports `lib/utils/ipc`.
+6. `keyHandlerFor` ignores Enter and Escape while an IME is composing, reading
+   the flag from the event or React's `nativeEvent`.
+7. `useSettingsSnapshot` orders failures: a failure is shown only when no
+   later-started load was accepted, and only the newest load settles the
+   loading flag.
+8. Both colour validators require three numeric or percentage channels with an
+   optional alpha, so `rgb(+)` and `rgba(,,,)` are refused; the parity suite
+   still proves the two agree.
+
+Focused suites: `command-table`, `settings-tab-slice`, `settings-tab-strip`,
+`settings-tab-input-gating`, `settings-tab-terminal-preservation`,
+`settings-tab-shell-behaviour`, `hyper-effects`, `hyper-key-registration` (new),
+`hyper-transport`, `settings-transport-gateway`, `settings-editor-hook`,
+`settings-coerce` (and property), `settings-catalogue-parity`,
+`settings-controls`, `bootstrap-transport-integration`,
+`settings-compile-contracts`, and `settings-container-model`: 156 tests, 0
+failures.
+
+2026-11-26: eighth repair round, covering the hosted CodeRabbit review's 31
+inline findings and its three-error/two-warning pre-merge table. Every finding
+was verified against the source and repaired or answered with evidence; the
+behaviour changes carry regressions:
+
+1. JSON5 removals now delete the separator comma separately from a property
+   when a comment sits between them, treat CR, LF, U+2028, and U+2029 as line
+   terminators, and refuse a duplicate key instead of removing the first match.
+2. The writer reports durability separately, retries only refusal-class
+   errnos, logs one bounded retry line per attempt, and the settings service
+   serializes writes through one ordered queue so an earlier retry cannot land
+   after a later value.
+3. A reload is suppressed as a self-write only when the config text is the
+   hash the writer recorded *and* the keybindings did not change; a coalesced
+   external keymap edit is still announced.
+4. Non-finite numbers parsed from JSON5 (`NaN`, `Infinity`) are encoded as
+   their JSON5 text in the transport snapshot, so the renderer schema accepts
+   the payload and the tab can repair the value.
+5. The renderer gates the close and session-targeting requests while settings
+   owns input, passes `keepThroughInitialSession` only for a programmatic open,
+   and keeps the inactive layer `inert`.
+6. Observability: counters `settingsApplies`, `settingsRejections`,
+   `settingsFailures`, `settingsWriteRetries`, and
+   `settingsDurabilityUnconfirmed`; a `settings-write` span; bounded refusal
+   and retry lines; a bounded field-store rejection line; and a sweep warning
+   that stays silent only for a first-run `ENOENT`.
+7. Documentation: the users' guide uses presence semantics for Changed and
+   Reset, the migration note covers `keybindings.json5` and a renamed
+   `hyper.json`, the architecture note gained an Observability section, the
+   developer guide documents the settings seams and the full counter set, and
+   the ADR records the equality and safe-integer boundaries.
+
+Gate evidence on the final tree: `make fmt`, `make check-fmt`, `make typecheck`,
+`make lint`, `make markdownlint`, `make nixie`, `make prove` (1 + 8 + 9 + 11
+verified, zero errors), `make build-fast`, 1,288 unit tests across 143 files
+with zero failures, the packaged settings deep E2E passing, and
+`cs delta origin/main` reporting no new issue. The deep lane's second test
+(`terminal-input-path`) cannot launch without a display in this headless
+environment and is unrelated to the settings change; the settings test sets
+`--ozone-platform=headless` and passes. Loading the deep lane under the local
+Node 22.23 needed a temporary, uncommitted substitution of the helper's
+`import.meta.url` base directory, because Node 22 evaluates Playwright's
+CommonJS transform of that file as ESM; the file is unchanged in the diff and
+CI runs Node 24.

@@ -427,11 +427,18 @@ shortcut can leak into a log.
 [config] import attempt phase=reload
 [config] import decision phase=reload config=applied configSource=velocetty
   keybindings=applied origin=file announced=true
-  attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0,writeFailures:0,watcherFailures:0
+  attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,
+  importFailures:0,retries:0,writeFailures:0,watcherFailures:0,
+  settingsApplies:0,settingsRejections:0,settingsFailures:0,
+  settingsWriteRetries:0,settingsDurabilityUnconfirmed:0
 [config] span operation=reload outcome=applied ms=2
 [config] span operation=watcher-dispatch outcome=applied ms=2
+[config] span operation=settings-write outcome=applied ms=1
 [config] import failure phase=reload cause=thrown
-  attempts:2,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0,writeFailures:0,watcherFailures:0
+  attempts:2,applies:1,parseFailures:0,readFailures:0,fallbacks:0,
+  importFailures:1,retries:0,writeFailures:0,watcherFailures:0,
+  settingsApplies:0,settingsRejections:0,settingsFailures:0,
+  settingsWriteRetries:0,settingsDurabilityUnconfirmed:0
 [config] keybindings rename attempt=1 category=busy exhausted=false
 ```
 
@@ -467,16 +474,23 @@ records are shown wrapped here. Its fields mean:
   attempts, `writeFailures` counts every failed `keybindings.json5` write
   including a bootstrap seed and a refused replacement target, and
   `watcherFailures` counts a watcher handle error and a failing watcher close.
-  All counters are cumulative for the process lifetime.
+  The `settings*` counters describe settings-tab writes: `settingsApplies`
+  counts edits the service applied, `settingsRejections` counts edits it
+  refused because the field is not editable, `settingsFailures` counts a
+  refused write or a protocol failure, `settingsWriteRetries` counts retried
+  configuration-file writes, and `settingsDurabilityUnconfirmed` counts writes
+  whose directory entry could not be flushed. All counters are cumulative for
+  the process lifetime.
 - `category` is `permission` for `EPERM` and `EACCES`, `busy` for `EBUSY`, and
   `other` for anything else. `exhausted` marks the attempt that ended the
   write, so a retry that later succeeds emits only `exhausted=false` events.
 - A span's `operation` is `startup`, `reload`, `watcher-dispatch`,
-  `keybindings-read`, or `keybindings-write`; its `outcome` is `applied`,
-  `fallback`, or `thrown` for the import operations and `present`, `missing`,
-  `unreadable`, `written`, or `failed` for the storage operations. `ms` is the
-  elapsed time rounded to a whole millisecond, so a span line is a completion
-  record rather than an in-progress marker.
+  `keybindings-read`, `keybindings-write`, or `settings-write`; its `outcome` is
+  `applied`, `fallback`, or `thrown` for the import operations, `present`,
+  `missing`, `unreadable`, `written`, or `failed` for the storage operations,
+  and `applied` or `failed` for a settings write. `ms` is the elapsed time
+  rounded to a whole millisecond, so a span line is a completion record rather
+  than an in-progress marker.
 
 `createConfigMetrics`, `createImportRecorder`, and `createConfigSpanRecorder`
 live in `app/config/config-metrics.ts`, `app/config/config-observability.ts`,
@@ -779,6 +793,58 @@ The dispatcher reaches every surface that runs a command:
 `emitKeymapsMarker(report, keymaps, marker)`. The applied keymaps arrive as a
 parameter, so the line names the configuration the import that just finished
 produced rather than whatever state happens to be stored.
+
+### Settings editing and persistence
+
+The full design is in
+[settings-tab-architecture.md](settings-tab-architecture.md); these are the
+seams a test drives directly rather than through the whole application.
+
+`app/config/json5/` is the shared comment-preserving edit boundary. Its
+`index.ts` exports `json5Document`, `propertyKey`, `Json5Parser`,
+`setPropertyAtPath`, and `removePropertyAtPath`, and both the config writer
+(`app/config/config-file-writer.ts`) and the plugin runtime
+(`app/runtime/plugin-runtime-json5-roundtrip.ts`) edit through that surface
+instead of re-serializing the file. `test/unit/json5-document-edit.test.ts` and
+its property suite drive the edits with real documents; the property suite also
+walks the fixtures in `test/fixtures/json5-config/`.
+
+`writeConfigEdit` and `writeConfigEditSync` in
+`app/config/config-file-writer.ts` are the only functions that write the user's
+config file. Both take a `ConfigWriterDependencies` whose `fileSystem` is a
+`ConfigFileSystemPort`: `createNodeConfigFileSystem` supplies the production
+port, and `createMemoryConfigFileSystem` in
+`test/testUtils/config-file-port.ts` supplies a `MemoryConfigFileSystem` that
+records every write, so a test can assert that a refused edit never reached
+disk. `writeConfigEdit` retries the whole critical section; the plugin runtime
+uses `writeConfigEditSync`, one pass, because it persists during module
+evaluation.
+
+The settings seams and the double each test uses:
+
+- `createSettingsService` (`app/settings/settings-service.ts`) — the
+  behavioural suite runs it over `createMemoryConfigFileSystem` and a quiet
+  `ConfigWriterDependencies`; the convergence property uses the same port
+  through `test/testUtils/settings-convergence-model.ts`.
+- `registerSettingsIpcHandlers` (`app/settings/settings-ipc.ts`) — its suite
+  registers the handlers against a `serviceDouble()` and a stubbed
+  `ipcMain.handle` from `test/testUtils/electron-path.ts`.
+- `createTransportSettingsGateway`
+  (`lib/settings/adapters/transport-settings-gateway.ts`) — its suite passes a
+  `transportOf` fake whose `invoke` answers each channel directly.
+- `createFieldStore` (`lib/settings/field-store.ts`) — its suite drives it
+  with `createFakeGateway()`, whose deferred writes resolve or reject one
+  outcome at a time.
+- `checkWritePolicy` (`app/settings/settings-write-policy.ts`) — a pure
+  predicate over a key and a JSON value, so it needs no double; the parity
+  suite checks it as a table.
+
+`createConfigWatchRuntime` (`app/config/config-watch.ts`) wires the watcher to
+the importer, and `shouldNotifyReload` (`app/config/import-report.ts`) decides
+whether a reload announces itself. `test/testUtils/config-watch-harness.ts`
+imports the composition root over a mocked chokidar, Electron, and config
+adapters, and `shouldNotifyReload` is tested as a table in
+`test/unit/config-watch-integration.test.ts`.
 
 ## Visible-only WebGL rendering practice
 

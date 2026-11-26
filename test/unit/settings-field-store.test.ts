@@ -36,17 +36,17 @@ type Call =
   | {readonly kind: 'set'; readonly target: SettingTarget; readonly value: unknown}
   | {readonly kind: 'reset'; readonly target: SettingTarget};
 
-type Deferred = {
-  readonly resolve: (outcome: SettingsWriteOutcome) => void;
-  readonly reject: (error: Error) => void;
-};
+type Deferred = Readonly<{
+  resolve: (outcome: SettingsWriteOutcome) => void;
+  reject: (error: unknown) => void;
+}>;
 
 type FakeGateway = {
   readonly gateway: SettingsGateway;
   readonly calls: Call[];
   readonly pending: Deferred[];
   readonly resolveNext: (outcome: SettingsWriteOutcome) => void;
-  readonly rejectNext: (error: Error) => void;
+  readonly rejectNext: (error: unknown) => void;
 };
 
 const createFakeGateway = (): FakeGateway => {
@@ -83,7 +83,8 @@ const createFakeGateway = (): FakeGateway => {
   };
 };
 
-const createStore = (gateway: SettingsGateway): FieldStore => createFieldStore({gateway, fields: [FONT, SHELL]});
+const createStore = (gateway: SettingsGateway, log: (message: string) => void = () => {}): FieldStore =>
+  createFieldStore({gateway, fields: [FONT, SHELL], log});
 
 const stateOf = (store: FieldStore, id = FONT.id) => {
   const state = store.getSnapshot().fields.get(id);
@@ -368,8 +369,20 @@ describe('settings field store', () => {
     store.refresh(snapshotWith({fontSize: 14}));
     store.setDraft(FONT.id, '22');
     store.refresh(snapshotWith({fontSize: 16}, 2));
-    expect(stateOf(store).draft).toBe('22');
-    expect(stateOf(store).committed).toBe(16);
+    expect([stateOf(store).draft, stateOf(store).committed]).toEqual(['22', 16]);
+  });
+
+  test('a transport rejection logs a bounded line and never the message', async () => {
+    const fake = createFakeGateway();
+    const lines: string[] = [];
+    const store = createStore(fake.gateway, (message) => lines.push(message));
+    store.setDraft(FONT.id, '16');
+    store.submit(FONT.id);
+    fake.rejectNext(new TypeError('EACCES: cannot write /home/user/.config/Hyper/config.json5'));
+    await store.whenIdle();
+    expect(lines).toEqual(['settings write rejected category=transport name=TypeError']);
+    expect(lines.join('\n')).not.toContain('/home/user');
+    expect(store.getSnapshot().status).toBe('failed');
   });
 
   test('a transport failure leaves a failure phase with a message', async () => {

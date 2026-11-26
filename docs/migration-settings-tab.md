@@ -19,14 +19,18 @@ terminal keeps running, and opening the tab does not resize or restart it.
 
 ## What did not change
 
-- The settings tab edits the same `config.json5` and `keybindings.json5` files
-  as before. There is no second store and no export step.
+- The settings tab edits the same `config.json5` file as before. There is no
+  second store and no export step.
+- Keybindings still require manual editing: the tab does not edit
+  `keybindings.json5`, and the keybinding editor is deferred to roadmap item
+  4.2.2.
 - Every write is a targeted edit: your comments, ordering, quoting, and line
   endings elsewhere in the file are preserved.
 - An external editor still works. A save from another program is reloaded and
   the tab refreshes.
-- A legacy `hyper.json` remains read-only in the settings tab until it is
-  renamed to `config.json5`.
+- A legacy `hyper.json` remains read-only in the settings tab. Rename it to
+  `config.json5` and restart Velocetty: the active file is chosen at start-up,
+  so the tab keeps reading `hyper.json` until the application restarts.
 
 ## Opening the file directly
 

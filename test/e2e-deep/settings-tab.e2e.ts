@@ -33,6 +33,12 @@ const commandOutputTimeoutMs = 12_000;
 const fileTimeoutMs = 15_000;
 const closeTimeoutMs = 5000;
 
+const terminalSizePattern = /^\d{1,3} \d{1,3}$/;
+// `lib/components/term.tsx` debounces its ResizeObserver by 500ms before it
+// refits xterm, so a baseline read any sooner can predate the resize.
+const sizeSettleDelayMs = 2000;
+const sizeSettleIntervalMs = 750;
+
 const SENTINEL = '// velocetty-e2e-sentinel: keep this comment';
 // The golden-path plugin persists its defaults at start-up, so the exact
 // document includes that namespace alongside the core setting.
@@ -101,25 +107,36 @@ const configPathFor = (environment: Awaited<ReturnType<typeof createIsolatedE2EE
 
 const readConfig = (configPath: string): Promise<string> => fs.readFile(configPath, 'utf8');
 
+/** Distinguishes one `stty size` request from responses left in scrollback. */
+let terminalSizeSequence = 0;
+
 /**
- * Types `stty size` in the terminal and reads the `rows cols` line it prints.
+ * Types a uniquely marked `stty size` command and reads its `rows cols` line.
  *
- * The PTY answers with the size it was given, so this is the closest observable
- * proxy for "the terminal was not resized".
+ * The marker ties each read to its own command, because an earlier response
+ * stays in the scrollback and would otherwise be matched again. The PTY
+ * answers with the size it was given, so this is the closest observable proxy
+ * for "the terminal was not resized".
  */
 const readTerminalSize = async (window: Page) => {
+  terminalSizeSequence += 1;
+  const marker = `__size-${terminalSizeSequence}-${Date.now()}__`;
   await window.locator('.xterm-helper-textarea').first().focus();
-  await window.keyboard.type('stty size');
+  await window.keyboard.type(`echo '${marker}'; stty size`);
   await window.keyboard.press('Enter');
   let size = '';
   await expect
     .poll(
       async () => {
-        const lines = await readActiveTerminalBuffer(window);
-        const buffer = lines.join('\n');
-        const match = /\b(\d{1,3}) (\d{1,3})\b/g;
-        const matches = [...buffer.matchAll(match)];
-        size = matches.at(-1)?.[0] ?? '';
+        const bufferLines = await readActiveTerminalBuffer(window);
+        const lines = bufferLines.map((line) => line.trim());
+        // The shell echoes the typed command, and that echo contains the marker
+        // as a substring. Only a line that is exactly the marker is this
+        // command's output, so the size is the first size-shaped line after it.
+        const markerIndex = lines.lastIndexOf(marker);
+        const response =
+          markerIndex === -1 ? undefined : lines.slice(markerIndex + 1).find((line) => terminalSizePattern.test(line));
+        size = response ?? '';
         return size;
       },
       {timeout: commandOutputTimeoutMs}
@@ -128,12 +145,53 @@ const readTerminalSize = async (window: Page) => {
   return size;
 };
 
+/**
+ * Reads the terminal size until two commands taken at least one fit interval
+ * apart agree.
+ *
+ * The renderer debounces its ResizeObserver by 500 ms before refitting xterm
+ * and telling the PTY the new geometry (`lib/components/term.tsx`), so two
+ * readings taken immediately after the viewport changes can both report the
+ * old size. Waiting longer than that debounce before the first reading, then
+ * sampling until the value stops moving, keeps the baseline out of the resize
+ * window.
+ */
+const readSettledTerminalSize = async (window: Page): Promise<string> => {
+  await new Promise((resolve) => setTimeout(resolve, sizeSettleDelayMs));
+  let settled = await readTerminalSize(window);
+  const deadline = Date.now() + commandOutputTimeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, sizeSettleIntervalMs));
+    const current = await readTerminalSize(window);
+    if (current === settled) {
+      return current;
+    }
+    settled = current;
+  }
+  throw new Error(`Terminal size did not settle within ${commandOutputTimeoutMs}ms`);
+};
+
+/**
+ * Gives the window a normal desktop size and waits for the renderer to see it.
+ *
+ * Headless ozone gives the window a very small content box in which the
+ * Settings tab sits at the edge, so the pointer round trip needs a larger
+ * window. Resizing before the baseline is read keeps the later comparison to
+ * settings activation alone.
+ */
+const resizeWindowForSettings = async (window: Page, app: ElectronApplication): Promise<void> => {
+  const readViewport = (): Promise<string> =>
+    window.evaluate(() => `${globalThis.innerWidth}x${globalThis.innerHeight}`);
+  const viewportBefore = await readViewport();
+  await app.evaluate(({BrowserWindow}) => {
+    const [main] = BrowserWindow.getAllWindows();
+    main.setSize(1000, 800);
+  });
+  await expect.poll(readViewport, {timeout: windowTimeoutMs}).not.toBe(viewportBefore);
+};
+
 /** Opens settings, verifies the terminal size survived, and reopens them. */
-const openSettingsAndVerifyTerminalSize = async (
-  window: Page,
-  app: ElectronApplication,
-  sizeBefore: string
-): Promise<void> => {
+const openSettingsAndVerifyTerminalSize = async (window: Page, sizeBefore: string): Promise<void> => {
   const preferencesShortcut = process.platform === 'darwin' ? 'Meta+,' : 'Control+,';
   const settingsTab = window.locator('header li', {hasText: 'Settings'});
   const searchInput = window.locator('input[type="search"]');
@@ -160,14 +218,6 @@ const openSettingsAndVerifyTerminalSize = async (
   };
   await openSettings();
   await expect(settingsTab).toBeVisible();
-
-  // Headless ozone gives the window a very small content box in which the
-  // Settings tab itself sits at the edge. Use a normal desktop size for the
-  // pointer round trip; the panel scrolls either way.
-  await app.evaluate(({BrowserWindow}) => {
-    const [main] = BrowserWindow.getAllWindows();
-    main.setSize(1000, 800);
-  });
   await searchInput.click();
 
   // Opening settings never resized the running terminal.
@@ -248,12 +298,15 @@ test('settings tab edits, validates, and resets the config file', async ({page: 
     });
 
     await waitForRendererReady(window, rendererReadyTimeoutMs);
-    const sizeBefore = await readTerminalSize(window);
+    // The resize is part of the baseline: the comparison below must isolate
+    // settings activation, not a geometry change.
+    await resizeWindowForSettings(window, app);
+    const sizeBefore = await readSettledTerminalSize(window);
 
     // The preferences shortcut opens the settings tab. The key bindings are
     // registered asynchronously at start-up, so the press is repeated until the
     // tab appears rather than assuming the first one was bound.
-    await openSettingsAndVerifyTerminalSize(window, app, sizeBefore);
+    await openSettingsAndVerifyTerminalSize(window, sizeBefore);
 
     const seededAtStart = await readConfig(configPath);
     expect(seededAtStart).toContain('fontSize: 14');
@@ -262,18 +315,22 @@ test('settings tab edits, validates, and resets the config file', async ({page: 
     expect(monitor.criticalErrors).toHaveLength(0);
   } finally {
     monitor?.stop();
-    await attachRunArtefacts(testInfo, logs);
-
-    if (mainWindow && testInfo.status !== testInfo.expectedStatus) {
-      const screenshot = await mainWindow.screenshot({fullPage: true});
-      await testInfo.attach('settings-tab-failure.png', {body: screenshot, contentType: 'image/png'});
-    }
-
+    // A failed screenshot must not skip shutdown: when the window is already
+    // gone, `screenshot` rejects, so cleanup sits in a nested `finally`.
     try {
-      await withTimeout(app.close(), closeTimeoutMs);
-    } catch {
-      electronProcess.kill('SIGKILL');
+      await attachRunArtefacts(testInfo, logs);
+
+      if (mainWindow && testInfo.status !== testInfo.expectedStatus) {
+        const screenshot = await mainWindow.screenshot({fullPage: true});
+        await testInfo.attach('settings-tab-failure.png', {body: screenshot, contentType: 'image/png'});
+      }
+    } finally {
+      try {
+        await withTimeout(app.close(), closeTimeoutMs);
+      } catch {
+        electronProcess.kill('SIGKILL');
+      }
+      await isolatedEnvironment.cleanup();
     }
-    await isolatedEnvironment.cleanup();
   }
 });

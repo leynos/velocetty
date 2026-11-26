@@ -5,6 +5,12 @@
  * The hash of the last self-written text lets the watcher refresh subscribers
  * without showing a "configuration reloaded" notification for the app's own
  * write. Both live here so the writer and `app/config.ts` observe one value.
+ *
+ * The singleton is deliberate: both consumers run in the one main process and
+ * must agree on the same revision and hash, and a second instance would silently
+ * disable self-write detection. `test/unit/config-write-state.test.ts` and
+ * `test/unit/config-watch-selfwrite.test.ts` cover it directly, so the state is
+ * tested rather than hidden behind an ambient import.
  */
 
 import {createHash} from 'node:crypto';

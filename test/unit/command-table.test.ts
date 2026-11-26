@@ -189,7 +189,9 @@ test('window:preferences asks the focused window to show the settings tab', () =
 
   harness.table['window:preferences']?.(window);
 
-  expect(emit.mock.calls).toEqual([['settings open req']]);
+  // An existing window already has a terminal, so this open does not ask to
+  // survive a session add: the next new session may take the surface back.
+  expect(emit.mock.calls).toEqual([['settings open req', {keepThroughInitialSession: false}]]);
   // A focused window already has a renderer to host the tab, so no window is
   // opened and the configuration file is not touched.
   expect(harness.effects).toEqual([]);

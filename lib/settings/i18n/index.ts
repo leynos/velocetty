@@ -105,7 +105,7 @@ export const settingsStrings = {
   legacyBanner: 'This configuration uses the legacy hyper.json file, which the settings tab cannot change.',
   missingBanner:
     'No config file exists yet, so settings cannot be saved from this tab. Open the file to create it, or restart Velocetty.',
-  modifiedNote: 'Changed from the default.'
+  modifiedNote: 'Set explicitly in your config file.'
 } as const;
 
 /**

@@ -15,9 +15,15 @@ import {
   propertyKey,
   removePropertyAtPath,
   setPropertyAtPath,
-  type DocumentEditResult
+  type DocumentEditResult,
+  type Json5ObjectProperty
 } from '../../app/config/json5';
-import {valueTextEnd} from '../../app/config/json5/document-scan';
+import {
+  lineEndIndex,
+  scanTrailingCommentEnd,
+  terminatorLength,
+  valueTextEnd
+} from '../../app/config/json5/document-scan';
 import {
   defaultStyle,
   json5DocumentArbitrary,
@@ -48,6 +54,8 @@ const deleteIn = (root: JsonValue, key: string): JsonValue => {
 };
 
 type CommentScan = {readonly text: string; readonly endIndex: number};
+
+type CommentRecord = CommentScan & {readonly startIndex: number};
 
 type ScanPosition = {readonly text: string; readonly index: number};
 
@@ -86,8 +94,8 @@ const commentAt = ({text, index}: ScanPosition): CommentScan | undefined => {
   return undefined;
 };
 
-const commentsOf = (text: string): string[] => {
-  const comments: string[] = [];
+const commentRecordsOf = (text: string): readonly CommentRecord[] => {
+  const records: CommentRecord[] = [];
   let index = 0;
   while (index < text.length) {
     const character = text[index];
@@ -100,11 +108,16 @@ const commentsOf = (text: string): string[] => {
       index += 1;
       continue;
     }
-    comments.push(comment.text);
+    records.push({...comment, startIndex: index});
     index = comment.endIndex;
   }
-  return comments.toSorted();
+  return records;
 };
+
+const commentsOf = (text: string): string[] =>
+  commentRecordsOf(text)
+    .map(({text: comment}) => comment)
+    .toSorted();
 
 // A newline is lone unless the segment before it ends with a carriage return.
 const hasLoneLf = (text: string): boolean =>
@@ -124,21 +137,49 @@ const editedDoc = (result: DocumentEditResult): string => {
 
 type RemovalSpan = {readonly before: string; readonly after: string; readonly key: string};
 
+type DocumentSpan = {readonly startIndex: number; readonly endIndex: number};
+
+/** The span a removal may delete for `property`; any preceding comma is separate. */
+const propertyRemovalSpan = (text: string, parser: Json5Parser, property: Json5ObjectProperty): DocumentSpan => {
+  const valueEnd = valueTextEnd(text, property);
+  const trailingEnd = scanTrailingCommentEnd({doc: text, index: valueEnd});
+  const lineStart = parser.getLineStartIndex({index: property.keyStartIndex});
+  const lineEnd = lineEndIndex({doc: text, index: trailingEnd});
+  const isOwnLine =
+    /^[ \t]*$/.test(text.slice(lineStart, property.keyStartIndex)) && /^[ \t]*$/.test(text.slice(trailingEnd, lineEnd));
+  if (isOwnLine) {
+    return {startIndex: lineStart, endIndex: lineEnd + terminatorLength({doc: text, index: lineEnd})};
+  }
+  if (!property.hasTrailingComma) {
+    return {startIndex: property.keyStartIndex, endIndex: trailingEnd};
+  }
+  const comma = parser.skipWhitespaceAndComments({startIndex: valueEnd, limitIndex: text.length});
+  return {startIndex: property.keyStartIndex, endIndex: text[comma] === ',' ? comma + 1 : trailingEnd};
+};
+
+/** Comments that lie wholly outside `span`, with their multiplicity. */
+const commentsOutsideSpan = (text: string, span: DocumentSpan): string[] =>
+  commentRecordsOf(text)
+    .filter((record) => record.endIndex <= span.startIndex || record.startIndex >= span.endIndex)
+    .map(({text: comment}) => comment)
+    .toSorted();
+
 const expectRemovalConfinedToConfig = ({before, after, key}: RemovalSpan): void => {
   const parser = new Json5Parser(before);
   const root = parser.findRootObjectRange();
   const configProperty = root ? parser.getObjectProperty(root, 'config') : null;
   const configRange = configProperty ? parser.getObjectRangeForProperty(configProperty) : null;
   const property = configRange ? parser.getObjectProperty(configRange, key) : null;
-  if (configRange && property) {
-    // Everything before the config object and after its close brace is
-    // untouched; the comment check below covers the removed span.
-    expect(after.startsWith(before.slice(0, configRange.openBraceIndex + 1))).toBe(true);
-    expect(after.endsWith(before.slice(configRange.closeBraceIndex + 1))).toBe(true);
+  if (!configRange || !property) {
+    return;
   }
-  const remaining = commentsOf(after);
-  const original = commentsOf(before);
-  expect(remaining.every((comment) => original.includes(comment))).toBe(true);
+  // Everything before the config object and after its close brace is
+  // untouched.
+  expect(after.startsWith(before.slice(0, configRange.openBraceIndex + 1))).toBe(true);
+  expect(after.endsWith(before.slice(configRange.closeBraceIndex + 1))).toBe(true);
+  // Comments outside the removed property's span survive with their
+  // multiplicity; only a comment inside that span may disappear.
+  expect(commentsOf(after)).toEqual(commentsOutsideSpan(before, propertyRemovalSpan(before, parser, property)));
 };
 
 const removeCases = fc
@@ -222,6 +263,29 @@ describe('JSON5 document edit properties', () => {
     const after = editedDoc(removePropertyAtPath(json5Document(crlf.text), pathTo('beta')));
     expect(hasLoneLf(after)).toBe(false);
     expect(JSON5.parse(after)).toEqual({config: {alpha: 1, gamma: 3}});
+  });
+
+  test('a remove keeps the comments attached to the surviving properties', () => {
+    // `beta` shares the closing-brace line, so the removal takes the inline
+    // path where the separating comma sits next to gamma's trailing comment.
+    const doc = `{
+  // config note
+  config: {
+    // alpha note
+    alpha: 1, // alpha tail
+    // gamma note
+    gamma: 2, // gamma tail
+    beta: 3}}
+`;
+    const after = editedDoc(removePropertyAtPath(json5Document(doc), pathTo('beta')));
+    expect(JSON5.parse(after)).toEqual({config: {alpha: 1, gamma: 2}});
+    expect(commentsOf(after)).toEqual([
+      '// alpha note',
+      '// alpha tail',
+      '// config note',
+      '// gamma note',
+      '// gamma tail'
+    ]);
   });
 
   test('the fixtures are refused or edited for the documented reason', () => {

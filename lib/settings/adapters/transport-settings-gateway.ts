@@ -1,29 +1,23 @@
 /**
  * @file Adapts the renderer command transport to the settings gateway port.
+ *
+ * The gateway never reaches Electron-backed IPC itself: the config-change
+ * subscription arrives as a dependency from `lib/transport/`, so a test can
+ * drive the gateway with doubles and the wiring lives at the transport
+ * boundary.
  */
 
 import type {RendererCommandTransport} from '@shared/types/transport';
 import type {JsonValue} from '@shared/types/json';
 import type {SettingTarget} from '@shared/settings/protocol';
-import {ipcRenderer} from '../../utils/ipc';
+import {
+  subscribeToConfigChange as subscribeToTransportConfigChange,
+  type ConfigChangeSubscription
+} from '../../transport/config-change-subscription';
 import type {SettingsGateway} from '../ports';
 
-/**
- * Subscribes to the main process's payload-free config change event.
- *
- * The event is sent with `webContents.send`, not through the RPC envelope, so
- * it is listened for on `ipcRenderer` directly rather than on the transport.
- *
- * @param onChanged - Called after every reload.
- * @returns The unsubscribe function.
- */
-export const subscribeToConfigChange = (onChanged: () => void): (() => void) => {
-  const handler = () => onChanged();
-  ipcRenderer.on('config change', handler);
-  return () => {
-    ipcRenderer.removeListener('config change', handler);
-  };
-};
+/** The command transport surface the gateway needs; only invoke is used. */
+export type SettingsCommandTransport = Pick<RendererCommandTransport, 'invoke'>;
 
 /**
  * Builds a gateway over the renderer transport.
@@ -32,16 +26,18 @@ export const subscribeToConfigChange = (onChanged: () => void): (() => void) => 
  * superseded result; a write the main process started still completes.
  *
  * @param transport - The renderer command transport, of which only `invoke` is used.
+ * @param subscribeToConfigChange - The transport adapter that reports config
+ * reloads; defaulted so existing callers keep their one-argument form.
  * @returns The settings gateway.
  *
  * @example
  * const gateway = createTransportSettingsGateway(transport);
  * await gateway.getSnapshot(new AbortController().signal);
  */
-/** The command transport surface the gateway needs; only invoke is used. */
-export type SettingsCommandTransport = Pick<RendererCommandTransport, 'invoke'>;
-
-export const createTransportSettingsGateway = (transport: SettingsCommandTransport): SettingsGateway => ({
+export const createTransportSettingsGateway = (
+  transport: SettingsCommandTransport,
+  subscribeToConfigChange: ConfigChangeSubscription = subscribeToTransportConfigChange
+): SettingsGateway => ({
   getSnapshot: async (signal) => {
     signal.throwIfAborted();
     const snapshot = await transport.invoke('settings:getSnapshot');

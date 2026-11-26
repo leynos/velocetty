@@ -101,13 +101,40 @@ describe('text coercion', () => {
 
 describe('colour coercion', () => {
   test('accepts the supported colour syntaxes', () => {
-    const accepted = ['#abc', '#AABBCC', '#aabbccdd', 'rgb(0, 0, 0)', 'rgba(0, 0, 0, 0.5)'];
-    expect(accepted.map((raw) => isColourValue(raw))).toEqual([true, true, true, true, true]);
+    const accepted = [
+      '#abc',
+      '#AABBCC',
+      '#aabbccdd',
+      'rgb(0, 0, 0)',
+      'rgb(255, 128, 0)',
+      'rgb(100%, 0%, 50%)',
+      'rgb(255 0 0)',
+      'rgb(255 0 0 / 50%)',
+      'rgba(0, 0, 0, 0.5)',
+      'rgba(0, 0, 0, 50%)',
+      'rgba(1 2 3 / 0.4)'
+    ];
+    expect(accepted.map((raw) => isColourValue(raw))).toEqual(accepted.map(() => true));
     expect(accepted.map((raw) => coerceInput(COLOUR, raw))).toEqual(accepted.map((value) => ({ok: true, value})));
   });
 
-  test('rejects everything else', () => {
-    const rejected = ['#ab', '#ggg', 'rgb()', 'tomato', 'red;', 'url(#x)'];
+  test('rejects malformed components, counts, and separators', () => {
+    const rejected = [
+      '#ab',
+      '#ggg',
+      'rgb()',
+      'rgb(+)',
+      'rgba(,,,)',
+      'rgb(1, 2)',
+      'rgb(1, 2, 3, 4, 5)',
+      'rgb(1, , 3)',
+      'rgb(1 2 3 4)',
+      'rgb(a, b, c)',
+      'rgb(1;2;3)',
+      'tomato',
+      'red;',
+      'url(#x)'
+    ];
     expect(rejected.map((raw) => rejectedReason(COLOUR, raw))).toEqual(rejected.map(() => 'not-a-colour'));
     expect(rejectedReason(COLOUR, '  ')).toBe('empty');
   });

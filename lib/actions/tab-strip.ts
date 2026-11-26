@@ -17,8 +17,28 @@ import {setActiveGroup} from './term-groups';
 
 import type {HyperDispatch} from '../../typings/hyper';
 
-/** Opens the settings tab and makes it active. */
-export const openSettingsTab = () => ({type: SETTINGS_TAB_OPEN});
+/**
+ * Opens the settings tab and makes it active.
+ *
+ * @param options - `keepThroughInitialSession` marks a programmatic open in a
+ * freshly created window: the window's initial terminal arrives as a
+ * `session add` after this action, and that one add must not take the surface
+ * back. A user-initiated preferences open omits it, so a later new session
+ * deactivates the tab as usual.
+ * @returns The open action.
+ *
+ * @example
+ * dispatch(openSettingsTab({keepThroughInitialSession: true})); // a new window
+ * dispatch(openSettingsTab()); // an existing window from Preferences…
+ */
+export const openSettingsTab = ({
+  keepThroughInitialSession = false
+}: {
+  readonly keepThroughInitialSession?: boolean;
+} = {}) => ({
+  type: SETTINGS_TAB_OPEN,
+  keepThroughInitialSession
+});
 
 /** Closes the settings tab. */
 export const closeSettingsTab = () => ({type: SETTINGS_TAB_CLOSE});

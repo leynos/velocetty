@@ -16,8 +16,10 @@ import {
   type ConfigWriterDependencies,
   TEMPORARY_FILE_PREFIX,
   sweepTemporaryFiles,
-  writeConfigEdit
+  writeConfigEdit,
+  writeConfigEditSync
 } from '../../app/config/config-file-writer';
+import {createConfigMetrics, type ConfigCounters} from '../../app/config/config-metrics';
 import {checkWritePolicy} from '../../app/settings/settings-write-policy';
 import {createMemoryConfigFileSystem, type MemoryConfigFileSystem} from '../testUtils/config-file-port';
 import {fastCheckRunCount} from '../testUtils/fast-check-runs';
@@ -35,20 +37,25 @@ type Harness = {
   readonly dependencies: ConfigWriterDependencies;
   readonly revision: () => number;
   readonly lastHash: () => string | null;
+  readonly logs: () => readonly string[];
+  readonly counters: () => ConfigCounters;
 };
 
 const createHarness = (): Harness => {
   const port = createMemoryConfigFileSystem();
   let revision = 0;
   let lastHash: string | null = null;
+  const logs: string[] = [];
+  const metrics = createConfigMetrics();
   const dependencies: ConfigWriterDependencies = {
     fileSystem: port,
     sleep: async () => {
       await Promise.resolve();
     },
-    log: () => {
-      // Deliberately quiet in tests.
+    log: (message) => {
+      logs.push(message);
     },
+    metrics,
     platform: 'linux',
     processId: () => 42,
     nextRevision: () => {
@@ -60,7 +67,14 @@ const createHarness = (): Harness => {
       lastHash = text;
     }
   };
-  return {port, dependencies, revision: () => revision, lastHash: () => lastHash};
+  return {
+    counters: () => metrics.snapshot(),
+    dependencies,
+    lastHash: () => lastHash,
+    logs: () => logs,
+    port,
+    revision: () => revision
+  };
 };
 
 const invalidFontSizeValues = fc.oneof(fc.constant(-1), fc.constant('big'), fc.constant(true), fc.constant(null));
@@ -170,6 +184,44 @@ describe('config writer', () => {
     expect(JSON5.parse(harness.port.readFile(CONFIG_PATH) ?? '')).toEqual({config: {fontSize: 16}});
   });
 
+  test('a retried write logs each attempt by number and errno alone', async () => {
+    const harness = createHarness();
+    harness.port.setFile(CONFIG_PATH, '{config: {}}');
+    harness.port.queueFault('rename', 'EBUSY');
+    harness.port.queueFault('rename', 'EPERM');
+
+    await set(harness, 16);
+
+    expect(harness.logs()).toEqual([
+      'config writer retry attempt=1 code=EBUSY',
+      'config writer retry attempt=2 code=EPERM'
+    ]);
+    expect(harness.counters().settingsWriteRetries).toBe(2);
+    // The retry line names no path, key, or value.
+    const logged = harness.logs().join('\n');
+    expect(logged).not.toContain('fontSize');
+    expect(logged).not.toContain(CONFIG_PATH);
+  });
+
+  test('the last retryable failure is logged as a failure, not a retry', async () => {
+    const harness = createHarness();
+    harness.port.setFile(CONFIG_PATH, '{config: {}}');
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      harness.port.queueFault('rename', 'EACCES');
+    }
+
+    await set(harness, 16);
+
+    // Only the two attempts with a successor are retries; the third ends the
+    // write and is the one failure record.
+    expect(harness.logs()).toEqual([
+      'config writer retry attempt=1 code=EACCES',
+      'config writer retry attempt=2 code=EACCES',
+      'config writer failed: {"code":"EACCES","name":"Error"}'
+    ]);
+    expect(harness.counters().settingsWriteRetries).toBe(2);
+  });
+
   test('gives up after three retryable failures without changing the file', async () => {
     const harness = createHarness();
     harness.port.setFile(CONFIG_PATH, '{config: {}}');
@@ -181,6 +233,42 @@ describe('config writer', () => {
 
     expect(outcome).toEqual({kind: 'refused', reason: 'io-error'});
     expect(harness.port.readFile(CONFIG_PATH)).toBe('{config: {}}');
+  });
+
+  test('a failed write logs its errno and category, never the raw message or path', async () => {
+    const harness = createHarness();
+    harness.port.setFile(CONFIG_PATH, '{config: {}}');
+    // A non-retryable fault stops the write after one attempt.
+    harness.port.queueFault('rename', 'EIO');
+
+    const outcome = await set(harness, 16);
+
+    expect(outcome).toEqual({kind: 'refused', reason: 'io-error'});
+    expect(harness.logs()).toEqual(['config writer failed: {"code":"EIO","name":"Error"}']);
+  });
+
+  test('a crafted error message and code never reach the log', async () => {
+    const harness = createHarness();
+    harness.port.setFile(CONFIG_PATH, '{config: {}}');
+    const failure = Object.assign(new Error(`EIO: i/o error, rename '${CONFIG_PATH}'`), {code: `bad ${CONFIG_PATH}`});
+    const failingPort = {
+      ...harness.port,
+      rename: (): never => {
+        throw failure;
+      }
+    };
+
+    const outcome = await writeConfigEditSync(
+      {...harness.dependencies, fileSystem: failingPort},
+      CONFIG_PATH,
+      {kind: 'set', path: ['config', 'fontSize'], value: 16},
+      guard
+    );
+
+    expect(outcome).toEqual({kind: 'refused', reason: 'io-error'});
+    const logged = harness.logs().join('\n');
+    expect(logged).toBe('config writer failed: {"name":"Error"}');
+    expect(logged).not.toContain(CONFIG_PATH);
   });
 
   test('a set on a healthy file reports confirmed durability', async () => {
@@ -201,6 +289,17 @@ describe('config writer', () => {
 
     expect(outcome).toMatchObject({kind: 'written', revision: 1, durability: 'unconfirmed'});
     expect(JSON5.parse(harness.port.readFile(CONFIG_PATH) ?? '')).toEqual({config: {fontSize: 16}});
+  });
+
+  test('an unconfirmed durability is logged and counted, never silently accepted', async () => {
+    const harness = createHarness();
+    harness.port.setFile(CONFIG_PATH, '{config: {fontSize: 14}}');
+    harness.port.queueFault('fsyncDirectory', 'EIO');
+
+    await set(harness, 16);
+
+    expect(harness.logs()).toEqual(['config writer durability=unconfirmed']);
+    expect(harness.counters().settingsDurabilityUnconfirmed).toBe(1);
   });
 
   test('a failed rename leaves no temporary file behind', async () => {
@@ -226,6 +325,28 @@ describe('config writer', () => {
 
     expect(sweepTemporaryFiles(harness.port, asConfigFilePath(directory))).toBe(2);
     expect([...harness.port.files.keys()]).toEqual([keep]);
+  });
+
+  test('a sweep that cannot list the directory warns with the errno alone', () => {
+    const harness = createHarness();
+    const directory = path.join('/home/user/.config/Hyper');
+    harness.port.setFile(path.join(directory, `${TEMPORARY_FILE_PREFIX}1-1`), '{}');
+    harness.port.queueFault('readdir', 'EACCES');
+    const warnings: string[] = [];
+    const removed = sweepTemporaryFiles(harness.port, asConfigFilePath(directory), (line) => warnings.push(line));
+    expect(removed).toBe(0);
+    expect(warnings).toEqual(['[config] temporary sweep failed category=readdir code=EACCES']);
+    expect(warnings.join('\n')).not.toContain(directory);
+  });
+
+  test('a sweep of an absent directory stays silent', () => {
+    const harness = createHarness();
+    harness.port.queueFault('readdir', 'ENOENT');
+    const warnings: string[] = [];
+
+    const directory = asConfigFilePath('/home/user/.config/Hyper');
+    expect(sweepTemporaryFiles(harness.port, directory, (line) => warnings.push(line))).toBe(0);
+    expect(warnings).toEqual([]);
   });
 
   test('concurrent writers never lose an update', async () => {

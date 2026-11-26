@@ -108,11 +108,19 @@ const SCHEMA_KIND_MATCHERS: ReadonlyMap<string, SchemaKindMatcher> = new Map<str
   ['enum', (control, enumOptions) => matchesEnumControl(control, enumOptions)]
 ]);
 
-const matchesSchemaType = (
+export const matchesSchemaType = (
   kind: string,
   control: ControlDescriptor,
   enumOptions: readonly string[] | undefined
-): boolean => SCHEMA_KIND_MATCHERS.get(kind)?.(control, enumOptions) ?? false;
+): boolean => {
+  // A declared enum constrains the control whatever base `type` sits beside
+  // it. Checking the type first would let `type: 'string'` accept any textual
+  // widget, including one offering options the schema rejects.
+  if (enumOptions !== undefined) {
+    return matchesEnumControl(control, enumOptions);
+  }
+  return SCHEMA_KIND_MATCHERS.get(kind)?.(control, enumOptions) ?? false;
+};
 
 type NumberControl = Extract<ControlDescriptor, {kind: 'number'}>;
 type SelectControl = Extract<ControlDescriptor, {kind: 'select'}>;
@@ -202,6 +210,18 @@ describe('settings catalogue parity', () => {
     expect(mismatches).toEqual([]);
   });
 
+  test('a declared enum is matched as an enum before its base type', () => {
+    const declared = ['canary', 'stable'];
+    const text: ControlDescriptor = {kind: 'text'};
+    const betaSelect: ControlDescriptor = {kind: 'select', options: ['beta', 'stable']};
+    const matchingSelect: ControlDescriptor = {kind: 'select', options: ['stable', 'canary']};
+
+    // `type: 'string'` would accept any textual control, including these two.
+    expect(matchesSchemaType('string', text, declared)).toBe(false);
+    expect(matchesSchemaType('string', betaSelect, declared)).toBe(false);
+    expect(matchesSchemaType('string', matchingSelect, declared)).toBe(true);
+  });
+
   test('every excluded key has a shape no control can express', () => {
     const expressible = Object.keys(EXCLUDED_CONFIG_KEYS).filter((key) => {
       const property = properties[key];
@@ -255,9 +275,36 @@ describe('settings write policy parity', () => {
   });
 
   test('the policy accepts exactly the colours the renderer accepts', () => {
-    const candidates = ['#abc', '#AABBCC', '#aabbccdd', '#ab', 'rgb(1, 2, 3)', 'rgba(0, 0, 0, 0.5)', 'tomato', ''];
+    const candidates = [
+      '#abc',
+      '#AABBCC',
+      '#aabbccdd',
+      '#ab',
+      'rgb(1, 2, 3)',
+      'rgb(100%, 0%, 50%)',
+      'rgb(255 0 0)',
+      'rgb(255 0 0 / 50%)',
+      'rgba(0, 0, 0, 0.5)',
+      'rgba(1 2 3 / 50%)',
+      'rgb(+)',
+      'rgba(,,,)',
+      'rgb(1, 2)',
+      'rgb(1 2 3 4)',
+      'rgb(a, b, c)',
+      'tomato',
+      ''
+    ];
     const observed = candidates.map((candidate) => checkWritePolicy('backgroundColor', candidate).length === 0);
     expect(observed).toEqual(candidates.map((candidate) => isColourValue(candidate)));
+  });
+
+  test('the policy refuses malformed functional colours and keeps valid ones', () => {
+    expect(checkWritePolicy('backgroundColor', 'rgb(+)')).toHaveLength(1);
+    expect(checkWritePolicy('backgroundColor', 'rgba(,,,)')).toHaveLength(1);
+    expect(checkWritePolicy('backgroundColor', 'rgb(1, 2)')).toHaveLength(1);
+    expect(checkWritePolicy('backgroundColor', 'rgb(255, 0, 0)')).toHaveLength(0);
+    expect(checkWritePolicy('backgroundColor', 'rgb(100%, 0%, 0%)')).toHaveLength(0);
+    expect(checkWritePolicy('backgroundColor', 'rgba(0, 0, 0, 50%)')).toHaveLength(0);
   });
 
   test('the policy agrees with coercion on representative values', () => {

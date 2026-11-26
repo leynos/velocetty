@@ -11,6 +11,8 @@
 
 import path from 'node:path';
 
+import {boundedErrorCode} from '../utils/error-code';
+
 /** Metadata the writer needs from the file system. */
 export type ConfigFileStat = {readonly mode: number};
 
@@ -146,18 +148,50 @@ export const writeFileAtomically = (request: ConfigFileWriteRequest): ConfigWrit
 };
 
 /**
+ * Lists a directory, reporting a failure as one bounded line.
+ *
+ * An absent directory is a first run, not a fault, so it stays silent; any
+ * other errno is worth a line. The errno is a fixed token, the path is not.
+ */
+const listDirectory = (
+  fileSystem: ConfigFileSystemPort,
+  directory: ConfigFilePath,
+  warn: (message: string) => void
+): readonly string[] => {
+  try {
+    return fileSystem.readdir(directory);
+  } catch (error) {
+    const code = boundedErrorCode(error);
+    if (code !== 'ENOENT') {
+      warn(`[config] temporary sweep failed category=readdir code=${code ?? 'unknown'}`);
+    }
+    return [];
+  }
+};
+
+/**
  * Removes temporary files left by an interrupted write.
+ *
+ * A directory that cannot be listed is reported through `warn` with only the
+ * errno, because the sweep's failure is a fact a session log should hold and a
+ * path is user data. A race with a concurrent sweep stays silent: that
+ * leftover is harmless and is swept next start-up.
  *
  * @param fileSystem - The file-system port.
  * @param directory - The directory holding the config file.
+ * @param warn - Receives one bounded line when the directory cannot be listed.
  * @returns The number of files removed.
  *
  * @example
  * sweepTemporaryFiles(port, '/home/me/.config/Hyper'); // 0
  */
-export const sweepTemporaryFiles = (fileSystem: ConfigFileSystemPort, directory: ConfigFilePath): number => {
+export const sweepTemporaryFiles = (
+  fileSystem: ConfigFileSystemPort,
+  directory: ConfigFilePath,
+  warn: (message: string) => void = () => {}
+): number => {
   let removed = 0;
-  for (const entry of fileSystem.readdir(directory)) {
+  for (const entry of listDirectory(fileSystem, directory, warn)) {
     if (!entry.startsWith(TEMPORARY_FILE_PREFIX)) {
       continue;
     }

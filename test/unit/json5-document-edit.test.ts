@@ -15,6 +15,11 @@ import type {JsonValue} from '@shared/types/json';
 const CONFIG = propertyKey('config');
 const pathTo = (...segments: string[]) => [CONFIG, ...segments.map((segment) => propertyKey(segment))];
 
+const unicodeTerminators = [
+  {name: 'U+2028', terminator: '\u2028'},
+  {name: 'U+2029', terminator: '\u2029'}
+] as const;
+
 const set = (text: string, path: readonly ReturnType<typeof propertyKey>[], value: JsonValue) =>
   setPropertyAtPath(json5Document(text), path, value);
 
@@ -88,6 +93,19 @@ describe('setPropertyAtPath', () => {
     expect(result).toEqual({kind: 'refused', reason: 'duplicate-key'});
   });
 
+  test('refuses a duplicate config key at the root', () => {
+    const doc = '{\n  config: {fontSize: 12},\n  config: {fontSize: 14}\n}\n';
+    expect(set(doc, pathTo('fontSize'), 16)).toEqual({kind: 'refused', reason: 'duplicate-key'});
+  });
+
+  for (const {name, terminator} of unicodeTerminators) {
+    test(`appends a property after a comment ending at ${name}`, () => {
+      const text = editedText(set(`{config: {fontSize: 14 // size${terminator}}}`, pathTo('shell'), 'bash'));
+      expect(text).toContain('// size');
+      expect(JSON5.parse(text).config).toEqual({fontSize: 14, shell: 'bash'});
+    });
+  }
+
   test('refuses a path that does not start at config', () => {
     expect(set(DOC, [propertyKey('plugins')], 1)).toEqual({kind: 'refused', reason: 'path-not-found'});
   });
@@ -130,6 +148,33 @@ describe('removePropertyAtPath', () => {
     expect(text).toContain('// note');
   });
 
+  test('keeps a line comment between the preceding comma and the removed property', () => {
+    const text = editedText(remove(`{config:{fontSize:14, // font size\n shell:'bash'}}`, pathTo('shell')));
+    expect(text).toBe(`{config:{fontSize:14 // font size\n }}`);
+    expect(JSON5.parse(text)).toEqual({config: {fontSize: 14}});
+  });
+
+  test('keeps a block comment between the preceding comma and the removed property', () => {
+    const text = editedText(remove(`{config:{fontSize:14, /* font size */ shell:'bash'}}`, pathTo('shell')));
+    expect(text).toBe(`{config:{fontSize:14 /* font size */ }}`);
+    expect(JSON5.parse(text)).toEqual({config: {fontSize: 14}});
+  });
+
+  for (const {name, terminator} of unicodeTerminators) {
+    test(`removes a property whose trailing comment ends at ${name}`, () => {
+      const text = editedText(remove(`{config: {fontSize: 14 // size${terminator}}}`, pathTo('fontSize')));
+      expect(text).not.toContain('// size');
+      expect(JSON5.parse(text)).toEqual({config: {}});
+    });
+
+    test(`keeps a comment ending at ${name} before the removed property`, () => {
+      const doc = `{config: {fontSize: 14, // size${terminator}\n  shell: 'bash'}}`;
+      const text = editedText(remove(doc, pathTo('shell')));
+      expect(text).toContain(`// size${terminator}`);
+      expect(JSON5.parse(text)).toEqual({config: {fontSize: 14}});
+    });
+  }
+
   test('refuses a missing property', () => {
     expect(remove(DOC, pathTo('shell'))).toEqual({kind: 'refused', reason: 'path-not-found'});
   });
@@ -137,6 +182,16 @@ describe('removePropertyAtPath', () => {
   test('refuses a duplicate key', () => {
     const doc = '{\n  config: {\n    fontSize: 12,\n    fontSize: 14\n  }\n}\n';
     expect(remove(doc, pathTo('fontSize'))).toEqual({kind: 'refused', reason: 'duplicate-key'});
+  });
+
+  test('refuses a duplicate config key at the root', () => {
+    const doc = '{\n  config: {fontSize: 12},\n  config: {fontSize: 14}\n}\n';
+    expect(remove(doc, pathTo('fontSize'))).toEqual({kind: 'refused', reason: 'duplicate-key'});
+  });
+
+  test('refuses a duplicate intermediate key', () => {
+    const doc = '{\n  config: {\n    colors: {black: "#000"},\n    colors: {black: "#fff"}\n  }\n}\n';
+    expect(remove(doc, pathTo('colors', 'black'))).toEqual({kind: 'refused', reason: 'duplicate-key'});
   });
 
   test('refuses a missing intermediate object', () => {

@@ -181,9 +181,86 @@ describe('settings row controls', () => {
     expect(reset?.disabled).toBe(true);
   });
 
-  test('Tab moves from the control to the reset button', async () => {
+  test('Enter on the rendered control commits and prevents the default', async () => {
+    const onCommit = mock(() => {});
+    await render(baseProps({onCommit}));
+    const field = input();
+    field.focus();
+    const event = new globalThis.window.KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true});
+    await act(async () => {
+      field.dispatchEvent(event);
+    });
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  test('Escape on the rendered control reverts without committing', async () => {
+    const calls: string[] = [];
+    await render(baseProps({onCommit: () => calls.push('commit'), onRevert: () => calls.push('revert')}));
+    const field = input();
+    field.focus();
+    const event = new globalThis.window.KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true});
+    await act(async () => {
+      field.dispatchEvent(event);
+    });
+    expect(calls).toEqual(['revert']);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  test('Enter and Escape during an IME composition neither commit nor revert', async () => {
+    const calls: string[] = [];
+    const props = controlProps({
+      onCommit: () => calls.push('commit'),
+      onRevert: () => calls.push('revert')
+    });
+
+    for (const key of ['Enter', 'Escape']) {
+      const event = new globalThis.window.KeyboardEvent('keydown', {
+        key,
+        bubbles: true,
+        cancelable: true,
+        isComposing: true
+      });
+      keyHandlerFor(props)(event);
+      expect(event.defaultPrevented).toBe(false);
+    }
+
+    // React's synthetic event hides the flag on `nativeEvent`; a composing
+    // native event behind a synthetic one must be honoured just the same.
+    for (const key of ['Enter', 'Escape']) {
+      const event = {key, preventDefault: mock(() => {}), nativeEvent: {isComposing: true}};
+      keyHandlerFor(props)(event);
+      expect(event.preventDefault).not.toHaveBeenCalled();
+    }
+
+    expect(calls).toEqual([]);
+
+    // A key outside a composition still commits, so the guard is not vacuous.
+    const settled = keyEvent('Enter');
+    keyHandlerFor(props)(settled);
+    expect(calls).toEqual(['commit']);
+  });
+
+  test('Tab order reaches the reset button after the control', async () => {
     await render(baseProps({isModified: true}));
-    const controls = [...document.querySelectorAll<HTMLElement>('input, button')];
-    expect(controls.map((node) => node.tagName)).toEqual(['INPUT', 'BUTTON']);
+    const field = input();
+    const reset = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (candidate) => candidate.getAttribute('aria-label') === 'Reset Font size to default'
+    );
+    expect(reset).toBeDefined();
+    if (reset === undefined) {
+      throw new Error('expected a reset button');
+    }
+
+    // Happy DOM has no sequential focus navigation for a synthetic Tab, so
+    // assert the properties that make the pair tabbable in this order rather
+    // than pretending a dispatched Tab moved focus.
+    expect(field.tabIndex).toBeGreaterThanOrEqual(0);
+    expect(reset.tabIndex).toBeGreaterThanOrEqual(0);
+    expect([...document.querySelectorAll<HTMLElement>('input, button')]).toEqual([field, reset]);
+    field.focus();
+    expect(document.activeElement).toBe(field);
+    reset.focus();
+    expect(document.activeElement).toBe(reset);
   });
 });

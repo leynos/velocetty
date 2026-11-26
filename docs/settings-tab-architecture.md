@@ -110,6 +110,43 @@ config file. One attempt runs as a synchronous critical section:
 backoff. The plugin runtime uses `writeConfigEditSync`, one pass, because it
 persists during module evaluation.
 
+## Observability
+
+The settings write path reports only bounded values: a counter from the closed
+`ConfigCounter` set, a `SettingsWriteFailure` reason token, an errno, an
+attempt number, a category, and an outcome. It never logs a path, a key name,
+file content, or a raw error message. `app/config.ts` exports the process-wide
+`configMetrics` and `configSpans` instances, and `app/start.ts` hands both to
+the settings service and its writer, so one session has one tally and one span
+stream.
+
+- `settingsApplies`, `settingsRejections`, and `settingsFailures` count the
+  three `SettingsWriteOutcome` kinds of one `setValue` or `resetValue`.
+  `settingsWriteRetries` counts a retryable writer failure that has another
+  attempt left, and `settingsDurabilityUnconfirmed` counts a rename whose
+  directory fsync failed, so the new text is visible but not known to survive a
+  crash.
+- Each service call records one `settings-write` span, finished `applied` or
+  `failed`.
+- `app/config/config-file-writer.ts` logs
+  `config writer retry attempt=<n> code=<errno>` before each retry and
+  `config writer durability=unconfirmed` after an unconfirmed rename. Other
+  write failures keep the bounded
+  `config writer failed: {"code":"<errno>","name":"Error"}` line.
+- `app/settings/settings-service.ts` logs
+  `settings write refused reason=<reason>` for a rejection or failure. The
+  reason is a protocol token: `not-editable` for a rejected edit, otherwise the
+  outcome's own `SettingsWriteFailure`.
+- The renderer's `lib/settings/field-store.ts` logs
+  `settings write rejected category=transport name=<name>` when the gateway
+  promise rejects, naming the error's constructor only when it is a string and
+  never its message.
+- The start-up sweep in `app/config/config-file-write-io.ts` logs
+  `[config] temporary sweep failed category=readdir code=<errno>` when it
+  cannot list the config directory. A missing directory is a first run and
+  stays silent, and a per-file unlink race stays silent because the leftover is
+  swept next time.
+
 ## The edit operations
 
 `app/config/json5/` contains the relocated scanner and the edits:

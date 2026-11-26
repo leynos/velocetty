@@ -15,7 +15,7 @@ import path from 'node:path';
 
 import {createChokidarHandle} from '../../app/config/chokidar-handle';
 import {errorCode} from '../../app/utils/error-code';
-import {shouldNotifyReload} from '../../app/config/import-report';
+import {keymapsDiffer, shouldNotifyReload, type ReloadOrigin} from '../../app/config/import-report';
 import {createConfigWatcher} from '../../app/config/watcher';
 
 const waitFor = async (predicate: () => boolean, timeoutMilliseconds = 5000): Promise<void> => {
@@ -54,7 +54,14 @@ const startWatch = async (filePath: string): Promise<{probe: Probe; close: () =>
     },
     schedule: (callback, delayMs) => setTimeout(callback, delayMs)
   });
-  await waitFor(() => probe.isReady);
+  try {
+    await waitFor(() => probe.isReady);
+  } catch (error) {
+    // A watcher that never became ready still owns its handle, so release it
+    // before surfacing the failure to keep later scenarios independent.
+    await debounced.close();
+    throw error;
+  }
   return {probe, close: () => debounced.close()};
 };
 
@@ -132,12 +139,17 @@ const runWatchScenario = async (scenario: WatchScenario): Promise<void> => {
     await fs.writeFile(filePath, '{config: {fontSize: 14}}');
     const {probe, close} = await startWatch(filePath);
 
-    await scenario.change({directory, filePath});
-    await waitFor(() => scenario.isFirstReload(probe));
-    await new Promise((resolve) => setTimeout(resolve, scenario.settleMilliseconds));
+    try {
+      await scenario.change({directory, filePath});
+      await waitFor(() => scenario.isFirstReload(probe));
+      await new Promise((resolve) => setTimeout(resolve, scenario.settleMilliseconds));
 
-    expect(probe.reloads).toBe(1);
-    await close();
+      expect(probe.reloads).toBe(1);
+    } finally {
+      // Close before the temporary directory is removed, and close even when
+      // an assertion or a wait fails, so the watcher cannot outlive its test.
+      await close();
+    }
   });
 };
 
@@ -147,16 +159,53 @@ describe('config watcher integration', () => {
   }
 });
 
+const externalOrigin: ReloadOrigin = {hasKeybindingsChange: false, isSelfWrite: false};
+const selfWriteOrigin: ReloadOrigin = {hasKeybindingsChange: false, isSelfWrite: true};
+const coalescedOrigin: ReloadOrigin = {hasKeybindingsChange: true, isSelfWrite: true};
+
 describe('shouldNotifyReload', () => {
   test('an applied external change is announced', () => {
-    expect(shouldNotifyReload({config: 'applied', keybindings: 'applied'}, false)).toBe(true);
+    expect(shouldNotifyReload({config: 'applied', keybindings: 'applied'}, externalOrigin)).toBe(true);
   });
 
-  test('a self-written change reloads without an announcement', () => {
-    expect(shouldNotifyReload({config: 'applied', keybindings: 'applied'}, true)).toBe(false);
+  test('a config-only self-write reloads without an announcement', () => {
+    expect(shouldNotifyReload({config: 'applied', keybindings: 'applied'}, selfWriteOrigin)).toBe(false);
+  });
+
+  test('a coalesced external keybindings change is announced despite the self-written config', () => {
+    // The config text still matches the writer's hash, but the same debounced
+    // reload also applied keybindings the user edited outside the settings tab.
+    expect(shouldNotifyReload({config: 'applied', keybindings: 'applied'}, coalescedOrigin)).toBe(true);
   });
 
   test('a fallback is never announced, whoever wrote it', () => {
-    expect(shouldNotifyReload({config: 'fallback', keybindings: 'applied'}, false)).toBe(false);
+    expect(shouldNotifyReload({config: 'fallback', keybindings: 'applied'}, externalOrigin)).toBe(false);
+  });
+});
+
+describe('keymapsDiffer', () => {
+  test('treats the same bindings in a different key order as unchanged', () => {
+    expect(
+      keymapsDiffer(
+        {'window:new': ['ctrl+n', 'ctrl+shift+n'], 'tab:new': ['ctrl+t']},
+        {
+          'tab:new': ['ctrl+t'],
+          'window:new': ['ctrl+n', 'ctrl+shift+n']
+        }
+      )
+    ).toBe(false);
+  });
+
+  test('reports a changed binding', () => {
+    expect(keymapsDiffer({'window:new': ['ctrl+n']}, {'window:new': ['ctrl+shift+n']})).toBe(true);
+  });
+
+  test('reports a command the reload added or removed', () => {
+    expect(keymapsDiffer({'window:new': ['ctrl+n']}, {})).toBe(true);
+    expect(keymapsDiffer({}, {'window:new': ['ctrl+n']})).toBe(true);
+  });
+
+  test('treats an unknown baseline as a change, so the reload is announced', () => {
+    expect(keymapsDiffer(undefined, {'window:new': ['ctrl+n']})).toBe(true);
   });
 });

@@ -149,6 +149,30 @@ describe('tab strip', () => {
     expect(activeTabUids(store)).toEqual([SETTINGS_TAB_UID]);
   });
 
+  test("a programmatic open survives the window's first session add", () => {
+    const store = createTestStore();
+    store.dispatch(actions.openSettingsTab({keepThroughInitialSession: true}));
+    addTerminal(store, 's1');
+
+    expect(store.getState().settingsTab.isOpen).toBe(true);
+    expect(store.getState().settingsTab.isActive).toBe(true);
+    expect(activeTabUids(store)).toEqual([SETTINGS_TAB_UID]);
+
+    addTerminal(store, 's2');
+    expect(store.getState().settingsTab.isActive).toBe(false);
+    expect(activeTabUids(store)).toEqual([terminalUids(store)[1] ?? '']);
+  });
+
+  test('a user-initiated open is taken back by a later new session', () => {
+    const store = withTwoTerminals();
+    store.dispatch(actions.openSettingsTab());
+    expect(store.getState().settingsTab.isActive).toBe(true);
+
+    addTerminal(store, 's3');
+    expect(store.getState().settingsTab.isOpen).toBe(true);
+    expect(store.getState().settingsTab.isActive).toBe(false);
+  });
+
   test('closing the settings tab leaves every terminal and session intact', () => {
     const store = withTwoTerminals();
     const terminalsBefore = terminalUids(store).length;

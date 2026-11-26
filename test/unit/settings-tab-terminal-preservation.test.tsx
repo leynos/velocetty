@@ -36,12 +36,13 @@ let moduleInstance = 0;
 const {transportMock} = createTransportMock();
 
 const registerMocks = () => {
+  // Only the transport is replaced. Bun's module-mock registry is process-wide,
+  // so a partial `lib/actions/ui` mock would remove the real action creators
+  // for every suite that runs after this one. The container renders without
+  // dispatching, and its UI action imports reach the transport this mock
+  // supplies, so the real module is safe here.
   registerModuleMock('../../lib/transport', () => ({transport: transportMock}));
   registerModuleMock('../../lib/transport/electron-ipc-transport', () => ({transport: transportMock}));
-  registerModuleMock('../../lib/actions/ui', () => ({
-    execCommand: () => ({type: 'exec'}),
-    setFontSmoothing: () => ({type: 'UI_SET_FONT_SMOOTHING'})
-  }));
   registerPluginsModuleMocks({}, {defaultExportMode: 'self'});
   registerModuleMock('../../lib/containers/header', () => ({HeaderContainer: () => null}));
   registerModuleMock('../../lib/containers/notifications', () => ({default: () => null}));
@@ -148,18 +149,22 @@ describe('settings tab and terminal preservation', () => {
     expect(after?.hasAttribute('inert')).toBe(true);
   });
 
-  test('the settings layer is visible only while the surface is active', async () => {
+  test('the settings layer is visible and interactive only while the surface is active', async () => {
     await render({isSettingsSurfaceActive: false});
     await act(async () => {
       await waitFor(0);
     });
     expect(settingsLayer()?.className).toContain('surfaceLayerOffscreen');
+    // The hidden settings form must not be reachable by keyboard or assistive
+    // technology while the terminal owns input, mirroring the terminal layer.
+    expect(settingsLayer()?.hasAttribute('inert')).toBe(true);
 
     await render({isSettingsSurfaceActive: true});
     await act(async () => {
       await waitFor(0);
     });
     expect(settingsLayer()?.className).not.toContain('surfaceLayerOffscreen');
+    expect(settingsLayer()?.hasAttribute('inert')).toBe(false);
   });
 
   test('closing settings removes only the settings layer', async () => {

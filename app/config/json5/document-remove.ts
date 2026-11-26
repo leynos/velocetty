@@ -3,7 +3,8 @@
  *
  * A removal deletes the key, its value, one separating comma, a trailing
  * same-line comment, and the whole line when the property occupied its own
- * line. Comments elsewhere in the document are untouched.
+ * line. A comment between the separating comma and the key is preserved, as
+ * are comments elsewhere in the document.
  */
 
 import {type DocumentEditResult, type Json5Document, edited, refused} from './document-result';
@@ -58,23 +59,52 @@ const precedingSeparator = (
   return doc[comma] === ',' ? comma : null;
 };
 
-const inlineSpan = (
+const inlineSpans = (
   doc: string,
   parser: Json5Parser,
   properties: readonly Json5ObjectProperty[],
   property: Json5ObjectProperty
-): Span => {
+): readonly Span[] => {
   const valueEnd = valueTextEnd(doc, property);
+  const trailingEnd = scanTrailingCommentEnd({doc, index: valueEnd});
   if (property.hasTrailingComma) {
     const comma = parser.skipWhitespaceAndComments({startIndex: valueEnd, limitIndex: doc.length});
-    const end = doc[comma] === ',' ? comma + 1 : scanTrailingCommentEnd({doc, index: valueEnd});
-    return {startIndex: property.keyStartIndex, endIndex: end};
+    const end = doc[comma] === ',' ? comma + 1 : trailingEnd;
+    return [{startIndex: property.keyStartIndex, endIndex: end}];
   }
   const separator = precedingSeparator(parser, doc, properties, property);
-  return {
-    startIndex: separator ?? property.keyStartIndex,
-    endIndex: scanTrailingCommentEnd({doc, index: valueEnd})
-  };
+  if (separator === null) {
+    return [{startIndex: property.keyStartIndex, endIndex: trailingEnd}];
+  }
+  // A comment between the comma and this property belongs to the document, not
+  // to the removed property. Delete the comma on its own so the comment stays.
+  if (doc.slice(separator + 1, property.keyStartIndex).trim() !== '') {
+    return [
+      {startIndex: separator, endIndex: separator + 1},
+      {startIndex: property.keyStartIndex, endIndex: trailingEnd}
+    ];
+  }
+  return [{startIndex: separator, endIndex: trailingEnd}];
+};
+
+/** Applies spans from the end of the document backwards so indices stay valid. */
+const removeSpans = (doc: string, spans: readonly Span[]): string => {
+  const descending = spans.toSorted((left, right) => right.startIndex - left.startIndex);
+  let text = doc;
+  for (const span of descending) {
+    text = `${text.slice(0, span.startIndex)}${text.slice(span.endIndex)}`;
+  }
+  return text;
+};
+
+const removalSpans = (
+  doc: string,
+  parser: Json5Parser,
+  properties: readonly Json5ObjectProperty[],
+  property: Json5ObjectProperty
+): readonly Span[] => {
+  const ownLine = ownLineSpan(doc, parser, property);
+  return ownLine ? [ownLine] : inlineSpans(doc, parser, properties, property);
 };
 
 const removeProperty = (doc: string, parentRange: Json5ObjectRange, key: PropertyKey): DocumentEditResult => {
@@ -91,8 +121,7 @@ const removeProperty = (doc: string, parentRange: Json5ObjectRange, key: Propert
   if (!property) {
     return refused('path-not-found');
   }
-  const span = ownLineSpan(doc, parser, property) ?? inlineSpan(doc, parser, properties, property);
-  return edited(`${doc.slice(0, span.startIndex)}${doc.slice(span.endIndex)}`);
+  return edited(removeSpans(doc, removalSpans(doc, parser, properties, property)));
 };
 
 /** Resolves the object that holds the last segment of `segments`. */

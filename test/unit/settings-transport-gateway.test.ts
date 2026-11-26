@@ -1,18 +1,22 @@
 /**
- * @file Abort behaviour of the transport-backed settings gateway.
+ * @file Abort behaviour and dependency wiring of the transport settings gateway.
  *
- * `ipcRenderer.invoke` cannot be cancelled, so the gateway's only defence is
- * to discard a result whose signal has aborted. Without that guard, a stale
- * snapshot from a superseded render could win.
+ * `ipcRenderer.invoke` cannot be cancelled, so the gateway's only defence is to
+ * discard a result whose signal has aborted. Without that guard, a stale
+ * snapshot from a superseded render could win. The config-change subscription
+ * is a dependency from `lib/transport/`, so the gateway neither imports
+ * Electron-backed IPC nor hides the subscription from a test double.
  */
-import {beforeAll, expect, test} from 'bun:test';
+import {beforeAll, beforeEach, expect, mock, test} from 'bun:test';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 import type {SettingsSnapshot, SettingsWriteOutcome} from '@shared/settings/protocol';
 import type {IpcCommands} from '@shared/types/common';
 import type {SettingsCommandTransport} from '../../lib/settings/adapters/transport-settings-gateway';
 
-import {registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
 import {importFresh} from '../testUtils/import-fresh';
+import {registerModuleMock} from '../testUtils/mock-module';
 
 const SNAPSHOT: SettingsSnapshot = {
   revision: 1,
@@ -22,6 +26,27 @@ const SNAPSHOT: SettingsSnapshot = {
   defaultValues: {},
   profileOverriddenKeys: []
 };
+
+/** Listeners the adapter registers on the `config change` channel. */
+const configChangeListeners: Array<() => void> = [];
+
+const ipcOn = mock((channel: string, listener: () => void) => {
+  if (channel === 'config change') {
+    configChangeListeners.push(listener);
+  }
+});
+
+const ipcRemoveListener = mock((channel: string, listener: () => void) => {
+  const index = configChangeListeners.indexOf(listener);
+  if (channel === 'config change' && index !== -1) {
+    configChangeListeners.splice(index, 1);
+  }
+});
+
+// The adapter under test is the only module that reaches Electron-backed IPC.
+registerModuleMock('../../lib/utils/ipc', () => ({
+  ipcRenderer: {on: ipcOn, removeListener: ipcRemoveListener}
+}));
 
 type Deferred<T> = {
   readonly promise: Promise<T>;
@@ -58,15 +83,22 @@ const transportOf = (
 };
 
 let createTransportSettingsGateway: typeof import('../../lib/settings/adapters/transport-settings-gateway')['createTransportSettingsGateway'];
+let subscribeToConfigChange: typeof import('../../lib/transport/config-change-subscription')['subscribeToConfigChange'];
 
 beforeAll(async () => {
-  // The gateway module imports `lib/utils/ipc`, which reads `electron` at
-  // evaluation time; install the mock before the fresh import.
-  resetElectronMock();
-  registerElectronMock();
   ({createTransportSettingsGateway} = await importFresh<
     typeof import('../../lib/settings/adapters/transport-settings-gateway')
   >('../../lib/settings/adapters/transport-settings-gateway', 'settings_transport_gateway_unit'));
+  ({subscribeToConfigChange} = await importFresh<typeof import('../../lib/transport/config-change-subscription')>(
+    '../../lib/transport/config-change-subscription',
+    'settings_config_change_unit'
+  ));
+});
+
+beforeEach(() => {
+  configChangeListeners.length = 0;
+  ipcOn.mockClear();
+  ipcRemoveListener.mockClear();
 });
 
 test('an already-aborted signal rejects without invoking the transport', async () => {
@@ -111,4 +143,47 @@ test('writes forward the channel, target, and value unaltered', async () => {
     ['settings:setValue', {scope: 'core', key: 'fontSize'}, 16],
     ['settings:resetValue', {scope: 'core', key: 'fontSize'}]
   ]);
+});
+
+test('subscribes through the injected config-change subscription', () => {
+  const unsubscribe = mock(() => {});
+  const subscribe = mock((_onChanged: () => void) => unsubscribe);
+  const gateway = createTransportSettingsGateway(
+    transportOf(async () => SNAPSHOT),
+    subscribe
+  );
+  const onChanged = mock(() => {});
+
+  const result = gateway.subscribe(onChanged);
+
+  expect(subscribe).toHaveBeenCalledTimes(1);
+  expect(subscribe.mock.calls[0]?.[0]).toBe(onChanged);
+  expect(result).toBe(unsubscribe);
+});
+
+test('the transport adapter listens for config change and cleans up', () => {
+  const onChanged = mock(() => {});
+
+  const unsubscribe = subscribeToConfigChange(onChanged);
+
+  expect(ipcOn).toHaveBeenCalledTimes(1);
+  expect(ipcOn.mock.calls[0]?.[0]).toBe('config change');
+  const registered = configChangeListeners.at(-1);
+  expect(registered).toBeDefined();
+  registered?.();
+  expect(onChanged).toHaveBeenCalledTimes(1);
+
+  unsubscribe();
+  expect(ipcRemoveListener).toHaveBeenCalledWith('config change', registered);
+  expect(configChangeListeners).toHaveLength(0);
+});
+
+test('the gateway module imports no Electron-backed IPC itself', async () => {
+  const source = await fs.readFile(
+    path.join(process.cwd(), 'lib/settings/adapters/transport-settings-gateway.ts'),
+    'utf8'
+  );
+
+  expect(source).not.toContain('utils/ipc');
+  expect(source).not.toContain("from 'electron'");
 });
