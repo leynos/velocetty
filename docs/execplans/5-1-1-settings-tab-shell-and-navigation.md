@@ -147,7 +147,7 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-delivered change is **151 non-Plan files** and **13,390 net non-generated
+delivered change is **151 non-Plan files** and **13,398 net non-generated
 lines**. The excess is recorded here as the escalation the tolerance requires,
 and the maintainer's acceptance of the raised counts is requested before merge.
 
@@ -2115,7 +2115,7 @@ disabled-row behaviour, category-label search, inline diagnostics, and pointer
 access in the packaged app. The proofs gained a grounded `StringSplit` axiom,
 transition-based reachability lemmas (search 9, field state 11 verified), and a
 per-summary positive-count guard; D22 now names the opaque `Seq.All` boundary.
-The scope tolerance is exceeded (151 non-Plan files, 13,390 net lines); the
+The scope tolerance is exceeded (151 non-Plan files, 13,398 net lines); the
 deviation and its reasons are recorded under Tolerances for maintainer
 acceptance.
 
