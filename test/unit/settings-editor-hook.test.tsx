@@ -14,68 +14,22 @@ import {afterEach, beforeEach, describe, expect, test} from 'bun:test';
 
 import type {CoreSettingKey} from '@shared/settings/core-catalogue';
 import type {SettingsSnapshot, SettingsWriteOutcome} from '@shared/settings/protocol';
-import type {SettingTarget} from '@shared/settings/protocol';
 
 import {
   buildFieldEntries,
   buildSettingsPanel,
   type SettingsEditorArguments
 } from '../../lib/settings/hooks/settings-editor-model';
-import {useSettingsSnapshot, type SettingsSnapshotState} from '../../lib/settings/hooks/use-settings-snapshot';
 import {useSettingsEditor, type SettingsEditor} from '../../lib/settings/hooks/use-settings-editor';
 import {createFieldStore, type FieldDefinition} from '../../lib/settings/field-store';
 import type {FieldStore, FieldStoreSnapshot} from '../../lib/settings/field-store';
 import type {SettingsGateway} from '../../lib/settings/ports';
 import {setupHappyDom} from '../testUtils/happy-dom';
+import * as snapshotFixtures from '../testUtils/settings-snapshot-fixtures';
 
-const CONFIG_PATH = '/home/me/.config/Velocetty/config.json5';
-const NO_CHANGE = () => {};
 const NO_TEXT: string | undefined = undefined;
 
-const snapshotOf = (revision: number, userValues: Readonly<Record<string, number>> = {}): SettingsSnapshot => ({
-  revision,
-  filePath: CONFIG_PATH,
-  fileStatus: {kind: 'ok'},
-  userValues,
-  defaultValues: {},
-  profileOverriddenKeys: []
-});
-
-type PendingLoad = {
-  readonly resolve: (snapshot: SettingsSnapshot) => void;
-  readonly reject: (error: Error) => void;
-};
-
-/**
- * Builds a gateway whose loads the test resolves by hand.
- *
- * Resolving by hand is what makes a late older snapshot observable: the test
- * chooses the order the promises settle in, rather than the transport.
- */
-const createRecordingGateway = () => {
-  const loads: PendingLoad[] = [];
-  let onChange: () => void = NO_CHANGE;
-
-  const gateway: SettingsGateway = {
-    getSnapshot: () =>
-      new Promise<SettingsSnapshot>((resolve, reject) => {
-        loads.push({resolve, reject});
-      }),
-    resetValue: async (_target: SettingTarget): Promise<SettingsWriteOutcome> => ({
-      kind: 'failed',
-      reason: 'io-error'
-    }),
-    setValue: async (_target: SettingTarget): Promise<SettingsWriteOutcome> => ({kind: 'failed', reason: 'io-error'}),
-    subscribe: (callback) => {
-      onChange = callback;
-      return () => {
-        onChange = NO_CHANGE;
-      };
-    }
-  };
-
-  return {gateway, loads, notifyChange: () => onChange()};
-};
+const {createRecordingGateway, snapshotOf} = snapshotFixtures;
 
 const fieldStoreDouble = (): FieldStore => ({
   getSnapshot: (): FieldStoreSnapshot => ({fields: new Map(), status: 'idle', settingsSnapshot: null}),
@@ -134,127 +88,6 @@ afterEach(() => {
   root = null;
   container = null;
   cleanup = null;
-});
-
-/** Reads the newest hook state the probe observed. */
-type ProbeReader = () => SettingsSnapshotState | null;
-
-/** Mounts a probe for the snapshot hook and returns its latest state. */
-const mountSnapshotProbe = async (gateway: SettingsGateway): Promise<ProbeReader> => {
-  let latest: SettingsSnapshotState | null = null;
-  const Probe = () => {
-    latest = useSettingsSnapshot(gateway);
-    return null;
-  };
-  await act(async () => {
-    root?.render(<Probe />);
-  });
-  return () => latest;
-};
-
-/** Runs one state change inside React's act boundary. */
-const settle = async (change: () => void): Promise<void> => {
-  await act(async () => {
-    change();
-  });
-};
-
-describe('useSettingsSnapshot', () => {
-  test('a late older revision does not replace a newer snapshot', async () => {
-    const recording = createRecordingGateway();
-    const current = await mountSnapshotProbe(recording.gateway);
-    expect(recording.loads).toHaveLength(1);
-
-    await settle(() => recording.notifyChange());
-    expect(recording.loads).toHaveLength(2);
-
-    // The newer load settles first; the older one must not win afterwards.
-    await settle(() => recording.loads[1]?.resolve(snapshotOf(2, {fontSize: 16})));
-    expect(current()?.snapshot?.revision).toBe(2);
-
-    await settle(() => recording.loads[0]?.resolve(snapshotOf(1, {fontSize: 12})));
-    expect(current()?.snapshot?.revision).toBe(2);
-    expect(current()?.snapshot?.userValues).toEqual({fontSize: 16});
-  });
-
-  test('an older failing load does not replace a newer success with an error', async () => {
-    const recording = createRecordingGateway();
-    const current = await mountSnapshotProbe(recording.gateway);
-    expect(recording.loads).toHaveLength(1);
-
-    await settle(() => recording.notifyChange());
-    expect(recording.loads).toHaveLength(2);
-
-    // The newer load succeeds and is shown; the older one fails afterwards.
-    await settle(() => recording.loads[1]?.resolve(snapshotOf(2, {fontSize: 16})));
-    expect(current()?.snapshot?.revision).toBe(2);
-    expect(current()?.loadError).toBeNull();
-
-    await settle(() => recording.loads[0]?.reject(new Error('stale failure')));
-
-    expect(current()?.snapshot?.revision).toBe(2);
-    expect(current()?.loadError).toBeNull();
-  });
-
-  test('a failing load with no newer accepted load still reports the error', async () => {
-    const recording = createRecordingGateway();
-    const current = await mountSnapshotProbe(recording.gateway);
-
-    await settle(() => recording.loads[0]?.reject(new Error('cannot read')));
-
-    expect(current()?.loadError).toBe('cannot read');
-    expect(current()?.isLoading).toBe(false);
-  });
-
-  test('an older success does not clear a newer failure', async () => {
-    const recording = createRecordingGateway();
-    const current = await mountSnapshotProbe(recording.gateway);
-    expect(recording.loads).toHaveLength(1);
-
-    await settle(() => recording.notifyChange());
-    expect(recording.loads).toHaveLength(2);
-
-    // The newer load fails first; the older load succeeds afterwards.
-    await settle(() => recording.loads[1]?.reject(new Error('reload failed')));
-    expect(current()?.loadError).toBe('reload failed');
-
-    await settle(() => recording.loads[0]?.resolve(snapshotOf(1, {fontSize: 12})));
-
-    // The banner stays: its failure is newer than the success that settled.
-    expect(current()?.loadError).toBe('reload failed');
-  });
-
-  test('an older failure does not take the banner from a newer one', async () => {
-    const recording = createRecordingGateway();
-    const current = await mountSnapshotProbe(recording.gateway);
-
-    await settle(() => recording.notifyChange());
-    await settle(() => recording.notifyChange());
-    expect(recording.loads).toHaveLength(3);
-
-    // The newest load fails first, then the oldest fails too.
-    await settle(() => recording.loads[2]?.reject(new Error('newest failure')));
-    await settle(() => recording.loads[0]?.reject(new Error('oldest failure')));
-    expect(current()?.loadError).toBe('newest failure');
-
-    // A success from the middle load must not clear the newest failure, even
-    // though it started after the oldest one.
-    await settle(() => recording.loads[1]?.resolve(snapshotOf(1, {fontSize: 12})));
-
-    expect(current()?.loadError).toBe('newest failure');
-  });
-
-  test('a newer failing load reports even when an older load succeeded', async () => {
-    const recording = createRecordingGateway();
-    const current = await mountSnapshotProbe(recording.gateway);
-    await settle(() => recording.loads[0]?.resolve(snapshotOf(1)));
-
-    await settle(() => recording.notifyChange());
-    await settle(() => recording.loads[1]?.reject(new Error('newer failure')));
-
-    expect(current()?.snapshot?.revision).toBe(1);
-    expect(current()?.loadError).toBe('newer failure');
-  });
 });
 
 describe('useSettingsEditor', () => {
