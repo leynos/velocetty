@@ -87,6 +87,21 @@ beforeEach(() => {
   calls = [];
 });
 
+test('a service refusal crosses the IPC boundary with its reason intact', async () => {
+  const refusal: SettingsWriteOutcome = {kind: 'failed', reason: 'user-config-unreadable'};
+  registerSettingsIpcHandlers({
+    getSnapshot: () => SNAPSHOT,
+    resetValue: async () => refusal,
+    setValue: async () => refusal
+  });
+
+  const setOutcome = await handlerFor('settings:setValue')(unusedIpcEvent, editableTarget, 16);
+  const resetOutcome = await handlerFor('settings:resetValue')(unusedIpcEvent, editableTarget);
+
+  expect(setOutcome).toMatchObject({kind: 'failed', reason: 'user-config-unreadable'});
+  expect(resetOutcome).toMatchObject({kind: 'failed', reason: 'user-config-unreadable'});
+});
+
 test('registers a handler for each settings command', () => {
   registerSettingsIpcHandlers(serviceDouble());
 

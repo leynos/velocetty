@@ -272,31 +272,34 @@ describe('settings write observability', () => {
     expect([...rejected.spans, ...failed.spans]).toEqual([writeSpan('failed'), writeSpan('failed')]);
   });
 
-  test('a file whose stat fails is refused, counted, and spanned failed', async () => {
-    const harness = harnessWithFile('{config: {fontSize: 14}}');
-    // The memory port fails one queued call, so each read gets its own fault.
-    harness.port.queueFault('stat', 'EIO');
+  for (const operation of ['stat', 'readText'] as const) {
+    test(`a file whose ${operation} fails with EACCES is refused and spanned failed`, async () => {
+      const harness = harnessWithFile('{config: {fontSize: 14}}');
+      // The memory port fails one queued call, so each read gets its own fault.
+      harness.port.queueFault(operation, 'EACCES');
 
-    // The read is total: the snapshot path needs a file state, and the write
-    // path turns the same failure into a refusal rather than an exception.
-    expect(harness.service.getSnapshot().fileStatus).toEqual({
-      kind: 'unreadable',
-      diagnostics: [
-        {
-          path: '/',
-          message: 'The config file could not be read.',
-          suggestedFix: 'Check the file permissions.'
-        }
-      ]
+      // The read is total: the snapshot path needs a file state, and the write
+      // path turns the same failure into a refusal rather than an exception.
+      expect(harness.service.getSnapshot().fileStatus).toEqual({
+        kind: 'unreadable',
+        diagnostics: [
+          {
+            path: '/',
+            message: 'The config file could not be read.',
+            suggestedFix: 'Check the file permissions.'
+          }
+        ]
+      });
+      harness.port.queueFault(operation, 'EACCES');
+      const outcome = await harness.service.setValue(target('fontSize'), 16);
+
+      expect(outcome).toMatchObject({kind: 'failed', reason: 'user-config-unreadable'});
+      expect(harness.counters().settingsFailures).toBe(1);
+      expect(harness.spans).toEqual(['[config] span operation=settings-write outcome=failed ms=0']);
+      expect(harness.refusals).toEqual(['settings write refused reason=user-config-unreadable']);
+      expect(harness.port.readFile(CONFIG_PATH)).toBe('{config: {fontSize: 14}}');
     });
-    harness.port.queueFault('stat', 'EIO');
-    const outcome = await harness.service.setValue(target('fontSize'), 16);
-
-    expect(outcome.kind).not.toBe('applied');
-    expect(harness.counters().settingsFailures).toBe(1);
-    expect(harness.refusals).toEqual(['settings write refused reason=user-config-unreadable']);
-    expect(harness.port.readFile(CONFIG_PATH)).toBe('{config: {fontSize: 14}}');
-  });
+  }
 });
 
 describe('non-finite numbers in the user values', () => {
