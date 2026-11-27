@@ -147,8 +147,8 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-current candidate delivers **174 non-Plan files** and **16,752 net
-non-generated lines** at `b6445e94`. Each revision entry in the revision note
+current candidate delivers **174 non-Plan files** and **16,823 net
+non-generated lines** at `09a3715d`. Each revision entry in the revision note
 records the count at the head it names, so those earlier figures are historical
 rather than current. The excess is recorded here as the escalation the
 tolerance requires, and the maintainer's acceptance of the raised counts is
@@ -2468,3 +2468,24 @@ nixie clean; 1,327 unit tests across 148 files with zero failures; the four
 proof summaries verify 1, 8, 9 and 11 programs with zero errors;
 `make build-fast` clean; the packaged settings deep E2E passing;
 `cs delta origin/main` reporting no new issue.
+
+2026-11-27: twentieth round, the two remaining Unit Architecture items from the
+approval review.
+
+1. **A failed self-write check is now explicit.** The watcher's read mapped
+   every failure to "not the writer", so an unreadable file produced an
+   announcement with nothing to explain it. The read returns a text, missing,
+   or unreadable result: a missing file stays quiet, and an unreadable one logs
+   `[config] self-write check failed reason=unreadable` and is treated as
+   external. `config-watch-selfwrite.test.ts` removes read permission and
+   asserts both the line and the announcement; the test fails against the
+   silent mapping.
+2. **The writer's retry loop separates its responsibilities.**
+   `classifyWriteFailure`, `recordRetry`, and `recordFailure` are named units,
+   so the critical section no longer also decides logging, counters, and
+   backoff.
+
+Recorded count: 174 non-Plan files and 16,823 net non-generated lines at
+`09a3715d`. Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and
+nixie clean; 1,328 unit tests across 148 files with zero failures; the four
+proof summaries verify 1, 8, 9 and 11 programs with zero errors.
