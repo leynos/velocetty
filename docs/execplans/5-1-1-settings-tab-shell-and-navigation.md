@@ -147,8 +147,8 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-current candidate delivers **174 non-Plan files** and **16,823 net
-non-generated lines** at `09a3715d`. Each revision entry in the revision note
+current candidate delivers **175 non-Plan files** and **16,873 net
+non-generated lines** at `e3bd3628`. Each revision entry in the revision note
 records the count at the head it names, so those earlier figures are historical
 rather than current. The excess is recorded here as the escalation the
 tolerance requires, and the maintainer's acceptance of the raised counts is
@@ -2489,3 +2489,23 @@ Recorded count: 174 non-Plan files and 16,823 net non-generated lines at
 `09a3715d`. Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and
 nixie clean; 1,328 unit tests across 148 files with zero failures; the four
 proof summaries verify 1, 8, 9 and 11 programs with zero errors.
+
+2026-11-27: twenty-first round, the three findings from the approval review.
+
+1. **The writer is under the size limit.** `config-file-writer.ts` reached 420
+   lines, so the retry policy, its counters, and its bounded lines moved to
+   `app/config/config-write-retry.ts`; the writer is 384 lines and keeps the
+   critical section and the loop.
+2. **Proof promotion accounts for the path filter.** ADR 009's exit criteria
+   now require an always-running check before `dafny` can be required, because
+   the workflow otherwise leaves unrelated pull requests without it.
+3. **The ADR describes the hook that exists.** The repository's tracked
+   `.husky/pre-push` hook runs `bun run test:unit`, not the verifier; the
+   addendum now says `make prove` is the documented local gate a developer runs
+   before publishing a proof-path change.
+
+Recorded count: 175 non-Plan files and 16,873 net non-generated lines at
+`e3bd3628`. Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and
+nixie clean; 1,328 unit tests across 148 files with zero failures; proofs 1 + 8
++ 9 + 11 with zero errors; `make build-fast` clean; `cs delta origin/main`
+reports no new issue.
