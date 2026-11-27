@@ -147,8 +147,8 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-current candidate delivers **169 non-Plan files** and **16,425 net
-non-generated lines** at `e039e215`. Each revision entry in the revision note
+current candidate delivers **172 non-Plan files** and **16,494 net
+non-generated lines** at `245a5e50`. Each revision entry in the revision note
 records the count at the head it names, so those earlier figures are historical
 rather than current. The excess is recorded here as the escalation the
 tolerance requires, and the maintainer's acceptance of the raised counts is
@@ -2430,3 +2430,13 @@ followed the queued request.
 Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint clean; 1,306 unit
 tests across 146 files with zero failures; the four proof summaries verify 1,
 8, 9 and 11 programs with zero errors.
+
+2026-11-27: eighteenth round, the file-size finding from the approval review.
+`settings-service-behaviour.test.ts` (403) and `settings-editor-hook.test.tsx`
+(417) exceeded the 400-line limit. The service harness moved to
+`test/testUtils/settings-service-harness.ts` (suite now 324 lines), and the
+snapshot hook's load-ordering suite moved to
+`test/unit/settings-snapshot-hook.test.tsx` (161 lines) with its gateway
+fixture in `test/testUtils/settings-snapshot-fixtures.ts`; the editor suite is
+250 lines. No assertion changed. Recorded count: 172 non-Plan files and 16,494
+net non-generated lines at `245a5e50`.
