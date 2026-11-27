@@ -58,10 +58,13 @@ test.serial('an unreadable self-write check announces the reload and names the f
   try {
     harness.configModule.setup();
     harness.configModule.subscribe(harness.subscriberMock);
-    // The watcher re-reads the file to compare it with the recorded hash; an
-    // unreadable file cannot be compared, so the reload must be treated as
-    // external rather than silently attributed to the writer.
-    fs.chmodSync(path.join(directory, 'config.json5'), 0o000);
+    // The watcher re-reads the file to compare it with the recorded hash. A
+    // directory in its place defeats the read on every platform (EISDIR), so
+    // the comparison cannot be made and the reload must be treated as external
+    // rather than silently attributed to the writer.
+    const configPath = path.join(directory, 'config.json5');
+    fs.rmSync(configPath, {force: true});
+    fs.mkdirSync(configPath);
     harness.emit({event: 'change', eventPath: path.join(directory, 'config.json5')});
     await settle();
 
@@ -69,7 +72,6 @@ test.serial('an unreadable self-write check announces the reload and names the f
     expect(harness.notifyMock).toHaveBeenCalledWith('Configuration updated', 'Configuration reloaded!');
   } finally {
     warnSpy.mockRestore();
-    fs.chmodSync(directory, 0o700);
     fs.rmSync(directory, {force: true, recursive: true});
   }
 });
