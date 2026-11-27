@@ -816,9 +816,30 @@ config file. Both take a `ConfigWriterDependencies` whose `fileSystem` is a
 port, and `createMemoryConfigFileSystem` in
 `test/testUtils/config-file-port.ts` supplies a `MemoryConfigFileSystem` that
 records every write, so a test can assert that a refused edit never reached
-disk. `writeConfigEdit` retries the whole critical section; the plugin runtime
+disk. `writeConfigEdit` retries the whole critical section; the policy, its
+counter, and its bounded lines live in `app/config/config-write-retry.ts`
+(`classifyWriteFailure`, `recordRetry`, `recordFailure`). The plugin runtime
 uses `writeConfigEditSync`, one pass, because it persists during module
 evaluation.
+
+The scanner and key parser have their own direct suite.
+`app/config/json5/lexer.ts` owns comment skipping, quoted-string ends,
+identifier characters, Unicode escapes, and line positions, and
+`app/config/json5/keys.ts` parses quoted, unquoted, and escaped object keys.
+`test/unit/json5-lexer.test.ts` exercises those primitives directly; the
+document-edit and property suites exercise the operations built on them.
+
+`app/settings/settings-file-kind.ts` decides whether the resolved config path is
+`json5` or `legacy-json`. The settings service takes that `SettingsFileKind`
+as a dependency and never inspects a path itself; `app/start.ts`, the test
+harness, and the convergence model each classify their own path with
+`fileKindFor`.
+
+`selfWriteVerdict` in `app/config.ts` compares the watched file with the
+writer's recorded hash and returns `'self-write'`, `'external'`, or
+`'unreadable'`. The watcher announces anything that is not a self-write, logs
+`[config] self-write check failed reason=unreadable` for the unreadable case,
+and treats an absent file as external without a line.
 
 The settings seams and the double each test uses:
 

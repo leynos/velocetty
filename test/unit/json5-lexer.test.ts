@@ -32,7 +32,7 @@ const PARAGRAPH_SEPARATOR = String.fromCodePoint(0x20_29);
 
 describe('comment and whitespace skipping', () => {
   test('a line comment ends at every line terminator', () => {
-    for (const terminator of ['\n', '\r', ' ', ' ']) {
+    for (const terminator of ['\n', '\r', LINE_SEPARATOR, PARAGRAPH_SEPARATOR]) {
       const source = `// note${terminator}next`;
       expect(skipLineComment(sourceText(source), {startIndex: 0, limitIndex: source.length})).toBe(7);
     }
@@ -121,7 +121,8 @@ describe('line positions', () => {
   test('the line start follows every terminator', () => {
     expect(getLineStartIndex('one\ntwo', at(5))).toBe(4);
     expect(getLineStartIndex('one\r\ntwo', at(6))).toBe(5);
-    expect(getLineStartIndex('one two', at(5))).toBe(4);
+    expect(getLineStartIndex(`one${LINE_SEPARATOR}two`, at(5))).toBe(4);
+    expect(getLineStartIndex(`one${PARAGRAPH_SEPARATOR}two`, at(5))).toBe(4);
     expect(getLineStartIndex('one', at(2))).toBe(0);
   });
 

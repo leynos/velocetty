@@ -22,6 +22,7 @@ import {checkDeprecatedConfig} from './config/config-queries';
 import {createConfigSpanRecorder} from './config/config-spans';
 import {createConfigWatchRuntime, emitKeymapsMarker, type ConfigWatchRuntime} from './config/config-watch';
 import {setCurrentConfig} from './config/current-config';
+import type {SelfWriteVerdict} from './config/import-report';
 import {silentMarkerSink, type E2EMarkerSink} from './config/e2e-marker-sink';
 import {createConfigImportModule} from './config/import';
 import {asConfigFilePath, sweepTemporaryFiles, type ConfigFileSystemPort} from './config/config-file-writer';
@@ -207,22 +208,21 @@ const readActiveConfigText = (reader: ActiveConfigReader): ActiveConfigRead => {
 };
 
 /**
- * Reports whether the pending reload was caused by the settings writer.
+ * Compares the file on disk with the settings writer's record.
  *
- * An unreadable file cannot be compared with the recorded hash, so it is
- * reported as external and named in one bounded line. Suppressing the notice
- * there would hide a change the process could not inspect.
+ * Pure: the caller decides how to report an unreadable file. Returning a
+ * verdict rather than a boolean keeps "not the writer" distinct from "could
+ * not check", which the watcher names in one bounded line.
  */
-export const isSelfWriteReload = (reader: ActiveConfigReader): boolean => {
+export const selfWriteVerdict = (reader: ActiveConfigReader): SelfWriteVerdict => {
   const read = readActiveConfigText(reader);
   if (read.kind === 'unreadable') {
-    console.warn('[config] self-write check failed reason=unreadable');
-    return false;
+    return 'unreadable';
   }
   if (read.kind === 'missing') {
-    return false;
+    return 'external';
   }
-  return getLastWrittenTextHash() === hashConfigText(read.text);
+  return getLastWrittenTextHash() === hashConfigText(read.text) ? 'self-write' : 'external';
 };
 
 export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions = {}) => {
@@ -238,7 +238,8 @@ export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions
     markerSink,
     spans,
     watchedFiles,
-    isSelfWriteReload: () => isSelfWriteReload(fileSystem),
+    isSelfWriteReload: () => selfWriteVerdict(fileSystem),
+    log: (line) => console.warn(line),
     onReloaded: nextConfigRevision
   });
   // The span and the record belong to the start-up session, which takes its

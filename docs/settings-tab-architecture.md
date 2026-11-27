@@ -107,8 +107,16 @@ config file. One attempt runs as a synchronous critical section:
 9. Record the text hash and allocate a new revision.
 
 `EBUSY`, `EPERM`, and `EACCES` re-run the whole section up to three times with
-backoff. The plugin runtime uses `writeConfigEditSync`, one pass, because it
-persists during module evaluation.
+backoff; `app/config/config-write-retry.ts` owns the retry policy, its counter,
+and its bounded lines. The plugin runtime uses `writeConfigEditSync`, one pass,
+because it persists during module evaluation.
+
+The reload watcher compares the file on disk with the writer's recorded hash
+through `selfWriteVerdict`, which answers `'self-write'`, `'external'`, or
+`'unreadable'`. Only a self-write with unchanged keybindings is silent; an
+unreadable file is announced and named in one bounded line, and a missing file
+is announced without a line. The composition root supplies the read port, so
+the comparison never reaches for an ambient module.
 
 ## Observability
 

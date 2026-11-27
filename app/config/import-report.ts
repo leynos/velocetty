@@ -24,6 +24,15 @@ export type ConfigSourceKind = 'development' | 'velocetty' | 'hyper';
  */
 export type ConfigFallbackCause = 'parse' | 'read';
 
+/**
+ * What a comparison of the file on disk with the writer's record concluded.
+ *
+ * `unreadable` is its own case: the reload cannot be attributed to the writer,
+ * so it is announced, and the watcher names the failed check in one bounded
+ * line rather than mapping the failure onto "external".
+ */
+export type SelfWriteVerdict = 'self-write' | 'external' | 'unreadable';
+
 /** What each configuration file did during an import. */
 export type ConfigImportReport = {
   readonly config: 'applied' | 'fallback';

@@ -19,11 +19,44 @@ import {formatKeymapsMarker, type E2EKeymapStatus} from './e2e-keymap-probe';
 import type {E2EMarkerSink} from './e2e-marker-sink';
 import {createChokidarHandle} from './chokidar-handle';
 import type {ConfigImportResult} from './import';
-import {keymapsDiffer, shouldNotifyReload, type ConfigImportReport, type ConfigSourceKind} from './import-report';
+import {
+  keymapsDiffer,
+  shouldNotifyReload,
+  type ConfigImportReport,
+  type ConfigSourceKind,
+  type SelfWriteVerdict
+} from './import-report';
 import {createConfigWatcher} from './watcher';
 import {createWatchedFileReconciler, type WatchedFileStamps} from './watched-file-stamp';
 
 const CONFIG_DEBOUNCE_MS = 100;
+
+/** The facts one reload's announcement decision is made from. */
+type AnnounceFacts = {
+  readonly report: ConfigImportReport;
+  readonly keymapsBefore: Readonly<Record<string, readonly string[]>> | undefined;
+  readonly keymapsAfter: Readonly<Record<string, readonly string[]>>;
+  readonly isSelfWriteReload: () => SelfWriteVerdict;
+  readonly log: (line: string) => void;
+};
+
+/**
+ * Decides whether one reload announces itself.
+ *
+ * An unreadable file is named once and treated as external; a self-write with
+ * unchanged keybindings stays silent so the settings tab's own writes do not
+ * produce a notice.
+ */
+const shouldAnnounce = ({report, keymapsBefore, keymapsAfter, isSelfWriteReload, log}: AnnounceFacts): boolean => {
+  const verdict = isSelfWriteReload();
+  if (verdict === 'unreadable') {
+    log('[config] self-write check failed reason=unreadable');
+  }
+  return shouldNotifyReload(report, {
+    hasKeybindingsChange: keymapsDiffer(keymapsBefore, keymapsAfter),
+    isSelfWrite: verdict === 'self-write'
+  });
+};
 
 /** Maps the import report onto the keymap status the E2E lane asserts on. */
 const keymapStatus = (report: ConfigImportReport): E2EKeymapStatus =>
@@ -69,11 +102,14 @@ export type ConfigWatchDependencies = {
   /** Absolute paths of the files a reload must react to. */
   readonly watchedFiles: readonly string[];
   /**
-   * Reports whether the config file now on disk is the one the settings writer
-   * just wrote. Such a reload updates the renderer silently, unless the same
-   * reload also applied a keybindings change.
+   * Compares the config file now on disk with the settings writer's record.
+   * A `self-write` reload updates the renderer silently, unless the same
+   * reload also applied a keybindings change. `unreadable` is announced and
+   * named through `log`.
    */
-  readonly isSelfWriteReload?: () => boolean;
+  readonly isSelfWriteReload?: () => SelfWriteVerdict;
+  /** Receives the bounded line for a self-write check that could not run. */
+  readonly log?: (line: string) => void;
   /** Allocates the snapshot revision a completed reload makes visible. */
   readonly onReloaded?: () => void;
 };
@@ -104,7 +140,8 @@ export type ConfigWatchRuntime = {
  */
 export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies): ConfigWatchRuntime => {
   const {importConfiguration, recorder, spans, metrics, notify, markerSink, configTree, watchedFiles} = dependencies;
-  const isSelfWriteReload = dependencies.isSelfWriteReload ?? (() => false);
+  const isSelfWriteReload = dependencies.isSelfWriteReload ?? (() => 'external' as const);
+  const log = dependencies.log ?? (() => {});
   const onReloaded = dependencies.onReloaded ?? (() => {});
   // The registration, not the callback, is a subscriber's identity. Keying by
   // callback would let a stale cleanup remove a later registration of the same
@@ -140,9 +177,12 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
     finishSpan(report.config === 'fallback' ? 'fallback' : 'applied');
     setCurrentConfig(config);
     onReloaded();
-    const announced = shouldNotifyReload(report, {
-      hasKeybindingsChange: keymapsDiffer(keymapsBefore, config.keymaps),
-      isSelfWrite: isSelfWriteReload()
+    const announced = shouldAnnounce({
+      report,
+      keymapsBefore,
+      keymapsAfter: config.keymaps,
+      isSelfWriteReload,
+      log
     });
     const record: ImportRecord = {announced, configSource: configTree, outcome, phase: 'reload', report};
     if (report.config === 'fallback') {

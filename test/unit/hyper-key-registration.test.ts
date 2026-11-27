@@ -33,8 +33,14 @@ let root: Root | null = null;
 let moduleInstance = 0;
 let bindCalls = 0;
 let boundKeys: string[] = [];
+/** The handler each bound key sequence reaches, so a test can press it. */
+const keyHandlers = new Map<string, (event: {preventDefault: () => void}) => void>();
+/** What the registry answers for `shouldPreventDefault`; a test may change it. */
+let preventDefaultAnswer = false;
 /** When set, each `getRegisteredKeys` call waits for the test to settle it. */
 let keyLoadQueue: Array<(keys: RegisteredKeyMap) => void> | null = null;
+/** Answers the registry's map when a test does not queue one. */
+let registeredKeysAnswer: () => RegisteredKeyMap = () => ({});
 
 const {transportMock} = createTransportMock();
 
@@ -45,12 +51,14 @@ const {transportMock} = createTransportMock();
  * rebind is then visible as an extra key rather than hidden by the newer set.
  */
 const MousetrapMock = () => ({
-  bind(keys: string, _handler: () => void) {
+  bind(keys: string, handler: (event: {preventDefault: () => void}) => void) {
     bindCalls += 1;
     boundKeys.push(keys);
+    keyHandlers.set(keys, handler);
   },
   reset() {
     boundKeys = [];
+    keyHandlers.clear();
   }
 });
 
@@ -108,16 +116,19 @@ const registerMocks = () => {
           keyLoadQueue?.push(resolve);
         });
       }
-      return {};
+      return registeredKeysAnswer();
     },
     getCommandHandler: () => {},
-    shouldPreventDefault: () => false
+    shouldPreventDefault: () => preventDefaultAnswer
   }));
 };
 
 beforeEach(async () => {
   bindCalls = 0;
   boundKeys = [];
+  keyHandlers.clear();
+  preventDefaultAnswer = false;
+  registeredKeysAnswer = () => ({});
   keyLoadQueue = null;
   cleanup = await setupHappyDom();
   moduleInstance += 1;
@@ -188,4 +199,27 @@ test.serial('a key registration that settles after unmount binds nothing', async
   });
 
   expect(bindCalls).toBe(0);
+});
+
+test.serial('a gated command leaves the native key behaviour alone while settings owns input', async () => {
+  registeredKeysAnswer = () => ({'ctrl+v': 'editor:paste', 'ctrl+t': 'tab:next'}) satisfies RegisteredKeyMap;
+  preventDefaultAnswer = true;
+  const execCommand = mock((_command: string, _handler: unknown, _event: unknown) => {});
+
+  await act(async () => {
+    renderHyper({execCommand, isSettingsSurfaceActive: true});
+    await waitFor(0);
+  });
+
+  // `editor:paste` is not on the settings allow-list: its keydown must reach
+  // the handler without preventing the browser's own paste.
+  const gatedEvent = {preventDefault: mock(() => {})};
+  keyHandlers.get('ctrl+v')?.(gatedEvent);
+  expect(gatedEvent.preventDefault).not.toHaveBeenCalled();
+
+  // `tab:next` is allowed on the surface, so the configured default stands.
+  const allowedEvent = {preventDefault: mock(() => {})};
+  keyHandlers.get('ctrl+t')?.(allowedEvent);
+  expect(allowedEvent.preventDefault).toHaveBeenCalledTimes(1);
+  expect(execCommand.mock.calls.map(([command]) => command)).toEqual(['editor:paste', 'tab:next']);
 });
