@@ -2506,6 +2506,6 @@ proof summaries verify 1, 8, 9 and 11 programs with zero errors.
 
 Recorded count: 175 non-Plan files and 16,873 net non-generated lines at
 `e3bd3628`. Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and
-nixie clean; 1,328 unit tests across 148 files with zero failures; proofs 1 + 8
-+ 9 + 11 with zero errors; `make build-fast` clean; `cs delta origin/main`
-reports no new issue.
+nixie clean; 1,328 unit tests across 148 files with zero failures; the four
+proof summaries verify 1, 8, 9 and 11 programs with zero errors;
+`make build-fast` clean; `cs delta origin/main` reports no new issue.
