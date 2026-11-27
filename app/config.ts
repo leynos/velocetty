@@ -13,6 +13,7 @@ import type {JsonObject} from '@shared/types/json';
 import {app} from 'electron';
 
 import {mkdirpSync} from 'fs-extra';
+import {errorCode} from './utils/error-code';
 import path from 'node:path';
 
 import {createConfigMetrics} from './config/config-metrics';
@@ -183,19 +184,45 @@ export const getConfigDefaults = (): JsonObject => {
 /** The port this root uses to read the file it watches. */
 type ActiveConfigReader = Pick<ConfigFileSystemPort, 'readText'>;
 
-/** Reads the active configuration file, or null when it cannot be read. */
-const readActiveConfigText = (reader: ActiveConfigReader): string | null => {
+/**
+ * What one read of the watched file produced.
+ *
+ * A failure is its own case, not an absence of text: a reload whose origin
+ * cannot be compared must be treated as external rather than silently
+ * attributed to the writer.
+ */
+type ActiveConfigRead =
+  | {readonly kind: 'text'; readonly text: string}
+  | {readonly kind: 'missing'}
+  | {readonly kind: 'unreadable'};
+
+const readActiveConfigText = (reader: ActiveConfigReader): ActiveConfigRead => {
   try {
-    return reader.readText(asConfigFilePath(cfgPath));
-  } catch {
-    return null;
+    return {kind: 'text', text: reader.readText(asConfigFilePath(cfgPath))};
+  } catch (error) {
+    // An absent file is a first run, not a fault, and the reload it triggers
+    // is announced anyway; any other failure is named.
+    return errorCode(error) === 'ENOENT' ? {kind: 'missing'} : {kind: 'unreadable'};
   }
 };
 
-/** Reports whether the pending reload was caused by the settings writer. */
-const isSelfWriteReload = (reader: ActiveConfigReader): boolean => {
-  const text = readActiveConfigText(reader);
-  return text !== null && getLastWrittenTextHash() === hashConfigText(text);
+/**
+ * Reports whether the pending reload was caused by the settings writer.
+ *
+ * An unreadable file cannot be compared with the recorded hash, so it is
+ * reported as external and named in one bounded line. Suppressing the notice
+ * there would hide a change the process could not inspect.
+ */
+export const isSelfWriteReload = (reader: ActiveConfigReader): boolean => {
+  const read = readActiveConfigText(reader);
+  if (read.kind === 'unreadable') {
+    console.warn('[config] self-write check failed reason=unreadable');
+    return false;
+  }
+  if (read.kind === 'missing') {
+    return false;
+  }
+  return getLastWrittenTextHash() === hashConfigText(read.text);
 };
 
 export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions = {}) => {

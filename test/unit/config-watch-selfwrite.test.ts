@@ -6,7 +6,7 @@
  * temporary directory so that decision is exercised together with a real
  * keybindings change landing in the same debounced reload.
  */
-import {afterEach, expect, mock, test} from 'bun:test';
+import {afterEach, expect, mock, spyOn, test} from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -47,6 +47,29 @@ test.serial('a self-written config reload with unchanged keymaps is not announce
     expect(getCurrentConfig()).toBe(reloaded);
     expect(harness.notifyMock.mock.calls).toEqual([]);
   } finally {
+    fs.rmSync(directory, {force: true, recursive: true});
+  }
+});
+
+test.serial('an unreadable self-write check announces the reload and names the failure', async () => {
+  const directory = writeSelfWrittenConfig();
+  const harness = await createWatchHarness({configDir: directory});
+  const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    harness.configModule.setup();
+    harness.configModule.subscribe(harness.subscriberMock);
+    // The watcher re-reads the file to compare it with the recorded hash; an
+    // unreadable file cannot be compared, so the reload must be treated as
+    // external rather than silently attributed to the writer.
+    fs.chmodSync(path.join(directory, 'config.json5'), 0o000);
+    harness.emit({event: 'change', eventPath: path.join(directory, 'config.json5')});
+    await settle();
+
+    expect(warnSpy.mock.calls.map(([line]) => line)).toContain('[config] self-write check failed reason=unreadable');
+    expect(harness.notifyMock).toHaveBeenCalledWith('Configuration updated', 'Configuration reloaded!');
+  } finally {
+    warnSpy.mockRestore();
+    fs.chmodSync(directory, 0o700);
     fs.rmSync(directory, {force: true, recursive: true});
   }
 });

@@ -312,6 +312,30 @@ const attemptWrite = (
 const shouldRetry = (code: string | undefined, attempt: number): boolean =>
   code !== undefined && RETRYABLE_CODES.has(code) && attempt < MAX_ATTEMPTS;
 
+/** What one failed attempt means for the caller. */
+type WriteFailureKind = 'missing' | 'retry' | 'failed';
+
+const classifyWriteFailure = (error: unknown, attempt: number): WriteFailureKind => {
+  const code = errorCode(error);
+  if (code === 'ENOENT') {
+    return 'missing';
+  }
+  return shouldRetry(code, attempt) ? 'retry' : 'failed';
+};
+
+/** Counts one retried attempt, logs its bounded line, and waits its backoff. */
+const recordRetry = async (dependencies: ConfigWriterDependencies, error: unknown, attempt: number): Promise<void> => {
+  dependencies.metrics?.increment('settingsWriteRetries');
+  // Only the errno and the attempt number: a key, a path, and the text are user data.
+  dependencies.log(`config writer retry attempt=${attempt} code=${boundedErrorCode(error) ?? 'unknown'}`);
+  await dependencies.sleep(attempt * 50);
+};
+
+/** Logs the failure that ended the write. */
+const recordFailure = (dependencies: ConfigWriterDependencies, error: unknown): void => {
+  dependencies.log(`config writer failed: ${describeFailure(error)}`);
+};
+
 /**
  * Applies one edit to the config file.
  *
@@ -341,18 +365,15 @@ export const writeConfigEdit = async (
     try {
       return attemptWrite(dependencies, filePath, edit, guard);
     } catch (error) {
-      const code = errorCode(error);
-      if (code === 'ENOENT') {
+      const kind = classifyWriteFailure(error, attempt);
+      if (kind === 'missing') {
         return refused('config-file-missing');
       }
-      if (!shouldRetry(code, attempt)) {
-        dependencies.log(`config writer failed: ${describeFailure(error)}`);
+      if (kind === 'failed') {
+        recordFailure(dependencies, error);
         return refused('io-error');
       }
-      dependencies.metrics?.increment('settingsWriteRetries');
-      // Only the errno and the attempt number: a key, a path, and the text are user data.
-      dependencies.log(`config writer retry attempt=${attempt} code=${boundedErrorCode(error) ?? 'unknown'}`);
-      await dependencies.sleep(attempt * 50);
+      await recordRetry(dependencies, error, attempt);
     }
   }
   return refused('io-error');
