@@ -147,8 +147,8 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-current candidate delivers **172 non-Plan files** and **16,494 net
-non-generated lines** at `245a5e50`. Each revision entry in the revision note
+current candidate delivers **172 non-Plan files** and **16,510 net
+non-generated lines** at `d90207a1`. Each revision entry in the revision note
 records the count at the head it names, so those earlier figures are historical
 rather than current. The excess is recorded here as the escalation the
 tolerance requires, and the maintainer's acceptance of the raised counts is
@@ -2438,5 +2438,8 @@ tests across 146 files with zero failures; the four proof summaries verify 1,
 snapshot hook's load-ordering suite moved to
 `test/unit/settings-snapshot-hook.test.tsx` (161 lines) with its gateway
 fixture in `test/testUtils/settings-snapshot-fixtures.ts`; the editor suite is
-250 lines. No assertion changed. Recorded count: 172 non-Plan files and 16,494
-net non-generated lines at `245a5e50`.
+250 lines. No assertion changed. The split suite's six similarly shaped tests
+then dropped its CodeScene health to 8.82, so they became one scenario table
+with a single runner; every scenario still fails against the old settlement
+behaviour. Recorded count: 172 non-Plan files and 16,510 net non-generated
+lines at `d90207a1`.
