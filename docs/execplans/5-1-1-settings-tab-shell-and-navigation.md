@@ -147,8 +147,8 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-current candidate delivers **175 non-Plan files** and **16,987 net
-non-generated lines** at `b056fd40`. Each revision entry in the revision note
+current candidate delivers **175 non-Plan files** and **17,002 net
+non-generated lines** at `5f34cc0e`. Each revision entry in the revision note
 records the count at the head it names, so those earlier figures are historical
 rather than current. The excess is recorded here as the escalation the
 tolerance requires, and the maintainer's acceptance of the raised counts is
@@ -2539,3 +2539,21 @@ Recorded count: 175 non-Plan files and 16,987 net non-generated lines at
 nixie clean; 1,329 unit tests across 148 files with zero failures; the four
 proof summaries verify 1, 8, 9 and 11 programs with zero errors;
 `make build-fast` clean; `cs delta origin/main` reports no new issue.
+
+2026-11-27: twenty-third round, the last Unit Architecture item from the
+approval review: a distinct status for a file that cannot be read.
+
+`SettingsFileStatus` gains `unreadable`, with the same diagnostic shape as
+`unparseable`; `SettingsWriteFailure` gains `user-config-unreadable`; the IPC
+response schema accepts the new shape; and the renderer has its own banner and
+row reason, so a permission problem no longer claims a syntax error.
+`bannerFor` now uses a table for the fixed banners so the added case keeps it
+within CodeScene's complexity threshold. The service tests assert the status,
+the refusal reason, the counter, and the untouched file; the container-model
+and IPC schema suites cover the new shape.
+
+Recorded count: 175 non-Plan files and 17,002 net non-generated lines at
+`5f34cc0e`. Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and
+nixie clean; 1,329 unit tests across 148 files with zero failures; proofs 1 + 8
++ 9 + 11 with zero errors; `make build-fast` clean; `cs delta origin/main`
+reports no new issue.
