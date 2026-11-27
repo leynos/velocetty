@@ -35,6 +35,7 @@ import {defaultWriterState} from './config/config-file-writer';
 import {createNodeConfigFileSystem} from './config/node-config-file-port';
 import {cfgPath} from './config/paths';
 import {registerSettingsIpcHandlers} from './settings/settings-ipc';
+import {fileKindFor} from './settings/settings-file-kind';
 import {createSettingsService} from './settings/settings-service';
 
 const windowSet = new Set<BrowserWindow>();
@@ -56,6 +57,7 @@ const logSettingsLine = (message: string): void => console.error(message);
 registerSettingsIpcHandlers(
   createSettingsService({
     filePath: cfgPath,
+    fileKind: fileKindFor(cfgPath),
     fileSystem: configFileSystem,
     writer: {
       fileSystem: configFileSystem,

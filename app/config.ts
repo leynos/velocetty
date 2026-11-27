@@ -8,8 +8,6 @@
  * without Electron.
  */
 
-import {readFileSync} from 'node:fs';
-
 import type {JsonObject} from '@shared/types/json';
 
 import {app} from 'electron';
@@ -25,7 +23,7 @@ import {createConfigWatchRuntime, emitKeymapsMarker, type ConfigWatchRuntime} fr
 import {setCurrentConfig} from './config/current-config';
 import {silentMarkerSink, type E2EMarkerSink} from './config/e2e-marker-sink';
 import {createConfigImportModule} from './config/import';
-import {asConfigFilePath, sweepTemporaryFiles} from './config/config-file-writer';
+import {asConfigFilePath, sweepTemporaryFiles, type ConfigFileSystemPort} from './config/config-file-writer';
 import {createNodeConfigFileSystem} from './config/node-config-file-port';
 import {getLastWrittenTextHash, hashConfigText, nextConfigRevision} from './config/config-write-state';
 import {_init} from './config/init';
@@ -182,22 +180,28 @@ export const getConfigDefaults = (): JsonObject => {
   return isJsonObject(defaults.config) ? defaults.config : {};
 };
 
+/** The port this root uses to read the file it watches. */
+type ActiveConfigReader = Pick<ConfigFileSystemPort, 'readText'>;
+
 /** Reads the active configuration file, or null when it cannot be read. */
-const readActiveConfigText = (): string | null => {
+const readActiveConfigText = (reader: ActiveConfigReader): string | null => {
   try {
-    return readFileSync(cfgPath, 'utf8');
+    return reader.readText(asConfigFilePath(cfgPath));
   } catch {
     return null;
   }
 };
 
 /** Reports whether the pending reload was caused by the settings writer. */
-const isSelfWriteReload = (): boolean => {
-  const text = readActiveConfigText();
+const isSelfWriteReload = (reader: ActiveConfigReader): boolean => {
+  const text = readActiveConfigText(reader);
   return text !== null && getLastWrittenTextHash() === hashConfigText(text);
 };
 
 export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions = {}) => {
+  // One filesystem port serves the watch-time read and the start-up sweep, so
+  // this root reads nothing through an ambient module.
+  const fileSystem = createNodeConfigFileSystem();
   const configWatch = createConfigWatchRuntime({
     configTree,
     importConfiguration: _import,
@@ -207,7 +211,7 @@ export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions
     markerSink,
     spans,
     watchedFiles,
-    isSelfWriteReload,
+    isSelfWriteReload: () => isSelfWriteReload(fileSystem),
     onReloaded: nextConfigRevision
   });
   // The span and the record belong to the start-up session, which takes its
@@ -227,7 +231,7 @@ export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions
       // start-up is the only phase that removes it. The sweep reports its own
       // bounded line, so a missing directory stays silent and a real failure
       // still names its errno.
-      sweepTemporaryFiles(createNodeConfigFileSystem(), asConfigFilePath(cfgDir), (line) => console.warn(line));
+      sweepTemporaryFiles(fileSystem, asConfigFilePath(cfgDir), (line) => console.warn(line));
       // A crashed write can leave a temporary file behind. Start-up is the
       // only phase that may remove it, and the edge owns that cleanup
       // immediately before the seed decision reads the file.

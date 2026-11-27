@@ -35,10 +35,17 @@ import type {
   SettingsWriteOutcome
 } from '@shared/settings/protocol';
 
+import type {SettingsFileKind} from './settings-file-kind';
+
 /** The injected dependencies of the settings service. */
 export type SettingsServiceDependencies = {
-  /** The active config file; a `.json` path is the legacy file. */
+  /** The active config file. */
   readonly filePath: string;
+  /**
+   * How the file may be treated, decided by the composition root from the
+   * resolved path; the service itself reads no path rules.
+   */
+  readonly fileKind: SettingsFileKind;
   readonly fileSystem: ConfigFileSystemPort;
   readonly writer: ConfigWriterDependencies;
   /** The built-in defaults, as they appear in `config-default.json`. */
@@ -67,8 +74,6 @@ type FileRead =
       readonly userValues: JsonObject;
     }
   | {readonly kind: 'ok'; readonly userValues: JsonObject};
-
-const isLegacyPath = (filePath: string): boolean => filePath.toLowerCase().endsWith('.json');
 
 const diagnostic = (path: string, message: string, suggestedFix: string): configValidationDiagnostic => ({
   path,
@@ -180,7 +185,7 @@ const readConfigFile = (dependencies: SettingsServiceDependencies): FileRead => 
     return {kind: 'unparseable', diagnostics: parseDiagnostics(error)};
   }
   const userValues = userValuesOf(parsed);
-  if (isLegacyPath(dependencies.filePath)) {
+  if (dependencies.fileKind === 'legacy-json') {
     return {kind: 'legacy', userValues};
   }
   // The load path validates the whole raw config, including the top-level
@@ -264,7 +269,7 @@ export const createSettingsService = (dependencies: SettingsServiceDependencies)
   const getSnapshot = (): SettingsSnapshot => snapshotOf(readConfigFile(dependencies));
 
   const precheck = (target: SettingTarget): Precheck => {
-    if (isLegacyPath(dependencies.filePath)) {
+    if (dependencies.fileKind === 'legacy-json') {
       return {kind: 'refused', outcome: refusedOutcome('legacy-json-config')};
     }
     const read = readConfigFile(dependencies);

@@ -13,6 +13,7 @@ import {createConfigMetrics, type ConfigCounters} from '../../app/config/config-
 import {createConfigSpanRecorder} from '../../app/config/config-spans';
 import type {ConfigWriterDependencies} from '../../app/config/config-file-writer';
 import {createSettingsService, type SettingsService} from '../../app/settings/settings-service';
+import {fileKindFor} from '../../app/settings/settings-file-kind';
 import {createMemoryConfigFileSystem} from './config-file-port';
 
 import type {JsonObject} from '@shared/types/json';
@@ -69,6 +70,7 @@ export const createHarness = (filePath = CONFIG_PATH): Harness => {
   };
   const service = createSettingsService({
     filePath,
+    fileKind: fileKindFor(filePath),
     fileSystem: port,
     writer,
     defaults: DEFAULTS,

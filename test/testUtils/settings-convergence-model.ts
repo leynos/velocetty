@@ -10,6 +10,7 @@ import JSON5 from 'json5';
 
 import type {ConfigWriterDependencies} from '../../app/config/config-file-writer';
 import {coerceInput} from '@shared/settings/coerce';
+import {fileKindFor} from '../../app/settings/settings-file-kind';
 import {createSettingsService} from '../../app/settings/settings-service';
 import {createFieldStore, type FieldDefinition, type FieldStore} from '../../lib/settings/field-store';
 import {createMemoryConfigFileSystem} from './config-file-port';
@@ -92,6 +93,7 @@ export const createHarness = () => {
   };
   const service = createSettingsService({
     filePath: CONFIG_PATH,
+    fileKind: fileKindFor(CONFIG_PATH),
     fileSystem: port,
     writer,
     defaults: {fontSize: 12, shell: '/bin/bash'},

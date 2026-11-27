@@ -19,6 +19,7 @@ import {
   target
 } from '../testUtils/settings-service-harness';
 
+import {fileKindFor} from '../../app/settings/settings-file-kind';
 import type {SettingsService} from '../../app/settings/settings-service';
 import type {SettingsSnapshot, SettingsWriteOutcome} from '@shared/settings/protocol';
 
@@ -320,5 +321,13 @@ describe('non-finite numbers in the user values', () => {
     const reset = await harness.service.resetValue(target('fontSize'));
     expect(reset.kind).toBe('applied');
     expect(harness.port.readFile(CONFIG_PATH)).not.toContain('fontSize');
+  });
+});
+
+describe('fileKindFor', () => {
+  test('a .json path is legacy and anything else is json5', () => {
+    expect(fileKindFor('/home/me/.config/Hyper/hyper.json')).toBe('legacy-json');
+    expect(fileKindFor('/home/me/.config/Hyper/HYPER.JSON')).toBe('legacy-json');
+    expect(fileKindFor('/home/me/.config/Hyper/config.json5')).toBe('json5');
   });
 });

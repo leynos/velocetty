@@ -131,6 +131,9 @@ field because the renderer and main process ship in one build.
 - LemmaScript 0.6.12 needed two local patches (generic records in emitted
   datatypes, and generic-union lookup). The version is pinned exactly so the
   patch cannot drift, but the upstream fix belongs in LemmaScript.
+- The Proofs workflow is advisory until its exit criteria are met (see the
+  2026-11-27 addendum), so a period without hosted verification is covered by
+  the local proof gate rather than by branch protection.
 
 ## Trusted assumptions
 
@@ -161,6 +164,26 @@ field because the renderer and main process ship in one build.
   the store cannot exhaust.
 - `useSyncExternalStore` re-renders after notifications and reads the latest
   snapshot.
+
+### Addendum 2026-11-27: the Proofs workflow is advisory
+
+`.github/workflows/proofs.yml` runs the Dafny verifier on a pull request only
+when a proof-related path changes, and it is **advisory**: the workflow is not
+a required status check while the proof suite settles. The decision is
+deliberate rather than an omission.
+
+- **Exit criteria.** Promote the workflow's `dafny` job to a required check in
+  branch protection after two consecutive weeks of green runs on `main` and on
+  pull requests that touch the listed paths, with no verifier timeout and no
+  freshness failure in that window. Record the promotion in this ADR.
+- **What is still enforced meanwhile.** `make proofs-fresh` runs inside
+  `make lint`, so a stale or hand-edited generated artefact fails the ordinary
+  gate even when the verifier does not run; `bin/prove.sh` refuses a vacuous
+  run; and the local commit gate runs `make prove` before a change is committed.
+- **Why advisory at all.** The verifier is slow and its toolchain (Dafny 4.11,
+  Z3 4.12.1, a patched LemmaScript) is young enough that a transient failure
+  should not block unrelated work. A red Proofs run is still treated as a real
+  failure and investigated, not dismissed as a flake.
 
 ## Alternatives rejected
 
