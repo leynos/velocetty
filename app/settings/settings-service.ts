@@ -66,6 +66,7 @@ export type SettingsService = {
 
 type FileRead =
   | {readonly kind: 'missing'}
+  | {readonly kind: 'unreadable'; readonly diagnostics: readonly configValidationDiagnostic[]}
   | {readonly kind: 'legacy'; readonly userValues: JsonObject}
   | {readonly kind: 'unparseable'; readonly diagnostics: readonly configValidationDiagnostic[]}
   | {
@@ -153,7 +154,7 @@ const diagnosticsOf = (parsed: JsonValue): readonly configValidationDiagnostic[]
 
 /** The read result for a file that exists but cannot be read or stat'ed. */
 const unreadableFile = (): FileRead => ({
-  kind: 'unparseable',
+  kind: 'unreadable',
   diagnostics: [diagnostic('/', 'The config file could not be read.', 'Check the file permissions.')]
 });
 
@@ -208,6 +209,9 @@ const statusOf = (read: FileRead): SettingsFileStatus => {
     }
     case 'unparseable': {
       return {kind: 'unparseable', diagnostics: read.diagnostics};
+    }
+    case 'unreadable': {
+      return {kind: 'unreadable', diagnostics: read.diagnostics};
     }
     case 'invalid': {
       return {kind: 'invalid', diagnostics: read.diagnostics};
@@ -278,6 +282,9 @@ export const createSettingsService = (dependencies: SettingsServiceDependencies)
     }
     if (read.kind === 'unparseable') {
       return {kind: 'refused', outcome: refusedOutcome('user-config-unparseable')};
+    }
+    if (read.kind === 'unreadable') {
+      return {kind: 'refused', outcome: refusedOutcome('user-config-unreadable')};
     }
     if (read.kind === 'invalid' && !read.diagnostics.some((item) => concernsKey(item, target.key))) {
       return {kind: 'refused', outcome: refusedOutcome('user-config-invalid')};

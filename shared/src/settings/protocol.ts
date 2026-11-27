@@ -18,6 +18,7 @@ export type SettingsFileStatus =
   | {readonly kind: 'ok'}
   | {readonly kind: 'missing'}
   | {readonly kind: 'unparseable'; readonly diagnostics: readonly configValidationDiagnostic[]}
+  | {readonly kind: 'unreadable'; readonly diagnostics: readonly configValidationDiagnostic[]}
   | {readonly kind: 'invalid'; readonly diagnostics: readonly configValidationDiagnostic[]}
   | {readonly kind: 'legacy-json'};
 
@@ -39,6 +40,7 @@ export type SettingsSnapshot = {
 /** Why a write did not happen. */
 export type SettingsWriteFailure =
   | 'user-config-unparseable'
+  | 'user-config-unreadable'
   | 'user-config-invalid'
   | 'legacy-json-config'
   | 'config-file-missing'

@@ -11,6 +11,14 @@ import {settingsStrings} from './i18n';
 import type {CoreSettingKey} from '@shared/settings/core-catalogue';
 import type {SettingsFileStatus} from '@shared/settings/protocol';
 
+/** The banner for each state that blocks every edit. */
+const fixedBanner = {
+  missing: settingsStrings.missingBanner,
+  unparseable: settingsStrings.unparseableBanner,
+  unreadable: settingsStrings.unreadableBanner,
+  'legacy-json': settingsStrings.legacyBanner
+} as const;
+
 export const bannerFor = (status: SettingsFileStatus | null, loadError: string | null): string | null => {
   if (loadError !== null) {
     return loadError;
@@ -18,28 +26,19 @@ export const bannerFor = (status: SettingsFileStatus | null, loadError: string |
   if (status === null || status.kind === 'ok') {
     return null;
   }
-  switch (status.kind) {
-    case 'missing': {
-      return settingsStrings.missingBanner;
-    }
-    case 'unparseable': {
-      return settingsStrings.unparseableBanner;
-    }
-    case 'invalid': {
-      const problems = status.diagnostics.map((diagnostic) => `${diagnostic.path}: ${diagnostic.message}`);
-      return [settingsStrings.invalidBanner, ...problems].join(' ');
-    }
-    case 'legacy-json': {
-      return settingsStrings.legacyBanner;
-    }
+  if (status.kind === 'invalid') {
+    const problems = status.diagnostics.map((diagnostic) => `${diagnostic.path}: ${diagnostic.message}`);
+    return [settingsStrings.invalidBanner, ...problems].join(' ');
   }
+  return fixedBanner[status.kind];
 };
 
 /** The fixed row reason for a file state that blocks every row. */
 const blockedRowReason = {
   missing: settingsStrings.missingRow,
   'legacy-json': settingsStrings.legacyRow,
-  unparseable: settingsStrings.unparseableRow
+  unparseable: settingsStrings.unparseableRow,
+  unreadable: settingsStrings.unreadableRow
 } as const;
 
 /** Whether the file's diagnostics name this key or one of its descendants. */

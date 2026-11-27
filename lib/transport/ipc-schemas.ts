@@ -190,6 +190,7 @@ const settingsFileStatusSchema = z.discriminatedUnion('kind', [
   z.object({kind: z.literal('ok')}).loose(),
   z.object({kind: z.literal('missing')}).loose(),
   z.object({kind: z.literal('unparseable'), diagnostics: z.array(settingsDiagnosticSchema)}).loose(),
+  z.object({kind: z.literal('unreadable'), diagnostics: z.array(settingsDiagnosticSchema)}).loose(),
   z.object({kind: z.literal('invalid'), diagnostics: z.array(settingsDiagnosticSchema)}).loose(),
   z.object({kind: z.literal('legacy-json')}).loose()
 ]);

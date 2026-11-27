@@ -280,7 +280,7 @@ describe('settings write observability', () => {
     // The read is total: the snapshot path needs a file state, and the write
     // path turns the same failure into a refusal rather than an exception.
     expect(harness.service.getSnapshot().fileStatus).toEqual({
-      kind: 'unparseable',
+      kind: 'unreadable',
       diagnostics: [
         {
           path: '/',
@@ -294,7 +294,7 @@ describe('settings write observability', () => {
 
     expect(outcome.kind).not.toBe('applied');
     expect(harness.counters().settingsFailures).toBe(1);
-    expect(harness.refusals).toEqual(['settings write refused reason=user-config-unparseable']);
+    expect(harness.refusals).toEqual(['settings write refused reason=user-config-unreadable']);
     expect(harness.port.readFile(CONFIG_PATH)).toBe('{config: {fontSize: 14}}');
   });
 });

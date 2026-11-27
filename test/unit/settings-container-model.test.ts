@@ -25,6 +25,7 @@ describe('bannerFor', () => {
     expect(bannerFor({kind: 'ok'}, null)).toBeNull();
     expect(bannerFor({kind: 'missing'}, null)).toBe(settingsStrings.missingBanner);
     expect(bannerFor({kind: 'unparseable', diagnostics: []}, null)).toBe(settingsStrings.unparseableBanner);
+    expect(bannerFor({kind: 'unreadable', diagnostics: []}, null)).toBe(settingsStrings.unreadableBanner);
     expect(bannerFor({kind: 'legacy-json'}, null)).toBe(settingsStrings.legacyBanner);
   });
 
@@ -58,5 +59,6 @@ describe('disabledReasonFor', () => {
   test('legacy and unparseable files disable every row', () => {
     expect(disabledReasonFor('fontSize', {kind: 'legacy-json'})).toBe(settingsStrings.legacyRow);
     expect(disabledReasonFor('fontSize', {kind: 'unparseable', diagnostics: []})).toBe(settingsStrings.unparseableRow);
+    expect(disabledReasonFor('fontSize', {kind: 'unreadable', diagnostics: []})).toBe(settingsStrings.unreadableRow);
   });
 });

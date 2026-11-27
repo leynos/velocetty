@@ -98,7 +98,10 @@ export const settingsStrings = {
   openConfigFile: 'Open config file',
   unparseableBanner: 'The config file has a syntax error, so settings cannot be saved until it is fixed.',
   legacyRow: 'The legacy hyper.json file is read-only here.',
+  unreadableBanner:
+    'The config file could not be read, so settings cannot be saved. Check its permissions, or open the file.',
   unparseableRow: 'Fix the config file syntax before saving.',
+  unreadableRow: 'Fix the config file permissions before saving.',
   invalidRow: 'Fix the other invalid settings first.',
   missingRow: 'No config file exists yet, so this setting cannot be saved.',
   invalidBanner: 'The config file has invalid values. Fix the highlighted settings, or open the file.',

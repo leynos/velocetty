@@ -85,6 +85,7 @@ describe('settings command schemas', () => {
       {kind: 'missing'},
       {kind: 'legacy-json'},
       {kind: 'unparseable', diagnostics: [{path: '/', message: 'bad', suggestedFix: 'fix it'}]},
+      {kind: 'unreadable', diagnostics: [{path: '/', message: 'bad', suggestedFix: 'fix it'}]},
       {kind: 'invalid', diagnostics: [{path: '/config/fontSize', message: 'bad', suggestedFix: 'fix it'}]}
     ];
     for (const fileStatus of statuses) {
