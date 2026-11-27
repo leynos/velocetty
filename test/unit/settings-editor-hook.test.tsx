@@ -224,6 +224,26 @@ describe('useSettingsSnapshot', () => {
     expect(current()?.loadError).toBe('reload failed');
   });
 
+  test('an older failure does not take the banner from a newer one', async () => {
+    const recording = createRecordingGateway();
+    const current = await mountSnapshotProbe(recording.gateway);
+
+    await settle(() => recording.notifyChange());
+    await settle(() => recording.notifyChange());
+    expect(recording.loads).toHaveLength(3);
+
+    // The newest load fails first, then the oldest fails too.
+    await settle(() => recording.loads[2]?.reject(new Error('newest failure')));
+    await settle(() => recording.loads[0]?.reject(new Error('oldest failure')));
+    expect(current()?.loadError).toBe('newest failure');
+
+    // A success from the middle load must not clear the newest failure, even
+    // though it started after the oldest one.
+    await settle(() => recording.loads[1]?.resolve(snapshotOf(1, {fontSize: 12})));
+
+    expect(current()?.loadError).toBe('newest failure');
+  });
+
   test('a newer failing load reports even when an older load succeeded', async () => {
     const recording = createRecordingGateway();
     const current = await mountSnapshotProbe(recording.gateway);
