@@ -147,8 +147,8 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-current candidate delivers **172 non-Plan files** and **16,510 net
-non-generated lines** at `d90207a1`. Each revision entry in the revision note
+current candidate delivers **174 non-Plan files** and **16,752 net
+non-generated lines** at `b6445e94`. Each revision entry in the revision note
 records the count at the head it names, so those earlier figures are historical
 rather than current. The excess is recorded here as the escalation the
 tolerance requires, and the maintainer's acceptance of the raised counts is
@@ -2443,3 +2443,28 @@ then dropped its CodeScene health to 8.82, so they became one scenario table
 with a single runner; every scenario still fails against the old settlement
 behaviour. Recorded count: 172 non-Plan files and 16,510 net non-generated
 lines at `d90207a1`.
+
+2026-11-27: nineteenth round, the refreshed pre-merge table's two errors and
+two warnings.
+
+1. **Unit Architecture.** `app/config.ts` no longer reads the watched file
+   through `node:fs`: the composition root builds one `ConfigFileSystemPort`
+   and passes its `readText` to the self-write check and the start-up sweep.
+2. **Domain Architecture.** The settings service no longer derives legacy
+   status from a `.json` path. `fileKindFor` classifies the resolved path at
+   composition, and the service receives an explicit `SettingsFileKind`; the
+   start-up root, the test harness, and the convergence model all pass it.
+3. **Testing.** `test/unit/json5-lexer.test.ts` adds direct cases for the
+   scanner primitives and `parseObjectKey`: every line terminator, unterminated
+   comments, quoted and escaped keys, four-hex-digit and braced Unicode
+   escapes, surrogate-pair lengths, and line positions.
+4. **Developer Documentation.** ADR 009 gains a dated addendum recording that
+   the Proofs workflow is advisory, its promotion exit criteria, and the local
+   gates that cover the gap meanwhile.
+
+Recorded count: 174 non-Plan files and 16,752 net non-generated lines at
+`b6445e94`. Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and
+nixie clean; 1,327 unit tests across 148 files with zero failures; the four
+proof summaries verify 1, 8, 9 and 11 programs with zero errors;
+`make build-fast` clean; the packaged settings deep E2E passing;
+`cs delta origin/main` reporting no new issue.
