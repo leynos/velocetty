@@ -147,8 +147,8 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-current candidate delivers **175 non-Plan files** and **17,002 net
-non-generated lines** at `5f34cc0e`. Each revision entry in the revision note
+current candidate delivers **175 non-Plan files** and **17,020 net
+non-generated lines** at `d57d1bca`. Each revision entry in the revision note
 records the count at the head it names, so those earlier figures are historical
 rather than current. The excess is recorded here as the escalation the
 tolerance requires, and the maintainer's acceptance of the raised counts is
@@ -2557,3 +2557,11 @@ Recorded count: 175 non-Plan files and 17,002 net non-generated lines at
 nixie clean; 1,329 unit tests across 148 files with zero failures; the four
 proof summaries verify 1, 8, 9 and 11 programs with zero errors;
 `make build-fast` clean; `cs delta origin/main` reports no new issue.
+
+2026-11-27: twenty-fourth round, the unreadable-file coverage the approval
+review asked for. The service test now runs the EACCES case for both `stat` and
+`readText` and asserts the returned `failed` reason, the failed span, the
+counter, the bounded line, and the untouched file. A second test proves a
+service refusal crosses the IPC boundary with its reason intact on both the set
+and reset channels. Recorded count: 175 non-Plan files and 17,020 net
+non-generated lines at `d57d1bca`; 1,331 unit tests across 148 files.
