@@ -147,8 +147,8 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-current candidate delivers **175 non-Plan files** and **16,873 net
-non-generated lines** at `e3bd3628`. Each revision entry in the revision note
+current candidate delivers **175 non-Plan files** and **16,987 net
+non-generated lines** at `b056fd40`. Each revision entry in the revision note
 records the count at the head it names, so those earlier figures are historical
 rather than current. The excess is recorded here as the escalation the
 tolerance requires, and the maintainer's acceptance of the raised counts is
@@ -2507,5 +2507,35 @@ proof summaries verify 1, 8, 9 and 11 programs with zero errors.
 Recorded count: 175 non-Plan files and 16,873 net non-generated lines at
 `e3bd3628`. Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and
 nixie clean; 1,328 unit tests across 148 files with zero failures; the four
+proof summaries verify 1, 8, 9 and 11 programs with zero errors;
+`make build-fast` clean; `cs delta origin/main` reports no new issue.
+
+2026-11-27: twenty-second round, the refreshed pre-merge table's two errors and
+two warnings.
+
+1. **Testing.** `test/unit/hyper-key-registration.test.ts` now drives the
+   rendered Mousetrap binding: a gated command's keydown reaches the handler
+   without preventing the native behaviour while settings owns input, and an
+   allowed command's configured default stands. Removing the gate fails it.
+2. **Unit Architecture.** `selfWriteVerdict` returns `self-write`, `external`,
+   or `unreadable` as a pure decision over the injected read; the watcher
+   announces anything that is not a self-write, names the unreadable case in
+   one bounded line, and stays quiet for a missing file. `shouldAnnounce`
+   carries the decision out of the reload method, which had crossed CodeScene's
+   complexity threshold.
+3. **Developer Documentation.** The guide and the architecture note document
+   `settings-file-kind.ts`, `config-write-retry.ts`, the self-write verdict,
+   and the lexer/key modules and their direct suite.
+4. **Domain Architecture.** The write policy stays duplicated between
+   `app/settings/settings-write-policy.ts` and `shared/src/settings/coerce.ts`
+   by necessity: `scripts/check-package-boundaries.mjs` rejects a runtime
+   `@shared/*` import (or a relative import of shared source) from `app/`,
+   because the main process is compiled to CommonJS without the alias. The
+   parity suite holds both copies to identical answers, and the equivalence is
+   documented in both module headers and the guide.
+
+Recorded count: 175 non-Plan files and 16,987 net non-generated lines at
+`b056fd40`. Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and
+nixie clean; 1,329 unit tests across 148 files with zero failures; the four
 proof summaries verify 1, 8, 9 and 11 programs with zero errors;
 `make build-fast` clean; `cs delta origin/main` reports no new issue.
