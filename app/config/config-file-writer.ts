@@ -33,7 +33,8 @@ import {
   type Json5Document
 } from './json5';
 import {validateConfigOptions} from './json5-config';
-import {boundedErrorCode, describeError, errorCode} from '../utils/error-code';
+import {describeError, errorCode} from '../utils/error-code';
+import {MAX_ATTEMPTS, classifyWriteFailure, recordFailure, recordRetry} from './config-write-retry';
 import {isJsonObject} from '../utils/runtime-guards';
 
 import type {ConfigMetrics} from './config-metrics';
@@ -84,9 +85,6 @@ export type ConfigWriterDependencies = {
   /** Counts this writer's retries and unconfirmed durabilities; optional for other callers. */
   readonly metrics?: Pick<ConfigMetrics, 'increment'>;
 };
-
-const MAX_ATTEMPTS = 3;
-const RETRYABLE_CODES = new Set(['EBUSY', 'EPERM', 'EACCES']);
 
 /** A path from the document root to one edited property. */
 type ConfigPath = readonly string[];
@@ -300,40 +298,6 @@ const attemptWrite = (
   }
   dependencies.recordWrittenText(edited.value);
   return {kind: 'written', text: edited.value, revision: dependencies.nextRevision(), durability};
-};
-
-/**
- * Decides whether a failed attempt may be retried.
- *
- * @param code - The error code, when the failure carried one.
- * @param attempt - The one-based number of the attempt that just failed.
- * @returns True when another attempt is both safe and available.
- */
-const shouldRetry = (code: string | undefined, attempt: number): boolean =>
-  code !== undefined && RETRYABLE_CODES.has(code) && attempt < MAX_ATTEMPTS;
-
-/** What one failed attempt means for the caller. */
-type WriteFailureKind = 'missing' | 'retry' | 'failed';
-
-const classifyWriteFailure = (error: unknown, attempt: number): WriteFailureKind => {
-  const code = errorCode(error);
-  if (code === 'ENOENT') {
-    return 'missing';
-  }
-  return shouldRetry(code, attempt) ? 'retry' : 'failed';
-};
-
-/** Counts one retried attempt, logs its bounded line, and waits its backoff. */
-const recordRetry = async (dependencies: ConfigWriterDependencies, error: unknown, attempt: number): Promise<void> => {
-  dependencies.metrics?.increment('settingsWriteRetries');
-  // Only the errno and the attempt number: a key, a path, and the text are user data.
-  dependencies.log(`config writer retry attempt=${attempt} code=${boundedErrorCode(error) ?? 'unknown'}`);
-  await dependencies.sleep(attempt * 50);
-};
-
-/** Logs the failure that ended the write. */
-const recordFailure = (dependencies: ConfigWriterDependencies, error: unknown): void => {
-  dependencies.log(`config writer failed: ${describeFailure(error)}`);
 };
 
 /**

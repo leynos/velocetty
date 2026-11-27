@@ -172,14 +172,21 @@ when a proof-related path changes, and it is **advisory**: the workflow is not
 a required status check while the proof suite settles. The decision is
 deliberate rather than an omission.
 
-- **Exit criteria.** Promote the workflow's `dafny` job to a required check in
-  branch protection after two consecutive weeks of green runs on `main` and on
-  pull requests that touch the listed paths, with no verifier timeout and no
-  freshness failure in that window. Record the promotion in this ADR.
+- **Exit criteria.** Promotion needs two things. First, the check must report
+  on every pull request: the `dafny` job currently runs only when a proof path
+  changes, so marking it required as-is would block unrelated changes that
+  never started it. Add an always-running job that verifies the proofs when a
+  listed path changes and reports success with a stated skip reason otherwise
+  (or configure protection to accept the skipped conclusion), and record which
+  shape was chosen here. Second, promote that check after two consecutive weeks
+  of green runs on `main` and on pull requests that touch the listed paths,
+  with no verifier timeout and no freshness failure in that window.
 - **What is still enforced meanwhile.** `make proofs-fresh` runs inside
   `make lint`, so a stale or hand-edited generated artefact fails the ordinary
-  gate even when the verifier does not run; `bin/prove.sh` refuses a vacuous
-  run; and the local commit gate runs `make prove` before a change is committed.
+  gate even when the verifier does not run, and `bin/prove.sh` refuses a
+  vacuous run. The tracked `.husky/pre-push` hook runs `bun run test:unit` and
+  does not invoke the verifier; `make prove` is the documented local gate that
+  a developer runs before publishing a change that touches a proof path.
 - **Why advisory at all.** The verifier is slow and its toolchain (Dafny 4.11,
   Z3 4.12.1, a patched LemmaScript) is young enough that a transient failure
   should not block unrelated work. A red Proofs run is still treated as a real
