@@ -147,8 +147,8 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-current candidate delivers **169 non-Plan files** and **16,399 net
-non-generated lines** at `e69384aa`. Each revision entry in the revision note
+current candidate delivers **169 non-Plan files** and **16,425 net
+non-generated lines** at `e039e215`. Each revision entry in the revision note
 records the count at the head it names, so those earlier figures are historical
 rather than current. The excess is recorded here as the escalation the
 tolerance requires, and the maintainer's acceptance of the raised counts is
@@ -2412,3 +2412,21 @@ alpha form, and all four function-name spellings — asserting every value both
 validators accept parses through `Color`; it fails against the previous
 grammar, which a fixed list could not catch. Recorded count: 169 non-Plan files
 and 16,399 net non-generated lines at `ddc365af`.
+
+2026-11-27: seventeenth round, the two findings from the formal review that
+followed the queued request.
+
+1. **The newest failure owns the banner.** A failure that settled after a newer
+   one wrote its load id unconditionally, so a later success for an
+   intermediate load could clear the newer failure. A failure now takes the
+   banner only when its id is at least the owner's; the three-load sequence is
+   a regression that fails against the old settlement.
+2. **The acceptance figure is the current candidate's.** The tolerance section
+   now records 169 non-Plan files and 16,425 net non-generated lines at
+   `e039e215` and states that each revision entry records the count at the head
+   it names; the tenth entry's original 167 files and 16,117 lines at
+   `663ae745` are restored.
+
+Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint clean; 1,306 unit
+tests across 146 files with zero failures; the four proof summaries verify 1,
+8, 9 and 11 programs with zero errors.
