@@ -147,8 +147,8 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-current candidate delivers **175 non-Plan files** and **17,022 net
-non-generated lines** at `d5e1430a`. Each revision entry in the revision note
+current candidate delivers **176 non-Plan files** and **17,179 net
+non-generated lines** at `252f82ea`. Each revision entry in the revision note
 records the count at the head it names, so those earlier figures are historical
 rather than current. The excess is recorded here as the escalation the
 tolerance requires, and the maintainer's acceptance of the raised counts is
@@ -2570,3 +2570,27 @@ non-generated lines at `d57d1bca`; 1,331 unit tests across 148 files.
 read the module-level handler map without isolation, so `bun test --concurrent`
 could interleave them; both are `test.serial`, like the refusal cases. Count at
 this head: 175 non-Plan files and 17,022 net non-generated lines at `d5e1430a`.
+
+2026-11-28: twenty-sixth round, the refreshed table's two errors and two
+warnings.
+
+1. **Testing.** `test/unit/settings-container-wiring.test.ts` calls the
+   container's exported `mapStateToProps` and `mapDispatchToProps`: the
+   settings slice is read, each handler dispatches the action the reducer
+   expects, and opening the config file emits the main-process command.
+2. **Unit Architecture.** `selfWriteVerdict` takes the watched path, the read
+   port, and the recorded hash explicitly, so the decision no longer closes
+   over module state.
+3. **Domain Architecture.** `ConfigWriteOutcome` uses the writer's own
+   `ConfigWriteFailureReason`; the settings service projects it onto
+   `SettingsWriteFailure` with a total `SETTINGS_FAILURE_OF` table, so a reason
+   added on one side without the other is a compile error.
+4. **Developer Documentation.** The guide and architecture note document
+   `config-write-state.ts`, `rejection-line.ts`, `file-state-messages.ts`, and
+   the two failure vocabularies.
+
+Recorded count: 176 non-Plan files and 17,179 net non-generated lines at
+`252f82ea`. Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and
+nixie clean; 1,334 unit tests across 149 files with zero failures; proofs 1 + 8
++ 9 + 11 with zero errors; `make build-fast` clean; packaged settings deep E2E
+passing; `cs delta origin/main` reports no new issue.
