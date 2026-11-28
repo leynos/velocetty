@@ -11,6 +11,7 @@ import {beforeAll, beforeEach, expect, test} from 'bun:test';
 import type {IpcHandleListener} from '../testUtils/electron-path';
 import {getElectronMock, registerElectronMock, resetElectronMock} from '../testUtils/electron-path';
 import {importFresh} from '../testUtils/import-fresh';
+import {harnessWithFile} from '../testUtils/settings-service-harness';
 
 import type {SettingsService} from '../../app/settings/settings-service';
 import type {SettingsSnapshot, SettingTarget, SettingsWriteOutcome} from '@shared/settings/protocol';
@@ -100,6 +101,17 @@ test.serial('a service refusal crosses the IPC boundary with its reason intact',
 
   expect(setOutcome).toMatchObject({kind: 'failed', reason: 'user-config-unreadable'});
   expect(resetOutcome).toMatchObject({kind: 'failed', reason: 'user-config-unreadable'});
+});
+
+test.serial('an unreadable file reaches the renderer as a refusal', async () => {
+  const harness = harnessWithFile('{config: {fontSize: 14}}');
+  harness.port.queueFault('readText', 'EACCES');
+  registerSettingsIpcHandlers(harness.service);
+
+  const outcome = await handlerFor('settings:setValue')(unusedIpcEvent, editableTarget, 16);
+
+  expect(outcome).toMatchObject({kind: 'failed', reason: 'user-config-unreadable'});
+  expect(harness.port.readFile('/home/user/.config/Hyper/config.json5')).toBe('{config: {fontSize: 14}}');
 });
 
 test.serial('registers a handler for each settings command', () => {

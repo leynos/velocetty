@@ -849,7 +849,7 @@ the recorded hash explicitly, and returns `'self-write'`, `'external'`, or
 `[config] self-write check failed reason=unreadable` for the unreadable case,
 and treats an absent file as external without a line.
 
-`app/settings/rejection-line.ts` builds the one bounded line for a transport
+`lib/settings/rejection-line.ts` builds the one bounded line for a transport
 rejection: the category always, and a name only from the built-in error names,
 so caller-supplied text cannot forge a line or leak a path.
 `lib/settings/file-state-messages.ts` derives the banner and the per-row

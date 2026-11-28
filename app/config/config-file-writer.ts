@@ -71,13 +71,7 @@ export type ConfigWriteOutcome =
       readonly diagnostics?: readonly configValidationDiagnostic[];
     };
 
-/**
- * Why a write did not happen, in the writer's own vocabulary.
- *
- * The writer is the persistence authority and must not depend on the IPC
- * protocol: the settings service projects this union onto the renderer's
- * `SettingsWriteFailure`, and one table in that service keeps the two aligned.
- */
+/** Why a write did not happen, in the writer's own vocabulary; the service projects it. */
 export type ConfigWriteFailureReason =
   | 'config-file-missing'
   | 'user-config-unparseable'
