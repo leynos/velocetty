@@ -513,57 +513,37 @@ The dispatcher always follows the same path:
 
 Command invocation API (frontend):
 
-
-
 ```ts
-
-export interface CommandInvocation<TArgs = unknown> {
-
-&nbsp; id: CommandId;
-
-&nbsp; args?: TArgs;
-
-&nbsp; source: "keybinding" | "palette" | "menu" | "ui" | "plugin" | "remote";
-
+export interface CommandInvocation<TArgs = JsonValue> {
+  readonly id: CommandId;
+  readonly args?: TArgs;
+  readonly source: 'keybinding' | 'palette' | 'menu' | 'ui' | 'plugin' | 'remote';
 }
 
-
-
-export interface CommandResult<TResult = unknown> {
-
-&nbsp; ok: boolean;
-
-&nbsp; result?: TResult;
-
-&nbsp; error?: {
-
-&nbsp;   code: string;
-
-&nbsp;   message: string;
-
-&nbsp;   details?: unknown;
-
-&nbsp; };
-
-&nbsp; cancelled?: boolean;
-
-}
-
-
+export type CommandResult<TResult extends JsonValue = JsonValue> =
+  | {readonly status: 'ok'; readonly value?: TResult}
+  | {readonly status: 'error'; readonly error: CommandInvocationError}
+  | {readonly status: 'cancelled'; readonly stage: 'before-execution' | 'during-execution'};
 
 export interface CommandDispatcher {
-
-&nbsp; invoke<TArgs, TResult>(
-
-&nbsp;   invocation: CommandInvocation<TArgs>,
-
-&nbsp;   options?: { signal?: AbortSignal },
-
-&nbsp; ): Promise<CommandResult<TResult>>;
-
+  invoke<TArgs extends JsonValue = JsonValue, TResult extends JsonValue = JsonValue>(
+    invocation: CommandInvocation<TArgs>,
+    options?: {signal?: AbortSignal}
+  ): Promise<CommandResult<TResult>>;
 }
-
 ```
+
+`CommandResult` is a discriminated union on `status`. The `ok`, `error`, and
+`cancelled` arms are mutually exclusive, so an invocation cannot report success
+together with an error, and every call site can switch exhaustively.
+
+The pipeline is implemented in `lib/command-dispatch/`: a proved invocation
+machine, a thin interpreter, and adapters for the registry, context keys,
+Redux, and the renderer executor.
+[Command dispatch architecture](command-dispatch-architecture.md) describes
+those components and the sequence of one invocation.
+[ADR 009](adrs/adr-0009-frontend-command-dispatcher-contract.md) records why
+the contract takes this shape.
 
 
 

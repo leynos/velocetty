@@ -21,10 +21,8 @@ import {
   UI_ENTER_FULLSCREEN,
   UI_LEAVE_FULLSCREEN,
   UI_OPEN_SSH_URL,
-  UI_CONTEXTMENU_OPEN,
-  UI_COMMAND_EXEC
+  UI_CONTEXTMENU_OPEN
 } from '@shared/constants/ui';
-import type {CommandId} from '@shared/types/commands';
 import type {HyperState, HyperDispatch, HyperActions, ITermGroups} from '../../typings/hyper';
 import {getRootGroups} from '../selectors';
 import {isExecutable} from '../utils/file';
@@ -326,23 +324,4 @@ export function openSSH(parsedUrl: ReturnType<typeof parseUrl>) {
       }
     });
   };
-}
-
-export function execCommand(
-  command: CommandId,
-  fn: ((e: unknown, dispatch: HyperDispatch) => void) | undefined,
-  e: unknown
-) {
-  return (dispatch: HyperDispatch) =>
-    dispatch({
-      type: UI_COMMAND_EXEC,
-      command,
-      effect() {
-        if (fn) {
-          fn(e, dispatch);
-        } else {
-          transport.emit('command', command);
-        }
-      }
-    });
 }

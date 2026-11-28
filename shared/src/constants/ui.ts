@@ -1,5 +1,6 @@
 /** @file Shared user interface action constants and action contracts. */
-import type {CommandId} from '../types/commands';
+import type {CommandId, CommandInvocationSource} from '../types/commands';
+import type {JsonValue} from '../types/json';
 
 /** Action type constant for setting font size directly. */
 export const UI_FONT_SIZE_SET = 'UI_FONT_SIZE_SET';
@@ -172,6 +173,10 @@ export interface UIContextmenuOpenAction {
 export interface UICommandExecAction {
   readonly type: typeof UI_COMMAND_EXEC;
   readonly command: CommandId;
+  /** Where the invocation came from; plugin middleware can observe it. */
+  readonly source: CommandInvocationSource;
+  /** Validated, frozen arguments, normalized to `null` when absent. */
+  readonly args: JsonValue;
 }
 
 /** Union of every shared UI action contract. */

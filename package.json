@@ -36,7 +36,7 @@
     "test:e2e:run": "bunx cross-env RUN_E2E=1 bun test test/e2e/",
     "test:e2e:fast": "bun run test:e2e:prepare && bun run test:e2e:run",
     "test:e2e:deep:prepare": "node ./node_modules/playwright/cli.js install chromium",
-    "test:e2e:deep:run": "node ./node_modules/playwright/cli.js test -c playwright.e2e.config.ts",
+    "test:e2e:deep:run": "bun ./node_modules/playwright/cli.js test -c playwright.e2e.config.ts",
     "test:e2e:deep": "bun run test:e2e:prepare && bun run test:e2e:deep:prepare && bun run test:e2e:deep:run",
     "test:e2e": "bun run test:e2e:fast",
     "postinstall": "bun run v8-snapshot && bun run build:hyper-app && bun bin/run-electron-builder.mjs install-app-deps && bun run rebuild-node-pty && node bin/copy-node-modules.mjs && bun node_modules/husky/bin.mjs install && bun run generate-schema",

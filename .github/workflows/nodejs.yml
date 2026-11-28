@@ -249,14 +249,23 @@ jobs:
 
   e2e-deep-linux:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/canary'
-    runs-on: ubuntu-latest
+    # Pinned, not `-latest`: this Playwright release has no Chromium build for
+    # ubuntu26.04, and `ubuntu-latest` moved there. A pinned image also stops
+    # the lane drifting under us for reasons unrelated to the application.
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
       - name: Use Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          # Node 22, not the workflow default 24: on 22 Playwright's
+          # TypeScript loader runs the same scenarios successfully, while on 24
+          # every deep-lane scenario fails to load with
+          # `ReferenceError: exports is not defined in ES module scope`.
+          # Pinning the lane is narrower than changing the toolchain the rest of
+          # CI uses.
+          node-version: '22'
       - name: Use Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
@@ -286,10 +295,20 @@ jobs:
         uses: ./.github/actions/build-packaged-app
         with:
           gh_token: ${{ secrets.GITHUB_TOKEN }}
+          # The deep lane launches `dist/linux-unpacked/hyper`, so the RPM and
+          # DEB packages are not needed. Skipping them also sidesteps a failure
+          # in electron-builder's bundled fpm, whose Ruby is linked against
+          # `libcrypt.so.1`, which current runners no longer provide.
+          electron_builder_args: '--dir'
+      - name: Install Xvfb
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends xvfb
       - name: Run deep-lane E2E tests
-        uses: GabrielBB/xvfb-action@b706e4e27b14669b486812790492dc50ca16b465 # v1.7
-        with:
-          run: bun run test:e2e:deep
+        # Plain `run:` under `xvfb-run` rather than a wrapper action: the
+        # wrapper gave no way to prove which environment the test process
+        # actually received, and two `NODE_OPTIONS` experiments were
+        # inconclusive because of it. As a normal step, `env:` reaches the
+        # process by construction.
+        run: xvfb-run --auto-servernum bun run test:e2e:deep
         env:
           DEBUG: pw:browser*
           ELECTRON_ENABLE_LOGGING: '1'

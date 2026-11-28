@@ -29,6 +29,12 @@ inputs:
     description: Apple app-specific password for notarization.
     required: false
     default: ''
+  electron_builder_args:
+    description: >-
+      Extra arguments for electron-builder. Pass `--dir` to build only the
+      unpacked application, skipping the distributable packages.
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -43,6 +49,7 @@ runs:
         WIN_CSC_KEY_PASSWORD: ${{ inputs.win_csc_key_password }}
         APPLE_ID: ${{ inputs.apple_id }}
         APPLE_APP_SPECIFIC_PASSWORD: ${{ inputs.apple_app_specific_password }}
+        ELECTRON_BUILDER_ARGS: ${{ inputs.electron_builder_args }}
       run: |
         if [ -z "$CSC_LINK" ] ; then unset CSC_LINK ; fi
         if [ -z "$CSC_KEY_PASSWORD" ] ; then unset CSC_KEY_PASSWORD ; fi
@@ -50,4 +57,10 @@ runs:
         if [ -z "$WIN_CSC_KEY_PASSWORD" ] ; then unset WIN_CSC_KEY_PASSWORD ; fi
         if [ -z "$APPLE_ID" ] ; then unset APPLE_ID ; fi
         if [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] ; then unset APPLE_APP_SPECIFIC_PASSWORD ; fi
-        bun run dist
+        # shellcheck disable=SC2086 # word splitting is the point: the input is
+        # a list of arguments.
+        if [ -n "$ELECTRON_BUILDER_ARGS" ] ; then
+          bun run build && bun bin/run-electron-builder.mjs $ELECTRON_BUILDER_ARGS
+        else
+          bun run dist
+        fi

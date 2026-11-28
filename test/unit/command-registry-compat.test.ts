@@ -1,18 +1,14 @@
 /**
- * @file Verifies the compatibility-alias and legacy-handler behaviour exposed
- * by the shared command-registry module.
+ * @file Verifies legacy-handler behaviour exposed by the shared
+ * command-registry module.
  *
  * Responsibilities:
- * - assert that legacy alias exports remain wired to the primary
- *   command-registry APIs
  * - verify `registerCommandHandlers(...)` ignores undefined input without
  *   mutating the existing registry
- * - confirm the legacy `editor:search-close` handler still dispatches the
+ * - confirm the built-in `editor:search-close` handler still dispatches the
  *   expected close-search action and restores terminal focus
  *
  * Invariants:
- * - compatibility aliases continue to reference the same callable
- *   implementations as the primary exports
  * - the built-in legacy handler remains registered throughout the suite
  * - each test runs against an isolated command-registry module instance and a
  *   reset transport mock state
@@ -24,19 +20,21 @@
  *   `window.focusActiveTerm` shim before importing the module under test
  *
  * Related modules:
- * - `../../lib/command-registry.ts` implements the compatibility aliases and
- *   legacy handlers under test
+ * - `../../lib/command-registry.ts` implements the registry and its legacy
+ *   handler registration
+ * - `../../lib/commands/search-close.ts` owns the close-search action and the
+ *   `editor:search-close` handler under test
  * - `./command-registry.test.ts` covers the core keymap and CRUD behaviour for
  *   the same module
- * - `./ensure-directory-path.test.ts` is the companion example for this
- *   richer test-module header format
  */
 import {expect, mock, test} from 'bun:test';
 import {SESSION_ADD, SESSION_SEARCH} from '@shared/constants/sessions';
 import {asProfileId, asSessionId} from '@shared/types/common';
 import type {CommandDefinition} from '@shared/types/commands';
 import type {HyperDispatch, HyperState} from '../../typings/hyper';
+import {closeSearchAction} from '../../lib/commands/search-close';
 import rootReducer from '../../lib/reducers';
+import {createRendererCommandRequest} from '../testUtils/renderer-command-request';
 
 type SearchCloseThunk = (dispatch: HyperDispatch, getState: () => HyperState) => void;
 
@@ -83,7 +81,7 @@ const createCommandRegistryCompatHarness = async (): Promise<CommandRegistryComp
   });
   const focusActiveTermMock = mock(() => {});
   moduleInstanceCounter += 1;
-  const {createCommandRegistryModule, closeSearchAction} = await import(
+  const {createCommandRegistryModule} = await import(
     `../../lib/command-registry.ts?command_registry_compat=${moduleInstanceCounter}`
   );
 
@@ -129,28 +127,6 @@ test('registerCommandHandlers ignores undefined input without mutating the regis
   }
 });
 
-test('compatibility aliases mirror the primary command-registry APIs', async () => {
-  const harness = await createCommandRegistryCompatHarness();
-  try {
-    expect(harness.registerCommand).toBe(harness.register);
-    expect(harness.createCommand).toBe(harness.register);
-    expect(harness.updateCommand).toBe(harness.update);
-    expect(harness.replaceCommand).toBe(harness.update);
-    expect(harness.removeCommand).toBe(harness.remove);
-    expect(harness.deleteCommand).toBe(harness.remove);
-    expect(harness.getCommand).toBe(harness.get);
-    expect(harness.getCommandDefinition).toBe(harness.get);
-    expect(harness.listCommands).toBe(harness.list);
-    expect(harness.enumerateCommands).toBe(harness.list);
-    expect(harness.hasCommand).toBe(harness.has);
-    expect(harness.hasCommandDefinition).toBe(harness.has);
-    expect(harness.validateCommandArgs).toBe(harness.validateArgs);
-    expect(harness.validateCommandArgsFor).toBe(harness.validateArgs);
-  } finally {
-    harness.cleanup();
-  }
-});
-
 /**
  * Runs the legacy search-close handler and hands back the thunk it dispatched.
  *
@@ -160,7 +136,7 @@ test('compatibility aliases mirror the primary command-registry APIs', async () 
  */
 const dispatchSearchClose = async (harness: CommandRegistryCompatHarness) => {
   const dispatch = mock<HyperDispatch>(() => {});
-  harness.getCommandHandler('editor:search-close')?.('event-payload', dispatch);
+  harness.getCommandHandler('editor:search-close')?.(createRendererCommandRequest({args: null, dispatch}));
 
   expect(dispatch).toHaveBeenCalledTimes(1);
   const dispatchedThunk = dispatch.mock.calls[0]?.[0];
@@ -224,9 +200,11 @@ test('legacy search-close handler does not dispatch when session search is inact
   try {
     const dispatch = mock<HyperDispatch>(() => {});
     const innerDispatch = mock<HyperDispatch>(() => {});
-    const keyEvent = {catched: true};
+    const keyEvent = Object.assign(new Event('keydown'), {catched: true});
 
-    harness.getCommandHandler('editor:search-close')?.(keyEvent, dispatch);
+    harness.getCommandHandler('editor:search-close')?.(
+      createRendererCommandRequest({dispatch, triggerEvent: keyEvent})
+    );
 
     expect(dispatch).toHaveBeenCalledTimes(1);
     const dispatchedThunk = dispatch.mock.calls[0]?.[0];

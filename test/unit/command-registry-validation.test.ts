@@ -1,4 +1,4 @@
-/** @file Covers command-registry validation edge cases and cache invalidation. */
+/** @file Covers command-registry argument and result validation edge cases. */
 import {afterAll, beforeAll, beforeEach, expect, mock, test} from 'bun:test';
 import {asCommandId, type CommandDefinition} from '@shared/types/commands';
 import type {JsonObject} from '@shared/types/json';
@@ -30,6 +30,7 @@ let update: typeof import('../../lib/command-registry').update;
 let remove: typeof import('../../lib/command-registry').remove;
 let list: typeof import('../../lib/command-registry').list;
 let validateArgs: typeof import('../../lib/command-registry').validateArgs;
+let validateResult: typeof import('../../lib/command-registry').validateResult;
 
 const TEST_COMMAND_PREFIX = 'test:command-registry:validation';
 let restoreWindow = () => {};
@@ -46,10 +47,9 @@ const createCommandDefinition = (commandId: string, argsSchema?: JsonObject): Co
 beforeAll(async () => {
   restoreWindow = installTestWindow();
 
-  ({register, update, remove, list, validateArgs} = await importFresh<typeof import('../../lib/command-registry')>(
-    '../../lib/command-registry',
-    'command_registry_validation_unit'
-  ));
+  ({register, update, remove, list, validateArgs, validateResult} = await importFresh<
+    typeof import('../../lib/command-registry')
+  >('../../lib/command-registry', 'command_registry_validation_unit'));
 });
 
 afterAll(() => {
@@ -189,4 +189,40 @@ test('remove clears cached validators before re-registering a command id', () =>
     },
     updatedValidPayload: {enabled: 7}
   });
+});
+
+test('validateResult reports a declared result schema and admits an undeclared one', () => {
+  const withSchema = asCommandId(`${TEST_COMMAND_PREFIX}:result-schema`);
+  register({
+    ...createCommandDefinition(withSchema),
+    resultSchema: {
+      type: 'object',
+      properties: {closed: {type: 'boolean'}},
+      required: ['closed'],
+      additionalProperties: false
+    }
+  });
+
+  expect(validateResult(withSchema, {closed: true})).toMatchObject({ok: true});
+  const rejected = validateResult(withSchema, {closed: 'yes'});
+  expect(rejected.ok).toBe(false);
+  if (rejected.ok) {
+    throw new Error('Expected the result schema to reject a string');
+  }
+  expect(rejected.error.code).toBe('INVALID_COMMAND_RESULT');
+  expect(rejected.error.target).toBe('result');
+
+  const undeclared = asCommandId(`${TEST_COMMAND_PREFIX}:result-undeclared`);
+  register(createCommandDefinition(undeclared));
+  expect(validateResult(undeclared, 'anything at all')).toMatchObject({ok: true});
+});
+
+test('validateResult reports an unknown command', () => {
+  const result = validateResult(asCommandId(`${TEST_COMMAND_PREFIX}:result-unknown`), null);
+
+  expect(result.ok).toBe(false);
+  if (result.ok) {
+    throw new Error('Expected an unknown command to fail validation');
+  }
+  expect(result.error.code).toBe('COMMAND_NOT_FOUND');
 });

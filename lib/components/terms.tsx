@@ -5,6 +5,8 @@ import React from 'react';
 import {CURSOR_STYLE_CONFIG_KEY} from '@shared/types/config';
 import type {TermsProps, HyperDispatch} from '../../typings/hyper';
 import {registerCommandHandlers} from '../command-registry';
+import {CommandDispatcherContext} from '../command-dispatch/inbound/command-dispatcher-provider';
+import {unavailablePluginCommandApi, type PluginCommandApi} from '../command-dispatch/inbound/plugin-api';
 import {ObjectTypedKeys} from '../utils/object';
 import {decorate, getTermGroupProps} from '../utils/plugins';
 
@@ -17,12 +19,23 @@ const TermGroup = decorate(TermGroup_, 'TermGroup');
 const isMac = /Mac/.test(navigator.userAgent);
 
 export default class Terms extends React.Component<React.PropsWithChildren<TermsProps>> {
+  static contextType = CommandDispatcherContext;
+  declare context: React.ContextType<typeof CommandDispatcherContext>;
+
   terms: Record<string, Term>;
   registerCommands: (cmds: Record<string, (e: unknown, dispatch: HyperDispatch) => void>) => void;
-  constructor(props: TermsProps, context: any) {
+  /**
+   * Runs a command on the plugin's behalf.
+   *
+   * The facade fixes `source: 'plugin'`, so a plugin cannot claim to be a
+   * keybinding or a UI control.
+   */
+  invokeCommand: PluginCommandApi;
+  constructor(props: TermsProps, context: React.ContextType<typeof CommandDispatcherContext>) {
     super(props, context);
     this.terms = {};
     this.registerCommands = registerCommandHandlers;
+    this.invokeCommand = context?.invokeCommand ?? unavailablePluginCommandApi;
     props.ref_(this);
   }
 

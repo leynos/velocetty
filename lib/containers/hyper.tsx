@@ -8,15 +8,11 @@
 import type React from 'react';
 import {forwardRef, useEffect, useRef} from 'react';
 
-import Mousetrap from 'mousetrap';
-import type {MousetrapInstance} from 'mousetrap';
 import stylis from 'stylis';
 
-import {asCommandId, type CommandId} from '@shared/types/commands';
-import type {HyperState, HyperProps, HyperDispatch} from '../../typings/hyper';
-import * as uiActions from '../actions/ui';
-import {getRegisteredKeys, getCommandHandler, shouldPreventDefault} from '../command-registry';
+import type {HyperState, HyperProps} from '../../typings/hyper';
 import type Terms from '../components/terms';
+import {useDispatcherBundle} from '../command-dispatch/inbound/command-dispatcher-provider';
 import {transport} from '../transport';
 import {connect} from '../utils/plugins';
 
@@ -28,12 +24,16 @@ import * as styles from './hyper.module.css';
 const isMac = /Mac/.test(navigator.userAgent);
 
 const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedRef<HTMLDivElement>) {
-  const mousetrap = useRef<MousetrapInstance | null>(null);
   const terms = useRef<Terms | null>(null);
+  const bundle = useDispatcherBundle();
 
   useEffect(() => {
-    void attachKeyListeners();
-  }, [props.execCommand, props.lastConfigUpdate]);
+    if (!bundle) {
+      return;
+    }
+    void bundle.keybindings.reload();
+  }, [bundle, props.lastConfigUpdate]);
+
   useEffect(() => {
     handleFocusActive(props.activeSession);
   }, [props.activeSession]);
@@ -50,34 +50,6 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
     if (term) {
       term.selectAll();
     }
-  };
-
-  const attachKeyListeners = async () => {
-    if (mousetrap.current) {
-      mousetrap.current.reset();
-    } else {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      mousetrap.current = Mousetrap(document.body);
-      mousetrap.current!.stopCallback = () => {
-        // All events should be intercepted even if focus is in an input/textarea
-        return false;
-      };
-    }
-
-    const keys = await getRegisteredKeys();
-    Object.keys(keys).forEach((commandKeys) => {
-      mousetrap.current?.bind(
-        commandKeys,
-        (e) => {
-          const command = asCommandId(keys[commandKeys]);
-          // We should tell xterm to ignore this event.
-          const caughtEvent = Object.assign(e, {catched: true});
-          props.execCommand(command, getCommandHandler(command), caughtEvent);
-          shouldPreventDefault(command) && e.preventDefault();
-        },
-        'keydown'
-      );
-    });
   };
 
   useEffect(() => {
@@ -101,9 +73,9 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
 
   useEffect(() => {
     return () => {
-      mousetrap.current?.reset();
+      bundle?.keybindings.reset();
     };
-  }, []);
+  }, [bundle]);
 
   const {isMac: isMac_, customCSS, uiFontFamily, borderColor, maximized, fullScreen} = props;
   const borderWidth = isMac_ ? '' : `${maximized ? '0' : '1'}px`;
@@ -148,16 +120,10 @@ const mapStateToProps = (state: HyperState) => {
   };
 };
 
-const mapDispatchToProps = (dispatch: HyperDispatch) => {
-  return {
-    execCommand: (command: CommandId, fn: ((e: unknown, dispatch: HyperDispatch) => void) | undefined, e: unknown) => {
-      dispatch(uiActions.execCommand(command, fn, e));
-    }
-  };
-};
+const mapDispatchToProps = () => ({});
 
-const HyperContainer = connect(mapStateToProps, mapDispatchToProps, null, {forwardRef: true})(Hyper, 'Hyper');
+const HyperContainer = connect(mapStateToProps, mapDispatchToProps, undefined, {forwardRef: true})(Hyper, 'Hyper');
 
 export default HyperContainer;
 
-export type HyperConnectedProps = ReturnType<typeof mapStateToProps> & ReturnType<typeof mapDispatchToProps>;
+export type HyperConnectedProps = ReturnType<typeof mapStateToProps>;

@@ -1,14 +1,16 @@
-# Velocetty users' guide
+# Users' guide
 
 ## Module header
 
 - Purpose: explain the configuration files a user edits, where they live on
-  each platform, and what the application does when they change.
+  each platform, what the application does when they change, and how commands
+  and keybindings behave when they run.
 - Invariants: every path and behaviour here matches `app/config` and the
   automated tests named in
   [Configuration architecture](configuration-architecture.md).
 - Cross-links:
   - [Configuration architecture](configuration-architecture.md)
+  - [Command dispatch architecture](command-dispatch-architecture.md)
   - [Developers' guide](developers-guide.md)
   - [ADR 007](adrs/adr-0007-keybindings-json5-storage.md)
   - [ADR 008](adrs/adr-0008-velocetty-configuration-directory.md)
@@ -311,3 +313,32 @@ shortcut that uses `command` is meaningful on macOS and inert elsewhere.
   `4.2.2` and `5.1.2`.
 
 [^1]: Mousetrap documentation: <https://craig.is/killing/mice>.
+
+## Commands and keybindings
+
+Velocetty treats every action as a command. Keyboard shortcuts, the close
+button on the search box, and plugins that ask to run a command are routed
+through the command dispatcher: it resolves the command, checks it, and runs
+it. Remaining menus and buttons still call their handlers directly and are
+being migrated; they are listed under roadmap item 4.3.2.
+
+### Refused shortcuts pass the key through
+
+A shortcut takes its key only when its command is admitted. If the command
+cannot run — its arguments do not validate, or its `when` condition disables it
+— the key is passed through to the terminal instead of being swallowed.
+
+Escape is the everyday example. It is bound to the command that closes the
+search box, and when there is no search box to close the key still reaches the
+terminal: run `cat -v`, press Escape, and `^[` appears. The same holds for any
+other shortcut whose command is unavailable.
+
+### Where refusals are reported
+
+A refused shortcut is reported in the developer console. The default build
+reports warnings; add `?debug=1` to the renderer URL for debug-level detail,
+which includes a shortcut refused because its command is disabled.
+
+A refusal is not always a fault. A command refused because it is disabled is
+reported only at debug level; every other refusal is a warning. Either way the
+key remains available to the terminal.

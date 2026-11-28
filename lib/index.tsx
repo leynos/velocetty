@@ -2,6 +2,7 @@ import './v8-snapshot-util';
 import './tailwind.css';
 import {webFrame} from 'electron';
 
+import Mousetrap from 'mousetrap';
 import {createRoot} from 'react-dom/client';
 import {Provider} from 'react-redux';
 
@@ -13,6 +14,8 @@ import * as termGroupActions from './actions/term-groups';
 import * as uiActions from './actions/ui';
 import * as updaterActions from './actions/updater';
 import {startRendererApplication} from './bootstrap/renderer-bootstrap';
+import {composeRendererDispatcher} from './command-dispatch/compose';
+import {CommandDispatcherProvider} from './command-dispatch/inbound/command-dispatcher-provider';
 import HyperContainer from './containers/hyper';
 import rpc from './rpc';
 import {transport} from './transport';
@@ -20,6 +23,25 @@ import configureStore from './store/configure-store';
 import * as config from './utils/config';
 import {getBase64FileData} from './utils/file';
 import * as plugins from './utils/plugins';
+
+/**
+ * The one Mousetrap instance for the document.
+ *
+ * Created on first use and reused: every call to `Mousetrap(document.body)`
+ * returns a new instance, so handing a fresh one to each keymap reload would
+ * leave the previous instance's handlers bound and fire every shortcut twice.
+ */
+let mousetrapInstance: ReturnType<typeof Mousetrap> | null = null;
+const memoiseMousetrap = () => {
+  if (!mousetrapInstance) {
+    mousetrapInstance = Mousetrap(document.body);
+    mousetrapInstance.stopCallback = () => {
+      // All events should be intercepted even if focus is in an input/textarea
+      return false;
+    };
+  }
+  return mousetrapInstance;
+};
 
 const mountElement = document.querySelector('#mount');
 if (!mountElement) {
@@ -41,10 +63,20 @@ startRendererApplication({
   configureStore,
   getBase64FileData,
   mountApp: (store) => {
+    // One dispatcher for the whole renderer: keybindings, UI controls, and
+    // plugins all reach commands through this bundle.
+    const bundle = composeRendererDispatcher({
+      dispatch: store.dispatch,
+      emitHostCommand: (id) => transport.emit('command', id),
+      getMousetrap: memoiseMousetrap
+    });
+
     const root = createRoot(mountElement);
     root.render(
       <Provider store={store}>
-        <HyperContainer />
+        <CommandDispatcherProvider bundle={bundle}>
+          <HyperContainer />
+        </CommandDispatcherProvider>
       </Provider>
     );
 

@@ -179,8 +179,11 @@ registry APIs. Follow these rules for command-system changes:
   and return structured `CommandValidationError` objects with `code`,
   `commandId`, and schema `issues`.
 - Preserve compatibility surfaces used by current runtime/plugin paths
-  (`registerCommandHandlers`, `getCommandHandler`, and `getRegisteredKeys`)
-  until dispatcher migration milestones replace those entry points.
+  (`registerCommandHandlers`, `getCommandHandler`, and `getRegisteredKeys`).
+  The dispatcher migration is complete: these remain the registry's storage and
+  lookup surface, and `lib/command-dispatch/` reads them through its adapters,
+  but every keybinding, UI control, and plugin invocation now runs through the
+  dispatcher. Do not add a second execution path.
 - Use `detectKeybindingConflicts(...)` in `app/runtime/plugin-runtime.ts` when
   testing exact shortcut collisions after precedence merges; the helper reports
   deterministic conflicts for remaining duplicate shortcuts.
@@ -192,6 +195,52 @@ registry APIs. Follow these rules for command-system changes:
 - Add or update precedence/conflict coverage in
   `test/unit/runtime-plugin-settings.test.ts` when changing runtime keybinding
   merge or conflict-detection behaviour.
+
+## Command dispatcher practice
+
+Roadmap item `4.1.1` makes `lib/command-dispatch/` the renderer's only path
+from an invocation to a command handler. Follow these rules when adding or
+changing commands:
+
+- Register the command through `register` in `lib/command-registry.ts`, or
+  through a plugin's `registerCommands`, with a stable identifier,
+  `metadata.title`, `kind`, and the argument and result schemas it needs. The
+  dispatcher resolves it through the registry catalogue; do not add a parallel
+  execution path for a new source.
+- Write renderer handlers against `RendererCommandRequest` from
+  `lib/command-registry-handlers.ts`. A handler receives the `invocation`, the
+  normalized `args`, `signal`, `dispatch`, and `triggerEvent`, and returns
+  `JsonValue | undefined` or a promise of one. Legacy `(event, dispatch)`
+  handlers keep working through `toRendererCommandHandler`.
+- Accept `request.signal` in any handler that can be cancelled, and stop
+  cooperatively: check `signal.aborted` between steps, pass the signal to
+  fetches, and return promptly. The dispatcher settles the invocation as soon
+  as the signal aborts; it cannot stop the handler's work for it.
+- Declare optional arguments as nullable. Absent arguments are normalized to
+  `null` before validation, so a command that may run without arguments declares
+  `type: ['object', 'null']`; `SEARCH_CLOSE_ARGS_SCHEMA` in
+  `lib/commands/search-close.ts` is the worked example. A schema that admits
+  only `object` rejects every keybinding that binds the command without
+  arguments, which is why Escape needs the `null` arm.
+- Invoke commands from UI code through `useCommandInvoker()` from
+  `lib/command-dispatch/inbound/command-dispatcher-provider.tsx`. The hook fixes
+  `source` to `ui`, so a component cannot claim another source, and it
+  resolves a structured failure outside the provider rather than throwing.
+- Test through the dispatcher's ports.
+  `test/testUtils/command-dispatcher-fakes.ts` supplies in-memory fakes for the
+  five ports and records the machine trace. Do not use `mock.module` for
+  dispatcher suites: the ports exist so a test can inject a seam, and a
+  process-wide module mock defeats that isolation.
+- Property tests must set an explicit `numRuns` and a per-test timeout, and
+  must not use timers. `cancellation.property.test.ts` uses `RUNS = 200` and a
+  30-second timeout; ordering comes from `fc.scheduler()`, not from sleeping.
+- Run the focused stress suite with
+  `bun test --concurrent test/unit/command-dispatch/` before relying on the
+  default `make test` result.
+
+See [Command dispatch architecture](command-dispatch-architecture.md) for the
+component map. [ADR 009](adrs/adr-0009-frontend-command-dispatcher-contract.md)
+records the contract's rationale.
 
 ## Configuration format practice
 
@@ -1431,72 +1480,16 @@ Suites that rely on timer or logger seams must not mutate global state during
 test execution; instead, provide test-doubles through the module's public
 interface.
 
-### Property tests (fast-check)
+For the command dispatcher suites, use the focused explicit-concurrency stress
+run:
 
-Property suites use `fast-check` and the `.property.test.ts` suffix, so the
-normal `make test` gate runs them.
+```bash
+bun test --concurrent test/unit/command-dispatch/
+```
 
-- Put shared arbitraries in `test/testUtils/` and export a fixed seed, as
-  `keybindings-arbitraries.ts` does with `KEYBINDINGS_PROPERTY_SEED`. A fixed
-  seed keeps failures reproducible; pass `seed` to `fc.assert` and `fc.sample`.
-- Every arbitrary needs a non-vacuity guard. A `.coverage.test.ts` file samples
-  the arbitrary and asserts that each interesting class occurs in more than
-  five per cent of samples. A law over an arbitrary that never produces the
-  interesting case proves nothing.
-- Keep generators small: bound string lengths, key counts, and event counts, so
-  a shrunk counterexample stays readable.
-- Never let a property depend on a real clock, a real file, or real timers.
-  Inject the scheduler, the handle, or the store, as
-  `config-watcher.property.test.ts` and `keybindings-service.property.test.ts`
-  do.
-- When a property fails, record the printed seed in the commit message or the
-  ExecPlan so the failure can be replayed.
-
-### Proofs (LemmaScript)
-
-`make prove` runs `./bin/prove.sh`, which verifies each source listed in
-`LemmaScript-files.txt` through the pinned `node_modules/.bin/lsc` with
-`check --backend=dafny`. Run `bun install` first: with no `node_modules`, a bare
-`bunx lsc` resolves the unrelated npm package named `lsc` and fails with
-`Command not found!`. The script says so rather than leaving the wrong-tool
-error to be diagnosed. The `dotnet tool` Dafny package ships no solver, so
-install Z3 4.12.1 where Dafny looks for it, as
-`~/.dotnet/tools/z3/bin/z3-4.12.1` beside the tool shim or as `z3` on `PATH`;
-otherwise the first source fails with `Z3 is not found`. The script checks for
-the solver before starting.
-
-- The script refuses a vacuous pass. It fails on an empty file list, on an
-  entry whose timeout exceeds 60 seconds (Dafny 4.11 is expected; `lsc` would
-  otherwise downgrade the entry to a generation check), on `extern` calls except
-  `emptyUserKeymaps`, which is admitted only on its exact declaration line,
-  and when it sees fewer positive verifier summaries than sources listed, so
-  one cached or combined run cannot stand in for the rest. This is a guard
-  against silent weakening, not a proof that Dafny, `lsc`, or the abstraction
-  is sound; those remain the trusted foundation.
-- Hand-authored contracts live in the `.dfy` beside the verified module. The
-  `.dfy.gen` artefact is regenerated deterministically. Keep the `.dfy` and add
-  clauses; review the regenerated diff as additions-only, so a contract that
-  silently weakened would be visible.
-- After editing a verified module, run
-  `bunx lsc regen --backend=dafny <source.ts>`, then `make prove`. Never delete
-  the `.dfy`: `lsc gen` refuses to rewrite a `.dfy` whose generated body no
-  longer matches, and `lsc regen` is the supported way to catch up.
-- The verified module must stay pure. If a decision needs I/O, keep the
-  decision in the verified module and the I/O in an adapter that passes the
-  observed outcome in.
-
-### Dafny generation
-
-`bin/generate-dafny.mjs` is the wrapper that regeneration goes through. It runs
-`lsc gen --backend=dafny` from the local `node_modules/.bin/lsc`, then prepends
-each generated `.dfy.gen` with a header derived from that TypeScript source's
-own `@file` summary and path, because `lsc gen` writes only a one-line
-provenance comment. `bin/prove.sh` runs the wrapper before verification to
-reject stale artefacts, and again afterwards, because `lsc check` rewrites the
-artefacts without the header. Editing a verified module is a two-step catch-up:
-`bunx lsc regen --backend=dafny <source.ts>` is the supported way to bring the
-`.dfy` back in step, and `make prove` regenerates the `.dfy.gen` artefacts
-through this wrapper and verifies them.
+Those suites inject in-memory fakes for the five dispatcher ports instead of
+mocking modules, so the directory is safe under explicit concurrency. Property
+tests set their own run counts and per-test timeouts.
 
 ### End-to-end (E2E) tests (layered strategy)
 
@@ -1656,51 +1649,25 @@ interaction and reporting.
 Before either lane, build packaged artefacts with `bun run dist` if they do not
 already exist.
 
-### End-to-end probe helpers
+### Proofs
 
-The E2E helpers are split so their spelling and attribution rules can be tested
-without a running Electron process. `parseShortcut` in
-`app/config/e2e-shortcut-chord.ts` turns `ctrl+alt+shift+n`-style text into a
-chord, rejecting anything that is not a modifier list plus a final key.
-`sendShortcut` in `app/config/e2e-shortcut-probe.ts` dispatches that chord into
-the focused window's page, or the newest window when none is focused, and
-reports `pressed`, `unbound`, or `rejected`. `withPressToken` in
-`app/config/e2e-keymap-probe.ts` binds the request token around a command
-dispatch, so the marker a handler prints names the press that sent the command
-rather than a later one.
+The dispatcher's contractual logic is one pure state machine,
+`lib/command-dispatch/policy/invocation-machine.ts`, listed in
+`LemmaScript-files.txt` alongside the other verified modules. `make prove`
+verifies it with the rest.
 
-Markers are written through `app/config/e2e-marker-sink.ts`. `createMarkerSink`
-builds a sink that prints only while the lane flag holds, and
-`silentMarkerSink` discards every line for callers with no stream to report to.
-There is no process-wide channel: the entry point builds the sink, passes it to
-`startApplication` in `app/startup.mts`, which hands it to
-`config.setup({markerSink})` and to `startMainProcess({markerSink})` in
-`app/start.ts`. Units take the sink as a parameter — the command table in
-`app/commands.ts`, the `window:new` handler in `app/commands/window-new.ts`,
-the configuration watcher, the RPC server in `app/rpc.ts` (through `createRPC`
-from `app/ui/window.ts`), and every window `newWindow` creates — so none of
-them can report a marker a launch did not ask for. Both entry points select the
-sink from the same lane flag: `app/index.mts` builds one with
-`createMarkerSink` and `RUN_E2E`, because the packaged build is what the lane
-launches, and `app/e2e-entry.mts` adds the shortcut probe. A launch without the
-flag prints nothing. Only `app/e2e-entry.mts` reads `VELOCETTY_E2E_PRESS_FILE`
-and starts `startShortcutProbe`, which takes the lane flag, the sink, and the
-request file as parameters, so it is dormant in a shipped build without reading
-the environment.
+The gate requires `bun install` for the pinned `node_modules/.bin/lsc`, Dafny
+4.11.x, and Z3 4.12.1 where Dafny looks for its solver. `bin/prove.sh` checks
+all three before it starts, and `prove` is part of `make all`.
 
-The RPC server reports `[e2e] renderer-ready` after each load and a
-high-severity renderer message as `[e2e][renderer-error]`, both through the
-sink it was given. A launch outside the lane therefore prints neither, because
-its sink discards every line. Nothing on that path reads the environment or
-writes to the console directly; only the entry points do.
+The machine imports nothing, starts no timers, and reads no clock, which is
+what keeps it a total function LemmaScript can translate. Its obligations are
+annotated with `//@ verify` and `//@ requires` or `//@ ensures` comments, and
+the trace-level lemmas live beside it in `invocation-machine.dfy`.
 
-The probe shortcut `ctrl+alt+shift+n` is bound by no shipped keymap, which
-`test/unit/e2e-keymap-probe.test.ts` enforces; a marker reporting it can
-therefore only have come from the user's file.
-`test/unit/e2e-marker-sink.test.ts` proves the sink is silent while the flag is
-false, that a normal start-up emits no `[e2e]` line at all, and that the
-`window:new` handler writes nothing to a silent sink and writes its command
-marker to the sink it is given.
+`make prove` checks the machine. The fast-check properties in
+`test/unit/command-dispatch/` check that the asynchronous interpreter refines
+it. Run both when changing either.
 
 ## Default test gate
 

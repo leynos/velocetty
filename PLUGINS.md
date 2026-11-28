@@ -166,6 +166,11 @@ this.terms.registerCommands({
 })
 ```
 
+The `e` parameter is the keyboard event only when a keybinding triggered the
+command, as in this example. It is `undefined` when a UI control or another
+plugin ran the command through `invokeCommand`, so guard before calling
+`e.preventDefault()`.
+
 ##### Main process
 
 If there is no handler in the renderer process for an existing command, an
@@ -177,6 +182,56 @@ rpc.on('command pane:snapshot', () => {
   /* Awesome snapshot feature */
 });
 ```
+
+### Running commands
+
+Plugins can run any registered command through
+`this.terms.invokeCommand(id, args, options)`. The call returns the
+dispatcher's result, a union on `status`:
+
+```js
+async runCommand() {
+  const result = await this.terms.invokeCommand('pane:maximize', null);
+
+  if (result.status === 'ok') {
+    // result.value holds the handler's JSON result, when it returned one.
+  } else if (result.status === 'error') {
+    // result.error carries a code, commandId, and message.
+  } else {
+    // result.status === 'cancelled'; result.stage is 'before-execution' or
+    // 'during-execution'.
+  }
+}
+```
+
+The invocation source is fixed to `plugin`, so a plugin cannot claim to be a
+keybinding or a UI control. Arguments must be JSON values: a function, a class
+instance, or any other value that would not survive serialization is rejected
+with `INVALID_COMMAND_ARGS` before the invocation is admitted.
+
+`when` enablement does not apply to plugin invocations, because the plugin has
+already chosen to run the command. Only the `keybinding`, `palette`, `menu`, and
+`ui` sources honour `defaultWhen`.
+
+If another plugin's Redux middleware swallows or defers the `UI_COMMAND_EXEC`
+action, the invocation stays pending until the effect runs or the signal
+aborts. Pass a signal when you await a result; otherwise a middleware that
+never runs the effect leaves the call pending indefinitely:
+
+```js
+async closeSearch(uid) {
+  const controller = new AbortController();
+  const result = await this.terms.invokeCommand('editor:search-close', {uid}, {
+    signal: controller.signal
+  });
+  return result;
+}
+```
+
+`registerCommands` handlers still receive `(event, dispatch)`, so existing
+plugins keep working; see
+[Register a handler for your commands](#register-a-handler-for-your-commands)
+for when `event` is present.
 
 ### Menu
 
