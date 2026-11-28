@@ -147,8 +147,8 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-current candidate delivers **176 non-Plan files** and **17,179 net
-non-generated lines** at `252f82ea`. Each revision entry in the revision note
+current candidate delivers **176 non-Plan files** and **17,185 net
+non-generated lines** at `8f9e72d1`. Each revision entry in the revision note
 records the count at the head it names, so those earlier figures are historical
 rather than current. The excess is recorded here as the escalation the
 tolerance requires, and the maintainer's acceptance of the raised counts is
@@ -2595,3 +2595,10 @@ nixie clean; 1,334 unit tests across 149 files with zero failures; the four
 proof summaries verify 1, 8, 9 and 11 programs with zero errors;
 `make build-fast` clean; packaged settings deep E2E passing;
 `cs delta origin/main` reports no new issue.
+
+2026-11-28: twenty-seventh round, the approval review's three items. The writer
+is 397 lines again (the failure-type doc was too long); the developer guide
+names `lib/settings/rejection-line.ts`; and the IPC suite drives the real
+settings service over the memory port with a queued `readText` EACCES fault, so
+`user-config-unreadable` is proven end to end through the handler. Count at
+this head: 176 non-Plan files and 17,185 net non-generated lines at `8f9e72d1`.
