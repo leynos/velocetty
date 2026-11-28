@@ -367,3 +367,14 @@ was evidence about the lane, not about the app.
 - [Oxlint plug-ins](https://oxc.rs/docs/guide/usage/linter/plugins.html)
 - [`ai-deslop`](https://github.com/maharshi365/deslop)
 - [Model pull request](https://github.com/leynos/simulacat-core/pull/121)
+
+## Addendum: the Unicode-escape bound after the scanner split
+
+Date: 2026-11-26.
+
+The link above records where the bound sat when this decision was accepted. The
+JSON5 scanner has since moved out of
+`app/runtime/plugin-runtime-json5-parser.ts` and been split into the modules
+under `app/config/json5/`; the bound now sits at
+[`app/config/json5/lexer.ts` line 182](../../app/config/json5/lexer.ts#L182).
+The `unicorn/number-literal-case` override names the same file.

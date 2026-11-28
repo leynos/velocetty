@@ -87,6 +87,8 @@ export type RuntimeTabDecorationContext = {
   readonly active: boolean;
   readonly hasActivity: boolean;
   readonly title?: string;
+  /** `settings` marks the singleton settings tab. */
+  readonly tabType?: 'terminal' | 'settings';
 };
 
 /** Runtime tab decoration provider contribution contract. */

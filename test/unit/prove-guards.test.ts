@@ -332,6 +332,20 @@ proofTest('prove ignores a hand-authored proof outside the policy directory', ()
   });
 });
 
+proofTest('prove refuses a verifier summary that verified nothing', () => {
+  inFixture((fixture) => {
+    writeStub({
+      body: '#!/usr/bin/env bash\necho "Dafny program verifier finished with 0 verified, 0 errors"\n',
+      filePath: path.join(fixture.root, 'node_modules', '.bin', 'lsc')
+    });
+
+    const result = runWithProof(fixture, {dafnySource: '// hand-authored proof\n'});
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('zero verified programs');
+  });
+});
+
 proofTest('prove admits only the emptyUserKeymaps axiom and then verifies', () => {
   inFixture((fixture) => {
     const result = runWithProof(fixture, {dafnySource: 'function {:axiom} emptyUserKeymaps(): UserKeymaps\n'});

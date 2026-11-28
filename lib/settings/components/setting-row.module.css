@@ -1,0 +1,66 @@
+/** @file Presentation for one editable setting row. */
+
+.row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.row[data-phase="saving"] {
+  opacity: 0.85;
+}
+
+.labelBlock {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.label {
+  font-weight: 500;
+}
+
+.description {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.note {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.controlBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+  max-width: 50%;
+}
+
+.error {
+  margin: 0;
+  font-size: 12px;
+  color: #ff9a9a;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.reset {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: inherit;
+  cursor: pointer;
+  background: rgb(255 255 255 / 8%);
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 4px;
+}

@@ -64,3 +64,55 @@ describe('clipboard command schemas', () => {
     expect(ipcResponseSchemas['clipboard.writeText'].safeParse(void 0).success).toBe(true);
   });
 });
+
+describe('settings command schemas', () => {
+  const snapshot = {
+    revision: 3,
+    filePath: '/home/user/.config/Hyper/config.json5',
+    fileStatus: {kind: 'ok' as const},
+    userValues: {fontSize: 16},
+    defaultValues: {fontSize: 12},
+    profileOverriddenKeys: ['fontSize']
+  };
+
+  test('accepts a settings snapshot', () => {
+    expect(ipcResponseSchemas['settings:getSnapshot'].parse(snapshot)).toEqual(snapshot);
+  });
+
+  test('accepts every file status shape', () => {
+    const statuses = [
+      {kind: 'ok'},
+      {kind: 'missing'},
+      {kind: 'legacy-json'},
+      {kind: 'unparseable', diagnostics: [{path: '/', message: 'bad', suggestedFix: 'fix it'}]},
+      {kind: 'unreadable', diagnostics: [{path: '/', message: 'bad', suggestedFix: 'fix it'}]},
+      {kind: 'invalid', diagnostics: [{path: '/config/fontSize', message: 'bad', suggestedFix: 'fix it'}]}
+    ];
+    for (const fileStatus of statuses) {
+      expect(ipcResponseSchemas['settings:getSnapshot'].safeParse({...snapshot, fileStatus}).success).toBe(true);
+    }
+  });
+
+  test('rejects an unknown file status', () => {
+    expect(
+      ipcResponseSchemas['settings:getSnapshot'].safeParse({...snapshot, fileStatus: {kind: 'unexpected'}}).success
+    ).toBe(false);
+  });
+
+  test('accepts applied, rejected, and failed write outcomes', () => {
+    const outcomes = [
+      {kind: 'applied', snapshot},
+      {kind: 'rejected', diagnostics: [{path: '/config/fontSize', message: 'bad', suggestedFix: 'fix it'}]},
+      {kind: 'failed', reason: 'user-config-invalid'},
+      {kind: 'failed', reason: 'io-error', detail: 'EPERM'}
+    ];
+    for (const outcome of outcomes) {
+      expect(ipcResponseSchemas['settings:setValue'].safeParse(outcome).success).toBe(true);
+      expect(ipcResponseSchemas['settings:resetValue'].safeParse(outcome).success).toBe(true);
+    }
+  });
+
+  test('rejects a malformed write outcome', () => {
+    expect(ipcResponseSchemas['settings:setValue'].safeParse({kind: 'applied'}).success).toBe(false);
+  });
+});

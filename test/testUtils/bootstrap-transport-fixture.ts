@@ -21,6 +21,7 @@
 import {mock} from 'bun:test';
 
 import {INIT} from '@shared/constants';
+import {SETTINGS_TAB_CLOSE, SETTINGS_TAB_OPEN} from '@shared/constants/settings-tab';
 import {CONFIG_LOAD, CONFIG_RELOAD} from '@shared/constants/config';
 import type {configOptions} from '@shared/types/config';
 import {NOTIFICATION_MESSAGE} from '@shared/constants/notifications';
@@ -52,7 +53,7 @@ import {
   UI_WINDOW_MOVE
 } from '@shared/constants/ui';
 import {UPDATE_AVAILABLE} from '@shared/constants/updater';
-import {asSessionId, type Session} from '@shared/types/common';
+import {asSessionId, type Session, type SessionId} from '@shared/types/common';
 import {isFunction} from '@shared/types/guards';
 import type {AddNotificationParams, UpdateAvailableParams} from '../../lib/bootstrap/renderer-bootstrap';
 import type {HyperActions, HyperDispatch} from '../../typings/hyper';
@@ -70,16 +71,39 @@ export type RecordedCall = {creator: string; args: unknown[]};
  */
 type FixtureState = ReturnType<typeof createFixtureState>;
 
+/** Whether the fixture reports the settings surface as owning input. */
+let settingsSurfaceActive = false;
+
+/**
+ * Sets the surface state the bootstrap listeners read.
+ *
+ * A handler that gates terminal requests consults `settingsTab.isActive` on
+ * every call, so a test can flip this between dispatches without rebuilding
+ * the fixture.
+ */
+export const setSettingsSurfaceActive = (isActive: boolean): void => {
+  settingsSurfaceActive = isActive;
+};
+
 /**
  * Builds the state the store double reports.
  *
  * The values are fixed for the same reason `now` is: the fixture's job is to
- * show which creator ran, and a changing state would only add noise.
+ * show which creator ran, and a changing state would only add noise. The one
+ * exception is the settings surface, which a gating test must be able to turn
+ * on.
  */
 const createFixtureState = () => ({
   ui: {bellSoundURL: 'sound.wav', bellSound: 'abc', bell: 'SOUND'},
   sessions: {activeUid: 'session-0', sessions: {}},
-  termGroups: {termGroups: {}, activeSessions: {}, activeRootGroup: null}
+  termGroups: {termGroups: {}, activeSessions: {}, activeRootGroup: null},
+  settingsTab: {
+    isOpen: settingsSurfaceActive,
+    isActive: settingsSurfaceActive,
+    keepThroughInitialSession: false,
+    query: '',
+    selectedCategory: 'all' as const
+  }
 });
 
 type Thunk = (dispatch: (action: unknown) => void, getState: () => FixtureState) => void;
@@ -240,17 +264,19 @@ const termGroupActions = {
   // Written out rather than built by `thunk`: the production creator returns
   // the dispatched session-exit action, and `BootstrapActionModules` names that
   // exact type, so the shape has to match branch for branch.
-  ptyExitTermGroup: (uid: string) => (dispatch: HyperDispatch) => {
-    record('ptyExitTermGroup', [uid]);
-    return dispatch({
-      type: SESSION_PTY_EXIT,
-      uid: asSessionId(uid),
-      effect() {
-        // The real effect also closes the window when no sessions remain; the
-        // wiring under test never invokes it, so it stays empty here.
-      }
-    });
-  }
+  ptyExitTermGroup:
+    (uid: string) =>
+    (dispatch: HyperDispatch): {type: typeof SESSION_PTY_EXIT; uid: SessionId; effect: () => void} => {
+      record('ptyExitTermGroup', [uid]);
+      return dispatch({
+        type: SESSION_PTY_EXIT,
+        uid: asSessionId(uid),
+        effect() {
+          // The real effect also closes the window when no sessions remain; the
+          // wiring under test never invokes it, so it stays empty here.
+        }
+      });
+    }
 };
 
 const uiActions = {
@@ -300,8 +326,20 @@ const reloadConfig = action('reloadConfig', (config: configOptions) => ({type: C
 /** `lib/actions/index.ts` returns a thunk, and the ready handler dispatches it. */
 const init = thunk('init', () => ({type: INIT}));
 
+const settingsTabActions = {
+  openSettingsTab: action(
+    'openSettingsTab',
+    ({keepThroughInitialSession = false}: {readonly keepThroughInitialSession?: boolean} = {}) => ({
+      type: SETTINGS_TAB_OPEN,
+      keepThroughInitialSession
+    })
+  ),
+  closeSettingsTab: action('closeSettingsTab', () => ({type: SETTINGS_TAB_CLOSE}))
+};
+
 export const createBootstrapActions = () => ({
   addNotificationMessage,
+  settingsTabActions,
   init,
   loadConfig,
   reloadConfig,
@@ -324,6 +362,7 @@ export const resetFixture = () => {
   dispatchMock.mockClear();
   pluginReloadCount = 0;
   recordedCalls.length = 0;
+  settingsSurfaceActive = false;
   transport.invoke.mockClear();
   transport.emit.mockClear();
   transport.off.mockClear();

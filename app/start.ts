@@ -31,6 +31,12 @@ remoteInitialize();
 // ahead of it because it registers the remote module before any window loads.
 
 import {registerClipboardIpcHandlers} from './clipboard';
+import {defaultWriterState} from './config/config-file-writer';
+import {createNodeConfigFileSystem} from './config/node-config-file-port';
+import {cfgPath} from './config/paths';
+import {registerSettingsIpcHandlers} from './settings/settings-ipc';
+import {fileKindFor} from './settings/settings-file-kind';
+import {createSettingsService} from './settings/settings-service';
 
 const windowSet = new Set<BrowserWindow>();
 type VelocettyRuntimeGlobal = typeof globalThis & VelocettyRuntimeGlobals;
@@ -42,6 +48,33 @@ type VelocettyRuntimeGlobal = typeof globalThis & VelocettyRuntimeGlobals;
 
 // Register before any window loads so renderers can paste from first paint.
 registerClipboardIpcHandlers();
+
+// The settings tab reads and writes the user's config through one service and
+// one writer; register it before any window loads for the same reason.
+const configFileSystem = createNodeConfigFileSystem();
+/** The one log adapter for this service, so every bounded line reaches the same sink. */
+const logSettingsLine = (message: string): void => console.error(message);
+registerSettingsIpcHandlers(
+  createSettingsService({
+    filePath: cfgPath,
+    fileKind: fileKindFor(cfgPath),
+    fileSystem: configFileSystem,
+    writer: {
+      fileSystem: configFileSystem,
+      sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+      log: logSettingsLine,
+      metrics: config.configMetrics,
+      platform: process.platform,
+      processId: () => process.pid,
+      ...defaultWriterState
+    },
+    defaults: config.getConfigDefaults(),
+    getDefaultProfileName: config.getDefaultProfile,
+    spans: config.configSpans,
+    metrics: config.configMetrics,
+    log: logSettingsLine
+  })
+);
 
 // expose to plugins
 app.config = config;
@@ -237,6 +270,17 @@ export const startMainProcess = ({markerSink}: StartMainProcessOptions): void =>
               process.platform !== 'darwin' && ['', true].includes(config.getConfig().showHamburgerMenu),
             markerSink,
             openConfig: () => void config.openConfig(),
+            openSettingsWindow: () => {
+              const created = createWindow();
+              created.webContents.once('did-finish-load', () => {
+                // This window opens with no terminal yet, and its initial one
+                // arrives after this request. The flag keeps the settings tab
+                // on screen through that one `session add`; without it the user
+                // would be shown a terminal instead of the preferences they
+                // asked for. A later new session still takes the surface back.
+                created.rpc.emit('settings open req', {keepThroughInitialSession: true});
+              });
+            },
             openWindow: (profileName) => {
               createWindow(undefined, undefined, profileName);
             },

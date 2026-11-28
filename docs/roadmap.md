@@ -322,13 +322,18 @@ Scope notes:
 
 ### 5.1. Settings shell and core settings
 
-- [ ] 5.1.1. Implement the settings tab shell and navigation. Requires 3.1.1.
-  See [velocetty-design.md](velocetty-design.md) §Settings tab + schema-driven
-  plugin settings and [PRD](velocetty-product-requirements-document.md)
-  §Settings tab + plugin settings panels.
-  - [ ] Add search, categories, and reset-to-default flows.
-  - [ ] Surface validation errors inline.
-  - [ ] Success criteria: core settings are editable and validated in the UI.
+- [x] 5.1.1. Implement the settings tab shell and navigation. Requires 3.1.1.
+  See [velocetty-design.md](velocetty-design.md) §Settings tab and plugin
+  settings panels and [PRD](velocetty-product-requirements-document.md) §4)
+  Settings tab + plugin settings panels. Decisions are recorded in
+  [ADR 009](adrs/adr-0009-settings-tab-hosting-and-persistence.md) and the
+  component layout in
+  [settings-tab-architecture.md](settings-tab-architecture.md). Existing users
+  are told what changed in
+  [migration-settings-tab.md](migration-settings-tab.md).
+  - [x] Add search, categories, and reset-to-default flows.
+  - [x] Surface validation errors inline.
+  - [x] Success criteria: core settings are editable and validated in the UI.
 - [ ] 5.1.2. Expose settings commands. Requires 4.1.1. See
   [velocetty-design.md](velocetty-design.md) §Settings-driven commands.
   - [ ] Implement commands for opening settings, opening keybindings, and

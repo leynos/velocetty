@@ -1,5 +1,5 @@
 .PHONY: all fmt check-fmt typecheck lint test coverage build build-fast \
-	clean markdownlint nixie spelling prove
+	clean markdownlint nixie spelling prove proofs proofs-fresh
 
 MDLINT ?= markdownlint-cli2
 # `make fmt` and `make check-fmt` call mdtablefix directly. `--git` selects the
@@ -16,6 +16,11 @@ TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.3
 TYPOS_CONFIG_BUILDER = $(UV) tool run --python 3.14 --from \
 	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
 	typos-config-builder
+# One annotated TypeScript file per line, optionally followed by a Dafny
+# timeout and extra flags. Comments (#) and blank lines are ignored.
+PROOF_LIST ?= LemmaScript-files.txt
+PROOF_FILES = $(shell sed -e 's/\#.*//' -e 's/^[[:space:]]*//' \
+	-e 's/[[:space:]].*$$//' -e '/^$$/d' $(PROOF_LIST) 2>/dev/null)
 
 all: check-fmt typecheck lint test spelling prove
 
@@ -31,14 +36,19 @@ check-fmt:
 typecheck:
 	bun run check:types
 
-lint:
+lint: proofs-fresh
 	bun run lint
 	@if command -v actionlint >/dev/null 2>&1; then actionlint; else echo "actionlint not installed; skipping"; fi
 
 test:
 	bun run test:unit:run
 
-prove:
+# `proofs-fresh` and `prove` both regenerate every `.dfy.gen` file, so under
+# `make -j` they would rewrite each other's inputs. A shared prerequisite makes
+# make run the freshness check once, before either consumer; unrelated targets
+# still run in parallel. `.NOTPARALLEL` cannot express this: given these two
+# targets as prerequisites, GNU make serializes only *their* prerequisites.
+prove: proofs-fresh
 	./bin/prove.sh
 
 coverage:
@@ -63,3 +73,8 @@ nixie:
 	# CI currently requires --no-sandbox; remove once nixie supports
 	# environment variable control for this option
 	nixie --no-sandbox
+
+proofs: prove # Alias for `prove`, kept for the ExecPlan's documented commands
+
+proofs-fresh: # Reject a hand-edited or stale generated Dafny artefact
+	bun scripts/check-proof-freshness.mjs

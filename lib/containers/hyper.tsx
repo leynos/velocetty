@@ -16,12 +16,14 @@ import {asCommandId, type CommandId} from '@shared/types/commands';
 import type {HyperState, HyperProps, HyperDispatch} from '../../typings/hyper';
 import * as uiActions from '../actions/ui';
 import {getRegisteredKeys, getCommandHandler, shouldPreventDefault} from '../command-registry';
+import {isSettingsSurfaceGated} from '../settings/surface-command-gate';
 import type Terms from '../components/terms';
 import {transport} from '../transport';
 import {connect} from '../utils/plugins';
 
 import {HeaderContainer} from './header';
 import NotificationsContainer from './notifications';
+import SettingsContainer from './settings';
 import TermsContainer from './terms';
 import * as styles from './hyper.module.css';
 
@@ -30,13 +32,24 @@ const isMac = /Mac/.test(navigator.userAgent);
 const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedRef<HTMLDivElement>) {
   const mousetrap = useRef<MousetrapInstance | null>(null);
   const terms = useRef<Terms | null>(null);
+  // `attachKeyListeners` waits for the registry, so a later attach can start
+  // while an earlier one is still pending. The id lets the older call notice it
+  // has been superseded and skip binding keys that are already out of date.
+  const keyListenerRegistration = useRef(0);
 
   useEffect(() => {
     void attachKeyListeners();
-  }, [props.execCommand, props.lastConfigUpdate]);
+  }, [props.execCommand, props.lastConfigUpdate, props.isSettingsSurfaceActive]);
   useEffect(() => {
     handleFocusActive(props.activeSession);
   }, [props.activeSession]);
+  useEffect(() => {
+    // Returning from settings restores focus explicitly: the terminal keeps
+    // its session, and the browser does not focus it for us.
+    if (!props.isSettingsSurfaceActive) {
+      handleFocusActive(props.activeSession);
+    }
+  }, [props.isSettingsSurfaceActive]);
 
   const handleFocusActive = (uid?: string | null) => {
     const term = uid && terms.current?.getTermByUid(uid);
@@ -53,6 +66,7 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
   };
 
   const attachKeyListeners = async () => {
+    const registrationId = ++keyListenerRegistration.current;
     if (mousetrap.current) {
       mousetrap.current.reset();
     } else {
@@ -65,6 +79,11 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
     }
 
     const keys = await getRegisteredKeys();
+    if (registrationId !== keyListenerRegistration.current) {
+      // A newer attachment (or unmount) superseded this one: binding now would
+      // restore stale keys over the newer set.
+      return;
+    }
     Object.keys(keys).forEach((commandKeys) => {
       mousetrap.current?.bind(
         commandKeys,
@@ -72,8 +91,11 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
           const command = asCommandId(keys[commandKeys]);
           // We should tell xterm to ignore this event.
           const caughtEvent = Object.assign(e, {catched: true});
+          const isGated = props.isSettingsSurfaceActive && isSettingsSurfaceGated(command);
           props.execCommand(command, getCommandHandler(command), caughtEvent);
-          shouldPreventDefault(command) && e.preventDefault();
+          // A gated command leaves native behaviour alone, so typing and
+          // editing shortcuts work in the settings inputs.
+          !isGated && shouldPreventDefault(command) && e.preventDefault();
         },
         'keydown'
       );
@@ -101,6 +123,9 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
 
   useEffect(() => {
     return () => {
+      // Invalidate any attachment still waiting on the registry, so it cannot
+      // bind keys into a reset mousetrap after the window has gone.
+      keyListenerRegistration.current += 1;
       mousetrap.current?.reset();
     };
   }, []);
@@ -115,7 +140,22 @@ const Hyper = forwardRef(function Hyper(props: HyperProps, ref: React.ForwardedR
         className={`${styles.hyperMain} ${isMac_ ? styles.hyperMainRounded : ''} ${fullScreen ? 'fullScreen' : ''}`}
       >
         <HeaderContainer />
-        <TermsContainer ref_={onTermsRef} />
+        <div className={styles.surfaceHost}>
+          <div
+            className={`${styles.surfaceLayer} ${props.isSettingsSurfaceActive ? styles.surfaceLayerOffscreen : ''}`}
+            inert={props.isSettingsSurfaceActive}
+          >
+            <TermsContainer ref_={onTermsRef} />
+          </div>
+          {props.isSettingsOpen && (
+            <div
+              className={`${styles.surfaceLayer} ${props.isSettingsSurfaceActive ? '' : styles.surfaceLayerOffscreen}`}
+              inert={!props.isSettingsSurfaceActive}
+            >
+              <SettingsContainer isActive={props.isSettingsSurfaceActive} />
+            </div>
+          )}
+        </div>
         {props.customInnerChildren}
       </div>
 
@@ -141,6 +181,8 @@ const mapStateToProps = (state: HyperState) => {
     uiFontFamily: state.ui.uiFontFamily,
     borderColor: state.ui.borderColor,
     activeSession: state.sessions.activeUid,
+    isSettingsSurfaceActive: state.settingsTab.isActive,
+    isSettingsOpen: state.settingsTab.isOpen,
     backgroundColor: state.ui.backgroundColor,
     maximized: state.ui.maximized,
     fullScreen: state.ui.fullScreen,

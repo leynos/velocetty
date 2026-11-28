@@ -41,3 +41,7 @@ __pycache__/
 *.swp
 *.swo
 *~
+
+# LemmaScript merge state written by `lsc regen`; never committed
+*.dfy.base
+*.dfy.merged

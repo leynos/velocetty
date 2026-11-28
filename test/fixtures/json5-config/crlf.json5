@@ -1,0 +1,7 @@
+{
+  // CRLF document
+  config: {
+    fontSize: 12,
+    shell: "bash", // chosen shell
+  },
+}

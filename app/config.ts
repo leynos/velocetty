@@ -8,9 +8,12 @@
  * without Electron.
  */
 
+import type {JsonObject} from '@shared/types/json';
+
 import {app} from 'electron';
 
 import {mkdirpSync} from 'fs-extra';
+import {errorCode} from './utils/error-code';
 import path from 'node:path';
 
 import {createConfigMetrics} from './config/config-metrics';
@@ -19,8 +22,12 @@ import {checkDeprecatedConfig} from './config/config-queries';
 import {createConfigSpanRecorder} from './config/config-spans';
 import {createConfigWatchRuntime, emitKeymapsMarker, type ConfigWatchRuntime} from './config/config-watch';
 import {setCurrentConfig} from './config/current-config';
+import type {SelfWriteVerdict} from './config/import-report';
 import {silentMarkerSink, type E2EMarkerSink} from './config/e2e-marker-sink';
 import {createConfigImportModule} from './config/import';
+import {asConfigFilePath, sweepTemporaryFiles, type ConfigFileSystemPort} from './config/config-file-writer';
+import {createNodeConfigFileSystem} from './config/node-config-file-port';
+import {getLastWrittenTextHash, hashConfigText, nextConfigRevision} from './config/config-write-state';
 import {_init} from './config/init';
 import {createKeybindingsService} from './config/keybindings';
 import {keybindingsCodec} from './config/keybindings-codec';
@@ -43,6 +50,7 @@ import {
   velocettyDir
 } from './config/paths';
 import notify from './notify';
+import {isJsonObject} from './utils/runtime-guards';
 import {runStartupSession} from './config/startup-session';
 import {closeWatcherAtShutdown} from './config/watcher';
 import {captureWatchedFileStamps, settleWatchedFileStamps} from './config/watched-file-stamp';
@@ -58,6 +66,18 @@ const spans = createConfigSpanRecorder({
   now: () => performance.now(),
   sink: {info: (line) => console.info(line), warn: (line) => console.warn(line)}
 });
+
+/**
+ * The process-wide counter tally, shared with every module that reports events.
+ *
+ * Exported so the entry point hands the same instance to the settings service
+ * it builds; a second tally would make one session's counters two partial
+ * views of the same process.
+ */
+export const configMetrics = metrics;
+
+/** The process-wide span recorder, exported for the same reason as the tally. */
+export const configSpans = spans;
 
 // The adapters are built once, at module load, exactly as before the ports
 // were split: only the start-up *command* is deferred to `setup()`, so a
@@ -77,7 +97,7 @@ const keybindingsService = createKeybindingsService({
 /** Whether the opt-in start-up trace is enabled for this process. */
 const isConfigImportDebugEnabled = (): boolean => process.env.DEBUG_CONFIG_IMPORT === '1';
 
-const {_import} = createConfigImportModule({
+const {_import, getDefaultConfig} = createConfigImportModule({
   _init,
   // The environment is read here, at the composition root, so the import
   // modules below take the flag as a dependency and stay testable without it.
@@ -156,7 +176,79 @@ export type ConfigurationSetupOptions = Readonly<{
  * setup(); // the application is now reading and watching its configuration
  * ```
  */
+/** The bundled defaults, as the settings service reports them. */
+export const getConfigDefaults = (): JsonObject => {
+  const {defaults} = getDefaultConfig();
+  return isJsonObject(defaults.config) ? defaults.config : {};
+};
+
+/** The port this root uses to read the file it watches. */
+type ActiveConfigReader = Pick<ConfigFileSystemPort, 'readText'>;
+
+/**
+ * What one read of the watched file produced.
+ *
+ * A failure is its own case, not an absence of text: a reload whose origin
+ * cannot be compared must be treated as external rather than silently
+ * attributed to the writer.
+ */
+type ActiveConfigRead =
+  | {readonly kind: 'text'; readonly text: string}
+  | {readonly kind: 'missing'}
+  | {readonly kind: 'unreadable'};
+
+const readActiveConfigText = (reader: ActiveConfigReader, filePath: string): ActiveConfigRead => {
+  try {
+    return {kind: 'text', text: reader.readText(asConfigFilePath(filePath))};
+  } catch (error) {
+    // An absent file is a first run, not a fault, and the reload it triggers
+    // is announced anyway; any other failure is named.
+    return errorCode(error) === 'ENOENT' ? {kind: 'missing'} : {kind: 'unreadable'};
+  }
+};
+
+/**
+ * Compares the file on disk with the settings writer's record.
+ *
+ * Pure: the caller decides how to report an unreadable file. Returning a
+ * verdict rather than a boolean keeps "not the writer" distinct from "could
+ * not check", which the watcher names in one bounded line.
+ */
+export type SelfWriteInput = {
+  /** The file the watcher saw change. */
+  readonly filePath: string;
+  /** The port the comparison reads through. */
+  readonly reader: ActiveConfigReader;
+  /** The hash the writer recorded, or null when it has written nothing. */
+  readonly recordedHash: string | null;
+};
+
+/**
+ * Compares one file with the writer's record.
+ *
+ * @param input - The path, the read port, and the recorded hash.
+ * @returns `self-write`, `external`, or `unreadable`.
+ *
+ * @example
+ * ```ts
+ * selfWriteVerdict({filePath: cfgPath, reader, recordedHash: getLastWrittenTextHash()});
+ * ```
+ */
+export const selfWriteVerdict = ({filePath, reader, recordedHash}: SelfWriteInput): SelfWriteVerdict => {
+  const read = readActiveConfigText(reader, filePath);
+  if (read.kind === 'unreadable') {
+    return 'unreadable';
+  }
+  if (read.kind === 'missing') {
+    return 'external';
+  }
+  return recordedHash === hashConfigText(read.text) ? 'self-write' : 'external';
+};
+
 export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions = {}) => {
+  // One filesystem port serves the watch-time read and the start-up sweep, so
+  // this root reads nothing through an ambient module.
+  const fileSystem = createNodeConfigFileSystem();
   const configWatch = createConfigWatchRuntime({
     configTree,
     importConfiguration: _import,
@@ -165,7 +257,11 @@ export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions
     recorder,
     markerSink,
     spans,
-    watchedFiles
+    watchedFiles,
+    isSelfWriteReload: () =>
+      selfWriteVerdict({filePath: cfgPath, reader: fileSystem, recordedHash: getLastWrittenTextHash()}),
+    log: (line) => console.warn(line),
+    onReloaded: nextConfigRevision
   });
   // The span and the record belong to the start-up session, which takes its
   // sinks as dependencies; this root only supplies the adapters and applies
@@ -180,6 +276,11 @@ export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions
       // The Velocetty tree holds new configuration files, so it must exist
       // before the importer copies schemas or seeds `keybindings.json5`.
       mkdirpSync(velocettyDir);
+      // A crashed write can leave a sibling temporary file beside the config;
+      // start-up is the only phase that removes it. The sweep reports its own
+      // bounded line, so a missing directory stays silent and a real failure
+      // still names its errno.
+      sweepTemporaryFiles(fileSystem, asConfigFilePath(cfgDir), (line) => console.warn(line));
       // A crashed write can leave a temporary file behind. Start-up is the
       // only phase that may remove it, and the edge owns that cleanup
       // immediately before the seed decision reads the file.

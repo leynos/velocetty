@@ -7,7 +7,6 @@
  * never reaches back into the composition root, and the baseline stamps and
  * reload callback arrive as explicit parameters.
  */
-import chokidar from 'chokidar';
 import path from 'node:path';
 
 import type {ConfigMetrics} from './config-metrics';
@@ -15,15 +14,49 @@ import type {ConfigSpanRecorder} from './config-spans';
 import type {ConfigWarningNotifier} from './config-queries';
 import {checkDeprecatedConfig} from './config-queries';
 import type {ImportRecord, ImportRecorder} from './config-observability';
-import {setCurrentConfig} from './current-config';
+import {getCurrentConfig, hasCurrentConfig, setCurrentConfig} from './current-config';
 import {formatKeymapsMarker, type E2EKeymapStatus} from './e2e-keymap-probe';
 import type {E2EMarkerSink} from './e2e-marker-sink';
+import {createChokidarHandle} from './chokidar-handle';
 import type {ConfigImportResult} from './import';
-import {shouldAnnounceReload, type ConfigImportReport, type ConfigSourceKind} from './import-report';
-import {createConfigWatcher, type WatcherEvent, type WatcherHandle} from './watcher';
+import {
+  keymapsDiffer,
+  shouldNotifyReload,
+  type ConfigImportReport,
+  type ConfigSourceKind,
+  type SelfWriteVerdict
+} from './import-report';
+import {createConfigWatcher} from './watcher';
 import {createWatchedFileReconciler, type WatchedFileStamps} from './watched-file-stamp';
 
 const CONFIG_DEBOUNCE_MS = 100;
+
+/** The facts one reload's announcement decision is made from. */
+type AnnounceFacts = {
+  readonly report: ConfigImportReport;
+  readonly keymapsBefore: Readonly<Record<string, readonly string[]>> | undefined;
+  readonly keymapsAfter: Readonly<Record<string, readonly string[]>>;
+  readonly isSelfWriteReload: () => SelfWriteVerdict;
+  readonly log: (line: string) => void;
+};
+
+/**
+ * Decides whether one reload announces itself.
+ *
+ * An unreadable file is named once and treated as external; a self-write with
+ * unchanged keybindings stays silent so the settings tab's own writes do not
+ * produce a notice.
+ */
+const shouldAnnounce = ({report, keymapsBefore, keymapsAfter, isSelfWriteReload, log}: AnnounceFacts): boolean => {
+  const verdict = isSelfWriteReload();
+  if (verdict === 'unreadable') {
+    log('[config] self-write check failed reason=unreadable');
+  }
+  return shouldNotifyReload(report, {
+    hasKeybindingsChange: keymapsDiffer(keymapsBefore, keymapsAfter),
+    isSelfWrite: verdict === 'self-write'
+  });
+};
 
 /** Maps the import report onto the keymap status the E2E lane asserts on. */
 const keymapStatus = (report: ConfigImportReport): E2EKeymapStatus =>
@@ -54,40 +87,6 @@ export const emitKeymapsMarker = (
   marker(formatKeymapsMarker(keymapStatus(report), keymaps));
 };
 
-/** Wraps chokidar in the adapter the watcher debounces over. */
-const createChokidarHandle = (directories: readonly string[]): WatcherHandle => {
-  const watcher = chokidar.watch([...directories], {depth: 0, ignoreInitial: true});
-  /** Subscribes one listener to a single chokidar event name. */
-  const on = (event: WatcherEvent, listener: (eventPath: string) => void) => {
-    switch (event) {
-      case 'add': {
-        watcher.on('add', listener);
-        break;
-      }
-      case 'change': {
-        watcher.on('change', listener);
-        break;
-      }
-      case 'unlink': {
-        watcher.on('unlink', listener);
-        break;
-      }
-    }
-  };
-
-  return {
-    close: async () => watcher.close(),
-    on,
-    onError: (listener) => {
-      // SAFETY: chokidar's error event emits the error as its only argument.
-      watcher.on('error', (error: unknown) => listener(error));
-    },
-    onReady: (listener) => {
-      watcher.on('ready', listener);
-    }
-  };
-};
-
 /** The collaborators the watcher runtime needs from the composition root. */
 export type ConfigWatchDependencies = {
   /** Re-runs the configuration import; the watcher never constructs it itself. */
@@ -102,6 +101,17 @@ export type ConfigWatchDependencies = {
   readonly configTree: ConfigSourceKind;
   /** Absolute paths of the files a reload must react to. */
   readonly watchedFiles: readonly string[];
+  /**
+   * Compares the config file now on disk with the settings writer's record.
+   * A `self-write` reload updates the renderer silently, unless the same
+   * reload also applied a keybindings change. `unreadable` is announced and
+   * named through `log`.
+   */
+  readonly isSelfWriteReload?: () => SelfWriteVerdict;
+  /** Receives the bounded line for a self-write check that could not run. */
+  readonly log?: (line: string) => void;
+  /** Allocates the snapshot revision a completed reload makes visible. */
+  readonly onReloaded?: () => void;
 };
 
 /** The reload and watching surface one composition root exposes. */
@@ -130,6 +140,9 @@ export type ConfigWatchRuntime = {
  */
 export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies): ConfigWatchRuntime => {
   const {importConfiguration, recorder, spans, metrics, notify, markerSink, configTree, watchedFiles} = dependencies;
+  const isSelfWriteReload = dependencies.isSelfWriteReload ?? (() => 'external' as const);
+  const log = dependencies.log ?? (() => {});
+  const onReloaded = dependencies.onReloaded ?? (() => {});
   // The registration, not the callback, is a subscriber's identity. Keying by
   // callback would let a stale cleanup remove a later registration of the same
   // function, which is how a torn-down component could silence its successor.
@@ -147,6 +160,9 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
    */
   const reloadConfiguration = () => {
     const finishSpan = spans.begin('reload');
+    // The keymaps in effect before this import, so a reload that only re-read
+    // an unchanged keybindings file is not mistaken for an external edit.
+    const keymapsBefore = hasCurrentConfig() ? getCurrentConfig().keymaps : undefined;
     let imported: ConfigImportResult;
     try {
       recorder.beginImport({phase: 'reload'});
@@ -160,7 +176,14 @@ export const createConfigWatchRuntime = (dependencies: ConfigWatchDependencies):
     const {config, keybindings: outcome, report} = imported;
     finishSpan(report.config === 'fallback' ? 'fallback' : 'applied');
     setCurrentConfig(config);
-    const announced = shouldAnnounceReload(report);
+    onReloaded();
+    const announced = shouldAnnounce({
+      report,
+      keymapsBefore,
+      keymapsAfter: config.keymaps,
+      isSelfWriteReload,
+      log
+    });
     const record: ImportRecord = {announced, configSource: configTree, outcome, phase: 'reload', report};
     if (report.config === 'fallback') {
       Object.assign(record, {fallbackBasis: 'defaults' as const});

@@ -22,6 +22,10 @@ type StoreState = {
     bellSound: string | null;
     bellSoundURL?: string | null;
   };
+  /** The settings surface owns input while `isActive`; terminal requests wait. */
+  settingsTab: {
+    isActive: boolean;
+  };
 };
 
 type StoreLike = {
@@ -83,6 +87,7 @@ type BootstrapActionModules = {
     | 'leaveFullScreen'
   >;
   updaterActions: Pick<typeof import('../actions/updater'), 'updateAvailable'>;
+  settingsTabActions: Pick<typeof import('../actions/tab-strip'), 'openSettingsTab' | 'closeSettingsTab'>;
 };
 
 type WindowLike = WindowGlobalsLike &
@@ -162,6 +167,7 @@ const rendererEventSchemas: RendererEventSchemaMap = {
   'split request horizontal': splitRequestParamsSchema,
   'split request vertical': splitRequestParamsSchema,
   'termgroup add req': splitRequestParamsSchema,
+  'settings open req': z.object({keepThroughInitialSession: z.boolean()}),
   'session add': asRendererEventSchema<'session add'>(
     z.object({
       uid: sessionIdSchema,
@@ -229,6 +235,30 @@ const registerRendererTransportEventHandlers = (
   register: RendererTransportRegister,
   {actions, plugins, store}: RendererTransportRegistrationDependencies
 ): void => {
+  /** Whether the settings tab, not a terminal, owns input right now. */
+  const isSettingsSurfaceActive = (): boolean => store.getState().settingsTab.isActive;
+
+  /**
+   * Registers a request that acts on the active terminal session.
+   *
+   * The renderer's command gate already drops these commands while settings
+   * owns input, but the main process's menus send the equivalent request
+   * straight to the window, bypassing that gate. Applying the same rule here
+   * keeps a hidden terminal's buffer, search, and cursor untouched until the
+   * user returns to it.
+   */
+  const registerTerminalRequest = <Event extends keyof RendererEvents>(
+    event: Event,
+    listener: (payload: RendererEvents[Event]) => void
+  ): void => {
+    register(event, (payload) => {
+      if (isSettingsSurfaceActive()) {
+        return;
+      }
+      listener(payload);
+    });
+  };
+
   register('ready', () => {
     store.dispatch(actions.init());
     store.dispatch(actions.uiActions.setFontSmoothing());
@@ -247,60 +277,73 @@ const registerRendererTransportEventHandlers = (
     store.dispatch(actions.termGroupActions.ptyExitTermGroup(uid));
   });
   register('termgroup close req', () => {
-    store.dispatch(actions.termGroupActions.exitActiveTermGroup());
+    // The main-menu Close reaches the renderer directly, so it must apply the
+    // same rule as the `pane:close` command: a Close while settings owns the
+    // surface closes the tab, never the terminal behind it.
+    store.dispatch(
+      isSettingsSurfaceActive()
+        ? actions.settingsTabActions.closeSettingsTab()
+        : actions.termGroupActions.exitActiveTermGroup()
+    );
   });
-  register('session clear req', () => {
+  register('settings open req', ({keepThroughInitialSession}) => {
+    store.dispatch(actions.settingsTabActions.openSettingsTab({keepThroughInitialSession}));
+  });
+  registerTerminalRequest('session clear req', () => {
     store.dispatch(actions.sessionActions.clearActiveSession());
   });
-  register('session move word left req', () => {
+  registerTerminalRequest('session move word left req', () => {
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1Bb'}));
   });
-  register('session move word right req', () => {
+  registerTerminalRequest('session move word right req', () => {
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1Bf'}));
   });
-  register('session move line beginning req', () => {
+  registerTerminalRequest('session move line beginning req', () => {
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1BOH'}));
   });
-  register('session move line end req', () => {
+  registerTerminalRequest('session move line end req', () => {
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1BOF'}));
   });
-  register('session del word left req', () => {
+  registerTerminalRequest('session del word left req', () => {
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1B\x7F'}));
   });
-  register('session del word right req', () => {
+  registerTerminalRequest('session del word right req', () => {
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1Bd'}));
   });
-  register('session del line beginning req', () => {
+  registerTerminalRequest('session del line beginning req', () => {
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1Bw'}));
   });
-  register('session del line end req', () => {
+  registerTerminalRequest('session del line end req', () => {
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x10B'}));
   });
-  register('session break req', () => {
+  registerTerminalRequest('session break req', () => {
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x03'}));
   });
-  register('session stop req', () => {
+  registerTerminalRequest('session stop req', () => {
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1A'}));
   });
-  register('session quit req', () => {
+  registerTerminalRequest('session quit req', () => {
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x1C'}));
   });
-  register('session tmux req', () => {
+  registerTerminalRequest('session tmux req', () => {
     store.dispatch(actions.sessionActions.sendSessionData({uid: null, data: '\x02'}));
   });
-  register('session search', () => {
+  registerTerminalRequest('session search', () => {
     store.dispatch(actions.sessionActions.openSearch());
   });
-  register('session search close', () => {
+  registerTerminalRequest('session search close', () => {
     store.dispatch(actions.sessionActions.closeSearch());
   });
   register('termgroup add req', ({activeUid, profile}) => {
     store.dispatch(actions.termGroupActions.requestTermGroup({activeUid, profile}));
   });
-  register('split request horizontal', ({activeUid, profile}) => {
+  // Splitting and pane navigation act on the terminal the settings tab hides,
+  // and their commands are gated on the settings surface. The main-process
+  // menu reaches these requests directly, so the same rule applies here.
+  registerTerminalRequest('split request horizontal', ({activeUid, profile}) => {
     store.dispatch(actions.termGroupActions.requestHorizontalSplit({activeUid, profile}));
   });
-  register('split request vertical', ({activeUid, profile}) => {
+  registerTerminalRequest('split request vertical', ({activeUid, profile}) => {
     store.dispatch(actions.termGroupActions.requestVerticalSplit({activeUid, profile}));
   });
   register('reset fontSize req', () => {
@@ -321,10 +364,10 @@ const registerRendererTransportEventHandlers = (
   register('move jump req', (index) => {
     store.dispatch(actions.uiActions.moveTo(index));
   });
-  register('next pane req', () => {
+  registerTerminalRequest('next pane req', () => {
     store.dispatch(actions.uiActions.moveToNextPane());
   });
-  register('prev pane req', () => {
+  registerTerminalRequest('prev pane req', () => {
     store.dispatch(actions.uiActions.moveToPreviousPane());
   });
   register('open file', ({path}) => {

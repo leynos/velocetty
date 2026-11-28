@@ -7,6 +7,7 @@ import type parseUrl from 'parse-url';
 
 import type {CommandDefinition, CommandId} from './commands';
 import type {configOptions} from './config';
+import type {SettingsIpcCommands} from '../settings/protocol';
 
 /** Branded identifier for session entities. */
 export type SessionId = string & {readonly brand: 'SessionId'};
@@ -150,6 +151,16 @@ export type RendererEvents = {
   'split request vertical': {activeUid?: SessionId; profile?: ProfileId};
   'termgroup add req': {activeUid?: SessionId; profile?: ProfileId};
   'termgroup close req': never;
+  /**
+   * Asks the renderer to show the settings tab.
+   *
+   * `keepThroughInitialSession` marks a programmatic open in a freshly created
+   * window: the window's initial terminal arrives as a `session add` after this
+   * request, and that one add must not take the surface back. A user-initiated
+   * preferences open in an existing window omits it, so a later new session
+   * deactivates the tab as usual.
+   */
+  'settings open req': {keepThroughInitialSession: boolean};
   'session add': Session;
   'session data': string;
   'session exit': {uid: SessionId};
@@ -176,7 +187,7 @@ export interface TypedEmitter<Events> {
 type OptionalPromise<T> = T | Promise<T>;
 
 /** IPC command signatures available over Electron invoke handlers. */
-export type IpcCommands = {
+export type IpcCommands = SettingsIpcCommands & {
   'child_process.exec': (command: string, options: ExecOptions) => {stdout: string | Buffer; stderr: string | Buffer};
   'child_process.execFile': (
     file: string,

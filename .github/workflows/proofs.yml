@@ -1,0 +1,73 @@
+name: Proofs
+on:
+  pull_request:
+    paths:
+      - 'shared/src/settings/**'
+      - 'app/config/keybindings-policy.ts'
+      - 'test/proofs/**'
+      - '**/*.dfy'
+      - '**/*.dfy.gen'
+      - 'LemmaScript-files.txt'
+      - 'Makefile'
+      - 'bin/prove.sh'
+      - 'bin/generate-dafny.mjs'
+      - 'scripts/check-proof-freshness.mjs'
+      - 'patches/lemmascript@0.6.12.patch'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/proofs.yml'
+  workflow_dispatch:
+defaults:
+  run:
+    shell: bash
+env:
+  DAFNY_VERSION: 4.11.0
+jobs:
+  dafny:
+    # Advisory while the proof suite settles; see ADR 009. Promote to a
+    # required check after two green weeks.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - name: Use Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: package.json
+      - name: Cache Dafny
+        id: cache-dafny
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
+        with:
+          path: ~/.dotnet/tools
+          key: dafny-${{ env.DAFNY_VERSION }}-${{ runner.os }}
+      - name: Install Dafny and Z3
+        if: steps.cache-dafny.outputs.cache-hit != 'true'
+        run: |
+          dotnet tool install --global dafny --version "${DAFNY_VERSION}"
+          # The NuGet tool ships no solver, so Dafny fails with "Z3 is not
+          # found" on a clean runner. It looks for `z3/bin/z3-4.12.1` beside
+          # its own executable and otherwise for `z3` on `PATH`; provide both.
+          z3_zip="$RUNNER_TEMP/z3.zip"
+          curl -fsSL -o "$z3_zip" \
+            https://github.com/Z3Prover/z3/releases/download/z3-4.12.1/z3-4.12.1-x64-glibc-2.35.zip
+          # The release publishes no checksum file, so the digest below was
+          # recorded from the pinned asset. Checking it keeps a swapped or
+          # truncated archive from running as the solver behind `make proofs`.
+          echo "c5360fd157b0f861ec8780ba3e51e2197e9486798dc93cd878df69a4b0c2b7c5  $z3_zip" |
+            sha256sum --check --strict -
+          unzip -q "$z3_zip" -d "$RUNNER_TEMP/z3-release"
+          mkdir -p "$HOME/.dotnet/tools/z3/bin"
+          install -m 0755 \
+            "$RUNNER_TEMP/z3-release/z3-4.12.1-x64-glibc-2.35/bin/z3" \
+            "$HOME/.dotnet/tools/z3/bin/z3"
+          ln -sf z3 "$HOME/.dotnet/tools/z3/bin/z3-4.12.1"
+      - name: Add Dafny to PATH
+        run: |
+          echo "${HOME}/.dotnet/tools" >> "${GITHUB_PATH}"
+          echo "${HOME}/.dotnet/tools/z3/bin" >> "${GITHUB_PATH}"
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Verify proofs
+        run: make proofs
+      - name: Check generated artefacts are current
+        run: make proofs-fresh

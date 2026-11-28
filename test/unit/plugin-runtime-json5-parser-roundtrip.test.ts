@@ -2,7 +2,7 @@
 import {expect, test} from 'bun:test';
 import JSON5 from 'json5';
 
-import {Json5Parser} from '../../app/runtime/plugin-runtime-json5-parser';
+import {Json5Parser} from '../../app/config/json5';
 import {applyPluginSettingsPatches, json5Document, pluginId} from '../../app/runtime/plugin-runtime-json5-roundtrip';
 
 const rootOf = (raw: string) => {

@@ -60,6 +60,8 @@ export type TabDecorationContext = {
   active: boolean;
   hasActivity: boolean;
   title?: string;
+  /** `settings` marks the singleton settings tab; providers are skipped for it. */
+  tabType?: 'terminal' | 'settings';
 };
 
 /** Contract for tab-decoration providers registered by plugins. */
@@ -384,5 +386,10 @@ export const subscribeTabDecorationProviderChanges = (listener: () => void) => {
 
 /** Resolve the merged decoration for a tab context. */
 export const resolveTabDecoration = (context: TabDecorationContext) => {
+  // Built-in decoration providers describe terminals; the settings tab has its
+  // own title and no terminal state.
+  if (context.tabType === 'settings') {
+    return {};
+  }
   return tabDecorationProviders.resolve(context);
 };

@@ -427,11 +427,18 @@ shortcut can leak into a log.
 [config] import attempt phase=reload
 [config] import decision phase=reload config=applied configSource=velocetty
   keybindings=applied origin=file announced=true
-  attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:0,retries:0,writeFailures:0,watcherFailures:0
+  attempts:1,applies:1,parseFailures:0,readFailures:0,fallbacks:0,
+  importFailures:0,retries:0,writeFailures:0,watcherFailures:0,
+  settingsApplies:0,settingsRejections:0,settingsFailures:0,
+  settingsWriteRetries:0,settingsDurabilityUnconfirmed:0
 [config] span operation=reload outcome=applied ms=2
 [config] span operation=watcher-dispatch outcome=applied ms=2
+[config] span operation=settings-write outcome=applied ms=1
 [config] import failure phase=reload cause=thrown
-  attempts:2,applies:1,parseFailures:0,readFailures:0,fallbacks:0,importFailures:1,retries:0,writeFailures:0,watcherFailures:0
+  attempts:2,applies:1,parseFailures:0,readFailures:0,fallbacks:0,
+  importFailures:1,retries:0,writeFailures:0,watcherFailures:0,
+  settingsApplies:0,settingsRejections:0,settingsFailures:0,
+  settingsWriteRetries:0,settingsDurabilityUnconfirmed:0
 [config] keybindings rename attempt=1 category=busy exhausted=false
 ```
 
@@ -467,16 +474,23 @@ records are shown wrapped here. Its fields mean:
   attempts, `writeFailures` counts every failed `keybindings.json5` write
   including a bootstrap seed and a refused replacement target, and
   `watcherFailures` counts a watcher handle error and a failing watcher close.
-  All counters are cumulative for the process lifetime.
+  The `settings*` counters describe settings-tab writes: `settingsApplies`
+  counts edits the service applied, `settingsRejections` counts edits it
+  refused because the field is not editable, `settingsFailures` counts a
+  refused write or a protocol failure, `settingsWriteRetries` counts retried
+  configuration-file writes, and `settingsDurabilityUnconfirmed` counts writes
+  whose directory entry could not be flushed. All counters are cumulative for
+  the process lifetime.
 - `category` is `permission` for `EPERM` and `EACCES`, `busy` for `EBUSY`, and
   `other` for anything else. `exhausted` marks the attempt that ended the
   write, so a retry that later succeeds emits only `exhausted=false` events.
 - A span's `operation` is `startup`, `reload`, `watcher-dispatch`,
-  `keybindings-read`, or `keybindings-write`; its `outcome` is `applied`,
-  `fallback`, or `thrown` for the import operations and `present`, `missing`,
-  `unreadable`, `written`, or `failed` for the storage operations. `ms` is the
-  elapsed time rounded to a whole millisecond, so a span line is a completion
-  record rather than an in-progress marker.
+  `keybindings-read`, `keybindings-write`, or `settings-write`; its `outcome` is
+  `applied`, `fallback`, or `thrown` for the import operations, `present`,
+  `missing`, `unreadable`, `written`, or `failed` for the storage operations,
+  and `applied` or `failed` for a settings write. `ms` is the elapsed time
+  rounded to a whole millisecond, so a span line is a completion record rather
+  than an in-progress marker.
 
 `createConfigMetrics`, `createImportRecorder`, and `createConfigSpanRecorder`
 live in `app/config/config-metrics.ts`, `app/config/config-observability.ts`,
@@ -779,6 +793,99 @@ The dispatcher reaches every surface that runs a command:
 `emitKeymapsMarker(report, keymaps, marker)`. The applied keymaps arrive as a
 parameter, so the line names the configuration the import that just finished
 produced rather than whatever state happens to be stored.
+
+### Settings editing and persistence
+
+The full design is in
+[settings-tab-architecture.md](settings-tab-architecture.md); these are the
+seams a test drives directly rather than through the whole application.
+
+`app/config/json5/` is the shared comment-preserving edit boundary. Its
+`index.ts` exports `json5Document`, `propertyKey`, `Json5Parser`,
+`setPropertyAtPath`, and `removePropertyAtPath`, and both the config writer
+(`app/config/config-file-writer.ts`) and the plugin runtime
+(`app/runtime/plugin-runtime-json5-roundtrip.ts`) edit through that surface
+instead of re-serializing the file. `test/unit/json5-document-edit.test.ts` and
+its property suite drive the edits with real documents; the property suite also
+walks the fixtures in `test/fixtures/json5-config/`.
+
+`writeConfigEdit` and `writeConfigEditSync` in
+`app/config/config-file-writer.ts` are the only functions that write the user's
+config file. Both take a `ConfigWriterDependencies` whose `fileSystem` is a
+`ConfigFileSystemPort`: `createNodeConfigFileSystem` supplies the production
+port, and `createMemoryConfigFileSystem` in
+`test/testUtils/config-file-port.ts` supplies a `MemoryConfigFileSystem` that
+records every write, so a test can assert that a refused edit never reached
+disk. `writeConfigEdit` retries the whole critical section; the policy, its
+counter, and its bounded lines live in `app/config/config-write-retry.ts`
+(`classifyWriteFailure`, `recordRetry`, `recordFailure`). The plugin runtime
+uses `writeConfigEditSync`, one pass, because it persists during module
+evaluation.
+
+The scanner and key parser have their own direct suite.
+`app/config/json5/lexer.ts` owns comment skipping, quoted-string ends,
+identifier characters, Unicode escapes, and line positions, and
+`app/config/json5/keys.ts` parses quoted, unquoted, and escaped object keys.
+`test/unit/json5-lexer.test.ts` exercises those primitives directly; the
+document-edit and property suites exercise the operations built on them.
+
+`app/settings/settings-file-kind.ts` decides whether the resolved config path is
+`json5` or `legacy-json`. The settings service takes that `SettingsFileKind`
+as a dependency and never inspects a path itself; `app/start.ts`, the test
+harness, and the convergence model each classify their own path with
+`fileKindFor`.
+
+`app/config/config-write-state.ts` owns the one process-wide write state: the
+monotonic config revision and the hash of the text the writer last recorded.
+The writer allocates a revision and records the hash; the watcher's self-write
+comparison reads them, so both sides agree on one record per process. The
+module is deliberately a singleton, with direct tests in
+`test/unit/config-write-state.test.ts` and
+`test/unit/config-watch-selfwrite.test.ts`.
+
+`selfWriteVerdict` in `app/config.ts` takes the watched path, a read port, and
+the recorded hash explicitly, and returns `'self-write'`, `'external'`, or
+`'unreadable'`. The watcher announces anything that is not a self-write, logs
+`[config] self-write check failed reason=unreadable` for the unreadable case,
+and treats an absent file as external without a line.
+
+`lib/settings/rejection-line.ts` builds the one bounded line for a transport
+rejection: the category always, and a name only from the built-in error names,
+so caller-supplied text cannot forge a line or leak a path.
+`lib/settings/file-state-messages.ts` derives the banner and the per-row
+disabled reason from the file status, including the distinct `unreadable`
+state, so the container only wires them to the view.
+
+`ConfigWriteOutcome` uses the writer's own `ConfigWriteFailureReason`
+(`app/config/config-file-writer.ts`). The settings service projects it onto the
+renderer's `SettingsWriteFailure` with one total `SETTINGS_FAILURE_OF` table,
+so a reason added on one side without the other is a compile error.
+
+The settings seams and the double each test uses:
+
+- `createSettingsService` (`app/settings/settings-service.ts`) — the
+  behavioural suite runs it over `createMemoryConfigFileSystem` and a quiet
+  `ConfigWriterDependencies`; the convergence property uses the same port
+  through `test/testUtils/settings-convergence-model.ts`.
+- `registerSettingsIpcHandlers` (`app/settings/settings-ipc.ts`) — its suite
+  registers the handlers against a `serviceDouble()` and a stubbed
+  `ipcMain.handle` from `test/testUtils/electron-path.ts`.
+- `createTransportSettingsGateway`
+  (`lib/settings/adapters/transport-settings-gateway.ts`) — its suite passes a
+  `transportOf` fake whose `invoke` answers each channel directly.
+- `createFieldStore` (`lib/settings/field-store.ts`) — its suite drives it
+  with `createFakeGateway()`, whose deferred writes resolve or reject one
+  outcome at a time.
+- `checkWritePolicy` (`app/settings/settings-write-policy.ts`) — a pure
+  predicate over a key and a JSON value, so it needs no double; the parity
+  suite checks it as a table.
+
+`createConfigWatchRuntime` (`app/config/config-watch.ts`) wires the watcher to
+the importer, and `shouldNotifyReload` (`app/config/import-report.ts`) decides
+whether a reload announces itself. `test/testUtils/config-watch-harness.ts`
+imports the composition root over a mocked chokidar, Electron, and config
+adapters, and `shouldNotifyReload` is tested as a table in
+`test/unit/config-watch-integration.test.ts`.
 
 ## Visible-only WebGL rendering practice
 
@@ -1798,3 +1905,148 @@ pattern has two layers:
    documented wrapper component that calls `useTranslation()` directly. This is
    an intentional exception to the hook-based pattern for historical
    compatibility; new code should prefer the `useSearchBoxLabels` approach.
+
+## Settings tab practice
+
+The settings tab is described in
+[settings-tab-architecture.md](settings-tab-architecture.md), and the decisions
+behind it are in
+[ADR 009](adrs/adr-0009-settings-tab-hosting-and-persistence.md). Three rules
+matter when changing it.
+
+### One writer, one activation path
+
+- The only code that may change the user's config file is
+  `app/config/config-file-writer.ts`. Do not call `writeFile` on the config
+  path anywhere else; route a new writer through the writer module.
+- The only way to change the active tab is `activateTab(uid)` in
+  `lib/actions/tab-strip.ts`. Do not dispatch `setActiveGroup` directly for a
+  user-facing tab change; the settings slice relies on the strip's ordering.
+- The renderer reads settings only through `SettingsGateway`. Do not import
+  `ipcRenderer` in a settings component.
+
+### Adding a core setting
+
+1. Add the key to `CORE_SETTINGS_CATALOGUE` in
+   `shared/src/settings/core-catalogue.ts` with its category and control. If it
+   cannot be edited safely (a structured value, a union, free-form code), add
+   it to `EXCLUDED_CONFIG_KEYS` with a reason instead. A parity test fails
+   until every schema property is decided.
+2. Add the label to `settingLabels` in `lib/settings/i18n/index.ts`. The table
+   is typed `Record<CoreSettingKey, string>`, so a missing label is a compile
+   error. Add a description if the setting needs one.
+3. Add the write rule to `SETTINGS_WRITE_POLICY` in
+   `app/settings/settings-write-policy.ts`. Bounds are write-time and UI-only;
+   never add them to the load schema, which must keep accepting every file that
+   loads today.
+4. Run `make test`. The parity suite compares the catalogue, the controls, the
+   schema types, the enum options, and the policy bounds.
+
+### The active surface
+
+While the settings tab is active, `execCommand` drops every command outside the
+allow-list in `lib/settings/surface-command-gate.ts`, and the key handler skips
+`preventDefault` so native editing works in the fields. A new command that must
+work there needs an entry in that allow-list; a test drives every command in
+the three platform keymaps.
+
+Terminals are never hidden with `display: none`. The terminal and settings
+layers keep an explicit width and height, and the inactive layer is moved
+offscreen by changing `left` only, because a size change would fire the
+terminal's `ResizeObserver` and refit the PTY.
+
+## Property tests and proofs practice
+
+### `fast-check`
+
+Property suites live in `test/unit/*.property.test.ts` and take their run count
+from `test/testUtils/fast-check-runs.ts`:
+
+```ts
+import {fastCheckRunCount} from '../testUtils/fast-check-runs';
+
+fc.assert(property, {numRuns: fastCheckRunCount()});
+```
+
+`FAST_CHECK_NUM_RUNS` defaults to 200 in the shared gate and is raised to 1,000
+for milestone acceptance runs. Prefer a relation over an example: round trips,
+oracles, metamorphic composition, and model-based sequences. A suite that
+asserts a classification (for example "at least 20 % of runs have a non-empty
+result") must say why in a comment next to the assertion.
+
+### LemmaScript and Dafny
+
+Annotated sources carry `//@` comments and stay the shipped code. Each listed
+file has two artefacts:
+
+- `foo.dfy.gen` is generated; never edit it.
+- `foo.dfy` is the proof: generated code plus handwritten lemmas, witnesses,
+  and assertions. `lsc check` requires the difference to be additions only.
+
+- Add every verified file to `LemmaScript-files.txt` (one path per line; the
+  batch reader does not accept comments).
+- `make proofs` is an alias for `make prove`, which runs `bin/prove.sh`:
+  it regenerates through `bin/generate-dafny.mjs`, refuses a vacuous run, and
+  verifies the list with `lsc check --backend=dafny`.
+- `make proofs-fresh` regenerates each artefact through
+  `bin/generate-dafny.mjs`, compares it with the committed copy, and restores
+  the committed copy. It runs as part of `make lint`.
+- `make prove` needs Dafny 4.11.x on `PATH`
+  (`dotnet tool install --global dafny --version 4.11.0`) with Z3 4.12.1 beside
+  the `dafny` executable or on `PATH`. `make proofs-fresh` is Dafny-free, so
+  the ordinary lint gate does not need the verifier.
+- `bin/prove.sh` rejects every Dafny trust construct except two exact
+  declarations: `emptyUserKeymaps` and LemmaScript's `StringSplit` model of
+  `String.prototype.split`. A proof that needs another axiom must extend that
+  admitted list deliberately, with a stated justification.
+- After editing an annotated `.ts`, run
+  `bunx lsc regen --backend=dafny <file>` — never delete the `.dfy` and run
+  `gen`, which discards every proof.
+- `//@ assume` is never an acceptable fix for a failing obligation. Restructure
+  the code, tighten a `requires`, or prove a helper lemma in the `.dfy`.
+- Mark every helper used in a specification with `//@ verify` as well as
+  `//@ pure`; once a file has one verified function, only marked functions are
+  extracted.
+- LemmaScript 0.6.12 is pinned exactly and patched locally
+  (`patches/lemmascript@0.6.12.patch`) so generic record types and generic
+  union lookups work. Keep the version pin when changing proofs.
+
+### The Proofs workflow
+
+`.github/workflows/proofs.yml` runs on a pull request only when a path it
+covers changes: `shared/src/settings/**`, `app/config/keybindings-policy.ts`,
+`test/proofs/**`, any `*.dfy` or `*.dfy.gen`, `LemmaScript-files.txt`, the
+`Makefile`, `bin/prove.sh`, `bin/generate-dafny.mjs`,
+`scripts/check-proof-freshness.mjs`, the LemmaScript patch, `package.json`,
+`bun.lock`, or the workflow itself. It can also be dispatched by hand.
+
+The job pins `DAFNY_VERSION: 4.11.0` and caches `~/.dotnet/tools` under that
+version. On a cache miss it installs Dafny with `dotnet tool install`, then
+downloads the Z3 4.12.1 release, checks its recorded SHA-256
+(`c5360fd157b0f861ec8780ba3e51e2197e9486798dc93cd878df69a4b0c2b7c5`), and
+installs the binary as `~/.dotnet/tools/z3/bin/z3` with a `z3-4.12.1` symlink,
+because the NuGet tool ships no solver. The job then runs `make proofs` and
+`make proofs-fresh`. It is advisory while the suite settles, as recorded in ADR
+009; treat a red run as a real failure and not as a flake.
+
+### A compiled-output hazard
+
+`tsgo` emits a parenthesized `return` whose first line is a comment as `return`
+with the expression on the next line. Automatic semicolon insertion then makes
+the function return `undefined` and the expression dead code. Unit tests run
+the TypeScript source and cannot see this; a packaged build can.
+
+```ts
+// Avoid: the emitted JavaScript returns undefined.
+return (
+  // comment
+  expression
+);
+
+// Prefer: assign first, then return.
+const value = expression;
+return value;
+```
+
+This is why the deep E2E lane runs the packaged app: it is the only gate that
+executes the emitted JavaScript.

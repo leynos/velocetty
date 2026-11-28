@@ -73,6 +73,8 @@ const MousetrapMock = () => ({
 });
 
 const buildHyperProps = (overrides: Partial<HyperProps> = {}): HyperProps => ({
+  isSettingsOpen: false,
+  isSettingsSurfaceActive: false,
   isMac: false,
   customCSS: '',
   uiFontFamily: 'sans-serif',

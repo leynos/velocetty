@@ -68,7 +68,7 @@ import {
 type ConnectOptions = NonNullable<Parameters<typeof reduxConnect>[3]>;
 type LoadedPluginVersion = ReturnType<RemotePluginsModule['getLoadedPluginVersions']>[number];
 type PluginConnector = {state: any[]; dispatch: any[]};
-type PluginConnectorRegistry = Record<'Terms' | 'Header' | 'Hyper' | 'Notifications', PluginConnector>;
+type PluginConnectorRegistry = Record<'Terms' | 'Header' | 'Hyper' | 'Notifications' | 'Settings', PluginConnector>;
 type PluginPropsDecoratorRegistry = {
   getTermProps: any[];
   getTabProps: any[];
@@ -259,18 +259,23 @@ type TabLike = {
   isActive?: boolean;
   hasActivity?: boolean;
   title?: string;
+  tabType?: 'terminal' | 'settings';
 };
 
 type ParentPropsLike = Partial<TabsProps>;
 
 const getTabDecorationContext = (tab: TabLike): TabDecorationContext => {
-  return {
+  const context: TabDecorationContext = {
     tabId: asTabId(String(tab.uid)),
     tabIndex: tab.tabIndex,
     active: Boolean(tab.isActive),
     hasActivity: Boolean(tab.hasActivity),
     title: tab.title
   };
+  if (tab.tabType !== undefined) {
+    context.tabType = tab.tabType;
+  }
+  return context;
 };
 
 // expose decorated component instance to the higher-order components
@@ -479,7 +484,8 @@ const initializePluginCaches = () => {
     Terms: {state: [], dispatch: []},
     Header: {state: [], dispatch: []},
     Hyper: {state: [], dispatch: []},
-    Notifications: {state: [], dispatch: []}
+    Notifications: {state: [], dispatch: []},
+    Settings: {state: [], dispatch: []}
   };
   uiReducers = [];
   middlewares = [];

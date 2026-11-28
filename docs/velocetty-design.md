@@ -1122,7 +1122,39 @@ The settings UI should surface which settings require restart.
 
 ## Settings tab and plugin settings panels
 
+### Implementation status
 
+The settings shell described in this section is implemented, with the decisions
+recorded in [ADR 009](adrs/adr-0009-settings-tab-hosting-and-persistence.md)
+and the component layout in
+[settings-tab-architecture.md](settings-tab-architecture.md).
+
+What ships today:
+
+- A singleton settings tab with the reserved uid `velocetty:settings`, part of
+  the ordinary tab strip and the ordinary tab navigation.
+- Category navigation, search, and an `@modified` filter over the core
+  catalogue of 31 settings.
+- Per-field editing with inline validation, reset-to-default, and the existing
+  restart-required warning for restart-classified keys.
+- A single main-process writer that preserves comments, formatting, and line
+  endings, validates every write, and refuses rather than damage a file.
+- Explicit handling for a missing, cannot-parse, schema-invalid, or legacy
+  `hyper.json` config file.
+
+Deferred:
+
+- Formal settings commands (`settings.open`, `settings.search`,
+  `settings.resetSetting`, `settings.exportConfig`, and the keybinding editor),
+  which depend on the command dispatcher (roadmap 4.1.1 and 5.1.2). The search
+  query and selection already live in Redux so the commands can drive them.
+- Schema-driven plugin settings panels (roadmap 5.2.1), which reuse the panel
+  model, the field machine, the search core, and the writer.
+- Editors for the excluded structured settings: the colour palette,
+  environment, shell arguments, custom CSS, profiles, and plugin namespaces.
+  They are edited in the config file, which the tab can open.
+- Profile-level editing of settings; the tab edits the base `config.<key>` and
+  notes when the default profile overrides it.
 
 ### Settings surface as a first-class tab
 
@@ -2318,7 +2350,8 @@ section, and
 
 
 
-- \[ ] 4.1. Settings tab shell with search, categories, and reset-to-default.
+- \[x] 4.1. Settings tab shell with search, categories, and
+  reset-to-default (delivered as roadmap 5.1.1).
 
 - \[ ] 4.2. Schema-driven plugin settings panels with namespaced persistence.
 

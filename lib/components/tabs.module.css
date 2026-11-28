@@ -5,6 +5,9 @@
 .tabsNav {
   font-size: 12px;
   height: 34px;
+  /* A long tab title must never draw outside the 34px strip: the settings
+   * panel starts below it, and an overflowing title would cover its rows. */
+  overflow: hidden;
   line-height: 34px;
   vertical-align: middle;
   color: #9b9b9b;

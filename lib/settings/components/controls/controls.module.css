@@ -1,0 +1,23 @@
+/** @file Presentation for the settings field controls. */
+
+.control {
+  min-width: 220px;
+  padding: 4px 8px;
+  color: inherit;
+  background: rgb(255 255 255 / 8%);
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 4px;
+}
+
+.colour {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.swatch {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgb(255 255 255 / 30%);
+  border-radius: 4px;
+}

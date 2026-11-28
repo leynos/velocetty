@@ -45,6 +45,15 @@ export type CommandDependencies = Readonly<{
   readonly markerSink: E2EMarkerSink;
   /** Opens the user's configuration file for editing. */
   readonly openConfig: () => void;
+  /**
+   * Creates a window and asks it to open the settings tab once its renderer has
+   * loaded. Used when the preferences command runs with no window focused.
+   *
+   * The request keeps the tab active through the new window's initial terminal;
+   * otherwise that terminal's `session add` would immediately hide the tab and
+   * leave the user looking at a terminal.
+   */
+  readonly openSettingsWindow: () => void;
   /** Re-reads the installed plugin list. */
   readonly updatePlugins: () => void;
   /** Installs the command-line helper. */
@@ -72,7 +81,8 @@ export type CommandDependencies = Readonly<{
  * @example
  * ```ts
  * const table = createCommandTable({openWindow, markerSink, ...adapters});
- * table['window:preferences']?.(); // calls `openConfig`
+ * table['window:openConfigFile']?.(); // calls `openConfig`
+ * table['window:preferences']?.(); // calls `openSettingsWindow`
  * ```
  */
 export const createCommandTable = (dependencies: CommandDependencies): CommandTable => {
@@ -83,6 +93,7 @@ export const createCommandTable = (dependencies: CommandDependencies): CommandTa
     isHamburgerMenuEnabled,
     markerSink,
     openConfig,
+    openSettingsWindow,
     openWindow,
     popupApplicationMenu,
     profileNames,
@@ -108,7 +119,16 @@ export const createCommandTable = (dependencies: CommandDependencies): CommandTa
     'pane:close': (focusedWindow) => {
       focusedWindow?.rpc.emit('termgroup close req');
     },
-    'window:preferences': () => {
+    'window:preferences': (focusedWindow) => {
+      if (focusedWindow) {
+        // The window already has a terminal, so the user is choosing to leave
+        // it: the tab may be taken back by the next new session.
+        focusedWindow.rpc.emit('settings open req', {keepThroughInitialSession: false});
+        return;
+      }
+      openSettingsWindow();
+    },
+    'window:openConfigFile': () => {
       openConfig();
     },
     'editor:clearBuffer': (focusedWindow) => {

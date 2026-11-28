@@ -12,6 +12,8 @@
   - [Developers' guide](developers-guide.md)
   - [ADR 007](adrs/adr-0007-keybindings-json5-storage.md)
   - [ADR 008](adrs/adr-0008-velocetty-configuration-directory.md)
+  - [ADR 009](adrs/adr-0009-settings-tab-hosting-and-persistence.md)
+  - [Settings tab architecture](settings-tab-architecture.md)
 
 ## Where configuration lives
 
@@ -154,6 +156,121 @@ one. `keybindings.json5` is the file Velocetty applies; `keymaps` inside
 
 Do not move the other files in the Hyper directory. They are Electron's
 application state (window layout, caches, preferences), not configuration.
+
+## Settings tab
+
+Velocetty keeps your settings in `config.json5`. You can edit that file
+directly, as [Where configuration lives](#where-configuration-lives) explains,
+or use the settings tab for the settings it covers. The tab edits the same
+`config.json5`, so an existing configuration, comments, and an external editor
+all keep working. A file that names the old `hyper.json` stays read-only in the
+tab until it is renamed. If you previously used **Preferences…** to open the
+file in an editor, see
+[Migrating to the settings tab](migration-settings-tab.md).
+
+### Opening settings
+
+Choose **Preferences…** from the menu, or press `Ctrl+,` (`Cmd+,` on macOS). A
+**Settings** tab appears after your terminal tabs and the search box has focus.
+Your terminals keep running; opening settings does not resize, write to, or
+close them.
+
+If no window is open — for example when the macOS application menu is used with
+every window closed — Velocetty opens a window with the settings tab active.
+
+### Moving between tabs
+
+The settings tab takes part in the tab order like any other tab. Click it, or
+use the tab shortcuts:
+
+| Action         | Shortcut                                |
+| -------------- | --------------------------------------- |
+| Next tab       | `Ctrl+Tab` (`Cmd+Shift+]` on macOS)     |
+| Previous tab   | `Ctrl+Shift+Tab` (`Cmd+Shift+[`)        |
+| Tab by number  | `Ctrl+1` to `Ctrl+9`                    |
+| Close settings | `Ctrl+Shift+W` while settings is active |
+
+_Table 2: Settings tab navigation._
+
+Clicking a terminal tab returns input to that terminal and restores its focus.
+The settings tab stays open.
+
+### Browsing by category
+
+The navigation list offers **All settings** and one entry per category:
+Appearance, Cursor, Colours, Terminal, Rendering, and Updates. Each entry shows
+how many settings match the current search, and the selected category is marked
+for assistive technology.
+
+### Searching
+
+Type in the search box to filter settings. The search matches the label, the
+config key, the description, and the category, and every word you type must
+match.
+
+Type `@modified` on its own, or alongside other words, to show only the
+settings your config file sets explicitly. For example `@modified font` shows
+the font settings that are present in your config file.
+
+If nothing matches, a **Clear search and category** button resets both filters.
+
+### Changing a setting
+
+- Toggles and dropdowns apply as soon as you change them.
+- Text, number, and colour fields apply when you press `Enter` or leave the
+  field. Press `Escape` to put the old value back.
+- A setting that is explicitly present in `config.json5` shows a **Changed**
+  marker, even when its value equals the default.
+
+Some settings take effect immediately; others say that they take effect after a
+restart.
+
+The default profile can override a setting. When it does, the row says so,
+because changing the base value then has no visible effect until the profile
+changes too.
+
+### When a value is not accepted
+
+If a value is not valid, an error appears under the field and the field is
+marked invalid for assistive technology. The config file is not changed. For
+example, a font size below the minimum reports the minimum, and letters in a
+number field report that a number is expected.
+
+Velocetty validates every change again before it touches the file, so a value
+the interface accepts but the file cannot hold is refused with the reason.
+
+### Resetting to the default
+
+A setting that is explicitly present in your config file has a **Reset** button
+labelled with the setting's name, for example **Reset Font size to default**.
+Resetting removes the explicit override from your config file, so the built-in
+default applies and any future change to that default reaches you.
+
+### Other settings, and the config file
+
+Some settings are not covered by the tab because they are structured values or
+free-form code: the colour palette, environment variables, shell arguments,
+custom CSS, profiles, and plugin namespaces. Edit those in `config.json5`
+directly. The **Open config file** button in the settings tab opens it in your
+editor.
+
+Every change the tab makes is a targeted edit: your comments, ordering,
+quoting, and line endings elsewhere in the file are preserved.
+
+### When your config file has a problem
+
+- **Syntax error.** The tab explains that settings cannot be saved until the
+  file is fixed, and disables editing. Fix the file and save it; the tab
+  updates.
+- **Invalid values.** Velocetty lists the problems. Only the settings named in
+  the list can be edited, so you can fix them one at a time; the others are
+  disabled until the file is valid again.
+- **Legacy `hyper.json`.** If Velocetty is reading the old `hyper.json` file,
+  the tab is read-only and names the file. Rename it to `config.json5` to use
+  the settings tab.
+- **No config file.** If no config file exists yet, the tab still shows the
+  defaults but disables editing and explains that there is no file to write.
+  Open the file or restart Velocetty to create one.
 
 ## Keyboard shortcuts
 

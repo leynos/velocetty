@@ -1,0 +1,11 @@
+// Velocetty configuration with comments and mixed formatting.
+{
+  // Appearance settings
+  config: {
+    fontSize: 14, // the user's preferred size
+    fontFamily: "Menlo", cursorBlink: true,
+    /* palette lives here */ colors: {black: '#000000', white: '#ffffff'},
+    scrollback: 1000 // keep the scrollback
+  },
+  plugins: [],
+}

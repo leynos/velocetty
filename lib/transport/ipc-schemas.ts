@@ -174,6 +174,46 @@ const commandDefinitionSchema = z
  * of this registry, and the `RendererCommandTransport` interface already
  * guarantees the correct return type at call sites.
  */
+/** One config validation diagnostic, as the main process reports it. */
+const settingsDiagnosticSchema = z
+  .object({
+    path: z.string(),
+    message: z.string(),
+    suggestedFix: z.string(),
+    docHint: z.string().optional(),
+    defaultHint: z.string().optional()
+  })
+  .loose();
+
+/** The config file's state, discriminated by `kind`. */
+const settingsFileStatusSchema = z.discriminatedUnion('kind', [
+  z.object({kind: z.literal('ok')}).loose(),
+  z.object({kind: z.literal('missing')}).loose(),
+  z.object({kind: z.literal('unparseable'), diagnostics: z.array(settingsDiagnosticSchema)}).loose(),
+  z.object({kind: z.literal('unreadable'), diagnostics: z.array(settingsDiagnosticSchema)}).loose(),
+  z.object({kind: z.literal('invalid'), diagnostics: z.array(settingsDiagnosticSchema)}).loose(),
+  z.object({kind: z.literal('legacy-json')}).loose()
+]);
+
+/** Everything the settings tab renders from. */
+const settingsSnapshotSchema = z
+  .object({
+    revision: z.number(),
+    filePath: z.string(),
+    fileStatus: settingsFileStatusSchema,
+    userValues: z.record(z.string(), z.json()),
+    defaultValues: z.record(z.string(), z.json()),
+    profileOverriddenKeys: z.array(z.string())
+  })
+  .loose();
+
+/** The result of one write or reset. */
+const settingsWriteOutcomeSchema = z.discriminatedUnion('kind', [
+  z.object({kind: z.literal('applied'), snapshot: settingsSnapshotSchema}).loose(),
+  z.object({kind: z.literal('rejected'), diagnostics: z.array(settingsDiagnosticSchema)}).loose(),
+  z.object({kind: z.literal('failed'), reason: z.string(), detail: z.string().optional()}).loose()
+]);
+
 export const ipcResponseSchemas = {
   'child_process.exec': childProcessResultSchema,
   'child_process.execFile': childProcessResultSchema,
@@ -186,5 +226,8 @@ export const ipcResponseSchemas = {
   getRuntimePluginCommands: z.array(commandDefinitionSchema),
   'clipboard.readFilePaths': z.array(z.string()),
   'clipboard.readText': z.string(),
-  'clipboard.writeText': z.void()
+  'clipboard.writeText': z.void(),
+  'settings:getSnapshot': settingsSnapshotSchema,
+  'settings:setValue': settingsWriteOutcomeSchema,
+  'settings:resetValue': settingsWriteOutcomeSchema
 } satisfies Record<keyof IpcCommands, ZodType>;

@@ -11,3 +11,25 @@
   border-radius: 10.5px;
   overflow: hidden;
 }
+
+/*
+ * The terminal and settings surfaces occupy the same box. Each is moved
+ * offscreen with an explicit width so its size never changes: a width change
+ * would fire the terminal's ResizeObserver and refit the PTY.
+ */
+.surfaceHost {
+  position: absolute;
+  inset: 0;
+}
+
+.surfaceLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.surfaceLayerOffscreen {
+  left: var(--terms-offscreen-left);
+}

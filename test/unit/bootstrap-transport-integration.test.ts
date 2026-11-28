@@ -25,6 +25,7 @@ import {
   plugins,
   recordedCalls,
   resetFixture,
+  setSettingsSurfaceActive,
   store,
   transport,
   transportOnCalls,
@@ -68,6 +69,7 @@ const TransportEvent = {
   SessionSearch: 'session search',
   SessionSearchClose: 'session search close',
   TermGroupCloseReq: 'termgroup close req',
+  SettingsOpenReq: 'settings open req',
   TermGroupAddReq: 'termgroup add req',
   SplitHorizontal: 'split request horizontal',
   SplitVertical: 'split request vertical',
@@ -143,6 +145,7 @@ describe('bootstrap transport event wiring', () => {
       TransportEvent.MoveJumpReq,
       TransportEvent.NextPaneReq,
       TransportEvent.PrevPaneReq,
+      TransportEvent.SettingsOpenReq,
       TransportEvent.OpenFile,
       TransportEvent.OpenSsh,
       TransportEvent.Move,
@@ -296,6 +299,88 @@ describe('bootstrap transport event wiring', () => {
     getListener(TransportEvent.SessionData)(`${uid}hello world`);
 
     expect(recordedCalls).toContainEqual({creator: 'addSessionData', args: [{uid, data: 'hello world'}]});
+  });
+
+  test('settings open req forwards whether the open survives the initial session', () => {
+    clearDispatch();
+
+    getListener(TransportEvent.SettingsOpenReq)({keepThroughInitialSession: true});
+    getListener(TransportEvent.SettingsOpenReq)({keepThroughInitialSession: false});
+
+    const opens = recordedCalls.filter(({creator}) => creator === 'openSettingsTab');
+    expect(opens.map(({args}) => args[0])).toEqual([
+      {keepThroughInitialSession: true},
+      {keepThroughInitialSession: false}
+    ]);
+  });
+
+  test('a main-menu close while settings is active closes the tab, not the terminal', () => {
+    clearDispatch();
+    setSettingsSurfaceActive(true);
+
+    getListener(TransportEvent.TermGroupCloseReq)(null);
+
+    expect(recordedCalls.map(({creator}) => creator)).toEqual(['closeSettingsTab']);
+    expect(recordedCalls.some(({creator}) => creator === 'exitActiveTermGroup')).toBe(false);
+  });
+
+  test('main-menu terminal requests do not reach the hidden session while settings is active', () => {
+    clearDispatch();
+    setSettingsSurfaceActive(true);
+
+    const requestEvents = [
+      TransportEvent.SessionClearReq,
+      TransportEvent.SessionMoveWordLeftReq,
+      TransportEvent.SessionMoveWordRightReq,
+      TransportEvent.SessionMoveLineBeginReq,
+      TransportEvent.SessionMoveLineEndReq,
+      TransportEvent.SessionDelWordLeftReq,
+      TransportEvent.SessionDelWordRightReq,
+      TransportEvent.SessionDelLineBeginReq,
+      TransportEvent.SessionDelLineEndReq,
+      TransportEvent.SessionBreakReq,
+      TransportEvent.SessionStopReq,
+      TransportEvent.SessionQuitReq,
+      TransportEvent.SessionTmuxReq,
+      TransportEvent.SessionSearch,
+      TransportEvent.SessionSearchClose
+    ];
+    for (const event of requestEvents) {
+      getListener(event)(null);
+    }
+
+    expect(recordedCalls).toEqual([]);
+    expect(dispatchMock).not.toHaveBeenCalled();
+  });
+
+  test('split and pane requests wait while settings owns the surface', () => {
+    clearDispatch();
+    setSettingsSurfaceActive(true);
+
+    getListener(TransportEvent.SplitHorizontal)({activeUid: 's-1', profile: 'default'});
+    getListener(TransportEvent.SplitVertical)({activeUid: 's-1', profile: 'default'});
+    getListener(TransportEvent.NextPaneReq)(null);
+    getListener(TransportEvent.PrevPaneReq)(null);
+
+    // None of these reaches the hidden terminal while the tab is in front.
+    expect(recordedCalls).toEqual([]);
+  });
+
+  test('split and pane requests run once the terminal owns the surface again', () => {
+    clearDispatch();
+    setSettingsSurfaceActive(false);
+
+    getListener(TransportEvent.SplitHorizontal)({activeUid: 's-1', profile: 'default'});
+    getListener(TransportEvent.SplitVertical)({activeUid: 's-1', profile: 'default'});
+    getListener(TransportEvent.NextPaneReq)(null);
+    getListener(TransportEvent.PrevPaneReq)(null);
+
+    expect(recordedCalls.map(({creator}) => creator)).toEqual([
+      'requestHorizontalSplit',
+      'requestVerticalSplit',
+      'moveToNextPane',
+      'moveToPreviousPane'
+    ]);
   });
 
   test('session exit event dispatches PTY_EXIT_TERM_GROUP action', () => {

@@ -1,13 +1,19 @@
 /** @file Runtime plugin manifest evaluation and JSON5-backed settings persistence. */
-import {readFileSync, writeFileSync} from 'node:fs';
-
 import isEqual from 'lodash/isEqual';
 import merge from 'lodash/merge';
+import {
+  defaultWriterState,
+  asConfigFilePath,
+  writeConfigEditSync,
+  type ConfigFileSystemPort,
+  type ConfigWriterDependencies
+} from '../config/config-file-writer';
+import {createNodeConfigFileSystem} from '../config/node-config-file-port';
 import {cfgPath} from '../config/paths';
 import type {JsonObject} from '@shared/types/json';
+import {describeError} from '../utils/error-code';
 import {isBoolean, isJsonObject} from '../utils/runtime-guards';
 import {
-  applyPluginSettingsPatches,
   json5Document,
   pluginId as toPluginId,
   parseConfigJson5Strict,
@@ -23,12 +29,9 @@ export type KeybindingConflict = {
   readonly keys: string;
   readonly commands: readonly string[];
 };
-type ReadTextFile = (path: string, encoding: BufferEncoding) => string;
-type WriteTextFile = (path: string, content: string, encoding: BufferEncoding) => void;
 type PersistenceOptions = {
   configFilePath?: string;
-  readFile?: ReadTextFile;
-  writeFile?: WriteTextFile;
+  fileSystem?: ConfigFileSystemPort;
 };
 
 const cloneValue = <T>(value: T): T => structuredClone(value);
@@ -75,9 +78,54 @@ const getOrInitPluginsNamespace = (cfg: rawConfig): RuntimePluginSettingsNamespa
   return pluginsNamespace;
 };
 
-const resolvePersistenceOptions = (options: PersistenceOptions = {}) => {
-  const {configFilePath = getDefaultConfigPath(), readFile = readFileSync, writeFile = writeFileSync} = options;
-  return {configFilePath, readFile, writeFile};
+const resolvePersistenceOptions = (options: PersistenceOptions = {}) => ({
+  configFilePath: options.configFilePath ?? getDefaultConfigPath(),
+  fileSystem: options.fileSystem ?? createNodeConfigFileSystem()
+});
+
+const writerDependenciesFor = (fileSystem: ConfigFileSystemPort): ConfigWriterDependencies => ({
+  fileSystem,
+  sleep: async () => {
+    // The synchronous entry point never waits, so there is no backoff to run.
+  },
+  log: (message) => {
+    console.error(message);
+  },
+  platform: process.platform,
+  processId: () => process.pid,
+  ...defaultWriterState
+});
+
+/** One plugin settings write, named by the persistence path a refusal reports. */
+type PluginSettingsPersistenceRequest = {
+  readonly fileSystem: ConfigFileSystemPort;
+  readonly configFilePath: string;
+  readonly pluginId: string;
+  readonly settings: JsonObject;
+  /** Names this persistence path in a refusal; it never carries a file path. */
+  readonly label: string;
+};
+
+/**
+ * Persists one plugin's settings through the single config writer.
+ *
+ * The plugin keys are not part of the core write policy: the plugin runtime
+ * owns that namespace, and the writer still re-parses and validates the
+ * result, so a malformed document is refused rather than overwritten.
+ *
+ * A refusal is reported by the writer's own closed reason code rather than the
+ * file path, because the path names the user's home directory.
+ */
+const persistPluginSettings = (request: PluginSettingsPersistenceRequest): void => {
+  const outcome = writeConfigEditSync(
+    writerDependenciesFor(request.fileSystem),
+    request.configFilePath,
+    {kind: 'set', path: ['config', 'plugins', request.pluginId], value: request.settings},
+    {checkPolicy: () => []}
+  );
+  if (outcome.kind !== 'written') {
+    console.error(`[runtime-plugins] ${request.label} was refused (reason=${outcome.reason}).`);
+  }
 };
 
 const isRuntimePluginManifestEnabled = (
@@ -186,12 +234,12 @@ export const detectKeybindingConflicts = (keymaps: Record<string, string[]>): re
 export const ensureRuntimePluginSettingsPersisted = (
   options: PersistenceOptions = {}
 ): RuntimePluginSettingsNamespace => {
-  const {configFilePath, readFile, writeFile} = resolvePersistenceOptions(options);
+  const {configFilePath, fileSystem} = resolvePersistenceOptions(options);
   try {
-    const rawConfigText = readFile(configFilePath, 'utf8');
+    const rawConfigText = fileSystem.readText(asConfigFilePath(configFilePath));
     const rawConfig = parseConfigJson5Strict(json5Document(rawConfigText));
     if (!rawConfig) {
-      console.error(`Failed to parse runtime plugin config at "${configFilePath}". Returning empty namespace.`);
+      console.error('[runtime-plugins] Failed to parse the configuration. Returning empty namespace.');
       return {};
     }
     const namespace = getOrInitPluginsNamespace(rawConfig);
@@ -208,22 +256,21 @@ export const ensureRuntimePluginSettingsPersisted = (
       }
     });
 
-    if (patches.length > 0) {
-      const patchedContent = applyPluginSettingsPatches(json5Document(rawConfigText), patches);
-      if (patchedContent) {
-        writeFile(configFilePath, patchedContent, 'utf8');
-      } else {
-        console.error(
-          `Failed to apply runtime plugin settings patch for "${configFilePath}". Skipping write to preserve user formatting.`
-        );
-      }
+    for (const patch of patches) {
+      persistPluginSettings({
+        fileSystem,
+        configFilePath,
+        pluginId: patch.pluginId.value,
+        settings: patch.settings,
+        label: 'The runtime plugin settings patch'
+      });
     }
 
     return namespace;
   } catch (error) {
     console.error(
-      `Failed to persist runtime plugin settings defaults from "${configFilePath}". Returning empty namespace.`,
-      error
+      '[runtime-plugins] Failed to persist the plugin settings defaults. Returning empty namespace.',
+      describeError(error)
     );
     return {};
   }
@@ -238,15 +285,15 @@ export const setRuntimePluginEnabledPersisted = (
   enabled: boolean,
   options: PersistenceOptions = {}
 ): JsonObject => {
-  const {configFilePath, readFile, writeFile} = resolvePersistenceOptions(options);
+  const {configFilePath, fileSystem} = resolvePersistenceOptions(options);
   const manifestDefaults = findRuntimePluginManifest(pluginId)?.settingsDefaults ?? {};
   const fallbackSettings = merge({}, manifestDefaults, {enabled}) satisfies JsonObject;
 
   try {
-    const rawConfigText = readFile(configFilePath, 'utf8');
+    const rawConfigText = fileSystem.readText(asConfigFilePath(configFilePath));
     const rawConfig = parseConfigJson5Strict(json5Document(rawConfigText));
     if (!rawConfig) {
-      console.error(`Failed to parse runtime plugin config at "${configFilePath}". Returning fallback settings.`);
+      console.error('[runtime-plugins] Failed to parse the configuration. Returning fallback settings.');
       return fallbackSettings;
     }
 
@@ -257,23 +304,20 @@ export const setRuntimePluginEnabledPersisted = (
 
     if (!isEqual(existing, merged)) {
       namespace[pluginId] = merged;
-      const patchedContent = applyPluginSettingsPatches(json5Document(rawConfigText), [
-        {pluginId: toPluginId(pluginId), settings: merged}
-      ]);
-      if (patchedContent) {
-        writeFile(configFilePath, patchedContent, 'utf8');
-      } else {
-        console.error(
-          `Failed to apply runtime plugin enabled patch for "${configFilePath}". Skipping write to preserve user formatting.`
-        );
-      }
+      persistPluginSettings({
+        fileSystem,
+        configFilePath,
+        pluginId,
+        settings: merged,
+        label: 'The runtime plugin enabled patch'
+      });
     }
 
     return merged;
   } catch (error) {
     console.error(
-      `Failed to persist runtime plugin enabled state for "${pluginId}" in "${configFilePath}". Returning fallback settings.`,
-      error
+      '[runtime-plugins] Failed to persist the plugin enabled state. Returning fallback settings.',
+      describeError(error)
     );
     return fallbackSettings;
   }

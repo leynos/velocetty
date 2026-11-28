@@ -5,6 +5,8 @@
  * from the importer lets the watcher use it without pulling in the importer's
  * filesystem dependencies.
  */
+import isEqual from 'lodash/isEqual';
+
 import type {KeybindingsLoadOutcome} from './keybindings-ports';
 
 /** A notification sink shared by the configuration modules. */
@@ -21,6 +23,15 @@ export type ConfigSourceKind = 'development' | 'velocetty' | 'hyper';
  * typo from a permissions problem without opening the file again.
  */
 export type ConfigFallbackCause = 'parse' | 'read';
+
+/**
+ * What a comparison of the file on disk with the writer's record concluded.
+ *
+ * `unreadable` is its own case: the reload cannot be attributed to the writer,
+ * so it is announced, and the watcher names the failed check in one bounded
+ * line rather than mapping the failure onto "external".
+ */
+export type SelfWriteVerdict = 'self-write' | 'external' | 'unreadable';
 
 /** What each configuration file did during an import. */
 export type ConfigImportReport = {
@@ -68,6 +79,68 @@ export const shouldAnnounceReload = (report: ConfigImportReport): boolean => {
   const hasFallback = report.config === 'fallback' || report.keybindings === 'kept';
   return hasApplied && !hasFallback;
 };
+
+/**
+ * Who caused a reload, as far as the watcher can tell.
+ *
+ * The config text hash alone says only that the active config file still holds
+ * the writer's last output. It cannot say whether the same reload also picked
+ * up an edit to another watched file, so the keybindings half is tracked
+ * separately.
+ */
+export type ReloadOrigin = {
+  /** The settings writer produced the config file now on disk. */
+  readonly isSelfWrite: boolean;
+  /** The reload applied keymaps that differ from the ones already in effect. */
+  readonly hasKeybindingsChange: boolean;
+};
+
+/**
+ * Reports whether a reload changed the keymaps in effect.
+ *
+ * The keybindings service reports `applied` for every successful read, so the
+ * coarse report cannot tell a reload that re-read an unchanged file from one
+ * that picked up an edit: comparing the keymaps in effect before and after is
+ * what distinguishes them. An unknown baseline counts as a change, so a reload
+ * the watcher cannot attribute is announced rather than hidden.
+ *
+ * @param before - The keymaps in effect before the reload, when known.
+ * @param after - The keymaps the reload applied.
+ * @returns True when the two sets differ, or the earlier set is unknown.
+ *
+ * @example
+ * keymapsDiffer({'window:new': ['ctrl+n']}, {'window:new': ['ctrl+n']}); // false
+ * keymapsDiffer({'window:new': ['ctrl+n']}, {'window:new': ['ctrl+shift+n']}); // true
+ */
+export const keymapsDiffer = (
+  before: Readonly<Record<string, readonly string[]>> | undefined,
+  after: Readonly<Record<string, readonly string[]>>
+): boolean => before === undefined || !isEqual(before, after);
+
+/**
+ * Decides whether a reload is announced to the user.
+ *
+ * A reload the application wrote itself updates the renderer silently: the
+ * user just made that change in the settings tab, and announcing it as an
+ * external update would be noise. That silence is scoped to a reload whose
+ * only change was the writer's config edit. When an external keybindings edit
+ * lands in the same debounced reload, the user did not make that change in the
+ * settings tab, so the reload is announced.
+ *
+ * @param report - What the import decided.
+ * @param origin - Whether the writer produced the config change, and whether
+ *   the same reload also changed the keymaps.
+ * @returns True only when the import applied and the app did not cause all of
+ *   the change.
+ *
+ * @example
+ * shouldNotifyReload({config: 'applied', keybindings: 'applied'}, {
+ *   hasKeybindingsChange: false,
+ *   isSelfWrite: true
+ * }); // false
+ */
+export const shouldNotifyReload = (report: ConfigImportReport, origin: ReloadOrigin): boolean =>
+  shouldAnnounceReload(report) && !(origin.isSelfWrite && !origin.hasKeybindingsChange);
 
 /**
  * Describes the keybindings half of a decision in that outcome's own terms.

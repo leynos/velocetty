@@ -1,3 +1,11 @@
+/**
+ * @file UI action creators: tab and pane movement, window state, the command
+ * dispatcher, and the file and shell helpers the context menu uses.
+ *
+ * `activateTab` and `selectTabStrip` in the tab-strip selectors decide which
+ * surface is active; `execCommand` gates terminal-targeting commands while the
+ * settings tab is active, so typing in its fields never reaches a shell.
+ */
 import {stat} from 'node:fs';
 import type {Stats} from 'node:fs';
 
@@ -26,14 +34,16 @@ import {
 } from '@shared/constants/ui';
 import type {CommandId} from '@shared/types/commands';
 import type {HyperState, HyperDispatch, HyperActions, ITermGroups} from '../../typings/hyper';
-import {getRootGroups} from '../selectors';
+import {SETTINGS_TAB_UID} from '@shared/constants/settings-tab';
+import {selectTabStrip} from '../selectors/tab-strip';
+import {activateTab, closeSettingsTab} from './tab-strip';
+import {isAllowedOnSettingsSurface} from '../settings/surface-command-gate';
 import {isExecutable} from '../utils/file';
 import notify from '../utils/notify';
 import findBySession, {getTermGroup} from '../utils/term-groups';
 import {transport} from '../transport';
 
 import {requestSession, sendSessionData, setActiveSession} from './sessions';
-import {setActiveGroup} from './term-groups';
 
 export function openContextMenu(uid: string, selection: string) {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
@@ -166,10 +176,10 @@ function moveToNeighbourPane(type: typeof UI_MOVE_NEXT_PANE | typeof UI_MOVE_PRE
 export const moveToNextPane = moveToNeighbourPane(UI_MOVE_NEXT_PANE);
 export const moveToPreviousPane = moveToNeighbourPane(UI_MOVE_PREV_PANE);
 
-const getGroupUids = (state: HyperState) => {
-  const rootGroups = getRootGroups(state);
-  return rootGroups.map(({uid}) => uid);
-};
+const getTabUids = (state: HyperState) => selectTabStrip(state).map(({uid}) => uid);
+
+const getSurfaceUid = (state: HyperState): string | null =>
+  state.settingsTab.isActive ? SETTINGS_TAB_UID : (state.termGroups.activeRootGroup ?? null);
 
 export function moveLeft() {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
@@ -177,14 +187,14 @@ export function moveLeft() {
       type: UI_MOVE_LEFT,
       effect() {
         const state = getState();
-        const uid = state.termGroups.activeRootGroup!;
-        const groupUids = getGroupUids(state);
-        const index = groupUids.indexOf(uid);
-        const next = groupUids[index - 1] || groupUids.at(-1);
-        if (!next || uid === next) {
+        const uid = getSurfaceUid(state);
+        const tabUids = getTabUids(state);
+        const index = tabUids.indexOf(uid ?? '');
+        const next = tabUids[index - 1] || tabUids.at(-1);
+        if (!next || next === uid) {
           console.log('ignoring left move action');
         } else {
-          dispatch(setActiveGroup(next));
+          dispatch(activateTab(next));
         }
       }
     });
@@ -197,45 +207,39 @@ export function moveRight() {
       type: UI_MOVE_RIGHT,
       effect() {
         const state = getState();
-        const groupUids = getGroupUids(state);
-        const uid = state.termGroups.activeRootGroup!;
-        const index = groupUids.indexOf(uid);
-        const next = groupUids[index + 1] || groupUids[0];
-        if (!next || uid === next) {
+        const uid = getSurfaceUid(state);
+        const tabUids = getTabUids(state);
+        const index = tabUids.indexOf(uid ?? '');
+        const next = tabUids[index + 1] || tabUids[0];
+        if (!next || next === uid) {
           console.log('ignoring right move action');
         } else {
-          dispatch(setActiveGroup(next));
+          dispatch(activateTab(next));
         }
       }
     });
   };
 }
 
-const getLastGroupIndex = (state: HyperState): number => {
-  const {termGroups} = state.termGroups;
-  const rootGroupCount = Object.keys(termGroups).filter((uid) => {
-    const group = termGroups[uid];
-    return group !== undefined && !group.parentUid;
-  }).length;
-  return rootGroupCount - 1;
-};
+const getLastTabIndex = (state: HyperState): number => getTabUids(state).length - 1;
 
 export function moveTo(i: number | 'last') {
   return (dispatch: HyperDispatch, getState: () => HyperState) => {
-    const targetIndex = i === 'last' ? getLastGroupIndex(getState()) : i;
+    const targetIndex = i === 'last' ? getLastTabIndex(getState()) : i;
     dispatch({
       type: UI_MOVE_TO,
       index: targetIndex,
       effect() {
         const state = getState();
-        const groupUids = getGroupUids(state);
-        const uid = state.termGroups.activeRootGroup;
-        if (uid === groupUids[targetIndex]) {
-          console.log('ignoring same uid');
-        } else if (groupUids[targetIndex]) {
-          dispatch(setActiveGroup(groupUids[targetIndex]));
-        } else {
+        const tabUids = getTabUids(state);
+        const uid = getSurfaceUid(state);
+        const target = tabUids[targetIndex];
+        if (!target) {
           console.log('ignoring inexistent index', targetIndex);
+        } else if (uid === target) {
+          console.log('ignoring same uid');
+        } else {
+          dispatch(activateTab(target));
         }
       }
     });
@@ -333,7 +337,18 @@ export function execCommand(
   fn: ((e: unknown, dispatch: HyperDispatch) => void) | undefined,
   e: unknown
 ) {
-  return (dispatch: HyperDispatch) =>
+  return (dispatch: HyperDispatch, getState: () => HyperState) => {
+    if (getState().settingsTab.isActive) {
+      if (command === 'pane:close') {
+        dispatch(closeSettingsTab());
+        return;
+      }
+      if (!isAllowedOnSettingsSurface(command)) {
+        // Drop the command entirely: no handler, no main-process fallback, and
+        // the caller leaves the native browser behaviour alone.
+        return;
+      }
+    }
     dispatch({
       type: UI_COMMAND_EXEC,
       command,
@@ -345,4 +360,5 @@ export function execCommand(
         }
       }
     });
+  };
 }

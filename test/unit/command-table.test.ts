@@ -89,6 +89,9 @@ const createHarness = (overrides: Partial<CommandDependencies> = {}) => {
   const openConfig = mock(() => {
     record('openConfig');
   });
+  const openSettingsWindow = mock(() => {
+    record('openSettingsWindow');
+  });
   const openWindow = mock((profileName?: string) => {
     record(`openWindow ${profileName ?? 'default'}`);
   });
@@ -110,6 +113,7 @@ const createHarness = (overrides: Partial<CommandDependencies> = {}) => {
       markerLines.push(line);
     },
     openConfig,
+    openSettingsWindow,
     openWindow,
     popupApplicationMenu,
     profileNames: ['default', 'work'],
@@ -126,6 +130,7 @@ const createHarness = (overrides: Partial<CommandDependencies> = {}) => {
     isHamburgerMenuEnabled,
     markerLines,
     openConfig,
+    openSettingsWindow,
     openWindow,
     popupApplicationMenu,
     removeSystemContextMenu,
@@ -178,14 +183,36 @@ test('the split and close commands reach the focused window and no other effect'
   expect(harness.openWindow).not.toHaveBeenCalled();
 });
 
-test('window:preferences opens the configuration', () => {
+test('window:preferences asks the focused window to show the settings tab', () => {
+  const harness = createHarness();
+  const {emit, window} = createFocusedWindow();
+
+  harness.table['window:preferences']?.(window);
+
+  // An existing window already has a terminal, so this open does not ask to
+  // survive a session add: the next new session may take the surface back.
+  expect(emit.mock.calls).toEqual([['settings open req', {keepThroughInitialSession: false}]]);
+  // A focused window already has a renderer to host the tab, so no window is
+  // opened and the configuration file is not touched.
+  expect(harness.effects).toEqual([]);
+  // Opening preferences is not a command the lane reports.
+  expect(harness.markerLines).toEqual([]);
+});
+
+test('window:preferences opens a settings window when none has focus', () => {
   const harness = createHarness();
 
   harness.table['window:preferences']?.();
 
+  expect(harness.effects).toEqual(['openSettingsWindow']);
+});
+
+test('window:openConfigFile opens the configuration in the editor', () => {
+  const harness = createHarness();
+
+  harness.table['window:openConfigFile']?.();
+
   expect(harness.effects).toEqual(['openConfig']);
-  // Opening the configuration is not a command the lane reports.
-  expect(harness.markerLines).toEqual([]);
 });
 
 test('plugins:update and cli:install call the adapters they were given', () => {
@@ -304,7 +331,7 @@ test('the dispatcher runs a known command and ignores an unknown one', () => {
   const harness = createHarness();
   const dispatch = createCommandDispatcher(harness.table);
 
-  dispatch(asCommandId('window:preferences'));
+  dispatch(asCommandId('window:openConfigFile'));
   dispatch(asCommandId('not:a:command'));
 
   // The unknown identifier reaches nothing: the same single effect runs.
