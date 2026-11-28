@@ -87,7 +87,7 @@ beforeEach(() => {
   calls = [];
 });
 
-test('a service refusal crosses the IPC boundary with its reason intact', async () => {
+test.serial('a service refusal crosses the IPC boundary with its reason intact', async () => {
   const refusal: SettingsWriteOutcome = {kind: 'failed', reason: 'user-config-unreadable'};
   registerSettingsIpcHandlers({
     getSnapshot: () => SNAPSHOT,
@@ -102,7 +102,7 @@ test('a service refusal crosses the IPC boundary with its reason intact', async 
   expect(resetOutcome).toMatchObject({kind: 'failed', reason: 'user-config-unreadable'});
 });
 
-test('registers a handler for each settings command', () => {
+test.serial('registers a handler for each settings command', () => {
   registerSettingsIpcHandlers(serviceDouble());
 
   expect([...handlers.keys()].toSorted()).toEqual(['settings:getSnapshot', 'settings:resetValue', 'settings:setValue']);
