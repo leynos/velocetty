@@ -2591,6 +2591,7 @@ warnings.
 
 Recorded count: 176 non-Plan files and 17,179 net non-generated lines at
 `252f82ea`. Gate evidence: fmt, check-fmt, typecheck, lint, markdownlint, and
-nixie clean; 1,334 unit tests across 149 files with zero failures; proofs 1 + 8
-+ 9 + 11 with zero errors; `make build-fast` clean; packaged settings deep E2E
-passing; `cs delta origin/main` reports no new issue.
+nixie clean; 1,334 unit tests across 149 files with zero failures; the four
+proof summaries verify 1, 8, 9 and 11 programs with zero errors;
+`make build-fast` clean; packaged settings deep E2E passing;
+`cs delta origin/main` reports no new issue.
