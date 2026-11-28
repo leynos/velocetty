@@ -147,8 +147,8 @@ terminal's column and row count did not change.
 ### Tolerance deviation (2026-11-26)
 
 The approved tolerances are 95 non-ExecPlan files and 8,000 net lines. The
-current candidate delivers **175 non-Plan files** and **17,020 net
-non-generated lines** at `d57d1bca`. Each revision entry in the revision note
+current candidate delivers **175 non-Plan files** and **17,022 net
+non-generated lines** at `d5e1430a`. Each revision entry in the revision note
 records the count at the head it names, so those earlier figures are historical
 rather than current. The excess is recorded here as the escalation the
 tolerance requires, and the maintainer's acceptance of the raised counts is
@@ -2565,3 +2565,8 @@ counter, the bounded line, and the untouched file. A second test proves a
 service refusal crosses the IPC boundary with its reason intact on both the set
 and reset channels. Recorded count: 175 non-Plan files and 17,020 net
 non-generated lines at `d57d1bca`; 1,331 unit tests across 148 files.
+
+2026-11-28: twenty-fifth round, the review's one new finding. Two IPC tests
+read the module-level handler map without isolation, so `bun test --concurrent`
+could interleave them; both are `test.serial`, like the refusal cases. Count at
+this head: 175 non-Plan files and 17,022 net non-generated lines at `d5e1430a`.
