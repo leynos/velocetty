@@ -835,11 +835,31 @@ as a dependency and never inspects a path itself; `app/start.ts`, the test
 harness, and the convergence model each classify their own path with
 `fileKindFor`.
 
-`selfWriteVerdict` in `app/config.ts` compares the watched file with the
-writer's recorded hash and returns `'self-write'`, `'external'`, or
+`app/config/config-write-state.ts` owns the one process-wide write state: the
+monotonic config revision and the hash of the text the writer last recorded.
+The writer allocates a revision and records the hash; the watcher's self-write
+comparison reads them, so both sides agree on one record per process. The
+module is deliberately a singleton, with direct tests in
+`test/unit/config-write-state.test.ts` and
+`test/unit/config-watch-selfwrite.test.ts`.
+
+`selfWriteVerdict` in `app/config.ts` takes the watched path, a read port, and
+the recorded hash explicitly, and returns `'self-write'`, `'external'`, or
 `'unreadable'`. The watcher announces anything that is not a self-write, logs
 `[config] self-write check failed reason=unreadable` for the unreadable case,
 and treats an absent file as external without a line.
+
+`app/settings/rejection-line.ts` builds the one bounded line for a transport
+rejection: the category always, and a name only from the built-in error names,
+so caller-supplied text cannot forge a line or leak a path.
+`lib/settings/file-state-messages.ts` derives the banner and the per-row
+disabled reason from the file status, including the distinct `unreadable`
+state, so the container only wires them to the view.
+
+`ConfigWriteOutcome` uses the writer's own `ConfigWriteFailureReason`
+(`app/config/config-file-writer.ts`). The settings service projects it onto the
+renderer's `SettingsWriteFailure` with one total `SETTINGS_FAILURE_OF` table,
+so a reason added on one side without the other is a compile error.
 
 The settings seams and the double each test uses:
 

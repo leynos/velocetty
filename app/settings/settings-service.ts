@@ -15,6 +15,7 @@ import {
   asConfigFilePath,
   type ConfigEditRequest,
   type ConfigFileSystemPort,
+  type ConfigWriteFailureReason,
   type ConfigWriterDependencies,
   writeConfigEdit
 } from '../config/config-file-writer';
@@ -249,6 +250,26 @@ const concernsKey = (item: configValidationDiagnostic, key: string): boolean =>
 
 const refusedOutcome = (reason: SettingsWriteFailure): SettingsWriteOutcome => ({kind: 'failed', reason});
 
+/**
+ * Projects the writer's persistence vocabulary onto the renderer protocol.
+ *
+ * A total record, so adding a writer reason without a protocol counterpart is a
+ * compile error rather than a runtime surprise.
+ */
+const SETTINGS_FAILURE_OF: Record<ConfigWriteFailureReason, SettingsWriteFailure> = {
+  'config-file-missing': 'config-file-missing',
+  'user-config-unparseable': 'user-config-unparseable',
+  'user-config-unreadable': 'user-config-unreadable',
+  'user-config-invalid': 'user-config-invalid',
+  'legacy-json-config': 'legacy-json-config',
+  'not-editable': 'not-editable',
+  'duplicate-key': 'duplicate-key',
+  'config-not-object': 'config-not-object',
+  'edit-failed': 'edit-failed',
+  'read-only': 'read-only',
+  'io-error': 'io-error'
+};
+
 type Precheck = {readonly kind: 'proceed'} | {readonly kind: 'refused'; readonly outcome: SettingsWriteOutcome};
 
 /**
@@ -302,7 +323,7 @@ export const createSettingsService = (dependencies: SettingsServiceDependencies)
     if (outcome.diagnostics !== undefined && outcome.diagnostics.length > 0) {
       return {kind: 'rejected', diagnostics: outcome.diagnostics};
     }
-    return refusedOutcome(outcome.reason);
+    return refusedOutcome(SETTINGS_FAILURE_OF[outcome.reason]);
   };
 
   /** The write at the tail of the queue, or `undefined` when the queue is idle. */

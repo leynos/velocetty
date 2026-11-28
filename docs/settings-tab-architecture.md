@@ -111,12 +111,18 @@ backoff; `app/config/config-write-retry.ts` owns the retry policy, its counter,
 and its bounded lines. The plugin runtime uses `writeConfigEditSync`, one pass,
 because it persists during module evaluation.
 
+The writer's state — the monotonic revision and the last written text hash —
+lives in one process-wide module (`app/config/config-write-state.ts`), and its
+outcome vocabulary is its own (`ConfigWriteFailureReason`); the settings
+service projects that onto the renderer protocol with a total table.
+
 The reload watcher compares the file on disk with the writer's recorded hash
-through `selfWriteVerdict`, which answers `'self-write'`, `'external'`, or
-`'unreadable'`. Only a self-write with unchanged keybindings is silent; an
-unreadable file is announced and named in one bounded line, and a missing file
-is announced without a line. The composition root supplies the read port, so
-the comparison never reaches for an ambient module.
+through `selfWriteVerdict`, which takes the path, the read port, and the hash
+explicitly and answers `'self-write'`, `'external'`, or `'unreadable'`. Only a
+self-write with unchanged keybindings is silent; an unreadable file is
+announced and named in one bounded line, and a missing file is announced
+without a line. The composition root supplies the read port, so the comparison
+never reaches for an ambient module.
 
 ## Observability
 

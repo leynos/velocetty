@@ -90,13 +90,13 @@ const Settings = (props: SettingsConnectedProps) => {
   );
 };
 
-const mapStateToProps = (state: HyperState) => ({
+export const mapStateToProps = (state: HyperState) => ({
   query: state.settingsTab.query,
   selectedCategory: state.settingsTab.selectedCategory,
   isActive: state.settingsTab.isActive
 });
 
-const mapDispatchToProps = (dispatch: HyperDispatch) => ({
+export const mapDispatchToProps = (dispatch: HyperDispatch) => ({
   onQueryChange: (query: string) => {
     dispatch({type: SETTINGS_QUERY_SET, query});
   },

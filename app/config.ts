@@ -197,9 +197,9 @@ type ActiveConfigRead =
   | {readonly kind: 'missing'}
   | {readonly kind: 'unreadable'};
 
-const readActiveConfigText = (reader: ActiveConfigReader): ActiveConfigRead => {
+const readActiveConfigText = (reader: ActiveConfigReader, filePath: string): ActiveConfigRead => {
   try {
-    return {kind: 'text', text: reader.readText(asConfigFilePath(cfgPath))};
+    return {kind: 'text', text: reader.readText(asConfigFilePath(filePath))};
   } catch (error) {
     // An absent file is a first run, not a fault, and the reload it triggers
     // is announced anyway; any other failure is named.
@@ -214,15 +214,35 @@ const readActiveConfigText = (reader: ActiveConfigReader): ActiveConfigRead => {
  * verdict rather than a boolean keeps "not the writer" distinct from "could
  * not check", which the watcher names in one bounded line.
  */
-export const selfWriteVerdict = (reader: ActiveConfigReader): SelfWriteVerdict => {
-  const read = readActiveConfigText(reader);
+export type SelfWriteInput = {
+  /** The file the watcher saw change. */
+  readonly filePath: string;
+  /** The port the comparison reads through. */
+  readonly reader: ActiveConfigReader;
+  /** The hash the writer recorded, or null when it has written nothing. */
+  readonly recordedHash: string | null;
+};
+
+/**
+ * Compares one file with the writer's record.
+ *
+ * @param input - The path, the read port, and the recorded hash.
+ * @returns `self-write`, `external`, or `unreadable`.
+ *
+ * @example
+ * ```ts
+ * selfWriteVerdict({filePath: cfgPath, reader, recordedHash: getLastWrittenTextHash()});
+ * ```
+ */
+export const selfWriteVerdict = ({filePath, reader, recordedHash}: SelfWriteInput): SelfWriteVerdict => {
+  const read = readActiveConfigText(reader, filePath);
   if (read.kind === 'unreadable') {
     return 'unreadable';
   }
   if (read.kind === 'missing') {
     return 'external';
   }
-  return getLastWrittenTextHash() === hashConfigText(read.text) ? 'self-write' : 'external';
+  return recordedHash === hashConfigText(read.text) ? 'self-write' : 'external';
 };
 
 export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions = {}) => {
@@ -238,7 +258,8 @@ export const setup = ({markerSink = silentMarkerSink}: ConfigurationSetupOptions
     markerSink,
     spans,
     watchedFiles,
-    isSelfWriteReload: () => selfWriteVerdict(fileSystem),
+    isSelfWriteReload: () =>
+      selfWriteVerdict({filePath: cfgPath, reader: fileSystem, recordedHash: getLastWrittenTextHash()}),
     log: (line) => console.warn(line),
     onReloaded: nextConfigRevision
   });

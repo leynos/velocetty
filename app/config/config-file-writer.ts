@@ -40,7 +40,6 @@ import {isJsonObject} from '../utils/runtime-guards';
 import type {ConfigMetrics} from './config-metrics';
 import type {configValidationDiagnostic} from '@shared/types/config';
 import type {JsonValue} from '@shared/types/json';
-import type {SettingsWriteFailure} from '@shared/settings/protocol';
 
 // The port and the atomic replacement live in `config-file-write-io`; these
 // re-exports keep `config-file-writer` the documented surface for callers.
@@ -68,9 +67,29 @@ export type ConfigWriteOutcome =
     }
   | {
       readonly kind: 'refused';
-      readonly reason: SettingsWriteFailure;
+      readonly reason: ConfigWriteFailureReason;
       readonly diagnostics?: readonly configValidationDiagnostic[];
     };
+
+/**
+ * Why a write did not happen, in the writer's own vocabulary.
+ *
+ * The writer is the persistence authority and must not depend on the IPC
+ * protocol: the settings service projects this union onto the renderer's
+ * `SettingsWriteFailure`, and one table in that service keeps the two aligned.
+ */
+export type ConfigWriteFailureReason =
+  | 'config-file-missing'
+  | 'user-config-unparseable'
+  | 'user-config-unreadable'
+  | 'user-config-invalid'
+  | 'legacy-json-config'
+  | 'not-editable'
+  | 'duplicate-key'
+  | 'config-not-object'
+  | 'edit-failed'
+  | 'read-only'
+  | 'io-error';
 
 /** Everything the writer needs, with production defaults supplied by the caller. */
 export type ConfigWriterDependencies = {
@@ -94,7 +113,7 @@ type StepOutcome<T> =
   | {readonly kind: 'ok'; readonly value: T}
   | {
       readonly kind: 'refused';
-      readonly reason: SettingsWriteFailure;
+      readonly reason: ConfigWriteFailureReason;
       readonly diagnostics?: readonly configValidationDiagnostic[];
     };
 
@@ -119,7 +138,7 @@ type ConfigDiagnosticJob = {
 };
 
 const refused = (
-  reason: SettingsWriteFailure,
+  reason: ConfigWriteFailureReason,
   diagnostics?: readonly configValidationDiagnostic[]
 ): ConfigWriteOutcome => {
   if (diagnostics === undefined) {
